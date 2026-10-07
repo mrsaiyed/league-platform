@@ -1,0 +1,6 @@
+node_modules
+dist
+artifacts
+package-lock.json
+examples/alhadi-school/assets
+docs/product/school-pilot-spec-v0.1.md

@@ -1,0 +1,170 @@
+/* Dialogs and presenter guide */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: #130d12a6;
+  backdrop-filter: blur(5px);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal {
+  width: 600px;
+  max-width: 100%;
+  max-height: 90dvh;
+  overflow: auto;
+  background: #fcf9f4;
+  color: #4b3542;
+  border: 1px solid #d6c4cd;
+  box-shadow: 0 25px 100px #0005;
+  border-radius: 9px;
+  color-scheme: light;
+  padding: 31px;
+  position: relative;
+}
+.modal.wide {
+  width: 850px;
+}
+.modal h2 {
+  font: 29px var(--serif);
+  margin: 7px 38px 15px 0;
+}
+.modal p {
+  font-size: 12px;
+  line-height: 1.85;
+  color: #907480;
+}
+.modal-close {
+  position: absolute;
+  right: 17px;
+  top: 17px;
+  background: #eee5e9;
+  border-radius: 50%;
+  width: 29px;
+  height: 29px;
+  color: #856373;
+  display: grid;
+  place-items: center;
+}
+.modal .eyebrow {
+  color: #a0637c;
+  font-size: 9px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid #e7dce2;
+  margin-top: 23px;
+  padding-top: 21px;
+}
+.modal .btn-ghost {
+  color: #885a70;
+  border-color: #cdb6c2;
+}
+.guide-steps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 22px 0;
+}
+.guide-step {
+  padding: 17px;
+  background: #f1e8ec;
+  border: 1px solid #e0ced8;
+  border-radius: 5px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+  color: #74445d;
+}
+.guide-step > span {
+  font: 23px var(--serif);
+  color: #b99068;
+}
+.guide-step b {
+  font-size: 11px;
+  display: block;
+  margin: 2px 0 5px;
+}
+.guide-step small {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #9c7e8e;
+  display: block;
+}
+.modal-note {
+  padding: 15px 17px;
+  background: #eae6dd;
+  border-radius: 5px;
+  color: #897b5f;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.modal .info-list {
+  background: #dfd2d9;
+  border-color: #dfd2d9;
+}
+.modal .info-list > div {
+  background: #f5eef1;
+}
+.modal .info-list span {
+  color: #a98b9c;
+}
+.modal .info-list strong {
+  color: #75475f;
+}
+.modal .field {
+  color: #725061;
+  margin-top: 10px;
+}
+.modal .check-row {
+  color: #826774;
+}
+#toast {
+  position: fixed;
+  bottom: 25px;
+  left: 50%;
+  transform: translate(-50%, 20px);
+  background: #fff8ef;
+  color: #77425c;
+  border: 1px solid #c4a3b3;
+  box-shadow: 0 8px 30px #1e0c2330;
+  padding: 13px 22px;
+  font-size: 12px;
+  border-radius: 6px;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+  max-width: 90%;
+  text-align: center;
+}
+#toast.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.inline-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.mt {
+  margin-top: 22px;
+}
+.wide-button {
+  width: 100%;
+}
+.subtle {
+  color: #a18a96;
+  font-size: 11px;
+}
+.mobile-admin-label {
+  display: none;
+}

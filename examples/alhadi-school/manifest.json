@@ -1,0 +1,21 @@
+{
+  "modules": {
+    "data": "src/data.js",
+    "domain": "src/domain.js",
+    "context": "src/context.js",
+    "components": "src/components.js",
+    "public": "src/views/public.js",
+    "commissioner": "src/views/commissioner.js",
+    "router": "src/router.js",
+    "dialogs": "src/dialogs.js",
+    "actions": "src/actions.js",
+    "main": "src/main.js"
+  },
+  "styles": [
+    "styles/public.css",
+    "styles/commissioner.css",
+    "styles/overlays.css",
+    "styles/responsive.css"
+  ],
+  "assets": ["assets/alhadi-logo.png", "assets/gym-hero.png"]
+}

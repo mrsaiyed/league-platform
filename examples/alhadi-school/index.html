@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta
+      name="description"
+      content="An interactive Al-Hadi school basketball league concept. Fictional demonstration data; no real registrations or payments."
+    />
+    <title>Al-Hadi Basketball · Concept</title>
+    <link rel="icon" href="assets/alhadi-logo.png" />
+    <link rel="stylesheet" href="styles/public.css" />
+    <link rel="stylesheet" href="styles/commissioner.css" />
+    <link rel="stylesheet" href="styles/overlays.css" />
+    <link rel="stylesheet" href="styles/responsive.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div id="app"></div>
+    <div id="modal-root"></div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="importmap">
+      {
+        "imports": {
+          "@demo/data": "./src/data.js",
+          "@demo/domain": "./src/domain.js",
+          "@demo/context": "./src/context.js",
+          "@demo/components": "./src/components.js",
+          "@demo/public": "./src/views/public.js",
+          "@demo/commissioner": "./src/views/commissioner.js",
+          "@demo/router": "./src/router.js",
+          "@demo/dialogs": "./src/dialogs.js",
+          "@demo/actions": "./src/actions.js",
+          "@demo/main": "./src/main.js"
+        }
+      }
+    </script>
+    <script type="module">
+      import '@demo/main';
+    </script>
+  </body>
+</html>
