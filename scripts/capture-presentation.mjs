@@ -48,13 +48,42 @@ try {
   await screenshot('05-schedule');
   await open('stats');
   await screenshot('06-player-statistics');
+  await open('standings');
+  await screenshot('09-standings');
+  await screenshot('10-standings-detail', '#main .public-content');
+  await open('schedule');
+  const scheduleBounds = await page.locator('#main .public-content').boundingBox();
+  const firstMatchups = await page.locator('#main .matchups').first().boundingBox();
+  await page.screenshot({
+    path: path.join(output, '11-schedule-detail.png'),
+    clip: {
+      x: scheduleBounds.x,
+      y: scheduleBounds.y,
+      width: scheduleBounds.width,
+      height: firstMatchups.y + firstMatchups.height - scheduleBounds.y + 20,
+    },
+    animations: 'disabled',
+  });
+  await open('stats');
+  const statsBounds = await page.locator('#main .public-content').boundingBox();
+  const sixthPlayer = await page.locator('#main tbody tr').nth(5).boundingBox();
+  await page.screenshot({
+    path: path.join(output, '12-statistics-detail.png'),
+    clip: {
+      x: statsBounds.x,
+      y: statsBounds.y,
+      width: statsBounds.width,
+      height: sixthPlayer.y + sixthPlayer.height - statsBounds.y + 6,
+    },
+    animations: 'disabled',
+  });
   await open('admin');
   await screenshot('07-commissioner');
   await page.setViewportSize({ width: 390, height: 844 });
   await open('home');
   await screenshot('08-mobile-homepage');
   assert.deepEqual(errors, []);
-  console.log('Exported 8 high-resolution presentation screenshots with all images decoded.');
+  console.log('Exported 12 high-resolution presentation screenshots with all images decoded.');
 } finally {
   await context.close();
   await browser.close();

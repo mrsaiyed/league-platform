@@ -86,8 +86,8 @@ function home() {
   return /* HTML */ `<section class="hero">
       <img
         class="hero-bg"
-        src="assets/ahs-court.png"
-        alt="AHS basketball players on the school court"
+        src="assets/ahs-team-latest.png"
+        alt="The most recent AHS basketball team together in matching black Al-Hadi tracksuits"
         fetchpriority="high"
       />
       <div class="hero-inner">

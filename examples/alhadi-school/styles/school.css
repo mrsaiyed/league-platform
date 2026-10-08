@@ -136,7 +136,8 @@
     top: auto;
     bottom: 0;
     height: 330px;
-    object-position: center 30%;
+    object-fit: contain;
+    object-position: center bottom;
   }
   .hero:before {
     background: linear-gradient(180deg, #170e13 55%, #170e1300 68%, #170e1300 88%, #170e13 100%);

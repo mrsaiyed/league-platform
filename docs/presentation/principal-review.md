@@ -10,7 +10,7 @@ The earlier specification is still a draft. These presentation edits do not rati
 
 ## Screenshot selections
 
-Run `npm run build:demo` followed by `npm run capture:presentation`. Use the browser setup in the root README. Eight high-resolution PNGs are exported to `artifacts/principal-screenshots/`:
+Run `npm run build:demo` followed by `npm run capture:presentation`. Use the browser setup in the root README. Twelve high-resolution PNGs are exported to `artifacts/principal-screenshots/`:
 
 1. `01-homepage.png` - primary website-slide image: AHS photography and league identity.
 2. `02-team-journey.png` - the huddle, earlier Lions team, and most recent team.
@@ -21,7 +21,12 @@ Run `npm run build:demo` followed by `npm run capture:presentation`. Use the bro
 7. `07-commissioner.png` - commissioner overview.
 8. `08-mobile-homepage.png` - phone preview.
 
-The presentation PDF is kept outside the source repository. Its website page uses screenshots 1 and 3. The remaining eight pages are unchanged. Hosted prototype: <https://mrsaiyed.github.io/league-platform/>.
+9. `09-standings.png` - full standings page.
+10. `10-standings-detail.png` - standings table and final results for the slide.
+11. `11-schedule-detail.png` - schedule introduction and complete matchup cards for the slide.
+12. `12-statistics-detail.png` - scoring summary and the first six leaderboard entries.
+
+The v6 presentation PDF is kept outside the source repository. Website slides are pages 6-8: home/media, schedules/results/standings, and player statistics. The accepted home/media layout is retained with the matching-black-tracksuit team photo as the homepage image. The eight original program pages retain their content; subsequent page numbers are updated. Hosted prototype: <https://mrsaiyed.github.io/league-platform/>.
 
 ## Feedback before the proposal becomes a commitment
 

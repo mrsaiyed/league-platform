@@ -16,3 +16,5 @@ These checks validate the concept, not production security, live payments, email
 ## October 8 presentation update
 
 The AHS photography and Around AHS route passed 18 desktop and 18 mobile route checks, existing interaction checks, all 13 domain tests, formatting, and the portable build. The presentation capture verifies that every image decodes before exporting eight screenshots. Real photographs remain separate from fictional player records. No production functionality was added.
+
+The follow-up presentation revision changes the homepage and commissioner branding preview to the latest team photograph. The capture script now exports 12 images, including dedicated schedule, standings/results, and statistics crops. The v6 proposal has 11 pages, with website screenshots on pages 6-8.
