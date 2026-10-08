@@ -147,7 +147,7 @@ export default (() => {
       review: 'approved',
       placement: 'confirmed',
       payment: 'paid',
-      amount: 50,
+      amount: 75,
     })),
     ...['Arman Shah', 'Saif Ali', 'Haroon Asad', 'Zakariya Mir', 'Owais Khan', 'Ilyas Noor'].map(
       (name, i) => ({
@@ -159,7 +159,7 @@ export default (() => {
         review: i < 4 ? 'pending' : 'approved',
         placement: i < 4 ? 'reserved' : 'waitlist',
         payment: 'paid',
-        amount: 50,
+        amount: 75,
       }),
     ),
   ];

@@ -11,4 +11,8 @@ Completed locally against the repository source and generated portable artifact:
 - A local HTTP check returned 200 and loaded the modular source, assets, and commissioner settings with no failed responses or page errors. The owned preview server was stopped afterward.
 - Desktop and mobile presentation screenshots were visually inspected. A layout regression found during formatting was corrected by giving the commissioner layout a complete template and checking that page content belongs inside its main region.
 
-These checks validate the concept, not production security, live payments, email delivery, school authorization, accessibility certification, database isolation, or production load. GitHub Actions and Pages are configured in source but have not run remotely; no GitHub authentication or deployment was available in this session.
+These checks validate the concept, not production security, live payments, email delivery, school authorization, accessibility certification, database isolation, or production load. The initial source passed GitHub Actions and the owner subsequently published it on GitHub Pages. Current runs and deployment status are visible in the repository Actions tab.
+
+## October 8 presentation update
+
+The AHS photography and Around AHS route passed 18 desktop and 18 mobile route checks, existing interaction checks, all 13 domain tests, formatting, and the portable build. The presentation capture verifies that every image decodes before exporting eight screenshots. Real photographs remain separate from fictional player records. No production functionality was added.

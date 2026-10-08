@@ -1,16 +1,23 @@
 # Assets and design provenance
 
-| Asset              | Source and intended use                                                                                                                                                                                                                        |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alhadi-logo.png`  | Logo supplied by the founder for the Al-Hadi concept; preserved without modification. School identity rights remain with their owner.                                                                                                          |
-| `gym-hero.png`     | Generated with the built-in image-generation tool for this concept. Illustrative court; not the actual school's gym.                                                                                                                           |
-| Team crests        | Simple original SVG letter shields created for fictional teams. No claim that these are approved school mascots.                                                                                                                               |
-| Layout inspiration | Founder-owned Faraj League reference: prominent league identity, court imagery, matchup cards, standings, stats, and optional recognition pages. No Faraj database, secrets, student records, or photographs were copied into this repository. |
+The founder supplied the school photographs and logos for this presentation on October 8, 2026 and requested their use on the hosted concept. Files are preserved as supplied; framing uses CSS. No people, uniforms, or school settings have been generated or altered.
 
-Faraj reference reviewed: <https://github.com/mrsaiyed/faraj-league/tree/b00384eda873bc33052e5efdac62cb9d447d71c0>.
+| Asset                  | Source and placement                                                         |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `alhadi-logo.png`      | Supplied school seal; retained in navigation.                                |
+| `ahs-lions.png`        | Supplied Lions basketball crest; homepage and media identity.                |
+| `ahs-court.png`        | Supplied court photograph; homepage and full-game placeholder.               |
+| `ahs-coaching.png`     | Supplied coaching photograph; league information and highlights placeholder. |
+| `ahs-bench.png`        | Supplied sideline photograph; team-moments placeholder.                      |
+| `ahs-team-latest.png`  | Black Al-Hadi tracksuits; identified by the founder as the latest team.      |
+| `ahs-team-archive.png` | Earlier Lions jersey team photograph; no year assigned.                      |
+| `ahs-huddle.png`       | Team huddle; identified by the founder as the earliest supplied team photo.  |
+| Team crests            | Original SVG letter shields for fictional intramural teams.                  |
 
-## Hero image prompt
+Real photographs are not linked to fictional player names, statistics, results, or achievements. The history section uses only the relative chronology supplied by the founder. No additional Instagram material was downloaded. Video panels contain still-photo placeholders, not playable recordings or invented footage.
 
-Built-in image generation was used with the following prompt:
+The generated empty-gym artwork from the first concept has been removed. School-specific presentation CSS is in `styles/school.css`; this is example branding, not production tenant configuration.
 
-> Use case: photorealistic-natural. Asset type: wide website hero background for a school intramural basketball concept, landscape 3:2. An empty modest indoor basketball gym at dusk, a single worn orange basketball near the lower right of frame on rich maple hardwood, hoop and backboard in the upper right distance, burgundy wall padding, warm high window light, cinematic atmospheric shadows. Premium sports editorial photography, realistic materials, subtle film grain. Composition: left half and upper center remain dark and uncluttered for cream typography overlaid by the website. Mood dignified, welcoming school sport, no professional arena spectacle. Palette deep wine burgundy, dark warm charcoal, muted amber, hardwood. No people, no readable signs or words, no logos, no watermarks. This is an illustrative gym, not a depiction of any actual school. Keep gym details and ball clearly visible in right half.
+School identity and photographic rights remain with their respective owners. Public repository visibility is not a license grant. Publication requirements for the eventual approved product remain a separate school decision.
+
+Layout inspiration: founder-owned [Faraj League reference](https://github.com/mrsaiyed/faraj-league/tree/b00384eda873bc33052e5efdac62cb9d447d71c0). Its prominent homepage, matchup cards, standings, and statistics informed the existing layout. No Faraj database, secrets, or student records were copied.

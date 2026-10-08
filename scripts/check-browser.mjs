@@ -41,6 +41,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#toast').classList.contains('visible'));
   const routes = [
     'home',
+    'media',
     'schedule',
     'teams',
     'team/falcons',
@@ -60,6 +61,10 @@ try {
   ];
   const views = {
     home: '01-public-home',
+    media: '10-media',
+    schedule: '11-schedule',
+    stats: '12-player-stats',
+    standings: '13-standings',
     register: '02-registration',
     'my-league': '03-my-league',
     admin: '04-commissioner',
@@ -156,7 +161,7 @@ try {
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
   console.log(
-    'Passed 17 desktop and 17 mobile route checks, critical demo interactions, reload recovery, and zero external requests.',
+    `Passed ${routes.length} desktop and ${routes.length} mobile route checks, critical demo interactions, reload recovery, and zero external requests.`,
   );
 } finally {
   await context.close();

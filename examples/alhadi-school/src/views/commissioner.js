@@ -130,7 +130,7 @@ function overview() {
                     (a) =>
                       /* HTML */ `<tr>
                         <td>${personCell(a)}</td>
-                        <td>${badge('Paid $50', 'green')}</td>
+                        <td>${badge('Paid $75', 'green')}</td>
                         <td>${badge('Pending', 'amber')}</td>
                         <td>
                           <button class="plain-button" data-action="review" data-id="${a.id}">
@@ -327,7 +327,7 @@ function registrations() {
                     </td>
                     <td>
                       ${badge(
-                        a.payment === 'paid' ? 'Paid $50' : 'Refunded',
+                        a.payment === 'paid' ? 'Paid $75' : 'Refunded',
                         a.payment === 'paid' ? 'green' : 'neutral',
                       )}
                     </td>
@@ -345,7 +345,7 @@ function registrations() {
       <div class="empty-state" id="search-empty" hidden>No students match this search.</div>
     </div>
     <p class="settings-note">
-      In this example: $50 paid at application, including waitlist. Refund actions are simulated and
+      In this example: $75 paid at application, including waitlist. Refund actions are simulated and
       require a deliberate review. Final school policies are still to be agreed.
     </p>`;
 }

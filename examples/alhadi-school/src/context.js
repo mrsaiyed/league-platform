@@ -1,6 +1,6 @@
 import D from '@demo/data';
 import * as M from '@demo/domain';
-const STORAGE = 'alhadi-concept-v1';
+const STORAGE = 'alhadi-concept-v2';
 const seed = () => ({
   config: {
     color: '#96062d',

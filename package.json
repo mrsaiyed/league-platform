@@ -15,7 +15,8 @@
     "test:browser": "node scripts/check-browser.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "npm run check && npm test && npm run format:check && npm run build:demo"
+    "verify": "npm run check && npm test && npm run format:check && npm run build:demo",
+    "capture:presentation": "node scripts/capture-presentation.mjs"
   },
   "devDependencies": {
     "playwright": "1.62.1",

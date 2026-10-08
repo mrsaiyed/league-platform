@@ -180,8 +180,8 @@ const handlers = {
           closes their playing-place request.
         </p>
         <div class="info-list">
-          <div><span>PAID AMOUNT</span><strong>$50.00</strong></div>
-          <div><span>SIMULATED REFUND</span><strong>$50.00</strong></div>
+          <div><span>PAID AMOUNT</span><strong>$75.00</strong></div>
+          <div><span>SIMULATED REFUND</span><strong>$75.00</strong></div>
         </div>
         <div class="modal-note">
           In the full product, authorized finance staff would follow the approved cutoff and refund
@@ -207,7 +207,7 @@ const handlers = {
     save();
     closeModal();
     render();
-    toast('Simulated $50 refund recorded. No funds moved.');
+    toast('Simulated $75 refund recorded. No funds moved.');
   },
   pay: () => {
     const c = showModal.candidate;
@@ -221,7 +221,7 @@ const handlers = {
       review: 'pending',
       placement: 'waitlist',
       payment: 'paid',
-      amount: 50,
+      amount: 75,
     });
     save();
     closeModal();

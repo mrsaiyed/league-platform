@@ -4,6 +4,8 @@ A basketball-first league-management product, starting with an Al-Hadi school in
 
 **Status: concept and planning.** There is no production authentication, database, payment processing, email delivery, or tenant isolation in this repository yet. All demo records are fictional. The school has not approved the sample rules, dates, fee, or program.
 
+**Live concept:** [Open the Al-Hadi demo](https://mrsaiyed.github.io/league-platform/).
+
 ## Show the concept
 
 Use Node.js 24 and run:
@@ -29,7 +31,7 @@ Use the **Meeting guide** at the top of the concept for a walkthrough. **Public 
 
 ```text
 examples/alhadi-school/       Presentation prototype; deliberately isolated
-  assets/                    School logo and generated illustrative court
+  assets/                    School seal, Lions crest, and supplied AHS photographs
   src/
     data.js                  Fictional fixtures
     domain.js                Demo calculations, draft, schedule, and game clock
@@ -41,7 +43,7 @@ examples/alhadi-school/       Presentation prototype; deliberately isolated
     dialogs.js               Dialog presentation and focus handling
     actions.js               Simulated commands
     main.js                  Event wiring
-  styles/                    Public, commissioner, overlays, responsive rules
+  styles/                    Public, commissioner, overlays, responsive, school branding
   manifest.json              Explicit modules, styles, and asset inventory
 docs/product/                School specification and account/notification addendum
 docs/architecture/           Decisions, boundaries, and future production structure
@@ -84,8 +86,8 @@ The proposed production stack remains Next.js, React, strict TypeScript, and Sup
 
 ## Upload and share
 
-See [GitHub setup](docs/operations/github-and-sharing.md). Uploading source to GitHub and publishing a website are different steps. The included Pages workflow only runs when someone explicitly dispatches it. A source repository can remain private where the selected GitHub plan supports the desired Pages setup; check your repository’s Pages settings before choosing a visibility change.
+See [GitHub and sharing](docs/operations/github-and-sharing.md). The owner has configured a public repository and GitHub Pages. The Pages workflow publishes when manually dispatched. For slide-ready screenshots, run `npm run capture:presentation` after building and see the [principal review](docs/presentation/principal-review.md).
 
 ## Ownership and assets
 
-No open-source license has been selected. Do not treat repository visibility as a license grant. The Al-Hadi logo was supplied for this concept; the school retains its identity rights. The court is AI-generated and is not a photograph of Al-Hadi. See [asset provenance](docs/presentation/assets.md).
+No open-source license has been selected. Do not treat repository visibility as a license grant. The Al-Hadi logo was supplied for this concept; the school retains its identity rights. The current concept uses founder-supplied AHS photographs; sample rosters and statistics remain fictional. See [asset provenance](docs/presentation/assets.md).

@@ -15,7 +15,17 @@
     "styles/public.css",
     "styles/commissioner.css",
     "styles/overlays.css",
-    "styles/responsive.css"
+    "styles/responsive.css",
+    "styles/school.css"
   ],
-  "assets": ["assets/alhadi-logo.png", "assets/gym-hero.png"]
+  "assets": [
+    "assets/alhadi-logo.png",
+    "assets/ahs-lions.png",
+    "assets/ahs-court.png",
+    "assets/ahs-coaching.png",
+    "assets/ahs-bench.png",
+    "assets/ahs-team-latest.png",
+    "assets/ahs-team-archive.png",
+    "assets/ahs-huddle.png"
+  ]
 }

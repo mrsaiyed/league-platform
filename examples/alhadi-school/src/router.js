@@ -1,6 +1,7 @@
 import { D, state, ui, $ } from '@demo/context';
 import { icon, stats, standings, standingsTable, matchCard } from '@demo/components';
 import {
+  media,
   publicHeader,
   footer,
   intro,
@@ -63,6 +64,7 @@ function render(scroll = false) {
   } else {
     const pages = {
       home,
+      media,
       schedule,
       teams,
       'my-league': myLeague,

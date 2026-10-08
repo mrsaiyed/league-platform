@@ -1,0 +1,322 @@
+/* School photography: keep real team history separate from sample statistics. */
+.hero-bg {
+  object-position: center 38%;
+}
+.hero:before {
+  background:
+    linear-gradient(90deg, #170e13f2 0%, #170e13c9 30%, #170e1333 67%, #170e131a),
+    linear-gradient(0deg, #170e13, transparent 22%);
+}
+.hero-seal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  writing-mode: horizontal-tb;
+  padding: 9px 14px;
+  background: #170e13d9;
+  border: 1px solid #d3b78045;
+  color: #f3dfb7;
+  letter-spacing: 0.12em;
+}
+.hero-seal img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+.school-story {
+  margin-top: 52px;
+}
+.school-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px;
+}
+.school-photo-card {
+  margin: 0;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.school-photo {
+  overflow: hidden;
+  aspect-ratio: 1.54;
+  background: #100e10;
+}
+.school-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+}
+.school-photo-card figcaption {
+  padding: 22px 24px 25px;
+}
+.school-photo-card h3 {
+  font: 25px/1.2 var(--serif);
+  margin-top: 12px;
+}
+.school-photo-card .eyebrow {
+  font-size: 9px;
+}
+.school-feature {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  align-items: center;
+  gap: 36px;
+  margin-bottom: 42px;
+}
+.school-feature h2,
+.media-next h2 {
+  font: 38px/1.15 var(--serif);
+  margin: 18px 0;
+}
+.school-feature p,
+.media-next p {
+  color: #c2aeb8;
+  font-size: 13px;
+  line-height: 1.9;
+}
+.school-feature .caption {
+  font-size: 11px;
+}
+.media-next {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 35px;
+  border: 1px solid #d3b78040;
+  background: linear-gradient(135deg, #3a1828, #21151c);
+}
+.media-next > img {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  margin-bottom: 24px;
+}
+.media-next .section-link {
+  margin-top: 24px;
+}
+.season-note {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 22px;
+  padding: 24px;
+  border: 1px solid #d3b78040;
+  background: #30202a;
+  margin-bottom: 28px;
+}
+.season-note strong {
+  display: block;
+  font: 24px var(--serif);
+  margin: 12px 0 8px;
+}
+.season-note p {
+  color: #c2aeb8;
+  font-size: 12px;
+  line-height: 1.8;
+  max-width: 640px;
+}
+.season-note .section-link {
+  flex-shrink: 0;
+}
+@media (max-width: 700px) {
+  .hero {
+    min-height: 780px;
+    align-items: flex-start;
+  }
+  .hero-inner {
+    margin: 0;
+    padding: 40px 25px 30px;
+  }
+  .hero-bg {
+    top: auto;
+    bottom: 0;
+    height: 330px;
+    object-position: center 30%;
+  }
+  .hero:before {
+    background: linear-gradient(180deg, #170e13 55%, #170e1300 68%, #170e1300 88%, #170e13 100%);
+  }
+  .hero-seal {
+    top: auto;
+    bottom: 25px;
+    font-size: 8px;
+  }
+  .hero-seal img {
+    width: 34px;
+    height: 34px;
+  }
+  .hero-note {
+    display: none;
+  }
+  .school-gallery,
+  .school-feature {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .school-story {
+    margin-top: 38px;
+  }
+  .school-photo-card h3 {
+    font-size: 23px;
+  }
+  .school-feature h2,
+  .media-next h2 {
+    font-size: 30px;
+  }
+  .school-feature {
+    margin-bottom: 28px;
+  }
+  .season-note {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 21px;
+  }
+  .season-note .eyebrow {
+    font-size: 8px;
+  }
+  .season-note strong {
+    font-size: 23px;
+    line-height: 1.3;
+  }
+}
+.school-story .school-gallery {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.school-story .school-photo-card h3 {
+  font-size: 22px;
+}
+.school-story .school-photo-card figcaption {
+  padding: 20px;
+}
+.school-photo img {
+  transform: scale(1.025);
+}
+.video-library {
+  margin-bottom: 48px;
+}
+.video-card {
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.video-poster {
+  position: relative;
+  height: 240px;
+  overflow: hidden;
+  background: #110b0e;
+}
+.video-poster > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+  transform: scale(1.035);
+}
+.video-poster:after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, #100710c9, transparent 50%);
+}
+.full-game .video-poster {
+  height: 350px;
+}
+.full-game .video-poster > img {
+  object-position: center 32%;
+}
+.video-kind,
+.video-placeholder {
+  position: absolute;
+  z-index: 1;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+.video-kind {
+  top: 18px;
+  left: 20px;
+  background: #170e13e0;
+  padding: 8px 12px;
+  color: #f3dfb7;
+}
+.video-placeholder {
+  bottom: 18px;
+  left: 20px;
+  color: #f2e4ec;
+}
+.video-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border: 1px solid #ffffff99;
+  border-radius: 50%;
+  background: #170e1380;
+  color: white;
+}
+.video-play .icon {
+  width: 25px;
+  height: 25px;
+}
+.video-description {
+  padding: 22px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 22px;
+}
+.video-description h2 {
+  font: 26px/1.25 var(--serif);
+  margin-top: 10px;
+}
+.video-description h3 {
+  font: 24px var(--serif);
+  margin-top: 10px;
+}
+.video-description .eyebrow {
+  font-size: 9px;
+}
+.video-source {
+  color: #bfa9b5;
+  font-size: 10px;
+  max-width: 150px;
+}
+.highlight-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 24px;
+}
+@media (max-width: 700px) {
+  .school-story .school-gallery,
+  .highlight-grid {
+    grid-template-columns: 1fr;
+  }
+  .school-story .school-photo-card h3 {
+    font-size: 24px;
+  }
+  .full-game .video-poster {
+    height: 245px;
+  }
+  .video-description {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 20px;
+    gap: 12px;
+  }
+  .video-description h2 {
+    font-size: 24px;
+  }
+  .video-source {
+    max-width: none;
+  }
+}

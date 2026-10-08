@@ -18,6 +18,7 @@ function publicNav() {
     ['standings', 'Standings'],
     ...(state.config.stats ? [['stats', 'Stats']] : []),
     ...(state.config.awards ? [['awards', 'Awards']] : []),
+    ['media', 'Around AHS'],
     ['about', 'League info'],
   ];
 }
@@ -62,8 +63,8 @@ const footer = () =>
       <p>A place to play. A school to play for.</p>
     </div>
     <div>
-      School league concept · All names, results, and teams are fictional.<br />Dates, rules, fee,
-      and policies are subject to school approval.
+      School league concept · Sample rosters and results are fictional. Photos show AHS
+      basketball.<br />Dates, rules, fee, and policies are subject to school approval.
     </div>
     <a href="#admin">Commissioner workspace ${icon('external')}</a>
   </footer>`;
@@ -85,28 +86,33 @@ function home() {
   return /* HTML */ `<section class="hero">
       <img
         class="hero-bg"
-        src="assets/gym-hero.png"
-        alt="Illustrative empty basketball gym with a ball on the hardwood"
+        src="assets/ahs-court.png"
+        alt="AHS basketball players on the school court"
+        fetchpriority="high"
       />
       <div class="hero-inner">
-        <div class="eyebrow">One school. Four teams. A new tradition.</div>
+        <div class="eyebrow">Our court. Our school. Our next chapter.</div>
         <h1>AL-HADI<br /><em>BASKETBALL</em></h1>
         <p class="hero-copy">
-          Your teammates. Your biggest moments.<br />A league that brings our school together.
+          Monday and Thursday afternoons at Al-Hadi.<br />Four teams. Coached training. A season
+          together.
         </p>
         <div class="hero-actions">
           <a class="btn btn-gold" href="#schedule">Explore the season ${icon('arrow')}</a
           ><a class="btn btn-ghost" href="#register">Join the league</a>
         </div>
       </div>
-      <div class="hero-seal">THE INAUGURAL SEASON · GRADES 9–12</div>
-      <div class="hero-note">Illustrative court · Concept photography</div>
+      <div class="hero-seal">
+        <img src="assets/ahs-lions.png" alt="Al Hadi Lions basketball crest" /> AL-HADI LIONS ·
+        INTRAMURAL CONCEPT
+      </div>
+      <div class="hero-note">From the AHS basketball archive · Proposed season 2026–27</div>
     </section>
     <div class="number-strip">
       <div><strong>04</strong><span>School teams</span></div>
-      <div><strong>6–7</strong><span>Players per team</span></div>
-      <div><strong>9–12</strong><span>Student grades</span></div>
-      <div><strong>01</strong><span>School community</span></div>
+      <div><strong>07</strong><span>Players per team · proposed</span></div>
+      <div><strong>28</strong><span>Target participants</span></div>
+      <div><strong>9–12</strong><span>Priority grades</span></div>
     </div>
     <div class="public-content">
       ${sectionHeading('On the court', 'The next matchups', 'Full schedule', 'schedule')}
@@ -131,7 +137,7 @@ function home() {
             <p>
               ${state.announcement
                 ? esc(state.announcement.body)
-                : 'Individual signup. School-appointed captains. Four teams, one shared season.'}
+                : 'A proposed November–February season, led by Coach Saif Ghori and Coach Raza Saiyed.'}
             </p>
           </div>
           <div class="news-item">
@@ -176,15 +182,155 @@ function home() {
             </div>
           </div>`
         : ''}
+      ${schoolStory()}
       <div class="banner-cta">
         <div>
-          <h2>Every season starts with showing up.</h2>
-          <p>Student signup for grades 9–12. School approval required.</p>
+          <h2>See you after school.</h2>
+          <p>Grades 9–12 get first priority. $75 proposed for the full intramural season.</p>
         </div>
         <a class="btn btn-gold" href="#register">Preview registration ${icon('arrow')}</a>
       </div>
     </div>`;
 }
+
+// Real school photography is kept separate from fictional player records and results.
+const photoCard = (file, alt, label, title) =>
+  /* HTML */ ` <figure class="school-photo-card">
+    <div class="school-photo"><img src="${file}" alt="${alt}" loading="lazy" /></div>
+    <figcaption>
+      <span class="eyebrow">${label}</span>
+      <h3>${title}</h3>
+    </figcaption>
+  </figure>`;
+function schoolStory() {
+  return /* HTML */ `<section class="school-story">
+    ${sectionHeading(
+      'AHS basketball, through the years',
+      'Same school. Always Lions.',
+      'Around AHS',
+      'media',
+    )}
+    <div class="school-gallery">
+      ${photoCard(
+        'assets/ahs-huddle.png',
+        'An earlier AHS basketball team joining hands in a huddle',
+        '01 / The early huddle',
+        'It starts with a team.',
+      )}
+      ${photoCard(
+        'assets/ahs-team-archive.png',
+        'A previous AHS basketball team in Lions jerseys',
+        '02 / Through the seasons',
+        'Proud to wear Lions.',
+      )}
+      ${photoCard(
+        'assets/ahs-team-latest.png',
+        'The most recent AHS team in black Al-Hadi tracksuits',
+        '03 / The latest chapter',
+        'Still Lions. Always together.',
+      )}
+    </div>
+    <p class="caption">
+      Real moments from AHS basketball. Archive photos are separate from the fictional intramural
+      teams in this concept.
+    </p>
+  </section>`;
+}
+function media() {
+  return /* HTML */ `<div class="public-content">
+    ${intro(
+      'Around AHS · Media & highlights',
+      'The game. And everything around it.',
+      'Full games, quick highlights, and the moments that make it ours. Video placements below are concept previews using AHS archive photos.',
+    )}
+    <section class="video-library" aria-label="Proposed game footage and highlights">
+      <article class="video-card full-game">
+        <div class="video-poster">
+          <img
+            src="assets/ahs-court.png"
+            alt="AHS court photograph used as a full-game video placeholder"
+          /><span class="video-kind">FULL GAME · CONCEPT</span
+          ><span class="video-play" aria-hidden="true">${icon('play')}</span
+          ><span class="video-placeholder">Video coming with the season</span>
+        </div>
+        <div class="video-description">
+          <div>
+            <span class="eyebrow">Watch the full game</span>
+            <h2>Every possession. From tip-off to the final whistle.</h2>
+          </div>
+          <span class="video-source">Hosted video or YouTube link · Planned</span>
+        </div>
+      </article>
+      <div class="highlight-grid">
+        <article class="video-card">
+          <div class="video-poster">
+            <img
+              src="assets/ahs-coaching.png"
+              alt="AHS coaching photograph used as a highlights placeholder"
+              loading="lazy"
+            /><span class="video-kind">HIGHLIGHTS · CONCEPT</span
+            ><span class="video-play" aria-hidden="true">${icon('play')}</span
+            ><span class="video-placeholder">Video preview only</span>
+          </div>
+          <div class="video-description">
+            <div>
+              <span class="eyebrow">The game in a few minutes</span>
+              <h3>Game-day highlights</h3>
+            </div>
+          </div>
+        </article>
+        <article class="video-card">
+          <div class="video-poster">
+            <img
+              src="assets/ahs-bench.png"
+              alt="AHS sideline photograph used as a team-moments video placeholder"
+              loading="lazy"
+            /><span class="video-kind">TEAM MOMENTS · CONCEPT</span
+            ><span class="video-play" aria-hidden="true">${icon('play')}</span
+            ><span class="video-placeholder">Video preview only</span>
+          </div>
+          <div class="video-description">
+            <div>
+              <span class="eyebrow">Beyond the box score</span>
+              <h3>From the AHS sideline</h3>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+    ${sectionHeading('Photos from the school archive', 'Lions through the years')}
+    <div class="school-gallery">
+      ${photoCard(
+        'assets/ahs-team-latest.png',
+        'The most recent AHS basketball team in black tracksuits',
+        'The latest team',
+        'The next chapter wears black and gold.',
+      )}
+      ${photoCard(
+        'assets/ahs-huddle.png',
+        'The earliest supplied AHS team photograph, showing a team huddle',
+        'Where the story began',
+        'One team. Hands in.',
+      )}
+      <article class="media-next">
+        <img src="assets/ahs-lions.png" alt="Al Hadi Lions crest" /><span class="eyebrow"
+          >Next up: the intramural season</span
+        >
+        <h2>More moments<br />to come.</h2>
+        <p>
+          This is where game galleries, short highlights, and the season story could live once the
+          program begins.
+        </p>
+        <a class="section-link" href="#schedule">See the schedule concept ${icon('arrow')}</a>
+      </article>
+    </div>
+    <p class="caption">
+      AHS archive photos supplied for this concept. No dates, player identities, or achievements
+      have been inferred. Intramural coverage is a proposed feature.
+    </p>
+  </div>`;
+}
+
 function schedule() {
   const gs = D.games.filter(
     (g) =>
@@ -197,6 +343,17 @@ function schedule() {
       'Game day starts here.',
       'Find your team. Plan your week. Sample times shown below; the school will set official dates.',
     )}
+    <div class="season-note">
+      <div>
+        <span class="eyebrow">Proposed season · November 2026–February 2027</span>
+        <strong>Mondays & Thursdays · 4:00–6:30 p.m.</strong>
+        <p>
+          Game days and coached training. Dates, prayer breaks, and the final calendar follow school
+          approval.
+        </p>
+      </div>
+      <a class="section-link" href="#about">Program details ${icon('arrow')}</a>
+    </div>
     <div class="filters">
       ${['all', 1, 2, 3, 4, 5, 6]
         .map(
@@ -230,7 +387,8 @@ function schedule() {
       )
       .join('')}
     <p class="caption">
-      Illustrative schedule · Times are local to the school. All games shown at the school gym.
+      Sample intramural matchups · Training days and any external games will be added to the
+      approved calendar. Times below are examples.
     </p>
   </div>`;
 }
@@ -249,7 +407,9 @@ function teams() {
               >${crest(t.id, 'large')}
               <h2>${t.name}</h2>
               <p>${t.motto}</p>
-              <div class="team-card-foot"><span>6 players</span><span>View roster →</span></div></a
+              <div class="team-card-foot">
+                <span>6 sample players</span><span>View roster →</span>
+              </div></a
             >`,
         )
         .join('')}
@@ -363,15 +523,37 @@ function about() {
     ${intro(
       'Built for our school',
       'A place to play. A reason to belong.',
-      'An intramural basketball season for Al-Hadi students in grades 9–12, organized by the school and led on the court by student captains.',
+      'A proposed boys basketball program led by Coach Saif Ghori and Coach Raza Saiyed. Grades 9–12 have first priority; remaining places may open to eighth graders after the priority deadline.',
     )}
+    <div class="school-feature">
+      <div class="school-photo">
+        <img
+          src="assets/ahs-coaching.png"
+          alt="Coaching on the AHS basketball court"
+          loading="lazy"
+        />
+      </div>
+      <div>
+        <span class="eyebrow">After school. On our court.</span>
+        <h2>Time to learn.<br />Room to compete.</h2>
+        <p>
+          The proposed $75 season includes jerseys, coaching, equipment, games, referees,
+          statistics, and media coverage. Al-Hadi provides the facility and confirms student
+          eligibility.
+        </p>
+        <p class="caption">
+          November 2026–February 2027 · Mondays & Thursdays, 4:00–6:30 p.m. · Subject to school
+          approval.
+        </p>
+      </div>
+    </div>
     <div class="rules-grid">
       <div>
         <div class="info-list">
           <div><span>WHO CAN JOIN</span><strong>Grades 9–12</strong></div>
-          <div><span>LEAGUE SIZE</span><strong>4 teams · 6–7 players</strong></div>
+          <div><span>LEAGUE SIZE</span><strong>4 teams · 7 players proposed</strong></div>
           <div><span>TEAM FORMATION</span><strong>Captain draft, hosted by staff</strong></div>
-          <div><span>PARTICIPATION FEE</span><strong>$50 proposed · paid at signup</strong></div>
+          <div><span>PARTICIPATION FEE</span><strong>$75 proposed · paid at signup</strong></div>
         </div>
         <div class="panel">
           <h3>The school sets the rules.</h3>
@@ -383,7 +565,7 @@ function about() {
         </div>
       </div>
       <div class="panel">
-        <h3>Your ui.route to game day</h3>
+        <h3>Your route to game day</h3>
         ${[
           [
             'Sign up & pay',
@@ -509,7 +691,7 @@ function myLeague() {
     (applicant ? 'Application pending · No team yet' : 'Falcons · #3 · Sample player') +
     '</p></div></div><div class="personal-summary">' +
     (applicant
-      ? '<div><strong>Paid</strong><small>Simulated $50</small></div><div><strong>Waitlist</strong><small>School review pending</small></div>'
+      ? '<div><strong>Paid</strong><small>Simulated $75</small></div><div><strong>Waitlist</strong><small>School review pending</small></div>'
       : '<div><strong>17.0</strong><small>Season PPG</small></div><div><strong>02</strong><small>Games played</small></div>') +
     '</div><button class="btn btn-ghost wide-button mt" data-action="preferences">' +
     icon('mail') +
@@ -558,7 +740,7 @@ function registration() {
     ${intro(
       'Your season starts here',
       'Find your place on the court.',
-      'Individual registration for students in grades 9–12. This is a practice signup; use the fictional details provided.',
+      'Grades 9–12 receive priority. Remaining places may open to grade 8 after the school’s deadline. This is a practice signup; use the fictional details provided.',
     )}
     <div class="registration-layout">
       <form class="registration-form" id="registration-form">
@@ -597,7 +779,7 @@ function registration() {
         </div>
         <label class="check-row"
           ><input type="checkbox" name="consent" required /><span
-            >I understand this is a simulated $50 payment at application, including the waitlist.
+            >I understand this is a simulated $75 payment at application, including the waitlist.
             Payment does not guarantee a playing place. The school’s final fee and refund policy are
             still to be agreed.</span
           ></label
@@ -611,13 +793,13 @@ function registration() {
       <aside>
         <div class="price-box">
           <div class="eyebrow">Inaugural season</div>
-          <div class="price">$50 <small>/ student</small></div>
-          <p>Illustrative participation fee.<br />School approval required.</p>
+          <div class="price">$75 <small>/ student</small></div>
+          <p>Proposed full-season fee.<br />School approval required.</p>
           <ul>
-            <li>Individual student registration</li>
-            <li>Commissioner-hosted team draft</li>
-            <li>Team schedule and season results</li>
-            <li>Public stats and league updates</li>
+            <li>Team jersey and coached training</li>
+            <li>Games, referees, and equipment</li>
+            <li>Season schedule and player statistics</li>
+            <li>Media coverage and highlights</li>
           </ul>
           <div class="private-note">
             ${icon('shield')}Registration and contact details stay private in the planned product.
@@ -647,7 +829,7 @@ function registrationStatus() {
           Demo payment complete. The school reviews eligibility before a place is confirmed.
         </p>
         <div class="status-cards">
-          <div>PAYMENT<strong>$50 · Simulated paid</strong></div>
+          <div>PAYMENT<strong>$75 · Simulated paid</strong></div>
           <div>SCHOOL REVIEW<strong>Pending approval</strong></div>
           <div>PLACEMENT<strong>Paid waitlist</strong></div>
         </div>
@@ -738,6 +920,7 @@ function gamePage(id) {
 }
 
 export {
+  media,
   publicNav,
   publicHeader,
   footer,

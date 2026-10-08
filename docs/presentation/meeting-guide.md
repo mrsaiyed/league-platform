@@ -11,6 +11,8 @@ Open the portable demo in Chrome/Edge. Use the reset icon before presenting. The
 7. **My league:** Show the applicant's personal status. Reset the demo to show the established-player scenario with upcoming-game reminders and the last-game report. Email delivery and secure account access are planned, not running.
 8. **League settings:** Turn Awards off, then open the public site to see it disappear. This demonstrates configuration without building a different application for every school.
 
-Suggested closing: “The school sets its rules and runs its games. Students get a simpler experience, and staff have one connected place to manage the season. This prototype shows the direction; our specification defines the production work behind it.”
+Suggested closing: “The coaches run the proposed program with school approval and eligibility checks. Students get a simpler experience, and staff have one connected place to manage the season. This prototype shows the direction; our specification defines the production work behind it.”
 
 Before committing a launch date, agree on the exact fee, payment responsibilities, refund policy, capacity, public-name format, staff permissions, game rules, and delivery scope. Do not present sample dates, names, achievements, or results as actual school records.
+
+For AHS photography, video placements, and proposal-specific screenshot selections, see [the October 8 principal review](principal-review.md). The product specification remains open for discussion.

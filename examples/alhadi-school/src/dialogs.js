@@ -101,7 +101,7 @@ function review(id) {
         <div>
           <span>PAYMENT</span
           ><strong
-            >${a.payment === 'paid' ? '$50 paid · simulated' : 'Refunded · simulated'}</strong
+            >${a.payment === 'paid' ? '$75 paid · simulated' : 'Refunded · simulated'}</strong
           >
         </div>
         <div>
@@ -141,7 +141,7 @@ function payModal(form) {
       <p>This is a payment preview. No card fields, charge, or payment service are connected.</p>
       <div class="info-list">
         <div><span>APPLICANT</span><strong>${esc(candidate.name)}</strong></div>
-        <div><span>PARTICIPATION FEE</span><strong>$50.00 · USD</strong></div>
+        <div><span>PARTICIPATION FEE</span><strong>$75.00 · USD</strong></div>
       </div>
       <div class="modal-note">
         Your sample application will enter the paid waitlist pending school review. Paying does not
@@ -149,7 +149,7 @@ function payModal(form) {
       </div>
       <div class="modal-actions">
         ${button('Back', 'close', '', 'btn-ghost')}${button(
-          'Simulate $50 payment ' + icon('arrow'),
+          'Simulate $75 payment ' + icon('arrow'),
           'pay',
         )}
       </div>`,
