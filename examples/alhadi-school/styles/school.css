@@ -4,8 +4,8 @@
 }
 .hero:before {
   background:
-    linear-gradient(90deg, #170e13f2 0%, #170e13c9 30%, #170e1333 67%, #170e131a),
-    linear-gradient(0deg, #170e13, transparent 22%);
+    linear-gradient(90deg, #481329f2 0%, #481329c9 30%, #48132933 67%, #4813291a),
+    linear-gradient(0deg, #481329, transparent 22%);
 }
 .hero-seal {
   display: flex;
@@ -13,7 +13,7 @@
   gap: 12px;
   writing-mode: horizontal-tb;
   padding: 9px 14px;
-  background: #170e13d9;
+  background: #481329d9;
   border: 1px solid #d3b78045;
   color: #f3dfb7;
   letter-spacing: 0.12em;
@@ -40,7 +40,7 @@
 .school-photo {
   overflow: hidden;
   aspect-ratio: 1.54;
-  background: #100e10;
+  background: #481329;
 }
 .school-photo img {
   display: block;
@@ -88,7 +88,7 @@
   justify-content: center;
   padding: 35px;
   border: 1px solid #d3b78040;
-  background: linear-gradient(135deg, #3a1828, #21151c);
+  background: linear-gradient(135deg, #69223c, #4e172e);
 }
 .media-next > img {
   width: 74px;
@@ -106,7 +106,7 @@
   gap: 22px;
   padding: 24px;
   border: 1px solid #d3b78040;
-  background: #30202a;
+  background: #601f3a;
   margin-bottom: 28px;
 }
 .season-note strong {
@@ -140,7 +140,7 @@
     object-position: center bottom;
   }
   .hero:before {
-    background: linear-gradient(180deg, #170e13 55%, #170e1300 68%, #170e1300 88%, #170e13 100%);
+    background: linear-gradient(180deg, #481329 55%, #48132900 68%, #48132900 88%, #481329 100%);
   }
   .hero-seal {
     top: auto;
@@ -210,7 +210,7 @@
   position: relative;
   height: 240px;
   overflow: hidden;
-  background: #110b0e;
+  background: #481329;
 }
 .video-poster > img {
   width: 100%;
@@ -223,7 +223,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, #100710c9, transparent 50%);
+  background: linear-gradient(0deg, #481329c9, transparent 50%);
 }
 .full-game .video-poster {
   height: 350px;
@@ -241,7 +241,7 @@
 .video-kind {
   top: 18px;
   left: 20px;
-  background: #170e13e0;
+  background: #481329e0;
   padding: 8px 12px;
   color: #f3dfb7;
 }
@@ -261,7 +261,7 @@
   height: 62px;
   border: 1px solid #ffffff99;
   border-radius: 50%;
-  background: #170e1380;
+  background: #48132980;
   color: white;
 }
 .video-play .icon {

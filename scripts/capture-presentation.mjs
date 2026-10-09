@@ -79,11 +79,19 @@ try {
   });
   await open('admin');
   await screenshot('07-commissioner');
+  await open('admin/scoring');
+  await screenshot('15-live-stats-tracker', '.scorer-layout');
+  await page.setViewportSize({ width: 1440, height: 720 });
+  await open('home');
+  await screenshot('16-homepage-slide');
+  await open('media');
+  await screenshot('17-full-game-card', '.full-game');
+  await screenshot('18-highlights-cards', '.highlight-grid');
   await page.setViewportSize({ width: 390, height: 844 });
   await open('home');
   await screenshot('08-mobile-homepage');
   assert.deepEqual(errors, []);
-  console.log('Exported 12 high-resolution presentation screenshots with all images decoded.');
+  console.log('Exported 16 high-resolution presentation screenshots with all images decoded.');
 } finally {
   await context.close();
   await browser.close();

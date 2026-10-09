@@ -6,8 +6,8 @@
   --cream: #f6f1e9;
   --ink: #211c20;
   --muted: #8e8489;
-  --dark: #170e13;
-  --panel: #24171e;
+  --dark: #481329;
+  --panel: #591d36;
   --line: #ffffff18;
   --sans: 'Segoe UI', Arial, sans-serif;
   --serif: Georgia, 'Times New Roman', serif;
@@ -161,7 +161,7 @@ button {
 }
 .public-head {
   border-bottom: 1px solid var(--line);
-  background: #1c1118;
+  background: #57152e;
 }
 .public-top {
   height: 92px;
@@ -262,7 +262,7 @@ button {
   align-items: center;
   isolation: isolate;
   overflow: hidden;
-  background: #170e13;
+  background: #481329;
 }
 .hero-bg {
   position: absolute;
@@ -279,7 +279,7 @@ button {
   inset: 0;
   background:
     linear-gradient(90deg, #1c0b16f2 0%, #240b18b5 42%, #180e1324 79%),
-    linear-gradient(0deg, #170e13 0%, transparent 26%, #170e134d 100%);
+    linear-gradient(0deg, #481329 0%, transparent 26%, #4813294d 100%);
   z-index: -2;
 }
 .hero:after {
@@ -456,7 +456,7 @@ button {
 }
 .match-card {
   border: 1px solid #71505f55;
-  background: linear-gradient(120deg, #2b1923, #22161d);
+  background: linear-gradient(120deg, #63203d, #4e172e);
   padding: 22px 25px;
   transition:
     border-color 0.15s,
@@ -610,7 +610,7 @@ tr:last-child td {
 .banner-cta {
   margin-top: 45px;
   padding: 35px 38px;
-  background: #3a1425;
+  background: #6b1936;
   border: 1px solid #95607640;
   display: flex;
   align-items: center;
@@ -678,7 +678,7 @@ tr:last-child td {
   border-color: #946578;
 }
 .dark-select {
-  background: #271923;
+  background: #551b32;
   color: var(--cream);
   border: 1px solid #765263;
   padding: 9px 13px;
@@ -745,7 +745,7 @@ tr:last-child td {
 }
 .leader.featured {
   border-color: #c1a26780;
-  background: linear-gradient(150deg, #492736, #271921);
+  background: linear-gradient(150deg, #772640, #551b32);
 }
 .leader .big-stat {
   font: 48px var(--serif);
@@ -1007,7 +1007,7 @@ tr:last-child td {
   margin-top: 6px;
 }
 .game-scoreboard {
-  background: linear-gradient(110deg, #341d2b, #21161e);
+  background: linear-gradient(110deg, #67223d, #4e172e);
   padding: 38px;
   border: 1px solid #b18c6750;
   text-align: center;
