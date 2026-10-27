@@ -1,6 +1,6 @@
 # Architecture decisions and production boundary
 
-The active discussion baseline is the [product specification v0.7](../product/platform/README.md), with a [detailed engineering design](../product/platform/engineering/README.md) for repository/files, schema, customization, APIs, security and operating budgets. The active first slice is [Al-Hadi varsity scoring](../initiatives/alhadi-varsity/README.md); the broader platform remains shared and configurable. [ADR-004](decisions/004-varsity-scoring-slice.md) defines the local SQL rehearsal, private hosted SQL pilot and production migration boundary.
+The active discussion baseline is the [product specification v0.7](../product/platform/README.md), with a [detailed engineering design](../product/platform/engineering/README.md) for repository/files, schema, customization, APIs, security and operating budgets. The active first slice is [Al-Hadi varsity scoring](../initiatives/alhadi-varsity/README.md); the broader platform remains shared and configurable. [ADR-004](decisions/004-varsity-scoring-slice.md) defines the local SQL rehearsal, private hosted SQL pilot and production migration boundary. [ADR-005](decisions/005-swappable-live-stats-storage.md) puts live stats storage behind one interface, so Supabase/PostgreSQL can later give way to a document database such as Firestore.
 
 ## ADR-001: retain a separate presentation example
 

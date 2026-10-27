@@ -17,6 +17,7 @@ const $ = (id) => document.getElementById(id);
 let team = null;
 let games = [];
 let canScore = false;
+let session = null;
 
 function card(g) {
   const us = ourSide(g);
@@ -49,7 +50,7 @@ function card(g) {
 }
 
 function render() {
-  $('site-header').innerHTML = siteHeader('schedule', team?.id);
+  $('site-header').innerHTML = siteHeader('schedule', team?.id, session);
   $('games').innerHTML = games.map(card).join('') || '<li class="empty">No games yet.</li>';
   const final = games.filter((g) => g.status === 'final');
   let wins = 0,
@@ -77,7 +78,8 @@ function tickClocks() {
 }
 
 async function start() {
-  canScore = (await getSession()).canScore;
+  session = await getSession();
+  canScore = session.canScore;
   const data = await api('/api/schedule').catch((err) => {
     $('games').innerHTML = `<li class="empty">${esc(err.message)}</li>`;
     return null;

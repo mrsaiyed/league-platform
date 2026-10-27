@@ -155,6 +155,8 @@ function perform(input) {
 
 let sending = false;
 let offline = false;
+/** The scorer's sign-in ran out: keep every tap here until they sign in again. */
+let signedOut = false;
 let retryTimer = null;
 let retryDelay = 1000;
 let savedAt = null;
@@ -170,6 +172,7 @@ async function pump() {
     try {
       const payload = await api(`/api/games/${gameId}/commands`, { method: 'POST', body: command });
       offline = false;
+      signedOut = false;
       retryDelay = 1000;
       savedAt = new Date();
       outbox = outbox.filter((c) => c.commandId !== command.commandId);
@@ -181,6 +184,10 @@ async function pump() {
         offline = true;
         retryTimer = setTimeout(() => void pump(), retryDelay);
         retryDelay = Math.min(retryDelay * 2, 15_000);
+        break;
+      }
+      if (err.status === 401) {
+        signedOut = true;
         break;
       }
       outbox = outbox.filter((c) => c.commandId !== command.commandId);
@@ -206,6 +213,12 @@ function syncLine() {
   const waiting = `${outbox.length} ${outbox.length === 1 ? 'action' : 'actions'}`;
   let kind = '',
     text;
+  if (signedOut && outbox.length) {
+    // Signing in comes back here, and the waiting taps send themselves.
+    el.className = 'lt-sync lt-sync-offline';
+    el.innerHTML = `Signed out — ${waiting} kept on this device. <a class="lt-link" href="/sign-in?next=${encodeURIComponent(location.pathname)}">Sign in to send them</a>`;
+    return;
+  }
   if (offline && outbox.length) {
     kind = 'offline';
     text = `Not connected — ${waiting} kept on this device and sent when the connection is back.`;
@@ -741,9 +754,12 @@ drawer.addEventListener('focusout', (e) => {
 
 // ---- start ---------------------------------------------------------------------
 async function start() {
-  if (!(await getSession()).canScore) {
-    // Another device on the network: it can watch, but scoring stays courtside.
-    location.replace(`/game/${gameId}`);
+  const session = await getSession();
+  if (!session.canScore) {
+    // Scorers sign in first. Where sign-in is not set up, other devices watch instead.
+    location.replace(
+      session.signIn ? `/sign-in?next=${encodeURIComponent(location.pathname)}` : `/game/${gameId}`,
+    );
     return;
   }
   try {

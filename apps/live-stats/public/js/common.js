@@ -123,9 +123,22 @@ export function gameClockText(game, now) {
   return `${label} · ${formatClock(clock.remainingMs)}`;
 }
 
-export function siteHeader(active, teamId) {
+/** The site header; with sign-in set up, it also signs scorers in and out. */
+export function siteHeader(active, teamId, session = null) {
   const link = (href, label, key) =>
     `<a href="${href}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`;
+  const account = !session?.signIn
+    ? ''
+    : session.canScore
+      ? '<button type="button" class="nav-button" data-sign-out>Sign out</button>'
+      : active === 'sign-in'
+        ? ''
+        : link(`/sign-in?next=${encodeURIComponent(location.pathname)}`, 'Scorer sign-in', '');
   return `<a class="brand" href="/"><img src="/img/lions.png" alt="" /><span><strong>Al-Hadi Lions</strong><small>Varsity boys basketball · 2026–27</small></span></a>
-    <nav aria-label="Site">${link('/', 'Schedule', 'schedule')}${teamId ? link(`/team/${teamId}`, 'Roster &amp; stats', 'team') : ''}</nav>`;
+    <nav aria-label="Site">${link('/', 'Schedule', 'schedule')}${teamId ? link(`/team/${teamId}`, 'Roster &amp; stats', 'team') : ''}${account}</nav>`;
 }
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest?.('[data-sign-out]'))
+    void api('/api/session', { method: 'DELETE' }).finally(() => location.reload());
+});

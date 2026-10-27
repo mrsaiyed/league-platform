@@ -30,6 +30,7 @@ const gameId = location.pathname.split('/')[2];
 const $ = (id) => document.getElementById(id);
 let game = null;
 let canScore = false;
+let session = null;
 
 /** The clock reading for the header, with the period derived from the plays. */
 function clockText(d, now) {
@@ -150,7 +151,8 @@ function adopt(payload) {
 }
 
 async function start() {
-  canScore = (await getSession()).canScore;
+  session = await getSession();
+  canScore = session.canScore;
   try {
     adopt(await api(`/api/games/${gameId}`));
   } catch (err) {
@@ -158,7 +160,7 @@ async function start() {
     return;
   }
   const tracked = [game.home, game.away].find((t) => t.tracked);
-  $('site-header').innerHTML = siteHeader('', tracked?.id);
+  $('site-header').innerHTML = siteHeader('', tracked?.id, session);
   subscribe(`?game=${gameId}`, { game: adopt }, (connected) => {
     $('notice').hidden = connected;
     $('notice').textContent =

@@ -14,7 +14,8 @@ npm run dev:stats
 Open `http://127.0.0.1:4180`. Stop with Ctrl+C. Records are kept in embedded PostgreSQL under gitignored `.local/live-stats/`; set `LIVE_STATS_DATA_DIR` or `LIVE_STATS_PORT` to use another folder or port. Only one server opens a database at a time; a lock left by a crash or a killed process is cleared on the next start.
 
 - **Phones watching in the gym:** start with `LIVE_STATS_LAN=1` and open one of the addresses it prints on a phone on the same Wi-Fi. Other devices can watch but not score.
-- **Scoring from a tablet:** add `LIVE_STATS_REMOTE_SCORING=1`. There are no accounts yet, so anyone on that network could then change scores; only do this on a network you trust.
+- **Scoring from a tablet:** also set `LIVE_STATS_SCORER_PASSCODE`; every device, this computer included, then signs in at `/sign-in` to score. (`LIVE_STATS_REMOTE_SCORING=1` lets any device on the network score without signing in; only on a network you trust.)
+- **Online:** see [putting live stats online](../../operations/live-stats-hosting.md).
 
 ## Pages
 
@@ -40,6 +41,10 @@ Open `http://127.0.0.1:4180`. Stop with Ctrl+C. Records are kept in embedded Pos
 | Play log                                                                | Same, with the running score; the full play-by-play is on the game page             |
 | Log kept on the device, totals pushed in batches, **Save stats** button | Every tap is saved to the database as it happens, so there is no separate save      |
 
+## Storage
+
+The tracker talks to one storage interface, so the database can change without touching it. PostgreSQL serves both the local embedded database and hosted ones such as Supabase; a document-store adapter runs the same tests to show a NoSQL database such as Firestore would fit. See [ADR-005](../../architecture/decisions/005-swappable-live-stats-storage.md).
+
 ## What is saved, and when
 
 Each tap is a command with its own id and the time it was tapped. The server applies it with the same engine the browser uses (`packages/sports/src/basketball/live.ts`) and, in one transaction, records the command, the new game state, the score and status, and every player's box score line. A command it has already taken is ignored, so retrying is always safe.
@@ -56,8 +61,8 @@ Each game defaults to four 8-minute quarters with 4-minute overtime, team fouls 
 
 ## Not yet
 
-- Hosting on the internet so parents can follow from anywhere. The store needs only plain PostgreSQL, so a hosted database such as Supabase plus a small Node host is the next step.
-- Accounts and roles (scorekeeper, coach, viewer), and rules for what the public may see.
+- Deployed online. Everything is ready (Supabase/PostgreSQL support, scorer sign-in, a Dockerfile, the [hosting guide](../../operations/live-stats-hosting.md)); it needs a Supabase project and a host chosen and set up.
+- Accounts and roles (scorekeeper, coach, viewer) in place of the shared scorer passcode, and rules for what the public may see.
 - Handing a game from one scoring device to another mid-game, and correcting minutes after the fact.
 - More stats (rebounds, assists, steals, blocks, turnovers, missed shots) and exports.
 
@@ -65,4 +70,4 @@ The earlier rehearsal (`npm run dev:varsity`) and the hosted Sites pilot are sep
 
 ## Checks
 
-`npm test` covers the engine (scoring, fouls, bonus, substitutions, minutes, clock corrections, undo/redo, periods, final/reopen) and the store against PostgreSQL (seeding, unlimited rosters, atomic saves, retries, refused plays, season totals). `npm run test:stats:browser` drives the whole flow in a real browser with its own throwaway database and saves screenshots to `artifacts/screenshots/live-stats-*.png`.
+`npm test` covers the engine (scoring, fouls, bonus, substitutions, minutes, clock corrections, undo/redo, periods, final/reopen); storage, with the same tests run against every database adapter (seeding, unlimited rosters, atomic saves, retries, refused plays, season totals); and the server online (passcode required, sign-in, wrong-passcode limit). `npm run test:stats:browser` drives the whole flow in a real browser with its own throwaway database and saves screenshots to `artifacts/screenshots/live-stats-*.png`.

@@ -1,0 +1,14 @@
+**/node_modules
+.git
+.github
+.claude
+.local
+artifacts
+dist
+docs
+tests
+apps/varsity-hosted
+apps/varsity-preview
+*.log
+.env
+.env.*

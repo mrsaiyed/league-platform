@@ -6,75 +6,97 @@ import { stripTypeScriptTypes } from 'node:module';
 import { mkdir, open, readFile, readdir, unlink } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { PGlite } from '@electric-sql/pglite';
 import { z, ZodError } from 'zod';
-import { LiveStatsStore, StoreError } from '../../packages/database/src/live-stats/store.ts';
-import type { ScheduleSeed } from '../../packages/database/src/live-stats/store.ts';
 import { TrackerError } from '../../packages/sports/src/basketball/live.ts';
+import { LiveStats, StatsError } from './service.ts';
+import type { ScheduleSeed } from './service.ts';
+import { chooseStorage, openStorage } from './storage.ts';
+import { attemptLimiter, scorerAuth } from './auth.ts';
 
-// Live stat tracking: the schedule, a courtside tracker that saves every tap to
-// PostgreSQL, and live game pages that update as the game is scored.
+// Live stat tracking: the schedule, a courtside tracker that saves every tap to the
+// database, and live game pages that update as the game is scored.
+//
+// On this computer by default. Online when LIVE_STATS_PUBLIC_URL is set, which also
+// requires LIVE_STATS_SCORER_PASSCODE: anyone can watch, only signed-in scorers can
+// change anything. The database comes from DATABASE_URL (see storage.ts).
+const env = process.env;
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const here = fileURLToPath(new URL('./', import.meta.url));
-const dataDir = path.resolve(
-  process.env.LIVE_STATS_DATA_DIR ?? path.join(root, '.local/live-stats'),
-);
-const port = Number(process.env.LIVE_STATS_PORT ?? 4180);
-// LIVE_STATS_LAN=1 lets phones on the same network watch; scoring stays on this computer
-// unless LIVE_STATS_REMOTE_SCORING=1. There are no accounts yet, so only use a trusted network.
-const lan = process.env.LIVE_STATS_LAN === '1';
-const remoteScoring = lan && process.env.LIVE_STATS_REMOTE_SCORING === '1';
-if (!Number.isInteger(port) || port < 1024 || port > 65535)
-  throw new Error('Choose a valid local port.');
+const publicUrl = env.LIVE_STATS_PUBLIC_URL ? new URL(env.LIVE_STATS_PUBLIC_URL) : null;
+const passcode = env.LIVE_STATS_SCORER_PASSCODE ?? '';
+if (publicUrl && passcode.length < 8)
+  throw new Error(
+    'Set LIVE_STATS_SCORER_PASSCODE (8 characters or more) before putting the tracker online.',
+  );
+// Hosting platforms say which port to use in PORT.
+const port = Number((publicUrl ? env.PORT : undefined) ?? env.LIVE_STATS_PORT ?? 4180);
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Choose a valid port.');
+// LIVE_STATS_LAN=1 lets phones on the same network watch; without a passcode, scoring
+// stays on this computer unless LIVE_STATS_REMOTE_SCORING=1 (trusted networks only).
+const lan = !publicUrl && env.LIVE_STATS_LAN === '1';
+const remoteScoring = lan && env.LIVE_STATS_REMOTE_SCORING === '1';
+const auth = passcode ? scorerAuth(passcode, { secure: publicUrl?.protocol === 'https:' }) : null;
+const limiter = attemptLimiter();
 
 const lanAddresses = Object.values(os.networkInterfaces())
   .flat()
   .filter((a) => a && a.family === 'IPv4' && !a.internal)
   .map((a) => a!.address);
-const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+const hosts = new Set(publicUrl ? [publicUrl.host] : [`127.0.0.1:${port}`, `localhost:${port}`]);
 if (lan) for (const a of lanAddresses) hosts.add(`${a}:${port}`);
 
-// One server per database. The lock holds this process id, so a lock left by a server
-// that was killed or crashed (a laptop that died mid-game) is cleared on the next start.
-await mkdir(path.dirname(dataDir), { recursive: true });
-const lockPath = `${dataDir}.lock`;
-const running = (pid: number) => {
+// One server per local database. The lock holds this process id, so a lock left by a
+// server that was killed or crashed (a laptop that died mid-game) is cleared next start.
+const storage = chooseStorage(env, root);
+let lock: FileHandle | null = null;
+let lockPath = '';
+if (storage.kind === 'local') {
+  await mkdir(path.dirname(storage.dataDir), { recursive: true });
+  lockPath = `${storage.dataDir}.lock`;
+  lock = await takeLock(lockPath);
+}
+async function takeLock(file: string): Promise<FileHandle> {
+  try {
+    const handle = await open(file, 'wx');
+    await handle.writeFile(String(process.pid));
+    return handle;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    const pid = Number(await readFile(file, 'utf8').catch(() => ''));
+    if (Number.isInteger(pid) && pid > 0 && running(pid))
+      throw new Error(
+        `The stats server is already running (process ${pid}). Use that one, or stop it first.`,
+      );
+    await unlink(file);
+    return takeLock(file);
+  }
+}
+function running(pid: number) {
   try {
     process.kill(pid, 0);
     return true;
   } catch (error) {
     return (error as NodeJS.ErrnoException).code === 'EPERM';
   }
-};
-async function takeLock(): Promise<FileHandle> {
-  try {
-    const handle = await open(lockPath, 'wx');
-    await handle.writeFile(String(process.pid));
-    return handle;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-    const pid = Number(await readFile(lockPath, 'utf8').catch(() => ''));
-    if (Number.isInteger(pid) && pid > 0 && running(pid))
-      throw new Error(
-        `The stats server is already running (process ${pid}). Use that one, or stop it first.`,
-      );
-    await unlink(lockPath);
-    return takeLock();
-  }
 }
-const lock = await takeLock();
-const db = new PGlite(dataDir);
-const store = new LiveStatsStore(db);
+async function releaseLock() {
+  if (!lock) return;
+  await lock.close();
+  await unlink(lockPath).catch(() => {});
+  lock = null;
+}
+
+const { repo, label } = await openStorage(storage, env);
+const stats = new LiveStats(repo);
 try {
-  await store.initialize();
+  await repo.initialize();
   const seed = JSON.parse(
     await readFile(path.join(here, 'data/tcsaal-alhadi-varsity-boys-2026-27.json'), 'utf8'),
   ) as ScheduleSeed;
-  await store.seed(seed);
+  await stats.seed(seed);
 } catch (error) {
-  await db.close().catch(() => {});
-  await lock.close();
-  await unlink(lockPath);
+  await repo.close().catch(() => {});
+  await releaseLock();
   throw error;
 }
 
@@ -99,6 +121,7 @@ const page = (name: string) => path.join(here, 'public', name);
 const ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const pages: [RegExp, string][] = [
   [/^\/$/, page('index.html')],
+  [/^\/sign-in$/, page('sign-in.html')],
   [new RegExp(`^/game/${ID}$`), page('game.html')],
   [new RegExp(`^/game/${ID}/track$`), page('track.html')],
   [new RegExp(`^/team/${ID}$`), page('team.html')],
@@ -112,8 +135,8 @@ function send(res: http.ServerResponse, event: string, data: unknown) {
 }
 /** The game's own pages get the whole game; the schedule gets its summary. */
 async function broadcastGame(gameId: string) {
-  if (![...listeners].length) return;
-  const game = await store.game(gameId);
+  if (!listeners.size) return;
+  const game = await stats.game(gameId);
   const { players: _players, state: _state, ...summary } = game;
   for (const l of listeners) {
     if (l.gameId === gameId) send(l.res, 'game', game);
@@ -124,7 +147,7 @@ async function broadcastGame(gameId: string) {
 async function broadcastTeam(teamId: string) {
   for (const l of listeners) {
     if (!l.gameId) continue;
-    const game = await store.game(l.gameId).catch(() => null);
+    const game = await stats.game(l.gameId).catch(() => null);
     if (game && (game.home.id === teamId || game.away.id === teamId)) send(l.res, 'game', game);
   }
 }
@@ -133,29 +156,40 @@ setInterval(() => {
 }, 20_000).unref();
 
 // ---- HTTP ------------------------------------------------------------------
-function json(res: http.ServerResponse, status: number, value: unknown) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+function json(res: http.ServerResponse, status: number, value: unknown, headers = {}) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...headers });
   res.end(JSON.stringify(value));
 }
 async function body(req: http.IncomingMessage) {
   if (req.headers['content-type'] !== 'application/json')
-    throw new StoreError('Use application/json.', 415);
+    throw new StatsError('Use application/json.', 415);
   let size = 0;
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 64 * 1024) throw new StoreError('Request exceeds 64 KiB.', 413);
+    if (size > 64 * 1024) throw new StatsError('Request exceeds 64 KiB.', 413);
     chunks.push(Buffer.from(chunk));
   }
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
   } catch {
-    throw new StoreError('Invalid JSON.', 400);
+    throw new StatsError('Invalid JSON.', 400);
   }
 }
 const isLoopback = (req: http.IncomingMessage) =>
   ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '');
-const canScore = (req: http.IncomingMessage) => isLoopback(req) || remoteScoring;
+/** Online, the platform's proxy says who is asking; on this computer the socket does. */
+const clientIp = (req: http.IncomingMessage) =>
+  (publicUrl &&
+    String(req.headers['x-forwarded-for'] ?? '')
+      .split(',')[0]
+      ?.trim()) ||
+  req.socket.remoteAddress ||
+  '';
+// With a passcode, everyone signs in, this computer included: behind a proxy every
+// request can look local. Without one, only this computer scores.
+const canScore = (req: http.IncomingMessage) =>
+  auth ? auth.valid(req.headers.cookie) : isLoopback(req) || remoteScoring;
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -165,16 +199,20 @@ const server = http.createServer(async (req, res) => {
     'Content-Security-Policy',
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   );
+  if (publicUrl?.protocol === 'https:')
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000');
   try {
+    // For the hosting platform's health checks, whatever host they use.
+    if (req.url === '/healthz') return json(res, 200, { ok: true });
     // Only the addresses printed at startup; refuses DNS rebinding and other sites' pages.
     const host = req.headers.host ?? '';
     if (!hosts.has(host))
-      throw new StoreError('Use the address printed when the server started.', 403);
-    const origin = `http://${host}`;
+      throw new StatsError('Use the address printed when the server started.', 403);
+    const origin = publicUrl ? publicUrl.origin : `http://${host}`;
     if (req.headers.origin && req.headers.origin !== origin)
-      throw new StoreError('Cross-origin access denied.', 403);
+      throw new StatsError('Cross-origin access denied.', 403);
     if (req.headers['sec-fetch-site'] === 'cross-site')
-      throw new StoreError('Cross-site access denied.', 403);
+      throw new StatsError('Cross-site access denied.', 403);
     const url = new URL(req.url ?? '/', origin);
     const p = url.pathname;
 
@@ -190,56 +228,71 @@ const server = http.createServer(async (req, res) => {
         res.end(await readFile(file));
         return;
       }
-      if (p === '/api/session') {
-        json(res, 200, {
+      if (p === '/api/session')
+        return json(res, 200, {
           canScore: canScore(req),
+          signIn: Boolean(auth),
           watchUrls: lan ? lanAddresses.map((a) => `http://${a}:${port}`) : [],
         });
-        return;
-      }
-      if (p === '/api/schedule') {
-        json(res, 200, await store.schedule());
-        return;
-      }
+      if (p === '/api/schedule') return json(res, 200, await stats.schedule());
       if (p === '/api/stream') {
         const gameId = url.searchParams.get('game');
         if (gameId !== null) z.uuid().parse(gameId);
-        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' });
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-store',
+          // Proxies must pass each update straight through rather than hold it back.
+          'X-Accel-Buffering': 'no',
+        });
         res.write('retry: 2000\n\n');
         const listener = { res, gameId };
         listeners.add(listener);
         req.on('close', () => listeners.delete(listener));
-        if (gameId) send(res, 'game', await store.game(gameId));
-        else send(res, 'schedule', await store.schedule());
+        if (gameId) send(res, 'game', await stats.game(gameId));
+        else send(res, 'schedule', await stats.schedule());
         return;
       }
       const game = new RegExp(`^/api/games/(${ID})$`).exec(p);
-      if (game?.[1]) {
-        json(res, 200, await store.game(game[1]));
-        return;
-      }
+      if (game?.[1]) return json(res, 200, await stats.game(game[1]));
       const team = new RegExp(`^/api/teams/(${ID})$`).exec(p);
-      if (team?.[1]) {
-        json(res, 200, await store.team(team[1]));
-        return;
-      }
-      throw new StoreError('Not found.', 404);
+      if (team?.[1]) return json(res, 200, await stats.team(team[1]));
+      throw new StatsError('Not found.', 404);
     }
 
-    // Changes: same-origin browser requests only, from a device allowed to score.
-    if (req.headers.origin !== origin) throw new StoreError('Same-origin request required.', 403);
+    // Changes: same-origin browser requests only.
+    if (req.headers.origin !== origin) throw new StatsError('Same-origin request required.', 403);
+    if (p === '/api/session') {
+      if (!auth) throw new StatsError('Sign-in is not set up here; this computer can score.', 400);
+      if (req.method === 'DELETE')
+        return json(res, 200, { canScore: false }, { 'Set-Cookie': auth.clear() });
+      if (req.method !== 'POST') throw new StatsError('Not found.', 404);
+      const ip = clientIp(req);
+      if (limiter.blocked(ip))
+        throw new StatsError('Too many wrong passcodes. Wait 15 minutes and try again.', 429);
+      const { passcode: attempt } = z
+        .strictObject({ passcode: z.string().max(200) })
+        .parse(await body(req));
+      if (!auth.matches(attempt)) {
+        limiter.fail(ip);
+        throw new StatsError('That passcode is not right.', 401);
+      }
+      limiter.clear(ip);
+      return json(res, 200, { canScore: true }, { 'Set-Cookie': auth.issue() });
+    }
     if (!canScore(req))
-      throw new StoreError('Scoring is only available on the computer running the stats.', 403);
+      throw auth
+        ? new StatsError('Sign in to score. Your taps are kept on this device until you do.', 401)
+        : new StatsError('Scoring is only available on the computer running the stats.', 403);
     const command = new RegExp(`^/api/games/(${ID})/commands$`).exec(p);
     if (req.method === 'POST' && command?.[1]) {
-      const result = await store.command(command[1], await body(req));
+      const result = await stats.command(command[1], await body(req));
       json(res, 200, result.game);
       if (result.changed) void broadcastGame(command[1]).catch(() => {});
       return;
     }
     const players = new RegExp(`^/api/teams/(${ID})/players$`).exec(p);
     if (req.method === 'POST' && players?.[1]) {
-      const player = await store.addPlayer(players[1], await body(req));
+      const player = await stats.addPlayer(players[1], await body(req));
       json(res, 201, player);
       void broadcastTeam(player.teamId).catch(() => {});
       return;
@@ -248,16 +301,16 @@ const server = http.createServer(async (req, res) => {
     if (one?.[1] && (req.method === 'PUT' || req.method === 'DELETE')) {
       const player =
         req.method === 'PUT'
-          ? await store.updatePlayer(one[1], await body(req))
-          : await store.removePlayer(one[1]);
+          ? await stats.updatePlayer(one[1], await body(req))
+          : await stats.removePlayer(one[1]);
       json(res, 200, player);
       void broadcastTeam(player.teamId).catch(() => {});
       return;
     }
-    throw new StoreError('Not found.', 404);
+    throw new StatsError('Not found.', 404);
   } catch (error) {
     const status =
-      error instanceof StoreError
+      error instanceof StatsError
         ? error.status
         : error instanceof ZodError || error instanceof TrackerError
           ? 422
@@ -278,14 +331,15 @@ const server = http.createServer(async (req, res) => {
 });
 server.requestTimeout = 15_000;
 server.headersTimeout = 10_000;
-server.listen(port, lan ? '0.0.0.0' : '127.0.0.1', () => {
-  console.log(`Live stats: http://127.0.0.1:${port}`);
+server.listen(port, publicUrl || lan ? '0.0.0.0' : '127.0.0.1', () => {
+  console.log(`Live stats: ${publicUrl ? publicUrl.origin : `http://127.0.0.1:${port}`}`);
   if (lan)
     for (const a of lanAddresses)
       console.log(
-        `On this network: http://${a}:${port} (${remoteScoring ? 'watch and score' : 'watch only'})`,
+        `On this network: http://${a}:${port} (${auth || remoteScoring ? 'watch and score' : 'watch only'})`,
       );
-  console.log(`Database: ${dataDir}`);
+  console.log(`Database: ${label}`);
+  if (auth) console.log('Scoring needs the scorer passcode.');
 });
 server.on('error', (error) => {
   console.error(error.message);
@@ -297,9 +351,8 @@ async function stop() {
   stopping = true;
   for (const l of listeners) l.res.end();
   await new Promise<void>((resolve) => server.close(() => resolve()));
-  await db.close();
-  await lock.close();
-  await unlink(lockPath);
+  await repo.close();
+  await releaseLock();
 }
 for (const signal of ['SIGINT', 'SIGTERM'] as const)
   process.on(signal, () => {

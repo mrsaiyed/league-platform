@@ -15,7 +15,7 @@ npm run dev:stats
 
 Open `http://127.0.0.1:4180` and choose **Track live stats** on a game. Add names and jersey numbers for both teams under **Players** (no limit on players; Al-Hadi's roster carries over to every game). Tap players to pick each starting lineup, start the clock, then tap a player for +1, +2, +3, Foul or −Foul. Tap a bench player to sub them in, or drag them onto whoever is coming off. **End game** puts the final on the schedule and counts the box score toward **Roster & stats**.
 
-Records are kept in embedded PostgreSQL under gitignored `.local/live-stats/` on this computer. To let phones on the same network watch live, start with `LIVE_STATS_LAN=1`. See [live stat tracking](docs/initiatives/alhadi-varsity/04-live-stats.md) for what is saved, the game format and what comes next.
+Records are kept in embedded PostgreSQL under gitignored `.local/live-stats/` on this computer. To let phones on the same network watch live, start with `LIVE_STATS_LAN=1`. To put it online with Supabase or another database, see [putting live stats online](docs/operations/live-stats-hosting.md). See [live stat tracking](docs/initiatives/alhadi-varsity/04-live-stats.md) for what is saved, the game format and what comes next.
 
 **Preserved presentation concept:** [Open the Al-Hadi demo](https://mrsaiyed.github.io/league-platform/).
 

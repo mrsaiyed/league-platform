@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Scorer sign-in · Al-Hadi Varsity</title>
+    <link rel="icon" href="/img/lions.png" />
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header" id="site-header"></header>
+    <main id="main" tabindex="-1">
+      <section class="panel signin">
+        <h1>Scorer sign-in</h1>
+        <p class="hint" id="intro">
+          Scorers sign in to track live stats and edit rosters. Anyone can watch games without
+          signing in.
+        </p>
+        <form id="form">
+          <label for="passcode">Scorer passcode</label>
+          <input id="passcode" type="password" autocomplete="current-password" required />
+          <button class="btn btn-primary" type="submit">Sign in</button>
+          <p class="error" id="error" role="alert"></p>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="/js/sign-in.js"></script>
+  </body>
+</html>

@@ -40,7 +40,8 @@ async function load() {
 }
 
 async function start() {
-  const canScore = (await getSession()).canScore;
+  const session = await getSession();
+  const canScore = session.canScore;
   let data;
   try {
     data = await load();
@@ -49,10 +50,10 @@ async function start() {
     return;
   }
   const tracked = data.team.tracked ? data.team.id : null;
-  $('site-header').innerHTML = siteHeader(tracked ? 'team' : '', tracked ?? undefined);
+  $('site-header').innerHTML = siteHeader(tracked ? 'team' : '', tracked ?? undefined, session);
   if (!tracked) {
     const schedule = await api('/api/schedule').catch(() => null);
-    if (schedule?.team) $('site-header').innerHTML = siteHeader('', schedule.team.id);
+    if (schedule?.team) $('site-header').innerHTML = siteHeader('', schedule.team.id, session);
   }
   document.title = `${data.team.name} · Roster & stats`;
   $('team-name').textContent = `${data.team.name} · Roster & stats`;
@@ -78,7 +79,9 @@ async function start() {
       },
     });
   else {
-    $('roster-hint').textContent = 'Rosters are edited on the computer running the stats.';
+    $('roster-hint').innerHTML = session.signIn
+      ? `<a href="/sign-in?next=${encodeURIComponent(location.pathname)}">Sign in</a> to edit the roster.`
+      : 'Rosters are edited on the computer running the stats.';
     $('roster').innerHTML =
       `<ul>${data.players.map((p) => `<li>${esc(p.jersey ? `#${p.jersey} ` : '')}${esc(p.name)}</li>`).join('')}</ul>`;
   }

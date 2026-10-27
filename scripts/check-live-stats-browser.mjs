@@ -63,9 +63,11 @@ try {
   const errors = [];
   const watch = (page) => {
     page.on('pageerror', (e) => errors.push(e.message));
-    // net::ERR_FAILED is the response this check throws away on purpose.
+    // On purpose: net::ERR_FAILED is the response this check throws away, and 401s are
+    // the wrong passcode and the expired sign-in.
     page.on('console', (m) => {
-      if (m.type() === 'error' && !m.text().includes('net::ERR_FAILED')) errors.push(m.text());
+      if (m.type() === 'error' && !/net::ERR_FAILED|status of 401/.test(m.text()))
+        errors.push(m.text());
     });
     page.on('dialog', (d) => (d.type() === 'prompt' ? d.accept('6:30') : d.accept()));
   };
@@ -271,6 +273,92 @@ try {
   await phone.locator('.sb-score').first().waitFor();
   assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
   await shot(phone, 'game-phone', true);
+
+  // Online: scorers sign in first, and taps made after a sign-in runs out wait for the next.
+  const onlinePort = 4195;
+  const onlineBase = `http://127.0.0.1:${onlinePort}`;
+  const online = spawn(
+    process.execPath,
+    ['--disable-warning=ExperimentalWarning', 'apps/live-stats/server.ts'],
+    {
+      cwd: root,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        DATABASE_URL: '',
+        LIVE_STATS_STORE: 'memory',
+        LIVE_STATS_PUBLIC_URL: onlineBase,
+        PORT: String(onlinePort),
+        LIVE_STATS_SCORER_PASSCODE: 'browser-check-passcode',
+      },
+    },
+  );
+  let onlineOutput = '';
+  online.stdout.on('data', (s) => (onlineOutput += s));
+  online.stderr.on('data', (s) => (onlineOutput += s));
+  try {
+    for (let i = 0; ; i++) {
+      if (online.exitCode !== null) throw new Error(onlineOutput);
+      if (onlineOutput.includes('Live stats:')) break;
+      if (i === 150) throw new Error(`Online server timeout: ${onlineOutput}`);
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    const g = (await (await fetch(`${onlineBase}/api/schedule`)).json()).games[0];
+    const scorer = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const p = await scorer.newPage();
+    watch(p);
+    const signIn = async (passcode) => {
+      await p.locator('#passcode').fill(passcode);
+      await p.getByRole('button', { name: 'Sign in' }).click();
+    };
+    await p.goto(`${onlineBase}/game/${g.id}/track`);
+    await p.waitForURL(/\/sign-in\?next=/);
+    await signIn('not the passcode');
+    await p.locator('#error', { hasText: 'not right' }).waitFor();
+    await signIn('browser-check-passcode');
+    await p.waitForURL(`${onlineBase}/game/${g.id}/track`);
+    await p.locator('#lt-drawer.lt-open').waitFor();
+    for (const [side, jersey] of [
+      ['home', '1'],
+      ['away', '2'],
+    ]) {
+      const editor = p.locator(`[data-editor="${side}"]`);
+      await editor.locator('.re-add .re-jersey').fill(jersey);
+      await editor.locator('.re-add .re-name').fill(`Player ${jersey}`);
+      await editor.locator('.re-add .re-name').press('Enter');
+      await editor.locator('.re-row[data-id]').waitFor();
+    }
+    await p.getByRole('button', { name: 'Done' }).click();
+    await tileOn(p, 'home', '1').click();
+    await p.getByRole('button', { name: 'Start with 1' }).click();
+    await tileOn(p, 'home', '1').click();
+    await p.locator('.lt-menu .lt-opt[data-act="p2"]').click();
+    await p.locator('#lt-sync.lt-sync-saved').waitFor();
+
+    await scorer.clearCookies();
+    await tileOn(p, 'home', '1').click();
+    await p.locator('.lt-menu .lt-opt[data-act="p3"]').click();
+    await p.locator('#lt-sync', { hasText: 'Signed out — 1 action kept' }).waitFor();
+    assert.equal(await p.locator('#lt-score-home').textContent(), '5');
+    await p.locator('#lt-sync a').click();
+    await signIn('browser-check-passcode');
+    await p.waitForURL(`${onlineBase}/game/${g.id}/track`);
+    await p.waitForFunction((id) => !localStorage.getItem(`live-stats:outbox:${id}`), g.id);
+    assert.equal((await (await fetch(`${onlineBase}/api/games/${g.id}`)).json()).homeScore, 5);
+
+    // Watching needs no sign-in.
+    const fan = await browser.newPage();
+    watch(fan);
+    await fan.goto(`${onlineBase}/game/${g.id}`);
+    await fan.locator('.sb-score', { hasText: '5' }).waitFor();
+    assert.equal(await fan.getByRole('link', { name: 'Scorer sign-in' }).count(), 1);
+    assert.equal(await fan.getByRole('link', { name: 'Track live stats' }).count(), 0);
+    await fan.close();
+    await scorer.close();
+  } finally {
+    online.kill();
+  }
 
   assert.deepEqual(errors, []);
   console.log(
