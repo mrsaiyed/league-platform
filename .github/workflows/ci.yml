@@ -16,6 +16,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - run: npm run test:varsity:browser
+      - run: npm run test:stats:browser
   hosted-build:
     runs-on: ubuntu-latest
     steps:

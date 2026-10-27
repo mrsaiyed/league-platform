@@ -8,31 +8,35 @@ The product is an end-to-end league management platform giving each league a cus
 
 Immediate implementation: **Al-Hadi varsity game statistics while the team participates in externally run TCSAAL**. Intramurals are a later opportunity. The varsity scorer is the first reusable operational module, not a change into a custom-school-website business. Work on the shared platform specs/architecture can proceed in parallel.
 
+The current working module is the **live stat tracker** (`apps/live-stats`): Al-Hadi's 2026–27 TCSAAL schedule, a courtside tracker matching the Faraj League one, live game pages and unlimited name-and-jersey rosters. It is ready to host on Supabase (PostgreSQL) but must stay able to move to another database, including a NoSQL one such as Firestore: storage goes only through `LiveStatsRepository` ([ADR-005](../architecture/decisions/005-swappable-live-stats-storage.md)). The earlier scorer and its hosted pilot below are kept but separate.
+
 The founder explicitly requires database persistence **after each accepted scoring action**, not browser-only storage. The hosted pilot writes game state, event receipt/history and player stat lines atomically to shared SQL. Browser storage holds only a pending retry. Do not replace this with a static simulation to make deployment easier.
 
 ## Read in this order
 
+1. [Live stat tracking](../initiatives/alhadi-varsity/04-live-stats.md), then [putting it online](live-stats-hosting.md).
 1. [Overall product specification](../product/platform/README.md), then its engineering package.
-2. [Current varsity initiative](../initiatives/alhadi-varsity/README.md), including behavior, engineering and Faraj source review.
-3. [Hosted operations](varsity-hosting.md) and `apps/varsity-hosted/README.md`.
-4. [Preserved intramural work](../initiatives/alhadi-intramural/README.md) only when that opportunity resumes.
+1. [Current varsity initiative](../initiatives/alhadi-varsity/README.md), including behavior, engineering and Faraj source review.
+1. [Hosted operations](varsity-hosting.md) and `apps/varsity-hosted/README.md`.
+1. [Preserved intramural work](../initiatives/alhadi-intramural/README.md) only when that opportunity resumes.
 
 ## Online access
 
-Open [the private SQL scorer](https://alhadi-varsity-scoring.fairstone8.chatgpt.site) and sign into the same owner account. The older [GitHub Pages concept](https://mrsaiyed.github.io/league-platform/) remains the intramural presentation. They have different purposes; only the private hosted scorer saves accepted game actions to the shared SQL database.
+The live stat tracker is not deployed yet; [the hosting guide](live-stats-hosting.md) lists what to set up (a Supabase project and a host). Open [the earlier private SQL scorer](https://alhadi-varsity-scoring.fairstone8.chatgpt.site) and sign into the same owner account. The older [GitHub Pages concept](https://mrsaiyed.github.io/league-platform/) remains the intramural presentation. They have different purposes; only the private hosted scorer saves accepted game actions to the shared SQL database.
 
 ## Code map
 
-| Path                        | Purpose                                                            |
-| --------------------------- | ------------------------------------------------------------------ |
-| `packages/contracts`        | Shared strict API/game/roster validation                           |
-| `packages/sports`           | Pure basketball events, clock, lineups, points, fouls and duration |
-| `packages/database`         | Local PGlite/PostgreSQL rehearsal adapter                          |
-| `apps/varsity-preview`      | Shared scorer UI plus loopback local server                        |
-| `apps/varsity-hosted`       | Managed hosted API and D1 SQL adapter/migrations                   |
-| `examples/alhadi-school`    | Preserved fictional intramural presentation on GitHub Pages        |
-| `docs/product/platform`     | Broader reusable platform specifications and future engineering    |
-| `scripts/prepare-varsity-*` | Deterministic shared-source preparation and provider mirror        |
+| Path                        | Purpose                                                             |
+| --------------------------- | ------------------------------------------------------------------- |
+| `apps/live-stats`           | Live stat tracker: server, service, sign-in, pages, TCSAAL fixtures |
+| `packages/contracts`        | Shared strict API/game/roster validation                            |
+| `packages/sports`           | Pure basketball rules; `basketball/live.ts` is the tracker engine   |
+| `packages/database`         | Storage: live stats interface and adapters, earlier rehearsal SQL   |
+| `apps/varsity-preview`      | Shared scorer UI plus loopback local server                         |
+| `apps/varsity-hosted`       | Managed hosted API and D1 SQL adapter/migrations                    |
+| `examples/alhadi-school`    | Preserved fictional intramural presentation on GitHub Pages         |
+| `docs/product/platform`     | Broader reusable platform specifications and future engineering     |
+| `scripts/prepare-varsity-*` | Deterministic shared-source preparation and provider mirror         |
 
 ## Continue work
 
@@ -43,16 +47,17 @@ npm ci
 npm run verify
 ```
 
-Use Node 24. Root verification prepares the shared hosted-test sources before executing tests. For the local PGlite rehearsal use `npm run dev:varsity` and `http://127.0.0.1:4174`. For the hosted adapter install its dependencies separately and follow the hosting guide. Windows ARM64 requires x64 Node 24 for Cloudflare's local runtime.
+Use Node 24. Root verification prepares the shared hosted-test sources before executing tests. For the live stat tracker use `npm run dev:stats` and `http://127.0.0.1:4180`; `npm run test:stats:browser` drives it end to end. For the earlier local PGlite rehearsal use `npm run dev:varsity` and `http://127.0.0.1:4174`. For the hosted adapter install its dependencies separately and follow the hosting guide. Windows ARM64 requires x64 Node 24 for Cloudflare's local runtime.
 
 The hosted scorer's online database is independent of the computer. Signing into the same owner account gives access on another computer. Git does not contain database records, credentials, browser profiles or local `.local`/`.wrangler` data. Export/backup operations are separate from source control.
 
 ## Known constraints and next steps
 
-- No actual roster/jersey numbers or exact current-season fixture link supplied yet; the founder will enter them later. No guessed fixtures or identities from photographs.
+- The 2026–27 fixtures were copied from the TCSAAL team page into the live tracker on October 27. The roster and jersey numbers are entered by the founder in the app; no identities guessed from photographs. TCSAAL's game format is still to be confirmed (the tracker defaults to four 8-minute quarters, editable per game).
+- Live tracker data on a laptop (`.local/live-stats`) does not move online automatically.
 - Current stats: points, made 1s/2s/3s, personal and period fouls, appearance and exact stored durations. No captured misses/FG%, rebounds, assists, steals, blocks or turnovers.
 - Zero-point appearances count as GP; DNP does not. Practice records never count toward real season totals.
-- Midgame clock correction flags minutes for review rather than inventing repaired durations.
+- Midgame clock correction: the earlier scorer flags minutes for review; the live tracker, like Faraj League, takes time set back on the clock off the minutes of whoever was on the floor.
 - The hosted Site stays owner-private. General staff roles, scorer leases/offline queues, public projections and full multitenant isolation are later implementation gates.
 - Team records do not claim to be TCSAAL's official results or standings.
 - Managed PostgreSQL is the broader product target; hosted D1 is an explicit pilot adapter, with migration requirements documented. Do not grow customer-specific source forks.

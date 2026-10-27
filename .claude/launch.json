@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "live-stats",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:stats"],
+      "port": 4180,
+      "url": "http://127.0.0.1:4180"
+    }
+  ]
+}
