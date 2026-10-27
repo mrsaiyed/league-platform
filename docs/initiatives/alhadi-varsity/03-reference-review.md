@@ -23,6 +23,8 @@ The new rehearsal covers the central scoring interaction but is not complete Far
 
 ## Current schedule evidence
 
+**Update, October 27, 2026:** at the founder's direction the 2026–27 schedule was copied from the [Al-Hadi varsity boys team page](https://texascharter.org/tc_team/26-27-al-hadi-school-varsity-boys-basketball/) (division ETXBBVB5, ten games) into the [live stat tracker](04-live-stats.md). The review below describes the earlier state.
+
 The official [TCSAAL schedule page](https://texascharter.org/league-schedules/) supports region/sport/division/season/team filters. The initial generic page did not establish a current Al-Hadi team-specific schedule. The [school basketball page](https://www.alhadi.com/athletic/basketball.html) describes TCSAAL participation but contains historical season information; it is not a current roster source. Search also surfaced a prior-season Vensport competition, which was not imported.
 
 The founder will supply/enter confirmed details later. The mock therefore links to the official schedule and accepts manual dates/venue/source URL; it does not claim automatic synchronization. Before adding an adapter, verify exact current-season team identity, allowed access, stable external IDs, time zone and cancellation/rescheduling semantics. Save source/provenance and require review of imported changes. Never let a subsequent feed overwrite a started game's reviewed roster or locally corrected result.

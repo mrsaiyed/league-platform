@@ -2,13 +2,26 @@
 
 An end-to-end league-management platform with customizable public websites, private administration, and reusable operational modules. Basketball is the first implemented sport. The immediate use case is Al-Hadi varsity keeping its own game records within TCSAAL; the broader product serves organizers through shared, configurable software. Intramurals remain a later opportunity.
 
-**Status: detailed specifications, a local rehearsal and a private hosted SQL scoring pilot.** The hosted MVP saves each accepted action, event and player stat line to a shared database. It uses Sites sign-in and owner-private access; general staff roles, production tenant isolation, public publication, payments and email remain future work. The older intramural demo remains a separate fictional presentation.
+**Status: detailed specifications, a working live stat tracker, a local rehearsal and a private hosted SQL scoring pilot.** Stat tracking is the first working module of the wider platform; accounts, roles, public publication, payments and email remain future work. The older intramural demo remains a separate fictional presentation.
+
+## Live stat tracking (start here)
+
+A courtside tracker that works like the Faraj League one, with Al-Hadi's 2026–27 TCSAAL varsity boys schedule loaded. Every tap is saved to the database, and each game's live page shows the score, clock, box scores and play-by-play as they happen. Use **Node.js 24**:
+
+```sh
+npm ci
+npm run dev:stats
+```
+
+Open `http://127.0.0.1:4180` and choose **Track live stats** on a game. Add names and jersey numbers for both teams under **Players** (no limit on players; Al-Hadi's roster carries over to every game). Tap players to pick each starting lineup, start the clock, then tap a player for +1, +2, +3, Foul or −Foul. Tap a bench player to sub them in, or drag them onto whoever is coming off. **End game** puts the final on the schedule and counts the box score toward **Roster & stats**.
+
+Records are kept in embedded PostgreSQL under gitignored `.local/live-stats/` on this computer. To let phones on the same network watch live, start with `LIVE_STATS_LAN=1`. See [live stat tracking](docs/initiatives/alhadi-varsity/04-live-stats.md) for what is saved, the game format and what comes next.
 
 **Preserved presentation concept:** [Open the Al-Hadi demo](https://mrsaiyed.github.io/league-platform/).
 
-**Online scorer:** [Al-Hadi Varsity Scoring](https://alhadi-varsity-scoring.fairstone8.chatgpt.site). Sign in with the owner account. Saved game records are shared across computers; browser storage is used only for pending retries. See the [cross-computer handoff](docs/operations/cross-computer-handoff.md).
+**Online scorer (earlier pilot):** [Al-Hadi Varsity Scoring](https://alhadi-varsity-scoring.fairstone8.chatgpt.site). Sign in with the owner account. It is separate from the live stat tracker above and does not share its records. See the [cross-computer handoff](docs/operations/cross-computer-handoff.md).
 
-## Run the local rehearsal
+## Run the earlier local rehearsal
 
 Use **Node.js 24**:
 
@@ -49,11 +62,13 @@ Use the **Meeting guide** at the top of the concept for a walkthrough. **Public 
 ## Repository layout
 
 ```text
-apps/varsity-hosted/         Private hosted API, shared SQL adapter and migrations
-apps/varsity-preview/        Shared scorer UI and local loopback HTTP server
+apps/live-stats/             Live stat tracker: server, schedule, tracker, live and team pages
+  data/                      Season fixtures copied from TCSAAL
+apps/varsity-hosted/         Earlier private hosted API, shared SQL adapter and migrations
+apps/varsity-preview/        Earlier scorer UI and local loopback HTTP server
 packages/contracts/          Validated typed roster/game/command schemas
-packages/sports/             Pure basketball state, clock and scoring rules
-packages/database/           Local SQL schema, scoped queries and transactions
+packages/sports/             Pure basketball rules; basketball/live.ts runs the live tracker
+packages/database/           SQL schemas, scoped queries and transactions
 examples/alhadi-school/       Presentation prototype; deliberately isolated
   assets/                    School seal, Lions crest, and supplied AHS photographs
   src/
@@ -88,9 +103,10 @@ Generated `dist/`, screenshots, local dependencies, credentials, and browser pro
 npm run verify
 npm run test:browser
 npm run test:varsity:browser
+npm run test:stats:browser
 ```
 
-`verify` checks demo syntax/assets, strict TypeScript, domain/database tests, formatting and the preserved demo build. The varsity browser check uses a disposable SQL database to exercise roster entry, scoring, lost-response recovery, reload, automatic totals and desktop/mobile layouts. The other browser check exercises the portable intramural artifact. Install the test browser once with `npx playwright install chromium`, or set `BROWSER_EXECUTABLE` to an installed Chrome/Edge executable. `BROWSER_PROFILE_DIR` can select an isolated writable profile directory for restricted Windows environments. Never use a personal browser profile for these tests.
+`verify` checks demo syntax/assets, strict TypeScript, domain/database tests, formatting and the preserved demo build. The varsity browser check uses a disposable SQL database to exercise roster entry, scoring, lost-response recovery, reload, automatic totals and desktop/mobile layouts. The live stats check does the same for the tracker: rosters, lineups, scoring, tap and drag substitutions, a lost response, the live page following along, ending a game and phone layouts. The other browser check exercises the portable intramural artifact. Install the test browser once with `npx playwright install chromium`, or set `BROWSER_EXECUTABLE` to an installed Chrome/Edge executable. `BROWSER_PROFILE_DIR` can select an isolated writable profile directory for restricted Windows environments. Never use a personal browser profile for these tests.
 
 The browser check also exports presentation screenshots under `artifacts/screenshots/`. These are generated deliverables, not source.
 

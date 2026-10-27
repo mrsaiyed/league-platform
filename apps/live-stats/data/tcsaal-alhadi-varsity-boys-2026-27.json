@@ -1,0 +1,135 @@
+{
+  "season": "2026-27",
+  "source": "TCSAAL",
+  "division": "ETXBBVB5",
+  "copiedFrom": "https://texascharter.org/tc_team/26-27-al-hadi-school-varsity-boys-basketball/",
+  "copiedOn": "2026-10-27",
+  "note": "Copied by hand from the TCSAAL team page. TCSAAL remains the official schedule; times are Central (Houston). Game 533 is listed as an Al-Hadi away game at the Al-Hadi Gym, kept exactly as published.",
+  "team": {
+    "slug": "al-hadi-school",
+    "name": "Al-Hadi",
+    "school": "Al-Hadi School",
+    "sourceUrl": "https://texascharter.org/tc_team/26-27-al-hadi-school-varsity-boys-basketball/"
+  },
+  "opponents": [
+    { "slug": "kipp-academy-west", "name": "KIPP Academy West", "school": "KIPP Academy West" },
+    {
+      "slug": "180-degrees-academy",
+      "name": "180 Degrees Academy",
+      "school": "180 Degrees Academy"
+    },
+    {
+      "slug": "kipp-connect-preparatory",
+      "name": "KIPP Connect Prep",
+      "school": "KIPP Connect Preparatory"
+    },
+    {
+      "slug": "houston-heights-high-school",
+      "name": "Houston Heights",
+      "school": "Houston Heights High School"
+    },
+    { "slug": "beta-academy", "name": "Beta Academy", "school": "Beta Academy" }
+  ],
+  "games": [
+    {
+      "number": 653,
+      "startsAt": "2026-11-02T19:00:00-06:00",
+      "home": "kipp-academy-west",
+      "away": "al-hadi-school",
+      "type": "exhibition",
+      "venue": "KIPP Academy West Gym",
+      "address": "15022 Old Richmond Dr, Sugar Land, TX 77498",
+      "sourceUrl": "https://texascharter.org/tc_event/26-27-al-hadi-school-varsity-boys-basketball-26-27-kipp-academy-west-varsity-boys-basketball/"
+    },
+    {
+      "number": 126,
+      "startsAt": "2026-11-06T17:30:00-06:00",
+      "home": "180-degrees-academy",
+      "away": "al-hadi-school",
+      "type": "regular_season",
+      "venue": "East TX TBD Gym",
+      "address": "Houston, TX",
+      "sourceUrl": "https://texascharter.org/tc_event/26-27-al-hadi-school-varsity-boys-basketball-26-27-180-degrees-academy-varsity-boys-basketball/"
+    },
+    {
+      "number": 159,
+      "startsAt": "2026-11-11T17:30:00-06:00",
+      "home": "al-hadi-school",
+      "away": "kipp-connect-preparatory",
+      "type": "regular_season",
+      "venue": "Al-Hadi Gym",
+      "address": "14855 Richmond Ave. Houston, TX 77082",
+      "sourceUrl": "https://texascharter.org/tc_event/26-27-kipp-connect-preparatory-varsity-boys-basketball-26-27-al-hadi-school-varsity-boys-basketball/"
+    },
+    {
+      "number": 229,
+      "startsAt": "2026-11-18T17:30:00-06:00",
+      "home": "al-hadi-school",
+      "away": "houston-heights-high-school",
+      "type": "regular_season",
+      "venue": "Al-Hadi Gym",
+      "address": "14855 Richmond Ave. Houston, TX 77082",
+      "sourceUrl": "https://texascharter.org/tc_event/26-27-houston-heights-high-school-varsity-boys-basketball-26-27-al-hadi-school-varsity-boys-basketball/"
+    },
+    {
+      "number": 287,
+      "startsAt": "2026-12-02T17:30:00-06:00",
+      "home": "al-hadi-school",
+      "away": "beta-academy",
+      "type": "regular_season",
+      "venue": "Al-Hadi Gym",
+      "address": "14855 Richmond Ave. Houston, TX 77082",
+      "sourceUrl": "https://texascharter.org/tc_event/26-27-beta-academy-varsity-boys-basketball-26-27-al-hadi-school-varsity-boys-basketball/"
+    },
+    {
+      "number": 658,
+      "startsAt": "2026-12-10T17:30:00-06:00",
+      "home": "al-hadi-school",
+      "away": "kipp-academy-west",
+      "type": "exhibition",
+      "venue": "Al-Hadi Gym",
+      "address": "14855 Richmond Ave. Houston, TX 77082",
+      "sourceUrl": "https://texascharter.org/tc_event/26-27-kipp-academy-west-varsity-boys-basketball-26-27-al-hadi-school-varsity-boys-basketball/"
+    },
+    {
+      "number": 409,
+      "startsAt": "2026-12-14T17:30:00-06:00",
+      "home": "beta-academy",
+      "away": "al-hadi-school",
+      "type": "regular_season",
+      "venue": "Beta Academy Gym",
+      "address": "10929 Almeda Genoa Rd Houston, TX 77034",
+      "sourceUrl": "https://texascharter.org/tc_event/26-27-al-hadi-school-varsity-boys-basketball-26-27-beta-academy-varsity-boys-basketball/"
+    },
+    {
+      "number": 438,
+      "startsAt": "2026-12-16T17:30:00-06:00",
+      "home": "al-hadi-school",
+      "away": "180-degrees-academy",
+      "type": "regular_season",
+      "venue": "Al-Hadi Gym",
+      "address": "14855 Richmond Ave. Houston, TX 77082",
+      "sourceUrl": "https://texascharter.org/tc_event/26-27-180-degrees-academy-varsity-boys-basketball-26-27-al-hadi-school-varsity-boys-basketball/"
+    },
+    {
+      "number": 533,
+      "startsAt": "2027-01-08T17:30:00-06:00",
+      "home": "houston-heights-high-school",
+      "away": "al-hadi-school",
+      "type": "regular_season",
+      "venue": "Al-Hadi Gym",
+      "address": "14855 Richmond Ave. Houston, TX 77082",
+      "sourceUrl": "https://texascharter.org/tc_event/26-27-al-hadi-school-varsity-boys-basketball-26-27-houston-heights-high-school-varsity-boys-basketball/"
+    },
+    {
+      "number": 583,
+      "startsAt": "2027-01-13T17:30:00-06:00",
+      "home": "kipp-connect-preparatory",
+      "away": "al-hadi-school",
+      "type": "regular_season",
+      "venue": "KIPP Connect Gym",
+      "address": "6700 Bellaire Blvd, Houston, TX, 77074",
+      "sourceUrl": "https://texascharter.org/tc_event/26-27-al-hadi-school-varsity-boys-basketball-26-27-kipp-connect-preparatory-varsity-boys-basketball/"
+    }
+  ]
+}

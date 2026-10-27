@@ -13,5 +13,5 @@
     "types": ["node"],
     "lib": ["ES2023", "DOM"]
   },
-  "include": ["packages/**/*.ts", "apps/varsity-preview/**/*.ts"]
+  "include": ["packages/**/*.ts", "apps/varsity-preview/**/*.ts", "apps/live-stats/**/*.ts"]
 }

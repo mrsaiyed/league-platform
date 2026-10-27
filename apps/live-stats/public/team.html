@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Roster &amp; stats · Al-Hadi Varsity</title>
+    <link rel="icon" href="/img/lions.png" />
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header" id="site-header"></header>
+    <main id="main" tabindex="-1">
+      <section class="intro">
+        <div>
+          <h1 id="team-name">Roster &amp; stats</h1>
+          <p class="sub" id="team-sub"></p>
+        </div>
+        <div class="record" id="record"></div>
+      </section>
+      <div class="team-grid">
+        <section class="panel">
+          <h2>Roster</h2>
+          <p class="hint" id="roster-hint">
+            Type a jersey number and name, then press Enter. Changes save as you go. There is no
+            limit on players.
+          </p>
+          <div id="roster"></div>
+        </section>
+        <section class="panel">
+          <h2>Season stats</h2>
+          <p class="hint">
+            Totals from final games. A game counts once it is ended in the tracker.
+          </p>
+          <div class="table-wrap" id="stats"></div>
+          <h2 class="spaced">Results</h2>
+          <div class="table-wrap" id="results"></div>
+        </section>
+      </div>
+    </main>
+    <script type="module" src="/js/team.js"></script>
+  </body>
+</html>

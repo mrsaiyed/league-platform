@@ -2,19 +2,21 @@
   "name": "league-platform",
   "version": "0.1.0",
   "private": true,
-  "description": "League platform specifications, preserved intramural concept, and Al-Hadi varsity scoring rehearsal",
+  "description": "League platform specifications, live stat tracking for Al-Hadi varsity, and preserved concepts",
   "type": "module",
   "engines": {
     "node": ">=24 <25"
   },
   "scripts": {
     "dev": "node scripts/serve-demo.mjs",
+    "dev:stats": "node --disable-warning=ExperimentalWarning apps/live-stats/server.ts",
     "build:demo": "node scripts/build-demo.mjs",
     "check": "node scripts/check.mjs",
     "test": "node --test tests/*.test.mjs",
     "pretest": "node scripts/prepare-varsity-hosted.mjs",
     "test:browser": "node scripts/check-browser.mjs",
     "test:varsity:browser": "node scripts/check-varsity-browser.mjs",
+    "test:stats:browser": "node scripts/check-live-stats-browser.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "verify": "npm run check && npm run typecheck && npm test && npm run format:check && npm run build:demo",

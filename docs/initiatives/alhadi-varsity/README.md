@@ -8,6 +8,7 @@ The founder will enter the roster, jersey numbers and confirmed fixtures later. 
 
 ## Documents
 
+- [Live stat tracking: the working tracker, schedule and live pages](04-live-stats.md).
 - [MVP behavior, scope and acceptance](01-mvp-contract.md).
 - [Technical implementation and production migration](02-engineering-contract.md).
 - [Faraj review and schedule provenance](03-reference-review.md).
@@ -45,7 +46,7 @@ Editable saved roster; manual game setup; opponent jerseys; first-five lineup he
 
 Full platform identity/game assignments and production schema/RLS; scorer lease/takeover and offline recovery; confirmed sport rules and exceptional outcomes; clock/minute correction review; real-device full-game rehearsal; backup/restore proof; approved public-data rules. The local preview is explicitly labeled as a rehearsal and should not be used as the sole record of a real game.
 
-GitHub Pages continues to host the existing static concept. The hosted varsity scorer uses a separate Sites deployment and shared D1 database. No current TCSAAL fixtures were imported. Hosted D1 is an explicit pilot adapter; managed PostgreSQL remains the broader product recommendation.
+GitHub Pages continues to host the existing static concept. The hosted varsity scorer uses a separate Sites deployment and shared D1 database. The 2026–27 TCSAAL fixtures are loaded only in the [live stat tracker](04-live-stats.md), not in this rehearsal or the hosted pilot. Hosted D1 is an explicit pilot adapter; managed PostgreSQL remains the broader product recommendation.
 
 ## Verification
 
