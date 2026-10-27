@@ -1,5 +1,7 @@
 # Architecture decisions and production boundary
 
+The active discussion baseline is the [product specification v0.7](../product/platform/README.md), with a [detailed engineering design](../product/platform/engineering/README.md) for repository/files, schema, customization, APIs, security and operating budgets. The active first slice is [Al-Hadi varsity scoring](../initiatives/alhadi-varsity/README.md); the broader platform remains shared and configurable. [ADR-004](decisions/004-varsity-scoring-slice.md) defines the local SQL rehearsal, private hosted SQL pilot and production migration boundary.
+
 ## ADR-001: retain a separate presentation example
 
 **Status:** implemented for the concept, October 7, 2026.
@@ -12,7 +14,7 @@ This preserves the visual work without presenting its persistence as production 
 
 ## ADR-002: use a modular monolith for production
 
-**Status:** proposed; see specification section 5.
+**Status:** proposed; see the [active architecture section](../product/platform/10-architecture-apis-integrations.md).
 
 One Next.js application with strict TypeScript, modular business services, managed PostgreSQL/Supabase, and explicit server-side commands is the recommended starting point. Public pages, commissioner tools, and the player portal share a product and domain model.
 
@@ -20,24 +22,28 @@ Introduce this structure when implementing the actual first production slice:
 
 ```text
 apps/web/                         Routes, views, authenticated server entry points
-packages/domain/                  Organization, registration, payment, draft, schedule
-packages/sports/basketball/        Typed events, rules, reducers, projections
-packages/contracts/               Validated API and event contracts
+apps/worker/                      Durable job runner and handler wiring
+packages/core/                    Authorized use cases, rules and adapter ports
+packages/database/                Typed SQL, transactions and scoped DTO queries
+packages/providers/               Auth, payments, email and storage adapters
+packages/sports/                  Sport rules, reducers and stat definitions
+packages/contracts/               Validated API, event and configuration contracts
 packages/ui/                      Shared accessible components and theme tokens
-supabase/migrations/              Schema, RLS, grants, constraints, transactions
-supabase/functions/               Reviewed background workers
+packages/site/                    Supported page blocks and public rendering
+packages/observability/           Redacted logging, metrics and tracing helpers
+supabase/migrations/              Schema, RLS, grants, constraints and SQL functions
 tests/integration/                Database isolation, concurrency, provider workflows
 ```
 
-These folders are a plan, not a collection of empty stubs that implies finished engineering. Start with one complete vertical slice: verified account → organization membership → registration → private status. Keep organization identity and scoped foreign keys from the first migration.
+These folders are a plan, not a collection of empty stubs that implies finished engineering. The [repository contract](../product/platform/engineering/01-repository-and-boundaries.md) owns the exact package responsibilities and 40-file first-slice source inventory. Start with the reusable scoring slice: roster → game setup → accepted events → final record → season totals. Hosted game-day release requires verified organizer/workspace/game authority and safe publication. Then expand self-service competition setup and the website editor. Enrollment and paid workflows follow their approved release gates. Keep owning-workspace identity and scoped foreign keys from the first migration. Introduce explicit competition/entry scope with the first competition workflow. Institution affiliations and delegated governance are separate contracts; see the [scale and governance contract](../product/platform/12-scale-governance-enterprise.md).
 
 ## ADR-003: identity before engagement automation
 
 **Status:** proposed in response to founder direction, October 7, 2026.
 
-Signup creates or reuses an authentication identity through verified email. Account creation is separate from participant identity, school approval, playing-place allocation, payment, and permission. Returning applicants do not get duplicate identities; paying for a student does not confer ownership of that student's account.
+Signup creates or reuses an authentication identity through verified email. Account creation is separate from participant identity, any required eligibility review, playing-place allocation, payment, and permission. Returning applicants do not get duplicate identities; paying for a participant does not confer ownership of that participant's account.
 
-A basic player portal is part of the pilot foundation. An inbox can start small. Game reminder scheduling, report emails, web push, and a native app are progressively added capabilities. See the [detailed contract](../product/accounts-and-notifications-v0.2.md).
+A participant portal and inbox are proposed core experiences. Reminder scheduling, report emails, push, and a native app follow their selected release gates. See the [communication contract](../product/platform/09-communication-media-engagement.md) and [security/privacy contract](../product/platform/04-identity-security-privacy.md).
 
 ## Review gates before production
 

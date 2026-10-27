@@ -1,6 +1,10 @@
 # League Platform — School Pilot & Product Foundation
 
+> Historical snapshot: this prospective-client initiative is inactive. Use the [active overall product plan](../../../product/platform/README.md) for current direction. Earlier approval/customer statements below retain their historical context.
+
 **Working specification v0.1 · October 6, 2026**
+
+Historical draft. The [platform specification v0.3](platform-spec-v0.3/README.md) is the current discussion baseline and supersedes conflicting pilot assumptions below.
 
 **Status:** Ready for discussion and revision. Confirmed requirements come from the founder's instructions. Architecture, defaults, targets, and sequencing are recommendations unless explicitly marked confirmed. This document is a proposed implementation contract, not a claim that the product is built or that every decision has been approved.
 

@@ -15,3 +15,20 @@ jobs:
       - run: npm run verify
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - run: npm run test:varsity:browser
+  hosted-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/varsity-hosted/package-lock.json
+      - run: npm ci
+      - run: npm run prepare:varsity:hosted
+      - run: npm --prefix apps/varsity-hosted ci
+      - run: node node_modules/typescript/bin/tsc --noEmit
+        working-directory: apps/varsity-hosted
+      - run: npm run build
+        working-directory: apps/varsity-hosted

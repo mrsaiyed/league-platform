@@ -1,5 +1,9 @@
 # Accounts and personal notifications — v0.2 proposal
 
+> Historical snapshot: this prospective-client initiative is inactive. Use the [active overall product plan](../../../product/platform/README.md) for current direction. Earlier approval/customer statements below retain their historical context.
+
+Historical addendum. Its direction is incorporated into the [platform specification v0.3](platform-spec-v0.3/README.md); use that package for current scope, security, and delivery decisions.
+
 **Date:** October 7, 2026. **Status:** founder-requested direction; the implementation choices and release placement below are proposed for discussion. This supplements the v0.1 school specification without silently approving unrelated decisions.
 
 The founder wants signup to create an account naturally, with a personal website notification area, upcoming-game reminders, last-game reports, and possible email delivery. A native app is not required for a personal website inbox.
