@@ -14,20 +14,44 @@ export class ApiError extends Error {
   }
 }
 
-/** JSON in, JSON out. Status 0 means the server could not be reached at all. */
-export async function api(path, { method = 'GET', body } = {}) {
-  let res;
+/**
+ * JSON in, JSON out. Status 0 means no usable answer: the server could not be
+ * reached, took longer than `timeoutMs`, or the answer was cut off. A request on
+ * gym Wi-Fi can hang without ever failing, so every request gives up in time and
+ * the caller retries; scorer actions are safe to repeat. `keepalive` lets a save
+ * started as the page closes finish after it.
+ */
+export async function api(path, { method = 'GET', body, timeoutMs = 12_000, keepalive } = {}) {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
+  let res, text;
   try {
     res = await fetch(path, {
       method,
       headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: abort.signal,
+      keepalive: Boolean(keepalive),
     });
+    text = await res.text();
   } catch {
-    throw new ApiError('No connection to the stats server.', 0);
+    throw new ApiError(
+      abort.signal.aborted
+        ? 'The stats server took too long to answer.'
+        : 'No connection to the stats server.',
+      0,
+    );
+  } finally {
+    clearTimeout(timer);
   }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(data.error || `Request failed (${res.status}).`, res.status);
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    // A proxy's error page, or an answer cut short: not the server's.
+  }
+  if (!res.ok) throw new ApiError(data?.error || `Request failed (${res.status}).`, res.status);
+  if (data === null) throw new ApiError('The stats server sent an unreadable answer.', 0);
   return data;
 }
 

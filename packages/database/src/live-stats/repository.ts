@@ -52,8 +52,14 @@ export interface LiveStatsRepository {
     decide: (game: GameRecord) => Recorded,
   ): Promise<'recorded' | 'duplicate' | 'missing'>;
 
-  /** Box score lines of this team's players from its final games, for season totals. */
-  finalLines(teamId: string): Promise<LineRecord[]>;
+  /**
+   * Box score lines of this team's players from its final games, each with its
+   * game: season totals and the team's and players' game logs come from these.
+   */
+  finalLines(teamId: string): Promise<GameLineRecord[]>;
+
+  /** One game's box score lines as last saved, with each player's name and number then. */
+  gameLines(gameId: string): Promise<LineRecord[]>;
 }
 
 /** The order every adapter lists players in: 00, 0, 1 … 99, then no number; then by name. */
@@ -128,6 +134,8 @@ export type LineRecord = {
   fouls: number;
   ms: number;
 };
+/** A line with the game it is from. */
+export type GameLineRecord = LineRecord & { gameId: string };
 
 /** What recording one scorer action saves. */
 export type Recorded = {

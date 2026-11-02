@@ -48,3 +48,15 @@ The Faraj-style live stat tracker (`apps/live-stats`) passed `npm run verify` wi
 By hand: the server was killed mid-game while the tracker kept scoring; after a restart (which cleared the stale lock by itself) every queued action landed once and earlier records were intact. A production-only install (no development packages) started in online mode and served the schedule and pages. The 2026–27 schedule was copied from the TCSAAL team page and each game page was opened to record its number and type.
 
 Not yet verified: building the Docker image (no Docker on the build computer), a real Supabase database and host, a full real game on the scoring laptop, and TCSAAL's game format.
+
+## November 2 live stats: game-ready and Supabase-ready
+
+Two save gaps were found by driving the tracker in a browser and are fixed: a player typed into the Players panel without pressing Enter or Add was lost when **Done** was tapped, and a save request that never answered (as on weak gym Wi-Fi) left the tracker on "Saving…" forever with every later tap stuck behind it. Each now has a browser check. Requests give up after 12 seconds and retry; a tap is only dropped when the rules refuse it. Hosted database connections now time out instead of hanging, and broken ones are discarded.
+
+`npm run verify` passed with 74 tests, including: the same storage tests against all three adapters, now with team and player game logs; a server killed with SIGKILL straight after a confirmed tap, restarted with nothing lost (run five times); Supabase's `anon` and `authenticated` roles locked out by privileges and by row-level security while a non-superuser owner, as Supabase's `postgres` is, keeps working; connection-string advice; and copying games up to PostgreSQL reached over the network through `pg` (teams matched by slug, a separately entered player matched by number and name, every recorded action and box score line carried over, then caught up, left alone when further along there, and conflicts refused unless `--replace`), and back down to a folder as a backup.
+
+`npm run test:stats:browser` passed in Chromium with the new steps: quick-adding numbers, a player saved by **Done** alone, lineup picks kept across a reload, the pre-game prompt, a request that never answers being saved once, the play log's "all saved" count, and the team and player game logs. Screenshots were inspected, including the pre-game prompt at desktop and phone width.
+
+By hand: `npm run stats:db-check` and `npm run stats:copy` were run against PostgreSQL over the network standing in for Supabase (placeholder password and missing URL rejected with advice; a game tracked through the local server copied up, a second run copying nothing; the tracker then served the copied game, record and game logs from it; and a backup copied down to a folder). The copy refused to run while the local tracker had its database open.
+
+Not yet verified: a real Supabase project (none exists yet), the Docker image, a full real game on the scoring laptop, and TCSAAL's game format.

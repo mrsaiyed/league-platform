@@ -31,6 +31,8 @@ const $ = (id) => document.getElementById(id);
 let game = null;
 let canScore = false;
 let session = null;
+/** Player id → the player, with the name and number saved with a final game's box score. */
+let people = new Map();
 
 /** The clock reading for the header, with the period derived from the plays. */
 function clockText(d, now) {
@@ -61,7 +63,9 @@ function boxScore(side, d) {
   const final = game.status === 'final';
   const onCourt = game.status === 'live' ? d.teams[side].onCourt : [];
   const roster = sortPlayers(
-    game.players.filter((p) => p.teamId === teamId && (p.active || d.players[p.id])),
+    game.players
+      .filter((p) => p.teamId === teamId && (p.active || d.players[p.id]))
+      .map((p) => people.get(p.id) ?? p),
   );
   const total = { points: 0, fg3: 0, fg2: 0, fg1: 0, fouls: 0 };
   const rows = roster.map((p) => {
@@ -71,7 +75,7 @@ function boxScore(side, d) {
     const cells = played
       ? `<td data-min="${esc(p.id)}">${formatMinutes(l.ms)}</td><td><b>${l.points}</b></td><td>${l.fg3}</td><td>${l.fg2}</td><td>${l.fg1}</td><td>${l.fouls}</td>`
       : `<td colspan="6" class="dnp-cell">${final ? 'DNP' : '—'}</td>`;
-    return `<tr class="${played ? '' : 'dnp'}${onCourt.includes(p.id) ? ' on-court' : ''}"><td class="num">${esc(p.jersey)}</td><td class="name">${esc(p.name || `#${p.jersey}`)}</td>${cells}</tr>`;
+    return `<tr class="${played ? '' : 'dnp'}${onCourt.includes(p.id) ? ' on-court' : ''}"><td class="num">${esc(p.jersey)}</td><td class="name"><a href="/player/${esc(p.id)}" title="Game log">${esc(p.name || `#${p.jersey}`)}</a></td>${cells}</tr>`;
   });
   return `<section class="panel">
     <h2>${esc(game[side].name)}</h2>
@@ -87,7 +91,7 @@ function playByPlay() {
   const plays = game.state.plays;
   const scores = runningScores(plays);
   const periods = game.state.rules.periods;
-  const nameOf = (id) => playerLabel(game.players.find((p) => p.id === id));
+  const nameOf = (id) => playerLabel(people.get(id));
   const items = plays.map((play, i) => {
     if (play.type === 'period')
       return `<li class="is-period"><span class="when">${esc(periodLabel(play.period, periods))}</span><span class="what">Start of ${esc(periodLabel(play.period, periods))}</span><span></span></li>`;
@@ -146,6 +150,14 @@ setInterval(() => {
 function adopt(payload) {
   if (game && payload.revision < game.revision) return;
   game = payload;
+  // A final game shows names and numbers as they were in it, even if a roster changed since.
+  const saved = new Map((payload.lines ?? []).map((l) => [l.playerId, l]));
+  people = new Map(
+    payload.players.map((p) => {
+      const l = saved.get(p.id);
+      return [p.id, l ? { ...p, name: l.name, jersey: l.jersey } : p];
+    }),
+  );
   serverClock.sync(payload.serverTime);
   render();
 }

@@ -76,6 +76,13 @@
         <div class="lt-sync" id="lt-sync" role="status">Connecting…</div>
       </div>
 
+      <div class="lt-pregame" id="lt-pregame" hidden>
+        <div><b>Before tip-off</b> · <span id="lt-pregame-text"></span></div>
+        <button type="button" class="lt-btn lt-btn-save" id="lt-pregame-players">
+          Enter jersey numbers
+        </button>
+      </div>
+
       <div class="lt-final" id="lt-final" hidden>
         Final. Everything is saved.
         <button type="button" class="lt-btn" id="lt-reopen">Reopen game</button>
@@ -114,7 +121,9 @@
       </p>
 
       <div class="lt-log-wrap">
-        <div class="lt-log-title">Play log</div>
+        <div class="lt-log-title">
+          Play log <span class="lt-log-count" id="lt-log-count"></span>
+        </div>
         <div class="lt-log" id="lt-log"></div>
       </div>
       <div class="lt-msg" id="lt-msg" role="status" aria-live="polite"></div>

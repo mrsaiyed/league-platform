@@ -6,16 +6,25 @@ An end-to-end league-management platform with customizable public websites, priv
 
 ## Live stat tracking (start here)
 
-A courtside tracker that works like the Faraj League one, with Al-Hadi's 2026–27 TCSAAL varsity boys schedule loaded. Every tap is saved to the database, and each game's live page shows the score, clock, box scores and play-by-play as they happen. Use **Node.js 24**:
+A courtside tracker that works like the Faraj League one, with Al-Hadi's 2026–27 TCSAAL varsity boys schedule loaded. Every tap is saved to the database as it happens, and each game's live page shows the score, clock, box scores and play-by-play as they happen. Use **Node.js 24**:
 
 ```sh
 npm ci
 npm run dev:stats
 ```
 
-Open `http://127.0.0.1:4180` and choose **Track live stats** on a game. Add names and jersey numbers for both teams under **Players** (no limit on players; Al-Hadi's roster carries over to every game). Tap players to pick each starting lineup, start the clock, then tap a player for +1, +2, +3, Foul or −Foul. Tap a bench player to sub them in, or drag them onto whoever is coming off. **End game** puts the final on the schedule and counts the box score toward **Roster & stats**.
+Open `http://127.0.0.1:4180` and choose **Track live stats** on a game.
 
-Records are kept in embedded PostgreSQL under gitignored `.local/live-stats/` on this computer. To let phones on the same network watch live, start with `LIVE_STATS_LAN=1`. To put it online with Supabase or another database, see [putting live stats online](docs/operations/live-stats-hosting.md). See [live stat tracking](docs/initiatives/alhadi-varsity/04-live-stats.md) for what is saved, the game format and what comes next.
+1. **Before tip-off**, tap **Enter jersey numbers** and check both teams. Type a number and name and press Enter, or put a whole team's numbers in **Several numbers** (`3 5 10 12 14 21`) and tap **Add all**. There is no limit on players; Al-Hadi's roster and each opponent's carry over to later games.
+2. Tap players to pick each starting five, then start the clock.
+3. Tap a player for +1, +2, +3, Foul or −Foul. Tap a bench player to sub them in, or drag them onto whoever is coming off.
+4. **End game** puts the final on the schedule and counts the box score toward **Roster & stats**.
+
+**What is kept:** the **play log** (every play with the running score, under the tracker and on the game page) and the **game logs** (on **Roster & stats**, one line per final game for the team, and for each player when you tap their name). The database also keeps every scorer action in order as each game's history.
+
+**Saving:** each tap is saved before the tracker shows **Saved to the database**. If the connection drops or the server is slow, taps wait on the scoring device and go through, once each, as soon as it can. Nothing typed into **Players** is left unsaved, including a player half-entered when **Done** is tapped.
+
+**Where it is saved:** on this computer by default, in embedded PostgreSQL under gitignored `.local/live-stats/`. To save to **Supabase** instead, put its connection string in a `.env` file (see [`.env.example`](.env.example)), run `npm run stats:db-check`, then `npm run stats:copy` to bring up games already tracked here. Full steps: [live stats on Supabase](docs/operations/live-stats-hosting.md). To let phones on the same network watch live, start with `LIVE_STATS_LAN=1`. See [live stat tracking](docs/initiatives/alhadi-varsity/04-live-stats.md) for what is saved, the game format and what comes next.
 
 **Preserved presentation concept:** [Open the Al-Hadi demo](https://mrsaiyed.github.io/league-platform/).
 
@@ -62,8 +71,9 @@ Use the **Meeting guide** at the top of the concept for a walkthrough. **Public 
 ## Repository layout
 
 ```text
-apps/live-stats/             Live stat tracker: server, schedule, tracker, live and team pages
+apps/live-stats/             Live stat tracker: server, schedule, tracker, live, team and player pages
   data/                      Season fixtures copied from TCSAAL
+  db-check.ts, copy.ts       Check a Supabase database; copy games between databases
 apps/varsity-hosted/         Earlier private hosted API, shared SQL adapter and migrations
 apps/varsity-preview/        Earlier scorer UI and local loopback HTTP server
 packages/contracts/          Validated typed roster/game/command schemas
@@ -106,7 +116,7 @@ npm run test:varsity:browser
 npm run test:stats:browser
 ```
 
-`verify` checks demo syntax/assets, strict TypeScript, domain/database tests, formatting and the preserved demo build. The varsity browser check uses a disposable SQL database to exercise roster entry, scoring, lost-response recovery, reload, automatic totals and desktop/mobile layouts. The live stats check does the same for the tracker: rosters, lineups, scoring, tap and drag substitutions, a lost response, the live page following along, ending a game and phone layouts. The other browser check exercises the portable intramural artifact. Install the test browser once with `npx playwright install chromium`, or set `BROWSER_EXECUTABLE` to an installed Chrome/Edge executable. `BROWSER_PROFILE_DIR` can select an isolated writable profile directory for restricted Windows environments. Never use a personal browser profile for these tests.
+`verify` checks demo syntax/assets, strict TypeScript, domain/database tests, formatting and the preserved demo build. The varsity browser check uses a disposable SQL database to exercise roster entry, scoring, lost-response recovery, reload, automatic totals and desktop/mobile layouts. The live stats check does the same for the tracker: rosters (quick-add numbers, a player saved by Done alone), lineups kept across a reload, scoring, tap and drag substitutions, a lost response, a request that never answers, the live page following along, ending a game, the team and player game logs and phone layouts. The other browser check exercises the portable intramural artifact. Install the test browser once with `npx playwright install chromium`, or set `BROWSER_EXECUTABLE` to an installed Chrome/Edge executable. `BROWSER_PROFILE_DIR` can select an isolated writable profile directory for restricted Windows environments. Never use a personal browser profile for these tests.
 
 The browser check also exports presentation screenshots under `artifacts/screenshots/`. These are generated deliverables, not source.
 

@@ -1,6 +1,8 @@
 -- Live stat tracking. Plain PostgreSQL: runs on embedded PGlite locally and on any
--- hosted PostgreSQL (Supabase included). No grants, roles or row-level security yet;
--- never expose a database with this schema to the internet as it stands.
+-- hosted PostgreSQL (Supabase included). The stats server creates all of this on
+-- start and it is safe to run again; it can also be pasted into Supabase's SQL editor.
+-- Only the stats server reads and writes it, with the database owner's password;
+-- the end of this file keeps Supabase's public API roles out.
 CREATE SCHEMA IF NOT EXISTS live_stats;
 
 CREATE TABLE IF NOT EXISTS live_stats.teams (
@@ -82,3 +84,26 @@ CREATE TABLE IF NOT EXISTS live_stats.player_game_lines (
   CHECK (points = fg1 + 2 * fg2 + 3 * fg3)
 );
 CREATE INDEX IF NOT EXISTS lines_player ON live_stats.player_game_lines(player_id);
+
+-- Supabase's Data API reaches tables as the anon and authenticated roles. This schema
+-- is not exposed to it, and these lines keep it closed even if it is added by mistake:
+-- row-level security with no policies lets those roles see no rows, and they are given
+-- no access to the schema. The stats server connects as the owner of these tables,
+-- which row-level security does not limit. Where those roles do not exist (embedded,
+-- plain PostgreSQL) the revokes are skipped.
+ALTER TABLE live_stats.teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE live_stats.players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE live_stats.games ENABLE ROW LEVEL SECURITY;
+ALTER TABLE live_stats.game_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE live_stats.player_game_lines ENABLE ROW LEVEL SECURITY;
+DO $$
+DECLARE
+  api_role text;
+BEGIN
+  FOREACH api_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_role) THEN
+      EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA live_stats FROM %I', api_role);
+      EXECUTE format('REVOKE ALL ON SCHEMA live_stats FROM %I', api_role);
+    END IF;
+  END LOOP;
+END $$;

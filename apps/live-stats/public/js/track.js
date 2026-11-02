@@ -49,6 +49,8 @@ import { playBonusHorn } from '/js/sound.js';
 const gameId = location.pathname.split('/')[2];
 const $ = (id) => document.getElementById(id);
 const OUTBOX = `live-stats:outbox:${gameId}`;
+/** Starting lineups being picked, kept so a refresh mid-pick keeps the taps. */
+const PICKS = `live-stats:picks:${gameId}`;
 
 /** A player's options: points first, they are the common case, then fouls. */
 const ACTIONS = [
@@ -69,7 +71,26 @@ let playerMap = new Map();
 /** The player whose options are open under their tile, or null. */
 let menuFor = null;
 /** Starting lineups being picked, per side. */
-const pending = { home: [], away: [] };
+const pending = loadPicks();
+
+function loadPicks() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PICKS) || '{}');
+    const list = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []);
+    return { home: list(saved?.home), away: list(saved?.away) };
+  } catch {
+    return { home: [], away: [] };
+  }
+}
+function savePicks() {
+  try {
+    if (pending.home.length || pending.away.length)
+      localStorage.setItem(PICKS, JSON.stringify(pending));
+    else localStorage.removeItem(PICKS);
+  } catch {
+    // Picks are a convenience; the lineup itself is saved when it is set.
+  }
+}
 
 function loadOutbox() {
   try {
@@ -157,9 +178,18 @@ let sending = false;
 let offline = false;
 /** The scorer's sign-in ran out: keep every tap here until they sign in again. */
 let signedOut = false;
+/** The server would not take scoring from this device; the reason, kept until it does. */
+let blocked = '';
 let retryTimer = null;
 let retryDelay = 1000;
 let savedAt = null;
+/**
+ * Answers that mean the action itself can never be saved: the rules refuse it, or
+ * the game is gone. Only these drop a tap. Anything else (no answer, a timeout, a
+ * server or database hiccup, a sign-in or permission problem) keeps it on this
+ * device and tries again, so a tap is never lost to a bad moment.
+ */
+const REFUSED = new Set([400, 404, 409, 413, 415, 422]);
 
 /** Send the outbox to the server, one command at a time, in order. */
 async function pump() {
@@ -173,21 +203,24 @@ async function pump() {
       const payload = await api(`/api/games/${gameId}/commands`, { method: 'POST', body: command });
       offline = false;
       signedOut = false;
+      blocked = '';
       retryDelay = 1000;
       savedAt = new Date();
       outbox = outbox.filter((c) => c.commandId !== command.commandId);
       saveOutbox();
       adopt(payload);
     } catch (err) {
-      if (err.status === 0 || err.status >= 500) {
-        // No connection or a server hiccup: keep it, and try again shortly.
-        offline = true;
-        retryTimer = setTimeout(() => void pump(), retryDelay);
-        retryDelay = Math.min(retryDelay * 2, 15_000);
-        break;
-      }
       if (err.status === 401) {
         signedOut = true;
+        break;
+      }
+      if (!REFUSED.has(err.status)) {
+        // No answer, a server or database hiccup, or not allowed right now: keep it
+        // and try again shortly. The server ignores a repeat it already saved.
+        offline = err.status === 0 || err.status >= 500;
+        blocked = offline ? '' : err.message;
+        retryTimer = setTimeout(() => void pump(), retryDelay);
+        retryDelay = Math.min(retryDelay * 2, 15_000);
         break;
       }
       outbox = outbox.filter((c) => c.commandId !== command.commandId);
@@ -222,6 +255,9 @@ function syncLine() {
   if (offline && outbox.length) {
     kind = 'offline';
     text = `Not connected — ${waiting} kept on this device and sent when the connection is back.`;
+  } else if (blocked && outbox.length) {
+    kind = 'offline';
+    text = `Not saved yet — ${blocked} ${waiting} kept on this device; trying again.`;
   } else if (outbox.length) {
     kind = 'saving';
     text = 'Saving…';
@@ -299,6 +335,13 @@ function renderCourt(side, d) {
     floor.innerHTML = `<div class="lt-pick">No ${esc(game[side].name)} players yet.<button type="button" class="lt-btn lt-btn-save" data-add-players="${side}">Add players</button></div>`;
     bench.innerHTML = '<span class="lt-empty">Add names and jersey numbers to start.</span>';
     return;
+  }
+  // Picks kept from before a refresh: only players still on this roster, and none
+  // once the lineup is set (perhaps from another device).
+  const keep = onCourt.length ? [] : pending[side].filter((id) => roster.some((p) => p.id === id));
+  if (keep.length !== pending[side].length) {
+    pending[side] = keep;
+    savePicks();
   }
   if (!onCourt.length) {
     const picked = pending[side].length;
@@ -402,10 +445,12 @@ function render() {
 function renderLog() {
   const scores = runningScores(view.plays);
   const unsaved = new Set(outbox.map((c) => c.commandId));
-  const rows = view.plays
-    .map((play, i) => ({ play, score: scores[i] }))
-    .slice(-60)
-    .reverse();
+  // Every play, newest first; the box scrolls. Plays still on their way to the server are dimmed.
+  const rows = view.plays.map((play, i) => ({ play, score: scores[i] })).reverse();
+  const saving = view.plays.filter((p) => unsaved.has(p.id)).length;
+  $('lt-log-count').textContent = rows.length
+    ? `${rows.length} ${rows.length === 1 ? 'play' : 'plays'} · ${saving ? `${saving} saving` : 'all saved'}`
+    : '';
   $('lt-log').innerHTML = rows.length
     ? rows
         .map(
@@ -431,6 +476,17 @@ function renderBadge() {
     : missing
       ? `${missing} ${missing === 1 ? 'player has' : 'players have'} no jersey number`
       : 'Add players and jersey numbers';
+
+  // Until the game starts: check both teams' numbers, then the starting fives and the clock.
+  const pregame = $('lt-pregame');
+  pregame.hidden = view.status !== 'scheduled';
+  if (!pregame.hidden)
+    $('lt-pregame-text').textContent = `${SIDES.map(
+      (side, i) =>
+        `${game[side].name}: ${teams[i].length} ${teams[i].length === 1 ? 'player' : 'players'}`,
+    ).join(
+      ' · ',
+    )}. Check both teams' jersey numbers, tap each starting five, then start the clock.`;
 }
 
 function paintClock(clock) {
@@ -491,6 +547,7 @@ function onPlayerTap(id, side) {
     pending[side] = picked.includes(id)
       ? picked.filter((x) => x !== id)
       : [...picked, id].slice(0, LINEUP_SIZE);
+    savePicks();
     if (pending[side].length === LINEUP_SIZE) setLineup(side);
     else render();
     return;
@@ -502,6 +559,7 @@ function onPlayerTap(id, side) {
 function setLineup(side) {
   const playerIds = pending[side];
   pending[side] = [];
+  savePicks();
   if (!perform({ type: 'lineup', side, playerIds })) render();
 }
 
@@ -713,6 +771,8 @@ function openPlayers(focusSide) {
       teamId: game[side].id,
       players: game.players.filter((p) => p.teamId === game[side].id),
       onChange: upsertPlayer,
+      // Said here too, since a save can fail after the panel is closed.
+      onError: (message) => flash(`${game[side].name} roster: ${message}`),
     }),
   }));
   drawerOpen = true;
@@ -728,7 +788,8 @@ function openPlayers(focusSide) {
 }
 function closePlayers() {
   if (!drawerOpen) return;
-  for (const { editor } of editors) editor.flush();
+  // Whatever was typed is saved, a player half-entered in an add row included.
+  for (const { editor } of editors) void editor.flush();
   drawerOpen = false;
   drawer.classList.remove('lt-open');
   scrim.classList.remove('lt-open');
@@ -744,8 +805,13 @@ function upsertPlayer(player) {
   render();
 }
 $('lt-players').onclick = () => openPlayers();
+$('lt-pregame-players').onclick = () => openPlayers();
 $('lt-drawer-done').onclick = closePlayers;
 scrim.onclick = closePlayers;
+// Closing or leaving the page with the panel open still saves what was typed.
+window.addEventListener('pagehide', () => {
+  if (drawerOpen) for (const { editor } of editors) void editor.flush({ keepalive: true });
+});
 // While a box is being typed in on a touch screen, leave room above the keyboard.
 drawer.addEventListener('focusin', () => drawer.classList.add('lt-drawer-typing'));
 drawer.addEventListener('focusout', (e) => {
@@ -762,11 +828,21 @@ async function start() {
     );
     return;
   }
-  try {
-    adopt(await api(`/api/games/${gameId}`));
-  } catch (err) {
-    $('lt-title').textContent = err.message;
-    return;
+  // A server still starting up, or a dropped connection: keep trying. Taps waiting
+  // in this browser stay put and go out once the game loads.
+  for (let wait = 1000; ; wait = Math.min(wait * 2, 10_000)) {
+    try {
+      adopt(await api(`/api/games/${gameId}`));
+      break;
+    } catch (err) {
+      if (err.status !== 0 && err.status < 500) {
+        $('lt-title').textContent = err.message;
+        return;
+      }
+      $('lt-title').textContent =
+        `Waiting for the stats server…${outbox.length ? ` ${outbox.length} unsaved ${outbox.length === 1 ? 'action is' : 'actions are'} kept on this device.` : ''}`;
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
   }
   const title = `${game.away.name} at ${game.home.name}`;
   document.title = `Live stats · ${title}`;

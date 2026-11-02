@@ -549,6 +549,27 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
 }
 
+/* Before tip-off: check both rosters */
+.lt-pregame {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  margin-top: 0.8rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--gold-line);
+  border-radius: 8px;
+  background: var(--panel);
+  font-size: 0.92rem;
+}
+.lt-pregame[hidden] {
+  display: none;
+}
+.lt-pregame b {
+  color: var(--gold);
+}
+
 /* Play log */
 .lt-log-wrap {
   margin-top: 1rem;
@@ -560,8 +581,13 @@
   color: var(--muted);
   margin-bottom: 0.4rem;
 }
+.lt-log-count {
+  margin-left: 0.5rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
 .lt-log {
-  max-height: 220px;
+  max-height: 320px;
   overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--gold-line);
@@ -699,6 +725,9 @@
 }
 .lt-drawer .re-msg {
   color: #ff8a80;
+}
+.lt-drawer .re-msg[data-kind='ok'] {
+  color: #7ed6a2;
 }
 @media (pointer: coarse) {
   .lt-drawer-typing .lt-drawer-body {

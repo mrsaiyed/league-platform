@@ -23,6 +23,8 @@ const server = spawn(
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
+      // Its own throwaway database, never one named in the environment.
+      DATABASE_URL: '',
       LIVE_STATS_PORT: String(port),
       LIVE_STATS_DATA_DIR: path.join(temporary, 'db'),
     },
@@ -108,6 +110,15 @@ try {
     ['21', 'Player TwentyOne'],
     ['00', 'Player DoubleZero'],
   ]);
+  // Several numbers at once; a repeat and a non-number are reported, not added.
+  const awayEditor = page.locator('[data-editor="away"]');
+  await awayEditor.locator('.re-quick-input').fill('40, 41 41 42 123');
+  await awayEditor.locator('.re-quick-input').press('Enter');
+  await awayEditor.locator('.re-msg', { hasText: 'Added #40, #41, #42.' }).waitFor();
+  assert.match(await awayEditor.locator('.re-msg').textContent(), /Not a jersey number .*123/);
+  // Typed into the add row, never Enter or Add: Done still saves it.
+  await page.locator('[data-editor="home"] .re-add .re-jersey').fill('44');
+  await page.locator('[data-editor="home"] .re-add .re-name').fill('Sam Typed');
   await shot(page, 'players');
   await page.getByRole('button', { name: 'Done' }).click();
 
@@ -130,12 +141,30 @@ try {
       gameId,
     );
 
+  await page.locator('#lt-pregame:not([hidden])', { hasText: 'Before tip-off' }).waitFor();
+  const roster = await page.evaluate(
+    (id) => fetch(`/api/games/${id}`).then((r) => r.json()),
+    page.url().split('/')[4],
+  );
+  const jerseys = (side) =>
+    roster.players.filter((p) => p.teamId === roster[side].id).map((p) => p.jersey);
+  assert.ok(jerseys('home').includes('44'), 'the typed-in player was saved on Done');
+  assert.equal(roster.players.find((p) => p.jersey === '44').name, 'Sam Typed');
+  assert.deepEqual(
+    jerseys('away').filter((j) => j.startsWith('4')),
+    ['40', '41', '42'],
+  );
+
   for (const j of ['4', '11', '15', '22', '30']) await tile('home', j).click();
   for (const j of ['3', '5', '10', '12']) await tile('away', j).click();
+  await page.getByRole('button', { name: 'Start with 4' }).waitFor();
+  // A refresh mid-pick keeps the picks.
+  await page.reload();
   await page.getByRole('button', { name: 'Start with 4' }).waitFor();
   await tile('away', '14').click();
   await page.locator('#lt-startstop').click();
   await page.locator('#lt-startstop', { hasText: 'Pause' }).waitFor();
+  await page.locator('#lt-pregame[hidden]').waitFor({ state: 'attached' });
 
   await tile('away', '3').click();
   await menu('p3').click();
@@ -179,6 +208,24 @@ try {
   assert.equal(saved.awayScore, 5, 'saved once on the server');
   assert.equal(saved.state.plays.filter((p) => p.type === 'score').length, 3);
 
+  // A request that never answers (gym Wi-Fi): it times out, the tap is kept and sent again.
+  await page.route('**/commands', () => {}, { times: 1 });
+  await tile('home', '15').click();
+  await menu('foul').click();
+  await page.waitForFunction(
+    (id) =>
+      !localStorage.getItem(`live-stats:outbox:${id}`) &&
+      document.getElementById('lt-sync').textContent.startsWith('Saved'),
+    gameId,
+    { timeout: 40_000 },
+  );
+  const afterHang = await page.evaluate(
+    (id) => fetch(`/api/games/${id}`).then((r) => r.json()),
+    gameId,
+  );
+  assert.equal(afterHang.state.plays.filter((p) => p.type === 'foul').length, 2, 'saved once');
+  assert.match(await page.locator('#lt-log-count').textContent(), /all saved/);
+
   // A viewer's live page follows along without reloading.
   const viewer = await context.newPage();
   watch(viewer);
@@ -221,7 +268,16 @@ try {
   await page.getByRole('link', { name: 'Roster & stats' }).click();
   await page.locator('#stats tbody tr').first().waitFor();
   assert.match(await page.locator('#stats tbody tr').first().textContent(), /Player Three/);
+  assert.match(
+    await page.locator('#game-log tbody tr').first().textContent(),
+    /KIPP Academy West.*[WT] 5–5/,
+  );
   await shot(page, 'team', true);
+  await page.locator('#stats tbody').getByRole('link', { name: 'Player Three' }).click();
+  await page.locator('#log tbody tr').first().waitFor();
+  assert.match(await page.locator('#log tbody tr').first().textContent(), /KIPP Academy West.*3/);
+  assert.match(await page.locator('#log tfoot').textContent(), /1 game played/);
+  await shot(page, 'player', true);
 
   // Phone: the second game, lying down and upright, with no sideways scrolling.
   await page.evaluate(async (teamId) => {

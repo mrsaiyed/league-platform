@@ -17,6 +17,8 @@ Adapters today:
 
 `tests/live-stats-storage.test.mjs` runs the same behaviour against every adapter, including PostgreSQL reached over the network the way a hosted database is. A new adapter is ready when it passes. `apps/live-stats/storage.ts` picks the adapter from the environment.
 
+Moving records between PostgreSQL databases (this computer's to Supabase, or Supabase's down to a folder as a backup) is a maintenance tool, `npm run stats:copy` (`packages/database/src/live-stats/copy.ts`), not part of the interface. It works on the shared schema directly and is tested in `tests/live-stats-supabase.test.mjs`.
+
 The browser never talks to the database. It talks to this app's server, so moving databases does not change the pages, and no database credentials reach a browser.
 
 ## Consequences

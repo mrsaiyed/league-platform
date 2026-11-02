@@ -141,6 +141,7 @@ for (const [name, make] of Object.entries(adapters))
         assert.deepEqual(
           lines.find((l) => l.playerId === away[0].id),
           {
+            gameId: g.id,
             playerId: away[0].id,
             teamId: g.away.id,
             name: 'Lion 10',
@@ -243,6 +244,98 @@ for (const [name, make] of Object.entries(adapters))
         const games = (await stats.schedule()).games;
         assert.equal(games.find((x) => x.id === g.id).venue, 'Al-Hadi Gym');
         assert.equal(games.find((x) => x.sourceRef === 'tcsaal:653').venue, 'Moved');
+      } finally {
+        await done();
+      }
+    });
+
+    test('game logs: one line per final game for the team and each player, as played', async () => {
+      const { stats, done, tick } = await open();
+      try {
+        const games = (await stats.schedule()).games;
+        const home = games[2]; // Al-Hadi at home
+        const away = games.find((g, i) => i > 2 && g.away.tracked); // later, on the road
+        const lions = home.home.id;
+        const yusuf = await stats.addPlayer(lions, { name: 'Yusuf', jersey: '23' });
+        const omar = await stats.addPlayer(lions, { name: 'Omar', jersey: '5' });
+        const play = async (g, side, other, points) => {
+          const rival = await stats.addPlayer(g[other].id, { name: '', jersey: '4' });
+          await send(stats, g.id, { type: 'lineup', side, playerIds: [yusuf.id] });
+          await send(stats, g.id, { type: 'lineup', side: other, playerIds: [rival.id] });
+          await send(stats, g.id, { type: 'start' });
+          tick(60_000);
+          await send(stats, g.id, { type: 'score', side, playerId: yusuf.id, points });
+          await send(stats, g.id, { type: 'score', side: other, playerId: rival.id, points: 2 });
+          await send(stats, g.id, { type: 'foul', side, playerId: yusuf.id });
+          await send(stats, g.id, { type: 'end' });
+          return rival;
+        };
+        const rival = await play(home, 'home', 'away', 3);
+        await play(away, 'away', 'home', 1);
+
+        const team = await stats.team(lions);
+        assert.deepEqual(
+          team.gameLog.map((g) => [g.gameId, g.result, g.score, g.opponentScore, g.home]),
+          [
+            [home.id, 'W', 3, 2, true],
+            [away.id, 'L', 1, 2, false],
+          ],
+        );
+        assert.deepEqual(
+          [team.gameLog[0].fg3, team.gameLog[0].fouls, team.gameLog[0].played],
+          [1, 1, 1],
+        );
+        assert.deepEqual(team.gameLog[0].top, {
+          playerId: yusuf.id,
+          name: 'Yusuf',
+          jersey: '23',
+          points: 3,
+        });
+        assert.equal(team.gameLog[1].opponent.id, away.home.id);
+
+        // Renumbered after the games: the log keeps the number worn in them.
+        await stats.updatePlayer(yusuf.id, { name: 'Yusuf', jersey: '10' });
+        const log = await stats.playerLog(yusuf.id);
+        assert.equal(log.player.jersey, '10');
+        assert.deepEqual(
+          log.games.map((g) => [
+            g.gameId,
+            g.played,
+            g.jersey,
+            g.points,
+            g.fg3,
+            g.fg1,
+            g.fouls,
+            g.ms,
+          ]),
+          [
+            [home.id, true, '23', 3, 1, 0, 1, 60_000],
+            [away.id, true, '23', 1, 0, 1, 1, 60_000],
+          ],
+        );
+        assert.deepEqual(log.totals, {
+          gp: 2,
+          points: 4,
+          fg1: 1,
+          fg2: 0,
+          fg3: 1,
+          fouls: 2,
+          ms: 120_000,
+        });
+        const benched = await stats.playerLog(omar.id);
+        assert.deepEqual(
+          benched.games.map((g) => g.played),
+          [false, false],
+          'DNP in both',
+        );
+        assert.equal(benched.totals.gp, 0);
+        await assert.rejects(stats.playerLog(randomUUID()), /Player not found/);
+
+        // A final game carries its saved lines, names and numbers as they were.
+        const final = await stats.game(home.id);
+        assert.equal(final.lines.find((l) => l.playerId === yusuf.id).jersey, '23');
+        assert.equal(final.lines.find((l) => l.playerId === rival.id).points, 2);
+        assert.deepEqual((await stats.game(games[5].id)).lines, [], 'none before a game is final');
       } finally {
         await done();
       }

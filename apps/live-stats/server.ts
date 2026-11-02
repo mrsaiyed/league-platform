@@ -3,14 +3,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stripTypeScriptTypes } from 'node:module';
-import { mkdir, open, readFile, readdir, unlink } from 'node:fs/promises';
-import type { FileHandle } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { z, ZodError } from 'zod';
 import { TrackerError } from '../../packages/sports/src/basketball/live.ts';
 import { LiveStats, StatsError } from './service.ts';
 import type { ScheduleSeed } from './service.ts';
-import { chooseStorage, openStorage } from './storage.ts';
+import { chooseStorage, lockDataDir, openStorage } from './storage.ts';
+import { describeDatabaseError } from '../../packages/database/src/live-stats/postgres.ts';
 import { attemptLimiter, scorerAuth } from './auth.ts';
 
 // Live stat tracking: the schedule, a courtside tracker that saves every tap to the
@@ -48,45 +48,24 @@ if (lan) for (const a of lanAddresses) hosts.add(`${a}:${port}`);
 // One server per local database. The lock holds this process id, so a lock left by a
 // server that was killed or crashed (a laptop that died mid-game) is cleared next start.
 const storage = chooseStorage(env, root);
-let lock: FileHandle | null = null;
-let lockPath = '';
-if (storage.kind === 'local') {
-  await mkdir(path.dirname(storage.dataDir), { recursive: true });
-  lockPath = `${storage.dataDir}.lock`;
-  lock = await takeLock(lockPath);
-}
-async function takeLock(file: string): Promise<FileHandle> {
-  try {
-    const handle = await open(file, 'wx');
-    await handle.writeFile(String(process.pid));
-    return handle;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-    const pid = Number(await readFile(file, 'utf8').catch(() => ''));
-    if (Number.isInteger(pid) && pid > 0 && running(pid))
-      throw new Error(
-        `The stats server is already running (process ${pid}). Use that one, or stop it first.`,
-      );
-    await unlink(file);
-    return takeLock(file);
-  }
-}
-function running(pid: number) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-async function releaseLock() {
-  if (!lock) return;
-  await lock.close();
-  await unlink(lockPath).catch(() => {});
-  lock = null;
-}
+const releaseLock =
+  storage.kind === 'local'
+    ? await lockDataDir(
+        storage.dataDir,
+        (pid) =>
+          `The stats server is already running (process ${pid}). Use that one, or stop it first.`,
+      )
+    : async () => {};
 
-const { repo, label } = await openStorage(storage, env);
+let opened: Awaited<ReturnType<typeof openStorage>>;
+try {
+  opened = await openStorage(storage, env);
+} catch (error) {
+  await releaseLock();
+  console.error(`Could not open the database: ${describeDatabaseError(error)}`);
+  process.exit(1);
+}
+const { repo, label } = opened;
 const stats = new LiveStats(repo);
 try {
   await repo.initialize();
@@ -97,7 +76,8 @@ try {
 } catch (error) {
   await repo.close().catch(() => {});
   await releaseLock();
-  throw error;
+  console.error(`Could not set up the database (${label}): ${describeDatabaseError(error)}`);
+  process.exit(1);
 }
 
 // The tracker engine runs in the scorer's browser too, so a tap shows before the server answers.
@@ -125,6 +105,7 @@ const pages: [RegExp, string][] = [
   [new RegExp(`^/game/${ID}$`), page('game.html')],
   [new RegExp(`^/game/${ID}/track$`), page('track.html')],
   [new RegExp(`^/team/${ID}$`), page('team.html')],
+  [new RegExp(`^/player/${ID}$`), page('player.html')],
 ];
 
 // ---- live updates (server-sent events) -------------------------------------
@@ -133,10 +114,13 @@ const listeners = new Set<Listener>();
 function send(res: http.ServerResponse, event: string, data: unknown) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
-/** The game's own pages get the whole game; the schedule gets its summary. */
-async function broadcastGame(gameId: string) {
+/**
+ * The game's own pages get the whole game; the schedule gets its summary. Pass the
+ * game just saved to send it as is, rather than reading it again.
+ */
+async function broadcastGame(gameId: string, saved?: Awaited<ReturnType<LiveStats['game']>>) {
   if (!listeners.size) return;
-  const game = await stats.game(gameId);
+  const game = saved ?? (await stats.game(gameId));
   const { players: _players, state: _state, ...summary } = game;
   for (const l of listeners) {
     if (l.gameId === gameId) send(l.res, 'game', game);
@@ -256,6 +240,8 @@ const server = http.createServer(async (req, res) => {
       if (game?.[1]) return json(res, 200, await stats.game(game[1]));
       const team = new RegExp(`^/api/teams/(${ID})$`).exec(p);
       if (team?.[1]) return json(res, 200, await stats.team(team[1]));
+      const player = new RegExp(`^/api/players/(${ID})$`).exec(p);
+      if (player?.[1]) return json(res, 200, await stats.playerLog(player[1]));
       throw new StatsError('Not found.', 404);
     }
 
@@ -287,7 +273,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && command?.[1]) {
       const result = await stats.command(command[1], await body(req));
       json(res, 200, result.game);
-      if (result.changed) void broadcastGame(command[1]).catch(() => {});
+      if (result.changed) void broadcastGame(command[1], result.game).catch(() => {});
       return;
     }
     const players = new RegExp(`^/api/teams/(${ID})/players$`).exec(p);
