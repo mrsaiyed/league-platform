@@ -363,7 +363,11 @@ for (const [name, make] of Object.entries(adapters))
         const final = await stats.game(home.id);
         assert.equal(final.lines.find((l) => l.playerId === yusuf.id).jersey, '23');
         assert.equal(final.lines.find((l) => l.playerId === rival.id).points, 2);
-        assert.deepEqual((await stats.game(games[5].id)).lines, [], 'none before a game is final');
+        assert.deepEqual(
+          (await stats.game(games.at(-1).id)).lines,
+          [],
+          'none before a game is final',
+        );
       } finally {
         await done();
       }

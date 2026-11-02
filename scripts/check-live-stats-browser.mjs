@@ -49,7 +49,9 @@ try {
   // Changes need a same-origin browser request.
   const schedule = await (await fetch(`${base}/api/schedule`)).json();
   assert.equal(schedule.games.length, 10);
-  const [first, second] = schedule.games;
+  const [first] = schedule.games;
+  // An Al-Hadi away game later on: its home team gets players below, Al-Hadi keeps the first game's.
+  const second = schedule.games.find((g) => g.id !== first.id && g.away.tracked);
   const hostile = await fetch(`${base}/api/games/${first.id}/commands`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: 'https://untrusted.example' },

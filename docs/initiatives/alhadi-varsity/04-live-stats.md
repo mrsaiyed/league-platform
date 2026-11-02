@@ -81,7 +81,7 @@ Stats kept: points, 3-pointers, 2-pointers and free throws made, personal fouls,
 
 ## Schedule and format
 
-The ten fixtures were copied from the [TCSAAL team page](https://texascharter.org/tc_team/26-27-al-hadi-school-varsity-boys-basketball/) on October 27, 2026 into `apps/live-stats/data/tcsaal-alhadi-varsity-boys-2026-27.json`, including the two exhibitions and each game's TCSAAL number and link. TCSAAL lists game 533 (January 8) as an Al-Hadi away game at the Al-Hadi Gym; it is kept as published. Each start re-reads that file: a game nobody has touched yet picks up edits (a new time or venue); a game that has been tracked is never changed.
+The ten fixtures were copied from the [TCSAAL team page](https://texascharter.org/tc_team/26-27-al-hadi-school-varsity-boys-basketball/) on October 27, 2026 and updated on November 2, 2026, when TCSAAL moved five games (159, 438, 287, 126 and 583) to new dates, into `apps/live-stats/data/tcsaal-alhadi-varsity-boys-2026-27.json`, including the two exhibitions and each game's TCSAAL number and link. TCSAAL lists game 533 (January 8) as an Al-Hadi away game at the Al-Hadi Gym; it is kept as published. Each start re-reads that file: a game nobody has touched yet picks up edits (a new time or venue); a game that has been tracked is never changed.
 
 Each game defaults to four 8-minute quarters with 4-minute overtime, team fouls resetting each quarter and the bonus on the fifth, as in high-school play. A **Halves: 2 × 20** preset matches Faraj League. Confirm TCSAAL's varsity format and set it under **Format** before tip-off; it is fixed once the game is under way.
 
