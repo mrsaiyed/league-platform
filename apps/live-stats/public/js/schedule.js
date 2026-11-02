@@ -81,6 +81,8 @@ function tickClocks() {
 async function start() {
   session = await getSession();
   canScore = session.canScore;
+  // The header straight away, even if the schedule cannot load.
+  $('site-header').innerHTML = siteHeader('schedule', null, session);
   const data = await api('/api/schedule').catch((err) => {
     $('games').innerHTML = `<li class="empty">${esc(err.message)}</li>`;
     return null;

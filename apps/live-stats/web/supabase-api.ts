@@ -51,7 +51,7 @@ export function createApi({ url, key }: Config) {
   if (!url || !key) {
     return async () => {
       throw new ApiFailure(
-        'This site is not connected to its database yet. Set SUPABASE_URL and SUPABASE_ANON_KEY for the site (see docs/operations/live-stats-hosting.md).',
+        'Live stats will appear here soon: this site is not connected to its database yet. (Site owner: see docs/operations/live-stats-hosting.md in the repository.)',
         503,
       );
     };

@@ -100,6 +100,8 @@ export const serverClock = {
  * data; the browser reconnects by itself, and `onStatus` hears about it.
  */
 export function subscribe(query, handlers, onStatus = () => {}) {
+  // A site not connected to its database yet has nothing to follow.
+  if (staticSite && !config.url) return { close() {} };
   if (staticSite) return poll(query, handlers, onStatus);
   const source = new EventSource(`/api/stream${query}`);
   for (const [event, fn] of Object.entries(handlers))
