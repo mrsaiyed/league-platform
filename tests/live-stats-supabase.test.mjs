@@ -15,6 +15,8 @@ import {
   parseDatabaseUrl,
 } from '../packages/database/src/live-stats/postgres.ts';
 import { copyLiveStats } from '../packages/database/src/live-stats/copy.ts';
+import { SupabaseRepository } from '../packages/database/src/live-stats/supabase.ts';
+import { fakeSupabase } from './support/fake-supabase.mjs';
 
 const seed = JSON.parse(
   await readFile(
@@ -28,7 +30,8 @@ test("Supabase's public API roles can reach nothing; the owner the server uses i
   try {
     // As on Supabase: API roles exist, and the server's role owns the tables without being a superuser.
     await db.exec(`CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;
-      CREATE ROLE app NOLOGIN; GRANT CREATE ON DATABASE postgres TO app; SET ROLE app;`);
+      CREATE ROLE app NOLOGIN; GRANT CREATE ON DATABASE postgres TO app;
+      GRANT CREATE ON SCHEMA public TO app; SET ROLE app;`);
     const repo = new PostgresRepository(db);
     await repo.initialize();
     const stats = new LiveStats(repo);
@@ -277,5 +280,135 @@ test('a hosted database copies down to a fresh folder as a backup', async () => 
   } finally {
     await cloud.done();
     await backup.close();
+  }
+});
+
+test('supabase/setup.sql is up to date and sets a project up as the stats server would', async () => {
+  const { setupSql } = await import('../scripts/build-supabase-sql.mjs');
+  const file = await readFile(new URL('../supabase/setup.sql', import.meta.url), 'utf8');
+  assert.equal(file, setupSql(), 'run npm run build:supabase');
+
+  const fromFile = new PGlite();
+  const fromServer = new PGlite();
+  try {
+    await fromFile.exec('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;');
+    await fromFile.exec(file);
+    await fromFile.exec(file); // again: nothing doubles
+    const serverRepo = new PostgresRepository(fromServer);
+    await serverRepo.initialize();
+    await new LiveStats(serverRepo).seed(seed);
+    const shape = async (db) => {
+      const stats = new LiveStats(new PostgresRepository(db));
+      const { team, games } = await stats.schedule();
+      return {
+        team: team.name,
+        teams: (await stats.teams()).map((t) => [t.slug, t.name, t.tracked]),
+        games: games.map((g) => [
+          g.sourceRef,
+          g.startsAt,
+          g.home.name,
+          g.away.name,
+          g.venue,
+          g.gameType,
+          g.status,
+          g.periods,
+        ]),
+      };
+    };
+    assert.deepEqual(await shape(fromFile), await shape(fromServer));
+  } finally {
+    await fromFile.close();
+    await fromServer.close();
+  }
+});
+
+test('the static site signs scorers in with the passcode, and nothing changes without it', async () => {
+  const supabase = await fakeSupabase({ passcode: '' });
+  try {
+    let token = null;
+    const repo = new SupabaseRepository({
+      url: supabase.url,
+      key: supabase.key,
+      token: () => token,
+    });
+    const signIn = (passcode) => repo.rpc('ls_sign_in', { p_passcode: passcode });
+    assert.match((await signIn('anything')).error, /No scorer passcode is set yet/);
+
+    await supabase.db.query("SELECT live_stats.set_scorer_passcode('lions-score-2026')");
+    await assert.rejects(
+      supabase.db.query("SELECT live_stats.set_scorer_passcode('short')"),
+      /8 characters or more/,
+    );
+    // Only from the SQL editor: not callable through the public API.
+    await assert.rejects(
+      repo.rpc('set_scorer_passcode', { p_passcode: 'taken-over-2026' }),
+      (e) => e.status === 503 && /not set up/.test(e.message),
+    );
+
+    assert.deepEqual(await signIn('wrong'), { status: 401, error: 'That passcode is not right.' });
+    token = (await signIn('lions-score-2026')).token;
+    assert.match(token, /^[0-9a-f]{64}$/);
+    assert.deepEqual(await repo.rpc('ls_session', { p_token: token }), { canScore: true });
+    const team =
+      (await repo.teams())[0] ??
+      (await repo.ensureTeam({
+        slug: 'lions',
+        name: 'Lions',
+        school: '',
+        tracked: true,
+        sourceUrl: '',
+      }));
+
+    // No session, an unknown one or an expired one: refused with 401, nothing written.
+    for (const bad of [null, 'f'.repeat(64)]) {
+      const outsider = new SupabaseRepository({
+        url: supabase.url,
+        key: supabase.key,
+        token: () => bad,
+      });
+      await assert.rejects(
+        outsider.addPlayer({
+          id: randomUUID(),
+          teamId: team.id,
+          name: 'X',
+          jersey: '1',
+          active: true,
+        }),
+        (e) => e.status === 401 && /Sign in to score/.test(e.message),
+      );
+    }
+    await supabase.db.query(
+      "UPDATE live_stats.sessions SET expires_at = now() - interval '1 minute'",
+    );
+    await assert.rejects(
+      repo.addPlayer({ id: randomUUID(), teamId: team.id, name: 'X', jersey: '1', active: true }),
+      (e) => e.status === 401,
+    );
+    assert.equal((await repo.players([team.id])).length, 0);
+
+    // A new passcode signs every device out.
+    token = (await signIn('lions-score-2026')).token;
+    await supabase.db.query("SELECT live_stats.set_scorer_passcode('new-passcode-2027')");
+    assert.deepEqual(await repo.rpc('ls_session', { p_token: token }), { canScore: false });
+
+    // At most 20 wrong passcodes in 15 minutes, then even the right one waits.
+    for (let i = 0; i < 20; i++) await signIn('guess');
+    assert.deepEqual(await signIn('new-passcode-2027'), {
+      status: 429,
+      error: 'Too many wrong passcodes. Wait 15 minutes and try again.',
+    });
+    await supabase.db.query(
+      "UPDATE live_stats.sign_in_failures SET at = now() - interval '16 minutes'",
+    );
+    assert.ok((await signIn('new-passcode-2027')).token, 'the wait passes');
+
+    // A wrong project key is told apart from a signed-out scorer.
+    const wrongKey = new SupabaseRepository({ url: supabase.url, key: 'not-the-key' });
+    await assert.rejects(
+      wrongKey.teams(),
+      (e) => e.status === 503 && /key was refused/.test(e.message),
+    );
+  } finally {
+    await supabase.stop();
   }
 });

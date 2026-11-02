@@ -1,8 +1,8 @@
 // One player's game log: a line for every final game of their team, and totals.
-import { formatMinutes } from '/js/engine.js';
-import { api, esc, fmtDay, gameTypeLabel, getSession, siteHeader } from '/js/common.js';
+import { formatMinutes } from './engine.js';
+import { api, esc, fmtDay, gameTypeLabel, getSession, link, pageId, siteHeader } from './common.js';
 
-const playerId = location.pathname.split('/')[2];
+const playerId = pageId();
 const $ = (id) => document.getElementById(id);
 
 function logTable(games, totals) {
@@ -10,7 +10,7 @@ function logTable(games, totals) {
     return '<p class="hint">No final games yet. Each one appears here once it is ended in the tracker.</p>';
   const rows = [...games].reverse().map((g) => {
     const when = g.startsAt ? esc(fmtDay(g.startsAt)) : 'TBD';
-    const opponent = `<a href="/game/${esc(g.gameId)}">${g.home ? 'vs' : '@'} ${esc(g.opponent.name)}</a>${g.gameType === 'regular_season' ? '' : ` <span class="tag tag-ex">${esc(gameTypeLabel(g.gameType))}</span>`}`;
+    const opponent = `<a href="${esc(link.game(g.gameId))}">${g.home ? 'vs' : '@'} ${esc(g.opponent.name)}</a>${g.gameType === 'regular_season' ? '' : ` <span class="tag tag-ex">${esc(gameTypeLabel(g.gameType))}</span>`}`;
     const cells = g.played
       ? `<td>${formatMinutes(g.ms)}</td><td><b>${g.points}</b></td><td>${g.fg3}</td><td>${g.fg2}</td><td>${g.fg1}</td><td>${g.turnovers}</td><td>${g.fouls}</td>`
       : '<td colspan="7" class="dnp-cell">DNP</td>';
@@ -44,7 +44,7 @@ async function start() {
   $('player-sub').textContent =
     `${team?.name ?? ''}${player.active ? '' : ' · removed from the roster'}`;
   if (team) {
-    $('back').href = `/team/${team.id}`;
+    $('back').href = link.team(team.id);
     $('back').textContent = `← ${team.name} roster & stats`;
   }
   const per = (v) => (totals.gp ? (v / totals.gp).toFixed(1) : '–');

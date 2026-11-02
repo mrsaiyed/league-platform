@@ -22,7 +22,7 @@ The founder explicitly requires database persistence **after each accepted scori
 
 ## Online access
 
-The live stat tracker is not deployed yet; [the hosting guide](live-stats-hosting.md) lists what to set up (a Supabase project and a host). Open [the earlier private SQL scorer](https://alhadi-varsity-scoring.fairstone8.chatgpt.site) and sign into the same owner account. The older [GitHub Pages concept](https://mrsaiyed.github.io/league-platform/) remains the intramural presentation. They have different purposes; only the private hosted scorer saves accepted game actions to the shared SQL database.
+The live stat tracker is at <https://mrsaiyed.github.io/league-platform/> and saves to Supabase once it is connected; see [live stats on GitHub Pages and Supabase](live-stats-hosting.md). Open [the earlier private SQL scorer](https://alhadi-varsity-scoring.fairstone8.chatgpt.site) and sign into the same owner account. The older [GitHub Pages concept](https://mrsaiyed.github.io/league-platform/demo/) remains the intramural presentation. They have different purposes; only the private hosted scorer saves accepted game actions to the shared SQL database.
 
 ## Code map
 

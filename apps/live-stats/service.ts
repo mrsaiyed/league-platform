@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Envelope, PlayerInput } from '../../packages/contracts/src/live-stats.ts';
 import {
   apply,
@@ -15,6 +14,9 @@ import type {
   PlayerRecord,
   TeamRecord,
 } from '../../packages/database/src/live-stats/repository.ts';
+
+// Web Crypto, so this also runs in the browser for the static site (secure pages only).
+const randomUUID = () => globalThis.crypto.randomUUID();
 
 export class StatsError extends Error {
   status: number;

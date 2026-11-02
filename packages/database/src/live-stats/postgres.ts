@@ -62,6 +62,8 @@ type LineRow = {
   ms: number | string;
 };
 
+/** Applied in order by `initialize`, and gathered into supabase/setup.sql. */
+export const SCHEMA_FILES = ['./001-schema.sql', './002-api.sql'];
 const TEAM_COLUMNS = 'id, slug, name, school, tracked, source_url';
 const PLAYER_COLUMNS = 'id, team_id AS "teamId", name, jersey, active';
 // By jersey as the pages sort: 00, 0, 1 … 99, then players with no number by name.
@@ -116,8 +118,23 @@ export class PostgresRepository implements LiveStatsRepository {
     this.db = db;
   }
 
+  /**
+   * The tables, then the API the static site calls (002-api.sql). Safe to repeat.
+   * A database that does not let this user create functions in its public schema
+   * still gets the tables: the server works without the static site's API.
+   */
   async initialize() {
-    await this.db.exec(await readFile(new URL('./001-schema.sql', import.meta.url), 'utf8'));
+    const [tables, ...rest] = SCHEMA_FILES;
+    await this.db.exec(await readFile(new URL(tables!, import.meta.url), 'utf8'));
+    for (const file of rest)
+      try {
+        await this.db.exec(await readFile(new URL(file, import.meta.url), 'utf8'));
+      } catch (error) {
+        if ((error as { code?: string }).code !== '42501') throw error;
+        console.warn(
+          'The static site API was not installed: this database user may not create functions in the public schema. The stats server works without it.',
+        );
+      }
   }
 
   close() {

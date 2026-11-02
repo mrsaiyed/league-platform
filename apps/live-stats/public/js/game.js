@@ -10,7 +10,7 @@ import {
   periodLabel,
   runningScores,
   SIDES,
-} from '/js/engine.js';
+} from './engine.js';
 import {
   api,
   esc,
@@ -19,14 +19,16 @@ import {
   gameClockText,
   gameTypeLabel,
   getSession,
+  link,
+  pageId,
   playerLabel,
   serverClock,
   siteHeader,
   sortPlayers,
   subscribe,
-} from '/js/common.js';
+} from './common.js';
 
-const gameId = location.pathname.split('/')[2];
+const gameId = pageId();
 const $ = (id) => document.getElementById(id);
 let game = null;
 let canScore = false;
@@ -75,7 +77,7 @@ function boxScore(side, d) {
     const cells = played
       ? `<td data-min="${esc(p.id)}">${formatMinutes(l.ms)}</td><td><b>${l.points}</b></td><td>${l.fg3}</td><td>${l.fg2}</td><td>${l.fg1}</td><td>${l.turnovers}</td><td>${l.fouls}</td>`
       : `<td colspan="7" class="dnp-cell">${final ? 'DNP' : '—'}</td>`;
-    return `<tr class="${played ? '' : 'dnp'}${onCourt.includes(p.id) ? ' on-court' : ''}"><td class="num">${esc(p.jersey)}</td><td class="name"><a href="/player/${esc(p.id)}" title="Game log">${esc(p.name || `#${p.jersey}`)}</a></td>${cells}</tr>`;
+    return `<tr class="${played ? '' : 'dnp'}${onCourt.includes(p.id) ? ' on-court' : ''}"><td class="num">${esc(p.jersey)}</td><td class="name"><a href="${esc(link.player(p.id))}" title="Game log">${esc(p.name || `#${p.jersey}`)}</a></td>${cells}</tr>`;
   });
   return `<section class="panel">
     <h2>${esc(game[side].name)}</h2>
@@ -127,7 +129,7 @@ function render() {
       ? `<a href="${esc(game.sourceUrl)}" rel="noopener noreferrer">${esc(game.source)} game ${esc(game.sourceRef?.split(':')[1] ?? '')} ↗</a>`
       : '',
     canScore
-      ? `<a class="btn${game.status === 'final' ? '' : ' btn-primary'}" href="/game/${esc(game.id)}/track">${game.status === 'final' ? 'Correct stats' : game.status === 'live' ? 'Open the tracker' : 'Track live stats'}</a>`
+      ? `<a class="btn${game.status === 'final' ? '' : ' btn-primary'}" href="${esc(link.track(game.id))}">${game.status === 'final' ? 'Correct stats' : game.status === 'live' ? 'Open the tracker' : 'Track live stats'}</a>`
       : '',
   ];
   $('game-info').innerHTML =

@@ -31,24 +31,27 @@ import {
   LINEUP_SIZE,
   QUARTERS,
   SIDES,
-} from '/js/engine.js';
+} from './engine.js';
 import {
   api,
   esc,
   fmtDay,
   fmtTime,
-  getSession,
   gameTypeLabel,
+  getSession,
+  here,
+  link,
+  pageId,
   playerLabel,
   serverClock,
   sortPlayers,
   subscribe,
   uuid,
-} from '/js/common.js';
-import { rosterEditor } from '/js/roster-editor.js';
-import { playBonusHorn } from '/js/sound.js';
+} from './common.js';
+import { rosterEditor } from './roster-editor.js';
+import { playBonusHorn } from './sound.js';
 
-const gameId = location.pathname.split('/')[2];
+const gameId = pageId();
 const $ = (id) => document.getElementById(id);
 const OUTBOX = `live-stats:outbox:${gameId}`;
 /** Starting lineups being picked, kept so a refresh mid-pick keeps the taps. */
@@ -254,7 +257,7 @@ function syncLine() {
   if (signedOut && outbox.length) {
     // Signing in comes back here, and the waiting taps send themselves.
     el.className = 'lt-sync lt-sync-offline';
-    el.innerHTML = `Signed out — ${waiting} kept on this device. <a class="lt-link" href="/sign-in?next=${encodeURIComponent(location.pathname)}">Sign in to send them</a>`;
+    el.innerHTML = `Signed out — ${waiting} kept on this device. <a class="lt-link" href="${esc(link.signIn(here()))}">Sign in to send them</a>`;
     return;
   }
   if (offline && outbox.length) {
@@ -872,9 +875,7 @@ async function start() {
   const session = await getSession();
   if (!session.canScore) {
     // Scorers sign in first. Where sign-in is not set up, other devices watch instead.
-    location.replace(
-      session.signIn ? `/sign-in?next=${encodeURIComponent(location.pathname)}` : `/game/${gameId}`,
-    );
+    location.replace(session.signIn ? link.signIn(here()) : link.game(gameId));
     return;
   }
   // A server still starting up, or a dropped connection: keep trying. Taps waiting
@@ -902,7 +903,7 @@ async function start() {
   ]
     .filter(Boolean)
     .join(' · ');
-  $('lt-watch').href = `/game/${gameId}`;
+  $('lt-watch').href = link.game(gameId);
   subscribe(`?game=${gameId}`, { game: adopt }, (connected) => {
     if (connected && outbox.length) void pump();
   });

@@ -14,6 +14,7 @@ Adapters today:
 
 - `PostgresRepository`: embedded PGlite locally, and any hosted PostgreSQL (Supabase first) through the `pg` driver.
 - `MemoryRepository`: documents in memory, for tests and demos, showing nothing depends on SQL.
+- `SupabaseRepository` (added November 2, 2026): the GitHub Pages site, which has no server. The browser runs the same service and rules and reaches Supabase through the database functions in `002-api.sql`, with the public key. Reading is open; changes need a scorer session from the passcode. Recording an action saves only if the game is still at the revision the browser read; otherwise it reads again and decides again, as a transaction retry would.
 
 `tests/live-stats-storage.test.mjs` runs the same behaviour against every adapter, including PostgreSQL reached over the network the way a hosted database is. A new adapter is ready when it passes. `apps/live-stats/storage.ts` picks the adapter from the environment.
 

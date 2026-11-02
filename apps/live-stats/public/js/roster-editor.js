@@ -5,7 +5,7 @@
 // Nothing typed is left unsaved: a change to a player saves shortly after typing
 // stops and again when the row is left, and a new player half-entered in the add
 // row is added when the row is left, on Done, or as the page closes.
-import { api, esc, sortPlayers, typedJersey } from '/js/common.js';
+import { api, esc, sortPlayers, typedJersey } from './common.js';
 
 const JERSEY = /^(?:0|00|[1-9][0-9]?)$/;
 /** Pause in typing after which a change to a player is saved. */

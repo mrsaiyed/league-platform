@@ -4,7 +4,11 @@
 
 The first working module of the wider platform: Al-Hadi's season schedule, a courtside tracker that works like the Faraj League one, and live game pages. Stat tracking will be one option in the full product; this is the baseline it grows from, not the whole of it.
 
-## Run it
+## Where it is
+
+**<https://mrsaiyed.github.io/league-platform/>**, published from `main` by GitHub Pages. It saves to Supabase straight from the browser once the project is connected (about 15 minutes, once). For the setup and the game-day checklist, see [live stats on GitHub Pages and Supabase](../../operations/live-stats-hosting.md).
+
+## Run it on a laptop
 
 ```sh
 npm ci

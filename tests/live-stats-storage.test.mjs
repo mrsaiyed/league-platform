@@ -13,6 +13,8 @@ import {
   connectPostgres,
 } from '../packages/database/src/live-stats/postgres.ts';
 import { TrackerError } from '../packages/sports/src/basketball/live.ts';
+import { SupabaseRepository } from '../packages/database/src/live-stats/supabase.ts';
+import { fakeSupabase } from './support/fake-supabase.mjs';
 
 const seed = JSON.parse(
   await readFile(
@@ -21,6 +23,18 @@ const seed = JSON.parse(
 );
 
 const adapters = {
+  // The static site on GitHub Pages: the browser calls Supabase's REST API, as a signed-in scorer.
+  'Supabase from the browser': async () => {
+    const supabase = await fakeSupabase();
+    let token = null;
+    const repo = new SupabaseRepository({
+      url: supabase.url,
+      key: supabase.key,
+      token: () => token,
+    });
+    ({ token } = await repo.rpc('ls_sign_in', { p_passcode: supabase.passcode }));
+    return { repo, done: () => supabase.stop() };
+  },
   'documents in memory': async () => ({ repo: new MemoryRepository(), done: async () => {} }),
   'embedded PostgreSQL': async () => {
     const repo = new PostgresRepository(new PGlite());

@@ -64,3 +64,13 @@ Not yet verified: a real Supabase project (none exists yet), the Docker image, a
 ### Turnovers
 
 Turnovers were added as a player stat (the **TO** option), shown as each team's total in its title with a per-player breakdown, and not on player tiles. `npm test` covers the engine (per player and team, taking one back, undo, no effect on score, fouls or bonus), every storage adapter (season totals and both game logs), a database made before turnovers gaining the column with earlier lines counting none, and turnovers copying up to a hosted database. The browser check taps TO, confirms the tile is unchanged and the team totals and breakdown are right, takes one back from the breakdown, and finds the TO column and totals on the game page and in a player's game log. Desktop and phone screenshots of the menu and breakdown were inspected.
+
+## November 2 GitHub Pages site on Supabase
+
+The live stats now run as a static site on GitHub Pages (`npm run build:pages`), saving to Supabase from the browser through database functions (`002-api.sql`), with the concept demo moved under `/demo/`. `supabase/setup.sql` sets a project up in one paste.
+
+`npm test` passed with 85 tests, including: the full shared storage suite run against the Supabase adapter through a stand-in for Supabase's REST API (PostgreSQL as the `anon` role, named-argument function calls, API-key checks, `PTxxx` status codes); `setup.sql` being current, safe to run twice and setting up the same schedule as the server's own seeding; and passcode sessions (none set, wrong passcode, the 20-in-15-minutes limit, expired and unknown sessions refused with nothing written, a new passcode signing every device out, the passcode setter unreachable through the API, a wrong project key reported as such). A database user without permission to create functions in `public` still gets the tables.
+
+`npm run test:pages:browser` passed in Chromium against the built site served under `/league-platform/`: the secret-key refusal, sign-in, rosters by name and by quick-add, a game tracked with baskets, a turnover, a foul and a substitution, the connection cut mid-game with two taps held and then saved once each, a signed-out phone following along by polling, reload, End game, the team and player game logs, the demo under `/demo/`, sign-out, and the "not connected yet" message without a project. Screenshots were inspected. The server-mode browser check still passes.
+
+Not yet verified: a real Supabase project (the REST API and dashboard steps follow Supabase's documented conventions, but none exists yet), and a full game on the scoring device.
