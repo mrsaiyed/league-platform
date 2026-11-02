@@ -26,7 +26,8 @@ fs.mkdirSync(out, { recursive: true });
 // repository: {"url": "https://<ref>.supabase.co", "key": "<anon or publishable key>"}.
 const committed = (() => {
   const file = path.join(root, 'supabase/site.json');
-  if (!fs.existsSync(file)) return {};
+  // Checks build their own sites, never one pointing at the real project.
+  if (process.env.LIVE_STATS_IGNORE_SITE_JSON === '1' || !fs.existsSync(file)) return {};
   const value = JSON.parse(fs.readFileSync(file, 'utf8'));
   return { url: String(value.url ?? ''), key: String(value.key ?? '') };
 })();

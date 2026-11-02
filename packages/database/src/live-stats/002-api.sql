@@ -8,7 +8,9 @@
 --    needs no sign-in, as on the hosted server.
 --  - Changing anything needs a scorer session: ls_sign_in with the scorer passcode
 --    returns a token, good for 7 days, that every change carries.
---  - The passcode is set in Supabase's SQL editor, never in the repository:
+--  - Until a passcode is set, scoring is open: anyone with the site's link can score,
+--    for trying it out. Setting one closes it. Set in Supabase's SQL editor, never in
+--    the repository:
 --      select live_stats.set_scorer_passcode('your passcode');
 --
 -- The browser applies the basketball rules with the same engine as the server and
@@ -67,11 +69,18 @@ BEGIN
   RETURN 'Scorer passcode set. Scorers sign in with it on each device.';
 END $$;
 
--- Raises "401" (PostgREST turns SQLSTATE PT401 into HTTP 401) without a live session.
+-- No passcode set yet: anyone may score.
+CREATE OR REPLACE FUNCTION live_stats.open_scoring()
+RETURNS boolean LANGUAGE sql STABLE SET search_path = '' AS $$
+  SELECT NOT EXISTS (SELECT 1 FROM live_stats.settings WHERE key = 'passcode')
+$$;
+
+-- Raises "401" (PostgREST turns SQLSTATE PT401 into HTTP 401) without a live session,
+-- unless scoring is open.
 CREATE OR REPLACE FUNCTION live_stats.require_scorer(p_token text)
 RETURNS void LANGUAGE plpgsql STABLE SET search_path = '' AS $$
 BEGIN
-  IF NOT EXISTS (
+  IF NOT live_stats.open_scoring() AND NOT EXISTS (
     SELECT 1 FROM live_stats.sessions
     WHERE token_hash = live_stats.token_hash(p_token) AND expires_at > now()
   ) THEN
@@ -91,8 +100,8 @@ DECLARE
 BEGIN
   SELECT value INTO stored FROM live_stats.settings WHERE key = 'passcode';
   IF stored IS NULL THEN
-    RETURN jsonb_build_object('status', 503, 'error',
-      'No scorer passcode is set yet. In Supabase''s SQL editor run: select live_stats.set_scorer_passcode(''your passcode'');');
+    RETURN jsonb_build_object('status', 409, 'error',
+      'No scorer passcode is set, so anyone with the link can score already. To require one, in Supabase''s SQL editor run: select live_stats.set_scorer_passcode(''your passcode'');');
   END IF;
   DELETE FROM live_stats.sign_in_failures WHERE at < now() - interval '15 minutes';
   DELETE FROM live_stats.sessions WHERE expires_at < now();
@@ -111,12 +120,14 @@ BEGIN
   RETURN jsonb_build_object('token', token, 'expiresAt', expires);
 END $$;
 
+-- canScore: this device may score. open: anyone may, as no passcode is set.
 CREATE OR REPLACE FUNCTION public.ls_session(p_token text)
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
-  SELECT jsonb_build_object('canScore', EXISTS (
-    SELECT 1 FROM live_stats.sessions
-    WHERE token_hash = live_stats.token_hash(p_token) AND expires_at > now()
-  ))
+  SELECT jsonb_build_object(
+    'canScore', live_stats.open_scoring() OR EXISTS (
+      SELECT 1 FROM live_stats.sessions
+      WHERE token_hash = live_stats.token_hash(p_token) AND expires_at > now()),
+    'open', live_stats.open_scoring())
 $$;
 
 CREATE OR REPLACE FUNCTION public.ls_sign_out(p_token text)

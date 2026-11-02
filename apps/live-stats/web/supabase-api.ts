@@ -67,12 +67,14 @@ export function createApi({ url, key }: Config) {
 
     if (p === '/api/session') {
       if (method === 'GET') {
+        // With no passcode set, scoring is open: no sign-in to offer.
         const t = token();
-        const { canScore } = t
-          ? await repo.rpc<{ canScore: boolean }>('ls_session', { p_token: t })
-          : { canScore: false };
+        const { canScore, open } = await repo.rpc<{ canScore: boolean; open?: boolean }>(
+          'ls_session',
+          { p_token: t ?? '' },
+        );
         if (t && !canScore) writeToken(null);
-        return { canScore, signIn: true, watchUrls: [] };
+        return { canScore, signIn: !open, watchUrls: [] };
       }
       if (method === 'POST') {
         const passcode = String((body as { passcode?: unknown })?.passcode ?? '');
@@ -110,11 +112,7 @@ export function createApi({ url, key }: Config) {
       throw new ApiFailure('Not found.', 404);
     }
 
-    if (!token())
-      throw new ApiFailure(
-        'Sign in to score. Your taps are kept on this device until you do.',
-        401,
-      );
+    // Changes: the database decides who may make them (a session, or open scoring).
     const command = match(`/api/games/(${ID})/commands`);
     if (method === 'POST' && command) return (await stats.command(command, body)).game;
     const players = match(`/api/teams/(${ID})/players`);

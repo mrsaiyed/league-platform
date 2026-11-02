@@ -25,7 +25,13 @@ function buildSite(env) {
   const result = spawnSync(process.execPath, ['scripts/build-pages.mjs'], {
     cwd: root,
     encoding: 'utf8',
-    env: { ...process.env, SUPABASE_URL: '', SUPABASE_ANON_KEY: '', ...env },
+    env: {
+      ...process.env,
+      SUPABASE_URL: '',
+      SUPABASE_ANON_KEY: '',
+      LIVE_STATS_IGNORE_SITE_JSON: '1',
+      ...env,
+    },
   });
   if (result.status !== 0) throw new Error(result.stderr || result.stdout);
 }

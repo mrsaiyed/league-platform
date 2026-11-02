@@ -78,3 +78,9 @@ Not yet verified: a real Supabase project (the REST API and dashboard steps foll
 ### Team turnovers
 
 Turnovers charged to the team rather than a player (**+ Team turnover** in the team's turnover list, with − to take one back) count in the team's total, the box score total with a note, the play-by-play and the team game log, and never in a player's stats. They need no new column: they are plays in the game state, and the static site's game lists keep them. Tests: the engine (counting, taking back, undo, descriptions), the team game log on every storage adapter including Supabase, and both browser checks. The site can also take its Supabase address and public key from a committed `supabase/site.json`, with the secret-key refusal applying there too.
+
+### Connected to the real Supabase project; open scoring
+
+The site is connected to the Supabase project through the committed `supabase/site.json` (the project URL and publishable key, both public). Against the real project, the site's API answered with the publishable key in both headers and returned the ten fixtures, the first check against real Supabase rather than the stand-in.
+
+Until a scorer passcode is set, scoring is now open: anyone with the link can score, with no sign-in (`live_stats.open_scoring()`); setting a passcode closes it. Tested in `tests/live-stats-supabase.test.mjs`, and by hand in a browser against the stand-in with no passcode: no sign-in offered, rosters, lineups and a basket saved.

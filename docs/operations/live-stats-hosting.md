@@ -1,6 +1,6 @@
 # Live stats on GitHub Pages and Supabase
 
-**November 2, 2026 · Site published; Supabase project not created yet**
+**November 2, 2026 · Site published and connected to the project `pkyqzruxoeliotnsvjnp`**
 
 **The site:** <https://mrsaiyed.github.io/league-platform/>
 
@@ -24,15 +24,15 @@ Until Supabase is connected, the site says "This site is not connected to its da
 
 It creates the stats tables in their own `live_stats` schema, the functions the site calls, and the ten 2026–27 TCSAAL fixtures. It is safe to run again; nothing tracked is ever changed by it.
 
-### 3. Set the scorer passcode
+### 3. Scorer passcode (optional)
 
-In the SQL Editor, run this as a new query, with your own passcode of 12 characters or more:
+**Until a passcode is set, scoring is open:** anyone with the site's link can track games and edit rosters, with no sign-in. That is handy for trying it out, but anyone who finds the link could change stats. To require a passcode, run this in the SQL Editor (12 characters or more):
 
 ```sql
 select live_stats.set_scorer_passcode('choose-a-long-passcode');
 ```
 
-Everyone who scores uses this passcode. Running it again with a new passcode signs every device out. It is stored only as a salted hash, never in the repository.
+From then on, scorers choose **Scorer sign-in** and enter it. Running it again with a new passcode signs every device out. It is stored only as a salted hash, never in the repository. There is no way back to open scoring short of deleting the passcode row (`delete from live_stats.settings where key = 'passcode';`).
 
 ### 4. Copy the project address and public key
 

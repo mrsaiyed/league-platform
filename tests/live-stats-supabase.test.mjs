@@ -322,7 +322,7 @@ test('supabase/setup.sql is up to date and sets a project up as the stats server
   }
 });
 
-test('the static site signs scorers in with the passcode, and nothing changes without it', async () => {
+test('scoring is open until a passcode is set; then only signed-in scorers change anything', async () => {
   const supabase = await fakeSupabase({ passcode: '' });
   try {
     let token = null;
@@ -332,9 +332,34 @@ test('the static site signs scorers in with the passcode, and nothing changes wi
       token: () => token,
     });
     const signIn = (passcode) => repo.rpc('ls_sign_in', { p_passcode: passcode });
-    assert.match((await signIn('anything')).error, /No scorer passcode is set yet/);
+    // No passcode yet: anyone with the link may score, with no sign-in at all.
+    assert.deepEqual(await repo.rpc('ls_session', { p_token: '' }), {
+      canScore: true,
+      open: true,
+    });
+    assert.match((await signIn('anything')).error, /anyone with the link can score already/);
+    const opened = await repo.ensureTeam({
+      slug: 'open-team',
+      name: 'Open',
+      school: '',
+      tracked: false,
+      sourceUrl: '',
+    });
+    await repo.addPlayer({
+      id: randomUUID(),
+      teamId: opened.id,
+      name: 'A',
+      jersey: '1',
+      active: true,
+    });
+    assert.equal((await repo.players([opened.id])).length, 1, 'saved without signing in');
 
+    // A passcode closes it.
     await supabase.db.query("SELECT live_stats.set_scorer_passcode('lions-score-2026')");
+    assert.deepEqual(await repo.rpc('ls_session', { p_token: '' }), {
+      canScore: false,
+      open: false,
+    });
     await assert.rejects(
       supabase.db.query("SELECT live_stats.set_scorer_passcode('short')"),
       /8 characters or more/,
@@ -348,16 +373,17 @@ test('the static site signs scorers in with the passcode, and nothing changes wi
     assert.deepEqual(await signIn('wrong'), { status: 401, error: 'That passcode is not right.' });
     token = (await signIn('lions-score-2026')).token;
     assert.match(token, /^[0-9a-f]{64}$/);
-    assert.deepEqual(await repo.rpc('ls_session', { p_token: token }), { canScore: true });
-    const team =
-      (await repo.teams())[0] ??
-      (await repo.ensureTeam({
-        slug: 'lions',
-        name: 'Lions',
-        school: '',
-        tracked: true,
-        sourceUrl: '',
-      }));
+    assert.deepEqual(await repo.rpc('ls_session', { p_token: token }), {
+      canScore: true,
+      open: false,
+    });
+    const team = await repo.ensureTeam({
+      slug: 'lions',
+      name: 'Lions',
+      school: '',
+      tracked: true,
+      sourceUrl: '',
+    });
 
     // No session, an unknown one or an expired one: refused with 401, nothing written.
     for (const bad of [null, 'f'.repeat(64)]) {
@@ -389,7 +415,10 @@ test('the static site signs scorers in with the passcode, and nothing changes wi
     // A new passcode signs every device out.
     token = (await signIn('lions-score-2026')).token;
     await supabase.db.query("SELECT live_stats.set_scorer_passcode('new-passcode-2027')");
-    assert.deepEqual(await repo.rpc('ls_session', { p_token: token }), { canScore: false });
+    assert.deepEqual(await repo.rpc('ls_session', { p_token: token }), {
+      canScore: false,
+      open: false,
+    });
 
     // At most 20 wrong passcodes in 15 minutes, then even the right one waits.
     for (let i = 0; i < 20; i++) await signIn('guess');
