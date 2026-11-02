@@ -74,3 +74,7 @@ The live stats now run as a static site on GitHub Pages (`npm run build:pages`),
 `npm run test:pages:browser` passed in Chromium against the built site served under `/league-platform/`: the secret-key refusal, sign-in, rosters by name and by quick-add, a game tracked with baskets, a turnover, a foul and a substitution, the connection cut mid-game with two taps held and then saved once each, a signed-out phone following along by polling, reload, End game, the team and player game logs, the demo under `/demo/`, sign-out, and the "not connected yet" message without a project. Screenshots were inspected. The server-mode browser check still passes.
 
 Not yet verified: a real Supabase project (the REST API and dashboard steps follow Supabase's documented conventions, but none exists yet), and a full game on the scoring device.
+
+### Team turnovers
+
+Turnovers charged to the team rather than a player (**+ Team turnover** in the team's turnover list, with − to take one back) count in the team's total, the box score total with a note, the play-by-play and the team game log, and never in a player's stats. They need no new column: they are plays in the game state, and the static site's game lists keep them. Tests: the engine (counting, taking back, undo, descriptions), the team game log on every storage adapter including Supabase, and both browser checks. The site can also take its Supabase address and public key from a committed `supabase/site.json`, with the secret-key refusal applying there too.

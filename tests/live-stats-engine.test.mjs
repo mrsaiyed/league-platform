@@ -117,6 +117,38 @@ test('turnovers count by player and add up to the team; they never touch the sco
   assert.equal(ended.status, 'final');
 });
 
+test('team turnovers count toward the team, never a player, and can be taken back', () => {
+  let s = run(newGame(QUARTERS), [
+    ...lineups,
+    { type: 'turnover', side: 'home', playerId: 'h1' },
+    { type: 'team-turnover', side: 'home' },
+    { type: 'team-turnover', side: 'home' },
+  ]);
+  let d = derive(s);
+  assert.equal(s.status, 'live');
+  assert.deepEqual([d.teams.home.turnovers, d.teams.home.teamTurnovers], [3, 2]);
+  assert.equal(d.players.h1.turnovers, 1, 'only the player-charged one');
+  assert.deepEqual([d.teams.away.turnovers, d.teams.away.teamTurnovers], [0, 0]);
+  s = at(s, { type: 'team-unturnover', side: 'home' }, 2_000);
+  d = derive(s);
+  assert.deepEqual([d.teams.home.turnovers, d.teams.home.teamTurnovers], [2, 1]);
+  assert.throws(
+    () => at(s, { type: 'team-unturnover', side: 'away' }, 2_000),
+    /no team turnover to take back/,
+  );
+  s = at(s, { type: 'undo' }, 3_000);
+  assert.equal(derive(s).teams.home.teamTurnovers, 2);
+  const team = (side) => (side === 'home' ? 'Lions' : 'Rivals');
+  assert.equal(
+    describePlay({ type: 'team-turnover', side: 'home' }, String, team),
+    'Team turnover — Lions',
+  );
+  assert.equal(
+    describePlay({ type: 'team-unturnover', side: 'away' }, String, team),
+    'Team turnover taken back — Rivals',
+  );
+});
+
 test('lineups alone do not make a game live; bench players can still score', () => {
   let s = run(newGame(), lineups);
   assert.equal(s.status, 'scheduled');

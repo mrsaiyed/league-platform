@@ -4,7 +4,8 @@
 //   /demo/       the preserved intramural concept demo
 //
 // The Supabase project comes from SUPABASE_URL and SUPABASE_ANON_KEY (in GitHub:
-// repository variables, read by .github/workflows/demo-pages.yml). Both are public by
+// repository variables, read by .github/workflows/demo-pages.yml), or else from
+// supabase/site.json committed to the repository. Both values are public by
 // design: the key only reaches the API functions in 002-api.sql, and changes need the
 // scorer passcode. Without them the site builds and says it is not connected yet.
 import fs from 'node:fs';
@@ -21,8 +22,21 @@ if (path.relative(root, out) !== path.join('dist', 'pages')) throw new Error('Un
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 
-const url = (process.env.SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
-const key = (process.env.SUPABASE_ANON_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY ?? '').trim();
+// From the environment (GitHub repository variables), or else supabase/site.json in the
+// repository: {"url": "https://<ref>.supabase.co", "key": "<anon or publishable key>"}.
+const committed = (() => {
+  const file = path.join(root, 'supabase/site.json');
+  if (!fs.existsSync(file)) return {};
+  const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+  return { url: String(value.url ?? ''), key: String(value.key ?? '') };
+})();
+const fromEnv = (process.env.SUPABASE_URL ?? '').trim();
+const url = (fromEnv || committed.url || '').trim().replace(/\/+$/, '');
+const key = (
+  (fromEnv
+    ? (process.env.SUPABASE_ANON_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY)
+    : committed.key) ?? ''
+).trim();
 if (url && !/^https:\/\/[\w.-]+$|^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(url))
   throw new Error('SUPABASE_URL should look like https://abcdefghijklmnopqrst.supabase.co');
 if (Boolean(url) !== Boolean(key))

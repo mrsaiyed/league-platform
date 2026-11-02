@@ -14,7 +14,7 @@ On a laptop instead (no internet needed), with **Node.js 24**: `npm ci`, `npm ru
 
 1. **Before tip-off**, tap **Enter jersey numbers** and check both teams. Type a number and name and press Enter, or put a whole team's numbers in **Several numbers** (`3 5 10 12 14 21`) and tap **Add all**. There is no limit on players; Al-Hadi's roster and each opponent's carry over to later games.
 2. Tap players to pick each starting five, then start the clock.
-3. Tap a player for +1, +2, +3, Foul, −Foul or **TO** (turnover). Each team's turnover total is in its title; tap it for each player's. Tap a bench player to sub them in, or drag them onto whoever is coming off.
+3. Tap a player for +1, +2, +3, Foul, −Foul or **TO** (turnover). Each team's turnover total is in its title; tap it for each player's, or **+ Team turnover** for one not charged to a player. Tap a bench player to sub them in, or drag them onto whoever is coming off.
 4. **End game** puts the final on the schedule and counts the box score toward **Roster & stats**.
 
 **What is kept:** the **play log** (every play with the running score, under the tracker and on the game page) and the **game logs** (on **Roster & stats**, one line per final game for the team, and for each player when you tap their name). The database also keeps every scorer action in order as each game's history.

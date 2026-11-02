@@ -1003,3 +1003,18 @@
   border-color: var(--gold-line);
   color: var(--muted);
 }
+.lt-to-team {
+  border-style: dashed;
+}
+.lt-opt.lt-opt-teamto {
+  min-width: 0;
+  min-height: 34px;
+  margin-left: auto;
+  padding: 0 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 8px;
+  background: transparent;
+  border-color: var(--team-dim, var(--gold-line));
+  color: var(--team, var(--text));
+}

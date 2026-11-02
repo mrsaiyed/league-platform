@@ -242,7 +242,15 @@ export class LiveStats {
       }))
       .sort((a, b) => b.points - a.points || b.gp - a.gp || byJersey(a, b));
     const now = this.now();
-    const games = (await this.repo.games({ teamId: id })).map((g) => summary(g, teams, now));
+    const records = await this.repo.games({ teamId: id });
+    // Turnovers charged to the team rather than a player live only in the game's plays.
+    const teamTurnovers = new Map(
+      records.map((g) => [
+        g.id,
+        derive(g.state).teams[g.homeTeamId === id ? 'home' : 'away'].teamTurnovers,
+      ]),
+    );
+    const games = records.map((g) => summary(g, teams, now));
     const record = { wins: 0, losses: 0 };
     const byGame = groupBy(finalLines, (l) => l.gameId);
     const gameLog = [];
@@ -263,7 +271,8 @@ export class LiveStats {
         fg2: sum('fg2'),
         fg1: sum('fg1'),
         fouls: sum('fouls'),
-        turnovers: sum('turnovers'),
+        turnovers: sum('turnovers') + (teamTurnovers.get(g.id) ?? 0),
+        teamTurnovers: teamTurnovers.get(g.id) ?? 0,
         played: lines.filter((l) => l.appeared).length,
         top: top
           ? { playerId: top.playerId, name: top.name, jersey: top.jersey, points: top.points }
@@ -350,7 +359,8 @@ type Totals = {
 
 /** Every player an action names must be on the roster of the team it is recorded for. */
 function checkPlayers(g: GameRecord, input: Command, players: Map<string, PlayerRecord>) {
-  if (!('side' in input)) return;
+  if (!('side' in input) || input.type === 'team-turnover' || input.type === 'team-unturnover')
+    return;
   const ids =
     input.type === 'lineup'
       ? input.playerIds

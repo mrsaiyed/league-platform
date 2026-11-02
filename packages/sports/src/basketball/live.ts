@@ -63,6 +63,9 @@ export type Play =
   | { type: 'unfoul'; side: Side; playerId: string }
   | { type: 'turnover'; side: Side; playerId: string }
   | { type: 'unturnover'; side: Side; playerId: string }
+  /** A turnover charged to the team rather than a player, such as a shot-clock violation. */
+  | { type: 'team-turnover'; side: Side }
+  | { type: 'team-unturnover'; side: Side }
   | { type: 'sub'; side: Side; inId: string; outId: string }
   | { type: 'period'; period: number };
 
@@ -128,8 +131,10 @@ export type Line = {
 export type TeamView = {
   score: number;
   fouls: number;
-  /** Every turnover charged to this team's players. */
+  /** Every turnover: its players' and the team's own. */
   turnovers: number;
+  /** Turnovers charged to the team rather than a player. */
+  teamTurnovers: number;
   /** Team fouls counted toward the bonus in the current period. */
   periodFouls: number;
   onCourt: string[];
@@ -280,6 +285,15 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
         teams[l.side].turnovers -= 1;
         break;
       }
+      case 'team-turnover':
+        teams[play.side].teamTurnovers += 1;
+        teams[play.side].turnovers += 1;
+        break;
+      case 'team-unturnover':
+        if (!teams[play.side].teamTurnovers) break;
+        teams[play.side].teamTurnovers -= 1;
+        teams[play.side].turnovers -= 1;
+        break;
       case 'sub': {
         const team = teams[play.side];
         if (!team.onCourt.includes(play.outId) || team.onCourt.includes(play.inId)) break;
@@ -331,6 +345,7 @@ const emptyTeam = (): TeamView => ({
   score: 0,
   fouls: 0,
   turnovers: 0,
+  teamTurnovers: 0,
   periodFouls: 0,
   onCourt: [],
   penalty: 0,
@@ -364,6 +379,8 @@ export function apply(state: GameState, command: Command, { id, now }: Context):
     case 'unfoul':
     case 'turnover':
     case 'unturnover':
+    case 'team-turnover':
+    case 'team-unturnover':
     case 'sub':
     case 'period':
       record(s, command, id, at);
@@ -497,6 +514,11 @@ function checkPlay(input: Play, d: Derived, rules: Rules): Play {
       if (!isId(input.playerId)) fail('Pick a player.');
       if (!d.players[input.playerId]?.turnovers) fail('That player has no turnover to take back.');
       return { type: 'unturnover', side, playerId: input.playerId };
+    case 'team-turnover':
+      return { type: 'team-turnover', side };
+    case 'team-unturnover':
+      if (!d.teams[side].teamTurnovers) fail('There is no team turnover to take back.');
+      return { type: 'team-unturnover', side };
     case 'sub': {
       const { inId, outId } = input;
       if (!isId(inId) || !isId(outId) || inId === outId)
@@ -563,7 +585,13 @@ function setClock(s: GameState, ms: number) {
 
 /** Has a basket, foul or turnover been recorded? Lineups and substitutions alone are not a played game. */
 export const hasRecordedStats = (state: GameState) =>
-  state.plays.some((p) => p.type === 'score' || p.type === 'foul' || p.type === 'turnover');
+  state.plays.some(
+    (p) =>
+      p.type === 'score' ||
+      p.type === 'foul' ||
+      p.type === 'turnover' ||
+      p.type === 'team-turnover',
+  );
 
 /** The score after each play, for a play-by-play log. */
 export function runningScores(plays: readonly Play[]) {
@@ -592,6 +620,10 @@ export function describePlay(
       return `Turnover — ${nameOf(play.playerId)}`;
     case 'unturnover':
       return `Turnover taken back — ${nameOf(play.playerId)}`;
+    case 'team-turnover':
+      return `Team turnover — ${teamOf(play.side)}`;
+    case 'team-unturnover':
+      return `Team turnover taken back — ${teamOf(play.side)}`;
     case 'sub':
       return `Sub: ${nameOf(play.inId)} in for ${nameOf(play.outId)}`;
     case 'lineup':

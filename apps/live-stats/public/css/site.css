@@ -705,3 +705,11 @@ table.stats tr.on-court td.name::after {
 .spaced {
   margin-top: 1.2rem;
 }
+table.stats tfoot tr.team-note td {
+  border-top: 0;
+  padding-top: 0;
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: normal;
+}

@@ -284,6 +284,7 @@ for (const [name, make] of Object.entries(adapters))
           await send(stats, g.id, { type: 'foul', side, playerId: yusuf.id });
           await send(stats, g.id, { type: 'turnover', side, playerId: yusuf.id });
           await send(stats, g.id, { type: 'turnover', side: other, playerId: rival.id });
+          await send(stats, g.id, { type: 'team-turnover', side });
           await send(stats, g.id, { type: 'end' });
           return rival;
         };
@@ -303,9 +304,11 @@ for (const [name, make] of Object.entries(adapters))
             team.gameLog[0].fg3,
             team.gameLog[0].fouls,
             team.gameLog[0].turnovers,
+            team.gameLog[0].teamTurnovers,
             team.gameLog[0].played,
           ],
-          [1, 1, 1, 1],
+          [1, 1, 2, 1, 1],
+          "the game's turnovers: Yusuf's and the team's own",
         );
         assert.equal(team.stats.find((x) => x.playerId === yusuf.id).turnovers, 2, 'season total');
         assert.deepEqual(team.gameLog[0].top, {

@@ -77,7 +77,7 @@ A tap answered by the server is on disk: a test kills the server outright straig
 
 Stats kept: points, 3-pointers, 2-pointers and free throws made, personal fouls, turnovers, minutes and games played.
 
-**Turnovers** are charged to a player: tap them, then **TO** (the tracker confirms it, since player tiles do not show turnovers). Each team's title shows its total, the sum of its players' turnovers; tap it to see each player's, and tap − beside one to take back a turnover recorded by mistake (Undo only reaches the last play). They count in the box score, season totals and both game logs, and do not touch the score, fouls or bonus. Games tracked before turnovers were added count none; a database made before then gains the column on the next start. Minutes come from the running clock while a player is on the floor. A player who never got on the floor is DNP and does not get a game played. Season totals count final games only.
+**Turnovers** are charged to a player: tap them, then **TO** (the tracker confirms it, since player tiles do not show turnovers). Each team's title shows its total, the sum of its players' turnovers; tap it to see each player's, and tap − beside one to take back a turnover recorded by mistake (Undo only reaches the last play). **+ Team turnover** in that list records one charged to the team rather than a player (a shot-clock or 5-second violation, say): it counts in the team's total, the box score total (with a note saying how many were the team's) and the team game log, never in a player's stats. They count in the box score, season totals and both game logs, and do not touch the score, fouls or bonus. Games tracked before turnovers were added count none; a database made before then gains the column on the next start. Minutes come from the running clock while a player is on the floor. A player who never got on the floor is DNP and does not get a game played. Season totals count final games only.
 
 ## Schedule and format
 
@@ -91,7 +91,7 @@ Each game defaults to four 8-minute quarters with 4-minute overtime, team fouls 
 - Deployed online. Scorer sign-in, a Dockerfile and the guide are ready; it needs a host chosen and set up.
 - Accounts and roles (scorekeeper, coach, viewer) in place of the shared scorer passcode, and rules for what the public may see.
 - Handing a game from one scoring device to another mid-game, and correcting minutes after the fact.
-- More stats (rebounds, assists, steals, blocks, missed shots), team turnovers not charged to a player (such as a shot-clock violation), and exports.
+- More stats (rebounds, assists, steals, blocks, missed shots) and exports.
 
 The earlier rehearsal (`npm run dev:varsity`) and the hosted Sites pilot are separate and unchanged; they do not share records with this tracker.
 

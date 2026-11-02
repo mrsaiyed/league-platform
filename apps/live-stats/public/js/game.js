@@ -70,6 +70,7 @@ function boxScore(side, d) {
       .map((p) => people.get(p.id) ?? p),
   );
   const total = { points: 0, fg3: 0, fg2: 0, fg1: 0, turnovers: 0, fouls: 0 };
+  const team = d.teams[side];
   const rows = roster.map((p) => {
     const l = d.players[p.id];
     if (l) for (const k of Object.keys(total)) total[k] += l[k];
@@ -84,7 +85,7 @@ function boxScore(side, d) {
     <div class="table-wrap"><table class="stats">
       <thead><tr><th class="num">#</th><th class="name">Player</th><th title="Minutes">MIN</th><th title="Points">PTS</th><th title="3-pointers made">3PM</th><th title="2-pointers made">2PM</th><th title="Free throws made">FTM</th><th title="Turnovers">TO</th><th title="Personal fouls">PF</th></tr></thead>
       <tbody>${rows.join('') || '<tr><td colspan="9" class="name">No players entered yet.</td></tr>'}</tbody>
-      <tfoot><tr><td></td><td class="name">Team</td><td></td><td>${total.points}</td><td>${total.fg3}</td><td>${total.fg2}</td><td>${total.fg1}</td><td>${total.turnovers}</td><td>${total.fouls}</td></tr></tfoot>
+      <tfoot><tr><td></td><td class="name">Team</td><td></td><td>${total.points}</td><td>${total.fg3}</td><td>${total.fg2}</td><td>${total.fg1}</td><td>${total.turnovers + team.teamTurnovers}</td><td>${total.fouls}</td></tr>${team.teamTurnovers ? `<tr class="team-note"><td></td><td class="name" colspan="8">Turnovers include ${team.teamTurnovers} team ${team.teamTurnovers === 1 ? 'turnover' : 'turnovers'}, not charged to a player.</td></tr>` : ''}</tfoot>
     </table></div>
   </section>`;
 }
@@ -100,7 +101,7 @@ function playByPlay() {
     const team = game[play.side].name;
     const what = describePlay(play, nameOf, () => team, periods);
     const s = scores[i];
-    return `<li class="${play.type === 'score' ? 'is-score' : ''}"><span class="when">${esc(periodLabel(play.period, periods))} ${esc(formatClock(play.clockMs))}</span><span class="what">${play.type === 'lineup' ? '' : `<span class="team-tag">${esc(team)}</span> `}${esc(what)}</span><span class="running">${play.type === 'score' ? `${s.home}–${s.away}` : ''}</span></li>`;
+    return `<li class="${play.type === 'score' ? 'is-score' : ''}"><span class="when">${esc(periodLabel(play.period, periods))} ${esc(formatClock(play.clockMs))}</span><span class="what">${['lineup', 'team-turnover', 'team-unturnover'].includes(play.type) ? '' : `<span class="team-tag">${esc(team)}</span> `}${esc(what)}</span><span class="running">${play.type === 'score' ? `${s.home}–${s.away}` : ''}</span></li>`;
   });
   return (
     items.reverse().join('') ||

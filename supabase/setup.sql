@@ -280,15 +280,16 @@ RETURNS jsonb LANGUAGE sql STABLE SET search_path = '' AS $$
     'homeScore', g.home_score, 'awayScore', g.away_score, 'revision', g.revision,
     'state', p_state)
 $$;
--- For lists, the game state without its plays, except period changes: enough for the
--- period and the clock, a small fraction of the size.
+-- For lists, the game state without its plays, except period changes and team
+-- turnovers: enough for the period, the clock and the team's own turnovers in the game
+-- log, a small fraction of the size.
 CREATE OR REPLACE FUNCTION live_stats.listed_state(p_state jsonb)
 RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
   SELECT p_state || jsonb_build_object(
     'plays', coalesce((
       SELECT jsonb_agg(p ORDER BY n) FROM jsonb_array_elements(p_state -> 'plays')
         WITH ORDINALITY AS x(p, n)
-      WHERE p ->> 'type' = 'period'), '[]'::jsonb),
+      WHERE p ->> 'type' IN ('period', 'team-turnover', 'team-unturnover')), '[]'::jsonb),
     'redo', '[]'::jsonb, 'recent', '[]'::jsonb)
 $$;
 CREATE OR REPLACE FUNCTION live_stats.line_json(l live_stats.player_game_lines)

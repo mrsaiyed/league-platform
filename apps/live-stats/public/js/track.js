@@ -474,14 +474,20 @@ function renderTurnovers(side, d, final) {
     .sort(
       ([a, x], [b, y]) => y.turnovers - x.turnovers || byJersey.indexOf(a) - byJersey.indexOf(b),
     );
-  list.innerHTML = charged.length
-    ? charged
-        .map(
-          ([id, l]) =>
-            `<span class="lt-to-item"><span class="lt-to-who">${esc(shortLabel(id))}</span><b>${l.turnovers}</b><button type="button" class="lt-opt lt-opt-unto" data-act="unto" data-player="${esc(id)}" data-team="${side}" title="Take back one turnover" aria-label="Take back one turnover from ${esc(label(id))}"${final ? ' disabled' : ''}>−</button></span>`,
-        )
-        .join('')
-    : '<span class="lt-empty">No turnovers yet. Tap a player, then TO.</span>';
+  const off = final ? ' disabled' : '';
+  const take = (attrs, who) =>
+    `<button type="button" class="lt-opt lt-opt-unto" ${attrs} data-team="${side}" title="Take back one turnover" aria-label="Take back one turnover from ${esc(who)}"${off}>−</button>`;
+  const items = charged.map(
+    ([id, l]) =>
+      `<span class="lt-to-item"><span class="lt-to-who">${esc(shortLabel(id))}</span><b>${l.turnovers}</b>${take(`data-act="unto" data-player="${esc(id)}"`, label(id))}</span>`,
+  );
+  // Charged to the team rather than a player: a shot-clock or 5-second violation, say.
+  const team = d.teams[side].teamTurnovers;
+  if (team)
+    items.push(
+      `<span class="lt-to-item lt-to-team"><span class="lt-to-who">Team</span><b>${team}</b>${take('data-act="unteamto"', `${game[side].name}, the team`)}</span>`,
+    );
+  list.innerHTML = `${items.join('') || '<span class="lt-empty">No turnovers yet. Tap a player, then TO.</span>'}<button type="button" class="lt-opt lt-opt-teamto" data-act="teamto" data-team="${side}" title="A turnover not charged to a player, such as a shot-clock violation"${off}>+ Team turnover</button>`;
 }
 
 function renderLog() {
@@ -617,6 +623,9 @@ function onAction(btn) {
     if (perform({ type: 'turnover', side, playerId: player }))
       flash(`Turnover — ${label(player)}.`);
   } else if (act === 'unto') perform({ type: 'unturnover', side, playerId: player });
+  else if (act === 'teamto') {
+    if (perform({ type: 'team-turnover', side })) flash(`Team turnover — ${game[side].name}.`);
+  } else if (act === 'unteamto') perform({ type: 'team-unturnover', side });
   else if (act === 'sub') perform({ type: 'sub', side, inId: player, outId: out });
   render();
 }

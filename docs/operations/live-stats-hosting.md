@@ -51,6 +51,8 @@ Never use the **secret** or **service_role** key on the site. The site build ref
    - `SUPABASE_ANON_KEY` set to the public key.
 3. Open **Actions → Publish site → Run workflow** on `main`, and wait for the green check (about 3 minutes).
 
+Instead of the two variables, the same values can go in a file committed to `main`, `supabase/site.json`: `{"url": "https://<project-ref>.supabase.co", "key": "<publishable or anon key>"}`. Pushing it publishes the site connected. Both values are public by design (they are in every page the site sends), and the build refuses a secret key. Variables, when set, take priority.
+
 ### 6. Check it
 
 1. Open <https://mrsaiyed.github.io/league-platform/>. The schedule shows the ten games.
@@ -78,7 +80,8 @@ The site is ready. A small daily job (**Keep Supabase awake** in Actions) stops 
 
 **During the game**
 
-- Tap a player for +1, +2, +3, Foul, −Foul or TO. Tap a bench player to sub them in, or drag them onto whoever is coming off. Tap a team's turnovers to see each player's, with − to take one back.
+- Tap a player for +1, +2, +3, Foul, −Foul or TO. Tap a bench player to sub them in, or drag them onto whoever is coming off.
+- Tap a team's turnovers (in its box, beside team fouls) to see each player's, with − to take one back. **+ Team turnover** there records one charged to the team rather than a player, such as a shot-clock or 5-second violation.
 - Watch the line under the buttons. **Saved to the database** means everything is saved. **Not connected — N actions kept on this device** means keep scoring: the taps are kept on the device and saved, once each and in order, when the connection is back. **Signed out** means sign in again from the link; the waiting taps then save.
 - Do not close the tab, clear the browser's data or use a private window while taps are waiting.
 - **Undo** reverses the last play. Tap the clock to correct it. Use one scoring device per game.

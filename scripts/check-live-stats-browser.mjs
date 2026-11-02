@@ -216,6 +216,12 @@ try {
     await page.locator('#lt-log .lt-log-row').first().locator('span').nth(1).textContent(),
     'Turnover taken back — #4 Jordan Ellis',
   );
+  // A team turnover, charged to no player, counts toward the team only.
+  await list.locator('.lt-opt-teamto').click();
+  await settled();
+  assert.equal(await page.locator('#lt-to-home').textContent(), '2 turnovers ▴');
+  assert.match(await list.locator('.lt-to-team').textContent(), /Team\s*1/);
+  assert.equal(await tileText('home', '11'), before, 'still nothing on the tiles');
 
   // The server saves a basket but the answer is lost: the retry must not count it twice.
   await page.route(
@@ -270,7 +276,8 @@ try {
   // The box score has turnovers, with the team's total underneath.
   const homeBox = viewer.locator('#box section').first();
   assert.equal(await homeBox.locator('thead th').nth(7).textContent(), 'TO');
-  assert.equal(await homeBox.locator('tfoot td').nth(7).textContent(), '1');
+  assert.equal(await homeBox.locator('tfoot td').nth(7).textContent(), '2');
+  assert.match(await homeBox.locator('tfoot .team-note').textContent(), /1 team turnover/);
 
   // Undo, redo, and a reload loses nothing.
   await page.locator('#lt-undo').click();

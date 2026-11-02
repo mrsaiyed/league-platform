@@ -165,6 +165,8 @@ try {
   await menu('p2').click();
   await tile(page, 'home', '11').click();
   await menu('to').click();
+  await page.locator('#lt-to-away').click();
+  await page.locator('#lt-to-list-away .lt-opt-teamto').click();
   await tile(page, 'away', '5').click();
   await menu('foul').click();
   await tile(page, 'away', '21').click();
@@ -177,6 +179,8 @@ try {
     'saved in Supabase',
   );
   assert.equal(await page.locator('#lt-to-home').textContent(), '1 turnover ▾');
+  assert.equal(await page.locator('#lt-to-away').textContent(), '1 turnover ▴', 'a team turnover');
+  assert.ok(row.state.plays.some((p) => p.type === 'team-turnover' && p.side === 'away'));
 
   // A fan's phone, not signed in, follows along.
   const fan = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
