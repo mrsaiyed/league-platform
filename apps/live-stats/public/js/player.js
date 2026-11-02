@@ -12,15 +12,15 @@ function logTable(games, totals) {
     const when = g.startsAt ? esc(fmtDay(g.startsAt)) : 'TBD';
     const opponent = `<a href="/game/${esc(g.gameId)}">${g.home ? 'vs' : '@'} ${esc(g.opponent.name)}</a>${g.gameType === 'regular_season' ? '' : ` <span class="tag tag-ex">${esc(gameTypeLabel(g.gameType))}</span>`}`;
     const cells = g.played
-      ? `<td>${formatMinutes(g.ms)}</td><td><b>${g.points}</b></td><td>${g.fg3}</td><td>${g.fg2}</td><td>${g.fg1}</td><td>${g.fouls}</td>`
-      : '<td colspan="6" class="dnp-cell">DNP</td>';
+      ? `<td>${formatMinutes(g.ms)}</td><td><b>${g.points}</b></td><td>${g.fg3}</td><td>${g.fg2}</td><td>${g.fg1}</td><td>${g.turnovers}</td><td>${g.fouls}</td>`
+      : '<td colspan="7" class="dnp-cell">DNP</td>';
     return `<tr${g.played ? '' : ' class="dnp"'}><td class="name">${when}</td><td class="name">${opponent}</td><td>${esc(g.result)} ${g.score}–${g.opponentScore}</td><td class="num">${esc(g.jersey)}</td>${cells}</tr>`;
   });
   const t = totals;
   return `<table class="stats">
-    <thead><tr><th class="name">Date</th><th class="name">Opponent</th><th>Result</th><th class="num" title="Jersey worn">#</th><th title="Minutes">MIN</th><th title="Points">PTS</th><th title="3-pointers made">3PM</th><th title="2-pointers made">2PM</th><th title="Free throws made">FTM</th><th title="Personal fouls">PF</th></tr></thead>
+    <thead><tr><th class="name">Date</th><th class="name">Opponent</th><th>Result</th><th class="num" title="Jersey worn">#</th><th title="Minutes">MIN</th><th title="Points">PTS</th><th title="3-pointers made">3PM</th><th title="2-pointers made">2PM</th><th title="Free throws made">FTM</th><th title="Turnovers">TO</th><th title="Personal fouls">PF</th></tr></thead>
     <tbody>${rows.join('')}</tbody>
-    <tfoot><tr><td class="name">Season</td><td class="name">${t.gp} ${t.gp === 1 ? 'game' : 'games'} played</td><td></td><td></td><td>${formatMinutes(t.ms)}</td><td>${t.points}</td><td>${t.fg3}</td><td>${t.fg2}</td><td>${t.fg1}</td><td>${t.fouls}</td></tr></tfoot>
+    <tfoot><tr><td class="name">Season</td><td class="name">${t.gp} ${t.gp === 1 ? 'game' : 'games'} played</td><td></td><td></td><td>${formatMinutes(t.ms)}</td><td>${t.points}</td><td>${t.fg3}</td><td>${t.fg2}</td><td>${t.fg1}</td><td>${t.turnovers}</td><td>${t.fouls}</td></tr></tfoot>
   </table>`;
 }
 

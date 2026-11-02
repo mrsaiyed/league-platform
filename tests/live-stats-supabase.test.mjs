@@ -135,6 +135,7 @@ test('games tracked on this computer copy up to a hosted database, whole and onl
   await send(local, final.id, { type: 'sub', side: 'home', inId: omar.id, outId: yusuf.id });
   await send(local, final.id, { type: 'score', side: 'home', playerId: omar.id, points: 2 });
   await send(local, final.id, { type: 'foul', side: 'away', playerId: rival.id });
+  await send(local, final.id, { type: 'turnover', side: 'home', playerId: omar.id });
   await send(local, final.id, { type: 'end' });
   const liveSide = live.home.tracked ? 'home' : 'away';
   await send(local, live.id, { type: 'lineup', side: liveSide, playerIds: [yusuf.id] });
@@ -195,7 +196,8 @@ test('games tracked on this computer copy up to a hosted database, whole and onl
       theirs.gameLog.map((g) => [g.result, g.score, g.opponentScore, g.top.name]),
       [['W', 5, 0, 'Yusuf']],
     );
-    assert.equal((await cloud.stats.playerLog(cloudOmar.id)).totals.points, 2);
+    const omarThere = (await cloud.stats.playerLog(cloudOmar.id)).totals;
+    assert.deepEqual([omarThere.points, omarThere.turnovers], [2, 1], 'turnovers came across');
 
     // Again: nothing new. Then the live game carries on here, and the copy catches up.
     const again = await copyLiveStats(localDb, cloud.db, { apply: false });

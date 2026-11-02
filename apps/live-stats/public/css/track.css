@@ -936,3 +936,70 @@
     flex: none;
   }
 }
+
+/* Turnovers: a third option in the player's menu, and each team's total in its title. */
+.lt-opt-to {
+  background: #4a3a14;
+  border-color: var(--gold);
+  color: #f5e3b0;
+}
+.lt-court-counts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem 0.6rem;
+}
+.lt-team-to {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--team-dim, var(--gold-line));
+  background: var(--chip);
+  color: var(--team, var(--text));
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lt-team-to[aria-expanded='true'] {
+  border-color: var(--team, var(--gold));
+}
+.lt-to-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: -0.2rem 0 0.6rem;
+  padding: 0.45rem;
+  border-radius: 8px;
+  background: var(--chip);
+  font-size: 0.85rem;
+}
+.lt-to-list[hidden] {
+  display: none;
+}
+.lt-to-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.15rem 0.2rem 0.15rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--team-dim, var(--gold-line));
+  color: var(--team, var(--text));
+}
+.lt-to-item b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.lt-opt.lt-opt-unto {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0 0.4rem;
+  font-size: 1.1rem;
+  border-radius: 6px;
+  background: transparent;
+  border-color: var(--gold-line);
+  color: var(--muted);
+}

@@ -89,6 +89,7 @@ type LineRow = {
   fg2: number;
   fg3: number;
   fouls: number;
+  turnovers: number;
   ms: number;
 };
 type Snapshot = {
@@ -142,7 +143,11 @@ async function snapshot(db: Sql, { full }: { full: boolean }): Promise<Snapshot>
   const lines = new Map<string, LineRow[]>();
   if (full)
     for (const l of (await db.query<LineRow>('SELECT * FROM live_stats.player_game_lines')).rows)
-      lines.set(l.game_id, [...(lines.get(l.game_id) ?? []), { ...l, ms: Number(l.ms) }]);
+      lines.set(l.game_id, [
+        ...(lines.get(l.game_id) ?? []),
+        // A database from before turnovers were kept has none to copy.
+        { ...l, turnovers: Number(l.turnovers ?? 0), ms: Number(l.ms) },
+      ]);
   return { teams, players, games, events, lines };
 }
 
@@ -371,12 +376,12 @@ export async function copyLiveStats(
       if (lines.length)
         await tx.query(
           `INSERT INTO live_stats.player_game_lines(game_id, player_id, team_id, name, jersey,
-             appeared, points, fg1, fg2, fg3, fouls, ms)
+             appeared, points, fg1, fg2, fg3, fouls, turnovers, ms)
            SELECT $1, x.player_id, x.team_id, x.name, x.jersey, x.appeared, x.points, x.fg1,
-             x.fg2, x.fg3, x.fouls, x.ms
+             x.fg2, x.fg3, x.fouls, x.turnovers, x.ms
            FROM jsonb_to_recordset($2::jsonb) AS x(player_id uuid, team_id uuid, name text,
              jersey text, appeared boolean, points integer, fg1 integer, fg2 integer,
-             fg3 integer, fouls integer, ms bigint)`,
+             fg3 integer, fouls integer, turnovers integer, ms bigint)`,
           [gameId, json(lines)],
         );
     }

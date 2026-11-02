@@ -47,12 +47,74 @@ test('baskets and fouls total by player and team; the score is the sum of points
   assert.deepEqual([d.teams.home.score, d.teams.away.score], [6, 2]);
   assert.deepEqual(
     { ...d.players.h1, ms: 0 },
-    { side: 'home', points: 5, fg1: 0, fg2: 1, fg3: 1, fouls: 0, ms: 0, appeared: true },
+    {
+      side: 'home',
+      points: 5,
+      fg1: 0,
+      fg2: 1,
+      fg3: 1,
+      fouls: 0,
+      turnovers: 0,
+      ms: 0,
+      appeared: true,
+    },
   );
   assert.equal(d.players.h2.fg1, 1);
   assert.equal(d.players.a2.fouls, 1);
   assert.equal(d.teams.away.fouls, 1);
   assert.equal(d.teams.away.periodFouls, 1);
+});
+
+test('turnovers count by player and add up to the team; they never touch the score or fouls', () => {
+  let s = run(newGame(QUARTERS), [
+    ...lineups,
+    { type: 'turnover', side: 'home', playerId: 'h1' },
+    { type: 'turnover', side: 'home', playerId: 'h1' },
+    { type: 'turnover', side: 'home', playerId: 'h2' },
+    { type: 'turnover', side: 'away', playerId: 'a3' },
+    // A bench player can be charged one (a sub before the scorer caught up); that counts as playing.
+    { type: 'turnover', side: 'home', playerId: 'h6' },
+  ]);
+  let d = derive(s);
+  assert.equal(s.status, 'live');
+  assert.deepEqual(
+    [d.players.h1.turnovers, d.players.h2.turnovers, d.players.h6.turnovers],
+    [2, 1, 1],
+  );
+  assert.ok(d.players.h6.appeared);
+  assert.deepEqual([d.teams.home.turnovers, d.teams.away.turnovers], [4, 1]);
+  assert.deepEqual([d.teams.home.score, d.teams.home.fouls, d.teams.home.periodFouls], [0, 0, 0]);
+  assert.equal(d.teams.away.bonus, 0);
+
+  // Taken back later, or undone straight away.
+  s = at(s, { type: 'unturnover', side: 'home', playerId: 'h1' }, 2_000);
+  d = derive(s);
+  assert.deepEqual([d.players.h1.turnovers, d.teams.home.turnovers], [1, 3]);
+  assert.throws(
+    () => at(s, { type: 'unturnover', side: 'away', playerId: 'a1' }, 2_000),
+    /no turnover to take back/,
+  );
+  s = at(s, { type: 'turnover', side: 'away', playerId: 'a3' }, 3_000);
+  assert.equal(derive(s).teams.away.turnovers, 2);
+  s = at(s, { type: 'undo' }, 3_000);
+  assert.equal(derive(s).teams.away.turnovers, 1);
+
+  const name = (id) => `#${id}`;
+  assert.equal(
+    describePlay({ type: 'turnover', side: 'home', playerId: 'h1' }, name),
+    'Turnover — #h1',
+  );
+  assert.equal(
+    describePlay({ type: 'unturnover', side: 'home', playerId: 'h1' }, name),
+    'Turnover taken back — #h1',
+  );
+  // A game with only a turnover recorded can be ended.
+  const ended = at(
+    run(newGame(), [...lineups, { type: 'turnover', side: 'home', playerId: 'h1' }]),
+    { type: 'end' },
+    9_000,
+  );
+  assert.equal(ended.status, 'final');
 });
 
 test('lineups alone do not make a game live; bench players can still score', () => {

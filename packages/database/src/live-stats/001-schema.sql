@@ -79,11 +79,17 @@ CREATE TABLE IF NOT EXISTS live_stats.player_game_lines (
   fg2 integer NOT NULL CHECK (fg2 >= 0),
   fg3 integer NOT NULL CHECK (fg3 >= 0),
   fouls integer NOT NULL CHECK (fouls >= 0),
+  turnovers integer NOT NULL DEFAULT 0 CHECK (turnovers >= 0),
   ms bigint NOT NULL CHECK (ms >= 0),
   PRIMARY KEY (game_id, player_id),
   CHECK (points = fg1 + 2 * fg2 + 3 * fg3)
 );
 CREATE INDEX IF NOT EXISTS lines_player ON live_stats.player_game_lines(player_id);
+
+-- Added after the first games were tracked: brings a database made before then up to
+-- date on the next start. Lines saved earlier count no turnovers.
+ALTER TABLE live_stats.player_game_lines
+  ADD COLUMN IF NOT EXISTS turnovers integer NOT NULL DEFAULT 0 CHECK (turnovers >= 0);
 
 -- Supabase's Data API reaches tables as the anon and authenticated roles. This schema
 -- is not exposed to it, and these lines keep it closed even if it is added by mistake:

@@ -132,6 +132,7 @@ export type LineRecord = {
   fg2: number;
   fg3: number;
   fouls: number;
+  turnovers: number;
   ms: number;
 };
 /** A line with the game it is from. */

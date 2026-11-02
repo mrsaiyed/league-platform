@@ -1,8 +1,10 @@
 /**
  * Courtside live stat tracker, after the Faraj League tracker.
  *
- *  - Tap a player and their options open under their name: +1, +2, +3, Foul and
- *    −Foul (a foul found to be wrong later; Undo only reaches the last play).
+ *  - Tap a player and their options open under their name: +1, +2, +3, Foul,
+ *    −Foul (a foul found to be wrong later; Undo only reaches the last play) and
+ *    TO, a turnover. Turnovers stay off the player tiles: each team's total sits
+ *    in its title, and tapping it lists each player's, with − to take one back.
  *  - A bench player's options also say who they come on "In for", one button per
  *    player on the floor, so a substitution is two taps. Dragging a bench player
  *    onto whoever is coming off works too (Pointer Events, which iOS supports).
@@ -52,13 +54,14 @@ const OUTBOX = `live-stats:outbox:${gameId}`;
 /** Starting lineups being picked, kept so a refresh mid-pick keeps the taps. */
 const PICKS = `live-stats:picks:${gameId}`;
 
-/** A player's options: points first, they are the common case, then fouls. */
+/** A player's options: points first, they are the common case, then fouls and turnovers. */
 const ACTIONS = [
   { act: 'p1', label: '+1', cls: 'lt-opt-score' },
   { act: 'p2', label: '+2', cls: 'lt-opt-score' },
   { act: 'p3', label: '+3', cls: 'lt-opt-score' },
   { act: 'foul', label: 'Foul', cls: 'lt-opt-foul' },
   { act: 'unfoul', label: '−Foul', cls: 'lt-opt-unfoul' },
+  { act: 'to', label: 'TO', cls: 'lt-opt-to', title: 'Turnover' },
 ];
 
 /** The server's latest copy: teams, players, state and revision. */
@@ -72,6 +75,8 @@ let playerMap = new Map();
 let menuFor = null;
 /** Starting lineups being picked, per side. */
 const pending = loadPicks();
+/** Which teams' turnover lists are open. */
+const turnoversOpen = { home: false, away: false };
 
 function loadPicks() {
   try {
@@ -318,12 +323,12 @@ function menu(p, side, fouls, onCourt, floor) {
           )
           .join('')}</div>`;
   const button = (a) =>
-    `<button type="button" class="lt-opt ${a.cls}" data-act="${a.act}" ${who}${a.act === 'unfoul' && !fouls ? ' disabled' : ''}>${esc(a.label)}</button>`;
+    `<button type="button" class="lt-opt ${a.cls}" data-act="${a.act}" ${who}${a.title ? ` title="${esc(a.title)}" aria-label="${esc(a.title)}"` : ''}${a.act === 'unfoul' && !fouls ? ' disabled' : ''}>${esc(a.label)}</button>`;
   const group = (acts) =>
     `<div class="lt-menu-row">${ACTIONS.filter((a) => acts.includes(a.act))
       .map(button)
       .join('')}</div>`;
-  return `<div class="lt-menu" aria-label="${esc(label(p.id))}">${subs}<div class="lt-menu-acts">${group(['p1', 'p2', 'p3'])}${group(['foul', 'unfoul'])}</div></div>`;
+  return `<div class="lt-menu" aria-label="${esc(label(p.id))}">${subs}<div class="lt-menu-acts">${group(['p1', 'p2', 'p3'])}${group(['foul', 'unfoul', 'to'])}</div></div>`;
 }
 
 function renderCourt(side, d) {
@@ -387,6 +392,7 @@ function render() {
       : '';
     fouls.classList.toggle('lt-fouls-bonus', t.penalty === 1);
     fouls.classList.toggle('lt-fouls-double', t.penalty === 2);
+    renderTurnovers(side, d, final);
     const bonus = $(`lt-bonus-${side}`);
     bonus.textContent = bonusLabel(t.bonus);
     bonus.hidden = !t.bonus;
@@ -440,6 +446,39 @@ function render() {
   renderLog();
   placeMenu();
   syncLine();
+}
+
+/**
+ * The team's turnovers in its title, the sum of its players'. Tapped, it lists
+ * each player's, most first, with − to take one back.
+ */
+function renderTurnovers(side, d, final) {
+  const total = d.teams[side].turnovers;
+  const toggle = $(`lt-to-${side}`);
+  const open = turnoversOpen[side];
+  toggle.textContent = `${total} ${total === 1 ? 'turnover' : 'turnovers'} ${open ? '▴' : '▾'}`;
+  toggle.setAttribute('aria-expanded', String(open));
+  const list = $(`lt-to-list-${side}`);
+  list.hidden = !open;
+  if (!open) return;
+  const byJersey = sortPlayers(
+    Object.keys(d.players)
+      .map((id) => playerMap.get(id))
+      .filter(Boolean),
+  ).map((p) => p.id);
+  const charged = Object.entries(d.players)
+    .filter(([id, l]) => l.side === side && l.turnovers > 0 && playerMap.has(id))
+    .sort(
+      ([a, x], [b, y]) => y.turnovers - x.turnovers || byJersey.indexOf(a) - byJersey.indexOf(b),
+    );
+  list.innerHTML = charged.length
+    ? charged
+        .map(
+          ([id, l]) =>
+            `<span class="lt-to-item"><span class="lt-to-who">${esc(shortLabel(id))}</span><b>${l.turnovers}</b><button type="button" class="lt-opt lt-opt-unto" data-act="unto" data-player="${esc(id)}" data-team="${side}" title="Take back one turnover" aria-label="Take back one turnover from ${esc(label(id))}"${final ? ' disabled' : ''}>−</button></span>`,
+        )
+        .join('')
+    : '<span class="lt-empty">No turnovers yet. Tap a player, then TO.</span>';
 }
 
 function renderLog() {
@@ -571,6 +610,10 @@ function onAction(btn) {
     perform({ type: 'score', side, playerId: player, points: Number(act.slice(1)) });
   else if (act === 'foul') perform({ type: 'foul', side, playerId: player });
   else if (act === 'unfoul') perform({ type: 'unfoul', side, playerId: player });
+  else if (act === 'to') {
+    if (perform({ type: 'turnover', side, playerId: player }))
+      flash(`Turnover — ${label(player)}.`);
+  } else if (act === 'unto') perform({ type: 'unturnover', side, playerId: player });
   else if (act === 'sub') perform({ type: 'sub', side, inId: player, outId: out });
   render();
 }
@@ -646,6 +689,12 @@ panel.addEventListener('click', (e) => {
   if (addPlayers) return openPlayers(addPlayers.dataset.addPlayers);
   const lineup = e.target.closest('[data-set-lineup]');
   if (lineup) return setLineup(lineup.dataset.setLineup);
+  const turnovers = e.target.closest('[data-to-side]');
+  if (turnovers) {
+    const side = turnovers.dataset.toSide;
+    turnoversOpen[side] = !turnoversOpen[side];
+    return render();
+  }
   if (e.detail !== 0) return;
   const opt = e.target.closest('.lt-opt');
   if (opt) {

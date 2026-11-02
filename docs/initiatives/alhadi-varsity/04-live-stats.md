@@ -33,7 +33,8 @@ Open `http://127.0.0.1:4180`. Stop with Ctrl+C. Records are kept in embedded Pos
 
 | Faraj League tracker                                                    | Here                                                                              |
 | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Tap a player: +1, +2, +3, Foul, −Foul                                   | Same                                                                              |
+| Tap a player: +1, +2, +3, Foul, −Foul                                   | Same, plus **TO** for a turnover                                                  |
+| —                                                                       | Team turnovers in each team's title; tap for each player's, with − to take back   |
 | Bench player's options include "In for" buttons; drag bench onto floor  | Same                                                                              |
 | Tap five players to set a starting five                                 | Same; a short-handed team can start with fewer                                    |
 | Undo and redo through the play list                                     | Same; undoing a period change also puts the old clock back                        |
@@ -56,10 +57,10 @@ Tap players to pick each starting five; picks survive a refresh. A short-handed 
 
 ## Play log and game logs
 
-- **Play log:** every play (lineups, baskets, fouls, substitutions, period changes) with the period, game clock and running score, newest first, under the tracker and on the game page. Plays still on their way to the database are dimmed, and the count says when all are saved.
+- **Play log:** every play (lineups, baskets, fouls, turnovers, substitutions, period changes) with the period, game clock and running score, newest first, under the tracker and on the game page. Plays still on their way to the database are dimmed, and the count says when all are saved.
 - **Game history:** the database keeps every scorer action in order, undos and clock changes included (`live_stats.game_events`), alongside the game's current state.
-- **Team game log** (Roster & stats): one line per final game: date, opponent, result, team 3PM, 2PM, FTM and fouls, and the top scorer.
-- **Player game log** (tap a name): one line per final game: the number worn, minutes, points, 3PM, 2PM, FTM and fouls, or DNP, with season totals and per-game averages.
+- **Team game log** (Roster & stats): one line per final game: date, opponent, result, team 3PM, 2PM, FTM, turnovers and fouls, and the top scorer.
+- **Player game log** (tap a name): one line per final game: the number worn, minutes, points, 3PM, 2PM, FTM, turnovers and fouls, or DNP, with season totals and per-game averages.
 - A final game's box score keeps each player's name and number as they were in that game, so editing a roster later does not rewrite past games.
 
 ## What is saved, and when
@@ -70,7 +71,9 @@ The browser shows the tap immediately and keeps it in a queue in local storage u
 
 A tap answered by the server is on disk: a test kills the server outright straight after a tap is confirmed and checks that everything is there on restart. With a hosted database, a connection that drops fails the request within 10 seconds rather than hanging, and is replaced.
 
-Stats kept: points, 3-pointers, 2-pointers and free throws made, personal fouls, minutes and games played. Minutes come from the running clock while a player is on the floor. A player who never got on the floor is DNP and does not get a game played. Season totals count final games only.
+Stats kept: points, 3-pointers, 2-pointers and free throws made, personal fouls, turnovers, minutes and games played.
+
+**Turnovers** are charged to a player: tap them, then **TO** (the tracker confirms it, since player tiles do not show turnovers). Each team's title shows its total, the sum of its players' turnovers; tap it to see each player's, and tap − beside one to take back a turnover recorded by mistake (Undo only reaches the last play). They count in the box score, season totals and both game logs, and do not touch the score, fouls or bonus. Games tracked before turnovers were added count none; a database made before then gains the column on the next start. Minutes come from the running clock while a player is on the floor. A player who never got on the floor is DNP and does not get a game played. Season totals count final games only.
 
 ## Schedule and format
 
@@ -84,7 +87,7 @@ Each game defaults to four 8-minute quarters with 4-minute overtime, team fouls 
 - Deployed online. Scorer sign-in, a Dockerfile and the guide are ready; it needs a host chosen and set up.
 - Accounts and roles (scorekeeper, coach, viewer) in place of the shared scorer passcode, and rules for what the public may see.
 - Handing a game from one scoring device to another mid-game, and correcting minutes after the fact.
-- More stats (rebounds, assists, steals, blocks, turnovers, missed shots) and exports.
+- More stats (rebounds, assists, steals, blocks, missed shots), team turnovers not charged to a player (such as a shot-clock violation), and exports.
 
 The earlier rehearsal (`npm run dev:varsity`) and the hosted Sites pilot are separate and unchanged; they do not share records with this tracker.
 

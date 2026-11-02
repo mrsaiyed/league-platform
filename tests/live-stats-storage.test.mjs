@@ -152,6 +152,7 @@ for (const [name, make] of Object.entries(adapters))
             fg2: 0,
             fg3: 1,
             fouls: 0,
+            turnovers: 0,
             ms: 30_000,
           },
         );
@@ -267,6 +268,8 @@ for (const [name, make] of Object.entries(adapters))
           await send(stats, g.id, { type: 'score', side, playerId: yusuf.id, points });
           await send(stats, g.id, { type: 'score', side: other, playerId: rival.id, points: 2 });
           await send(stats, g.id, { type: 'foul', side, playerId: yusuf.id });
+          await send(stats, g.id, { type: 'turnover', side, playerId: yusuf.id });
+          await send(stats, g.id, { type: 'turnover', side: other, playerId: rival.id });
           await send(stats, g.id, { type: 'end' });
           return rival;
         };
@@ -282,9 +285,15 @@ for (const [name, make] of Object.entries(adapters))
           ],
         );
         assert.deepEqual(
-          [team.gameLog[0].fg3, team.gameLog[0].fouls, team.gameLog[0].played],
-          [1, 1, 1],
+          [
+            team.gameLog[0].fg3,
+            team.gameLog[0].fouls,
+            team.gameLog[0].turnovers,
+            team.gameLog[0].played,
+          ],
+          [1, 1, 1, 1],
         );
+        assert.equal(team.stats.find((x) => x.playerId === yusuf.id).turnovers, 2, 'season total');
         assert.deepEqual(team.gameLog[0].top, {
           playerId: yusuf.id,
           name: 'Yusuf',
@@ -306,11 +315,12 @@ for (const [name, make] of Object.entries(adapters))
             g.fg3,
             g.fg1,
             g.fouls,
+            g.turnovers,
             g.ms,
           ]),
           [
-            [home.id, true, '23', 3, 1, 0, 1, 60_000],
-            [away.id, true, '23', 1, 0, 1, 1, 60_000],
+            [home.id, true, '23', 3, 1, 0, 1, 1, 60_000],
+            [away.id, true, '23', 1, 0, 1, 1, 1, 60_000],
           ],
         );
         assert.deepEqual(log.totals, {
@@ -320,6 +330,7 @@ for (const [name, make] of Object.entries(adapters))
           fg2: 0,
           fg3: 1,
           fouls: 2,
+          turnovers: 2,
           ms: 120_000,
         });
         const benched = await stats.playerLog(omar.id);
@@ -341,6 +352,37 @@ for (const [name, make] of Object.entries(adapters))
       }
     });
   });
+
+test('a database made before turnovers were kept gains them on the next start', async () => {
+  const db = new PGlite();
+  const repo = new PostgresRepository(db);
+  await repo.initialize();
+  const stats = new LiveStats(repo);
+  await stats.seed(seed);
+  const g = (await stats.schedule()).games[0];
+  const p = await stats.addPlayer(g.away.id, { name: 'A', jersey: '1' });
+  await stats.command(g.id, {
+    commandId: randomUUID(),
+    input: { type: 'lineup', side: 'away', playerIds: [p.id] },
+  });
+  // As it was before: no turnovers column, and a line already saved.
+  await db.exec('ALTER TABLE live_stats.player_game_lines DROP COLUMN turnovers');
+  assert.equal((await db.query('SELECT * FROM live_stats.player_game_lines')).rows.length, 1);
+  await repo.initialize();
+  assert.deepEqual(
+    (await db.query('SELECT turnovers FROM live_stats.player_game_lines')).rows,
+    [{ turnovers: 0 }],
+    'earlier lines count none',
+  );
+  await stats.command(g.id, {
+    commandId: randomUUID(),
+    input: { type: 'turnover', side: 'away', playerId: p.id },
+  });
+  assert.deepEqual((await db.query('SELECT turnovers FROM live_stats.player_game_lines')).rows, [
+    { turnovers: 1 },
+  ]);
+  await repo.close();
+});
 
 test('PostgreSQL keeps every action and the live box score in its own tables', async () => {
   const db = new PGlite();

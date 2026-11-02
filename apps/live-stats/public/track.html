@@ -95,8 +95,20 @@
               ><span class="lt-court-team" id="lt-court-name-home"></span
               ><span class="lt-bonus" id="lt-bonus-home" hidden></span
             ></span>
-            <span class="lt-team-fouls" id="lt-fouls-home"></span>
+            <span class="lt-court-counts"
+              ><span class="lt-team-fouls" id="lt-fouls-home"></span
+              ><button
+                type="button"
+                class="lt-team-to"
+                id="lt-to-home"
+                data-to-side="home"
+                aria-expanded="false"
+                aria-controls="lt-to-list-home"
+                title="Team turnovers: tap to see each player's"
+              ></button
+            ></span>
           </div>
+          <div class="lt-to-list" id="lt-to-list-home" hidden></div>
           <div class="lt-floor" id="lt-floor-home"></div>
           <div class="lt-bench-title">Bench</div>
           <div class="lt-bench" id="lt-bench-home"></div>
@@ -107,8 +119,20 @@
               ><span class="lt-court-team" id="lt-court-name-away"></span
               ><span class="lt-bonus" id="lt-bonus-away" hidden></span
             ></span>
-            <span class="lt-team-fouls" id="lt-fouls-away"></span>
+            <span class="lt-court-counts"
+              ><span class="lt-team-fouls" id="lt-fouls-away"></span
+              ><button
+                type="button"
+                class="lt-team-to"
+                id="lt-to-away"
+                data-to-side="away"
+                aria-expanded="false"
+                aria-controls="lt-to-list-away"
+                title="Team turnovers: tap to see each player's"
+              ></button
+            ></span>
           </div>
+          <div class="lt-to-list" id="lt-to-list-away" hidden></div>
           <div class="lt-floor" id="lt-floor-away"></div>
           <div class="lt-bench-title">Bench</div>
           <div class="lt-bench" id="lt-bench-away"></div>
@@ -116,8 +140,9 @@
       </div>
 
       <p class="lt-hint">
-        Tap a player for +1, +2, +3, a foul or −Foul. Tap someone on the bench to sub them in, or
-        drag them onto whoever is coming off. Every tap is saved to the database.
+        Tap a player for +1, +2, +3, a foul, −Foul or a turnover (TO). Tap a team's turnovers to see
+        each player's. Tap someone on the bench to sub them in, or drag them onto whoever is coming
+        off. Every tap is saved to the database.
       </p>
 
       <div class="lt-log-wrap">

@@ -60,3 +60,7 @@ Two save gaps were found by driving the tracker in a browser and are fixed: a pl
 By hand: `npm run stats:db-check` and `npm run stats:copy` were run against PostgreSQL over the network standing in for Supabase (placeholder password and missing URL rejected with advice; a game tracked through the local server copied up, a second run copying nothing; the tracker then served the copied game, record and game logs from it; and a backup copied down to a folder). The copy refused to run while the local tracker had its database open.
 
 Not yet verified: a real Supabase project (none exists yet), the Docker image, a full real game on the scoring laptop, and TCSAAL's game format.
+
+### Turnovers
+
+Turnovers were added as a player stat (the **TO** option), shown as each team's total in its title with a per-player breakdown, and not on player tiles. `npm test` covers the engine (per player and team, taking one back, undo, no effect on score, fouls or bonus), every storage adapter (season totals and both game logs), a database made before turnovers gaining the column with earlier lines counting none, and turnovers copying up to a hosted database. The browser check taps TO, confirms the tile is unchanged and the team totals and breakdown are right, takes one back from the breakdown, and finds the TO column and totals on the game page and in a player's game log. Desktop and phone screenshots of the menu and breakdown were inspected.

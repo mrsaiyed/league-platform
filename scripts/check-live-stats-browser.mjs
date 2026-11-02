@@ -188,6 +188,35 @@ try {
   await settled();
   assert.ok(await tile('home', '33').evaluate((el) => el.dataset.oncourt === '1'));
 
+  // Turnovers: off the player tiles; each team's total in its title, opening to each player's.
+  const tileText = (side, j) => tile(side, j).locator('.lt-player-stats').textContent();
+  const before = await tileText('home', '11');
+  await tile('home', '11').click();
+  await menu('to').click();
+  await tile('home', '4').click();
+  await menu('to').click();
+  await tile('away', '3').click();
+  await menu('to').click();
+  await settled();
+  assert.equal(await tileText('home', '11'), before, 'the tile does not change');
+  const tiles = (await page.locator('.lt-player').allInnerTexts()).join(' ');
+  assert.doesNotMatch(tiles, /\bTO\b|turnover/i, 'no player tile shows turnovers');
+  assert.equal(await page.locator('#lt-to-home').textContent(), '2 turnovers ▾');
+  assert.equal(await page.locator('#lt-to-away').textContent(), '1 turnover ▾');
+  await page.locator('#lt-to-home').click();
+  const list = page.locator('#lt-to-list-home');
+  await list.waitFor();
+  assert.match(await list.textContent(), /#4 Jordan\s*1.*#11 Marcus\s*1/);
+  // Taken back from the list.
+  await list.locator('.lt-to-item', { hasText: '#4 Jordan' }).locator('.lt-opt-unto').click();
+  await settled();
+  assert.equal(await page.locator('#lt-to-home').textContent(), '1 turnover ▴');
+  assert.doesNotMatch(await list.textContent(), /#4 Jordan/);
+  assert.equal(
+    await page.locator('#lt-log .lt-log-row').first().locator('span').nth(1).textContent(),
+    'Turnover taken back — #4 Jordan Ellis',
+  );
+
   // The server saves a basket but the answer is lost: the retry must not count it twice.
   await page.route(
     '**/commands',
@@ -238,6 +267,10 @@ try {
     () => [...document.querySelectorAll('.sb-score')].map((s) => s.textContent).join() === '5,5',
   );
   assert.match(await viewer.locator('#pbp li').first().textContent(), /#11 Marcus Webb \+3/);
+  // The box score has turnovers, with the team's total underneath.
+  const homeBox = viewer.locator('#box section').first();
+  assert.equal(await homeBox.locator('thead th').nth(7).textContent(), 'TO');
+  assert.equal(await homeBox.locator('tfoot td').nth(7).textContent(), '1');
 
   // Undo, redo, and a reload loses nothing.
   await page.locator('#lt-undo').click();
@@ -277,6 +310,8 @@ try {
   await page.locator('#log tbody tr').first().waitFor();
   assert.match(await page.locator('#log tbody tr').first().textContent(), /KIPP Academy West.*3/);
   assert.match(await page.locator('#log tfoot').textContent(), /1 game played/);
+  assert.equal(await page.locator('#log thead th').nth(9).textContent(), 'TO');
+  assert.equal(await page.locator('#log tfoot td').nth(9).textContent(), '1', 'his turnover');
   await shot(page, 'player', true);
 
   // Phone: the second game, lying down and upright, with no sideways scrolling.

@@ -67,22 +67,22 @@ function boxScore(side, d) {
       .filter((p) => p.teamId === teamId && (p.active || d.players[p.id]))
       .map((p) => people.get(p.id) ?? p),
   );
-  const total = { points: 0, fg3: 0, fg2: 0, fg1: 0, fouls: 0 };
+  const total = { points: 0, fg3: 0, fg2: 0, fg1: 0, turnovers: 0, fouls: 0 };
   const rows = roster.map((p) => {
     const l = d.players[p.id];
     if (l) for (const k of Object.keys(total)) total[k] += l[k];
     const played = l?.appeared;
     const cells = played
-      ? `<td data-min="${esc(p.id)}">${formatMinutes(l.ms)}</td><td><b>${l.points}</b></td><td>${l.fg3}</td><td>${l.fg2}</td><td>${l.fg1}</td><td>${l.fouls}</td>`
-      : `<td colspan="6" class="dnp-cell">${final ? 'DNP' : '—'}</td>`;
+      ? `<td data-min="${esc(p.id)}">${formatMinutes(l.ms)}</td><td><b>${l.points}</b></td><td>${l.fg3}</td><td>${l.fg2}</td><td>${l.fg1}</td><td>${l.turnovers}</td><td>${l.fouls}</td>`
+      : `<td colspan="7" class="dnp-cell">${final ? 'DNP' : '—'}</td>`;
     return `<tr class="${played ? '' : 'dnp'}${onCourt.includes(p.id) ? ' on-court' : ''}"><td class="num">${esc(p.jersey)}</td><td class="name"><a href="/player/${esc(p.id)}" title="Game log">${esc(p.name || `#${p.jersey}`)}</a></td>${cells}</tr>`;
   });
   return `<section class="panel">
     <h2>${esc(game[side].name)}</h2>
     <div class="table-wrap"><table class="stats">
-      <thead><tr><th class="num">#</th><th class="name">Player</th><th title="Minutes">MIN</th><th title="Points">PTS</th><th title="3-pointers made">3PM</th><th title="2-pointers made">2PM</th><th title="Free throws made">FTM</th><th title="Personal fouls">PF</th></tr></thead>
-      <tbody>${rows.join('') || '<tr><td colspan="8" class="name">No players entered yet.</td></tr>'}</tbody>
-      <tfoot><tr><td></td><td class="name">Team</td><td></td><td>${total.points}</td><td>${total.fg3}</td><td>${total.fg2}</td><td>${total.fg1}</td><td>${total.fouls}</td></tr></tfoot>
+      <thead><tr><th class="num">#</th><th class="name">Player</th><th title="Minutes">MIN</th><th title="Points">PTS</th><th title="3-pointers made">3PM</th><th title="2-pointers made">2PM</th><th title="Free throws made">FTM</th><th title="Turnovers">TO</th><th title="Personal fouls">PF</th></tr></thead>
+      <tbody>${rows.join('') || '<tr><td colspan="9" class="name">No players entered yet.</td></tr>'}</tbody>
+      <tfoot><tr><td></td><td class="name">Team</td><td></td><td>${total.points}</td><td>${total.fg3}</td><td>${total.fg2}</td><td>${total.fg1}</td><td>${total.turnovers}</td><td>${total.fouls}</td></tr></tfoot>
     </table></div>
   </section>`;
 }

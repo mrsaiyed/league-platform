@@ -32,6 +32,8 @@ export const Command = z.discriminatedUnion('type', [
   }),
   z.strictObject({ type: z.literal('foul'), side: Side, playerId: Id }),
   z.strictObject({ type: z.literal('unfoul'), side: Side, playerId: Id }),
+  z.strictObject({ type: z.literal('turnover'), side: Side, playerId: Id }),
+  z.strictObject({ type: z.literal('unturnover'), side: Side, playerId: Id }),
   z.strictObject({ type: z.literal('sub'), side: Side, inId: Id, outId: Id }),
   z.strictObject({ type: z.literal('period'), period: z.number().int().min(1).max(20) }),
   z.strictObject({ type: z.literal('start') }),

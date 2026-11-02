@@ -207,6 +207,7 @@ export class LiveStats {
         fg2: 0,
         fg3: 0,
         fouls: 0,
+        turnovers: 0,
         ms: 0,
       };
       if (l.appeared) t.gp += 1;
@@ -215,6 +216,7 @@ export class LiveStats {
       t.fg2 += l.fg2;
       t.fg3 += l.fg3;
       t.fouls += l.fouls;
+      t.turnovers += l.turnovers;
       t.ms += l.ms;
       totals.set(l.playerId, t);
     }
@@ -225,7 +227,16 @@ export class LiveStats {
         name: p.name,
         jersey: p.jersey,
         active: p.active,
-        ...(totals.get(p.id) ?? { gp: 0, points: 0, fg1: 0, fg2: 0, fg3: 0, fouls: 0, ms: 0 }),
+        ...(totals.get(p.id) ?? {
+          gp: 0,
+          points: 0,
+          fg1: 0,
+          fg2: 0,
+          fg3: 0,
+          fouls: 0,
+          turnovers: 0,
+          ms: 0,
+        }),
       }))
       .sort((a, b) => b.points - a.points || b.gp - a.gp || byJersey(a, b));
     const now = this.now();
@@ -239,7 +250,7 @@ export class LiveStats {
       if (r.result === 'W') record.wins += 1;
       else if (r.result === 'L') record.losses += 1;
       const lines = byGame.get(g.id) ?? [];
-      const sum = (key: 'fg1' | 'fg2' | 'fg3' | 'fouls') =>
+      const sum = (key: 'fg1' | 'fg2' | 'fg3' | 'fouls' | 'turnovers') =>
         lines.reduce((total, l) => total + l[key], 0);
       const top = lines
         .filter((l) => l.points > 0)
@@ -250,6 +261,7 @@ export class LiveStats {
         fg2: sum('fg2'),
         fg1: sum('fg1'),
         fouls: sum('fouls'),
+        turnovers: sum('turnovers'),
         played: lines.filter((l) => l.appeared).length,
         top: top
           ? { playerId: top.playerId, name: top.name, jersey: top.jersey, points: top.points }
@@ -276,7 +288,16 @@ export class LiveStats {
         .filter((l) => l.playerId === id)
         .map((l) => [l.gameId, l]),
     );
-    const totals: Totals = { gp: 0, points: 0, fg1: 0, fg2: 0, fg3: 0, fouls: 0, ms: 0 };
+    const totals: Totals = {
+      gp: 0,
+      points: 0,
+      fg1: 0,
+      fg2: 0,
+      fg3: 0,
+      fouls: 0,
+      turnovers: 0,
+      ms: 0,
+    };
     const log = games
       .filter((g) => g.status === 'final')
       .map((g) => {
@@ -289,6 +310,7 @@ export class LiveStats {
           totals.fg2 += l.fg2;
           totals.fg3 += l.fg3;
           totals.fouls += l.fouls;
+          totals.turnovers += l.turnovers;
           totals.ms += l.ms;
         }
         return {
@@ -301,6 +323,7 @@ export class LiveStats {
           fg2: l?.fg2 ?? 0,
           fg1: l?.fg1 ?? 0,
           fouls: l?.fouls ?? 0,
+          turnovers: l?.turnovers ?? 0,
         };
       });
     const team = teams.find((t) => t.id === player.teamId);
@@ -319,6 +342,7 @@ type Totals = {
   fg2: number;
   fg3: number;
   fouls: number;
+  turnovers: number;
   ms: number;
 };
 

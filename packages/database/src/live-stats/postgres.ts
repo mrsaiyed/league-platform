@@ -58,6 +58,7 @@ type LineRow = {
   fg2: number;
   fg3: number;
   fouls: number;
+  turnovers: number;
   ms: number | string;
 };
 
@@ -104,6 +105,7 @@ const line = (r: LineRow): LineRecord => ({
   fg2: r.fg2,
   fg3: r.fg3,
   fouls: r.fouls,
+  turnovers: r.turnovers,
   ms: Number(r.ms),
 });
 
@@ -242,12 +244,12 @@ export class PostgresRepository implements LiveStatsRepository {
       if (r.lines.length)
         await tx.query(
           `INSERT INTO live_stats.player_game_lines(game_id, player_id, team_id, name, jersey,
-             appeared, points, fg1, fg2, fg3, fouls, ms)
+             appeared, points, fg1, fg2, fg3, fouls, turnovers, ms)
            SELECT $1, x.player_id, x.team_id, x.name, x.jersey, x.appeared, x.points, x.fg1,
-             x.fg2, x.fg3, x.fouls, x.ms
+             x.fg2, x.fg3, x.fouls, x.turnovers, x.ms
            FROM jsonb_to_recordset($2::jsonb) AS x(player_id uuid, team_id uuid, name text,
              jersey text, appeared boolean, points integer, fg1 integer, fg2 integer,
-             fg3 integer, fouls integer, ms bigint)`,
+             fg3 integer, fouls integer, turnovers integer, ms bigint)`,
           [
             gameId,
             JSON.stringify(
@@ -262,6 +264,7 @@ export class PostgresRepository implements LiveStatsRepository {
                 fg2: l.fg2,
                 fg3: l.fg3,
                 fouls: l.fouls,
+                turnovers: l.turnovers,
                 ms: l.ms,
               })),
             ),
@@ -274,7 +277,7 @@ export class PostgresRepository implements LiveStatsRepository {
   async finalLines(teamId: string) {
     const rows = await this.db.query<LineRow & { game_id: string }>(
       `SELECT l.game_id, l.player_id, l.team_id, l.name, l.jersey, l.appeared, l.points, l.fg1,
-         l.fg2, l.fg3, l.fouls, l.ms
+         l.fg2, l.fg3, l.fouls, l.turnovers, l.ms
        FROM live_stats.player_game_lines l
        JOIN live_stats.games g ON g.id = l.game_id AND g.status = 'final'
        WHERE l.team_id = $1`,
@@ -285,7 +288,8 @@ export class PostgresRepository implements LiveStatsRepository {
 
   async gameLines(gameId: string) {
     const rows = await this.db.query<LineRow>(
-      `SELECT player_id, team_id, name, jersey, appeared, points, fg1, fg2, fg3, fouls, ms
+      `SELECT player_id, team_id, name, jersey, appeared, points, fg1, fg2, fg3, fouls, turnovers,
+         ms
        FROM live_stats.player_game_lines WHERE game_id = $1`,
       [gameId],
     );
