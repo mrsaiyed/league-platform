@@ -10,7 +10,9 @@ import {
   newGame,
   periodLabel,
   runningScores,
+  timeoutRules,
   HALVES,
+  NFHS_QUARTERS,
   QUARTERS,
   TrackerError,
 } from '../packages/sports/src/basketball/live.ts';
@@ -333,6 +335,181 @@ test('the format can change only before the game is under way', () => {
   );
   s = run(s, lineups);
   assert.throws(() => run(s, [{ type: 'rules', rules: QUARTERS }]), /fixed once/);
+});
+
+test('a foul stops a running clock where it happened; the scorer starts it again', () => {
+  let s = run(newGame(QUARTERS), lineups, { start: 0 });
+  s = at(s, { type: 'start' }, 0);
+  s = at(s, { type: 'foul', side: 'away', playerId: 'a2' }, 30_000);
+  assert.equal(s.clock.running, false);
+  assert.equal(s.clock.remainingMs, 480_000 - 30_000);
+  assert.equal(s.plays.at(-1).clockMs, 480_000 - 30_000);
+  assert.equal(s.plays.at(-1).stoppedClock, true);
+  assert.equal(s.clock.anchorAt, s.plays.at(-1).at, 'the clock stopped with this play');
+  // Free throws on a stopped clock: no minutes go by, however long they take.
+  s = at(s, { type: 'score', side: 'home', playerId: 'h1', points: 1 }, 50_000);
+  s = at(s, { type: 'score', side: 'home', playerId: 'h1', points: 1 }, 60_000);
+  assert.equal(clockAt(s, 90_000).remainingMs, 480_000 - 30_000);
+  assert.equal(derive(s, clockAt(s, 90_000).elapsedMs).players.h1.ms, 30_000);
+  // A foul on a stopped clock (a technical, or one caught up late) leaves it alone.
+  s = at(s, { type: 'foul', side: 'home', playerId: 'h2' }, 70_000);
+  assert.equal(s.plays.at(-1).stoppedClock, undefined);
+  assert.equal(s.clock.running, false);
+  s = at(s, { type: 'start' }, 100_000);
+  assert.equal(clockAt(s, 110_000).remainingMs, 480_000 - 40_000);
+  // Undo takes the foul back but leaves the clock to the scorer.
+  s = at(s, { type: 'foul', side: 'home', playerId: 'h3' }, 120_000);
+  s = at(s, { type: 'undo' }, 121_000);
+  assert.equal(s.clock.running, false);
+  assert.equal(derive(s).players.h3.fouls, 0);
+  // Other plays never touch the clock.
+  s = at(s, { type: 'start' }, 130_000);
+  for (const play of [
+    { type: 'score', side: 'home', playerId: 'h1', points: 2 },
+    { type: 'turnover', side: 'away', playerId: 'a1' },
+    { type: 'team-turnover', side: 'away' },
+    { type: 'sub', side: 'home', inId: 'h6', outId: 'h1' },
+  ])
+    s = at(s, play, 131_000);
+  assert.equal(s.clock.running, true);
+});
+
+test('a timeout stops the clock and counts against the team, 60 or 30 seconds', () => {
+  let s = run(newGame(QUARTERS), lineups, { start: 0 });
+  s = at(s, { type: 'start' }, 0);
+  assert.deepEqual(derive(s).teams.home.timeoutsLeft, { full: 3, short: 2 });
+  s = at(s, { type: 'timeout', side: 'home', seconds: 60 }, 45_000);
+  assert.equal(s.clock.running, false);
+  assert.equal(s.clock.remainingMs, 480_000 - 45_000);
+  assert.equal(s.plays.at(-1).stoppedClock, true);
+  s = at(s, { type: 'timeout', side: 'home', seconds: 30 }, 50_000);
+  let d = derive(s);
+  assert.deepEqual(d.teams.home.timeoutsLeft, { full: 2, short: 1 });
+  assert.deepEqual(d.teams.away.timeoutsLeft, { full: 3, short: 2 }, 'the other team keeps theirs');
+  assert.deepEqual(d.teams.home.timeouts, [
+    { period: 1, seconds: 60 },
+    { period: 1, seconds: 30 },
+  ]);
+  assert.equal(s.status, 'live');
+  // Taken back: the latest one, whatever its length.
+  s = at(s, { type: 'untimeout', side: 'home' }, 55_000);
+  assert.deepEqual(derive(s).teams.home.timeoutsLeft, { full: 2, short: 2 });
+  assert.throws(
+    () => at(s, { type: 'untimeout', side: 'away' }, 56_000),
+    /no timeout to take back/,
+  );
+  assert.throws(
+    () => at(s, { type: 'timeout', side: 'away', seconds: 45 }, 56_000),
+    /60 or 30 seconds/,
+  );
+  // More than allowed is still recorded (officials grant it, with a technical foul).
+  for (let i = 0; i < 3; i++) s = at(s, { type: 'timeout', side: 'home', seconds: 60 }, 60_000);
+  assert.deepEqual(derive(s).teams.home.timeoutsLeft, { full: -1, short: 2 });
+
+  const team = () => 'Al-Hadi';
+  assert.equal(
+    describePlay({ type: 'timeout', side: 'home', seconds: 60 }, String, team),
+    'Full timeout — Al-Hadi',
+  );
+  assert.equal(
+    describePlay({ type: 'timeout', side: 'home', seconds: 30 }, String, team),
+    '30-second timeout — Al-Hadi',
+  );
+  assert.equal(
+    describePlay({ type: 'untimeout', side: 'home' }, String, team),
+    'Timeout taken back — Al-Hadi',
+  );
+});
+
+test('TCSAAL timeouts: per game, one each overtime, none carried over', () => {
+  let s = run(newGame(QUARTERS), lineups);
+  s = run(s, [
+    { type: 'timeout', side: 'home', seconds: 60 },
+    { type: 'period', period: 3 },
+    { type: 'timeout', side: 'home', seconds: 30 },
+    { type: 'period', period: 4 },
+  ]);
+  assert.deepEqual(
+    derive(s).teams.home.timeoutsLeft,
+    { full: 2, short: 1 },
+    'one allowance a game',
+  );
+  s = run(s, [{ type: 'period', period: 5 }]);
+  assert.deepEqual(derive(s).teams.home.timeoutsLeft, { full: 1, short: 0 }, 'OT1: one, fresh');
+  s = run(s, [
+    { type: 'timeout', side: 'home', seconds: 60 },
+    { type: 'period', period: 6 },
+  ]);
+  assert.deepEqual(derive(s).teams.home.timeoutsLeft, { full: 1, short: 0 }, 'OT2: one, fresh');
+});
+
+test('UIL (NFHS) timeouts carry into overtime; a halves format can allow them per half', () => {
+  let s = run(newGame(NFHS_QUARTERS), lineups);
+  s = run(s, [
+    { type: 'timeout', side: 'away', seconds: 60 },
+    { type: 'period', period: 5 },
+  ]);
+  assert.deepEqual(derive(s).teams.away.timeoutsLeft, { full: 3, short: 2 }, '2 + 2 left, +1');
+  s = run(s, [
+    { type: 'timeout', side: 'away', seconds: 60 },
+    { type: 'period', period: 6 },
+  ]);
+  assert.deepEqual(derive(s).teams.away.timeoutsLeft, { full: 3, short: 2 });
+
+  // Two a half, none carried: the second half starts fresh.
+  let h = run(newGame(HALVES), lineups);
+  h = run(h, [{ type: 'timeout', side: 'home', seconds: 60 }]);
+  assert.deepEqual(derive(h).teams.home.timeoutsLeft, { full: 1, short: 0 });
+  h = run(h, [{ type: 'period', period: 2 }]);
+  assert.deepEqual(derive(h).teams.home.timeoutsLeft, { full: 2, short: 0 });
+  h = run(h, [{ type: 'period', period: 3 }]);
+  assert.deepEqual(derive(h).teams.home.timeoutsLeft, { full: 1, short: 0 }, 'overtime: one');
+
+  // Per half in a quarters game: Q1–Q2 and Q3–Q4, and carried when the format says so.
+  const rules = {
+    ...QUARTERS,
+    fullTimeouts: 2,
+    shortTimeouts: 1,
+    timeoutsPer: 'half',
+    timeoutsCarry: true,
+  };
+  let q = run(newGame(rules), lineups);
+  q = run(q, [
+    { type: 'period', period: 2 },
+    { type: 'timeout', side: 'home', seconds: 30 },
+  ]);
+  assert.deepEqual(derive(q).teams.home.timeoutsLeft, { full: 2, short: 0 });
+  q = run(q, [{ type: 'period', period: 3 }]);
+  assert.deepEqual(derive(q).teams.home.timeoutsLeft, { full: 4, short: 1 }, 'first half carried');
+});
+
+test('a game saved before timeouts were tracked gets TCSAAL timeouts', () => {
+  const old = newGame(QUARTERS);
+  for (const key of [
+    'fullTimeouts',
+    'shortTimeouts',
+    'timeoutsPer',
+    'overtimeTimeouts',
+    'timeoutsCarry',
+  ])
+    delete old.rules[key];
+  assert.deepEqual(timeoutRules(old.rules), timeoutRules(QUARTERS));
+  const s = run(old, [...lineups, { type: 'timeout', side: 'home', seconds: 30 }]);
+  assert.deepEqual(derive(s).teams.home.timeoutsLeft, { full: 3, short: 1 });
+  // A format sent by a page from before timeouts gets them too.
+  const { fullTimeouts, timeoutsCarry, ...plain } = HALVES;
+  const set = run(newGame(QUARTERS), [{ type: 'rules', rules: plain }]);
+  assert.equal(set.rules.fullTimeouts, 3);
+  assert.equal(set.rules.timeoutsCarry, false);
+  assert.equal(set.rules.timeoutsPer, 'half', 'what was sent is kept');
+  assert.throws(
+    () => run(newGame(), [{ type: 'rules', rules: { ...QUARTERS, fullTimeouts: 11 } }]),
+    /0 to 10 timeouts/,
+  );
+  assert.throws(
+    () => run(newGame(), [{ type: 'rules', rules: { ...QUARTERS, timeoutsPer: 'quarter' } }]),
+    /per game or per half/,
+  );
 });
 
 test('apply never mutates its input and remembers recent command ids', () => {

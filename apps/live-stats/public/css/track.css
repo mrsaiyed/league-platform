@@ -442,7 +442,8 @@
   flex: 1;
 }
 .lt-slot-open {
-  z-index: 5;
+  /* Above the Start clock button too: the options being used come first. */
+  z-index: 12;
 }
 .lt-menu {
   position: absolute;
@@ -780,6 +781,12 @@
   font: inherit;
   padding: 0.2rem 0.5rem;
 }
+.lt-dialog .lt-dialog-check input {
+  width: 1.4rem;
+  height: 1.4rem;
+  min-height: 0;
+  accent-color: var(--gold);
+}
 .lt-dialog-actions {
   display: flex;
   flex-wrap: wrap;
@@ -949,6 +956,13 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.35rem 0.6rem;
+  margin-left: auto;
+}
+/* Where the name and the counts do not fit side by side, the counts go under the name
+   together, rather than stacking one per line beside it. */
+.lt-court-title {
+  flex-wrap: wrap;
+  row-gap: 0.3rem;
 }
 .lt-team-to {
   padding: 0.2rem 0.6rem;
@@ -1017,4 +1031,223 @@
   background: transparent;
   border-color: var(--team-dim, var(--gold-line));
   color: var(--team, var(--text));
+}
+
+/* Timeouts: each team's left in its title, opening to call one. */
+.lt-team-tmo.lt-tmo-none {
+  border-color: #c87070;
+  color: #ff8a80;
+}
+.lt-tmo-list {
+  /* A grid, not a column of flex rows: those take the height of their wrapped size. */
+  display: grid;
+  gap: 0.5rem;
+}
+.lt-tmo-calls,
+.lt-tmo-taken {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.lt-tmo-taken .lt-menu-label {
+  width: auto;
+  margin-right: 0.2rem;
+}
+.lt-opt.lt-opt-tmo {
+  flex: 1 1 9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 56px;
+  font-size: 1.05rem;
+  background: #1f3550;
+  border-color: #6fa8dc;
+}
+.lt-opt-tmo small {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #c9dcf0;
+}
+.lt-opt.lt-opt-tmo-none {
+  background: #2a1820;
+  border-color: #c87070;
+}
+.lt-opt-tmo-none small {
+  color: #ff8a80;
+}
+.lt-tmo-rule {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* Start clock: while the clock is stopped, a big button floats over the page at the
+   bottom of the screen, by the scorer's thumbs. The layer around it lets every tap
+   through, so stats and subs carry on (free throws are scored on a stopped clock). */
+.lt-go {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(0.9rem, env(safe-area-inset-bottom));
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem;
+  pointer-events: none;
+}
+.lt-go[hidden] {
+  display: none;
+}
+.lt-go-card {
+  width: min(560px, 100%);
+}
+.lt-go-row {
+  position: relative;
+  pointer-events: auto;
+}
+.lt-go-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+  min-height: 92px;
+  padding: 0.6rem 3.4rem 0.6rem 1.2rem;
+  border-radius: 18px;
+  border: 3px solid var(--go-line);
+  background: var(--go);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.7),
+    0 0 0 6px rgba(52, 168, 116, 0.28);
+  animation: lt-go-pulse 1.8s ease-in-out infinite;
+}
+.lt-go-start:focus-visible,
+.lt-go-close:focus-visible {
+  outline: 3px solid #8ec5ff;
+  outline-offset: 3px;
+}
+.lt-go-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+.lt-go-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.05;
+}
+.lt-go-title {
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.lt-go-when {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--clock);
+  font-variant-numeric: tabular-nums;
+}
+.lt-go-close {
+  position: absolute;
+  top: 50%;
+  right: 0.6rem;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  background: rgba(10, 30, 20, 0.55);
+  color: #fff;
+  font: inherit;
+  font-size: 1.7rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.lt-go-note {
+  margin: 0.45rem auto 0;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(20, 12, 16, 0.92);
+  border: 1px solid var(--gold-line);
+  color: var(--text);
+  font-size: 0.82rem;
+  text-align: center;
+}
+@keyframes lt-go-pulse {
+  50% {
+    box-shadow:
+      0 14px 40px rgba(0, 0, 0, 0.7),
+      0 0 0 12px rgba(52, 168, 116, 0.12);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lt-go-start {
+    animation: none;
+  }
+}
+/* Room to scroll the last of the page out from under it. */
+.lt-go-shown .lt-panel {
+  padding-bottom: 10rem;
+}
+@media (max-width: 880px) {
+  .lt-go-start {
+    min-height: 80px;
+  }
+  .lt-go-title {
+    font-size: 1.7rem;
+  }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .lt-go {
+    bottom: max(0.4rem, env(safe-area-inset-bottom));
+  }
+  .lt-go-card {
+    width: min(400px, 100%);
+  }
+  .lt-go-start {
+    min-height: 54px;
+    gap: 0.6rem;
+    padding: 0.3rem 3rem 0.3rem 0.8rem;
+    border-radius: 12px;
+  }
+  .lt-go-icon {
+    font-size: 1.5rem;
+  }
+  .lt-go-text {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+  .lt-go-title {
+    font-size: 1.35rem;
+  }
+  .lt-go-when {
+    font-size: 0.9rem;
+  }
+  .lt-go-close {
+    width: 40px;
+    height: 40px;
+    font-size: 1.4rem;
+    right: 0.4rem;
+  }
+  .lt-go-note {
+    display: none;
+  }
+  .lt-team-to {
+    padding: 0.05rem 0.45rem;
+    font-size: 0.66rem;
+  }
+  /* The panel fills the screen here; the courts scroll, so they make the room. */
+  .lt-go-shown .lt-panel {
+    padding-bottom: 0.3rem;
+  }
+  .lt-go-shown .lt-court {
+    padding-bottom: 4.2rem;
+  }
 }

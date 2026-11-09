@@ -530,7 +530,7 @@ ON CONFLICT (slug) DO NOTHING;
 INSERT INTO live_stats.games(id, season, home_team_id, away_team_id, starts_at, venue,
   venue_address, game_type, source, source_ref, source_url, state)
 SELECT gen_random_uuid(), f.season, h.id, a.id, f.starts_at::timestamptz, f.venue, f.address,
-  f.game_type, f.source, f.source_ref, f.source_url, '{"version":1,"status":"scheduled","rules":{"periods":4,"periodSeconds":480,"overtimeSeconds":240,"bonusFouls":5,"doubleBonusFouls":null},"clock":{"remainingMs":480000,"running":false,"anchorAt":0,"elapsedMs":0},"plays":[],"redo":[],"colorsSwapped":false,"recent":[],"lastAt":0}'::jsonb
+  f.game_type, f.source, f.source_ref, f.source_url, '{"version":1,"status":"scheduled","rules":{"periods":4,"periodSeconds":480,"overtimeSeconds":240,"bonusFouls":5,"doubleBonusFouls":null,"fullTimeouts":3,"shortTimeouts":2,"timeoutsPer":"game","overtimeTimeouts":1,"timeoutsCarry":false},"clock":{"remainingMs":480000,"running":false,"anchorAt":0,"elapsedMs":0},"plays":[],"redo":[],"colorsSwapped":false,"recent":[],"lastAt":0}'::jsonb
 FROM (VALUES
   ('2026-27', 'kipp-academy-west', 'al-hadi-school', '2026-11-03T01:00:00.000Z', 'KIPP Academy West Gym', '15022 Old Richmond Dr, Sugar Land, TX 77498', 'exhibition', 'TCSAAL', 'tcsaal:653', 'https://texascharter.org/tc_event/26-27-al-hadi-school-varsity-boys-basketball-26-27-kipp-academy-west-varsity-boys-basketball/'),
   ('2026-27', 'al-hadi-school', 'kipp-connect-preparatory', '2026-11-09T23:30:00.000Z', 'Al-Hadi Gym', '14855 Richmond Ave. Houston, TX 77082', 'regular_season', 'TCSAAL', 'tcsaal:159', 'https://texascharter.org/tc_event/26-27-kipp-connect-preparatory-varsity-boys-basketball-26-27-al-hadi-school-varsity-boys-basketball-2/'),

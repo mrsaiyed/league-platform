@@ -359,14 +359,16 @@ type Totals = {
 
 /** Every player an action names must be on the roster of the team it is recorded for. */
 function checkPlayers(g: GameRecord, input: Command, players: Map<string, PlayerRecord>) {
-  if (!('side' in input) || input.type === 'team-turnover' || input.type === 'team-unturnover')
-    return;
+  if (!('side' in input)) return;
   const ids =
     input.type === 'lineup'
       ? input.playerIds
       : input.type === 'sub'
         ? [input.inId, input.outId]
-        : [input.playerId];
+        : 'playerId' in input
+          ? [input.playerId]
+          : // A team's own play, such as a team turnover or a timeout, names no player.
+            [];
   const teamId = input.side === 'home' ? g.homeTeamId : g.awayTeamId;
   if (ids.some((id) => players.get(id)?.teamId !== teamId))
     throw new StatsError('That player is not on this team. Reload the roster.', 422);

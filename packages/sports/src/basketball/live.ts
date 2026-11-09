@@ -13,7 +13,8 @@
  * running total, so it can never drift from what is displayed. The game clock
  * is anchored to a timestamp while it runs, so a sleeping tablet never stops
  * game time, and minutes are credited from the cumulative running time stamped
- * on each play.
+ * on each play. A foul or a timeout stops a running clock, as the officials'
+ * whistle does (NFHS 5-8-1); only the scorer starts it again.
  */
 
 export type Side = 'home' | 'away';
@@ -29,25 +30,84 @@ export type Rules = {
   bonusFouls: number;
   /** Team fouls for the double bonus, or null when the format has none. */
   doubleBonusFouls: number | null;
+  // Timeouts each team may take. Games saved before timeouts were tracked have none
+  // of these; read them through `timeoutRules`, which fills in TCSAAL's.
+  /** 60-second ("full") timeouts per game or per half. */
+  fullTimeouts?: number;
+  /** 30-second timeouts per game or per half. */
+  shortTimeouts?: number;
+  timeoutsPer?: 'game' | 'half';
+  /** 60-second timeouts added for each overtime period. */
+  overtimeTimeouts?: number;
+  /** Whether unused timeouts carry into the next half or overtime. */
+  timeoutsCarry?: boolean;
+};
+export type TimeoutRules = Required<
+  Pick<
+    Rules,
+    'fullTimeouts' | 'shortTimeouts' | 'timeoutsPer' | 'overtimeTimeouts' | 'timeoutsCarry'
+  >
+>;
+
+/**
+ * TCSAAL's timeouts (2025–26 basketball rules): three 60-second and two 30-second
+ * a game, one 60-second for each overtime, and none carried into overtime or from
+ * one overtime to the next.
+ */
+const TCSAAL_TIMEOUTS: TimeoutRules = {
+  fullTimeouts: 3,
+  shortTimeouts: 2,
+  timeoutsPer: 'game',
+  overtimeTimeouts: 1,
+  timeoutsCarry: false,
 };
 
-/** High-school format: 8-minute quarters, team fouls reset each quarter, bonus on the 5th. */
+/**
+ * TCSAAL varsity, which plays NFHS rules: 8-minute quarters and 4-minute overtime,
+ * team fouls reset each quarter, the bonus on the 5th; TCSAAL's timeouts.
+ */
 export const QUARTERS: Rules = {
   periods: 4,
   periodSeconds: 8 * 60,
   overtimeSeconds: 4 * 60,
   bonusFouls: 5,
   doubleBonusFouls: null,
+  ...TCSAAL_TIMEOUTS,
 };
-/** Rec-league format, as Faraj League plays it: 20-minute halves, bonus on 7, double on 10. */
+/**
+ * UIL, which plays NFHS rules as written: as TCSAAL, except unused timeouts carry
+ * into overtime (NFHS 5-11-1).
+ */
+export const NFHS_QUARTERS: Rules = { ...QUARTERS, timeoutsCarry: true };
+/**
+ * Rec-league format, as Faraj League plays it: 20-minute halves, bonus on 7, double
+ * on 10. Two timeouts a half and one each overtime, none carried over: common in rec
+ * leagues; confirm with the league.
+ */
 export const HALVES: Rules = {
   periods: 2,
   periodSeconds: 20 * 60,
   overtimeSeconds: 5 * 60,
   bonusFouls: 7,
   doubleBonusFouls: 10,
+  fullTimeouts: 2,
+  shortTimeouts: 0,
+  timeoutsPer: 'half',
+  overtimeTimeouts: 1,
+  timeoutsCarry: false,
 };
 export const DEFAULT_RULES = QUARTERS;
+
+/** A format's timeouts, with TCSAAL's for a game saved before timeouts were tracked. */
+export function timeoutRules(rules: Rules): TimeoutRules {
+  return {
+    fullTimeouts: rules.fullTimeouts ?? TCSAAL_TIMEOUTS.fullTimeouts,
+    shortTimeouts: rules.shortTimeouts ?? TCSAAL_TIMEOUTS.shortTimeouts,
+    timeoutsPer: rules.timeoutsPer ?? TCSAAL_TIMEOUTS.timeoutsPer,
+    overtimeTimeouts: rules.overtimeTimeouts ?? TCSAAL_TIMEOUTS.overtimeTimeouts,
+    timeoutsCarry: rules.timeoutsCarry ?? TCSAAL_TIMEOUTS.timeoutsCarry,
+  };
+}
 
 /** Players on the floor per team. */
 export const LINEUP_SIZE = 5;
@@ -66,8 +126,15 @@ export type Play =
   /** A turnover charged to the team rather than a player, such as a shot-clock violation. */
   | { type: 'team-turnover'; side: Side }
   | { type: 'team-unturnover'; side: Side }
+  /** A charged timeout, 60 or 30 seconds. It stops a running clock. */
+  | { type: 'timeout'; side: Side; seconds: 60 | 30 }
+  /** Takes back the team's latest timeout, recorded by mistake. */
+  | { type: 'untimeout'; side: Side }
   | { type: 'sub'; side: Side; inId: string; outId: string }
   | { type: 'period'; period: number };
+
+/** Plays that stop a running clock, as the officials' whistle does. */
+const STOPS_CLOCK: ReadonlySet<Play['type']> = new Set(['foul', 'timeout']);
 
 export type Command =
   | Play
@@ -91,6 +158,8 @@ export type Stamp = {
   elapsedMs: number;
   /** On a period change, the clock it replaced, so undoing the change puts it back. */
   prevClockMs?: number;
+  /** This play stopped the running clock (a foul or a timeout). */
+  stoppedClock?: true;
 };
 export type LoggedPlay = Play & Stamp;
 
@@ -142,6 +211,14 @@ export type TeamView = {
   penalty: 0 | 1 | 2;
   /** What this team shoots, driven by the opponent's fouls. */
   bonus: 0 | 1 | 2;
+  /** Every timeout still standing, oldest first. */
+  timeouts: { period: number; seconds: 60 | 30 }[];
+  /**
+   * Timeouts the team has left now, by length: what is allowed so far, by the
+   * format, less what has been taken. Below zero when the team has taken more
+   * than allowed (officials grant one, at the cost of a technical foul).
+   */
+  timeoutsLeft: { full: number; short: number };
 };
 export type Derived = {
   period: number;
@@ -294,6 +371,12 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
         teams[play.side].teamTurnovers -= 1;
         teams[play.side].turnovers -= 1;
         break;
+      case 'timeout':
+        teams[play.side].timeouts.push({ period: play.period, seconds: play.seconds });
+        break;
+      case 'untimeout':
+        teams[play.side].timeouts.pop();
+        break;
       case 'sub': {
         const team = teams[play.side];
         if (!team.onCourt.includes(play.outId) || team.onCourt.includes(play.inId)) break;
@@ -326,8 +409,44 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
   for (const side of SIDES) {
     teams[side].penalty = bonusLevel(teams[side].periodFouls, state.rules);
     teams[side].bonus = bonusLevel(teams[otherSide(side)].periodFouls, state.rules);
+    teams[side].timeoutsLeft = timeoutsLeft(state.rules, teams[side].timeouts, period);
   }
   return { period, periodStartElapsedMs, teams, players, standing };
+}
+
+/**
+ * Timeouts are allowed per window: the whole of regulation, or each half, then
+ * each overtime period on its own. Q1–Q2 are the first half of a quarters game.
+ */
+function timeoutWindow(rules: Rules, period: number): number {
+  const half = timeoutRules(rules).timeoutsPer === 'half';
+  if (period > rules.periods) return (half ? 1 : 0) + (period - rules.periods);
+  return half && period > rules.periods / 2 ? 1 : 0;
+}
+
+/** Timeouts left in `period`, by length; see `TeamView.timeoutsLeft`. */
+export function timeoutsLeft(
+  rules: Rules,
+  taken: readonly { period: number; seconds: 60 | 30 }[],
+  period: number,
+): { full: number; short: number } {
+  const t = timeoutRules(rules);
+  const now = timeoutWindow(rules, period);
+  const regulation = timeoutWindow(rules, rules.periods);
+  // Without carry-over only this window's allowance counts; with it, every one so far.
+  const first = t.timeoutsCarry ? 0 : now;
+  const left = { full: 0, short: 0 };
+  for (let w = first; w <= now; w++) {
+    left.full += w <= regulation ? t.fullTimeouts : t.overtimeTimeouts;
+    left.short += w <= regulation ? t.shortTimeouts : 0;
+  }
+  for (const timeout of taken) {
+    const w = timeoutWindow(rules, timeout.period);
+    if (w < first || w > now) continue;
+    if (timeout.seconds === 30) left.short -= 1;
+    else left.full -= 1;
+  }
+  return left;
 }
 
 const emptyLine = (side: Side): Line => ({
@@ -350,6 +469,8 @@ const emptyTeam = (): TeamView => ({
   onCourt: [],
   penalty: 0,
   bonus: 0,
+  timeouts: [],
+  timeoutsLeft: { full: 0, short: 0 },
 });
 
 export type Context = { id: string; now: number };
@@ -381,6 +502,8 @@ export function apply(state: GameState, command: Command, { id, now }: Context):
     case 'unturnover':
     case 'team-turnover':
     case 'team-unturnover':
+    case 'timeout':
+    case 'untimeout':
     case 'sub':
     case 'period':
       record(s, command, id, at);
@@ -465,6 +588,10 @@ function record(s: GameState, input: Play, id: string, at: number) {
       clockMs: s.clock.remainingMs,
       prevClockMs,
     });
+  } else if (STOPS_CLOCK.has(play.type) && s.clock.running) {
+    // The whistle stops the clock where the play happened; the scorer starts it again.
+    s.clock = { ...s.clock, running: false };
+    s.plays.push({ ...play, ...stamp, stoppedClock: true });
   } else s.plays.push({ ...play, ...stamp });
   s.redo = [];
   // Setting lineups before tip-off does not make the game live for viewers; anything else does.
@@ -519,6 +646,13 @@ function checkPlay(input: Play, d: Derived, rules: Rules): Play {
     case 'team-unturnover':
       if (!d.teams[side].teamTurnovers) fail('There is no team turnover to take back.');
       return { type: 'team-unturnover', side };
+    case 'timeout':
+      // More than the format allows is still recorded: officials grant it, with a technical foul.
+      if (input.seconds !== 60 && input.seconds !== 30) fail('A timeout is 60 or 30 seconds.');
+      return { type: 'timeout', side, seconds: input.seconds };
+    case 'untimeout':
+      if (!d.teams[side].timeouts.length) fail('There is no timeout to take back.');
+      return { type: 'untimeout', side };
     case 'sub': {
       const { inId, outId } = input;
       if (!isId(inId) || !isId(outId) || inId === outId)
@@ -541,12 +675,21 @@ function checkRules(rules: Rules): Rules {
   if (!whole(r.bonusFouls, 1, 30)) fail('The bonus starts between 1 and 30 team fouls.');
   if (r.doubleBonusFouls != null && !whole(r.doubleBonusFouls, r.bonusFouls + 1, 40))
     fail('The double bonus must come after the bonus.');
+  // A format sent without timeouts (a page from before they were tracked) gets TCSAAL's.
+  const t = timeoutRules(r);
+  if (!whole(t.fullTimeouts, 0, 10) || !whole(t.shortTimeouts, 0, 10))
+    fail('Allow 0 to 10 timeouts of each length.');
+  if (t.timeoutsPer !== 'game' && t.timeoutsPer !== 'half')
+    fail('Timeouts are per game or per half.');
+  if (!whole(t.overtimeTimeouts, 0, 5)) fail('Allow 0 to 5 timeouts each overtime.');
+  if (typeof t.timeoutsCarry !== 'boolean') fail('Say whether unused timeouts carry over.');
   return {
     periods: r.periods,
     periodSeconds: r.periodSeconds,
     overtimeSeconds: r.overtimeSeconds,
     bonusFouls: r.bonusFouls,
     doubleBonusFouls: r.doubleBonusFouls ?? null,
+    ...t,
   };
 }
 
@@ -624,6 +767,10 @@ export function describePlay(
       return `Team turnover — ${teamOf(play.side)}`;
     case 'team-unturnover':
       return `Team turnover taken back — ${teamOf(play.side)}`;
+    case 'timeout':
+      return `${play.seconds === 30 ? '30-second' : 'Full'} timeout — ${teamOf(play.side)}`;
+    case 'untimeout':
+      return `Timeout taken back — ${teamOf(play.side)}`;
     case 'sub':
       return `Sub: ${nameOf(play.inId)} in for ${nameOf(play.outId)}`;
     case 'lineup':

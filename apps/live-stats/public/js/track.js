@@ -10,6 +10,12 @@
  *    onto whoever is coming off works too (Pointer Events, which iOS supports).
  *  - Until a team's starting lineup is set, tapping its players picks them.
  *  - "Players" opens a panel to add names and jersey numbers, both teams at once.
+ *  - Each team's timeouts left sit in its title; tapped, they open to call a full
+ *    or a 30-second one. A foul or a timeout stops the clock (the engine does it).
+ *  - While the clock is stopped, a big Start clock button floats over the page, so
+ *    play never runs on with the clock forgotten. Only the button takes taps: the
+ *    players, subs and everything around it keep working, for free throws on a
+ *    stopped clock. Its × hides it until the clock next stops.
  *
  * Every tap is a command saved to the database. It is applied here at once with
  * the same engine the server runs, held in an outbox in this browser until the
@@ -27,8 +33,10 @@ import {
   periodLabel,
   periodOptions,
   runningScores,
+  timeoutRules,
   HALVES,
   LINEUP_SIZE,
+  NFHS_QUARTERS,
   QUARTERS,
   SIDES,
 } from './engine.js';
@@ -80,6 +88,10 @@ let menuFor = null;
 const pending = loadPicks();
 /** Which teams' turnover lists are open. */
 const turnoversOpen = { home: false, away: false };
+/** Which teams' timeout rows are open. */
+const timeoutsOpen = { home: false, away: false };
+/** The clock stop the scorer hid the Start clock button for; see `stopKey`. */
+let goHiddenFor = null;
 
 function loadPicks() {
   try {
@@ -395,6 +407,7 @@ function render() {
       : '';
     fouls.classList.toggle('lt-fouls-bonus', t.penalty === 1);
     fouls.classList.toggle('lt-fouls-double', t.penalty === 2);
+    renderTimeouts(side, d, final);
     renderTurnovers(side, d, final);
     const bonus = $(`lt-bonus-${side}`);
     bonus.textContent = bonusLabel(t.bonus);
@@ -420,6 +433,7 @@ function render() {
   startStop.disabled = final || (!clock.running && clock.remainingMs <= 0);
   startStop.title =
     !clock.running && clock.remainingMs <= 0 ? 'Period over: pick the next period' : '';
+  renderGo(clock, d);
 
   // Only rebuilt when the options change, so an open picker is never yanked shut.
   const options = periodOptions(view.rules, d.period);
@@ -449,6 +463,100 @@ function render() {
   renderLog();
   placeMenu();
   syncLine();
+}
+
+/** A clock stop: when the clock stopped and in which period. A new one shows the Start button again. */
+const stopKey = (d) => `${view.clock.anchorAt}|${d.period}`;
+
+/**
+ * The big Start clock button, while the clock is stopped with time left in a game
+ * under way (or both starting fives set, for the tip-off), until the scorer hides it.
+ */
+function renderGo(clock, d) {
+  const ready = view.status === 'live' || SIDES.every((side) => d.teams[side].onCourt.length > 0);
+  const show =
+    view.status !== 'final' &&
+    !clock.running &&
+    clock.remainingMs > 0 &&
+    ready &&
+    !drawerOpen &&
+    goHiddenFor !== stopKey(d);
+  const go = $('lt-go');
+  go.hidden = !show;
+  document.body.classList.toggle('lt-go-shown', show);
+  if (!show) return;
+  $('lt-go-title').textContent =
+    view.status === 'scheduled' ? 'Start clock · tip-off' : 'Start clock';
+  $('lt-go-when').textContent =
+    `${periodLabel(d.period, view.rules.periods)} · ${formatClock(clock.remainingMs)}`;
+  $('lt-go-note').textContent = `${stopReason(clock, d)} Stats and subs still work; × hides this.`;
+}
+
+/** Why the clock is stopped, as far as the plays tell. */
+function stopReason(clock, d) {
+  if (view.status === 'scheduled') return 'Start it at the tip.';
+  const last = view.plays.at(-1);
+  // The play that stopped the clock carries the moment it did, which the clock keeps.
+  const stopper = view.plays.findLast((p) => p.stoppedClock);
+  if (stopper && stopper.at === view.clock.anchorAt)
+    return stopper.type === 'foul'
+      ? `Stopped for a foul on ${label(stopper.playerId)}.`
+      : `Stopped for a ${game[stopper.side].name} timeout.`;
+  if (last?.type === 'period' && last.clockMs === clock.remainingMs)
+    return `Start of ${periodLabel(d.period, view.rules.periods)}.`;
+  return 'The clock is stopped.';
+}
+
+/** "3 full and 2 30-second a game · 1 more each overtime · none carried over". */
+function timeoutRulesText(rules) {
+  const t = timeoutRules(rules);
+  const allowed = [
+    t.fullTimeouts ? `${t.fullTimeouts} full` : '',
+    t.shortTimeouts ? `${t.shortTimeouts} 30-second` : '',
+  ].filter(Boolean);
+  return [
+    `${allowed.join(' and ') || 'None'} a ${t.timeoutsPer}`,
+    t.overtimeTimeouts ? `${t.overtimeTimeouts} more each overtime` : 'none in overtime',
+    t.timeoutsCarry ? 'unused carry over' : 'none carried over',
+  ].join(' · ');
+}
+
+/**
+ * The team's timeouts left in its title. Tapped, it opens to call a full or a
+ * 30-second one, lists those taken, and takes back the latest.
+ */
+function renderTimeouts(side, d, final) {
+  const t = timeoutRules(view.rules);
+  const left = d.teams[side].timeoutsLeft;
+  const total = Math.max(0, left.full) + Math.max(0, left.short);
+  const open = timeoutsOpen[side];
+  const toggle = $(`lt-tmo-${side}`);
+  toggle.textContent = `${total ? `${total} ${total === 1 ? 'timeout' : 'timeouts'} left` : 'No timeouts left'} ${open ? '▴' : '▾'}`;
+  toggle.classList.toggle('lt-tmo-none', !total);
+  toggle.setAttribute('aria-expanded', String(open));
+  const list = $(`lt-tmo-list-${side}`);
+  list.hidden = !open;
+  if (!open) return;
+  // Each one taken, with when: rebuilt from the plays, as the engine counts them.
+  const taken = [];
+  for (const p of view.plays) {
+    if (p.side !== side) continue;
+    if (p.type === 'timeout') taken.push(p);
+    else if (p.type === 'untimeout') taken.pop();
+  }
+  const off = final ? ' disabled' : '';
+  const call = (seconds, name, n) =>
+    `<button type="button" class="lt-opt lt-opt-tmo${n > 0 ? '' : ' lt-opt-tmo-none'}" data-act="timeout" data-team="${side}" data-seconds="${seconds}"${off}>${name}<small>${n > 0 ? `${n} left` : 'none left'}</small></button>`;
+  const shortUsed = taken.some((p) => p.seconds === 30);
+  const items = taken.map(
+    (p) =>
+      `<span class="lt-to-item"><span class="lt-to-who">${esc(periodLabel(p.period, view.rules.periods))} ${esc(formatClock(p.clockMs))}</span><b>${p.seconds === 30 ? '30s' : 'Full'}</b></span>`,
+  );
+  list.innerHTML = `<div class="lt-tmo-calls">${call(60, 'Full timeout', left.full)}${t.shortTimeouts || shortUsed ? call(30, '30-second', left.short) : ''}</div>${
+    items.length
+      ? `<div class="lt-tmo-taken"><span class="lt-menu-label">Taken</span>${items.join('')}<button type="button" class="lt-opt lt-opt-unto" data-act="untimeout" data-team="${side}" title="Take back the latest timeout" aria-label="Take back ${esc(game[side].name)}'s latest timeout"${off}>−</button></div>`
+      : ''
+  }<div class="lt-tmo-rule">${esc(timeoutRulesText(view.rules))}</div>`;
 }
 
 /**
@@ -615,11 +723,34 @@ function onAction(btn) {
   if (btn.disabled) return;
   const { act, player, team: side, out } = btn.dataset;
   menuFor = null;
+  // A foul or a timeout stops a running clock; say so, since it changes what comes next.
+  const stops = clockAt(view, serverClock.now()).running ? ' Clock stopped.' : '';
   if (act === 'p1' || act === 'p2' || act === 'p3')
     perform({ type: 'score', side, playerId: player, points: Number(act.slice(1)) });
-  else if (act === 'foul') perform({ type: 'foul', side, playerId: player });
-  else if (act === 'unfoul') perform({ type: 'unfoul', side, playerId: player });
-  else if (act === 'to') {
+  else if (act === 'foul') {
+    // Said first, so the bonus this foul may bring is said over it; the Start clock
+    // button still shows the clock stopped.
+    if (stops) flash(`Foul — ${label(player)}.${stops}`);
+    perform({ type: 'foul', side, playerId: player });
+  } else if (act === 'unfoul') perform({ type: 'unfoul', side, playerId: player });
+  else if (act === 'timeout') {
+    const seconds = Number(btn.dataset.seconds);
+    const kind = seconds === 30 ? '30-second' : 'full';
+    const left = derive(view).teams[side].timeoutsLeft[seconds === 30 ? 'short' : 'full'];
+    if (
+      left <= 0 &&
+      !confirm(
+        `${game[side].name} has no ${kind} timeouts left. Officials charge a technical foul for an extra one.\n\nRecord it anyway?`,
+      )
+    )
+      return render();
+    if (perform({ type: 'timeout', side, seconds })) {
+      timeoutsOpen[side] = false;
+      flash(`${seconds === 30 ? '30-second' : 'Full'} timeout — ${game[side].name}.${stops}`);
+    }
+  } else if (act === 'untimeout') {
+    if (perform({ type: 'untimeout', side })) flash(`Timeout taken back — ${game[side].name}.`);
+  } else if (act === 'to') {
     if (perform({ type: 'turnover', side, playerId: player }))
       flash(`Turnover — ${label(player)}.`);
   } else if (act === 'unto') perform({ type: 'unturnover', side, playerId: player });
@@ -707,6 +838,12 @@ panel.addEventListener('click', (e) => {
     turnoversOpen[side] = !turnoversOpen[side];
     return render();
   }
+  const timeouts = e.target.closest('[data-tmo-side]');
+  if (timeouts) {
+    const side = timeouts.dataset.tmoSide;
+    timeoutsOpen[side] = !timeoutsOpen[side];
+    return render();
+  }
   if (e.detail !== 0) return;
   const opt = e.target.closest('.lt-opt');
   if (opt) {
@@ -725,7 +862,10 @@ panel.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (drawerOpen) return closePlayers();
-  if (!menuFor) return;
+  if (!menuFor) {
+    if (!$('lt-go').hidden) hideGo();
+    return;
+  }
   const id = menuFor;
   menuFor = null;
   render();
@@ -735,6 +875,17 @@ document.addEventListener('keydown', (e) => {
 // ---- clock, period and game controls ----------------------------------------
 $('lt-startstop').onclick = () =>
   perform({ type: clockAt(view, serverClock.now()).running ? 'pause' : 'start' });
+$('lt-go-start').onclick = () => {
+  menuFor = null;
+  perform({ type: 'start' });
+};
+/** Scoring on with the clock stopped: hidden until the clock next stops, or the period changes. */
+function hideGo() {
+  goHiddenFor = stopKey(derive(view));
+  render();
+  $('lt-startstop').focus({ preventScroll: true });
+}
+$('lt-go-close').onclick = hideGo;
 $('lt-clock').onclick = () => {
   const now = clockAt(view, serverClock.now());
   const entry = prompt(
@@ -787,6 +938,12 @@ function fillFormat(rules) {
   form.elements.ot.value = String(rules.overtimeSeconds / 60);
   form.elements.bonus.value = String(rules.bonusFouls);
   form.elements.double.value = rules.doubleBonusFouls == null ? '' : String(rules.doubleBonusFouls);
+  const t = timeoutRules(rules);
+  form.elements.full.value = String(t.fullTimeouts);
+  form.elements.short.value = String(t.shortTimeouts);
+  form.elements.per.value = t.timeoutsPer;
+  form.elements.otTimeouts.value = String(t.overtimeTimeouts);
+  form.elements.carry.checked = t.timeoutsCarry;
 }
 $('lt-format').onclick = () => {
   fillFormat(view.rules);
@@ -794,6 +951,7 @@ $('lt-format').onclick = () => {
   formatDialog.showModal();
 };
 $('lt-format-quarters').onclick = () => fillFormat(QUARTERS);
+$('lt-format-nfhs').onclick = () => fillFormat(NFHS_QUARTERS);
 $('lt-format-halves').onclick = () => fillFormat(HALVES);
 formatDialog.addEventListener('close', () => {
   if (formatDialog.returnValue !== 'save') return;
@@ -804,10 +962,15 @@ formatDialog.addEventListener('close', () => {
     overtimeSeconds: Math.round(Number(f.ot.value) * 60),
     bonusFouls: Number(f.bonus.value),
     doubleBonusFouls: f.double.value === '' ? null : Number(f.double.value),
+    fullTimeouts: Number(f.full.value),
+    shortTimeouts: Number(f.short.value),
+    timeoutsPer: f.per.value,
+    overtimeTimeouts: Number(f.otTimeouts.value),
+    timeoutsCarry: f.carry.checked,
   };
   if (perform({ type: 'rules', rules }))
     flash(
-      `Format: ${rules.periods === 4 ? '4 quarters' : '2 halves'} of ${rules.periodSeconds / 60} minutes.`,
+      `Format: ${rules.periods === 4 ? '4 quarters' : '2 halves'} of ${rules.periodSeconds / 60} minutes. Timeouts: ${timeoutRulesText(rules)}.`,
     );
 });
 
@@ -837,6 +1000,7 @@ function openPlayers(focusSide) {
     }),
   }));
   drawerOpen = true;
+  $('lt-go').hidden = true;
   drawer.classList.add('lt-open');
   scrim.classList.add('lt-open');
   drawer.removeAttribute('aria-hidden');
@@ -856,6 +1020,7 @@ function closePlayers() {
   scrim.classList.remove('lt-open');
   drawer.setAttribute('aria-hidden', 'true');
   panel.inert = false;
+  render();
   $('lt-players').focus({ preventScroll: true });
 }
 function upsertPlayer(player) {

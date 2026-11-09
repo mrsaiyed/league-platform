@@ -285,11 +285,18 @@ for (const [name, make] of Object.entries(adapters))
           await send(stats, g.id, { type: 'turnover', side, playerId: yusuf.id });
           await send(stats, g.id, { type: 'turnover', side: other, playerId: rival.id });
           await send(stats, g.id, { type: 'team-turnover', side });
+          // A timeout names no player, only the team.
+          await send(stats, g.id, { type: 'timeout', side: other, seconds: 30 });
           await send(stats, g.id, { type: 'end' });
           return rival;
         };
         const rival = await play(home, 'home', 'away', 3);
         await play(away, 'away', 'home', 1);
+        const saved = await stats.game(home.id);
+        assert.deepEqual(
+          saved.state.plays.filter((p) => p.type === 'timeout').map((p) => [p.side, p.seconds]),
+          [['away', 30]],
+        );
 
         const team = await stats.team(lions);
         assert.deepEqual(

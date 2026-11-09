@@ -52,6 +52,10 @@ function teamBlock(side, d) {
   const notes = [side === 'home' ? 'Home' : 'Away'];
   if (live && t.periodFouls)
     notes.push(`${t.periodFouls} team foul${t.periodFouls === 1 ? '' : 's'}`);
+  if (live) {
+    const left = Math.max(0, t.timeoutsLeft.full) + Math.max(0, t.timeoutsLeft.short);
+    notes.push(left ? `${left} timeout${left === 1 ? '' : 's'} left` : 'No timeouts left');
+  }
   return `<div class="sb-team">
     <span class="sb-name">${esc(game[side].name)}</span>
     <span class="sb-score">${t.score}</span>
@@ -101,7 +105,7 @@ function playByPlay() {
     const team = game[play.side].name;
     const what = describePlay(play, nameOf, () => team, periods);
     const s = scores[i];
-    return `<li class="${play.type === 'score' ? 'is-score' : ''}"><span class="when">${esc(periodLabel(play.period, periods))} ${esc(formatClock(play.clockMs))}</span><span class="what">${['lineup', 'team-turnover', 'team-unturnover'].includes(play.type) ? '' : `<span class="team-tag">${esc(team)}</span> `}${esc(what)}</span><span class="running">${play.type === 'score' ? `${s.home}–${s.away}` : ''}</span></li>`;
+    return `<li class="${play.type === 'score' ? 'is-score' : ''}"><span class="when">${esc(periodLabel(play.period, periods))} ${esc(formatClock(play.clockMs))}</span><span class="what">${['lineup', 'team-turnover', 'team-unturnover', 'timeout', 'untimeout'].includes(play.type) ? '' : `<span class="team-tag">${esc(team)}</span> `}${esc(what)}</span><span class="running">${play.type === 'score' ? `${s.home}–${s.away}` : ''}</span></li>`;
   });
   return (
     items.reverse().join('') ||

@@ -1,6 +1,6 @@
 # Live stat tracking
 
-[Initiative index](README.md) · November 2, 2026 · Ready for game use; Supabase-ready
+[Initiative index](README.md) · November 9, 2026 · Ready for game use; Supabase-ready
 
 The first working module of the wider platform: Al-Hadi's season schedule, a courtside tracker that works like the Faraj League one, and live game pages. Stat tracking will be one option in the full product; this is the baseline it grows from, not the whole of it.
 
@@ -35,19 +35,21 @@ Open `http://127.0.0.1:4180`. Stop with Ctrl+C. Records are kept in embedded Pos
 
 ## Tracker, compared with Faraj League
 
-| Faraj League tracker                                                    | Here                                                                              |
-| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Tap a player: +1, +2, +3, Foul, −Foul                                   | Same, plus **TO** for a turnover                                                  |
-| —                                                                       | Team turnovers in each team's title; tap for each player's, with − to take back   |
-| Bench player's options include "In for" buttons; drag bench onto floor  | Same                                                                              |
-| Tap five players to set a starting five                                 | Same; a short-handed team can start with fewer                                    |
-| Undo and redo through the play list                                     | Same; undoing a period change also puts the old clock back                        |
-| Tap the clock to set it; setting it back takes minutes off the floor    | Same                                                                              |
-| Period picker, team fouls, bonus badge and horn                         | Same; quarters or halves per game, and overtime continues the last period's fouls |
-| Swap colors, Mark not started, End game                                 | Same; End game locks the game until **Reopen game**                               |
-| Jersey numbers panel                                                    | **Players** panel for both teams: by name and number, or a team's numbers at once |
-| Play log                                                                | Every play, with the running score; the same play-by-play is on the game page     |
-| Log kept on the device, totals pushed in batches, **Save stats** button | Every tap is saved to the database as it happens, so there is no separate save    |
+| Faraj League tracker                                                    | Here                                                                                                      |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Tap a player: +1, +2, +3, Foul, −Foul                                   | Same, plus **TO** for a turnover                                                                          |
+| —                                                                       | Team turnovers in each team's title; tap for each player's, with − to take back                           |
+| Bench player's options include "In for" buttons; drag bench onto floor  | Same                                                                                                      |
+| Tap five players to set a starting five                                 | Same; a short-handed team can start with fewer                                                            |
+| Undo and redo through the play list                                     | Same; undoing a period change also puts the old clock back                                                |
+| Tap the clock to set it; setting it back takes minutes off the floor    | Same                                                                                                      |
+| —                                                                       | A foul or a timeout stops the clock; a big **Start clock** button then floats over the page until it runs |
+| —                                                                       | Each team's timeouts left in its title: full and 30-second, per the format                                |
+| Period picker, team fouls, bonus badge and horn                         | Same; quarters or halves per game, and overtime continues the last period's fouls                         |
+| Swap colors, Mark not started, End game                                 | Same; End game locks the game until **Reopen game**                                                       |
+| Jersey numbers panel                                                    | **Players** panel for both teams: by name and number, or a team's numbers at once                         |
+| Play log                                                                | Every play, with the running score; the same play-by-play is on the game page                             |
+| Log kept on the device, totals pushed in batches, **Save stats** button | Every tap is saved to the database as it happens, so there is no separate save                            |
 
 ## Storage
 
@@ -58,6 +60,14 @@ The tracker talks to one storage interface, so the database can change without t
 Until the game starts, the tracker shows **Before tip-off** with each team's player count and an **Enter jersey numbers** button. The Players panel has both teams side by side. Type a number and name and press Enter, or type a whole team's numbers into **Several numbers** (`3 5 10 12 14 21`) and tap **Add all**: numbers already on the roster are skipped and anything that is not a jersey number is reported. Changes save as you type; a player typed into the add row is added when you leave the row or tap **Done**. Rosters carry over, so the second game against an opponent starts with the numbers from the first: check them, since teams can change jerseys.
 
 Tap players to pick each starting five; picks survive a refresh. A short-handed team can start with fewer than five.
+
+## The clock: fouls, timeouts and the Start clock button
+
+A foul or a timeout stops a running clock where it happened, as the officials' whistle does (NFHS 5-8-1); the tracker says so. Only the scorer starts it again. Turnovers do not stop it, since a steal keeps play going; scores and substitutions never touch it. Undo takes a foul back but leaves the clock stopped.
+
+While the clock is stopped (a foul, a timeout, a pause, a new period, or both starting fives set before the tip) a big green **Start clock** button floats over the bottom of the screen with the period, the clock and why it stopped, so play never runs on with the clock forgotten. Only the button takes taps: players, substitutions, the header and everything around it keep working under it, because free throws, subs and corrections happen on a stopped clock. A player's options open over it. **×** (or Escape) hides it to keep scoring on a stopped clock; it comes back the next time the clock stops or the period changes. It is gone while the clock runs, once a period is over (pick the next one) and when the game is final.
+
+**Timeouts:** each team's title shows how many it has left; tap it to call a **Full timeout** or a **30-second** one, each showing how many are left of that kind, see those taken (period and clock) and take back the latest with −. Calling one stops the clock. A team out of timeouts can still be charged one, after a confirmation, since officials grant it at the cost of a technical foul (NFHS 5-11-6). The live game page shows each team's timeouts left, and timeouts are in both play logs.
 
 ## Play log and game logs
 
@@ -83,7 +93,17 @@ Stats kept: points, 3-pointers, 2-pointers and free throws made, personal fouls,
 
 The ten fixtures were copied from the [TCSAAL team page](https://texascharter.org/tc_team/26-27-al-hadi-school-varsity-boys-basketball/) on October 27, 2026 and updated on November 2, 2026, when TCSAAL moved five games (159, 438, 287, 126 and 583) to new dates, into `apps/live-stats/data/tcsaal-alhadi-varsity-boys-2026-27.json`, including the two exhibitions and each game's TCSAAL number and link. TCSAAL lists game 533 (January 8) as an Al-Hadi away game at the Al-Hadi Gym; it is kept as published. Each start re-reads that file: a game nobody has touched yet picks up edits (a new time or venue); a game that has been tracked is never changed.
 
-Each game defaults to four 8-minute quarters with 4-minute overtime, team fouls resetting each quarter and the bonus on the fifth, as in high-school play. A **Halves: 2 × 20** preset matches Faraj League. Confirm TCSAAL's varsity format and set it under **Format** before tip-off; it is fixed once the game is under way.
+Each game defaults to TCSAAL varsity's format, checked against the [TCSAAL 2025–26 basketball rules](https://s3.amazonaws.com/rsportz-production/file_assets/attachments/000/027/859/original/TCSAAL_Basketball_Rules_2025-2026.pdf) on November 9, 2026: four 8-minute quarters and 4-minute overtimes; team fouls resetting each quarter with the bonus on the fifth, as NFHS rules have it; and each team's **three full (60-second) and two 30-second timeouts a game, plus one full timeout each overtime, with none carried into overtime or from one overtime to the next**. TCSAAL plays NFHS rules except where it says otherwise, uses no shot clock, and stops the clock "for out-of-bounds, time-outs, free-throws and any other time under NFHS/UIL rules."
+
+**Format** offers three presets, to set before tip-off (the format is fixed once the game is under way):
+
+| Preset            | Periods                  | Timeouts                                                                                             |
+| ----------------- | ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| TCSAAL: 4 × 8     | 8-min quarters, 4-min OT | 3 full + 2 × 30 s a game, 1 full each overtime, none carried over                                    |
+| UIL (NFHS): 4 × 8 | The same                 | The same, but unused ones carry into overtime (NFHS rule 5-11-1, which UIL plays)                    |
+| Halves: 2 × 20    | Faraj League's halves    | 2 full a half, 1 each overtime, none carried over: a common rec-league rule; confirm with the league |
+
+Any of it can be changed by hand: full and 30-second timeouts, per game or per half, how many each overtime, and whether unused ones carry over. Games saved before timeouts were tracked count TCSAAL's.
 
 ## Not yet
 
@@ -97,4 +117,4 @@ The earlier rehearsal (`npm run dev:varsity`) and the hosted Sites pilot are sep
 
 ## Checks
 
-`npm test` covers the engine (scoring, fouls, bonus, substitutions, minutes, clock corrections, undo/redo, periods, final/reopen); storage, with the same tests run against every database adapter (seeding, unlimited rosters, atomic saves, retries, refused plays, season totals, team and player game logs); the server online (passcode required, sign-in, wrong-passcode limit) and killed outright mid-game; and Supabase readiness (the public API roles locked out, connection-string advice, copying games up to a database reached over the network and back down as a backup, without doubling anything). `npm run test:stats:browser` drives the whole flow in a real browser with its own throwaway database and saves screenshots to `artifacts/screenshots/live-stats-*.png`.
+`npm test` covers the engine (scoring, fouls, bonus, substitutions, minutes, clock corrections, fouls and timeouts stopping the clock, timeouts per game, per half and in overtime with and without carry-over, undo/redo, periods, final/reopen); storage, with the same tests run against every database adapter (seeding, unlimited rosters, atomic saves, retries, refused plays, season totals, team and player game logs); the server online (passcode required, sign-in, wrong-passcode limit) and killed outright mid-game; and Supabase readiness (the public API roles locked out, connection-string advice, copying games up to a database reached over the network and back down as a backup, without doubling anything). `npm run test:stats:browser` drives the whole flow in a real browser, the Start clock button included (it comes up at the tip, after a foul, a timeout and a pause; stats and subs work under it; × and Escape hide it) with its own throwaway database and saves screenshots to `artifacts/screenshots/live-stats-*.png`.
