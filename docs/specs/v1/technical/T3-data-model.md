@@ -1,0 +1,197 @@
+# T3 — Data model
+
+[Spec home](../README.md) · Decisions T-40 to T-52
+
+Every table, grouped by area, with its important columns and the rules the database itself enforces. Column lists show what matters for understanding; every table also has `id`, `created_at` and `updated_at` unless noted. The earlier [v0.7 database document](../../../product/platform/engineering/02-database-and-integrity.md) goes further on some column-level detail; where names differ, the names here win.
+
+## 1. Conventions
+
+- **T-40: every table that holds league data has a `league_id` column**, and every link between two such tables includes it. A roster entry cannot point at a team in another league because the database refuses the row, whatever the code does.
+- **T-41: IDs are UUIDs** (version 7, which sort by creation time). Addresses use short names (`farajleague`, `jaysh`) where a human reads them and IDs elsewhere.
+- **T-42: times are stored in UTC**; each league has a time zone used for display, for reminder timing and for quiet hours. Dates without a time (a birthday) are stored as dates.
+- **T-43: money is whole cents plus a currency code.** Never a decimal number.
+- **T-44: real columns for anything we search, sort, join or constrain; JSON only for self-contained documents.** A page layout, a form definition, a set of form answers, a game's engine state and a season's rules are JSON, each with a written schema and a version number. Scores, dates, names, statuses and links are columns.
+- **T-45: things that the bin can restore have `deleted_at`.** Things that are history (game events, accepted agreements, published site versions, the activity log) are never edited or deleted, only added to.
+- **T-46: rows that two people might edit at once have a `version` number.** A save states the version it started from; if it has moved, the save is refused and the user sees the latest (A-8).
+
+## 2. The core at a glance
+
+```mermaid
+erDiagram
+  accounts ||--o{ profile_access : "acts for"
+  profiles ||--o{ profile_access : ""
+  profiles ||--o{ people : "linked to"
+  leagues ||--o{ programs : has
+  programs ||--o{ seasons : has
+  seasons ||--o{ divisions : has
+  seasons ||--o{ teams : has
+  leagues ||--o{ people : has
+  teams ||--o{ roster_entries : has
+  people ||--o{ roster_entries : on
+  seasons ||--o{ games : has
+  games ||--o{ game_events : "every tap"
+  games ||--o{ player_game_stats : produces
+  seasons ||--o{ registrations : receives
+  people ||--o{ registrations : for
+  leagues ||--o{ role_grants : grants
+  accounts ||--o{ role_grants : holds
+  accounts ||--o{ notifications : receives
+```
+
+## 3. Accounts and people
+
+The split between these tables is what makes "one account, many leagues", "admin adds people by hand" and "parents manage children" all work (U-11, R-3, R-7).
+
+| Table            | What a row is                                              | Key columns                                                                                                                                                                  |
+| ---------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accounts`       | A sign-in. One per email. Not tied to any league.          | `email`, `display_name`, `phone`, `last_seen_at`                                                                                                                             |
+| `profiles`       | A human being an account can act for: yourself, or a child | `first_name`, `last_name`, `birth_date`                                                                                                                                      |
+| `profile_access` | Which account may act for which profile                    | `account_id`, `profile_id`, `relation` (self or guardian)                                                                                                                    |
+| `people`         | A person **as one league knows them**                      | `league_id`, `profile_id` (empty until linked), `first_name`, `last_name`, `public_name`, `contact_email`, `birth_date`, `is_minor`, `visibility`, `photo`, `merged_into_id` |
+| `follows`        | An account following a team                                | `account_id`, `league_id`, `team_id`                                                                                                                                         |
+
+A person added by hand is a `people` row with an empty `profile_id`. Claiming or registering fills it in. Statistics and rosters point at `people`, so nothing moves when the link is made.
+
+## 4. Leagues and structure
+
+| Table                 | What a row is                        | Key columns                                                                                                                                                                                                                                                                                      |
+| --------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `leagues`             | A customer and its site              | `slug` (unique across the platform), `name`, `status` (draft, live, archived, suspended), `time_zone`, `audience` (adult, youth, mixed), `contact_email`, `listed`, `owner_account_id`, `agreement` (JSON: the price, term and limits agreed with us), `wording` (JSON: the league's own labels) |
+| `league_slug_history` | A former short name still forwarding | `old_slug`, `league_id`, `expires_at`                                                                                                                                                                                                                                                            |
+| `league_features`     | An optional feature switched on      | `league_id`, `feature_key`, `enabled`, `config` (JSON)                                                                                                                                                                                                                                           |
+| `programs`            | A sport for a group                  | `league_id`, `slug`, `name`, `sport_key`, `is_default`                                                                                                                                                                                                                                           |
+| `seasons`             | One running of a program             | `program_id`, `slug`, `name`, `starts_on`, `ends_on`, `status`, `is_current`, `rules` (JSON, versioned), `stat_keys`, `logo`                                                                                                                                                                     |
+| `divisions`           | A group of teams sharing standings   | `season_id`, `name`, `color`, `sort`, `parent_division_id`                                                                                                                                                                                                                                       |
+| `clubs`               | A member organization (a school)     | `league_id`, `slug`, `name`, `logo`, `colors`                                                                                                                                                                                                                                                    |
+| `venues`, `courts`    | Where games are played               | `name`, `address`, `map_link`; a court belongs to a venue                                                                                                                                                                                                                                        |
+
+Every league gets one program with `is_default` set when it is created. Single-program leagues never see it (U-3, U-12).
+
+## 5. Access
+
+| Table                | What a row is                                | Key columns                                                                                                           |
+| -------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `role_grants`        | "This account has this role here"            | `league_id`, `account_id`, `role`, `scope_type` (league, program, club, team), `scope_id`, `granted_by`, `revoked_at` |
+| `invitations`        | A pending invitation                         | `league_id`, `email`, `role`, scope, `token_hash`, `expires_at`, `accepted_at`                                        |
+| `activity_log`       | Who changed what (A-6)                       | `league_id`, `actor_account_id`, `action`, `target_type`, `target_id`, `summary`, `details` (JSON), `at`              |
+| `support_access_log` | Our staff opening a league (section 8 of P2) | `league_id`, `staff_account_id`, `reason`, `started_at`, `ended_at`                                                   |
+
+## 6. Registration
+
+| Table                              | What a row is                                  | Key columns                                                                                                                                                                                                               |
+| ---------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `registration_forms`               | A season's registration setup                  | `season_id`, `mode`, `opens_at`, `closes_at`, `capacity`, `approval`, `access`, `status`                                                                                                                                  |
+| `registration_form_versions`       | The questions as they stood at a point in time | `form_id`, `version`, `definition` (JSON)                                                                                                                                                                                 |
+| `agreements`, `agreement_versions` | A waiver and each wording of it                | `title`; `body`, `version`, `published_at`                                                                                                                                                                                |
+| `registrations`                    | One sign-up                                    | `season_id`, `person_id`, `form_version_id`, `submitted_by_account_id`, `kind` (individual, captain, team player), `team_id`, `status`, `waitlist_position`, `answers` (JSON), `submitted_at`, `decided_by`, `decided_at` |
+| `agreement_acceptances`            | Proof someone agreed                           | `registration_id`, `agreement_version_id`, `typed_name`, `accepted_by_account_id`, `accepted_at`, `method` (accepted online, or collected by the league), `recorded_by_account_id`                                        |
+| `team_invites`                     | A captain's invite link                        | `team_id`, `token_hash`, `expires_at`                                                                                                                                                                                     |
+
+A registration points at the exact form version and agreement version it was made against, so later edits never rewrite what someone answered or accepted.
+
+Stage 5 adds `payment_accounts` (a league's connected payment account), `orders`, `payments`, `refunds` and `discount_codes`.
+
+## 7. Teams
+
+| Table            | What a row is        | Key columns                                                                                                                                                                                      |
+| ---------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `teams`          | A team in one season | `season_id`, `division_id`, `club_id`, `slug`, `name`, `color`, `logo`, `stats_visibility` (everyone, league members, team, or staff), `lineage_id` (ties the same team together across seasons) |
+| `roster_entries` | A person on a team   | `team_id`, `person_id`, `jersey_number`, `role` (player, captain, coach), `joined_on`, `left_on`, `sort`                                                                                         |
+| `drafts`         | A draft              | `season_id`, `status`, `order_type`, `seconds_per_pick`, `team_order`                                                                                                                            |
+| `draft_picks`    | One pick             | `draft_id`, `pick_number`, `team_id`, `person_id`, `undone_at`                                                                                                                                   |
+
+## 8. Schedule and games
+
+| Table                | What a row is                                 | Key columns                                                                                                                                                                                                                                                                                                                                           |
+| -------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rounds`             | A week or round                               | `season_id`, `number`, `label`, `date`                                                                                                                                                                                                                                                                                                                |
+| `stages`             | Regular season or a bracket                   | `season_id`, `type`, `name`, `config` (JSON)                                                                                                                                                                                                                                                                                                          |
+| `games`              | A published game                              | `season_id`, `division_id`, `round_id`, `stage_id`, `game_number`, `home_team_id`, `away_team_id`, `starts_at`, `venue_id`, `court_id`, `status` (scheduled, live, final, postponed, cancelled, forfeit), `capture_mode` (final, box, live), `home_score`, `away_score`, `winner_team_id`, `format` (JSON), `finalized_at`, `external_ref`, `version` |
+| `schedule_drafts`    | Unpublished schedule edits                    | `season_id`, `changes` (JSON), `based_on_revision`                                                                                                                                                                                                                                                                                                    |
+| `schedule_revisions` | Each publication of the schedule              | `season_id`, `number`, `published_by`, `published_at`, `summary` (JSON)                                                                                                                                                                                                                                                                               |
+| `bracket_slots`      | A position in a bracket                       | `stage_id`, `round`, `position`, `game_id`, where each side comes from                                                                                                                                                                                                                                                                                |
+| `game_assignments`   | A scorekeeper assigned to a game              | `game_id`, `account_id`                                                                                                                                                                                                                                                                                                                               |
+| `scoring_sessions`   | The one device currently scoring a game (S-5) | `game_id`, `account_id`, `device_id`, `held_until`                                                                                                                                                                                                                                                                                                    |
+| `game_events`        | **Every tap in the tracker.** Never edited.   | `game_id`, `seq`, `command_id`, `type`, `payload` (JSON), `tapped_at`, `account_id`                                                                                                                                                                                                                                                                   |
+| `game_states`        | The engine's latest state for a game          | `game_id`, `seq`, `state` (JSON)                                                                                                                                                                                                                                                                                                                      |
+| `player_game_stats`  | One player's line in one game                 | `game_id`, `team_id`, `person_id`, `played`, `seconds_played`, `stats` (JSON keyed by stat)                                                                                                                                                                                                                                                           |
+| `game_corrections`   | A reopening, with reason                      | `game_id`, `account_id`, `reason`, `before`, `after`, `at`                                                                                                                                                                                                                                                                                            |
+
+The current live tracker already stores exactly this: a command log, the latest state, the score and the box score lines, saved together. The table shapes carry over.
+
+## 9. Calculated tables
+
+These are never edited by hand (A-12, S-9). They are rebuilt from games whenever a result changes, inside the same transaction, and can be rebuilt from scratch at any time.
+
+| Table                   | What it holds                                                                                                                 |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `standings_rows`        | Per team per division: rank, seed, wins, losses, ties, points for and against, streak, and which tiebreaker decided its place |
+| `standings_adjustments` | Manual adjustments with reasons (S-10). This one is entered by an admin and feeds the calculation.                            |
+| `season_player_totals`  | Per player per season: games played, minutes, each stat's total                                                               |
+
+## 10. Site and content
+
+| Table                              | What a row is                                        | Key columns                                                                                                    |
+| ---------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `sites`                            | A league's site in its draft state                   | `league_id`, `design_draft` (JSON), `menu_draft` (JSON), `published_release_id`                                |
+| `pages`                            | A page in its draft state                            | `league_id`, `slug`, `title`, `kind` (standard or custom), `program_id`, `draft` (JSON: the stack of sections) |
+| `site_releases`                    | A published version of the whole site. Never edited. | `league_id`, `number`, `design`, `menu`, `pages` (JSON), `published_by`, `published_at`                        |
+| `assets`                           | An uploaded image                                    | `league_id`, `path`, `width`, `height`, `alt_text`, `bytes`                                                    |
+| `news_posts`                       | A news post                                          | `slug`, `title`, `body` (JSON), `status`, `pinned`, `published_at`                                             |
+| `award_types`                      | An award the league gives                            | `name`, `cadence` (per round or per season), `stat_key`, `sort`                                                |
+| `awards`                           | An award given                                       | `season_id`, `round_id`, `award_type_id`, `person_id`, `team_id`, `note`                                       |
+| `sponsors`                         | A sponsor in a season                                | `season_id`, `name`, `tier`, `logo`, `link`, `division_id`, `team_id`, `sort`                                  |
+| `media_collections`, `media_items` | A named collection and a video link in it            | `name`; `season_id`, `round_id`, `title`, `link`                                                               |
+
+The public site is always drawn from the latest `site_releases` row, never from drafts (A-9, C-3).
+
+## 11. Notifications and background work
+
+| Table                | What a row is                   | Key columns                                                                                  |
+| -------------------- | ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `notifications`      | An inbox item                   | `account_id`, `league_id`, `type`, `title`, `body`, `link`, `read_at`, `dedupe_key` (unique) |
+| `notification_prefs` | A person's choice               | `account_id`, `league_id`, `type`, `channel`, `enabled`                                      |
+| `announcements`      | A message from a league         | `league_id`, `audience` (JSON), `subject`, `body`, `essential`, `send_at`, `sent_at`         |
+| `email_deliveries`   | One email and what became of it | `league_id`, `to_email`, `template`, `status` (queued, sent, delivered, bounced, complained) |
+| `email_suppressions` | An address we must not email    | `email`, `reason`                                                                            |
+| `imports`            | A spreadsheet import            | `league_id`, `kind`, `status`, `report` (JSON), what it created (so it can be undone)        |
+| `command_receipts`   | Commands already carried out    | `league_id`, `command_id`, `result`                                                          |
+| job queue tables     | Managed by pg-boss              |                                                                                              |
+
+`dedupe_key` is what guarantees "nothing is ever sent twice" (N-8): a recap for game G to account A has one possible key, and the database refuses a second.
+
+### Group chats (N-15, N-16; from stage 4)
+
+| Table                  | What a row is                | Key columns                                                                                                                 |
+| ---------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `conversations`        | A chat                       | `league_id`, `scope_type` (league, division, team, custom), `scope_id`, `name`, `mode` (announcements or open), `closed_at` |
+| `conversation_members` | An account in a chat         | `conversation_id`, `account_id`, `can_post`, `muted_until`, `last_read_message_id`                                          |
+| `messages`             | One message. Text only.      | `conversation_id`, `author_account_id`, `body`, `sent_at`, `removed_at`, `removed_by`                                       |
+| `message_reports`      | A member reporting a message | `message_id`, `reporter_account_id`, `reason`, `handled_at`                                                                 |
+
+Members of team and division chats are worked out from rosters, so they never drift from the teams.
+
+## 12. Rules the database enforces by itself
+
+**T-47:** these hold even if the application has a bug.
+
+- A league short name is unique across live leagues and unexpired history.
+- Only one season per program is marked current.
+- A person has at most one active registration per season.
+- A game's two teams are different and in the same season.
+- Within a game, each `command_id` and each `seq` appears once (a tap cannot be saved twice).
+- Jersey numbers are unique within a team where the league requires it.
+- A final game has both scores; a scheduled game has none.
+- Capacity: taking a place locks the form row first, so two simultaneous sign-ups cannot both take the last place.
+- Row-level security on every league table, as the second fence ([T4](T4-tenancy-auth-security.md)).
+
+## 13. Changing the schema
+
+- **T-48:** the schema changes only through numbered SQL files in `supabase/migrations/`, reviewed like code and applied automatically on release. Nobody edits the production database by hand.
+- **T-49:** changes are made in two steps when needed: first add the new thing while the old still works, release, then remove the old. This allows releasing without downtime.
+- **T-50:** JSON documents carry a version number, and reading an old version upgrades it in code, so a format change never requires rewriting every league's pages at once.
+
+## 14. Keeping and deleting
+
+- **T-51:** the bin holds soft-deleted rows for 30 days, then a nightly job removes them for good.
+- **T-52:** a player who leaves a team or the league keeps their history: the roster entry gets a `left_on` date and every record stays as it was. Removal is a separate, explicit request (R-17). Then their `people` row loses its name, contact details and link, and their statistics rows remain attached to the now-nameless record. When an account is deleted, its `accounts`, `profiles`, preferences and inbox are erased, and each league's `people` row is treated the same way. Accepted agreements and payment records are kept for the period the law requires, then removed.

@@ -4,6 +4,8 @@ An end-to-end league-management platform with customizable public websites, priv
 
 **Status: detailed specifications, a working live stat tracker, a local rehearsal and a private hosted SQL scoring pilot.** Stat tracking is the first working module of the wider platform; accounts, roles, public publication, payments and email remain future work. The older intramural demo remains a separate fictional presentation.
 
+**Product specification v1 (working name: SR Leagues):** [docs/specs/v1](docs/specs/v1/README.md) describes the whole product and how it will be built. The first round of decisions was settled on November 12, 2026; the [list of decisions](docs/specs/v1/DECISIONS.md) shows what is settled and what still needs the founder's answer.
+
 ## Live stat tracking (start here)
 
 A courtside tracker that works like the Faraj League one, with Al-Hadi's 2026–27 TCSAAL varsity boys schedule loaded. Every tap is saved to the database, and each game's live page shows the score, clock, box scores and play-by-play as they happen. Use **Node.js 24**:
