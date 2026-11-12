@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { checkStructure, report } from './structure/index.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const example = path.join(root, 'examples/alhadi-school');
 const manifest = JSON.parse(fs.readFileSync(path.join(example, 'manifest.json'), 'utf8'));
@@ -24,3 +25,6 @@ for (const file of [...manifest.styles, ...manifest.assets]) {
   if (!fs.existsSync(path.join(example, file))) throw new Error('Missing asset ' + file);
 }
 console.log(`Validated ${count} modules, import targets, local assets, and the offline boundary.`);
+
+// T2 §2 and §6, T9 §3: imports, index.ts, league names, SQL, addresses, secrets.
+process.exitCode = report(checkStructure(root));
