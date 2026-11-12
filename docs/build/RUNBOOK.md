@@ -26,7 +26,7 @@ The stage plan lists steps in order. Take the first one that is not done and who
 6. **Commit** on the build branch with a message that says what changed and which decision IDs it carries out. End the message with the attribution line your session was given.
 7. **Update `STATUS.md`**: tick the step, add one line to the log, rewrite the lock time.
 
-Then take the next step. A run can be cut off at any moment by the usage limit, so the tree must be committed and `STATUS.md` true after every step, not at the end of the run.
+**Then take the next step, in the same run.** Finishing one step is not the end of a run: keep going, step after step, until section 6 says to stop. A run can be cut off at any moment by the usage limit, so the tree must be committed and `STATUS.md` true after every step, not at the end of the run.
 
 ## 3. Sub-agents: who does what
 
