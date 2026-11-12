@@ -19,12 +19,13 @@
     "test:stats:browser": "node scripts/check-live-stats-browser.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "npm run check && npm run typecheck && npm test && npm run format:check && npm run build:demo",
+    "verify": "npm run check && npm run typecheck && npm test && npm run test:units && npm run format:check && npm run build:demo",
     "capture:presentation": "node scripts/capture-presentation.mjs",
     "dev:varsity": "node apps/varsity-preview/server.ts",
     "prepare:varsity:hosted": "node scripts/prepare-varsity-hosted.mjs",
     "prepare:varsity:publish": "node scripts/prepare-varsity-publish.mjs",
-    "typecheck": "tsc --project tsconfig.varsity.json"
+    "typecheck": "tsc --project tsconfig.varsity.json && tsc --project tsconfig.workspaces.json",
+    "test:units": "vitest run"
   },
   "devDependencies": {
     "@electric-sql/pglite-socket": "0.2.15",
@@ -32,7 +33,8 @@
     "@types/pg": "8.23.1",
     "playwright": "1.62.1",
     "prettier": "3.6.2",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "3.2.7"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.12",

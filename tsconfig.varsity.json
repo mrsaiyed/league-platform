@@ -1,17 +1,4 @@
 {
-  "compilerOptions": {
-    "target": "ES2023",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "types": ["node"],
-    "lib": ["ES2023", "DOM"]
-  },
+  "extends": "./tsconfig.base.json",
   "include": ["packages/**/*.ts", "apps/varsity-preview/**/*.ts", "apps/live-stats/**/*.ts"]
 }
