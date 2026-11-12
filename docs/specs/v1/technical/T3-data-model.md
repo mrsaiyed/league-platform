@@ -1,6 +1,6 @@
 # T3 — Data model
 
-[Spec home](../README.md) · Decisions T-40 to T-52
+[Spec home](../README.md) · Decisions T-40 to T-52, T-220
 
 Every table, grouped by area, with its important columns and the rules the database itself enforces. Column lists show what matters for understanding; every table also has `id`, `created_at` and `updated_at` unless noted. The earlier [v0.7 database document](../../../product/platform/engineering/02-database-and-integrity.md) goes further on some column-level detail; where names differ, the names here win.
 
@@ -67,14 +67,18 @@ A person added by hand is a `people` row with an empty `profile_id`. Claiming or
 
 Every league gets one program with `is_default` set when it is created. Single-program leagues never see it (U-3, U-12).
 
+`seasons.logo` is not built yet: it will link to an uploaded image, so it waits for the `assets` table (section 10).
+
 ## 5. Access
 
-| Table                | What a row is                                | Key columns                                                                                                           |
-| -------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `role_grants`        | "This account has this role here"            | `league_id`, `account_id`, `role`, `scope_type` (league, program, club, team), `scope_id`, `granted_by`, `revoked_at` |
-| `invitations`        | A pending invitation                         | `league_id`, `email`, `role`, scope, `token_hash`, `expires_at`, `accepted_at`                                        |
-| `activity_log`       | Who changed what (A-6)                       | `league_id`, `actor_account_id`, `action`, `target_type`, `target_id`, `summary`, `details` (JSON), `at`              |
-| `support_access_log` | Our staff opening a league (section 8 of P2) | `league_id`, `staff_account_id`, `reason`, `started_at`, `ended_at`                                                   |
+| Table                | What a row is                                | Key columns                                                                                                                      |
+| -------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `role_grants`        | "This account has this role here"            | `league_id`, `account_id`, `role`, `scope_type` (league, program, club, team), `scope_id`, `granted_by_account_id`, `revoked_at` |
+| `invitations`        | A pending invitation                         | `league_id`, `email`, `role`, scope, `token_hash`, `expires_at`, `accepted_at`                                                   |
+| `activity_log`       | Who changed what (A-6)                       | `league_id`, `actor_account_id`, `action`, `target_type`, `target_id`, `summary`, `details` (JSON), `at`                         |
+| `support_access_log` | Our staff opening a league (section 8 of P2) | `league_id`, `staff_account_id`, `reason`, `started_at`, `ended_at`                                                              |
+
+A grant's account, role and scope, and an invitation's email, role and scope, never change once the row exists: a different role is a new grant. A support visit starts when its row is written and lasts at most an hour (T-77); while it runs it can be ended early, and once over it never changes.
 
 ## 6. Registration
 
@@ -155,10 +159,12 @@ The public site is always drawn from the latest `site_releases` row, never from 
 | `email_deliveries`   | One email and what became of it | `league_id`, `to_email`, `template`, `status` (queued, sent, delivered, bounced, complained) |
 | `email_suppressions` | An address we must not email    | `email`, `reason`                                                                            |
 | `imports`            | A spreadsheet import            | `league_id`, `kind`, `status`, `report` (JSON), what it created (so it can be undone)        |
-| `command_receipts`   | Commands already carried out    | `league_id`, `command_id`, `result`                                                          |
+| `command_receipts`   | Commands already carried out    | `league_id`, `account_id`, `command_id`, `command`, `result`                                 |
 | job queue tables     | Managed by pg-boss              |                                                                                              |
 
 `dedupe_key` is what guarantees "nothing is ever sent twice" (N-8): a recap for game G to account A has one possible key, and the database refuses a second.
+
+A command receipt is unique by league, account and command id together, and is looked up by all three, so one account can never be answered with another account's result. Commands the system runs have no account and share one key.
 
 ### Group chats (N-15, N-16; from stage 4)
 
@@ -185,6 +191,11 @@ Members of team and division chats are worked out from rosters, so they never dr
 - Capacity: taking a place locks the form row first, so two simultaneous sign-ups cannot both take the last place.
 - Row-level security on every league table, as the second fence ([T4](T4-tenancy-auth-security.md)).
 
+What these rules do not cover yet:
+
+- **TRUNCATE.** The triggers that keep history unchanged run per row, and `TRUNCATE` fires no row triggers, so it would empty a history table. The app's database role must never be granted `TRUNCATE` (step 1.7); migrations are already barred from it (T-183).
+- **Creation times.** `created_at`, and `at` in the activity log, default to the current time but the caller can still set them. Commands must leave them to the database; making the database refuse a caller's value is open.
+
 ## 13. Changing the schema
 
 - **T-48:** the schema changes only through numbered SQL files in `supabase/migrations/`, reviewed like code and applied automatically on release. Nobody edits the production database by hand.
@@ -195,3 +206,4 @@ Members of team and division chats are worked out from rosters, so they never dr
 
 - **T-51:** the bin holds soft-deleted rows for 30 days, then a nightly job removes them for good.
 - **T-52:** a player who leaves a team or the league keeps their history: the roster entry gets a `left_on` date and every record stays as it was. Removal is a separate, explicit request (R-17). Then their `people` row loses its name, contact details and link, and their statistics rows remain attached to the now-nameless record. When an account is deleted, its `accounts`, `profiles`, preferences and inbox are erased, and each league's `people` row is treated the same way. Accepted agreements and payment records are kept for the period the law requires, then removed.
+- **T-220: history keeps ids, so erasure and purging never rewrite it.** History tables (`activity_log`, `command_receipts`, `support_access_log`, and later ones) link to `accounts` and `leagues` and are never changed. So erasing an account overwrites its `accounts` row in place: the row and its id stay, the email becomes a placeholder and every other personal detail is emptied; history keeps only the id. History rows therefore name accounts and people by id, never by copying their names or emails. A league purged from the bin (T-51) loses its history through one function, `purge_league_history`, which only the role that owns the tables can run, only for a league in the bin for 30 days. The rest of the purge is the nightly job's work. Detail: [decision record 007](../../../architecture/decisions/007-history-erasure-and-purge.md).
