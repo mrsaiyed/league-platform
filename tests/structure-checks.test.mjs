@@ -1,6 +1,6 @@
 // Each structure check (scripts/structure) is proven two ways: it catches a
 // violation planted in a throwaway repository (and nothing else fires), and the
-// real repository passes. Every fixture runs all six checks, so a false positive
+// real repository passes. Every fixture runs all seven checks, so a false positive
 // from any rule fails the test that planted something else.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -523,6 +523,217 @@ test('T-30 allows reading process.env only in the config module files', (t) => {
   );
 });
 
+test('T-183 catches drops and renames in a migration, wherever the SQL sits', (t) => {
+  const m = 'supabase/migrations/';
+  assertExactly(
+    found(t, {
+      [m + '0001_a.sql']: 'create table teams (id int);\nDROP TABLE old_teams;\n',
+      [m + '0002_b.sql']: 'alter table teams drop column nickname;\n',
+      [m + '0003_c.sql']: 'alter table teams\n  add column a int,\n  drop nickname;\n',
+      [m + '0004_d.sql']: 'drop type if exists team_status;\ndrop view team_list;\n',
+      [m + '0005_e.sql']: 'alter table teams rename to clubs;\n',
+      [m + '0006_f.sql']: 'alter table teams rename column name to title;\n',
+      [m + '0007_g.sql']: 'alter type team_status rename value $$a$$ to $$b$$;\n',
+      [m + '0008_h.sql']: 'alter table teams set schema archive;\n',
+      [m + '0009_i.sql']: 'do $$\nbegin\n  drop table scratch;\nend\n$$;\n',
+      [m + '0010_j.sql']:
+        "do $body$ begin execute 'alter table ' || quote_ident('t') || ' drop column x'; end $body$;\n",
+      [m + '0011_k.sql']: 'alter type team_kind drop attribute size;\ndrop function f(int);\n',
+      [m + '0012_l.sql']: 'alter table "Teams" drop "drop";\n',
+    }),
+    [
+      [m + '0001_a.sql:2 [T-183]', 'drops in one step ("DROP TABLE old_teams")'],
+      [m + '0002_b.sql:1 [T-183]', 'drops in one step ("drop column nickname")'],
+      [m + '0003_c.sql:3 [T-183]', 'drops in one step ("drop nickname")'],
+      [m + '0004_d.sql:1 [T-183]', 'drop type if exists team_status'],
+      [m + '0004_d.sql:2 [T-183]', 'drop view team_list'],
+      [m + '0005_e.sql:1 [T-183]', 'renames in one step ("alter table teams rename to clubs")'],
+      [m + '0006_f.sql:1 [T-183]', 'renames in one step'],
+      [m + '0007_g.sql:1 [T-183]', 'renames in one step'],
+      [m + '0008_h.sql:1 [T-183]', 'renames in one step ("alter table teams set schema archive")'],
+      [m + '0009_i.sql:3 [T-183]', 'drop table scratch'],
+      [m + '0010_j.sql:1 [T-183]', 'builds SQL at run time ("execute'],
+      [m + '0011_k.sql:1 [T-183]', 'drop attribute size'],
+      [m + '0011_k.sql:2 [T-183]', 'drop function f(int)'],
+      [m + '0012_l.sql:1 [T-183]', 'drops in one step'],
+    ],
+  );
+});
+
+test('T-183 leaves additions, safe drops, comments, names and string text alone', (t) => {
+  const m = 'supabase/migrations/';
+  assertExactly(
+    found(t, {
+      [m + '0001_a.sql']: [
+        '-- We will drop table old_teams and rename x later (T-49).',
+        '/* drop table a; /* nested: rename b */ drop table c; */',
+        'create table teams (id int, drop_reason text, renamed_at timestamptz, "drop" int);',
+        'alter table teams alter column drop_reason drop default;',
+        'alter table teams alter column renamed_at drop not null;',
+        'alter table teams drop constraint if exists teams_pkey;',
+        'alter table teams alter column id drop identity if exists;',
+        'drop index if exists teams_name_idx;',
+        'drop policy if exists teams_read on teams;',
+        'drop trigger if exists teams_touch on teams;',
+        "comment on table teams is 'Rename requests go through support; we never drop teams.';",
+        "insert into notes (body) values (E'don\\'t drop table teams');",
+        "create function f() returns void language plpgsql as $$ begin raise exception 'cannot rename'; end $$;",
+      ].join('\n'),
+      'supabase/seed/teams.sql': 'drop table if exists teams;\n',
+    }),
+    [],
+  );
+});
+
+test('T-183 reads dollar-quoted bodies as SQL without losing what follows them', (t) => {
+  const m = 'supabase/migrations/';
+  assertExactly(
+    found(t, {
+      // An apostrophe, a comment opener and a quote mark inside $$...$$ end with it.
+      [m + '0001_a.sql']: 'comment on table t is $$it\'s /* "odd -- yes$$;\ndrop table x;\n',
+      [m + '0002_b.sql']: [
+        'create function f() returns void language plpgsql as $body$',
+        'begin',
+        "  -- don't worry",
+        "  raise notice 'it''s fine';",
+        '  drop table inside_body;',
+        "  perform $q$ it's $q$;",
+        'end',
+        '$body$;',
+        'truncate teams;',
+      ].join('\n'),
+    }),
+    [
+      [m + '0001_a.sql:2 [T-183]', 'drops in one step ("drop table x")'],
+      [m + '0002_b.sql:5 [T-183]', 'drop table inside_body'],
+      [m + '0002_b.sql:9 [T-183]', 'empties a table in one step ("truncate teams")'],
+    ],
+  );
+});
+
+test('T-183 reads single-quoted function and DO bodies as SQL', (t) => {
+  const m = 'supabase/migrations/';
+  assertExactly(
+    found(t, {
+      [m + '0001_a.sql']: "create function f() returns void language sql as 'drop table t';\n",
+      [m + '0002_b.sql']:
+        "create function g() returns void language plpgsql as '\nbegin\n" +
+        "  raise exception ''cannot rename'';\n  alter table t rename to u;\nend';\n",
+      [m + '0003_c.sql']: "do 'begin truncate t; end';\nselect 'drop table t' as text;\n",
+      [m + '0004_d.sql']: "create function h() returns text language sql as E'select 1';\n",
+    }),
+    [
+      [m + '0001_a.sql:1 [T-183]', 'drops in one step ("drop table t")'],
+      [m + '0002_b.sql:4 [T-183]', 'renames in one step ("alter table t rename to u")'],
+      [m + '0003_c.sql:1 [T-183]', 'empties a table in one step'],
+    ],
+  );
+});
+
+test('T-183 rejects dynamic SQL but not trigger calls or privileges', (t) => {
+  const m = 'supabase/migrations/';
+  assertExactly(
+    found(t, {
+      [m + '0001_a.sql']: "do $$ begin execute 'select 1'; end $$;\n",
+      [m + '0002_b.sql']: "select format('%I', 'x');\n",
+      [m + '0003_c.sql']: [
+        'create trigger touch before update on t for each row execute function f();',
+        'create trigger old before update on t for each row execute procedure f();',
+        'grant execute on function f() to app;',
+        'revoke execute on function f() from public;',
+        'grant select, truncate on t to app;',
+        "comment on table t is 'we never execute format(x)';",
+      ].join('\n'),
+    }),
+    [
+      [m + '0001_a.sql:1 [T-183]', 'builds SQL at run time ("execute'],
+      [m + '0002_b.sql:1 [T-183]', 'builds SQL at run time ("format('],
+    ],
+  );
+});
+
+test('T-183 allows DROP IDENTITY, EXPRESSION, DEFAULT and NOT NULL only on a column', (t) => {
+  const m = 'supabase/migrations/';
+  assertExactly(
+    found(t, {
+      [m + '0001_a.sql']: [
+        'alter table t alter column c drop identity;',
+        'alter table t alter c drop expression;',
+        'alter table "T" alter column "c" drop default, alter column d drop not null;',
+        'alter domain score drop default;',
+        'alter domain score drop not null;',
+        'alter table only t alter column c drop default;',
+      ].join('\n'),
+      // Without ALTER [COLUMN] name, these drop a column called identity or expression.
+      [m + '0002_b.sql']: 'alter table t drop identity;\nalter table t drop expression;\n',
+      [m + '0003_c.sql']: 'alter table t drop not;\n',
+    }),
+    [
+      [m + '0002_b.sql:1 [T-183]', 'drops in one step ("drop identity")'],
+      [m + '0002_b.sql:2 [T-183]', 'drops in one step ("drop expression")'],
+      [m + '0003_c.sql:1 [T-183]', 'drops in one step ("drop not")'],
+    ],
+  );
+});
+
+test('T-183 lets a reviewed file drop only while it matches its checksum', async (t) => {
+  const { migrationChecksum } = await import('../scripts/structure/migration-safety.mjs');
+  // Imported by path, not through @srleagues/database, on purpose: this compares the
+  // gate's copy of the checksum with the runner's own, line for line. tests/ is outside
+  // the workspaces, so the T-22 rule (packages only through index.ts) does not apply.
+  const runner = await import('../packages/database/src/migrations/checksum.ts');
+  const text =
+    '-- step 2 of 2: release 7 stopped reading nickname.\nalter table teams drop nickname;\n';
+  assert.equal(migrationChecksum(text), runner.migrationChecksum(text));
+  const windows = String.fromCharCode(0xfeff) + text.replace(/\n/g, '\r\n');
+  assert.equal(migrationChecksum(windows), runner.migrationChecksum(text));
+  assert.equal(runner.migrationChecksum(windows), runner.migrationChecksum(text));
+
+  const file = 'supabase/migrations/0002_drop_nickname.sql';
+  const check = (files, allowed) =>
+    checkStructure(fixture(t, files), {
+      config: { migrationDropsAllowed: allowed },
+    }).violations.map((v) => `${v.file}:${v.line} [${v.rule}] ${v.message}`);
+  const entry = { file, sha256: migrationChecksum(text), reason: 'release 7 stopped reading it' };
+
+  assertExactly(check({ [file]: text }, [entry]), []);
+  assertExactly(check({ [file]: text + 'drop table teams;\n' }, [entry]), [
+    [file + ':1 [T-183]', 'changed after it was allowed to drop or rename'],
+    [file + ':2 [T-183]', 'drops in one step ("drop nickname")'],
+    [file + ':3 [T-183]', 'drops in one step ("drop table teams")'],
+  ]);
+  assertExactly(
+    check({ [file]: 'select 1;\n' }, [{ ...entry, sha256: migrationChecksum('select 1;\n') }]),
+    [[file + ':1 [T-183]', 'no longer drops or renames anything']],
+  );
+  assertExactly(check({}, [entry]), [
+    ['scripts/structure/config.mjs:1 [T-183]', `names ${file}, which does not exist`],
+  ]);
+
+  // Dynamic SQL is allowed the same way, by review.
+  const dynamic = "do $$ begin execute 'select 1'; end $$;\n";
+  const dynamicEntry = { file, sha256: migrationChecksum(dynamic), reason: 'reviewed: no drops' };
+  assertExactly(check({ [file]: dynamic }, [dynamicEntry]), []);
+
+  // Entries must name a migration, give a reason and a checksum.
+  const config = 'scripts/structure/config.mjs:1 [T-183]';
+  assertExactly(
+    check({ [file]: text, 'supabase/seed/a.sql': text }, [
+      { ...entry, file: 'supabase/seed/a.sql' },
+      { ...entry, reason: '  ' },
+    ]),
+    [
+      [config, 'names supabase/seed/a.sql, which is not in supabase/migrations/'],
+      [config, `entry for ${file} has no reason`],
+      [file + ':2 [T-183]', 'drops in one step'],
+    ],
+  );
+  assertExactly(check({ [file]: text }, [{ ...entry, sha256: 'abc' }]), [
+    [config, `entry for ${file} has no sha256`],
+    [file + ':2 [T-183]', 'drops in one step'],
+  ]);
+});
+
 test('a planted violation of any rule fails the gate', (t) => {
   const plants = {
     'T-21': { 'packages/core/src/a.ts': "import '@srleagues/database';\n" },
@@ -531,6 +742,7 @@ test('a planted violation of any rule fails the gate', (t) => {
     SQL: { 'apps/web/src/a.ts': "const q = 'delete from games where id = $1';\n" },
     'T-34': { 'apps/web/src/a.ts': 'const u = `/${league.slug}/news`;\n' },
     'T-30': { 'packages/ui/src/a.ts': 'const u = process.env.X;\n' },
+    'T-183': { 'supabase/migrations/0001_a.sql': 'drop table teams;\n' },
   };
   const quiet = () => {};
   for (const [rule, files] of Object.entries(plants)) {

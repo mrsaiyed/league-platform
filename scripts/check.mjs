@@ -26,5 +26,6 @@ for (const file of [...manifest.styles, ...manifest.assets]) {
 }
 console.log(`Validated ${count} modules, import targets, local assets, and the offline boundary.`);
 
-// T2 §2 and §6, T9 §3: imports, index.ts, league names, SQL, addresses, secrets.
+// T2 §2 and §6, T9 §3: imports, index.ts, league names, SQL, addresses, secrets,
+// and migration safety (T-183).
 process.exitCode = report(checkStructure(root));

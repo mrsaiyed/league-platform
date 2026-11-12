@@ -63,6 +63,21 @@ export const legacyFiles = [
   'packages/sports/src/basketball/scorer.ts',
 ];
 
+/** T-48: the numbered SQL files that define the database. */
+export const migrationFolder = 'supabase/migrations/';
+
+/**
+ * T-183 and T-49: the only migrations that may drop or rename something. Such a
+ * file is always the second step of a two-step change: an earlier release stopped
+ * using the old thing, and this file removes it. A file that needs dynamic SQL
+ * (EXECUTE, format) is listed the same way, since the check cannot read it. Each
+ * entry is `{ file, sha256, reason }`: the file's path inside migrationFolder, its
+ * checksum (the gate prints it), and a reason that is not empty: which release
+ * stopped using what it removes. Adding an entry is the review; if the file
+ * changes afterwards, the entry no longer counts.
+ */
+export const migrationDropsAllowed = [];
+
 /** Folders outside the workspaces that are also scanned (T2 §1: migrations and seed). */
 export const extraRoots = ['supabase'];
 

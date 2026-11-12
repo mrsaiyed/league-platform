@@ -10,6 +10,7 @@ import * as leagueNames from './league-names.mjs';
 import * as sqlLocation from './sql-location.mjs';
 import * as leagueAddresses from './league-addresses.mjs';
 import * as browserSecrets from './browser-secrets.mjs';
+import * as migrationSafety from './migration-safety.mjs';
 
 export const checks = [
   importDirections,
@@ -18,6 +19,7 @@ export const checks = [
   sqlLocation,
   leagueAddresses,
   browserSecrets,
+  migrationSafety,
 ];
 
 /** Runs every check (or those whose rule is in `only`) over the repository at `root`. */
