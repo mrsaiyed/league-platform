@@ -16,3 +16,4 @@ playwright-report/
 *.pem
 *.key
 docs/build/.lock
+docs/build/dashboard.html
