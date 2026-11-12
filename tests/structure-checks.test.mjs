@@ -504,6 +504,25 @@ test('T-30 leaves server code, type-only imports and messages alone', (t) => {
   );
 });
 
+test('T-30 allows reading process.env only in the config module files', (t) => {
+  assertExactly(
+    found(t, {
+      'apps/web/src/server/config.ts': 'export const e = process.env;\n',
+      'apps/web/src/server/config-schema.ts': 'export const url = process.env.DATABASE_URL;\n',
+      'apps/worker/src/config.ts': 'export const e = process.env;\n',
+      'apps/worker/src/job.ts': "const { env } = process;\nconst a = process['env'];\n",
+      'packages/providers/src/mail.ts': 'export const k = process.env.RESEND_API_KEY;\n',
+      'packages/database/src/pool.ts': "// reads process.env\nexport const m = 'process.env';\n",
+    }),
+    [
+      ['apps/web/src/server/config-schema.ts:1 [T-30]', 'is not a config module'],
+      ['apps/worker/src/job.ts:1 [T-30]', 'is not a config module'],
+      ['apps/worker/src/job.ts:2 [T-30]', 'is not a config module'],
+      ['packages/providers/src/mail.ts:1 [T-30]', 'call getConfig() instead'],
+    ],
+  );
+});
+
 test('a planted violation of any rule fails the gate', (t) => {
   const plants = {
     'T-21': { 'packages/core/src/a.ts': "import '@srleagues/database';\n" },

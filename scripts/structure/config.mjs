@@ -145,3 +145,10 @@ export const browserFolders = ['apps/web/public/'];
 
 /** T-30: workspaces that hold server-only code and must never be imported by browser code. */
 export const serverOnlyWorkspaces = ['packages/database', 'packages/providers'];
+
+/**
+ * T-30: the only files that may read process.env (the one startup read of the
+ * environment). Each app has one; loadConfig itself takes the environment as an
+ * argument and is not listed. Add a file here only by adding a config module.
+ */
+export const settingsReaderFiles = ['apps/web/src/server/config.ts', 'apps/worker/src/config.ts'];

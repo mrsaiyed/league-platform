@@ -5,7 +5,8 @@
 // packages, followed to their source. Type-only imports are erased, so not followed.
 // Browser code may not read the environment, import server-only packages, or
 // contain anything that looks like a secret. The pure layers (contracts, sports,
-// core, ui, site) may not read the environment anywhere (T2 §2).
+// core, ui, site) may not read the environment anywhere (T2 §2). Everywhere else,
+// the environment is read only in the config module files named in config.mjs.
 import { isCodeFile, violation } from './source.mjs';
 
 export const rule = 'T-30';
@@ -34,14 +35,31 @@ const secretShapes = [
 ];
 
 export function check(repo) {
-  const { noSettingsWorkspaces, serverOnlyWorkspaces } = repo.config;
+  const { noSettingsWorkspaces, serverOnlyWorkspaces, settingsReaderFiles } = repo.config;
   const out = [];
   const browser = browserFiles(repo);
   for (const file of repo.files) {
     const workspace = repo.workspaceOf(file.rel);
     const inBrowser = browser.get(file.rel);
     const pure = workspace && noSettingsWorkspaces.includes(workspace.dir) && isCodeFile(file.rel);
-    if (!inBrowser && !pure) continue;
+    if (!inBrowser && !pure) {
+      // Server code: allowed to read settings only in the config module files.
+      if (!workspace || !isCodeFile(file.rel) || settingsReaderFiles.includes(file.rel)) continue;
+      for (const { on, re } of envReads) {
+        for (const match of file.lexed[on].matchAll(re)) {
+          out.push(
+            violation(
+              rule,
+              file,
+              match.index,
+              `reads the environment but is not a config module. Settings are read once, in ` +
+                `${settingsReaderFiles.join(' or ')}; call getConfig() instead.`,
+            ),
+          );
+        }
+      }
+      continue;
+    }
     const why = inBrowser
       ? `is browser code (${inBrowser})`
       : `is in ${workspace.dir}, which never reads settings`;
