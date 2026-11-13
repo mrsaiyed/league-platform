@@ -32,7 +32,16 @@ import {
   createPerson,
   clearSettingFor,
   createSeason,
+  addDraftGame,
   addToRoster,
+  changeDraftRoundDate,
+  discardScheduleDraft,
+  getScheduleDraft,
+  moveDraftGame,
+  removeDraftGame,
+  renameDraftRound,
+  setDraftRecording,
+  swapDraftGames,
   changeRosterEntry,
   createTeam,
   listRoster,
@@ -109,6 +118,7 @@ import {
   newStage,
   newProgram,
   newRosterEntry,
+  newRound,
   newSeason,
   newTeam,
   newVenue,
@@ -494,6 +504,156 @@ const rosterCommandRows: readonly Row[] = [
   ),
 ];
 
+/** A season with a round, two games and a venue, of the default program or of the other one. */
+async function scheduleIn(league: League, program: boolean) {
+  const seasonId = await seasonIn(league, program);
+  const stageId = await newStage(pglite, league.leagueId, seasonId);
+  const roundId = await newRound(pglite, league.leagueId, seasonId, 1);
+  const teams = [
+    await newTeam(pglite, league.leagueId, seasonId),
+    await newTeam(pglite, league.leagueId, seasonId),
+    await newTeam(pglite, league.leagueId, seasonId),
+  ] as [string, string, string];
+  const game = (home: string, away: string, startsAt: string) =>
+    newGame(pglite, {
+      leagueId: league.leagueId,
+      seasonId,
+      stageId,
+      homeTeamId: home,
+      awayTeamId: away,
+      columns: { round_id: roundId, starts_at: startsAt },
+    });
+  return {
+    seasonId,
+    roundId,
+    teams,
+    first: await game(teams[0], teams[1], '2026-12-06T18:00:00Z'),
+    second: await game(teams[1], teams[2], '2026-12-13T18:00:00Z'),
+    venueId: await newVenue(pglite, league.leagueId),
+  };
+}
+
+/** A schedule command's two rows: a season of the default program, and of the other one. */
+function scheduleRows(
+  command: string,
+  name: string,
+  needs: Permission,
+  prepare: (
+    s: Awaited<ReturnType<typeof scheduleIn>>,
+    league: League,
+  ) => Promise<unknown> | unknown,
+  run: Row['run'],
+): Row[] {
+  return [false, true].map((program) => ({
+    command,
+    name: `${name} ${program ? 'of one program' : 'of the default program'}`,
+    needs,
+    ...(program ? { scope: 'program' as const } : {}),
+    prepare: async (league) => ({
+      input: await prepare(await scheduleIn(league, program), league),
+    }),
+    run,
+  }));
+}
+
+const firstEdit = (s: { seasonId: string }) => ({
+  seasonId: s.seasonId,
+  basedOnRevision: null,
+  version: null,
+});
+
+// The schedule draft is edited at its season's program (P4 §3 `schedule.edit`): the owner,
+// admins and schedulers; a scheduler limited to one program edits only that program's.
+const scheduleDraftRows: readonly Row[] = [
+  ...scheduleRows(
+    'scheduling.add_draft_game',
+    'add a game to the draft',
+    'schedule.edit',
+    (s) => ({
+      ...firstEdit(s),
+      gameId: randomUUID(),
+      homeTeamId: s.teams[0],
+      awayTeamId: s.teams[2],
+      roundId: s.roundId,
+      date: '2026-12-20',
+      time: '20:00',
+      venueId: s.venueId,
+      court: null,
+    }),
+    (c, i) => addDraftGame(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.move_draft_game',
+    'move a game in the draft',
+    'schedule.edit',
+    (s) => ({
+      ...firstEdit(s),
+      gameId: s.first,
+      roundId: s.roundId,
+      date: '2026-12-20',
+      time: '20:00',
+      venueId: s.venueId,
+      court: null,
+    }),
+    (c, i) => moveDraftGame(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.swap_draft_games',
+    'swap two games in the draft',
+    'schedule.edit',
+    (s) => ({ ...firstEdit(s), gameId: s.first, otherGameId: s.second }),
+    (c, i) => swapDraftGames(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.remove_draft_game',
+    'remove a game in the draft',
+    'schedule.edit',
+    (s) => ({ ...firstEdit(s), gameId: s.first }),
+    (c, i) => removeDraftGame(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.rename_draft_round',
+    'rename a round in the draft',
+    'schedule.edit',
+    (s) => ({ ...firstEdit(s), roundId: s.roundId, label: 'Rivalry week' }),
+    (c, i) => renameDraftRound(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.change_draft_round_date',
+    "change a round's date in the draft",
+    'schedule.edit',
+    (s) => ({ ...firstEdit(s), roundId: s.roundId, date: '2026-12-07' }),
+    (c, i) => changeDraftRoundDate(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.set_draft_recording',
+    "set a game's recording mode in the draft",
+    'schedule.edit',
+    (s) => ({ ...firstEdit(s), gameId: s.first, recording: 'live' }),
+    (c, i) => setDraftRecording(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.discard_schedule_draft',
+    'discard the draft',
+    'schedule.edit',
+    async (s, league) => {
+      await pglite.query('insert into schedule_drafts (league_id, season_id) values ($1, $2)', [
+        league.leagueId,
+        s.seasonId,
+      ]);
+      return { seasonId: s.seasonId, version: 1 };
+    },
+    (c, i) => discardScheduleDraft(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.get_schedule_draft',
+    'see the draft',
+    'schedule.read',
+    (s) => ({ seasonId: s.seasonId }),
+    (c, i) => getScheduleDraft(c, i, schedulingDeps),
+  ),
+];
+
 /** A game of a season of the default program, or of the league's other program. */
 async function gameIn(league: League, program: boolean, columns: Record<string, unknown> = {}) {
   const seasonId = await seasonIn(league, program);
@@ -869,6 +1029,7 @@ const rows: readonly Row[] = [
   ...gameCommandRows,
   ...teamCommandRows,
   ...rosterCommandRows,
+  ...scheduleDraftRows,
   ...settingRows(declaredSettings),
   ...settingRows(settingRegistry([bannerSetting])),
   // League settings (P4 §6) and seasons (P4 §3): the owner and admins (O-7).

@@ -326,7 +326,14 @@ async function seededLeague(
     pglite,
     `insert into schedule_drafts (league_id, season_id, based_on_revision, changes)
      values ($1, $2, 1, $3)`,
-    [leagueId, seasonId, JSON.stringify({ version: 1, changes: [{ renameRound: `Week 1 ${m}` }] })],
+    [
+      leagueId,
+      seasonId,
+      JSON.stringify({
+        version: 1,
+        changes: [{ kind: 'rename-round', roundId, label: `Week 1 ${m}` }],
+      }),
+    ],
   );
   const gameId = await id(
     pglite,
