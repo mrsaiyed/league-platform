@@ -52,7 +52,7 @@ The split between these tables is what makes "one account, many leagues", "admin
 
 A person added by hand is a `people` row with an empty `profile_id`. Claiming or registering fills it in. Statistics and rosters point at `people`, so nothing moves when the link is made.
 
-A profile is linked to at most one person in a league (while not in the bin), and a person is merged only into another person of the same league. `visibility` is the person's own request for public pages: `none`, `initials` or `removed` (R-15, R-17). Erasure (T-52) empties the name, contact details, birth date and link in place, so the names may be empty; `is_minor` is empty when the league does not know. `photo` waits for the `assets` table (section 10). Detail: [decision record 022](../../../architecture/decisions/022-people-teams-and-rosters.md) (T-234).
+A profile is linked to at most one person in a league (while not in the bin), and a person is merged only into another person of the same league. `visibility` is the person's own request for public pages: `none`, `initials` or `removed` (R-15, R-17). Erasure (T-52) empties the name, contact details, birth date and link in place, so the names may be empty (never only spaces); a birth date is never after today; `is_minor` is empty when the league does not know. `photo` waits for the `assets` table (section 10). Detail: [decision record 022](../../../architecture/decisions/022-people-teams-and-rosters.md) (T-234).
 
 ## 4. Leagues and structure
 
