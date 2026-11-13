@@ -119,6 +119,98 @@ export const en = {
     'This person has left the team, so their entry can no longer be changed.',
   'error.teams.mark_left.already-left': 'This person is already marked as having left.',
   'error.teams.mark_left.left-before-joined': 'The leaving date is before the day they joined.',
+  // Why a schedule draft edit was refused (T-187).
+  'error.scheduling.add_draft_game.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.add_draft_game.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.move_draft_game.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.move_draft_game.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.swap_draft_games.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.swap_draft_games.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.remove_draft_game.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.remove_draft_game.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.rename_draft_round.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.rename_draft_round.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.change_draft_round_date.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.change_draft_round_date.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.set_draft_recording.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.set_draft_recording.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.discard_schedule_draft.changed-since-read':
+    'Someone else changed the schedule draft since you opened it, so it was not discarded. Reload it to see their changes.',
+  'error.scheduling.add_draft_game.season-not-found': 'That season is not there.',
+  'error.scheduling.add_draft_game.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.add_draft_game.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.add_draft_game.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.move_draft_game.season-not-found': 'That season is not there.',
+  'error.scheduling.move_draft_game.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.move_draft_game.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.move_draft_game.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.swap_draft_games.season-not-found': 'That season is not there.',
+  'error.scheduling.swap_draft_games.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.swap_draft_games.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.swap_draft_games.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.remove_draft_game.season-not-found': 'That season is not there.',
+  'error.scheduling.remove_draft_game.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.remove_draft_game.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.remove_draft_game.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.rename_draft_round.season-not-found': 'That season is not there.',
+  'error.scheduling.rename_draft_round.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.rename_draft_round.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.rename_draft_round.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.change_draft_round_date.season-not-found': 'That season is not there.',
+  'error.scheduling.change_draft_round_date.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.change_draft_round_date.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.change_draft_round_date.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.set_draft_recording.season-not-found': 'That season is not there.',
+  'error.scheduling.set_draft_recording.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.set_draft_recording.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.set_draft_recording.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.add_draft_game.unknown-team':
+    'One of those teams is not a team of this season.',
+  'error.scheduling.add_draft_game.unknown-venue': 'That venue is not there.',
+  'error.scheduling.add_draft_game.unknown-court': 'That court is not at the chosen venue.',
+  'error.scheduling.move_draft_game.unknown-venue': 'That venue is not there.',
+  'error.scheduling.move_draft_game.unknown-court': 'That court is not at the chosen venue.',
+  'error.scheduling.discard_schedule_draft.season-not-found': 'That season is not there.',
+  'error.scheduling.discard_schedule_draft.draft-not-found':
+    'There is no schedule draft to discard.',
+  'error.scheduling.get_schedule_draft.season-not-found': 'That season is not there.',
+  'error.scheduling.get_schedule_draft.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
   // Activity log lines (A-6, T-226): the key is `activity.` and the command's name;
   // the values come from the entry's details. {role} is a role's name from above.
   'activity.access.invite': 'Invited someone as {role}',
@@ -157,6 +249,14 @@ export const en = {
   'activity.teams.change_roster_entry': "Changed a player's number or role",
   'activity.teams.reorder_roster': 'Changed the order of a roster',
   'activity.teams.mark_left': 'Marked a person as having left a team',
+  'activity.scheduling.add_draft_game': 'Added a game to the schedule draft',
+  'activity.scheduling.move_draft_game': 'Moved a game in the schedule draft',
+  'activity.scheduling.swap_draft_games': 'Swapped two games in the schedule draft',
+  'activity.scheduling.remove_draft_game': 'Removed a game in the schedule draft',
+  'activity.scheduling.rename_draft_round': 'Renamed a round in the schedule draft',
+  'activity.scheduling.change_draft_round_date': "Changed a round's date in the schedule draft",
+  'activity.scheduling.set_draft_recording': 'Changed how a game is recorded in the schedule draft',
+  'activity.scheduling.discard_schedule_draft': 'Discarded the schedule draft',
   'activity.scheduling.create_venue': 'Added a venue',
   'activity.scheduling.update_venue': 'Changed a venue',
   'activity.scheduling.remove_venue': 'Moved a venue to the bin',

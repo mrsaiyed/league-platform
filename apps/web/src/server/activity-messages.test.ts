@@ -16,6 +16,7 @@ const reads = new Set([
   'games.list_postponed_games',
   'leagues.get_season',
   'scheduling.list_venues',
+  'scheduling.get_schedule_draft',
   'teams.list_roster',
 ]);
 
