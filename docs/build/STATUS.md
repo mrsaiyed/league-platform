@@ -17,17 +17,16 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 ## In progress
 
-One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
+One line per open lane. A run that is cut off leaves this as the map for the next run. Check the lane branches for commits: builders were still working when the usage limit hit.
 
-Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migration 0010, record 026, T-238. Check the folders before trusting these.
+Next free: migration 0012, record 033, T-245 (0011 / 031 / T-243 belong to 1.14; 0010 / 030 / T-242 to 2.4).
 
-- **1.27 Sturdy timing tests** — `.local/lanes/1.27-sturdy-tests` — none — builder started.
-
-- **2.4 Live game, calculated and import tables** — `.local/lanes/2.4-live-tables` — migration 0010, record 030 / T-242 — builder started.
-- **1.14 Sign-in flows in the web app** — `.local/lanes/1.14-signin-flows` — migration 0011 (only if the sign-in store needs tables), record 031 / T-243 — builder started.
-- **2.19 Rosters commands** — `.local/lanes/2.19-roster-commands` — none — builder started.
-
-Next free: migration 0012, record 033, T-245.
+- **1.14 Sign-in flows** — `.local/lanes/1.14-signin-flows` — migration 0011 (unused so far), record 031 / T-243 — built (541dfc0, 103f385); security review found 2 high faults (open redirect via next=, spoofable X-Forwarded-For) and 6 more; ALL 8 are now fixed in the lane (head dc03926, build branch merged in; verify green apart from load flakes; new setting TRUSTED_PROXY, T-69/T4 §3 reworded, T-243 still to add to DECISIONS.md). Then: independent re-review of the fixes (opus), gate, land.
+- **2.4 Live game, calculated and import tables** — `.local/lanes/2.4-live-tables` — migration 0010, record 030 / T-242 — built and reviewed; builder was fixing findings (takeover must delete+re-insert the scoring session, binned scored games rule, walk-up roster entry game check, standings division check, notes). Then: catch up, gate, land.
+- **2.19 Rosters commands** — `.local/lanes/2.19-roster-commands` — none — built, reviewed, findings fixed; a builder was catching it up with build/stage-1 (conflicts in en.ts after 2.23 landed). Then: gate, land. Note: people.remove_person checks roster membership unlocked; reorder_roster returns {count, versions}.
+- **1.27 Sturdy timing tests** — `.local/lanes/1.27-sturdy-tests` — none — builder working; no report yet.
+- **1.21 Seed leagues** — `.local/lanes/1.21-seed-leagues` — none — builder starting.
+- **1.20 part 2 Health checks** — `.local/lanes/1.20-health-checks` — none — builder starting.
 
 ## Needs the founder
 
@@ -49,6 +48,8 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — promote-to-main refused: 'files the live site is built from differ from main (packages/contracts/src/live-stats.ts, packages/sports/src/basketball/live.ts)': these are step 2.66's allowed changes; main left alone, the tracker has to be checked before main moves.
+- 2026-11-13 — Run end (usage limit): landed 1.18 part 2, 1.23, 2.3, 2.18, 2.15, 2.17, 2.66, 2.23. Open lanes listed under In progress. Skipped on purpose: 2.27 (needs the founder's scorekeeper setting default). Known load flakes still failing the gate on this computer: isolation-cases 90 s limit, vitest 'Timeout calling onTaskUpdate', run-migrations lock, live-stats start-up text (step 1.27 is the fix). Stray untracked file .verify-215.log in the main folder (a builder's mistake; the permission system refused its deletion): safe to delete.
 - 2026-11-13 — Step 2.23 done: games module (record final score, forfeit, postpone, cancel, reopen with a reason + game_corrections row, list postponed) with events games.finalized/games.reopened (T-24). A game's format is the season's whole rules document copied on first decision, and ties/forfeit scores are judged by the game's own rules. Every reopened game (also a forfeit) goes back to 'scheduled' with its score cleared; step 2.30 may revisit tracked games. Postpone keeps starts_at. Scorekeeper 'own games only' is 2.27/2.55. .prettierignore now ignores .claude (another session's worktree lives there and broke format:check). Gate: all tests pass in the main folder apart from load flakes (isolation-cases timeout, live-stats start-up text), both pass alone.
 - 2026-11-13 — Step 2.66 done: engine clock mode (stop or running) and a mid-game switch play in packages/sports/src/basketball/live.ts; rules without a mode mean stop, old saved games read the same (tests/support/clock-mode-before.json). The live Al-Hadi server's contract is unchanged: the wider shapes are PlatformRules/PlatformCommand/PlatformEnvelope in packages/contracts for step 2.68's server (it should switch TrackerCommand to PlatformEnvelope and decide on a protocol version). A switch before tip-off is a recorded play and locks the format, like a lineup (T6 §1). T6 §1 corrected. For 2.68: under default season rules (running clock) new games no longer stop on fouls. For 2.69: game.js play-by-play assumes a side on every play. Gate: 1544 of 1545 passed in the main folder; isolation-cases timed out under load and passes alone (step 1.27).
 - 2026-11-13 — Lead, with the founder: first run against real Supabase (a staging project of its own, made-up data only, PostgreSQL 17.11). All nine migrations applied through the repository's runner in about 3 seconds over the session pooler, and a second run changed nothing. The league fence held in 14 checks with two made-up leagues inside a rolled-back transaction (no league set sees nothing; league A cannot read, change, delete or write into B; app_user cannot create a table). A restricted login `app_login` (member of app_user, no powers of its own) was made outside migrations and passes checkLoginRole. Findings for builders: (1) on Supabase `postgres` bypasses row-level security but cannot `set role app_user`, so nothing may assume the migration user can act as the app role; (2) the pooler's certificate is signed by Supabase's own authority, so `ssl: 'verify'` needs their certificate passed as `ca` (this run used 'no-verify'); (3) postgres-driver.ts still says it has not been run against a hosted database: correct that comment in the next step that touches the file. Not yet tried on staging: the full two-league harness, pg-boss, sign-in, live updates, email, the web app itself.
