@@ -25,7 +25,13 @@ afterAll(async () => {
 
 /** Tables that belong to a person, not a league (T-62). Every other table is a league table. */
 const personalTables = ['accounts', 'profiles', 'profile_access'];
-const historyTables = ['activity_log', 'command_receipts', 'support_access_log'];
+const historyTables = [
+  'activity_log',
+  'command_receipts',
+  'support_access_log',
+  'schedule_revisions',
+  'game_corrections',
+];
 /** The only functions that run as their owner, each reviewed (T-221, records 008 and 012). */
 const definerFunctions = [
   'check_league_has_default_program',

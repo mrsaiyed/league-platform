@@ -155,15 +155,20 @@ const idsIn = (text, self) => {
 const landed = (id) => byId.get(id)?.state === 'done';
 const partLanded = (id, n) =>
   log.some((entry) => entry.text.startsWith(`Step ${id} part ${n} done`));
+const partsOf = (step) =>
+  [...step.needs.matchAll(/part (\d+):([^·]*)/gi)].map((m) => ({ n: Number(m[1]), text: m[2] }));
+// A step built in parts is done once the log has every part's landing, ticked in the plan or
+// not. (A forgotten tick once hid the step that fourteen others were waiting on.)
+for (const step of byId.values()) {
+  const parts = partsOf(step);
+  if (parts.length && parts.every((p) => partLanded(step.id, p.n))) step.state = 'done';
+}
 const ready = [];
 for (const step of byId.values()) {
   step.needIds = idsIn(step.needs, step);
   if (step.state === 'done' || open.has(step.id) || step.blocked) continue;
   if (/drafts:/i.test(step.needs)) continue;
-  const parts = [...step.needs.matchAll(/part (\d+):([^·]*)/gi)].map((m) => ({
-    n: Number(m[1]),
-    text: m[2],
-  }));
+  const parts = partsOf(step);
   if (parts.length) {
     const next = parts.find((p) => !partLanded(step.id, p.n));
     if (next && idsIn(next.text, step).every(landed)) {

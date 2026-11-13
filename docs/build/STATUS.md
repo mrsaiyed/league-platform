@@ -8,7 +8,7 @@ The one file that says where the build is. Every run reads it first and updates 
 - **Stage:** 1, foundations — [plan](STAGE-1.md). Stage 2 — [plan](STAGE-2.md) — fills spare lanes.
 - **Branch:** `build/stage-1`
 - **Gate:** `npm run verify`
-- **Next step:** 1.26 Catch up with main, and at the same time every other step that can be opened ("Side by side" in the stage plan).
+- **Next step:** finish stage 1 first: 1.14 Sign-in flows (14 steps wait on it), 1.21 Seed leagues, 1.20 part 2, 1.27 Sturdy timing tests; then 1.22, 1.24, 1.25. Stage 2 steps fill the lanes left over. `node scripts/build-dashboard.mjs` prints what can start.
 - **Lanes:** up to 6 at once (runbook, section 3). The founder confirmed on 2026-11-12 that many builders at once is what they want. Lower the number if this computer struggles with that many.
 - **Moving main forward:** allowed, only through `node scripts/promote-to-main.mjs`, which the lead runs at the end of a run. The founder left `main` to the lead (2026-11-12) and asked on 2026-11-13 to see the commits in GitHub's statistics, which count `main` only. The script moves `main` only when it is a plain fast-forward, the live tracker's own files are untouched, GitHub's checks have passed on that exact commit, and no game is within 24 hours. Never push to `main` any other way, and never by hand in a run.
 - **Pushing to GitHub:** allowed, for the build branch only (`git push origin build/stage-1`). The founder said yes on 2026-11-12 and confirmed that the repository being public is fine. Never push or merge to `main`: every push to `main` republishes the live Al-Hadi tracker site at `mrsaiyed.github.io/league-platform/`, which is in use for real games.
@@ -21,8 +21,15 @@ One line per open lane, written before its builder starts: `- **<step>** — <la
 
 Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migration 0010, record 026, T-238. Check the folders before trusting these.
 
-- **1.18 part 2 Header, menu, footer, hard-coded-text scan** — `.local/lanes/1.18p2-shell-design` — none — built and reviewed; a builder was fixing the reviewer's findings (stronger T-187 scan, design values re-validated in the style block, contrast, refusal pages). Then: catch up with the build branch, gate (rerun db/tracker timing tests alone), land.
 - **2.3 Schedule and game tables** — `.local/lanes/2.3-schedule-game-tables` — migration 0009, record 025 / T-237 — BUILT (a0c7594), gate green in the lane (run-migrations lock test flaked under load, passes alone). Needs: independent review (opus), catch up, gate, land. Notes: capture_mode uses T3's final/box/live while the season rules say final-score/box-score (2.20/2.21 must translate); a game's result changes need a game_corrections row in the same transaction (2.21 publishing, 2.22 import undo, 2.23 results/reopen, the Al-Hadi transfer must respect this); no brackets or step 2.4 tables yet; purging binned games needs DELETE on games or an owner-run function.
+
+- **2.15 Seasons and their rules** — `.local/lanes/2.15-season-commands` — record 026 / T-238 — just opened (2026-11-13 run).
+- **2.17 People commands** — `.local/lanes/2.17-people-commands` — record 027 / T-239 — just opened.
+- **2.18 Teams commands** — `.local/lanes/2.18-teams-commands` — record 028 / T-240 — just opened.
+
+- **2.66 Engine clock mode and its switch** — `.local/lanes/2.66-clock-mode` — record 029 / T-241 — folder opened but no builder started yet (machine saturated: npm ci timed out); 2.57 was closed again, its numbers (record 030 / T-242) are free.
+
+Reserved now: next free migration 0010, record 031, T-243.
 
 ## Needs the founder
 
@@ -44,6 +51,11 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Lead: the check that guards main was too wide and too narrow at once. It refused any new file in packages/sports/src (where the stage plan puts standings and statistics), yet missed three files and one library that the tracker's browser code really pulls in. scripts/promote-to-main.mjs now asks the bundler for the exact list and compares those files, the tracker's own folders, the publish workflow, the bundled library versions and the build command; beside the engine it allows new files only. This settles the earlier 'someone has to decide' note: every file the live site is built from is the same as on main. Stage plans ticked to match this log.
+- 2026-11-13 — Step 1.23 done: ci.yml sets NEXT_TELEMETRY_DISABLED (job already ran npm ci and npm run verify on Node 24); YAML checked by eye only.
+- 2026-11-13 — Step 1.18 part 2 done: league design, header, menu, footer in the web shell, T-187 hard-coded-text scan. Stand-in league sites in apps/web/src/server/stand-in-league-sites.ts (TODO for 1.21). Gate green in main folder. Vitest 'Timeout calling onTaskUpdate' and isolation test 90s limit seen under load: a sturdiness step is still wanted.
+- 2026-11-13 — Step 1.23 done: ci.yml sets NEXT_TELEMETRY_DISABLED (the job already ran npm ci and npm run verify on Node 24); YAML checked by eye only.
+- 2026-11-13 — Step 1.18 part 2 done: league design, header, menu, footer in the web shell, T-187 hard-coded-text scan (scripts/structure/interface-text.mjs). Stand-in league names/designs in apps/web/src/server/stand-in-league-sites.ts (TODO for 1.21). Gate green in main folder. Vitest 'Timeout calling onTaskUpdate' and isolation test 90s limits seen under load: sturdiness step still wanted.
 - 2026-11-13 — Run end: promote-to-main refused: 'Main not moved: the live site's own files differ from main (packages/sports/src/game-status.ts, standings/calculate-standings.generated.test.ts, standings/calculate-standings.test.ts)'. Those changes come from step 2.7 (standings maths, allowed by the stage plan). Main left alone; someone has to decide whether the tracker's files may move (founder or a later run after checking the tracker still behaves). Also: run-migrations 'waits for another run holding the lock' and tests/live-stats-\*.test.mjs (server start-up text, hosted backup) fail under load and pass alone: a small step to make them sturdy is still wanted. Stale lane folders from earlier runs remain under .local/lanes (git ignores them): safe to delete.
 - 2026-11-13 — Step 2.16 done: 15 commands for divisions (leagues module) and venues/courts (scheduling module) with queries and isolation cases; removing a parent is refused while live children exist (no cascade); restore commands use bin.restore (admin-only pending the founder); list_venues readable at any scope by schedule.read; reorder needs the full sibling set. Open: remove/restore do not yet check teams (2.18) or games (2.3); purge order is children first (2.76); list_divisions needs divisions.manage (other roles need a broader read in 2.18/2.52).
 - 2026-11-13 — Step 2.14 done: defined settings in packages/core/src/modules/leagues/settings (defineSetting refuses a missing default/limits/label/permission, optional and transform schemas, unbounded objects; lookup season>program>league>default), commands leagues.set_setting and clear_setting (version check, program-scope checks, activity entries with scope), database queries (SQL-filtered), role matrix row per declared setting. Only members.startPage is declared; the other three S-22/P4 settings wait for the founder's defaults (listed under Needs the founder). Step 2.48 needs words for the option labels (keys added).
