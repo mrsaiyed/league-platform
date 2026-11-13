@@ -2,8 +2,11 @@
 //
 // It keeps everything in this process and forgets it on restart (everyone would be
 // signed out, and every device would look new), and two web servers would each keep
-// their own. Production needs the store backed by our own tables (record 018). Each
-// method finishes before it returns and awaits nothing, so each is atomic.
+// their own. Production needs the store backed by our own tables (record 018). No
+// method awaits anything, so each runs to its end before another starts: each is one
+// atomic step, as `SupabaseSignInStore` asks. Proofs that have run out are forgotten
+// whenever a proof is looked up; the Supabase sessions they held are not ended here
+// (they stay alive at Supabase, out of reach: the tokens are gone).
 import { randomUUID } from 'node:crypto';
 import type { AttemptLimits } from '../sign-in-settings.ts';
 import { createAttemptLimiter, type AttemptLimiter } from '../local/attempt-limiter.ts';
@@ -89,6 +92,13 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
     ended: s.ended,
   });
 
+  /** Forgets proofs that have run out, with the Supabase tokens they hold. */
+  const purgeProofs = (at: Date) => {
+    for (const [hash, proof] of proofs) {
+      if (at.getTime() >= proof.expiresAt.getTime()) proofs.delete(hash);
+    }
+  };
+
   const account = (accountId: string) => {
     let found = accounts.get(accountId);
     if (!found) {
@@ -166,13 +176,17 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
         proofs.set(proofHash, proof);
       },
       async peekProof(proofHash, at) {
-        const proof = proofs.get(proofHash);
-        return proof && at.getTime() < proof.expiresAt.getTime() ? proof : undefined;
+        purgeProofs(at);
+        return proofs.get(proofHash);
       },
       async takeProof(proofHash, at) {
+        purgeProofs(at);
         const proof = proofs.get(proofHash);
-        proofs.delete(proofHash);
-        return proof && at.getTime() < proof.expiresAt.getTime() ? proof : undefined;
+        if (!proof) return undefined;
+        // The address's other proofs end in the same step, so two at once cannot both
+        // go on to set a password.
+        for (const [hash, other] of proofs) if (other.email === proof.email) proofs.delete(hash);
+        return proof;
       },
       async dropProofsFor(email) {
         for (const [hash, proof] of proofs) if (proof.email === email) proofs.delete(hash);

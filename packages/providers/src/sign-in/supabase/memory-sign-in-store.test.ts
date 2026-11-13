@@ -63,6 +63,37 @@ describe('the in-memory sign-in store', () => {
     expect(taken.filter(Boolean)).toHaveLength(1);
   });
 
+  it('hands one of two proofs for one address to one caller, and keeps other addresses’', async () => {
+    const s = store();
+    const proof = (email: string) => ({
+      email,
+      accountId: 'a-1',
+      expiresAt: new Date(at.getTime() + 60_000),
+      supabase: { accessToken: 'x', refreshToken: 'y', accessExpiresAt: at, sessionId: 's-1' },
+    });
+    await s.codes.putProof('p-1', proof('ana@example.test'));
+    await s.codes.putProof('p-2', proof('ana@example.test'));
+    await s.codes.putProof('p-3', proof('ben@example.test'));
+    const taken = await Promise.all([s.codes.takeProof('p-1', at), s.codes.takeProof('p-2', at)]);
+    expect(taken.filter(Boolean)).toHaveLength(1);
+    expect(await s.codes.peekProof('p-3', at)).toBeDefined();
+  });
+
+  it('forgets proofs that have run out, with the tokens they hold', async () => {
+    const s = store();
+    const proof = {
+      email: 'ana@example.test',
+      accountId: 'a-1',
+      expiresAt: new Date(at.getTime() + 60_000),
+      supabase: { accessToken: 'x', refreshToken: 'y', accessExpiresAt: at, sessionId: 's-1' },
+    };
+    await s.codes.putProof('p-1', proof);
+    const later = new Date(at.getTime() + 60_000);
+    expect(await s.codes.peekProof('p-1', later)).toBeUndefined();
+    // Gone, not just hidden: an earlier time does not bring it back.
+    expect(await s.codes.takeProof('p-1', at)).toBeUndefined();
+  });
+
   it('claims an account for exactly one caller', async () => {
     const s = store();
     const claims = await Promise.all([

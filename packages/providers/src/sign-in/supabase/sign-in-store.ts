@@ -8,7 +8,9 @@
 // Every method is one atomic step: an implementation backed by a database does each
 // in one statement or transaction. The adapter's guarantees about requests at once
 // (record 013) rest on that. Tokens are never kept, only their SHA-256 (`...Hash`),
-// except the proof's Supabase session, which lives for at most the proof's minutes.
+// except the tokens of the proof's Supabase session. Those are kept until the proof is
+// taken or has run out, and a store must then forget them (record 018); the production
+// store also ends the session at Supabase, which otherwise stays alive there.
 //
 // Two implementations: `createMemorySignInStore` (development and tests, one process)
 // and, for production, one backed by our own tables, which is not built yet.
@@ -84,9 +86,13 @@ export type SignInCodeStore = {
   readonly takeCodeAttempt: (email: string, at: Date) => Promise<CodeAttempt>;
   readonly dropCode: (email: string) => Promise<void>;
   readonly putProof: (proofHash: string, proof: HeldProof) => Promise<void>;
-  /** The proof, if it has not expired at `at`, without using it. */
+  /** The proof, if it has not expired at `at`, without using it. Forgets proofs that have run out. */
   readonly peekProof: (proofHash: string, at: Date) => Promise<HeldProof | undefined>;
-  /** The proof, removed, if it has not expired at `at`. Two callers at once: one gets it. */
+  /**
+   * The proof, if it has not expired at `at`, removed together with every other proof
+   * for its address, in one step: of two callers at once, with the same proof or two
+   * for one address, one gets it. Forgets proofs that have run out.
+   */
   readonly takeProof: (proofHash: string, at: Date) => Promise<HeldProof | undefined>;
   /** Ends every proof and code for the address. */
   readonly dropProofsFor: (email: string) => Promise<void>;
