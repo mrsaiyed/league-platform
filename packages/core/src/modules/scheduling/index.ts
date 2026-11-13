@@ -6,6 +6,7 @@ export type {
   ChangeError,
   Clash,
   DraftChange,
+  GameRecording,
   ScheduleGame,
   ScheduleRound,
   ScheduleSlot,

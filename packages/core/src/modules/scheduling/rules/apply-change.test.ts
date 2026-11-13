@@ -123,6 +123,24 @@ describe('applyDraftChange (P7 §4.3)', () => {
     expect(r.ok).toBe(false);
   });
 
+  it('sets how a game is recorded and refuses an unknown game', () => {
+    const r = ok(
+      applyDraftChange(
+        baseState(),
+        { kind: 'set-recording', gameId: 'g2', recording: 'box-score' },
+        [],
+      ),
+    );
+    expect(r.state.games.find((g) => g.id === 'g2')).toMatchObject({ recording: 'box-score' });
+    expect(r.clashes).toEqual([]);
+    const refused = applyDraftChange(
+      baseState(),
+      { kind: 'set-recording', gameId: 'zz', recording: 'live' },
+      [],
+    );
+    expect(refused).toEqual({ ok: false, error: { code: 'unknown-game', gameId: 'zz' } });
+  });
+
   it('renames a round, trimming the label, and refuses an empty one', () => {
     const renamed = ok(
       applyDraftChange(
