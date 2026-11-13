@@ -246,6 +246,7 @@ All dated November 12, 2026.
 | T-81                  | The name function applies the display policy and the guardian's consent      | The league's one switch (R-14), the person's own request (`people.visibility`) and the team's stats setting   | R-14 became a league setting the admin controls; no per-guardian consent (step 2.11 review)        |
 | T-233                 | New                                                                          | The browser half of live updates lives in the web app; Realtime policies listed before use (record 021)       | Step 2.31: the providers package is server-only, so pages cannot subscribe through it              |
 | T-231                 | New                                                                          | Setting values kept in one `setting_values` table, one row per key and place (record 019)                     | Step 2.1: T3 did not say where the values of T5 section 6's settings are stored                    |
+| T-234                 | New                                                                          | Agreed (delegated): people, teams, rosters; the unique-jersey switch (record 022)                             | Step 2.2: T3 did not say how the jersey rule is kept and checked                                   |
 
 ## The full list
 
@@ -487,6 +488,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-52  | When a person leaves a league (R-17), their `people` row loses its name, contact details and link, and their statistics rows remain attached to the now-nameless record           | Agreed (delegated) |         |
 | T-220 | History keeps ids, so erasure and purging never rewrite it: an erased account's row is emptied in place, and a purged league's history is removed only by one owner-only function | Agreed (delegated) | yes     |
 | T-231 | Setting values an admin sets are kept in one `setting_values` table, one row per key at the league, a program or a season, each a small versioned document (record 019)           | Agreed (delegated) |         |
+| T-234 | The unique-jersey switch stays in the season's rules, read by a generated column the database enforces (record 022)                                                               | Agreed (delegated) |         |
 
 ### [T4 — Keeping leagues apart, sign-in, security](technical/T4-tenancy-auth-security.md)
 

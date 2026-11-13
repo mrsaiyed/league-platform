@@ -52,6 +52,8 @@ The split between these tables is what makes "one account, many leagues", "admin
 
 A person added by hand is a `people` row with an empty `profile_id`. Claiming or registering fills it in. Statistics and rosters point at `people`, so nothing moves when the link is made.
 
+A profile is linked to at most one person in a league (while not in the bin), and a person is merged only into another person of the same league. `visibility` is the person's own request for public pages: `none`, `initials` or `removed` (R-15, R-17). Erasure (T-52) empties the name, contact details, birth date and link in place, so the names may be empty; `is_minor` is empty when the league does not know. `photo` waits for the `assets` table (section 10). Detail: [decision record 022](../../../architecture/decisions/022-people-teams-and-rosters.md) (T-234).
+
 ## 4. Leagues and structure
 
 | Table                 | What a row is                        | Key columns                                                                                                                                                                                                                                                                                      |
@@ -60,7 +62,7 @@ A person added by hand is a `people` row with an empty `profile_id`. Claiming or
 | `league_slug_history` | A former short name still forwarding | `old_slug`, `league_id`, `expires_at`                                                                                                                                                                                                                                                            |
 | `league_features`     | An optional feature switched on      | `league_id`, `feature_key`, `enabled`, `config` (JSON)                                                                                                                                                                                                                                           |
 | `programs`            | A sport for a group                  | `league_id`, `slug`, `name`, `sport_key`, `is_default`                                                                                                                                                                                                                                           |
-| `seasons`             | One running of a program             | `program_id`, `slug`, `name`, `starts_on`, `ends_on`, `status`, `is_current`, `rules` (JSON, versioned), `stat_keys`, `logo`                                                                                                                                                                     |
+| `seasons`             | One running of a program             | `program_id`, `slug`, `name`, `starts_on`, `ends_on`, `status`, `is_current`, `rules` (JSON, versioned), `stat_keys`, `logo`, `unique_jerseys`                                                                                                                                                   |
 | `divisions`           | A group of teams sharing standings   | `season_id`, `name`, `color`, `sort`, `parent_division_id`                                                                                                                                                                                                                                       |
 | `clubs`               | A member organization (a school)     | `league_id`, `slug`, `name`, `logo`, `colors`                                                                                                                                                                                                                                                    |
 | `venues`, `courts`    | Where games are played               | `name`, `address`, `map_link`; a court belongs to a venue and has a `sort`                                                                                                                                                                                                                       |
@@ -68,7 +70,7 @@ A person added by hand is a `people` row with an empty `profile_id`. Claiming or
 
 Every league gets one program with `is_default` set when it is created. Single-program leagues never see it (U-3, U-12).
 
-`seasons.logo` is not built yet: it will link to an uploaded image, so it waits for the `assets` table (section 10).
+`seasons.logo` is not built yet: it will link to an uploaded image, so it waits for the `assets` table (section 10). `seasons.unique_jerseys` is worked out from the rules document (`rosters.uniqueJerseys`), so the switch has one home and a real column the database enforces (T-44, record 022).
 
 A division's parent is in the same season, and a division is never its own ancestor. A court stays at its venue. Names are unique where people pick by name: a division among its siblings in its season, a venue in its league, a court at its venue, while not in the bin. Divisions, venues and courts go to the bin (`deleted_at`).
 
@@ -83,7 +85,7 @@ A division's parent is in the same season, and a division is never its own ances
 | `activity_log`       | Who changed what (A-6)                       | `league_id`, `actor_account_id`, `action`, `target_type`, `target_id`, `summary`, `details` (JSON), `at`                         |
 | `support_access_log` | Our staff opening a league (section 8 of P2) | `league_id`, `staff_account_id`, `reason`, `started_at`, `ended_at`                                                              |
 
-A grant's account, role and scope, and an invitation's email, role and scope, never change once the row exists: a different role is a new grant. An activity entry's `action` is the command's name and its `summary` a message key (T-226); `details` holds ids and fixed words only. A support visit starts when its row is written and lasts at most an hour (T-77); while it runs it can be ended early, and once over it never changes.
+A grant's account, role and scope, and an invitation's email, role and scope, never change once the row exists: a different role is a new grant. A program or team scope points at a program or team of the same league; club scopes are refused until the `clubs` table exists. An activity entry's `action` is the command's name and its `summary` a message key (T-226); `details` holds ids and fixed words only. A support visit starts when its row is written and lasts at most an hour (T-77); while it runs it can be ended early, and once over it never changes.
 
 ## 6. Registration
 
@@ -108,6 +110,10 @@ Stage 5 adds `payment_accounts` (a league's connected payment account), `orders`
 | `roster_entries` | A person on a team   | `team_id`, `person_id`, `jersey_number`, `role` (player, captain, coach), `joined_on`, `left_on`, `sort`                                                                                         |
 | `drafts`         | A draft              | `season_id`, `status`, `order_type`, `seconds_per_pick`, `team_order`                                                                                                                            |
 | `draft_picks`    | One pick             | `draft_id`, `pick_number`, `team_id`, `person_id`, `undone_at`                                                                                                                                   |
+
+A team's division is optional and of the same season. Its short name and its name are unique in its season while not in the bin; a lineage has at most one team in a season, and a team never moves to another season. `stats_visibility` takes S-22's four levels (`everyone`, `members`, `team`, `staff`) and has no default: the league's setting gives a new team its starting level. `logo` waits for the `assets` table and `club_id` for the `clubs` table.
+
+A roster entry's team and person are the same league's, and never change: moving a player is leaving one team and joining another. A person is on a team once at a time. Leaving sets `left_on` and keeps the entry (R-17, T-52); roster entries are not binned. A jersey number is 0 to 99 or 00, or empty. While the season's `unique_jerseys` is on, no two people still on a team (no `left_on`) wear the same number, and the switch cannot be turned on while a team already has a number worn twice. Detail: record 022.
 
 ## 8. Schedule and games
 
@@ -194,7 +200,7 @@ Members of team and division chats are worked out from rosters, so they never dr
 - A person has at most one active registration per season.
 - A game's two teams are different and in the same season.
 - Within a game, each `command_id` and each `seq` appears once (a tap cannot be saved twice).
-- Jersey numbers are unique within a team where the league requires it.
+- Jersey numbers are unique within a team where the season's rules require it.
 - A final game has both scores; a scheduled game has none.
 - Capacity: taking a place locks the form row first, so two simultaneous sign-ups cannot both take the last place.
 - Row-level security on every league table, as the second fence ([T4](T4-tenancy-auth-security.md)).
