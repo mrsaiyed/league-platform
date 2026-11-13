@@ -57,6 +57,30 @@ describe('unassignScorekeeper', () => {
     }
   });
 
+  it('clears an assignment in an archived or suspended league, which changes nothing else', async () => {
+    for (const status of ['archived', 'suspended']) {
+      const { db, deps, as } = memoryGames({
+        games: [game(1)],
+        grants,
+        assignments: [input],
+        status,
+      });
+      expect(await unassignScorekeeper(as(ownerId), input, deps)).toMatchObject({ ok: true });
+      expect(db.state.assignments).toEqual([]);
+    }
+    // It still needs games.manage.
+    const { deps, as } = memoryGames({
+      games: [game(1)],
+      grants,
+      assignments: [input],
+      status: 'archived',
+    });
+    expect(await unassignScorekeeper(as(scorekeeperId), input, deps)).toEqual({
+      ok: false,
+      error: { code: 'not-allowed' },
+    });
+  });
+
   it('refuses a missing game and someone not assigned', async () => {
     const { deps, as } = memoryGames({ games: [game(1)], grants });
     const code = async (fields: object) => {
