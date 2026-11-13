@@ -27,7 +27,10 @@ Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migrati
 - **2.17 People commands** — `.local/lanes/2.17-people-commands` — record 027 / T-239 — just opened.
 - **2.18 Teams commands** — `.local/lanes/2.18-teams-commands` — record 028 / T-240 — just opened.
 
-Reserved now: next free migration 0010, record 029, T-241.
+- **2.66 Engine clock mode and its switch** — `.local/lanes/2.66-clock-mode` — record 029 / T-241 — just opened.
+- **2.57 Al-Hadi transfer reader** — `.local/lanes/2.57-alhadi-reader` — record 030 / T-242 — just opened.
+
+Reserved now: next free migration 0010, record 031, T-243.
 
 ## Needs the founder
 
