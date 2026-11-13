@@ -43,6 +43,15 @@ describe('leagueUrl (T-34)', () => {
     expect(leagueUrl(north, 'score', { game: 'g1' })).toBe('/north-league/score/g1');
   });
 
+  it("builds an invitation's link, a full address for its email (T-226)", () => {
+    const token = 'Ab3_-xYz0123456789abcdefghijklmnopqrstuvwxy';
+    expect(leagueUrl(north, 'invitation', { token, origin: 'https://site.example.test' })).toBe(
+      `https://site.example.test/north-league/invitation/${token}`,
+    );
+    // @ts-expect-error: the link takes no season.
+    leagueUrl(north, 'invitation', { token, season: 'fall-2025' });
+  });
+
   it('builds pages inside an admin area, each part encoded and checked', () => {
     expect(leagueUrl(north, 'admin-area', { area: 'teams', subpath: ['lions', 'roster'] })).toBe(
       '/north-league/admin/teams/lions/roster',
@@ -160,6 +169,7 @@ describe('the names the site uses under a league', () => {
         'clubs',
         'draft',
         'games',
+        'invitation',
         'media',
         'my',
         'news',

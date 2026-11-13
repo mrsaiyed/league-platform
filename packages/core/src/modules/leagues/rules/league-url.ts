@@ -66,6 +66,12 @@ export const leaguePages = {
   'admin-area': { path: ['admin', ':area'], level: 'private' },
   /** The courtside tracker for one game. */
   score: { path: ['score', ':game'], level: 'private' },
+  /**
+   * Accepting an invitation (P4 §4, T-226): the link in the invitation's email, built
+   * only by the worker as it sends. `token` is the link's secret; the page that
+   * opens it should send no Referer (`Referrer-Policy: no-referrer`).
+   */
+  invitation: { path: ['invitation', ':token'], level: 'private' },
 } as const satisfies Record<string, PageSpec>;
 
 export type LeaguePage = keyof typeof leaguePages;

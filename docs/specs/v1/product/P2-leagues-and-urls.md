@@ -96,11 +96,12 @@ A past season is the same address with `?season=fall-2025`. Without it, you get 
 
 **Private areas**
 
-| Address                  | What it is                                        |
-| ------------------------ | ------------------------------------------------- |
-| `/{league}/admin`        | The admin dashboard ([P4](P4-admin-dashboard.md)) |
-| `/{league}/admin/...`    | Each admin area                                   |
-| `/{league}/score/{game}` | The courtside tracker for one game                |
+| Address                       | What it is                                             |
+| ----------------------------- | ------------------------------------------------------ |
+| `/{league}/admin`             | The admin dashboard ([P4](P4-admin-dashboard.md))      |
+| `/{league}/admin/...`         | Each admin area                                        |
+| `/{league}/score/{game}`      | The courtside tracker for one game                     |
+| `/{league}/invitation/{link}` | Accepting an invitation: the link in its email (T-226) |
 
 **U-6 (agreed): the address shows where you are asking to go; it never proves you are allowed.** Typing `/farajleague/admin` when you are not a Faraj admin shows "you do not have access", whoever you are.
 
