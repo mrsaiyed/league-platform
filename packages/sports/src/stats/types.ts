@@ -1,11 +1,12 @@
 // Inputs and outputs of the statistics calculations (P7 §5.6, §6, §8; S-11; T6 §9).
 // Pure data in, pure data out: no database, no league names.
+import type { GameStatus } from '../game-status.ts';
+
+/** The game statuses of T3 §8, shared with the standings. Only `final` games count here (S-11). */
+export type { GameStatus };
 
 /** How a game was recorded (T3 §8 `games.capture_mode`). */
 export type CaptureMode = 'final' | 'box' | 'live';
-
-/** The game statuses of T3 §8. Only `final` games count (S-11). */
-export type GameStatus = 'scheduled' | 'live' | 'final' | 'postponed' | 'cancelled' | 'forfeit';
 
 /**
  * One player's line in one game (T3 §8 `player_game_stats`). A stat that is missing

@@ -21,12 +21,15 @@ const addNote = defineCommand({
   allowed: async (context, _input, tx: NotesTx) => context.accountId === tx.state.ownerId,
   run: async ({ context, input, tx, emit }): Promise<Result<number, { code: 'too-many' }>> => {
     tx.state.notes.push(input.text);
-    await tx.jobs.enqueue({ type: 'notes.tell_owner', leagueId, ids: { leagueId } });
+    await tx.jobs.enqueue({ type: 'notify.event', leagueId, ids: { leagueId } });
     if (input.failAfterSaving) return fail({ code: 'too-many' });
     if (input.text === 'explode') throw new Error('unexpected');
     if (input.text === 'elsewhere') emit({ type: 'notes.added', leagueId: 'another' });
     if (input.text === 'misfiled') {
-      await tx.jobs.enqueue({ type: 'notes.tell_owner', leagueId: 'another', ids: {} });
+      await tx.jobs.enqueue({ type: 'notify.event', leagueId: 'another', ids: {} });
+    }
+    if (input.text === 'personal') {
+      await tx.jobs.enqueue({ type: 'notify.event', leagueId, ids: { to: 'a@example.test' } });
     }
     emit({ type: 'notes.added', leagueId: context.leagueId, count: tx.state.notes.length });
     return ok(tx.state.notes.length);
@@ -48,7 +51,7 @@ describe('defineCommand', () => {
     const { db, deps } = setUp();
     expect(await addNote(owner, { text: 'hello' }, deps)).toEqual({ ok: true, value: 1 });
     expect(db.state).toEqual({ ownerId: 'owner', notes: ['hello'], audit: ['note 1'] });
-    expect(db.jobs).toEqual([{ type: 'notes.tell_owner', leagueId, ids: { leagueId } }]);
+    expect(db.jobs).toEqual([{ type: 'notify.event', leagueId, ids: { leagueId } }]);
     expect(db.opened).toEqual([owner]);
   });
 
@@ -125,8 +128,18 @@ describe('defineCommand', () => {
   it('refuses a job for another league, whoever records it', async () => {
     const { db, deps } = setUp();
     await expect(addNote(owner, { text: 'misfiled' }, deps)).rejects.toThrow(
-      'notes.add_note recorded the job notes.tell_owner for another league.',
+      'notes.add_note recorded the job notify.event for another league.',
     );
+    expect(db.jobs).toEqual([]);
+  });
+
+  it('refuses a job carrying anything but ids, without repeating it (T-131)', async () => {
+    const { db, deps } = setUp();
+    const failure = addNote(owner, { text: 'personal' }, deps);
+    await expect(failure).rejects.toThrow(
+      'notes.add_note recorded a job that it carries something other than a lower-case UUID',
+    );
+    await expect(failure).rejects.not.toThrow('example.test');
     expect(db.jobs).toEqual([]);
   });
 

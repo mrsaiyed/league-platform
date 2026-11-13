@@ -9,9 +9,10 @@
 // commits. An expected error, including "not allowed", rolls everything back, jobs
 // recorded with it too. Anything thrown is unexpected: it rolls back and goes on up
 // to be reported. An event or job for another league than the context's is refused
-// by throwing. Every call writes one T-196 log line, whatever the outcome, and a
+// by throwing, and so is a job carrying anything but ids (T-131, job-rules.ts). Every call writes one T-196 log line, whatever the outcome, and a
 // failing log or clock never changes the outcome.
 import type { z } from 'zod';
+import { jobProblem } from './job-rules.ts';
 import type {
   CommandContext,
   CommandDeps,
@@ -151,6 +152,8 @@ export function defineCommand<
           jobs: {
             enqueue: async (job: Job) => {
               sameLeague(`recorded the job ${job.type}`, job.leagueId);
+              const problem = jobProblem(job);
+              if (problem !== null) throw new Error(`${name} recorded a job that ${problem}.`);
               await given.jobs.enqueue(job);
             },
           },
