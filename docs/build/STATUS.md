@@ -19,7 +19,7 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
 
-Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Reserved: migration 0007, record 019, T-231 (2.1). Reserved: record 020, T-232 (1.17). Reserved: record 021, T-233 (2.31). Reserved: migration 0008, record 022, T-234 (2.2). Next free: migration 0009, record 023, T-235. Check the folders before trusting these.
+Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Reserved: migration 0007, record 019, T-231 (2.1). Reserved: record 020, T-232 (1.17). Reserved: record 021, T-233 (2.31). Reserved: migration 0008, record 022, T-234 (2.2). Reserved: record 023, T-235 (1.19 part 2). Next free: migration 0009, record 024, T-236. Check the folders before trusting these.
 
 - **2.31 Live updates service** — `.local/lanes/2.31-live-updates` — none — builder starting.
 - **1.17 Web app shell** — `.local/lanes/1.17-web-shell` — record 020 / T-232 — builder starting.
