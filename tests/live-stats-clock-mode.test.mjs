@@ -2,6 +2,11 @@
 // a running clock keeps going, and the scorer can switch between them mid-game.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { LiveStats } from '../apps/live-stats/service.ts';
+import { MemoryRepository } from '../packages/database/src/live-stats/memory.ts';
+import { Envelope, PlatformEnvelope } from '../packages/contracts/src/live-stats.ts';
 import {
   apply,
   clockAt,
@@ -199,4 +204,95 @@ test('the play log describes the switch', () => {
   const name = (id) => id;
   assert.equal(describePlay(running, name), 'Running clock on');
   assert.equal(describePlay(stop, name), 'Stop clock on');
+});
+
+// ------------------------------------------------- reviewer's cases (step 2.66)
+
+test('a switch before tip-off is a recorded play, so like a lineup it fixes the format', () => {
+  // Decided on purpose: the switch is a play in the event log wherever it happens, and
+  // the format can only change while nothing is recorded. Undo the switch to change it.
+  let s = at(newGame(QUARTERS), running, 100);
+  assert.throws(
+    () => at(s, { type: 'rules', rules: HALVES }, 200),
+    /format is fixed once the game is under way/,
+  );
+  s = at(s, { type: 'undo' }, 300);
+  // The undone switch still sits on the redo stack, which also holds the format.
+  assert.throws(() => at(s, { type: 'rules', rules: HALVES }, 400), /format is fixed/);
+  s = at(newGame(QUARTERS), { type: 'rules', rules: { ...HALVES, clockMode: 'running' } }, 100);
+  assert.equal(derive(s).clockMode, 'running', 'set the mode in the format before tip-off');
+});
+
+test('a game saved before the clock mode existed reads exactly as it did', async () => {
+  // Recorded with the engine as it was before this step (build/stage-1 at 50036ee).
+  const before = JSON.parse(
+    await readFile(new URL('./support/clock-mode-before.json', import.meta.url), 'utf8'),
+  );
+  assert.equal('clockMode' in before.state.rules, false);
+  assert.ok(before.state.plays.some((p) => p.stoppedClock === true));
+  // The saved state, read by today's engine.
+  assert.deepEqual(derive(before.state), { ...before.derived, clockMode: 'stop' });
+  // The same commands, replayed by today's engine, give the same saved state.
+  let s = newGame(QUARTERS, 0);
+  before.commands.forEach((c, i) => (s = apply(s, c, { id: `old${i}`, now: 10_000 * (i + 1) })));
+  assert.deepEqual(s, before.state);
+});
+
+test('under a running clock, undo and redo of a foul leave the clock as it was', () => {
+  let s = underway({ ...QUARTERS, clockMode: 'running' });
+  s = at(s, foul, 5_000);
+  s = at(s, { type: 'undo' }, 6_000);
+  assert.equal(s.clock.running, true);
+  assert.equal(clockAt(s, 6_000).remainingMs, 8 * 60_000 - 5_000);
+  assert.equal(derive(s).teams.home.fouls, 0);
+  s = at(s, { type: 'redo' }, 7_000);
+  assert.equal(s.clock.running, true);
+  assert.equal(clockAt(s, 7_000).remainingMs, 8 * 60_000 - 6_000);
+  assert.equal(derive(s).teams.home.fouls, 1);
+  assert.equal(s.plays.at(-1).stoppedClock, undefined);
+});
+
+test('a mid-game switch survives setting the clock and a new period', () => {
+  let s = underway(QUARTERS);
+  s = at(s, running, 2_000);
+  s = at(s, { type: 'set-clock', ms: 7 * 60_000 }, 3_000);
+  assert.equal(derive(s).clockMode, 'running');
+  s = at(s, { type: 'period', period: 2 }, 4_000);
+  assert.equal(derive(s).clockMode, 'running');
+  s = at(s, { type: 'start' }, 5_000);
+  s = at(s, foul, 6_000);
+  assert.equal(s.clock.running, true, 'a foul in the next period still leaves it running');
+  // Undoing the period change keeps the switch made before it.
+  s = at(s, { type: 'undo' }, 7_000);
+  s = at(s, { type: 'undo' }, 8_000);
+  assert.equal(derive(s).period, 1);
+  assert.equal(derive(s).clockMode, 'running');
+});
+
+test('the Al-Hadi server still refuses the clock mode; the platform shape takes it', async () => {
+  const switchMode = { commandId: randomUUID(), input: running };
+  const rules = {
+    commandId: randomUUID(),
+    input: { type: 'rules', rules: { ...HALVES, clockMode: 'running' } },
+  };
+  assert.equal(Envelope.safeParse(switchMode).success, false);
+  assert.equal(Envelope.safeParse(rules).success, false);
+  assert.equal(PlatformEnvelope.safeParse(switchMode).success, true);
+  assert.equal(PlatformEnvelope.safeParse(rules).success, true);
+
+  const seed = JSON.parse(
+    await readFile(
+      new URL('../apps/live-stats/data/tcsaal-alhadi-varsity-boys-2026-27.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const stats = new LiveStats(new MemoryRepository(), () => Date.parse('2026-11-02T19:05:00Z'));
+  await stats.repo.initialize();
+  await stats.seed(seed);
+  const gameId = (await stats.schedule()).games[0].id;
+  await assert.rejects(() => stats.command(gameId, switchMode));
+  await assert.rejects(() => stats.command(gameId, rules));
+  const game = await stats.game(gameId);
+  assert.deepEqual(game.state.plays, []);
+  assert.equal('clockMode' in game.state.rules, false);
 });
