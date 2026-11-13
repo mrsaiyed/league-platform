@@ -40,6 +40,8 @@ import {
   changeDraftRoundDate,
   discardScheduleDraft,
   getScheduleDraft,
+  previewSchedulePublish,
+  publishSchedule,
   moveDraftGame,
   removeDraftGame,
   renameDraftRound,
@@ -565,6 +567,29 @@ function scheduleRows(
   }));
 }
 
+/** A draft on the season (before any publication) that moves its first game; its id. */
+async function draftMovingFirstGame(
+  s: Awaited<ReturnType<typeof scheduleIn>>,
+  league: League,
+): Promise<string> {
+  const changes = {
+    version: 1,
+    changes: [
+      {
+        kind: 'move-game',
+        gameId: s.first,
+        to: { roundId: s.roundId, date: '2026-12-20', time: '19:00', venueId: null, court: null },
+      },
+    ],
+  };
+  const draft = await one<{ id: string }>(
+    pglite,
+    'insert into schedule_drafts (league_id, season_id, changes) values ($1, $2, $3::jsonb) returning id',
+    [league.leagueId, s.seasonId, JSON.stringify(changes)],
+  );
+  return draft.id;
+}
+
 const firstEdit = (s: { seasonId: string }) => ({
   seasonId: s.seasonId,
   basedOnRevision: null,
@@ -662,6 +687,28 @@ const scheduleDraftRows: readonly Row[] = [
     'schedule.read',
     (s) => ({ seasonId: s.seasonId }),
     (c, i) => getScheduleDraft(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.preview_schedule_publish',
+    'see what publishing would change',
+    'schedule.publish',
+    async (s, league) => {
+      await draftMovingFirstGame(s, league);
+      return { seasonId: s.seasonId };
+    },
+    (c, i) => previewSchedulePublish(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.publish_schedule',
+    'publish the schedule',
+    'schedule.publish',
+    async (s, league) => ({
+      seasonId: s.seasonId,
+      basedOnRevision: null,
+      draftId: await draftMovingFirstGame(s, league),
+      version: 1,
+    }),
+    (c, i) => publishSchedule(c, i, schedulingDeps),
   ),
 ];
 

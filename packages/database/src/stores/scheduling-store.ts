@@ -2,6 +2,14 @@
 import type { SchedulingStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
+  binPublishedGames,
+  countPeopleOnTeams,
+  findSeasonRules,
+  insertPublishedGames,
+  insertScheduleRevision,
+  listGamesById,
+  updatePublishedGame,
+  updateRound,
   deleteScheduleDraft,
   findCourt,
   findScheduleDraft,
@@ -38,6 +46,15 @@ export function schedulingStore(scope: LeagueScope): SchedulingStore {
     deleteDraft: (seasonId, draftId, version) =>
       deleteScheduleDraft(scope, seasonId, draftId, version),
     loadSchedule: (seasonId) => loadSchedule(scope, seasonId),
+    seasonRules: (seasonId) => findSeasonRules(scope, seasonId),
+    gamesById: (seasonId, gameIds) => listGamesById(scope, seasonId, gameIds),
+    countPeopleOnTeams: (seasonId, teamIds) => countPeopleOnTeams(scope, seasonId, teamIds),
+    insertPublishedGames: (seasonId, games) => insertPublishedGames(scope, seasonId, games),
+    updatePublishedGame: (seasonId, gameId, change) =>
+      updatePublishedGame(scope, seasonId, gameId, change),
+    binPublishedGames: (seasonId, gameIds) => binPublishedGames(scope, seasonId, gameIds),
+    updateRound: (seasonId, roundId, change) => updateRound(scope, seasonId, roundId, change),
+    insertRevision: (seasonId, revision) => insertScheduleRevision(scope, seasonId, revision),
     teamsOfSeason: (seasonId, teamIds) => listTeamsOfSeason(scope, seasonId, teamIds),
     findVenue: (venueId) => findVenue(scope, venueId),
     listVenues: () => listVenues(scope),
