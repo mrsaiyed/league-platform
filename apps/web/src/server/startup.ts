@@ -22,11 +22,16 @@ export class StartupError extends Error {
   }
 }
 
-export type StartupDeps = {
-  /** Opens the database at a postgres:// address (createDatabase). */
-  readonly openDatabase: (url: string) => DatabaseHandle;
-  /** What is wrong with the login role, in plain words; empty when fit (checkLoginRole). */
+/** What startup uses of packages/database: opening it and checking its login role. */
+export type DatabasePackage = {
+  readonly createDatabase: (source: { kind: 'postgres'; url: string }) => DatabaseHandle;
+  /** What is wrong with the login role, in plain words; empty when fit. */
   readonly checkLoginRole: (db: DatabaseHandle) => Promise<string[]>;
+};
+
+export type StartupDeps = {
+  /** Loads packages/database; only staging and production ask for it. */
+  readonly database: () => Promise<DatabasePackage>;
   /** Where the access module's T-196 lines go. */
   readonly log: (line: CommandLogLine) => void;
 };
@@ -35,11 +40,12 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
   if (config.APP_ENV === 'local' || config.APP_ENV === 'test') {
     return standInPorts({ appEnv: config.APP_ENV, log: deps.log });
   }
-  const db = deps.openDatabase(config.DATABASE_URL);
+  const database = await deps.database();
+  const db = database.createDatabase({ kind: 'postgres', url: config.DATABASE_URL });
   try {
     let problems: string[];
     try {
-      problems = await deps.checkLoginRole(db);
+      problems = await database.checkLoginRole(db);
     } catch {
       // The driver's message may hold the address; it is not repeated here.
       throw new StartupError('the database could not be reached to check its login role.');

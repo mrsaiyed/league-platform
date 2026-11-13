@@ -4,7 +4,10 @@
 // The answer is kept on globalThis, not in this module: Next.js may load this file
 // more than once in one process (the proxy and the pages are bundled apart), and the
 // app must still start only once.
-import { checkLoginRole, createDatabase } from '@srleagues/database';
+//
+// The database package is loaded by Node.js itself when the app starts on a
+// database (staging and production), not bundled by Next.js: it runs TypeScript
+// directly as the tracker does, and its migration runner finds its folder on disk.
 import { consoleSink, createLogger } from '@srleagues/observability';
 import { getConfig } from './config.ts';
 import type { WebPorts } from './ports.ts';
@@ -24,8 +27,7 @@ function start(): Promise<WebPorts> {
   const config = getConfig();
   const logger = createLogger({ sink: consoleSink, level: config.LOG_LEVEL, base: { app: 'web' } });
   return startWebApp(config, {
-    openDatabase: (url) => createDatabase({ kind: 'postgres', url }),
-    checkLoginRole: (db) => checkLoginRole(db),
+    database: () => import(/* turbopackIgnore: true */ '@srleagues/database'),
     log: (line) => logger.info('command', line),
   });
 }

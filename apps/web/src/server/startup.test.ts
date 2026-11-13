@@ -21,13 +21,14 @@ const configFor = (appEnv: string) => loadConfig({ ...env, APP_ENV: appEnv });
 function deps(problems: string[] | Error) {
   const close = vi.fn(async () => {});
   const db = { close } as unknown as DatabaseHandle;
-  const openDatabase = vi.fn((_url: string) => db);
+  const createDatabase = vi.fn((_source: { kind: 'postgres'; url: string }) => db);
   const checkLoginRole = vi.fn(async (_db: DatabaseHandle) => {
     if (problems instanceof Error) throw problems;
     return problems;
   });
-  const given: StartupDeps = { openDatabase, checkLoginRole, log: () => {} };
-  return { given, openDatabase, checkLoginRole, close };
+  const database = vi.fn(async () => ({ createDatabase, checkLoginRole }));
+  const given: StartupDeps = { database, log: () => {} };
+  return { given, database, createDatabase, checkLoginRole, close };
 }
 
 describe('startWebApp', () => {
@@ -36,7 +37,7 @@ describe('startWebApp', () => {
       const d = deps([]);
       const ports = await startWebApp(configFor(appEnv), d.given);
       expect(await ports.findLeague('north-valley')).toMatchObject({ slug: 'north-valley' });
-      expect(d.openDatabase).not.toHaveBeenCalled();
+      expect(d.database).not.toHaveBeenCalled();
     }
   });
 
@@ -47,7 +48,7 @@ describe('startWebApp', () => {
         'The web app cannot start: the database login role is not fit for the app (T-60): ' +
           'it is a superuser; it bypasses row-level security.',
       );
-      expect(d.openDatabase).toHaveBeenCalledWith(env.DATABASE_URL);
+      expect(d.createDatabase).toHaveBeenCalledWith({ kind: 'postgres', url: env.DATABASE_URL });
       expect(d.checkLoginRole).toHaveBeenCalledOnce();
       expect(d.close).toHaveBeenCalledOnce();
     }

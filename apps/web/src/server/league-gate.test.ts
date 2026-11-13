@@ -3,7 +3,13 @@
 // who run them (U-9). Runs on the made-up stand-in, through the real request
 // context and the access module's own query.
 import { describe, expect, it } from 'vitest';
-import { leagueOutcome, type LeagueOutcome, type LeagueWant } from './league-gate.ts';
+import {
+  leagueOutcome,
+  leaguePageOutcome,
+  resolveLeagueRequest,
+  type LeagueOutcome,
+  type LeagueWant,
+} from './league-gate.ts';
 import { standInPeople, standInPorts } from './stand-in-ports.ts';
 
 const ports = standInPorts({ appEnv: 'test', log: () => {} });
@@ -124,6 +130,28 @@ describe('suspended and archived leagues (U-9)', () => {
     expect(kind(await ask('visitor', '/old-meadow/standings', site))).toBe('show');
     expect(kind(await ask('stranger', '/old-meadow/admin', adminHome))).toBe('no-access');
     expect(kind(await ask('owner', '/old-meadow/admin', adminHome))).toBe('show');
+  });
+});
+
+describe('one request', () => {
+  it("reads the person's access once, whatever its layouts and pages ask", async () => {
+    let reads = 0;
+    const counting = {
+      ...deps,
+      accessOf: (context: Parameters<typeof deps.accessOf>[0]) => {
+        reads += 1;
+        return deps.accessOf(context);
+      },
+    };
+    const session = await ports.identify(standInPeople.scheduler.token);
+    const resolved = await resolveLeagueRequest(
+      { host: 'localhost:3000', path: '/north-valley/admin/teams', session },
+      counting,
+    );
+    expect(kind(leaguePageOutcome(resolved, site))).toBe('show');
+    expect(kind(leaguePageOutcome(resolved, adminHome))).toBe('show');
+    expect(kind(leaguePageOutcome(resolved, area('teams')))).toBe('no-access');
+    expect(reads).toBe(1);
   });
 });
 

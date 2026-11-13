@@ -9,6 +9,10 @@
   },
   "scripts": {
     "dev": "node scripts/serve-demo.mjs",
+    "dev:web": "node --env-file-if-exists=.env scripts/web.mjs dev",
+    "build:web": "node scripts/web.mjs build",
+    "start:web": "node --env-file-if-exists=.env scripts/web.mjs start",
+    "test:web": "node scripts/check-web-shell.mjs",
     "dev:stats": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning apps/live-stats/server.ts",
     "stats:db-check": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning apps/live-stats/db-check.ts",
     "stats:copy": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning apps/live-stats/copy.ts",
@@ -29,7 +33,7 @@
     "dev:varsity": "node apps/varsity-preview/server.ts",
     "prepare:varsity:hosted": "node scripts/prepare-varsity-hosted.mjs",
     "prepare:varsity:publish": "node scripts/prepare-varsity-publish.mjs",
-    "typecheck": "tsc --project tsconfig.varsity.json && tsc --project tsconfig.workspaces.json",
+    "typecheck": "tsc --project tsconfig.varsity.json && tsc --project tsconfig.workspaces.json && tsc --project apps/web/tsconfig.json",
     "test:units": "vitest run",
     "db:types": "node packages/database/scripts/generate-schema-types.ts"
   },
