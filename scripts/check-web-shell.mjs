@@ -296,30 +296,52 @@ async function checkSignIn(origin) {
     return location.pathname + location.search;
   };
 
-  // T-68: asking for a code answers the same for any address.
-  const asked = [];
-  for (const email of ['someone@example.test', 'someone-else@example.test']) {
-    const response = await post('/signup', 0, { email });
-    if (response === undefined) return problems;
-    asked.push({ status: response.status, to: where(response), cookies: cookieNamesOf(response) });
-    for (const cookie of response.headers.getSetCookie()) {
-      if (!/HttpOnly/i.test(cookie) || !/SameSite=lax/i.test(cookie)) {
-        problems.push(
-          `sign-up sets a cookie without HttpOnly and SameSite=Lax: ${cookie.split('=')[0]}`,
-        );
+  // T-68: the same answer for the made-up member's address, which has an account
+  // (stand-in-ports.ts, standInMember), and one that has none: asking to sign up,
+  // the forgotten-password route, and a wrong password.
+  const member = 'member@example.test';
+  const nobody = 'nobody-here@example.test';
+  const forms = [
+    ['/signup', (email) => ({ email }), '/signup/code'],
+    ['/signin/forgot', (email) => ({ email }), '/signup/code'],
+    [
+      '/signin',
+      (email) => ({ email, password: 'not the password' }),
+      '/signin?problem=wrongEmailOrPassword',
+    ],
+  ];
+  for (const [page, fields, expected] of forms) {
+    const answers = [];
+    for (const email of [member, nobody]) {
+      const response = await post(page, 0, fields(email));
+      if (response === undefined) return problems;
+      answers.push({
+        status: response.status,
+        to: where(response),
+        cookies: cookieNamesOf(response),
+      });
+      for (const cookie of response.headers.getSetCookie()) {
+        if (!/HttpOnly/i.test(cookie) || !/SameSite=lax/i.test(cookie)) {
+          problems.push(
+            `${page} sets a cookie without HttpOnly and SameSite=Lax: ${cookie.split('=')[0]}`,
+          );
+        }
       }
     }
+    if (answers[0].status !== 303 || answers[0].to !== expected) {
+      problems.push(`${page} answers ${answers[0].status} to ${answers[0].to}, not ${expected}`);
+    }
+    if (JSON.stringify(answers[0]) !== JSON.stringify(answers[1])) {
+      problems.push(`${page} answers differently for an address with an account and one without`);
+    }
   }
-  if (asked[0].status !== 303 || asked[0].to !== '/signup/code') {
-    problems.push(`asking for a code answers ${asked[0].status} to ${asked[0].to}`);
-  }
-  if (JSON.stringify(asked[0]) !== JSON.stringify(asked[1])) {
-    problems.push('asking for a code answers differently for two addresses');
-  }
-  // One problem for a wrong address and a wrong password.
-  const wrong = await post('/signin', 0, { email: 'someone@example.test', password: 'wrong' });
-  if (wrong !== undefined && where(wrong) !== '/signin?problem=wrongEmailOrPassword') {
-    problems.push(`a wrong sign-in goes to ${where(wrong)}`);
+  // The member's account is real: the right password signs in.
+  const right = await post('/signin', 0, { email: member, password: 'made-up member password' });
+  if (
+    right !== undefined &&
+    (where(right) !== '/account' || !cookieNamesOf(right).includes('srl_session'))
+  ) {
+    problems.push(`the made-up member could not sign in (${right.status} to ${where(right)})`);
   }
   // A form posted from another site changes nothing (T4 §5).
   const forged = await post(

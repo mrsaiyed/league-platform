@@ -22,6 +22,7 @@ export const problems = {
   googleFailed: 'problem.googleFailed',
   signInAgain: 'problem.signInAgain',
   noPassword: 'problem.noPassword',
+  signOutEverywhereFailed: 'problem.signOutEverywhereFailed',
 } as const satisfies Record<string, TextKey>;
 
 /** "Too many tries", with the wait in seconds: a plural message of its own. */

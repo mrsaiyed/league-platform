@@ -45,7 +45,14 @@ export type FlowAnswer = { readonly to: string };
 type Fields = Readonly<Record<string, string | undefined>>;
 
 const goTo = (to: string): FlowAnswer => ({ to });
-const afterSignIn = (next: string | null) => goTo(next ?? platformUrl('account'));
+// Checked again here: a place to go may come back from a cookie, which the browser can change.
+const afterSignIn = (next: string | null) => goTo(safeReturnPath(next) ?? platformUrl('account'));
+
+/** A cookie's value; an empty one counts as none. */
+const cookie = (jar: CookieJar, name: string): string | undefined => {
+  const value = jar.get(name);
+  return value === undefined || value === '' ? undefined : value;
+};
 const tooMany = (retryAfterSeconds: number): { problem: Problem; wait: number } => ({
   problem: 'tooManyAttempts',
   wait: retryAfterSeconds,
@@ -138,12 +145,13 @@ export async function choosePassword(
         return goTo(screenUrl('choosePassword', { problem: 'passwordLeaked' }));
     }
   }
-  visit.jar.delete(cookieNames.flow);
   await startSession(visit.jar, set.value.session, deps);
-  // A changed password has ended every other session: the account hears of it (T-85).
-  // A new account has nothing to warn about.
+  // A changed password has ended every other session: the account hears of it (T-85),
+  // at the address the service holds for it, never one read from a cookie. A new
+  // account has nothing to warn about.
   if (set.value.outcome === 'password-changed') {
-    await deps.mail.passwordChanged(flow.email, deps.now());
+    const who = await deps.signIn.identify({ accessToken: set.value.session.accessToken });
+    if (who.ok) await deps.mail.passwordChanged(who.value.email, deps.now());
   }
   return afterSignIn(flow.next);
 }
@@ -226,7 +234,7 @@ export async function confirmPassword(
   deps: FlowDeps,
 ): Promise<FlowAnswer> {
   const next = safeReturnPath(fields['next']);
-  const accessToken = visit.jar.get(cookieNames.session);
+  const accessToken = cookie(visit.jar, cookieNames.session);
   if (accessToken === undefined) {
     return goTo(screenUrl('signin', { problem: 'signInAgain', next }));
   }
@@ -257,14 +265,23 @@ export async function signOut(visit: Visit, deps: FlowDeps): Promise<FlowAnswer>
   return goTo(platformUrl('signin'));
 }
 
-/** Ends every session of the account, this one too (T-71). */
+/**
+ * Ends every session of the account, this one too (T-71). When that cannot be done
+ * (no session here, or it has ended), this device is still signed out and the
+ * person is told to sign in and try again: they are never told it worked.
+ */
 export async function signOutEverywhere(visit: Visit, deps: FlowDeps): Promise<FlowAnswer> {
-  const accessToken = visit.jar.get(cookieNames.session);
-  if (accessToken !== undefined) {
-    await deps.signIn.signOutEverywhere({ accessToken, keepThisSession: false });
-  }
-  // Whatever the answer: this device is signed out, and an ended session needs nothing more.
+  const accessToken = cookie(visit.jar, cookieNames.session);
+  const ended =
+    accessToken === undefined
+      ? undefined
+      : await deps.signIn.signOutEverywhere({ accessToken, keepThisSession: false });
   await endSessionIn(visit.jar, deps);
+  if (ended === undefined || !ended.ok) {
+    return goTo(
+      screenUrl('signin', { problem: 'signOutEverywhereFailed', next: platformUrl('account') }),
+    );
+  }
   return goTo(platformUrl('signin'));
 }
 
@@ -274,13 +291,12 @@ async function startSession(jar: CookieJar, session: SessionTokens, deps: FlowDe
   setSessionCookies(jar, session, deps.secureCookies, deps.now());
 }
 
+/** Ends this device's session, if any, and forgets any sign-up or reset under way. */
 async function endSessionIn(jar: CookieJar, deps: FlowDeps) {
-  const refreshToken = jar.get(cookieNames.renew);
-  const accessToken = jar.get(cookieNames.session);
-  if (refreshToken !== undefined && refreshToken !== '') {
-    await deps.signIn.signOut({ refreshToken });
-  } else if (accessToken !== undefined && accessToken !== '') {
-    await deps.signIn.signOut({ accessToken });
-  }
+  const refreshToken = cookie(jar, cookieNames.renew);
+  const accessToken = cookie(jar, cookieNames.session);
+  if (refreshToken !== undefined) await deps.signIn.signOut({ refreshToken });
+  else if (accessToken !== undefined) await deps.signIn.signOut({ accessToken });
   clearSessionCookies(jar);
+  jar.delete(cookieNames.flow);
 }

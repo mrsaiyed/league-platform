@@ -214,6 +214,8 @@ export const en = {
   'problem.wrongPassword': 'Wrong password.',
   'problem.googleFailed': 'Signing in with Google did not work. Please try again.',
   'problem.signInAgain': 'Please sign in again.',
+  'problem.signOutEverywhereFailed':
+    'We could not sign out your other devices. This one is signed out: sign in and try again.',
   'problem.noPassword': 'Your account has no password. Sign in with Google again instead.',
   // The tracker's saved banner (T6 §4), chosen from the queue's status by
   // apps/web/src/features/tracker/queue-banner.ts.

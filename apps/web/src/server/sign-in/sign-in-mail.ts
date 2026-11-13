@@ -2,9 +2,15 @@
 // the new-device notice (T-70) and the password-changed notice (T-85). The sign-in
 // service decides when a code is due; the flows decide when a notice is (flows.ts).
 //
-// A code asked for an address with no account (a reset) comes with no code, and
-// nothing is sent: the work done before that point is the same either way (T-68).
-import { fail, ok, platformUrl, type EmailSender } from '@srleagues/core';
+// T-68: asking for a code must answer the same, in the same time, whether or not the
+// address has an account. A reset for an address with no account comes with no
+// code and nothing is sent; so the request never waits for the email service, nor
+// learns whether it took the email: the email is drawn either way, handed over
+// without waiting, and a failure is only reported (with no address and no content,
+// T-86). The person who got nothing asks again. In production this should become a
+// job recorded for every request, whose run sends nothing when there is no code
+// (record 031).
+import { ok, platformUrl, type EmailSender } from '@srleagues/core';
 import {
   fromHeader,
   newDeviceEmail,
@@ -29,8 +35,8 @@ export type SignInMailOptions = {
   readonly fromAddress: string;
   /** PUBLIC_BASE_URL. */
   readonly siteOrigin: string;
-  /** Told when a notice could not be sent. Gets no address and no content (T-86). */
-  readonly onNoticeFailed: (kind: 'new-device' | 'password-changed') => void;
+  /** Told when an email could not be sent. Gets no address and no content (T-86). */
+  readonly onNoticeFailed: (kind: 'code' | 'new-device' | 'password-changed') => void;
   /** The clock the sign-in service uses, for how long a code still works. */
   readonly now: () => Date;
 };
@@ -44,11 +50,10 @@ export function createSignInMail(options: SignInMailOptions): SignInMail {
   return {
     codeSender: {
       send: async (message) => {
-        if (message.code === null) return ok({ queued: true as const });
         const email = signInCodeEmail(
           {
             purpose: message.purpose,
-            code: message.code,
+            code: message.code ?? '000000',
             validMinutes: Math.max(
               1,
               Math.round((message.expiresAt.getTime() - options.now().getTime()) / 60_000),
@@ -58,12 +63,13 @@ export function createSignInMail(options: SignInMailOptions): SignInMail {
           },
           t,
         );
-        try {
-          await send(message.to, email);
-          return ok({ queued: true as const });
-        } catch {
-          return fail({ code: 'code-not-sent' as const });
+        if (message.code !== null) {
+          // Not awaited (see above). Any failure, thrown or rejected, is only reported.
+          void Promise.resolve()
+            .then(() => send(message.to, email))
+            .catch(() => options.onNoticeFailed('code'));
         }
+        return ok({ queued: true as const });
       },
     },
     newDevice: async (to, deviceLabel, at) => {

@@ -160,9 +160,26 @@ export type StandInOptions = {
   readonly log: CommandDeps<AccessTx>['log'];
   /** EMAIL_FROM, the sign-in emails' sending address. */
   readonly emailFrom: string;
+  /** Where a sign-in email that could not be sent is reported: its kind only (T-86). */
+  readonly warn?: (message: string, fields: { readonly kind: string }) => void;
 };
 
-export function standInPorts(options: StandInOptions): WebPorts {
+/**
+ * A made-up member who signs in with a password on the sign-in stand-in, made when
+ * the app starts (signUpMadeUpMember), so checks can compare an address that has an
+ * account with one that has none (T-68).
+ */
+export const standInMember = {
+  email: 'member@example.test',
+  password: 'made-up member password',
+} as const;
+
+export type StandInPorts = WebPorts & {
+  /** Gives standInMember an account, through the sign-in service's own steps. */
+  readonly signUpMadeUpMember: () => Promise<void>;
+};
+
+export function standInPorts(options: StandInOptions): StandInPorts {
   if (options.appEnv !== 'local' && options.appEnv !== 'test') {
     throw new Error(
       `The web app's made-up stand-in is for local work and tests only, not "${options.appEnv}".`,
@@ -176,12 +193,12 @@ export function standInPorts(options: StandInOptions): WebPorts {
   }
   const people: readonly MadeUpPerson[] = Object.values(standInPeople);
   const now = () => new Date();
-  // The capture keeps every email in memory and never fails, so no notice is lost.
+  const outbox = captureEmail({ now });
   const signInMail = createSignInMail({
-    sender: captureEmail({ now }),
+    sender: outbox,
     fromAddress: options.emailFrom,
     siteOrigin: options.publicBaseUrl,
-    onNoticeFailed: () => undefined,
+    onNoticeFailed: (kind) => options.warn?.('sign-in email not sent', { kind }),
     now,
   });
   const { service: signIn } = createLocalSignInStandIn({
@@ -228,6 +245,25 @@ export function standInPorts(options: StandInOptions): WebPorts {
     signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf: accessOfVia(deps),
+    signUpMadeUpMember: async () => {
+      const here = '127.0.0.1';
+      const { email, password } = standInMember;
+      const asked = await signIn.startSignUp({ email, networkAddress: here });
+      // The code email is handed over without waiting: let it reach the capture.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const sent = outbox.messages().findLast((m) => m.to === email);
+      const code = /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
+      if (!asked.ok || code === undefined) throw new Error('The made-up member got no code.');
+      const proved = await signIn.verifyCode({ email, code, networkAddress: here });
+      if (!proved.ok) throw new Error('The made-up member could not be proved.');
+      const set = await signIn.setPassword({
+        proof: proved.value.proof,
+        password,
+        device: { deviceId: 'made-up-member-device', label: 'made-up', networkAddress: here },
+      });
+      if (!set.ok) throw new Error('The made-up member could not choose a password.');
+      await signIn.signOut({ accessToken: set.value.session.accessToken });
+    },
   };
 }
 

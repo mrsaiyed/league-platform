@@ -2,8 +2,9 @@
 // the same answers whether or not an account exists (T-68), attempt limits (T-85,
 // T-225), the session cookie (T-69), new-device and password-changed emails (T-70,
 // T-85), and "sign out everywhere" (T-71).
+import type { EmailSender } from '@srleagues/core';
 import { captureEmail, createLocalSignInStandIn } from '@srleagues/providers';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { cookieNames, type CookieJar, type CookieOptions } from './cookies.ts';
 import type { Visit } from './device.ts';
 import {
@@ -18,21 +19,23 @@ import {
   startGoogle,
   type FlowDeps,
 } from './flows.ts';
-import { renewIfDue, sharedRenewal } from './renew-session.ts';
+import { renewIfDue, sharedRenewal, sharedRenewalLimit } from './renew-session.ts';
 import { createSignInMail } from './sign-in-mail.ts';
 
 const origin = 'http://localhost:3000';
 const password = 'correct horse battery';
 
-function setup() {
+/** `sender` wraps the capture's own sending, to make it slow or fail. */
+function setup(sender?: (outbox: EmailSender) => EmailSender) {
   let at = Date.UTC(2026, 10, 13, 12);
   const now = () => new Date(at);
   const outbox = captureEmail({ now });
+  const failed: string[] = [];
   const mail = createSignInMail({
-    sender: outbox,
+    sender: sender === undefined ? outbox : sender(outbox),
     fromAddress: 'hello@example.test',
     siteOrigin: origin,
-    onNoticeFailed: () => undefined,
+    onNoticeFailed: (kind) => failed.push(kind),
     now,
   });
   const standIn = createLocalSignInStandIn({
@@ -59,7 +62,7 @@ function setup() {
     if (code === undefined) throw new Error(`no code emailed to ${to}`);
     return code;
   };
-  return { deps, outbox, standIn, advanceSeconds, codeFor };
+  return { deps, outbox, standIn, advanceSeconds, codeFor, failed };
 }
 
 type Env = ReturnType<typeof setup>;
@@ -468,5 +471,184 @@ describe('Google (T-67)', () => {
     expect(await finishGoogle('made-up', browser().visit, env.deps)).toEqual({
       to: '/signin?problem=googleFailed',
     });
+  });
+});
+
+// Findings of the security review of step 1.14.
+describe('after review', () => {
+  const options = {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60,
+  } as const;
+  const flowOf = (b: ReturnType<typeof browser>): Record<string, unknown> =>
+    JSON.parse(Buffer.from(b.jar.get(cookieNames.flow) ?? '', 'base64url').toString('utf8'));
+  const writeFlowRaw = (b: ReturnType<typeof browser>, flow: unknown) =>
+    b.jar.set(
+      cookieNames.flow,
+      Buffer.from(JSON.stringify(flow), 'utf8').toString('base64url'),
+      options,
+    );
+
+  it('checks again a place to go that comes back from a cookie', async () => {
+    const env = setup();
+    const b = browser();
+    await askForCode('sign-up', { email: 'new@example.test' }, b.visit, env.deps);
+    await enterCode({ code: env.codeFor('new@example.test') }, b.visit, env.deps);
+    writeFlowRaw(b, { ...flowOf(b), next: '/.//evil.com' });
+    expect(await choosePassword({ password }, b.visit, env.deps)).toEqual({ to: '/account' });
+  });
+
+  it('sends the password-changed email to the account, never to an address in the cookie', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'me@example.test');
+    const b = browser();
+    await askForCode('reset', { email: 'me@example.test' }, b.visit, env.deps);
+    await enterCode({ code: env.codeFor('me@example.test') }, b.visit, env.deps);
+    writeFlowRaw(b, { ...flowOf(b), email: 'someone-else@example.test' });
+    await choosePassword({ password: 'another long password' }, b.visit, env.deps);
+    const notice = env.outbox.messages().find((m) => m.subject === 'Your password was changed');
+    expect(notice?.to).toBe('me@example.test');
+    expect(env.outbox.messages().some((m) => m.to === 'someone-else@example.test')).toBe(false);
+  });
+
+  it('forgets a sign-up under way when a session starts or ends', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'me@example.test');
+    const b = browser();
+    await askForCode('sign-up', { email: 'other@example.test' }, b.visit, env.deps);
+    expect(b.jar.get(cookieNames.flow)).toBeDefined();
+    await signInWithPassword({ email: 'me@example.test', password }, b.visit, env.deps);
+    expect(b.jar.get(cookieNames.flow)).toBeUndefined();
+    await askForCode('sign-up', { email: 'other@example.test' }, b.visit, env.deps);
+    await signOut(b.visit, env.deps);
+    expect(b.jar.get(cookieNames.flow)).toBeUndefined();
+  });
+
+  it('"sign out everywhere" that could not be done says so', async () => {
+    const env = setup();
+    const failedTo = '/signin?problem=signOutEverywhereFailed&next=%2Faccount';
+    expect(await signOutEverywhere(browser().visit, env.deps)).toEqual({ to: failedTo });
+    const empty = browser();
+    empty.jar.set(cookieNames.session, '', options);
+    expect(await signOutEverywhere(empty.visit, env.deps)).toEqual({ to: failedTo });
+    // A session that has already ended: this device is still signed out.
+    const b = browser();
+    await signUp(env, b, 'me@example.test');
+    await env.deps.signIn.signOut({ accessToken: b.jar.get(cookieNames.session) ?? '' });
+    expect(await signOutEverywhere(b.visit, env.deps)).toEqual({ to: failedTo });
+    expect(b.jar.get(cookieNames.session)).toBeUndefined();
+  });
+
+  it('treats an empty session cookie as none when asking for the password again', async () => {
+    const env = setup();
+    const b = browser();
+    b.jar.set(cookieNames.session, '', options);
+    expect(await confirmPassword({ password }, b.visit, env.deps)).toEqual({
+      to: '/signin?problem=signInAgain',
+    });
+  });
+
+  it('answers a code request without waiting on the email service, and only reports a failure', async () => {
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const env = setup(() => ({
+      send: async () => {
+        await held;
+        throw new Error('the email service is down');
+      },
+    }));
+    // Answered while the email is still held, and the same as for any address.
+    expect(
+      await askForCode('sign-up', { email: 'x@example.test' }, browser().visit, env.deps),
+    ).toEqual({ to: '/signup/code' });
+    expect(env.failed).toEqual([]);
+    release();
+    await vi.waitFor(() => expect(env.failed).toEqual(['code']));
+  });
+
+  it('answers a reset alike for an address with an account and one without, while sending is held (T-68)', async () => {
+    let held = false;
+    const waiting: (() => void)[] = [];
+    const env = setup((outbox) => ({
+      send: async (message) => {
+        if (held) await new Promise<void>((resolve) => waiting.push(resolve));
+        return outbox.send(message);
+      },
+    }));
+    await signUp(env, browser(), 'me@example.test');
+    held = true;
+    const known = browser();
+    const unknown = browser();
+    const a = await askForCode('reset', { email: 'me@example.test' }, known.visit, env.deps);
+    const b = await askForCode('reset', { email: 'nobody@example.test' }, unknown.visit, env.deps);
+    expect(a).toEqual(b);
+    expect(known.names()).toEqual(unknown.names());
+    // The account's email is still waiting: the answer did not wait for it.
+    await vi.waitFor(() => expect(waiting).toHaveLength(1));
+    for (const go of waiting) go();
+  });
+
+  it('leaves the cookies alone when the service cannot be reached, and tries again next time', async () => {
+    const env = setup();
+    const b = browser();
+    await signUp(env, b, 'me@example.test');
+    b.jar.delete(cookieNames.session);
+    const renewToken = b.jar.get(cookieNames.renew);
+    let calls = 0;
+    let down = true;
+    const renew = sharedRenewal(async (refreshToken) => {
+      calls++;
+      if (down) throw new Error('busy');
+      return env.deps.signIn.renew({ refreshToken });
+    }, env.deps.now);
+    expect(await renewIfDue(b.jar, renew, false, env.deps.now)).toBe(false);
+    expect(b.jar.get(cookieNames.renew)).toBe(renewToken);
+    down = false;
+    expect(await renewIfDue(b.jar, renew, false, env.deps.now)).toBe(true);
+    expect(calls).toBe(2);
+    expect(b.jar.get(cookieNames.session)).toBeDefined();
+  });
+
+  it('never asks the service about a renewing cookie that cannot be a token', async () => {
+    const env = setup();
+    const renewCalls = vi.fn(async () => {
+      throw new Error('must not be called');
+    });
+    const renew = sharedRenewal(renewCalls, env.deps.now);
+    for (const junk of ['', 'short', 'has spaces in it', 'x'.repeat(5000), 'semi;colon;token']) {
+      const b = browser();
+      b.jar.set(cookieNames.renew, junk, options);
+      b.jar.set(cookieNames.device, 'device-0000000000000001', options);
+      await renewIfDue(b.jar, renew, false, env.deps.now);
+      expect(b.names(), junk).toEqual([cookieNames.device]);
+    }
+    expect(renewCalls).not.toHaveBeenCalled();
+  });
+
+  it('remembers at most a fixed number of renewals', async () => {
+    let calls = 0;
+    const limit = 3;
+    const renew = sharedRenewal(
+      async () => {
+        calls++;
+        return { ok: false, error: { code: 'session-ended' } } as const;
+      },
+      () => new Date(),
+      limit,
+    );
+    const token = (n: number) => 'token-' + n.toString().padStart(8, '0');
+    for (let i = 0; i <= limit; i++) await renew(token(i));
+    // The first was forgotten to make room, so asking again calls the service again.
+    await renew(token(0));
+    expect(calls).toBe(limit + 2);
+    // A recent one is still shared.
+    await renew(token(limit));
+    expect(calls).toBe(limit + 2);
+    expect(sharedRenewalLimit).toBeLessThanOrEqual(10_000);
   });
 });
