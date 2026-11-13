@@ -5,3 +5,4 @@ export { divisionsStore } from './divisions-store.ts';
 export { jobsStore } from './jobs-store.ts';
 export { leaguesStore } from './leagues-store.ts';
 export { schedulingStore } from './scheduling-store.ts';
+export { teamsStore } from './teams-store.ts';

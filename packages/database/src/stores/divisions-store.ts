@@ -4,6 +4,7 @@ import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
   findDivision,
   hasLiveSubdivisions,
+  hasLiveTeams,
   insertDivision,
   listDivisions,
   setDivisionBinned,
@@ -18,5 +19,6 @@ export function divisionsStore(scope: LeagueScope): DivisionsStore {
     update: (divisionId, change, version) => updateDivision(scope, divisionId, change, version),
     setBinned: (divisionId, binned) => setDivisionBinned(scope, divisionId, binned),
     hasLiveSubdivisions: (divisionId) => hasLiveSubdivisions(scope, divisionId),
+    hasLiveTeams: (divisionId) => hasLiveTeams(scope, divisionId),
   };
 }
