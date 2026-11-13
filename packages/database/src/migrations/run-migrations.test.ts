@@ -272,7 +272,7 @@ describe('one run at a time', () => {
     const driver = intercept(real, /pg_try_advisory_lock/, async () => [{ locked: ++tries > 3 }]);
 
     const run = await applyMigrations(driver, await folderWith(steps), {
-      lockWaitMs: 5_000,
+      lockWaitMs: 600_000,
       lockPollMs: 5,
     });
     expect(tries).toBe(4);

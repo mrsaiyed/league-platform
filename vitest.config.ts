@@ -13,7 +13,7 @@ const inLane = process.cwd().split('\\').join('/').includes('/.local/lanes/');
 
 export default defineConfig({
   test: {
-    ...(inLane ? { maxWorkers: 4, minWorkers: 1 } : {}),
+    ...(inLane ? { maxWorkers: 3, minWorkers: 1 } : {}),
     include: [
       'apps/web/**/*.test.ts',
       'apps/worker/**/*.test.ts',
