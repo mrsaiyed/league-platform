@@ -631,10 +631,34 @@ table.stats tr.on-court td.name::after {
   padding-top: 0.6rem;
   border-top: 1px dashed var(--re-border);
 }
+.re-quick-input {
+  flex: 1;
+  min-width: 0;
+}
+.re-quick-btn {
+  flex: none;
+  min-height: 42px;
+  padding: 0 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--re-accent);
+  background: transparent;
+  color: var(--re-accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.re-add-btn:disabled,
+.re-quick-btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
 .re-msg {
   min-height: 1.2rem;
   font-size: 0.84rem;
   color: #c0392b;
+}
+.re-msg[data-kind='ok'] {
+  color: var(--win);
 }
 .re-count {
   color: var(--re-muted);
@@ -680,4 +704,12 @@ table.stats tr.on-court td.name::after {
 }
 .spaced {
   margin-top: 1.2rem;
+}
+table.stats tfoot tr.team-note td {
+  border-top: 0;
+  padding-top: 0;
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: normal;
 }

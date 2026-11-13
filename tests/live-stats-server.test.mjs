@@ -6,6 +6,9 @@ import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { attemptLimiter, scorerAuth } from '../apps/live-stats/auth.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -181,4 +184,97 @@ test('sessions expire, survive a restart and end when the passcode changes', () 
   assert.ok(limiter.blocked('1.2.3.4', now + 10));
   assert.ok(!limiter.blocked('5.6.7.8', now + 10));
   assert.ok(!limiter.blocked('1.2.3.4', now + 1001), 'the window passes');
+});
+
+/** A same-origin request to a server on this computer, as the tracker page sends it. */
+function local(port, method, path, body) {
+  return new Promise((resolve, reject) => {
+    const data = body === undefined ? undefined : JSON.stringify(body);
+    const origin = `http://127.0.0.1:${port}`;
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port,
+        method,
+        path,
+        headers: {
+          Host: `127.0.0.1:${port}`,
+          ...(method === 'GET' ? {} : { Origin: origin }),
+          ...(data ? { 'Content-Type': 'application/json' } : {}),
+        },
+      },
+      (res) => {
+        let text = '';
+        res.on('data', (c) => (text += c));
+        res.on('end', () =>
+          resolve({ status: res.statusCode, json: text ? JSON.parse(text) : null }),
+        );
+      },
+    );
+    req.on('error', reject);
+    req.end(data);
+  });
+}
+
+test('every tap is on disk once it is answered: a server killed mid-game loses nothing', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'live-stats-kill-'));
+  const port = 4197;
+  const env = {
+    LIVE_STATS_STORE: '',
+    LIVE_STATS_PORT: String(port),
+    LIVE_STATS_DATA_DIR: path.join(dir, 'db'),
+  };
+  let server = start(env);
+  try {
+    await server.ready;
+    const g = (await local(port, 'GET', '/api/schedule')).json.games[0];
+    const add = async (side, jersey) =>
+      (
+        await local(port, 'POST', `/api/teams/${g[side].id}/players`, {
+          name: `P${jersey}`,
+          jersey,
+        })
+      ).json;
+    const home = await add('home', '4');
+    const away = await add('away', '23');
+    const tap = async (input) => {
+      const res = await local(port, 'POST', `/api/games/${g.id}/commands`, {
+        commandId: randomUUID(),
+        input,
+      });
+      assert.equal(res.status, 200, JSON.stringify(res.json));
+      return res.json;
+    };
+    await tap({ type: 'lineup', side: 'home', playerIds: [home.id] });
+    await tap({ type: 'lineup', side: 'away', playerIds: [away.id] });
+    await tap({ type: 'start' });
+    await tap({ type: 'score', side: 'away', playerId: away.id, points: 3 });
+    await tap({ type: 'foul', side: 'home', playerId: home.id });
+    const last = await tap({ type: 'score', side: 'home', playerId: home.id, points: 2 });
+    assert.deepEqual([last.homeScore, last.awayScore, last.revision], [2, 3, 6]);
+
+    // No shutdown, no flush: the process is gone the instant the last answer arrives.
+    server.child.kill('SIGKILL');
+    await new Promise((resolve) => server.child.once('exit', resolve));
+    server = start(env);
+    await server.ready;
+    const after = (await local(port, 'GET', `/api/games/${g.id}`)).json;
+    assert.deepEqual(
+      [after.homeScore, after.awayScore, after.revision, after.status],
+      [2, 3, 6, 'live'],
+    );
+    assert.deepEqual(
+      after.state.plays.map((p) => p.type),
+      ['lineup', 'lineup', 'score', 'foul', 'score'],
+    );
+    assert.deepEqual(after.players.map((p) => p.jersey).sort(), ['23', '4'], 'both rosters kept');
+    // And it carries on from there.
+    const next = await tap({ type: 'score', side: 'home', playerId: home.id, points: 1 });
+    assert.equal(next.homeScore, 3);
+    assert.equal((await local(port, 'GET', `/api/players/${home.id}`)).status, 200);
+  } finally {
+    server.child.kill();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await rm(dir, { recursive: true, force: true });
+  }
 });

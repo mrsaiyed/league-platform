@@ -1,7 +1,9 @@
 // End-to-end check of live stat tracking in a real browser, against its own throwaway
-// database: enter rosters, pick lineups, score through the player menus, sub by tap
-// and by drag, survive a lost response, watch the live page update, end the game and
-// see the season stats. Saves screenshots under artifacts/screenshots/live-stats-*.png.
+// database: enter rosters, set the format, pick lineups, score through the player menus,
+// sub by tap and by drag, have fouls and timeouts stop the clock with the Start clock
+// button over everything (stats and subs still working under it), survive a lost
+// response, watch the live page update, end the game and see the season stats. Saves
+// screenshots under artifacts/screenshots/live-stats-*.png.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -23,6 +25,8 @@ const server = spawn(
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
+      // Its own throwaway database, never one named in the environment.
+      DATABASE_URL: '',
       LIVE_STATS_PORT: String(port),
       LIVE_STATS_DATA_DIR: path.join(temporary, 'db'),
     },
@@ -47,7 +51,9 @@ try {
   // Changes need a same-origin browser request.
   const schedule = await (await fetch(`${base}/api/schedule`)).json();
   assert.equal(schedule.games.length, 10);
-  const [first, second] = schedule.games;
+  const [first] = schedule.games;
+  // An Al-Hadi away game later on: its home team gets players below, Al-Hadi keeps the first game's.
+  const second = schedule.games.find((g) => g.id !== first.id && g.away.tracked);
   const hostile = await fetch(`${base}/api/games/${first.id}/commands`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: 'https://untrusted.example' },
@@ -108,6 +114,15 @@ try {
     ['21', 'Player TwentyOne'],
     ['00', 'Player DoubleZero'],
   ]);
+  // Several numbers at once; a repeat and a non-number are reported, not added.
+  const awayEditor = page.locator('[data-editor="away"]');
+  await awayEditor.locator('.re-quick-input').fill('40, 41 41 42 123');
+  await awayEditor.locator('.re-quick-input').press('Enter');
+  await awayEditor.locator('.re-msg', { hasText: 'Added #40, #41, #42.' }).waitFor();
+  assert.match(await awayEditor.locator('.re-msg').textContent(), /Not a jersey number .*123/);
+  // Typed into the add row, never Enter or Add: Done still saves it.
+  await page.locator('[data-editor="home"] .re-add .re-jersey').fill('44');
+  await page.locator('[data-editor="home"] .re-add .re-name').fill('Sam Typed');
   await shot(page, 'players');
   await page.getByRole('button', { name: 'Done' }).click();
 
@@ -130,24 +145,79 @@ try {
       gameId,
     );
 
+  await page.locator('#lt-pregame:not([hidden])', { hasText: 'Before tip-off' }).waitFor();
+  const roster = await page.evaluate(
+    (id) => fetch(`/api/games/${id}`).then((r) => r.json()),
+    page.url().split('/')[4],
+  );
+  const jerseys = (side) =>
+    roster.players.filter((p) => p.teamId === roster[side].id).map((p) => p.jersey);
+  assert.ok(jerseys('home').includes('44'), 'the typed-in player was saved on Done');
+  assert.equal(roster.players.find((p) => p.jersey === '44').name, 'Sam Typed');
+  assert.deepEqual(
+    jerseys('away').filter((j) => j.startsWith('4')),
+    ['40', '41', '42'],
+  );
+
+  // The format: TCSAAL's timeouts by default; UIL (NFHS) carries them into overtime.
+  await page.locator('#lt-format').click();
+  const format = page.locator('#lt-format-dialog');
+  const field = (name) => format.locator(`[name="${name}"]`);
+  assert.deepEqual(
+    [
+      await field('full').inputValue(),
+      await field('short').inputValue(),
+      await field('per').inputValue(),
+      await field('otTimeouts').inputValue(),
+      await field('carry').isChecked(),
+    ],
+    ['3', '2', 'game', '1', false],
+  );
+  await format.getByRole('button', { name: 'UIL (NFHS): 4 × 8' }).click();
+  assert.equal(await field('carry').isChecked(), true);
+  await format.getByRole('button', { name: 'Halves: 2 × 20' }).click();
+  assert.equal(await field('per').inputValue(), 'half');
+  await format.getByRole('button', { name: 'TCSAAL: 4 × 8' }).click();
+  await format.getByRole('button', { name: 'Save format' }).click();
+  await page.locator('#lt-msg', { hasText: 'none carried over' }).waitFor();
+  assert.equal(await page.locator('#lt-tmo-home').textContent(), '5 timeouts left ▾');
+
+  const go = page.locator('#lt-go');
+  const goShown = () => go.isVisible();
+
   for (const j of ['4', '11', '15', '22', '30']) await tile('home', j).click();
   for (const j of ['3', '5', '10', '12']) await tile('away', j).click();
   await page.getByRole('button', { name: 'Start with 4' }).waitFor();
+  // A refresh mid-pick keeps the picks.
+  await page.reload();
+  await page.getByRole('button', { name: 'Start with 4' }).waitFor();
+  assert.equal(await goShown(), false, 'no Start clock button until both fives are set');
   await tile('away', '14').click();
+  // Both fives set: the Start clock button comes up for the tip.
+  await go.locator('.lt-go-title', { hasText: 'Start clock · tip-off' }).waitFor();
   await page.locator('#lt-startstop').click();
   await page.locator('#lt-startstop', { hasText: 'Pause' }).waitFor();
+  await page.locator('#lt-pregame[hidden]').waitFor({ state: 'attached' });
+  assert.equal(await goShown(), false, 'gone once the clock runs');
 
   await tile('away', '3').click();
   await menu('p3').click();
   await tile('home', '4').click();
   await menu('p2').click();
+  // A foul stops the clock, and the Start clock button comes up over everything.
   await tile('away', '5').click();
   await menu('foul').click();
+  await page.locator('#lt-startstop', { hasText: 'Start' }).waitFor();
+  await page.locator('#lt-msg', { hasText: 'Foul — #5 Player Five. Clock stopped.' }).waitFor();
+  await go.waitFor();
+  assert.match(await go.locator('.lt-go-note').textContent(), /foul on #5 Player Five/);
+  // Subs carry on under it.
   await tile('away', '21').click();
   await page.locator('.lt-menu .lt-opt-sub', { hasText: '#10' }).click();
   await settled();
   assert.deepEqual(await score(), ['2', '3']);
   assert.ok(await tile('away', '21').evaluate((el) => el.dataset.oncourt === '1'));
+  assert.equal(await goShown(), true, 'still there until the clock starts or it is hidden');
 
   // Drag a bench player onto whoever comes off.
   const from = await tile('home', '33').boundingBox();
@@ -158,6 +228,41 @@ try {
   await page.mouse.up();
   await settled();
   assert.ok(await tile('home', '33').evaluate((el) => el.dataset.oncourt === '1'));
+
+  // Turnovers: off the player tiles; each team's total in its title, opening to each player's.
+  const tileText = (side, j) => tile(side, j).locator('.lt-player-stats').textContent();
+  const before = await tileText('home', '11');
+  await tile('home', '11').click();
+  await menu('to').click();
+  await tile('home', '4').click();
+  await menu('to').click();
+  await tile('away', '3').click();
+  await menu('to').click();
+  await settled();
+  assert.equal(await tileText('home', '11'), before, 'the tile does not change');
+  const tiles = (await page.locator('.lt-player').allInnerTexts()).join(' ');
+  assert.doesNotMatch(tiles, /\bTO\b|turnover/i, 'no player tile shows turnovers');
+  assert.equal(await page.locator('#lt-to-home').textContent(), '2 turnovers ▾');
+  assert.equal(await page.locator('#lt-to-away').textContent(), '1 turnover ▾');
+  await page.locator('#lt-to-home').click();
+  const list = page.locator('#lt-to-list-home');
+  await list.waitFor();
+  assert.match(await list.textContent(), /#4 Jordan\s*1.*#11 Marcus\s*1/);
+  // Taken back from the list.
+  await list.locator('.lt-to-item', { hasText: '#4 Jordan' }).locator('.lt-opt-unto').click();
+  await settled();
+  assert.equal(await page.locator('#lt-to-home').textContent(), '1 turnover ▴');
+  assert.doesNotMatch(await list.textContent(), /#4 Jordan/);
+  assert.equal(
+    await page.locator('#lt-log .lt-log-row').first().locator('span').nth(1).textContent(),
+    'Turnover taken back — #4 Jordan Ellis',
+  );
+  // A team turnover, charged to no player, counts toward the team only.
+  await list.locator('.lt-opt-teamto').click();
+  await settled();
+  assert.equal(await page.locator('#lt-to-home').textContent(), '2 turnovers ▴');
+  assert.match(await list.locator('.lt-to-team').textContent(), /Team\s*1/);
+  assert.equal(await tileText('home', '11'), before, 'still nothing on the tiles');
 
   // The server saves a basket but the answer is lost: the retry must not count it twice.
   await page.route(
@@ -179,6 +284,24 @@ try {
   assert.equal(saved.awayScore, 5, 'saved once on the server');
   assert.equal(saved.state.plays.filter((p) => p.type === 'score').length, 3);
 
+  // A request that never answers (gym Wi-Fi): it times out, the tap is kept and sent again.
+  await page.route('**/commands', () => {}, { times: 1 });
+  await tile('home', '15').click();
+  await menu('foul').click();
+  await page.waitForFunction(
+    (id) =>
+      !localStorage.getItem(`live-stats:outbox:${id}`) &&
+      document.getElementById('lt-sync').textContent.startsWith('Saved'),
+    gameId,
+    { timeout: 40_000 },
+  );
+  const afterHang = await page.evaluate(
+    (id) => fetch(`/api/games/${id}`).then((r) => r.json()),
+    gameId,
+  );
+  assert.equal(afterHang.state.plays.filter((p) => p.type === 'foul').length, 2, 'saved once');
+  assert.match(await page.locator('#lt-log-count').textContent(), /all saved/);
+
   // A viewer's live page follows along without reloading.
   const viewer = await context.newPage();
   watch(viewer);
@@ -191,6 +314,11 @@ try {
     () => [...document.querySelectorAll('.sb-score')].map((s) => s.textContent).join() === '5,5',
   );
   assert.match(await viewer.locator('#pbp li').first().textContent(), /#11 Marcus Webb \+3/);
+  // The box score has turnovers, with the team's total underneath.
+  const homeBox = viewer.locator('#box section').first();
+  assert.equal(await homeBox.locator('thead th').nth(7).textContent(), 'TO');
+  assert.equal(await homeBox.locator('tfoot td').nth(7).textContent(), '2');
+  assert.match(await homeBox.locator('tfoot .team-note').textContent(), /1 team turnover/);
 
   // Undo, redo, and a reload loses nothing.
   await page.locator('#lt-undo').click();
@@ -204,6 +332,87 @@ try {
   await page.locator('#lt-clock').click(); // prompt answers 6:30
   await page.locator('#lt-clock', { hasText: '6:30' }).waitFor();
   await settled();
+
+  // Still stopped since the foul, reload and all: the Start clock button stays up.
+  await go.waitFor();
+  assert.equal(await go.locator('.lt-go-when').textContent(), 'Q1 · 6:30');
+  // Only the button takes taps: a free throw on the stopped clock goes in around it,
+  // and a player's options open over it.
+  const card = await go.locator('.lt-go-row').boundingBox();
+  const beside = await page.evaluate(
+    ([x, y]) => !document.elementFromPoint(x, y)?.closest('#lt-go'),
+    [card.x - 8, card.y + card.height / 2],
+  );
+  assert.ok(beside, 'taps beside the button reach the page');
+  await tile('away', '3').click();
+  const plusOne = menu('p1');
+  const box = await plusOne.boundingBox();
+  assert.ok(
+    await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x, y)?.dataset.act === 'p1',
+      [box.x + box.width / 2, box.y + box.height / 2],
+    ),
+    "the player's options are not under the button",
+  );
+  await plusOne.click();
+  await settled();
+  assert.deepEqual(await score(), ['5', '6']);
+  assert.equal(await goShown(), true);
+  await page.locator('#lt-undo').click();
+  await settled();
+  assert.deepEqual(await score(), ['5', '5']);
+
+  // × hides it: scoring on with the clock stopped, until it next stops.
+  await go.locator('.lt-go-close').click();
+  assert.equal(await goShown(), false);
+  await tile('home', '30').click();
+  await page.locator('.lt-menu .lt-opt-sub', { hasText: '#11' }).click();
+  await settled();
+  assert.ok(await tile('home', '30').evaluate((el) => el.dataset.oncourt === '1'));
+  assert.equal(await goShown(), false, 'stays hidden while scoring on a stopped clock');
+
+  // A timeout: counted against the team, and it stops the clock.
+  await page.locator('#lt-startstop').click();
+  await page.locator('#lt-startstop', { hasText: 'Pause' }).waitFor();
+  await page.locator('#lt-tmo-home').click();
+  const timeouts = page.locator('#lt-tmo-list-home');
+  assert.match(await timeouts.textContent(), /Full timeout3 left.*30-second2 left/);
+  assert.match(
+    await timeouts.textContent(),
+    /3 full and 2 30-second a game · 1 more each overtime/,
+  );
+  await shot(page, 'timeouts');
+  await timeouts.getByRole('button', { name: /Full timeout/ }).click();
+  await page.locator('#lt-startstop', { hasText: 'Start' }).waitFor();
+  await go.waitFor();
+  assert.match(await go.locator('.lt-go-note').textContent(), /KIPP Academy West timeout/);
+  assert.equal(await page.locator('#lt-tmo-home').textContent(), '4 timeouts left ▾');
+  await settled();
+  assert.equal(
+    await page.locator('#lt-log .lt-log-row').first().locator('span').nth(1).textContent(),
+    'Full timeout — KIPP Academy West',
+  );
+  await shot(page, 'tracker-stopped');
+  // The big button starts the clock.
+  await go.locator('.lt-go-start').click();
+  await page.locator('#lt-startstop', { hasText: 'Pause' }).waitFor();
+  assert.equal(await goShown(), false);
+  // Paused by hand: back again; Escape hides it too.
+  await page.locator('#lt-startstop').click();
+  await go.waitFor();
+  assert.match(await go.locator('.lt-go-note').textContent(), /The clock is stopped/);
+  await page.keyboard.press('Escape');
+  assert.equal(await goShown(), false);
+  // The timeout shows on the live page, and can be taken back.
+  const homeNote = (text) =>
+    viewer.waitForFunction((t) => document.querySelector('.sb-sub').textContent.includes(t), text);
+  await homeNote('4 timeouts left');
+  await page.locator('#lt-tmo-home').click();
+  await timeouts.locator('.lt-to-item', { hasText: /Q1 \d:\d\dFull/ }).waitFor();
+  await timeouts.getByRole('button', { name: /latest timeout/ }).click();
+  await settled();
+  assert.equal(await page.locator('#lt-tmo-home').textContent(), '5 timeouts left ▴');
+  await homeNote('5 timeouts left');
 
   await tile('away', '3').click();
   await menu('p1').waitFor();
@@ -221,7 +430,18 @@ try {
   await page.getByRole('link', { name: 'Roster & stats' }).click();
   await page.locator('#stats tbody tr').first().waitFor();
   assert.match(await page.locator('#stats tbody tr').first().textContent(), /Player Three/);
+  assert.match(
+    await page.locator('#game-log tbody tr').first().textContent(),
+    /KIPP Academy West.*[WT] 5–5/,
+  );
   await shot(page, 'team', true);
+  await page.locator('#stats tbody').getByRole('link', { name: 'Player Three' }).click();
+  await page.locator('#log tbody tr').first().waitFor();
+  assert.match(await page.locator('#log tbody tr').first().textContent(), /KIPP Academy West.*3/);
+  assert.match(await page.locator('#log tfoot').textContent(), /1 game played/);
+  assert.equal(await page.locator('#log thead th').nth(9).textContent(), 'TO');
+  assert.equal(await page.locator('#log tfoot td').nth(9).textContent(), '1', 'his turnover');
+  await shot(page, 'player', true);
 
   // Phone: the second game, lying down and upright, with no sideways scrolling.
   await page.evaluate(async (teamId) => {
@@ -253,9 +473,21 @@ try {
       await phone.locator('#lt-startstop').click();
       await tileOn(phone, 'away', '5').click();
       await phone.locator('.lt-menu .lt-opt[data-act="p2"]').click();
+      await tileOn(phone, 'away', '3').click();
+      await phone.locator('.lt-menu .lt-opt[data-act="foul"]').click();
     }
+    // The foul stopped the clock: the Start clock button is up, on either way round.
+    await phone.locator('#lt-go').waitFor();
     await tileOn(phone, 'home', '7').click();
     await phone.locator('.lt-menu').waitFor();
+    const foulBtn = await phone.locator('.lt-menu .lt-opt[data-act="foul"]').boundingBox();
+    assert.ok(
+      await phone.evaluate(
+        ([x, y]) => document.elementFromPoint(x, y)?.dataset.act === 'foul',
+        [foulBtn.x + foulBtn.width / 2, foulBtn.y + foulBtn.height / 2],
+      ),
+      `${name}: the options are over the Start clock button`,
+    );
     assert.ok(
       await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       `${name}: page scrolls sideways`,

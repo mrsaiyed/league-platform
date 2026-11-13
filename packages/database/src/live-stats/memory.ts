@@ -141,9 +141,15 @@ export class MemoryRepository implements LiveStatsRepository {
   async finalLines(teamId: string) {
     return [...this.#games.values()]
       .filter(({ game }) => game.status === 'final')
-      .flatMap(({ game }) => this.#lines.get(game.id) ?? [])
+      .flatMap(({ game }) =>
+        (this.#lines.get(game.id) ?? []).map((l) => ({ gameId: game.id, ...l })),
+      )
       .filter((l) => l.teamId === teamId)
       .map((l) => structuredClone(l));
+  }
+
+  async gameLines(gameId: string) {
+    return structuredClone(this.#lines.get(gameId) ?? []);
   }
 }
 

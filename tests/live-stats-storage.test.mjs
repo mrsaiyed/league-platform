@@ -13,6 +13,8 @@ import {
   connectPostgres,
 } from '../packages/database/src/live-stats/postgres.ts';
 import { TrackerError } from '../packages/sports/src/basketball/live.ts';
+import { SupabaseRepository } from '../packages/database/src/live-stats/supabase.ts';
+import { fakeSupabase } from './support/fake-supabase.mjs';
 
 const seed = JSON.parse(
   await readFile(
@@ -21,6 +23,18 @@ const seed = JSON.parse(
 );
 
 const adapters = {
+  // The static site on GitHub Pages: the browser calls Supabase's REST API, as a signed-in scorer.
+  'Supabase from the browser': async () => {
+    const supabase = await fakeSupabase();
+    let token = null;
+    const repo = new SupabaseRepository({
+      url: supabase.url,
+      key: supabase.key,
+      token: () => token,
+    });
+    ({ token } = await repo.rpc('ls_sign_in', { p_passcode: supabase.passcode }));
+    return { repo, done: () => supabase.stop() };
+  },
   'documents in memory': async () => ({ repo: new MemoryRepository(), done: async () => {} }),
   'embedded PostgreSQL': async () => {
     const repo = new PostgresRepository(new PGlite());
@@ -141,6 +155,7 @@ for (const [name, make] of Object.entries(adapters))
         assert.deepEqual(
           lines.find((l) => l.playerId === away[0].id),
           {
+            gameId: g.id,
             playerId: away[0].id,
             teamId: g.away.id,
             name: 'Lion 10',
@@ -151,6 +166,7 @@ for (const [name, make] of Object.entries(adapters))
             fg2: 0,
             fg3: 1,
             fouls: 0,
+            turnovers: 0,
             ms: 30_000,
           },
         );
@@ -247,7 +263,154 @@ for (const [name, make] of Object.entries(adapters))
         await done();
       }
     });
+
+    test('game logs: one line per final game for the team and each player, as played', async () => {
+      const { stats, done, tick } = await open();
+      try {
+        const games = (await stats.schedule()).games;
+        const home = games[2]; // Al-Hadi at home
+        const away = games.find((g, i) => i > 2 && g.away.tracked); // later, on the road
+        const lions = home.home.id;
+        const yusuf = await stats.addPlayer(lions, { name: 'Yusuf', jersey: '23' });
+        const omar = await stats.addPlayer(lions, { name: 'Omar', jersey: '5' });
+        const play = async (g, side, other, points) => {
+          const rival = await stats.addPlayer(g[other].id, { name: '', jersey: '4' });
+          await send(stats, g.id, { type: 'lineup', side, playerIds: [yusuf.id] });
+          await send(stats, g.id, { type: 'lineup', side: other, playerIds: [rival.id] });
+          await send(stats, g.id, { type: 'start' });
+          tick(60_000);
+          await send(stats, g.id, { type: 'score', side, playerId: yusuf.id, points });
+          await send(stats, g.id, { type: 'score', side: other, playerId: rival.id, points: 2 });
+          await send(stats, g.id, { type: 'foul', side, playerId: yusuf.id });
+          await send(stats, g.id, { type: 'turnover', side, playerId: yusuf.id });
+          await send(stats, g.id, { type: 'turnover', side: other, playerId: rival.id });
+          await send(stats, g.id, { type: 'team-turnover', side });
+          // A timeout names no player, only the team.
+          await send(stats, g.id, { type: 'timeout', side: other, seconds: 30 });
+          await send(stats, g.id, { type: 'end' });
+          return rival;
+        };
+        const rival = await play(home, 'home', 'away', 3);
+        await play(away, 'away', 'home', 1);
+        const saved = await stats.game(home.id);
+        assert.deepEqual(
+          saved.state.plays.filter((p) => p.type === 'timeout').map((p) => [p.side, p.seconds]),
+          [['away', 30]],
+        );
+
+        const team = await stats.team(lions);
+        assert.deepEqual(
+          team.gameLog.map((g) => [g.gameId, g.result, g.score, g.opponentScore, g.home]),
+          [
+            [home.id, 'W', 3, 2, true],
+            [away.id, 'L', 1, 2, false],
+          ],
+        );
+        assert.deepEqual(
+          [
+            team.gameLog[0].fg3,
+            team.gameLog[0].fouls,
+            team.gameLog[0].turnovers,
+            team.gameLog[0].teamTurnovers,
+            team.gameLog[0].played,
+          ],
+          [1, 1, 2, 1, 1],
+          "the game's turnovers: Yusuf's and the team's own",
+        );
+        assert.equal(team.stats.find((x) => x.playerId === yusuf.id).turnovers, 2, 'season total');
+        assert.deepEqual(team.gameLog[0].top, {
+          playerId: yusuf.id,
+          name: 'Yusuf',
+          jersey: '23',
+          points: 3,
+        });
+        assert.equal(team.gameLog[1].opponent.id, away.home.id);
+
+        // Renumbered after the games: the log keeps the number worn in them.
+        await stats.updatePlayer(yusuf.id, { name: 'Yusuf', jersey: '10' });
+        const log = await stats.playerLog(yusuf.id);
+        assert.equal(log.player.jersey, '10');
+        assert.deepEqual(
+          log.games.map((g) => [
+            g.gameId,
+            g.played,
+            g.jersey,
+            g.points,
+            g.fg3,
+            g.fg1,
+            g.fouls,
+            g.turnovers,
+            g.ms,
+          ]),
+          [
+            [home.id, true, '23', 3, 1, 0, 1, 1, 60_000],
+            [away.id, true, '23', 1, 0, 1, 1, 1, 60_000],
+          ],
+        );
+        assert.deepEqual(log.totals, {
+          gp: 2,
+          points: 4,
+          fg1: 1,
+          fg2: 0,
+          fg3: 1,
+          fouls: 2,
+          turnovers: 2,
+          ms: 120_000,
+        });
+        const benched = await stats.playerLog(omar.id);
+        assert.deepEqual(
+          benched.games.map((g) => g.played),
+          [false, false],
+          'DNP in both',
+        );
+        assert.equal(benched.totals.gp, 0);
+        await assert.rejects(stats.playerLog(randomUUID()), /Player not found/);
+
+        // A final game carries its saved lines, names and numbers as they were.
+        const final = await stats.game(home.id);
+        assert.equal(final.lines.find((l) => l.playerId === yusuf.id).jersey, '23');
+        assert.equal(final.lines.find((l) => l.playerId === rival.id).points, 2);
+        assert.deepEqual(
+          (await stats.game(games.at(-1).id)).lines,
+          [],
+          'none before a game is final',
+        );
+      } finally {
+        await done();
+      }
+    });
   });
+
+test('a database made before turnovers were kept gains them on the next start', async () => {
+  const db = new PGlite();
+  const repo = new PostgresRepository(db);
+  await repo.initialize();
+  const stats = new LiveStats(repo);
+  await stats.seed(seed);
+  const g = (await stats.schedule()).games[0];
+  const p = await stats.addPlayer(g.away.id, { name: 'A', jersey: '1' });
+  await stats.command(g.id, {
+    commandId: randomUUID(),
+    input: { type: 'lineup', side: 'away', playerIds: [p.id] },
+  });
+  // As it was before: no turnovers column, and a line already saved.
+  await db.exec('ALTER TABLE live_stats.player_game_lines DROP COLUMN turnovers');
+  assert.equal((await db.query('SELECT * FROM live_stats.player_game_lines')).rows.length, 1);
+  await repo.initialize();
+  assert.deepEqual(
+    (await db.query('SELECT turnovers FROM live_stats.player_game_lines')).rows,
+    [{ turnovers: 0 }],
+    'earlier lines count none',
+  );
+  await stats.command(g.id, {
+    commandId: randomUUID(),
+    input: { type: 'turnover', side: 'away', playerId: p.id },
+  });
+  assert.deepEqual((await db.query('SELECT turnovers FROM live_stats.player_game_lines')).rows, [
+    { turnovers: 1 },
+  ]);
+  await repo.close();
+});
 
 test('PostgreSQL keeps every action and the live box score in its own tables', async () => {
   const db = new PGlite();

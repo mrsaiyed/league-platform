@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Envelope, PlayerInput } from '../../packages/contracts/src/live-stats.ts';
 import {
   apply,
@@ -15,6 +14,9 @@ import type {
   PlayerRecord,
   TeamRecord,
 } from '../../packages/database/src/live-stats/repository.ts';
+
+// Web Crypto, so this also runs in the browser for the static site (secure pages only).
+const randomUUID = () => globalThis.crypto.randomUUID();
 
 export class StatsError extends Error {
   status: number;
@@ -98,11 +100,17 @@ export class LiveStats {
     };
   }
 
+  /**
+   * A game with its players and state. A final game also carries its saved box
+   * score lines, with each player's name and number as they were in that game, so
+   * its box score stays as played if a roster is edited later.
+   */
   async game(id: string) {
     const g = await this.repo.game(id);
     if (!g) throw new StatsError('Game not found.', 404);
     const players = await this.repo.players([g.homeTeamId, g.awayTeamId]);
-    return { ...summary(g, await this.repo.teams(), this.now()), players, state: g.state };
+    const lines = g.status === 'final' ? await this.repo.gameLines(id) : [];
+    return { ...summary(g, await this.repo.teams(), this.now()), players, state: g.state, lines };
   }
 
   /**
@@ -182,14 +190,18 @@ export class LiveStats {
     return found;
   }
 
-  /** A team's roster, record and season totals from its final games. */
+  /**
+   * A team's roster, record, season totals and game log (one line per final game:
+   * result, team totals and top scorer), all from its final games.
+   */
   async team(id: string) {
     const teams = await this.repo.teams();
     const team = teams.find((t) => t.id === id);
     if (!team) throw new StatsError('Team not found.', 404);
     const everyone = await this.repo.players([id]);
+    const finalLines = await this.repo.finalLines(id);
     const totals = new Map<string, Totals>();
-    for (const l of await this.repo.finalLines(id)) {
+    for (const l of finalLines) {
       const t = totals.get(l.playerId) ?? {
         gp: 0,
         points: 0,
@@ -197,6 +209,7 @@ export class LiveStats {
         fg2: 0,
         fg3: 0,
         fouls: 0,
+        turnovers: 0,
         ms: 0,
       };
       if (l.appeared) t.gp += 1;
@@ -205,6 +218,7 @@ export class LiveStats {
       t.fg2 += l.fg2;
       t.fg3 += l.fg3;
       t.fouls += l.fouls;
+      t.turnovers += l.turnovers;
       t.ms += l.ms;
       totals.set(l.playerId, t);
     }
@@ -215,20 +229,116 @@ export class LiveStats {
         name: p.name,
         jersey: p.jersey,
         active: p.active,
-        ...(totals.get(p.id) ?? { gp: 0, points: 0, fg1: 0, fg2: 0, fg3: 0, fouls: 0, ms: 0 }),
+        ...(totals.get(p.id) ?? {
+          gp: 0,
+          points: 0,
+          fg1: 0,
+          fg2: 0,
+          fg3: 0,
+          fouls: 0,
+          turnovers: 0,
+          ms: 0,
+        }),
       }))
       .sort((a, b) => b.points - a.points || b.gp - a.gp || byJersey(a, b));
     const now = this.now();
-    const games = (await this.repo.games({ teamId: id })).map((g) => summary(g, teams, now));
+    const records = await this.repo.games({ teamId: id });
+    // Turnovers charged to the team rather than a player live only in the game's plays.
+    const teamTurnovers = new Map(
+      records.map((g) => [
+        g.id,
+        derive(g.state).teams[g.homeTeamId === id ? 'home' : 'away'].teamTurnovers,
+      ]),
+    );
+    const games = records.map((g) => summary(g, teams, now));
     const record = { wins: 0, losses: 0 };
+    const byGame = groupBy(finalLines, (l) => l.gameId);
+    const gameLog = [];
     for (const g of games) {
       if (g.status !== 'final') continue;
-      const mine = g.home.id === id ? g.homeScore : g.awayScore;
-      const theirs = g.home.id === id ? g.awayScore : g.homeScore;
-      if (mine > theirs) record.wins += 1;
-      else if (mine < theirs) record.losses += 1;
+      const r = result(g, id);
+      if (r.result === 'W') record.wins += 1;
+      else if (r.result === 'L') record.losses += 1;
+      const lines = byGame.get(g.id) ?? [];
+      const sum = (key: 'fg1' | 'fg2' | 'fg3' | 'fouls' | 'turnovers') =>
+        lines.reduce((total, l) => total + l[key], 0);
+      const top = lines
+        .filter((l) => l.points > 0)
+        .sort((a, b) => b.points - a.points || byJersey(a, b))[0];
+      gameLog.push({
+        ...r,
+        fg3: sum('fg3'),
+        fg2: sum('fg2'),
+        fg1: sum('fg1'),
+        fouls: sum('fouls'),
+        turnovers: sum('turnovers') + (teamTurnovers.get(g.id) ?? 0),
+        teamTurnovers: teamTurnovers.get(g.id) ?? 0,
+        played: lines.filter((l) => l.appeared).length,
+        top: top
+          ? { playerId: top.playerId, name: top.name, jersey: top.jersey, points: top.points }
+          : null,
+      });
     }
-    return { team, players: everyone.filter((p) => p.active), stats, games, record };
+    return { team, players: everyone.filter((p) => p.active), stats, games, record, gameLog };
+  }
+
+  /**
+   * One player's game log: a line for each of their team's final games (DNP when
+   * they did not get on the floor), with the name and number they wore, and totals.
+   */
+  async playerLog(id: string) {
+    const player = await this.repo.player(id);
+    if (!player) throw new StatsError('Player not found.', 404);
+    const teams = await this.repo.teams();
+    const now = this.now();
+    const games = (await this.repo.games({ teamId: player.teamId })).map((g) =>
+      summary(g, teams, now),
+    );
+    const mine = new Map(
+      (await this.repo.finalLines(player.teamId))
+        .filter((l) => l.playerId === id)
+        .map((l) => [l.gameId, l]),
+    );
+    const totals: Totals = {
+      gp: 0,
+      points: 0,
+      fg1: 0,
+      fg2: 0,
+      fg3: 0,
+      fouls: 0,
+      turnovers: 0,
+      ms: 0,
+    };
+    const log = games
+      .filter((g) => g.status === 'final')
+      .map((g) => {
+        const l = mine.get(g.id);
+        const played = Boolean(l?.appeared);
+        if (l) {
+          if (played) totals.gp += 1;
+          totals.points += l.points;
+          totals.fg1 += l.fg1;
+          totals.fg2 += l.fg2;
+          totals.fg3 += l.fg3;
+          totals.fouls += l.fouls;
+          totals.turnovers += l.turnovers;
+          totals.ms += l.ms;
+        }
+        return {
+          ...result(g, player.teamId),
+          played,
+          jersey: l?.jersey ?? player.jersey,
+          ms: l?.ms ?? 0,
+          points: l?.points ?? 0,
+          fg3: l?.fg3 ?? 0,
+          fg2: l?.fg2 ?? 0,
+          fg1: l?.fg1 ?? 0,
+          fouls: l?.fouls ?? 0,
+          turnovers: l?.turnovers ?? 0,
+        };
+      });
+    const team = teams.find((t) => t.id === player.teamId);
+    return { player, team: publicTeam(team), games: log, totals };
   }
 
   teams() {
@@ -243,6 +353,7 @@ type Totals = {
   fg2: number;
   fg3: number;
   fouls: number;
+  turnovers: number;
   ms: number;
 };
 
@@ -254,10 +365,36 @@ function checkPlayers(g: GameRecord, input: Command, players: Map<string, Player
       ? input.playerIds
       : input.type === 'sub'
         ? [input.inId, input.outId]
-        : [input.playerId];
+        : 'playerId' in input
+          ? [input.playerId]
+          : // A team's own play, such as a team turnover or a timeout, names no player.
+            [];
   const teamId = input.side === 'home' ? g.homeTeamId : g.awayTeamId;
   if (ids.some((id) => players.get(id)?.teamId !== teamId))
     throw new StatsError('That player is not on this team. Reload the roster.', 422);
+}
+
+function groupBy<T>(items: T[], key: (item: T) => string) {
+  const groups = new Map<string, T[]>();
+  for (const item of items) groups.set(key(item), [...(groups.get(key(item)) ?? []), item]);
+  return groups;
+}
+
+/** A final game from one team's side: who they played, where, and the result. */
+function result(g: GameSummary, teamId: string) {
+  const home = g.home.id === teamId;
+  const score = home ? g.homeScore : g.awayScore;
+  const opponentScore = home ? g.awayScore : g.homeScore;
+  return {
+    gameId: g.id,
+    startsAt: g.startsAt,
+    gameType: g.gameType,
+    home,
+    opponent: home ? g.away : g.home,
+    score,
+    opponentScore,
+    result: score > opponentScore ? 'W' : score < opponentScore ? 'L' : 'T',
+  };
 }
 
 const publicTeam = (t: TeamRecord | undefined) =>

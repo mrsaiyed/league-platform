@@ -1,20 +1,46 @@
 // A team's roster (names and jersey numbers, no limit) and its season totals.
-import { formatMinutes } from '/js/engine.js';
-import { api, esc, fmtDay, getSession, siteHeader } from '/js/common.js';
-import { rosterEditor } from '/js/roster-editor.js';
+import { formatMinutes } from './engine.js';
+import {
+  api,
+  esc,
+  fmtDay,
+  gameTypeLabel,
+  getSession,
+  here,
+  link,
+  pageId,
+  siteHeader,
+} from './common.js';
+import { rosterEditor } from './roster-editor.js';
 
-const teamId = location.pathname.split('/')[2];
+const teamId = pageId();
 const $ = (id) => document.getElementById(id);
 
 function statsTable(stats) {
   const rows = stats.map((s) => {
     const ppg = s.gp ? (s.points / s.gp).toFixed(1) : '–';
     const mpg = s.gp ? formatMinutes(s.ms / s.gp) : '–';
-    return `<tr${s.gp ? '' : ' class="dnp"'}><td class="num">${esc(s.jersey)}</td><td class="name">${esc(s.name || `#${s.jersey}`)}${s.active ? '' : ' (removed)'}</td><td>${s.gp}</td><td>${mpg}</td><td><b>${s.points}</b></td><td>${ppg}</td><td>${s.fg3}</td><td>${s.fg2}</td><td>${s.fg1}</td><td>${s.fouls}</td></tr>`;
+    return `<tr${s.gp ? '' : ' class="dnp"'}><td class="num">${esc(s.jersey)}</td><td class="name"><a href="${esc(link.player(s.playerId))}" title="Game log">${esc(s.name || `#${s.jersey}`)}</a>${s.active ? '' : ' (removed)'}</td><td>${s.gp}</td><td>${mpg}</td><td><b>${s.points}</b></td><td>${ppg}</td><td>${s.fg3}</td><td>${s.fg2}</td><td>${s.fg1}</td><td>${s.turnovers}</td><td>${s.fouls}</td></tr>`;
   });
   return `<table class="stats">
-    <thead><tr><th class="num">#</th><th class="name">Player</th><th title="Games played">GP</th><th title="Minutes per game">MPG</th><th title="Points">PTS</th><th title="Points per game">PPG</th><th title="3-pointers made">3PM</th><th title="2-pointers made">2PM</th><th title="Free throws made">FTM</th><th title="Personal fouls">PF</th></tr></thead>
-    <tbody>${rows.join('') || '<tr><td colspan="10" class="name">No players yet.</td></tr>'}</tbody>
+    <thead><tr><th class="num">#</th><th class="name">Player</th><th title="Games played">GP</th><th title="Minutes per game">MPG</th><th title="Points">PTS</th><th title="Points per game">PPG</th><th title="3-pointers made">3PM</th><th title="2-pointers made">2PM</th><th title="Free throws made">FTM</th><th title="Turnovers">TO</th><th title="Personal fouls">PF</th></tr></thead>
+    <tbody>${rows.join('') || '<tr><td colspan="11" class="name">No players yet.</td></tr>'}</tbody>
+  </table>`;
+}
+
+/** One line per final game: result, team totals and top scorer, newest first. */
+function gameLogTable(log) {
+  if (!log.length)
+    return '<p class="hint">Each game appears here once it is ended in the tracker.</p>';
+  const rows = [...log].reverse().map((g) => {
+    const top = g.top
+      ? `<a href="${esc(link.player(g.top.playerId))}">${esc(g.top.name || `#${g.top.jersey}`)}</a> ${g.top.points}`
+      : '–';
+    return `<tr><td class="name">${g.startsAt ? esc(fmtDay(g.startsAt)) : 'TBD'}</td><td class="name"><a href="${esc(link.game(g.gameId))}">${g.home ? 'vs' : '@'} ${esc(g.opponent.name)}</a>${g.gameType === 'regular_season' ? '' : ` <span class="tag tag-ex">${esc(gameTypeLabel(g.gameType))}</span>`}</td><td><b>${esc(g.result)}</b> ${g.score}–${g.opponentScore}</td><td>${g.fg3}</td><td>${g.fg2}</td><td>${g.fg1}</td><td>${g.turnovers}</td><td>${g.fouls}</td><td class="name">${top}</td></tr>`;
+  });
+  return `<table class="stats">
+    <thead><tr><th class="name">Date</th><th class="name">Opponent</th><th>Result</th><th title="3-pointers made">3PM</th><th title="2-pointers made">2PM</th><th title="Free throws made">FTM</th><th title="Turnovers">TO</th><th title="Personal fouls">PF</th><th class="name">Top scorer</th></tr></thead>
+    <tbody>${rows.join('')}</tbody>
   </table>`;
 }
 
@@ -30,7 +56,7 @@ function resultsTable(games) {
         : g.status === 'live'
           ? `Live ${mine}–${theirs}`
           : '';
-    return `<tr><td class="name">${g.startsAt ? esc(fmtDay(g.startsAt)) : 'TBD'}</td><td class="name"><a href="/game/${esc(g.id)}">${us === 'home' ? 'vs' : '@'} ${esc(them.name)}</a></td><td>${esc(result)}</td></tr>`;
+    return `<tr><td class="name">${g.startsAt ? esc(fmtDay(g.startsAt)) : 'TBD'}</td><td class="name"><a href="${esc(link.game(g.id))}">${us === 'home' ? 'vs' : '@'} ${esc(them.name)}</a></td><td>${esc(result)}</td></tr>`;
   });
   return `<table class="stats"><tbody>${rows.join('')}</tbody></table>`;
 }
@@ -64,11 +90,12 @@ async function start() {
     `<div><b>${data.record.wins}–${data.record.losses}</b><span>Record</span></div><div><b>${data.players.length}</b><span>Players</span></div>`;
   const paint = (d) => {
     $('stats').innerHTML = statsTable(d.stats);
+    $('game-log').innerHTML = gameLogTable(d.gameLog);
     $('results').innerHTML = resultsTable(d.games);
   };
   paint(data);
-  if (canScore)
-    rosterEditor($('roster'), {
+  if (canScore) {
+    const editor = rosterEditor($('roster'), {
       teamId,
       players: data.players,
       onChange: async () => {
@@ -78,9 +105,11 @@ async function start() {
         $('record').querySelector('div:last-child b').textContent = String(fresh.players.length);
       },
     });
-  else {
+    // Leaving the page saves anything still being typed.
+    window.addEventListener('pagehide', () => void editor.flush({ keepalive: true }));
+  } else {
     $('roster-hint').innerHTML = session.signIn
-      ? `<a href="/sign-in?next=${encodeURIComponent(location.pathname)}">Sign in</a> to edit the roster.`
+      ? `<a href="${esc(link.signIn(here()))}">Sign in</a> to edit the roster.`
       : 'Rosters are edited on the computer running the stats.';
     $('roster').innerHTML =
       `<ul>${data.players.map((p) => `<li>${esc(p.jersey ? `#${p.jersey} ` : '')}${esc(p.name)}</li>`).join('')}</ul>`;

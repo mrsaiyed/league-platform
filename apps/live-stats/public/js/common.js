@@ -1,5 +1,14 @@
-// Shared by every page: escaping, API calls, live updates, dates and player names.
-import { clockAt, formatClock, periodLabel } from '/js/engine.js';
+// Shared by every page: escaping, API calls, live updates, links, dates and player names.
+//
+// The pages run two ways. Served by the stats server (npm run dev:stats, or hosted),
+// they call its /api and hear live updates from it. As the static site on GitHub
+// Pages (config.mode 'supabase'), the same /api requests are answered in the browser
+// against Supabase (js/supabase-api.js), and live pages check for changes every few
+// seconds instead.
+import { clockAt, formatClock, periodLabel } from './engine.js';
+import { config } from './config.js';
+
+export const staticSite = config.mode === 'supabase';
 
 export const esc = (s) =>
   String(s ?? '').replace(
@@ -14,22 +23,56 @@ export class ApiError extends Error {
   }
 }
 
-/** JSON in, JSON out. Status 0 means the server could not be reached at all. */
-export async function api(path, { method = 'GET', body } = {}) {
-  let res;
+/**
+ * JSON in, JSON out. Status 0 means no usable answer: the server could not be
+ * reached, took longer than `timeoutMs`, or the answer was cut off. A request on
+ * gym Wi-Fi can hang without ever failing, so every request gives up in time and
+ * the caller retries; scorer actions are safe to repeat. `keepalive` lets a save
+ * started as the page closes finish after it.
+ */
+export async function api(path, { method = 'GET', body, timeoutMs = 12_000, keepalive } = {}) {
+  if (staticSite) {
+    const handle = await (local ??= import('./supabase-api.js').then((m) => m.createApi(config)));
+    try {
+      return await handle(path, { method, body });
+    } catch (err) {
+      throw new ApiError(err?.message || 'Something went wrong.', err?.status ?? 0);
+    }
+  }
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
+  let res, text;
   try {
     res = await fetch(path, {
       method,
       headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: abort.signal,
+      keepalive: Boolean(keepalive),
     });
+    text = await res.text();
   } catch {
-    throw new ApiError('No connection to the stats server.', 0);
+    throw new ApiError(
+      abort.signal.aborted
+        ? 'The stats server took too long to answer.'
+        : 'No connection to the stats server.',
+      0,
+    );
+  } finally {
+    clearTimeout(timer);
   }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(data.error || `Request failed (${res.status}).`, res.status);
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    // A proxy's error page, or an answer cut short: not the server's.
+  }
+  if (!res.ok) throw new ApiError(data?.error || `Request failed (${res.status}).`, res.status);
+  if (data === null) throw new ApiError('The stats server sent an unreadable answer.', 0);
   return data;
 }
+
+let local = null;
 
 /** A v4 UUID. `crypto.randomUUID` exists only on secure origins, which a phone on the gym network is not. */
 export function uuid() {
@@ -57,6 +100,9 @@ export const serverClock = {
  * data; the browser reconnects by itself, and `onStatus` hears about it.
  */
 export function subscribe(query, handlers, onStatus = () => {}) {
+  // A site not connected to its database yet has nothing to follow.
+  if (staticSite && !config.url) return { close() {} };
+  if (staticSite) return poll(query, handlers, onStatus);
   const source = new EventSource(`/api/stream${query}`);
   for (const [event, fn] of Object.entries(handlers))
     source.addEventListener(event, (e) => fn(JSON.parse(e.data)));
@@ -64,6 +110,74 @@ export function subscribe(query, handlers, onStatus = () => {}) {
   source.onerror = () => onStatus(false);
   return source;
 }
+
+/**
+ * The static site's live updates: ask what changed every few seconds, and fetch the
+ * game or schedule only when something did. Paused while the page is hidden.
+ */
+function poll(query, handlers, onStatus) {
+  const gameId = new URLSearchParams(query).get('game');
+  const every = gameId ? 2_000 : 10_000;
+  let last = null;
+  let stopped = false;
+  async function check() {
+    if (stopped) return;
+    if (!document.hidden) {
+      try {
+        const { version } = await api(
+          gameId ? `/api/games/${gameId}/version` : '/api/schedule/version',
+        );
+        if (version !== last) {
+          const data = await api(gameId ? `/api/games/${gameId}` : '/api/schedule');
+          last = version;
+          if (gameId) handlers.game?.(data);
+          else handlers.schedule?.(data);
+        }
+        onStatus(true);
+      } catch {
+        onStatus(false);
+      }
+    }
+    setTimeout(check, every);
+  }
+  void check();
+  // Back on the page after a while: fetch it fresh.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) last = null;
+  });
+  return { close: () => (stopped = true) };
+}
+
+/**
+ * Where each page is. The server has tidy paths (/game/<id>); the static site has
+ * one file per page (game.html?id=<id>) next to each other, so links stay relative.
+ */
+export const link = staticSite
+  ? {
+      home: () => './',
+      game: (id) => `game.html?id=${id}`,
+      track: (id) => `track.html?id=${id}`,
+      team: (id) => `team.html?id=${id}`,
+      player: (id) => `player.html?id=${id}`,
+      signIn: (next) => `sign-in.html?next=${encodeURIComponent(next)}`,
+      img: (name) => `img/${name}`,
+    }
+  : {
+      home: () => '/',
+      game: (id) => `/game/${id}`,
+      track: (id) => `/game/${id}/track`,
+      team: (id) => `/team/${id}`,
+      player: (id) => `/player/${id}`,
+      signIn: (next) => `/sign-in?next=${encodeURIComponent(next)}`,
+      img: (name) => `/img/${name}`,
+    };
+/** The id of the game, team or player this page shows. */
+export const pageId = () =>
+  staticSite
+    ? (new URLSearchParams(location.search).get('id') ?? '')
+    : location.pathname.split('/')[2];
+/** This page, to come back to after signing in. */
+export const here = () => location.pathname + location.search;
 
 let session = null;
 /** Whether this device may score, and the addresses phones can watch on. */
@@ -125,7 +239,7 @@ export function gameClockText(game, now) {
 
 /** The site header; with sign-in set up, it also signs scorers in and out. */
 export function siteHeader(active, teamId, session = null) {
-  const link = (href, label, key) =>
+  const item = (href, label, key) =>
     `<a href="${href}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`;
   const account = !session?.signIn
     ? ''
@@ -133,9 +247,9 @@ export function siteHeader(active, teamId, session = null) {
       ? '<button type="button" class="nav-button" data-sign-out>Sign out</button>'
       : active === 'sign-in'
         ? ''
-        : link(`/sign-in?next=${encodeURIComponent(location.pathname)}`, 'Scorer sign-in', '');
-  return `<a class="brand" href="/"><img src="/img/lions.png" alt="" /><span><strong>Al-Hadi Lions</strong><small>Varsity boys basketball · 2026–27</small></span></a>
-    <nav aria-label="Site">${link('/', 'Schedule', 'schedule')}${teamId ? link(`/team/${teamId}`, 'Roster &amp; stats', 'team') : ''}${account}</nav>`;
+        : item(link.signIn(here()), 'Scorer sign-in', '');
+  return `<a class="brand" href="${link.home()}"><img src="${link.img('lions.png')}" alt="" /><span><strong>Al-Hadi Lions</strong><small>Varsity boys basketball · 2026–27</small></span></a>
+    <nav aria-label="Site">${item(link.home(), 'Schedule', 'schedule')}${teamId ? item(link.team(teamId), 'Roster &amp; stats', 'team') : ''}${account}</nav>`;
 }
 
 document.addEventListener('click', (e) => {

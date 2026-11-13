@@ -48,3 +48,39 @@ The Faraj-style live stat tracker (`apps/live-stats`) passed `npm run verify` wi
 By hand: the server was killed mid-game while the tracker kept scoring; after a restart (which cleared the stale lock by itself) every queued action landed once and earlier records were intact. A production-only install (no development packages) started in online mode and served the schedule and pages. The 2026–27 schedule was copied from the TCSAAL team page and each game page was opened to record its number and type.
 
 Not yet verified: building the Docker image (no Docker on the build computer), a real Supabase database and host, a full real game on the scoring laptop, and TCSAAL's game format.
+
+## November 2 live stats: game-ready and Supabase-ready
+
+Two save gaps were found by driving the tracker in a browser and are fixed: a player typed into the Players panel without pressing Enter or Add was lost when **Done** was tapped, and a save request that never answered (as on weak gym Wi-Fi) left the tracker on "Saving…" forever with every later tap stuck behind it. Each now has a browser check. Requests give up after 12 seconds and retry; a tap is only dropped when the rules refuse it. Hosted database connections now time out instead of hanging, and broken ones are discarded.
+
+`npm run verify` passed with 74 tests, including: the same storage tests against all three adapters, now with team and player game logs; a server killed with SIGKILL straight after a confirmed tap, restarted with nothing lost (run five times); Supabase's `anon` and `authenticated` roles locked out by privileges and by row-level security while a non-superuser owner, as Supabase's `postgres` is, keeps working; connection-string advice; and copying games up to PostgreSQL reached over the network through `pg` (teams matched by slug, a separately entered player matched by number and name, every recorded action and box score line carried over, then caught up, left alone when further along there, and conflicts refused unless `--replace`), and back down to a folder as a backup.
+
+`npm run test:stats:browser` passed in Chromium with the new steps: quick-adding numbers, a player saved by **Done** alone, lineup picks kept across a reload, the pre-game prompt, a request that never answers being saved once, the play log's "all saved" count, and the team and player game logs. Screenshots were inspected, including the pre-game prompt at desktop and phone width.
+
+By hand: `npm run stats:db-check` and `npm run stats:copy` were run against PostgreSQL over the network standing in for Supabase (placeholder password and missing URL rejected with advice; a game tracked through the local server copied up, a second run copying nothing; the tracker then served the copied game, record and game logs from it; and a backup copied down to a folder). The copy refused to run while the local tracker had its database open.
+
+Not yet verified: a real Supabase project (none exists yet), the Docker image, a full real game on the scoring laptop, and TCSAAL's game format.
+
+### Turnovers
+
+Turnovers were added as a player stat (the **TO** option), shown as each team's total in its title with a per-player breakdown, and not on player tiles. `npm test` covers the engine (per player and team, taking one back, undo, no effect on score, fouls or bonus), every storage adapter (season totals and both game logs), a database made before turnovers gaining the column with earlier lines counting none, and turnovers copying up to a hosted database. The browser check taps TO, confirms the tile is unchanged and the team totals and breakdown are right, takes one back from the breakdown, and finds the TO column and totals on the game page and in a player's game log. Desktop and phone screenshots of the menu and breakdown were inspected.
+
+## November 2 GitHub Pages site on Supabase
+
+The live stats now run as a static site on GitHub Pages (`npm run build:pages`), saving to Supabase from the browser through database functions (`002-api.sql`), with the concept demo moved under `/demo/`. `supabase/setup.sql` sets a project up in one paste.
+
+`npm test` passed with 85 tests, including: the full shared storage suite run against the Supabase adapter through a stand-in for Supabase's REST API (PostgreSQL as the `anon` role, named-argument function calls, API-key checks, `PTxxx` status codes); `setup.sql` being current, safe to run twice and setting up the same schedule as the server's own seeding; and passcode sessions (none set, wrong passcode, the 20-in-15-minutes limit, expired and unknown sessions refused with nothing written, a new passcode signing every device out, the passcode setter unreachable through the API, a wrong project key reported as such). A database user without permission to create functions in `public` still gets the tables.
+
+`npm run test:pages:browser` passed in Chromium against the built site served under `/league-platform/`: the secret-key refusal, sign-in, rosters by name and by quick-add, a game tracked with baskets, a turnover, a foul and a substitution, the connection cut mid-game with two taps held and then saved once each, a signed-out phone following along by polling, reload, End game, the team and player game logs, the demo under `/demo/`, sign-out, and the "not connected yet" message without a project. Screenshots were inspected. The server-mode browser check still passes.
+
+Not yet verified: a real Supabase project (the REST API and dashboard steps follow Supabase's documented conventions, but none exists yet), and a full game on the scoring device.
+
+### Team turnovers
+
+Turnovers charged to the team rather than a player (**+ Team turnover** in the team's turnover list, with − to take one back) count in the team's total, the box score total with a note, the play-by-play and the team game log, and never in a player's stats. They need no new column: they are plays in the game state, and the static site's game lists keep them. Tests: the engine (counting, taking back, undo, descriptions), the team game log on every storage adapter including Supabase, and both browser checks. The site can also take its Supabase address and public key from a committed `supabase/site.json`, with the secret-key refusal applying there too.
+
+### Connected to the real Supabase project; open scoring
+
+The site is connected to the Supabase project through the committed `supabase/site.json` (the project URL and publishable key, both public). Against the real project, the site's API answered with the publishable key in both headers and returned the ten fixtures, the first check against real Supabase rather than the stand-in.
+
+Until a scorer passcode is set, scoring is now open: anyone with the link can score, with no sign-in (`live_stats.open_scoring()`); setting a passcode closes it. Tested in `tests/live-stats-supabase.test.mjs`, and by hand in a browser against the stand-in with no passcode: no sign-in offered, rosters, lineups and a basket saved.

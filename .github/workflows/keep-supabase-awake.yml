@@ -1,0 +1,28 @@
+# Free Supabase projects pause after a week without use, and the season has longer
+# gaps than that (mid-December to January). Once a day this asks the live stats
+# database one small question, so it is awake on game day. Uses the same public
+# repository variables as the site; does nothing until they are set.
+name: Keep Supabase awake
+on:
+  schedule:
+    - cron: '17 15 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask the stats database for the schedule's version
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "SUPABASE_URL and SUPABASE_ANON_KEY are not set yet; nothing to do."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/ls_schedule_version" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" -d '{}'
