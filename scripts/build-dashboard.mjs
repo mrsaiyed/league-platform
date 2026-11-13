@@ -226,12 +226,18 @@ const commits = git('log', '--format=%h\t%cI\t%s', '-12', 'main..HEAD')
     return { hash, time, subject };
   });
 
+// The newest saved work anywhere in the build: the build branch or any builder's lane.
+// A builder saves in its own lane long before the lead lands it, so this is the truest
+// sign that the team is alive.
+const newestWork = git('log', '-1', '--format=%cI', 'HEAD', '--glob=refs/heads/lane/*').trim();
+
 const data = {
   generatedAt: new Date().toISOString(),
   state: field('State'),
   branch: field('Branch'),
   currentStage,
   lock: read(path.join(buildDir, '.lock')).trim(),
+  newestWork,
   stagePlans,
   stages,
   commits,
@@ -319,6 +325,9 @@ const names = ready
       (step.unblocks ? ` (${step.unblocks} wait on it)` : ''),
   )
   .join(', ');
+// `--quiet` only refreshes the page. The ten-minute check uses it while another run is
+// working: that check must not be told to open lanes.
+if (process.argv.includes('--quiet')) process.exit(0);
 console.log(`Lanes: ${lanes.length} of ${data.laneCount} open in STATUS.md.`);
 if (free && ready.length) {
   console.log(

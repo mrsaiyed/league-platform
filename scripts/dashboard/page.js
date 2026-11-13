@@ -427,14 +427,21 @@ if (preview) {
     if (s.state !== 'done') s.state = ids.has(s.id) ? 'now' : 'todo';
   });
 }
-// The newest sign that the team is alive: the lead's own time stamp, or newer saved work.
-const newestSave = D.commits[0] ? D.commits[0].time : '';
+// The newest sign that the team is alive: the lead's own time stamp, or newer saved work
+// on the build branch or in any builder's lane.
 const lastSign =
-  D.lock && newestSave && new Date(newestSave) > new Date(D.lock) ? newestSave : D.lock;
+  [D.lock, D.commits[0] && D.commits[0].time, D.newestWork]
+    .filter(Boolean)
+    .sort((a, b) => new Date(b) - new Date(a))[0] || '';
 const lockAge = D.lock ? (Date.now() - new Date(lastSign)) / 60000 : Infinity;
+// This page is a saved file: it knows only what was true when it was written. When it is
+// old it says so, and does not guess why the team looks quiet.
+const pageAge = (Date.now() - new Date(D.generatedAt)) / 60000;
 const building = D.state === 'building';
 const working = preview || (building && lockAge < 35);
-const quiet = !preview && building && lockAge >= 35 && lockAge < 600;
+const silent = !preview && building && lockAge >= 35;
+const stale = silent && pageAge >= 25;
+const quiet = silent && !stale && lockAge < 600;
 const busy = working && lanes.length > 0;
 const doneCount = all.filter((s) => s.state === 'done').length;
 const laneOf = (id) => lanes.find((l) => l.id === id);
@@ -497,14 +504,11 @@ const pill = preview
     ? ['wait', 'Waiting on you']
     : working
       ? ['go', 'The team is working (last save or check-in ' + ago(lastSign) + ')']
-      : quiet
-        ? [
-            'wait',
-            'Paused since ' +
-              ago(lastSign) +
-              ', most likely the usage limit. It resumes by itself.',
-          ]
-        : ['', 'Between runs: the next one starts by itself'];
+      : stale
+        ? ['wait', 'This page is out of date: last refreshed ' + ago(D.generatedAt)]
+        : quiet
+          ? ['wait', 'Quiet: no saved work or check-in since ' + ago(lastSign)]
+          : ['', 'Between runs: the next one starts by itself'];
 $('pill').className = 'pill ' + pill[0];
 $('pilltext').textContent = pill[1];
 $('preview').hidden = !preview;
@@ -754,11 +758,19 @@ const says = busy
     ]
   : working
     ? ['Checking what the last run left…', 'Handing out the next steps…']
-    : quiet
-      ? ['We ran out of usage allowance. We start again by ourselves when it resets.']
-      : D.state === 'waiting-for-founder'
-        ? ['We need an answer from you. Click my tent to see what.']
-        : ['Everyone is resting. The next run starts by itself in a few minutes.'];
+    : stale
+      ? [
+          'This page has not been refreshed lately, so I cannot say what the team is doing right now.',
+          'It refreshes every ten minutes while the Claude app is open and has usage left.',
+        ]
+      : quiet
+        ? [
+            'No saved work for a while. A long check may be running.',
+            'If this run is stuck, the next one takes over by itself.',
+          ]
+        : D.state === 'waiting-for-founder'
+          ? ['We need an answer from you. Click my tent to see what.']
+          : ['Everyone is resting. The next run starts by itself in a few minutes.'];
 let line = 0;
 bubble.textContent = says[line++ % says.length];
 if (says.length > 1) {
@@ -1140,7 +1152,7 @@ if (!$('needs').children.length) $('needs').append(el('li', 'muted', 'Nothing ri
 $('foot').textContent =
   'Page written ' +
   clock(D.generatedAt) +
-  '. It is rewritten each time a step is saved, and reloads itself every minute. ' +
+  '. It is rewritten every ten minutes and each time a step is saved, and reloads itself every minute. ' +
   'Each character stands for a kind of work: every step is built by a fresh AI builder, and the character shows which kind of work it is. ';
 const toggle = el(
   'button',
