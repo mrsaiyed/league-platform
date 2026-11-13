@@ -273,8 +273,8 @@ test('every tap is on disk once it is answered: a server killed mid-game loses n
     assert.equal(next.homeScore, 3);
     assert.equal((await local(port, 'GET', `/api/players/${home.id}`)).status, 200);
   } finally {
-    const gone = new Promise((resolve) => server.child.once('exit', resolve));
-    if (server.child.exitCode === null) {
+    const gone = new Promise((resolve) => server.child.once('close', resolve));
+    if (server.child.exitCode === null && server.child.signalCode === null) {
       server.child.kill();
       await gone;
     }
