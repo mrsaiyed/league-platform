@@ -12,6 +12,8 @@ export async function updatePublishedGame(
   gameId: string,
   change: PublishedGameChange,
 ): Promise<boolean> {
+  // A change that names nothing would build an empty update: nothing is changed.
+  if (change.slot === undefined && change.captureMode === undefined) return false;
   const trx = transactionOf(scope);
   const league = await trx
     .selectFrom('leagues')
