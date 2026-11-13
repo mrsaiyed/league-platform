@@ -69,6 +69,19 @@ export type LeagueRecords = MadeLeague & {
   /** A game still to play, with the member assigned to score it. */
   upcomingGameId: string;
   gameAssignmentId: string;
+  /** The final game's two events, its state, the player's line in it, and a session scoring the upcoming game. */
+  gameEventIds: string[];
+  gameStateId: string;
+  playerGameStatsId: string;
+  scoringSessionId: string;
+  /** A player added at the final game's scorer's table, waiting for the admin's review (S-6). */
+  walkUpRosterEntryId: string;
+  /** The team's standings row, an adjustment to it, and the player's season totals. */
+  standingsRowId: string;
+  standingsAdjustmentId: string;
+  seasonPlayerTotalsId: string;
+  /** A fixtures import, applied, with what it created. */
+  importId: string;
 };
 
 export type TwoLeagues = {
@@ -352,6 +365,91 @@ async function seededLeague(
     'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
     [leagueId, upcomingGameId, member.accountId],
   );
+  // The live game: the final game's events, state and the player's line; a session
+  // scoring the upcoming game; a walk-up player added at the final game's table.
+  const gameEventIds: string[] = [];
+  for (const [seq, type, payload] of [
+    [1, 'start', {}],
+    [2, 'score', { side: 'home', playerId: personId, points: 2 }],
+  ] as const) {
+    gameEventIds.push(
+      await id(
+        pglite,
+        `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at, account_id)
+         values ($1, $2, $3, $4, $5, $6, '2026-12-06T18:05:00Z', $7)`,
+        [leagueId, gameId, seq, randomUUID(), type, JSON.stringify(payload), member.accountId],
+      ),
+    );
+  }
+  const gameStateId = await id(
+    pglite,
+    'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 2, $3)',
+    [leagueId, gameId, JSON.stringify({ version: 1, status: 'final', plays: [] })],
+  );
+  const playerGameStatsId = await id(
+    pglite,
+    `insert into player_game_stats
+       (league_id, game_id, team_id, person_id, jersey_number, played, seconds_played, stats)
+     values ($1, $2, $3, $4, '23', true, 1200, '{"points": 2, "fg2": 1}')`,
+    [leagueId, gameId, teamId, personId],
+  );
+  const scoringSessionId = await id(
+    pglite,
+    `insert into scoring_sessions (league_id, game_id, account_id, device_id, held_until)
+     values ($1, $2, $3, $4, now() + interval '2 minutes')`,
+    [leagueId, upcomingGameId, member.accountId, `${m}-tablet`],
+  );
+  const walkUpPersonId = await id(
+    pglite,
+    `insert into people (league_id, first_name, last_name) values ($1, $2, 'Walk-up')`,
+    [leagueId, m],
+  );
+  const walkUpRosterEntryId = await id(
+    pglite,
+    `insert into roster_entries (league_id, team_id, person_id, jersey_number, added_at_game_id, needs_review)
+     values ($1, $2, $3, '7', $4, true)`,
+    [leagueId, teamId, walkUpPersonId, gameId],
+  );
+  // The calculated tables: the team's standings row with an adjustment, and the
+  // player's season totals.
+  const standingsRowId = await id(
+    pglite,
+    `insert into standings_rows (league_id, season_id, division_id, team_id, rank, seed,
+       games_played, wins, points_for, points_against, streak_result, streak_length)
+     values ($1, $2, $3, $4, 1, 1, 1, 1, 52, 48, 'won', 1)`,
+    [leagueId, seasonId, divisionId, teamId],
+  );
+  const standingsAdjustmentId = await id(
+    pglite,
+    `insert into standings_adjustments (league_id, season_id, team_id, points, reason, account_id)
+     values ($1, $2, $3, -1, $4, $5)`,
+    [leagueId, seasonId, teamId, `Late roster for ${m}`, ownerId],
+  );
+  const seasonPlayerTotalsId = await id(
+    pglite,
+    `insert into season_player_totals (league_id, season_id, person_id, games_played,
+       seconds_played, seconds_games, stats)
+     values ($1, $2, $3, 1, 1200, 1, $4)`,
+    [
+      leagueId,
+      seasonId,
+      personId,
+      JSON.stringify({ version: 1, stats: { points: { total: 2, gamesRecorded: 1 } } }),
+    ],
+  );
+  const importId = await id(
+    pglite,
+    `insert into imports (league_id, season_id, kind, status, account_id, file_name, report,
+       created, applied_at)
+     values ($1, $2, 'fixtures', 'applied', $3, $4, '{"version": 1, "rows": 2}', $5, now())`,
+    [
+      leagueId,
+      seasonId,
+      ownerId,
+      `${m}-fixtures.csv`,
+      JSON.stringify({ version: 1, games: [upcomingGameId] }),
+    ],
+  );
   // A job a worker holds. It carries ids only (T-131), so no marker: its ids are the league's.
   const jobLeaseToken = randomUUID();
   const jobId = await id(
@@ -396,6 +494,15 @@ async function seededLeague(
     gameId,
     upcomingGameId,
     gameAssignmentId,
+    gameEventIds,
+    gameStateId,
+    playerGameStatsId,
+    scoringSessionId,
+    walkUpRosterEntryId,
+    standingsRowId,
+    standingsAdjustmentId,
+    seasonPlayerTotalsId,
+    importId,
   };
 }
 

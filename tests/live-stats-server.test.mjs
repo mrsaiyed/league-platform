@@ -28,16 +28,16 @@ function start(env) {
   let output = '';
   child.stdout.on('data', (s) => (output += s));
   child.stderr.on('data', (s) => (output += s));
+  // Ready when the whole start-up text is out (its last fixed line is the database line), or
+  // when the process ends first; no timer, so a slow machine only makes it wait longer.
+  const databaseLine = /Database: .*\n/;
   const ready = new Promise((resolve, reject) => {
-    const timer = setInterval(() => {
-      if (output.includes('Live stats:')) {
-        clearInterval(timer);
-        resolve();
-      } else if (child.exitCode !== null) {
-        clearInterval(timer);
-        reject(new Error(output));
-      }
-    }, 100);
+    const check = () => {
+      if (databaseLine.test(output)) resolve();
+    };
+    child.stdout.on('data', check);
+    child.stderr.on('data', check);
+    child.once('close', () => (databaseLine.test(output) ? resolve() : reject(new Error(output))));
   });
   return { child, ready, output: () => output };
 }
@@ -273,8 +273,11 @@ test('every tap is on disk once it is answered: a server killed mid-game loses n
     assert.equal(next.homeScore, 3);
     assert.equal((await local(port, 'GET', `/api/players/${home.id}`)).status, 200);
   } finally {
-    server.child.kill();
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    const gone = new Promise((resolve) => server.child.once('close', resolve));
+    if (server.child.exitCode === null && server.child.signalCode === null) {
+      server.child.kill();
+      await gone;
+    }
     await rm(dir, { recursive: true, force: true });
   }
 });

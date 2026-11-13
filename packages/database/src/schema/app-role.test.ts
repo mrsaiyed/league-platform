@@ -31,6 +31,7 @@ const historyTables = [
   'support_access_log',
   'schedule_revisions',
   'game_corrections',
+  'game_events',
 ];
 /** The only functions that run as their owner, each reviewed (T-221, records 008 and 012). */
 const definerFunctions = [

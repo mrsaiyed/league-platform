@@ -33,9 +33,20 @@ export async function readRows(trx: Trx): Promise<DatabaseRows> {
     where t.table_schema = 'public' and t.table_type = 'BASE TABLE'
     order by 1`.execute(trx);
   const groups: DatabaseRows = new Map();
-  for (const { name, by_league } of tables) {
-    const { rows } = await sql<{ row: string }>`
-      select to_jsonb(r)::text as row from ${sql.table(name)} r order by 1`.execute(trx);
+  // Every table in one statement: the harness reads the whole database after each
+  // case, so one round trip instead of one per table keeps it quick as tables grow.
+  const byLeague = new Map(tables.map((t) => [t.name, t.by_league]));
+  const { rows: all } = await sql<{ name: string; row: string }>`
+    select name, row from (${sql.join(
+      tables.map(
+        ({ name }) =>
+          sql`select ${name}::text as name, to_jsonb(r)::text as row from ${sql.table(name)} r`,
+      ),
+      sql` union all `,
+    )}) as every_row order by name, row`.execute(trx);
+  for (const { name } of tables) {
+    const by_league = byLeague.get(name) ?? false;
+    const rows = all.filter((r) => r.name === name);
     for (const { row } of rows) {
       const parsed: Record<string, unknown> = JSON.parse(row);
       const key = name === 'leagues' ? parsed.id : by_league ? parsed.league_id : outside;
@@ -124,8 +135,17 @@ export async function removeRows(trx: Trx, rows: Map<string, string[]>): Promise
   if (state === undefined) throw new Error('removeRows: could not read the transaction state');
   await sql`reset role`.execute(trx);
   await sql`set local session_replication_role = replica`.execute(trx);
-  for (const [table, ids] of rows) {
-    await sql`delete from ${sql.table(table)} where id::text in (${sql.join(ids)})`.execute(trx);
+  // Every table's rows in one statement (each delete its own step of one WITH), so
+  // the harness's many runs make one round trip here, not one per table.
+  const deletes = [...rows].filter(([, ids]) => ids.length > 0);
+  if (deletes.length > 0) {
+    await sql`with ${sql.join(
+      deletes.map(
+        ([table, ids], k) =>
+          sql`${sql.id(`removed_${k}`)} as (
+            delete from ${sql.table(table)} where id::text in (${sql.join(ids)}) returning 1)`,
+      ),
+    )} select 1`.execute(trx);
   }
   await sql`set local session_replication_role = origin`.execute(trx);
   if (state.role !== state.login) await sql`set local role ${sql.id(state.role)}`.execute(trx);
