@@ -3,7 +3,7 @@
 // sent (the worker's email.send job) and exists nowhere else, so nothing here keeps
 // or logs it. Plain HTML for now; the league's logo and colors (T7 §6) come when
 // templates are drawn with the league's design.
-import { escapeHtml, type EmailWords, type RenderedEmail } from './rendered-email.ts';
+import { escapeHtml, headerText, type EmailWords, type RenderedEmail } from './rendered-email.ts';
 
 /** The message keys this template uses (packages/site's English catalog has each). */
 export type InvitationEmailKey =
@@ -33,7 +33,8 @@ export function invitationEmail(
   data: InvitationEmailData,
   t: EmailWords<InvitationEmailKey>,
 ): RenderedEmail {
-  const subject = t('email.invitation.subject', { league: data.leagueName });
+  // One header line: the league's name may hold a line break (headerText).
+  const subject = headerText(t('email.invitation.subject', { league: data.leagueName }));
   const intro = t('email.invitation.intro', { league: data.leagueName, role: data.roleName });
   const action = t('email.invitation.action');
   const howTo = t('email.invitation.howTo');

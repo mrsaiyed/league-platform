@@ -262,17 +262,23 @@ function leagueRoot(league: LeagueAddressee, origin: string | undefined): string
   if (!isShortNameFormat(league.slug)) {
     throw new TypeError('leagueUrl: the league has no short name of the right form.');
   }
-  return `${origin === undefined ? '' : siteOrigin(origin)}/${league.slug}`;
+  return `${origin === undefined ? '' : checkedSiteOrigin(origin)}/${league.slug}`;
 }
 
-function siteOrigin(origin: string): string {
+/**
+ * Our site's origin as addresses use it: `https://site` or `http://site`, nothing
+ * after the host. Throws on anything else, as leagueUrl does with `origin`; a
+ * setting can be checked with this once, at startup, before it is used.
+ */
+export function checkedSiteOrigin(origin: string): string {
   let url: URL;
   try {
     url = new URL(origin);
   } catch {
     throw new TypeError('leagueUrl: origin is not an address.');
   }
-  const bare = url.pathname === '/' && url.search === '' && url.hash === '' && !url.username;
+  const bare =
+    url.pathname === '/' && url.search === '' && url.hash === '' && !url.username && !url.password;
   if (!bare || (url.protocol !== 'https:' && url.protocol !== 'http:')) {
     throw new TypeError('leagueUrl: origin must be only a scheme and host, like https://site.');
   }

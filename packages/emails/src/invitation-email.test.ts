@@ -1,7 +1,7 @@
 // The invitation email's template: words from the message files, values escaped.
 import { describe, expect, it } from 'vitest';
 import { invitationEmail, type InvitationEmailKey } from './invitation-email.ts';
-import { escapeHtml, fromHeader } from './rendered-email.ts';
+import { escapeHtml, fromHeader, headerText } from './rendered-email.ts';
 
 // Stands in for the site's translator: the key, then its values.
 const t = (key: InvitationEmailKey, params?: Readonly<Record<string, string | number>>) =>
@@ -42,6 +42,23 @@ describe('invitationEmail', () => {
     expect(email.html).not.toContain('<League>');
     expect(email.html).toContain('North &lt;League&gt; &amp; \\&quot;Friends\\&quot;');
   });
+
+  it('keeps the subject on one header line', () => {
+    // Words that put the name in as it is, as the real catalog's do.
+    const plain = (key: InvitationEmailKey, params?: Readonly<Record<string, string | number>>) =>
+      `${key} ${String(params?.['league'] ?? '')}`;
+    const email = invitationEmail({ ...data, leagueName: 'North\r\nBcc: x@example.test' }, plain);
+    expect(email.subject).toBe('email.invitation.subject North Bcc: x@example.test');
+  });
+});
+
+describe('headerText', () => {
+  it('turns every run of characters that could end a header line into one space', () => {
+    for (const breaker of ['\r', '\n', '\t', '\v', '\f', '\0', '\u0085', '\u2028', '\u2029']) {
+      expect(headerText(`North${breaker}${breaker}League`)).toBe('North League');
+    }
+    expect(headerText('  North League  ')).toBe('North League');
+  });
 });
 
 describe('escapeHtml', () => {
@@ -64,10 +81,38 @@ describe('fromHeader', () => {
 
   it('cannot be made to start another header', () => {
     expect(fromHeader('North\r\nBcc: x@example.test', 'a@example.test')).toBe(
-      '"North Bcc: x@example.test" <a@example.test>',
+      '"North Bcc: x example.test" <a@example.test>',
     );
+    for (const breaker of ['\v', '\f', '\0', '\u0085', '\u2028', '\u2029']) {
+      expect(fromHeader(`North${breaker}Bcc: b`, 'a@example.test')).toBe(
+        '"North Bcc: b" <a@example.test>',
+      );
+    }
     expect(fromHeader('  ', 'a@example.test')).toBe('a@example.test');
-    expect(() => fromHeader('North', 'a@example.test\r\nBcc: b@example.test')).toThrow(TypeError);
-    expect(() => fromHeader('North', 'not an address')).toThrow(TypeError);
+  });
+
+  it('cannot be made to name a second address', () => {
+    expect(fromHeader('North <x@example.test>', 'a@example.test')).toBe(
+      '"North x example.test" <a@example.test>',
+    );
+    expect(fromHeader('<>@', 'a@example.test')).toBe('a@example.test');
+  });
+
+  it('refuses a sending address that is not one plain address', () => {
+    for (const address of [
+      '',
+      'not an address',
+      '@example.test',
+      'a@',
+      'a@b@example.test',
+      'North <a@example.test>',
+      'a@example.test, b@example.test',
+      'a@example.test\r\nBcc: b@example.test',
+      'a@example.test\u2028',
+      'a\u0085@example.test',
+      'a\0@example.test',
+    ]) {
+      expect(() => fromHeader('North', address)).toThrow(TypeError);
+    }
   });
 });

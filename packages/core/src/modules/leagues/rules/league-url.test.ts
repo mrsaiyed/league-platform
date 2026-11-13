@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   adminAreas,
+  checkedSiteOrigin,
   forwardedLeagueUrl,
   isLeagueIdFormat,
   isLeagueSiteName,
@@ -112,9 +113,13 @@ describe('leagueUrl (T-34)', () => {
       'https://site.example.test/?x=1',
       'ftp://site.example.test',
       'https://user@site.example.test',
+      'https://:secret@site.example.test',
     ]) {
       expect(() => leagueUrl(north, 'home', { origin })).toThrow(TypeError);
+      // The same check, alone, for a setting read at startup.
+      expect(() => checkedSiteOrigin(origin)).toThrow(TypeError);
     }
+    expect(checkedSiteOrigin('http://localhost:3000/')).toBe('http://localhost:3000');
   });
 
   it('encodes values, so a value cannot add a segment or a query', () => {

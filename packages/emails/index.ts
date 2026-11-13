@@ -8,6 +8,7 @@ export {
 export {
   escapeHtml,
   fromHeader,
+  headerText,
   type EmailWords,
   type RenderedEmail,
 } from './src/rendered-email.ts';
