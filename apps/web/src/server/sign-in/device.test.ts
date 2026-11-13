@@ -27,11 +27,16 @@ describe('deviceLabel', () => {
 });
 
 describe('networkAddressOf', () => {
-  it('believes only the last entry, written by the nearest server', () => {
-    expect(networkAddressOf('6.6.6.6, 192.0.2.10')).toBe('192.0.2.10');
-    expect(networkAddressOf('::ffff:127.0.0.1')).toBe('::ffff:127.0.0.1');
-    expect(networkAddressOf('192.0.2.10, not-an-address')).toBe(unknownNetwork);
-    expect(networkAddressOf(null)).toBe(unknownNetwork);
+  it('believes no forwarded address by default: everyone shares one key', () => {
+    expect(networkAddressOf('192.0.2.10', 'none')).toBe(unknownNetwork);
+    expect(networkAddressOf('6.6.6.6, 192.0.2.10', 'none')).toBe(unknownNetwork);
+  });
+
+  it('behind one trusted proxy, believes only its entry, the last one', () => {
+    expect(networkAddressOf('6.6.6.6, 192.0.2.10', 'one')).toBe('192.0.2.10');
+    expect(networkAddressOf('::ffff:127.0.0.1', 'one')).toBe('::ffff:127.0.0.1');
+    expect(networkAddressOf('192.0.2.10, not-an-address', 'one')).toBe(unknownNetwork);
+    expect(networkAddressOf(null, 'one')).toBe(unknownNetwork);
   });
 });
 
@@ -41,6 +46,24 @@ describe('safeReturnPath', () => {
     for (const bad of ['//evil.example', '/\\evil.example', 'https://evil.example', 'x', '', 3]) {
       expect(safeReturnPath(bad)).toBeNull();
     }
+  });
+
+  it('refuses paths that become another site once the browser normalises or decodes them', () => {
+    for (const bad of [
+      '/.//evil.com',
+      '/..//evil.com',
+      '/%2e%2e//evil.com',
+      '/%2e//evil.com/x?y=1',
+      '/a/../..//evil.com',
+      '/%2F%2Fevil.com',
+      '/%5Cevil.com',
+      '/x%0d%0aSet-Cookie:a=b',
+      '/\u0000evil',
+    ]) {
+      expect(safeReturnPath(bad), bad).toBeNull();
+    }
+    expect(safeReturnPath('/north-valley/./teams')).toBe('/north-valley/teams');
+    expect(safeReturnPath('/find?q=a%20b')).toBe('/find?q=a%20b');
   });
 });
 

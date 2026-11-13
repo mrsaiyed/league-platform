@@ -19,7 +19,7 @@ export async function nextVisit(): Promise<Visit> {
         jar.delete(name);
       },
     },
-    networkAddress: networkAddressOf(given.get('x-forwarded-for')),
+    networkAddress: networkAddressOf(given.get('x-forwarded-for'), getConfig().TRUSTED_PROXY),
     userAgent: given.get('user-agent') ?? '',
   };
 }

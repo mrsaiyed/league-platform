@@ -17,6 +17,7 @@ export const fields = {
   APP_ENV: { secret: false },
   PUBLIC_BASE_URL: { secret: false },
   LOG_LEVEL: { secret: false },
+  TRUSTED_PROXY: { secret: false },
   DATABASE_URL: { secret: true },
   SESSION_SECRET: { secret: true },
   SUPABASE_URL: { secret: false },
@@ -35,6 +36,10 @@ const schema = z.object({
   APP_ENV: z.enum(['local', 'test', 'staging', 'production']),
   PUBLIC_BASE_URL: webUrl,
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  // Whether X-Forwarded-For is believed for the sign-in attempt limits (record 031):
+  // 'none' (default) never; 'one' when exactly one proxy of the host appends the
+  // address it was reached from.
+  TRUSTED_PROXY: z.enum(['none', 'one']).default('none'),
   DATABASE_URL: z
     .string()
     .trim()
@@ -51,7 +56,7 @@ const schema = z.object({
 export type Config = Readonly<z.infer<typeof schema>>;
 
 /** Optional variables: absent or blank means "use the default", not "missing". */
-const optional: readonly ConfigName[] = ['LOG_LEVEL'];
+const optional: readonly ConfigName[] = ['LOG_LEVEL', 'TRUSTED_PROXY'];
 
 export class ConfigError extends Error {
   readonly missing: readonly string[];

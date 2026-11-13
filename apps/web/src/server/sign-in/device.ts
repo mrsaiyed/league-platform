@@ -55,33 +55,59 @@ export function deviceLabel(userAgent: string): string {
   return t('device.label', { browser, system });
 }
 
-/** Used when no address can be read. The service needs one; all such requests share it. */
+/**
+ * The one key every request shares when its address is not believed. The service
+ * needs one; sharing it fails closed: guesses from everyone count together.
+ */
 export const unknownNetwork = '0.0.0.0';
 
 /**
- * The address a request came from, from X-Forwarded-For: its last entry, the one
- * written by the nearest server in front of the app (the host's own proxy, or
- * Next.js itself from the connection). The entries before it are what the browser
- * claimed and are never believed. Record 031: hosting must put one proxy that
- * appends the real address in front of the app.
+ * Whether X-Forwarded-For is believed (TRUSTED_PROXY, config-schema.ts):
+ * - `none` (the default): never. Next.js fills the header from the connection only
+ *   when the browser did not send one, so on its own the header is whatever the
+ *   browser claims. Every request then shares one key (unknownNetwork).
+ * - `one`: exactly one proxy of the host's stands in front of the app and appends
+ *   the address it was reached from; its entry, the last one, is believed. Entries
+ *   before it are what the browser claimed.
  */
-export function networkAddressOf(forwardedFor: string | null): string {
+export type TrustedProxy = 'none' | 'one';
+
+/** The network a request came from, for the attempt limits (T-85, T-225). */
+export function networkAddressOf(forwardedFor: string | null, trust: TrustedProxy): string {
+  if (trust === 'none') return unknownNetwork;
   const last = forwardedFor?.split(',').at(-1)?.trim() ?? '';
   return networkAddressShape.safeParse(last).success ? last : unknownNetwork;
 }
 
+const site = 'http://site.invalid';
+
+/** A path that stays on this site: one leading slash, no backslash, space or control character. */
+function staysHere(path: string): boolean {
+  return path.startsWith('/') && !path.startsWith('//') && !/[\\\s\p{Cc}]/u.test(path);
+}
+
 /**
  * A place of ours to go after signing in: a path on this site, never another site
- * (`//elsewhere`, `/\elsewhere` or a full address), or null.
+ * (`//elsewhere`, `/\elsewhere`, `/.//elsewhere`, `/%2e%2e//elsewhere` or a full
+ * address), or null. The path is checked as given, as the browser will read it
+ * (normalised), and decoded.
  */
 export function safeReturnPath(value: unknown): string | null {
   if (typeof value !== 'string' || value.length === 0 || value.length > 2000) return null;
-  if (!value.startsWith('/') || value.startsWith('//') || /[\\\s]/.test(value)) return null;
+  if (!staysHere(value)) return null;
+  let parsed: URL;
   try {
-    const parsed = new URL(value, 'http://site.invalid');
-    if (parsed.origin !== 'http://site.invalid') return null;
-    return parsed.pathname + parsed.search;
+    parsed = new URL(value, site);
   } catch {
     return null;
   }
+  if (parsed.origin !== site) return null;
+  const path = parsed.pathname + parsed.search;
+  if (!staysHere(path)) return null;
+  try {
+    if (!staysHere(decodeURIComponent(parsed.pathname))) return null;
+  } catch {
+    return null;
+  }
+  return path;
 }

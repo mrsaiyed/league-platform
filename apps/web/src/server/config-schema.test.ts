@@ -6,6 +6,7 @@ const valid: Record<ConfigName, string> = {
   APP_ENV: 'test',
   PUBLIC_BASE_URL: 'http://localhost:3000',
   LOG_LEVEL: 'debug',
+  TRUSTED_PROXY: 'one',
   DATABASE_URL: 'postgres://app:hunter2-made-up@localhost:5432/x',
   SESSION_SECRET: longValue('SESSION_SECRET'),
   SUPABASE_URL: 'http://localhost:54321',
@@ -16,7 +17,7 @@ const valid: Record<ConfigName, string> = {
   STRIPE_WEBHOOK_SECRET: longValue('STRIPE_WEBHOOK_SECRET'),
 };
 const names = Object.keys(fields) as ConfigName[];
-const required = names.filter((name) => name !== 'LOG_LEVEL');
+const required = names.filter((name) => name !== 'LOG_LEVEL' && name !== 'TRUSTED_PROXY');
 
 function failure(env: Record<string, string | undefined>): ConfigError {
   try {
@@ -39,6 +40,13 @@ describe('loadConfig', () => {
     const rest: Record<string, string | undefined> = { ...valid };
     delete rest['LOG_LEVEL'];
     expect(loadConfig(rest).LOG_LEVEL).toBe('info');
+  });
+
+  it('believes no forwarded address unless told (record 031)', () => {
+    const rest: Record<string, string | undefined> = { ...valid };
+    delete rest['TRUSTED_PROXY'];
+    expect(loadConfig(rest).TRUSTED_PROXY).toBe('none');
+    expect(failure({ ...valid, TRUSTED_PROXY: 'all' }).invalid.join()).toContain('TRUSTED_PROXY');
   });
 
   it('ignores variables it does not know', () => {
