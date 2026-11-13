@@ -26,7 +26,6 @@ Reserved so far: migration 0006 and decision record 012 / T-224 to 1.19 part 1; 
 - **1.13 Sign-in interface and stand-in** — `.local/lanes/1.13-signin-interface` — record 013 / T-225 — whole step.
 - **1.18 part 1** — `.local/lanes/1.18p1-design-messages` — record 015 / T-227 — design values to CSS variables, message loader, right-to-left.
 - **1.19 part 1** — `.local/lanes/1.19p1-queue-email` — migration 0006, record 012 / T-224 — queue and email interfaces, stand-ins, adapters, jobs table.
-- **1.20 part 1** — `.local/lanes/1.20p1-logging` — record 016 / T-228 — logging and error-reporting library.
 
 ## Needs the founder
 
@@ -42,6 +41,8 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 ## Log
 
 Newest first. One line per step or event.
+
+- 2026-11-13 — Step 1.20 part 1 done: logging and error reporting in packages/observability (JSON logs with request ID, redaction of personal content and secrets, error reporter, local adapters, Sentry adapter over an injected client, unverified). Reviewer's findings fixed. To do when real Sentry is wired: sendDefaultPii off, beforeSend running redact, drop breadcrumbs/request data. Open: CommandLine is a copy of core's log-line shape; free-text names under harmless keys cannot be detected; health checks are part 2. Gate: under six concurrent lanes the database tests time out at 30 s (app-role.test.ts); they pass alone.
 
 - 2026-11-12 — Founder: no more one step at a time; as many builders as realistic, on every stage that does not have to wait; the founder is away and the build needs no permission from them. Runbook rewritten: each step is built in its own lane (a private copy of the repository under `.local/lanes`), up to 5 at once, landed one at a time by the lead; the end of a stage no longer stops the build; later stages fill spare lanes (T-212 changed, record 011). A trial lane installed in 8 seconds and ran the gate in about two and a half minutes; one timing test in the migration runner failed under load and passed alone (flaky under load: make it sturdy).
 
