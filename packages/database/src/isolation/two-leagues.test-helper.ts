@@ -53,6 +53,8 @@ export type LeagueRecords = MadeLeague & {
   /** A team of the season in the division, with one person on its roster. */
   teamId: string;
   personId: string;
+  /** A person who left the team (so not on a roster now): the child of the shared account. */
+  formerPlayerId: string;
   rosterEntryId: string;
   /** The season's regular-season stage and its first round. */
   stageId: string;
@@ -384,6 +386,7 @@ async function seededLeague(
     emptyVenueId,
     teamId,
     personId,
+    formerPlayerId: childPersonId,
     rosterEntryId,
     stageId,
     roundId,
