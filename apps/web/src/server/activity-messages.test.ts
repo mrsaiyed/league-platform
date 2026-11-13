@@ -14,9 +14,11 @@ const reads = new Set([
   'leagues.list_divisions',
   'people.list_people',
   'games.list_postponed_games',
+  'games.list_my_games',
   'leagues.get_season',
   'scheduling.list_venues',
   'scheduling.get_schedule_draft',
+  'scheduling.preview_schedule_publish',
   'teams.list_roster',
 ]);
 

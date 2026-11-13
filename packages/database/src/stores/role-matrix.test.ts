@@ -23,8 +23,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import {
   acceptInvitation,
+  assignScorekeeper,
   cancelInvitation,
   commands,
+  listMyGames,
+  unassignScorekeeper,
   createCourt,
   createDivision,
   cancelGame,
@@ -37,6 +40,8 @@ import {
   changeDraftRoundDate,
   discardScheduleDraft,
   getScheduleDraft,
+  previewSchedulePublish,
+  publishSchedule,
   moveDraftGame,
   removeDraftGame,
   renameDraftRound,
@@ -562,6 +567,29 @@ function scheduleRows(
   }));
 }
 
+/** A draft on the season (before any publication) that moves its first game; its id. */
+async function draftMovingFirstGame(
+  s: Awaited<ReturnType<typeof scheduleIn>>,
+  league: League,
+): Promise<string> {
+  const changes = {
+    version: 1,
+    changes: [
+      {
+        kind: 'move-game',
+        gameId: s.first,
+        to: { roundId: s.roundId, date: '2026-12-20', time: '19:00', venueId: null, court: null },
+      },
+    ],
+  };
+  const draft = await one<{ id: string }>(
+    pglite,
+    'insert into schedule_drafts (league_id, season_id, changes) values ($1, $2, $3::jsonb) returning id',
+    [league.leagueId, s.seasonId, JSON.stringify(changes)],
+  );
+  return draft.id;
+}
+
 const firstEdit = (s: { seasonId: string }) => ({
   seasonId: s.seasonId,
   basedOnRevision: null,
@@ -660,6 +688,28 @@ const scheduleDraftRows: readonly Row[] = [
     (s) => ({ seasonId: s.seasonId }),
     (c, i) => getScheduleDraft(c, i, schedulingDeps),
   ),
+  ...scheduleRows(
+    'scheduling.preview_schedule_publish',
+    'see what publishing would change',
+    'schedule.publish',
+    async (s, league) => {
+      await draftMovingFirstGame(s, league);
+      return { seasonId: s.seasonId };
+    },
+    (c, i) => previewSchedulePublish(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.publish_schedule',
+    'publish the schedule',
+    'schedule.publish',
+    async (s, league) => ({
+      seasonId: s.seasonId,
+      basedOnRevision: null,
+      draftId: await draftMovingFirstGame(s, league),
+      version: 1,
+    }),
+    (c, i) => publishSchedule(c, i, schedulingDeps),
+  ),
 ];
 
 /** A game of a season of the default program, or of the league's other program. */
@@ -757,6 +807,41 @@ const gameCommandRows: readonly Row[] = [
     }),
     (c, i) => reopenGame(c, i, gamesDeps),
   ),
+  // Assigning scorekeepers is part of running Games (P4 §3, P7 §5.1): schedulers too.
+  ...gameRows(
+    'games.assign_scorekeeper',
+    'assign a scorekeeper to a game',
+    'games.manage',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      accountId: await grant(league.leagueId, 'scorekeeper'),
+    }),
+    (c, i) => assignScorekeeper(c, i, gamesDeps),
+  ),
+  ...gameRows(
+    'games.unassign_scorekeeper',
+    'take a scorekeeper off a game',
+    'games.manage',
+    async (league, program) => {
+      const { gameId } = await gameIn(league, program);
+      const accountId = await grant(league.leagueId, 'scorekeeper');
+      await pglite.query(
+        'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
+        [league.leagueId, gameId, accountId],
+      );
+      return { gameId, accountId };
+    },
+    (c, i) => unassignScorekeeper(c, i, gamesDeps),
+  ),
+  {
+    command: 'games.list_my_games',
+    name: 'see my games to score this week',
+    needs: 'games.score',
+    // Anyone who scores somewhere may look; the list itself holds what they may score.
+    scope: 'program',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listMyGames(c, i, gamesDeps),
+  },
   {
     command: 'games.list_postponed_games',
     name: 'see the games waiting to be rescheduled',

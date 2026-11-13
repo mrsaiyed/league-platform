@@ -119,6 +119,16 @@ export const en = {
     'This person has left the team, so their entry can no longer be changed.',
   'error.teams.mark_left.already-left': 'This person is already marked as having left.',
   'error.teams.mark_left.left-before-joined': 'The leaving date is before the day they joined.',
+  // Why assigning a scorekeeper was refused (T-187).
+  'error.games.assign_scorekeeper.game-not-found': 'That game is not there.',
+  'error.games.assign_scorekeeper.game-closed':
+    'That game is already decided or cancelled, so there is nothing left to score.',
+  'error.games.assign_scorekeeper.cannot-score-game':
+    'That person cannot score this game. Give them the scorekeeper role first.',
+  'error.games.assign_scorekeeper.already-assigned':
+    'That person is already assigned to this game.',
+  'error.games.unassign_scorekeeper.game-not-found': 'That game is not there.',
+  'error.games.unassign_scorekeeper.not-assigned': 'That person is not assigned to this game.',
   // Why a schedule draft edit was refused (T-187).
   'error.scheduling.add_draft_game.changed-since-read':
     'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
@@ -211,6 +221,40 @@ export const en = {
   'error.scheduling.get_schedule_draft.season-not-found': 'That season is not there.',
   'error.scheduling.get_schedule_draft.draft-unreadable':
     'The saved schedule draft cannot be read. Discard it and start again.',
+  // Why publishing the schedule, or previewing it, was refused (P7 §4.4, T-187).
+  'error.scheduling.publish_schedule.season-not-found': 'That season is not there.',
+  'error.scheduling.publish_schedule.draft-not-found': 'There is no schedule draft to publish.',
+  'error.scheduling.publish_schedule.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.publish_schedule.changed-since-read':
+    'Someone else changed or published the schedule draft since you opened it. Reload it to see the latest.',
+  'error.scheduling.publish_schedule.revision-out-of-date':
+    'The schedule was published since this draft was started. Discard the draft and start again from the published schedule.',
+  'error.scheduling.publish_schedule.nothing-to-publish':
+    'The draft changes nothing in the published schedule, so there is nothing to publish.',
+  'error.scheduling.publish_schedule.change-no-longer-fits':
+    'Some edits in the draft no longer fit the schedule (a game they name is gone). Fix or discard the draft.',
+  'error.scheduling.publish_schedule.game-already-started':
+    'The draft changes a game that is already live or has a final result. Games like that are corrected, not moved or removed.',
+  'error.scheduling.publish_schedule.game-cannot-be-removed':
+    'The draft removes a game that has been scored, which cannot be removed.',
+  'error.scheduling.publish_schedule.game-id-taken':
+    'A game the draft adds already exists (it may be in the bin or have no date).',
+  'error.scheduling.publish_schedule.game-without-time':
+    'A game in the draft has no time yet. Give every added or moved game a time before publishing.',
+  'error.scheduling.publish_schedule.round-cannot-be-updated':
+    'A round the draft renames or re-dates is no longer in this season. Discard the draft and start again.',
+  'error.scheduling.publish_schedule.unknown-team':
+    'A game in the draft names a team that is no longer in this season.',
+  'error.scheduling.publish_schedule.unknown-venue':
+    'A game in the draft names a venue that is no longer there.',
+  'error.scheduling.publish_schedule.unknown-court':
+    'A game in the draft names a court that is not at its venue.',
+  'error.scheduling.preview_schedule_publish.season-not-found': 'That season is not there.',
+  'error.scheduling.preview_schedule_publish.draft-not-found':
+    'There is no schedule draft to publish.',
+  'error.scheduling.preview_schedule_publish.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
   // Activity log lines (A-6, T-226): the key is `activity.` and the command's name;
   // the values come from the entry's details. {role} is a role's name from above.
   'activity.access.invite': 'Invited someone as {role}',
@@ -237,6 +281,8 @@ export const en = {
   'activity.games.postpone_game': 'Postponed a game',
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
+  'activity.games.assign_scorekeeper': 'Assigned a scorekeeper to a game',
+  'activity.games.unassign_scorekeeper': 'Took a scorekeeper off a game',
   'activity.standings.rebuild_season': "Worked out a season's standings and totals again",
   'activity.people.create_person': 'Added a person',
   'activity.people.update_person': 'Changed a person',
@@ -257,6 +303,7 @@ export const en = {
   'activity.scheduling.change_draft_round_date': "Changed a round's date in the schedule draft",
   'activity.scheduling.set_draft_recording': 'Changed how a game is recorded in the schedule draft',
   'activity.scheduling.discard_schedule_draft': 'Discarded the schedule draft',
+  'activity.scheduling.publish_schedule': 'Published the schedule',
   'activity.scheduling.create_venue': 'Added a venue',
   'activity.scheduling.update_venue': 'Changed a venue',
   'activity.scheduling.remove_venue': 'Moved a venue to the bin',
@@ -273,6 +320,10 @@ export const en = {
   // The words for that setting's choices: `setting.<key>.option.<choice>`.
   'setting.members.startPage.option.leagueHome': 'The league home',
   'setting.members.startPage.option.myTeam': 'Their own team page',
+  'setting.games.whoMayScore.label':
+    'Which games a scorekeeper may score: any game, or only the games they are assigned to',
+  'setting.games.whoMayScore.option.anyScorekeeper': 'Any game',
+  'setting.games.whoMayScore.option.assignedOnly': 'Only games they are assigned to',
   // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
   // league's name, {role} a role's name from above, {days} how long a link works.
   'email.invitation.subject': 'You are invited to help run {league}',

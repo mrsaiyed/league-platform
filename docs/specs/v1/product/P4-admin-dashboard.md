@@ -56,7 +56,7 @@ A **search box** at the top of the dashboard finds any person, team or game by n
 | **Registrar**        | Registration and People                                                                                                                       |
 | **Scheduler**        | Schedule and Games                                                                                                                            |
 | **Editor**           | Site, news, media, awards, sponsors                                                                                                           |
-| **Scorekeeper**      | Score games. Either any game, or only games assigned to them (league's choice).                                                               |
+| **Scorekeeper**      | Score games. Either any game, or only games assigned to them (league's choice; a new league starts with any game, A-13).                      |
 | **Club admin**       | Big leagues only. Their own club's teams, rosters and registrations. Reads the schedule.                                                      |
 | **Coach or captain** | Every team has one. Their own team: roster changes the league allows, lineup, messaging the team                                              |
 

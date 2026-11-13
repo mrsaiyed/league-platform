@@ -8,7 +8,16 @@ import {
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { DraftDocument } from './draft-document.ts';
-import type { CourtRecord, DraftRecord, SchedulingTx, VenueRecord } from './ports.ts';
+import type {
+  CourtRecord,
+  DraftRecord,
+  GameFacts,
+  NewPublishedGame,
+  NewScheduleRevision,
+  PublishedGameChange,
+  SchedulingTx,
+  VenueRecord,
+} from './ports.ts';
 import type { ScheduleState } from './rules/schedule-types.ts';
 
 export type MemoryScheduling = {
@@ -28,6 +37,20 @@ export type MemoryScheduling = {
   schedule: ScheduleState;
   /** The teams of the season. */
   teamIds: string[];
+  /** Games that exist besides the published schedule's (in the bin, undated, scored). */
+  otherGames: GameFacts[];
+  /** The season's rules as stored; none yet by default. */
+  seasonRules: unknown;
+  /** How many people the rosters of any teams hold, for the count. */
+  people: number;
+  /** What publishing wrote, in order. */
+  inserted: NewPublishedGame[];
+  updated: { gameId: string; change: PublishedGameChange }[];
+  binned: string[];
+  roundChanges: { roundId: string; label?: string; date?: string }[];
+  revisions: NewScheduleRevision[];
+  /** Makes every round update find no such round, to test the refusal. */
+  roundsMissing?: boolean;
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -95,6 +118,14 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
     draftsStarted: 0,
     schedule: { rounds: [], games: [] },
     teamIds: [],
+    otherGames: [],
+    seasonRules: undefined,
+    people: 0,
+    inserted: [],
+    updated: [],
+    binned: [],
+    roundChanges: [],
+    revisions: [],
     ...state,
   });
   const transaction = memoryTransaction(db, (s, jobs): SchedulingTx => {
@@ -143,6 +174,38 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           return true;
         },
         loadSchedule: async () => structuredClone(s.schedule),
+        seasonRules: async () => s.seasonRules,
+        gamesById: async (_season, ids) => [
+          ...s.schedule.games
+            .filter((g) => ids.includes(g.id))
+            .map((g) => ({ id: g.id, status: g.status, binned: false, hasEvents: false })),
+          ...s.otherGames.filter((g) => ids.includes(g.id)),
+        ],
+        countPeopleOnTeams: async () => s.people,
+        insertPublishedGames: async (_season, games) => void s.inserted.push(...games),
+        updatePublishedGame: async (_season, gameId, change) => {
+          const game = s.schedule.games.find((g) => g.id === gameId);
+          if (game === undefined || ['live', 'final', 'forfeit'].includes(game.status)) {
+            return false;
+          }
+          s.updated.push({ gameId, change });
+          return true;
+        },
+        binPublishedGames: async (_season, ids) => {
+          s.binned.push(...ids);
+          return ids.length;
+        },
+        updateRound: async (_season, roundId, change) => {
+          if (s.roundsMissing === true) return false;
+          s.roundChanges.push({ roundId, ...change });
+          return true;
+        },
+        insertRevision: async (_season, revision) => {
+          if (s.latestRevision !== null && revision.number <= s.latestRevision) return false;
+          s.revisions.push(revision);
+          s.latestRevision = revision.number;
+          return true;
+        },
         teamsOfSeason: async (_season, ids) => ids.filter((t) => s.teamIds.includes(t)),
         findVenue: async (id) => s.venues.find((v) => v.id === id),
         listVenues: async () =>
