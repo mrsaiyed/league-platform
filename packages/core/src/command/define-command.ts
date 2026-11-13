@@ -58,11 +58,16 @@ export type CommandDefinition<
   }) => Promise<Result<Value, Err>>;
 };
 
-/** A defined command: call it with (context, input, deps). */
-export type Command<Value, Err extends CommandError, Tx extends CommandTx> = ((
+/**
+ * A defined command: call it with (context, input, deps). The transaction may offer
+ * more stores than the command's own (`T` beyond `Tx`): the apps' transaction has
+ * every module's, so the event handlers, which belong to other modules (T-24), find
+ * the stores they need in it.
+ */
+export type Command<Value, Err extends CommandError, Tx extends CommandTx> = (<T extends Tx>(
   context: CommandContext,
   input: unknown,
-  deps: CommandDeps<Tx>,
+  deps: CommandDeps<T>,
 ) => Promise<Result<Value, Err | InvalidInput | NotAllowed>>) & {
   readonly commandName: string;
   readonly permission: string;
@@ -96,10 +101,10 @@ export function defineCommand<
     throw new Error(`defineCommand: ${name} names no permission (T4 §4).`);
   }
 
-  async function execute(
+  async function execute<T extends Tx>(
     given: CommandContext,
     input: unknown,
-    deps: CommandDeps<Tx>,
+    deps: CommandDeps<T>,
   ): Promise<Result<Value, Err | InvalidInput | NotAllowed>> {
     // Ids in lower case, as the database reads them, for every comparison and the log.
     const context: CommandContext = {
@@ -135,10 +140,10 @@ export function defineCommand<
     }
   }
 
-  async function attempt(
+  async function attempt<T extends Tx>(
     context: CommandContext,
     raw: unknown,
-    deps: CommandDeps<Tx>,
+    deps: CommandDeps<T>,
   ): Promise<Result<Value, Err | InvalidInput | NotAllowed>> {
     const parsed = definition.input.safeParse(raw);
     if (!parsed.success) {
@@ -162,7 +167,7 @@ export function defineCommand<
       const value = await deps.transaction(context, async (given) => {
         // Every job, the command's or a handler's, is for the command's league. The tx
         // is a plain object of stores, so a copy with a checked queue is the same tx.
-        const tx = {
+        const tx: T = {
           ...given,
           jobs: {
             enqueue: async (job: Job) => {

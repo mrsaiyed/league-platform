@@ -100,7 +100,9 @@ import {
   type PeopleTx,
   type SchedulingTx,
   type SettingRegistry,
+  type StandingsTx,
   type TeamsTx,
+  rebuildStandings,
 } from '@srleagues/core';
 import { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -133,6 +135,7 @@ import { divisionsStore } from './divisions-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 import { peopleStore } from './people-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
+import { standingsStore } from './standings-store.ts';
 import { teamsStore } from './teams-store.ts';
 
 const actors = [
@@ -177,6 +180,7 @@ let schedulingDeps: CommandDeps<SchedulingTx>;
 let gamesDeps: CommandDeps<GamesTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
 let teamsDeps: CommandDeps<TeamsTx>;
+let standingsDeps: CommandDeps<StandingsTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
@@ -189,10 +193,12 @@ beforeAll(async () => {
     games: gamesStore(scope),
     people: peopleStore(scope),
     teams: teamsStore(scope),
+    standings: standingsStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));
   const rest = { log: () => {}, now: () => 0 };
+  standingsDeps = { transaction, events: [], ...rest };
   accessDeps = { transaction, events: [], ...rest };
   leaguesDeps = { transaction, events: [], ...rest };
   schedulingDeps = { transaction, events: [], ...rest };
@@ -1025,10 +1031,21 @@ const peopleRows: readonly Row[] = [
   },
 ];
 
+// Standings are checked at their season's program (P4 §3 and §4, S-10): the owner
+// and admins.
+const standingsRows: readonly Row[] = gameRows(
+  'standings.rebuild_season',
+  "work out a season's standings again",
+  'standings.adjust',
+  async (league, program) => ({ seasonId: await seasonIn(league, program) }),
+  (c, i) => rebuildStandings(c, i, standingsDeps),
+);
+
 const rows: readonly Row[] = [
   ...divisionAndVenueRows,
   ...peopleRows,
   ...gameCommandRows,
+  ...standingsRows,
   ...teamCommandRows,
   ...rosterCommandRows,
   ...scheduleDraftRows,

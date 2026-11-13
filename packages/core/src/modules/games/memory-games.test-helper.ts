@@ -10,12 +10,14 @@ import {
 } from '../../command/testing/memory-transaction.ts';
 import type { DomainEvent, EventHandler } from '../../command/index.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
-import type { GameRecord, GamesTx, NewGameCorrection } from './ports.ts';
+import { isDecided } from './game-fields.ts';
+import type { GameLine, GameRecord, GamesTx, NewGameCorrection } from './ports.ts';
 
 export type MemoryGames = {
   status: string;
   seasons: { id: string; programId: string; rules: unknown }[];
   games: GameRecord[];
+  lines: GameLine[];
   corrections: NewGameCorrection[];
   grants: Grant[];
   activity: ActivityEntry[];
@@ -90,6 +92,12 @@ export const programAdminGrant = grantOf('1', programAdminId, 'admin', {
   id: 'p2',
 });
 
+/** A season's decided games not in the bin, in id order, as the database lists them. */
+export const decidedOf = (s: Pick<MemoryGames, 'games'>, season: string) =>
+  s.games
+    .filter((g) => g.seasonId === season && !g.binned && isDecided(g.status))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
 export function memoryGames(state: Partial<MemoryGames> = {}) {
   const db = memoryDatabase<MemoryGames>({
     status: 'draft',
@@ -98,6 +106,7 @@ export function memoryGames(state: Partial<MemoryGames> = {}) {
       { id: otherSeasonId, programId: 'p2', rules: rules() },
     ],
     games: [],
+    lines: [],
     corrections: [],
     grants: [],
     activity: [],
@@ -144,6 +153,11 @@ export function memoryGames(state: Partial<MemoryGames> = {}) {
                 (season === undefined || g.seasonId === season),
             )
             .sort((a, b) => (a.startsAt ?? '9').localeCompare(b.startsAt ?? '9')),
+        listDecided: async (season) => decidedOf(s, season),
+        listDecidedLines: async (season) => {
+          const ids = new Set(decidedOf(s, season).map((g) => g.id));
+          return s.lines.filter((line) => ids.has(line.gameId));
+        },
         findSeason: async (id) => s.seasons.find((x) => x.id === id),
       },
     }),

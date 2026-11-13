@@ -14,24 +14,30 @@
 // the target's own league fails the control run, and one naming B is a leak.
 //
 // Jobs are written to the jobs table in the run's transaction (jobsStore, step
-// 1.19), and kept for the harness to judge as well. Event handlers: pass the app's list as `events`
-// once the apps wire one (none exists yet); the coverage test fails on a handler
-// exported from core until then.
-import type {
-  AccessTx,
-  Command,
-  CommandDeps,
-  CommandError,
-  CommandTx,
-  EventHandler,
-  GamesTx,
-  Job,
-  JobQueue,
-  LeaguesTx,
-  PeopleTx,
-  SchedulingTx,
-  TeamsTx,
-  TransactionRunner,
+// 1.19), and kept for the harness to judge as well. Every command case runs with
+// core's event handlers (eventHandlers, as the apps pass them), in the command's own
+// transaction, so what a handler does is judged with the command. Each handler also
+// has cases of its own (registerHandlerCase): run in another league's scope with an
+// event naming the target's records, and judged by what it writes too, since a
+// command aimed at the target is refused there before any handler runs.
+import {
+  eventHandlers,
+  type AccessTx,
+  type Command,
+  type CommandDeps,
+  type CommandError,
+  type CommandTx,
+  type DomainEvent,
+  type EventHandler,
+  type GamesTx,
+  type Job,
+  type JobQueue,
+  type LeaguesTx,
+  type PeopleTx,
+  type SchedulingTx,
+  type StandingsTx,
+  type TeamsTx,
+  type TransactionRunner,
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
@@ -45,16 +51,23 @@ import {
   leaguesStore,
   peopleStore,
   schedulingStore,
+  standingsStore,
   teamsStore,
 } from '../stores/index.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
+/** Every module's store, as the apps' transaction offers them. Grows with each module. */
+export type HarnessTx = LeaguesTx &
+  SchedulingTx &
+  GamesTx &
+  PeopleTx &
+  TeamsTx &
+  AccessTx &
+  StandingsTx;
+
 /** Every module's stores, bound to the run's scope. Grows with each module. */
-export function harnessTx(
-  scope: LeagueScope,
-  jobs: JobQueue,
-): LeaguesTx & SchedulingTx & GamesTx & PeopleTx & TeamsTx & AccessTx {
+export function harnessTx(scope: LeagueScope, jobs: JobQueue): HarnessTx {
   // The run's account counts as our staff, so commands only staff may run are tried
   // too: the worst case for isolation.
   const platformStaff = scope.accountId === null ? [] : [scope.accountId];
@@ -66,6 +79,7 @@ export function harnessTx(
     games: gamesStore(scope),
     people: peopleStore(scope),
     teams: teamsStore(scope),
+    standings: standingsStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
   };
@@ -122,17 +136,20 @@ export type CommandCaseOptions<Tx extends CommandTx> = {
   readonly events?: readonly EventHandler<Tx>[];
 };
 
-/** Runs `command` in the harness's scope, as that scope's account. */
-export async function runInScope<Tx extends CommandTx>(
+/**
+ * Runs `command` in the harness's scope, as that scope's account, with the handlers
+ * given (none unless given: a planted command's transaction may lack their stores).
+ */
+export async function runInScope<Tx extends CommandTx, T extends Tx>(
   command: Command<unknown, CommandError, Tx>,
-  makeTx: (scope: LeagueScope, jobs: JobQueue) => Tx,
+  makeTx: (scope: LeagueScope, jobs: JobQueue) => T,
   scope: LeagueScope,
   input: unknown,
-  { events = [] }: CommandCaseOptions<Tx> = {},
+  { events = [] }: CommandCaseOptions<T> = {},
 ): Promise<{ value: unknown; jobs: Job[] }> {
   const context = { leagueId: scope.leagueId, accountId: scope.accountId, requestId: 'harness' };
   const jobs: Job[] = [];
-  const deps: CommandDeps<Tx> = {
+  const deps: CommandDeps<T> = {
     transaction: inScope(scope, makeTx, jobs),
     events,
     log: () => {},
@@ -153,19 +170,71 @@ function withoutSecrets(job: Job): Job {
   return { ...job, ids: { ...job.ids, token: '(new token)' } };
 }
 
-/** Adds a command to the harness, with input aimed at the target league's records. */
+/** Runs `command` as the apps do: every module's stores and core's event handlers. */
+export function runAsApp<Tx extends CommandTx>(
+  command: Command<unknown, CommandError, Tx>,
+  makeTx: (scope: LeagueScope, jobs: JobQueue) => HarnessTx & Tx,
+  scope: LeagueScope,
+  input: unknown,
+): Promise<{ value: unknown; jobs: Job[] }> {
+  return runInScope(command, makeTx, scope, input, { events: eventHandlers });
+}
+
+/**
+ * Adds a command to the harness, with input aimed at the target league's records. It
+ * runs as the apps run it (runAsApp), so the handlers of the events it announces run
+ * in its transaction and are judged with it.
+ */
 export function registerCommandCase<Tx extends CommandTx>(
   command: Command<unknown, CommandError, Tx>,
-  makeTx: (scope: LeagueScope, jobs: JobQueue) => Tx,
-  {
-    name,
-    input,
-    ...options
-  }: CommandCaseOptions<Tx> & { name: string; input: (target: LeagueRecords) => unknown },
+  makeTx: (scope: LeagueScope, jobs: JobQueue) => HarnessTx & Tx,
+  { name, input }: { name: string; input: (target: LeagueRecords) => unknown },
 ): void {
   registerIsolationCase({
     subject: command,
     name,
-    run: (scope, target) => runInScope(command, makeTx, scope, input(target), options),
+    run: (scope, target) => runAsApp(command, makeTx, scope, input(target)),
   });
+}
+
+/**
+ * Adds an event handler to the harness: it runs in the scope's transaction with every
+ * module's stores, for an event in the scope's league that names the target's
+ * records, and is judged by what it returns (its jobs) and what it writes.
+ */
+export function registerHandlerCase(
+  handler: EventHandler<HarnessTx>,
+  {
+    name,
+    event,
+  }: {
+    name: string;
+    event: (scope: LeagueScope, target: LeagueRecords) => DomainEvent;
+  },
+): void {
+  registerIsolationCase({
+    subject: handler.handle,
+    name,
+    compareWrites: true,
+    run: (scope, target) => runHandler(handler, harnessTx, scope, event(scope, target)),
+  });
+}
+
+/** Runs one event handler in the scope's transaction; returns the jobs it recorded. */
+export async function runHandler<T extends CommandTx>(
+  handler: EventHandler<T>,
+  makeTx: (scope: LeagueScope, jobs: JobQueue) => T,
+  scope: LeagueScope,
+  event: DomainEvent,
+): Promise<{ jobs: Job[] }> {
+  const jobs: Job[] = [];
+  const recorded = jobsStore(scope);
+  const tx = makeTx(scope, {
+    enqueue: async (job) => {
+      jobs.push(job);
+      await recorded.enqueue(job);
+    },
+  });
+  await handler.handle(event, tx);
+  return { jobs: jobs.map(withoutSecrets) };
 }

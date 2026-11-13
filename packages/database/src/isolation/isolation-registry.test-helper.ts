@@ -22,6 +22,12 @@ export type IsolationCase = {
    * the subject returned.
    */
   run: (scope: LeagueScope, target: LeagueRecords) => Promise<unknown>;
+  /**
+   * Also compare what the run wrote in its own league with what it writes once the
+   * other league's rows are gone (an event handler's work is its writes). Off by
+   * default: it reads the whole database once more per run.
+   */
+  compareWrites?: true;
 };
 
 const registered: IsolationCase[] = [];
