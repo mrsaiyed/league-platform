@@ -10,7 +10,7 @@ export type RenameDraftRoundError = DraftEditError;
 export const renameDraftRound = defineCommand({
   name: 'scheduling.rename_draft_round',
   permission: 'schedule.edit',
-  input: z.object({ ...draftBasis, roundId: z.uuid(), label: z.string().max(120) }),
+  input: z.object({ ...draftBasis, roundId: z.uuid(), label: z.string().trim().min(1).max(120) }),
   allowed: (context, input, tx: SchedulingTx) => mayEditSchedule(context, tx, input.seasonId),
   run: async ({ context, input, tx }): Promise<Result<DraftEditValue, RenameDraftRoundError>> =>
     editDraft({

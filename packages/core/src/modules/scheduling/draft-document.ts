@@ -49,7 +49,11 @@ export function parseDraftDocument(stored: unknown): DraftDocument | undefined {
   return parsed.success ? (parsed.data as DraftDocument) : undefined;
 }
 
-/** The most text a draft may hold: the database refuses a megabyte, so stop short of it. */
-export const maxDraftBytes = 900_000;
+/**
+ * The most a draft may hold, in bytes of its JSON text. The database refuses a megabyte of
+ * the text form it stores (octet_length of the jsonb as text, a little longer than this text
+ * because it spaces after colons and commas), so stop well short of it.
+ */
+export const maxDraftBytes = 700_000;
 
 export const emptyDraft: DraftDocument = { version: 1, changes: [] };

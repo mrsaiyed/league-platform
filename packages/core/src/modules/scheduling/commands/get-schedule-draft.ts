@@ -14,6 +14,7 @@ import { summarizePublish, type PublishSummary } from '../rules/summarize-publis
 export type ScheduleDraftView = {
   readonly latestRevision: number | null;
   readonly draft: {
+    readonly id: string;
     readonly version: number;
     readonly basedOnRevision: number | null;
     /** A revision was published since the draft was started: it must be discarded. */
@@ -52,6 +53,7 @@ export const getScheduleDraft = defineCommand({
         draft === undefined || document === undefined
           ? null
           : {
+              id: draft.id,
               version: draft.version,
               basedOnRevision: draft.basedOnRevision,
               outOfDate: draft.basedOnRevision !== latestRevision,

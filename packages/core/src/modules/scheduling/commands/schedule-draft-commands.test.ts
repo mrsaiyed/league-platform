@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   court,
+  draftUuid,
   gameUuid,
   memoryScheduling,
   ownerId,
@@ -60,6 +61,7 @@ const basis = (version: number | null = null, basedOnRevision: number | null = n
   seasonId,
   basedOnRevision,
   version,
+  draftId: version === null ? null : draftUuid(1),
 });
 
 const slot = {
@@ -78,7 +80,10 @@ describe('schedule draft commands', () => {
       { ...basis(), gameId: gameUuid(1), ...slot },
       deps,
     );
-    expect(first).toEqual({ ok: true, value: { version: 1, basedOnRevision: null, clashes: [] } });
+    expect(first).toEqual({
+      ok: true,
+      value: { draftId: draftUuid(1), version: 1, basedOnRevision: null, clashes: [] },
+    });
     const second = await renameDraftRound(
       as(ownerId),
       { ...basis(1), roundId: roundUuid(1), label: 'Opening night' },
@@ -173,6 +178,7 @@ describe('schedule draft commands', () => {
     const stale = world({
       latestRevision: 2,
       draft: {
+        id: draftUuid(1),
         seasonId,
         changes: { version: 1, changes: [] },
         basedOnRevision: 1,
@@ -266,26 +272,110 @@ describe('schedule draft commands', () => {
       await code(
         renameDraftRound(as(ownerId), { ...basis(), roundId: roundUuid(1), label: '  ' }, deps),
       ),
-    ).toContain('empty-round-label');
+    ).toContain('invalid-input');
   });
 
   it('discards the draft, only the version that was seen', async () => {
     const { db, deps, as } = world();
-    expect(await discardScheduleDraft(as(ownerId), { seasonId, version: 1 }, deps)).toMatchObject({
+    expect(
+      await discardScheduleDraft(
+        as(ownerId),
+        { seasonId, draftId: draftUuid(1), version: 1 },
+        deps,
+      ),
+    ).toMatchObject({
       ok: false,
       error: { code: 'draft-not-found' },
     });
     await moveDraftGame(as(ownerId), { ...basis(), gameId: gameUuid(1), ...slot }, deps);
-    expect(await discardScheduleDraft(as(ownerId), { seasonId, version: 5 }, deps)).toMatchObject({
+    expect(
+      await discardScheduleDraft(
+        as(ownerId),
+        { seasonId, draftId: draftUuid(1), version: 5 },
+        deps,
+      ),
+    ).toMatchObject({
       ok: false,
       error: { code: 'changed-since-read' },
     });
-    expect(await discardScheduleDraft(as(ownerId), { seasonId, version: 1 }, deps)).toEqual({
+    expect(
+      await discardScheduleDraft(
+        as(ownerId),
+        { seasonId, draftId: draftUuid(1), version: 1 },
+        deps,
+      ),
+    ).toEqual({
       ok: true,
       value: {},
     });
     expect(db.state.draft).toBeUndefined();
     expect(db.state.activity.at(-1)?.action).toBe('scheduling.discard_schedule_draft');
+  });
+
+  it('refuses a reader of a draft that was discarded and started again (A-8)', async () => {
+    const { db, deps, as } = world();
+    await moveDraftGame(as(ownerId), { ...basis(), gameId: gameUuid(1), ...slot }, deps);
+    // A read the draft at version 1; B discards it and starts a new one, also at version 1.
+    expect(
+      await discardScheduleDraft(
+        as(ownerId),
+        { seasonId, draftId: draftUuid(1), version: 1 },
+        deps,
+      ),
+    ).toMatchObject({ ok: true });
+    const again = await renameDraftRound(
+      as(ownerId),
+      { ...basis(), roundId: roundUuid(1), label: 'Bs draft' },
+      deps,
+    );
+    expect(again).toMatchObject({ ok: true, value: { draftId: draftUuid(2), version: 1 } });
+
+    const edit = await renameDraftRound(
+      as(ownerId),
+      { ...basis(1), roundId: roundUuid(1), label: 'As edit' },
+      deps,
+    );
+    expect(edit).toMatchObject({ ok: false, error: { code: 'changed-since-read' } });
+    const discard = await discardScheduleDraft(
+      as(ownerId),
+      { seasonId, draftId: draftUuid(1), version: 1 },
+      deps,
+    );
+    expect(discard).toMatchObject({ ok: false, error: { code: 'changed-since-read' } });
+    expect(db.state.draft?.id).toBe(draftUuid(2));
+  });
+
+  it('trims a round label and refuses a draft that grows too large', async () => {
+    const { db, deps, as } = world();
+    await renameDraftRound(
+      as(ownerId),
+      { ...basis(), roundId: roundUuid(1), label: '  Opening night  ' },
+      deps,
+    );
+    expect(db.state.draft?.changes).toMatchObject({
+      changes: [{ kind: 'rename-round', label: 'Opening night' }],
+    });
+    const huge = Array.from({ length: 9000 }, (_, k) => ({
+      kind: 'rename-round' as const,
+      roundId: roundUuid(1),
+      label: `Label number ${k} `.repeat(4),
+    }));
+    const big = world({
+      draft: {
+        id: draftUuid(1),
+        seasonId,
+        changes: { version: 1, changes: huge },
+        basedOnRevision: null,
+        version: 1,
+      },
+    });
+    expect(
+      await renameDraftRound(
+        big.as(ownerId),
+        { ...basis(1), roundId: roundUuid(1), label: 'One more' },
+        big.deps,
+      ),
+    ).toMatchObject({ ok: false, error: { code: 'draft-too-large' } });
   });
 
   it('reads an unreadable draft as such, and shows none when there is none', async () => {
@@ -295,7 +385,13 @@ describe('schedule draft commands', () => {
       value: { draft: null, latestRevision: null, clashes: [] },
     });
     const broken = world({
-      draft: { seasonId, changes: { version: 7 }, basedOnRevision: null, version: 1 },
+      draft: {
+        id: draftUuid(1),
+        seasonId,
+        changes: { version: 7 },
+        basedOnRevision: null,
+        version: 1,
+      },
     });
     expect(await getScheduleDraft(broken.as(ownerId), { seasonId }, broken.deps)).toMatchObject({
       ok: false,

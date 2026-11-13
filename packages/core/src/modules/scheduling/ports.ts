@@ -48,6 +48,8 @@ export type CourtChange = { readonly name?: string; readonly sort?: number };
 
 /** A season's one schedule draft (A-9), its changes as stored: parse them with parseDraftDocument. */
 export type DraftRecord = {
+  /** Tells this draft from one started after it was discarded, whatever the version (A-8). */
+  readonly id: string;
   readonly seasonId: string;
   readonly changes: unknown;
   /** The revision of the season's schedule the draft was started on; null before the first publication. */
@@ -61,20 +63,27 @@ export type SchedulingStore = {
   /** The number of the season's latest published schedule revision, or null if none yet. */
   readonly latestRevision: (seasonId: string) => Promise<number | null>;
   readonly findDraft: (seasonId: string) => Promise<DraftRecord | undefined>;
-  /** Starts the season's draft: its version (1), or 'exists' if the season already has one. */
+  /**
+   * Starts the season's draft: its id and version (1), 'exists' if the season already has
+   * one, or 'no-season' if the season is not in this league.
+   */
   readonly insertDraft: (
     seasonId: string,
     changes: DraftDocument,
     basedOnRevision: number | null,
-  ) => Promise<number | 'exists'>;
-  /** Saves the draft's changes if it is still at `version` (A-8, T-46): the new version, or undefined. */
+  ) => Promise<{ readonly id: string; readonly version: number } | 'exists' | 'no-season'>;
+  /**
+   * Saves the draft's changes if it is that draft and still at `version` (A-8, T-46): the
+   * new version, or undefined.
+   */
   readonly updateDraft: (
     seasonId: string,
+    draftId: string,
     changes: DraftDocument,
     version: number,
   ) => Promise<number | undefined>;
-  /** Removes the draft if it is still at `version`; false if it is not there or moved on. */
-  readonly deleteDraft: (seasonId: string, version: number) => Promise<boolean>;
+  /** Removes the draft if it is that draft and still at `version`; false if not. */
+  readonly deleteDraft: (seasonId: string, draftId: string, version: number) => Promise<boolean>;
   /**
    * The season's published schedule as the rules read it: its rounds and its games not in
    * the bin that have a date, with dates and times in the league's time zone and a game's

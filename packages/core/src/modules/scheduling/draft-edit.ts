@@ -19,12 +19,14 @@ import type { ChangeError, Clash, DraftChange, ScheduleSlot } from './rules/sche
 /**
  * What an edit says it was based on: the season, the schedule revision the admin was
  * looking at (null if none was published yet) and the draft's version (null if there was
- * no draft yet). Both must still be current, or the edit is refused.
+ * no draft yet) with its id. All must still be current, or the edit is refused.
  */
 export const draftBasis = {
   seasonId: z.uuid(),
   basedOnRevision: z.number().int().positive().nullable(),
   version: z.number().int().positive().nullable(),
+  /** Which draft the version belongs to (null if there was none): a new draft after a discard is another. */
+  draftId: z.uuid().nullable(),
 };
 
 export type DraftEditError =
@@ -44,7 +46,8 @@ export type DraftEditError =
   | { readonly code: 'change-refused'; readonly reason: ChangeError };
 
 export type DraftEditValue = {
-  /** The draft's version after this edit: what the next edit names. */
+  /** The draft's id and version after this edit: what the next edit names. */
+  readonly draftId: string;
   readonly version: number;
   readonly basedOnRevision: number | null;
   /** The clashes the edit causes, among the games it touched. */
@@ -70,7 +73,12 @@ export async function editDraft(args: {
   context: CommandContext;
   tx: SchedulingTx;
   action: string;
-  input: { seasonId: string; basedOnRevision: number | null; version: number | null };
+  input: {
+    seasonId: string;
+    basedOnRevision: number | null;
+    version: number | null;
+    draftId: string | null;
+  };
   change: DraftChange;
   /** Further checks on what the change names, run once the basis is known to be current. */
   check?: () => Promise<DraftEditError | undefined>;
@@ -86,9 +94,13 @@ export async function editDraft(args: {
   const draft = await store.findDraft(input.seasonId);
   let document: DraftDocument = emptyDraft;
   if (draft === undefined) {
-    if (input.version !== null) return fail({ code: 'changed-since-read' });
+    if (input.version !== null || input.draftId !== null) {
+      return fail({ code: 'changed-since-read' });
+    }
   } else {
-    if (input.version !== draft.version) return fail({ code: 'changed-since-read' });
+    if (input.draftId !== draft.id || input.version !== draft.version) {
+      return fail({ code: 'changed-since-read' });
+    }
     if (draft.basedOnRevision !== latest) return fail({ code: 'revision-out-of-date' });
     const parsed = parseDraftDocument(draft.changes);
     if (parsed === undefined) return fail({ code: 'draft-unreadable' });
@@ -105,21 +117,28 @@ export async function editDraft(args: {
   if (!applied.ok) return fail({ code: 'change-refused', reason: applied.error });
 
   const next: DraftDocument = { version: 1, changes: [...document.changes, change] };
-  if (JSON.stringify(next).length > maxDraftBytes) return fail({ code: 'draft-too-large' });
+  if (new TextEncoder().encode(JSON.stringify(next)).length > maxDraftBytes) {
+    return fail({ code: 'draft-too-large' });
+  }
 
-  let version: number | undefined;
+  let draftId: string;
+  let version: number;
   if (draft === undefined) {
     const inserted = await store.insertDraft(input.seasonId, next, latest);
-    version = inserted === 'exists' ? undefined : inserted;
+    if (inserted === 'no-season') return fail({ code: 'season-not-found' });
+    if (inserted === 'exists') return fail({ code: 'changed-since-read' });
+    ({ id: draftId, version } = inserted);
   } else {
-    version = await store.updateDraft(input.seasonId, next, draft.version);
+    const saved = await store.updateDraft(input.seasonId, draft.id, next, draft.version);
+    if (saved === undefined) return fail({ code: 'changed-since-read' });
+    draftId = draft.id;
+    version = saved;
   }
-  if (version === undefined) return fail({ code: 'changed-since-read' });
 
   await recordActivity(tx, context, {
     action: args.action,
     target: { type: 'season', id: input.seasonId },
     details: { change: change.kind },
   });
-  return ok({ version, basedOnRevision: latest, clashes: applied.clashes });
+  return ok({ draftId, version, basedOnRevision: latest, clashes: applied.clashes });
 }
