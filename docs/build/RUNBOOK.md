@@ -77,6 +77,7 @@ Every builder's brief says, in these words or close to them:
 - Do not edit `docs/build/STATUS.md` or any stage plan. Say what should be recorded in your report.
 - Commit to your lane branch as you go: one commit for each part that works by itself (an interface, a table, a command with its test, a page). Each commit must type-check and pass its own package's tests, and its message says what that part is and why, in plain words, ending with the attribution line you were given. No "wip" messages: these commits are kept and the founder reads them on GitHub. A cut-off run must not lose your work. Never push, never switch branches, never use `git stash`.
 - Use only the numbers reserved for you. If you need one you were not given, stop and say so.
+- Several other builders are working on this computer at the same moment. Never stop processes by name (`pkill`, `taskkill`, "kill every node"): that stops their checks too. Stop only a process you started, by its own id. Never write a file outside your lane folder, not even a log. Change files with the editing tool, not with `sed -i`.
 - You are done when the step's done test and `npm run verify` pass in your lane. Report what you built, what you left out and why, and anything the lead should know.
 
 Start all the builders you are opening in one message, so they run together. While they work, the lead checks, reviews and lands other lanes.
@@ -84,6 +85,10 @@ Start all the builders you are opening in one message, so they run together. Whi
 ### Checking and reviewing a lane
 
 When a builder reports done: read its diff, then start its independent reviewer at once (read-only, given the diff and the spec sections). Do not wait for other lanes. Findings go back to a builder working in the same lane.
+
+A reviewer's brief names the lane folder and says: read the lane's files there, or with `git show <lane branch>:<file>` and `git diff <build branch>...<lane branch>`. Never run `git checkout`, `git switch` or `git stash` anywhere, least of all in the main folder: the lead is working there, and switching its branch would pull the ground from under every landing. On 2026-11-13 three reviewers tried exactly that and only the app's safety check stopped them.
+
+The app's safety check refuses a handful of commands a day. That is expected and it is not a problem to report to the founder. Do the work another way that is plainly safe (the editing tool, a file inside the lane) or leave that piece and note why; never look for a way round the refusal.
 
 ### Landing a lane
 
