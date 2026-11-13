@@ -2,6 +2,7 @@
 // whose numbers this viewer may not see already taken out (S-22, T-87). It is taken out
 // before anything is ranked, so a rank, a gap in ranks or a count can never show that a
 // hidden player exists. Names come only through the one name function (T-81).
+import { seasonTotals, type CaptureMode, type StatsGame } from '@srleagues/sports';
 import type { Audience } from '../leagues/index.ts';
 import {
   showName,
@@ -11,6 +12,7 @@ import {
   type Viewer,
 } from '../people/index.ts';
 import type {
+  DecidedGameLines,
   PlayerTotalsRecord,
   SeasonTeamRow,
   StandingsReadStore,
@@ -96,6 +98,50 @@ export type StatisticsSource = {
   readonly teams: readonly TeamTotals[];
 };
 
+const captureModes: readonly string[] = ['final', 'box', 'live'] satisfies CaptureMode[];
+
+/** Totals of these players over the games of shown teams only (the calculation is packages/sports'). */
+async function recompute(
+  store: StandingsReadStore,
+  seasonId: string,
+  personIds: ReadonlySet<string>,
+  hiddenTeamIds: ReadonlySet<string>,
+): Promise<
+  {
+    personId: string;
+    teamIds: string[];
+    gamesPlayed: number;
+    seconds: StatEntry;
+    stats: Record<string, StatEntry>;
+  }[]
+> {
+  const games = await store.decidedGamesOf(seasonId, [...personIds]);
+  const statsGames: StatsGame[] = games.flatMap((game: DecidedGameLines) =>
+    (game.status === 'final' || game.status === 'forfeit') &&
+    captureModes.includes(game.captureMode)
+      ? [
+          {
+            gameId: game.gameId,
+            status: game.status,
+            captureMode: game.captureMode as CaptureMode,
+            homeTeamId: game.homeTeamId,
+            awayTeamId: game.awayTeamId,
+            lines: game.lines.filter((line) => personIds.has(line.personId)),
+          },
+        ]
+      : [],
+  );
+  return seasonTotals(statsGames, { hiddenTeamIds }).map((total) => ({
+    personId: total.personId,
+    teamIds: [...total.teamIds],
+    gamesPlayed: total.gamesPlayed,
+    seconds: entryOf(total.seconds.total, total.seconds.gamesRecorded),
+    stats: Object.fromEntries(
+      Object.entries(total.stats).map(([key, t]) => [key, entryOf(t.total, t.gamesRecorded)]),
+    ),
+  }));
+}
+
 /** Undefined when the season is not in this league. */
 export async function statisticsSource(
   store: StandingsReadStore,
@@ -120,18 +166,43 @@ export async function statisticsSource(
   for (const link of links) {
     teamsOf.set(link.personId, [...(teamsOf.get(link.personId) ?? []), link.teamId]);
   }
-  // Fail closed: a player with no known team, or with any team whose numbers are hidden
-  // from this viewer, is left out entirely.
-  const visible = totals.filter((row: PlayerTotalsRecord) => {
+  // A player with no known team is left out (fail closed). A player whose teams are all
+  // shown keeps the stored totals. A player on both a shown and a hidden team has the
+  // stored totals thrown away and recomputed from the box score lines of the shown teams'
+  // games only, so a hidden team's numbers never reach the page (S-22, record 033). A
+  // player with only hidden teams, or with no line for a shown team, is left out.
+  const mixed = new Set<string>();
+  const stored: PlayerTotalsRecord[] = [];
+  for (const row of totals) {
     const own = teamsOf.get(row.personId) ?? [];
-    return own.length > 0 && own.every(shownTeam);
-  });
-  const people = await store.people(visible.map((row) => row.personId));
+    if (own.length === 0) continue;
+    if (own.every(shownTeam)) stored.push(row);
+    else if (own.some(shownTeam)) mixed.add(row.personId);
+  }
+  const hiddenTeamIds = new Set(teams.filter((t) => !shownTeam(t.id)).map((t) => t.id));
+  const recomputed =
+    mixed.size === 0 ? [] : await recompute(store, season.id, mixed, hiddenTeamIds);
+  const rows: Array<{
+    personId: string;
+    teamIds: string[];
+    gamesPlayed: number;
+    seconds: StatEntry;
+    stats: Record<string, StatEntry>;
+  }> = [
+    ...stored.map((row) => ({
+      personId: row.personId,
+      teamIds: [...new Set(teamsOf.get(row.personId) ?? [])].sort(),
+      gamesPlayed: row.gamesPlayed,
+      seconds: entryOf(row.secondsPlayed, row.secondsGames),
+      stats: statsOf(row.stats),
+    })),
+    ...recomputed,
+  ].sort((x, y) => (x.personId < y.personId ? -1 : x.personId > y.personId ? 1 : 0));
+  const people = await store.people(rows.map((row) => row.personId));
   const personOf = new Map(people.map((p) => [p.id, p]));
-  const players: VisiblePlayer[] = visible.map((row) => {
+  const players: VisiblePlayer[] = rows.map((row) => {
     const person = personOf.get(row.personId);
-    const own = [...new Set(teamsOf.get(row.personId) ?? [])].sort();
-    const setting = settings.get(own[0] ?? '');
+    const setting = settings.get(row.teamIds[0] ?? '');
     const shown =
       person === undefined || setting === undefined
         ? undefined
@@ -158,10 +229,10 @@ export async function statisticsSource(
     return {
       personId: row.personId,
       name,
-      teamIds: own,
+      teamIds: row.teamIds,
       gamesPlayed: row.gamesPlayed,
-      seconds: entryOf(row.secondsPlayed, row.secondsGames),
-      stats: statsOf(row.stats),
+      seconds: row.seconds,
+      stats: row.stats,
     };
   });
   const totalsByTeam = new Map<string, Record<string, StatEntry>>();

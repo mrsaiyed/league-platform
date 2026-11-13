@@ -37,6 +37,7 @@ export {
   type TeamStanding,
 } from './queries/read-team-records.ts';
 export type {
+  DecidedGameLines,
   PersonDisplayRecord,
   PlayerTeamLink,
   PlayerTotalsRecord,

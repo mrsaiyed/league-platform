@@ -66,6 +66,22 @@ export type PlayerTotalsRecord = {
 /** A team a person has numbers or a roster place with in the season. */
 export type PlayerTeamLink = { readonly personId: string; readonly teamId: string };
 
+/** A decided game with the box score lines of some players: what a mixed-team player's totals are recomputed from. */
+export type DecidedGameLines = {
+  readonly gameId: string;
+  readonly status: string;
+  readonly captureMode: string;
+  readonly homeTeamId: string;
+  readonly awayTeamId: string;
+  readonly lines: readonly {
+    readonly teamId: string;
+    readonly personId: string;
+    readonly played: boolean;
+    readonly secondsPlayed: number | null;
+    readonly stats: Readonly<Record<string, number>>;
+  }[];
+};
+
 /** One stat of one team over its final games, summed over its players' lines. */
 export type TeamStatTotalRecord = {
   readonly teamId: string;
@@ -103,6 +119,11 @@ export type StandingsReadStore = {
   readonly adjustments: (seasonId: string) => Promise<readonly StandingsAdjustmentWithReason[]>;
   readonly playerTotals: (seasonId: string) => Promise<readonly PlayerTotalsRecord[]>;
   readonly playerTeams: (seasonId: string) => Promise<readonly PlayerTeamLink[]>;
+  /** The season's decided games (not in the bin) with only these people's lines. */
+  readonly decidedGamesOf: (
+    seasonId: string,
+    personIds: readonly string[],
+  ) => Promise<readonly DecidedGameLines[]>;
   readonly teamStatTotals: (seasonId: string) => Promise<readonly TeamStatTotalRecord[]>;
   readonly people: (personIds: readonly string[]) => Promise<readonly PersonDisplayRecord[]>;
 };

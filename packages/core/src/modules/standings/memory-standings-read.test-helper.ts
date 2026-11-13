@@ -101,6 +101,7 @@ export function memoryStandingsRead(): StandingsReadStore {
       { personId: openPlayer, teamId: openTeam },
       { personId: staffPlayer, teamId: staffTeam },
     ],
+    decidedGamesOf: async () => [],
     teamStatTotals: async () => [
       { teamId: openTeam, statKey: 'points', total: 80, gamesRecorded: 2 },
       { teamId: staffTeam, statKey: 'points', total: 100, gamesRecorded: 2 },
@@ -113,5 +114,55 @@ export function memoryStandingsRead(): StandingsReadStore {
         isMinor: false,
         visibility: 'none',
       })),
+  };
+}
+
+export const mixedPlayer = '01900000-0000-7000-8000-00000000f004';
+
+/** A player who scored 10 for the open team and 40 for the staff-only team: stored totals hold both. */
+export function memoryStandingsReadWithMixedPlayer(): StandingsReadStore {
+  const base = memoryStandingsRead();
+  const line = (teamId: string, points: number) => ({
+    teamId,
+    personId: mixedPlayer,
+    played: true,
+    secondsPlayed: null,
+    stats: { points },
+  });
+  return {
+    ...base,
+    playerTotals: async () => [
+      ...(await base.playerTotals(seasonId)),
+      {
+        personId: mixedPlayer,
+        gamesPlayed: 2,
+        secondsPlayed: 0,
+        secondsGames: 0,
+        stats: { version: 1, stats: { points: { total: 50, gamesRecorded: 2 } } },
+      },
+    ],
+    playerTeams: async () => [
+      ...(await base.playerTeams(seasonId)),
+      { personId: mixedPlayer, teamId: openTeam },
+      { personId: mixedPlayer, teamId: staffTeam },
+    ],
+    decidedGamesOf: async () => [
+      {
+        gameId: 'g1',
+        status: 'final',
+        captureMode: 'box',
+        homeTeamId: openTeam,
+        awayTeamId: staffTeam,
+        lines: [line(openTeam, 10)],
+      },
+      {
+        gameId: 'g2',
+        status: 'final',
+        captureMode: 'box',
+        homeTeamId: staffTeam,
+        awayTeamId: openTeam,
+        lines: [line(staffTeam, 40)],
+      },
+    ],
   };
 }

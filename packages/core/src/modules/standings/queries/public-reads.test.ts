@@ -4,6 +4,8 @@ import {
   divisionId,
   leagueId,
   memoryStandingsRead,
+  memoryStandingsReadWithMixedPlayer,
+  mixedPlayer,
   openPlayer,
   openTeam,
   seasonId,
@@ -144,5 +146,28 @@ describe('statistics for each kind of viewer (S-22, T-87)', () => {
     expect(
       await readStatLeaders(memoryStandingsRead(), { seasonId, measure: 'bad key!' }, admin),
     ).toMatchObject({ error: { code: 'invalid-input' } });
+  });
+
+  it("counts a player of a public team who also sits on a staff-only team only for the public team's games", async () => {
+    const store = memoryStandingsReadWithMixedPlayer();
+    const asVisitor = await readStatisticsTable(store, { seasonId, viewing: visitor });
+    const player = asVisitor.ok
+      ? asVisitor.value.players.find((p) => p.personId === mixedPlayer)
+      : undefined;
+    expect(player?.stats['points']?.total).toBe(10);
+    expect(player?.gamesPlayed).toBe(1);
+    expect(player?.teamIds).toEqual([openTeam]);
+    expect(JSON.stringify(asVisitor)).not.toContain(staffTeam + '","' + mixedPlayer);
+    const leaders = await readStatLeaders(store, { seasonId, measure: 'points' }, visitor);
+    expect(leaders.ok && leaders.value.leaders.map((l) => [l.personId, l.value])).toEqual([
+      [openPlayer, 14],
+      [mixedPlayer, 10],
+    ]);
+    // The staff-only team's own coach sees the stored totals of both teams.
+    const asCoach = await readStatisticsTable(store, { seasonId, viewing: coach });
+    const full = asCoach.ok
+      ? asCoach.value.players.find((p) => p.personId === mixedPlayer)
+      : undefined;
+    expect(full?.stats['points']?.total).toBe(50);
   });
 });

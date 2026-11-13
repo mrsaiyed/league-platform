@@ -1,6 +1,7 @@
 // Every team a person has a line in a final game with, or a roster place on, in the
 // season: how the public statistics find whose numbers a team's setting hides (S-22).
-// A roster place counts even after the player left, so a hidden team stays hidden.
+// A roster place counts even after the player left: a player with a hidden team has their
+// totals recomputed from the shown teams' lines only (statistics-source.ts).
 import { sql } from 'kysely';
 import type { PlayerTeamLink } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
