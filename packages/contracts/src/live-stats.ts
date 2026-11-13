@@ -25,6 +25,8 @@ export const Rules = z.strictObject({
   timeoutsPer: z.enum(['game', 'half']).optional(),
   overtimeTimeouts: z.number().int().min(0).max(5).optional(),
   timeoutsCarry: z.boolean().optional(),
+  // Optional: absent means a stop clock, as every game before the mode existed (T-128).
+  clockMode: z.enum(['stop', 'running']).optional(),
 });
 
 /** Mirrors `Command` in packages/sports/src/basketball/live.ts, which applies the rules. */
@@ -50,6 +52,8 @@ export const Command = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('untimeout'), side: Side }),
   z.strictObject({ type: z.literal('sub'), side: Side, inId: Id, outId: Id }),
   z.strictObject({ type: z.literal('period'), period: z.number().int().min(1).max(20) }),
+  // Switches the clock mode mid-game (S-21, T-128); undone like any play.
+  z.strictObject({ type: z.literal('clock-mode'), mode: z.enum(['stop', 'running']) }),
   z.strictObject({ type: z.literal('start') }),
   z.strictObject({ type: z.literal('pause') }),
   z.strictObject({ type: z.literal('set-clock'), ms: z.number().int().min(0).max(3_600_000) }),
