@@ -17,3 +17,19 @@ describe('getConfig', () => {
     }
   });
 });
+
+describe('isBuildPhase', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('is true only while Next.js builds, so the build never starts the app', async () => {
+    const { isBuildPhase } = await import('./config.ts');
+    vi.stubEnv('NEXT_PHASE', 'phase-production-build');
+    expect(isBuildPhase()).toBe(true);
+    vi.stubEnv('NEXT_PHASE', 'phase-production-server');
+    expect(isBuildPhase()).toBe(false);
+    vi.stubEnv('NEXT_PHASE', '');
+    expect(isBuildPhase()).toBe(false);
+  });
+});

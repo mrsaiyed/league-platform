@@ -248,6 +248,7 @@ All dated November 12, 2026.
 | T-231                 | New                                                                          | Setting values kept in one `setting_values` table, one row per key and place (record 019)                     | Step 2.1: T3 did not say where the values of T5 section 6's settings are stored                    |
 | T-235                 | New                                                                          | Templates in plain TypeScript until React is in; the invitation link stays in the path, unlogged (record 023) | Step 1.19 part 2 review: no React toolchain yet; the link must not leak or be lost                 |
 | T-236                 | New                                                                          | Tracker queue: only game rules refuse a tap; storage failures apart; fake-indexeddb (record 024)              | Step 2.12 review: request refusals lost taps; IndexedDB was untested                               |
+| T-232                 | New                                                                          | Agreed (delegated): how the web app shell answers a league page, and Next.js 16 (record 020)                  | Step 1.17 needed the shell's checks for U-6 and U-9 and a Next.js version                          |
 
 ## The full list
 
@@ -452,23 +453,24 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 
 ### [T2 — Repository and code structure](technical/T2-repo-and-code-structure.md)
 
-| ID   | Decision                                                                                                                                                               | Status             | Stage 1 |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------- |
-| T-20 | Everything lives in this one repository, organized as npm workspaces with a single lockfile, as it is today                                                            | Agreed (delegated) | yes     |
-| T-21 | Dependencies point one way                                                                                                                                             | Agreed (delegated) | yes     |
-| T-22 | A module is used only through its `index.ts`                                                                                                                           | Agreed (delegated) | yes     |
-| T-23 | Every change to data is a command, and every command has the same shape                                                                                                | Agreed (delegated) | yes     |
-| T-24 | Things that happen afterwards are events                                                                                                                               | Agreed (delegated) | yes     |
-| T-25 | Pages and handlers are thin. A page asks a query for data and renders it. A form action or API handler parses the request, builds the context, calls one command, and… | Agreed (delegated) | yes     |
-| T-26 | Two ways in, one set of commands                                                                                                                                       | Agreed (delegated) | yes     |
-| T-27 | No league is ever named in code                                                                                                                                        | Agreed (delegated) | yes     |
-| T-28 | No query without a league. Every function in `packages/database` that touches league data requires a league ID argument; there is no way to call it without one. The…  | Agreed (delegated) | yes     |
-| T-29 | What goes to the browser is chosen, not leaked                                                                                                                         | Agreed (delegated) |         |
-| T-30 | Settings and secrets are read in one place at startup, checked against a schema, and the app refuses to start if one is missing                                        | Agreed (delegated) |         |
-| T-31 | Naming. Files are `kebab-case.ts`. One command or query per file, named for what it does (`end-game.ts`). Tests sit beside the code as `end-game.test.ts`. Database…   | Agreed (delegated) |         |
-| T-32 | Strict TypeScript settings, no `any`, no ignored errors without a comment saying why                                                                                   | Agreed (delegated) |         |
-| T-33 | Size is a signal. A file past about 300 lines, or a command doing three separate things, gets split                                                                    | Agreed (delegated) |         |
-| T-34 | Every address is built by one function, and the league a request is for is worked out in one place                                                                     | Agreed (delegated) | yes     |
+| ID    | Decision                                                                                                                                                               | Status             | Stage 1 |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------- |
+| T-20  | Everything lives in this one repository, organized as npm workspaces with a single lockfile, as it is today                                                            | Agreed (delegated) | yes     |
+| T-21  | Dependencies point one way                                                                                                                                             | Agreed (delegated) | yes     |
+| T-22  | A module is used only through its `index.ts`                                                                                                                           | Agreed (delegated) | yes     |
+| T-23  | Every change to data is a command, and every command has the same shape                                                                                                | Agreed (delegated) | yes     |
+| T-24  | Things that happen afterwards are events                                                                                                                               | Agreed (delegated) | yes     |
+| T-25  | Pages and handlers are thin. A page asks a query for data and renders it. A form action or API handler parses the request, builds the context, calls one command, and… | Agreed (delegated) | yes     |
+| T-26  | Two ways in, one set of commands                                                                                                                                       | Agreed (delegated) | yes     |
+| T-27  | No league is ever named in code                                                                                                                                        | Agreed (delegated) | yes     |
+| T-28  | No query without a league. Every function in `packages/database` that touches league data requires a league ID argument; there is no way to call it without one. The…  | Agreed (delegated) | yes     |
+| T-29  | What goes to the browser is chosen, not leaked                                                                                                                         | Agreed (delegated) |         |
+| T-30  | Settings and secrets are read in one place at startup, checked against a schema, and the app refuses to start if one is missing                                        | Agreed (delegated) |         |
+| T-31  | Naming. Files are `kebab-case.ts`. One command or query per file, named for what it does (`end-game.ts`). Tests sit beside the code as `end-game.test.ts`. Database…   | Agreed (delegated) |         |
+| T-32  | Strict TypeScript settings, no `any`, no ignored errors without a comment saying why                                                                                   | Agreed (delegated) |         |
+| T-33  | Size is a signal. A file past about 300 lines, or a command doing three separate things, gets split                                                                    | Agreed (delegated) |         |
+| T-34  | Every address is built by one function, and the league a request is for is worked out in one place                                                                     | Agreed (delegated) | yes     |
+| T-232 | The shell works a request out once, then each page answers shown, not found, forwarded or no access (403); pages check, layouts never refuse; Next.js 16 (record 020)  | Agreed (delegated) | yes     |
 
 ### [T3 — Data model](technical/T3-data-model.md)
 

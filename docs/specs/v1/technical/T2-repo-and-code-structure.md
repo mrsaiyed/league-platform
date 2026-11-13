@@ -154,13 +154,19 @@ apps/web/src/
     tracker/  site-editor/  schedule-builder/  draft-board/  registration-form/
   server/
     context.ts                     Turns a request into "who, which league"
+    league-gate.ts                 Shown, not found, forwarded or "no access", for each league page
     container.ts                   The one place adapters are plugged into core
+    startup.ts                     Checks settings and the database login before serving anyone
     actions/                       Thin wrappers that call core commands
+  proxy.ts                         Hands the pages the address exactly as it arrived
+  instrumentation.ts               Starts the app once, before the first request
 ```
 
 Our own top-level names (`account`, `find`, `start`...) are real folders, so they always win over `[league]`. The same list is the blocked list for league short names (U-7), kept in one file that both use.
 
 **T-25: pages and handlers are thin.** A page asks a query for data and renders it. A form action or API handler parses the request, builds the context, calls one command, and formats the answer. If a page file contains an `if` about league rules, it is in the wrong place.
+
+**T-232 (agreed, delegated): how the shell answers a league page** ([record 020](../../../architecture/decisions/020-the-web-app-shell.md)). Next.js 16 with React 19. A request is worked out once (its league, and what the signed-in person holds there); each page then answers shown, not found, forwarded or "you do not have access" (403). Every page checks, because Next.js does not draw a layout again between pages under it; layouts never refuse. Which admin areas a person sees, and who sees a draft or suspended league, are rules in core. Local work and tests run on a made-up stand-in; staging and production check the database login role (T-60) before serving anyone.
 
 **T-26: two ways in, one set of commands.** Admin screens submit through server actions. The tracker and anything that must work offline or be retried uses versioned JSON endpoints under `/api/v1`. Both end at the same command. An endpoint about one league sits under `/api/v1/leagues/{leagueId}/...` ([T-229](T4-tenancy-auth-security.md)).
 

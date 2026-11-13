@@ -23,7 +23,12 @@ import { workInProgress } from './transaction-scope.ts';
 class GuardedConnection implements DatabaseConnection {
   open = true;
   readonly running = new Set<Promise<unknown>>();
-  constructor(readonly inner: DatabaseConnection) {}
+  // A plain field, not a constructor parameter property: Node.js runs this package's
+  // TypeScript as it is (the web app loads it at startup), and only erasable syntax runs.
+  readonly inner: DatabaseConnection;
+  constructor(inner: DatabaseConnection) {
+    this.inner = inner;
+  }
 
   #refuseWhenClosed() {
     if (!this.open) {
