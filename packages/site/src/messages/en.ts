@@ -127,6 +127,67 @@ export const en = {
     'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
   'error.scheduling.discard_schedule_draft.changed-since-read':
     'Someone else changed the schedule draft since you opened it, so it was not discarded. Reload it to see their changes.',
+  'error.scheduling.add_draft_game.season-not-found': 'That season is not there.',
+  'error.scheduling.add_draft_game.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.add_draft_game.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.add_draft_game.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.move_draft_game.season-not-found': 'That season is not there.',
+  'error.scheduling.move_draft_game.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.move_draft_game.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.move_draft_game.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.swap_draft_games.season-not-found': 'That season is not there.',
+  'error.scheduling.swap_draft_games.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.swap_draft_games.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.swap_draft_games.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.remove_draft_game.season-not-found': 'That season is not there.',
+  'error.scheduling.remove_draft_game.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.remove_draft_game.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.remove_draft_game.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.rename_draft_round.season-not-found': 'That season is not there.',
+  'error.scheduling.rename_draft_round.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.rename_draft_round.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.rename_draft_round.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.change_draft_round_date.season-not-found': 'That season is not there.',
+  'error.scheduling.change_draft_round_date.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.change_draft_round_date.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.change_draft_round_date.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.set_draft_recording.season-not-found': 'That season is not there.',
+  'error.scheduling.set_draft_recording.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.set_draft_recording.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.set_draft_recording.change-refused':
+    'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.add_draft_game.unknown-team':
+    'One of those teams is not a team of this season.',
+  'error.scheduling.add_draft_game.unknown-venue': 'That venue is not there.',
+  'error.scheduling.add_draft_game.unknown-court': 'That court is not at the chosen venue.',
+  'error.scheduling.move_draft_game.unknown-venue': 'That venue is not there.',
+  'error.scheduling.move_draft_game.unknown-court': 'That court is not at the chosen venue.',
+  'error.scheduling.discard_schedule_draft.season-not-found': 'That season is not there.',
+  'error.scheduling.discard_schedule_draft.draft-not-found':
+    'There is no schedule draft to discard.',
+  'error.scheduling.get_schedule_draft.season-not-found': 'That season is not there.',
+  'error.scheduling.get_schedule_draft.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
   // Activity log lines (A-6, T-226): the key is `activity.` and the command's name;
   // the values come from the entry's details. {role} is a role's name from above.
   'activity.access.invite': 'Invited someone as {role}',
