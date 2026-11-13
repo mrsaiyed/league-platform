@@ -4,10 +4,15 @@ import { z } from 'zod';
 import { blockedShortNames } from './blocked-short-names.ts';
 
 /** 3 to 40 lowercase letters, numbers and hyphens. */
-export const shortNameSchema = z
-  .string()
-  .trim()
-  .regex(/^[a-z0-9-]{3,40}$/);
+const shortNamePattern = /^[a-z0-9-]{3,40}$/;
+
+/** What a person types as a short name: spaces around it are dropped first. */
+export const shortNameSchema = z.string().trim().regex(shortNamePattern);
+
+/** Whether `value`, exactly as it is, has the form of a short name (nothing trimmed). */
+export function isShortNameFormat(value: string): boolean {
+  return shortNamePattern.test(value);
+}
 
 export function isBlockedShortName(slug: string): boolean {
   return blockedShortNames.has(slug.toLowerCase());
