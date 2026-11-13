@@ -1,9 +1,9 @@
 // Words and checks the games commands share.
-import type { RecordingMode } from '@srleagues/contracts';
+import type { SeasonRules } from '@srleagues/contracts';
 import { z } from 'zod';
 
 /** The database spells recording modes final, box and live; season rules say final-score, box-score and live. */
-export function recordingOf(captureMode: string): RecordingMode | undefined {
+export function recordingOf(captureMode: string): SeasonRules['recording'] | undefined {
   if (captureMode === 'final') return 'final-score';
   if (captureMode === 'box') return 'box-score';
   if (captureMode === 'live') return 'live';

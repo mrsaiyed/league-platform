@@ -103,46 +103,51 @@ export function memoryGames(state: Partial<MemoryGames> = {}) {
     activity: [],
     ...state,
   });
-  const transaction = memoryTransaction(db, (s, jobs): GamesTx => ({
-    jobs,
-    access: {
-      ownerAccountId: async () => ownerId,
-      leagueStatus: async () => s.status,
-      activeGrantsOf: async (account) =>
-        s.grants.filter((g) => g.accountId === account && g.revokedAt === null),
-    },
-    activity: {
-      record: async (entry) => void s.activity.push(entry),
-      list: async () => [],
-    },
-    games: {
-      find: async (id) => s.games.find((g) => g.id === id),
-      setResult: async (id, change, version) => {
-        const at = s.games.findIndex((g) => g.id === id);
-        const found = s.games[at];
-        if (found === undefined || found.binned || found.version !== version) return undefined;
-        s.games[at] = {
-          ...found,
-          status: change.status,
-          homeScore: change.homeScore,
-          awayScore: change.awayScore,
-          finalizedAt: change.decided ? '2026-12-06T20:00:00.000Z' : null,
-          format: found.format ?? change.format ?? null,
-          version: found.version + 1,
-        };
-        return found.version + 1;
+  const transaction = memoryTransaction(
+    db,
+    (s, jobs): GamesTx => ({
+      jobs,
+      access: {
+        ownerAccountId: async () => ownerId,
+        leagueStatus: async () => s.status,
+        activeGrantsOf: async (account) =>
+          s.grants.filter((g) => g.accountId === account && g.revokedAt === null),
       },
-      addCorrection: async (correction) => void s.corrections.push(correction),
-      listPostponed: async (season) =>
-        s.games
-          .filter(
-            (g) =>
-              g.status === 'postponed' && !g.binned && (season === undefined || g.seasonId === season),
-          )
-          .sort((a, b) => (a.startsAt ?? '9').localeCompare(b.startsAt ?? '9')),
-      findSeason: async (id) => s.seasons.find((x) => x.id === id),
-    },
-  }));
+      activity: {
+        record: async (entry) => void s.activity.push(entry),
+        list: async () => [],
+      },
+      games: {
+        find: async (id) => s.games.find((g) => g.id === id),
+        setResult: async (id, change, version) => {
+          const at = s.games.findIndex((g) => g.id === id);
+          const found = s.games[at];
+          if (found === undefined || found.binned || found.version !== version) return undefined;
+          s.games[at] = {
+            ...found,
+            status: change.status,
+            homeScore: change.homeScore,
+            awayScore: change.awayScore,
+            finalizedAt: change.decided ? '2026-12-06T20:00:00.000Z' : null,
+            format: found.format ?? change.format ?? null,
+            version: found.version + 1,
+          };
+          return found.version + 1;
+        },
+        addCorrection: async (correction) => void s.corrections.push(correction),
+        listPostponed: async (season) =>
+          s.games
+            .filter(
+              (g) =>
+                g.status === 'postponed' &&
+                !g.binned &&
+                (season === undefined || g.seasonId === season),
+            )
+            .sort((a, b) => (a.startsAt ?? '9').localeCompare(b.startsAt ?? '9')),
+        findSeason: async (id) => s.seasons.find((x) => x.id === id),
+      },
+    }),
+  );
   const events: DomainEvent[] = [];
   const handlers: EventHandler<GamesTx>[] = ['games.finalized', 'games.reopened'].map((type) => ({
     type,
