@@ -25,6 +25,8 @@ Next free: migration 0012, record 034, T-246 (0011 / 031 / T-243 belong to 1.14;
 - **2.39 Public queries for the schedule, teams and rosters** — `.local/lanes/2.39-public-schedule-queries` — none — built (2 commits), gate green apart from a since-fixed isolation case. Then: catch up with build/stage-1, independent review (sonnet), gate, land.
 - **2.27 Scorekeepers and assignments** — `.local/lanes/2.27-scorekeepers` — none (no migration; T-246 if needed) — opened; built on our recommendation (any scorekeeper may score any game), see Needs the founder.
 - **2.21 Publishing the schedule** — `.local/lanes/2.21-publish` — none (no migration; T-246 / record 034 if needed) — opened.
+- **2.22 Fixture import** — `.local/lanes/2.22-fixture-import` — none (no migration; record 034 / T-246 if needed) — opened.
+- **2.25 Adjustments and the rule-change preview** — `.local/lanes/2.25-adjustments` — none (no migration; record 035 / T-247 if needed) — opened.
 
 ## Needs the founder
 
