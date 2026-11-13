@@ -162,7 +162,7 @@ Our own top-level names (`account`, `find`, `start`...) are real folders, so the
 
 **T-25: pages and handlers are thin.** A page asks a query for data and renders it. A form action or API handler parses the request, builds the context, calls one command, and formats the answer. If a page file contains an `if` about league rules, it is in the wrong place.
 
-**T-26: two ways in, one set of commands.** Admin screens submit through server actions. The tracker and anything that must work offline or be retried uses versioned JSON endpoints under `/api/v1`. Both end at the same command.
+**T-26: two ways in, one set of commands.** Admin screens submit through server actions. The tracker and anything that must work offline or be retried uses versioned JSON endpoints under `/api/v1`. Both end at the same command. An endpoint about one league sits under `/api/v1/leagues/{leagueId}/...` ([T-229](T4-tenancy-auth-security.md)).
 
 ## 5. Sections of a page
 
