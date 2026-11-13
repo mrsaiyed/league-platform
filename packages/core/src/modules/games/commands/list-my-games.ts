@@ -4,10 +4,11 @@
 // is every game in the scorekeeper's reach; where only assigned ones may, it is the
 // games they are assigned to. The owner, admins and schedulers see every game they
 // may score. Each game says whether the person is assigned to it. "Today" is the
-// league's today, in its time zone, by the database's clock. It changes nothing,
+// league's today, in its time zone, by the database's clock. In an archived or
+// suspended league the games are still listed, but marked not scorable (U-9). It changes nothing,
 // but runs in the same shape as a command (record 014).
 import { z } from 'zod';
-import { accessOfAccount, type Scope } from '../../access/index.ts';
+import { accessOfAccount, readOnlyLeagueStatuses, type Scope } from '../../access/index.ts';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
 import { myGamesDays, recordingOf } from '../game-fields.ts';
 import { mayReadGames } from '../policy.ts';
@@ -29,6 +30,8 @@ export type MyGame = {
   readonly recording: ReturnType<typeof recordingOf>;
   /** Whether the person is assigned to score it. */
   readonly assignedToMe: boolean;
+  /** False while the league is archived or suspended: the game is shown, not scorable (U-9). */
+  readonly scorable: boolean;
   readonly version: number;
 };
 
@@ -39,7 +42,7 @@ export type MyGames = {
   readonly games: readonly MyGame[];
 };
 
-const view = ({ game, day, assigned }: GameInWindow, today: string): MyGame => ({
+const view = ({ game, day, assigned }: GameInWindow, today: string, scorable: boolean): MyGame => ({
   id: game.id,
   seasonId: game.seasonId,
   divisionId: game.divisionId,
@@ -51,6 +54,7 @@ const view = ({ game, day, assigned }: GameInWindow, today: string): MyGame => (
   status: game.status,
   recording: recordingOf(game.captureMode),
   assignedToMe: assigned,
+  scorable,
   version: game.version,
 });
 
@@ -66,10 +70,15 @@ export const listMyGames = defineCommand({
     if (accountId === null || holder === undefined) return ok({ today: '', games: [] });
     const window = await tx.games.listWindow(accountId, myGamesDays);
     const rule = await scoringRuleOf(tx);
+    const status = await tx.access.leagueStatus();
+    const scorable = status !== undefined && !readOnlyLeagueStatuses.includes(status);
     const games = window.games.filter((entry) => {
       const scope: Scope = { type: 'program', id: entry.programId };
       return mayScoreUnder(holder, scope, rule, entry.assigned);
     });
-    return ok({ today: window.today, games: games.map((entry) => view(entry, window.today)) });
+    return ok({
+      today: window.today,
+      games: games.map((entry) => view(entry, window.today, scorable)),
+    });
   },
 });

@@ -68,6 +68,7 @@ describe('listMyGames', () => {
       status: 'scheduled',
       recording: 'final-score',
       assignedToMe: true,
+      scorable: true,
       version: 1,
     });
     expect(result.ok && result.value.games[3]).toMatchObject({
@@ -106,6 +107,19 @@ describe('listMyGames', () => {
     expect(
       await listed(programScorekeeperId, { assignments, settings: scoringRule('assignedOnly') }),
     ).toEqual([]);
+  });
+
+  it('still lists the games in an archived or suspended league, marked not scorable', async () => {
+    for (const status of ['archived', 'suspended']) {
+      const { deps, as } = memoryGames({ games, grants, status });
+      const result = await listMyGames(as(scorekeeperId), {}, deps);
+      expect(result.ok && result.value.games.map((g) => [g.id.slice(-1), g.scorable])).toEqual([
+        ['8', false],
+        ['1', false],
+        ['7', false],
+        ['2', false],
+      ]);
+    }
   });
 
   it('refuses anyone who scores nowhere, a removed scorekeeper at once, and a visitor', async () => {
