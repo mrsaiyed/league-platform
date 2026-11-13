@@ -24,6 +24,13 @@ Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migrati
 - **1.18 part 2 Header, menu, footer, hard-coded-text scan** — `.local/lanes/1.18p2-shell-design` — none — BUILT and review findings FIXED (dc71537; gate green in the lane except tests/live-stats-\*.test.mjs not rerun alone). Needs: catch up with the build branch, gate (rerun db/tracker timing tests alone), land. Note: the league name now uses dir=auto; the stand-in league names and designs live in apps/web/src/server/stand-in-league-sites.ts with a TODO for step 1.21.
 - **2.3 Schedule and game tables** — `.local/lanes/2.3-schedule-game-tables` — migration 0009, record 025 / T-237 — BUILT (a0c7594), gate green in the lane (run-migrations lock test flaked under load, passes alone). Needs: independent review (opus), catch up, gate, land. Notes: capture_mode uses T3's final/box/live while the season rules say final-score/box-score (2.20/2.21 must translate); a game's result changes need a game_corrections row in the same transaction (2.21 publishing, 2.22 import undo, 2.23 results/reopen, the Al-Hadi transfer must respect this); no brackets or step 2.4 tables yet; purging binned games needs DELETE on games or an owner-run function.
 
+- **2.15 Seasons and their rules** — `.local/lanes/2.15-season-commands` — record 026 / T-238 — just opened (2026-11-13 run).
+- **2.17 People commands** — `.local/lanes/2.17-people-commands` — record 027 / T-239 — just opened.
+- **2.18 Teams commands** — `.local/lanes/2.18-teams-commands` — record 028 / T-240 — just opened.
+- **1.23 CI** — `.local/lanes/1.23-ci` — none — just opened.
+
+Reserved now: next free migration 0010, record 029, T-241.
+
 ## Needs the founder
 
 Nothing blocks the next steps. These are wanted before stage 1 can be called done:
