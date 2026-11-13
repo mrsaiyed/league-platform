@@ -595,7 +595,10 @@ const rows: readonly Row[] = [
     name: 'make a season of the default program current',
     needs: 'season.settings',
     prepare: async (league) => ({
-      input: { seasonId: await newSeason(pglite, league.leagueId, league.defaultProgramId) },
+      input: {
+        seasonId: await newSeason(pglite, league.leagueId, league.defaultProgramId),
+        version: 1,
+      },
     }),
     run: (c, i) => setCurrentSeason(c, i, leaguesDeps),
   },
@@ -605,7 +608,10 @@ const rows: readonly Row[] = [
     needs: 'season.settings',
     scope: 'program',
     prepare: async (league) => ({
-      input: { seasonId: await newSeason(pglite, league.leagueId, league.programId) },
+      input: {
+        seasonId: await newSeason(pglite, league.leagueId, league.programId),
+        version: 1,
+      },
     }),
     run: (c, i) => setCurrentSeason(c, i, leaguesDeps),
   },

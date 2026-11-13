@@ -282,8 +282,8 @@ describe('seasons on the database', () => {
       { slug: 'fall-2026', status: 'draft', is_current: false },
       { slug: 'winter-2027', status: 'draft', is_current: false },
     ]);
-    await setCurrentSeason(owner, { seasonId: first.value.seasonId }, deps);
-    await setCurrentSeason(owner, { seasonId: second.value.seasonId }, deps);
+    await setCurrentSeason(owner, { seasonId: first.value.seasonId, version: 1 }, deps);
+    await setCurrentSeason(owner, { seasonId: second.value.seasonId, version: 1 }, deps);
     expect((await state()).map((s) => s.is_current)).toEqual([false, true]);
   });
 
@@ -306,7 +306,9 @@ describe('seasons on the database', () => {
     const otherSeason = await newSeason(pglite, other.leagueId, otherProgram, { isCurrent: true });
     const a = await create(unique('hoops'));
     const owner = as(a.leagueId, a.ownerAccountId);
-    expect(await setCurrentSeason(owner, { seasonId: otherSeason }, deps)).toMatchObject({
+    expect(
+      await setCurrentSeason(owner, { seasonId: otherSeason, version: 1 }, deps),
+    ).toMatchObject({
       error: { code: 'season-not-found' },
     });
     expect(
