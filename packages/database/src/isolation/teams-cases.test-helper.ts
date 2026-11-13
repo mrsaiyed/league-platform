@@ -161,7 +161,10 @@ registerCommandCase(changeRosterEntry, harnessTx, {
 
 registerCommandCase(reorderRoster, harnessTx, {
   name: "reorder the target team's roster",
-  input: (target) => ({ teamId: target.teamId, rosterEntryIds: [target.rosterEntryId] }),
+  input: (target) => ({
+    teamId: target.teamId,
+    rosterEntryIds: [target.rosterEntryId, target.walkUpRosterEntryId],
+  }),
 });
 
 registerCommandCase(markLeft, harnessTx, {
