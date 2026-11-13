@@ -203,6 +203,19 @@ describe('who may score, on the database (P4 section 4, T-75)', () => {
     expect(await triesToScore(loose, loose.unassigned.accountId)).toBe('ok');
   });
 
+  it('refuses to assign an account from another league: it holds no role here', async () => {
+    const l = await leagueWithScorekeepers();
+    const elsewhere = await leagueWithScorekeepers();
+    expect(await assign(l, elsewhere.assigned.accountId)).toEqual({
+      ok: false,
+      error: { code: 'cannot-score-game' },
+    });
+    expect(await assign(l, elsewhere.ownerId)).toEqual({
+      ok: false,
+      error: { code: 'cannot-score-game' },
+    });
+  });
+
   it("keeps a program's scorekeeper to that program", async () => {
     const l = await leagueWithScorekeepers();
     const other = await newSeason(pglite, l.leagueId, l.defaultProgramId);
