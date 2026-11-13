@@ -7,11 +7,13 @@ What gets built in what order, and what each stage has to prove before the next 
 ## 1. Rules for every stage
 
 - **T-210: each stage ends with a real league really using what was built**, not with a mock-up. The TCSAAL demo in stage 2 follows the same rule: it is Al-Hadi's real season on the real platform.
-- **T-211: a stage starts only when the decisions it depends on are marked agreed** in [DECISIONS.md](../DECISIONS.md). Section 4 lists what stage 1 needs.
-- **T-212: nothing from a later stage is built early**, with one exception: foundations that would be expensive to add afterwards (programs and clubs in the database, the league fence, the job queue, message files for text). Those go in at stage 1 even though their screens come later.
+- **T-211: nothing is built until the decisions it depends on are marked agreed** in [DECISIONS.md](../DECISIONS.md). This holds stage by stage and, since T-212 changed, step by step. Section 4 lists what stage 1 needs.
+- **T-212 (changed November 12, 2026): work from a later stage is built early whenever it does not have to wait.** The founder asked for everything that can be built at the same time to be built at the same time, on every stage. A later-stage step may be opened as soon as the steps it needs are finished and its decisions are agreed (T-211). Three things do not move. The earliest unfinished stage gets builders first. Each stage's exit test is still run in order, with real people (T-210). And nothing reaches `main`, a release, a real service or real people before the founder has checked the stage it belongs to. The old rule, "nothing from a later stage is built early", guarded against building a great deal on foundations that later prove wrong on the real services. That risk is real and is now carried another way: the foundations are checked against the real services as early as the founder can open the accounts, and until then every outside service sits behind an interface (decision record 011).
 - **T-213: the Al-Hadi tracker keeps running as it is until stage 2 has passed its exit test** (T-16).
 
 Durations are my rough estimates for the founder working steadily with AI assistance. They are for comparing stages and planning around the demo date, not commitments.
+
+**How fast it actually goes.** Since November 12 the building is done by unattended AI runs with several builders working at once ([runbook](../../../build/RUNBOOK.md)), so as working time the week counts below are far too long: on the first day, eleven of stage 1's steps were built, reviewed and committed in about nine hours, with one builder at a time. Two things set the pace now, and neither is the number of builders. The first is the usage allowance of the founder's Claude plan: more builders finish sooner by the clock and use the allowance up sooner. The second is the part of every exit test that needs real people, real devices, vendor accounts or a lawyer, which no number of builders can hurry. The week counts are kept as a measure of how big the stages are compared with each other.
 
 ## 2. The stages
 
@@ -61,7 +63,7 @@ The tracker, live game pages, schedule and season totals for Al-Hadi varsity, wi
 - The bin and the activity log screens.
 - The transfer of Faraj's whole history into an unpublished league.
 
-**Timing.** Today is November 12, 2026, and Al-Hadi's last listed game is January 13, 2027. Stage 1 plus part A is seven to nine weeks by these estimates, with the holidays in the middle, so the demo is ready around mid-January at the earliest and probably later. The founder should book the TCSAAL meeting for after the season, not for the last game. If part A is late, the real season is still safe in the current tracker (T-213) and is shown from there.
+**Timing.** Today is November 12, 2026, and Al-Hadi's last listed game is January 13, 2027. Stage 1 plus part A is seven to nine weeks by these estimates, with the holidays in the middle, so the demo is ready around mid-January at the earliest and probably later. The code can be ready much sooner than that if the allowance allows (see "How fast it actually goes"); the rehearsal on real devices and the school's permission cannot be skipped. The founder should still book the TCSAAL meeting for after the season, not for the last game. If part A is late, the real season is still safe in the current tracker (T-213) and is shown from there.
 
 **Exit test:** the demo milestone above has been met and a real game has been scored on the platform. Faraj's whole history is transferred into an unpublished league and every team record and player total matches the current site.
 

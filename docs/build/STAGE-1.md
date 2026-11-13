@@ -1,6 +1,6 @@
 # Stage 1 plan — foundations
 
-The goal and exit test are in the [build order](../specs/v1/technical/T10-build-order.md), stage 1. This file breaks the stage into steps small enough for one run to finish several. Do them in order unless a step's "needs" says otherwise. How to do a step is in the [runbook](RUNBOOK.md).
+The goal and exit test are in the [build order](../specs/v1/technical/T10-build-order.md), stage 1. This file breaks the stage into steps small enough for one run to finish several. They are not done one after another: every step whose needs have landed is built at the same time as the others, each in its own lane. The "Side by side" section below says what each step needs. How to do a step is in the [runbook](RUNBOOK.md).
 
 ## What this machine can and cannot do
 
@@ -30,8 +30,8 @@ Each step is done when its done test passes, the gate passes, the independent re
 ### C. Rules of the product
 
 - [x] **1.10 The command shape.** `command(context, input, deps) → result | error` with typed results, typed expected errors, permission check, one transaction, follow-up jobs recorded in the same transaction, and the log line of T-196. Events (T-24). The command registry the harness reads. _Spec: T2 §3, T-23 to T-26, T-74, T-196. Model: opus._
-- [ ] **1.11 Leagues.** Module `leagues`: create a league (internal tool only for now), short-name rules and the blocked list (U-7), rename with forwarding, states draft, live, archived, suspended (U-9), the hidden default program (U-3, U-12), season records. _Spec: P2 §5–6, T3 §4. Model: sonnet._
-- [ ] **1.26 Catch up with main.** GitHub's `main` (already here as `origin/main`, commit 24d8bfb) is 8 commits ahead of where this branch started: the game-ready live stats tracker, its Supabase setup and its GitHub Pages site, about 57 files. Bring them in with `git merge origin/main`: no fetch, no push, never a rebase. Where both sides changed a file, keep `main`'s tracker behavior and its tests exactly, and keep this branch's new structure and gate; every test that came from `main` must pass unchanged. `supabase/site.json` names the founder's real Supabase project: nothing in the gate and nothing a run does may contact it (T-201); tests use the fake. If a script would contact it, do not run it and say so in the log. Do this alone, with a clean tree and no lanes open, straight after 1.11 is committed and before any other step. _Spec: T-16, T-201. Done test: `git log HEAD..origin/main` prints nothing; `npm run verify` passes. Model: opus, high._
+- [x] **1.11 Leagues.** Module `leagues`: create a league (internal tool only for now), short-name rules and the blocked list (U-7), rename with forwarding, states draft, live, archived, suspended (U-9), the hidden default program (U-3, U-12), season records. _Spec: P2 §5–6, T3 §4. Model: sonnet._
+- [ ] **1.26 Catch up with main.** GitHub's `main` (already here as `origin/main`, commit 24d8bfb) is 8 commits ahead of where this branch started: the game-ready live stats tracker, its Supabase setup and its GitHub Pages site, about 57 files. Bring them in with `git merge origin/main`: no fetch, no push, never a rebase. Where both sides changed a file, keep `main`'s tracker behavior and its tests exactly, and keep this branch's new structure and gate; every test that came from `main` must pass unchanged. `supabase/site.json` names the founder's real Supabase project: nothing in the gate and nothing a run does may contact it (T-201); tests use the fake. If a script would contact it, do not run it and say so in the log. Do it in its own lane and land it with a real merge (`git merge --no-ff`), so the history of `main` is kept. It does not have to be alone: other lanes may be open beside it. _Spec: T-16, T-201. Done test: `git log HEAD..origin/main` prints nothing; `npm run verify` passes. Model: opus, high._
 - [ ] **1.12 Access.** Module `access`: the fixed roles and their permissions (A-3, O-7), role grants with scope, invitations (create, accept, re-send, cancel, expire), removing access takes effect at once (T-75), the activity log (A-6). A test of every role against every command (T4 §12). _Spec: P4 §4, T4 §4, T3 §5. Model: opus._
 
 ### D. Sign-in
@@ -58,22 +58,27 @@ Each step is done when its done test passes, the gate passes, the independent re
 
 ## Side by side
 
-Which steps can be built at the same time, as lanes (runbook, section 3). Each lane runs top to bottom; lanes in the same wave run together. The lead may regroup when it sees the real files: the rule is that two open lanes never share a file.
+What each remaining step needs before its lane can be opened (runbook, sections 2 and 3). A step with "nothing new" can be opened now. Several steps are built in two parts so the first part does not wait; each part lands as its own commit, and the step is ticked when both have landed.
 
-| Wave | Lane A: rules of the product                                                     | Lane B: outside services                                         | Lane C: looks, logs, records                                                          |
-| ---- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| 0    | 1.11 Leagues, then 1.26 Catch up with main. Nothing else is open while 1.26 runs |                                                                  |                                                                                       |
-| 1    | 1.12 Access                                                                      | 1.13 Sign-in interface and stand-in, then 1.15 Supabase adapter  | 1.20 Logging and errors (the library part), then 1.23 CI                              |
-| 2    | 1.16 Address builder, then 1.17 Shell                                            | 1.19 Worker and queue (its invitation email job needs 1.12 done) | 1.18 Design values and message files (the parts that need no page first), 1.24 drafts |
-| 3    | 1.14 Sign-in flows in the web app                                                | 1.21 Seed leagues                                                | The rest of 1.18 and 1.20 that needed the shell (header, footer, health checks)       |
-| 4    | 1.22 Browser tests                                                               | 1.24 Records, finished                                           |                                                                                       |
-| 5    | 1.25 Whole-stage review, alone                                                   |                                                                  |                                                                                       |
+| Step                                  | Needs                                                           | Migration | Notes                                                                                                                               |
+| ------------------------------------- | --------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 1.26 Catch up with main               | nothing new                                                     | no        | Lands with a real merge, not a squash. Other lanes may be open beside it; each takes it in when it catches up before landing.       |
+| 1.12 Access                           | 1.11 (landed)                                                   | no        | Tables exist since 1.6. If it finds it needs a table change, it asks the lead for a migration number.                               |
+| 1.13 Sign-in interface and stand-in   | nothing new                                                     | no        | `packages/providers`.                                                                                                               |
+| 1.15 Supabase adapter                 | 1.13                                                            | no        |                                                                                                                                     |
+| 1.16 Address builder, request context | 1.13                                                            | no        | The address builder half needs nothing new and can go first.                                                                        |
+| 1.17 Web app shell                    | 1.12, 1.16                                                      | no        |                                                                                                                                     |
+| 1.18 Design values and message files  | part 1: nothing new · part 2: 1.17                              | no        | Part 1: design document to CSS variables, the message-file loader, right-to-left. Part 2: header, menu and footer inside the shell. |
+| 1.19 Worker and queue                 | part 1: nothing new · part 2: 1.12                              | yes       | Part 1: queue and email interfaces, stand-ins, adapters, the jobs table. Part 2: the invitation email job.                          |
+| 1.20 Logging and errors               | part 1: nothing new · part 2: 1.17 and 1.19                     | no        | Part 1: the logging and error-reporting library. Part 2: the health checks for web and worker.                                      |
+| 1.14 Sign-in flows in the web app     | 1.13, 1.17, 1.19                                                | maybe     | Sessions and attempt limits may need tables: reserve a migration number.                                                            |
+| 1.21 Seed leagues                     | 1.12, 1.18 part 1                                               | no        |                                                                                                                                     |
+| 1.23 CI                               | 1.26                                                            | no        | The workflow file changes when `main` is merged in, so this waits for it.                                                           |
+| 1.22 Browser tests                    | 1.14, 1.17, 1.18, 1.19, 1.21                                    | no        |                                                                                                                                     |
+| 1.24 Records                          | drafts: nothing new · final pass: everything else in this table | no        | A decision record is written by the lane that makes the decision. This step fills the gaps and writes the two operations guides.    |
+| 1.25 Whole-stage review and report    | every other step                                                | no        | Alone for this stage: no lane of stage 1 open. Lanes of later stages may carry on.                                                  |
 
-Folders each lane owns in waves 1 and 2:
-
-- **Lane A:** `packages/core`, `packages/database` (its queries, stores, isolation cases and any migration), `packages/site`, `apps/web`.
-- **Lane B:** `packages/providers`, `apps/worker`. Step 1.19 also needs a jobs table and the same-transaction hookup in `packages/database`: that part is done when lane A has no migration or database work open, never beside it.
-- **Lane C:** `packages/observability`, `packages/ui`, `packages/emails`, `.github`, `docs/architecture`, `docs/operations`.
+So right now six lanes can be open: 1.26, 1.12, 1.13, and the first parts of 1.18, 1.19 and 1.20. When stage 1 has fewer steps that can be opened than there are lanes, the spare lanes take steps from [stage 2](STAGE-2.md) that need only what has already landed.
 
 ## What stage 1 cannot finish without the founder
 

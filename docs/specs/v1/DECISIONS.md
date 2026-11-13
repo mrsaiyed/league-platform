@@ -237,6 +237,7 @@ All dated November 12, 2026.
 | T-221                 | New                                                                          | Lookups before a league or account is known go through a few narrow owner-run functions, never a wider policy | The league fence (step 1.7) left sign-up, sign-in, invitations and access lists with no way in     |
 | T-222                 | New                                                                          | Typed queries and the transaction helper (record 009)                                                         | Step 1.8 needed a transaction helper that cannot leak a league across pooled requests              |
 | T-223                 | New                                                                          | The command shape and where it lives (record 010)                                                             | Step 1.10 needed one shape for every change to data                                                |
+| T-212                 | Nothing from a later stage is built early                                    | Later-stage work is built early whenever it does not have to wait (record 011)                                | The founder asked for every stage that can be built in parallel to be built in parallel            |
 
 ## The full list
 
@@ -636,15 +637,15 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 
 ### [T10 — Build order](technical/T10-build-order.md)
 
-| ID    | Decision                                                                                                                                         | Status             | Stage 1 |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ | ------- |
-| T-210 | Each stage ends with a real league really using what was built, not with a demo                                                                  | Agreed (delegated) |         |
-| T-211 | A stage starts only when the decisions it depends on are marked agreed in DECISIONS.md                                                           | Agreed (delegated) |         |
-| T-212 | Nothing from a later stage is built early, with one exception                                                                                    | Agreed (delegated) |         |
-| T-213 | The Al-Hadi tracker keeps running as it is until stage 2 has passed its exit test (T-16)                                                         | Agreed (delegated) |         |
-| T-214 | Stage 3 before stage 4, because Faraj cannot move until its site can be rebuilt, and Faraj's first season on the platform is stage 4's exit test | Agreed (delegated) |         |
-| T-215 | Fuller basketball statistics can be pulled forward into stage 2 if Al-Hadi's coaches want rebounds and assists this season                       | Agreed (delegated) |         |
-| T-216 | The hosting vendor between equivalents (T-9), by price when stage 1 starts                                                                       | Open               |         |
-| T-217 | Whether the outside engineer in T-181 is someone the founder already knows (closed: no outside engineer for now)                                 | Closed             |         |
-| T-218 | The target Faraj season (closed: F-3 sets none)                                                                                                  | Closed             |         |
-| T-219 | Whether to recruit two or three more small leagues during stage 4, so that stage 5 opens with more than two real customers                       | Agreed             |         |
+| ID    | Decision                                                                                                                                                                                                                   | Status              | Stage 1 |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------- |
+| T-210 | Each stage ends with a real league really using what was built, not with a demo                                                                                                                                            | Agreed (delegated)  |         |
+| T-211 | A stage starts only when the decisions it depends on are marked agreed in DECISIONS.md                                                                                                                                     | Agreed (delegated)  |         |
+| T-212 | Work from a later stage is built early whenever it does not have to wait; the earliest stage gets builders first, exit tests stay in order, nothing reaches main or a real service before the founder's check (record 011) | Changed (delegated) |         |
+| T-213 | The Al-Hadi tracker keeps running as it is until stage 2 has passed its exit test (T-16)                                                                                                                                   | Agreed (delegated)  |         |
+| T-214 | Stage 3 before stage 4, because Faraj cannot move until its site can be rebuilt, and Faraj's first season on the platform is stage 4's exit test                                                                           | Agreed (delegated)  |         |
+| T-215 | Fuller basketball statistics can be pulled forward into stage 2 if Al-Hadi's coaches want rebounds and assists this season                                                                                                 | Agreed (delegated)  |         |
+| T-216 | The hosting vendor between equivalents (T-9), by price when stage 1 starts                                                                                                                                                 | Open                |         |
+| T-217 | Whether the outside engineer in T-181 is someone the founder already knows (closed: no outside engineer for now)                                                                                                           | Closed              |         |
+| T-218 | The target Faraj season (closed: F-3 sets none)                                                                                                                                                                            | Closed              |         |
+| T-219 | Whether to recruit two or three more small leagues during stage 4, so that stage 5 opens with more than two real customers                                                                                                 | Agreed              |         |

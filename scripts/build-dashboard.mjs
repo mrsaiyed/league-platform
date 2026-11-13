@@ -25,6 +25,11 @@ const needs = [...section('Needs the founder').matchAll(/^- \[( |x)\] (.*)$/gm)]
   done: m[1] === 'x',
   text: plain(m[2]),
 }));
+const lanes = [...section('In progress').matchAll(/^- \*\*(\d+\.\d+)\*\* — (.*)$/gm)].map((m) => ({
+  id: m[1],
+  text: plain(m[2]),
+}));
+const open = new Set(lanes.map((lane) => lane.id));
 const nextStep = field('Next step').match(/^(\d+\.\d+)/)?.[1] ?? '';
 const currentStage = Number(field('Stage').match(/^(\d+)/)?.[1] ?? 0);
 
@@ -48,7 +53,12 @@ const stagePlans = fs
         model: plain(meta.match(/Model: ([^_]*)/)?.[1] ?? '').replace(/\.$/, ''),
         spec: plain(meta.match(/Spec: (.*?)\.(?: Done test| Needs| Model|$)/)?.[1] ?? ''),
         test: plain(meta.match(/Done test: (.*?)\.(?: Needs| Model|$)/)?.[1] ?? ''),
-        state: step[1] === 'x' || note ? 'done' : step[2] === nextStep ? 'now' : 'todo',
+        state:
+          step[1] === 'x' || note
+            ? 'done'
+            : open.has(step[2]) || (!open.size && step[2] === nextStep)
+              ? 'now'
+              : 'todo',
         note: note ? note.text.replace(/^Step [\d.]+ done:?\s*/, '') : '',
       });
     }
@@ -64,7 +74,12 @@ const stages = [...order.matchAll(/^### Stage (\d+) — (.*?)(?: · (.*))?$/gm)]
     name: plain(m[2]),
     size: plain(m[3] ?? ''),
     goal: plain(after.match(/^\*\*Goal:\*\* (.*)$/m)?.[1] ?? ''),
-    state: number < currentStage ? 'done' : number === currentStage ? 'now' : 'todo',
+    state:
+      number < currentStage
+        ? 'done'
+        : number === currentStage || lanes.some((lane) => lane.id.startsWith(number + '.'))
+          ? 'now'
+          : 'todo',
   };
 });
 
@@ -87,6 +102,8 @@ const data = {
   stages,
   commits,
   needs,
+  lanes,
+  laneLimit: field('Lanes'),
 };
 
 const html = `<!doctype html>
@@ -146,6 +163,9 @@ const html = `<!doctype html>
     <div class="crew" id="crew"></div>
   </div>
 
+  <h2>Builders at work</h2>
+  <div class="card"><div class="muted small" id="teamnote"></div><ul id="team"></ul></div>
+
   <h2>Work groups</h2>
   <div class="card" id="lanes"></div>
   <div class="card" id="detail"></div>
@@ -183,13 +203,17 @@ $('pill').className = 'pill ' + pill[0]; $('pilltext').textContent = pill[1];
 const stage = D.stages.find((s) => s.number === D.currentStage);
 $('sub').textContent = 'Stage ' + D.currentStage + (stage ? ': ' + stage.name : '') + ' · branch ' + D.branch;
 $('headline').innerHTML = '';
-$('headline').append(el('b', '', now ? 'Now: ' + now.id + ' ' + now.name : 'All steps in this stage are done'), el('div', 'muted', now ? now.text : ''));
+const all = D.stagePlans.flatMap((p) => p.groups.flatMap((g) => g.steps));
+$('headline').append(el('b', '', D.lanes.length ? D.lanes.length + (D.lanes.length === 1 ? ' builder' : ' builders') + ' at work at the same time' : now ? 'Next: ' + now.id + ' ' + now.name : 'All steps in this stage are done'), el('div', 'muted', D.lanes.length ? 'Each builds one step in its own copy of the code. The lead checks each one, has it reviewed, and saves it.' : now ? now.text : ''));
+$('teamnote').textContent = D.laneLimit ? 'Allowed: ' + D.laneLimit : '';
+D.lanes.forEach((l) => { const s = all.find((x) => x.id === l.id); const li = el('li'); li.append(el('b', '', l.id + (s ? ' ' + s.name : '')), document.createTextNode((s && s.model ? ' · built by ' + s.model : '') + ' · ' + l.text)); $('team').append(li); });
+if (!D.lanes.length) $('team').append(el('li', 'muted', working ? 'The lead is checking what the last run left and opening lanes' : 'No builder is working right now'));
 $('count').textContent = done + ' of ' + steps.length + ' steps done in this stage';
 requestAnimationFrame(() => { $('fill').style.width = (steps.length ? (100 * done) / steps.length : 0) + '%'; });
 
 const roles = [
-  ['Lead', 'Plans the step, writes the brief, checks the result'],
-  ['Builder' + (now && now.model ? ' · ' + now.model : ''), 'Writes the code for the step'],
+  ['Lead', 'Plans, writes each brief, keeps the lanes full, checks every result'],
+  ['Builders' + (D.lanes.length ? ' · ' + D.lanes.length + ' at once' : ''), 'Each writes the code for one step, in its own lane'],
   ['Reviewer', 'A fresh agent that did not write it looks for faults'],
   ['Save', 'Full check passes, then the work is committed'],
 ];
@@ -197,7 +221,7 @@ roles.forEach(([name, what]) => { const r = el('div', 'role'); r.append(el('b', 
 if (working) { let i = 0; const tick = () => { [...$('crew').children].forEach((c, k) => c.classList.toggle('on', k === i)); i = (i + 1) % roles.length; }; tick(); setInterval(tick, 1600); }
 
 let delay = 0;
-plan.groups.forEach((g) => {
+D.stagePlans.slice().sort((a, b) => a.number - b.number).forEach((p) => { $('lanes').append(el('h3', '', 'Stage ' + p.number)); p.groups.forEach((g) => {
   const lane = el('div', 'lane'); const left = el('div');
   const d = g.steps.filter((s) => s.state === 'done').length;
   const models = [...new Set(g.steps.map((s) => s.model.split(/[ ,]/)[0]).filter(Boolean))].join(', ');
@@ -209,7 +233,7 @@ plan.groups.forEach((g) => {
     c.onclick = () => show(s, c); chips.append(c);
   });
   lane.append(left, chips); $('lanes').append(lane);
-});
+}); });
 function show(s, chip) {
   document.querySelectorAll('.chip.sel').forEach((c) => c.classList.remove('sel')); chip.classList.add('sel');
   const d = $('detail'); d.innerHTML = ''; d.className = 'card open';
@@ -222,7 +246,7 @@ D.commits.forEach((c) => { const li = el('li'); li.append(document.createTextNod
 if (!D.commits.length) $('commits').append(el('li', 'muted', 'Nothing saved yet'));
 D.needs.filter((n) => !n.done).forEach((n) => $('needs').append(el('li', '', n.text)));
 if (!$('needs').children.length) $('needs').append(el('li', 'muted', 'Nothing right now'));
-$('foot').textContent = 'Page written ' + clock(D.generatedAt) + '. It is rewritten after every step and reloads itself every minute.';
+$('foot').textContent = 'Page written ' + clock(D.generatedAt) + '. It is rewritten each time a step is saved and reloads itself every minute.';
 setInterval(() => { if (!$('detail').classList.contains('open')) location.reload(); }, 60000);
 </script>
 </body>

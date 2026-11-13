@@ -5,19 +5,23 @@ The one file that says where the build is. Every run reads it first and updates 
 ## Now
 
 - **State:** `building`
-- **Stage:** 1, foundations — [plan](STAGE-1.md)
+- **Stage:** 1, foundations — [plan](STAGE-1.md). Stage 2 — [plan](STAGE-2.md) — fills spare lanes.
 - **Branch:** `build/stage-1`
 - **Gate:** `npm run verify`
-- **Next step:** 1.26 Catch up with main (then 1.12)
+- **Next step:** 1.26 Catch up with main, and at the same time every other step that can be opened ("Side by side" in the stage plan).
+- **Lanes:** up to 5 at once (runbook, section 3). Lower the number if this computer struggles with that many.
+- **Merging to `main`:** not by a run, ever. The founder left this to the lead (2026-11-12). The lead's rule: a finished, checked stage is moved onto `main` by the lead in a session where someone is watching, when GitHub's checks are green on that exact commit and no Al-Hadi game is under way, because every push to `main` republishes the live tracker site. Nothing needs `main` before then: the build branch is on GitHub and checked there.
 - **Pushing to GitHub:** allowed, for the build branch only (`git push origin build/stage-1`). The founder said yes on 2026-11-12 and confirmed that the repository being public is fine. Never push or merge to `main`: every push to `main` republishes the live Al-Hadi tracker site at `mrsaiyed.github.io/league-platform/`, which is in use for real games.
 
-States: `building` (take the next step) · `waiting-for-founder` (nothing can be done until the list below is answered) · `stage-review` (the stage is finished and waiting for the founder's check).
+States: `building` (keep the lanes full) · `waiting-for-founder` (no step in any plan can be opened until the list below is answered). The end of a stage does not stop the build (runbook, section 9).
 
 ## In progress
 
-Open lanes when work runs side by side (runbook, section 3): the step, and the folders that lane owns. Keep this true before starting builders, so a run that is cut off leaves a map.
+One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
 
-- Nothing open. Next, alone and before any lane opens: step 1.26, catch up with `main` (stage plan, group C). The tracker on GitHub's `main` is 8 commits newer than the one this branch has been testing against.
+Reserved so far: nothing. Next free numbers: migration 0006, decision record 012, T-224. Check the folders before trusting these.
+
+- No lane is open.
 
 ## Needs the founder
 
@@ -33,6 +37,8 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 ## Log
 
 Newest first. One line per step or event.
+
+- 2026-11-12 — Founder: no more one step at a time; as many builders as realistic, on every stage that does not have to wait; the founder is away and the build needs no permission from them. Runbook rewritten: each step is built in its own lane (a private copy of the repository under `.local/lanes`), up to 5 at once, landed one at a time by the lead; the end of a stage no longer stops the build; later stages fill spare lanes (T-212 changed, record 011). A trial lane installed in 8 seconds and ran the gate in about two and a half minutes; one timing test in the migration runner failed under load and passed alone (flaky under load: make it sturdy).
 
 - 2026-11-13 — Step 1.11 done: league commands (create league, rename short name with forwarding, set status along the U-9 table, create season, set current season) in packages/core/src/modules/leagues, database queries/stores, isolation cases. Reviewer's finding fixed: archived and suspended leagues are now read-only for name, short name and seasons. Open: new database queries are tested through the store tests, not one test file each; blocked short-name list has system words only (offensive words wait for the founder); create/set-current season emit no events; resolving an old short name for forwarding from the app side is a later routing step.
 
