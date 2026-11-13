@@ -13,8 +13,9 @@ import type { ScheduleGame } from './schedule-types.ts';
  *
  * What the words mean here:
  * - Postponed and cancelled games hold no place and are not counted.
- * - A week is a round of the schedule; games with no round are grouped by their date. Weeks
- *   are taken in date order, and weeks with no games at all (a holiday) are left out.
+ * - A week is a round of the schedule. A game with no round belongs to the round on its date,
+ *   or, when no round falls on that date, to a week of its own by date. Weeks are taken in date
+ *   order, and weeks with no games at all (a holiday) are left out.
  * - A bye is a week with games in which the team has none.
  * - Early and late: on a date with games at two or more times, the earliest time is early and
  *   the latest is late. Games with no time are neither.
@@ -211,13 +212,31 @@ function uniqueTeams(input: FairnessInput): FairnessInput['teams'] {
   return input.teams.filter((t) => !seen.has(t.id) && seen.add(t.id));
 }
 
-/** The games week by week, in date order: each round is a week; games with no round are grouped by date. */
+/**
+ * The games week by week, in date order: each round is a week. A game with no round joins the
+ * round on its date (the round's own date first, else a round with games that day, the first
+ * listed); only when no round falls on its date is it grouped by date as a week of its own.
+ */
 function weeksOf(input: FairnessInput, holding: readonly ScheduleGame[]): ScheduleGame[][] {
   const roundIndex = new Map(input.rounds.map((r, i) => [r.id, { round: r, index: i }]));
+  // Which round a game with no round joins: the round dated that day, else the first-listed
+  // round with games that day.
+  const roundOn = new Map<string, string>(); // date → round id
+  for (const r of input.rounds)
+    if (r.date !== null && !roundOn.has(r.date)) roundOn.set(r.date, r.id);
+  const listed = (id: string): number => roundIndex.get(id)?.index ?? input.rounds.length;
+  const playedOn = new Map<string, string>(); // date → round id, from the games
+  for (const g of holding) {
+    if (g.roundId === null || roundOn.has(g.date)) continue;
+    const other = playedOn.get(g.date);
+    if (other === undefined || listed(g.roundId) < listed(other)) playedOn.set(g.date, g.roundId);
+  }
+  for (const [date, id] of playedOn) roundOn.set(date, id);
   const weeks = new Map<string, { games: ScheduleGame[]; date: string; index: number }>();
   for (const g of holding) {
-    const round = g.roundId === null ? undefined : roundIndex.get(g.roundId);
-    const key = g.roundId === null ? `date:${g.date}` : `round:${g.roundId}`;
+    const roundId = g.roundId ?? roundOn.get(g.date) ?? null;
+    const round = roundId === null ? undefined : roundIndex.get(roundId);
+    const key = roundId === null ? `date:${g.date}` : `round:${roundId}`;
     const week = weeks.get(key) ?? {
       games: [],
       date: round?.round.date ?? g.date,

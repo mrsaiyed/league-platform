@@ -185,6 +185,39 @@ describe('fairnessReport, worked examples (P7 §4.2)', () => {
     ]);
   });
 
+  it('puts a game with no round into the round on its date, not a week of its own', () => {
+    const teams = teamsOf('abcd');
+    const rounds = [
+      { id: 'r1', label: 'Week 1', date: '2026-10-04' },
+      { id: 'r2', label: 'Week 2', date: null },
+    ];
+    const games = [
+      game('g1'),
+      game('g2', { roundId: null, homeTeamId: 'c', awayTeamId: 'd' }),
+      game('g3', { roundId: 'r2', date: '2026-10-11', homeTeamId: 'a', awayTeamId: 'c' }),
+      game('g4', { roundId: null, date: '2026-10-11', homeTeamId: 'b', awayTeamId: 'd' }),
+      game('g5', { roundId: null, date: '2026-10-18', homeTeamId: 'a', awayTeamId: 'd' }),
+      game('g6', { roundId: null, date: '2026-10-25', homeTeamId: 'd', awayTeamId: 'a' }),
+    ];
+    const rules = { ...allOff, avoidSameMatchupTwoWeeksRunning: true };
+    const report = fairnessReport({ teams, rounds, games, rules });
+    // Two rounds and two weeks by date: c and d play in round 1 (g2 joins it), b and d in
+    // round 2 (g4 joins it, by the round's games). a and d meet in the last two weeks.
+    expect(report.teams.map((t) => [t.teamId, t.byes, t.backToBack])).toEqual([
+      ['a', 0, 1],
+      ['b', 2, 0],
+      ['c', 2, 0],
+      ['d', 0, 1],
+    ]);
+    expect(report.issues).toEqual([
+      {
+        rule: 'avoid-same-matchup-two-weeks-running',
+        teamIds: ['a', 'd'],
+        gameIds: ['g5', 'g6'],
+      },
+    ]);
+  });
+
   it('leaves out postponed and cancelled games, and empty weeks are no one’s bye', () => {
     const report = fairnessReport({
       teams: teamsOf('ab'),
