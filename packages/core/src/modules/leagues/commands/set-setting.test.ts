@@ -185,6 +185,92 @@ describe('setSetting', () => {
   });
 });
 
+describe('program admins and the activity log', () => {
+  const programAdmin = '01900000-0000-7000-8000-0000000000a4';
+  const adminOf = (id: string) => ({
+    id: 'g',
+    accountId: programAdmin,
+    role: 'admin' as const,
+    scope: { type: 'program' as const, id },
+    grantedByAccountId: ownerId,
+    revokedAt: null,
+  });
+
+  it('lets a program admin set and clear on their own program and its seasons only', async () => {
+    const { db, deps, as } = setUp();
+    db.state.grants = [adminOf(programId)];
+    const admin = as(programAdmin);
+    expect(await set(admin, input({ level: 'program', programId }), deps)).toMatchObject({
+      ok: true,
+    });
+    expect(await set(admin, input({ level: 'season', seasonId, value: 5 }), deps)).toMatchObject({
+      ok: true,
+    });
+    expect(await set(admin, input({}), deps)).toMatchObject({ error: { code: 'not-allowed' } });
+    expect(
+      await clear(admin, { level: 'season', seasonId, key: hours.key, version: 1 }, deps),
+    ).toMatchObject({ ok: true });
+    db.state.grants = [adminOf('program-default')];
+    expect(await set(as(programAdmin), input({ level: 'season', seasonId }), deps)).toMatchObject({
+      error: { code: 'not-allowed' },
+    });
+  });
+
+  it('checks the permission the setting declares, at the place, not league.settings', async () => {
+    const edits = defineSetting({
+      key: 'site.banner',
+      type: z.string().max(40),
+      default: 'x',
+      levels: ['league', 'program', 'season'],
+      permission: 'site.edit',
+      label: 'setting.site.banner.label',
+    });
+    const setEdit = setSettingFor(settingRegistry([edits]));
+    const { db, deps, as } = setUp();
+    const editor = '01900000-0000-7000-8000-0000000000a5';
+    db.state.grants = [
+      {
+        id: 'e',
+        accountId: editor,
+        role: 'editor',
+        scope: { type: 'program', id: programId },
+        grantedByAccountId: ownerId,
+        revokedAt: null,
+      },
+    ];
+    const at = (extra: Record<string, unknown>) => ({
+      key: edits.key,
+      value: 'hi',
+      version: null,
+      ...extra,
+    });
+    expect(await setEdit(as(editor), at({ level: 'season', seasonId }), deps)).toMatchObject({
+      ok: true,
+    });
+    expect(await setEdit(as(editor), at({ level: 'program', programId }), deps)).toMatchObject({
+      ok: true,
+    });
+    expect(await setEdit(as(editor), at({ level: 'league' }), deps)).toMatchObject({
+      error: { code: 'not-allowed' },
+    });
+  });
+
+  it('writes the scope of a program or season place into the activity entry', async () => {
+    const { db, deps, context } = setUp();
+    await set(context, input({}), deps);
+    await set(context, input({ level: 'program', programId }), deps);
+    await set(context, input({ level: 'season', seasonId }), deps);
+    await clear(context, { level: 'season', seasonId, key: hours.key, version: 1 }, deps);
+    await clear(context, { level: 'program', programId, key: hours.key, version: 1 }, deps);
+    const details = db.state.activity.map((a) => a.details);
+    expect(details[0]).toMatchObject({ scopeType: 'league', scopeId: null });
+    expect(details[1]).toMatchObject({ scopeType: 'program', scopeId: programId });
+    expect(details[2]).toMatchObject({ scopeType: 'program', scopeId: programId });
+    expect(details[3]).toMatchObject({ scopeType: 'program', scopeId: programId });
+    expect(details[4]).toMatchObject({ scopeType: 'program', scopeId: programId });
+  });
+});
+
 describe('clearSetting', () => {
   it('removes the value, so the lookup falls back, and writes the activity log', async () => {
     const { db, deps, context } = setUp();

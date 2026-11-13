@@ -1,6 +1,7 @@
 // T-98: a setting cannot be declared without a default, limits, a label and a permission.
 import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
+import { isPermission, roleHasPermission, roles } from '../../access/index.ts';
 import { declaredSettings } from './declarations.ts';
 import {
   defineSetting,
@@ -82,6 +83,34 @@ describe('defineSetting', () => {
     }
   });
 
+  it('refuses objects that take any other keys (records, loose objects, catchalls)', () => {
+    const n = z.number().int().min(0).max(9);
+    expect(() => declare({ type: z.record(z.string().max(5), n), default: {} })).toThrow(/limits/);
+    expect(() => declare({ type: z.looseObject({ a: n }), default: { a: 1 } })).toThrow(/limits/);
+    expect(() => declare({ type: z.object({ a: n }).catchall(n), default: { a: 1 } })).toThrow(
+      /limits/,
+    );
+    expect(hasLimits({ type: 'object', additionalProperties: { type: 'boolean' } })).toBe(false);
+    expect(hasLimits({ type: 'object', propertyNames: { maxLength: 3 } })).toBe(false);
+    expect(hasLimits({ type: 'object', additionalProperties: false, properties: {} })).toBe(true);
+    expect(declare({ type: z.strictObject({ a: n }), default: { a: 1 } }).key).toBe(good.key);
+  });
+
+  it('refuses a schema that accepts no value at all (optional), and transforms', () => {
+    const n = z.number().int().min(0).max(9);
+    expect(() => declare({ type: n.optional(), default: 1 })).toThrow(/optional/);
+    expect(() => declare({ type: n.default(1), default: 1 })).toThrow(/optional/);
+    expect(() =>
+      declare({
+        type: z
+          .string()
+          .max(5)
+          .transform((v) => v.length),
+        default: 'a',
+      }),
+    ).toThrow(/transform/);
+  });
+
   it('refuses a schema that cannot be described', () => {
     expect(() => declare({ type: z.custom<number>(() => true), default: 1 })).toThrow();
   });
@@ -111,6 +140,14 @@ describe('the settings stage 2 declares', () => {
       expect(setting.type.safeParse(setting.default).success).toBe(true);
       expect(setting.levels.length).toBeGreaterThan(0);
       expect(setting.label).toBe(`setting.${setting.key}.label`);
+    }
+  });
+
+  it('each name a permission the set-setting command can check', () => {
+    for (const setting of declaredSettings.all()) {
+      expect(isPermission(setting.permission)).toBe(true);
+      // Someone can hold it, so the setting is not out of everyone's reach.
+      expect(roles.some((role) => roleHasPermission(role, setting.permission))).toBe(true);
     }
   });
 

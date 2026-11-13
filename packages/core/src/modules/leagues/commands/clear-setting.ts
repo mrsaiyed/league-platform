@@ -6,7 +6,13 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import type { LeaguesTx } from '../ports.ts';
 import { declaredSettings } from '../settings/declarations.ts';
 import type { SettingRegistry } from '../settings/define-setting.ts';
-import { findPlace, mayChangeSetting, placeFields, settingKey } from '../settings/place.ts';
+import {
+  findPlace,
+  mayChangeSetting,
+  placeFields,
+  placeScopeDetails,
+  settingKey,
+} from '../settings/place.ts';
 import { placeId } from './set-setting.ts';
 
 export type ClearSettingError = {
@@ -33,7 +39,12 @@ export function clearSettingFor(registry: SettingRegistry) {
       await recordActivity(tx, context, {
         action: 'leagues.clear_setting',
         target: { type: place.level, id: placeId(place, context.leagueId) },
-        details: { key: setting.key, level: place.level, label: setting.label },
+        details: {
+          key: setting.key,
+          level: place.level,
+          label: setting.label,
+          ...(await placeScopeDetails(tx, place)),
+        },
       });
       return ok({ key: setting.key });
     },

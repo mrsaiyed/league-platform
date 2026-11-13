@@ -16,20 +16,25 @@ export async function listSettingValues(
 ): Promise<SettingValueRow[]> {
   const rows = await transactionOf(scope)
     .selectFrom('setting_values')
-    .select(['level', 'program_id', 'season_id', 'value', 'version'])
+    .select(['level', 'value', 'version'])
     .where('league_id', '=', scope.leagueId)
     .where('key', '=', key)
+    .where((eb) => {
+      const matches = [eb('level', '=', 'league')];
+      if (places.programId !== undefined) {
+        matches.push(
+          eb.and([eb('level', '=', 'program'), eb('program_id', '=', places.programId)]),
+        );
+      }
+      if (places.seasonId !== undefined) {
+        matches.push(eb.and([eb('level', '=', 'season'), eb('season_id', '=', places.seasonId)]));
+      }
+      return eb.or(matches);
+    })
     .execute();
-  return rows
-    .filter(
-      (row) =>
-        row.level === 'league' ||
-        (row.level === 'program' && row.program_id === (places.programId ?? null)) ||
-        (row.level === 'season' && row.season_id === (places.seasonId ?? null)),
-    )
-    .map((row) => ({
-      level: row.level as SettingValueRow['level'],
-      document: row.value,
-      version: row.version,
-    }));
+  return rows.map((row) => ({
+    level: row.level as SettingValueRow['level'],
+    document: row.value,
+    version: row.version,
+  }));
 }

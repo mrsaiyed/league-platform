@@ -73,7 +73,13 @@ export function hasLimits(schema: unknown): boolean {
     case 'array':
       return isChosen(schema.maxItems) && hasLimits(schema.items);
     case 'object':
-      return Object.values(isObject(schema.properties) ? schema.properties : {}).every(hasLimits);
+      // A fixed set of named parts only: a record, a loose object or a catchall accepts
+      // any number of extra keys, which is no limit.
+      if (!isObject(schema.properties) || schema.propertyNames !== undefined) return false;
+      if (schema.additionalProperties !== undefined && schema.additionalProperties !== false) {
+        return false;
+      }
+      return Object.values(schema.properties).every(hasLimits);
     default:
       return false;
   }
@@ -109,6 +115,15 @@ function check(declaration: Record<string, unknown>): void {
     described = z.toJSONSchema(declaration.type, { io: 'input' });
   } catch {
     throw refuse('its schema cannot be described, so its limits cannot be shown');
+  }
+  try {
+    z.toJSONSchema(declaration.type, { io: 'output' });
+  } catch {
+    // A transform stores one thing and reads another, so the limits shown would be wrong.
+    throw refuse('its schema transforms the value, which a stored setting must not');
+  }
+  if (declaration.type.safeParse(undefined).success) {
+    throw refuse('its schema accepts no value at all (optional), which cannot be stored');
   }
   if (!hasLimits(described)) {
     throw refuse('its schema has no limits (a range, a length or a list of choices)');

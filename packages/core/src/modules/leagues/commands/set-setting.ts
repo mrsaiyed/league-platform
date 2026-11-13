@@ -8,7 +8,13 @@ import type { LeaguesTx, SettingPlace } from '../ports.ts';
 import { declaredSettings } from '../settings/declarations.ts';
 import type { SettingRegistry } from '../settings/define-setting.ts';
 import { settingDocument } from '../settings/lookup-setting.ts';
-import { findPlace, mayChangeSetting, placeFields, settingKey } from '../settings/place.ts';
+import {
+  findPlace,
+  mayChangeSetting,
+  placeFields,
+  placeScopeDetails,
+  settingKey,
+} from '../settings/place.ts';
 
 export type SetSettingError = {
   readonly code:
@@ -48,7 +54,7 @@ export function setSettingFor(registry: SettingRegistry) {
       if (setting === undefined) return fail({ code: 'unknown-setting' });
       if (!setting.levels.includes(input.level)) return fail({ code: 'level-not-allowed' });
       const parsed = setting.type.safeParse(input.value);
-      if (!parsed.success) return fail({ code: 'invalid-value' });
+      if (!parsed.success || parsed.data === undefined) return fail({ code: 'invalid-value' });
       const place = await findPlace(tx, input);
       if (place === undefined) return fail({ code: 'place-not-found' });
       const version = await tx.leagues.writeSetting(
@@ -61,7 +67,12 @@ export function setSettingFor(registry: SettingRegistry) {
       await recordActivity(tx, context, {
         action: 'leagues.set_setting',
         target: { type: place.level, id: placeId(place, context.leagueId) },
-        details: { key: setting.key, level: place.level, label: setting.label },
+        details: {
+          key: setting.key,
+          level: place.level,
+          label: setting.label,
+          ...(await placeScopeDetails(tx, place)),
+        },
       });
       return ok({ key: setting.key, version });
     },
