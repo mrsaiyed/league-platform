@@ -5,18 +5,24 @@
 // tab loses nothing: the next queue opened on the same storage carries on, and the
 // server recognises anything it already had by its command ID.
 //
-// What each answer leaves behind:
+// What each answer leaves behind (record 024):
 // - accepted, duplicate: the tap is removed.
 // - refused because of the game's rules (`rule`): kept as refused, never sent again,
 //   until the tracker has told the scorekeeper and calls `forget` (T-113). The taps
 //   after it are still sent: the server judges each one, as it does inside a batch.
-// - refused for any other reason (the device lost the game, the game is not live, the
-//   person may not score it): the same, and the queue then halts, because every later
-//   tap would be refused too. The rest stay waiting until `resume` or `forget`.
+// - refused for a reason about the request, not the tap (the device lost the game, the
+//   game is not live, the person may not score it, no such game): the tap stays
+//   waiting and the queue halts, because every later tap would be refused too. After
+//   `resume` the waiting taps go out in order, none skipped; `forget` drops them.
+// - the server could not take the batch as sent (400, 413, 422): the queue sends the
+//   batch's taps one at a time; the one still turned away is kept as refused (`rule`),
+//   and the rest go on.
 // - the server does not speak the batch's protocol version, or turns the request away
-//   whole (signed out, no such game): the queue halts with nothing changed.
+//   whole (signed out, not allowed, no such game): the queue halts with nothing changed.
 // - no answer (no network, a timeout, a server error): nothing changes, and the queue
 //   tries again after a wait that doubles up to half a minute (retry-delay.ts).
+// - the device's storage fails: nothing is lost that was stored; `storageFailure` says
+//   so (never `unansweredSince`: it is not the network), and the queue tries again.
 //
 // It holds no screen and no words: step 2.37's banner reads `status()` (queue-banner.ts).
 import {
@@ -27,7 +33,13 @@ import {
   type TrackerCommand,
 } from '@srleagues/contracts';
 import type { CommandTransport, TransportOutcome } from './command-transport.ts';
-import type { CommandRefusal, QueueStorage, QueuedCommand } from './queue-storage.ts';
+import {
+  QueueError,
+  type CommandRefusal,
+  type QueueErrorCode,
+  type QueueStorage,
+  type QueuedCommand,
+} from './queue-storage.ts';
 import { defaultRetryTiming, retryDelayMs, type RetryTiming } from './retry-delay.ts';
 
 /** Time as the queue sees it, so tests can move it on by hand. */
@@ -52,7 +64,7 @@ export type QueueHalt =
   | { readonly kind: 'refused'; readonly code: Exclude<RefusalCode, 'rule'> }
   /** The server no longer speaks the version these taps were made under (T-127). */
   | { readonly kind: 'version-refused'; readonly accepted: readonly number[] }
-  /** The server turned the request away whole: signed out, not allowed, no such game. */
+  /** The server turned the request away whole: signed out (401), not allowed (403), no such game (404). */
   | { readonly kind: 'rejected'; readonly httpStatus: number };
 
 export type RefusedCommand = {
@@ -73,9 +85,17 @@ export type QueueStatus = {
    * answers. Lets the tracker warn after several minutes offline (T6 §4).
    */
   readonly unansweredSince: number | null;
+  /**
+   * Set while the device's storage fails to keep or read taps (clock milliseconds it
+   * began, and a fixed code); null once it works again. Separate from
+   * `unansweredSince`, so a storage failure is never shown as being offline.
+   */
+  readonly storageFailure: StorageFailure | null;
   /** The game's sequence number in the server's latest answer. */
   readonly sequence: number | null;
 };
+
+export type StorageFailure = { readonly code: QueueErrorCode; readonly since: number };
 
 export type TrackerQueueOptions = {
   readonly gameId: string;
@@ -100,16 +120,21 @@ export type TrackerQueue = {
   start(): Promise<void>;
   /**
    * Stores a tap at the end of the queue. Resolves once it is stored: confirm the tap
-   * on screen only then (T-114). Rejects if it could not be stored.
+   * on screen only then (T-114). Rejects if it could not be stored, or if its command
+   * ID is already held for another game (`command-id-in-other-game`).
    */
   enqueue(command: TrackerCommand): Promise<void>;
   /** Sends now instead of waiting: the network is back, or a scoring session was taken. */
   wake(): void;
-  /** Clears a halt and sends again (after signing in again, or taking the game back). */
+  /**
+   * Clears a halt and sends again (after signing in again, or taking the game back).
+   * Taps left waiting by the halt go out first, in order.
+   */
   resume(): void;
   /**
    * Drops taps for good: refused ones the scorekeeper has been told about, or waiting
    * ones after another device took over and they were shown as not saved (T6 §5).
+   * A halt is cleared once no waiting tap is left for it to hold back.
    */
   forget(commandIds: readonly string[]): Promise<void>;
   status(): QueueStatus;
@@ -122,6 +147,8 @@ export type TrackerQueue = {
 };
 
 const unanswered: TransportOutcome = { kind: 'unanswered' };
+
+type RefusedEntry = { readonly commandId: string; readonly refusal: CommandRefusal };
 
 export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
   const {
@@ -144,12 +171,16 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     sending: false,
     halted: null,
     unansweredSince: null,
+    storageFailure: null,
     sequence: null,
   };
   const listeners = new Set<(status: QueueStatus) => void>();
   let started = false;
   let stopped = false;
   let failures = 0;
+  let storageFailures = 0;
+  /** After a batch the server could not take, how many taps still go out one at a time. */
+  let singlesLeft = 0;
   let cancelRetry: (() => void) | null = null;
   let pumping: Promise<void> | null = null;
   let again = false;
@@ -161,10 +192,28 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     for (const listener of listeners) listener(current);
   };
 
+  /** Runs one storage call, keeping `storageFailure` true to how the last one went. */
+  const stored = async <T>(fallback: QueueErrorCode, run: () => Promise<T>): Promise<T> => {
+    let value: T;
+    try {
+      value = await run();
+    } catch (error) {
+      // A command ID held for another game is the caller's mistake, not the storage's.
+      const code = error instanceof QueueError ? error.code : fallback;
+      if (code !== 'command-id-in-other-game') {
+        update({ storageFailure: { code, since: current.storageFailure?.since ?? clock.now() } });
+      }
+      throw error;
+    }
+    storageFailures = 0;
+    if (current.storageFailure !== null) update({ storageFailure: null });
+    return value;
+  };
+
   /** Reads the queue and shows it. A read that finishes after a newer one is not shown. */
   const refresh = async (): Promise<readonly QueuedCommand[]> => {
     const ticket = ++readsStarted;
-    const list = await storage.list(gameId);
+    const list = await stored('storage-read-failed', () => storage.list(gameId));
     if (ticket > readsShown) {
       readsShown = ticket;
       update({
@@ -192,24 +241,39 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     });
   };
 
-  const retryLater = (): void => {
-    failures += 1;
-    update({ unansweredSince: current.unansweredSince ?? clock.now() });
+  const tryAgainAfter = (attempt: number): void => {
     if (stopped) return;
-    cancelRetry = clock.after(retryDelayMs(failures, random(), retry), () => {
+    cancelRetry = clock.after(retryDelayMs(attempt, random(), retry), () => {
       cancelRetry = null;
       kick();
     });
   };
+
+  /** The server did not answer. */
+  const retryLater = (): void => {
+    failures += 1;
+    update({ unansweredSince: current.unansweredSince ?? clock.now() });
+    tryAgainAfter(failures);
+  };
+
+  /** The server answered: whatever it said, the device is not offline. */
+  const answered = (change: Partial<QueueStatus> = {}): void => {
+    failures = 0;
+    update({ unansweredSince: null, ...change });
+  };
+
+  const settle = (remove: readonly string[], refuse: readonly RefusedEntry[]): Promise<void> =>
+    stored('storage-write-failed', () => storage.settle(gameId, { remove, refuse }));
 
   const nextBatch = (list: readonly QueuedCommand[], session: string): CommandBatch | null => {
     const waiting = list.filter((entry) => entry.state === 'waiting');
     const first = waiting[0];
     if (first === undefined) return null;
     // A batch carries one version: taps stored before a release go out as they were made.
+    const most = singlesLeft > 0 ? 1 : size;
     const commands: TrackerCommand[] = [];
     for (const entry of waiting) {
-      if (entry.protocolVersion !== first.protocolVersion || commands.length === size) break;
+      if (entry.protocolVersion !== first.protocolVersion || commands.length === most) break;
       commands.push(entry.command);
     }
     return { protocolVersion: first.protocolVersion, sessionId: session, commands };
@@ -239,11 +303,28 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
         retryLater();
         return false;
       case 'version-refused':
-        update({ halted: { kind: 'version-refused', accepted: outcome.refusal.accepted } });
+        answered({ halted: { kind: 'version-refused', accepted: outcome.refusal.accepted } });
         return false;
       case 'rejected':
-        update({ halted: { kind: 'rejected', httpStatus: outcome.httpStatus } });
+        answered({ halted: { kind: 'rejected', httpStatus: outcome.httpStatus } });
         return false;
+      case 'batch-refused': {
+        const [only, ...rest] = batch.commands;
+        if (only === undefined) return false;
+        answered();
+        if (rest.length > 0) {
+          // One of these taps is bad, or there are too many: send them one at a time.
+          singlesLeft = Math.max(singlesLeft, batch.commands.length);
+          return true;
+        }
+        // This one tap the server cannot take as sent: refused, as a game rule would
+        // be, so the scorekeeper is told and the rest go on (record 024).
+        const refusal: CommandRefusal = { code: 'rule', message: `http-${outcome.httpStatus}` };
+        await settle([], [{ commandId: only.commandId, refusal }]);
+        singlesLeft = Math.max(singlesLeft - 1, 0);
+        await refresh();
+        return true;
+      }
       case 'reply':
         break;
     }
@@ -251,7 +332,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     // anything the reply leaves out stays waiting and goes again.
     const sent = new Set(batch.commands.map((command) => command.commandId));
     const remove: string[] = [];
-    const refuse: { commandId: string; refusal: CommandRefusal }[] = [];
+    const refuse: RefusedEntry[] = [];
     let halt: QueueHalt | null = null;
     for (const result of outcome.reply.results) {
       if (!sent.delete(result.commandId)) continue;
@@ -260,18 +341,19 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
         continue;
       }
       const { code, message } = result.reason;
-      refuse.push({ commandId: result.commandId, refusal: { code, message } });
-      if (code !== 'rule') halt ??= { kind: 'refused', code };
+      // Only a game rule is about the tap. Any other reason is about the request (the
+      // session, the game, the person): the tap stays waiting for `resume`.
+      if (code === 'rule') refuse.push({ commandId: result.commandId, refusal: { code, message } });
+      else halt ??= { kind: 'refused', code };
     }
-    if (remove.length === 0 && refuse.length === 0) {
+    if (remove.length === 0 && refuse.length === 0 && halt === null) {
       // An answer about none of what was sent is no answer.
       retryLater();
       return false;
     }
-    await storage.settle(gameId, { remove, refuse });
-    failures = 0;
-    update({
-      unansweredSince: null,
+    if (remove.length > 0 || refuse.length > 0) await settle(remove, refuse);
+    if (singlesLeft > 0) singlesLeft = Math.max(singlesLeft - batch.commands.length, 0);
+    answered({
       sequence: Math.max(current.sequence ?? 0, outcome.reply.sequence),
       ...(halt === null ? {} : { halted: halt }),
     });
@@ -296,8 +378,10 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
         if (!(await apply(batch, await send(batch)))) return;
       }
     } catch {
-      // The storage could not be read or written. What it holds is unchanged; try again.
-      retryLater();
+      // The storage could not be read or written (`storageFailure` says so). What it
+      // holds is unchanged; try again, without calling it the network.
+      storageFailures += 1;
+      tryAgainAfter(storageFailures);
     } finally {
       update({ sending: false });
     }
@@ -312,10 +396,18 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     },
 
     async enqueue(command) {
-      if (stopped) throw new Error('The queue has stopped; the tap was not stored.');
-      await storage.add(gameId, { protocolVersion, command });
-      // Stored: whatever happens next, the tap is kept. A failed read only delays the count.
-      await refresh().catch(() => undefined);
+      if (stopped) throw new QueueError('queue-stopped');
+      const added = await stored('storage-write-failed', () =>
+        storage.add(gameId, { protocolVersion, command }),
+      );
+      // Stored: whatever happens next, the tap is kept. If the read after it fails, the
+      // count goes up by hand, so the screen never shows fewer waiting than are held.
+      const shown = readsShown;
+      try {
+        await refresh();
+      } catch {
+        if (added === 'added' && readsShown === shown) update({ waiting: current.waiting + 1 });
+      }
       kick();
     },
 
@@ -331,8 +423,12 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     },
 
     async forget(commandIds) {
-      await storage.settle(gameId, { remove: commandIds });
-      await refresh();
+      await settle(commandIds, []);
+      const list = await refresh();
+      // Nothing left for the halt to hold back: the queue is free again.
+      if (current.halted !== null && !list.some((entry) => entry.state === 'waiting')) {
+        update({ halted: null });
+      }
       kick();
     },
 

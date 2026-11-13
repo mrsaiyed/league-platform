@@ -1,6 +1,6 @@
 // How the queue reaches the server, as the queue sees it. The browser's version is
 // fetch-command-transport.ts; tests give a stand-in server. The queue never learns
-// about addresses or status codes, only which of four things happened.
+// about addresses, only which of five things happened (and a status code to log).
 import type { CommandBatch, CommandReply, VersionRefusal } from '@srleagues/contracts';
 
 export type TransportOutcome =
@@ -10,9 +10,15 @@ export type TransportOutcome =
   | { readonly kind: 'version-refused'; readonly refusal: VersionRefusal }
   /**
    * The server turned the request away whole, and sending the same again will not
-   * help until something changes: signed out, not allowed, no such game.
+   * help until something changes: signed out (401), not allowed (403), no such game (404).
    */
   | { readonly kind: 'rejected'; readonly httpStatus: number }
+  /**
+   * The server could not take the batch as sent (400, 413, 422 and the other 4xx): one
+   * of its taps is bad or the batch too big. The queue finds the tap by sending one at
+   * a time (record 024).
+   */
+  | { readonly kind: 'batch-refused'; readonly httpStatus: number }
   /** No usable answer: no network, a timeout, a server error. Send again later. */
   | { readonly kind: 'unanswered' };
 

@@ -1,6 +1,6 @@
 // The queue's way to the server in the browser: one POST of a batch to the game's
 // commands endpoint (T6 §3), addressed by the league's id so a queue held across a
-// change of short name still arrives (T-229). The answer is sorted into the four
+// change of short name still arrives (T-229). The answer is sorted into the five
 // outcomes the queue knows; nothing here throws.
 import { CommandReply, VersionRefusal } from '@srleagues/contracts';
 import { leagueApiUrl } from '@srleagues/core';
@@ -15,6 +15,9 @@ export type FetchCommandTransportOptions = {
 /** Statuses where the same request may well work later: a timeout, too many, the server's fault. */
 const tryAgainLater = (status: number): boolean =>
   status === 408 || status === 425 || status === 429 || status >= 500;
+
+/** Statuses about who is asking or what for, not about the taps: the queue halts. */
+const turnedAway = (status: number): boolean => status === 401 || status === 403 || status === 404;
 
 export function createFetchCommandTransport(
   options: FetchCommandTransportOptions,
@@ -51,7 +54,8 @@ export function createFetchCommandTransport(
         return reply.success ? { kind: 'reply', reply: reply.data } : { kind: 'unanswered' };
       }
       if (tryAgainLater(response.status) || response.status < 400) return { kind: 'unanswered' };
-      return { kind: 'rejected', httpStatus: response.status };
+      if (turnedAway(response.status)) return { kind: 'rejected', httpStatus: response.status };
+      return { kind: 'batch-refused', httpStatus: response.status };
     },
   };
 }

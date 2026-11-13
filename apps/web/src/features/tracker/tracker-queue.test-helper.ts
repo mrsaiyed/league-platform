@@ -67,6 +67,11 @@ export type FakeServer = {
   slowMs: number;
   /** Command IDs to refuse, with the reason's code. */
   readonly refuse: Map<string, RefusalCode>;
+  /**
+   * Command IDs the server cannot take as sent, with the HTTP status: a batch holding
+   * any of them is turned away whole (`batch-refused`).
+   */
+  readonly badRequest: Map<string, number>;
   /** When set, every batch is answered with this instead. */
   answerWith: TransportOutcome | null;
   /** Every command saved, once each, in the order saved. */
@@ -85,6 +90,7 @@ export function createFakeServer(clock: QueueClock): FakeServer {
   const saved: string[] = [];
   const received: CommandBatch[] = [];
   const refuse = new Map<string, RefusalCode>();
+  const badRequest = new Map<string, number>();
 
   const save = (batch: CommandBatch): TransportOutcome => {
     const results = batch.commands.map((command): CommandResult => {
@@ -105,6 +111,7 @@ export function createFakeServer(clock: QueueClock): FakeServer {
     mode: 'up',
     slowMs: 0,
     refuse,
+    badRequest,
     answerWith: null,
     saved,
     received,
@@ -116,6 +123,10 @@ export function createFakeServer(clock: QueueClock): FakeServer {
         most = Math.max(most, underWay);
         try {
           if (server.answerWith !== null) return server.answerWith;
+          const bad = batch.commands.find((c) => badRequest.has(c.commandId));
+          if (bad !== undefined && server.mode !== 'down') {
+            return { kind: 'batch-refused', httpStatus: badRequest.get(bad.commandId) ?? 400 };
+          }
           switch (server.mode) {
             case 'down':
               return { kind: 'unanswered' };

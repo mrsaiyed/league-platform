@@ -67,11 +67,21 @@ describe('fetch command transport', () => {
     });
   });
 
-  it('reports a request turned away whole with its status', async () => {
-    for (const status of [400, 401, 403, 404]) {
+  it('reports a request turned away whole (signed out, not allowed, no such game) with its status', async () => {
+    for (const status of [401, 403, 404]) {
       const { transport } = transportAnswering(() => json(status, { error: 'no' }));
       expect(await transport.send(batch, new AbortController().signal)).toEqual({
         kind: 'rejected',
+        httpStatus: status,
+      });
+    }
+  });
+
+  it('reports a batch the server could not take as sent, so the queue can find the bad tap', async () => {
+    for (const status of [400, 413, 422, 409]) {
+      const { transport } = transportAnswering(() => json(status, { error: 'bad' }));
+      expect(await transport.send(batch, new AbortController().signal)).toEqual({
+        kind: 'batch-refused',
         httpStatus: status,
       });
     }

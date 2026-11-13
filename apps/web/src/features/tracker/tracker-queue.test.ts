@@ -56,6 +56,63 @@ describe('tracker queue: storing taps (T-114)', () => {
     expect(queue.status().waiting).toBe(0);
   });
 
+  it('counts a stored tap as waiting even when the read after it fails', async () => {
+    const storage = createMemoryQueueStorage();
+    let failList = false;
+    const flaky: QueueStorage = {
+      ...storage,
+      list: (g) => (failList ? Promise.reject(new Error('busy')) : storage.list(g)),
+    };
+    let current: string | null = null;
+    const { queue } = setup({ storage: flaky, sessionId: () => current });
+    await queue.start();
+    failList = true;
+    await queue.enqueue(tap(1));
+    expect(queue.status().waiting).toBe(1);
+    // The same tap again is already held: the count does not grow.
+    await queue.enqueue(tap(1));
+    expect(queue.status().waiting).toBe(1);
+    expect(await held(storage)).toEqual([[commandId(1), 'waiting']]);
+  });
+
+  it('rejects a command ID already used in another game (a bug), not as a storage failure', async () => {
+    const { queue, storage } = setup();
+    await storage.add('00000000-0000-4000-8000-0000000000a9', {
+      protocolVersion: 1,
+      command: tap(1),
+    });
+    await queue.start();
+    await expect(queue.enqueue(tap(1))).rejects.toThrow('command-id-in-other-game');
+    expect(queue.status()).toMatchObject({ waiting: 0, storageFailure: null });
+  });
+
+  it('a storage failure is shown as one, never as offline, and clears once storage works', async () => {
+    const storage = createMemoryQueueStorage();
+    let broken = true;
+    const flaky: QueueStorage = {
+      add: (g, e) => (broken ? Promise.reject(new Error('disk full')) : storage.add(g, e)),
+      list: (g) => (broken ? Promise.reject(new Error('disk full')) : storage.list(g)),
+      settle: (g, s) => storage.settle(g, s),
+    };
+    const { queue, clock } = setup({ storage: flaky });
+    await expect(queue.start()).rejects.toThrow('disk full');
+    await expect(queue.enqueue(tap(1))).rejects.toThrow('disk full');
+    expect(queue.status()).toMatchObject({
+      storageFailure: { code: 'storage-write-failed', since: clock.now() },
+      unansweredSince: null,
+      waiting: 0,
+    });
+    broken = false;
+    await queue.start();
+    await queue.enqueue(tap(1));
+    await queue.idle();
+    expect(queue.status()).toMatchObject({
+      storageFailure: null,
+      unansweredSince: null,
+      waiting: 0,
+    });
+  });
+
   it('sends taps made before it started once it starts', async () => {
     const { queue, server } = setup();
     await queue.enqueue(tap(1));
@@ -301,29 +358,121 @@ describe('tracker queue: the done test, each case left in a known state', () => 
     expect(queue.status().refused).toEqual([]);
   });
 
-  it('a refused command (device lost the game): the queue halts, the rest wait for resume or forget', async () => {
+  it('a refused command (device lost the game): the tap stays waiting, the queue halts, resume sends all in order', async () => {
     const { queue, server, storage } = setup({ batchSize: 1 });
     server.refuse.set(commandId(2), 'session-not-held');
     for (const n of [1, 2, 3]) await queue.enqueue(tap(n));
     await queue.start();
     await queue.idle();
     expect(queue.status()).toMatchObject({
-      waiting: 1,
+      waiting: 2,
+      refused: [],
       halted: { kind: 'refused', code: 'session-not-held' },
     });
     await queue.enqueue(tap(4));
     await queue.idle();
     expect(server.received).toHaveLength(2);
     expect(await held(storage)).toEqual([
-      [commandId(2), 'refused'],
+      [commandId(2), 'waiting'],
       [commandId(3), 'waiting'],
       [commandId(4), 'waiting'],
     ]);
 
+    // The device takes the game back.
+    server.refuse.delete(commandId(2));
     queue.resume();
     await queue.idle();
-    expect(server.saved).toEqual([1, 3, 4].map(commandId));
+    expect(server.saved).toEqual([1, 2, 3, 4].map(commandId));
+    expect(server.received.slice(2).map((b) => b.commands[0]?.commandId)).toEqual(
+      [2, 3, 4].map(commandId),
+    );
+    expect(queue.status()).toMatchObject({ waiting: 0, refused: [], halted: null });
+  });
+
+  it('every refusal about the request, not the tap, leaves the taps waiting', async () => {
+    for (const code of [
+      'session-not-held',
+      'game-not-live',
+      'not-allowed',
+      'unknown-game',
+    ] as const) {
+      const { queue, server, storage } = setup();
+      // The server says the same for every tap of the request.
+      for (const n of [1, 2]) server.refuse.set(commandId(n), code);
+      for (const n of [1, 2]) await queue.enqueue(tap(n));
+      await queue.start();
+      await queue.idle();
+      expect(queue.status().halted).toEqual({ kind: 'refused', code });
+      expect(queue.status().refused).toEqual([]);
+      expect(await held(storage)).toEqual([
+        [commandId(1), 'waiting'],
+        [commandId(2), 'waiting'],
+      ]);
+    }
+  });
+
+  it('forget clears a halt once nothing is left waiting behind it', async () => {
+    const { queue, server, storage } = setup();
+    for (const n of [1, 2]) server.refuse.set(commandId(n), 'session-not-held');
+    for (const n of [1, 2]) await queue.enqueue(tap(n));
+    await queue.start();
+    await queue.idle();
+    // Another device took over; the tracker showed both taps as not saved.
+    await queue.forget([commandId(1)]);
+    expect(queue.status().halted).not.toBeNull();
+    await queue.forget([commandId(2)]);
     expect(queue.status()).toMatchObject({ waiting: 0, halted: null });
+    expect(await held(storage)).toEqual([]);
+
+    server.refuse.clear();
+    await queue.enqueue(tap(3));
+    await queue.idle();
+    expect(server.saved).toEqual([commandId(3)]);
+  });
+
+  it('a halt after an outage clears the offline clock: the server did answer', async () => {
+    const { queue, server, clock } = setup();
+    server.mode = 'down';
+    await queue.start();
+    await queue.enqueue(tap(1));
+    await clock.advance(5_000);
+    expect(queue.status().unansweredSince).not.toBeNull();
+    server.answerWith = { kind: 'rejected', httpStatus: 403 };
+    queue.wake();
+    await queue.idle();
+    expect(queue.status()).toMatchObject({
+      halted: { kind: 'rejected', httpStatus: 403 },
+      unansweredSince: null,
+    });
+    expect(clock.pending()).toBe(0);
+  });
+
+  it('a batch the server cannot take (400, 413, 422): the bad tap is found one at a time and refused, the rest saved', async () => {
+    for (const status of [400, 413, 422]) {
+      const { queue, server, storage } = setup();
+      server.badRequest.set(commandId(3), status);
+      for (const n of [1, 2, 3, 4, 5]) await queue.enqueue(tap(n));
+      await queue.start();
+      await queue.idle();
+      expect(server.saved).toEqual([1, 2, 4, 5].map(commandId));
+      expect(await held(storage)).toEqual([[commandId(3), 'refused']]);
+      expect(queue.status()).toMatchObject({
+        waiting: 0,
+        halted: null,
+        unansweredSince: null,
+        refused: [{ command: tap(3), refusal: { code: 'rule', message: `http-${status}` } }],
+      });
+      expect(server.received.map((b) => b.commands.length)).toEqual([5, 1, 1, 1, 1, 1]);
+
+      // Once the bad tap is found, batches are whole again.
+      server.mode = 'down';
+      for (const n of [6, 7]) await queue.enqueue(tap(n));
+      server.mode = 'up';
+      queue.wake();
+      await queue.idle();
+      expect(server.received.at(-1)?.commands.length).toBe(2);
+      expect(server.saved).toEqual([1, 2, 4, 5, 6, 7].map(commandId));
+    }
   });
 
   it('a version the server no longer speaks, or a request turned away whole: halts, nothing lost', async () => {
