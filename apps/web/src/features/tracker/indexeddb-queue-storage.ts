@@ -7,18 +7,38 @@
 // tap in the order it was made; one index finds a game's taps, another finds a tap
 // by its command ID (and stops the same ID being held twice).
 //
-// The stored shape is QueuedCommand. If a later release changes it, raise
-// `databaseVersion` and convert the old rows in `upgrade`: a queue left on a device
-// before the release must still be read (T-127).
-import type { QueueSettlement, QueueStorage, QueuedCommand } from './queue-storage.ts';
+// The connection is let go when another tab opens a newer version (versionchange) or
+// the browser closes it (close), and opened again on the next use (record 024).
+//
+// The stored shape is QueuedCommand. If a later release changes it, add a step to
+// `upgradeSteps`, converting the old rows through the upgrade's transaction: a queue
+// left on a device before the release must still be read (T-127). A device may skip
+// releases, so every step from the stored version on runs in turn. An older build
+// opening a database a newer one has upgraded gets `storage-newer-version`.
+import {
+  QueueError,
+  type QueueErrorCode,
+  type QueueSettlement,
+  type QueueStorage,
+  type QueuedCommand,
+} from './queue-storage.ts';
 
 export const queueDatabaseName = 'srleagues-tracker-queue';
-const databaseVersion = 1;
 const store = 'commands';
 const byGame = 'by-game';
 const byCommand = 'by-command';
 
 type Row = QueuedCommand & { position?: number };
+
+/** Step i brings the database from version i to version i + 1. */
+const upgradeSteps: readonly ((db: IDBDatabase, transaction: IDBTransaction) => void)[] = [
+  (db) => {
+    const commands = db.createObjectStore(store, { keyPath: 'position', autoIncrement: true });
+    commands.createIndex(byGame, 'gameId');
+    commands.createIndex(byCommand, 'command.commandId', { unique: true });
+  },
+];
+const databaseVersion = upgradeSteps.length;
 
 /**
  * Opens the queue's database. Rejects where the browser gives no database storage
@@ -28,49 +48,112 @@ export async function openIndexedDbQueueStorage(
   factory: IDBFactory = indexedDB,
   name: string = queueDatabaseName,
 ): Promise<QueueStorage> {
-  const db = await opened(factory, name);
-  // Another tab opening a newer version of the tracker asks this one to let go.
-  db.onversionchange = () => db.close();
+  let db: IDBDatabase | null = null;
+  let opening: Promise<IDBDatabase> | null = null;
 
-  const write = (run: (commands: IDBObjectStore) => void): Promise<void> =>
-    new Promise((resolve, reject) => {
-      const tx = db.transaction(store, 'readwrite', { durability: 'strict' });
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error ?? new Error('The queue could not be saved.'));
-      tx.onabort = () => reject(tx.error ?? new Error('Saving the queue was stopped.'));
-      run(tx.objectStore(store));
+  const connection = (): Promise<IDBDatabase> => {
+    if (db !== null) return Promise.resolve(db);
+    opening ??= opened(factory, name)
+      .then((fresh) => {
+        // Another tab opening a newer version of the tracker asks this one to let go.
+        fresh.onversionchange = () => {
+          fresh.close();
+          if (db === fresh) db = null;
+        };
+        // The browser closed it (storage cleared, the disk went away).
+        fresh.onclose = () => {
+          if (db === fresh) db = null;
+        };
+        db = fresh;
+        return fresh;
+      })
+      .finally(() => {
+        opening = null;
+      });
+    return opening;
+  };
+
+  /** A transaction on a live connection: one closed without notice is opened again once. */
+  const transaction = async (mode: IDBTransactionMode): Promise<IDBTransaction> => {
+    for (let attempt = 0; ; attempt += 1) {
+      const current = await connection();
+      try {
+        return current.transaction(store, mode, { durability: 'strict' });
+      } catch (error) {
+        if (db === current) db = null;
+        if (attempt > 0) {
+          const code = mode === 'readonly' ? 'storage-read-failed' : 'storage-write-failed';
+          throw new QueueError(code, { cause: error });
+        }
+      }
+    }
+  };
+
+  const write = async <T>(
+    initial: T,
+    run: (commands: IDBObjectStore, outcome: Outcome<T>, tx: IDBTransaction) => void,
+  ): Promise<T> => {
+    const tx = await transaction('readwrite');
+    const outcome: Outcome<T> = { value: initial, refusal: null };
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve(outcome.value);
+      tx.onabort = () =>
+        reject(outcome.refusal ?? new QueueError('storage-write-failed', { cause: tx.error }));
+      try {
+        run(tx.objectStore(store), outcome, tx);
+      } catch (error) {
+        reject(new QueueError('storage-write-failed', { cause: error }));
+      }
     });
+  };
+
+  await connection();
 
   return {
     add(gameId, { protocolVersion, command }) {
-      return write((commands) => {
-        const known = commands.index(byCommand).getKey(command.commandId);
+      return write<'added' | 'held'>('added', (commands, outcome, tx) => {
+        const known = commands.index(byCommand).get(command.commandId);
         known.onsuccess = () => {
-          if (known.result !== undefined) return;
-          const row: Row = { gameId, protocolVersion, command, state: 'waiting' };
-          commands.add(row);
+          const row = known.result as Row | undefined;
+          if (row === undefined) {
+            const fresh: Row = { gameId, protocolVersion, command, state: 'waiting' };
+            commands.add(fresh);
+          } else if (row.gameId === gameId) {
+            outcome.value = 'held';
+          } else {
+            outcome.refusal = new QueueError('command-id-in-other-game');
+            tx.abort();
+          }
         };
       });
     },
 
-    list(gameId) {
+    async list(gameId) {
+      const tx = await transaction('readonly');
       return new Promise((resolve, reject) => {
-        const tx = db.transaction(store, 'readonly');
-        const request = tx.objectStore(store).index(byGame).getAll(gameId);
+        const failed = (cause: unknown) => reject(new QueueError('storage-read-failed', { cause }));
+        tx.onabort = () => failed(tx.error);
+        let request: IDBRequest;
+        try {
+          request = tx.objectStore(store).index(byGame).getAll(gameId);
+        } catch (error) {
+          failed(error);
+          return;
+        }
         // Within one game, rows come back in the order of their key: the order tapped.
         request.onsuccess = () => {
           const rows = request.result as Row[];
           resolve(rows.map(({ position: _position, ...entry }) => entry));
         };
-        request.onerror = () => reject(request.error ?? new Error('The queue could not be read.'));
+        request.onerror = () => failed(request.error);
       });
     },
 
-    settle(gameId, { remove = [], refuse = [] }: QueueSettlement) {
+    async settle(gameId, { remove = [], refuse = [] }: QueueSettlement) {
       const dropped = new Set(remove);
       const refusals = new Map(refuse.map((r) => [r.commandId, r.refusal]));
-      if (dropped.size === 0 && refusals.size === 0) return Promise.resolve();
-      return write((commands) => {
+      if (dropped.size === 0 && refusals.size === 0) return;
+      await write(undefined, (commands) => {
         const walk = commands.index(byGame).openCursor(gameId);
         walk.onsuccess = () => {
           const cursor = walk.result;
@@ -87,26 +170,46 @@ export async function openIndexedDbQueueStorage(
   };
 }
 
+type Outcome<T> = { value: T; refusal: QueueError | null };
+
 function opened(factory: IDBFactory, name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const fail = (code: QueueErrorCode, cause?: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(new QueueError(code, { cause }));
+    };
     let request: IDBOpenDBRequest;
     try {
       request = factory.open(name, databaseVersion);
     } catch (error) {
-      reject(error instanceof Error ? error : new Error('Database storage is not available.'));
+      fail('storage-unavailable', error);
       return;
     }
-    request.onupgradeneeded = () => upgrade(request.result);
-    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const upgrade = request.transaction;
+      if (upgrade === null) return;
+      for (let version = event.oldVersion; version < databaseVersion; version += 1) {
+        upgradeSteps[version]?.(request.result, upgrade);
+      }
+    };
+    request.onsuccess = () => {
+      // Opened after it was given up as blocked: nobody holds it, so let it go.
+      if (settled) {
+        request.result.close();
+        return;
+      }
+      settled = true;
+      resolve(request.result);
+    };
     request.onerror = () =>
-      reject(request.error ?? new Error('Database storage is not available.'));
+      fail(
+        request.error?.name === 'VersionError' ? 'storage-newer-version' : 'storage-unavailable',
+        request.error,
+      );
+    // A tab of an older version still holds the database and will not let go. The
+    // tracker says so; the next use tries again.
+    request.onblocked = () => fail('storage-blocked');
   });
-}
-
-function upgrade(db: IDBDatabase): void {
-  if (!db.objectStoreNames.contains(store)) {
-    const commands = db.createObjectStore(store, { keyPath: 'position', autoIncrement: true });
-    commands.createIndex(byGame, 'gameId');
-    commands.createIndex(byCommand, 'command.commandId', { unique: true });
-  }
 }

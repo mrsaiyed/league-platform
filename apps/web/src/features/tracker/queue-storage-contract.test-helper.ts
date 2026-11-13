@@ -1,6 +1,6 @@
 // What every QueueStorage must do, written once so each implementation is held to the
-// same promises. The in-memory storage runs it in memory-queue-storage.test.ts. The
-// IndexedDB storage needs a browser (or a stand-in library the lead would add, T-191).
+// same promises. The in-memory storage runs it in memory-queue-storage.test.ts, the
+// IndexedDB one in indexeddb-queue-storage.test.ts on a stand-in database (record 024).
 import type { TrackerCommand } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import type { QueueStorage } from './queue-storage.ts';
@@ -40,13 +40,26 @@ export function queueStorageContract(name: string, make: () => Promise<QueueStor
       expect(ids(await storage.list(other))).toEqual([commandId(9)]);
     });
 
-    it('ignores a command ID it already holds', async () => {
+    it('ignores a command ID it already holds for the game, and says so', async () => {
       const storage = await make();
-      await storage.add(game, { protocolVersion: 1, command: tap(1) });
-      await storage.add(game, { protocolVersion: 1, command: { ...tap(1), at: 99 } });
+      expect(await storage.add(game, { protocolVersion: 1, command: tap(1) })).toBe('added');
+      expect(await storage.add(game, { protocolVersion: 1, command: { ...tap(1), at: 99 } })).toBe(
+        'held',
+      );
       const list = await storage.list(game);
       expect(list).toHaveLength(1);
       expect(list[0]?.command.at).toBe(tap(1).at);
+    });
+
+    it('rejects a command ID it holds for another game, changing nothing', async () => {
+      const storage = await make();
+      await storage.add(other, { protocolVersion: 1, command: tap(1) });
+      await expect(storage.add(game, { protocolVersion: 1, command: tap(1) })).rejects.toThrow(
+        'command-id-in-other-game',
+      );
+      expect(await storage.list(game)).toEqual([]);
+      expect(ids(await storage.list(other))).toEqual([commandId(1)]);
+      expect(await storage.add(game, { protocolVersion: 1, command: tap(2) })).toBe('added');
     });
 
     it('removes and refuses in one settlement, keeping the order of the rest', async () => {

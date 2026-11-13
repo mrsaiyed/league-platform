@@ -28,16 +28,49 @@ export type QueueSettlement = {
   readonly refuse?: readonly { readonly commandId: string; readonly refusal: CommandRefusal }[];
 };
 
+/**
+ * Fixed codes for what went wrong, never sentences (T-187): the tracker picks the words.
+ * The message of every error a storage or the queue throws is one of these.
+ */
+export const queueErrorCodes = [
+  /** The tap's command ID is already held for a different game: a bug in the caller. */
+  'command-id-in-other-game',
+  /** The queue was stopped; nothing more is stored. */
+  'queue-stopped',
+  /** The browser gives no database storage here (some private windows). */
+  'storage-unavailable',
+  /** Another tab holds an older version of the database open and will not let go. */
+  'storage-blocked',
+  /** A newer build has upgraded the database; this older one cannot open it. */
+  'storage-newer-version',
+  'storage-write-failed',
+  'storage-read-failed',
+] as const;
+export type QueueErrorCode = (typeof queueErrorCodes)[number];
+
+export class QueueError extends Error {
+  readonly code: QueueErrorCode;
+  constructor(code: QueueErrorCode, options?: { cause?: unknown }) {
+    super(code, options);
+    this.name = 'QueueError';
+    this.code = code;
+  }
+}
+
+/** `added` when the tap is newly stored, `held` when the device already had it. */
+export type AddResult = 'added' | 'held';
+
 export interface QueueStorage {
   /**
    * Adds a tap at the end of its game's queue. Resolves only once it is safely stored:
    * the screen confirms the tap after this, never before (T-114). A command ID the
-   * device already holds is left as it is.
+   * device already holds for the same game is left as it is (`held`); one held for
+   * another game rejects with `command-id-in-other-game`.
    */
   add(
     gameId: string,
     entry: { readonly protocolVersion: number; readonly command: TrackerCommand },
-  ): Promise<void>;
+  ): Promise<AddResult>;
   /** The game's queue, oldest tap first. */
   list(gameId: string): Promise<readonly QueuedCommand[]>;
   /** Applies one answer in a single write. IDs the queue no longer holds are ignored. */

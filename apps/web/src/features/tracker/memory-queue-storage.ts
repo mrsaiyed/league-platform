@@ -1,7 +1,12 @@
 // The queue's storage kept in memory, for tests and for a page that has no database
 // storage. It copies what goes in and what comes out, as the browser's storage does,
 // so a test cannot pass by changing an object the queue still holds.
-import type { QueueSettlement, QueueStorage, QueuedCommand } from './queue-storage.ts';
+import {
+  QueueError,
+  type QueueSettlement,
+  type QueueStorage,
+  type QueuedCommand,
+} from './queue-storage.ts';
 
 export type MemoryQueueStorage = QueueStorage & {
   /** Every held command of every game, oldest first: for tests to look at. */
@@ -13,8 +18,13 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
 
   return {
     async add(gameId, { protocolVersion, command }) {
-      if (held.some((entry) => entry.command.commandId === command.commandId)) return;
+      const known = held.find((entry) => entry.command.commandId === command.commandId);
+      if (known !== undefined) {
+        if (known.gameId !== gameId) throw new QueueError('command-id-in-other-game');
+        return 'held';
+      }
       held.push(structuredClone({ gameId, protocolVersion, command, state: 'waiting' }));
+      return 'added';
     },
     async list(gameId) {
       return structuredClone(held.filter((entry) => entry.gameId === gameId));
