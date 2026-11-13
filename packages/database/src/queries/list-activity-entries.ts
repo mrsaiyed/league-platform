@@ -1,6 +1,7 @@
 // The scope's league's activity log, newest first, at most `limit` entries, older
-// than `before` when given (A-6).
-import type { ActivityCursor, ActivityRecord } from '@srleagues/core';
+// than `before` when given (A-6). For a program (club, team), only the entries
+// whose details name it: the access entries say which scope they were about.
+import type { ActivityCursor, ActivityRecord, Scope } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
@@ -23,6 +24,7 @@ export async function listActivityEntries(
   scope: LeagueScope,
   limit: number,
   before: ActivityCursor | undefined,
+  about: Scope,
 ): Promise<ActivityRecord[]> {
   let query = transactionOf(scope)
     .selectFrom('activity_log')
@@ -38,6 +40,11 @@ export async function listActivityEntries(
       sql<string>`to_char(at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as('at_text'),
     ])
     .where('league_id', '=', scope.leagueId);
+  if (about.type !== 'league') {
+    query = query
+      .where(sql<boolean>`details ->> 'scopeType' = ${about.type}`)
+      .where(sql<boolean>`details ->> 'scopeId' = ${about.id}`);
+  }
   if (before !== undefined) {
     query = query.where(sql<boolean>`(at, id) < (${before.at}::timestamptz, ${before.id}::uuid)`);
   }

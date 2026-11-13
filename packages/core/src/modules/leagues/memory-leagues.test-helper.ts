@@ -57,6 +57,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
       jobs,
       access: {
         ownerAccountId: async () => s.league?.ownerAccountId,
+        leagueStatus: async () => s.league?.status,
         activeGrantsOf: async (account) =>
           s.grants.filter((g) => g.accountId === account && g.revokedAt === null),
       },

@@ -19,6 +19,6 @@ export {
   type LeagueShortNameChanged,
   type LeagueStatusChanged,
 } from './events.ts';
-export { leagueTransitions, type Transition } from './league-states.ts';
+export { leagueTransitions, readOnlyStatuses, type Transition } from './league-states.ts';
 export { audiences, leagueStatuses, type Audience, type LeagueStatus } from './league-values.ts';
 export type { LeagueRecord, LeaguesStore, LeaguesTx, NewLeague, NewSeason } from './ports.ts';

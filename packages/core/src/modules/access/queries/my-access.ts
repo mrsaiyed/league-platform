@@ -4,7 +4,7 @@
 // themselves (T-74). Read in the same shape as a command (record 014).
 import { z } from 'zod';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
-import { allows, isSignedIn } from '../policy.ts';
+import { allows, isSignedInHere } from '../policy.ts';
 import type { AccessTx, Grant } from '../ports.ts';
 import { permissions, type Permission } from '../roles.ts';
 import { leagueScope } from '../scopes.ts';
@@ -19,7 +19,7 @@ export type MyAccess = {
 export const myAccess = defineCommand({
   name: 'access.my_access',
   input: z.object({}),
-  allowed: (context, _input, _tx: AccessTx) => isSignedIn(context),
+  allowed: (context, _input, tx: AccessTx) => isSignedInHere(context, tx),
   run: async ({ context, tx }): Promise<Result<MyAccess, never>> => {
     const accountId = context.accountId;
     if (accountId === null) throw new Error('access.my_access: nobody is signed in.');

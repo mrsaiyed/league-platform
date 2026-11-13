@@ -23,6 +23,7 @@ import {
 export function accessStore(scope: LeagueScope): AccessStore {
   return {
     ownerAccountId: async () => (await findCurrentLeague(scope))?.ownerAccountId,
+    leagueStatus: async () => (await findCurrentLeague(scope))?.status,
     activeGrantsOf: (accountId) => listActiveGrantsOf(scope, accountId),
     programExists: async (programId) => (await findProgramId(scope, programId)) !== undefined,
     hasPendingInvitation: (email, role, where) => hasPendingInvitation(scope, email, role, where),
@@ -32,8 +33,8 @@ export function accessStore(scope: LeagueScope): AccessStore {
     renewInvitation: (invitationId, tokenHash, days) =>
       renewInvitationLink(scope, invitationId, tokenHash, days),
     cancelInvitation: (invitationId) => markInvitationCancelled(scope, invitationId),
-    acceptInvitation: (invitationId, accountId) =>
-      markInvitationAccepted(scope, invitationId, accountId),
+    acceptInvitation: (invitationId, tokenHash, accountId) =>
+      markInvitationAccepted(scope, invitationId, tokenHash, accountId),
     createGrant: (grant) => insertRoleGrant(scope, grant),
     findGrant: (grantId) => findRoleGrant(scope, grantId),
     revokeGrant: (grantId, by) => revokeRoleGrant(scope, grantId, by),

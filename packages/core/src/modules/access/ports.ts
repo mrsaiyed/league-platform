@@ -51,13 +51,19 @@ export type NewGrant = {
 export type AccessReader = {
   /** The league's one owner (O-7), or undefined if the league is in the bin or out of sight. */
   readonly ownerAccountId: () => Promise<string | undefined>;
+  /** The league's state (draft, live, archived, suspended), or undefined as above. */
+  readonly leagueStatus: () => Promise<string | undefined>;
   /** The account's grants in force in this league. */
   readonly activeGrantsOf: (accountId: string) => Promise<readonly Grant[]>;
 };
 
 export type AccessStore = AccessReader & {
   readonly programExists: (programId: string) => Promise<boolean>;
-  /** Whether a pending, unexpired invitation for this email, role and scope exists. */
+  /**
+   * Whether a pending, unexpired invitation for this email, role and scope exists.
+   * Holds that question for the rest of the transaction, so two invitations of the
+   * same person to the same role and place cannot both be made at once.
+   */
   readonly hasPendingInvitation: (email: string, role: Role, scope: Scope) => Promise<boolean>;
   readonly createInvitation: (invitation: NewInvitation) => Promise<Invitation>;
   readonly findInvitation: (invitationId: string) => Promise<Invitation | undefined>;
@@ -73,9 +79,17 @@ export type AccessStore = AccessReader & {
   ) => Promise<Invitation | undefined>;
   /** Cancels an invitation not accepted or cancelled: false if it was. */
   readonly cancelInvitation: (invitationId: string) => Promise<boolean>;
-  /** Marks a pending, unexpired invitation accepted by the account: false if it is not. */
-  readonly acceptInvitation: (invitationId: string, accountId: string) => Promise<boolean>;
-  readonly createGrant: (grant: NewGrant) => Promise<Grant>;
+  /**
+   * Marks a pending, unexpired invitation accepted by the account, only while its link
+   * is still `tokenHash`: false if it is not (used, cancelled, expired or re-sent).
+   */
+  readonly acceptInvitation: (
+    invitationId: string,
+    tokenHash: string,
+    accountId: string,
+  ) => Promise<boolean>;
+  /** A new grant, or 'already-held' when the account has that role there already. */
+  readonly createGrant: (grant: NewGrant) => Promise<Grant | 'already-held'>;
   readonly findGrant: (grantId: string) => Promise<Grant | undefined>;
   /** Ends a grant in force, at once: false if it was already ended. */
   readonly revokeGrant: (grantId: string, byAccountId: string) => Promise<boolean>;
@@ -104,10 +118,14 @@ export type ActivityCursor = { readonly at: string; readonly id: string };
 
 export type ActivityLog = {
   readonly record: (entry: ActivityEntry) => Promise<void>;
-  /** Newest first, at most `limit`, older than `before` when given. */
+  /**
+   * Newest first, at most `limit`, older than `before` when given. For a program,
+   * club or team scope, only the entries whose details name that scope.
+   */
   readonly list: (
     limit: number,
     before: ActivityCursor | undefined,
+    scope: Scope,
   ) => Promise<readonly ActivityRecord[]>;
 };
 

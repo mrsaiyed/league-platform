@@ -19,7 +19,7 @@ describe('revokeGrant', () => {
     expect(await invite(as(adminId), input, deps)).toMatchObject({ ok: true });
     expect(await revokeGrant(as(ownerId), { grantId: adminGrant.id }, deps)).toEqual({
       ok: true,
-      value: { grantId: adminGrant.id },
+      value: { grantId: adminGrant.id, cancelledInvitations: 1 },
     });
     expect(await invite(as(adminId), { ...input, email: 'b@example.test' }, deps)).toEqual({
       ok: false,

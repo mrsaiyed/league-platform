@@ -8,7 +8,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { recordActivity } from '../activity.ts';
 import { invitationLifetimeDays, sendInvitationJob } from '../access-values.ts';
 import { newInvitationToken } from '../invitation-token.ts';
-import { hasPermission } from '../policy.ts';
+import { hasPermission, isOpenForNewPeople } from '../policy.ts';
 import type { AccessTx } from '../ports.ts';
 import { roles } from '../roles.ts';
 import {
@@ -24,7 +24,8 @@ export type InviteError = {
     | 'role-does-not-fit-scope'
     | 'scope-not-available'
     | 'program-not-found'
-    | 'already-invited';
+    | 'already-invited'
+    | 'league-read-only';
 };
 
 export const invite = defineCommand({
@@ -48,6 +49,7 @@ export const invite = defineCommand({
     tx,
   }): Promise<Result<{ invitationId: string; expiresAt: string }, InviteError>> => {
     const { email, role, scope } = input;
+    if (!(await isOpenForNewPeople(tx))) return fail({ code: 'league-read-only' });
     if (!roleScopeTypes[role].includes(scope.type))
       return fail({ code: 'role-does-not-fit-scope' });
     if (!availableScopeTypes.includes(scope.type)) return fail({ code: 'scope-not-available' });

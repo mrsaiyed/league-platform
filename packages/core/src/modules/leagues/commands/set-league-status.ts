@@ -1,5 +1,5 @@
 // Moves a league between draft, live, archived and suspended (U-9) along the
-// allowed changes in league-states.ts. The owner publishes and archives; only our
+// allowed changes in league-states.ts. The owner and admins publish and archive; only our
 // staff suspend and lift a suspension. Anything else is an "illegal-transition".
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
@@ -21,7 +21,7 @@ export const setLeagueStatus = defineCommand({
     const league = await tx.leagues.currentLeague();
     if (league === undefined) return false;
     // A change not in the table is refused by the command with its own error, to
-    // anyone who could have made some change of the owner's.
+    // anyone who could have made some change of the owner's or an admin's.
     if (findTransition(league.status, input.status)?.by === 'platform') {
       return mayActAsPlatform(context, tx);
     }

@@ -5,7 +5,7 @@ export {
   type AcceptedInvitation,
   type AcceptInvitationError,
 } from './commands/accept-invitation.ts';
-export { cancelInvitation } from './commands/cancel-invitation.ts';
+export { cancelInvitation, type CancelInvitationError } from './commands/cancel-invitation.ts';
 export { invite, type InviteError } from './commands/invite.ts';
 export { resendInvitation, type InvitationClosedError } from './commands/resend-invitation.ts';
 export { revokeGrant, type RevokeGrantError } from './commands/revoke-grant.ts';
@@ -16,13 +16,20 @@ export {
   activityPageLimit,
   invitationLifetimeDays,
   invitationStatuses,
+  readOnlyLeagueStatuses,
   sendInvitationJob,
   type InvitationStatus,
 } from './access-values.ts';
 export { activitySummaryKey, recordActivity, type ActivityChange } from './activity.ts';
 export { roleGranted, roleRevoked, type RoleGranted, type RoleRevoked } from './events.ts';
 export { hashInvitationToken } from './invitation-token.ts';
-export { accessOf, allows, hasPermission, type AccessHolder } from './policy.ts';
+export {
+  accessOfAccount,
+  allows,
+  hasPermission,
+  isOpenForNewPeople,
+  type AccessHolder,
+} from './policy.ts';
 export type {
   AccessReader,
   AccessStore,

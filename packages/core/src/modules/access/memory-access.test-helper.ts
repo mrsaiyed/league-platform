@@ -18,7 +18,9 @@ type StoredInvitation = Omit<Invitation, 'status'> & {
 };
 
 export type MemoryAccess = {
+  /** Undefined stands for a league in the bin or out of sight. */
   ownerId: string | undefined;
+  status: string;
   programs: string[];
   grants: Grant[];
   invitations: StoredInvitation[];
@@ -62,6 +64,7 @@ export function grantOf(accountId: string, role: Grant['role'], scope: Scope = {
 export function memoryAccess(state: Partial<MemoryAccess> = {}) {
   const db = memoryDatabase<MemoryAccess>({
     ownerId,
+    status: 'live',
     programs: [programId, otherProgramId],
     grants: [grantOf(adminId, 'admin')],
     invitations: [],
@@ -74,14 +77,21 @@ export function memoryAccess(state: Partial<MemoryAccess> = {}) {
       jobs,
       activity: {
         record: async (entry) => void s.activity.push(entry),
-        list: async (limit) =>
+        list: async (limit, _before, scope) =>
           s.activity
             .map((entry, n) => ({ ...entry, id: `entry-${n}`, at: `2026-11-13T00:00:0${n}Z` }))
+            .filter(
+              (entry) =>
+                scope.type === 'league' ||
+                (entry.details['scopeType'] === scope.type &&
+                  entry.details['scopeId'] === scope.id),
+            )
             .reverse()
             .slice(0, limit),
       },
       access: {
         ownerAccountId: async () => s.ownerId,
+        leagueStatus: async () => (s.ownerId === undefined ? undefined : s.status),
         activeGrantsOf: async (account) =>
           s.grants.filter((g) => g.accountId === account && g.revokedAt === null),
         programExists: async (id) => s.programs.includes(id),
@@ -129,13 +139,22 @@ export function memoryAccess(state: Partial<MemoryAccess> = {}) {
           found.cancelled = true;
           return true;
         },
-        acceptInvitation: async (id, account) => {
+        acceptInvitation: async (id, tokenHash, account) => {
           const found = s.invitations.find((i) => i.id === id);
           if (found === undefined || statusOf(found) !== 'pending') return false;
+          if (found.tokenHash !== tokenHash) return false;
           found.acceptedBy = account;
           return true;
         },
         createGrant: async (n) => {
+          const held = s.grants.some(
+            (g) =>
+              g.accountId === n.accountId &&
+              g.role === n.role &&
+              g.revokedAt === null &&
+              sameScope(g.scope, n.scope),
+          );
+          if (held) return 'already-held';
           const grant: Grant = { id: nextId(), ...n, revokedAt: null };
           s.grants.push(grant);
           return grant;

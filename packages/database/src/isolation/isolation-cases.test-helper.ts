@@ -284,7 +284,12 @@ registerIsolationCase({
   subject: markInvitationAccepted,
   name: "accept the target's invitation as the run account",
   run: (scope, target) =>
-    markInvitationAccepted(scope, target.invitationId, actor(scope.accountId)),
+    markInvitationAccepted(
+      scope,
+      target.invitationId,
+      sha256(target.invitationToken),
+      actor(scope.accountId),
+    ),
 });
 
 registerIsolationCase({
@@ -310,7 +315,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: listActivityEntries,
   name: "read the scope's activity log",
-  run: (scope) => listActivityEntries(scope, 50, undefined),
+  run: (scope) => listActivityEntries(scope, 50, undefined, { type: 'league' }),
 });
 
 registerCommandCase(invite, harnessTx, {

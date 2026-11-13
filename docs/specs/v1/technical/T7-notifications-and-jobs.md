@@ -9,7 +9,7 @@ How reminders, recaps and every other piece of delayed or scheduled work ([P8](.
 The **worker** is the second of our two programs (T1 section 2). It does nothing but take jobs from a queue and carry them out. The queue is a set of tables in the same PostgreSQL database as everything else, managed by the pg-boss library.
 
 - **T-130: a job is recorded in the same transaction as the change that causes it.** "Game finalized" and "send its recap at 7:52" are saved together or not at all. A crash between the two cannot happen, so a recap is never lost and never sent for a result that was not saved.
-- **T-131: a job carries identifiers, not content.** It says "recap for game G", not the score. The content is built when the job runs (N-11), which keeps it current and keeps personal data out of the queue.
+- **T-131: a job carries identifiers, not content.** It says "recap for game G", not the score. The content is built when the job runs (N-11), which keeps it current and keeps personal data out of the queue. One exception: the job that emails an invitation carries the link's secret token, which exists nowhere else (T-226).
 - A job has a name, the league it belongs to, the earliest time it may run, a count of attempts, and optionally a key that prevents a duplicate of itself being queued.
 - Several workers can run at once. A job is leased to one worker at a time; if that worker dies, the lease expires and another takes it.
 

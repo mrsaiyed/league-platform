@@ -138,15 +138,40 @@ async function leagueWithActors(): Promise<League> {
   return { ...made, programId, accountOf: (actor) => ids.get(actor) ?? null };
 }
 
-async function invitationIn(leagueId: string, token: string = randomUUID(), role = 'scorekeeper') {
+/** An open invitation sent by the owner, to the whole league or one program. */
+async function invitationIn(
+  league: League,
+  { token = randomUUID(), program = false }: { token?: string; program?: boolean } = {},
+) {
   const row = await one<{ id: string }>(
     pglite,
-    `insert into invitations (league_id, email, role, token_hash, expires_at)
-     values ($1, $2, $3, $4, now() + interval '7 days') returning id`,
-    [leagueId, `${unique('invitee')}@example.test`, role, sha256(token)],
+    `insert into invitations (league_id, email, role, scope_type, scope_id, token_hash,
+                              invited_by_account_id, expires_at)
+     values ($1, $2, 'scorekeeper', $3, $4, $5, $6, now() + interval '7 days') returning id`,
+    [
+      league.leagueId,
+      `${unique('invitee')}@example.test`,
+      program ? 'program' : 'league',
+      program ? league.programId : null,
+      sha256(token),
+      league.ownerId,
+    ],
   );
   return row.id;
 }
+
+/** A grant to a new account, by its id. */
+async function grantId(leagueId: string, role: string, scope: string | null = null) {
+  const accountId = await grant(leagueId, role, scope);
+  const row = await one<{ id: string }>(
+    pglite,
+    'select id from role_grants where account_id = $1',
+    [accountId],
+  );
+  return row.id;
+}
+
+const programAdmins: readonly Actor[] = ['owner', 'admin', 'program_admin'];
 
 const ownerAndAdmins: readonly Actor[] = ['owner', 'admin'];
 
@@ -238,29 +263,48 @@ const rows: readonly Row[] = [
     command: 'access.resend_invitation',
     name: 're-send an invitation',
     allowed: ownerAndAdmins,
-    prepare: async (league) => ({ input: { invitationId: await invitationIn(league.leagueId) } }),
+    prepare: async (league) => ({ input: { invitationId: await invitationIn(league) } }),
+    run: (c, i) => resendInvitation(c, i, accessDeps),
+  },
+  {
+    command: 'access.resend_invitation',
+    name: 're-send an invitation to one program',
+    allowed: programAdmins,
+    prepare: async (league) => ({
+      input: { invitationId: await invitationIn(league, { program: true }) },
+    }),
     run: (c, i) => resendInvitation(c, i, accessDeps),
   },
   {
     command: 'access.cancel_invitation',
     name: 'cancel an invitation',
     allowed: ownerAndAdmins,
-    prepare: async (league) => ({ input: { invitationId: await invitationIn(league.leagueId) } }),
+    prepare: async (league) => ({ input: { invitationId: await invitationIn(league) } }),
+    run: (c, i) => cancelInvitation(c, i, accessDeps),
+  },
+  {
+    command: 'access.cancel_invitation',
+    name: 'cancel an invitation to one program',
+    allowed: programAdmins,
+    prepare: async (league) => ({
+      input: { invitationId: await invitationIn(league, { program: true }) },
+    }),
     run: (c, i) => cancelInvitation(c, i, accessDeps),
   },
   {
     command: 'access.revoke_grant',
     name: "remove someone's access",
     allowed: ownerAndAdmins,
-    prepare: async (league) => {
-      const accountId = await grant(league.leagueId, 'editor');
-      const row = await one<{ id: string }>(
-        pglite,
-        'select id from role_grants where account_id = $1',
-        [accountId],
-      );
-      return { input: { grantId: row.id } };
-    },
+    prepare: async (league) => ({ input: { grantId: await grantId(league.leagueId, 'editor') } }),
+    run: (c, i) => revokeGrant(c, i, accessDeps),
+  },
+  {
+    command: 'access.revoke_grant',
+    name: "remove someone's access to one program",
+    allowed: programAdmins,
+    prepare: async (league) => ({
+      input: { grantId: await grantId(league.leagueId, 'editor', league.programId) },
+    }),
     run: (c, i) => revokeGrant(c, i, accessDeps),
   },
   {
@@ -268,6 +312,13 @@ const rows: readonly Row[] = [
     name: 'see who has access',
     allowed: ownerAndAdmins,
     prepare: async () => ({ input: {} }),
+    run: (c, i) => listAccess(c, i, accessDeps),
+  },
+  {
+    command: 'access.list_access',
+    name: 'see who has access to one program',
+    allowed: programAdmins,
+    prepare: async (league) => ({ input: { scope: { type: 'program', id: league.programId } } }),
     run: (c, i) => listAccess(c, i, accessDeps),
   },
   // A-6: the activity log is the owner's and admins'.
@@ -278,6 +329,13 @@ const rows: readonly Row[] = [
     prepare: async () => ({ input: {} }),
     run: (c, i) => listActivity(c, i, accessDeps),
   },
+  {
+    command: 'access.list_activity',
+    name: "read one program's activity",
+    allowed: programAdmins,
+    prepare: async (league) => ({ input: { scope: { type: 'program', id: league.programId } } }),
+    run: (c, i) => listActivity(c, i, accessDeps),
+  },
   // Anyone signed in who holds the link (P4 §4: sign in, and they are in).
   {
     command: 'access.accept_invitation',
@@ -285,7 +343,7 @@ const rows: readonly Row[] = [
     allowed: signedIn,
     prepare: async (league) => {
       const token = 'a'.repeat(22) + randomUUID().replace(/-/g, '').slice(0, 21);
-      await invitationIn(league.leagueId, token);
+      await invitationIn(league, { token });
       return { input: { token } };
     },
     run: (c, i) => acceptInvitation(c, i, accessDeps),

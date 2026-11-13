@@ -9,5 +9,12 @@ export const sendInvitationJob = 'access.send_invitation';
 export const invitationStatuses = ['pending', 'expired', 'accepted', 'cancelled'] as const;
 export type InvitationStatus = (typeof invitationStatuses)[number];
 
+/**
+ * U-9: archived and suspended leagues are read-only. No one is invited into them or
+ * joins them; cancelling an invitation and removing access always work. The same
+ * states as the leagues module's readOnlyStatuses (a test checks they agree).
+ */
+export const readOnlyLeagueStatuses: readonly string[] = ['archived', 'suspended'];
+
 /** The most activity entries one read returns. */
 export const activityPageLimit = 100;

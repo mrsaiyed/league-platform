@@ -6,12 +6,12 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { recordActivity } from '../activity.ts';
 import { invitationLifetimeDays, sendInvitationJob } from '../access-values.ts';
 import { newInvitationToken } from '../invitation-token.ts';
-import { mayManageInvitation } from '../policy.ts';
+import { isOpenForNewPeople, mayManageInvitation } from '../policy.ts';
 import type { AccessTx } from '../ports.ts';
 import { scopeDetails } from '../scopes.ts';
 
 export type InvitationClosedError = {
-  readonly code: 'invitation-not-found' | 'invitation-closed';
+  readonly code: 'invitation-not-found' | 'invitation-closed' | 'league-read-only';
 };
 
 export const resendInvitation = defineCommand({
@@ -28,6 +28,7 @@ export const resendInvitation = defineCommand({
     if (found.status === 'accepted' || found.status === 'cancelled') {
       return fail({ code: 'invitation-closed' });
     }
+    if (!(await isOpenForNewPeople(tx))) return fail({ code: 'league-read-only' });
     const { token, tokenHash } = await newInvitationToken();
     const renewed = await tx.access.renewInvitation(found.id, tokenHash, invitationLifetimeDays);
     if (renewed === undefined) return fail({ code: 'invitation-closed' });

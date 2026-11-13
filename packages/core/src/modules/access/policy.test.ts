@@ -78,6 +78,7 @@ describe('hasPermission', () => {
       jobs: { enqueue: async () => {} },
       access: {
         ownerAccountId: async () => 'someone-else',
+        leagueStatus: async () => 'live',
         activeGrantsOf: async () => {
           reads += 1;
           return grants;
