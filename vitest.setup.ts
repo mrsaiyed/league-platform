@@ -1,12 +1,12 @@
-// Runs first in every test worker. A worker takes the computer's spare time and leaves the
-// first claim to the main vitest process, which answers each worker's progress report. When
-// workers and other runs crowd the machine, a main process that cannot get a turn leaves a
-// report unanswered for a minute and vitest fails the run ("Timeout calling onTaskUpdate")
-// although every test passed. Lowering the workers' priority keeps the reports flowing.
+// Runs first in every test worker. vitest's main process answers each worker's progress
+// report; the config gives it a little extra priority (vitest.config.ts) so that, when
+// workers and other runs crowd the computer, a report is never left unanswered for a
+// minute ("Timeout calling onTaskUpdate", a failed run although every test passed).
+// Workers start from the main process's priority, so they go back to normal here.
 import { constants, setPriority } from 'node:os';
 
 try {
-  setPriority(0, constants.priority.PRIORITY_BELOW_NORMAL);
+  setPriority(0, constants.priority.PRIORITY_NORMAL);
 } catch {
   // A computer that refuses to change priority just runs the tests as before.
 }

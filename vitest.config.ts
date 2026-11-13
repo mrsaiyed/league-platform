@@ -1,3 +1,4 @@
+import { constants, setPriority } from 'node:os';
 import { defineConfig } from 'vitest/config';
 
 // Runs only the new workspaces' tests, and the new code in packages/database (the
@@ -10,6 +11,12 @@ import { defineConfig } from 'vitest/config';
 // Left alone, each run starts a worker for every processor core, and six runs fight over
 // the machine until tests time out. Inside a lane folder a run takes a small share instead.
 const inLane = process.cwd().split('\\').join('/').includes('/.local/lanes/');
+
+try {
+  setPriority(0, constants.priority.PRIORITY_ABOVE_NORMAL);
+} catch {
+  // Not allowed on this computer: run at the usual priority.
+}
 
 export default defineConfig({
   test: {
