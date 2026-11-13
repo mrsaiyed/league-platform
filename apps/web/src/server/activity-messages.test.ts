@@ -16,6 +16,7 @@ const reads = new Set([
   'games.list_postponed_games',
   'leagues.get_season',
   'scheduling.list_venues',
+  'teams.list_roster',
 ]);
 
 describe('activity log messages', () => {
@@ -29,6 +30,12 @@ describe('activity log messages', () => {
   it('has words for the label of every declared setting (T-98, T-187)', () => {
     for (const setting of declaredSettings.all()) {
       expect(Object.hasOwn(en, setting.label), setting.label).toBe(true);
+    }
+  });
+
+  it('has plain words for refusing a duplicate jersey number (step 2.19)', () => {
+    for (const command of ['add_to_roster', 'change_roster_entry'] as const) {
+      expect(en[`error.teams.${command}.jersey-taken`]).toMatch(/already wears that number/);
     }
   });
 
