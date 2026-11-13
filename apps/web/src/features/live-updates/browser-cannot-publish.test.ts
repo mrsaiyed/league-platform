@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { serverSentEventsSubscriber } from './index.ts';
+import { serverSentEventsSubscriber, supabaseRealtimeSubscriber } from './index.ts';
 
 type Violation = { file: string; rule: string; message: string };
 type StructureCheck = { checkStructure: (root: string) => { violations: Violation[] } };
@@ -56,8 +56,12 @@ function fixture(files: Record<string, string>): string {
 
 describe('only our server can publish', () => {
   it('gives the browser subscribers that can only listen', () => {
-    const subscriber = serverSentEventsSubscriber({ address: '/api/v1/live' });
-    expect(Object.keys(subscriber).sort()).toEqual(['subscribeGame', 'subscribeLeagueScores']);
+    for (const subscriber of [
+      serverSentEventsSubscriber({ address: '/api/v1/live' }),
+      supabaseRealtimeSubscriber({ url: 'https://p.test', publishableKey: 'k' }),
+    ]) {
+      expect(Object.keys(subscriber).sort()).toEqual(['subscribeGame', 'subscribeLeagueScores']);
+    }
   });
 
   it('lets a page load the subscribers, and fails any page that loads a publisher', async () => {

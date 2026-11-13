@@ -14,3 +14,8 @@ export {
   type EventSourceLike,
   type ServerSentEventsSubscriberOptions,
 } from './server-sent-events-subscriber.ts';
+export {
+  supabaseRealtimeSubscriber,
+  type SupabaseRealtimeSubscriberOptions,
+  type WebSocketLike,
+} from './supabase-realtime-subscriber.ts';
