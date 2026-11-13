@@ -178,8 +178,10 @@ export async function signInWithPassword(
     );
   }
   await startSession(visit.jar, signed.value.session, deps);
+  // To the address the service holds for the account, never the one typed (T-70).
   if (signed.value.newDevice) {
-    await deps.mail.newDevice(signInEmail.parse(fields['email']), device.label, deps.now());
+    const who = await deps.signIn.identify({ accessToken: signed.value.session.accessToken });
+    if (who.ok) await deps.mail.newDevice(who.value.email, device.label, deps.now());
   }
   return afterSignIn(next);
 }

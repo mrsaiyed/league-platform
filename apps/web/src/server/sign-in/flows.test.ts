@@ -514,6 +514,24 @@ describe('after review', () => {
     expect(env.outbox.messages().some((m) => m.to === 'someone-else@example.test')).toBe(false);
   });
 
+  it('sends the new-device email to the address the service holds, not the one typed', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'me@example.test');
+    const service = env.deps.signIn;
+    const identify = vi.fn(async (input: Parameters<typeof service.identify>[0]) => {
+      const who = await service.identify(input);
+      return who.ok ? { ...who, value: { ...who.value, email: 'held@example.test' } } : who;
+    });
+    const deps: FlowDeps = { ...env.deps, signIn: { ...service, identify } };
+    const phone = browser('192.0.2.20', safariOnIphone);
+    await signInWithPassword({ email: ' ME@example.test ', password }, phone.visit, deps);
+    expect(identify).toHaveBeenCalledWith({ accessToken: phone.jar.get(cookieNames.session) });
+    const notices = env.outbox
+      .messages()
+      .filter((m) => m.subject === 'Your account was signed in on a new device');
+    expect(notices.map((m) => m.to)).toEqual(['held@example.test']);
+  });
+
   it('forgets a sign-up under way when a session starts or ends', async () => {
     const env = setup();
     await signUp(env, browser(), 'me@example.test');
