@@ -32,6 +32,33 @@ export type {
   GamesReadStore,
 } from './read-ports.ts';
 export { seasonResults, type SeasonResults } from './season-results.ts';
+export {
+  openScoringSession,
+  type OpenScoringSessionError,
+} from './commands/open-scoring-session.ts';
+export {
+  renewScoringSession,
+  type RenewScoringSessionError,
+} from './commands/renew-scoring-session.ts';
+export {
+  releaseScoringSession,
+  type ReleaseScoringSessionError,
+} from './commands/release-scoring-session.ts';
+export { takeOverScoring, type TakeOverScoringError } from './commands/take-over-scoring.ts';
+export {
+  leaseMs,
+  sessionStanding,
+  type ScoringHolder,
+  type ScoringSessionReply,
+} from './scoring-session.ts';
+export { systemClock } from './system-clock.ts';
+export type {
+  Clock,
+  NewScoringSession,
+  ScoringSession,
+  ScoringSessionsStore,
+  ScoringTx,
+} from './ports.ts';
 export type {
   GameInWindow,
   GamesWindow,

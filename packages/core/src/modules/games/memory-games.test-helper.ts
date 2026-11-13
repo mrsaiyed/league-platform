@@ -8,7 +8,7 @@ import {
   memoryTransaction,
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
-import type { DomainEvent, EventHandler } from '../../command/index.ts';
+import type { DomainEvent, EventHandler, JobQueue } from '../../command/index.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { StoredSetting } from '../leagues/index.ts';
 import { isDecided } from './game-fields.ts';
@@ -119,104 +119,26 @@ export const scoringRule = (value: 'anyScorekeeper' | 'assignedOnly') => ({
   'games.whoMayScore': [{ level: 'league' as const, document: { version: 1, value } }],
 });
 
+/** A league with two seasons and nothing else, in draft. */
+export const emptyGames = (): MemoryGames => ({
+  status: 'draft',
+  seasons: [
+    { id: seasonId, programId: 'p1', rules: rules() },
+    { id: otherSeasonId, programId: 'p2', rules: rules() },
+  ],
+  games: [],
+  lines: [],
+  corrections: [],
+  grants: [],
+  activity: [],
+  assignments: [],
+  settings: {},
+  today: '2026-12-06',
+});
+
 export function memoryGames(state: Partial<MemoryGames> = {}) {
-  const db = memoryDatabase<MemoryGames>({
-    status: 'draft',
-    seasons: [
-      { id: seasonId, programId: 'p1', rules: rules() },
-      { id: otherSeasonId, programId: 'p2', rules: rules() },
-    ],
-    games: [],
-    lines: [],
-    corrections: [],
-    grants: [],
-    activity: [],
-    assignments: [],
-    settings: {},
-    today: '2026-12-06',
-    ...state,
-  });
-  const transaction = memoryTransaction(
-    db,
-    (s, jobs): GamesTx => ({
-      jobs,
-      access: {
-        ownerAccountId: async () => ownerId,
-        leagueStatus: async () => s.status,
-        activeGrantsOf: async (account) =>
-          s.grants.filter((g) => g.accountId === account && g.revokedAt === null),
-      },
-      activity: {
-        record: async (entry) => void s.activity.push(entry),
-        list: async () => [],
-      },
-      games: {
-        find: async (id) => s.games.find((g) => g.id === id),
-        setResult: async (id, change, version) => {
-          const at = s.games.findIndex((g) => g.id === id);
-          const found = s.games[at];
-          if (found === undefined || found.binned || found.version !== version) return undefined;
-          s.games[at] = {
-            ...found,
-            status: change.status,
-            homeScore: change.homeScore,
-            awayScore: change.awayScore,
-            finalizedAt: change.decided ? '2026-12-06T20:00:00.000Z' : null,
-            format: found.format ?? change.format ?? null,
-            version: found.version + 1,
-          };
-          return found.version + 1;
-        },
-        addCorrection: async (correction) => void s.corrections.push(correction),
-        listPostponed: async (season) =>
-          s.games
-            .filter(
-              (g) =>
-                g.status === 'postponed' &&
-                !g.binned &&
-                (season === undefined || g.seasonId === season),
-            )
-            .sort((a, b) => (a.startsAt ?? '9').localeCompare(b.startsAt ?? '9')),
-        listDecided: async (season) => decidedOf(s, season),
-        listDecidedLines: async (season) => {
-          const ids = new Set(decidedOf(s, season).map((g) => g.id));
-          return s.lines.filter((line) => ids.has(line.gameId));
-        },
-        findSeason: async (id) => s.seasons.find((x) => x.id === id),
-        leagueSettingRows: async (key) => s.settings[key] ?? [],
-        isAssigned: async (gameId, accountId) => isAssigned(s, gameId, accountId),
-        assign: async (gameId, accountId) => {
-          if (isAssigned(s, gameId, accountId)) return false;
-          s.assignments.push({ gameId, accountId });
-          return true;
-        },
-        unassign: async (gameId, accountId) => {
-          if (!isAssigned(s, gameId, accountId)) return false;
-          s.assignments = s.assignments.filter(
-            (a) => !(a.gameId === gameId && a.accountId === accountId),
-          );
-          return true;
-        },
-        listWindow: async (accountId, days) => {
-          const end = new Date(`${s.today}T00:00:00.000Z`);
-          end.setUTCDate(end.getUTCDate() + days);
-          const until = end.toISOString().slice(0, 10);
-          const games = s.games
-            .filter((g) => !g.binned && g.startsAt !== null)
-            .map((g) => ({ g, day: (g.startsAt ?? '').slice(0, 10) }))
-            .filter(({ day }) => day >= s.today && day < until)
-            .sort((a, b) => (a.g.startsAt ?? '').localeCompare(b.g.startsAt ?? ''))
-            .map(({ g, day }) => ({
-              game: g,
-              programId: s.seasons.find((x) => x.id === g.seasonId)?.programId ?? '',
-              day,
-              assigned: isAssigned(s, g.id, accountId),
-            }));
-          return { today: s.today, games };
-        },
-      },
-    }),
-  );
+  const db = memoryDatabase<MemoryGames>({ ...emptyGames(), ...state });
+  const transaction = memoryTransaction(db, gamesTxOf);
   const events: DomainEvent[] = [];
   const handlers: EventHandler<GamesTx>[] = ['games.finalized', 'games.reopened'].map((type) => ({
     type,
@@ -225,4 +147,86 @@ export function memoryGames(state: Partial<MemoryGames> = {}) {
   const deps = testDeps(transaction, handlers);
   const as = (accountId: string | null) => ({ leagueId, accountId, requestId: 'request-1' });
   return { db, deps, as, events };
+}
+
+/** The games transaction over one copy of the state. */
+export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
+  return {
+    jobs,
+    access: {
+      ownerAccountId: async () => ownerId,
+      leagueStatus: async () => s.status,
+      activeGrantsOf: async (account) =>
+        s.grants.filter((g) => g.accountId === account && g.revokedAt === null),
+    },
+    activity: {
+      record: async (entry) => void s.activity.push(entry),
+      list: async () => [],
+    },
+    games: {
+      find: async (id) => s.games.find((g) => g.id === id),
+      setResult: async (id, change, version) => {
+        const at = s.games.findIndex((g) => g.id === id);
+        const found = s.games[at];
+        if (found === undefined || found.binned || found.version !== version) return undefined;
+        s.games[at] = {
+          ...found,
+          status: change.status,
+          homeScore: change.homeScore,
+          awayScore: change.awayScore,
+          finalizedAt: change.decided ? '2026-12-06T20:00:00.000Z' : null,
+          format: found.format ?? change.format ?? null,
+          version: found.version + 1,
+        };
+        return found.version + 1;
+      },
+      addCorrection: async (correction) => void s.corrections.push(correction),
+      listPostponed: async (season) =>
+        s.games
+          .filter(
+            (g) =>
+              g.status === 'postponed' &&
+              !g.binned &&
+              (season === undefined || g.seasonId === season),
+          )
+          .sort((a, b) => (a.startsAt ?? '9').localeCompare(b.startsAt ?? '9')),
+      listDecided: async (season) => decidedOf(s, season),
+      listDecidedLines: async (season) => {
+        const ids = new Set(decidedOf(s, season).map((g) => g.id));
+        return s.lines.filter((line) => ids.has(line.gameId));
+      },
+      findSeason: async (id) => s.seasons.find((x) => x.id === id),
+      leagueSettingRows: async (key) => s.settings[key] ?? [],
+      isAssigned: async (gameId, accountId) => isAssigned(s, gameId, accountId),
+      assign: async (gameId, accountId) => {
+        if (isAssigned(s, gameId, accountId)) return false;
+        s.assignments.push({ gameId, accountId });
+        return true;
+      },
+      unassign: async (gameId, accountId) => {
+        if (!isAssigned(s, gameId, accountId)) return false;
+        s.assignments = s.assignments.filter(
+          (a) => !(a.gameId === gameId && a.accountId === accountId),
+        );
+        return true;
+      },
+      listWindow: async (accountId, days) => {
+        const end = new Date(`${s.today}T00:00:00.000Z`);
+        end.setUTCDate(end.getUTCDate() + days);
+        const until = end.toISOString().slice(0, 10);
+        const games = s.games
+          .filter((g) => !g.binned && g.startsAt !== null)
+          .map((g) => ({ g, day: (g.startsAt ?? '').slice(0, 10) }))
+          .filter(({ day }) => day >= s.today && day < until)
+          .sort((a, b) => (a.g.startsAt ?? '').localeCompare(b.g.startsAt ?? ''))
+          .map(({ g, day }) => ({
+            game: g,
+            programId: s.seasons.find((x) => x.id === g.seasonId)?.programId ?? '',
+            day,
+            assigned: isAssigned(s, g.id, accountId),
+          }));
+        return { today: s.today, games };
+      },
+    },
+  };
 }
