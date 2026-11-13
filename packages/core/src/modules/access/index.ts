@@ -47,6 +47,7 @@ export type {
   PermissionsTx,
 } from './ports.ts';
 export {
+  isPermission,
   ownerOnlyPermissions,
   permissions,
   roleHasPermission,
