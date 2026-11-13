@@ -24,7 +24,12 @@ Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migrati
 - **2.66 Engine clock mode and its switch** — `.local/lanes/2.66-clock-mode` — record 029 / T-241 — builder started (run of 2026-11-13).
 - **1.27 Sturdy timing tests** — `.local/lanes/1.27-sturdy-tests` — none — builder started.
 
-Reserved now: next free migration 0010, record 031, T-243.
+- **2.4 Live game, calculated and import tables** — `.local/lanes/2.4-live-tables` — migration 0010, record 030 / T-242 — builder started.
+- **1.14 Sign-in flows in the web app** — `.local/lanes/1.14-signin-flows` — migration 0011 (only if the sign-in store needs tables), record 031 / T-243 — builder started.
+- **2.23 Results entered by hand** — `.local/lanes/2.23-hand-results` — record 032 / T-244 — builder started.
+- **2.19 Rosters commands** — `.local/lanes/2.19-roster-commands` — none — builder started.
+
+Next free: migration 0012, record 033, T-245.
 
 ## Needs the founder
 
