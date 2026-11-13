@@ -11,6 +11,7 @@ export default defineConfig({
       'apps/web/**/*.test.ts',
       'apps/worker/**/*.test.ts',
       'packages/{core,site,ui,emails,providers,observability}/**/*.test.ts',
+      'packages/contracts/**/*.test.ts',
       'packages/sports/src/stats/**/*.test.ts',
       'packages/database/src/{migrations,schema,db,queries,stores,isolation}/**/*.test.ts',
     ],
