@@ -33,53 +33,25 @@ import type {
   SignInService,
   TooManyAttempts,
 } from '../sign-in-service.ts';
-import { createAttemptLimiter, type AttemptLimits } from './attempt-limiter.ts';
+import { signInDefaults, type SignInSettings } from '../sign-in-settings.ts';
+import { createAttemptLimiter } from './attempt-limiter.ts';
 import { sampleLeakedPasswords } from './leaked-passwords.ts';
 import { scryptPasswordHasher, type PasswordHash, type PasswordHasher } from './password-hash.ts';
 
-/** The numbers of T4 §3 and T-225. The Supabase project is set up with the same ones. */
-export type LocalSignInSettings = {
-  /** T-67: a code is valid 10 minutes. */
-  readonly codeValidMinutes: number;
-  /** T-67: a few attempts per code. */
-  readonly attemptsPerCode: number;
-  /** T-67: a few codes per hour per address (sign-up and reset together). */
-  readonly codesPerHour: number;
-  /** T-225: codes asked for from one network in an hour, whatever the addresses. */
-  readonly codesPerHourPerNetwork: number;
-  /** How long the proof from a right code stays good for setting the password. */
-  readonly proofValidMinutes: number;
+/**
+ * The numbers of T4 §3 and T-225, shared with the Supabase adapter, and two the real
+ * service keeps on its own side (the access token's life and the leaked-password list).
+ */
+export type LocalSignInSettings = SignInSettings & {
   /** T-69: the access token is short-lived; the session itself has no limit (T-70). */
   readonly accessTokenMinutes: number;
-  /** T-85: wrong passwords per address typed. */
-  readonly guessesPerEmail: AttemptLimits;
-  /** T-85, T-225: wrong passwords and wrong codes per network. */
-  readonly guessesPerNetwork: AttemptLimits;
   /** Stands in for the public lists of leaked passwords (T-85). Lower case. */
   readonly leakedPasswords: readonly string[];
 };
 
 export const localSignInDefaults: LocalSignInSettings = {
-  codeValidMinutes: 10,
-  attemptsPerCode: 5,
-  codesPerHour: 5,
-  codesPerHourPerNetwork: 30,
-  proofValidMinutes: 15,
+  ...signInDefaults,
   accessTokenMinutes: 60,
-  guessesPerEmail: {
-    windowMinutes: 15,
-    slowAfter: 5,
-    slowSeconds: 30,
-    lockAfter: 10,
-    lockMinutes: 15,
-  },
-  guessesPerNetwork: {
-    windowMinutes: 15,
-    slowAfter: 30,
-    slowSeconds: 5,
-    lockAfter: 100,
-    lockMinutes: 15,
-  },
   leakedPasswords: sampleLeakedPasswords,
 };
 
