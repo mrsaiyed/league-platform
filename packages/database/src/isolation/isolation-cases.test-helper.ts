@@ -67,6 +67,7 @@ import {
 import './divisions-venues-cases.test-helper.ts';
 import './games-cases.test-helper.ts';
 import './people-cases.test-helper.ts';
+import './public-schedule-cases.test-helper.ts';
 import './seasons-cases.test-helper.ts';
 import './teams-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';

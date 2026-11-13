@@ -18,7 +18,11 @@ function game(localDate: string | null): PublicGame {
     courtName: null,
   };
 }
-const round = (number: number, date: string | null, days: (string | null)[] = []): RoundToPlace => ({
+const round = (
+  number: number,
+  date: string | null,
+  days: (string | null)[] = [],
+): RoundToPlace => ({
   id: `r${number}`,
   number,
   label: null,

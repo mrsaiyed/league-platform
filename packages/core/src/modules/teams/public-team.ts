@@ -52,7 +52,6 @@ export type PublicRosterLine = {
 };
 
 export type PublicRoster = {
-  readonly teamId: string;
   readonly lines: readonly PublicRosterLine[];
 };
 
