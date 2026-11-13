@@ -29,6 +29,30 @@ export async function hasPermission(
 }
 
 /**
+ * May the acting account do `permission` somewhere in the league: held at any scope
+ * (the whole league, or one program)? For league-shared data a role limited to one
+ * program may still read, such as the venue list.
+ */
+export async function hasPermissionAnywhere(
+  context: CommandContext,
+  tx: PermissionsTx,
+  permission: Permission,
+): Promise<boolean> {
+  const holder =
+    context.accountId === null ? undefined : await accessOfAccount(tx, context.accountId);
+  if (holder === undefined || !isPermission(permission)) return false;
+  return (
+    holder.isOwner ||
+    holder.grants.some(
+      (grant) =>
+        grant.accountId === holder.accountId &&
+        grant.revokedAt === null &&
+        roleHasPermission(grant.role, permission),
+    )
+  );
+}
+
+/**
  * What an account holds in the transaction's league, read fresh (T-75): undefined
  * if the league is in the bin or out of sight.
  */

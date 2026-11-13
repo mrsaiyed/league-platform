@@ -24,6 +24,32 @@ describe('reorderDivisions', () => {
     expect(db.state.activity.map((a) => a.action)).toEqual(['leagues.reorder_divisions']);
   });
 
+  it('refuses a list that leaves out a sibling, and leaves a division already in place alone', async () => {
+    const { db, deps, as } = memoryLeagues({
+      seasons,
+      divisions: [division(1, { sort: 0 }), division(2, { sort: 1 }), division(3, { sort: 5 })],
+    });
+    expect(
+      await reorderDivisions(
+        as(ownerId),
+        { seasonId, divisionIds: [divisionId(2), divisionId(1)] },
+        deps,
+      ),
+    ).toEqual({ ok: false, error: { code: 'divisions-incomplete' } });
+    expect(db.state.divisions.map((d) => d.sort)).toEqual([0, 1, 5]);
+    await reorderDivisions(
+      as(ownerId),
+      { seasonId, divisionIds: [divisionId(1), divisionId(2), divisionId(3)] },
+      deps,
+    );
+    expect(db.state.divisions.map((d) => [d.sort, d.version])).toEqual([
+      [0, 1],
+      [1, 1],
+      [2, 2],
+    ]);
+    expect(db.state.activity[0]?.details).toEqual({ seasonId, count: 3, moved: 1 });
+  });
+
   it('refuses a division of another season, in the bin, under another parent, or missing', async () => {
     const { db, deps, as } = memoryLeagues({
       seasons,

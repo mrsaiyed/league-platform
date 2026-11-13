@@ -50,6 +50,11 @@ export const updateDivision = defineCommand({
     await recordActivity(tx, context, {
       action: 'leagues.update_division',
       target: { type: 'division', id: division.id },
+      details: {
+        changed: [name === undefined ? '' : 'name', color === undefined ? '' : 'color']
+          .filter((f) => f !== '')
+          .join(','),
+      },
     });
     return ok({ version: updated });
   },

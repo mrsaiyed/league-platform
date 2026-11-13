@@ -123,6 +123,8 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           return true;
         },
         hasLiveCourts: async (id) => s.courts.some((c) => c.venueId === id && !c.binned),
+        listCourts: async (id) =>
+          s.courts.filter((c) => c.venueId === id && !c.binned).sort((a, b) => a.sort - b.sort),
         findCourt: async (id) => s.courts.find((c) => c.id === id),
         createCourt: async (c) => {
           if (courtNameTaken(c.venueId, c.name)) return 'name-taken';

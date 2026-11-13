@@ -61,6 +61,7 @@ export const createDivision = defineCommand({
     await recordActivity(tx, context, {
       action: 'leagues.create_division',
       target: { type: 'division', id: created },
+      details: { seasonId: input.seasonId, sort },
     });
     return ok({ divisionId: created });
   },

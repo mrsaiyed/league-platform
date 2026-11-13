@@ -1,6 +1,6 @@
 // The league's venues with their courts, for the schedule area (P7 §4). It changes
 // nothing, but runs in the same shape as a command (record 014). Anyone who may read
-// the schedule may read it, in a league that is archived or suspended too.
+// the schedule, at any scope (a program-limited scheduler too), may read it, in a league that is archived or suspended too.
 import { z } from 'zod';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
 import { mayReadSchedule } from '../policy.ts';

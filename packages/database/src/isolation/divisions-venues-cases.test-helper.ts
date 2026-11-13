@@ -30,6 +30,7 @@ import {
   insertDivision,
   insertVenue,
   listDivisions,
+  listCourts,
   listVenues,
   setCourtBinned,
   setDivisionBinned,
@@ -149,6 +150,12 @@ registerIsolationCase({
   subject: findCourt,
   name: "find the target's court",
   run: (scope, target) => findCourt(scope, target.courtId),
+});
+
+registerIsolationCase({
+  subject: listCourts,
+  name: "list the target's venue's courts",
+  run: (scope, target) => listCourts(scope, target.venueId),
 });
 
 registerIsolationCase({

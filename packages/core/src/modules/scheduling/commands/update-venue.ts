@@ -46,6 +46,7 @@ export const updateVenue = defineCommand({
     await recordActivity(tx, context, {
       action: 'scheduling.update_venue',
       target: { type: 'venue', id: venue.id },
+      details: { changed: Object.keys(change).join(',') },
     });
     return ok({ version: updated });
   },

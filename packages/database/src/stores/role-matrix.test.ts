@@ -436,11 +436,13 @@ const divisionAndVenueRows: readonly Row[] = [
     },
     run: (c, i) => restoreCourt(c, i, schedulingDeps),
   },
-  // Reading the schedule: the scheduler, scorekeepers, the owner and admins.
+  // Reading the schedule: the scheduler (program-limited too), scorekeepers, the owner and admins.
   {
     command: 'scheduling.list_venues',
     name: 'see the venues and courts',
     needs: 'schedule.read',
+    // Venues are league-shared: a grant at any scope reads them, so program roles too.
+    scope: 'program',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listVenues(c, i, schedulingDeps),
   },

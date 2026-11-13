@@ -11,6 +11,7 @@ export { insertCourt, type NewCourtRow } from './insert-court.ts';
 export { insertDivision, type NewDivisionRow } from './insert-division.ts';
 export { insertVenue, type NewVenueRow } from './insert-venue.ts';
 export { listDivisions } from './list-divisions.ts';
+export { listCourts } from './list-courts.ts';
 export { listVenues } from './list-venues.ts';
 export { setCourtBinned } from './set-court-binned.ts';
 export { setDivisionBinned } from './set-division-binned.ts';

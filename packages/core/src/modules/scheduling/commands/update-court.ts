@@ -44,6 +44,10 @@ export const updateCourt = defineCommand({
     await recordActivity(tx, context, {
       action: 'scheduling.update_court',
       target: { type: 'court', id: court.id },
+      details: {
+        changed: Object.keys(change).join(','),
+        ...(change.sort === undefined ? {} : { sort: change.sort }),
+      },
     });
     return ok({ version: updated });
   },

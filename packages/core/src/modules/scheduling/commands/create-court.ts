@@ -20,9 +20,9 @@ export const createCourt = defineCommand({
     if (venue === undefined || venue.binned) return fail({ code: 'venue-not-found' });
     let sort = input.sort;
     if (sort === undefined) {
-      const listed = (await tx.scheduling.listVenues()).find((v) => v.id === venue.id);
+      const courts = await tx.scheduling.listCourts(venue.id);
       sort = Math.min(
-        (listed?.courts ?? []).reduce((next, c) => Math.max(next, c.sort + 1), 0),
+        courts.reduce((next, c) => Math.max(next, c.sort + 1), 0),
         100000,
       );
     }
@@ -35,6 +35,7 @@ export const createCourt = defineCommand({
     await recordActivity(tx, context, {
       action: 'scheduling.create_court',
       target: { type: 'court', id: created },
+      details: { sort },
     });
     return ok({ courtId: created });
   },

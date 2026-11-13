@@ -64,6 +64,8 @@ export type SchedulingStore = {
   readonly setVenueBinned: (venueId: string, binned: boolean) => Promise<boolean | 'name-taken'>;
   /** Whether any court of this venue is not in the bin. */
   readonly hasLiveCourts: (venueId: string) => Promise<boolean>;
+  /** The venue's courts not in the bin, in order (by sort, then name). */
+  readonly listCourts: (venueId: string) => Promise<readonly CourtRecord[]>;
   readonly findCourt: (courtId: string) => Promise<CourtRecord | undefined>;
   /** Adds a court to a venue: its id, or 'name-taken' (the venue has a court of that name). */
   readonly createCourt: (court: NewCourt) => Promise<string | 'name-taken'>;

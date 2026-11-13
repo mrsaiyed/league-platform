@@ -32,3 +32,9 @@ Divisions, venues and courts go to the bin (`deleted_at`, T-45), and the databas
 ## Revisit if
 
 A setting must be enforced by the database itself (then it becomes a real column), values are needed at a further level (a team or a division), or a value grows past the 8 KB limit, which would mean it is a document of its own rather than a setting.
+
+## Notes from the step 2.16 review
+
+- **Who may read the lists.** `scheduling.list_venues` needs `schedule.read` at any scope, so a scheduler or scorekeeper limited to one program can list venues (they are the league's shared data). `leagues.list_divisions` needs `divisions.manage` today; other roles will need a broader read in steps 2.18 and 2.52 and in registration, and that read is added then, not by loosening this one.
+- **Removing is refused for what uses it.** Removing a division or a venue must also be refused while teams (step 2.18) or games (step 2.3) use it, once those exist. Today only live sub-divisions and live courts stop it.
+- **Purge order: children first.** The nightly purge removes sub-divisions before their parent division, and courts before their venue, and teams and games before either, since the database does not cascade.
