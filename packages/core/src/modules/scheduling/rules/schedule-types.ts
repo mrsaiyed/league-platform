@@ -10,8 +10,13 @@ export type ScheduleSlot = {
   court: string | null;
 };
 
+/** How a game is recorded (P7 §5.2); the words season rules use. */
+export type GameRecording = 'final-score' | 'box-score' | 'live';
+
 export type ScheduleGame = ScheduleSlot & {
   id: string;
+  /** Empty: the game follows its season's rules (decided when it is published). */
+  recording?: GameRecording | null;
   homeTeamId: string;
   awayTeamId: string;
   /** Postponed and cancelled games hold no place, so they never clash. */
@@ -35,6 +40,7 @@ export type DraftChange =
   | { kind: 'move-game'; gameId: string; to: ScheduleSlot }
   | { kind: 'swap-games'; gameId: string; otherGameId: string }
   | { kind: 'remove-game'; gameId: string }
+  | { kind: 'set-recording'; gameId: string; recording: GameRecording }
   | { kind: 'rename-round'; roundId: string; label: string }
   | { kind: 'change-round-date'; roundId: string; date: string };
 

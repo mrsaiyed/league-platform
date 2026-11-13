@@ -5,8 +5,10 @@ import type { CommandContext } from '../../command/index.ts';
 import {
   hasPermission,
   hasPermissionAnywhere,
+  leagueScope,
   readOnlyLeagueStatuses,
   type Permission,
+  type Scope,
 } from '../access/index.ts';
 import type { SchedulingTx } from './ports.ts';
 
@@ -32,4 +34,35 @@ export async function mayChangeSchedule(
   if (!(await hasPermission(context, tx, permission))) return false;
   const status = await tx.access.leagueStatus();
   return status !== undefined && !readOnlyLeagueStatuses.includes(status);
+}
+
+/** The scope of a season's program (league-wide if the season is not there). */
+export async function seasonScope(tx: SchedulingTx, seasonId: string): Promise<Scope> {
+  const season = await tx.scheduling.findSeason(seasonId);
+  return season === undefined ? leagueScope : { type: 'program', id: season.programId };
+}
+
+/**
+ * Editing a season's schedule draft (P4 §3 `schedule.edit`): at the season's program, so a
+ * scheduler limited to one program edits only its seasons; not while the league is
+ * archived or suspended (U-9). A season that is not there is checked league-wide.
+ */
+export async function mayEditSchedule(
+  context: CommandContext,
+  tx: SchedulingTx,
+  seasonId: string,
+): Promise<boolean> {
+  const scope = await seasonScope(tx, seasonId);
+  if (!(await hasPermission(context, tx, 'schedule.edit', scope))) return false;
+  const status = await tx.access.leagueStatus();
+  return status !== undefined && !readOnlyLeagueStatuses.includes(status);
+}
+
+/** Seeing a season's draft: the read permission at its program, in any state of the league. */
+export async function maySeeSchedule(
+  context: CommandContext,
+  tx: SchedulingTx,
+  seasonId: string,
+): Promise<boolean> {
+  return hasPermission(context, tx, 'schedule.read', await seasonScope(tx, seasonId));
 }
