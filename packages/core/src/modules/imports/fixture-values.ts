@@ -25,28 +25,49 @@ function validDate(year: number, month: number, day: number): string | null {
 function monthNumber(word: string): number | null {
   const w = word.toLowerCase();
   if (w.length < 3) return null;
-  const index = MONTHS.findIndex((name) => name === w || (w.length === 3 && name.startsWith(w)));
+  const index = MONTHS.findIndex(
+    (name) => name === w || ((w.length === 3 || w === 'sept') && name.startsWith(w)),
+  );
   return index === -1 ? null : index + 1;
 }
 
-/** 2026-11-02, 11/2/2026 (month first), "Nov 2, 2026" or "2 November 2026". Returns YYYY-MM-DD. */
+function fullYear(text: string): number {
+  const n = Number(text);
+  return text.length === 2 ? 2000 + n : n;
+}
+
+const WEEKDAY_PREFIX = /^(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,? +/i;
+
+/**
+ * 2026-11-02, 11/2/2026 or 11/2/26 (month first), "Nov 2, 2026", "2 November 2026", with an
+ * optional weekday in front ("Tuesday, November 03, 2026"). Returns YYYY-MM-DD.
+ */
 export function parseDate(raw: string): string | null {
-  const s = raw.trim().replace(/\s+/g, ' ');
+  const s = raw.trim().replace(/\s+/g, ' ').replace(WEEKDAY_PREFIX, '');
   let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
   if (m) return validDate(Number(m[1]), Number(m[2]), Number(m[3]));
-  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
-  if (m) return validDate(Number(m[3]), Number(m[1]), Number(m[2]));
-  m = /^([a-z]{3,9})\.? (\d{1,2}),? (\d{4})$/i.exec(s);
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})$/.exec(s);
+  if (m) return validDate(fullYear(m[3] as string), Number(m[1]), Number(m[2]));
+  m = /^([a-z]{3,9})\.? (\d{1,2}),? (\d{4}|\d{2})$/i.exec(s);
   if (m) {
     const month = monthNumber(m[1] as string);
-    return month ? validDate(Number(m[3]), month, Number(m[2])) : null;
+    return month ? validDate(fullYear(m[3] as string), month, Number(m[2])) : null;
   }
-  m = /^(\d{1,2}) ([a-z]{3,9})\.?,? (\d{4})$/i.exec(s);
+  m = /^(\d{1,2}) ([a-z]{3,9})\.?,? (\d{4}|\d{2})$/i.exec(s);
   if (m) {
     const month = monthNumber(m[2] as string);
-    return month ? validDate(Number(m[3]), month, Number(m[1])) : null;
+    return month ? validDate(fullYear(m[3] as string), month, Number(m[1])) : null;
   }
   return null;
+}
+
+/** True for a slash date such as 3/4/2026 that reads differently day-first and month-first. */
+export function isAmbiguousDate(raw: string): boolean {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})$/.exec(raw.trim());
+  if (!m) return false;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  return a <= 12 && b <= 12 && a !== b;
 }
 
 /** 19:30, 7:30 PM, 7pm. Returns HH:MM on a 24-hour clock. */
@@ -76,13 +97,13 @@ export function parseWholeNumber(raw: string, max: number): number | null {
   return n <= max ? n : null;
 }
 
-/** Lowercase, accents and punctuation removed, spaces collapsed: for matching names. */
+/** Lowercase, accents and punctuation removed, spaces collapsed: for matching names in any script. */
 export function normalizeName(raw: string): string {
   return raw
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 }

@@ -2,13 +2,21 @@
 // Pure: it takes the text and the season's teams and venues, and returns draft games plus
 // a plain-words problem for every row it could not use. It writes and keeps nothing.
 import { splitCsv } from './csv-text.ts';
-import { normalizeName, parseDate, parseTime, parseWholeNumber } from './fixture-values.ts';
+import {
+  isAmbiguousDate,
+  normalizeName,
+  parseDate,
+  parseTime,
+  parseWholeNumber,
+} from './fixture-values.ts';
 
 export const fixtureFileLimits = {
   maxCharacters: 2_000_000,
   maxRows: 5_000,
   maxColumns: 40,
   maxCellCharacters: 300,
+  maxProblemsListed: 200,
+  maxEchoCharacters: 40,
   maxScore: 999,
   maxGameNumber: 1_000_000,
 } as const;
@@ -21,7 +29,7 @@ export type SeasonNames = {
 };
 
 export type DraftFixture = {
-  /** The spreadsheet line it came from (line 1 is the header). */
+  /** The spreadsheet row it came from (row 1 is the header). */
   rowNumber: number;
   date: string; // YYYY-MM-DD
   time: string | null; // HH:MM, 24-hour; null when the file gives none
@@ -43,6 +51,12 @@ export type FixtureReport = {
   fileProblem: string | null;
   fixtures: DraftFixture[];
   problems: RowProblem[];
+  /** How many further rows had problems beyond the ones listed. */
+  omittedProblems: number;
+  /** Plain-words note for the end of the problem list, or null. */
+  problemsNote: string | null;
+  /** Things worth a look that do not stop a row being used. */
+  warnings: RowProblem[];
   rowsRead: number;
   /** Plain-words names of the columns the reader found, for the preview. */
   columnsFound: string[];
@@ -76,18 +90,17 @@ const FIELD_LABELS: Record<Field, string> = {
 };
 
 const HEADER_NAMES: Record<Field, readonly string[]> = {
-  date: ['date', 'game date', 'day'],
+  date: ['date', 'game date'],
   time: ['time', 'start', 'start time', 'tip off', 'tipoff'],
   home: ['home', 'home team', 'hometeam'],
   away: ['away', 'away team', 'visitor', 'visitors', 'visiting team', 'awayteam'],
   venue: ['venue', 'location', 'gym', 'site', 'facility'],
   court: ['court', 'field', 'court name', 'court number', 'court no'],
   round: ['round', 'week', 'matchday', 'game week'],
-  gameNumber: ['game number', 'game no', 'game', 'game id', 'number', 'no', 'match number'],
+  gameNumber: ['game number', 'game no', 'game id', 'match number'],
   reference: [
     'outside reference',
     'reference',
-    'ref',
     'external id',
     'external reference',
     'source id',
@@ -102,8 +115,42 @@ for (const field of Object.keys(HEADER_NAMES) as Field[]) {
   for (const name of HEADER_NAMES[field]) lookup.set(normalizeName(name), field);
 }
 
+/** A value copied from the file into a message: control characters removed, kept short. */
+function echo(value: string): string {
+  const clean = value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/gu, ' ').trim();
+  const max = fixtureFileLimits.maxEchoCharacters;
+  return clean.length > max ? `${clean.slice(0, max)}...` : clean;
+}
+
+const SAVE_AS_CSV = 'Save it as CSV (UTF-8) from your spreadsheet program and try again.';
+
+function wrongFormat(text: string): string | null {
+  const nul = String.fromCharCode(0);
+  const replacement = String.fromCharCode(0xfffd);
+  const reversedMark = String.fromCharCode(0xfffe);
+  if (text.startsWith('PK')) {
+    return `This looks like an Excel file, not a CSV file. ${SAVE_AS_CSV}`;
+  }
+  if (text.includes(nul) || text.startsWith(reversedMark)) {
+    return `The file is not plain text (it may be UTF-16 or a binary file). ${SAVE_AS_CSV}`;
+  }
+  if (text.includes(replacement)) {
+    return `The file has characters that could not be read (it is probably not UTF-8). ${SAVE_AS_CSV}`;
+  }
+  return null;
+}
+
 function emptyReport(fileProblem: string | null, rowsRead = 0): FixtureReport {
-  return { fileProblem, fixtures: [], problems: [], rowsRead, columnsFound: [] };
+  return {
+    fileProblem,
+    fixtures: [],
+    problems: [],
+    omittedProblems: 0,
+    problemsNote: null,
+    warnings: [],
+    rowsRead,
+    columnsFound: [],
+  };
 }
 
 function indexNames<T extends { id: string }>(
@@ -140,6 +187,8 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
       `The file is too large (the limit is about ${Math.round(limits.maxCharacters / 1_000_000)} MB of text). Split it into smaller files.`,
     );
   }
+  const wrong = wrongFormat(csvText);
+  if (wrong) return emptyReport(wrong);
   const split = splitCsv(csvText);
   if (!split.ok) return emptyReport(split.message);
 
@@ -155,18 +204,17 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
 
   // Find the columns.
   const columns = new Map<Field, number>();
-  const repeated: string[] = [];
+  const warnings: RowProblem[] = [];
   header.cells.forEach((cell, index) => {
     const field = lookup.get(normalizeName(cell));
     if (!field) return;
-    if (columns.has(field)) repeated.push(FIELD_LABELS[field]);
-    else columns.set(field, index);
+    if (columns.has(field)) {
+      warnings.push({
+        rowNumber: header.row,
+        message: `The first row has more than one "${FIELD_LABELS[field]}" column. I used the first and ignored the column "${echo(cell)}".`,
+      });
+    } else columns.set(field, index);
   });
-  if (repeated.length > 0) {
-    return emptyReport(
-      `The first row has more than one "${repeated[0]}" column. Keep one column for each kind of information.`,
-    );
-  }
   const missing = (['date', 'home', 'away'] as const).filter((f) => !columns.has(f));
   if (missing.length > 0) {
     return emptyReport(
@@ -179,7 +227,10 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
     );
   }
 
-  const dataRecords = records.slice(headerIndex + 1);
+  const dataRecords = records
+    .slice(headerIndex + 1)
+    .filter((r) => r.cells.some((c) => c.trim() !== ''));
+  const usedColumns = [...columns.entries()].map(([field, index]) => ({ field, index }));
   if (dataRecords.length > limits.maxRows) {
     return emptyReport(
       `The file has more than ${limits.maxRows} rows, which is over the limit. Split it into smaller files.`,
@@ -202,19 +253,21 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
   let rowsRead = 0;
 
   for (const record of dataRecords) {
-    if (record.cells.every((c) => c.trim() === '')) continue; // blank line
     rowsRead++;
-    const rowNumber = record.line;
+    const rowNumber = record.row;
     const issues: string[] = [];
     const cell = (field: Field): string => {
       const i = columns.get(field);
       return i === undefined ? '' : (record.cells[i] ?? '').trim();
     };
 
-    if (record.cells.some((c) => c.length > limits.maxCellCharacters)) {
+    const tooLong = usedColumns.find(
+      (c) => (record.cells[c.index] ?? '').length > limits.maxCellCharacters,
+    );
+    if (tooLong) {
       problems.push({
         rowNumber,
-        message: `Row ${rowNumber}: a cell is far too long to be a fixture detail.`,
+        message: `Row ${rowNumber}: the ${FIELD_LABELS[tooLong.field]} cell is far too long to be a fixture detail.`,
       });
       continue;
     }
@@ -224,9 +277,15 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
     if (rawDate === '') issues.push('The date is empty.');
     else {
       date = parseDate(rawDate);
+      if (date && isAmbiguousDate(rawDate)) {
+        warnings.push({
+          rowNumber,
+          message: `Row ${rowNumber}: the date "${echo(rawDate)}" was read month first (${date}). If your file puts the day first, check this row.`,
+        });
+      }
       if (!date) {
         issues.push(
-          `The date "${rawDate}" is not a date I can read. Use a form like 2026-11-02 or 11/2/2026 (month first).`,
+          `The date "${echo(rawDate)}" is not a date I can read. Use a form like 2026-11-02 or 11/2/2026 (month first).`,
         );
       }
     }
@@ -237,7 +296,7 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
       time = parseTime(rawTime);
       if (!time) {
         issues.push(
-          `The time "${rawTime}" is not a time I can read. Use a form like 7:30 PM or 19:30.`,
+          `The time "${echo(rawTime)}" is not a time I can read. Use a form like 7:30 PM or 19:30.`,
         );
       }
     }
@@ -255,9 +314,9 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
         if (side === 'home') homeId = found.id;
         else awayId = found.id;
       } else if (found.problem === 'none') {
-        issues.push(`The ${side} team "${raw}" is not a team in this season.`);
+        issues.push(`The ${side} team "${echo(raw)}" is not a team in this season.`);
       } else {
-        issues.push(`The ${side} team "${raw}" matches more than one team in this season.`);
+        issues.push(`The ${side} team "${echo(raw)}" matches more than one team in this season.`);
       }
     }
     if (homeId !== null && homeId === awayId) {
@@ -270,20 +329,26 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
       const found = matchName(venueIndex, rawVenue);
       if ('id' in found) venueId = found.id;
       else if (found.problem === 'none') {
-        issues.push(`The venue "${rawVenue}" is not a venue in this season.`);
-      } else issues.push(`The venue "${rawVenue}" matches more than one venue in this season.`);
+        issues.push(`The venue "${echo(rawVenue)}" is not a venue in this season.`);
+      } else
+        issues.push(`The venue "${echo(rawVenue)}" matches more than one venue in this season.`);
     }
 
     const rawCourt = cell('court');
+    let court: string | null = rawCourt === '' ? null : rawCourt;
     if (rawCourt !== '') {
       if (rawVenue === '') issues.push('A court is given without a venue.');
       else if (venueId !== null) {
         const courts = venuesById.get(venueId)?.courts ?? [];
-        if (
-          courts.length > 0 &&
-          !courts.some((c) => normalizeName(c) === normalizeName(rawCourt))
-        ) {
-          issues.push(`The court "${rawCourt}" is not one of that venue's courts.`);
+        if (courts.length > 0) {
+          const wanted = normalizeName(rawCourt);
+          const bare = /^\d+$/.test(wanted) ? `court ${wanted}` : null;
+          const found = courts.find((c) => {
+            const key = normalizeName(c);
+            return key === wanted || key === bare;
+          });
+          if (found) court = found;
+          else issues.push(`The court "${echo(rawCourt)}" is not one of that venue's courts.`);
         }
       }
     }
@@ -294,7 +359,7 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
       gameNumber = parseWholeNumber(rawNumber, limits.maxGameNumber);
       if (gameNumber === null || gameNumber < 1) {
         gameNumber = null;
-        issues.push(`The game number "${rawNumber}" is not a whole number of 1 or more.`);
+        issues.push(`The game number "${echo(rawNumber)}" is not a whole number of 1 or more.`);
       }
     }
 
@@ -309,7 +374,7 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
         const away = parseWholeNumber(rawAwayScore, limits.maxScore);
         if (home === null || away === null) {
           issues.push(
-            `The scores "${rawHomeScore}" and "${rawAwayScore}" must be whole numbers from 0 to ${limits.maxScore}.`,
+            `The scores "${echo(rawHomeScore)}" and "${echo(rawAwayScore)}" must be whole numbers from 0 to ${limits.maxScore}.`,
           );
         } else finalScore = { home, away };
       }
@@ -320,13 +385,18 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
     if (gameNumber !== null) {
       const earlier = seenGameNumber.get(gameNumber);
       if (earlier !== undefined) {
-        issues.push(`Game number ${gameNumber} is already used on row ${earlier}.`);
+        warnings.push({
+          rowNumber,
+          message: `Row ${rowNumber}: game number ${gameNumber} is also used on row ${earlier}.`,
+        });
       }
     }
     if (reference !== '') {
       const earlier = seenReference.get(reference.toLowerCase());
       if (earlier !== undefined) {
-        issues.push(`The outside reference "${reference}" is already used on row ${earlier}.`);
+        issues.push(
+          `The outside reference "${echo(reference)}" is already used on row ${earlier}.`,
+        );
       }
     }
     const slotKey = date && homeId && awayId ? `${date}|${time ?? ''}|${homeId}|${awayId}` : null;
@@ -341,7 +411,9 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
       problems.push({ rowNumber, message: `Row ${rowNumber}: ${issues.join(' ')}` });
       continue;
     }
-    if (gameNumber !== null) seenGameNumber.set(gameNumber, rowNumber);
+    if (gameNumber !== null && !seenGameNumber.has(gameNumber)) {
+      seenGameNumber.set(gameNumber, rowNumber);
+    }
     if (reference !== '') seenReference.set(reference.toLowerCase(), rowNumber);
     if (slotKey !== null) seenSlot.set(slotKey, rowNumber);
 
@@ -352,7 +424,7 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
       homeTeamId: homeId,
       awayTeamId: awayId,
       venueId,
-      court: rawCourt === '' ? null : rawCourt,
+      court,
       round: cell('round') === '' ? null : cell('round'),
       gameNumber,
       outsideReference: reference === '' ? null : reference,
@@ -361,10 +433,14 @@ export function readFixtureSheet(csvText: string, season: SeasonNames): FixtureR
   }
 
   if (rowsRead === 0) return emptyReport('The file has column names but no games.');
+  const omitted = Math.max(0, problems.length - limits.maxProblemsListed);
   return {
     fileProblem: null,
     fixtures,
-    problems,
+    problems: problems.slice(0, limits.maxProblemsListed),
+    omittedProblems: omitted,
+    problemsNote: omitted > 0 ? `...and ${omitted} more rows have problems.` : null,
+    warnings,
     rowsRead,
     columnsFound: [...columns.keys()].map((f) => FIELD_LABELS[f]),
   };

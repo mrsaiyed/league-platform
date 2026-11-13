@@ -14,7 +14,7 @@ const season: SeasonNames = {
   ],
 };
 
-const header = 'Date,Time,Home,Away,Venue,Court,Round,Game #,Reference,Home Score,Away Score';
+const header = 'Date,Time,Home,Away,Venue,Court,Round,Game Number,Reference,Home Score,Away Score';
 
 describe('fixture spreadsheet reader (step 2.10)', () => {
   it('reads good rows, with scores on some', () => {
@@ -66,7 +66,7 @@ describe('fixture spreadsheet reader (step 2.10)', () => {
     const csv = `${header}\n2026-11-02,7:30 PM,Lions,Hawks,Main Gym,,"Week ""1""\nopener",,,,\n2026-11-03,7:30 PM,Cubs,Hawks,,,,,,,`;
     const report = readFixtureSheet(csv, season);
     expect(report.fixtures[0]?.round).toBe('Week "1"\nopener');
-    expect(report.fixtures[1]?.rowNumber).toBe(4);
+    expect(report.fixtures[1]?.rowNumber).toBe(3); // the multi-line cell is one spreadsheet row
   });
 
   it('reads semicolon files', () => {
@@ -129,11 +129,14 @@ describe('fixture spreadsheet reader (step 2.10)', () => {
       '2026-11-05,7:30 PM,Cubs,Lions,,,,3,B,,',
     ].join('\n');
     const report = readFixtureSheet(csv, season);
-    expect(report.fixtures.map((f) => f.rowNumber)).toEqual([2, 6]);
-    expect(report.problems.map((p) => p.rowNumber)).toEqual([3, 4, 5]);
+    expect(report.fixtures.map((f) => f.rowNumber)).toEqual([2, 4, 6]);
+    expect(report.problems.map((p) => p.rowNumber)).toEqual([3, 5]);
     expect(report.problems[0]?.message).toContain('same game as row 2');
-    expect(report.problems[1]?.message).toContain('Game number 1 is already used on row 2');
-    expect(report.problems[2]?.message).toContain('outside reference "a" is already used on row 2');
+    expect(report.problems[1]?.message).toContain('outside reference "a" is already used on row 2');
+    // A repeated game number is only a warning: the row is still used.
+    expect(report.warnings.map((w) => w.message)).toEqual([
+      expect.stringContaining('game number 1 is also used on row 2'),
+    ]);
   });
 
   it('rejects whole files that cannot be used', () => {
@@ -145,9 +148,6 @@ describe('fixture spreadsheet reader (step 2.10)', () => {
     expect(readFixtureSheet('Date,Home,Away', season).fileProblem).toContain('no games');
     expect(readFixtureSheet('Date,Home,Away,Home Score\n', season).fileProblem).toContain(
       'score columns',
-    );
-    expect(readFixtureSheet('Date,Date,Home,Away\n', season).fileProblem).toContain(
-      'more than one',
     );
     expect(
       readFixtureSheet('Date,Home,Away\n2026-11-02,"Lions,Hawks', season).fileProblem,
@@ -167,7 +167,7 @@ describe('fixture spreadsheet reader (step 2.10)', () => {
     expect(big.fileProblem).toContain('too large');
 
     const longCell = `Date,Home,Away,Round\n2026-11-02,Lions,Hawks,${'r'.repeat(1000)}`;
-    expect(readFixtureSheet(longCell, season).problems[0]?.message).toContain('too long');
+    expect(readFixtureSheet(longCell, season).problems[0]?.message).toContain('round cell');
   });
 
   it('accepts the row limit exactly and handles 300 games', () => {
@@ -190,5 +190,127 @@ describe('fixture spreadsheet reader (step 2.10)', () => {
     // The first row has an unquoted comma, so it is split wrongly: that is a row problem, not a crash.
     expect(report.problems.map((p) => p.rowNumber)).toEqual([2]);
     expect(report.fixtures.map((f) => f.date)).toEqual(['2026-11-03', '2026-11-04']);
+  });
+
+  it('uses the first of two columns for one field and warns about the other', () => {
+    const report = readFixtureSheet('Date,Date,Home,Away\n2026-11-02,x,Lions,Hawks', season);
+    expect(report.fileProblem).toBeNull();
+    expect(report.fixtures).toHaveLength(1);
+    expect(report.warnings[0]?.message).toContain('ignored the column "Date"');
+  });
+
+  it('does not treat day, ref, game, number or no as column names', () => {
+    const csv = 'Day,Date,Home,Away,Ref,Game,Number,No\n,2026-11-02,Lions,Hawks,a,b,c,d';
+    const report = readFixtureSheet(csv, season);
+    expect(report.fileProblem).toBeNull();
+    expect(report.columnsFound).toEqual(['date', 'home team', 'away team']);
+    expect(report.fixtures[0]?.gameNumber).toBeNull();
+  });
+
+  it('matches names in other scripts', () => {
+    const other: SeasonNames = {
+      teams: [
+        { id: 'a', name: 'النمور' },
+        { id: 'b', name: 'Динамо' },
+        { id: 'c', name: '东方队' },
+      ],
+      venues: [],
+    };
+    const csv = 'Date,Home,Away\n2026-11-02,النمور,Динамо\n2026-11-03,东方队,динамо';
+    const report = readFixtureSheet(csv, other);
+    expect(report.problems).toEqual([]);
+    expect(report.fixtures.map((f) => [f.homeTeamId, f.awayTeamId])).toEqual([
+      ['a', 'b'],
+      ['c', 'b'],
+    ]);
+  });
+
+  it('counts only non-blank rows toward the limit and rowsRead', () => {
+    const rows = Array.from({ length: fixtureFileLimits.maxRows }, () => '2026-11-02,Lions,Hawks');
+    const blanks = Array.from({ length: 50 }, () => ',,');
+    const report = readFixtureSheet(['Date,Home,Away', ...rows, ...blanks].join('\n'), season);
+    expect(report.fileProblem).toBeNull();
+    expect(report.rowsRead).toBe(fixtureFileLimits.maxRows);
+  });
+
+  it('numbers rows as a spreadsheet shows them, blank lines included', () => {
+    const csv = 'Date,Home,Away\n\n2026-11-02,Lions,Hawks\n\n2026-11-03,Lions,Nobody';
+    const report = readFixtureSheet(csv, season);
+    expect(report.fixtures[0]?.rowNumber).toBe(3);
+    expect(report.problems[0]?.rowNumber).toBe(5);
+    const open = readFixtureSheet('Date,Home,Away\n2026-11-02,Lions,Hawks\n\n"x', season);
+    expect(open.fileProblem).toContain('opened on row 4');
+  });
+
+  it('checks cell length only on used columns and names the column', () => {
+    const long = 'z'.repeat(1000);
+    const ok = readFixtureSheet(`Date,Home,Away,Notes\n2026-11-02,Lions,Hawks,${long}`, season);
+    expect(ok.problems).toEqual([]);
+    const bad = readFixtureSheet(`Date,Home,Away\n2026-11-02,Lions,${long}`, season);
+    expect(bad.problems[0]?.message).toContain('away team cell');
+  });
+
+  it('shortens echoed values, strips control characters and caps the problem list', () => {
+    const csv = `Date,Home,Away\n2026-11-02,Li\u0007ons${'x'.repeat(100)},Hawks`;
+    const message = readFixtureSheet(csv, season).problems[0]?.message ?? '';
+    expect(message).not.toContain('\u0007');
+    expect(message.length).toBeLessThan(200);
+    const many = Array.from({ length: 250 }, () => '2026-11-02,Nobody,Hawks');
+    const report = readFixtureSheet(['Date,Home,Away', ...many].join('\n'), season);
+    expect(report.problems).toHaveLength(fixtureFileLimits.maxProblemsListed);
+    expect(report.omittedProblems).toBe(50);
+    expect(report.problemsNote).toContain('50 more rows have problems');
+  });
+
+  it('matches a bare court number and returns the venue court name', () => {
+    const csv = [
+      'Date,Home,Away,Venue,Court',
+      '2026-11-02,Lions,Hawks,Main Gym,2',
+      '2026-11-03,Lions,Hawks,Main Gym,court 1',
+    ].join('\n');
+    const report = readFixtureSheet(csv, season);
+    expect(report.problems).toEqual([]);
+    expect(report.fixtures.map((f) => f.court)).toEqual(['Court 2', 'Court 1']);
+  });
+
+  it('reads two-digit years, Sept and weekday dates, and warns when day and month are unclear', () => {
+    const csv = [
+      'Date,Home,Away',
+      '3/4/26,Lions,Hawks',
+      '"Sept 5, 2026",Cubs,Hawks',
+      '"Tuesday, November 03, 2026",Cubs,Lions',
+      '13/1/2026,Lions,Cubs',
+      '5/5/2026,Hawks,Cubs',
+    ].join('\n');
+    const report = readFixtureSheet(csv, season);
+    expect(report.fixtures.map((f) => f.date)).toEqual([
+      '2026-03-04',
+      '2026-09-05',
+      '2026-11-03',
+      '2026-05-05',
+    ]);
+    expect(report.problems.map((p) => p.rowNumber)).toEqual([5]);
+    expect(report.warnings).toHaveLength(1);
+    expect(report.warnings[0]?.message).toContain('month first');
+  });
+
+  it('tells the user to save as CSV for Excel, UTF-16 and unreadable files', () => {
+    const bad = [
+      'PK\u0003\u0004abc',
+      'D\u0000a\u0000t\u0000e\u0000',
+      'Date,Home,Away\n2026-11-02,L�ons,Hawks',
+    ];
+    for (const text of bad) {
+      expect(readFixtureSheet(text, season).fileProblem).toContain('CSV (UTF-8)');
+    }
+  });
+
+  it('treats a space before an opening quote as a quote and skips leading blank lines for the separator', () => {
+    const csv = '\n\nDate;Home;Away\n2026-11-02; "Lions" ;Hawks';
+    const report = readFixtureSheet(csv, season);
+    expect(report.problems).toEqual([]);
+    expect(report.fixtures).toHaveLength(1);
+    const quoted = readFixtureSheet('Date,Home,Away\n2026-11-02, "St. Mary, East",Cubs', season);
+    expect(quoted.problems).toEqual([]);
   });
 });
