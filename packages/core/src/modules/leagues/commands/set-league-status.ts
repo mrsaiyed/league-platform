@@ -16,6 +16,10 @@ export type SetLeagueStatusError = {
 
 export const setLeagueStatus = defineCommand({
   name: 'leagues.set_status',
+  // The permission named covers the owner's and admins' changes (publish, archive,
+  // bring back). Suspending and lifting a suspension need our staff instead, which
+  // `allowed` checks; the role matrix lists this as its one documented exception.
+  permission: 'league.settings',
   input: z.object({ status: z.enum(leagueStatuses), version: z.number().int().positive() }),
   allowed: async (context, input, tx: LeaguesTx) => {
     const league = await tx.leagues.currentLeague();

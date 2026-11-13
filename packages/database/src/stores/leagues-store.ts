@@ -4,6 +4,7 @@ import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
   findCurrentLeague,
   findProgramId,
+  findSeasonProgramId,
   insertLeague,
   insertSeason,
   renameLeagueSlug,
@@ -35,6 +36,7 @@ export function leaguesStore(
       return id === undefined ? undefined : { id };
     },
     createSeason: (season) => insertSeason(scope, season),
+    seasonProgramId: (seasonId) => findSeasonProgramId(scope, seasonId),
     setCurrentSeason: (seasonId) => setCurrentSeason(scope, seasonId),
   };
 }

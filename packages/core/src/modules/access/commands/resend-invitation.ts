@@ -25,6 +25,7 @@ export type InvitationClosedError = {
 
 export const resendInvitation = defineCommand({
   name: 'access.resend_invitation',
+  permission: 'access.manage',
   input: z.object({ invitationId: z.uuid().transform((id) => id.toLowerCase()) }),
   allowed: (context, input, tx: AccessTx) => mayManageInvitation(context, tx, input.invitationId),
   run: async ({

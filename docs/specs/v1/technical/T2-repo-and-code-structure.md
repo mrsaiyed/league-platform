@@ -21,7 +21,7 @@ league-platform/
     site/                The sections a league page is built from, and the page renderer
     ui/                  Shared buttons, forms, tables; design tokens
     emails/              Email templates
-    providers/           Adapters to outside services: sign-in, email, payments, files, live updates
+    providers/           Adapters to outside services (server only): sign-in, email, payments, files, live updates (publishing; pages subscribe through apps/web, T-233)
     observability/       Logging, error reporting, metrics helpers
   supabase/
     migrations/          Ordered SQL files that define the database. The only way the schema changes.

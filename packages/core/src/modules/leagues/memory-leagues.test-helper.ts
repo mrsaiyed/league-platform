@@ -112,6 +112,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           s.seasons.push({ id, programId: season.programId, slug: season.slug, isCurrent: false });
           return id;
         },
+        seasonProgramId: async (seasonId) => s.seasons.find((x) => x.id === seasonId)?.programId,
         setCurrentSeason: async (seasonId) => {
           const season = s.seasons.find((x) => x.id === seasonId);
           if (season === undefined) return false;

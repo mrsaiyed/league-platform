@@ -87,6 +87,19 @@ export const en = {
   'activity.leagues.set_status': "Changed the league's state to {status}",
   'activity.leagues.create_season': 'Added a season',
   'activity.leagues.set_current_season': 'Changed the current season',
+  // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
+  // league's name, {role} a role's name from above, {days} how long a link works.
+  'email.invitation.subject': 'You are invited to help run {league}',
+  'email.invitation.intro': 'You have been invited to help run {league} as {role}.',
+  'email.invitation.action': 'Accept the invitation',
+  'email.invitation.howTo':
+    'Open the link, then sign in or create your account, and you are in. The link works once.',
+  'email.invitation.expiry':
+    'It stops working {days} days after the invitation was sent, or as soon as it is re-sent or cancelled.',
+  'email.invitation.notExpected':
+    'If you were not expecting this, you can ignore this email and nothing will happen.',
+  'email.invitation.linkFallback':
+    'If the button does not work, copy this address into your browser:',
 } as const;
 
 export type MessageKey = keyof typeof en;

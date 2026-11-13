@@ -14,6 +14,7 @@ export type CancelInvitationError = {
 
 export const cancelInvitation = defineCommand({
   name: 'access.cancel_invitation',
+  permission: 'access.manage',
   input: z.object({ invitationId: z.uuid().transform((id) => id.toLowerCase()) }),
   allowed: (context, input, tx: AccessTx) => mayManageInvitation(context, tx, input.invitationId),
   run: async ({

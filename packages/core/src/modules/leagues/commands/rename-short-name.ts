@@ -17,6 +17,7 @@ export type RenameShortNameError = {
 
 export const renameShortName = defineCommand({
   name: 'leagues.rename_short_name',
+  permission: 'league.settings',
   input: z.object({ slug: shortNameSchema, version: z.number().int().positive() }),
   allowed: (context, _input, tx: LeaguesTx) => mayEditLeague(context, tx),
   run: async ({

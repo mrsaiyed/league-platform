@@ -33,6 +33,7 @@ afterAll(async () => {
 /** Renames the league and records a job about it; refuses afterwards if asked. */
 const renameAndTell = defineCommand({
   name: 'leagues.rename_and_tell',
+  permission: 'league.settings',
   input: z.object({ name: z.string(), version: z.number(), refuse: z.boolean() }),
   allowed: async () => true,
   run: async ({

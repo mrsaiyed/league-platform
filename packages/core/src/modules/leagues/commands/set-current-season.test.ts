@@ -3,6 +3,16 @@ import { memoryLeagues, ownerId, staffId } from '../memory-leagues.test-helper.t
 import { setCurrentSeason } from './set-current-season.ts';
 
 const id = (n: number) => `01900000-0000-7000-8000-0000000000c${n}`;
+const programAdminId = '01900000-0000-7000-8000-0000000000e1';
+/** An admin limited to program p1 (P4 §4). */
+const programAdminGrant = {
+  id: '01900000-0000-7000-8000-0000000000f1',
+  accountId: programAdminId,
+  role: 'admin',
+  scope: { type: 'program', id: 'p1' },
+  grantedByAccountId: ownerId,
+  revokedAt: null,
+} as const;
 const seasons = [
   { id: id(1), programId: 'p1', slug: 'one', isCurrent: true },
   { id: id(2), programId: 'p1', slug: 'two', isCurrent: false },
@@ -31,5 +41,28 @@ describe('setCurrentSeason', () => {
       error: { code: 'not-allowed' },
     });
     expect(db.state.seasons.map((s) => s.isCurrent)).toEqual([true, false, true]);
+  });
+
+  it("lets an admin limited to a program choose that program's season, and no other's (P4 §4)", async () => {
+    const { db, deps, as } = memoryLeagues({ seasons, grants: [programAdminGrant] });
+    expect(await setCurrentSeason(as(programAdminId), { seasonId: id(2) }, deps)).toMatchObject({
+      ok: true,
+    });
+    expect(await setCurrentSeason(as(programAdminId), { seasonId: id(3) }, deps)).toEqual({
+      ok: false,
+      error: { code: 'not-allowed' },
+    });
+    expect(db.state.seasons.map((s) => s.isCurrent)).toEqual([false, true, true]);
+  });
+
+  it('refuses even that admin while the league is archived or suspended (U-9)', async () => {
+    for (const status of ['archived', 'suspended'] as const) {
+      const { db, deps, as } = memoryLeagues({ seasons, grants: [programAdminGrant] });
+      if (db.state.league !== undefined) db.state.league = { ...db.state.league, status };
+      expect(await setCurrentSeason(as(programAdminId), { seasonId: id(2) }, deps)).toEqual({
+        ok: false,
+        error: { code: 'not-allowed' },
+      });
+    }
   });
 });

@@ -41,6 +41,7 @@ async function heldGrant(tx: AccessTx, accountId: string, role: Role, scope: Sco
 
 export const acceptInvitation = defineCommand({
   name: 'access.accept_invitation',
+  permission: 'signed-in',
   input: z.object({ token: invitationTokenSchema }),
   allowed: (context, _input, tx: AccessTx) => isSignedInHere(context, tx),
   run: async ({
