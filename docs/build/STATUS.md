@@ -24,7 +24,6 @@ Next free: migration 0012, record 033, T-245 (0011 / 031 / T-243 belong to 1.14;
 - **1.14 Sign-in flows** — `.local/lanes/1.14-signin-flows` — migration 0011 (unused so far), record 031 / T-243 — built (541dfc0, 103f385); security review found 2 high faults (open redirect via next=, spoofable X-Forwarded-For) and 6 more; ALL 8 are now fixed in the lane (head dc03926, build branch merged in; verify green apart from load flakes; new setting TRUSTED_PROXY, T-69/T4 §3 reworded, T-243 still to add to DECISIONS.md). Then: independent re-review of the fixes (opus), gate, land.
 - **1.27 Sturdy timing tests** — `.local/lanes/1.27-sturdy-tests` — none — builder working; no report yet.
 - **1.21 Seed leagues** — `.local/lanes/1.21-seed-leagues` — none — builder starting.
-- **1.20 part 2 Health checks** — `.local/lanes/1.20-health-checks` — none — builder starting.
 - **2.24 Standings and totals on every result** — `.local/lanes/2.24-standings-on-results` — none (T-245 if needed) — builder starting.
 - **2.20 Schedule draft commands** — `.local/lanes/2.20-draft-commands` — none — builder starting.
 
@@ -48,6 +47,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 1.20 part 2 done: GET /api/v1/health (web, 200/503, no-store, fixed words only, T-86) and the worker heartbeat plus GET/HEAD /health server (apps/worker/src/health.ts). Open: nothing calls the worker's beat() or startHealthServer yet (the step that builds the worker's start-up file must); no jobs-waiting / oldest-job count (T-142); web health is 503 in staging/production until sign-in is wired (1.14, 1.15), so set no uptime alarm yet. Gate: all stages pass apart from load flakes.
 - 2026-11-13 — Step 2.19 done: rosters commands (add, update, remove, reorder) landed. people.remove_person checks roster membership unlocked; reorder_roster returns {count, versions}. Gate: node and web checks pass; vitest passes apart from load flakes (isolation-cases took 216 s under load against a 90 s limit; run-migrations lock test counts exactly 4 tries and can see 3; live-stats tests collide on port 4193 when lanes run at once; a hosted-backup test hit 'Query read timeout' once in the main gate and passed alone). Step 1.27 is the fix.
 - 2026-11-13 — Step 2.4 done: migration 0010 (live game, calculated and import tables), record 030 / T-242; reviewer's findings fixed (takeover deletes and re-inserts the scoring session, scored games cannot be binned, walk-up roster entries must join a team in that game, standings rows match their team's division). For later steps: takeover command must delete+insert in one transaction; commands must never bin a scored or decided game; a team changing division needs its standings rebuilt. Gate: all vitest tests passed apart from load flakes.
 - 2026-11-13 — promote-to-main refused: 'files the live site is built from differ from main (packages/contracts/src/live-stats.ts, packages/sports/src/basketball/live.ts)': these are step 2.66's allowed changes; main left alone, the tracker has to be checked before main moves.
