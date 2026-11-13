@@ -22,7 +22,6 @@ One line per open lane. A run that is cut off leaves this as the map for the nex
 Next free: migration 0012, record 034, T-246 (0011 / 031 / T-243 belong to 1.14; 0010 / 030 / T-242 to 2.4).
 
 - **2.39 Public queries for the schedule, teams and rosters** — `.local/lanes/2.39-public-schedule-queries` — none — built (2 commits), gate green apart from a since-fixed isolation case. Then: catch up with build/stage-1, independent review (sonnet), gate, land.
-- **2.21 Publishing the schedule** — `.local/lanes/2.21-publish` — none (no migration; T-246 / record 034 if needed) — opened.
 - **2.22 Fixture import** — `.local/lanes/2.22-fixture-import` — none (no migration; record 034 / T-246 if needed) — opened.
 - **2.25 Adjustments and the rule-change preview** — `.local/lanes/2.25-adjustments` — none (no migration; record 035 / T-247 if needed) — opened.
 
@@ -47,6 +46,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 2.21 done (no migration): scheduling.preview_schedule_publish and scheduling.publish_schedule share one plan; publish claims the draft first, creates/moves/bins games (never live or final ones), writes the revision, all in one transaction; a second publish from the same revision is refused. Notes for 2.53: a consumed draft answers revision-out-of-date (treat as "someone else published, reload"); a moved postponed/cancelled game keeps its status (check P7 §4.4 before 2.53 relies on it); skipped dates are not stored; two truly concurrent publishes are argued safe (row lock on the draft delete, unique revision number) but untested. Passed GitHub and review.
 - 2026-11-13 — Step 2.40 done: public queries for standings, statistics, leaders, team records and the game page (core standings/games queries, database read stores). Review fixes: mixed-team players recomputed from visible teams' box score lines; reads find only active or completed seasons (a draft season is not there); correction dates in the league time zone; stat totals skip non-integers. Its first two GitHub checks failed with no visible cause and passed after build/stage-1 was merged in (the cause was not found: the same code passed every step here; treat as a flaky check). Open: minimum-games setting (2.14), name policy source.
 - 2026-11-13 — Step 1.27 proof so far: the same commit (1a5250a) passed GitHub 4 times and failed once, in npm run test:pages:browser (the fixed 15-30 s waits in scripts/check-pages-browser.mjs, outside the step's folders). 1.27 stays unticked; a small step is needed to make that browser check wait for what it tests.
 - 2026-11-13 — Founder, asked whether a new league should start with any scorekeeper able to score any game: "up to the lead". Lead: yes, the recommended value stays; a league can tighten it to assigned scorekeepers only. Recorded as A-13 in DECISIONS.md and in P4 section 4; the code note and the test title no longer say "pending". The two statistics-level starting values are still the founder's to answer.
