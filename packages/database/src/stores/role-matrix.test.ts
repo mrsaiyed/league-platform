@@ -27,14 +27,17 @@ import {
   createCourt,
   createDivision,
   createLeague,
+  createPerson,
   clearSettingFor,
   createSeason,
   createVenue,
   invite,
   listDivisions,
+  listPeople,
   listVenues,
   removeCourt,
   removeDivision,
+  removePerson,
   removeVenue,
   reorderDivisions,
   restoreCourt,
@@ -42,6 +45,7 @@ import {
   restoreVenue,
   updateCourt,
   updateDivision,
+  updatePerson,
   updateVenue,
   declaredSettings,
   defineSetting,
@@ -63,6 +67,7 @@ import {
   type Job,
   type LeaguesTx,
   type Permission,
+  type PeopleTx,
   type SchedulingTx,
   type SettingRegistry,
 } from '@srleagues/core';
@@ -77,6 +82,7 @@ import {
   newCourt,
   newDivision,
   newLeague,
+  newPerson,
   newProgram,
   newSeason,
   newVenue,
@@ -88,6 +94,7 @@ import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { divisionsStore } from './divisions-store.ts';
 import { leaguesStore } from './leagues-store.ts';
+import { peopleStore } from './people-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
 
 const actors = [
@@ -129,6 +136,7 @@ let staffId: string;
 let accessDeps: CommandDeps<AccessTx>;
 let leaguesDeps: CommandDeps<LeaguesTx>;
 let schedulingDeps: CommandDeps<SchedulingTx>;
+let peopleDeps: CommandDeps<PeopleTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
@@ -138,6 +146,7 @@ beforeAll(async () => {
     leagues: leaguesStore(scope, { platformStaff: [staffId] }),
     divisions: divisionsStore(scope),
     scheduling: schedulingStore(scope),
+    people: peopleStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));
@@ -145,6 +154,7 @@ beforeAll(async () => {
   accessDeps = { transaction, events: [], ...rest };
   leaguesDeps = { transaction, events: [], ...rest };
   schedulingDeps = { transaction, events: [], ...rest };
+  peopleDeps = { transaction, events: [], ...rest };
 });
 afterAll(async () => {
   await db.close();
@@ -533,8 +543,49 @@ const bannerSetting = defineSetting({
   label: 'setting.site.banner.label',
 });
 
+/** People belong to the league: checked league-wide (P4 §3, R-16). */
+const peopleRows: readonly Row[] = [
+  {
+    command: 'people.create_person',
+    name: 'add a person',
+    needs: 'people.manage',
+    prepare: async () => ({ input: { firstName: 'Sam', lastName: 'Ng' } }),
+    run: (c, i) => createPerson(c, i, peopleDeps),
+  },
+  {
+    command: 'people.update_person',
+    name: 'fix a person',
+    needs: 'people.manage',
+    prepare: async (league) => ({
+      input: {
+        personId: await newPerson(pglite, league.leagueId),
+        version: 1,
+        firstName: 'Renamed',
+      },
+    }),
+    run: (c, i) => updatePerson(c, i, peopleDeps),
+  },
+  {
+    command: 'people.remove_person',
+    name: 'remove a person',
+    needs: 'people.manage',
+    prepare: async (league) => ({
+      input: { personId: await newPerson(pglite, league.leagueId) },
+    }),
+    run: (c, i) => removePerson(c, i, peopleDeps),
+  },
+  {
+    command: 'people.list_people',
+    name: 'see the people list',
+    needs: 'people.read',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listPeople(c, i, peopleDeps),
+  },
+];
+
 const rows: readonly Row[] = [
   ...divisionAndVenueRows,
+  ...peopleRows,
   ...settingRows(declaredSettings),
   ...settingRows(settingRegistry([bannerSetting])),
   // League settings (P4 §6) and seasons (P4 §3): the owner and admins (O-7).

@@ -65,6 +65,7 @@ import {
   runInScope,
 } from './command-cases.test-helper.ts';
 import './divisions-venues-cases.test-helper.ts';
+import './people-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 
 registerIsolationCase({
