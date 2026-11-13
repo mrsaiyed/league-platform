@@ -18,6 +18,7 @@ States: `building` (take the next step) · `waiting-for-founder` (nothing can be
 Open lanes when work runs side by side (runbook, section 3): the step, and the folders that lane owns. Keep this true before starting builders, so a run that is cut off leaves a map.
 
 - Step 1.11 Leagues: half built and uncommitted in `packages/core/src/modules/leagues` and `packages/database/src/queries`, `stores`, `isolation`. Finish it, do not redo it.
+- Straight after 1.11 is committed, alone and before any lane opens: step 1.26, catch up with `main` (stage plan, group C). The tracker on GitHub's `main` is 8 commits newer than the one this branch has been testing against.
 
 ## Needs the founder
 

@@ -31,6 +31,7 @@ Each step is done when its done test passes, the gate passes, the independent re
 
 - [x] **1.10 The command shape.** `command(context, input, deps) → result | error` with typed results, typed expected errors, permission check, one transaction, follow-up jobs recorded in the same transaction, and the log line of T-196. Events (T-24). The command registry the harness reads. _Spec: T2 §3, T-23 to T-26, T-74, T-196. Model: opus._
 - [ ] **1.11 Leagues.** Module `leagues`: create a league (internal tool only for now), short-name rules and the blocked list (U-7), rename with forwarding, states draft, live, archived, suspended (U-9), the hidden default program (U-3, U-12), season records. _Spec: P2 §5–6, T3 §4. Model: sonnet._
+- [ ] **1.26 Catch up with main.** GitHub's `main` (already here as `origin/main`, commit 24d8bfb) is 8 commits ahead of where this branch started: the game-ready live stats tracker, its Supabase setup and its GitHub Pages site, about 57 files. Bring them in with `git merge origin/main`: no fetch, no push, never a rebase. Where both sides changed a file, keep `main`'s tracker behavior and its tests exactly, and keep this branch's new structure and gate; every test that came from `main` must pass unchanged. `supabase/site.json` names the founder's real Supabase project: nothing in the gate and nothing a run does may contact it (T-201); tests use the fake. If a script would contact it, do not run it and say so in the log. Do this alone, with a clean tree and no lanes open, straight after 1.11 is committed and before any other step. _Spec: T-16, T-201. Done test: `git log HEAD..origin/main` prints nothing; `npm run verify` passes. Model: opus, high._
 - [ ] **1.12 Access.** Module `access`: the fixed roles and their permissions (A-3, O-7), role grants with scope, invitations (create, accept, re-send, cancel, expire), removing access takes effect at once (T-75), the activity log (A-6). A test of every role against every command (T4 §12). _Spec: P4 §4, T4 §4, T3 §5. Model: opus._
 
 ### D. Sign-in
@@ -59,13 +60,14 @@ Each step is done when its done test passes, the gate passes, the independent re
 
 Which steps can be built at the same time, as lanes (runbook, section 3). Each lane runs top to bottom; lanes in the same wave run together. The lead may regroup when it sees the real files: the rule is that two open lanes never share a file.
 
-| Wave | Lane A: rules of the product          | Lane B: outside services                                         | Lane C: looks, logs, records                                                          |
-| ---- | ------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| 1    | 1.11 Leagues, then 1.12 Access        | 1.13 Sign-in interface and stand-in, then 1.15 Supabase adapter  | 1.20 Logging and errors (the library part), then 1.23 CI                              |
-| 2    | 1.16 Address builder, then 1.17 Shell | 1.19 Worker and queue (its invitation email job needs 1.12 done) | 1.18 Design values and message files (the parts that need no page first), 1.24 drafts |
-| 3    | 1.14 Sign-in flows in the web app     | 1.21 Seed leagues                                                | The rest of 1.18 and 1.20 that needed the shell (header, footer, health checks)       |
-| 4    | 1.22 Browser tests                    | 1.24 Records, finished                                           |                                                                                       |
-| 5    | 1.25 Whole-stage review, alone        |                                                                  |                                                                                       |
+| Wave | Lane A: rules of the product                                                     | Lane B: outside services                                         | Lane C: looks, logs, records                                                          |
+| ---- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 0    | 1.11 Leagues, then 1.26 Catch up with main. Nothing else is open while 1.26 runs |                                                                  |                                                                                       |
+| 1    | 1.12 Access                                                                      | 1.13 Sign-in interface and stand-in, then 1.15 Supabase adapter  | 1.20 Logging and errors (the library part), then 1.23 CI                              |
+| 2    | 1.16 Address builder, then 1.17 Shell                                            | 1.19 Worker and queue (its invitation email job needs 1.12 done) | 1.18 Design values and message files (the parts that need no page first), 1.24 drafts |
+| 3    | 1.14 Sign-in flows in the web app                                                | 1.21 Seed leagues                                                | The rest of 1.18 and 1.20 that needed the shell (header, footer, health checks)       |
+| 4    | 1.22 Browser tests                                                               | 1.24 Records, finished                                           |                                                                                       |
+| 5    | 1.25 Whole-stage review, alone                                                   |                                                                  |                                                                                       |
 
 Folders each lane owns in waves 1 and 2:
 
