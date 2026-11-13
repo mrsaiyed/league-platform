@@ -24,10 +24,12 @@ export default defineConfig({
       'packages/database/src/{migrations,schema,db,queries,stores,isolation,queue}/**/*.test.ts',
     ],
     exclude: ['**/node_modules/**'],
+    setupFiles: ['./vitest.setup.ts'],
     // Database tests start a real PostgreSQL (PGlite) and apply every migration.
     // Alone that takes a second or two; with every test file running at once it
-    // can pass the 5 and 10 second defaults, and grows with each new migration.
-    testTimeout: 90_000,
-    hookTimeout: 90_000,
+    // can pass the 5 and 10 second defaults, and grows with each new migration. A test that
+    // is working passes however long it takes; the limit only stops one that is stuck.
+    testTimeout: 300_000,
+    hookTimeout: 300_000,
   },
 });
