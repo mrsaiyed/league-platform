@@ -27,6 +27,8 @@ Next free: migration 0012, record 033, T-245 (0011 / 031 / T-243 belong to 1.14;
 - **1.27 Sturdy timing tests** — `.local/lanes/1.27-sturdy-tests` — none — builder working; no report yet.
 - **1.21 Seed leagues** — `.local/lanes/1.21-seed-leagues` — none — builder starting.
 - **1.20 part 2 Health checks** — `.local/lanes/1.20-health-checks` — none — builder starting.
+- **1.21 Seed leagues** — `.local/lanes/1.21-seed-leagues` — none — builder starting.
+- **1.20 part 2 Health checks** — `.local/lanes/1.20-health-checks` — none — builder starting.
 
 ## Needs the founder
 
