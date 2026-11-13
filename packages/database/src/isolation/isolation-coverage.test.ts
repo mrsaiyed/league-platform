@@ -7,7 +7,7 @@
 // which the apps use.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { commands } from '@srleagues/core';
+import { commands, eventHandlers } from '@srleagues/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as databasePackage from '../../index.ts';
 import {
@@ -64,6 +64,11 @@ const reachNoLeagueData = new Map<unknown, string>([
     'binds the division queries, each with its own cases, to a scope',
   ],
   [databasePackage.gamesStore, 'binds the game queries (own cases) to a scope'],
+  [databasePackage.standingsStore, 'binds the standings queries (own cases) to a scope'],
+  [
+    databasePackage.lockSeasonStandings,
+    "takes a lock keyed by the scope's own league and a season id; reads and writes no rows",
+  ],
   [databasePackage.peopleStore, 'binds the people queries (own cases) to a scope'],
   [databasePackage.schedulingStore, 'binds the venue and court queries (own cases) to a scope'],
   [currentLeague, 'turns a row already read into the returned shape; runs no SQL'],
@@ -121,16 +126,28 @@ const narrowLookups = new Map<unknown, string>([
 const commandsIn = (found: readonly ExportedFunction[]) =>
   found.filter((f) => typeof (f.value as { commandName?: unknown }).commandName === 'string');
 
+type FoundHandler = { where: string; handler: { type: string; handle: unknown } };
+
 /** Exported objects shaped like an event handler (onEvent): a type and a handle. */
-const handlersIn = (scan: ScannedModules) =>
+const foundHandlers = (scan: ScannedModules): FoundHandler[] =>
   [...scan].flatMap(([file, exports]) =>
-    Object.entries(exports)
-      .filter(([, value]) => {
-        const handler = value as { type?: unknown; handle?: unknown } | null;
-        return typeof handler?.type === 'string' && typeof handler.handle === 'function';
-      })
-      .map(([name]) => `${file}: ${name}`),
+    Object.entries(exports).flatMap(([name, value]) => {
+      const handler = value as { type?: unknown; handle?: unknown } | null;
+      return typeof handler?.type === 'string' && typeof handler.handle === 'function'
+        ? [{ where: `${file}: ${name}`, handler: { type: handler.type, handle: handler.handle } }]
+        : [];
+    }),
   );
+const handlersIn = (scan: ScannedModules) => foundHandlers(scan).map((f) => f.where);
+
+/** Handlers found with no case of their own, or missing from core's eventHandlers. */
+const handlersUncovered = (found: readonly FoundHandler[]) => {
+  const listed = new Set<unknown>(eventHandlers.map((h) => h.handle));
+  const cased = subjects();
+  return found
+    .filter(({ handler }) => !listed.has(handler.handle) || !cased.has(handler.handle))
+    .map((f) => f.where);
+};
 
 let modules: ScannedModules;
 let functions: ExportedFunction[];
@@ -170,15 +187,31 @@ describe('every query and command is in the two-league harness (T-65)', () => {
     expect([...commands.values()].filter((c) => !found.has(c))).toEqual([]);
   });
 
-  it('finds no event handler in core yet, since the harness runs none', () => {
-    // When the first handler lands, pass the app's handler list to the command cases
-    // (registerCommandCase's `events`), then replace this check with one that every
-    // handler found is in that list.
-    expect(handlersIn(coreModules)).toEqual([]);
+  it("every event handler in core is in core's eventHandlers, which the command cases run, and has a case", () => {
+    const found = foundHandlers(coreModules);
+    expect(found.map((f) => f.where)).toEqual(
+      expect.arrayContaining([
+        '../core/src/modules/standings/on-game-result.ts: rebuildOnGameFinalized',
+      ]),
+    );
+    expect(handlersUncovered(found)).toEqual([]);
+    // And the other way: every handler the apps run is one the scan finds.
+    const handles = new Set(found.map((f) => f.handler.handle));
+    expect(eventHandlers.filter((h) => !handles.has(h.handle)).map((h) => h.type)).toEqual([]);
+  });
+
+  it('reports a planted handler with no case and not in eventHandlers', () => {
+    const planted: ScannedModules = new Map([
+      ['../core/src/x.ts', { onRename: { type: 'leagues.name_changed', handle: () => {} } }],
+    ]);
+    expect(handlersUncovered(foundHandlers(planted))).toEqual(['../core/src/x.ts: onRename']);
   });
 
   it('names no case or reason for a function the scan does not find', () => {
-    const found = new Set([...functions, ...coreCommands].map((f) => f.value));
+    const found = new Set<unknown>([
+      ...[...functions, ...coreCommands].map((f) => f.value),
+      ...foundHandlers(coreModules).map((f) => f.handler.handle),
+    ]);
     const stale = [...subjects(), ...reachNoLeagueData.keys(), ...narrowLookups.keys()].filter(
       (f) => !found.has(f),
     );

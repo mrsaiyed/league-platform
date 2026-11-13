@@ -16,7 +16,7 @@ The session that reads this is the **lead**. The lead plans, delegates, checks e
    - The main folder should be clean and on the build branch. If it is dirty, an earlier run was cut off there. If the change is a half-finished step, finish it; prefer finishing to redoing. Only if it cannot be understood, set it aside with `git stash push -u -m "rescue <date and time>"`, note that in `STATUS.md`, and redo the step. Never use a bare `git stash` or `git stash pop`: the stash list is shared with every lane. Never discard work silently.
    - Every folder under `.local/lanes/` is a step that was being built when the last run ended. Its work is on its lane branch and in its folder. Carry each one on from where it stands (section 3). Do not start it again.
    - A lane branch with no folder, or a lane with nothing on it, is leftover. Remove it (`git worktree remove`, `git worktree prune`, `git branch -D lane/<step>`) only after checking that it holds nothing that has not landed.
-6. Run the gate named in `STATUS.md` once in the main folder. If it fails on a clean tree, fixing that is the first job of the run.
+6. See what GitHub found on the build branch: `node scripts/github-check.mjs <build branch>`. If it says FAILED, fixing that is the first job of the run, before any lane is opened or landed. If it says this computer's newest commit has not been checked, push the build branch (if pushing is allowed) and carry on. Only when GitHub cannot be reached, run the gate named in `STATUS.md` once in the main folder instead; if it fails on a clean tree, fixing that is the first job of the run.
 7. **See whether the live tracker has moved.** Run `git fetch origin main`. If `git log HEAD..origin/main` prints anything, someone has changed the tracker on `main`. Add a catch-up step to the current stage plan, shaped like step 1.26 in the stage 1 plan, and give it a lane first.
 8. **Fill the lanes** (section 3) before doing anything else by hand.
 
@@ -31,13 +31,13 @@ A stage plan lists steps. Each step says what it **needs**: the steps that must 
 Every step goes through the same six things:
 
 1. **Brief.** The lead reads the spec sections the step names (not from memory) and writes the brief: the lane folder, the spec sections, the done test, what must not be touched, and any numbers reserved for it (section 3).
-2. **Build.** A builder sub-agent works in the step's lane and commits there as it goes. It is finished when the step's done test and the whole gate pass in the lane. If a step looks larger than about 400 changed lines of real code, split it into parts and write the split into the stage plan first.
-3. **Check.** The lead reads the diff (`git diff <build branch>...lane/<step>`) and looks at the gate result. A sub-agent's report is a claim, not proof.
+2. **Build.** A builder sub-agent works in the step's lane and commits there as it goes. It is finished when the step's done test and the quick checks pass in the lane (section 3 says which). The whole gate is then run for the lane on GitHub's machines, not on this computer. If a step looks larger than about 400 changed lines of real code, split it into parts and write the split into the stage plan first.
+3. **Check.** The lead reads the diff (`git diff <build branch>...lane/<step>`) and reads GitHub's check of the lane (`node scripts/github-check.mjs lane/<step>`, section 3). A sub-agent's report is a claim, not proof.
 4. **Independent review.** A fresh sub-agent that did not write the change and has not seen how it was written. Give it only the diff, the spec sections and this instruction: "Find faults. Check it against the spec and against the rules in CLAUDE.md. List concrete problems with file and line, or say there are none." Every finding is fixed by a builder in the same lane, or answered in one line in the commit message. (T-181.)
 5. **Land.** The lead brings the lane onto the build branch as one commit (section 3), with a message that says what changed and which decision IDs it carries out. End the message with the attribution line your session was given.
 6. **Record.** Tick the step in its stage plan (a step built in parts is ticked when its last part lands), add one line to the log in `STATUS.md`, update "In progress", rewrite the lock time, run `node scripts/build-dashboard.mjs`, and push if allowed (below). After the push, run `node scripts/promote-to-main.mjs` (section 7): GitHub counts only `main` in the founder's statistics, so `main` follows the build after every landing, not only at the end of a run.
 
-**Push, only if allowed.** If the "Pushing to GitHub" line in `STATUS.md` starts with `allowed`, run `git push origin <build branch>` after each landing. Only the build branch: never `main`, never a lane branch, never with force. If that line says anything else, do not push. A push that fails (no network, sign-in needed) is noted in the log and never retried in a loop.
+**Push, only if allowed.** If the "Pushing to GitHub" line in `STATUS.md` starts with `allowed`: run `git push origin <build branch>` after each landing, and push a lane branch when its builder reports done so that GitHub checks it (section 3). Never `main`, never a tag, never with force. If that line says anything else, do not push. A push that fails (no network, sign-in needed) is noted in the log and never retried in a loop.
 
 ## 3. Lanes: many steps at once
 
@@ -78,13 +78,21 @@ Every builder's brief says, in these words or close to them:
 - Commit to your lane branch as you go: one commit for each part that works by itself (an interface, a table, a command with its test, a page). Each commit must type-check and pass its own package's tests, and its message says what that part is and why, in plain words, ending with the attribution line you were given. No "wip" messages: these commits are kept and the founder reads them on GitHub. A cut-off run must not lose your work. Never push, never switch branches, never use `git stash`.
 - Use only the numbers reserved for you. If you need one you were not given, stop and say so.
 - Several other builders are working on this computer at the same moment. Never stop processes by name (`pkill`, `taskkill`, "kill every node"): that stops their checks too. Stop only a process you started, by its own id. Never write a file outside your lane folder, not even a log. Change files with the editing tool, not with `sed -i`.
-- You are done when the step's done test and `npm run verify` pass in your lane. Report what you built, what you left out and why, and anything the lead should know.
+- You are done when the step's done test passes and these pass in your lane: `npm run check`, `npm run typecheck`, `npm run format:check`, and the test files of everything you changed and of everything that uses what you changed, run by name (for example `npx vitest run <files>` or `node --test <file>`). Do NOT run `npm run verify` or a whole test suite in the lane: six lanes doing that at once is what makes this computer crawl and makes sound tests time out. GitHub's machines run the whole gate on your lane after you report. Report what you built, what you left out and why, the test files you ran, and anything the lead should know.
 
 Start all the builders you are opening in one message, so they run together. While they work, the lead checks, reviews and lands other lanes.
 
 ### Checking and reviewing a lane
 
-When a builder reports done: read its diff, then start its independent reviewer at once (read-only, given the diff and the spec sections). Do not wait for other lanes. Findings go back to a builder working in the same lane.
+When a builder reports done: read its diff, push its lane branch so GitHub checks it, and start its independent reviewer at once (read-only, given the diff and the spec sections). Do not wait for other lanes. Findings go back to a builder working in the same lane.
+
+**The whole gate runs on GitHub's machines, not here** (decided by the lead, 2026-11-13). This computer is at its limit with six lanes: a whole gate takes 12 to 24 minutes here against about 7 on GitHub, and on 2026-11-13 a real failure hid for 35 minutes behind a timeout that was written off as the computer being busy. So:
+
+- When a builder reports done: `git push origin lane/<step>` (only if pushing is allowed; the lead pushes, builders never do). GitHub then runs `npm run verify` and the browser checks on that commit, on a machine doing nothing else.
+- Read the result with `node scripts/github-check.mjs` (one line for the build branch and each lane) or `node scripts/github-check.mjs lane/<step>` (what failed and why). It only reads. GitHub answers about 60 questions an hour from this computer, so ask once a push has had about seven minutes, never in a loop; use the wait to brief, review and land other lanes.
+- **A lane lands only when GitHub PASSED its newest commit.** After review fixes, push the lane again and read the new result.
+- To have the same commit checked a second time without a new commit: `git push origin lane/<step>:refs/heads/lane/<step>-again`, read that branch's line, then `git push origin --delete lane/<step>-again`.
+- If GitHub cannot be reached at all, fall back to the old way for that lane: `npm run verify` in the lane, one lane at a time.
 
 A reviewer's brief names the lane folder and says: read the lane's files there, or with `git show <lane branch>:<file>` and `git diff <build branch>...<lane branch>`. Never run `git checkout`, `git switch` or `git stash` anywhere, least of all in the main folder: the lead is working there, and switching its branch would pull the ground from under every landing. On 2026-11-13 three reviewers tried exactly that and only the app's safety check stopped them.
 
@@ -94,11 +102,11 @@ The app's safety check refuses a handful of commands a day. That is expected and
 
 The lead lands lanes one at a time, in the main folder. Nobody else writes to the build branch.
 
-1. **Catch the lane up.** In the lane: `git merge <build branch>`, to take in what has landed since the lane opened. If that brings anything in, the gate must pass in the lane again. Conflicts are settled in the lane, by a builder for that lane, never in the main folder. Generated files (the database types) are made again by their generator, not merged by hand.
+1. **Catch the lane up.** In the lane: `git merge <build branch>`, to take in what has landed since the lane opened. If it merges cleanly, run `npm run check` and `npm run typecheck` in the lane and go on: GitHub checks the combination on the build branch right after the landing. If there are conflicts, they are settled in the lane, by a builder for that lane, never in the main folder, and the lane is pushed and must PASS on GitHub again before it lands. Generated files (the database types) are made again by their generator, not merged by hand.
 2. **Bring it over with its commits.** In the main folder: `git merge --no-ff lane/<step> -m "<the step's message>"`. The lane's own commits are kept, so the history shows the step being built part by part, and the merge commit names the step and the decision IDs it carries out. The founder asked for frequent commits (2026-11-13): several small, sound commits for a step are better than one large one. Before landing, read the lane's commit list (`git log --oneline <build branch>..lane/<step>`): if a message is unclear or says "wip", have the builder reword it in the lane first.
-3. **Check the result.** If `package-lock.json` changed, run `npm ci` in the main folder. Then run the gate in the main folder. It takes about two and a half minutes; use them to brief the next lane.
-4. **Record and push** (section 2, item 6).
-5. **Close the lane.** `git worktree remove ".local/lanes/<step>"` and `git branch -D "lane/<step>"`.
+3. **Check the result.** If `package-lock.json` changed, run `npm ci` in the main folder. Then run `npm run check` and `npm run typecheck` in the main folder (about a minute). Do not run the whole gate here: GitHub runs it on the build branch as soon as you push, and that result is what lets `main` move.
+4. **Record and push** (section 2, item 6). Lanes that have PASSED on GitHub can be landed one after another without waiting for GitHub in between. But read what the promote script prints after each push: if it, or `node scripts/github-check.mjs <build branch>`, says GitHub's checks FAILED on the build branch, stop landing. Find what failed (`node scripts/github-check.mjs <build branch>` names the step and the tests), fix it in the main folder or through a builder, push, and land nothing more until the build branch has PASSED again. A red build branch stops `main`, and every lane opened from it inherits the fault.
+5. **Close the lane.** `git worktree remove ".local/lanes/<step>"`, `git branch -D "lane/<step>"` and, if the lane was pushed, `git push origin --delete "lane/<step>"`.
 
 ### Inside one step
 
@@ -112,7 +120,7 @@ A large step can also be split among builders inside its lane, when their files 
 
 ### When it goes wrong
 
-- **A test that fails only when the machine is busy.** Several gates running at once make timing-sensitive tests fail. Run the failing test file once more by itself. If it passes, it is a flaky test: note it in the log and open a small step to make it sturdy. Never delete or weaken it.
+- **A test that fails here but not on GitHub.** Several lanes working at once make timing-sensitive tests fail or time out on this computer. GitHub's check is the judge. A failure here may be put down to the busy computer only when the same test file, run by itself, passes: passes, not times out. A test that timed out has proved nothing. A failure on GitHub is never the computer being busy. If a check fails on GitHub in a step the change cannot have touched, and passes when the same commit is checked again, it is a flaky check: note it in the log and open a small step to make it sturdy. Never delete or weaken it.
 - **A lane fails the gate twice for its own reasons.** The lead takes that step over itself, or closes the lane and splits the step smaller.
 - **A step that will not come right.** Nobody is here to ask. If a step has been tried in two runs and still does not pass, park it: keep its lane branch, write what was tried and what fails under "Needs the founder" in `STATUS.md`, mark the step in its plan as parked, and give the lane to another step. Do not spend a third run on it.
 - **Something outside the build is broken** (GitHub refuses a push, the network is down, a tool is missing). Note it in the log once, carry on with everything that does not need it, and try it again at the start of the next run. Never change a setting, a sign-in or a permission to get past it.
@@ -149,8 +157,9 @@ Rules for delegating:
 
 ## 6. What a run must never do
 
-- Commit to `main`, merge into `main`, push `main` by hand, or open a pull request. `main` is the live Al-Hadi site. The only way `main` ever moves is `node scripts/promote-to-main.mjs` (section 7), which refuses unless it is safe.
-- Push anything, unless the "Pushing to GitHub" line in `STATUS.md` starts with `allowed`; and then only the build branch, never a lane branch, never with force.
+- Commit to `main`, merge into `main`, push `main` by hand, or open a pull request. `main` is the branch the live Al-Hadi site is published from. The only way `main` ever moves is `node scripts/promote-to-main.mjs` (section 7), which refuses unless it is safe.
+- Release the live tracker. Never run that script with `--release-tracker`, never change `.github/workflows/demo-pages.yml` or `.github/workflows/keep-supabase-awake.yml`, and never add a workflow that publishes the site or uses the live database's address. Those files decide what people at a real game see. Only the lead changes them, in a session the founder started.
+- Push anything, unless the "Pushing to GitHub" line in `STATUS.md` starts with `allowed`; and then only the build branch and, for checking, lane branches. Never `main`, never a tag, never with force.
 - Touch production, a vendor dashboard, real people's data or any secret.
 - Change `apps/live-stats`, `packages/sports` or the Al-Hadi data except where a stage plan says to.
 - Weaken or delete a test to make the gate pass, or skip a hook.
@@ -165,9 +174,9 @@ When one of the real reasons holds:
 
 1. Stop opening lanes. Let builders that are close to done finish; tell the others to commit where they are.
 2. Land every lane that is built and reviewed. Every other lane keeps its folder and its branch, with its work committed there, for the next run.
-3. Make sure the main folder is clean and its last commit passes the gate.
+3. Make sure the main folder is clean, its last commit is pushed, and GitHub has PASSED it or is still checking it (`node scripts/github-check.mjs <build branch>`). If GitHub FAILED it and there is no time left to fix it, say so in the log in plain words: it is the next run's first job.
 4. Update `STATUS.md`: what landed this run, and under "In progress" each lane still open with what is left to do in it.
-5. **Move `main` forward if it is safe.** Run `node scripts/promote-to-main.mjs` once more (it is also run after every landing, section 2). It moves GitHub's `main` up to the newest build commit only when the move is a plain fast-forward, nothing the live tracker is built from differs, GitHub's checks have passed on that exact commit, no game is within 24 hours, and `STATUS.md` allows it. It picks the newest commit GitHub has finished checking, so `main` is usually one landing behind, which is fine. This is what makes the founder's commits count in GitHub's statistics. Copy the one line it prints into the log at the end of a run, and during a run only when it refuses for a new reason. If it refuses, leave `main` alone: never work around it.
+5. **Move `main` forward if it is safe.** Run `node scripts/promote-to-main.mjs` once more (it is also run after every landing, section 2). It moves GitHub's `main` up to the newest build commit only when the move is a plain fast-forward, GitHub's checks have passed on that exact commit, `STATUS.md` allows it, and no workflow that reaches the live tracker differs from `main`'s. The live tracker is built from one fixed commit named in `.github/workflows/demo-pages.yml`, so this move does not touch it, whatever the build changed and whether or not a game is near. It picks the newest commit GitHub has finished checking, so `main` is usually one landing behind, which is fine. This is what makes the founder's commits count in GitHub's statistics. Copy the one line it prints into the log at the end of a run, and during a run only when it refuses for a new reason. If it refuses, leave `main` alone: never work around it, and never pass `--release-tracker` (section 6).
 6. Delete `docs/build/.lock` and run `node scripts/build-dashboard.mjs`.
 7. Reply with three or four plain lines: what landed, what is open, what is waiting on the founder.
 
