@@ -81,3 +81,8 @@ export { listPostponedGames } from './list-postponed-games.ts';
 export { updateGameResult } from './update-game-result.ts';
 export { listDecidedGames } from './list-decided-games.ts';
 export { listDecidedGameLines } from './list-decided-game-lines.ts';
+export { listTableTeams } from './list-table-teams.ts';
+export { listStandingsAdjustments } from './list-standings-adjustments.ts';
+export { lockSeasonStandings } from './lock-season-standings.ts';
+export { replaceStandingsRows } from './replace-standings-rows.ts';
+export { replaceSeasonPlayerTotals } from './replace-season-player-totals.ts';

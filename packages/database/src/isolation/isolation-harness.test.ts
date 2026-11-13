@@ -1,16 +1,22 @@
 // The harness catches what it is for: planted leaky reads and writes, a leak that
 // names nothing, an error naming the other league, a policy hole, a case that
 // commits, a case that cannot reach its target, planted leaky commands and jobs, and
-// a command refused in its own league. A refusal is not a leak, and nor is a new
-// id or time; a time the rows already held is still compared.
+// a command refused in its own league, commands running their events' handlers, and
+// planted leaky handlers. A refusal is not a leak, and nor is a new id or time; a
+// time the rows already held is still compared.
 import {
   defineCommand,
   ok,
+  onEvent,
+  rebuildOnGameFinalized,
+  recordFinalScore,
   setLeagueName,
   type Command,
   type CommandContext,
   type CommandError,
   type CommandTx,
+  type DomainEvent,
+  type EventHandler,
   type JobQueue,
   type Result,
 } from '@srleagues/core';
@@ -18,9 +24,21 @@ import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withFenceSetTo } from '../db/db.test-helper.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
+import { withTransaction } from '../db/with-transaction.ts';
 import { z } from 'zod';
-import { findCurrentLeague, findProgramBySlug, listPrograms } from '../queries/index.ts';
-import { harnessTx, runInScope } from './command-cases.test-helper.ts';
+import {
+  findCurrentLeague,
+  findProgramBySlug,
+  listPrograms,
+  listTableTeams,
+} from '../queries/index.ts';
+import {
+  harnessTx,
+  runAsApp,
+  runHandler,
+  runInScope,
+  type HarnessTx,
+} from './command-cases.test-helper.ts';
 import { findIsolationFailures } from './isolation-harness.test-helper.ts';
 import type { IsolationCase } from './isolation-registry.test-helper.ts';
 import { openTwoLeagues, type LeagueRecords, type TwoLeagues } from './two-leagues.test-helper.ts';
@@ -314,6 +332,105 @@ describe('the harness, with commands (step 1.10)', () => {
         run: 'control',
         problem: "refused in the target's own league: leagues.set_name refused: changed-since-read",
       },
+    ]);
+  });
+
+  it('runs the handlers of the events a command announces, in its transaction', async () => {
+    // Recording the target's upcoming game's score in its own league rebuilds that
+    // season's standings through the standings handler, and so reaches its rows.
+    const scored = await withTransaction(
+      leagues.db,
+      { leagueId: leagues.b.leagueId, accountId: leagues.b.ownerId },
+      async (scope) => {
+        const before = await listTableTeams(scope, leagues.b.seasonId);
+        await runAsApp(recordFinalScore, harnessTx, scope, {
+          gameId: leagues.b.upcomingGameId,
+          version: 1,
+          homeScore: 60,
+          awayScore: 55,
+        });
+        const { rows } = await sql<{ n: number }>`
+          select count(*)::int as n from standings_rows
+          where league_id = ${leagues.b.leagueId} and season_id = ${leagues.b.seasonId}`.execute(
+          transactionOf(scope),
+        );
+        // Rolled back: the harness's leagues are shared by every test here.
+        throw Object.assign(new Error('roll back'), { counted: rows[0]?.n, teams: before.length });
+      },
+    ).catch((error: unknown) => error as { counted?: number; teams?: number });
+    // Seeded with one row; every team of the season has one now.
+    expect(scored.counted).toBe(scored.teams);
+    expect(scored.counted).toBe(2);
+  });
+});
+
+describe('the harness, with event handlers (step 2.24)', () => {
+  const handlerCase = (handler: EventHandler<HarnessTx>): IsolationCase => ({
+    subject: handler.handle,
+    name: handler.type,
+    compareWrites: true,
+    run: (scope, target) =>
+      runHandler(handler, harnessTx, scope, {
+        type: handler.type,
+        leagueId: scope.leagueId,
+        gameId: target.gameId,
+        seasonId: target.seasonId,
+      } as DomainEvent),
+  });
+
+  it('passes the real standings handlers', async () => {
+    expect(await check(handlerCase(rebuildOnGameFinalized))).toEqual([]);
+  });
+
+  it('catches a planted handler that writes a total over every league into its own', async () => {
+    // The leak names nothing of the other league: it counts every league's final games
+    // (no league filter) into the scope's own standings.
+    const leaky = onEvent<DomainEvent, HarnessTx>('games.finalized', async (_event, tx) => {
+      const scope = (tx as HarnessTx & { scope?: LeagueScope }).scope;
+      if (scope === undefined) throw new Error('planted handler needs its scope');
+      await sql`update standings_rows set wins = (select count(*) from games where status = 'final')
+                where league_id = ${scope.leagueId}`.execute(transactionOf(scope));
+    });
+    const withScope = (scope: LeagueScope, jobs: JobQueue) => ({
+      ...harnessTx(scope, jobs),
+      scope,
+    });
+    const entry: IsolationCase = {
+      subject: leaky.handle,
+      name: 'count every final game',
+      compareWrites: true,
+      run: (scope, target) =>
+        runHandler(leaky, withScope, scope, {
+          type: 'games.finalized',
+          leagueId: scope.leagueId,
+          seasonId: target.seasonId,
+        } as DomainEvent),
+    };
+    expect(await check(entry)).toEqual([
+      {
+        run: 'code-only',
+        problem:
+          "writes differently once league bravo's rows are gone: league alpha's standings_rows",
+      },
+    ]);
+  });
+
+  it("catches a planted handler that records a job naming the other league's records", async () => {
+    const leaky = onEvent<DomainEvent & { seasonId: string }, HarnessTx>(
+      'games.finalized',
+      async (event, tx) => {
+        await tx.jobs.enqueue({
+          type: 'notify.event',
+          leagueId: event.leagueId,
+          ids: { seasonId: event.seasonId },
+        });
+      },
+    );
+    const leak = `returned "${leagues.b.seasonId}" of league bravo`;
+    // A run that may not write the job's league (row-level security) is refused, not leaky.
+    expect(await check(handlerCase(leaky))).toEqual([
+      { run: 'app', problem: leak },
+      { run: 'code-only', problem: leak },
     ]);
   });
 });

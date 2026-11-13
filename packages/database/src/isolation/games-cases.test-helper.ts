@@ -18,7 +18,7 @@ import {
   updateGameResult,
 } from '../queries/index.ts';
 import type { LeagueScope } from '../db/transaction-scope.ts';
-import { harnessTx, registerCommandCase, runInScope } from './command-cases.test-helper.ts';
+import { harnessTx, registerCommandCase, runAsApp } from './command-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
@@ -123,6 +123,6 @@ registerIsolationCase({
   name: "list the scope's postponed games after postponing the target's",
   run: async (scope, target) => {
     await postponeTargetGame(scope, target);
-    return runInScope(listPostponedGamesCommand, harnessTx, scope, {});
+    return runAsApp(listPostponedGamesCommand, harnessTx, scope, {});
   },
 });
