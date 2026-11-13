@@ -13,6 +13,7 @@ const reads = new Set([
   'access.my_access',
   'leagues.list_divisions',
   'people.list_people',
+  'games.list_postponed_games',
   'leagues.get_season',
   'scheduling.list_venues',
   'teams.list_roster',

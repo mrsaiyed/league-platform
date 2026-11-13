@@ -20,6 +20,7 @@ import { constraintOf } from '../queries/constraint-of.ts';
 import { currentLeague } from '../queries/find-current-league.ts';
 import { leagueStatusOf } from '../queries/league-status-of.ts';
 import { divisionSummary } from '../queries/division-summary.ts';
+import { gameSummary } from '../queries/game-summary.ts';
 import { personSummary, personSummaryWithSensitive } from '../queries/person-summary.ts';
 import { rosterEntrySummary } from '../queries/roster-entry-summary.ts';
 import { teamSummary } from '../queries/team-summary.ts';
@@ -45,6 +46,7 @@ const coreScanned = ['../core/index.ts', '../core/src'];
 /** Exported functions that read or write no league data, and why. */
 const reachNoLeagueData = new Map<unknown, string>([
   [programSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [gameSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [personSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [personSummaryWithSensitive, 'turns a row already read into the returned shape; runs no SQL'],
   [divisionSummary, 'turns a row already read into the returned shape; runs no SQL'],
@@ -57,6 +59,7 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.divisionsStore,
     'binds the division queries, each with its own cases, to a scope',
   ],
+  [databasePackage.gamesStore, 'binds the game queries (own cases) to a scope'],
   [databasePackage.peopleStore, 'binds the people queries (own cases) to a scope'],
   [databasePackage.schedulingStore, 'binds the venue and court queries (own cases) to a scope'],
   [currentLeague, 'turns a row already read into the returned shape; runs no SQL'],

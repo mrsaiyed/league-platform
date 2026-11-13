@@ -74,3 +74,8 @@ export type { DivisionSummary } from './division-summary.ts';
 export type { CourtSummary, VenueSummary } from './venue-summary.ts';
 export type { ProgramSummary } from './program-summary.ts';
 export { writeSettingValue, type SettingPlaceRow } from './write-setting-value.ts';
+export { findGame } from './find-game.ts';
+export { gameSummary } from './game-summary.ts';
+export { insertGameCorrection } from './insert-game-correction.ts';
+export { listPostponedGames } from './list-postponed-games.ts';
+export { updateGameResult } from './update-game-result.ts';
