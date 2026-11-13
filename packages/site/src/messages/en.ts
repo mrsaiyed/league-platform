@@ -211,6 +211,38 @@ export const en = {
   'error.scheduling.get_schedule_draft.season-not-found': 'That season is not there.',
   'error.scheduling.get_schedule_draft.draft-unreadable':
     'The saved schedule draft cannot be read. Discard it and start again.',
+  // Why publishing the schedule, or previewing it, was refused (P7 §4.4, T-187).
+  'error.scheduling.publish_schedule.season-not-found': 'That season is not there.',
+  'error.scheduling.publish_schedule.draft-not-found': 'There is no schedule draft to publish.',
+  'error.scheduling.publish_schedule.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.publish_schedule.changed-since-read':
+    'Someone else changed or published the schedule draft since you opened it. Reload it to see the latest.',
+  'error.scheduling.publish_schedule.revision-out-of-date':
+    'The schedule was published since this draft was started. Discard the draft and start again from the published schedule.',
+  'error.scheduling.publish_schedule.nothing-to-publish':
+    'The draft changes nothing in the published schedule, so there is nothing to publish.',
+  'error.scheduling.publish_schedule.change-no-longer-fits':
+    'Some edits in the draft no longer fit the schedule (a game they name is gone). Fix or discard the draft.',
+  'error.scheduling.publish_schedule.game-already-started':
+    'The draft changes a game that is already live or has a final result. Games like that are corrected, not moved or removed.',
+  'error.scheduling.publish_schedule.game-cannot-be-removed':
+    'The draft removes a game that has been scored, which cannot be removed.',
+  'error.scheduling.publish_schedule.game-id-taken':
+    'A game the draft adds already exists (it may be in the bin or have no date).',
+  'error.scheduling.publish_schedule.game-without-time':
+    'A game in the draft has no time yet. Give every added or moved game a time before publishing.',
+  'error.scheduling.publish_schedule.unknown-team':
+    'A game in the draft names a team that is no longer in this season.',
+  'error.scheduling.publish_schedule.unknown-venue':
+    'A game in the draft names a venue that is no longer there.',
+  'error.scheduling.publish_schedule.unknown-court':
+    'A game in the draft names a court that is not at its venue.',
+  'error.scheduling.preview_schedule_publish.season-not-found': 'That season is not there.',
+  'error.scheduling.preview_schedule_publish.draft-not-found':
+    'There is no schedule draft to publish.',
+  'error.scheduling.preview_schedule_publish.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
   // Activity log lines (A-6, T-226): the key is `activity.` and the command's name;
   // the values come from the entry's details. {role} is a role's name from above.
   'activity.access.invite': 'Invited someone as {role}',
@@ -257,6 +289,7 @@ export const en = {
   'activity.scheduling.change_draft_round_date': "Changed a round's date in the schedule draft",
   'activity.scheduling.set_draft_recording': 'Changed how a game is recorded in the schedule draft',
   'activity.scheduling.discard_schedule_draft': 'Discarded the schedule draft',
+  'activity.scheduling.publish_schedule': 'Published the schedule',
   'activity.scheduling.create_venue': 'Added a venue',
   'activity.scheduling.update_venue': 'Changed a venue',
   'activity.scheduling.remove_venue': 'Moved a venue to the bin',

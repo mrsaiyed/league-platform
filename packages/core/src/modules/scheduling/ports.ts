@@ -57,6 +57,43 @@ export type DraftRecord = {
   readonly version: number;
 };
 
+/** What publishing needs to know of a game that already exists, binned or dated or not. */
+export type GameFacts = {
+  readonly id: string;
+  readonly status: string;
+  readonly binned: boolean;
+  /** Whether the tracker has recorded anything for it: such a game never goes to the bin. */
+  readonly hasEvents: boolean;
+};
+
+/** A game a publication creates; it is always scheduled, with the time in the league's zone. */
+export type NewPublishedGame = {
+  readonly id: string;
+  readonly roundId: string | null;
+  readonly date: string;
+  readonly time: string;
+  readonly venueId: string | null;
+  /** The court's name at the venue; the store finds the court. */
+  readonly court: string | null;
+  readonly homeTeamId: string;
+  readonly awayTeamId: string;
+  /** How the database spells it: final, box or live. */
+  readonly captureMode: 'final' | 'box' | 'live';
+};
+
+/** What a publication changes in a game that exists; a field left out stays as it is. */
+export type PublishedGameChange = {
+  readonly slot?: Pick<NewPublishedGame, 'roundId' | 'date' | 'time' | 'venueId' | 'court'>;
+  readonly captureMode?: NewPublishedGame['captureMode'];
+};
+
+export type NewScheduleRevision = {
+  readonly number: number;
+  readonly publishedByAccountId: string | null;
+  /** A small versioned document of ids and counts only (T-220). */
+  readonly summary: unknown;
+};
+
 export type SchedulingStore = {
   /** The program a season belongs to, or undefined if the season is not in this league. */
   readonly findSeason: (seasonId: string) => Promise<{ readonly programId: string } | undefined>;
@@ -90,6 +127,36 @@ export type SchedulingStore = {
    * court by name. A round with no label is called "Round n".
    */
   readonly loadSchedule: (seasonId: string) => Promise<ScheduleState>;
+  /** The season's rules as stored (read them with upgradeSeasonRules), or undefined if the season is not in this league. */
+  readonly seasonRules: (seasonId: string) => Promise<unknown>;
+  /** The season's games with these ids, in the bin or not, dated or not. */
+  readonly gamesById: (
+    seasonId: string,
+    gameIds: readonly string[],
+  ) => Promise<readonly GameFacts[]>;
+  /** How many people are on the current rosters of these teams of the season (each counted once). */
+  readonly countPeopleOnTeams: (seasonId: string, teamIds: readonly string[]) => Promise<number>;
+  /** Creates the games (and the season's regular stage if it has none yet); divisions follow the teams. */
+  readonly insertPublishedGames: (
+    seasonId: string,
+    games: readonly NewPublishedGame[],
+  ) => Promise<void>;
+  /** Changes a game that has not started; false if it is not there, is in the bin or has started. */
+  readonly updatePublishedGame: (
+    seasonId: string,
+    gameId: string,
+    change: PublishedGameChange,
+  ) => Promise<boolean>;
+  /** Moves games that were never scored and have not been decided to the bin; how many went. */
+  readonly binPublishedGames: (seasonId: string, gameIds: readonly string[]) => Promise<number>;
+  /** Changes a round's label or date. */
+  readonly updateRound: (
+    seasonId: string,
+    roundId: string,
+    change: { readonly label?: string; readonly date?: string },
+  ) => Promise<boolean>;
+  /** Writes the season's next revision; false if its number is already taken. */
+  readonly insertRevision: (seasonId: string, revision: NewScheduleRevision) => Promise<boolean>;
   /** Which of these teams are teams of the season that are not in the bin. */
   readonly teamsOfSeason: (
     seasonId: string,
