@@ -29,4 +29,15 @@ describe('webHealth', () => {
     expect(answer.body.checks.startup).toBe('failed');
     expect(JSON.stringify(answer)).not.toContain('secret-password');
   });
+
+  it('answers 503 when started throws at once instead of rejecting', async () => {
+    const answer = await webHealth({
+      started: () => {
+        throw new Error('a setting is missing');
+      },
+      now,
+    });
+    expect(answer.httpStatus).toBe(503);
+    expect(answer.body.checks.startup).toBe('failed');
+  });
 });
