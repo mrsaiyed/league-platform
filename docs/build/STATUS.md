@@ -26,6 +26,7 @@ Next free: migration 0012, record 033, T-245 (0011 / 031 / T-243 belong to 1.14;
 - **2.24 Standings and totals on every result** — `.local/lanes/2.24-standings-on-results` — none (T-245 if needed) — builder starting.
 - **2.20 Schedule draft commands** — `.local/lanes/2.20-draft-commands` — none — builder starting.
 - **2.40 Public queries for standings, statistics and games** — `.local/lanes/2.40-public-queries` — none — builder starting.
+- **2.41 Shared display pieces** — `.local/lanes/2.41-display-pieces` — none — builder starting.
 
 ## Needs the founder
 
