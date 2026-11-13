@@ -15,10 +15,18 @@ import {
   type CaptureMode,
   type StandingsGame,
   type StandingsProblem,
+  type StandingsResult,
   type StatsGame,
 } from '@srleagues/sports';
-import { seasonResults, type GameLine, type GameRecord } from '../games/index.ts';
-import type { StandingsTx } from './ports.ts';
+import type { SeasonRules } from '@srleagues/contracts';
+import {
+  seasonResults,
+  type GameLine,
+  type GameRecord,
+  type GamesStore,
+  type SeasonResults,
+} from '../games/index.ts';
+import type { StandingsStore, StandingsTx } from './ports.ts';
 
 export type SeasonRebuilt = {
   /** Standings rows saved: one per team of the season. */
@@ -79,26 +87,39 @@ function statsGame(
   };
 }
 
-/** Rebuilds the season's standings rows and player totals; nothing if it is not here. */
-export async function rebuildSeason(tx: StandingsTx, seasonId: string): Promise<SeasonRebuilt> {
-  await tx.standings.lockSeason(seasonId);
+type Readers = {
+  readonly standings: Pick<StandingsStore, 'listTeams' | 'listAdjustments'>;
+  readonly games: Pick<GamesStore, 'findSeason' | 'listDecided' | 'listDecidedLines'>;
+};
+
+/** What the season's results give under some rules; the standings calculation, run once. */
+export type SeasonCalculation = {
+  readonly results: SeasonResults;
+  readonly games: readonly (GameRecord & { status: 'final' | 'forfeit' })[];
+  readonly standings: StandingsResult;
+};
+
+/**
+ * Works the season's standings out from its results, its teams and its adjustments,
+ * under `rules` when given (to see what a change would do) or else the season's own.
+ * Saves nothing; undefined if the season is not here.
+ */
+export async function calculateSeason(
+  tx: Readers,
+  seasonId: string,
+  rules?: SeasonRules,
+): Promise<SeasonCalculation | undefined> {
   const results = await seasonResults(tx, seasonId);
-  if (results === undefined) return { teams: 0, players: 0, problems: [] };
+  if (results === undefined) return undefined;
   const teams = await tx.standings.listTeams(seasonId);
   const adjustments = await tx.standings.listAdjustments(seasonId);
-
-  const linesByGame = new Map<string, GameLine[]>();
-  for (const line of results.lines) {
-    linesByGame.set(line.gameId, [...(linesByGame.get(line.gameId) ?? []), line]);
-  }
   const games = results.games.filter((g): g is GameRecord & { status: 'final' | 'forfeit' } =>
     decided(g.status),
   );
-
   const standings = calculateStandings({
     teams: teams.map((t) => ({ teamId: t.teamId, divisionId: t.divisionId })),
     games: games.map(standingsGame),
-    rules: results.rules,
+    rules: rules ?? results.rules,
     adjustments: adjustments.map((a) => ({
       adjustmentId: a.id,
       teamId: a.teamId,
@@ -110,8 +131,21 @@ export async function rebuildSeason(tx: StandingsTx, seasonId: string): Promise<
     })),
     coinFlips: [],
   });
+  return { results, games, standings };
+}
+
+/** Rebuilds the season's standings rows and player totals; nothing if it is not here. */
+export async function rebuildSeason(tx: StandingsTx, seasonId: string): Promise<SeasonRebuilt> {
+  await tx.standings.lockSeason(seasonId);
+  const calculation = await calculateSeason(tx, seasonId);
+  if (calculation === undefined) return { teams: 0, players: 0, problems: [] };
+  const { results, games, standings } = calculation;
   const rows = standings.tables.flatMap((table) => table.rows);
 
+  const linesByGame = new Map<string, GameLine[]>();
+  for (const line of results.lines) {
+    linesByGame.set(line.gameId, [...(linesByGame.get(line.gameId) ?? []), line]);
+  }
   const totals = seasonTotals(
     games.flatMap((game) =>
       isCaptureMode(game.captureMode)

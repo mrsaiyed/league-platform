@@ -237,6 +237,8 @@ export const en = {
   'activity.games.postpone_game': 'Postponed a game',
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
+  'activity.standings.add_adjustment': 'Added a standings adjustment',
+  'activity.standings.remove_adjustment': 'Removed a standings adjustment',
   'activity.standings.rebuild_season': "Worked out a season's standings and totals again",
   'activity.people.create_person': 'Added a person',
   'activity.people.update_person': 'Changed a person',

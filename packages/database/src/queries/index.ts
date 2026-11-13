@@ -90,6 +90,8 @@ export { listDecidedGames } from './list-decided-games.ts';
 export { listDecidedGameLines } from './list-decided-game-lines.ts';
 export { listTableTeams } from './list-table-teams.ts';
 export { listStandingsAdjustments } from './list-standings-adjustments.ts';
+export { insertStandingsAdjustment } from './insert-standings-adjustment.ts';
+export { binStandingsAdjustment } from './bin-standings-adjustment.ts';
 export { lockSeasonStandings } from './lock-season-standings.ts';
 export { replaceStandingsRows } from './replace-standings-rows.ts';
 export { replaceSeasonPlayerTotals } from './replace-season-player-totals.ts';

@@ -31,6 +31,7 @@ import {
   getSeason,
   updateSeason,
   setSeasonRules,
+  previewSeasonRules,
   setSeasonRosterSettings,
 } from './modules/leagues/index.ts';
 import {
@@ -42,7 +43,7 @@ import {
   reopenGame,
 } from './modules/games/index.ts';
 import { createPerson, listPeople, removePerson, updatePerson } from './modules/people/index.ts';
-import { rebuildStandings } from './modules/standings/index.ts';
+import { addAdjustment, rebuildStandings, removeAdjustment } from './modules/standings/index.ts';
 import {
   addDraftGame,
   changeDraftRoundDate,
@@ -85,6 +86,7 @@ export const commands = commandRegistry([
   getSeason,
   updateSeason,
   setSeasonRules,
+  previewSeasonRules,
   setSeasonRosterSettings,
   createDivision,
   updateDivision,
@@ -117,6 +119,8 @@ export const commands = commandRegistry([
   reopenGame,
   listPostponedGames,
   rebuildStandings,
+  addAdjustment,
+  removeAdjustment,
   createPerson,
   updatePerson,
   removePerson,

@@ -10,6 +10,7 @@ import {
   type CommandDeps,
   type Job,
   type LeaguesTx,
+  type StandingsTx,
 } from '@srleagues/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
@@ -28,11 +29,13 @@ import {
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { divisionsStore } from './divisions-store.ts';
+import { gamesStore } from './games-store.ts';
+import { standingsStore } from './standings-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 
 let pglite: PGlite;
 let db: DatabaseHandle;
-let deps: CommandDeps<LeaguesTx>;
+let deps: CommandDeps<LeaguesTx & StandingsTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
@@ -41,6 +44,8 @@ beforeAll(async () => {
       jobs: { enqueue: async (_job: Job) => {} },
       leagues: leaguesStore(scope),
       divisions: divisionsStore(scope),
+      games: gamesStore(scope),
+      standings: standingsStore(scope),
       access: accessStore(scope),
       activity: activityLogStore(scope),
     })),

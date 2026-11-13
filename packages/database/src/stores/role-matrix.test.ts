@@ -86,6 +86,7 @@ import {
   getSeason,
   updateSeason,
   setSeasonRules,
+  previewSeasonRules,
   setSeasonRosterSettings,
   setLeagueName,
   setLeagueStatus,
@@ -102,7 +103,9 @@ import {
   type SettingRegistry,
   type StandingsTx,
   type TeamsTx,
+  addAdjustment,
   rebuildStandings,
+  removeAdjustment,
 } from '@srleagues/core';
 import { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -175,7 +178,7 @@ let pglite: PGlite;
 let db: DatabaseHandle;
 let staffId: string;
 let accessDeps: CommandDeps<AccessTx>;
-let leaguesDeps: CommandDeps<LeaguesTx>;
+let leaguesDeps: CommandDeps<LeaguesTx & StandingsTx>;
 let schedulingDeps: CommandDeps<SchedulingTx>;
 let gamesDeps: CommandDeps<GamesTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
@@ -1041,11 +1044,43 @@ const standingsRows: readonly Row[] = gameRows(
   (c, i) => rebuildStandings(c, i, standingsDeps),
 );
 
+// Adjustments are checked at their season's program too (S-10): the owner and admins.
+const adjustmentRows: readonly Row[] = [
+  ...gameRows(
+    'standings.add_adjustment',
+    'add an adjustment',
+    'standings.adjust',
+    async (league, program) => {
+      const seasonId = await seasonIn(league, program);
+      const teamId = await newTeam(pglite, league.leagueId, seasonId);
+      return { seasonId, teamId, wins: 1, reason: 'Won by ruling' };
+    },
+    (c, i) => addAdjustment(c, i, standingsDeps),
+  ),
+  ...gameRows(
+    'standings.remove_adjustment',
+    'remove an adjustment',
+    'standings.adjust',
+    async (league, program) => {
+      const seasonId = await seasonIn(league, program);
+      const teamId = await newTeam(pglite, league.leagueId, seasonId);
+      const added = await pglite.query<{ id: string }>(
+        `insert into standings_adjustments (league_id, season_id, team_id, wins, reason, account_id)
+         values ($1, $2, $3, 1, 'Won by ruling', $4) returning id`,
+        [league.leagueId, seasonId, teamId, league.ownerId],
+      );
+      return { seasonId, adjustmentId: added.rows[0]?.id };
+    },
+    (c, i) => removeAdjustment(c, i, standingsDeps),
+  ),
+];
+
 const rows: readonly Row[] = [
   ...divisionAndVenueRows,
   ...peopleRows,
   ...gameCommandRows,
   ...standingsRows,
+  ...adjustmentRows,
   ...teamCommandRows,
   ...rosterCommandRows,
   ...scheduleDraftRows,
@@ -1187,6 +1222,17 @@ const rows: readonly Row[] = [
     },
     run: (c, i) => setSeasonRules(c, i, leaguesDeps),
   },
+  ...[false, true].map((program) => ({
+    command: 'leagues.preview_season_rules',
+    name: `see what new rules would move in a season of ${program ? 'one program' : 'the default program'}`,
+    needs: 'season.settings' as const,
+    ...(program ? { scope: 'program' as const } : {}),
+    prepare: async (league: League) => {
+      const seasonId = await seasonIn(league, program);
+      return { input: { seasonId, rules: defaultSeasonRules() } };
+    },
+    run: (c: CommandContext, i: unknown) => previewSeasonRules(c, i, leaguesDeps),
+  })),
   {
     command: 'leagues.set_season_roster_settings',
     name: 'set the roster settings of a season of the default program',

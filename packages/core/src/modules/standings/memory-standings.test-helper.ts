@@ -12,8 +12,12 @@ import {
 import type { EventHandler } from '../../command/index.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { GameLine, GameRecord, GamesTx, NewGameCorrection } from '../games/index.ts';
+import {
+  standingsStores,
+  type MemoryOptions,
+} from '../../command/testing/memory-standings-stores.ts';
 import { standingsHandlers } from './on-game-result.ts';
-import type { SeasonAdjustment, StandingsTx, TableTeam } from './ports.ts';
+import type { SeasonAdjustment, StandingsStore, StandingsTx, TableTeam } from './ports.ts';
 
 export type MemoryStandings = {
   status: string;
@@ -21,7 +25,7 @@ export type MemoryStandings = {
   teams: (TableTeam & { seasonId: string })[];
   games: GameRecord[];
   lines: GameLine[];
-  adjustments: (SeasonAdjustment & { seasonId: string })[];
+  adjustments: (SeasonAdjustment & { seasonId: string; binned?: boolean })[];
   corrections: NewGameCorrection[];
   grants: Grant[];
   activity: ActivityEntry[];
@@ -113,11 +117,6 @@ export const fourTeams = [1, 2, 3, 4].map((n) => ({
   seasonId,
 }));
 
-export type MemoryOptions = {
-  /** Thrown from saving the standings rows, to see a failed recalculation roll back. */
-  readonly failSaving?: Error;
-};
-
 export function memoryStandings(state: Partial<MemoryStandings> = {}, options: MemoryOptions = {}) {
   const db = memoryDatabase<MemoryStandings>({
     status: 'live',
@@ -137,10 +136,7 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     locked: [],
     ...state,
   });
-  const decidedOf = (s: MemoryStandings, season: string) =>
-    s.games
-      .filter((g) => g.seasonId === season && !g.binned && ['final', 'forfeit'].includes(g.status))
-      .sort(byId);
+
   const transaction = memoryTransaction(db, (s, jobs): GamesTx & StandingsTx => ({
     jobs,
     access: {
@@ -172,33 +168,9 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
       },
       addCorrection: async (correction) => void s.corrections.push(correction),
       listPostponed: async () => [],
-      listDecided: async (season) => decidedOf(s, season),
-      listDecidedLines: async (season) => {
-        const ids = new Set(decidedOf(s, season).map((g) => g.id));
-        return s.lines.filter((l) => ids.has(l.gameId));
-      },
-      findSeason: async (id) => s.seasons.find((x) => x.id === id),
+      ...standingsStores(s, options).games,
     },
-    standings: {
-      lockSeason: async (season) => void s.locked.push(season),
-      listTeams: async (season) =>
-        s.teams
-          .filter((t) => t.seasonId === season)
-          .map(({ teamId: id, divisionId: division }) => ({ teamId: id, divisionId: division }))
-          .sort((a, b) => a.teamId.localeCompare(b.teamId)),
-      listAdjustments: async (season) =>
-        s.adjustments
-          .filter((a) => a.seasonId === season)
-          .map(({ seasonId: _season, ...adjustment }) => adjustment)
-          .sort(byId),
-      replaceRows: async (season, rows) => {
-        if (options.failSaving !== undefined) throw options.failSaving;
-        s.rows[season] = [...rows];
-      },
-      replaceTotals: async (season, totals) => {
-        s.totals[season] = [...totals];
-      },
-    },
+    standings: standingsStores(s, options).standings,
   }));
   const handlers: readonly EventHandler<GamesTx & StandingsTx>[] = standingsHandlers;
   // One transaction with both modules' stores and the standings handlers, as the apps
