@@ -19,14 +19,14 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
 
-Reserved so far: migration 0006 and decision record 012 / T-224 to 1.19 part 1; decision record 013 / T-225 to 1.13; decision record 014 / T-226 to 1.12; decision record 015 / T-227 to 1.18 part 1; decision record 016 / T-228 to 1.20 part 1. Next free: migration 0007, record 017, T-229. Check the folders before trusting these.
+Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Next free: migration 0007, record 019, T-231. Check the folders before trusting these.
 
-- **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — whole step.
-- **1.19 part 1** — `.local/lanes/1.19p1-queue-email` — migration 0006, record 012 / T-224 — queue and email interfaces, stand-ins, adapters, jobs table.
-- **2.7 Standings and tiebreakers** — `.local/lanes/2.7-standings` — none — whole step.
-- **1.16 Address builder and request context** — `.local/lanes/1.16-address-context` — none — whole step.
-- **1.15 Supabase adapter** — `.local/lanes/1.15-supabase-adapter` — none (record 017 / T-229 if needed) — whole step.
-- **2.10 Fixture spreadsheet reader** — `.local/lanes/2.10-fixture-reader` — none — whole step.
+- **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — built and review findings fixed; needs one more catch-up merge with the build branch (a builder was doing it), gate green in the lane, then land (read-only-league behaviour is on the founder list).
+- **1.19 part 1** — `.local/lanes/1.19p1-queue-email` — migration 0006, record 012 / T-224 — built; review findings (take_jobs callable by any app transaction, dedupe key and last_error pattern too loose, narrow INSERT grant, short pg-boss lease, wiring comment) were sent to the builder; then catch up with the build branch (keep 90 s test timeouts), gate green, land. `npm ci` needed after landing (pg-boss).
+- **2.7 Standings and tiebreakers** — `.local/lanes/2.7-standings` — none — built and reviewed; review findings (adjustment checks, allowTies, gamesPlayed, head-to-head points per game, restart test, spec wording) sent to the builder; then catch up (vitest.config.ts keep all globs), gate, land.
+- **1.16 Address builder and request context** — `.local/lanes/1.16-address-context` — record 017 / T-229 if needed — builder just started; check its lane branch for commits.
+- **1.15 Supabase adapter** — `.local/lanes/1.15-supabase-adapter` — record 018 / T-230 if needed — builder just started; check its lane branch for commits.
+- **2.10 Fixture spreadsheet reader** — `.local/lanes/2.10-fixture-reader` — none — builder just started; check its lane branch for commits.
 
 ## Needs the founder
 
