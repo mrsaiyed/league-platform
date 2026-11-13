@@ -9,6 +9,7 @@ describe('summarizePublish (P7 §4.4)', () => {
       gamesAdded: [],
       gamesRemoved: [],
       gamesMoved: [],
+      gamesRecordingChanged: [],
       roundsRenamed: [],
       roundsDateChanged: [],
       teamsAffected: [],
@@ -48,6 +49,18 @@ describe('summarizePublish (P7 §4.4)', () => {
       [],
     );
     const summary = summarizePublish(published, state);
+    expect(summary.gamesMoved).toEqual([]);
+    expect(summary.teamsAffected).toEqual([]);
+  });
+
+  it('lists a game whose recording mode changed, without counting its teams as affected', () => {
+    const { state } = applyDraft(
+      baseState(),
+      [{ kind: 'set-recording', gameId: 'g1', recording: 'live' }],
+      [],
+    );
+    const summary = summarizePublish(baseState(), state);
+    expect(summary.gamesRecordingChanged).toEqual(['g1']);
     expect(summary.gamesMoved).toEqual([]);
     expect(summary.teamsAffected).toEqual([]);
   });
