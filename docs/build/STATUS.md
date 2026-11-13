@@ -25,6 +25,8 @@ Next free: migration 0012, record 033, T-245 (0011 / 031 / T-243 belong to 1.14;
 - **2.4 Live game, calculated and import tables** — `.local/lanes/2.4-live-tables` — migration 0010, record 030 / T-242 — built and reviewed; builder was fixing findings (takeover must delete+re-insert the scoring session, binned scored games rule, walk-up roster entry game check, standings division check, notes). Then: catch up, gate, land.
 - **2.19 Rosters commands** — `.local/lanes/2.19-roster-commands` — none — built, reviewed, findings fixed; a builder was catching it up with build/stage-1 (conflicts in en.ts after 2.23 landed). Then: gate, land. Note: people.remove_person checks roster membership unlocked; reorder_roster returns {count, versions}.
 - **1.27 Sturdy timing tests** — `.local/lanes/1.27-sturdy-tests` — none — builder working; no report yet.
+- **1.21 Seed leagues** — `.local/lanes/1.21-seed-leagues` — none — builder starting.
+- **1.20 part 2 Health checks** — `.local/lanes/1.20-health-checks` — none — builder starting.
 
 ## Needs the founder
 
