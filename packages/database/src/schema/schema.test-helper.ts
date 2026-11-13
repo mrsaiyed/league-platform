@@ -217,8 +217,16 @@ export type GameOptions = {
   columns?: Record<string, unknown>;
 };
 
-/** Adds a game (scheduled, final score only, unless `columns` says otherwise) and returns its id. */
+/** The rules a started test game is played under, unless `columns` gives its own. */
+export const gameRules = '{"version": 1, "periods": 2}';
+
+/**
+ * Adds a game (scheduled, final score only, unless `columns` says otherwise) and
+ * returns its id. A live, final or forfeited game gets `gameRules` as its format
+ * unless `columns` names one (games_format_when_started).
+ */
 export async function newGame(db: Sql, game: GameOptions) {
+  const started = ['live', 'final', 'forfeit'].includes(String(game.columns?.status));
   const columns: Record<string, unknown> = {
     league_id: game.leagueId,
     season_id: game.seasonId,
@@ -226,6 +234,7 @@ export async function newGame(db: Sql, game: GameOptions) {
     home_team_id: game.homeTeamId,
     away_team_id: game.awayTeamId,
     capture_mode: 'final',
+    ...(started ? { format: gameRules } : {}),
     ...game.columns,
   };
   const names = Object.keys(columns);

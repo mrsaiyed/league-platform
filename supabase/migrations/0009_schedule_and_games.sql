@@ -18,8 +18,8 @@
 --   game has both scores and the time it was finalized (T3 §12); a live game has
 --   both scores or neither; the winner is worked out from the scores, never typed;
 --   a forfeit has a winner;
--- - a game's rules (`format`) never change once it has gone live or been decided
---   (S-1, S-21);
+-- - a live or decided game has its rules (`format`), and they never change once it
+--   has first gone live or been decided, even if it goes back to scheduled (S-1, S-21);
 -- - changing a decided game's result (its status, a score, a team, its division or
 --   stage, the time it was finalized, or putting it in or taking it out of the bin)
 --   needs a correction row for that game in the same transaction (S-7);
@@ -130,6 +130,10 @@ create table public.games (
   -- season's rules; set when a game is given its own rules before it starts, or
   -- when it starts. A small versioned document whose shape is in code (T-50).
   format jsonb,
+  -- When the game first went live or was decided, so its rules were fixed. Set by
+  -- the database (games_stamp_format_fixed), never by the caller, and never
+  -- cleared: a game that goes back to scheduled keeps the rules it started with.
+  format_fixed_at timestamptz,
   finalized_at timestamptz,
   -- Where the fixture came from outside (an import's reference); optional.
   external_ref text,
@@ -182,6 +186,10 @@ create table public.games (
   ),
   -- A forfeit has a winner and a loser (P7 §5.6), at the season's forfeit score.
   constraint games_forfeit_has_winner check (status <> 'forfeit' or home_score <> away_score),
+  -- A game that has started is played under rules of its own (S-1).
+  constraint games_format_when_started check (
+    status not in ('live', 'final', 'forfeit') or format is not null
+  ),
   constraint games_format_document check (
     format is null or (public.is_versioned_document(format) and octet_length(format::text) <= 16384)
   ),
@@ -213,15 +221,40 @@ comment on table public.games is
 
 -- A game keeps the rules it started with (S-1: "a game already played keeps the
 -- rules it was played under"; S-21: a game can be given its own rules before it
--- starts). Once a game is live or decided, its format is fixed; the scorekeeper's
+-- starts). Once a game has first gone live or been decided, its format is fixed,
+-- even if the game later goes back to scheduled or is postponed; the scorekeeper's
 -- changes at the table (the clock switch, corrections by hand) are plays, not
 -- changes to the format.
+create or replace function public.stamp_game_format_fixed() returns trigger
+language plpgsql
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if tg_op = 'UPDATE' and old.format_fixed_at is not null then
+    new.format_fixed_at := old.format_fixed_at;
+  elsif new.status in ('live', 'final', 'forfeit') then
+    new.format_fixed_at := now();
+  else
+    new.format_fixed_at := null;
+  end if;
+  return new;
+end
+$$;
+
+comment on function public.stamp_game_format_fixed() is
+  'BEFORE INSERT OR UPDATE on games: format_fixed_at is the time the game first went live or was decided, set by the database and never cleared.';
+
+create trigger games_stamp_format_fixed
+  before insert or update on public.games
+  for each row execute function public.stamp_game_format_fixed();
+
 create or replace function public.check_game_format_fixed() returns trigger
 language plpgsql
 set search_path = pg_catalog, pg_temp
 as $$
 begin
-  if old.status in ('live', 'final', 'forfeit') and new.format is distinct from old.format then
+  if (old.format_fixed_at is not null or old.status in ('live', 'final', 'forfeit'))
+     and new.format is distinct from old.format then
     raise exception 'game % has started, so the rules it is played under cannot change', new.id
       using errcode = 'restrict_violation', constraint = 'games_format_fixed_once_started';
   end if;
@@ -230,7 +263,7 @@ end
 $$;
 
 comment on function public.check_game_format_fixed() is
-  'BEFORE UPDATE OF format on games: refuses a change to the rules of a game that is live or decided (S-1, S-21).';
+  'BEFORE UPDATE OF format on games: refuses a change to the rules of a game that has ever gone live or been decided (S-1, S-21).';
 
 create trigger games_format_fixed_once_started
   before update of format on public.games

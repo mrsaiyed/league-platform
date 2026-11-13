@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   asApp,
   freshSchema,
+  gameRules,
   newDivision,
   newGame,
   newLeague,
@@ -290,8 +291,9 @@ describe("a decided game's result changes only with a correction (S-7)", () => {
       finalized_at: null,
     });
     await db.query(
-      "update games set status = 'forfeit', home_score = 20, away_score = 0, finalized_at = now() where id = $1",
-      [scheduled.gameId],
+      `update games set status = 'forfeit', home_score = 20, away_score = 0, finalized_at = now(),
+         format = $2 where id = $1`,
+      [scheduled.gameId, gameRules],
     );
     const g = await game();
     await db.query(

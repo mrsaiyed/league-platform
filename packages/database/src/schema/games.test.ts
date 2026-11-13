@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   asApp,
   freshSchema,
+  gameRules,
   newCourt,
   newDivision,
   newGame,
@@ -228,6 +229,7 @@ describe('a game’s status and recording mode', () => {
       game,
     ]);
     expect(status).toBe('scheduled');
+    await set(game, { format: gameRules });
     for (const value of ['postponed', 'cancelled', 'live', 'scheduled']) {
       await set(game, { status: value });
     }
@@ -386,7 +388,63 @@ describe('the rules a game is played under (S-1, S-21)', () => {
         finalized_at: new Date().toISOString(),
       },
     });
-    await expect(set(forfeited, { format: JSON.stringify(rules) })).rejects.toMatchObject(fixed);
+    await expect(
+      set(forfeited, { format: JSON.stringify({ ...rules, periods: 4 }) }),
+    ).rejects.toMatchObject(fixed);
+  });
+
+  it('are there once it is live or decided', async () => {
+    const s = await season();
+    const set_ = { ...refused.check, constraint: 'games_format_when_started' };
+    for (const columns of [
+      { status: 'live' },
+      final(50, 45),
+      { status: 'forfeit', home_score: 20, away_score: 0, finalized_at: new Date().toISOString() },
+    ]) {
+      await expect(
+        newGame(db, { ...s.game, columns: { ...columns, format: null } }),
+      ).rejects.toMatchObject(set_);
+    }
+    const game = await newGame(db, s.game);
+    await expect(set(game, { status: 'live' })).rejects.toMatchObject(set_);
+    // Given as the game goes live, as the step that starts games does (step 2.20).
+    await set(game, { status: 'live', format: JSON.stringify(rules) });
+  });
+
+  it('stay fixed once the game has started, even if it goes back to scheduled or is postponed', async () => {
+    const s = await season();
+    const fixed = { ...refused.restrict, constraint: 'games_format_fixed_once_started' };
+    const fixedAt = async (game: string) =>
+      (
+        await one<{ format_fixed_at: Date | null }>(
+          db,
+          'select format_fixed_at from games where id = $1',
+          [game],
+        )
+      ).format_fixed_at;
+    const game = await newGame(db, s.game);
+    expect(await fixedAt(game)).toBeNull();
+    await set(game, { status: 'live', format: JSON.stringify(rules) });
+    const when = await fixedAt(game);
+    expect(when).not.toBeNull();
+    for (const status of ['scheduled', 'postponed', 'cancelled']) {
+      await set(game, { status });
+      await expect(
+        set(game, { format: JSON.stringify({ ...rules, periods: 4 }) }),
+      ).rejects.toMatchObject(fixed);
+      await expect(set(game, { format: null })).rejects.toMatchObject(fixed);
+    }
+    // The time the rules were fixed is the database's: never cleared or moved.
+    await set(game, { format_fixed_at: null });
+    await set(game, { format_fixed_at: '2020-01-01T00:00:00Z' });
+    expect(await fixedAt(game)).toEqual(when);
+    const scheduled = await newGame(db, {
+      ...s.game,
+      columns: { format_fixed_at: '2020-01-01T00:00:00Z' },
+    });
+    expect(await fixedAt(scheduled)).toBeNull();
+    const decided = await newGame(db, { ...s.game, columns: final(50, 45) });
+    expect(await fixedAt(decided)).not.toBeNull();
   });
 
   it('cannot change for the app either', async () => {

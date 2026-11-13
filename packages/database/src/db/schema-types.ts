@@ -113,6 +113,7 @@ export interface GamesTable {
   away_score: number | null;
   winner_team_id: GeneratedAlways<string | null>;
   format: ColumnType<JsonValue | null, JsonObject | null, JsonObject | null>;
+  format_fixed_at: GeneratedAlways<Date | null>;
   finalized_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
   external_ref: string | null;
   deleted_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
