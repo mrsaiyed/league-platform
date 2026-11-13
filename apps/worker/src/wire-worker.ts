@@ -7,15 +7,21 @@
 //   staging         the pg-boss queue, as in production, and captured email
 //   production      the pg-boss queue, and Resend
 //
+// It also makes the job handlers (jobs/job-handlers.ts), each job's transaction
+// bound to the database's stores; the caller passes them to `queue.start`.
+//
 // What it does not do yet: read the environment (the worker's config file,
 // apps/worker/src/config.ts, does not exist yet), check the login role
-// (checkLoginRole), start the queue, or give it handlers. No job type has a
-// handler until the invitation email (step 1.19 part 2); the caller passes them to
-// `queue.start`.
-import { errorCodeOf, type EmailSender, type WorkQueue } from '@srleagues/core';
+// (checkLoginRole), or start the queue.
+import { errorCodeOf, type EmailSender, type JobHandlers, type WorkQueue } from '@srleagues/core';
 import {
+  accessStore,
+  activityLogStore,
+  commandTransaction,
   createDatabase,
   createPgBoss,
+  jobsStore,
+  leaguesStore,
   pgBossQueue,
   tableQueue,
   type DatabaseHandle,
@@ -23,6 +29,8 @@ import {
   type QueueOptions,
 } from '@srleagues/database';
 import { emailSenderFor } from '@srleagues/providers';
+import type { InvitationEmailTx } from './jobs/invitation-email-job.ts';
+import { jobHandlers } from './jobs/job-handlers.ts';
 
 export type WorkerSettings = {
   readonly appEnv: 'local' | 'test' | 'staging' | 'production';
@@ -30,6 +38,10 @@ export type WorkerSettings = {
   readonly resendApiKey?: string | undefined;
   /** Where captured emails are written, outside production. */
   readonly captureDirectory?: string | undefined;
+  /** Our site's origin, such as `https://oursite.com`, for links in emails (T-34). */
+  readonly siteOrigin: string;
+  /** The address league mail is sent from (T7 §6, T-139). */
+  readonly sendingAddress: string;
   readonly queue?: QueueOptions;
 };
 
@@ -38,6 +50,8 @@ export type WiredWorker = {
   readonly queue: WorkQueue;
   readonly email: EmailSender;
   readonly emailKind: 'resend' | 'capture';
+  /** The handler for each job type, for `queue.start`. */
+  readonly handlers: JobHandlers;
   /** Stops the queue, then closes the database. */
   readonly close: () => Promise<void>;
 };
@@ -63,11 +77,25 @@ export function wireWorker(settings: WorkerSettings): WiredWorker {
     settings.appEnv === 'local' || settings.appEnv === 'test'
       ? tableQueue(db, options)
       : pgBossQueue(db, createPgBoss(settings.database), options);
+  // Each job's transaction: one league, the stores its handler needs (T-28).
+  const transaction = commandTransaction<InvitationEmailTx>(db, (scope) => ({
+    jobs: jobsStore(scope),
+    leagues: leaguesStore(scope),
+    access: accessStore(scope),
+    activity: activityLogStore(scope),
+  }));
+  const handlers = jobHandlers({
+    transaction,
+    email: email.sender,
+    siteOrigin: settings.siteOrigin,
+    sendingAddress: settings.sendingAddress,
+  });
   return {
     db,
     queue,
     email: email.sender,
     emailKind: email.kind,
+    handlers,
     close: async () => {
       await queue.stop();
       await db.close();
