@@ -50,7 +50,7 @@ export const maxCommandsPerBatch = 50;
 export const TrackerCommand = Envelope.required({ at: true });
 export type TrackerCommand = z.infer<typeof TrackerCommand>;
 
-/** What the tracker posts to `POST /api/v1/games/{game}/commands`. */
+/** What the tracker posts to `POST /api/v1/leagues/{leagueId}/games/{game}/commands` (T-229). */
 export const CommandBatch = z.strictObject({
   protocolVersion: z.number().int().min(1),
   sessionId: Id,

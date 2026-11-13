@@ -50,6 +50,15 @@ export const en = {
     'If you were not expecting this, you can ignore this email and nothing will happen.',
   'email.invitation.linkFallback':
     'If the button does not work, copy this address into your browser:',
+  // The tracker's saved banner (T6 §4), chosen from the queue's status by
+  // apps/web/src/features/tracker/queue-banner.ts.
+  'tracker.queue.allSaved': 'All saved',
+  'tracker.queue.waiting_one': '{count} action waiting to send',
+  'tracker.queue.waiting_other': '{count} actions waiting to send',
+  'tracker.queue.notSaved_one': '{count} action not saved',
+  'tracker.queue.notSaved_other': '{count} actions not saved',
+  'tracker.queue.storageFailed': 'This device could not save to its storage',
+  'tracker.queue.separator': ' · ',
 } as const;
 
 export type MessageKey = keyof typeof en;
