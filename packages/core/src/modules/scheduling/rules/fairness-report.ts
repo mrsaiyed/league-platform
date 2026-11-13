@@ -13,7 +13,10 @@ import type { ScheduleGame } from './schedule-types.ts';
  *
  * What the words mean here:
  * - Postponed and cancelled games hold no place and are not counted.
- * - A week is a round of the schedule. A game with no round belongs to the round on its date,
+ * - A week is a round of the schedule, not a calendar week: two rounds in the same calendar
+ *   week are two weeks, and a round whose games span several dates is still one week. P7 §4.2
+ *   speaks of weeks because leagues mostly play one round a week; byes and back-to-back are
+ *   counted per round. A game with no round belongs to the round on its date,
  *   or, when no round falls on that date, to a week of its own by date. Weeks are taken in date
  *   order, and weeks with no games at all (a holiday) are left out.
  * - A bye is a week with games in which the team has none.
