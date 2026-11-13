@@ -25,11 +25,14 @@ export type { LeagueRecord, LeaguesStore, LeaguesTx, NewLeague, NewSeason } from
 export {
   adminAreas,
   forwardedLeagueUrl,
+  isLeagueIdFormat,
   isLeagueSiteName,
+  leagueApiBase,
+  leagueApiUrl,
   leagueUrl,
   type AdminArea,
   type LeagueAddressee,
   type LeaguePage,
   type LeagueUrlOptions,
 } from './rules/league-url.ts';
-export { isBlockedShortName, isShortNameFormat } from './short-names.ts';
+export { isBlockedShortName, isShortNameFormat, isSystemShortName } from './short-names.ts';

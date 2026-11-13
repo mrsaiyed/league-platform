@@ -13,6 +13,10 @@
 // several programs, the sports pages move one level down, under the program's short
 // name; league-wide pages stay at the top (P2 §4). A past season is the same address
 // with `?season=` (P2 §4).
+//
+// The JSON endpoints (T-26) are not pages: the tracker's queue may hold a command
+// across a change of short name, so they name the league by its id, under
+// `/api/v1/leagues/{leagueId}/...` (record 017, T-229). leagueApiUrl builds those.
 import { isShortNameFormat } from '../short-names.ts';
 
 /** What the builder needs to know about a league: its current short name. */
@@ -58,6 +62,7 @@ export const leaguePages = {
   /** A page the admin made (About, Rules): `/{league}/{page}`. */
   page: { path: [':page'], level: 'league' },
   admin: { path: ['admin'], level: 'private' },
+  /** An area of the admin, and optionally a page inside it (`subpath`). */
   'admin-area': { path: ['admin', ':area'], level: 'private' },
   /** The courtside tracker for one game. */
   score: { path: ['score', ':game'], level: 'private' },
@@ -87,7 +92,11 @@ type ParamName<P extends LeaguePage> = Spec<P>['path'][number] extends infer S
     : never
   : never;
 type Params<P extends LeaguePage> = P extends 'admin-area'
-  ? { readonly area: AdminArea }
+  ? {
+      readonly area: AdminArea;
+      /** Pages inside the area, one value per segment: `['teams', 'lions']`. */
+      readonly subpath?: readonly string[] | undefined;
+    }
   : { readonly [N in ParamName<P>]: string };
 
 type Common = {
@@ -152,10 +161,15 @@ export function leagueUrl<P extends LeaguePage>(
   ...[options]: OptionsArg<P>
 ): string {
   const spec: PageSpec = leaguePages[page];
-  const given: Readonly<Record<string, string | undefined>> = options ?? {};
+  const values: Readonly<Record<string, unknown>> = options ?? {};
+  const given = (name: string): string | undefined => {
+    const value = values[name];
+    if (value === undefined || typeof value === 'string') return value;
+    throw new TypeError(`leagueUrl: "${name}" must be text.`);
+  };
   const segments: string[] = [];
 
-  const program = spec.level === 'program' ? given['program'] : undefined;
+  const program = spec.level === 'program' ? given('program') : undefined;
   if (program !== undefined) {
     if (isLeagueSiteName(program)) {
       throw new TypeError(`leagueUrl: "${program}" is a page of the site, not a program.`);
@@ -169,7 +183,7 @@ export function leagueUrl<P extends LeaguePage>(
       continue;
     }
     const name = part.slice(1);
-    const value = given[name];
+    const value = given(name);
     if (value === undefined) throw new TypeError(`leagueUrl: "${page}" needs "${name}".`);
     if (page === 'page' && isLeagueSiteName(value)) {
       throw new TypeError(`leagueUrl: "${value}" is a page of the site, not a custom page.`);
@@ -180,11 +194,44 @@ export function leagueUrl<P extends LeaguePage>(
     segments.push(segment(name, value));
   }
 
-  const season = spec.level === 'private' ? undefined : given['season'];
+  const subpath = page === 'admin-area' ? values['subpath'] : undefined;
+  if (subpath !== undefined) {
+    if (!Array.isArray(subpath)) throw new TypeError('leagueUrl: "subpath" must be a list.');
+    for (const part of subpath as readonly unknown[]) {
+      if (typeof part !== 'string') throw new TypeError('leagueUrl: "subpath" holds only text.');
+      segments.push(segment('subpath', part));
+    }
+  }
+
+  const season = spec.level === 'private' ? undefined : given('season');
   const query =
     season === undefined ? '' : `?${new URLSearchParams({ season: checked('season', season) })}`;
   const below = segments.length === 0 ? '' : `/${segments.join('/')}`;
-  return leagueRoot(league, given['origin']) + below + query;
+  return leagueRoot(league, given('origin')) + below + query;
+}
+
+/** A league's id as it goes into an endpoint's address: a UUID in lower case. */
+const leagueIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** Whether `value`, exactly as it is, is a league id as endpoint addresses spell it. */
+export function isLeagueIdFormat(value: string): boolean {
+  return leagueIdPattern.test(value);
+}
+
+/** The fixed start of every league's endpoints, before the league's id. */
+export const leagueApiBase = ['api', 'v1', 'leagues'] as const;
+
+/**
+ * The address of one of a league's JSON endpoints (T-26, record 017):
+ * `/api/v1/leagues/{leagueId}/{...path}`, each part encoded. Throws on an id or part
+ * that cannot be in an address, as leagueUrl does.
+ */
+export function leagueApiUrl(league: { readonly id: string }, path: readonly string[]): string {
+  if (!isLeagueIdFormat(league.id)) {
+    throw new TypeError('leagueApiUrl: the league id must be a UUID in lower case.');
+  }
+  const below = path.map((part) => `/${segment('path', part)}`).join('');
+  return `/${leagueApiBase.join('/')}/${league.id}${below}`;
 }
 
 /**

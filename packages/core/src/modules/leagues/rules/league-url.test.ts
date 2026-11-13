@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   adminAreas,
   forwardedLeagueUrl,
+  isLeagueIdFormat,
   isLeagueSiteName,
+  leagueApiUrl,
   leaguePages,
   leagueSiteNames,
   leagueUrl,
@@ -39,6 +41,29 @@ describe('leagueUrl (T-34)', () => {
       expect(leagueUrl(north, 'admin-area', { area })).toBe(`/north-league/admin/${area}`);
     }
     expect(leagueUrl(north, 'score', { game: 'g1' })).toBe('/north-league/score/g1');
+  });
+
+  it('builds pages inside an admin area, each part encoded and checked', () => {
+    expect(leagueUrl(north, 'admin-area', { area: 'teams', subpath: ['lions', 'roster'] })).toBe(
+      '/north-league/admin/teams/lions/roster',
+    );
+    expect(leagueUrl(north, 'admin-area', { area: 'people', subpath: [] })).toBe(
+      '/north-league/admin/people',
+    );
+    expect(leagueUrl(north, 'admin-area', { area: 'site', subpath: ['a/b?c'] })).toBe(
+      '/north-league/admin/site/a%2Fb%3Fc',
+    );
+    for (const part of ['', '.', '..']) {
+      expect(() => leagueUrl(north, 'admin-area', { area: 'teams', subpath: [part] })).toThrow(
+        TypeError,
+      );
+    }
+    const notList = 'lions' as unknown as readonly string[];
+    expect(() => leagueUrl(north, 'admin-area', { area: 'teams', subpath: notList })).toThrow(
+      TypeError,
+    );
+    // @ts-expect-error: only an admin area takes a subpath.
+    leagueUrl(north, 'admin', { subpath: ['x'] });
   });
 
   it('puts sports pages under the program, and leaves league-wide pages at the top', () => {
@@ -176,5 +201,26 @@ describe('forwardedLeagueUrl (U-7)', () => {
   it('cannot be turned into an address on another site', () => {
     expect(() => forwardedLeagueUrl(north, 'evil.example')).toThrow(TypeError);
     expect(forwardedLeagueUrl(north, '//evil.example')).toBe('/north-league//evil.example');
+  });
+});
+
+describe('leagueApiUrl (record 017, T-229)', () => {
+  const league = { id: '01900000-0000-7000-8000-00000000000a' };
+
+  it('names the league by its id under /api/v1/leagues, each part encoded', () => {
+    expect(leagueApiUrl(league, ['games', 'g1', 'commands'])).toBe(
+      '/api/v1/leagues/01900000-0000-7000-8000-00000000000a/games/g1/commands',
+    );
+    expect(leagueApiUrl(league, [])).toBe('/api/v1/leagues/01900000-0000-7000-8000-00000000000a');
+    expect(leagueApiUrl(league, ['a/b'])).toMatch(/\/a%2Fb$/);
+  });
+
+  it('refuses an id that is not a lower-case UUID, and parts that cannot be in an address', () => {
+    for (const id of ['', 'north-league', league.id.toUpperCase(), `${league.id}/x`]) {
+      expect(() => leagueApiUrl({ id }, [])).toThrow(TypeError);
+      expect(isLeagueIdFormat(id)).toBe(false);
+    }
+    expect(isLeagueIdFormat(league.id)).toBe(true);
+    expect(() => leagueApiUrl(league, ['..'])).toThrow(TypeError);
   });
 });
