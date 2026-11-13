@@ -24,6 +24,7 @@ Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014
 - **2.31 Live updates service** — `.local/lanes/2.31-live-updates` — none — builder starting.
 - **1.17 Web app shell** — `.local/lanes/1.17-web-shell` — record 020 / T-232 — builder starting.
 - **1.19 part 2 Invitation email job** — `.local/lanes/1.19p2-invitation-job` — none — builder starting.
+- **2.14 Defined settings** — `.local/lanes/2.14-defined-settings` — none — builder starting.
 - **2.12 Tracker offline queue** — `.local/lanes/2.12-offline-queue` — none — builder starting.
 - **2.2 People, teams and rosters tables** — `.local/lanes/2.2-people-teams-tables` — migration 0008, record 022 / T-234 — builder starting.
 
