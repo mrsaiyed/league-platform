@@ -59,7 +59,8 @@ export function createHeartbeat(options: HeartbeatOptions): Heartbeat {
 export function startHealthServer(heartbeat: Heartbeat, port: number): Promise<Server> {
   const server = createServer((request, response) => {
     const path = (request.url ?? '').split('?')[0];
-    if (request.method !== 'GET' || path !== '/health') {
+    const isHead = request.method === 'HEAD';
+    if ((request.method !== 'GET' && !isHead) || path !== '/health') {
       response.writeHead(404).end();
       return;
     }
@@ -68,10 +69,15 @@ export function startHealthServer(heartbeat: Heartbeat, port: number): Promise<S
       'Content-Type': 'application/json',
       'Cache-Control': 'no-store',
     });
-    response.end(JSON.stringify(body));
+    // HEAD gets the same status and headers as GET, without the body.
+    response.end(isHead ? undefined : JSON.stringify(body));
   });
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(port, () => resolve(server));
+    server.listen(port, () => {
+      // Listening worked: a later fault must not reach a promise already settled.
+      server.off('error', reject);
+      resolve(server);
+    });
   });
 }

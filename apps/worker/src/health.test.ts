@@ -51,6 +51,10 @@ describe('startHealthServer', () => {
       expect(await up.json()).toMatchObject({ status: 'ok', app: 'worker' });
       expect((await fetch(`${base}/other`)).status).toBe(404);
       expect((await fetch(`${base}/health`, { method: 'POST' })).status).toBe(404);
+      const head = await fetch(`${base}/health`, { method: 'HEAD' });
+      expect(head.status).toBe(200);
+      expect(head.headers.get('cache-control')).toBe('no-store');
+      expect(await head.text()).toBe('');
     } finally {
       await new Promise<void>((done) => server.close(() => done()));
     }
