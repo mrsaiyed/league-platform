@@ -1,7 +1,8 @@
 // T-68 on the Supabase adapter: nothing it answers tells a stranger whether an account
 // exists. Each case runs the same steps against an address with an account and one
-// without; the answers must be equal, and so must the calls made to Supabase (the
-// same work, so timing tells nothing either). Against a fake Supabase Auth only.
+// without; the answers must be equal, and so must the calls made to Supabase, the
+// calls made to our store and the waits added to password checks (the same work, so
+// timing tells nothing either). Against a fake Supabase Auth only.
 import { describe, expect, it } from 'vitest';
 import type { SignInService } from '../sign-in-service.ts';
 import {
@@ -20,16 +21,24 @@ const stranger = 'nobody@example.test';
 async function both<T>(steps: (sign: SignInService, email: string, env: Setup) => Promise<T>) {
   const answers: T[] = [];
   const work: string[][] = [];
+  const kept: string[][] = [];
+  const waits: number[][] = [];
   for (const email of [member, stranger]) {
     const env = setup();
     await signUp(env, member);
     // Past the hour, so the sign-up's own code request no longer counts.
     env.advanceSeconds(2 * 60 * 60);
     const from = env.fake.calls().length;
+    const fromStore = env.storeCalls().length;
+    const fromSleeps = env.sleeps.length;
     answers.push(await steps(env.sign, email, env));
     work.push(env.callsSince(from));
+    kept.push(env.storeCalls().slice(fromStore));
+    waits.push(env.sleeps.slice(fromSleeps));
   }
   expect(work[1]).toEqual(work[0]);
+  expect(kept[1]).toEqual(kept[0]);
+  expect(waits[1]).toEqual(waits[0]);
   return answers;
 }
 

@@ -278,6 +278,51 @@ describe('sign-up with an emailed code', () => {
     );
   });
 
+  it('does not count a code check against the network when Supabase is busy or down', async () => {
+    const env = setup({
+      settings: {
+        guessesPerNetwork: {
+          windowMinutes: 15,
+          slowAfter: 2,
+          slowSeconds: 5,
+          lockAfter: 3,
+          lockMinutes: 15,
+        },
+      },
+    });
+    await env.sign.startSignUp({ email: 'ana@example.test', networkAddress: here });
+    const code = codeFor(env, 'ana@example.test');
+    let answer: (() => Response) | undefined = () =>
+      Response.json({ code: 'over_request_rate_limit' }, { status: 429 });
+    env.fake.override('POST', '/verify', () => answer?.());
+    const check = () =>
+      env.sign.verifyCode({ email: 'ana@example.test', code, networkAddress: here });
+    expect(await check()).toEqual(fail({ code: 'too-many-attempts', retryAfterSeconds: 60 }));
+    answer = () => new Response('{}', { status: 500 });
+    await expect(check()).rejects.toThrow(SupabaseAuthUnexpected);
+    answer = () => Response.json({ code: 'unexpected_failure' }, { status: 400 });
+    await expect(check()).rejects.toThrow(/unexpected_failure/);
+    answer = undefined;
+    // Three tries used of the code's five, none of them counted against the network.
+    expect(errorCode(await check())).toBe('ok');
+  });
+
+  it('answers a reset the same way, with no code, whatever Supabase refuses it with', async () => {
+    const env = setup();
+    env.fake.override('POST', '/admin/generate_link', () =>
+      Response.json({ code: 'validation_failed' }, { status: 422 }),
+    );
+    expect(await env.sign.startReset({ email: 'ana@example.test', networkAddress: here })).toEqual({
+      ok: true,
+      value: { codeValidMinutes: 10 },
+    });
+    expect(env.capture.messages()).toMatchObject([{ code: null, accountExists: false }]);
+    // A sign-up refused is not an answer we have.
+    await expect(
+      env.sign.startSignUp({ email: 'ana@example.test', networkAddress: here }),
+    ).rejects.toThrow(/validation_failed/);
+  });
+
   it('refuses a project whose codes are not 6 digits', async () => {
     const env = setup();
     env.fake.override('POST', '/admin/generate_link', () =>
@@ -331,7 +376,41 @@ describe('setting a password', () => {
       ),
     );
     const outcomes = results.map((r) => (r.ok ? r.value.outcome : r.error.code));
-    expect(outcomes.filter((o) => o === 'account-created')).toHaveLength(1);
+    expect(outcomes.sort()).toEqual(['account-created', 'proof-invalid']);
+    // Only one of them reached Supabase.
+    expect(env.callsSince(0).filter((c) => c === 'PUT /user')).toHaveLength(1);
+  });
+
+  it('keeps the proof when Supabase is down, silent or busy', async () => {
+    const env = setup();
+    const proof = await proofFor(env, 'ana@example.test');
+    let answer: (() => Response) | undefined = () => new Response('{}', { status: 503 });
+    env.fake.override('PUT', '/user', () => answer?.());
+    const set = () => env.sign.setPassword({ proof, password: strongPassword, device: laptop });
+    await expect(set()).rejects.toThrow(SupabaseAuthUnexpected);
+    answer = () => Response.json({ code: 'over_request_rate_limit' }, { status: 429 });
+    await expect(set()).rejects.toThrow(SupabaseAuthUnexpected);
+    answer = () => {
+      throw new Error('ECONNRESET');
+    };
+    await expect(set()).rejects.toThrow(/no connection/);
+    answer = undefined;
+    expect(value(await set()).outcome).toBe('account-created');
+  });
+
+  it('throws on a refusal it does not expect, and turns an ended session into proof-invalid', async () => {
+    const env = setup();
+    const proof = await proofFor(env, 'ana@example.test');
+    let code = 'validation_failed';
+    env.fake.override('PUT', '/user', () => Response.json({ code }, { status: 422 }));
+    await expect(
+      env.sign.setPassword({ proof, password: strongPassword, device: laptop }),
+    ).rejects.toThrow(/validation_failed/);
+    const again = await proofFor(env, 'ana@example.test');
+    code = 'session_not_found';
+    expect(
+      await env.sign.setPassword({ proof: again, password: strongPassword, device: laptop }),
+    ).toEqual(fail({ code: 'proof-invalid' }));
   });
 });
 
@@ -400,6 +479,69 @@ describe('sign-in', () => {
       ),
     );
     expect(results.map(errorCode).filter((c) => c === 'wrong-email-or-password')).toHaveLength(5);
+  });
+
+  it('never answers a password sooner than the floor, so a quick "no such address" looks like a wrong password (T-68)', async () => {
+    let clock = 0;
+    let took = 200;
+    const env = setup({ elapsed: () => clock });
+    await signUp(env, 'ana@example.test');
+    env.fake.override('POST', '/token?grant_type=password', () => {
+      clock += took;
+      return undefined;
+    });
+    await env.sign.signIn({ email: 'nobody@example.test', password: 'whatever', device: laptop });
+    await env.sign.signIn({ email: 'ana@example.test', password: strongPassword, device: laptop });
+    expect(env.sleeps).toEqual([550, 550]);
+    // A slow answer gets no wait added.
+    took = 900;
+    await env.sign.signIn({ email: 'ana@example.test', password: 'wrong one', device: laptop });
+    expect(env.sleeps).toHaveLength(2);
+    // The password again before a sensitive action is held to the same floor.
+    took = 100;
+    const { session } = value(
+      await env.sign.signIn({
+        email: 'ana@example.test',
+        password: strongPassword,
+        device: laptop,
+      }),
+    );
+    await env.sign.confirmPassword({
+      accessToken: session.accessToken,
+      password: strongPassword,
+      networkAddress: here,
+    });
+    expect(env.sleeps.slice(2)).toEqual([650, 650]);
+  });
+
+  it('does not count a try against the person when Supabase is busy or down', async () => {
+    const env = setup();
+    await signUp(env, 'ana@example.test');
+    let busy: (() => Response) | undefined = () =>
+      Response.json({ code: 'over_request_rate_limit' }, { status: 429 });
+    env.fake.override('POST', '/token?grant_type=password', () => busy?.());
+    const guess = () =>
+      env.sign
+        .signIn({ email: 'ana@example.test', password: 'wrong password', device: laptop })
+        .then(errorCode);
+    for (let i = 0; i < 12; i++) expect(await guess()).toBe('too-many-attempts');
+    busy = () => new Response('{}', { status: 502 });
+    for (let i = 0; i < 12; i++) await expect(guess()).rejects.toThrow(SupabaseAuthUnexpected);
+    busy = undefined;
+    const later = [];
+    for (let i = 0; i < 6; i++) later.push(await guess());
+    expect(later).toEqual([...Array(5).fill('wrong-email-or-password'), 'too-many-attempts']);
+  });
+
+  it('throws on a password refusal it does not expect, rather than calling it wrong', async () => {
+    const env = setup();
+    await signUp(env, 'ana@example.test');
+    env.fake.override('POST', '/token?grant_type=password', () =>
+      Response.json({ code: 'validation_failed' }, { status: 400 }),
+    );
+    await expect(
+      env.sign.signIn({ email: 'ana@example.test', password: strongPassword, device: laptop }),
+    ).rejects.toThrow(/validation_failed/);
   });
 
   it('refuses a sign-up that was never finished as just wrong', async () => {
@@ -478,6 +620,21 @@ describe('Google sign-in', () => {
       }),
     ).toEqual(fail({ code: 'external-sign-in-failed' }));
   });
+
+  it('throws on a refusal it does not expect', async () => {
+    const env = setup();
+    env.fake.override('POST', '/token?grant_type=pkce', () =>
+      Response.json({ code: 'validation_failed' }, { status: 400 }),
+    );
+    await expect(
+      env.sign.completeExternalSignIn({
+        provider: 'google',
+        code: 'some-code',
+        verifier: 'some-verifier',
+        device: laptop,
+      }),
+    ).rejects.toThrow(/validation_failed/);
+  });
 });
 
 describe('sessions', () => {
@@ -534,6 +691,53 @@ describe('sessions', () => {
       SupabaseAuthUnexpected,
     );
     down = false;
+    expect((await env.sign.renew({ refreshToken: session.refreshToken })).ok).toBe(true);
+  });
+
+  it('treats an access token as run out 30 seconds early', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    env.advanceSeconds(60 * 60 - 31);
+    expect((await env.sign.identify({ accessToken: session.accessToken })).ok).toBe(true);
+    env.advanceSeconds(1);
+    expect(await env.sign.identify({ accessToken: session.accessToken })).toEqual(
+      fail({ code: 'access-expired' }),
+    );
+  });
+
+  it('reads Supabase finding the token run out as access-expired, and leaves the session to renew', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    let expired = true;
+    env.fake.override('GET', '/user', () =>
+      expired ? Response.json({ code: 'bad_jwt' }, { status: 403 }) : undefined,
+    );
+    expect(await env.sign.identify({ accessToken: session.accessToken })).toEqual(
+      fail({ code: 'access-expired' }),
+    );
+    expired = false;
+    const renewed = value(await env.sign.renew({ refreshToken: session.refreshToken }));
+    expect((await env.sign.identify({ accessToken: renewed.accessToken })).ok).toBe(true);
+  });
+
+  it('throws on a refusal it does not expect from Supabase, and ends nothing', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    let odd = true;
+    env.fake.override('GET', '/user', () =>
+      odd ? Response.json({ code: 'over_request_rate_limit' }, { status: 429 }) : undefined,
+    );
+    env.fake.override('POST', '/token?grant_type=refresh_token', () =>
+      odd ? Response.json({ code: 'validation_failed' }, { status: 400 }) : undefined,
+    );
+    await expect(env.sign.identify({ accessToken: session.accessToken })).rejects.toThrow(
+      SupabaseAuthUnexpected,
+    );
+    await expect(env.sign.renew({ refreshToken: session.refreshToken })).rejects.toThrow(
+      /validation_failed/,
+    );
+    odd = false;
+    expect((await env.sign.identify({ accessToken: session.accessToken })).ok).toBe(true);
     expect((await env.sign.renew({ refreshToken: session.refreshToken })).ok).toBe(true);
   });
 

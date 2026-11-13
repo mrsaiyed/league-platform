@@ -10,6 +10,7 @@ import {
   type FakeSupabaseAuthOptions,
 } from './fake-supabase-auth.test-helper.ts';
 import { createMemorySignInStore } from './memory-sign-in-store.ts';
+import type { SupabaseSignInStore } from './sign-in-store.ts';
 import { createSupabaseSignIn, type SupabaseSignInOptions } from './supabase-sign-in.ts';
 
 export const laptop: SignInDevice = {
@@ -44,7 +45,12 @@ export function setup(
     leakedPasswords: sampleLeakedPasswords,
     ...fakeOptions,
   });
-  const store = createMemorySignInStore({ environment: 'test', nodeEnv: 'test', now });
+  const { store, storeCalls } = recorded(
+    createMemorySignInStore({ environment: 'test', nodeEnv: 'test', now }),
+  );
+  // The password time floor is measured on a clock that stands still, and its waits
+  // are written down rather than waited.
+  const sleeps: number[] = [];
   const sign = createSupabaseSignIn({
     projectUrl,
     secretKey,
@@ -54,6 +60,10 @@ export function setup(
     returnOrigins: [returnOrigin],
     allowLocalHttp: true,
     now,
+    elapsed: () => 0,
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
     ...overrides,
   });
   const advanceSeconds = (seconds: number) => {
@@ -65,7 +75,30 @@ export function setup(
       .calls()
       .slice(from)
       .map((c) => `${c.method} ${c.path}`);
-  return { sign, fake, store, capture, advanceSeconds, callsSince };
+  return { sign, fake, store, storeCalls, sleeps, capture, advanceSeconds, callsSince };
+}
+
+/** The store, with every method call written down by name, oldest first. */
+function recorded(inner: SupabaseSignInStore) {
+  const calls: string[] = [];
+  const wrap = <T extends object>(part: string, target: T): T =>
+    new Proxy(target, {
+      get(object, key, receiver) {
+        const found: unknown = Reflect.get(object, key, receiver);
+        if (typeof found !== 'function') return found;
+        return (...args: unknown[]): unknown => {
+          calls.push(`${part}.${String(key)}`);
+          return Reflect.apply(found, object, args);
+        };
+      },
+    });
+  const store: SupabaseSignInStore = {
+    limits: wrap('limits', inner.limits),
+    codes: wrap('codes', inner.codes),
+    accounts: wrap('accounts', inner.accounts),
+    sessions: wrap('sessions', inner.sessions),
+  };
+  return { store, storeCalls: () => [...calls] };
 }
 
 export type Setup = ReturnType<typeof setup>;

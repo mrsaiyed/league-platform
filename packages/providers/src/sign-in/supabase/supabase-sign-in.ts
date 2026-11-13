@@ -24,6 +24,11 @@
 //
 // Parallel calls: every count is taken by one atomic store call before anything else
 // is awaited, as in the stand-in (record 013).
+//
+// Refusals are sorted by Supabase's error code, never by status alone: each call
+// accepts only the codes it expects, and anything else is thrown as unexpected. A
+// refusal that is not the person's doing (Supabase busy, down or silent) never counts
+// as a wrong guess, and never uses up a proof.
 import { createHash, randomBytes } from 'node:crypto';
 import {
   emailCode,
@@ -54,6 +59,7 @@ import {
   type GoTrueRefusal,
   type GoTrueSession,
   type GoTrueUser,
+  type StartTimer,
 } from './gotrue-client.ts';
 import type { PendingCode, StoredSession, SupabaseSignInStore } from './sign-in-store.ts';
 
@@ -75,9 +81,19 @@ export type SupabaseSignInOptions = {
   readonly allowLocalHttp?: boolean;
   readonly now?: () => Date;
   readonly settings?: Partial<SignInSettings>;
+  /** Milliseconds from a steady clock, to measure how long a call took. Injected for tests. */
+  readonly elapsed?: () => number;
+  /** Waits; injected so tests need not. */
+  readonly sleep?: (ms: number) => Promise<void>;
+  /** The time limit on each call to Supabase, and its timer (`gotrue-client.ts`). */
+  readonly callTimeoutMs?: number;
+  readonly startTimer?: StartTimer;
 };
 
 const minute = 60_000;
+/** An access token this close to running out is treated as run out, so it never dies mid-request. */
+const expiryMarginMs = 30_000;
+const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const token = () => randomBytes(32).toString('base64url');
 const digest = (value: string) => createHash('sha256').update(value).digest('base64url');
 
@@ -107,6 +123,16 @@ const unexpected = (what: string, refusal: GoTrueRefusal): never => {
   throw new SupabaseAuthUnexpected(what, refusal.status, refusal.code);
 };
 
+/** The refusal's code, if it is one this call expects; anything else is thrown. */
+const expectedRefusal = <C extends string>(
+  what: string,
+  refusal: GoTrueRefusal,
+  expected: readonly C[],
+): C => {
+  const found = expected.find((code) => code === refusal.code);
+  return found === undefined ? unexpected(what, refusal) : found;
+};
+
 function checkProjectUrl(projectUrl: string, allowLocalHttp: boolean) {
   let url: URL;
   try {
@@ -126,11 +152,15 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
   if (!options.secretKey) throw new Error('The Supabase secret key is missing.');
   const settings: SignInSettings = { ...signInDefaults, ...options.settings };
   const now = options.now ?? (() => new Date());
+  const elapsed = options.elapsed ?? (() => performance.now());
+  const sleep = options.sleep ?? realSleep;
   const { store, codeSender } = options;
   const auth = createGoTrueClient({
     projectUrl: options.projectUrl,
     secretKey: options.secretKey,
     fetch: options.fetch,
+    ...(options.callTimeoutMs === undefined ? {} : { timeoutMs: options.callTimeoutMs }),
+    ...(options.startTimer === undefined ? {} : { startTimer: options.startTimer }),
   });
   const returnRules = { allowedOrigins: options.returnOrigins ?? [], allowLocalHttp };
 
@@ -180,9 +210,19 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
   ): Promise<{ session: StoredSession; user: GoTrueUser } | SessionError> => {
     const session = await store.sessions.sessionByAccessToken(digest(accessToken));
     if (!session || session.ended) return { code: 'session-ended' };
-    if (now().getTime() >= session.accessExpiresAt.getTime()) return { code: 'access-expired' };
+    if (now().getTime() >= session.accessExpiresAt.getTime() - expiryMarginMs) {
+      return { code: 'access-expired' };
+    }
     const user = await auth.user(accessToken);
-    if (!user.ok && user.refusal.status === 429) unexpected('user', user.refusal);
+    if (!user.ok) {
+      const refused = expectedRefusal('user', user.refusal, [
+        'session_not_found',
+        'user_not_found',
+        'bad_jwt',
+      ]);
+      // Supabase's clock found it run out before ours: renewing is the answer.
+      if (refused === 'bad_jwt') return { code: 'access-expired' };
+    }
     if (!user.ok || user.value.id !== session.accountId) {
       // Ended at Supabase (a password change, reuse caught there, or by hand).
       await store.sessions.endSession(session.sessionId);
@@ -220,25 +260,26 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       purpose === 'sign-up' ? 'magiclink' : 'recovery',
       email,
     );
-    let code: string | null = null;
-    let verifyType: VerifyType | null = null;
-    let accountExists = false;
-    if (generated.ok) {
-      if (!emailCode.safeParse(generated.value.code).success) {
-        // The project's code length is not 6 (record 018 lists the settings).
-        throw new SupabaseAuthUnexpected('generate_link: the code is not 6 digits');
-      }
-      accountExists = await store.accounts.accountExists(generated.value.user.id);
-      if (purpose === 'sign-up' || accountExists) {
-        code = generated.value.code;
-        verifyType = generated.value.verifyType;
-      }
-    } else {
+    if (!generated.ok) {
       const limit = supabaseLimited(generated.refusal);
       if (limit) return fail(limit);
-      const noUser =
-        generated.refusal.status === 404 || generated.refusal.code === 'user_not_found';
-      if (purpose === 'sign-up' || !noUser) unexpected('generate_link', generated.refusal);
+      // Any other refusal of a reset is read as "no such user": the answer is the same
+      // as for an address with an account, and no code is sent.
+      if (purpose === 'sign-up') unexpected('generate_link', generated.refusal);
+    } else if (!emailCode.safeParse(generated.value.code).success) {
+      // The project's code length is not 6 (record 018 lists the settings).
+      throw new SupabaseAuthUnexpected('generate_link: the code is not 6 digits');
+    }
+    // Asked either way, with an id that matches nothing when Supabase has no user, so
+    // the store sees the same calls whether or not the account exists (T-68).
+    const accountExists =
+      (await store.accounts.accountExists(generated.ok ? generated.value.user.id : token())) &&
+      generated.ok;
+    let code: string | null = null;
+    let verifyType: VerifyType | null = null;
+    if (generated.ok && (purpose === 'sign-up' || accountExists)) {
+      code = generated.value.code;
+      verifyType = generated.value.verifyType;
     }
     const expiresAt = new Date(now().getTime() + settings.codeValidMinutes * minute);
     // Every request hands the sender a message, one with no code for a reset with no
@@ -254,8 +295,22 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
     return ok({ codeValidMinutes: settings.codeValidMinutes });
   };
 
-  /** Signs in by password at Supabase, never sending one over 72 bytes (T-225). */
+  /**
+   * Signs in by password at Supabase, never sending one over 72 bytes (T-225), and
+   * never answering sooner than `passwordMinMilliseconds`: Supabase skips the hash for
+   * an address it does not know, so its answer is quicker then (T-68).
+   */
   const passwordSignIn = async (email: string | null, password: string) => {
+    const started = elapsed();
+    try {
+      return await passwordSignInOnce(email, password);
+    } finally {
+      const left = settings.passwordMinMilliseconds - (elapsed() - started);
+      if (left > 0) await sleep(left);
+    }
+  };
+
+  const passwordSignInOnce = async (email: string | null, password: string) => {
     const attempt = passwordAttempt.safeParse(password);
     const typed =
       attempt.success && Buffer.byteLength(attempt.data, 'utf8') <= passwordMaxBytes
@@ -276,10 +331,25 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
     if (answer.ok) return { session: answer.value };
     const limit = supabaseLimited(answer.refusal);
     if (limit) return { limited: limit };
-    // `invalid_credentials`, and `email_not_confirmed` for a sign-up never finished.
-    if (answer.refusal.status === 400 || answer.refusal.status === 401)
-      return { wrong: true as const };
-    return unexpected('password sign-in', answer.refusal);
+    // `email_not_confirmed` is a sign-up never finished: no account, so just wrong.
+    expectedRefusal('password sign-in', answer.refusal, [
+      'invalid_credentials',
+      'email_not_confirmed',
+    ]);
+    return { wrong: true as const };
+  };
+
+  /** A password check whose try is taken back if it was not the person's doing (Supabase busy or down). */
+  const checkPassword = async (email: string | null, password: string, ticket: string) => {
+    let answer;
+    try {
+      answer = await passwordSignIn(email, password);
+    } catch (error) {
+      await store.limits.cancelGuess(ticket);
+      throw error;
+    }
+    if ('limited' in answer) await store.limits.cancelGuess(ticket);
+    return answer;
   };
 
   const service: SignInService = {
@@ -306,31 +376,46 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
         fail({ code: attempt.attemptsLeft <= 0 ? 'too-many-attempts' : 'code-wrong' } as const);
       const code = emailCode.safeParse(rawCode);
       if (!email.success || !code.success) return wrong();
-      if (attempt.verifyType === null) {
+      const { verifyType } = attempt;
+      let verified;
+      try {
         // No code was sent (T-68): the same call, which cannot succeed.
-        await auth.verifyNothing(token());
-        return wrong();
+        verified =
+          verifyType === null
+            ? await auth.verifyNothing(token())
+            : await auth.verifyCode(verifyType, email.data, code.data);
+        if (!verified.ok && !supabaseLimited(verified.refusal)) {
+          // Supabase answers `otp_expired` for a wrong code too; ours says which.
+          expectedRefusal('verify', verified.refusal, ['otp_expired']);
+        }
+      } catch (error) {
+        await store.limits.cancelGuess(reserved.ticket);
+        throw error;
       }
-      const verified = await auth.verifyCode(attempt.verifyType, email.data, code.data);
       if (!verified.ok) {
         const limit = supabaseLimited(verified.refusal);
-        if (limit) return fail(limit);
-        // Supabase answers `otp_expired` for a wrong code too; ours says which.
+        if (limit) {
+          // Supabase was busy: the code was not checked, so it is not a wrong guess.
+          await store.limits.cancelGuess(reserved.ticket);
+          return fail(limit);
+        }
         return wrong();
       }
+      const made = verified.value;
+      if (made === null) return wrong();
       await store.limits.cancelGuess(reserved.ticket);
       await store.codes.dropCode(email.data);
       const proof = token();
       const proofExpiresAt = new Date(now().getTime() + settings.proofValidMinutes * minute);
       await store.codes.putProof(digest(proof), {
         email: email.data,
-        accountId: verified.value.user.id,
+        accountId: made.user.id,
         expiresAt: proofExpiresAt,
         supabase: {
-          accessToken: verified.value.accessToken,
-          refreshToken: verified.value.refreshToken,
-          accessExpiresAt: verified.value.accessExpiresAt,
-          sessionId: verified.value.sessionId,
+          accessToken: made.accessToken,
+          refreshToken: made.refreshToken,
+          accessExpiresAt: made.accessExpiresAt,
+          sessionId: made.sessionId,
         },
       });
       return ok({ proof, proofExpiresAt });
@@ -345,25 +430,40 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
         const tooLong = checked.error.issues.some((issue) => issue.message === 'too-long');
         return fail({ code: tooLong ? 'password-too-long' : 'password-too-short' });
       }
+      // Taking it also ends the address's other proofs, in one step: of two proofs
+      // used at once, only one goes on to Supabase.
       const held = await store.codes.takeProof(proofHash, now());
       if (!held) return fail({ code: 'proof-invalid' });
-      const set = await auth.setPassword(held.supabase.accessToken, checked.data);
+      let set;
+      try {
+        set = await auth.setPassword(held.supabase.accessToken, checked.data);
+      } catch (error) {
+        // Supabase down or silent: not the person's doing, so the proof is kept.
+        await store.codes.putProof(proofHash, held);
+        throw error;
+      }
       if (!set.ok) {
         const { refusal } = set;
-        if (refusal.code === 'weak_password') {
+        if (refusal.status === 429) {
+          await store.codes.putProof(proofHash, held);
+          return unexpected('user update', refusal);
+        }
+        const refused = expectedRefusal('user update', refusal, [
+          'weak_password',
+          'same_password',
+          'session_not_found',
+          'bad_jwt',
+        ]);
+        if (refused === 'weak_password') {
           // The proof is kept, so the person can try another password.
           await store.codes.putProof(proofHash, held);
           if (refusal.reasons.includes('pwned')) return fail({ code: 'password-leaked' });
           if (refusal.reasons.includes('length')) return fail({ code: 'password-too-short' });
           return unexpected('user update', refusal);
         }
+        // The proof's session has ended at Supabase or run out.
+        if (refused !== 'same_password') return fail({ code: 'proof-invalid' });
         // The same password again is still a reset: carry on, and end the other sessions below.
-        if (refusal.code !== 'same_password') {
-          // The proof's session has ended (another proof finished first) or run out.
-          if (refusal.status === 401 || refusal.status === 403)
-            return fail({ code: 'proof-invalid' });
-          return unexpected('user update', refusal);
-        }
       }
       // T-85: a new password signs out every other device. Supabase does this on a
       // password change; asking again does not depend on it, and covers the same password.
@@ -395,7 +495,7 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       const email = parsedEmail.success ? parsedEmail.data : null;
       const reserved = await reserveGuess(email, where.networkAddress);
       if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
-      const answer = await passwordSignIn(email, password);
+      const answer = await checkPassword(email, password, reserved.ticket);
       if ('limited' in answer) return fail(answer.limited);
       if ('wrong' in answer) return fail({ code: 'wrong-email-or-password' });
       await store.limits.forgiveGuess(reserved.ticket);
@@ -425,10 +525,12 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       if (!code || !verifier) return fail({ code: 'external-sign-in-failed' });
       const exchanged = await auth.exchangeCode(code, verifier);
       if (!exchanged.ok) {
-        if (exchanged.refusal.status >= 400 && exchanged.refusal.status < 500) {
-          return fail({ code: 'external-sign-in-failed' });
-        }
-        return unexpected('pkce exchange', exchanged.refusal);
+        // A code already used or made up, or a verifier that does not match.
+        expectedRefusal('pkce exchange', exchanged.refusal, [
+          'flow_state_not_found',
+          'bad_code_verifier',
+        ]);
+        return fail({ code: 'external-sign-in-failed' });
       }
       const session = exchanged.value;
       const { created } = await store.accounts.claimAccount(session.user.id);
@@ -469,8 +571,15 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       let renewed;
       try {
         renewed = await auth.refresh(refreshToken);
-        // Supabase being busy is not a reason to sign the person out.
-        if (!renewed.ok && renewed.refusal.status === 429) unexpected('refresh', renewed.refusal);
+        // Only these end the session; anything else (Supabase busy, say) is thrown, and
+        // is not a reason to sign the person out.
+        if (!renewed.ok) {
+          expectedRefusal('refresh', renewed.refusal, [
+            'refresh_token_not_found',
+            'refresh_token_already_used',
+            'session_not_found',
+          ]);
+        }
       } catch (error) {
         // The token may be tried again: Supabase either did not rotate it, or will
         // hand back the same new tokens within its reuse window.
@@ -504,7 +613,7 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
       // Supabase has no "check this password" call: a sign-in checks it, and the
       // session it makes is ended at once.
-      const answer = await passwordSignIn(user.email, password);
+      const answer = await checkPassword(user.email, password, reserved.ticket);
       if ('limited' in answer) return fail(answer.limited);
       if ('wrong' in answer) return fail({ code: 'wrong-password' });
       await auth.signOut(answer.session.accessToken, 'local');

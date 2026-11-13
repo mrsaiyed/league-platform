@@ -301,8 +301,14 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
     },
 
     /** A check that cannot succeed, for the same work when no code was sent (T-68). */
-    async verifyNothing(tokenHash: string) {
-      await call('verify', 'POST', '/verify', admin, { type: 'recovery', token_hash: tokenHash });
+    async verifyNothing(tokenHash: string): Promise<GoTrueAnswer<null>> {
+      const answer = await call('verify', 'POST', '/verify', admin, {
+        type: 'recovery',
+        token_hash: tokenHash,
+      });
+      // A random hash matches nothing; a success would be a fault, never a session to use.
+      if (answer.ok) throw new SupabaseAuthUnexpected('verify: a made-up code was accepted');
+      return answer;
     },
 
     /** Sets the password of the session's user. Supabase ends the user's other sessions. */
