@@ -20,7 +20,8 @@
 --   a forfeit has a winner;
 -- - a game's rules (`format`) never change once it has gone live or been decided
 --   (S-1, S-21);
--- - changing a decided game's result (status, a score, or putting it in the bin)
+-- - changing a decided game's result (its status, a score, a team, its division or
+--   stage, the time it was finalized, or putting it in or taking it out of the bin)
 --   needs a correction row for that game in the same transaction (S-7);
 -- - one regular-season stage per season, one schedule draft per season, round
 --   numbers and game numbers unique in their season, schedule revisions numbered
@@ -400,9 +401,10 @@ comment on function public.stamp_game_correction() is
 create trigger game_corrections_at_now before insert on public.game_corrections
   for each row execute function public.stamp_game_correction();
 
--- S-7: every correction is logged. A decided game (final or forfeit) whose status
--- or a score changes, or that goes to the bin, needs a correction row for that game
--- written in the same transaction, before or after the change: the check waits
+-- S-7: every correction is logged. A decided game (final or forfeit) whose status,
+-- a score, a team, its division or stage (where the result counts) or the time it
+-- was finalized changes, or that goes to the bin or comes back from it, needs a
+-- correction row for that game written in the same transaction, before or after the change: the check waits
 -- until the transaction commits. A correction is dated now() (the transaction's
 -- start, set by the database), which is how it is told apart from older ones. It
 -- reads only rows its own transaction wrote, so it needs no lock and holds at every
@@ -437,7 +439,13 @@ create constraint trigger games_result_change_needs_correction
       new.status is distinct from old.status
       or new.home_score is distinct from old.home_score
       or new.away_score is distinct from old.away_score
-      or (old.deleted_at is null and new.deleted_at is not null)
+      or new.home_team_id is distinct from old.home_team_id
+      or new.away_team_id is distinct from old.away_team_id
+      or new.division_id is distinct from old.division_id
+      or new.stage_id is distinct from old.stage_id
+      or new.finalized_at is distinct from old.finalized_at
+      -- Into the bin or back out of it.
+      or (old.deleted_at is null) <> (new.deleted_at is null)
     )
   )
   execute function public.check_game_result_corrected();

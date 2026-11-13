@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   asApp,
   freshSchema,
+  newDivision,
   newGame,
   newLeague,
   newSeason,
@@ -234,6 +235,46 @@ describe("a decided game's result changes only with a correction (S-7)", () => {
         await tx.query(sql, [g.gameId]);
       });
     }
+  });
+
+  it('covers a change of team, of division and of the time it was finalized', async () => {
+    const changes: [string, (g: Made) => Promise<unknown[]>][] = [
+      ['home_team_id', async (g) => [await newTeam(db, g.leagueId, g.seasonId)]],
+      ['away_team_id', async (g) => [await newTeam(db, g.leagueId, g.seasonId)]],
+      ['division_id', async (g) => [await newDivision(db, g.leagueId, g.seasonId)]],
+      ['finalized_at', async () => ['2026-01-01T00:00:00Z']],
+    ];
+    for (const [column, value] of changes) {
+      const g = await game();
+      const params = [g.gameId, ...(await value(g))];
+      const sql = `update games set ${column} = $2 where id = $1`;
+      await expect(db.query(sql, params)).rejects.toMatchObject(needsCorrection);
+      await db.transaction(async (tx) => {
+        await correct(tx, g);
+        await tx.query(sql, params);
+      });
+    }
+    // Its stage is the season's one regular-season stage, so it cannot change yet;
+    // the same check covers it once brackets add more stages (S-4).
+  });
+
+  it('covers taking a decided game back out of the bin', async () => {
+    const g = await game({ deleted_at: decided() });
+    const restore = 'update games set deleted_at = null where id = $1';
+    await expect(db.query(restore, [g.gameId])).rejects.toMatchObject(needsCorrection);
+    await db.transaction(async (tx) => {
+      await correct(tx, g);
+      await tx.query(restore, [g.gameId]);
+    });
+    // A game that was never decided comes back without one.
+    const scheduled = await game({
+      status: 'scheduled',
+      home_score: null,
+      away_score: null,
+      finalized_at: null,
+      deleted_at: decided(),
+    });
+    await db.query(restore, [scheduled.gameId]);
   });
 
   it('is not needed to decide a game, or to change what is not its result', async () => {

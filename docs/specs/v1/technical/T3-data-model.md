@@ -134,7 +134,7 @@ A roster entry's team and person are the same league's, and never change: moving
 
 The current live tracker already stores exactly this: a command log, the latest state, the score and the box score lines, saved together. The table shapes carry over.
 
-A game's stage, round, division and both teams are of its season, the teams are different, and its court is at its venue. Scheduled, postponed and cancelled games have no score; final and forfeited games have both scores and `finalized_at`; a live game has both or neither; a forfeit has a winner. `winner_team_id` is worked out from the scores, never typed. `format` is the rules the game is played under: empty while it follows the season's, and fixed once the game is live or decided (S-1, S-21). Changing a decided game's status or score, or putting it in the bin, needs a `game_corrections` row for it in the same transaction (S-7). Games go to the bin; schedule revisions (numbered 1, 2, 3 in a season) and corrections are history, never changed or removed. One regular-season stage and one schedule draft per season for now; brackets (S-4) come later. Detail: [decision record 025](../../../architecture/decisions/025-schedule-and-games.md) (T-237).
+A game's stage, round, division and both teams are of its season, the teams are different, and its court is at its venue. Scheduled, postponed and cancelled games have no score; final and forfeited games have both scores and `finalized_at`; a live game has both or neither; a forfeit has a winner. `winner_team_id` is worked out from the scores, never typed. `format` is the rules the game is played under: empty while it follows the season's, and fixed once the game is live or decided (S-1, S-21). Changing a decided game's result (its status, a score, a team, its division or stage, `finalized_at`, or putting it in or taking it out of the bin) needs a `game_corrections` row for it in the same transaction (S-7). Games go to the bin; schedule revisions (numbered 1, 2, 3 in a season) and corrections are history, never changed or removed. One regular-season stage and one schedule draft per season for now; brackets (S-4) come later. Detail: [decision record 025](../../../architecture/decisions/025-schedule-and-games.md) (T-237).
 
 ## 9. Calculated tables
 
@@ -204,6 +204,7 @@ Members of team and division chats are worked out from rosters, so they never dr
 - Within a game, each `command_id` and each `seq` appears once (a tap cannot be saved twice).
 - Jersey numbers are unique within a team where the season's rules require it.
 - A final game has both scores; a scheduled game has none.
+- A decided game's result changes only with a correction for it in the same transaction (S-7).
 - Capacity: taking a place locks the form row first, so two simultaneous sign-ups cannot both take the last place.
 - Row-level security on every league table, as the second fence ([T4](T4-tenancy-auth-security.md)).
 
