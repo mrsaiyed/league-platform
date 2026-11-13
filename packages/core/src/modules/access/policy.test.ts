@@ -39,7 +39,9 @@ describe('allows', () => {
     for (const role of roles) {
       const scope: Scope = role === 'coach' || role === 'captain' ? team : { type: 'league' };
       for (const p of permissions) {
-        expect(allows(holder(grant(role, scope)), p, scope)).toBe(rolePermissions[role].includes(p));
+        expect(allows(holder(grant(role, scope)), p, scope)).toBe(
+          rolePermissions[role].includes(p),
+        );
       }
       expect(allows(holder(grant(role, scope)), 'access.manage', scope)).toBe(role === 'admin');
       expect(allows(holder(grant(role, scope)), 'activity.read', scope)).toBe(role === 'admin');
@@ -62,9 +64,9 @@ describe('allows', () => {
     expect(allows(holder({ ...grant('admin'), revokedAt: 'now' }), 'access.manage', program)).toBe(
       false,
     );
-    expect(allows(holder({ ...grant('admin'), accountId: 'other' }), 'access.manage', program)).toBe(
-      false,
-    );
+    expect(
+      allows(holder({ ...grant('admin'), accountId: 'other' }), 'access.manage', program),
+    ).toBe(false);
   });
 });
 

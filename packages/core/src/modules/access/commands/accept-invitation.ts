@@ -62,7 +62,8 @@ export const acceptInvitation = defineCommand({
       target: { type: 'role_grant', id: grant.id },
       details: { role, ...scopeDetails(scope), invitationId: invitation.id },
     });
-    if (held === undefined) emit({ type: roleGranted, leagueId: context.leagueId, grantId: grant.id });
+    if (held === undefined)
+      emit({ type: roleGranted, leagueId: context.leagueId, grantId: grant.id });
     return ok({ grantId: grant.id, role, scope });
   },
 });

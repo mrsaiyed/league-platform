@@ -33,7 +33,13 @@ export const programId = '01900000-0000-7000-8000-0000000000c1';
 export const otherProgramId = '01900000-0000-7000-8000-0000000000c2';
 
 const statusOf = (i: StoredInvitation): Invitation['status'] =>
-  i.acceptedBy !== null ? 'accepted' : i.cancelled ? 'cancelled' : i.expired ? 'expired' : 'pending';
+  i.acceptedBy !== null
+    ? 'accepted'
+    : i.cancelled
+      ? 'cancelled'
+      : i.expired
+        ? 'expired'
+        : 'pending';
 
 const view = (i: StoredInvitation): Invitation => ({
   id: i.id,

@@ -34,7 +34,8 @@ export async function listActivityEntries(
       'target_id',
       'summary',
       'details',
-      'at',
+      // To the microsecond, as stored, so a page can carry on exactly after it.
+      sql<string>`to_char(at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as('at_text'),
     ])
     .where('league_id', '=', scope.leagueId);
   if (before !== undefined) {
@@ -43,7 +44,7 @@ export async function listActivityEntries(
   const rows = await query.orderBy('at', 'desc').orderBy('id', 'desc').limit(limit).execute();
   return rows.map((row) => ({
     id: row.id,
-    at: row.at.toISOString(),
+    at: row.at_text,
     actorAccountId: row.actor_account_id,
     action: row.action,
     targetType: row.target_type,

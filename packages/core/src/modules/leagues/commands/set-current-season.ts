@@ -12,7 +12,11 @@ export const setCurrentSeason = defineCommand({
   name: 'leagues.set_current_season',
   input: z.object({ seasonId: z.uuid() }),
   allowed: (context, _input, tx: LeaguesTx) => mayEditLeague(context, tx),
-  run: async ({ context, input, tx }): Promise<Result<{ seasonId: string }, SetCurrentSeasonError>> => {
+  run: async ({
+    context,
+    input,
+    tx,
+  }): Promise<Result<{ seasonId: string }, SetCurrentSeasonError>> => {
     if (!(await tx.leagues.setCurrentSeason(input.seasonId))) {
       return fail({ code: 'season-not-found' });
     }

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { grantOf, memoryAccess, ownerId, programId, strangerId } from '../memory-access.test-helper.ts';
+import {
+  grantOf,
+  memoryAccess,
+  ownerId,
+  programId,
+  strangerId,
+} from '../memory-access.test-helper.ts';
 import { acceptInvitation } from './accept-invitation.ts';
 import { invite } from './invite.ts';
 
@@ -7,7 +13,11 @@ const volleyball = { type: 'program', id: programId } as const;
 
 async function invited(role = 'scheduler', scope: object = volleyball) {
   const made = memoryAccess();
-  const result = await invite(made.as(ownerId), { email: 'a@example.test', role, scope }, made.deps);
+  const result = await invite(
+    made.as(ownerId),
+    { email: 'a@example.test', role, scope },
+    made.deps,
+  );
   if (!result.ok) throw new Error('not invited');
   const token = made.db.jobs[0]?.ids['token'] ?? '';
   return { ...made, token };

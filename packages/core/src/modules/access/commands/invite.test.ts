@@ -83,9 +83,9 @@ describe('invite', () => {
     expect(await invite(as(ownerId), { ...input, email: 'A@example.test' }, deps)).toMatchObject({
       error: { code: 'already-invited' },
     });
-    expect(
-      await invite(as(ownerId), { ...input, scope: volleyball }, deps),
-    ).toMatchObject({ ok: true });
+    expect(await invite(as(ownerId), { ...input, scope: volleyball }, deps)).toMatchObject({
+      ok: true,
+    });
     expect(db.jobs).toHaveLength(2);
   });
 

@@ -1,6 +1,13 @@
 // How role_grants and invitations rows become the access module's shapes (T-29),
 // field by field, and the columns the queries read for them. Runs no SQL itself.
-import { roles, type Grant, type Invitation, type InvitationStatus, type Role, type Scope } from '@srleagues/core';
+import {
+  roles,
+  type Grant,
+  type Invitation,
+  type InvitationStatus,
+  type Role,
+  type Scope,
+} from '@srleagues/core';
 import { sql } from 'kysely';
 
 export const grantColumns = [

@@ -7,10 +7,7 @@ export {
 } from './commands/accept-invitation.ts';
 export { cancelInvitation } from './commands/cancel-invitation.ts';
 export { invite, type InviteError } from './commands/invite.ts';
-export {
-  resendInvitation,
-  type InvitationClosedError,
-} from './commands/resend-invitation.ts';
+export { resendInvitation, type InvitationClosedError } from './commands/resend-invitation.ts';
 export { revokeGrant, type RevokeGrantError } from './commands/revoke-grant.ts';
 export { listAccess, type AccessList } from './queries/list-access.ts';
 export { listActivity } from './queries/list-activity.ts';

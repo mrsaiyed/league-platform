@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { grantOf, memoryAccess, ownerId, programId, strangerId } from '../memory-access.test-helper.ts';
+import {
+  grantOf,
+  memoryAccess,
+  ownerId,
+  programId,
+  strangerId,
+} from '../memory-access.test-helper.ts';
 import { permissions } from '../roles.ts';
 import { myAccess } from './my-access.ts';
 

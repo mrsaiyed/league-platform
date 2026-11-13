@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { hashInvitationToken, invitationTokenSchema, newInvitationToken } from './invitation-token.ts';
+import {
+  hashInvitationToken,
+  invitationTokenSchema,
+  newInvitationToken,
+} from './invitation-token.ts';
 
 describe('invitation tokens', () => {
   it('are 43 URL-safe characters, different every time, hashed as the table expects', async () => {

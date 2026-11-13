@@ -6,7 +6,11 @@ import { resendInvitation } from './resend-invitation.ts';
 
 async function invited() {
   const made = memoryAccess();
-  const result = await invite(made.as(ownerId), { email: 'a@example.test', role: 'editor' }, made.deps);
+  const result = await invite(
+    made.as(ownerId),
+    { email: 'a@example.test', role: 'editor' },
+    made.deps,
+  );
   if (!result.ok) throw new Error('not invited');
   return { ...made, invitationId: result.value.invitationId };
 }

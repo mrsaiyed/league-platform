@@ -31,7 +31,12 @@ export const invite = defineCommand({
   name: 'access.invite',
   // The same limits as the invitations table (0004). Emails are kept in lower case.
   input: z.object({
-    email: z.string().trim().max(320).pipe(z.email()).transform((e) => e.toLowerCase()),
+    email: z
+      .string()
+      .trim()
+      .max(320)
+      .pipe(z.email())
+      .transform((e) => e.toLowerCase()),
     role: z.enum(roles),
     scope: scopeInput.default(leagueScope),
   }),
@@ -43,7 +48,8 @@ export const invite = defineCommand({
     tx,
   }): Promise<Result<{ invitationId: string; expiresAt: string }, InviteError>> => {
     const { email, role, scope } = input;
-    if (!roleScopeTypes[role].includes(scope.type)) return fail({ code: 'role-does-not-fit-scope' });
+    if (!roleScopeTypes[role].includes(scope.type))
+      return fail({ code: 'role-does-not-fit-scope' });
     if (!availableScopeTypes.includes(scope.type)) return fail({ code: 'scope-not-available' });
     if (scope.type === 'program' && !(await tx.access.programExists(scope.id))) {
       return fail({ code: 'program-not-found' });
