@@ -12,6 +12,8 @@ const reads = new Set([
   'access.list_activity',
   'access.my_access',
   'leagues.list_divisions',
+  'people.list_people',
+  'games.list_postponed_games',
   'leagues.get_season',
   'scheduling.list_venues',
 ]);

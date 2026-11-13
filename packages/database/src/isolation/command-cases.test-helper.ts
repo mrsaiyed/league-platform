@@ -24,9 +24,11 @@ import type {
   CommandError,
   CommandTx,
   EventHandler,
+  GamesTx,
   Job,
   JobQueue,
   LeaguesTx,
+  PeopleTx,
   SchedulingTx,
   TeamsTx,
   TransactionRunner,
@@ -38,8 +40,10 @@ import {
   accessStore,
   activityLogStore,
   divisionsStore,
+  gamesStore,
   jobsStore,
   leaguesStore,
+  peopleStore,
   schedulingStore,
   teamsStore,
 } from '../stores/index.ts';
@@ -50,7 +54,7 @@ import type { LeagueRecords } from './two-leagues.test-helper.ts';
 export function harnessTx(
   scope: LeagueScope,
   jobs: JobQueue,
-): LeaguesTx & SchedulingTx & TeamsTx & AccessTx {
+): LeaguesTx & SchedulingTx & GamesTx & PeopleTx & TeamsTx & AccessTx {
   // The run's account counts as our staff, so commands only staff may run are tried
   // too: the worst case for isolation.
   const platformStaff = scope.accountId === null ? [] : [scope.accountId];
@@ -59,6 +63,8 @@ export function harnessTx(
     leagues: leaguesStore(scope, { platformStaff }),
     divisions: divisionsStore(scope),
     scheduling: schedulingStore(scope),
+    games: gamesStore(scope),
+    people: peopleStore(scope),
     teams: teamsStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),

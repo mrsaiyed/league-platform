@@ -27,8 +27,16 @@ export const Rules = z.strictObject({
   timeoutsCarry: z.boolean().optional(),
 });
 
-/** Mirrors `Command` in packages/sports/src/basketball/live.ts, which applies the rules. */
-export const Command = z.discriminatedUnion('type', [
+/**
+ * The rules the platform's tracker sends (T-128): the Al-Hadi tracker's, plus the clock
+ * mode, which is absent for a stop clock as every game before the mode existed.
+ */
+export const PlatformRules = Rules.extend({
+  clockMode: z.enum(['stop', 'running']).optional(),
+});
+
+/** The commands both trackers send. */
+const sharedCommands = [
   z.strictObject({ type: z.literal('lineup'), side: Side, playerIds: z.array(Id).min(1).max(5) }),
   z.strictObject({
     type: z.literal('score'),
@@ -55,11 +63,30 @@ export const Command = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('set-clock'), ms: z.number().int().min(0).max(3_600_000) }),
   z.strictObject({ type: z.literal('undo') }),
   z.strictObject({ type: z.literal('redo') }),
-  z.strictObject({ type: z.literal('rules'), rules: Rules }),
   z.strictObject({ type: z.literal('colors'), swapped: z.boolean() }),
   z.strictObject({ type: z.literal('end') }),
   z.strictObject({ type: z.literal('reopen') }),
   z.strictObject({ type: z.literal('reset') }),
+] as const;
+
+/**
+ * What the Al-Hadi tracker's server takes (apps/live-stats). It must not change while
+ * that tracker is live (T-16): it refuses the clock mode and its switch.
+ */
+export const Command = z.discriminatedUnion('type', [
+  ...sharedCommands,
+  z.strictObject({ type: z.literal('rules'), rules: Rules }),
+]);
+
+/**
+ * Mirrors `Command` in packages/sports/src/basketball/live.ts, which applies the rules:
+ * what the platform's server takes (step 2.68). Adds the clock mode and its mid-game
+ * switch (S-21, T-128), undone like any play.
+ */
+export const PlatformCommand = z.discriminatedUnion('type', [
+  ...sharedCommands,
+  z.strictObject({ type: z.literal('rules'), rules: PlatformRules }),
+  z.strictObject({ type: z.literal('clock-mode'), mode: z.enum(['stop', 'running']) }),
 ]);
 
 /**
@@ -73,5 +100,9 @@ export const Envelope = z.strictObject({
   input: Command,
 });
 
+/** One scorer action as the platform's tracker sends it; see `Envelope`. */
+export const PlatformEnvelope = Envelope.extend({ input: PlatformCommand });
+
 export type PlayerInput = z.infer<typeof PlayerInput>;
 export type Envelope = z.infer<typeof Envelope>;
+export type PlatformEnvelope = z.infer<typeof PlatformEnvelope>;

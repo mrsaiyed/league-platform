@@ -27,16 +27,25 @@ import {
   commands,
   createCourt,
   createDivision,
+  cancelGame,
   createLeague,
+  createPerson,
   clearSettingFor,
   createSeason,
   createTeam,
   createVenue,
   invite,
   listDivisions,
+  listPeople,
+  listPostponedGames,
+  postponeGame,
+  recordFinalScore,
+  recordForfeit,
+  reopenGame,
   listVenues,
   removeCourt,
   removeDivision,
+  removePerson,
   removeTeam,
   removeVenue,
   reorderDivisions,
@@ -45,6 +54,7 @@ import {
   restoreVenue,
   updateCourt,
   updateDivision,
+  updatePerson,
   setTeamStatsVisibility,
   updateTeam,
   updateVenue,
@@ -69,9 +79,11 @@ import {
   type CommandContext,
   type CommandRequirement,
   type CommandDeps,
+  type GamesTx,
   type Job,
   type LeaguesTx,
   type Permission,
+  type PeopleTx,
   type SchedulingTx,
   type SettingRegistry,
   type TeamsTx,
@@ -86,7 +98,10 @@ import {
   newAccount,
   newCourt,
   newDivision,
+  newGame,
   newLeague,
+  newPerson,
+  newStage,
   newProgram,
   newSeason,
   newTeam,
@@ -97,8 +112,10 @@ import {
 } from '../schema/schema.test-helper.ts';
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
+import { gamesStore } from './games-store.ts';
 import { divisionsStore } from './divisions-store.ts';
 import { leaguesStore } from './leagues-store.ts';
+import { peopleStore } from './people-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
 import { teamsStore } from './teams-store.ts';
 
@@ -141,6 +158,8 @@ let staffId: string;
 let accessDeps: CommandDeps<AccessTx>;
 let leaguesDeps: CommandDeps<LeaguesTx>;
 let schedulingDeps: CommandDeps<SchedulingTx>;
+let gamesDeps: CommandDeps<GamesTx>;
+let peopleDeps: CommandDeps<PeopleTx>;
 let teamsDeps: CommandDeps<TeamsTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
@@ -151,6 +170,8 @@ beforeAll(async () => {
     leagues: leaguesStore(scope, { platformStaff: [staffId] }),
     divisions: divisionsStore(scope),
     scheduling: schedulingStore(scope),
+    games: gamesStore(scope),
+    people: peopleStore(scope),
     teams: teamsStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
@@ -159,6 +180,8 @@ beforeAll(async () => {
   accessDeps = { transaction, events: [], ...rest };
   leaguesDeps = { transaction, events: [], ...rest };
   schedulingDeps = { transaction, events: [], ...rest };
+  gamesDeps = { transaction, events: [], ...rest };
+  peopleDeps = { transaction, events: [], ...rest };
   teamsDeps = { transaction, events: [], ...rest };
 });
 afterAll(async () => {
@@ -386,6 +409,112 @@ const teamCommandRows: readonly Row[] = [
   ),
 ];
 
+/** A game of a season of the default program, or of the league's other program. */
+async function gameIn(league: League, program: boolean, columns: Record<string, unknown> = {}) {
+  const seasonId = await seasonIn(league, program);
+  return {
+    seasonId,
+    gameId: await newGame(pglite, {
+      leagueId: league.leagueId,
+      seasonId,
+      stageId: await newStage(pglite, league.leagueId, seasonId),
+      homeTeamId: await newTeam(pglite, league.leagueId, seasonId),
+      awayTeamId: await newTeam(pglite, league.leagueId, seasonId),
+      columns,
+    }),
+  };
+}
+
+/** A games command's two rows: a game of the default program, and of the other one. */
+function gameRows(
+  command: string,
+  name: string,
+  needs: Permission,
+  prepare: (league: League, program: boolean) => Promise<unknown>,
+  run: Row['run'],
+): Row[] {
+  return [false, true].map((program) => ({
+    command,
+    name: `${name} ${program ? 'of one program' : 'of the default program'}`,
+    needs,
+    ...(program ? { scope: 'program' as const } : {}),
+    prepare: async (league) => ({ input: await prepare(league, program) }),
+    run,
+  }));
+}
+
+// Games are checked at their season's program (P4 �4): scores by scorekeepers and
+// schedulers, outcomes no one played by schedulers, corrections by schedulers (P4 �3).
+const gameCommandRows: readonly Row[] = [
+  ...gameRows(
+    'games.record_final_score',
+    'record a final score',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      version: 1,
+      homeScore: 52,
+      awayScore: 48,
+    }),
+    (c, i) => recordFinalScore(c, i, gamesDeps),
+  ),
+  ...gameRows(
+    'games.record_forfeit',
+    'record a forfeit',
+    'games.results',
+    async (league, program) => {
+      const game = await gameIn(league, program);
+      const home = await pglite.query<{ home_team_id: string }>(
+        'select home_team_id from games where id = $1',
+        [game.gameId],
+      );
+      return { gameId: game.gameId, version: 1, forfeitingTeamId: home.rows[0]?.home_team_id };
+    },
+    (c, i) => recordForfeit(c, i, gamesDeps),
+  ),
+  ...gameRows(
+    'games.postpone_game',
+    'postpone a game',
+    'games.results',
+    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId, version: 1 }),
+    (c, i) => postponeGame(c, i, gamesDeps),
+  ),
+  ...gameRows(
+    'games.cancel_game',
+    'cancel a game',
+    'games.results',
+    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId, version: 1 }),
+    (c, i) => cancelGame(c, i, gamesDeps),
+  ),
+  ...gameRows(
+    'games.reopen_game',
+    'reopen a final game',
+    'games.correct',
+    async (league, program) => ({
+      gameId: (
+        await gameIn(league, program, {
+          status: 'final',
+          home_score: 50,
+          away_score: 40,
+          finalized_at: '2026-12-06T19:30:00Z',
+        })
+      ).gameId,
+      version: 1,
+      reason: 'The score was wrong',
+    }),
+    (c, i) => reopenGame(c, i, gamesDeps),
+  ),
+  {
+    command: 'games.list_postponed_games',
+    name: 'see the games waiting to be rescheduled',
+    needs: 'schedule.read',
+    // Any grant that reads the schedule, at any scope, may look.
+    scope: 'program',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listPostponedGames(c, i, gamesDeps),
+  },
+];
+
 const divisionAndVenueRows: readonly Row[] = [
   // Divisions are checked at their season's program (P4 §4): the owner and admins.
   ...divisionRows(
@@ -609,8 +738,50 @@ const bannerSetting = defineSetting({
   label: 'setting.site.banner.label',
 });
 
+/** People belong to the league: checked league-wide (P4 §3, R-16). */
+const peopleRows: readonly Row[] = [
+  {
+    command: 'people.create_person',
+    name: 'add a person',
+    needs: 'people.manage',
+    prepare: async () => ({ input: { firstName: 'Sam', lastName: 'Ng' } }),
+    run: (c, i) => createPerson(c, i, peopleDeps),
+  },
+  {
+    command: 'people.update_person',
+    name: 'fix a person',
+    needs: 'people.manage',
+    prepare: async (league) => ({
+      input: {
+        personId: await newPerson(pglite, league.leagueId),
+        version: 1,
+        firstName: 'Renamed',
+      },
+    }),
+    run: (c, i) => updatePerson(c, i, peopleDeps),
+  },
+  {
+    command: 'people.remove_person',
+    name: 'remove a person',
+    needs: 'people.manage',
+    prepare: async (league) => ({
+      input: { personId: await newPerson(pglite, league.leagueId) },
+    }),
+    run: (c, i) => removePerson(c, i, peopleDeps),
+  },
+  {
+    command: 'people.list_people',
+    name: 'see the people list',
+    needs: 'people.read',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listPeople(c, i, peopleDeps),
+  },
+];
+
 const rows: readonly Row[] = [
   ...divisionAndVenueRows,
+  ...peopleRows,
+  ...gameCommandRows,
   ...teamCommandRows,
   ...settingRows(declaredSettings),
   ...settingRows(settingRegistry([bannerSetting])),
