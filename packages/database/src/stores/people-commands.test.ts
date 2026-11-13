@@ -7,6 +7,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import {
   createPerson,
   listPeople,
+  rolePermissions,
   removePerson,
   updatePerson,
   type CommandDeps,
@@ -18,7 +19,7 @@ import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import { withTransaction } from '../db/with-transaction.ts';
-import { listPeople as listPeopleQuery } from '../queries/index.ts';
+import { findPerson, listPeople as listPeopleQuery } from '../queries/index.ts';
 import {
   allPersonColumns,
   publicPersonColumns,
@@ -237,5 +238,73 @@ describe('the people commands on the database', () => {
       expect(publicPersonColumns as readonly string[]).not.toContain(column);
       expect(allPersonColumns as readonly string[]).toContain(column);
     }
+  });
+
+  /**
+   * No role holds people.read and people.manage without people.read_sensitive, so
+   * the test takes that one permission off the registrar for the length of a call.
+   */
+  async function withoutSensitiveRead<T>(run: () => Promise<T>): Promise<T> {
+    const held = rolePermissions.registrar as string[];
+    const at = held.indexOf('people.read_sensitive');
+    if (at < 0) throw new Error('the registrar no longer holds people.read_sensitive');
+    held.splice(at, 1);
+    try {
+      return await run();
+    } finally {
+      held.splice(at, 0, 'people.read_sensitive');
+    }
+  }
+
+  it('gives a reader without people.read_sensitive no private key and no search by email', async () => {
+    const l = await league();
+    const reader = await accountWith(l.leagueId, 'registrar');
+    const personId = await newSensitivePerson(l.leagueId);
+    await pglite.query("update people set first_name = 'Quinn', last_name = 'Vale' where id = $1", [
+      personId,
+    ]);
+    const version = (
+      await one<{ version: number }>(pglite, 'select version from people where id = $1', [personId])
+    ).version;
+    await withoutSensitiveRead(async () => {
+      const listed = await listPeople(l.as(reader), {}, deps);
+      if (!listed.ok) throw new Error('not listed');
+      expect(listed.value).toHaveLength(1);
+      expect(Object.keys(listed.value[0] ?? {}).sort()).toEqual(
+        ['binned', 'firstName', 'id', 'lastName', 'publicName', 'version', 'visibility'].sort(),
+      );
+      expect(JSON.stringify(listed.value)).not.toMatch(sensitiveText);
+      // An email finds nothing for this reader, though it finds the person for one who may see it.
+      expect(await listPeople(l.as(reader), { search: 'test@example' }, deps)).toEqual({
+        ok: true,
+        value: [],
+      });
+      expect(await listPeople(l.as(reader), { search: 'vale' }, deps)).toMatchObject({
+        value: [{ id: personId }],
+      });
+      // Fixing a name works; touching a private field is refused, and nothing leaks either way.
+      const found = await withTransaction(
+        db,
+        { leagueId: l.leagueId, accountId: reader },
+        (scope) => findPerson(scope, personId, false),
+      );
+      expect(found).toBeDefined();
+      expect(Object.keys(found ?? {})).not.toContain('sensitive');
+      expect(JSON.stringify(found)).not.toMatch(sensitiveText);
+      expect(
+        await updatePerson(l.as(reader), { personId, version, birthDate: null }, deps),
+      ).toMatchObject({ error: { code: 'sensitive-fields-not-allowed' } });
+      expect(
+        await updatePerson(l.as(reader), { personId, version, firstName: 'Quincy' }, deps),
+      ).toEqual({ ok: true, value: { version: version + 1 } });
+    });
+    const stored = await one<{ contact_email: string; birth_date: string | Date }>(
+      pglite,
+      'select contact_email, birth_date from people where id = $1',
+      [personId],
+    );
+    expect(stored.contact_email).toBe('test@example.test');
+    const withEmail = await listPeople(l.as(l.ownerId), { search: 'test@example' }, deps);
+    expect(withEmail).toMatchObject({ value: [{ id: personId }] });
   });
 });
