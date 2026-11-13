@@ -27,6 +27,7 @@ const validTimeZone = (value: string) => {
 
 export const createLeague = defineCommand({
   name: 'leagues.create',
+  permission: 'platform-staff',
   input: z.object({
     slug: shortNameSchema,
     name: z.string().trim().min(1).max(120),

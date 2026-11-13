@@ -39,6 +39,14 @@ export type CommandDefinition<
   /** `module.action`, as command receipts and the log store it. */
   readonly name: string;
   readonly input: Schema;
+  /**
+   * T4 §4: the permission this command needs, as the access module names it (or
+   * one of its two non-role needs, "signed-in" and "platform-staff"). `allowed`
+   * checks it, with the scope; the role-by-command test (T4 §12) runs every role
+   * against the command as this name says, and fails a command whose name is
+   * missing or unknown.
+   */
+  readonly permission: string;
   /** T-74: may the acting account run this, here, with this input? */
   readonly allowed: (context: CommandContext, input: z.output<Schema>, tx: Tx) => Promise<boolean>;
   readonly run: (args: {
@@ -55,7 +63,10 @@ export type Command<Value, Err extends CommandError, Tx extends CommandTx> = ((
   context: CommandContext,
   input: unknown,
   deps: CommandDeps<Tx>,
-) => Promise<Result<Value, Err | InvalidInput | NotAllowed>>) & { readonly commandName: string };
+) => Promise<Result<Value, Err | InvalidInput | NotAllowed>>) & {
+  readonly commandName: string;
+  readonly permission: string;
+};
 
 /** The clock, or null if it fails: a broken clock must not stop the log line. */
 function readClock(deps: { readonly now: () => number }): number | null {
@@ -79,6 +90,10 @@ export function defineCommand<
   const { name } = definition;
   if (!namePattern.test(name) || name.length > 100) {
     throw new Error(`defineCommand: "${name}" is not a command name like "games.end_game".`);
+  }
+  const { permission } = definition;
+  if (typeof permission !== 'string' || permission.trim() === '') {
+    throw new Error(`defineCommand: ${name} names no permission (T4 §4).`);
   }
 
   async function execute(
@@ -188,5 +203,5 @@ export function defineCommand<
 
   // Named for the command, so failures and the harness's reports say which one.
   Object.defineProperty(execute, 'name', { value: name });
-  return Object.assign(execute, { commandName: name });
+  return Object.assign(execute, { commandName: name, permission });
 }

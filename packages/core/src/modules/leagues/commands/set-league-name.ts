@@ -15,6 +15,7 @@ const changedSinceRead: ChangedSinceRead = { code: 'changed-since-read' };
 
 export const setLeagueName = defineCommand({
   name: 'leagues.set_name',
+  permission: 'league.settings',
   // The same limits as the leagues table (0003).
   input: z.object({
     name: z.string().trim().min(1).max(120),
