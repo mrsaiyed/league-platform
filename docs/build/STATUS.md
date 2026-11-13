@@ -26,6 +26,7 @@ Next free: migration 0012, record 034, T-246 (0011 / 031 / T-243 belong to 1.14;
 - **2.72 Pairings and the fairness report** — `.local/lanes/2.72-pairings` — none — built (4779be7, cb8ac83), gate green apart from a since-fixed isolation case. Then: catch up (scheduling/index.ts may conflict with 2.20), independent review (opus), gate, land. Definitions chosen (week, bye, early/late, back-to-back) are in code comments; record them in T7-ish notes when landing.
 - **2.27 Scorekeepers and assignments** — `.local/lanes/2.27-scorekeepers` — none (no migration; T-246 if needed) — opened; built on our recommendation (any scorekeeper may score any game), see Needs the founder.
 - **1.27 Sturdy timing tests** — `.local/lanes/1.27-sturdy-tests` — none — opened; the eight-run proof happens on GitHub (push the branch repeatedly), not here.
+- **2.21 Publishing the schedule** — `.local/lanes/2.21-publish` — none (no migration; T-246 / record 034 if needed) — opened.
 
 ## Needs the founder
 
