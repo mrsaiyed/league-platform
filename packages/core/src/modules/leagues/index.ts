@@ -24,6 +24,7 @@ export { audiences, leagueStatuses, type Audience, type LeagueStatus } from './l
 export type { LeagueRecord, LeaguesStore, LeaguesTx, NewLeague, NewSeason } from './ports.ts';
 export {
   adminAreas,
+  checkedSiteOrigin,
   forwardedLeagueUrl,
   isLeagueIdFormat,
   isLeagueSiteName,

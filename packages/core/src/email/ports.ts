@@ -16,8 +16,12 @@ export type EmailMessage = {
   /** Extra headers, such as the one-click unsubscribe header (T7 §6). */
   readonly headers?: Readonly<Record<string, string>>;
   /**
-   * The same for every attempt to send this one email (built from the job's ids), so
-   * the email service sends it once however often the job runs (T-137).
+   * The same for every attempt to send this one email, so the email service sends it
+   * once however often it is handed over (T-137). What "this one email" is belongs to
+   * the job: for an email whose content is fixed by the job's ids it is built from
+   * those ids; the invitation email holds a new link on every run, so its key is per
+   * link (record 023), and a retry after an answer that was lost or unreadable can
+   * send a second email, whose link ends the first.
    */
   readonly idempotencyKey: string;
 };
