@@ -13,7 +13,7 @@ import {
 } from './league-gate.ts';
 import { standInPeople, standInPorts } from './stand-in-ports.ts';
 
-const signInOptions = { nodeEnv: 'test', emailFrom: 'hello@example.test' };
+const signInOptions = { emailFrom: 'hello@example.test' };
 
 const ports = standInPorts({
   appEnv: 'test',

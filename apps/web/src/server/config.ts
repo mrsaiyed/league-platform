@@ -20,14 +20,6 @@ export function isBuildPhase(): boolean {
   return process.env['NEXT_PHASE'] === 'phase-production-build';
 }
 
-/**
- * NODE_ENV, which Next.js sets: the sign-in stand-in refuses to run when it is
- * "production", whatever APP_ENV says (record 013).
- */
-export function nodeEnv(): string | undefined {
-  return process.env['NODE_ENV'];
-}
-
 /** Call once when the server starts, so a bad setting stops it before it serves anyone. */
 export function assertConfig(): Config {
   return getConfig();

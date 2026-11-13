@@ -158,8 +158,6 @@ export type StandInOptions = {
   readonly publicBaseUrl: string;
   /** Where the access module's T-196 lines go. */
   readonly log: CommandDeps<AccessTx>['log'];
-  /** NODE_ENV as config.ts read it: the sign-in stand-in refuses "production". */
-  readonly nodeEnv: string | undefined;
   /** EMAIL_FROM, the sign-in emails' sending address. */
   readonly emailFrom: string;
 };
@@ -188,7 +186,11 @@ export function standInPorts(options: StandInOptions): WebPorts {
   });
   const { service: signIn } = createLocalSignInStandIn({
     environment: options.appEnv === 'local' ? 'development' : 'test',
-    nodeEnv: options.nodeEnv,
+    // The sign-in stand-in also refuses NODE_ENV "production", but Next.js's built
+    // server always sets that, the test server of npm run test:web included. The
+    // guards above (APP_ENV local or test, and a site address on this computer or a
+    // test name) are this app's, so the stand-in is told the APP_ENV (record 031).
+    nodeEnv: options.appEnv,
     codeSender: signInMail.codeSender,
     returnOrigins: [options.publicBaseUrl],
     now,
