@@ -734,6 +734,29 @@ test('T-183 lets a reviewed file drop only while it matches its checksum', async
   ]);
 });
 
+test('T-226 lets only the worker, its module and tests name a worker-only step', (t) => {
+  const call =
+    "import { issueInvitationLink } from '@srleagues/core';\nissueInvitationLink(tx, id);\n";
+  assertExactly(
+    found(t, {
+      'apps/web/src/a.ts': call,
+      'packages/database/src/b.ts': call,
+      'apps/worker/src/send-email.ts': call,
+      'packages/core/src/modules/access/invitation-link.ts':
+        'export async function issueInvitationLink() {}\n',
+      'packages/database/src/c.test.ts': call,
+      'apps/web/src/d.ts':
+        "// issueInvitationLink is the worker's\nconst s = 'issueInvitationLink';\n",
+    }),
+    [
+      ['apps/web/src/a.ts:1 [T-226]', 'only the worker may call'],
+      ['apps/web/src/a.ts:2 [T-226]', 'only the worker may call'],
+      ['packages/database/src/b.ts:1 [T-226]', 'apps/worker/'],
+      ['packages/database/src/b.ts:2 [T-226]', 'only the worker may call'],
+    ],
+  );
+});
+
 test('a planted violation of any rule fails the gate', (t) => {
   const plants = {
     'T-21': { 'packages/core/src/a.ts': "import '@srleagues/database';\n" },
@@ -743,6 +766,7 @@ test('a planted violation of any rule fails the gate', (t) => {
     'T-34': { 'apps/web/src/a.ts': 'const u = `/${league.slug}/news`;\n' },
     'T-30': { 'packages/ui/src/a.ts': 'const u = process.env.X;\n' },
     'T-183': { 'supabase/migrations/0001_a.sql': 'drop table teams;\n' },
+    'T-226': { 'apps/web/src/a.ts': 'issueInvitationLink(tx, id);\n' },
   };
   const quiet = () => {};
   for (const [rule, files] of Object.entries(plants)) {

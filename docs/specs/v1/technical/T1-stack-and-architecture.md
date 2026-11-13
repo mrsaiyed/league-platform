@@ -71,7 +71,7 @@ One database with a `league_id` on every row, not a database per league. A thous
 - PostgreSQL then adds protections that Firebase's database does not have. The database itself refuses a row that links two different leagues (T-40), refuses a second registration or a tap counted twice (T-47), and filters every query by league even if our code forgets to (T-61).
 - Our data is relational (T-4), and PostgreSQL is a standard that every host offers, so we are never locked to one vendor.
 
-**T-6: sign-in by Supabase Auth.** Password storage, emailed codes, Google sign-in, session cookies and rate limiting are solved problems we should not rebuild. Our own tables hold everything about what a person may do; the sign-in service only answers "who is this?".
+**T-6: sign-in by Supabase Auth.** Password storage, emailed codes, Google sign-in, session cookies and rate limiting are solved problems we should not rebuild. Our own tables hold everything about what a person may do; the sign-in service only answers "who is this?". Supabase keeps the passwords, makes and checks the codes, signs in with Google and issues the tokens; our adapter adds what it lacks (the device and session list, the limits per address of T-225, attempts per code) in a small store of our own (T-230, [record 018](../../../architecture/decisions/018-the-supabase-sign-in-adapter.md)).
 
 **T-7: a worker with its queue in PostgreSQL.** Because jobs are rows in the same database as everything else, "the game was finalized" and "send its recap" are saved together. If the worker is down, jobs wait; when it returns, it continues. No separate queue product is needed at our size.
 

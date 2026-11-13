@@ -19,13 +19,13 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
 
-Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Reserved: migration 0007, record 019, T-231 (2.1). Next free: migration 0008, record 020, T-232. Check the folders before trusting these.
+Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Reserved: migration 0007, record 019, T-231 (2.1). Reserved: record 020, T-232 (1.17). Reserved: record 021, T-233 (2.31). Next free: migration 0008, record 022, T-234. Check the folders before trusting these.
 
-- **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — built, reviewed, findings fixed; MID-MERGE with the build branch (conflicts after 1.19 landed in T7 doc, core index, isolation helpers, stores index). A builder was settling them; its job must now carry ids only (UUIDs/dates) so the invitation token cannot ride in job ids: redesign, then gate, then land.
-- **1.15 Supabase adapter** — `.local/lanes/1.15-supabase-adapter` — record 018 / T-230 if needed — builder just started; check its lane branch for commits.
-- **2.11 Public names and who sees statistics** — `.local/lanes/2.11-public-names` — none — builder starting.
 - **2.31 Live updates service** — `.local/lanes/2.31-live-updates` — none — builder starting.
-- **2.9 Schedule drafts and clashes** — `.local/lanes/2.9-schedule-rules` — none — builder starting.
+- **1.17 Web app shell** — `.local/lanes/1.17-web-shell` — record 020 / T-232 — builder starting.
+- **1.19 part 2 Invitation email job** — `.local/lanes/1.19p2-invitation-job` — none — builder starting.
+- **2.12 Tracker offline queue** — `.local/lanes/2.12-offline-queue` — none — builder starting.
+- **2.13 Stage 2 permissions** — `.local/lanes/2.13-permissions` — none — builder starting.
 - **2.1 Divisions, venues, courts, settings tables** — `.local/lanes/2.1-settings-tables` — migration 0007, record 019 / T-231 — builder starting.
 
 ## Needs the founder
@@ -44,6 +44,10 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 2.11 done: showName, statsShown, Viewer (with leagueId), private-field scan in packages/core/src/modules/people (fail closed everywhere; T-81 reworded to follow R-14). Founder to confirm: 'players may ask for initials' (R-15) starts off; unknown age counts as a child in youth/mixed leagues. For 2.39/2.40/2.32: public queries must call showName/statsShown (store public_name or run it in the query layer); live latestPlay must be redacted to the strictest setting; scan helper needs privateValues from made-up people.
+- 2026-11-13 — Step 2.9 done: scheduling rules in packages/core/src/modules/scheduling/rules (applyChange, applyDraft, findClashes, summarizePublish). Choices: clashes compare exact slot equality (spec has no game length); courts by canonical name (2.20 must map ids to names); a round-date change moves only games on the old date; postponed/cancelled hold no slot. Reviewer's findings fixed.
+- 2026-11-13 — Step 1.15 done (built, NOT verified against the live service): Supabase sign-in adapter in packages/providers/src/sign-in/supabase over an injected fetch, memory store (dev/test only), record 018 / T-230 with a staging checklist (timing floor, 429 limits, refresh-token reuse window, sign-ups on, secure password change off). Reviewer's 11 findings fixed. Open: the production sign-in store needs tables (devices, sessions, attempt counts, proofs): it needs a migration number (give it to 1.14 or a new step); Supabase's leaked-password protection may be a paid-plan feature (founder).
+- 2026-11-13 — Step 1.12 done: access module (fixed roles, invitations, grants, activity log) in packages/core/src/modules/access with database queries/stores; invitation jobs carry the invitation id only (T-226, T-131 changed in place); structure rule T-226 allows only the worker to name issueInvitationLink. Reviewers' findings fixed (link refuses closed leagues and senders who lost the right; resend refuses withdrawn). For 1.19 part 2: email.send handler must call issueInvitationLink, commit, then hand the email to the provider.
 - 2026-11-13 — Step 1.16 done: league address builder (leagueUrl, leagueApiUrl), short-name lookup, request context in apps/web/src/server/context.ts; record 017 / T-229 (API endpoints sit under /api/v1/leagues/{leagueId}/..., spec T2/T4/T6 and step 2.32 corrected). Reviewer's findings fixed. For 1.17: league-moved refusal carries status and leagueId (apply U-9: draft/suspended forward only for admins); requestId is made by the server; offensive-word list is empty for the founder to fill.
 - 2026-11-13 — Flaky under load (seen twice this run): tests/live-stats-server.test.mjs 'online: watching is open' reads the server's start-up text too early; passes alone. Not weakened. A small step to make it wait for the line is wanted (touches the tracker's tests only, no behaviour).
 - 2026-11-13 — Step 2.10 done: fixture CSV reader in packages/core/src/modules/imports (review's 11 findings fixed). Open: formula-looking cells pass through unchanged, so any later spreadsheet export (P9) must neutralise cells starting with = + - @; ambiguous dates read month first with a warning; messages are English text inside core (to be returned as codes by screens 2.54 if wanted).

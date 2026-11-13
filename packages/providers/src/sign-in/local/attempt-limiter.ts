@@ -1,18 +1,11 @@
 // Counts failures per key and says when the next try may come (T-85: wrong guesses
 // are limited, then slowed and locked for a while). The local stand-in uses it for
 // password guesses per address typed and per network address, and for code requests.
-// In memory only: not for production.
+// The in-memory store behind the Supabase adapter uses it too. In memory only: not
+// for production.
+import type { AttemptLimits } from '../sign-in-settings.ts';
 
-export type AttemptLimits = {
-  /** Failures older than this are forgotten. */
-  readonly windowMinutes: number;
-  /** From this many failures in the window, each new try waits `slowSeconds` after the last failure. */
-  readonly slowAfter: number;
-  readonly slowSeconds: number;
-  /** At this many failures in the window, the key is locked for `lockMinutes`. */
-  readonly lockAfter: number;
-  readonly lockMinutes: number;
-};
+export type { AttemptLimits };
 
 export type AttemptCheck =
   | { readonly allowed: true }

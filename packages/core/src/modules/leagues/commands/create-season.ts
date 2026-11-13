@@ -2,6 +2,7 @@
 // named it goes in the league's default program, which is all a single-program
 // league ever sees (U-3). A season is not current until setCurrentSeason says so.
 import { z } from 'zod';
+import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { mayEditLeague } from '../policy.ts';
 import type { LeaguesTx } from '../ports.ts';
@@ -28,7 +29,7 @@ export const createSeason = defineCommand({
       path: ['endsOn'],
     }),
   allowed: (context, _input, tx: LeaguesTx) => mayEditLeague(context, tx),
-  run: async ({ input, tx }): Promise<Result<{ seasonId: string }, CreateSeasonError>> => {
+  run: async ({ context, input, tx }): Promise<Result<{ seasonId: string }, CreateSeasonError>> => {
     const program = await tx.leagues.findProgram(input.programId);
     if (program === undefined) return fail({ code: 'program-not-found' });
     const created = await tx.leagues.createSeason({
@@ -39,6 +40,10 @@ export const createSeason = defineCommand({
       endsOn: input.endsOn ?? null,
     });
     if (created === 'slug-taken') return fail({ code: 'season-slug-taken' });
+    await recordActivity(tx, context, {
+      action: 'leagues.create_season',
+      target: { type: 'season', id: created },
+    });
     return ok({ seasonId: created });
   },
 });

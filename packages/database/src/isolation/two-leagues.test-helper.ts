@@ -6,7 +6,7 @@
 //
 // One more account holds a role in both leagues, with its own profile and a
 // child's. Its texts carry neither marker: it is not either league's to hide.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
@@ -33,6 +33,12 @@ export type LeagueRecords = MadeLeague & {
   memberProfileId: string;
   /** A short name the league used to have (it still forwards). */
   formerSlug: string;
+  /** The member's grant (editor, whole league). */
+  memberGrantId: string;
+  /** A pending invitation, and the token of its link (only its hash is stored). */
+  invitationId: string;
+  invitationEmail: string;
+  invitationToken: string;
   /** A job a worker holds, and the lease it holds it by. */
   jobId: string;
   jobLeaseToken: string;
@@ -122,16 +128,10 @@ async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) 
       'insert into league_features (league_id, feature_key, enabled) values ($1, $2, true)',
       [leagueId, `${m}_feature`],
     ],
-    ...[member.accountId, sharedAccountId].map((account): [string, unknown[]] => [
+    [
       `insert into role_grants (league_id, account_id, role, granted_by_account_id)
        values ($1, $2, 'editor', $3)`,
-      [leagueId, account, ownerId],
-    ]),
-    [
-      `insert into invitations (league_id, email, role, token_hash, invited_by_account_id, expires_at)
-       values ($1, $2, 'scheduler', encode(sha256(convert_to($2, 'UTF8')), 'hex'), $3,
-               now() + interval '7 days')`,
-      [leagueId, `${unique(m)}-invitee@example.test`, ownerId],
+      [leagueId, sharedAccountId, ownerId],
     ],
     [
       `insert into activity_log (league_id, actor_account_id, action, summary)
@@ -150,6 +150,25 @@ async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) 
     ],
   ];
   for (const [text, params] of rows) await pglite.query(text, params);
+  const memberGrantId = await id(
+    pglite,
+    `insert into role_grants (league_id, account_id, role, granted_by_account_id)
+     values ($1, $2, 'editor', $3)`,
+    [leagueId, member.accountId, ownerId],
+  );
+  const invitationToken = randomBytes(32).toString('base64url');
+  const invitationEmail = `${unique(m)}-invitee@example.test`;
+  const invitationId = await id(
+    pglite,
+    `insert into invitations (league_id, email, role, token_hash, invited_by_account_id, expires_at)
+     values ($1, $2, 'scheduler', $3, $4, now() + interval '7 days')`,
+    [
+      leagueId,
+      invitationEmail,
+      createHash('sha256').update(invitationToken).digest('hex'),
+      ownerId,
+    ],
+  );
   // The season's structure: a division with a sub-division, a venue with a court,
   // and a setting value at each level.
   const divisionId = await id(
@@ -204,6 +223,10 @@ async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) 
     memberId: member.accountId,
     memberProfileId: member.profileId,
     formerSlug,
+    memberGrantId,
+    invitationId,
+    invitationEmail,
+    invitationToken,
     jobId,
     jobLeaseToken,
     divisionId,
