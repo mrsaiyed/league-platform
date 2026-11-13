@@ -28,3 +28,16 @@ export {
   type TeamStatsSetting,
 } from './rules/stats-shown.ts';
 export { publicViewer, type Viewer } from './rules/viewer.ts';
+export { createPerson, type CreatePersonError } from './commands/create-person.ts';
+export { listPeople } from './commands/list-people.ts';
+export { removePerson, type RemovePersonError } from './commands/remove-person.ts';
+export { updatePerson, type UpdatePersonError } from './commands/update-person.ts';
+export type {
+  NewPerson,
+  PeopleSearch,
+  PeopleStore,
+  PeopleTx,
+  PersonChange,
+  PersonRecord,
+  PersonSensitiveFields,
+} from './ports.ts';

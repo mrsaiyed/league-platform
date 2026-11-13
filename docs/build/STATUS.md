@@ -21,12 +21,15 @@ One line per open lane, written before its builder starts: `- **<step>** — <la
 
 Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migration 0010, record 026, T-238. Check the folders before trusting these.
 
-- **2.17 People commands** — `.local/lanes/2.17-people-commands` — record 027 / T-239 — just opened.
-
 - **2.66 Engine clock mode and its switch** — `.local/lanes/2.66-clock-mode` — record 029 / T-241 — builder started (run of 2026-11-13).
 - **1.27 Sturdy timing tests** — `.local/lanes/1.27-sturdy-tests` — none — builder started.
 
-Reserved now: next free migration 0010, record 031, T-243.
+- **2.4 Live game, calculated and import tables** — `.local/lanes/2.4-live-tables` — migration 0010, record 030 / T-242 — builder started.
+- **1.14 Sign-in flows in the web app** — `.local/lanes/1.14-signin-flows` — migration 0011 (only if the sign-in store needs tables), record 031 / T-243 — builder started.
+- **2.23 Results entered by hand** — `.local/lanes/2.23-hand-results` — record 032 / T-244 — builder started.
+- **2.19 Rosters commands** — `.local/lanes/2.19-roster-commands` — none — builder started.
+
+Next free: migration 0012, record 033, T-245.
 
 ## Needs the founder
 
@@ -48,6 +51,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 2.17 done: people commands (create, update, remove to bin, list with search) in packages/core/src/modules/people; birth date, contact email and minor flag are selected, searched and changed only with people.read_sensitive (R-16/T-76); merged-away people are treated as not found. Choice recorded: removing a person is refused (person-on-a-roster) while they have an open roster entry (R-17); step 2.19 roster-add must refuse binned people (the check is not locked); 2.50 must show that refusal. Birth date 'only where the league asks' is not enforced (no setting yet). Gate: 1542 of 1543 passed on the main folder, the one isolation test timed out under load and passes alone (step 1.27).
 - 2026-11-13 — Step 2.15 done: get_season, update_season, set_season_rules, set_season_roster_settings (permission season.settings at the program; version check A-8; no program named in one-program leagues, U-3); setCurrentSeason now takes the season version. The unique-jersey switch is rules.rosters.uniqueJerseys (seasons.unique_jersey is generated from it). Step 2.25 must run its preview before updateSeason/setSeasonRules when a final game exists. Error wording keys 'error.<module>...' in en.ts are a new convention. Gate: 1517 tests pass, vitest worker timeout error under load (step 1.27).
 - 2026-11-13 — Step 2.18 done: teams module (create, update, remove to bin, set who sees numbers; admin only for now), queries/store, isolation cases; removing a division is refused while live teams are in it. Open: no setting declared for teams choosing their own level (founder's default, listed under Needs the founder); renaming a team's short name has no forwarding; restore belongs to 2.76 (must handle taken short name/name and bring the roster back); small race between removing a division and creating a team in it. Gate: 1488 tests pass, vitest worker timeout error under load (step 1.27).
 - 2026-11-13 — Step 2.3 done: migration 0009 (schedule and game tables, game_corrections, publish history), record 025 / T-237. Reviewer's findings fixed (any change to a decided game's result, teams, division, stage, finalized_at or bin state needs a game_corrections row; format required and fixed once a game starts, format_fixed_at). Notes for 2.20/2.21/2.22/2.23/2.30: capture_mode uses final/box/live while the season rules say final-score/box-score (translate); unfenced system sessions must set the league before correcting a game; no brackets or step 2.4 tables yet; purging binned games needs DELETE or an owner-run function. Gate: all 1461 tests passed; vitest printed the worker 'Timeout calling onTaskUpdate' error under load (step 1.27 will fix).
