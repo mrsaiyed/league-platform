@@ -1,4 +1,5 @@
 // Test-only ways past the fences, to prove each fence on its own.
+import { sql } from 'kysely';
 import type { DatabaseHandle } from './database-handle.ts';
 import { kyselyOf } from './database-handle.ts';
 import { closeScope, openScope, type LeagueScope } from './transaction-scope.ts';
@@ -17,6 +18,37 @@ export function withUnfencedScope<T>(
     .transaction()
     .execute(async (trx) => {
       const scope = openScope(trx, leagueId, null) as LeagueScope;
+      try {
+        return await work(scope);
+      } finally {
+        closeScope(scope);
+      }
+    });
+}
+
+/** What the database is told a transaction is for; missing means none. */
+export type FenceSetting = { leagueId?: string; accountId?: string };
+
+/**
+ * Runs `work` with a LeagueScope naming `scopeLeagueId` while the database is set
+ * to something else: the transaction is the app's role (app_user, T-60) with the
+ * league and account of `fence`, or none. The query's own filter points at
+ * `scopeLeagueId`, so only row-level security (T-61, T-62, fence 3) can keep that
+ * league out.
+ */
+export function withFenceSetTo<T>(
+  db: DatabaseHandle,
+  fence: FenceSetting,
+  scopeLeagueId: string,
+  work: (scope: LeagueScope) => Promise<T>,
+): Promise<T> {
+  return kyselyOf(db)
+    .transaction()
+    .execute(async (trx) => {
+      await sql`set local role app_user`.execute(trx);
+      await sql`select set_config('app.league_id', ${fence.leagueId ?? ''}, true),
+                       set_config('app.account_id', ${fence.accountId ?? ''}, true)`.execute(trx);
+      const scope = openScope(trx, scopeLeagueId, null) as LeagueScope;
       try {
         return await work(scope);
       } finally {
