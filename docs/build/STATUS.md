@@ -27,7 +27,6 @@ Next free: migration 0012, record 033, T-245 (0011 / 031 / T-243 belong to 1.14;
 - **2.41 Shared display pieces** — `.local/lanes/2.41-display-pieces` — none — builder starting.
 - **2.39 Public queries for the schedule, teams and rosters** — `.local/lanes/2.39-public-schedule-queries` — none — builder starting.
 - **2.72 Pairings and the fairness report** — `.local/lanes/2.72-pairings` — none — builder starting.
-- **Fix: reorder_roster isolation case** — `.local/lanes/fix-reorder-case` — none — main gate failed after 2.19 landed: case 'reorder the target team's roster' is refused with roster-incomplete in its control run.
 
 ## Needs the founder
 
@@ -49,6 +48,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Fix landed: the isolation case for teams.reorder_roster sent an incomplete list after the two-league seed gained a walk-up roster entry (2.4); it now sends every open entry. The command is right. Found by the main-folder gate; each lane's own gate had missed it behind load flakes.
 - 2026-11-13 — Step 1.21 done: `npm run seed` loads two made-up leagues (Lakeside Hoops League, Maple Street Rec League; all emails end example.test) into a local PGlite folder (.local/seed-db), never an address (T-201). Leagues are data in packages/database/src/seed/seed-data.ts. Deferred: each league's design is carried as seed data only, because the database has no design column until the design editor stage (the web stand-in sites stay; siteOfLeague should read the database then); no roster entries or games; the Faraj-like, Al-Hadi-like and generated leagues of T-195 come later (spec note added). A half-loaded league is refused on rerun, not reported as 'Already there'. Gate: pass apart from load flakes.
 - 2026-11-13 — Step 1.14 done: sign-in flows (record 031, T-243). Security review found 8 faults, all fixed; second review found 1 medium + 5 low, fixed: staging and production now refuse to start unless TRUSTED_PROXY is set (new setting: none/one; the founder's hosting must set it), the 30-second shared renewal is written into T4 §3, the new-device email goes to the address the service holds, an expired password-again screen ends the server session. T-243 added to DECISIONS.md as 'Agreed (delegated)'. Gate: all pass apart from load flakes. Note: DECISIONS.md's T4 table appears three times run together (older merge); worth tidying.
 - 2026-11-13 — Step 1.27 part 1 done (code landed): lock-wait and live-stats server tests wait on events not time; vitest runs 2 workers inside lane folders at above-normal priority, 180 s test/hook timeouts, and a reporter that holds back vitest's 'Timeout calling onTaskUpdate' and re-records it unless the whole run passed (vitest.reporter.ts, tested). No assertion removed. STILL OPEN: the done test's proof (five gate runs in a row, three with a second gate beside them, ~24 min each under load) was not done; a later run must do it. Step left unticked in STAGE-1.md until then. Not touched: hosted-backup tests.
