@@ -8,6 +8,7 @@ export const en = {
   'nav.teams': 'Teams',
   'nav.signIn': 'Sign in',
   'nav.menu': 'Menu',
+  'footer.label': 'Footer',
   'footer.terms': 'Terms',
   'footer.privacy': 'Privacy',
   'common.loading': 'Loading',

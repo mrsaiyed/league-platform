@@ -108,4 +108,33 @@ describe('design to CSS variables (T-90)', () => {
       expect(() => designToCssText(d, bad)).toThrow();
     }
   });
+
+  it('refuses hostile values even when the schema was skipped', () => {
+    const d = startingDesign('clean-court');
+    const hostile = (change: (x: any) => void) => {
+      const copy: any = structuredClone(d);
+      change(copy);
+      return () => designToCssText(copy);
+    };
+    expect(hostile((x) => (x.colors.primary = 'red;} body{display:none'))).toThrow();
+    expect(hostile((x) => (x.colors.text = 'url(http://evil.example)'))).toThrow();
+    expect(hostile((x) => (x.fonts.body = 'constructor'))).toThrow();
+    expect(hostile((x) => (x.fonts.heading = '__proto__'))).toThrow();
+    expect(hostile((x) => (x.corners = 'toString'))).toThrow();
+    expect(hostile((x) => (x.cards = 'x; color: red'))).toThrow();
+    expect(hostile((x) => (x.spacing = undefined))).toThrow();
+    expect(hostile((x) => (x.base = 'dark; x'))).toThrow();
+  });
+
+  it('keeps links, names and hover swaps readable in both starting designs', () => {
+    for (const key of startingDesignKeys) {
+      const { colors } = startingDesign(key);
+      for (const bg of [colors.background, colors.panel]) {
+        expect(contrastRatio(colors.primary, bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(colors.text, bg)).toBeGreaterThanOrEqual(4.5);
+      }
+      // hover swaps text and background colors
+      expect(contrastRatio(colors.background, colors.text)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });

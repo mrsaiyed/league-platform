@@ -72,6 +72,56 @@ export interface DivisionsTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface GameAssignmentsTable {
+  id: Generated<string>;
+  league_id: string;
+  game_id: string;
+  account_id: string;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface GameCorrectionsTable {
+  id: Generated<string>;
+  league_id: string;
+  game_id: string;
+  account_id: string;
+  reason: string;
+  before: ColumnType<JsonValue, JsonObject, JsonObject>;
+  after: ColumnType<JsonValue, JsonObject, JsonObject>;
+  at: ColumnType<Date, Date | string | undefined, Date | string>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface GamesTable {
+  id: Generated<string>;
+  league_id: string;
+  season_id: string;
+  stage_id: string;
+  division_id: string | null;
+  round_id: string | null;
+  game_number: number | null;
+  home_team_id: string;
+  away_team_id: string;
+  starts_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  venue_id: string | null;
+  court_id: string | null;
+  status: Generated<string>;
+  capture_mode: string;
+  home_score: number | null;
+  away_score: number | null;
+  winner_team_id: GeneratedAlways<string | null>;
+  format: ColumnType<JsonValue | null, JsonObject | null, JsonObject | null>;
+  format_fixed_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  finalized_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  external_ref: string | null;
+  deleted_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface InvitationsTable {
   id: Generated<string>;
   league_id: string;
@@ -233,6 +283,40 @@ export interface RosterEntriesTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface RoundsTable {
+  id: Generated<string>;
+  league_id: string;
+  season_id: string;
+  number: number;
+  label: string | null;
+  date: string | null;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface ScheduleDraftsTable {
+  id: Generated<string>;
+  league_id: string;
+  season_id: string;
+  changes: ColumnType<JsonValue, JsonObject | undefined, JsonObject>;
+  based_on_revision: number | null;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface ScheduleRevisionsTable {
+  id: Generated<string>;
+  league_id: string;
+  season_id: string;
+  number: number;
+  published_by_account_id: string | null;
+  published_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  summary: ColumnType<JsonValue, JsonObject | undefined, JsonObject>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface SeasonsTable {
   id: Generated<string>;
   league_id: string;
@@ -260,6 +344,18 @@ export interface SettingValuesTable {
   season_id: string | null;
   key: string;
   value: ColumnType<JsonValue, JsonObject, JsonObject>;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface StagesTable {
+  id: Generated<string>;
+  league_id: string;
+  season_id: string;
+  type: Generated<string>;
+  name: string;
+  config: ColumnType<JsonValue, JsonObject | undefined, JsonObject>;
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
@@ -311,6 +407,9 @@ export interface Database {
   command_receipts: CommandReceiptsTable;
   courts: CourtsTable;
   divisions: DivisionsTable;
+  game_assignments: GameAssignmentsTable;
+  game_corrections: GameCorrectionsTable;
+  games: GamesTable;
   invitations: InvitationsTable;
   jobs: JobsTable;
   league_features: LeagueFeaturesTable;
@@ -322,8 +421,12 @@ export interface Database {
   programs: ProgramsTable;
   role_grants: RoleGrantsTable;
   roster_entries: RosterEntriesTable;
+  rounds: RoundsTable;
+  schedule_drafts: ScheduleDraftsTable;
+  schedule_revisions: ScheduleRevisionsTable;
   seasons: SeasonsTable;
   setting_values: SettingValuesTable;
+  stages: StagesTable;
   support_access_log: SupportAccessLogTable;
   teams: TeamsTable;
   venues: VenuesTable;

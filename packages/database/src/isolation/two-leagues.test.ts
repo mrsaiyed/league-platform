@@ -78,8 +78,17 @@ describe('openTwoLeagues', () => {
         ...(await texts('select email || display_name as t from accounts where id = $1', [
           ownerId,
         ])),
+        ...(await texts('select name as t from stages where league_id = $1', [leagueId])),
+        ...(await texts('select label as t from rounds where league_id = $1', [leagueId])),
+        ...(await texts(
+          'select external_ref as t from games where league_id = $1 and external_ref is not null',
+          [leagueId],
+        )),
+        ...(await texts('select reason as t from game_corrections where league_id = $1', [
+          leagueId,
+        ])),
       ];
-      expect(found.length).toBe(13);
+      expect(found.length).toBe(18);
       for (const text of found) expect(text.toLowerCase()).toContain(marker);
     }
     const shared = await texts(
@@ -111,6 +120,27 @@ describe('openTwoLeagues', () => {
       expect(own?.get('people')).toContain(league.personId);
       expect(own?.get('roster_entries')).toContain(league.rosterEntryId);
       expect(own?.get('profiles') ?? []).not.toContain(child[0]?.profile_id);
+    }
+  });
+
+  it("lets the harness snapshot each league's schedule and games as its own", async () => {
+    const { a, b } = leagues;
+    const rows = await withUnfencedScope(leagues.db, a.leagueId, async (s) =>
+      readRows(transactionOf(s)),
+    );
+    const prints = footprints(
+      rows,
+      new Map([a, b].map((league) => [league.leagueId, league.marker])),
+    );
+    for (const league of [a, b]) {
+      const own = prints.get(league.leagueId)?.rows;
+      expect(own?.get('stages')).toEqual([league.stageId]);
+      expect(own?.get('rounds')).toEqual([league.roundId]);
+      expect(own?.get('games')?.sort()).toEqual([league.gameId, league.upcomingGameId].sort());
+      expect(own?.get('schedule_revisions')).toEqual([league.scheduleRevisionId]);
+      expect(own?.get('schedule_drafts')).toEqual([league.scheduleDraftId]);
+      expect(own?.get('game_assignments')).toEqual([league.gameAssignmentId]);
+      expect(own?.get('game_corrections')?.length).toBe(1);
     }
   });
 });
