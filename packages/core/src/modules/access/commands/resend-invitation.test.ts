@@ -51,6 +51,26 @@ describe('resendInvitation', () => {
     expect(db.jobs).toHaveLength(1);
   });
 
+  it('refuses once the sender can no longer give the role, sending nothing', async () => {
+    const made = memoryAccess();
+    const sent = await invite(
+      made.as(adminId),
+      { email: 'b@example.test', role: 'editor' },
+      made.deps,
+    );
+    if (!sent.ok) throw new Error('not invited');
+    const { invitationId } = sent.value;
+    const before = made.db.state.invitations[0];
+    // The admin's access ended some other way than revokeGrant (which cancels too).
+    made.db.state.grants = made.db.state.grants.map((g) => ({ ...g, revokedAt: 'now' }));
+    expect(await resendInvitation(made.as(ownerId), { invitationId }, made.deps)).toEqual({
+      ok: false,
+      error: { code: 'invitation-withdrawn' },
+    });
+    expect(made.db.state.invitations[0]).toEqual(before);
+    expect(made.db.jobs).toHaveLength(1);
+  });
+
   it('refuses anyone who may not manage access, even for an unknown id', async () => {
     const { deps, as, invitationId } = await invited();
     expect(await resendInvitation(as(strangerId), { invitationId }, deps)).toEqual({

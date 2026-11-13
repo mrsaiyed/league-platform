@@ -4,7 +4,13 @@ import { acceptInvitation } from './commands/accept-invitation.ts';
 import { invite } from './commands/invite.ts';
 import { issueInvitationLink } from './invitation-link.ts';
 import { hashInvitationToken } from './invitation-token.ts';
-import { memoryAccess, ownerId, strangerId } from './memory-access.test-helper.ts';
+import {
+  adminId,
+  memoryAccess,
+  ownerId,
+  programId,
+  strangerId,
+} from './memory-access.test-helper.ts';
 
 async function invited() {
   const made = memoryAccess();
@@ -52,5 +58,61 @@ describe('issueInvitationLink', () => {
       ).toBeUndefined();
       expect(db.state.invitations[0]?.tokenHash).toBe(hash);
     }
+  });
+
+  it('makes nothing where the league takes no new people, keeping the link as it was', async () => {
+    for (const change of [
+      { status: 'archived' },
+      { status: 'suspended' },
+      { ownerId: undefined },
+    ]) {
+      const { db, deps, as, invitationId } = await invited();
+      const hash = db.state.invitations[0]?.tokenHash;
+      Object.assign(db.state, change);
+      expect(
+        await deps.transaction(as(null), (tx) => issueInvitationLink(tx, invitationId)),
+      ).toBeUndefined();
+      expect(db.state.invitations[0]?.tokenHash).toBe(hash);
+    }
+  });
+
+  it('makes nothing once the sender can no longer give the role, or there is no sender', async () => {
+    const made = memoryAccess();
+    const sent = await invite(
+      made.as(adminId),
+      { email: 'b@example.test', role: 'editor' },
+      made.deps,
+    );
+    if (!sent.ok) throw new Error('not invited');
+    const { invitationId } = sent.value;
+    const hash = made.db.state.invitations[0]?.tokenHash;
+    made.db.state.grants = made.db.state.grants.map((g) => ({ ...g, revokedAt: 'now' }));
+    expect(
+      await made.deps.transaction(made.as(null), (tx) => issueInvitationLink(tx, invitationId)),
+    ).toBeUndefined();
+    expect(made.db.state.invitations[0]?.tokenHash).toBe(hash);
+
+    const { db, deps, as, invitationId: ownersId } = await invited();
+    const stored = db.state.invitations[0];
+    if (stored !== undefined) stored.invitedByAccountId = null;
+    expect(
+      await deps.transaction(as(null), (tx) => issueInvitationLink(tx, ownersId)),
+    ).toBeUndefined();
+  });
+
+  it('makes nothing once its program has gone to the bin', async () => {
+    const made = memoryAccess();
+    const sent = await invite(
+      made.as(ownerId),
+      { email: 'c@example.test', role: 'editor', scope: { type: 'program', id: programId } },
+      made.deps,
+    );
+    if (!sent.ok) throw new Error('not invited');
+    made.db.state.programs = [];
+    expect(
+      await made.deps.transaction(made.as(null), (tx) =>
+        issueInvitationLink(tx, sent.value.invitationId),
+      ),
+    ).toBeUndefined();
   });
 });

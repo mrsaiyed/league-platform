@@ -5,7 +5,7 @@
 // read, and then nobody may do anything in it.
 import type { CommandContext } from '../../command/index.ts';
 import { readOnlyLeagueStatuses } from './access-values.ts';
-import type { AccessTx, Grant, PermissionsTx } from './ports.ts';
+import type { AccessTx, Grant, Invitation, PermissionsTx } from './ports.ts';
 import { roleHasPermission, type Permission } from './roles.ts';
 import { covers, leagueScope, type Scope } from './scopes.ts';
 
@@ -65,6 +65,17 @@ export async function isSignedInHere(context: CommandContext, tx: PermissionsTx)
 export async function isOpenForNewPeople(tx: PermissionsTx): Promise<boolean> {
   const status = await tx.access.leagueStatus();
   return status !== undefined && !readOnlyLeagueStatuses.includes(status);
+}
+
+/**
+ * Whoever sent the invitation may still give its role there, read fresh (T-75). An
+ * invitation with no sender may not. Checked when it is accepted, re-sent and
+ * emailed, so access removed after sending ends what was offered.
+ */
+export async function senderStillMay(tx: PermissionsTx, invitation: Invitation): Promise<boolean> {
+  if (invitation.invitedByAccountId === null) return false;
+  const sender = await accessOfAccount(tx, invitation.invitedByAccountId);
+  return sender !== undefined && allows(sender, 'access.manage', invitation.scope);
 }
 
 // Changing an invitation or a grant that exists: whoever may manage access where it

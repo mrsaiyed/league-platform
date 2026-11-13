@@ -160,7 +160,7 @@ describe('invitations on the database', () => {
     });
     expect(await acceptInvitation(someone, { token: second }, deps)).toMatchObject({ ok: true });
 
-    // Nothing to send once it is used, cancelled or expired.
+    // Nothing to send once it is used, expired or cancelled.
     expect(
       await deps.transaction(as(league.leagueId, null), (tx) =>
         issueInvitationLink(tx, invitationId),
@@ -177,6 +177,29 @@ describe('invitations on the database', () => {
     expect(
       await deps.transaction(as(league.leagueId, null), (tx) => issueInvitationLink(tx, expiredId)),
     ).toBeUndefined();
+    const toCancel = await invite(owner, { email: 'off@example.test', role: 'editor' }, deps);
+    if (!toCancel.ok) throw new Error('not invited');
+    const cancelledId = toCancel.value.invitationId;
+    expect(await cancelInvitation(owner, { invitationId: cancelledId }, deps)).toMatchObject({
+      ok: true,
+    });
+    const cancelledHash = await one<{ token_hash: string }>(
+      pglite,
+      'select token_hash from invitations where id = $1',
+      [cancelledId],
+    );
+    expect(
+      await deps.transaction(as(league.leagueId, null), (tx) =>
+        issueInvitationLink(tx, cancelledId),
+      ),
+    ).toBeUndefined();
+    expect(
+      await one<{ token_hash: string }>(
+        pglite,
+        'select token_hash from invitations where id = $1',
+        [cancelledId],
+      ),
+    ).toEqual(cancelledHash);
   });
 
   it("finds no invitation from another league's link", async () => {

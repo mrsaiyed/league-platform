@@ -1,6 +1,7 @@
 // An invitation link's secret (T-226): 32 random bytes, written as 43 URL-safe
 // characters. Only its SHA-256 is stored (invitations.token_hash, 0004); the token
-// itself goes only into the job that emails the link. Web Crypto, which Node and
+// itself goes only into the email, made by the worker as it sends (invitation-link.ts),
+// never into a job or a table. Web Crypto, which Node and
 // browsers both have, so core needs no library for it.
 import { z } from 'zod';
 

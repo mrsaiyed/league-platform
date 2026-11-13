@@ -12,8 +12,8 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { recordActivity } from '../activity.ts';
 import { roleGranted } from '../events.ts';
 import { hashInvitationToken, invitationTokenSchema } from '../invitation-token.ts';
-import { accessOfAccount, allows, isOpenForNewPeople, isSignedInHere } from '../policy.ts';
-import type { AccessTx, Grant, Invitation } from '../ports.ts';
+import { isOpenForNewPeople, isSignedInHere, senderStillMay } from '../policy.ts';
+import type { AccessTx, Grant } from '../ports.ts';
 import type { Role } from '../roles.ts';
 import { sameScope, scopeDetails, type Scope } from '../scopes.ts';
 
@@ -32,13 +32,6 @@ export type AcceptedInvitation = {
   readonly role: Role;
   readonly scope: Scope;
 };
-
-/** Whoever sent it may still give this role there (an invitation with no sender may not). */
-async function senderStillMay(tx: AccessTx, invitation: Invitation): Promise<boolean> {
-  if (invitation.invitedByAccountId === null) return false;
-  const sender = await accessOfAccount(tx, invitation.invitedByAccountId);
-  return sender !== undefined && allows(sender, 'access.manage', invitation.scope);
-}
 
 async function heldGrant(tx: AccessTx, accountId: string, role: Role, scope: Scope) {
   return (await tx.access.activeGrantsOf(accountId)).find(
