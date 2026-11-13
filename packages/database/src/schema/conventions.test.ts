@@ -24,9 +24,15 @@ afterAll(async () => {
 // league id. Every other table is a league table.
 const personTables = ['accounts', 'profiles', 'profile_access', 'leagues'];
 // History: only ever added to (T-45), so no version.
-const historyTables = ['activity_log', 'command_receipts', 'support_access_log'];
+const historyTables = [
+  'activity_log',
+  'command_receipts',
+  'support_access_log',
+  'schedule_revisions',
+  'game_corrections',
+];
 // History that is never changed at all, so no updated_at either.
-const neverChanged = ['activity_log', 'command_receipts'];
+const neverChanged = ['activity_log', 'command_receipts', 'schedule_revisions', 'game_corrections'];
 
 type Column = {
   table_name: string;
@@ -52,7 +58,7 @@ async function tables(): Promise<string[]> {
 }
 
 describe('every table', () => {
-  it('is one of the tables of steps 1.6, 1.19 (jobs), 2.1 (divisions to settings) and 2.2 (people to rosters)', async () => {
+  it('is one of the tables of steps 1.6, 1.19 (jobs), 2.1 (divisions to settings), 2.2 (people to rosters) and 2.3 (schedule and games)', async () => {
     expect(await tables()).toEqual(
       [
         'accounts',
@@ -60,6 +66,9 @@ describe('every table', () => {
         'command_receipts',
         'courts',
         'divisions',
+        'game_assignments',
+        'game_corrections',
+        'games',
         'invitations',
         'jobs',
         'league_features',
@@ -71,8 +80,12 @@ describe('every table', () => {
         'programs',
         'role_grants',
         'roster_entries',
+        'rounds',
+        'schedule_drafts',
+        'schedule_revisions',
         'seasons',
         'setting_values',
+        'stages',
         'support_access_log',
         'teams',
         'venues',
