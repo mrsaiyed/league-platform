@@ -19,11 +19,12 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
 
-Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Reserved: migration 0007, record 019, T-231 (2.1). Reserved: record 020, T-232 (1.17). Reserved: record 021, T-233 (2.31). Reserved: migration 0008, record 022, T-234 (2.2). Reserved: record 023, T-235 (1.19 part 2). Reserved: record 024, T-236 (2.12). Next free: migration 0009, record 025, T-237. Check the folders before trusting these.
+Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Reserved: migration 0007, record 019, T-231 (2.1). Reserved: record 020, T-232 (1.17). Reserved: record 021, T-233 (2.31). Reserved: migration 0008, record 022, T-234 (2.2). Reserved: record 023, T-235 (1.19 part 2). Reserved: record 024, T-236 (2.12). Reserved: migration 0009, record 025, T-237 (2.3). Next free: migration 0010, record 026, T-238. Check the folders before trusting these.
 
 - **2.31 Live updates service** — `.local/lanes/2.31-live-updates` — none — builder starting.
 - **2.14 Defined settings** — `.local/lanes/2.14-defined-settings` — none — builder starting.
 - **1.18 part 2 Header, menu, footer, hard-coded-text scan** — `.local/lanes/1.18p2-shell-design` — none — builder starting.
+- **2.3 Schedule and game tables** — `.local/lanes/2.3-schedule-game-tables` — migration 0009, record 025 / T-237 — builder starting.
 - **2.16 Divisions, venues and courts commands** — `.local/lanes/2.16-divisions-venues-commands` — none — builder starting.
 - **2.2 People, teams and rosters tables** — `.local/lanes/2.2-people-teams-tables` — migration 0008, record 022 / T-234 — builder starting.
 
