@@ -12,6 +12,15 @@ export type {
   ScheduleState,
 } from './rules/schedule-types.ts';
 export { summarizePublish, type PublishSummary } from './rules/summarize-publish.ts';
+export { generatePairings, maxTimesEachPair } from './rules/generate-pairings.ts';
+export type {
+  Pairing,
+  PairingRound,
+  PairingTeam,
+  PairingsError,
+  PairingsInput,
+  PairingsResult,
+} from './rules/pairing-types.ts';
 export { createCourt, type CreateCourtError } from './commands/create-court.ts';
 export { createVenue, type CreateVenueError } from './commands/create-venue.ts';
 export { listVenues } from './commands/list-venues.ts';
