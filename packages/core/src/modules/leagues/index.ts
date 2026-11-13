@@ -16,6 +16,27 @@ export {
 } from './commands/set-league-name.ts';
 export { setLeagueStatus, type SetLeagueStatusError } from './commands/set-league-status.ts';
 export {
+  setSetting,
+  setSettingFor,
+  type SetSettingError,
+  type SettingSaved,
+} from './commands/set-setting.ts';
+export { clearSetting, clearSettingFor, type ClearSettingError } from './commands/clear-setting.ts';
+export { declaredSettings, membersStartPage, startPageChoices } from './settings/declarations.ts';
+export {
+  defineSetting,
+  hasLimits,
+  settingLevels,
+  settingRegistry,
+  SettingDeclarationError,
+  type Setting,
+  type SettingDeclaration,
+  type SettingLevel,
+  type SettingRegistry,
+} from './settings/define-setting.ts';
+export { getSetting } from './settings/get-setting.ts';
+export { lookupSetting, type SettingValue, type StoredSetting } from './settings/lookup-setting.ts';
+export {
   leagueCreated,
   leagueNameChanged,
   leagueShortNameChanged,
@@ -37,6 +58,8 @@ export type {
   NewDivision,
   NewLeague,
   NewSeason,
+  SettingPlace,
+  StoredSettingRow,
 } from './ports.ts';
 export {
   adminAreas,

@@ -1,5 +1,8 @@
 // The two-league fixture gives the harness something to find in every table.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { withUnfencedScope } from '../db/db.test-helper.ts';
+import { transactionOf } from '../db/transaction-scope.ts';
+import { footprints, readRows } from './database-rows.test-helper.ts';
 import { openTwoLeagues, type TwoLeagues } from './two-leagues.test-helper.ts';
 
 let leagues: TwoLeagues;
@@ -66,11 +69,17 @@ describe('openTwoLeagues', () => {
           leagueId,
         ])),
         ...(await texts('select name as t from courts where league_id = $1', [leagueId])),
+        ...(await texts('select name as t from teams where league_id = $1', [leagueId])),
+        ...(await texts(
+          `select first_name || coalesce(public_name, '') || coalesce(contact_email, '') as t
+           from people where league_id = $1`,
+          [leagueId],
+        )),
         ...(await texts('select email || display_name as t from accounts where id = $1', [
           ownerId,
         ])),
       ];
-      expect(found.length).toBe(10);
+      expect(found.length).toBe(13);
       for (const text of found) expect(text.toLowerCase()).toContain(marker);
     }
     const shared = await texts(
@@ -80,5 +89,28 @@ describe('openTwoLeagues', () => {
       [leagues.sharedAccountId],
     );
     expect(shared.some((text) => /alpha|bravo/i.test(text))).toBe(false);
+  });
+
+  it("lets the harness snapshot each league's people, teams and rosters as its own", async () => {
+    const { a, b } = leagues;
+    const rows = await withUnfencedScope(leagues.db, a.leagueId, async (s) =>
+      readRows(transactionOf(s)),
+    );
+    const prints = footprints(
+      rows,
+      new Map([a, b].map((league) => [league.leagueId, league.marker])),
+    );
+    const { rows: child } = await leagues.pglite.query<{ profile_id: string }>(
+      'select distinct profile_id from people where profile_id is not null',
+    );
+    // The shared child is a person in both leagues; their profile is neither's.
+    expect(child.length).toBe(1);
+    for (const league of [a, b]) {
+      const own = prints.get(league.leagueId)?.rows;
+      expect(own?.get('teams')).toContain(league.teamId);
+      expect(own?.get('people')).toContain(league.personId);
+      expect(own?.get('roster_entries')).toContain(league.rosterEntryId);
+      expect(own?.get('profiles') ?? []).not.toContain(child[0]?.profile_id);
+    }
   });
 });

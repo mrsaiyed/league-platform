@@ -15,6 +15,8 @@ import {
 } from './modules/access/index.ts';
 import {
   createDivision,
+  clearSetting,
+  setSetting,
   createLeague,
   createSeason,
   listDivisions,
@@ -61,6 +63,8 @@ export const commands = commandRegistry([
   removeCourt,
   restoreCourt,
   listVenues,
+  setSetting,
+  clearSetting,
   invite,
   resendInvitation,
   cancelInvitation,

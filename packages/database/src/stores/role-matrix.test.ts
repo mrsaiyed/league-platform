@@ -27,6 +27,7 @@ import {
   createCourt,
   createDivision,
   createLeague,
+  clearSettingFor,
   createSeason,
   createVenue,
   invite,
@@ -42,6 +43,10 @@ import {
   updateCourt,
   updateDivision,
   updateVenue,
+  declaredSettings,
+  defineSetting,
+  setSettingFor,
+  settingRegistry,
   listAccess,
   listActivity,
   myAccess,
@@ -59,7 +64,9 @@ import {
   type LeaguesTx,
   type Permission,
   type SchedulingTx,
+  type SettingRegistry,
 } from '@srleagues/core';
+import { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
@@ -109,6 +116,8 @@ type Row = {
   readonly needs: CommandRequirement;
   /** Where this call applies: the whole league (the default) or the league's program. */
   readonly scope?: 'league' | 'program';
+  /** The row's permission is the setting's own, not the one the command names. */
+  readonly declared?: true;
   /** The input, made valid for this league, and the league the call is for. */
   readonly prepare: (league: League) => Promise<{ input: unknown; leagueId?: string }>;
   readonly run: (context: CommandContext, input: unknown) => Promise<Outcome>;
@@ -448,8 +457,86 @@ const divisionAndVenueRows: readonly Row[] = [
   },
 ];
 
+/**
+ * One row per declared setting and level it allows: the permission is the setting's
+ * own (T-98), checked at the league, or at the program of a program or a season (P4 §4).
+ */
+function settingRows(registry: SettingRegistry): Row[] {
+  const set = setSettingFor(registry);
+  const clear = clearSettingFor(registry);
+  return registry.all().flatMap((setting) =>
+    setting.levels.flatMap((level): Row[] => {
+      const scope = level === 'league' ? 'league' : 'program';
+      const place = async (league: League) =>
+        level === 'league'
+          ? { level }
+          : level === 'program'
+            ? { level, programId: league.programId }
+            : {
+                level,
+                seasonId: await newSeason(pglite, league.leagueId, league.programId),
+              };
+      const at = level === 'league' ? 'the league' : `a ${level}`;
+      return [
+        {
+          command: 'leagues.set_setting',
+          name: `set ${setting.key} at ${at}`,
+          needs: setting.permission,
+          declared: true,
+          scope,
+          prepare: async (league) => ({
+            input: {
+              ...(await place(league)),
+              key: setting.key,
+              value: setting.default,
+              version: null,
+            },
+          }),
+          run: (c, i) => set(c, i, leaguesDeps),
+        },
+        {
+          command: 'leagues.clear_setting',
+          name: `clear ${setting.key} at ${at}`,
+          needs: setting.permission,
+          declared: true,
+          scope,
+          prepare: async (league) => {
+            const where = await place(league);
+            await pglite.query(
+              `insert into setting_values (league_id, level, program_id, season_id, key, value)
+               values ($1, $2, $3, $4, $5, $6::jsonb)`,
+              [
+                league.leagueId,
+                level,
+                'programId' in where ? where.programId : null,
+                'seasonId' in where ? where.seasonId : null,
+                setting.key,
+                JSON.stringify({ version: 1, value: setting.default }),
+              ],
+            );
+            return { input: { ...where, key: setting.key, version: 1 } };
+          },
+          run: (c, i) => clear(c, i, leaguesDeps),
+        },
+      ];
+    }),
+  );
+}
+
+/** A setting only the matrix declares, to try the program and season levels and a permission other than league.settings. */
+const bannerSetting = defineSetting({
+  key: 'site.banner',
+  type: z.string().max(40),
+  default: 'Welcome',
+  levels: ['league', 'program', 'season'],
+  permission: 'site.edit',
+  label: 'setting.site.banner.label',
+});
+
 const rows: readonly Row[] = [
   ...divisionAndVenueRows,
+  ...settingRows(declaredSettings),
+  ...settingRows(settingRegistry([bannerSetting])),
   // League settings (P4 §6) and seasons (P4 §3): the owner and admins (O-7).
   {
     command: 'leagues.set_name',
@@ -679,6 +766,7 @@ describe('every role against every command (T4 §12)', () => {
   it('runs each command as the permission it names itself (T4 §4)', () => {
     const wrong = rows
       .filter((row) => {
+        if (row.declared) return false;
         const named = commands.get(row.command)?.permission;
         if (named === row.needs) return false;
         return !(namedExceptions[row.command] ?? []).includes(row.needs);
@@ -691,6 +779,23 @@ describe('every role against every command (T4 §12)', () => {
         expect(rows.some((row) => row.command === command && row.needs === need)).toBe(true);
       }
     }
+  });
+
+  it('has a row at every level of every declared setting, for both commands', () => {
+    for (const setting of declaredSettings.all()) {
+      for (const level of setting.levels) {
+        for (const command of ['leagues.set_setting', 'leagues.clear_setting']) {
+          const found = rows.filter(
+            (r) => r.command === command && r.needs === setting.permission && r.declared,
+          );
+          expect(
+            found.some((r) => r.name.includes(setting.key)),
+            `${command} ${level}`,
+          ).toBe(true);
+        }
+      }
+    }
+    expect(rows.filter((r) => r.name.includes(bannerSetting.key))).toHaveLength(6);
   });
 
   for (const row of rows) {

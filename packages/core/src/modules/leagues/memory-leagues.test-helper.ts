@@ -8,7 +8,7 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
-import type { DivisionRecord, LeagueRecord, LeaguesTx } from './ports.ts';
+import type { DivisionRecord, LeagueRecord, LeaguesTx, SettingPlace } from './ports.ts';
 
 export type MemoryLeagues = {
   /** Undefined until createLeague runs. */
@@ -22,6 +22,13 @@ export type MemoryLeagues = {
   divisions: DivisionRecord[];
   /** Role grants in this league (the access module's; read by the policy). */
   grants: Grant[];
+  /** Setting values, one per key and place (record 019). */
+  settings: {
+    place: SettingPlace;
+    key: string;
+    document: { version: number; value: unknown };
+    version: number;
+  }[];
   activity: ActivityEntry[];
 };
 
@@ -64,6 +71,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
     seasons: [],
     divisions: [],
     grants: [],
+    settings: [],
     activity: [],
     ...state,
   });
@@ -183,6 +191,41 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           for (const other of s.seasons) {
             if (other.programId === season.programId) other.isCurrent = other === season;
           }
+          return true;
+        },
+        settingRows: async (key, places) =>
+          s.settings
+            .filter(
+              (r) =>
+                r.key === key &&
+                (r.place.level === 'league' ||
+                  (r.place.level === 'program' && r.place.programId === places.programId) ||
+                  (r.place.level === 'season' && r.place.seasonId === places.seasonId)),
+            )
+            .map((r) => ({ level: r.place.level, document: r.document, version: r.version })),
+        writeSetting: async (place, key, document, version) => {
+          const same = (r: MemoryLeagues['settings'][number]) =>
+            r.key === key && JSON.stringify(r.place) === JSON.stringify(place);
+          const row = s.settings.find(same);
+          if (row === undefined) {
+            if (version !== null) return undefined;
+            s.settings.push({ place, key, document, version: 1 });
+            return 1;
+          }
+          if (row.version !== version) return undefined;
+          row.document = document;
+          row.version += 1;
+          return row.version;
+        },
+        clearSetting: async (place, key, version) => {
+          const at = s.settings.findIndex(
+            (r) =>
+              r.key === key &&
+              JSON.stringify(r.place) === JSON.stringify(place) &&
+              r.version === version,
+          );
+          if (at < 0) return false;
+          s.settings.splice(at, 1);
           return true;
         },
       },

@@ -118,7 +118,7 @@ defineSetting({
   default: 24,
   levels: ['league', 'season'], // where it can be set
   permission: 'league.settings',
-  label: 'Send game reminders this many hours before the game',
+  label: 'setting.notifications.reminderLeadHours.label', // the words are in the message files (T-187)
 });
 ```
 
