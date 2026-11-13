@@ -24,6 +24,9 @@ Reserved so far: migration 0006 and decision record 012 / T-224 to 1.19 part 1; 
 - **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — whole step.
 - **1.19 part 1** — `.local/lanes/1.19p1-queue-email` — migration 0006, record 012 / T-224 — queue and email interfaces, stand-ins, adapters, jobs table.
 - **2.7 Standings and tiebreakers** — `.local/lanes/2.7-standings` — none — whole step.
+- **1.16 Address builder and request context** — `.local/lanes/1.16-address-context` — none — whole step.
+- **1.15 Supabase adapter** — `.local/lanes/1.15-supabase-adapter` — none (record 017 / T-229 if needed) — whole step.
+- **2.10 Fixture spreadsheet reader** — `.local/lanes/2.10-fixture-reader` — none — whole step.
 
 ## Needs the founder
 
