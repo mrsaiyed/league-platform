@@ -176,3 +176,16 @@ export const serverOnlyWorkspaces = ['packages/database', 'packages/providers'];
  * argument and is not listed. Add a file here only by adding a config module.
  */
 export const settingsReaderFiles = ['apps/web/src/server/config.ts', 'apps/worker/src/config.ts'];
+
+/**
+ * T-226 (record 014): steps of the worker's jobs that are not commands, so nothing
+ * but the worker may name them outside tests. `allowedIn` lists the worker first,
+ * then the module that defines and exports the step.
+ */
+export const workerOnlySteps = [
+  {
+    name: 'issueInvitationLink',
+    allowedIn: ['apps/worker/', 'packages/core/src/modules/access/'],
+    why: 'it makes a working invitation link with no permission check',
+  },
+];

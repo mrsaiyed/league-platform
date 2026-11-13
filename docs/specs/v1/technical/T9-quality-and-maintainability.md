@@ -38,7 +38,7 @@ This product will be built and kept running by a very small team, with much of t
 A change cannot be merged unless all of these pass. They run automatically.
 
 - Formatting and code style.
-- Structure rules: imports only in allowed directions (T-21); no league named in code (T-27); no SQL outside `packages/database`; no secrets in browser code (T-30).
+- Structure rules: imports only in allowed directions (T-21); no league named in code (T-27); no SQL outside `packages/database`; no secrets in browser code (T-30); steps of the worker's jobs that are not commands are named only by the worker (T-226, record 014).
 - Type checking in strict mode.
 - Rule tests and database tests, including the two-league harness (T-65) and the role-by-command matrix.
 - The public-field scan (T-81).
