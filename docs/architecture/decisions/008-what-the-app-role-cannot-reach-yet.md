@@ -18,7 +18,7 @@ Migration 0005 puts every table behind row-level security. The app's role, `app_
 - **Everything else goes through narrow owner-run functions, added with the step that needs them**, not by widening a table grant or a policy:
   - account and own-profile creation, and erasure: with sign-in, steps 1.13 and 1.14;
   - finding an account by email: steps 1.13 and 1.14. It answers only what the sign-in flow needs, never whether an address has an account;
-  - accepting an invitation: step 1.12. It takes the token, checks its hash, expiry and that it was not cancelled, and creates the grant for that one league;
+  - accepting an invitation: not needed after all (record 014, T-226). The link names the league, so the app sets the league first and accepts inside its fence;
   - names on an access list: step 1.12. It returns the display names of the accounts holding grants in the league that is set, and nothing else about them.
 - **The rules for every such function** (SECURITY DEFINER, so it runs as the role that owns the tables):
   - it does one job, takes only what that job needs and returns the fewest columns;

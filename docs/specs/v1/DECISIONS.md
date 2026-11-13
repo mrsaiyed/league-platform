@@ -237,6 +237,7 @@ All dated November 12, 2026.
 | T-221                 | New                                                                          | Lookups before a league or account is known go through a few narrow owner-run functions, never a wider policy | The league fence (step 1.7) left sign-up, sign-in, invitations and access lists with no way in     |
 | T-222                 | New                                                                          | Typed queries and the transaction helper (record 009)                                                         | Step 1.8 needed a transaction helper that cannot leak a league across pooled requests              |
 | T-223                 | New                                                                          | The command shape and where it lives (record 010)                                                             | Step 1.10 needed one shape for every change to data                                                |
+| T-226                 | New                                                                          | Invitation links, accepting in the league's fence, what the activity log holds (record 014); T-221 narrowed   | Step 1.12 needed them; the link names the league, so accepting needs no owner-run function         |
 | T-212                 | Nothing from a later stage is built early                                    | Later-stage work is built early whenever it does not have to wait (record 011)                                | The founder asked for every stage that can be built in parallel to be built in parallel            |
 
 ## The full list
@@ -511,9 +512,10 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-85  | Password rules: a one-way hash held by the sign-in service, at least 8 characters, leaked passwords refused, guesses limited                                                                                              | Agreed (delegated)  | yes     |
 | T-86  | Logs and error reports carry no personal content and are kept for a fixed time; exports are delivered by an expiring link                                                                                                 | Agreed (delegated)  |         |
 | T-87  | Who may see statistics (S-22) is enforced in the same one function as names, and never leaks through the cache or live updates                                                                                            | Agreed (delegated)  |         |
-| T-221 | What must happen before a league or account is known (short-name lookup, sign-up, sign-in by email, accepting an invitation, names on an access list) goes through a few narrow owner-run functions, never a wider policy | Agreed (delegated)  | yes     |
+| T-221 | What must happen before a league or account is known (short-name lookup, sign-up, sign-in by email, names on an access list) goes through a few narrow owner-run functions, never a wider policy                          | Agreed (delegated)  | yes     |
 | T-222 | Typed queries use Kysely behind a hidden handle; one transaction helper sets league and account for that transaction only and refuses stray queries after commit; `date` columns read as text (record 009)                | Agreed (delegated)  | yes     |
 | T-223 | The command shape: Zod input, one transaction, permission inside it, events inside it, jobs through the transaction object, one log line; core defines ports, database implements them (record 010)                       | Agreed (delegated)  | yes     |
+| T-226 | Invitation links hold a random secret stored only as a hash and sent only in the email job; 14 days; re-send replaces it; any signed-in holder accepts once in the league's fence; activity entries hold ids (record 014) | Agreed (delegated)  | yes     |
 
 ### [T5 — Customization engine](technical/T5-customization-engine.md)
 

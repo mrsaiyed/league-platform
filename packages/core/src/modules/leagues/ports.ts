@@ -43,7 +43,7 @@ export type LeaguesStore = {
   readonly currentLeague: () => Promise<LeagueRecord | undefined>;
   /** Sets its name if it is still at `version` (T-46): the new version, or undefined. */
   readonly setName: (name: string, version: number) => Promise<number | undefined>;
-  /** Whether the acting account is one of our own staff (a stand-in until step 1.12). */
+  /** Whether the acting account is one of our own staff (named in the app settings; not a league role). */
   readonly isPlatformStaff: () => Promise<boolean>;
   /** Creates the transaction's league and its default program together. */
   readonly createLeague: (

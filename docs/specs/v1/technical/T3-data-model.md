@@ -78,7 +78,7 @@ Every league gets one program with `is_default` set when it is created. Single-p
 | `activity_log`       | Who changed what (A-6)                       | `league_id`, `actor_account_id`, `action`, `target_type`, `target_id`, `summary`, `details` (JSON), `at`                         |
 | `support_access_log` | Our staff opening a league (section 8 of P2) | `league_id`, `staff_account_id`, `reason`, `started_at`, `ended_at`                                                              |
 
-A grant's account, role and scope, and an invitation's email, role and scope, never change once the row exists: a different role is a new grant. A support visit starts when its row is written and lasts at most an hour (T-77); while it runs it can be ended early, and once over it never changes.
+A grant's account, role and scope, and an invitation's email, role and scope, never change once the row exists: a different role is a new grant. An activity entry's `action` is the command's name and its `summary` a message key (T-226); `details` holds ids and fixed words only. A support visit starts when its row is written and lasts at most an hour (T-77); while it runs it can be ended early, and once over it never changes.
 
 ## 6. Registration
 
