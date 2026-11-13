@@ -87,8 +87,15 @@ describe('openTwoLeagues', () => {
         ...(await texts('select reason as t from game_corrections where league_id = $1', [
           leagueId,
         ])),
+        ...(await texts('select device_id as t from scoring_sessions where league_id = $1', [
+          leagueId,
+        ])),
+        ...(await texts('select reason as t from standings_adjustments where league_id = $1', [
+          leagueId,
+        ])),
+        ...(await texts('select file_name as t from imports where league_id = $1', [leagueId])),
       ];
-      expect(found.length).toBe(18);
+      expect(found.length).toBe(22);
       for (const text of found) expect(text.toLowerCase()).toContain(marker);
     }
     const shared = await texts(
@@ -141,6 +148,29 @@ describe('openTwoLeagues', () => {
       expect(own?.get('schedule_drafts')).toEqual([league.scheduleDraftId]);
       expect(own?.get('game_assignments')).toEqual([league.gameAssignmentId]);
       expect(own?.get('game_corrections')?.length).toBe(1);
+    }
+  });
+
+  it("lets the harness snapshot each league's live games, calculated tables and imports as its own", async () => {
+    const { a, b } = leagues;
+    const rows = await withUnfencedScope(leagues.db, a.leagueId, async (s) =>
+      readRows(transactionOf(s)),
+    );
+    const prints = footprints(
+      rows,
+      new Map([a, b].map((league) => [league.leagueId, league.marker])),
+    );
+    for (const league of [a, b]) {
+      const own = prints.get(league.leagueId)?.rows;
+      expect(own?.get('game_events')?.sort()).toEqual([...league.gameEventIds].sort());
+      expect(own?.get('game_states')).toEqual([league.gameStateId]);
+      expect(own?.get('player_game_stats')).toEqual([league.playerGameStatsId]);
+      expect(own?.get('scoring_sessions')).toEqual([league.scoringSessionId]);
+      expect(own?.get('roster_entries')).toContain(league.walkUpRosterEntryId);
+      expect(own?.get('standings_rows')).toEqual([league.standingsRowId]);
+      expect(own?.get('standings_adjustments')).toEqual([league.standingsAdjustmentId]);
+      expect(own?.get('season_player_totals')).toEqual([league.seasonPlayerTotalsId]);
+      expect(own?.get('imports')).toEqual([league.importId]);
     }
   });
 });
