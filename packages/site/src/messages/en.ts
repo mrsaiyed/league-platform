@@ -37,6 +37,11 @@ export const en = {
   'activity.leagues.set_status': "Changed the league's state to {status}",
   'activity.leagues.create_season': 'Added a season',
   'activity.leagues.set_current_season': 'Changed the current season',
+  'activity.leagues.set_setting': 'Changed a setting',
+  'activity.leagues.clear_setting': 'Went back to the default for a setting',
+  // Setting labels (T5 §6, T-98): `setting.<key>.label`, shown on the admin screen.
+  'setting.members.startPage.label':
+    'Where members land first: the league home or their own team page',
 } as const;
 
 export type MessageKey = keyof typeof en;

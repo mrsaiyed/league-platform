@@ -1,6 +1,7 @@
 // Typed queries (T1 §1). Each takes the scope withTransaction opened; one that
 // touches league data takes a LeagueScope (T-28), except the few T-221 lookups that
 // must answer before a league is known. Used only through this file.
+export { deleteSettingValue } from './delete-setting-value.ts';
 export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts';
 export { findInvitation } from './find-invitation.ts';
 export { findInvitationByTokenHash } from './find-invitation-by-token-hash.ts';
@@ -19,6 +20,7 @@ export { insertSeason, type NewSeasonRow } from './insert-season.ts';
 export { listActiveGrantsOf } from './list-active-grants-of.ts';
 export { listActivityEntries } from './list-activity-entries.ts';
 export { listOpenInvitations } from './list-open-invitations.ts';
+export { listSettingValues, type SettingValueRow } from './list-setting-values.ts';
 export { listPrograms } from './list-programs.ts';
 export { listRoleGrants } from './list-role-grants.ts';
 export { markInvitationAccepted } from './mark-invitation-accepted.ts';
@@ -33,3 +35,4 @@ export { takeJobs, type NoLeagueScope, type TakenJob } from './take-jobs.ts';
 export { updateLeagueName } from './update-league-name.ts';
 export { updateLeagueStatus } from './update-league-status.ts';
 export type { ProgramSummary } from './program-summary.ts';
+export { writeSettingValue, type SettingPlaceRow } from './write-setting-value.ts';

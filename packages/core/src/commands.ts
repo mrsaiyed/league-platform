@@ -14,6 +14,8 @@ import {
   revokeGrant,
 } from './modules/access/index.ts';
 import {
+  clearSetting,
+  setSetting,
   createLeague,
   createSeason,
   renameShortName,
@@ -29,6 +31,8 @@ export const commands = commandRegistry([
   setLeagueStatus,
   createSeason,
   setCurrentSeason,
+  setSetting,
+  clearSetting,
   invite,
   resendInvitation,
   cancelInvitation,

@@ -4,8 +4,10 @@ import {
   acceptInvitation,
   cancelInvitation,
   createLeague,
+  clearSetting,
   createSeason,
   invite,
+  setSetting,
   listAccess,
   listActivity,
   myAccess,
@@ -18,6 +20,7 @@ import {
 } from '@srleagues/core';
 import { createHash, randomUUID } from 'node:crypto';
 import {
+  deleteSettingValue,
   findCurrentLeague,
   findInvitation,
   findInvitationByTokenHash,
@@ -42,11 +45,13 @@ import {
   insertLeague,
   insertSeason,
   listPrograms,
+  listSettingValues,
   renameLeagueSlug,
   setCurrentSeason,
   settleJob,
   updateLeagueName,
   updateLeagueStatus,
+  writeSettingValue,
 } from '../queries/index.ts';
 import {
   harnessTx,
@@ -124,6 +129,16 @@ registerCommandCase(setLeagueStatus, harnessTx, {
 registerCommandCase(createSeason, harnessTx, {
   name: "add a season to the league's default program",
   input: () => ({ slug: 'harness-season', name: 'Harness season' }),
+});
+
+registerCommandCase(setSetting, harnessTx, {
+  name: "set the league's start page for members as its owner",
+  input: () => ({ level: 'league', key: 'members.startPage', value: 'myTeam', version: 1 }),
+});
+
+registerCommandCase(clearSetting, harnessTx, {
+  name: "clear the league's start page for members as its owner",
+  input: () => ({ level: 'league', key: 'members.startPage', version: 1 }),
 });
 
 registerCommandCase(setCurrentSeasonCommand, harnessTx, {
@@ -219,6 +234,62 @@ registerIsolationCase({
   subject: setCurrentSeason,
   name: "make the target's season current",
   run: (scope, target) => setCurrentSeason(scope, target.seasonId),
+});
+
+// Setting values (step 2.14) ---------------------------------------------------------
+
+registerIsolationCase({
+  subject: listSettingValues,
+  name: "read a key at the scope's league and the target's program and season",
+  run: (scope, target) =>
+    listSettingValues(scope, 'members.startPage', {
+      programId: target.programId,
+      seasonId: target.seasonId,
+    }),
+});
+
+registerIsolationCase({
+  subject: writeSettingValue,
+  name: "add a value at the scope's league",
+  run: (scope) =>
+    writeSettingValue(
+      scope,
+      { level: 'league' },
+      'notifications.reminderLeadHours',
+      { version: 1, value: 12 },
+      null,
+    ),
+});
+
+registerIsolationCase({
+  subject: writeSettingValue,
+  name: "change the target's program value at version 1",
+  run: (scope, target) =>
+    writeSettingValue(
+      scope,
+      { level: 'program', programId: target.programId },
+      'members.startPage',
+      { version: 1, value: 'changed' },
+      1,
+    ),
+});
+
+registerIsolationCase({
+  subject: deleteSettingValue,
+  name: "clear the target's season value at version 1",
+  run: (scope, target) =>
+    deleteSettingValue(
+      scope,
+      { level: 'season', seasonId: target.seasonId },
+      'members.startPage',
+      1,
+    ),
+});
+
+registerIsolationCase({
+  subject: deleteSettingValue,
+  name: "clear the scope's league value at version 1",
+  run: (scope) => deleteSettingValue(scope, { level: 'league' }, 'members.startPage', 1),
 });
 
 // Access (step 1.12) ------------------------------------------------------------------

@@ -25,8 +25,10 @@ import {
   cancelInvitation,
   commands,
   createLeague,
+  clearSetting,
   createSeason,
   invite,
+  setSetting,
   listAccess,
   listActivity,
   myAccess,
@@ -277,6 +279,29 @@ const rows: readonly Row[] = [
   },
   // Seasons are checked at their program (P4 §4): the default program's rows refuse
   // the admin of another program; the program's rows let that program's admin in.
+  {
+    command: 'leagues.set_setting',
+    name: "set the league's start page for members",
+    needs: 'league.settings',
+    prepare: async () => ({
+      input: { level: 'league', key: 'members.startPage', value: 'myTeam', version: null },
+    }),
+    run: (c, i) => setSetting(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.clear_setting',
+    name: "clear the league's start page for members",
+    needs: 'league.settings',
+    prepare: async (league) => {
+      await pglite.query(
+        `insert into setting_values (league_id, level, key, value)
+         values ($1, 'league', 'members.startPage', $2::jsonb)`,
+        [league.leagueId, JSON.stringify({ version: 1, value: 'myTeam' })],
+      );
+      return { input: { level: 'league', key: 'members.startPage', version: 1 } };
+    },
+    run: (c, i) => clearSetting(c, i, leaguesDeps),
+  },
   {
     command: 'leagues.create_season',
     name: 'add a season to the default program',
