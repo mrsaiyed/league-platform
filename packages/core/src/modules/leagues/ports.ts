@@ -3,7 +3,8 @@
 // only ever reach the league the transaction is for (T-28).
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
-import type { Audience, LeagueStatus } from './league-values.ts';
+import type { SeasonRules } from '@srleagues/contracts';
+import type { Audience, LeagueStatus, SeasonStatus } from './league-values.ts';
 import type { SettingLevel } from './settings/define-setting.ts';
 
 /** Where a setting value is kept: the league, one program or one season (record 019). */
@@ -52,6 +53,30 @@ export type NewSeason = {
   readonly endsOn: string | null;
 };
 
+/** A season as it is kept. `rules` is the stored document, which may be of an older version. */
+export type SeasonRecord = {
+  readonly id: string;
+  readonly programId: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly startsOn: string | null;
+  readonly endsOn: string | null;
+  readonly status: SeasonStatus;
+  readonly isCurrent: boolean;
+  readonly rules: unknown;
+  readonly version: number;
+};
+
+/** What a season change sets; a field left out stays as it is. */
+export type SeasonChange = {
+  readonly name?: string;
+  readonly startsOn?: string | null;
+  readonly endsOn?: string | null;
+  readonly status?: SeasonStatus;
+  readonly isCurrent?: boolean;
+  readonly rules?: SeasonRules;
+};
+
 export type LeaguesStore = {
   /** The transaction's league, or undefined if it is in the bin or out of sight. */
   readonly currentLeague: () => Promise<LeagueRecord | undefined>;
@@ -81,6 +106,21 @@ export type LeaguesStore = {
   readonly createSeason: (season: NewSeason) => Promise<string | 'slug-taken'>;
   /** The program the season belongs to, or undefined if it is not found. */
   readonly seasonProgramId: (seasonId: string) => Promise<string | undefined>;
+  /** The season with this id, or undefined if it is not in this league or is in the bin. */
+  readonly findSeason: (seasonId: string) => Promise<SeasonRecord | undefined>;
+  /** How many programs the league has, not counting the bin (U-3: one means none is shown). */
+  readonly programCount: () => Promise<number>;
+  /**
+   * Changes a season if it is still at `version` (T-46, A-8): the new version,
+   * 'unique-jerseys-clash' (the switch cannot go on while a team has a number worn
+   * twice), or undefined if it is not there or the version moved. Making it current
+   * clears the mark from the program's other season.
+   */
+  readonly updateSeason: (
+    seasonId: string,
+    change: SeasonChange,
+    version: number,
+  ) => Promise<number | 'unique-jerseys-clash' | undefined>;
   /** Makes the season the current one of its program, and no other: false if it is not found. */
   readonly setCurrentSeason: (seasonId: string) => Promise<boolean>;
   /**

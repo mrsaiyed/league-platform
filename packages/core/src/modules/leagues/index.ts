@@ -7,6 +7,14 @@ export { reorderDivisions, type ReorderDivisionsError } from './commands/reorder
 export { restoreDivision, type RestoreDivisionError } from './commands/restore-division.ts';
 export { updateDivision, type UpdateDivisionError } from './commands/update-division.ts';
 export { createSeason, type CreateSeasonError } from './commands/create-season.ts';
+export { getSeason, type GetSeasonError } from './commands/get-season.ts';
+export { updateSeason, type UpdateSeasonError } from './commands/update-season.ts';
+export { setSeasonRules, type SetSeasonRulesError } from './commands/set-season-rules.ts';
+export {
+  setSeasonRosterSettings,
+  type SetSeasonRosterSettingsError,
+} from './commands/set-season-roster-settings.ts';
+export { readSeasonRules, type SeasonView } from './commands/season-view.ts';
 export { renameShortName, type RenameShortNameError } from './commands/rename-short-name.ts';
 export { setCurrentSeason, type SetCurrentSeasonError } from './commands/set-current-season.ts';
 export {
@@ -47,7 +55,14 @@ export {
   type LeagueStatusChanged,
 } from './events.ts';
 export { leagueTransitions, readOnlyStatuses, type Transition } from './league-states.ts';
-export { audiences, leagueStatuses, type Audience, type LeagueStatus } from './league-values.ts';
+export {
+  audiences,
+  leagueStatuses,
+  seasonStatuses,
+  type Audience,
+  type LeagueStatus,
+  type SeasonStatus,
+} from './league-values.ts';
 export type {
   DivisionChange,
   DivisionRecord,
@@ -58,6 +73,8 @@ export type {
   NewDivision,
   NewLeague,
   NewSeason,
+  SeasonChange,
+  SeasonRecord,
   SettingPlace,
   StoredSettingRow,
 } from './ports.ts';

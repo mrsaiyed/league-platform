@@ -18,6 +18,7 @@
 // cannot be granted until those tables exist (0004). Their permissions are tested
 // in core (modules/access/policy.test.ts), and they join this matrix with the
 // clubs and teams step.
+import { defaultSeasonRules } from '@srleagues/contracts';
 import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import {
@@ -54,6 +55,10 @@ import {
   resendInvitation,
   revokeGrant,
   setCurrentSeason,
+  getSeason,
+  updateSeason,
+  setSeasonRules,
+  setSeasonRosterSettings,
   setLeagueName,
   setLeagueStatus,
   type AccessTx,
@@ -603,6 +608,90 @@ const rows: readonly Row[] = [
       input: { seasonId: await newSeason(pglite, league.leagueId, league.programId) },
     }),
     run: (c, i) => setCurrentSeason(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.get_season',
+    name: 'see a season of the default program',
+    needs: 'season.settings',
+    prepare: async (league) => {
+      const seasonId = await newSeason(pglite, league.leagueId, league.defaultProgramId);
+      return { input: { seasonId } };
+    },
+    run: (c, i) => getSeason(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.get_season',
+    name: 'see a season of one program',
+    needs: 'season.settings',
+    scope: 'program',
+    prepare: async (league) => {
+      const seasonId = await newSeason(pglite, league.leagueId, league.programId);
+      return { input: { seasonId } };
+    },
+    run: (c, i) => getSeason(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.update_season',
+    name: 'rename a season of the default program',
+    needs: 'season.settings',
+    prepare: async (league) => {
+      const seasonId = await newSeason(pglite, league.leagueId, league.defaultProgramId);
+      return { input: { seasonId, version: 1, name: 'Renamed' } };
+    },
+    run: (c, i) => updateSeason(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.update_season',
+    name: 'rename a season of one program',
+    needs: 'season.settings',
+    scope: 'program',
+    prepare: async (league) => {
+      const seasonId = await newSeason(pglite, league.leagueId, league.programId);
+      return { input: { seasonId, version: 1, name: 'Renamed' } };
+    },
+    run: (c, i) => updateSeason(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.set_season_rules',
+    name: 'set the rules of a season of the default program',
+    needs: 'season.settings',
+    prepare: async (league) => {
+      const seasonId = await newSeason(pglite, league.leagueId, league.defaultProgramId);
+      return { input: { seasonId, version: 1, rules: defaultSeasonRules() } };
+    },
+    run: (c, i) => setSeasonRules(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.set_season_rules',
+    name: 'set the rules of a season of one program',
+    needs: 'season.settings',
+    scope: 'program',
+    prepare: async (league) => {
+      const seasonId = await newSeason(pglite, league.leagueId, league.programId);
+      return { input: { seasonId, version: 1, rules: defaultSeasonRules() } };
+    },
+    run: (c, i) => setSeasonRules(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.set_season_roster_settings',
+    name: 'set the roster settings of a season of the default program',
+    needs: 'season.settings',
+    prepare: async (league) => {
+      const seasonId = await newSeason(pglite, league.leagueId, league.defaultProgramId);
+      return { input: { seasonId, version: 1, uniqueJerseys: true } };
+    },
+    run: (c, i) => setSeasonRosterSettings(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.set_season_roster_settings',
+    name: 'set the roster settings of a season of one program',
+    needs: 'season.settings',
+    scope: 'program',
+    prepare: async (league) => {
+      const seasonId = await newSeason(pglite, league.leagueId, league.programId);
+      return { input: { seasonId, version: 1, uniqueJerseys: true } };
+    },
+    run: (c, i) => setSeasonRosterSettings(c, i, leaguesDeps),
   },
   {
     command: 'leagues.create',
