@@ -99,11 +99,11 @@ async function season() {
   };
 }
 
-const basis = (seasonId: string, version: number | null = null, basedOnRevision = null) => ({
-  seasonId,
-  basedOnRevision: basedOnRevision as number | null,
-  version,
-});
+const basis = (
+  seasonId: string,
+  version: number | null = null,
+  basedOnRevision: number | null = null,
+) => ({ seasonId, basedOnRevision, version });
 
 describe('schedule draft commands against the database', () => {
   it('reads the published schedule in the league time zone, with court names and recording', async () => {
