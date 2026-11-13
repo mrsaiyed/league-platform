@@ -238,6 +238,7 @@ All dated November 12, 2026.
 | T-222                 | New                                                                          | Typed queries and the transaction helper (record 009)                                                         | Step 1.8 needed a transaction helper that cannot leak a league across pooled requests              |
 | T-223                 | New                                                                          | The command shape and where it lives (record 010)                                                             | Step 1.10 needed one shape for every change to data                                                |
 | T-212                 | Nothing from a later stage is built early                                    | Later-stage work is built early whenever it does not have to wait (record 011)                                | The founder asked for every stage that can be built in parallel to be built in parallel            |
+| T-225                 | New                                                                          | Sign-in numbers and the shape of the sign-in interface (record 013)                                           | Step 1.13 turned "a few" and "for a while" into numbers the stand-in and Supabase share            |
 
 ## The full list
 
@@ -514,6 +515,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-221 | What must happen before a league or account is known (short-name lookup, sign-up, sign-in by email, accepting an invitation, names on an access list) goes through a few narrow owner-run functions, never a wider policy | Agreed (delegated)  | yes     |
 | T-222 | Typed queries use Kysely behind a hidden handle; one transaction helper sets league and account for that transaction only and refuses stray queries after commit; `date` columns read as text (record 009)                | Agreed (delegated)  | yes     |
 | T-223 | The command shape: Zod input, one transaction, permission inside it, events inside it, jobs through the transaction object, one log line; core defines ports, database implements them (record 010)                       | Agreed (delegated)  | yes     |
+| T-225 | Sign-in numbers: codes last 10 minutes, 5 tries, 5 an hour per address and 30 per network; passwords 8 characters to 72 bytes, NFKC; wrong guesses slowed, then locked, per address and network (record 013)              | Agreed (delegated)  | yes     |
 
 ### [T5 — Customization engine](technical/T5-customization-engine.md)
 
