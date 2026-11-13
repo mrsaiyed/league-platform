@@ -108,7 +108,17 @@ export async function runInScope<Tx extends CommandTx>(
   };
   const result = await command(context, input, deps);
   if (!result.ok) throw new CommandRefused(command.commandName, result.error);
-  return { value: result.value, jobs };
+  return { value: result.value, jobs: jobs.map(withoutSecrets) };
+}
+
+/**
+ * A job's link token (an invitation's, T-226) is a fresh random secret, new in each
+ * run as a new row's id is, so it is set aside when runs are compared. No league's
+ * rows hold a token (only its hash), so no leak could be read from it anyway.
+ */
+function withoutSecrets(job: Job): Job {
+  if (!('token' in job.ids)) return job;
+  return { ...job, ids: { ...job.ids, token: '(new token)' } };
 }
 
 /** Adds a command to the harness, with input aimed at the target league's records. */

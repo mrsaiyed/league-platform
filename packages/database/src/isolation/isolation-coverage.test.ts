@@ -10,6 +10,12 @@ import { fileURLToPath } from 'node:url';
 import { commands } from '@srleagues/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as databasePackage from '../../index.ts';
+import {
+  grantFromRow,
+  invitationFromRow,
+  invitationStatus,
+  scopeColumns,
+} from '../queries/access-rows.ts';
 import { constraintOf } from '../queries/constraint-of.ts';
 import { currentLeague } from '../queries/find-current-league.ts';
 import { programSummary } from '../queries/program-summary.ts';
@@ -40,6 +46,12 @@ const reachNoLeagueData = new Map<unknown, string>([
   // mapping of a context to the fences is tested beside it.
   [databasePackage.commandTransaction, "opens a command's fenced transaction (withTransaction)"],
   [databasePackage.leaguesStore, 'binds the leagues queries, each with its own cases, to a scope'],
+  [databasePackage.accessStore, 'binds the access queries, each with its own cases, to a scope'],
+  [databasePackage.activityLogStore, 'binds the activity log queries (own cases) to a scope'],
+  [grantFromRow, 'turns a row already read into the returned shape; runs no SQL'],
+  [invitationFromRow, 'turns a row already read into the returned shape; runs no SQL'],
+  [invitationStatus, 'builds a column expression for the queries that use it; runs no SQL'],
+  [scopeColumns, 'turns a scope into its two column values; runs no SQL'],
   [databasePackage.createDatabase, 'opens connections; reads no rows'],
   [databasePackage.checkLoginRole, "reads the login role's facts from pg_roles only"],
   [databasePackage.applyMigrations, 'the migration runner (T-48): schema, as the owner'],
