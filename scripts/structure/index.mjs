@@ -12,6 +12,7 @@ import * as leagueAddresses from './league-addresses.mjs';
 import * as browserSecrets from './browser-secrets.mjs';
 import * as migrationSafety from './migration-safety.mjs';
 import * as workerOnly from './worker-only.mjs';
+import * as interfaceText from './interface-text.mjs';
 
 export const checks = [
   importDirections,
@@ -22,6 +23,7 @@ export const checks = [
   browserSecrets,
   migrationSafety,
   workerOnly,
+  interfaceText,
 ];
 
 /** Runs every check (or those whose rule is in `only`) over the repository at `root`. */

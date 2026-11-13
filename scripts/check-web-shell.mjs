@@ -2,7 +2,7 @@
 // browser: npm run test:web. Builds the app (skip with --no-build), starts it on
 // this computer with made-up settings on the made-up stand-in (APP_ENV=test), asks
 // for addresses as different made-up people, and checks the status and the words of
-// each answer: "you do not have access" for admin addresses without access (U-6),
+// each answer, the league's own design, name and the "Powered by" mark (step 1.18): "you do not have access" for admin addresses without access (U-6),
 // unpublished leagues only for their owner and admins (U-9), forwarding (U-7), and
 // the security headers on every answer.
 // Then it starts the app as staging with a database address that answers nobody,
@@ -49,6 +49,23 @@ const cases = [
   ['visitor', '/account', 200, ['Your account']],
   ['visitor', '/north-valley', 200, ['Home', 'This page is not built yet.']],
   ['visitor', '/north-valley/teams/lions', 200, ['Team']],
+  // The design as variables once per page, the header and the mark (step 1.18, T-90, U-8):
+  // two leagues, two looks.
+  [
+    'visitor',
+    '/north-valley',
+    200,
+    ['North Valley League', 'Powered by SR Leagues', '--color-primary: #c8a84b', 'Schedule'],
+    ['#1f5fbf'],
+  ],
+  [
+    'visitor',
+    '/harbor-city/standings',
+    200,
+    ['Harbor City League', 'Powered by SR Leagues', '--color-primary: #1f5fbf'],
+    ['#c8a84b'],
+  ],
+  ['scheduler', '/north-valley/admin', 200, ['Powered by SR Leagues', '--color-primary: #c8a84b']],
   ['visitor', '/north-valley/admin', 403, [noAccess], ['Admin areas']],
   ['stranger', '/north-valley/admin', 403, [noAccess]],
   ['coach', '/north-valley/admin/teams', 403, [noAccess]],
