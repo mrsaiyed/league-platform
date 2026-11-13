@@ -11,6 +11,7 @@ export {
   findPrivateFields,
   privateValuesOf,
   type PrivateFieldFinding,
+  type PrivateFieldScanOptions,
   type PrivatePersonFields,
 } from './rules/private-field-scan.ts';
 export {
