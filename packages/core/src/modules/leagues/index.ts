@@ -22,3 +22,17 @@ export {
 export { leagueTransitions, type Transition } from './league-states.ts';
 export { audiences, leagueStatuses, type Audience, type LeagueStatus } from './league-values.ts';
 export type { LeagueRecord, LeaguesStore, LeaguesTx, NewLeague, NewSeason } from './ports.ts';
+export {
+  adminAreas,
+  forwardedLeagueUrl,
+  isLeagueIdFormat,
+  isLeagueSiteName,
+  leagueApiBase,
+  leagueApiUrl,
+  leagueUrl,
+  type AdminArea,
+  type LeagueAddressee,
+  type LeaguePage,
+  type LeagueUrlOptions,
+} from './rules/league-url.ts';
+export { isBlockedShortName, isShortNameFormat, isSystemShortName } from './short-names.ts';
