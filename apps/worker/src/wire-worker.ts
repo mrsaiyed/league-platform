@@ -29,7 +29,10 @@ import {
   type QueueOptions,
 } from '@srleagues/database';
 import { emailSenderFor } from '@srleagues/providers';
-import type { InvitationEmailTx } from './jobs/invitation-email-job.ts';
+import {
+  checkedInvitationEmailSettings,
+  type InvitationEmailTx,
+} from './jobs/invitation-email-job.ts';
 import { jobHandlers } from './jobs/job-handlers.ts';
 
 export type WorkerSettings = {
@@ -69,8 +72,10 @@ export function reportQueueError(error: unknown): void {
 }
 
 export function wireWorker(settings: WorkerSettings): WiredWorker {
-  // First, so a missing production key throws before anything is opened.
+  // First, so a missing production key or a setting the emails cannot use throws
+  // before anything is opened or any job runs (record 023).
   const email = emailSenderFor(settings);
+  checkedInvitationEmailSettings(settings);
   const db = createDatabase(settings.database);
   const options: QueueOptions = { onError: reportQueueError, ...settings.queue };
   const queue =

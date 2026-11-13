@@ -57,6 +57,16 @@ describe('wireWorker', () => {
   it('refuses production without an email key, before opening anything', () => {
     expect(() => wireWorker({ appEnv: 'production', database, ...site })).toThrow('RESEND_API_KEY');
   });
+
+  it('refuses an origin or sending address the emails cannot use, before opening anything', () => {
+    const local = { appEnv: 'local', database } as const;
+    expect(() => wireWorker({ ...local, ...site, siteOrigin: 'leagues.example.test' })).toThrow(
+      'site origin',
+    );
+    expect(() =>
+      wireWorker({ ...local, ...site, sendingAddress: 'Leagues <a@example.test>' }),
+    ).toThrow('sending address');
+  });
 });
 
 describe('reportQueueError', () => {

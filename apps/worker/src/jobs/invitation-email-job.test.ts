@@ -18,7 +18,11 @@ import {
 } from '@srleagues/core';
 import { captureEmail } from '@srleagues/providers';
 import { describe, expect, it } from 'vitest';
-import { BadJobDataError, sendInvitationEmail } from './invitation-email-job.ts';
+import {
+  BadJobDataError,
+  EmailNotBuiltError,
+  sendInvitationEmail,
+} from './invitation-email-job.ts';
 import { jobHandlers } from './job-handlers.ts';
 import { leagueId, memoryLeague, ownerId, strangerId } from './memory-league.test-helper.ts';
 
@@ -244,5 +248,48 @@ describe('the invitation email job', () => {
       });
     }
     expect(made.db.opened).toEqual([]);
+  });
+
+  it('refuses a bad origin or sending address when made, before any job runs (record 023)', () => {
+    const made = memoryLeague();
+    const make = (settings: { siteOrigin: string; sendingAddress: string }) => () =>
+      sendInvitationEmail({ transaction: made.transaction, email: captureEmail(), ...settings });
+    for (const bad of [
+      'leagues.example.test',
+      'https://leagues.example.test/base',
+      'ftp://x.test',
+    ]) {
+      expect(make({ siteOrigin: bad, sendingAddress })).toThrow('site origin');
+    }
+    for (const bad of [
+      '',
+      'not an address',
+      'North <a@example.test>',
+      'a@example.test\r\nBcc: b',
+    ]) {
+      expect(make({ siteOrigin, sendingAddress: bad })).toThrow('sending address');
+    }
+    expect(made.db.opened).toEqual([]);
+  });
+
+  it('rolls the new link back and fails at once when the email cannot be built', async () => {
+    const email = captureEmail();
+    const { db, run } = await invited(email);
+    const hash = db.state.invitations[0]?.tokenHash;
+    // A short name the address helper refuses: the email cannot be built.
+    if (db.state.league !== undefined) db.state.league = { ...db.state.league, slug: 'Not A Slug' };
+
+    const thrown = await run().then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    expect(thrown).toBeInstanceOf(EmailNotBuiltError);
+    expect(afterFailure(thrown, 1, maxJobAttempts)).toEqual({
+      outcome: 'failed',
+      errorCode: 'unexpected',
+    });
+    expect(email.messages()).toEqual([]);
+    // The link the invitation had is still the one stored: nothing was rotated.
+    expect(db.state.invitations[0]?.tokenHash).toBe(hash);
   });
 });
