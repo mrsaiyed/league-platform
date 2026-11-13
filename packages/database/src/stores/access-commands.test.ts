@@ -32,6 +32,7 @@ import {
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { jobsStore } from './jobs-store.ts';
+import { divisionsStore } from './divisions-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 
 let pglite: PGlite;
@@ -51,6 +52,7 @@ beforeAll(async () => {
       },
     },
     leagues: leaguesStore(scope),
+    divisions: divisionsStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));

@@ -7,7 +7,13 @@ import { en } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
 
 /** Commands that only read, so write no activity entry. */
-const reads = new Set(['access.list_access', 'access.list_activity', 'access.my_access']);
+const reads = new Set([
+  'access.list_access',
+  'access.list_activity',
+  'access.my_access',
+  'leagues.list_divisions',
+  'scheduling.list_venues',
+]);
 
 describe('activity log messages', () => {
   it('has English words for every command that writes an entry, and no others', () => {

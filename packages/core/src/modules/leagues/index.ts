@@ -1,5 +1,11 @@
 // The leagues module (T2 §3). Other modules and packages use only what is here.
 export { createLeague, type CreateLeagueError } from './commands/create-league.ts';
+export { createDivision, type CreateDivisionError } from './commands/create-division.ts';
+export { listDivisions } from './commands/list-divisions.ts';
+export { removeDivision, type RemoveDivisionError } from './commands/remove-division.ts';
+export { reorderDivisions, type ReorderDivisionsError } from './commands/reorder-divisions.ts';
+export { restoreDivision, type RestoreDivisionError } from './commands/restore-division.ts';
+export { updateDivision, type UpdateDivisionError } from './commands/update-division.ts';
 export { createSeason, type CreateSeasonError } from './commands/create-season.ts';
 export { renameShortName, type RenameShortNameError } from './commands/rename-short-name.ts';
 export { setCurrentSeason, type SetCurrentSeasonError } from './commands/set-current-season.ts';
@@ -43,9 +49,13 @@ export {
 export { leagueTransitions, readOnlyStatuses, type Transition } from './league-states.ts';
 export { audiences, leagueStatuses, type Audience, type LeagueStatus } from './league-values.ts';
 export type {
+  DivisionChange,
+  DivisionRecord,
+  DivisionsStore,
   LeagueRecord,
   LeaguesStore,
   LeaguesTx,
+  NewDivision,
   NewLeague,
   NewSeason,
   SettingPlace,

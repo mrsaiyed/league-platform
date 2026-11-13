@@ -79,7 +79,7 @@ describe('openTwoLeagues', () => {
           ownerId,
         ])),
       ];
-      expect(found.length).toBe(12);
+      expect(found.length).toBe(13);
       for (const text of found) expect(text.toLowerCase()).toContain(marker);
     }
     const shared = await texts(
