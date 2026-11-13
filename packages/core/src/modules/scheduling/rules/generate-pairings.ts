@@ -33,6 +33,9 @@ export function generatePairings(input: PairingsInput): PairingsResult {
   if (!Number.isInteger(timesEachPair) || timesEachPair < 1 || timesEachPair > maxTimesEachPair) {
     return { ok: false, error: { code: 'invalid-times-each-pair', value: timesEachPair } };
   }
+  if (!Number.isSafeInteger(arrangement) || arrangement < 0) {
+    return { ok: false, error: { code: 'invalid-arrangement', value: arrangement } };
+  }
   const seen = new Set<string>();
   for (const team of teams) {
     if (seen.has(team.id)) return { ok: false, error: { code: 'duplicate-team', teamId: team.id } };

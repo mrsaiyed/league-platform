@@ -23,7 +23,7 @@ export type PairingsInput = {
   /**
    * Which arrangement to produce. The same inputs and the same arrangement always give the same
    * pairings; another arrangement gives a different order of opponents ("generate again").
-   * 0 keeps the teams in the order given.
+   * 0 keeps the teams in the order given. A whole number, 0 or more.
    */
   arrangement?: number;
 };
@@ -36,6 +36,7 @@ export type PairingRound = { games: Pairing[]; byes: string[] };
 
 export type PairingsError =
   | { code: 'invalid-times-each-pair'; value: number }
+  | { code: 'invalid-arrangement'; value: number }
   | { code: 'duplicate-team'; teamId: string }
   /** Fewer than two teams to pair. With `withinDivisions`, `divisionId` names the division that is too small. */
   | { code: 'too-few-teams'; divisionId: string | null; count: number };

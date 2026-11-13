@@ -93,6 +93,13 @@ describe('generatePairings, worked examples (P7 §4.2; S-3)', () => {
       });
     }
     expect(generatePairings({ ...base, timesEachPair: maxTimesEachPair }).ok).toBe(true);
+    for (const arrangement of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(generatePairings({ ...base, timesEachPair: 1, arrangement })).toEqual({
+        ok: false,
+        error: { code: 'invalid-arrangement', value: arrangement },
+      });
+    }
+    expect(generatePairings({ ...base, timesEachPair: 1, arrangement: 0 }).ok).toBe(true);
     expect(
       generatePairings({ teams: teamsOf('aba'), timesEachPair: 1, withinDivisions: false }),
     ).toEqual({ ok: false, error: { code: 'duplicate-team', teamId: 'a' } });
