@@ -28,14 +28,35 @@ import type {
   LeaguesTx,
   TransactionRunner,
 } from '@srleagues/core';
-import type { LeagueScope } from '../db/transaction-scope.ts';
+import { randomUUID } from 'node:crypto';
+import { sql } from 'kysely';
+import { openScope, transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { leaguesStore } from '../stores/index.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
 /** Every module's stores, bound to the run's scope. Grows with each module. */
 export function harnessTx(scope: LeagueScope, jobs: JobQueue): LeaguesTx {
-  return { jobs, leagues: leaguesStore(scope) };
+  // The run's account counts as our staff, so commands only staff may run are tried
+  // too: the worst case for isolation.
+  const platformStaff = scope.accountId === null ? [] : [scope.accountId];
+  return { jobs, leagues: leaguesStore(scope, { platformStaff }) };
+}
+
+/**
+ * Runs `work` in a scope for a league that does not exist yet, in the run's own
+ * transaction and account: how creating a league is tried (its id is set first,
+ * record 008). The harness's scopes name existing leagues, so creating one there
+ * would only collide with them.
+ */
+export async function inFreshLeague<T>(
+  scope: LeagueScope,
+  work: (fresh: LeagueScope) => Promise<T>,
+): Promise<T> {
+  const trx = transactionOf(scope);
+  const leagueId = randomUUID();
+  await sql`select set_config('app.league_id', ${leagueId}, true)`.execute(trx);
+  return work(openScope(trx, leagueId, scope.accountId) as LeagueScope);
 }
 
 /** An expected error a command returned in the harness, with the error as its cause. */

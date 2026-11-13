@@ -8,7 +8,7 @@ The one file that says where the build is. Every run reads it first and updates 
 - **Stage:** 1, foundations — [plan](STAGE-1.md)
 - **Branch:** `build/stage-1`
 - **Gate:** `npm run verify`
-- **Next step:** 1.11 Leagues
+- **Next step:** 1.26 Catch up with main (then 1.12)
 - **Pushing to GitHub:** allowed, for the build branch only (`git push origin build/stage-1`). The founder said yes on 2026-11-12 and confirmed that the repository being public is fine. Never push or merge to `main`: every push to `main` republishes the live Al-Hadi tracker site at `mrsaiyed.github.io/league-platform/`, which is in use for real games.
 
 States: `building` (take the next step) · `waiting-for-founder` (nothing can be done until the list below is answered) · `stage-review` (the stage is finished and waiting for the founder's check).
@@ -17,8 +17,7 @@ States: `building` (take the next step) · `waiting-for-founder` (nothing can be
 
 Open lanes when work runs side by side (runbook, section 3): the step, and the folders that lane owns. Keep this true before starting builders, so a run that is cut off leaves a map.
 
-- Step 1.11 Leagues: half built and uncommitted in `packages/core/src/modules/leagues` and `packages/database/src/queries`, `stores`, `isolation`. Finish it, do not redo it.
-- Straight after 1.11 is committed, alone and before any lane opens: step 1.26, catch up with `main` (stage plan, group C). The tracker on GitHub's `main` is 8 commits newer than the one this branch has been testing against.
+- Nothing open. Next, alone and before any lane opens: step 1.26, catch up with `main` (stage plan, group C). The tracker on GitHub's `main` is 8 commits newer than the one this branch has been testing against.
 
 ## Needs the founder
 
@@ -34,6 +33,8 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 ## Log
 
 Newest first. One line per step or event.
+
+- 2026-11-13 — Step 1.11 done: league commands (create league, rename short name with forwarding, set status along the U-9 table, create season, set current season) in packages/core/src/modules/leagues, database queries/stores, isolation cases. Reviewer's finding fixed: archived and suspended leagues are now read-only for name, short name and seasons. Open: new database queries are tested through the store tests, not one test file each; blocked short-name list has system words only (offensive words wait for the founder); create/set-current season emit no events; resolving an old short name for forwarding from the app side is a later routing step.
 
 - 2026-11-12 — Founder: pushing allowed and public is fine. Build branch pushed to GitHub at d4ccb71. The Al-Hadi tracker stays where it is, at the root of the Pages site, untouched until its season ends; the new product is not put on GitHub Pages (it cannot run there). Pushing the build branch does not republish the Pages site; only a push to `main` does.
 

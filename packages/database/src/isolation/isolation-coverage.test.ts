@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { commands } from '@srleagues/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as databasePackage from '../../index.ts';
+import { constraintOf } from '../queries/constraint-of.ts';
+import { currentLeague } from '../queries/find-current-league.ts';
 import { programSummary } from '../queries/program-summary.ts';
 import './isolation-cases.test-helper.ts';
 import {
@@ -31,6 +33,8 @@ const coreScanned = ['../core/index.ts', '../core/src'];
 /** Exported functions that read or write no league data, and why. */
 const reachNoLeagueData = new Map<unknown, string>([
   [programSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [currentLeague, 'turns a row already read into the returned shape; runs no SQL'],
+  [constraintOf, 'reads the code and constraint name off an error already thrown; runs no SQL'],
   [databasePackage.withTransaction, 'opens the fenced transaction every case runs in'],
   // It opens its own transaction, which no case can do inside a harness run; its
   // mapping of a context to the fences is tested beside it.

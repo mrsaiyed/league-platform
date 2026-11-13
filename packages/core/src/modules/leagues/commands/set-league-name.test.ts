@@ -2,39 +2,17 @@
 // tested in packages/database/src/stores and run by the two-league harness.
 import { describe, expect, it } from 'vitest';
 import { onEvent } from '../../../command/index.ts';
-import {
-  memoryDatabase,
-  memoryTransaction,
-  testDeps,
-} from '../../../command/testing/memory-transaction.ts';
+import { testDeps } from '../../../command/testing/memory-transaction.ts';
 import { leagueNameChanged, type LeagueNameChanged } from '../events.ts';
-import type { LeagueRecord, LeaguesTx } from '../ports.ts';
+import { leagueId, memoryLeagues, ownerId } from '../memory-leagues.test-helper.ts';
+import type { LeaguesTx } from '../ports.ts';
 import { setLeagueName } from './set-league-name.ts';
 
-const leagueId = '01900000-0000-7000-8000-000000000001';
-const owner = { leagueId, accountId: 'owner', requestId: 'request-1' };
+const owner = { leagueId, accountId: ownerId, requestId: 'request-1' };
 
 function setUp() {
-  const db = memoryDatabase<LeagueRecord>({
-    id: leagueId,
-    name: 'Old name',
-    ownerAccountId: 'owner',
-    version: 3,
-  });
-  const transaction = memoryTransaction(
-    db,
-    (league, jobs): LeaguesTx => ({
-      jobs,
-      leagues: {
-        currentLeague: async () => ({ ...league }),
-        setName: async (name, version) => {
-          if (league.version !== version) return undefined;
-          Object.assign(league, { name, version: version + 1 });
-          return league.version;
-        },
-      },
-    }),
-  );
+  const { db, transaction, as } = memoryLeagues();
+  as(ownerId);
   const announced: string[] = [];
   const listener = onEvent<LeagueNameChanged, LeaguesTx>(leagueNameChanged, async (event) => {
     announced.push(event.leagueId);
@@ -49,7 +27,7 @@ describe('setLeagueName', () => {
       ok: true,
       value: { name: 'New name', version: 4 },
     });
-    expect(db.state).toMatchObject({ name: 'New name', version: 4 });
+    expect(db.state.league).toMatchObject({ name: 'New name', version: 4 });
     expect(announced).toEqual([leagueId]);
   });
 
@@ -59,7 +37,7 @@ describe('setLeagueName', () => {
       ok: false,
       error: { code: 'changed-since-read' },
     });
-    expect(db.state.name).toBe('Old name');
+    expect(db.state.league?.name).toBe('Old name');
   });
 
   it('changes nothing and announces nothing when the name is the same', async () => {
@@ -80,7 +58,7 @@ describe('setLeagueName', () => {
     expect(await setLeagueName(otherLeague, { name: 'X', version: 3 }, deps)).toMatchObject({
       error: { code: 'not-allowed' },
     });
-    expect(db.state.name).toBe('Old name');
+    expect(db.state.league?.name).toBe('Old name');
   });
 
   it('refuses an empty or over-long name', async () => {
@@ -88,6 +66,16 @@ describe('setLeagueName', () => {
     for (const name of ['   ', 'x'.repeat(121)]) {
       expect(await setLeagueName(owner, { name, version: 3 }, deps)).toMatchObject({
         error: { code: 'invalid-input' },
+      });
+    }
+  });
+
+  it('refuses while the league is archived or suspended, which are read-only (U-9)', async () => {
+    for (const status of ['archived', 'suspended'] as const) {
+      const { db, deps } = setUp();
+      if (db.state.league !== undefined) db.state.league = { ...db.state.league, status };
+      expect(await setLeagueName(owner, { name: 'Nope', version: 3 }, deps)).toMatchObject({
+        error: { code: 'not-allowed' },
       });
     }
   });

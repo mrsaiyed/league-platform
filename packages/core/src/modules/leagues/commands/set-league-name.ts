@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { leagueNameChanged } from '../events.ts';
-import { mayChangeLeagueSettings } from '../policy.ts';
+import { mayEditLeague } from '../policy.ts';
 import type { LeaguesTx } from '../ports.ts';
 
 export type ChangedSinceRead = { readonly code: 'changed-since-read' };
@@ -19,7 +19,7 @@ export const setLeagueName = defineCommand({
     name: z.string().trim().min(1).max(120),
     version: z.number().int().positive(),
   }),
-  allowed: (context, _input, tx: LeaguesTx) => mayChangeLeagueSettings(context, tx),
+  allowed: (context, _input, tx: LeaguesTx) => mayEditLeague(context, tx),
   run: async ({ context, input, tx, emit }): Promise<Result<LeagueName, ChangedSinceRead>> => {
     const league = await tx.leagues.currentLeague();
     // The policy just read it in this same transaction.

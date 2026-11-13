@@ -29,6 +29,8 @@ describe('findCurrentLeague', () => {
     expect(await withTransaction(db, { leagueId: a.leagueId }, findCurrentLeague)).toEqual({
       id: a.leagueId,
       name: 'Made-up League',
+      slug: expect.stringMatching(/^league-/),
+      status: 'draft',
       ownerAccountId: a.ownerId,
       version: 1,
     });
