@@ -2,6 +2,7 @@
 // rename handles with forwarding). The save names the version it started from and
 // is refused if someone else saved since (T-46).
 import { z } from 'zod';
+import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { leagueNameChanged } from '../events.ts';
 import { mayEditLeague } from '../policy.ts';
@@ -28,6 +29,10 @@ export const setLeagueName = defineCommand({
     if (league.name === input.name) return ok({ name: league.name, version: league.version });
     const version = await tx.leagues.setName(input.name, input.version);
     if (version === undefined) return fail(changedSinceRead);
+    await recordActivity(tx, context, {
+      action: 'leagues.set_name',
+      target: { type: 'league', id: context.leagueId },
+    });
     emit({ type: leagueNameChanged, leagueId: context.leagueId });
     return ok({ name: input.name, version });
   },

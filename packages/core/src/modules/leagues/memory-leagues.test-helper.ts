@@ -7,6 +7,7 @@ import {
   memoryTransaction,
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
+import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { LeagueRecord, LeaguesTx } from './ports.ts';
 
 export type MemoryLeagues = {
@@ -18,6 +19,9 @@ export type MemoryLeagues = {
   forwarding: { slug: string; months: number }[];
   programs: { id: string; slug: string; isDefault: boolean }[];
   seasons: { id: string; programId: string; slug: string; isCurrent: boolean }[];
+  /** Role grants in this league (the access module's; read by the policy). */
+  grants: Grant[];
+  activity: ActivityEntry[];
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -39,6 +43,8 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
     forwarding: [],
     programs: [{ id: 'program-default', slug: 'main', isDefault: true }],
     seasons: [],
+    grants: [],
+    activity: [],
     ...state,
   });
   let accountId: string | null = null;
@@ -49,6 +55,16 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
     };
     return {
       jobs,
+      access: {
+        ownerAccountId: async () => s.league?.ownerAccountId,
+        leagueStatus: async () => s.league?.status,
+        activeGrantsOf: async (account) =>
+          s.grants.filter((g) => g.accountId === account && g.revokedAt === null),
+      },
+      activity: {
+        record: async (entry) => void s.activity.push(entry),
+        list: async () => [],
+      },
       leagues: {
         currentLeague: async () => (s.league === undefined ? undefined : { ...s.league }),
         setName: async (name, version) => {

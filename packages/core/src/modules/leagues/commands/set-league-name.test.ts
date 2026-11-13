@@ -48,7 +48,43 @@ describe('setLeagueName', () => {
     expect(announced).toEqual([]);
   });
 
-  it('lets only the owner set it, until roles exist (step 1.12)', async () => {
+  it('records who set it in the activity log (A-6)', async () => {
+    const { db, deps } = setUp();
+    await setLeagueName(owner, { name: 'New name', version: 3 }, deps);
+    expect(db.state.activity).toEqual([
+      {
+        actorAccountId: ownerId,
+        action: 'leagues.set_name',
+        targetType: 'league',
+        targetId: leagueId,
+        summary: 'activity.leagues.set_name',
+        details: {},
+      },
+    ]);
+  });
+
+  it('lets the owner and admins set it, and no other role (P4 §4)', async () => {
+    const admin = '01900000-0000-7000-8000-0000000000a2';
+    const editor = '01900000-0000-7000-8000-0000000000a3';
+    const grant = (accountId: string, role: 'admin' | 'editor') => ({
+      id: `grant-${role}`,
+      accountId,
+      role,
+      scope: { type: 'league' } as const,
+      grantedByAccountId: ownerId,
+      revokedAt: null,
+    });
+    const { db, deps } = setUp();
+    db.state.grants = [grant(admin, 'admin'), grant(editor, 'editor')];
+    expect(
+      await setLeagueName({ ...owner, accountId: editor }, { name: 'X', version: 3 }, deps),
+    ).toMatchObject({ error: { code: 'not-allowed' } });
+    expect(
+      await setLeagueName({ ...owner, accountId: admin }, { name: 'X', version: 3 }, deps),
+    ).toMatchObject({ ok: true });
+  });
+
+  it('refuses anyone with no role, a visitor, and another league', async () => {
     const { db, deps } = setUp();
     for (const accountId of ['someone-else', null]) {
       const result = await setLeagueName({ ...owner, accountId }, { name: 'X', version: 3 }, deps);

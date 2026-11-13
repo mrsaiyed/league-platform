@@ -31,7 +31,7 @@ The game-day part of the product ([P7](../product/P7-teams-schedule-gameday.md) 
 
 ## 3. The command protocol
 
-The tracker sends commands to `POST /api/v1/games/{game}/commands`.
+The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/commands`. The league is named by its id, which never changes, so queued commands still arrive after the league changes its short name (T-229).
 
 ```json
 {

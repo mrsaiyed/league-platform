@@ -139,8 +139,8 @@ export const databaseLibraries = [
 
 /**
  * T-34: the only files that may put a league into an address by hand: the one
- * address helper and the one place that reads the league from a request. Neither
- * exists yet; the step that writes them puts them at these paths or updates this list.
+ * address helper (leagueUrl) and the one place that reads the league from a request
+ * (step 1.16). Moving either file means updating this list in the same change.
  */
 export const addressHelperFiles = [
   'packages/core/src/modules/leagues/rules/league-url.ts',
@@ -176,3 +176,16 @@ export const serverOnlyWorkspaces = ['packages/database', 'packages/providers'];
  * argument and is not listed. Add a file here only by adding a config module.
  */
 export const settingsReaderFiles = ['apps/web/src/server/config.ts', 'apps/worker/src/config.ts'];
+
+/**
+ * T-226 (record 014): steps of the worker's jobs that are not commands, so nothing
+ * but the worker may name them outside tests. `allowedIn` lists the worker first,
+ * then the module that defines and exports the step.
+ */
+export const workerOnlySteps = [
+  {
+    name: 'issueInvitationLink',
+    allowedIn: ['apps/worker/', 'packages/core/src/modules/access/'],
+    why: 'it makes a working invitation link with no permission check',
+  },
+];
