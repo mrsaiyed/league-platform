@@ -155,7 +155,7 @@ describe('the settings stage 2 declares', () => {
     expect(declaredSettings.get('members.startPage')?.default).toBe('leagueHome');
   });
 
-  it('let any scorekeeper score any game until the league tightens it (P4 section 4, 12a)', () => {
+  it('let any scorekeeper score any game until the league tightens it (P4 section 4; recommended starting value 12a, pending confirmation by the founder)', () => {
     const setting = declaredSettings.get('games.whoMayScore');
     expect(setting?.default).toBe('anyScorekeeper');
     expect(setting?.type.safeParse('assignedOnly').success).toBe(true);
