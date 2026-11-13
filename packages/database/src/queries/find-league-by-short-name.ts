@@ -4,14 +4,16 @@
 // time and returns only these columns, so it cannot list leagues. Run in a
 // transaction with no league set (an AppScope); apps/web/src/server/context.ts is
 // what calls it.
+import type { LeagueStatus } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type AppScope } from '../db/transaction-scope.ts';
+import { leagueStatusOf } from './league-status-of.ts';
 
 export type LeagueByShortName = {
   readonly leagueId: string;
   /** Its current short name: different from the one asked for if that one is a former name. */
   readonly slug: string;
-  readonly status: 'draft' | 'live' | 'archived' | 'suspended';
+  readonly status: LeagueStatus;
   readonly inBin: boolean;
   /** True when the name asked for is a former one, still forwarding (U-7). */
   readonly forwarded: boolean;
@@ -35,14 +37,10 @@ export async function findLeagueByShortName(
   `.execute(transactionOf(scope));
   const row = rows[0];
   if (row === undefined) return undefined;
-  const status = row.status;
-  if (status !== 'draft' && status !== 'live' && status !== 'archived' && status !== 'suspended') {
-    throw new Error('A league has a state the leagues table does not allow.');
-  }
   return {
     leagueId: row.league_id,
     slug: row.slug,
-    status,
+    status: leagueStatusOf(row.status),
     inBin: row.in_bin,
     forwarded: row.forwarded,
   };
