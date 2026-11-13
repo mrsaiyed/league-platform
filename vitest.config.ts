@@ -32,6 +32,7 @@ export default defineConfig({
     ],
     exclude: ['**/node_modules/**'],
     setupFiles: ['./vitest.setup.ts'],
+    reporters: ['default', './vitest.reporter.ts'],
     // Database tests start a real PostgreSQL (PGlite) and apply every migration.
     // Alone that takes a second or two; with every test file running at once it
     // can pass the 5 and 10 second defaults, and grows with each new migration. A test that
