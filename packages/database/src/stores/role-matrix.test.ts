@@ -32,7 +32,12 @@ import {
   createPerson,
   clearSettingFor,
   createSeason,
+  addToRoster,
+  changeRosterEntry,
   createTeam,
+  listRoster,
+  markLeft,
+  reorderRoster,
   createVenue,
   invite,
   listDivisions,
@@ -103,6 +108,7 @@ import {
   newPerson,
   newStage,
   newProgram,
+  newRosterEntry,
   newSeason,
   newTeam,
   newVenue,
@@ -406,6 +412,85 @@ const teamCommandRows: readonly Row[] = [
       statsVisibility: 'staff',
     }),
     (c, i) => setTeamStatsVisibility(c, i, teamsDeps),
+  ),
+];
+
+/** A roster command's rows: a team of a season of the default program, and of the other one. */
+function rosterRows(
+  command: string,
+  name: string,
+  prepare: (team: string, league: League) => Promise<unknown>,
+  run: Row['run'],
+): Row[] {
+  return [false, true].map((program) => ({
+    command,
+    name: `${name} ${program ? 'of one program' : 'of the default program'}`,
+    needs: 'rosters.manage',
+    ...(program ? { scope: 'program' as const } : {}),
+    prepare: async (league) => ({ input: await prepare(await teamIn(league, program), league) }),
+    run,
+  }));
+}
+
+// Rosters are checked at their team's season's program (P4 §4): the owner and admins.
+const rosterCommandRows: readonly Row[] = [
+  ...rosterRows(
+    'teams.add_to_roster',
+    'put a person on a team',
+    async (teamId, league) => ({ teamId, personId: await newPerson(pglite, league.leagueId) }),
+    (c, i) => addToRoster(c, i, teamsDeps),
+  ),
+  ...rosterRows(
+    'teams.change_roster_entry',
+    "change a player's number",
+    async (teamId, league) => ({
+      rosterEntryId: await newRosterEntry(
+        pglite,
+        league.leagueId,
+        teamId,
+        await newPerson(pglite, league.leagueId),
+      ),
+      version: 1,
+      jerseyNumber: '12',
+    }),
+    (c, i) => changeRosterEntry(c, i, teamsDeps),
+  ),
+  ...rosterRows(
+    'teams.reorder_roster',
+    'reorder a roster',
+    async (teamId, league) => ({
+      teamId,
+      rosterEntryIds: [
+        await newRosterEntry(
+          pglite,
+          league.leagueId,
+          teamId,
+          await newPerson(pglite, league.leagueId),
+        ),
+      ],
+    }),
+    (c, i) => reorderRoster(c, i, teamsDeps),
+  ),
+  ...rosterRows(
+    'teams.mark_left',
+    'mark a player as left',
+    async (teamId, league) => ({
+      rosterEntryId: await newRosterEntry(
+        pglite,
+        league.leagueId,
+        teamId,
+        await newPerson(pglite, league.leagueId),
+      ),
+      version: 1,
+      leftOn: '2026-12-01',
+    }),
+    (c, i) => markLeft(c, i, teamsDeps),
+  ),
+  ...rosterRows(
+    'teams.list_roster',
+    'see a roster',
+    async (teamId) => ({ teamId }),
+    (c, i) => listRoster(c, i, teamsDeps),
   ),
 ];
 
@@ -783,6 +868,7 @@ const rows: readonly Row[] = [
   ...peopleRows,
   ...gameCommandRows,
   ...teamCommandRows,
+  ...rosterCommandRows,
   ...settingRows(declaredSettings),
   ...settingRows(settingRegistry([bannerSetting])),
   // League settings (P4 §6) and seasons (P4 §3): the owner and admins (O-7).

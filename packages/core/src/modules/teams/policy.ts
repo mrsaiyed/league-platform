@@ -29,3 +29,33 @@ export async function teamScope(tx: TeamsTx, teamId: string): Promise<Scope> {
   const team = await tx.teams.find(teamId);
   return team === undefined ? leagueScope : seasonScope(tx, team.seasonId);
 }
+
+/**
+ * Changing rosters (P4 §3 `rosters.manage`): checked at the team's season's program,
+ * like the team itself, so the owner and admins today; a coach's own tools for their
+ * team come with stage 4. Not while the league is archived or suspended (U-9).
+ */
+export async function mayChangeRosters(
+  context: CommandContext,
+  tx: TeamsTx,
+  scope: Scope,
+): Promise<boolean> {
+  if (!(await hasPermission(context, tx, 'rosters.manage', scope))) return false;
+  const status = await tx.access.leagueStatus();
+  return status !== undefined && !readOnlyLeagueStatuses.includes(status);
+}
+
+/** The scope of the team an entry belongs to (league-wide if it is not there). */
+export async function entryScope(tx: TeamsTx, entryId: string): Promise<Scope> {
+  const entry = await tx.teams.findRosterEntry(entryId);
+  return entry === undefined ? leagueScope : teamScope(tx, entry.teamId);
+}
+
+/** Reading rosters: the same permission and scope, and it still works in an archived league. */
+export async function mayReadRosters(
+  context: CommandContext,
+  tx: TeamsTx,
+  scope: Scope,
+): Promise<boolean> {
+  return hasPermission(context, tx, 'rosters.manage', scope);
+}

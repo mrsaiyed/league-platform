@@ -43,6 +43,48 @@ export type TeamChange = {
 /** Which of a team's unique fields a save hit. */
 export type TeamTaken = 'slug-taken' | 'name-taken';
 
+/** A person on a team (T3 §7). A person who left keeps the entry, with a leaving date (R-17, T-52). */
+export type RosterEntryRecord = {
+  readonly id: string;
+  readonly teamId: string;
+  readonly personId: string;
+  /** '0' to '99' or '00', or null for no number yet. */
+  readonly jerseyNumber: string | null;
+  /** 'player', 'captain' or 'coach': a label only (a sign-in role is an invitation). */
+  readonly role: string;
+  /** A date as yyyy-mm-dd, or null. */
+  readonly joinedOn: string | null;
+  readonly leftOn: string | null;
+  readonly sort: number;
+  readonly version: number;
+};
+
+/** A roster entry with the name of its person, for the roster list. */
+export type RosterLine = RosterEntryRecord & {
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly publicName: string | null;
+};
+
+export type NewRosterEntry = {
+  readonly teamId: string;
+  readonly personId: string;
+  readonly jerseyNumber: string | null;
+  readonly role: string;
+  readonly joinedOn: string | null;
+};
+
+/** What a roster change sets; a field left out stays as it is, null clears a number. */
+export type RosterEntryChange = {
+  jerseyNumber?: string | null;
+  role?: string;
+  leftOn?: string;
+  sort?: number;
+};
+
+/** Why a roster write was refused by the database. */
+export type RosterTaken = 'already-on-team' | 'jersey-taken';
+
 export type TeamsStore = {
   /** The team with this id, in the bin or not, or undefined if it is not in this league. */
   readonly find: (teamId: string) => Promise<TeamRecord | undefined>;
@@ -62,6 +104,28 @@ export type TeamsStore = {
   ) => Promise<number | TeamTaken | undefined>;
   /** Moves a team to the bin or brings it back: false if it is not in this league. */
   readonly setBinned: (teamId: string, binned: boolean) => Promise<boolean | TeamTaken>;
+  /** The person (not merged into another) and whether they are in the bin, or undefined. */
+  readonly findPerson: (
+    personId: string,
+  ) => Promise<{ readonly id: string; readonly binned: boolean } | undefined>;
+  readonly findRosterEntry: (entryId: string) => Promise<RosterEntryRecord | undefined>;
+  /** Every entry of the team, those who left too, in roster order. */
+  readonly listRoster: (teamId: string) => Promise<readonly RosterLine[]>;
+  /**
+   * Adds a person to the end of a team's roster: the entry's id, or why the database
+   * refused (the person is already on the team; the number is worn, where the season
+   * asks for unique numbers, 0008).
+   */
+  readonly addRosterEntry: (entry: NewRosterEntry) => Promise<string | RosterTaken>;
+  /**
+   * Changes an entry: the new version, why it was refused, or undefined if it is not
+   * there or, when `version` is given, has moved on (T-46).
+   */
+  readonly updateRosterEntry: (
+    entryId: string,
+    change: RosterEntryChange,
+    version?: number,
+  ) => Promise<number | RosterTaken | undefined>;
   /** The program a season belongs to (where a team's permission is checked), or undefined. */
   readonly seasonProgramId: (seasonId: string) => Promise<string | undefined>;
   /** The season a division belongs to and whether it is in the bin, or undefined if not found. */

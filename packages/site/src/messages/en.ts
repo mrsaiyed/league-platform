@@ -84,6 +84,18 @@ export const en = {
     'The largest roster is not a valid number, or is smaller than the smallest.',
   'error.leagues.set_season_roster_settings.invalid-rules.locksOn':
     'The day rosters lock is not a valid date.',
+  // Why a roster change was refused (T-187).
+  'error.teams.add_to_roster.team-not-found': 'That team is not there.',
+  'error.teams.add_to_roster.person-not-found': 'That person is not in the league list.',
+  'error.teams.add_to_roster.already-on-team': 'That person is already on this team.',
+  'error.teams.add_to_roster.jersey-taken':
+    'Another player on this team already wears that number. This season asks for a different number for each player.',
+  'error.teams.change_roster_entry.jersey-taken':
+    'Another player on this team already wears that number. This season asks for a different number for each player.',
+  'error.teams.change_roster_entry.already-left':
+    'This person has left the team, so their entry can no longer be changed.',
+  'error.teams.mark_left.already-left': 'This person is already marked as having left.',
+  'error.teams.mark_left.left-before-joined': 'The leaving date is before the day they joined.',
   // Activity log lines (A-6, T-226): the key is `activity.` and the command's name;
   // the values come from the entry's details. {role} is a role's name from above.
   'activity.access.invite': 'Invited someone as {role}',
@@ -117,6 +129,10 @@ export const en = {
   'activity.teams.update_team': 'Changed a team',
   'activity.teams.remove_team': 'Moved a team to the bin',
   'activity.teams.set_stats_visibility': "Changed who sees a team's players' numbers",
+  'activity.teams.add_to_roster': 'Added a person to a roster',
+  'activity.teams.change_roster_entry': "Changed a player's number or role",
+  'activity.teams.reorder_roster': 'Changed the order of a roster',
+  'activity.teams.mark_left': 'Marked a person as having left a team',
   'activity.scheduling.create_venue': 'Added a venue',
   'activity.scheduling.update_venue': 'Changed a venue',
   'activity.scheduling.remove_venue': 'Moved a venue to the bin',
