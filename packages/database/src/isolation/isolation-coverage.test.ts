@@ -12,6 +12,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import * as databasePackage from '../../index.ts';
 import { constraintOf } from '../queries/constraint-of.ts';
 import { currentLeague } from '../queries/find-current-league.ts';
+import { leagueStatusOf } from '../queries/league-status-of.ts';
 import { programSummary } from '../queries/program-summary.ts';
 import './isolation-cases.test-helper.ts';
 import {
@@ -34,6 +35,7 @@ const coreScanned = ['../core/index.ts', '../core/src'];
 const reachNoLeagueData = new Map<unknown, string>([
   [programSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [currentLeague, 'turns a row already read into the returned shape; runs no SQL'],
+  [leagueStatusOf, "checks a state already read against core's list; runs no SQL"],
   [constraintOf, 'reads the code and constraint name off an error already thrown; runs no SQL'],
   [databasePackage.withTransaction, 'opens the fenced transaction every case runs in'],
   // It opens its own transaction, which no case can do inside a harness run; its
