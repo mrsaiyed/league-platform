@@ -44,6 +44,12 @@ import {
   updateCourt,
   updateVenue,
 } from './modules/scheduling/index.ts';
+import {
+  createTeam,
+  removeTeam,
+  setTeamStatsVisibility,
+  updateTeam,
+} from './modules/teams/index.ts';
 
 export const commands = commandRegistry([
   setLeagueName,
@@ -71,6 +77,10 @@ export const commands = commandRegistry([
   removeCourt,
   restoreCourt,
   listVenues,
+  createTeam,
+  updateTeam,
+  removeTeam,
+  setTeamStatsVisibility,
   setSetting,
   clearSetting,
   invite,

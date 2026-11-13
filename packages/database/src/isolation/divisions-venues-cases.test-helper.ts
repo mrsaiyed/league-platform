@@ -26,6 +26,7 @@ import {
   findVenue,
   hasLiveCourts,
   hasLiveSubdivisions,
+  hasLiveTeams,
   insertCourt,
   insertDivision,
   insertVenue,
@@ -108,6 +109,12 @@ registerIsolationCase({
   subject: hasLiveSubdivisions,
   name: "ask about the target's division's sub-divisions",
   run: (scope, target) => hasLiveSubdivisions(scope, target.divisionId),
+});
+
+registerIsolationCase({
+  subject: hasLiveTeams,
+  name: "ask about the target's division's teams",
+  run: (scope, target) => hasLiveTeams(scope, target.divisionId),
 });
 
 registerIsolationCase({
