@@ -63,7 +63,10 @@ grant execute on function public.is_stat_counts(jsonb) to app_user;
 -- Scoring sessions (T3 §8, S-5, T6 §5) ---------------------------------------------------
 
 -- The one device currently scoring a game: a short lease the tracker renews while it
--- is open (T-116). Taking over changes the row's account and device; the session
+-- is open (T-116). Renewing moves only held_until. Taking over removes the row and
+-- writes a new one in the same transaction, so the new session has a new id and the
+-- displaced device's id matches nothing: its account and device are fixed
+-- (scoring_sessions_on_update), so an update cannot take over in place. The session
 -- ends by removing the row, or by its lease running out. Commands from a session
 -- that no longer holds the game are refused by the scoring command, which compares
 -- the session id the tracker sends with this row's id.
@@ -326,12 +329,44 @@ create table public.standings_rows (
       'coin-flip', 'still-tied'
     )
   ),
-  constraint standings_rows_version_positive check (version > 0)
+  constraint standings_rows_version_positive check (version > 0),
+  -- Seeds run 1 to n with no repeats in each table (a season without divisions is
+  -- one table). Checked when the transaction ends, so a rebuild may rewrite rows in
+  -- place in any order (two teams swapping seeds); deleting the season's rows and
+  -- writing them again works too.
+  constraint standings_rows_seed_once unique nulls not distinct (league_id, season_id, division_id, seed)
+    deferrable initially deferred
 );
 
--- Seeds run 1 to n with no repeats in each table (a season without divisions is one table).
-create unique index standings_rows_seed_once
-  on public.standings_rows (league_id, season_id, division_id, seed) nulls not distinct;
+-- A row sits in its team's own table: its division is the team's division (both
+-- empty for a team in no division). A foreign key cannot say this, because one with
+-- an empty column checks nothing. Runs as the caller and takes no lock: a team that
+-- changes division has its season's standings rebuilt after it.
+create or replace function public.check_standings_row_division() returns trigger
+language plpgsql
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  team_division uuid;
+begin
+  select t.division_id into team_division
+  from public.teams t where t.league_id = new.league_id and t.id = new.team_id;
+  -- No such team: standings_rows_team answers that.
+  if found and new.division_id is distinct from team_division then
+    raise exception 'team % is not in division %', new.team_id, new.division_id
+      using errcode = 'check_violation', constraint = 'standings_rows_team_division';
+  end if;
+  return new;
+end
+$$;
+
+comment on function public.check_standings_row_division() is
+  'BEFORE INSERT OR UPDATE on standings_rows: the row''s division is its team''s own division.';
+
+create trigger standings_rows_team_division
+  before insert or update of team_id, division_id on public.standings_rows
+  for each row execute function public.check_standings_row_division();
+
 create index standings_rows_team_lookup on public.standings_rows (team_id);
 create index standings_rows_division_lookup on public.standings_rows (division_id) where division_id is not null;
 
@@ -505,6 +540,76 @@ drop trigger roster_entries_on_update on public.roster_entries;
 create trigger roster_entries_on_update before update on public.roster_entries
   for each row execute function public.on_row_update('team_id', 'person_id', 'added_at_game_id');
 
+-- A player is added at the table of a game their team plays in, so of the team's
+-- season (a game's teams are of its season). Checked when the entry is written; the
+-- game and team never change on it afterwards. Runs as the caller and takes no lock,
+-- as check_player_game_team does.
+create or replace function public.check_roster_added_at_game() returns trigger
+language plpgsql
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if new.added_at_game_id is not null
+     and exists (
+       -- No such game: roster_entries_added_at_game answers that.
+       select 1 from public.games g
+       where g.league_id = new.league_id and g.id = new.added_at_game_id
+     )
+     and not exists (
+       select 1 from public.games g
+       join public.teams t on t.league_id = g.league_id and t.id = new.team_id
+       where g.league_id = new.league_id and g.id = new.added_at_game_id
+         and t.season_id = g.season_id
+         and new.team_id in (g.home_team_id, g.away_team_id)
+     ) then
+    raise exception 'team % does not play in game %', new.team_id, new.added_at_game_id
+      using errcode = 'check_violation', constraint = 'roster_entries_added_at_game_team';
+  end if;
+  return new;
+end
+$$;
+
+comment on function public.check_roster_added_at_game() is
+  'BEFORE INSERT on roster_entries: a player added at a scorer''s table is added to a team playing in that game.';
+
+create trigger roster_entries_added_at_game_team
+  before insert on public.roster_entries
+  for each row execute function public.check_roster_added_at_game();
+
+-- A scored game never goes to the bin (record 030) ----------------------------------------------
+
+-- Game events are history and name their game, so a game with events could never
+-- be removed for good on its own (T-51) without removing history. Such a game is
+-- corrected or reopened instead (S-7); only games never scored go to the bin, and
+-- only they are removed singly. Removing a scored game's rows is the league purge's
+-- work, for the whole league (T-220). This takes no lock of its own: the scoring
+-- command locks the game's row for each tap (T-111), and putting a game in the bin
+-- updates that row, so the two wait for each other.
+create or replace function public.check_game_bin_unscored() returns trigger
+language plpgsql
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if exists (
+    select 1 from public.game_events e
+    where e.league_id = new.league_id and e.game_id = new.id
+  ) then
+    raise exception 'game % has been scored, so it cannot go to the bin', new.id
+      using errcode = 'restrict_violation', constraint = 'games_scored_not_binned',
+            hint = 'Correct or reopen the game instead (S-7).';
+  end if;
+  return new;
+end
+$$;
+
+comment on function public.check_game_bin_unscored() is
+  'BEFORE UPDATE OF deleted_at on games: a game with game events is never put in the bin.';
+
+create trigger games_scored_not_binned
+  before update of deleted_at on public.games
+  for each row when (old.deleted_at is null and new.deleted_at is not null)
+  execute function public.check_game_bin_unscored();
+
 -- The league purge removes game events too (T-220, record 007) ------------------------------
 
 create or replace function public.purge_league_history(purged_league uuid) returns void
@@ -537,11 +642,11 @@ revoke all on function public.purge_league_history(uuid) from public;
 
 -- Every editable table moves version and updated_at on each change ------------------------------
 
--- Each row stays with its game, season, team or person; a session stays with its game
--- (taking over changes its account and device); an import keeps its kind, season and
--- who started it.
+-- Each row stays with its game, season, team or person; a session stays with its
+-- game, account and device (taking over is a new row, so a new id); an import keeps
+-- its kind, season and who started it.
 create trigger scoring_sessions_on_update before update on public.scoring_sessions
-  for each row execute function public.on_row_update('game_id');
+  for each row execute function public.on_row_update('game_id', 'account_id', 'device_id');
 create trigger game_states_on_update before update on public.game_states
   for each row execute function public.on_row_update('game_id');
 create trigger player_game_stats_on_update before update on public.player_game_stats

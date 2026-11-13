@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   asApp,
   freshSchema,
+  newAccount,
   newGame,
   newLeague,
   newPerson,
@@ -208,15 +209,14 @@ describe('scoring sessions (S-5, T-116)', () => {
       [g.leagueId, gameId, g.ownerId, device],
     );
 
-  it('let one device hold a game at a time; taking over changes the holder', async () => {
+  it('let one device hold a game at a time, renewing only its lease', async () => {
     const g = await game();
     const { rows } = await session(db, g);
     await expect(session(db, g, 'phone-2')).rejects.toMatchObject(
       refusedBy('scoring_sessions_one_per_game', refused.unique),
     );
     await db.query(
-      `update scoring_sessions set device_id = 'phone-2', held_until = now() + interval '2 minutes'
-       where id = $1`,
+      `update scoring_sessions set held_until = now() + interval '2 minutes' where id = $1`,
       [rows[0]?.id],
     );
     const held = await one<{ device_id: string; version: number }>(
@@ -224,7 +224,34 @@ describe('scoring sessions (S-5, T-116)', () => {
       'select device_id, version from scoring_sessions where id = $1',
       [rows[0]?.id],
     );
-    expect(held).toEqual({ device_id: 'phone-2', version: 2 });
+    expect(held).toEqual({ device_id: 'tablet-1', version: 2 });
+  });
+
+  it('are taken over by a new row with a new id, never by changing the holder in place', async () => {
+    const g = await game();
+    const { rows } = await session(db, g);
+    const first = rows[0]?.id;
+    const other = await newAccount(db);
+    for (const [column, value] of [
+      ['device_id', 'phone-2'],
+      ['account_id', other],
+    ] as const) {
+      await expect(
+        db.query(`update scoring_sessions set ${column} = $2 where id = $1`, [first, value]),
+      ).rejects.toMatchObject(refused.restrict);
+    }
+    // Taking over: the old session removed and a new one written, as one change.
+    const taken = await asApp(db, { league: g.leagueId }, async (tx) => {
+      await tx.query('delete from scoring_sessions where game_id = $1', [g.gameId]);
+      return (await session(tx, g, 'phone-2')).rows[0]?.id;
+    });
+    expect(taken).toBeDefined();
+    expect(taken).not.toBe(first);
+    const { rows: now } = await db.query<{ id: string }>(
+      'select id from scoring_sessions where game_id = $1',
+      [g.gameId],
+    );
+    expect(now.map((r) => r.id)).toEqual([taken]);
   });
 
   it('stay with their game, of their own league, and name the device', async () => {
@@ -449,6 +476,30 @@ describe("players added at the scorer's table (S-6)", () => {
     }
   });
 
+  it("are added to a team playing in that game, in the game's season", async () => {
+    const g = await game();
+    const bystander = await newTeam(db, g.leagueId, g.seasonId);
+    const addTo = (teamId: string) =>
+      db.query(
+        `with person as (
+           insert into people (league_id, first_name, last_name) values ($1, 'Walk', 'Up') returning id
+         )
+         insert into roster_entries (league_id, team_id, person_id, added_at_game_id, needs_review)
+         select $1, $2, person.id, $3, true from person`,
+        [g.leagueId, teamId, g.gameId],
+      );
+    await expect(addTo(bystander)).rejects.toMatchObject(
+      refusedBy('roster_entries_added_at_game_team'),
+    );
+    const nextSeason = await newSeason(db, g.leagueId, g.defaultProgramId);
+    const elsewhere = await newTeam(db, g.leagueId, nextSeason);
+    await expect(addTo(elsewhere)).rejects.toMatchObject(
+      refusedBy('roster_entries_added_at_game_team'),
+    );
+    await addTo(g.awayTeamId);
+    await addTo(g.homeTeamId);
+  });
+
   it('leave every other roster entry unmarked', async () => {
     const g = await game();
     const marks = await one<{ added: string | null; review: boolean }>(
@@ -457,5 +508,31 @@ describe("players added at the scorer's table (S-6)", () => {
       [g.personId],
     );
     expect(marks).toEqual({ added: null, review: false });
+  });
+});
+
+describe('a scored game never goes to the bin (record 030)', () => {
+  const bin = (sql: Sql, g: Made) =>
+    sql.query('update games set deleted_at = now() where id = $1', [g.gameId]);
+
+  it('refuses to bin a game that has events, even as its owner', async () => {
+    const g = await game();
+    await event(db, g, 1);
+    await expect(bin(db, g)).rejects.toMatchObject({
+      ...refused.restrict,
+      constraint: 'games_scored_not_binned',
+    });
+    await expect(asApp(db, { league: g.leagueId }, (tx) => bin(tx, g))).rejects.toMatchObject({
+      ...refused.restrict,
+      constraint: 'games_scored_not_binned',
+    });
+  });
+
+  it('bins a game never scored, and leaves other changes to a scored game alone', async () => {
+    const unscored = await game();
+    await bin(db, unscored);
+    const scored = await game();
+    await event(db, scored, 1);
+    await db.query(`update games set starts_at = now() where id = $1`, [scored.gameId]);
   });
 });

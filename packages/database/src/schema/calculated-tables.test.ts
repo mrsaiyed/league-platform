@@ -95,14 +95,51 @@ describe('standings rows (T3 §9)', () => {
     await expect(row(db, s, elsewhere)).rejects.toMatchObject(
       refusedBy('standings_rows_team', refused.foreignKey),
     );
-    const team = await newTeam(db, s.leagueId, s.seasonId);
+    // A division of another season, even with its own team, is refused.
     const otherDivision = await newDivision(db, s.leagueId, otherSeason);
-    await expect(row(db, s, team, { division_id: otherDivision })).rejects.toMatchObject(
-      refusedBy('standings_rows_division', refused.foreignKey),
+    const inIt = await newTeam(db, s.leagueId, otherSeason, { divisionId: otherDivision });
+    await expect(row(db, s, inIt, { division_id: otherDivision })).rejects.toMatchObject(
+      refused.foreignKey,
     );
     const other = await season();
     const theirs = await newTeam(db, other.leagueId, other.seasonId);
     await expect(row(db, s, theirs, {}, other.seasonId)).rejects.toMatchObject(refused.foreignKey);
+  });
+
+  it("sit in their team's own division", async () => {
+    const s = await season();
+    const north = await newDivision(db, s.leagueId, s.seasonId);
+    const south = await newDivision(db, s.leagueId, s.seasonId);
+    const inNorth = await newTeam(db, s.leagueId, s.seasonId, { divisionId: north });
+    const inNone = await newTeam(db, s.leagueId, s.seasonId);
+    const teamDivision = refusedBy('standings_rows_team_division');
+    await expect(row(db, s, inNorth, { division_id: south })).rejects.toMatchObject(teamDivision);
+    await expect(row(db, s, inNorth)).rejects.toMatchObject(teamDivision);
+    await expect(row(db, s, inNone, { division_id: north })).rejects.toMatchObject(teamDivision);
+    await row(db, s, inNorth, { division_id: north });
+    await row(db, s, inNone);
+  });
+
+  it('let a rebuild swap two seeds in one transaction, and refuse a repeated seed at its end', async () => {
+    const s = await season();
+    const first = await newTeam(db, s.leagueId, s.seasonId);
+    const second = await newTeam(db, s.leagueId, s.seasonId);
+    await row(db, s, first, { seed: 1 });
+    await row(db, s, second, { rank: 2, seed: 2 });
+    await asApp(db, { league: s.leagueId }, async (tx) => {
+      await tx.query('update standings_rows set seed = 2, rank = 2 where team_id = $1', [first]);
+      await tx.query('update standings_rows set seed = 1, rank = 1 where team_id = $1', [second]);
+    });
+    const { rows } = await db.query<{ team_id: string }>(
+      'select team_id from standings_rows where season_id = $1 order by seed',
+      [s.seasonId],
+    );
+    expect(rows.map((r) => r.team_id)).toEqual([second, first]);
+    await expect(
+      asApp(db, { league: s.leagueId }, (tx) =>
+        tx.query('update standings_rows set seed = 1 where team_id = $1', [first]),
+      ),
+    ).rejects.toMatchObject(refusedBy('standings_rows_seed_once', refused.unique));
   });
 
   it('keep counts, places, streak and what decided the place in range', async () => {
