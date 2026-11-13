@@ -40,8 +40,8 @@ describe('GET /api/v1/health', () => {
     expect((await GET()).status).toBe(503);
   });
 
-  it('is not gated by the proxy: it only passes the request on', () => {
-    const response = proxy(new NextRequest('http://localhost:3000/api/v1/health'));
+  it('is not gated by the proxy: it only passes the request on', async () => {
+    const response = await proxy(new NextRequest('http://localhost:3000/api/v1/health'));
     expect(response.status).toBe(200);
     expect(response.headers.get('x-middleware-next')).toBe('1');
     expect(response.headers.get('location')).toBeNull();

@@ -15,6 +15,8 @@ const env = {
   EMAIL_FROM: 'hello@example.test',
   STRIPE_SECRET_KEY: 'made-up-stripe-key',
   STRIPE_WEBHOOK_SECRET: 'made-up-webhook-key',
+  // Required in staging and production (config-schema.ts).
+  TRUSTED_PROXY: 'one',
 };
 const configFor = (appEnv: string) => loadConfig({ ...env, APP_ENV: appEnv });
 
