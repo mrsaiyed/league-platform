@@ -1,6 +1,6 @@
 # T4 — Keeping leagues apart, sign-in, and security
 
-[Spec home](../README.md) · Decisions T-60 to T-87, T-221
+[Spec home](../README.md) · Decisions T-60 to T-87, T-221, T-229
 
 ## 1. What we are protecting against
 
@@ -22,6 +22,8 @@
 All leagues share one database (T-4), so separation is the most important property of the system. It is enforced three times over, so that one mistake is not enough to break it.
 
 **Fence 1 — the request.** For every request the server works out, from the session and the address, _who_ is asking and _which league_ they are asking about. This "context" is built in one place (`server/context.ts`) and passed to every command and query. Nothing the browser sends can set it.
+
+- **T-229: where the league is in an address.** A page's league is the first part of its address, and a page is served only at the league's short name exactly as stored: other capitals or encodings (`%2D` for `-`) forward to it, like a former name (U-7). The forward carries the league's state, so a draft or suspended league is forwarded only for those who may see it and is "not found" for everyone else (U-9). Only our own words, not the offensive ones on the blocked list, mean one of our pages. A JSON endpoint about one league is `/api/v1/leagues/{leagueId}/...`, built by `leagueApiUrl`: the id never changes, so a tracker's queued commands survive a change of short name, and `server/context.ts` reads that league in its own transaction, so handlers get their league in the same one place as pages. [Record 017](../../../architecture/decisions/017-the-league-of-an-endpoint.md).
 
 **Fence 2 — the code.** Every database function that touches league data requires a league ID (T-28). There is no function that reads "all teams"; only "teams of league X".
 

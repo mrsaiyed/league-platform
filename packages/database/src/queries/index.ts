@@ -1,29 +1,31 @@
 // Typed queries (T1 §1). Each takes the scope withTransaction opened; one that
-// touches league data takes a LeagueScope (T-28). Used only through this file.
+// touches league data takes a LeagueScope (T-28), except the few T-221 lookups that
+// must answer before a league is known. Used only through this file.
+export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts';
 export { findInvitation } from './find-invitation.ts';
 export { findInvitationByTokenHash } from './find-invitation-by-token-hash.ts';
+export { findLeagueByShortName, type LeagueByShortName } from './find-league-by-short-name.ts';
+export { findProgramBySlug } from './find-program-by-slug.ts';
+export { findProgramId } from './find-program-id.ts';
 export { findRoleGrant } from './find-role-grant.ts';
 export { hasPendingInvitation } from './has-pending-invitation.ts';
 export { insertActivity } from './insert-activity.ts';
 export { insertInvitation } from './insert-invitation.ts';
+export { insertJob } from './insert-job.ts';
+export { insertLeague, type InsertLeagueRefusal, type NewLeagueRows } from './insert-league.ts';
 export { insertRoleGrant } from './insert-role-grant.ts';
+export { insertSeason, type NewSeasonRow } from './insert-season.ts';
 export { listActiveGrantsOf } from './list-active-grants-of.ts';
 export { listActivityEntries } from './list-activity-entries.ts';
 export { listOpenInvitations } from './list-open-invitations.ts';
+export { listPrograms } from './list-programs.ts';
 export { listRoleGrants } from './list-role-grants.ts';
 export { markInvitationAccepted } from './mark-invitation-accepted.ts';
 export { markInvitationCancelled } from './mark-invitation-cancelled.ts';
+export { renameLeagueSlug } from './rename-league-slug.ts';
 export { renewInvitationLink } from './renew-invitation-link.ts';
 export { replaceInvitationLink } from './replace-invitation-link.ts';
 export { revokeRoleGrant } from './revoke-role-grant.ts';
-export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts';
-export { findProgramBySlug } from './find-program-by-slug.ts';
-export { findProgramId } from './find-program-id.ts';
-export { insertJob } from './insert-job.ts';
-export { insertLeague, type InsertLeagueRefusal, type NewLeagueRows } from './insert-league.ts';
-export { insertSeason, type NewSeasonRow } from './insert-season.ts';
-export { listPrograms } from './list-programs.ts';
-export { renameLeagueSlug } from './rename-league-slug.ts';
 export { setCurrentSeason } from './set-current-season.ts';
 export { settleJob, type JobSettlement } from './settle-job.ts';
 export { takeJobs, type NoLeagueScope, type TakenJob } from './take-jobs.ts';

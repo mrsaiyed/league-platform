@@ -241,6 +241,7 @@ All dated November 12, 2026.
 | T-212                 | Nothing from a later stage is built early                                    | Later-stage work is built early whenever it does not have to wait (record 011)                                | The founder asked for every stage that can be built in parallel to be built in parallel            |
 | T-224                 | New                                                                          | Jobs recorded in our own fenced `jobs` table; pg-boss runs them in production (record 012)                    | Step 1.19: pg-boss's tables have no league fence, so a job there would be open to every league     |
 | T-225                 | New                                                                          | Sign-in numbers and the shape of the sign-in interface (record 013)                                           | Step 1.13 turned "a few" and "for a while" into numbers the stand-in and Supabase share            |
+| T-229                 | New                                                                          | Agreed (delegated): endpoints name their league by id; one spelling per address (record 017)                  | Step 1.16 review: endpoints had no league; other spellings were served                             |
 
 ## The full list
 
@@ -514,11 +515,12 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-85  | Password rules: a one-way hash held by the sign-in service, at least 8 characters, leaked passwords refused, guesses limited                                                                                                                     | Agreed (delegated)  | yes     |
 | T-86  | Logs and error reports carry no personal content and are kept for a fixed time; exports are delivered by an expiring link                                                                                                                        | Agreed (delegated)  |         |
 | T-87  | Who may see statistics (S-22) is enforced in the same one function as names, and never leaks through the cache or live updates                                                                                                                   | Agreed (delegated)  |         |
-| T-221 | What must happen before a league or account is known (short-name lookup, sign-up, sign-in by email, names on an access list) goes through a few narrow owner-run functions, never a wider policy                                                 | Agreed (delegated)  | yes     |
+| T-221 | What must happen before a league or account is known (short-name lookup, sign-up, sign-in by email, accepting an invitation, names on an access list) goes through a few narrow owner-run functions, never a wider policy                        | Agreed (delegated)  | yes     |
 | T-222 | Typed queries use Kysely behind a hidden handle; one transaction helper sets league and account for that transaction only and refuses stray queries after commit; `date` columns read as text (record 009)                                       | Agreed (delegated)  | yes     |
 | T-223 | The command shape: Zod input, one transaction, permission inside it, events inside it, jobs through the transaction object, one log line; core defines ports, database implements them (record 010)                                              | Agreed (delegated)  | yes     |
 | T-225 | Sign-in numbers: codes last 10 minutes, 5 tries, 5 an hour per address and 30 per network; passwords 8 characters to 72 bytes, NFKC; wrong guesses slowed, then locked, per address and network (record 013)                                     | Agreed (delegated)  | yes     |
 | T-226 | Invitation links hold a random secret stored only as a hash, made as the email is sent and held only in the email; 14 days; re-send replaces it; any signed-in holder accepts once in the league's fence; activity entries hold ids (record 014) | Agreed (delegated)  | yes     |
+| T-229 | Endpoints name their league by its id under `/api/v1/leagues`; each address has one proper spelling, and others forward to it (record 017)                                                                                                       | Agreed (delegated)  | yes     |
 
 ### [T5 — Customization engine](technical/T5-customization-engine.md)
 

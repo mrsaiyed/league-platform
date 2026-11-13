@@ -18,6 +18,7 @@ import {
 } from '../queries/access-rows.ts';
 import { constraintOf } from '../queries/constraint-of.ts';
 import { currentLeague } from '../queries/find-current-league.ts';
+import { leagueStatusOf } from '../queries/league-status-of.ts';
 import { programSummary } from '../queries/program-summary.ts';
 import './isolation-cases.test-helper.ts';
 import {
@@ -40,6 +41,7 @@ const coreScanned = ['../core/index.ts', '../core/src'];
 const reachNoLeagueData = new Map<unknown, string>([
   [programSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [currentLeague, 'turns a row already read into the returned shape; runs no SQL'],
+  [leagueStatusOf, "checks a state already read against core's list; runs no SQL"],
   [constraintOf, 'reads the code and constraint name off an error already thrown; runs no SQL'],
   [databasePackage.withTransaction, 'opens the fenced transaction every case runs in'],
   // It opens its own transaction, which no case can do inside a harness run; its
@@ -75,6 +77,20 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.connectPostgresDriver, "the migration runner's PostgreSQL connection"],
 ]);
 
+/**
+ * T-221: lookups that must answer before any league is set, so they cannot be fenced
+ * to one league and no two-league case can hold them. Each goes through one narrow
+ * database function that runs as the tables' owner, answers one question for one
+ * value at a time and returns the fewest columns; the function itself is reviewed and
+ * listed in schema/app-role.test.ts. Adding to this list is a review too.
+ */
+const narrowLookups = new Map<unknown, string>([
+  [
+    databasePackage.findLeagueByShortName,
+    'the league one short name in an address names (find_league_by_slug): id, short name, state',
+  ],
+]);
+
 /** The exported functions that are commands (made by defineCommand). */
 const commandsIn = (found: readonly ExportedFunction[]) =>
   found.filter((f) => typeof (f.value as { commandName?: unknown }).commandName === 'string');
@@ -101,7 +117,8 @@ beforeAll(async () => {
   coreCommands = commandsIn(exportedFunctions(coreModules));
 });
 const subjects = () => new Set<unknown>(registeredIsolationCases().map((c) => c.subject));
-const covered = () => new Set([...subjects(), ...reachNoLeagueData.keys()]);
+const covered = () =>
+  new Set([...subjects(), ...reachNoLeagueData.keys(), ...narrowLookups.keys()]);
 
 const registered = () => new Set<unknown>(commands.values());
 const commandFile = '../core/src/modules/leagues/commands/set-league-name.ts';
@@ -136,7 +153,9 @@ describe('every query and command is in the two-league harness (T-65)', () => {
 
   it('names no case or reason for a function the scan does not find', () => {
     const found = new Set([...functions, ...coreCommands].map((f) => f.value));
-    const stale = [...subjects(), ...reachNoLeagueData.keys()].filter((f) => !found.has(f));
+    const stale = [...subjects(), ...reachNoLeagueData.keys(), ...narrowLookups.keys()].filter(
+      (f) => !found.has(f),
+    );
     expect(stale).toEqual([]);
   });
 

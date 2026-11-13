@@ -139,8 +139,8 @@ export const databaseLibraries = [
 
 /**
  * T-34: the only files that may put a league into an address by hand: the one
- * address helper and the one place that reads the league from a request. Neither
- * exists yet; the step that writes them puts them at these paths or updates this list.
+ * address helper (leagueUrl) and the one place that reads the league from a request
+ * (step 1.16). Moving either file means updating this list in the same change.
  */
 export const addressHelperFiles = [
   'packages/core/src/modules/leagues/rules/league-url.ts',
