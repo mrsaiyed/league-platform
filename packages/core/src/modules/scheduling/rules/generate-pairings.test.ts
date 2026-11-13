@@ -28,7 +28,19 @@ describe('generatePairings, worked examples (P7 §4.2; S-3)', () => {
 
   it('gives three teams a bye each, and swaps home and away the second time round', () => {
     const rounds = pairings({ teams: teamsOf('abc'), timesEachPair: 2, withinDivisions: false });
-    expect(shown(rounds)).toEqual(['bvc /a', 'cva /b', 'avb /c', 'cvb /a', 'avc /b', 'bva /c']);
+    expect(shown(rounds)).toEqual(['bvc /a', 'cva /b', 'avb /c', 'avc /b', 'bva /c', 'cvb /a']);
+  });
+
+  it('starts the second turn one round on, so no team is home or away three times running', () => {
+    const rounds = pairings({ teams: teamsOf('abcd'), timesEachPair: 2, withinDivisions: false });
+    expect(shown(rounds)).toEqual([
+      'avd bvc',
+      'dvb cva',
+      'cvd avb',
+      'bvd avc',
+      'dvc bva',
+      'dva cvb',
+    ]);
   });
 
   it('alternates home and away for five teams, one bye each', () => {
@@ -201,6 +213,20 @@ describe('generatePairings, generated inputs (T-182)', () => {
         if (before.has(pairKey(g.homeTeamId, g.awayTeamId)) && size !== 2) {
           problems.push(`${g.homeTeamId} and ${g.awayTeamId} meet in rounds ${i} and ${i + 1}`);
         }
+      }
+    }
+
+    // No team plays three home or three away games in a row.
+    const runs = new Map<string, { side: string; length: number }>();
+    for (const g of rounds.flatMap((r) => r.games)) {
+      for (const [id, side] of [
+        [g.homeTeamId, 'home'],
+        [g.awayTeamId, 'away'],
+      ] as const) {
+        const run = runs.get(id);
+        const length = run?.side === side ? run.length + 1 : 1;
+        if (length === 3) problems.push(`${id} plays ${side} three in a row`);
+        runs.set(id, { side, length });
       }
     }
 

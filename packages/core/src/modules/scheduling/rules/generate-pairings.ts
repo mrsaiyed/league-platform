@@ -15,8 +15,10 @@ export const maxTimesEachPair = 20;
  * number of teams one team rests (a bye), and over each full turn every team rests exactly
  * once. Home and away are balanced: within one full turn each team's home and away games
  * differ by at most one and mostly alternate week to week, and every second turn swaps them,
- * so after an even number of turns
- * every team has as many home games as away and every pair has met at each team's home equally.
+ * so after an even number of turns every team has as many home games as away and every pair
+ * has met at each team's home equally. Each turn starts one round further on than the last,
+ * so no team ever plays three home or three away games in a row, and no pair meets in the
+ * last round of one turn and the first of the next.
  *
  * With divisions, each division gets its own rounds and they run side by side. A smaller
  * division needs fewer rounds; its rest weeks are spread through the season, not bunched
@@ -76,7 +78,8 @@ export function generatePairings(input: PairingsInput): PairingsResult {
 /**
  * One group's rounds: `times` full turns of the circle method. Positions 0..m-1 sit on a
  * circle (m odd) and the last position is fixed; in round r the fixed position meets r, and
- * r+k meets r-k. A null position is the bye.
+ * r+k meets r-k. A null position is the bye. Turn t plays the rounds from round t (mod m)
+ * onwards, home and away swapped in every second turn.
  */
 function roundRobin(group: readonly string[], times: number): Pairing[][] {
   const positions: (string | null)[] = group.length % 2 === 0 ? [...group] : [...group, null];
@@ -94,8 +97,9 @@ function roundRobin(group: readonly string[], times: number): Pairing[][] {
       const a = (r + k) % m;
       const b = (r - k + m) % m;
       // r+k is home when k is odd. With the fixed position alternating, each team's games
-      // alternate home and away with the fewest possible breaks (two in a row): none at all
-      // with an odd number of teams, and n-2 in all with an even number.
+      // within one turn alternate home and away with the fewest possible breaks (two in a
+      // row): none at all with an odd number of teams, and n-2 in all with an even number.
+      // Starting each turn one round further on keeps the turn boundaries to two in a row.
       const aHome = k % 2 === 1;
       const home = positions[aHome ? a : b] ?? null;
       const away = positions[aHome ? b : a] ?? null;
@@ -106,7 +110,8 @@ function roundRobin(group: readonly string[], times: number): Pairing[][] {
 
   const out: Pairing[][] = [];
   for (let t = 0; t < times; t++) {
-    for (const round of turn) {
+    for (let i = 0; i < m; i++) {
+      const round = turn[(t + i) % m] ?? [];
       const games: Pairing[] = [];
       for (const [home, away] of round) {
         if (home === null || away === null) continue;
