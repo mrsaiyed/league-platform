@@ -19,11 +19,13 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane. A run that is cut off leaves this as the map for the next run. Check the lane branches for commits: builders were still working when the usage limit hit.
 
-Next free: migration 0012, record 034, T-246 (0011 / 031 / T-243 belong to 1.14; 0010 / 030 / T-242 to 2.4).
+Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 / 031 / T-243 belong to 1.14; 0010 / 030 / T-242 to 2.4).
 
 - **2.39 Public queries for the schedule, teams and rosters** — `.local/lanes/2.39-public-schedule-queries` — none — built (2 commits), gate green apart from a since-fixed isolation case. Then: catch up with build/stage-1, independent review (sonnet), gate, land.
 - **2.22 Fixture import** — `.local/lanes/2.22-fixture-import` — none (no migration; record 034 / T-246 if needed) — opened.
 - **2.25 Adjustments and the rule-change preview** — `.local/lanes/2.25-adjustments` — none (no migration; record 035 / T-247 if needed) — opened.
+- **2.28 Scoring sessions and takeover** — `.local/lanes/2.28-scoring-sessions` — none (no migration; record 036 / T-248 if needed) — opened.
+- **2.73 Slots and fairness rules** — `.local/lanes/2.73-slots` — none (no migration; record 037 / T-249 if needed) — opened.
 
 ## Needs the founder
 
