@@ -58,6 +58,30 @@ export async function mayEditSchedule(
   return status !== undefined && !readOnlyLeagueStatuses.includes(status);
 }
 
+/**
+ * Publishing a season's schedule (P4 §3 `schedule.publish`): at the season's program; not
+ * while the league is archived or suspended (U-9).
+ */
+export async function mayPublishSchedule(
+  context: CommandContext,
+  tx: SchedulingTx,
+  seasonId: string,
+): Promise<boolean> {
+  const scope = await seasonScope(tx, seasonId);
+  if (!(await hasPermission(context, tx, 'schedule.publish', scope))) return false;
+  const status = await tx.access.leagueStatus();
+  return status !== undefined && !readOnlyLeagueStatuses.includes(status);
+}
+
+/** Seeing what publishing would change: the publish permission at the season's program, in any state of the league. */
+export async function mayPreviewPublish(
+  context: CommandContext,
+  tx: SchedulingTx,
+  seasonId: string,
+): Promise<boolean> {
+  return hasPermission(context, tx, 'schedule.publish', await seasonScope(tx, seasonId));
+}
+
 /** Seeing a season's draft: the read permission at its program, in any state of the league. */
 export async function maySeeSchedule(
   context: CommandContext,

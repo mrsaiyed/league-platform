@@ -1,0 +1,37 @@
+// Each team's total of each stat over the final games of a season, summed over its
+// players' lines that entered the game (P7 §6, §8): the numbers shown where a team's
+// player lines are hidden (S-22). `gamesRecorded` counts the games with the stat. A value
+// that is not a whole number is skipped, never allowed to fail the page (the database
+// already refuses one, is_stat_counts).
+import { sql } from 'kysely';
+import type { TeamStatTotalRecord } from '@srleagues/core';
+import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
+
+export async function listTeamStatTotals(
+  scope: LeagueScope,
+  seasonId: string,
+): Promise<TeamStatTotalRecord[]> {
+  const result = await sql<{
+    team_id: string;
+    stat_key: string;
+    total: string;
+    games_recorded: string;
+  }>`
+    select s.team_id, e.key as stat_key,
+           sum((e.value #>> '{}')::bigint)::text as total,
+           count(distinct s.game_id)::text as games_recorded
+      from player_game_stats s
+      join games g on g.league_id = s.league_id and g.id = s.game_id
+      cross join lateral jsonb_each(s.stats) e
+     where s.league_id = ${scope.leagueId} and g.season_id = ${seasonId}
+       and g.status = 'final' and g.deleted_at is null and s.played
+       and jsonb_typeof(e.value) = 'number' and (e.value #>> '{}') ~ '^[0-9]{1,15}$'
+     group by s.team_id, e.key
+     order by s.team_id, e.key`.execute(transactionOf(scope));
+  return result.rows.map((row) => ({
+    teamId: row.team_id,
+    statKey: row.stat_key,
+    total: Number(row.total),
+    gamesRecorded: Number(row.games_recorded),
+  }));
+}

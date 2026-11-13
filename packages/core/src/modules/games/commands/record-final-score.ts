@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
 import { decideGame, openGame, type DecideGameError } from '../decide-game.ts';
 import { gameScore, gameVersion } from '../game-fields.ts';
-import { gameScope, mayChangeGames } from '../policy.ts';
+import { mayScoreGame } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
 
@@ -22,8 +22,8 @@ export const recordFinalScore = defineCommand({
     homeScore: gameScore,
     awayScore: gameScore,
   }),
-  allowed: async (context, input, tx: GamesTx) =>
-    mayChangeGames(context, tx, 'games.score', await gameScope(tx, input.gameId)),
+  // Whoever may score this game, by the league's setting (P4 §4).
+  allowed: (context, input, tx: GamesTx) => mayScoreGame(context, tx, input.gameId),
   run: async ({
     context,
     input,

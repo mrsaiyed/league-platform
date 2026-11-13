@@ -64,4 +64,10 @@ describe('summarizePublish (P7 §4.4)', () => {
     expect(summary.gamesMoved).toEqual([]);
     expect(summary.teamsAffected).toEqual([]);
   });
+
+  it('does not count a round whose date a draft state clears', () => {
+    const draft = baseState();
+    draft.rounds = draft.rounds.map((r) => ({ ...r, date: null }));
+    expect(summarizePublish(baseState(), draft).roundsDateChanged).toEqual([]);
+  });
 });

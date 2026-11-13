@@ -19,3 +19,9 @@ export const gameVersion = z.number().int().positive();
 export const correctionReason = z.string().trim().min(1).max(1000);
 
 export const isDecided = (status: string) => status === 'final' || status === 'forfeit';
+
+/** A game no one will play or score any more: decided, or called off. */
+export const isClosed = (status: string) => isDecided(status) || status === 'cancelled';
+
+/** The scorekeeper's list covers today and the six days after: the week ahead (P4 §4). */
+export const myGamesDays = 7;
