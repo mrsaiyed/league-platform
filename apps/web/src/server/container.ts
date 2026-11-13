@@ -29,5 +29,6 @@ function start(): Promise<WebPorts> {
   return startWebApp(config, {
     database: () => import(/* turbopackIgnore: true */ '@srleagues/database'),
     log: (line) => logger.info('command', line),
+    warn: (message, fields) => logger.warn(message, fields),
   });
 }

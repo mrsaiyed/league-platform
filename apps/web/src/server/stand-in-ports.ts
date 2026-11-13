@@ -7,10 +7,12 @@
 // localhost, 127.0.0.1, [::1], *.localhost or *.test), so a wrong APP_ENV on a real
 // server still cannot hand out its made-up sign-ins.
 //
-// Being someone: until the sign-in screens exist (step 1.14), a person here is
-// "signed in" when the browser's session cookie holds one of the made-up tokens
-// below. That is the only way, so nothing about it works outside this file. Step
-// 1.14 replaces `identify` with the sign-in stand-in of packages/providers.
+// Being someone: the sign-in screens (step 1.14) run on the sign-in stand-in of
+// packages/providers, in this process's memory, its emails caught by the email
+// capture instead of sent (T-140). Beside it, the four made-up people below are
+// "signed in" when the browser's session cookie holds their made-up token, so the
+// shell's checks can be someone who holds roles in the made-up leagues; nothing
+// about that works outside this file.
 //
 // Reads go through the access module's own query (myAccess) on an in-memory
 // transaction; this stand-in cannot change anything.
@@ -23,11 +25,13 @@ import {
   type LeagueStatus,
   type Role,
 } from '@srleagues/core';
-import type { SessionIdentity } from '@srleagues/providers';
+import { captureEmail, createLocalSignInStandIn, type SessionIdentity } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import type { WebPorts } from './ports.ts';
+import { sharedRenewal } from './sign-in/renew-session.ts';
+import { createSignInMail } from './sign-in/sign-in-mail.ts';
 
 type MadeUpLeague = {
   readonly id: string;
@@ -154,9 +158,28 @@ export type StandInOptions = {
   readonly publicBaseUrl: string;
   /** Where the access module's T-196 lines go. */
   readonly log: CommandDeps<AccessTx>['log'];
+  /** EMAIL_FROM, the sign-in emails' sending address. */
+  readonly emailFrom: string;
+  /** Where a sign-in email that could not be sent is reported: its kind only (T-86). */
+  readonly warn?: (message: string, fields: { readonly kind: string }) => void;
 };
 
-export function standInPorts(options: StandInOptions): WebPorts {
+/**
+ * A made-up member who signs in with a password on the sign-in stand-in, made when
+ * the app starts (signUpMadeUpMember), so checks can compare an address that has an
+ * account with one that has none (T-68).
+ */
+export const standInMember = {
+  email: 'member@example.test',
+  password: 'made-up member password',
+} as const;
+
+export type StandInPorts = WebPorts & {
+  /** Gives standInMember an account, through the sign-in service's own steps. */
+  readonly signUpMadeUpMember: () => Promise<void>;
+};
+
+export function standInPorts(options: StandInOptions): StandInPorts {
   if (options.appEnv !== 'local' && options.appEnv !== 'test') {
     throw new Error(
       `The web app's made-up stand-in is for local work and tests only, not "${options.appEnv}".`,
@@ -169,6 +192,26 @@ export function standInPorts(options: StandInOptions): WebPorts {
     );
   }
   const people: readonly MadeUpPerson[] = Object.values(standInPeople);
+  const now = () => new Date();
+  const outbox = captureEmail({ now });
+  const signInMail = createSignInMail({
+    sender: outbox,
+    fromAddress: options.emailFrom,
+    siteOrigin: options.publicBaseUrl,
+    onNoticeFailed: (kind) => options.warn?.('sign-in email not sent', { kind }),
+    now,
+  });
+  const { service: signIn } = createLocalSignInStandIn({
+    environment: options.appEnv === 'local' ? 'development' : 'test',
+    // The sign-in stand-in also refuses NODE_ENV "production", but Next.js's built
+    // server always sets that, the test server of npm run test:web included. The
+    // guards above (APP_ENV local or test, and a site address on this computer or a
+    // test name) are this app's, so the stand-in is told the APP_ENV (record 031).
+    nodeEnv: options.appEnv,
+    codeSender: signInMail.codeSender,
+    returnOrigins: [options.publicBaseUrl],
+    now,
+  });
   const deps: CommandDeps<AccessTx> = {
     transaction: (context, work) => work(accessTx(context.leagueId)),
     events: [],
@@ -196,9 +239,31 @@ export function standInPorts(options: StandInOptions): WebPorts {
     newRequestId: () => randomUUID(),
     identify: async (accessToken) => {
       const person = people.find((p) => p.token === accessToken);
-      return person === undefined ? fail({ code: 'session-ended' }) : ok(identityOf(person));
+      return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
     },
+    signIn,
+    signInMail,
+    renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf: accessOfVia(deps),
+    signUpMadeUpMember: async () => {
+      const here = '127.0.0.1';
+      const { email, password } = standInMember;
+      const asked = await signIn.startSignUp({ email, networkAddress: here });
+      // The code email is handed over without waiting: let it reach the capture.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const sent = outbox.messages().findLast((m) => m.to === email);
+      const code = /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
+      if (!asked.ok || code === undefined) throw new Error('The made-up member got no code.');
+      const proved = await signIn.verifyCode({ email, code, networkAddress: here });
+      if (!proved.ok) throw new Error('The made-up member could not be proved.');
+      const set = await signIn.setPassword({
+        proof: proved.value.proof,
+        password,
+        device: { deviceId: 'made-up-member-device', label: 'made-up', networkAddress: here },
+      });
+      if (!set.ok) throw new Error('The made-up member could not choose a password.');
+      await signIn.signOut({ accessToken: set.value.session.accessToken });
+    },
   };
 }
 

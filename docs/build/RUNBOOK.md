@@ -149,7 +149,8 @@ Rules for delegating:
 
 ## 6. What a run must never do
 
-- Commit to `main`, merge into `main`, push `main` by hand, or open a pull request. `main` is the live Al-Hadi site. The only way `main` ever moves is `node scripts/promote-to-main.mjs` (section 7), which refuses unless it is safe.
+- Commit to `main`, merge into `main`, push `main` by hand, or open a pull request. `main` is the branch the live Al-Hadi site is published from. The only way `main` ever moves is `node scripts/promote-to-main.mjs` (section 7), which refuses unless it is safe.
+- Release the live tracker. Never run that script with `--release-tracker`, never change `.github/workflows/demo-pages.yml` or `.github/workflows/keep-supabase-awake.yml`, and never add a workflow that publishes the site or uses the live database's address. Those files decide what people at a real game see. Only the lead changes them, in a session the founder started.
 - Push anything, unless the "Pushing to GitHub" line in `STATUS.md` starts with `allowed`; and then only the build branch, never a lane branch, never with force.
 - Touch production, a vendor dashboard, real people's data or any secret.
 - Change `apps/live-stats`, `packages/sports` or the Al-Hadi data except where a stage plan says to.
@@ -167,7 +168,7 @@ When one of the real reasons holds:
 2. Land every lane that is built and reviewed. Every other lane keeps its folder and its branch, with its work committed there, for the next run.
 3. Make sure the main folder is clean and its last commit passes the gate.
 4. Update `STATUS.md`: what landed this run, and under "In progress" each lane still open with what is left to do in it.
-5. **Move `main` forward if it is safe.** Run `node scripts/promote-to-main.mjs` once more (it is also run after every landing, section 2). It moves GitHub's `main` up to the newest build commit only when the move is a plain fast-forward, nothing the live tracker is built from differs, GitHub's checks have passed on that exact commit, no game is within 24 hours, and `STATUS.md` allows it. It picks the newest commit GitHub has finished checking, so `main` is usually one landing behind, which is fine. This is what makes the founder's commits count in GitHub's statistics. Copy the one line it prints into the log at the end of a run, and during a run only when it refuses for a new reason. If it refuses, leave `main` alone: never work around it.
+5. **Move `main` forward if it is safe.** Run `node scripts/promote-to-main.mjs` once more (it is also run after every landing, section 2). It moves GitHub's `main` up to the newest build commit only when the move is a plain fast-forward, GitHub's checks have passed on that exact commit, `STATUS.md` allows it, and no workflow that reaches the live tracker differs from `main`'s. The live tracker is built from one fixed commit named in `.github/workflows/demo-pages.yml`, so this move does not touch it, whatever the build changed and whether or not a game is near. It picks the newest commit GitHub has finished checking, so `main` is usually one landing behind, which is fine. This is what makes the founder's commits count in GitHub's statistics. Copy the one line it prints into the log at the end of a run, and during a run only when it refuses for a new reason. If it refuses, leave `main` alone: never work around it, and never pass `--release-tracker` (section 6).
 6. Delete `docs/build/.lock` and run `node scripts/build-dashboard.mjs`.
 7. Reply with three or four plain lines: what landed, what is open, what is waiting on the founder.
 

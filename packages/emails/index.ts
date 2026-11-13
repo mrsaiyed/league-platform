@@ -6,6 +6,15 @@ export {
   type InvitationEmailKey,
 } from './src/invitation-email.ts';
 export {
+  newDeviceEmail,
+  passwordChangedEmail,
+  signInCodeEmail,
+  type NewDeviceEmailData,
+  type PasswordChangedEmailData,
+  type SignInCodeEmailData,
+  type SignInEmailKey,
+} from './src/sign-in-emails.ts';
+export {
   escapeHtml,
   fromHeader,
   headerText,
