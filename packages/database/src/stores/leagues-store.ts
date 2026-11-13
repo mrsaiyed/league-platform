@@ -17,6 +17,7 @@ import {
   updateLeagueName,
   updateLeagueStatus,
   updateSeason,
+  type SeasonChangeRow,
   writeSettingValue,
 } from '../queries/index.ts';
 
@@ -53,16 +54,13 @@ export function leaguesStore(
         : { ...season, status: season.status as SeasonStatus };
     },
     programCount: () => countPrograms(scope),
-    updateSeason: (seasonId, change, version) =>
-      updateSeason(
-        scope,
-        seasonId,
-        {
-          ...(({ rules: _rules, ...rest }) => rest)(change),
-          ...(change.rules === undefined ? {} : { rules: toJson(change.rules) as JsonObject }),
-        },
-        version,
-      ),
+    updateSeason: (seasonId, change, version) => {
+      // The rules are a typed document in core and plain JSON in the database.
+      const { rules, ...others } = change;
+      const row: SeasonChangeRow =
+        rules === undefined ? others : { ...others, rules: toJson(rules) as JsonObject };
+      return updateSeason(scope, seasonId, row, version);
+    },
     seasonProgramId: (seasonId) => findSeasonProgramId(scope, seasonId),
     setCurrentSeason: (seasonId) => setCurrentSeason(scope, seasonId),
     settingRows: (key, places) => listSettingValues(scope, key, places),
