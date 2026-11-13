@@ -1,5 +1,15 @@
-# Publishes https://mrsaiyed.github.io/league-platform/ on every push to main (or by hand
-# from the Actions tab): the live stats site at the root, the concept demo under /demo/.
+# Publishes https://mrsaiyed.github.io/league-platform/: the live stats site at the root,
+# the concept demo under /demo/.
+#
+# The site is built from ONE FIXED COMMIT, the "ref:" line below, not from the newest
+# main. Ordinary pushes to main do not run this workflow at all: it runs only when this
+# file changes (or by hand from the Actions tab), and then it builds that same commit. So
+# main can follow the build every day while the live tracker stays exactly as it is.
+#
+# Changing the "ref:" line is a release of the live tracker. Only the technical lead makes
+# one, with `node scripts/promote-to-main.mjs --release-tracker=<commit>`, never around a
+# game (docs/build/RUNBOOK.md, sections 6 and 7). tests/promote-rules.test.mjs fails if this file
+# stops naming one full commit or starts running on every push.
 #
 # The live stats pages save to Supabase. Its address and public key come from the
 # repository variables SUPABASE_URL and SUPABASE_ANON_KEY (Settings → Secrets and
@@ -10,6 +20,7 @@ name: Publish site
 on:
   push:
     branches: [main]
+    paths: ['.github/workflows/demo-pages.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,6 +37,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The released version of the live site: the commit it was last published from
+          # before this line existed (2026-11-13).
+          ref: 0259e87af1b46b37c4c72c228f11b4c85dc75c8b
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

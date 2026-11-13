@@ -91,8 +91,10 @@ async function resolveWith(facts: RequestFacts, deps: GateDeps): Promise<Resolve
         return settled({ kind: 'not-found' });
       case 'forward':
         return settled({ kind: 'forward', to: refusal.to });
-      // Renewing a session and clearing an ended one are the sign-in screens' work
-      // (step 1.14). Until then the page is drawn as for a visitor.
+      // The proxy renews a session whose cookie ran out before any page sees it
+      // (renew-session.ts). A token that still fails here (it ran out in between, or
+      // the session ended) is drawn as for a visitor; the next request renews or
+      // clears it.
       case 'renew-session':
       case 'session-ended':
         return resolveWith({ ...facts, session: null }, deps);

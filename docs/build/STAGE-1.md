@@ -37,7 +37,7 @@ Each step is done when its done test passes, the gate passes, the independent re
 ### D. Sign-in
 
 - [x] **1.13 The sign-in interface and local stand-in.** An interface in `packages/providers` for: start sign-up with an emailed code, set a password, sign in, sign out, sign out everywhere, list sessions, reset by code. A local stand-in for development and tests only, clearly marked as not for production. _Spec: T-6, T-14, T-67 to T-71, T-85. Model: opus, high._
-- [ ] **1.14 Sign-in flows in the web app.** Sign up (email, code, password), sign in, forgotten password, Google button behind the interface, the session cookie (T-69), no time limit (T-70), the password again for sensitive actions, the new-device email, the device list with "sign out everywhere" (T-71), identical behavior whether or not an account exists (T-68), attempt limits (T-85). _Spec: P6 §2 and §5, T4 §3. Needs: 1.17, 1.19. Model: opus, high._
+- [x] **1.14 Sign-in flows in the web app.** Sign up (email, code, password), sign in, forgotten password, Google button behind the interface, the session cookie (T-69), no time limit (T-70), the password again for sensitive actions, the new-device email, the device list with "sign out everywhere" (T-71), identical behavior whether or not an account exists (T-68), attempt limits (T-85). _Spec: P6 §2 and §5, T4 §3. Needs: 1.17, 1.19. Model: opus, high._
 - [x] **1.15 The Supabase adapter.** The real adapter for the same interface, unit-tested against recorded responses. Marked not verified against the live service. _Spec: T-5, T-6. Model: opus._
 
 ### E. The web app and the worker
@@ -50,7 +50,7 @@ Each step is done when its done test passes, the gate passes, the independent re
 
 ### F. Proving it
 
-- [ ] **1.21 Seed leagues.** Two made-up leagues with different designs, admins and members, loaded by one command. No real people. _Spec: T-195. Model: haiku._
+- [x] **1.21 Seed leagues.** Two made-up leagues with different designs, admins and members, loaded by one command. No real people. _Spec: T-195. Model: haiku._
 - [ ] **1.22 Browser tests for the exit test.** In a real browser: two leagues at two addresses with different looks; a person signs in, closes the browser, returns and is still signed in; an admin of the first is refused everywhere in the second; an invitation email is captured and its link works. Accessibility checks on each screen (T-186). _Spec: T10 stage 1, T9 §2. Model: sonnet._
 - [x] **1.23 CI.** The GitHub workflow runs the new gate. Nothing is pushed by a run; this only edits the file. _Model: haiku._
 - [ ] **1.24 Records.** A decision record for each choice in T1 that stage 1 used, and for every decision made along the way. `docs/operations/` gets "run it locally" and "apply migrations". _Spec: T9 §5. Model: haiku to draft, lead to check._

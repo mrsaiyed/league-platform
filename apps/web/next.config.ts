@@ -21,6 +21,7 @@ const config: NextConfig = {
   transpilePackages: [
     '@srleagues/contracts',
     '@srleagues/core',
+    '@srleagues/emails',
     '@srleagues/observability',
     '@srleagues/providers',
     '@srleagues/site',
@@ -43,6 +44,11 @@ const config: NextConfig = {
     // Later rules win for the same header.
     {
       source: '/:league/invitation/:rest*',
+      headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+    },
+    // Google's return address holds its one-time code (step 1.14).
+    {
+      source: '/signin/google',
       headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
     },
   ],

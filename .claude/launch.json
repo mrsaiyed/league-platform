@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev:stats"],
       "port": 4180,
       "url": "http://127.0.0.1:4180"
+    },
+    {
+      "name": "product-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/preview-web.mjs"],
+      "port": 3210,
+      "url": "http://localhost:3210"
     }
   ]
 }

@@ -10,7 +10,17 @@ export const platformPages = {
   find: ['find'],
   start: ['start'],
   signin: ['signin'],
+  /** The forgotten-password route (T-67): an emailed code, then a new password. */
+  forgotPassword: ['signin', 'forgot'],
+  /** Where Google sends the browser back to (T-67). */
+  googleReturn: ['signin', 'google'],
+  signup: ['signup'],
+  /** Sign-up and forgotten password share these two screens (T-67). */
+  enterCode: ['signup', 'code'],
+  choosePassword: ['signup', 'password'],
   account: ['account'],
+  /** The password again before a sensitive action (T-70). */
+  confirmPassword: ['account', 'confirm'],
   inbox: ['account', 'inbox'],
   help: ['help'],
   contact: ['contact'],

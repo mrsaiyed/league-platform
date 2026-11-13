@@ -34,15 +34,21 @@ export type StartupDeps = {
   readonly database: () => Promise<DatabasePackage>;
   /** Where the access module's T-196 lines go. */
   readonly log: (line: CommandLogLine) => void;
+  /** Where a sign-in email that could not be sent is reported: its kind only (T-86). */
+  readonly warn?: (message: string, fields: { readonly kind: string }) => void;
 };
 
 export async function startWebApp(config: Config, deps: StartupDeps): Promise<WebPorts> {
   if (config.APP_ENV === 'local' || config.APP_ENV === 'test') {
-    return standInPorts({
+    const ports = standInPorts({
       appEnv: config.APP_ENV,
       publicBaseUrl: config.PUBLIC_BASE_URL,
       log: deps.log,
+      ...(deps.warn === undefined ? {} : { warn: deps.warn }),
+      emailFrom: config.EMAIL_FROM,
     });
+    await ports.signUpMadeUpMember();
+    return ports;
   }
   const database = await deps.database();
   const db = database.createDatabase({ kind: 'postgres', url: config.DATABASE_URL });

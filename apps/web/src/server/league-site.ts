@@ -1,7 +1,8 @@
 // What a league's pages look like and are called (T-90, P5 §2): its design document and
-// its display name. They come from a LeagueSiteSource, a small port. TODO (step 1.21):
-// replace the made-up stand-in below with the database-backed source, where the design
-// editor's saved design and the league's real name are read. A league the source does
+// its display name. They come from a LeagueSiteSource, a small port. Until the design
+// editor exists and saves a design with the league, there is nothing in the database to
+// read a design from (the seed leagues of packages/database carry theirs as data), so the
+// made-up stand-in below is the only source; the database-backed one arrives with the editor. A league the source does
 // not know gets the neutral starting design and its short name.
 import type { DesignDocument, StartingDesignKey } from '@srleagues/site';
 import { startingDesign } from '@srleagues/site';
@@ -20,7 +21,6 @@ export type LeagueSiteSource = (
 
 const fallbackDesign: StartingDesignKey = 'clean-court';
 
-// TODO (step 1.21): wire the real source here instead of the made-up one.
 export function siteOfLeague(
   league: { readonly id: string; readonly slug: string },
   source: LeagueSiteSource = standInLeagueSites,
