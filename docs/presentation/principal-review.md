@@ -26,7 +26,7 @@ Run `npm run build:demo` followed by `npm run capture:presentation`. Use the bro
 11. `11-schedule-detail.png` - schedule introduction and complete matchup cards for the slide.
 12. `12-statistics-detail.png` - scoring summary and the first six leaderboard entries.
 
-The v6 presentation PDF is kept outside the source repository. Website slides are pages 6-8: home/media, schedules/results/standings, and player statistics. The accepted home/media layout is retained with the matching-black-tracksuit team photo as the homepage image. The eight original program pages retain their content; subsequent page numbers are updated. Hosted prototype: <https://mrsaiyed.github.io/league-platform/>.
+The v6 presentation PDF is kept outside the source repository. Website slides are pages 6-8: home/media, schedules/results/standings, and player statistics. The accepted home/media layout is retained with the matching-black-tracksuit team photo as the homepage image. The eight original program pages retain their content; subsequent page numbers are updated. Hosted prototype: <https://mrsaiyed.github.io/league-platform/demo/> (it moved under `/demo/` on November 2, 2026, when the site's root became the live stats).
 
 ## Feedback before the proposal becomes a commitment
 

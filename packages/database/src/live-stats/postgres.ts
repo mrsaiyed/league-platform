@@ -58,9 +58,12 @@ type LineRow = {
   fg2: number;
   fg3: number;
   fouls: number;
+  turnovers: number;
   ms: number | string;
 };
 
+/** Applied in order by `initialize`, and gathered into supabase/setup.sql. */
+export const SCHEMA_FILES = ['./001-schema.sql', './002-api.sql'];
 const TEAM_COLUMNS = 'id, slug, name, school, tracked, source_url';
 const PLAYER_COLUMNS = 'id, team_id AS "teamId", name, jersey, active';
 // By jersey as the pages sort: 00, 0, 1 … 99, then players with no number by name.
@@ -104,6 +107,7 @@ const line = (r: LineRow): LineRecord => ({
   fg2: r.fg2,
   fg3: r.fg3,
   fouls: r.fouls,
+  turnovers: r.turnovers,
   ms: Number(r.ms),
 });
 
@@ -114,8 +118,23 @@ export class PostgresRepository implements LiveStatsRepository {
     this.db = db;
   }
 
+  /**
+   * The tables, then the API the static site calls (002-api.sql). Safe to repeat.
+   * A database that does not let this user create functions in its public schema
+   * still gets the tables: the server works without the static site's API.
+   */
   async initialize() {
-    await this.db.exec(await readFile(new URL('./001-schema.sql', import.meta.url), 'utf8'));
+    const [tables, ...rest] = SCHEMA_FILES;
+    await this.db.exec(await readFile(new URL(tables!, import.meta.url), 'utf8'));
+    for (const file of rest)
+      try {
+        await this.db.exec(await readFile(new URL(file, import.meta.url), 'utf8'));
+      } catch (error) {
+        if ((error as { code?: string }).code !== '42501') throw error;
+        console.warn(
+          'The static site API was not installed: this database user may not create functions in the public schema. The stats server works without it.',
+        );
+      }
   }
 
   close() {
@@ -242,12 +261,12 @@ export class PostgresRepository implements LiveStatsRepository {
       if (r.lines.length)
         await tx.query(
           `INSERT INTO live_stats.player_game_lines(game_id, player_id, team_id, name, jersey,
-             appeared, points, fg1, fg2, fg3, fouls, ms)
+             appeared, points, fg1, fg2, fg3, fouls, turnovers, ms)
            SELECT $1, x.player_id, x.team_id, x.name, x.jersey, x.appeared, x.points, x.fg1,
-             x.fg2, x.fg3, x.fouls, x.ms
+             x.fg2, x.fg3, x.fouls, x.turnovers, x.ms
            FROM jsonb_to_recordset($2::jsonb) AS x(player_id uuid, team_id uuid, name text,
              jersey text, appeared boolean, points integer, fg1 integer, fg2 integer,
-             fg3 integer, fouls integer, ms bigint)`,
+             fg3 integer, fouls integer, turnovers integer, ms bigint)`,
           [
             gameId,
             JSON.stringify(
@@ -262,6 +281,7 @@ export class PostgresRepository implements LiveStatsRepository {
                 fg2: l.fg2,
                 fg3: l.fg3,
                 fouls: l.fouls,
+                turnovers: l.turnovers,
                 ms: l.ms,
               })),
             ),
@@ -272,13 +292,23 @@ export class PostgresRepository implements LiveStatsRepository {
   }
 
   async finalLines(teamId: string) {
-    const rows = await this.db.query<LineRow>(
-      `SELECT l.player_id, l.team_id, l.name, l.jersey, l.appeared, l.points, l.fg1, l.fg2,
-         l.fg3, l.fouls, l.ms
+    const rows = await this.db.query<LineRow & { game_id: string }>(
+      `SELECT l.game_id, l.player_id, l.team_id, l.name, l.jersey, l.appeared, l.points, l.fg1,
+         l.fg2, l.fg3, l.fouls, l.turnovers, l.ms
        FROM live_stats.player_game_lines l
        JOIN live_stats.games g ON g.id = l.game_id AND g.status = 'final'
        WHERE l.team_id = $1`,
       [teamId],
+    );
+    return rows.rows.map((r) => ({ gameId: r.game_id, ...line(r) }));
+  }
+
+  async gameLines(gameId: string) {
+    const rows = await this.db.query<LineRow>(
+      `SELECT player_id, team_id, name, jersey, appeared, points, fg1, fg2, fg3, fouls, turnovers,
+         ms
+       FROM live_stats.player_game_lines WHERE game_id = $1`,
+      [gameId],
     );
     return rows.rows.map(line);
   }
@@ -292,13 +322,20 @@ export class PostgresRepository implements LiveStatsRepository {
  */
 export async function connectPostgres(
   url: string,
-  options: { ssl?: 'require' | 'off'; ca?: string | undefined; max?: number } = {},
+  options: {
+    ssl?: 'require' | 'off';
+    ca?: string | undefined;
+    max?: number;
+    /** Longest wait for a connection, and for any one query, in milliseconds. */
+    timeoutMs?: number;
+  } = {},
 ): Promise<Db> {
   const { default: pg } = await import('pg');
-  const target = new URL(url);
+  const target = parseDatabaseUrl(url);
   for (const key of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat'])
     target.searchParams.delete(key);
   const builtIn = pg.types.getTypeParser;
+  const timeoutMs = options.timeoutMs ?? 10_000;
   const pool = new pg.Pool({
     connectionString: target.toString(),
     max: options.max ?? 5,
@@ -308,6 +345,14 @@ export async function connectPostgres(
         : options.ca
           ? { ca: options.ca, rejectUnauthorized: true }
           : { rejectUnauthorized: false },
+    // A network that drops mid-game must fail a request, not hang it: the scorer's
+    // browser keeps the tap and sends it again. Without these a lost connection can
+    // hold every pooled connection forever.
+    connectionTimeoutMillis: timeoutMs,
+    query_timeout: timeoutMs,
+    keepAlive: true,
+    idleTimeoutMillis: 30_000,
+    application_name: 'live-stats',
     // bigint (minutes in milliseconds) as a number; values stay far below 2^53.
     types: {
       getTypeParser: ((oid: number, format?: 'text' | 'binary') =>
@@ -323,6 +368,7 @@ export async function connectPostgres(
     exec: (sql) => pool.query(sql),
     async transaction(fn) {
       const client = await pool.connect();
+      let broken: Error | undefined;
       try {
         await client.query('BEGIN');
         const result = await fn({
@@ -333,12 +379,57 @@ export async function connectPostgres(
         await client.query('COMMIT');
         return result;
       } catch (error) {
-        await client.query('ROLLBACK').catch(() => {});
+        // A refused action rolls back cleanly. If even that fails, the connection is
+        // gone or stuck: throw it away rather than hand it to the next request.
+        await client.query('ROLLBACK').catch((e: Error) => (broken = e));
         throw error;
       } finally {
-        client.release();
+        client.release(broken);
       }
     },
     close: () => pool.end(),
   };
+}
+
+/** A database error as the person setting it up needs it: what went wrong and what to try. */
+export function describeDatabaseError(error: unknown): string {
+  const e = error as { code?: string; message?: string; errors?: { code?: string }[] };
+  const message = e?.message || String(error);
+  const codes = [e?.code, ...(e?.errors ?? []).map((x) => x.code)];
+  if (codes.includes('ENOTFOUND') || codes.includes('EAI_AGAIN'))
+    return `Cannot find the database's address (${message}). Check DATABASE_URL and that this computer is online.`;
+  if (codes.some((c) => c === 'ENETUNREACH' || c === 'EHOSTUNREACH'))
+    return `Cannot reach the database (${message}). Supabase's direct connection needs IPv6; use the Session pooler connection string instead.`;
+  if (codes.includes('ECONNREFUSED'))
+    return `The database refused the connection (${message}). Check the host and port in DATABASE_URL.`;
+  if (e?.code === '28P01' || /password authentication failed/i.test(message))
+    return 'The database password in DATABASE_URL is wrong. Reset it in Supabase (Database settings) and update DATABASE_URL.';
+  if (/tenant or user not found/i.test(message))
+    return 'Supabase did not recognise the user. With the pooler, the user is postgres.<project-ref>, exactly as in the copied connection string.';
+  if (/timeout|timed out/i.test(message))
+    return `The database did not answer in time (${message}). If it is a free Supabase project, it pauses after a week without use: restore it from the Supabase dashboard.`;
+  return message;
+}
+
+/**
+ * The connection string as a URL, or an error that says how to fix it. Supabase's
+ * copied strings carry a [YOUR-PASSWORD] placeholder, and a password with # / ? or
+ * spaces in it must be percent-encoded to fit in a URL.
+ */
+export function parseDatabaseUrl(url: string): URL {
+  const advice =
+    'Copy the connection string from Supabase (Connect → Session pooler) and put your database password in it. If the password has symbols such as # / ? @ or spaces, reset it to letters and numbers or percent-encode it.';
+  if (/YOUR[-_]PASSWORD/i.test(url))
+    throw new Error(`DATABASE_URL still has the [YOUR-PASSWORD] placeholder. ${advice}`);
+  let parsed: URL;
+  try {
+    parsed = new URL(url.trim());
+  } catch {
+    throw new Error(`DATABASE_URL is not a valid connection string. ${advice}`);
+  }
+  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:')
+    throw new Error(`DATABASE_URL must start with postgresql://. ${advice}`);
+  if (!parsed.hostname || parsed.hash || parsed.pathname.split('/').length > 2)
+    throw new Error(`DATABASE_URL looks cut short or has an unencoded symbol in it. ${advice}`);
+  return parsed;
 }

@@ -10,7 +10,7 @@ import {
   periodLabel,
   runningScores,
   SIDES,
-} from '/js/engine.js';
+} from './engine.js';
 import {
   api,
   esc,
@@ -19,18 +19,22 @@ import {
   gameClockText,
   gameTypeLabel,
   getSession,
+  link,
+  pageId,
   playerLabel,
   serverClock,
   siteHeader,
   sortPlayers,
   subscribe,
-} from '/js/common.js';
+} from './common.js';
 
-const gameId = location.pathname.split('/')[2];
+const gameId = pageId();
 const $ = (id) => document.getElementById(id);
 let game = null;
 let canScore = false;
 let session = null;
+/** Player id → the player, with the name and number saved with a final game's box score. */
+let people = new Map();
 
 /** The clock reading for the header, with the period derived from the plays. */
 function clockText(d, now) {
@@ -48,6 +52,10 @@ function teamBlock(side, d) {
   const notes = [side === 'home' ? 'Home' : 'Away'];
   if (live && t.periodFouls)
     notes.push(`${t.periodFouls} team foul${t.periodFouls === 1 ? '' : 's'}`);
+  if (live) {
+    const left = Math.max(0, t.timeoutsLeft.full) + Math.max(0, t.timeoutsLeft.short);
+    notes.push(left ? `${left} timeout${left === 1 ? '' : 's'} left` : 'No timeouts left');
+  }
   return `<div class="sb-team">
     <span class="sb-name">${esc(game[side].name)}</span>
     <span class="sb-score">${t.score}</span>
@@ -61,24 +69,27 @@ function boxScore(side, d) {
   const final = game.status === 'final';
   const onCourt = game.status === 'live' ? d.teams[side].onCourt : [];
   const roster = sortPlayers(
-    game.players.filter((p) => p.teamId === teamId && (p.active || d.players[p.id])),
+    game.players
+      .filter((p) => p.teamId === teamId && (p.active || d.players[p.id]))
+      .map((p) => people.get(p.id) ?? p),
   );
-  const total = { points: 0, fg3: 0, fg2: 0, fg1: 0, fouls: 0 };
+  const total = { points: 0, fg3: 0, fg2: 0, fg1: 0, turnovers: 0, fouls: 0 };
+  const team = d.teams[side];
   const rows = roster.map((p) => {
     const l = d.players[p.id];
     if (l) for (const k of Object.keys(total)) total[k] += l[k];
     const played = l?.appeared;
     const cells = played
-      ? `<td data-min="${esc(p.id)}">${formatMinutes(l.ms)}</td><td><b>${l.points}</b></td><td>${l.fg3}</td><td>${l.fg2}</td><td>${l.fg1}</td><td>${l.fouls}</td>`
-      : `<td colspan="6" class="dnp-cell">${final ? 'DNP' : '—'}</td>`;
-    return `<tr class="${played ? '' : 'dnp'}${onCourt.includes(p.id) ? ' on-court' : ''}"><td class="num">${esc(p.jersey)}</td><td class="name">${esc(p.name || `#${p.jersey}`)}</td>${cells}</tr>`;
+      ? `<td data-min="${esc(p.id)}">${formatMinutes(l.ms)}</td><td><b>${l.points}</b></td><td>${l.fg3}</td><td>${l.fg2}</td><td>${l.fg1}</td><td>${l.turnovers}</td><td>${l.fouls}</td>`
+      : `<td colspan="7" class="dnp-cell">${final ? 'DNP' : '—'}</td>`;
+    return `<tr class="${played ? '' : 'dnp'}${onCourt.includes(p.id) ? ' on-court' : ''}"><td class="num">${esc(p.jersey)}</td><td class="name"><a href="${esc(link.player(p.id))}" title="Game log">${esc(p.name || `#${p.jersey}`)}</a></td>${cells}</tr>`;
   });
   return `<section class="panel">
     <h2>${esc(game[side].name)}</h2>
     <div class="table-wrap"><table class="stats">
-      <thead><tr><th class="num">#</th><th class="name">Player</th><th title="Minutes">MIN</th><th title="Points">PTS</th><th title="3-pointers made">3PM</th><th title="2-pointers made">2PM</th><th title="Free throws made">FTM</th><th title="Personal fouls">PF</th></tr></thead>
-      <tbody>${rows.join('') || '<tr><td colspan="8" class="name">No players entered yet.</td></tr>'}</tbody>
-      <tfoot><tr><td></td><td class="name">Team</td><td></td><td>${total.points}</td><td>${total.fg3}</td><td>${total.fg2}</td><td>${total.fg1}</td><td>${total.fouls}</td></tr></tfoot>
+      <thead><tr><th class="num">#</th><th class="name">Player</th><th title="Minutes">MIN</th><th title="Points">PTS</th><th title="3-pointers made">3PM</th><th title="2-pointers made">2PM</th><th title="Free throws made">FTM</th><th title="Turnovers">TO</th><th title="Personal fouls">PF</th></tr></thead>
+      <tbody>${rows.join('') || '<tr><td colspan="9" class="name">No players entered yet.</td></tr>'}</tbody>
+      <tfoot><tr><td></td><td class="name">Team</td><td></td><td>${total.points}</td><td>${total.fg3}</td><td>${total.fg2}</td><td>${total.fg1}</td><td>${total.turnovers + team.teamTurnovers}</td><td>${total.fouls}</td></tr>${team.teamTurnovers ? `<tr class="team-note"><td></td><td class="name" colspan="8">Turnovers include ${team.teamTurnovers} team ${team.teamTurnovers === 1 ? 'turnover' : 'turnovers'}, not charged to a player.</td></tr>` : ''}</tfoot>
     </table></div>
   </section>`;
 }
@@ -87,14 +98,14 @@ function playByPlay() {
   const plays = game.state.plays;
   const scores = runningScores(plays);
   const periods = game.state.rules.periods;
-  const nameOf = (id) => playerLabel(game.players.find((p) => p.id === id));
+  const nameOf = (id) => playerLabel(people.get(id));
   const items = plays.map((play, i) => {
     if (play.type === 'period')
       return `<li class="is-period"><span class="when">${esc(periodLabel(play.period, periods))}</span><span class="what">Start of ${esc(periodLabel(play.period, periods))}</span><span></span></li>`;
     const team = game[play.side].name;
     const what = describePlay(play, nameOf, () => team, periods);
     const s = scores[i];
-    return `<li class="${play.type === 'score' ? 'is-score' : ''}"><span class="when">${esc(periodLabel(play.period, periods))} ${esc(formatClock(play.clockMs))}</span><span class="what">${play.type === 'lineup' ? '' : `<span class="team-tag">${esc(team)}</span> `}${esc(what)}</span><span class="running">${play.type === 'score' ? `${s.home}–${s.away}` : ''}</span></li>`;
+    return `<li class="${play.type === 'score' ? 'is-score' : ''}"><span class="when">${esc(periodLabel(play.period, periods))} ${esc(formatClock(play.clockMs))}</span><span class="what">${['lineup', 'team-turnover', 'team-unturnover', 'timeout', 'untimeout'].includes(play.type) ? '' : `<span class="team-tag">${esc(team)}</span> `}${esc(what)}</span><span class="running">${play.type === 'score' ? `${s.home}–${s.away}` : ''}</span></li>`;
   });
   return (
     items.reverse().join('') ||
@@ -123,7 +134,7 @@ function render() {
       ? `<a href="${esc(game.sourceUrl)}" rel="noopener noreferrer">${esc(game.source)} game ${esc(game.sourceRef?.split(':')[1] ?? '')} ↗</a>`
       : '',
     canScore
-      ? `<a class="btn${game.status === 'final' ? '' : ' btn-primary'}" href="/game/${esc(game.id)}/track">${game.status === 'final' ? 'Correct stats' : game.status === 'live' ? 'Open the tracker' : 'Track live stats'}</a>`
+      ? `<a class="btn${game.status === 'final' ? '' : ' btn-primary'}" href="${esc(link.track(game.id))}">${game.status === 'final' ? 'Correct stats' : game.status === 'live' ? 'Open the tracker' : 'Track live stats'}</a>`
       : '',
   ];
   $('game-info').innerHTML =
@@ -146,6 +157,14 @@ setInterval(() => {
 function adopt(payload) {
   if (game && payload.revision < game.revision) return;
   game = payload;
+  // A final game shows names and numbers as they were in it, even if a roster changed since.
+  const saved = new Map((payload.lines ?? []).map((l) => [l.playerId, l]));
+  people = new Map(
+    payload.players.map((p) => {
+      const l = saved.get(p.id);
+      return [p.id, l ? { ...p, name: l.name, jersey: l.jersey } : p];
+    }),
+  );
   serverClock.sync(payload.serverTime);
   render();
 }

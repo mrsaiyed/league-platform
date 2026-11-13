@@ -1,5 +1,15 @@
-name: Publish concept demo
+# Publishes https://mrsaiyed.github.io/league-platform/ on every push to main (or by hand
+# from the Actions tab): the live stats site at the root, the concept demo under /demo/.
+#
+# The live stats pages save to Supabase. Its address and public key come from the
+# repository variables SUPABASE_URL and SUPABASE_ANON_KEY (Settings → Secrets and
+# variables → Actions → Variables). Both are public by design; never put the secret
+# (service_role) key here: the build refuses it. Without them the site says it is not
+# connected yet. After setting or changing them, run this workflow again.
+name: Publish site
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,10 +32,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify
+      - run: npm run build:pages
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/demo
+          path: dist/pages
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

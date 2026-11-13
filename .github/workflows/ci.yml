@@ -17,6 +17,7 @@ jobs:
       - run: npm run test:browser
       - run: npm run test:varsity:browser
       - run: npm run test:stats:browser
+      - run: npm run test:pages:browser
   hosted-build:
     runs-on: ubuntu-latest
     steps:

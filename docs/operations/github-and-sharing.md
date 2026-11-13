@@ -3,18 +3,18 @@
 ## Current setup
 
 - Source: <https://github.com/mrsaiyed/league-platform>, branch `main`.
-- Concept: <https://mrsaiyed.github.io/league-platform/>.
+- Live stats: <https://mrsaiyed.github.io/league-platform/>, published by the **Publish site** workflow on every push to `main`.
+- Concept: <https://mrsaiyed.github.io/league-platform/demo/>.
 - The owner configured the repository as public and enabled GitHub Pages. Preserve those settings unless the owner requests otherwise.
-- GitHub Actions verifies pushes and pull requests. The Pages workflow is manually dispatched; pushing by itself does not publish.
+- GitHub Actions verifies pushes and pull requests. Every push to `main` publishes the site; **Publish site** can also be run by hand from the Actions tab.
 
 ## Publish an update
 
-1. Run `npm run verify` and `npm run test:browser` locally.
-2. Commit and push. Check **Verify** in GitHub Actions.
-3. Run **Publish concept demo** from Actions with branch `main`.
-4. Wait for success and verify the hosted site reflects the update.
+1. Run `npm run verify` and the browser checks locally.
+2. Commit and push to `main`. **Publish site** runs by itself; check it and **Verify** in GitHub Actions.
+3. Wait for success and check the hosted site reflects the update.
 
-Only `dist/demo/` is published. The site contains fictional records plus founder-supplied AHS photography. Commissioner and personal-player views are presentation personas accessible to everyone who opens the concept. Do not enter private student records.
+`dist/pages/` is published: the live stats at the root (`npm run build:pages`) and the concept demo under `demo/`. The concept contains fictional records plus founder-supplied AHS photography. Commissioner and personal-player views are presentation personas accessible to everyone who opens the concept. Do not enter private student records.
 
 ## Offline presentation and screenshots
 
