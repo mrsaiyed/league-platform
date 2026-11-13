@@ -23,7 +23,9 @@ export type {
   GamePlayerLine,
   GamesReadStore,
 } from './read-ports.ts';
+export { seasonResults, type SeasonResults } from './season-results.ts';
 export type {
+  GameLine,
   GameRecord,
   GameResultDocument,
   GameResultChange,

@@ -7,6 +7,7 @@ export { jobsStore } from './jobs-store.ts';
 export { leaguesStore } from './leagues-store.ts';
 export { peopleStore } from './people-store.ts';
 export { schedulingStore } from './scheduling-store.ts';
+export { standingsStore } from './standings-store.ts';
 export { teamsStore } from './teams-store.ts';
 export { gamesReadStore } from './games-read-store.ts';
 export { standingsReadStore } from './standings-read-store.ts';

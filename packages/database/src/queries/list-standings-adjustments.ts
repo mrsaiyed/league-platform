@@ -1,19 +1,18 @@
-// A season's standings adjustments not in the bin, with their reasons (S-10), oldest
-// first. Who entered each is never read: the footnote shows the reason only.
-import type { StandingsAdjustmentWithReason } from '@srleagues/core';
+// A season's standings adjustments (S-10) in the scope's league, not in the bin, in id
+// order: what the calculation applies on top of the games.
+import type { SeasonAdjustment } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
 export async function listStandingsAdjustments(
   scope: LeagueScope,
   seasonId: string,
-): Promise<StandingsAdjustmentWithReason[]> {
+): Promise<readonly SeasonAdjustment[]> {
   const rows = await transactionOf(scope)
     .selectFrom('standings_adjustments')
     .select(['id', 'team_id', 'wins', 'losses', 'ties', 'points', 'reason'])
     .where('league_id', '=', scope.leagueId)
     .where('season_id', '=', seasonId)
     .where('deleted_at', 'is', null)
-    .orderBy('created_at')
     .orderBy('id')
     .execute();
   return rows.map((row) => ({

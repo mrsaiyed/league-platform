@@ -46,7 +46,17 @@ const notFound = 'NEXT_HTTP_ERROR_FALLBACK;404';
 /** [who, path, status, words that must be there, words that must not, forward to] */
 const cases = [
   ['visitor', '/', 200, ['Find your league, or start one']],
-  ['visitor', '/account', 200, ['Your account']],
+  // The sign-in screens (step 1.14).
+  ['visitor', '/account', 307, [], [], '/signin?next=%2Faccount'],
+  ['owner', '/account', 200, ['Your account', 'Signed-in devices', 'Sign out everywhere']],
+  ['visitor', '/signin', 200, ['Sign in', 'Continue with Google', 'Forgot your password?']],
+  ['visitor', '/signin?problem=wrongEmailOrPassword', 200, ['Wrong email or password.']],
+  ['visitor', '/signin?problem=%3Cscript%3E', 200, ['Sign in'], ['role="alert"']],
+  ['visitor', '/signup', 200, ['Create your account', 'Email me a code']],
+  ['visitor', '/signin/forgot', 200, ['Forgot your password']],
+  ['visitor', '/signup/code', 200, ['Enter your code', 'If that address can sign in']],
+  ['visitor', '/signup/password', 200, ['Choose your password']],
+  ['visitor', '/account/confirm', 200, ['Enter your password again']],
   ['visitor', '/north-valley', 200, ['Home', 'This page is not built yet.']],
   ['visitor', '/north-valley/teams/lions', 200, ['Team']],
   // The design as variables once per page, the header and the mark (step 1.18, T-90, U-8):
@@ -166,6 +176,7 @@ try {
       `an invitation address sends referrer-policy "${invitation.headers.get('referrer-policy')}"`,
     );
   }
+  failures.push(...(await checkSignIn(origin)));
 } finally {
   server.child.kill();
 }
@@ -174,6 +185,8 @@ try {
 const staging = start(['start', '--port', String(await freePort())], {
   APP_ENV: 'staging',
   PUBLIC_BASE_URL: 'https://staging.example.test',
+  // Required outside local and test (config-schema.ts), so the database is reached.
+  TRUSTED_PROXY: 'one',
 });
 const code = await new Promise((resolve) => {
   const timer = setTimeout(() => {
@@ -246,4 +259,123 @@ function freePort() {
       probe.close(() => resolve(port));
     });
   });
+}
+
+/**
+ * The sign-in forms over HTTP (step 1.14), as a browser with no script posts them:
+ * answers and cookies (T-68, T-69), refusal of a form posted from another site,
+ * and the proxy clearing a session that has ended. The full flows, with codes, are
+ * tested beside the code (apps/web/src/server/sign-in/flows.test.ts).
+ */
+async function checkSignIn(origin) {
+  const problems = [];
+  /** Posts the `index`th form of `page`, as Next.js's no-script form post does. */
+  async function post(page, index, fields, from = origin) {
+    const html = await (await fetch(origin + page)).text();
+    const ids = [...html.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1]);
+    const id = ids[index];
+    if (id === undefined) {
+      problems.push(`${page}: no form ${index}`);
+      return undefined;
+    }
+    const body = new FormData();
+    body.set(id, '');
+    for (const [name, value] of Object.entries(fields)) body.set(name, value);
+    return fetch(origin + page, {
+      method: 'POST',
+      body,
+      headers: { origin: from },
+      redirect: 'manual',
+    });
+  }
+  const cookieNamesOf = (response) =>
+    response.headers
+      .getSetCookie()
+      .map((c) => c.split('=')[0])
+      .sort();
+  const where = (response) => {
+    const location = new URL(response.headers.get('location') ?? '/nowhere', origin);
+    return location.pathname + location.search;
+  };
+
+  // T-68: the same answer for the made-up member's address, which has an account
+  // (stand-in-ports.ts, standInMember), and one that has none: asking to sign up,
+  // the forgotten-password route, and a wrong password.
+  const member = 'member@example.test';
+  const nobody = 'nobody-here@example.test';
+  const forms = [
+    ['/signup', (email) => ({ email }), '/signup/code'],
+    ['/signin/forgot', (email) => ({ email }), '/signup/code'],
+    [
+      '/signin',
+      (email) => ({ email, password: 'not the password' }),
+      '/signin?problem=wrongEmailOrPassword',
+    ],
+  ];
+  for (const [page, fields, expected] of forms) {
+    const answers = [];
+    for (const email of [member, nobody]) {
+      const response = await post(page, 0, fields(email));
+      if (response === undefined) return problems;
+      answers.push({
+        status: response.status,
+        to: where(response),
+        cookies: cookieNamesOf(response),
+      });
+      for (const cookie of response.headers.getSetCookie()) {
+        if (!/HttpOnly/i.test(cookie) || !/SameSite=lax/i.test(cookie)) {
+          problems.push(
+            `${page} sets a cookie without HttpOnly and SameSite=Lax: ${cookie.split('=')[0]}`,
+          );
+        }
+      }
+    }
+    if (answers[0].status !== 303 || answers[0].to !== expected) {
+      problems.push(`${page} answers ${answers[0].status} to ${answers[0].to}, not ${expected}`);
+    }
+    if (JSON.stringify(answers[0]) !== JSON.stringify(answers[1])) {
+      problems.push(`${page} answers differently for an address with an account and one without`);
+    }
+  }
+  // The member's account is real: the right password signs in.
+  const right = await post('/signin', 0, { email: member, password: 'made-up member password' });
+  if (
+    right !== undefined &&
+    (where(right) !== '/account' || !cookieNamesOf(right).includes('srl_session'))
+  ) {
+    problems.push(`the made-up member could not sign in (${right.status} to ${where(right)})`);
+  }
+  // A form posted from another site changes nothing (T4 §5).
+  const forged = await post(
+    '/signup',
+    0,
+    { email: 'someone@example.test' },
+    'https://evil.example',
+  );
+  if (
+    forged !== undefined &&
+    (forged.status === 303 || cookieNamesOf(forged).includes('srl_flow'))
+  ) {
+    problems.push(`a form posted from another site was taken (${forged.status})`);
+  }
+  // An ended session's renewing token is cleared by the proxy (T-69).
+  const ended = await fetch(`${origin}/signin`, {
+    headers: { cookie: 'srl_renew=made-up-ended-token' },
+    redirect: 'manual',
+  });
+  const cleared = ended.headers.getSetCookie().find((c) => c.startsWith('srl_renew='));
+  if (cleared === undefined || !/Max-Age=0|Expires=Thu, 01 Jan 1970/i.test(cleared)) {
+    problems.push('an ended session was not cleared from the browser');
+  }
+  // Google's return address holds a one-time code: never passed on.
+  const back = await fetch(`${origin}/signin/google?code=made-up`, { redirect: 'manual' });
+  if (back.status !== 303 || where(back) !== '/signin?problem=googleFailed') {
+    problems.push(
+      `Google's return with no sign-in started answers ${back.status} to ${where(back)}`,
+    );
+  }
+  if (back.headers.get('referrer-policy') !== 'no-referrer') {
+    problems.push(`Google's return sends referrer-policy "${back.headers.get('referrer-policy')}"`);
+  }
+  return problems;
 }

@@ -1,0 +1,33 @@
+# 033 — Standings and totals follow every result
+
+Date: 2026-11-13. Step 2.24; serves T3 §9, T6 §7, S-9, S-11, S-22, T-22, T-23, T-24, T-65. Decided by the lead (technical). T-245.
+
+## Problem
+
+T3 §9 says standings rows and season player totals are rebuilt from games whenever a result changes, inside the same transaction, and can be rebuilt from scratch. T6 §7 says ending a game recalculates them in its one transaction. T-24 says the module that reacts to a result does so through an event the games module announces without knowing who listens. Several things were left open: how a handler belonging to one module gets the stores it needs inside another module's command; how two results of one season saved at the same moment avoid writing standings that miss one of them; what the totals document holds, given that who may see a player's numbers is each team's choice (S-22); and how the two-league harness (T-65), which step 1.10 left without event handlers, judges them.
+
+## What
+
+- **One calculation, two ways in.** `rebuildSeason` (packages/core, standings module) locks the season's standings, asks the games module for the season's results (`seasonResults`: its rules, its final and forfeit games not in the bin, and their box score lines, T-22), reads the season's teams and adjustments, runs the pure calculations of steps 2.7 and 2.8 (packages/sports), and writes the rows. The handlers for `games.finalized` and `games.reopened` call it with the event's season; the `standings.rebuild_season` command calls it for a season the admin names. So a rebuild from nothing gives exactly the rows built up result by result.
+- **Same transaction, all or nothing.** The handlers run inside the command's transaction (defineCommand), so if the recalculation fails the result, its correction row and its activity entry are rolled back with it.
+- **A command runs in any transaction that offers at least its stores.** `Command<Value, Err, Tx>` is now called with `CommandDeps<T>` for any `T` that extends `Tx`. The apps' transaction has every module's stores, so a games command's handlers find the standings store in it. Nothing else about the command shape changed (record 010).
+- **Core keeps the apps' handler list.** `eventHandlers` (packages/core/src/event-handlers.ts) is every handler the apps pass to commands, as `commands` is every command.
+- **Two results at once.** `lockSeasonStandings` takes a transaction-long advisory lock keyed by the league and season before anything is read. A second result of the same season waits for the first to commit, and because each statement reads afresh at read committed, it then sees the first game. The key names the league, so leagues never wait on each other except by a rare hash collision, which only delays.
+- **Rows are written over in place.** Each team's row (and each player's totals row) is inserted or, if it exists, updated, keeping its id; rows of teams no longer in the season (moved to the bin) and of players with no counted game are removed. Seeds may swap in any order because their uniqueness is checked when the transaction ends (record 030). A team that changed division moves to its new table at the next rebuild.
+- **Totals hold every team's lines.** A season totals row holds the player's numbers from every team they played for, and its `stats` document names those teams (`{version: 1, teamIds, stats: {key: {total, gamesRecorded}}}`). Who may see them (S-22) depends on who is looking, so it is applied where they are shown: a page showing a player whose teams include one that hides its numbers from that viewer works the visible part out from the box score lines instead. The calculation is never told which teams are hidden, so the stored totals are the same for every viewer and the Faraj totals check (step 2.80) compares whole numbers.
+- **What the calculation reports is returned, not stored.** Games, teams and adjustments it left out or wants the admin to see (a level score in a season without ties, say) come back from the rebuild command. The handlers discard them; a place to show them waits for the admin's standings page.
+- **Coin flips.** There is still nowhere to store them (record 030), so none are passed: teams no tiebreaker separates share a rank and take seeds in id order.
+- **The harness runs handlers.** Every command case runs with core's `eventHandlers`, in the command's transaction, so a handler's jobs are judged with the command. Each handler also has cases of its own (`registerHandlerCase`): run in the other league's scope with an event naming the target's season, because a command aimed at the target is refused there before any handler runs. A handler's work is what it writes, so its runs are also compared, table by table in the run's own league, with the same run once the other league's rows are deleted (`compareWrites`): a total over another league written into one's own is caught though it names nothing. The coverage test fails on a handler exported from core that is not in `eventHandlers` or has no case.
+- **Permission.** Rebuilding needs `standings.adjust` at the season's program, as adjustments do (S-10), and is refused while the league is archived or suspended (U-9). It is logged (A-6).
+
+## Considered
+
+- **Recalculating only the teams of the changed game.** Ranks, seeds and tiebreakers depend on the whole table, and head-to-head on games between level teams, so the whole season is recalculated; a season is small.
+- **Deleting the season's rows and writing them again.** Simpler, but every row would get a new id on every result, which the page cache and any later reference to a row would feel. Writing over in place keeps ids.
+- **Locking the season row (`select … for update`).** It works as well, but needs the app to be allowed to update seasons for a lock that has nothing to do with the season's own fields; an advisory lock says what it is for.
+- **Passing hidden teams to the totals calculation (the note from step 2.8).** The stored row would then be right for one kind of viewer only and wrong for the team's own staff and the league's admins, who may see everything.
+- **A handler signature with its own store list, separate from commands.** It would need a second way of wiring stores in every app; widening the command's transaction type is one line and keeps one way.
+
+## Revisit if
+
+A season grows so large that recalculating it on every result is slow (thousands of games), a reader needs a team's share of a player's totals often enough that working it out from box score lines is slow, coin flips get a place to be stored, or a handler appears that must not run in the command's transaction (it would record a job instead, T-24).

@@ -12,11 +12,13 @@ import { randomUUID } from 'node:crypto';
 import {
   findGame,
   insertGameCorrection,
+  listDecidedGameLines,
+  listDecidedGames,
   listPostponedGames,
   updateGameResult,
 } from '../queries/index.ts';
 import type { LeagueScope } from '../db/transaction-scope.ts';
-import { harnessTx, registerCommandCase, runInScope } from './command-cases.test-helper.ts';
+import { harnessTx, registerCommandCase, runAsApp } from './command-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
@@ -45,6 +47,19 @@ registerIsolationCase({
     await postponeTargetGame(scope, target);
     return listPostponedGames(scope);
   },
+});
+
+// A season's results, as the games module gives them to standings (step 2.24).
+registerIsolationCase({
+  subject: listDecidedGames,
+  name: "list the target's season's decided games",
+  run: (scope, target) => listDecidedGames(scope, target.seasonId),
+});
+
+registerIsolationCase({
+  subject: listDecidedGameLines,
+  name: "list the lines of the target's season's decided games",
+  run: (scope, target) => listDecidedGameLines(scope, target.seasonId),
 });
 
 registerIsolationCase({
@@ -108,6 +123,6 @@ registerIsolationCase({
   name: "list the scope's postponed games after postponing the target's",
   run: async (scope, target) => {
     await postponeTargetGame(scope, target);
-    return runInScope(listPostponedGamesCommand, harnessTx, scope, {});
+    return runAsApp(listPostponedGamesCommand, harnessTx, scope, {});
   },
 });

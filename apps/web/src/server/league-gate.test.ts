@@ -13,10 +13,13 @@ import {
 } from './league-gate.ts';
 import { standInPeople, standInPorts } from './stand-in-ports.ts';
 
+const signInOptions = { emailFrom: 'hello@example.test' };
+
 const ports = standInPorts({
   appEnv: 'test',
   publicBaseUrl: 'http://localhost:3000',
   log: () => {},
+  ...signInOptions,
 });
 const deps = { ...ports, siteOrigin: 'http://localhost:3000' };
 
@@ -236,7 +239,12 @@ describe('everything else', () => {
   it('refuses to make the stand-in for staging or production', () => {
     for (const appEnv of ['staging', 'production']) {
       expect(() =>
-        standInPorts({ appEnv, publicBaseUrl: 'http://localhost:3000', log: () => {} }),
+        standInPorts({
+          appEnv,
+          publicBaseUrl: 'http://localhost:3000',
+          log: () => {},
+          ...signInOptions,
+        }),
       ).toThrow(/local work and tests only/);
     }
   });
@@ -249,9 +257,9 @@ describe('everything else', () => {
       'http://10.0.0.5:3000',
       'not an address',
     ]) {
-      expect(() => standInPorts({ appEnv: 'local', publicBaseUrl, log: () => {} })).toThrow(
-        /PUBLIC_BASE_URL/,
-      );
+      expect(() =>
+        standInPorts({ appEnv: 'local', publicBaseUrl, log: () => {}, ...signInOptions }),
+      ).toThrow(/PUBLIC_BASE_URL/);
     }
     for (const publicBaseUrl of [
       'http://localhost:3000',
@@ -260,7 +268,9 @@ describe('everything else', () => {
       'http://north.localhost:3000',
       'https://staging.example.test',
     ]) {
-      expect(() => standInPorts({ appEnv: 'test', publicBaseUrl, log: () => {} })).not.toThrow();
+      expect(() =>
+        standInPorts({ appEnv: 'test', publicBaseUrl, log: () => {}, ...signInOptions }),
+      ).not.toThrow();
     }
   });
 });

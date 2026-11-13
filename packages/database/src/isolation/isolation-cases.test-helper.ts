@@ -62,13 +62,14 @@ import {
   harnessTx,
   inFreshLeague,
   registerCommandCase,
-  runInScope,
+  runAsApp,
 } from './command-cases.test-helper.ts';
 import './divisions-venues-cases.test-helper.ts';
 import './games-cases.test-helper.ts';
 import './people-cases.test-helper.ts';
 import './public-reads-cases.test-helper.ts';
 import './seasons-cases.test-helper.ts';
+import './standings-cases.test-helper.ts';
 import './teams-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 
@@ -178,7 +179,7 @@ registerIsolationCase({
   subject: setSetting,
   name: "set a value at the target's program",
   run: (scope, target) =>
-    runInScope(setAtAnyLevel, harnessTx, scope, {
+    runAsApp(setAtAnyLevel, harnessTx, scope, {
       level: 'program',
       programId: target.programId,
       key: reminderHours.key,
@@ -191,7 +192,7 @@ registerIsolationCase({
   subject: setSetting,
   name: "set a value at the target's season",
   run: (scope, target) =>
-    runInScope(setAtAnyLevel, harnessTx, scope, {
+    runAsApp(setAtAnyLevel, harnessTx, scope, {
       level: 'season',
       seasonId: target.seasonId,
       key: reminderHours.key,
@@ -204,7 +205,7 @@ registerIsolationCase({
   subject: clearSetting,
   name: "clear the target's program value at version 1",
   run: (scope, target) =>
-    runInScope(clearAtAnyLevel, harnessTx, scope, {
+    runAsApp(clearAtAnyLevel, harnessTx, scope, {
       level: 'program',
       programId: target.programId,
       key: 'members.startPage',
@@ -235,7 +236,7 @@ registerIsolationCase({
   name: 'create a league owned by the run account, in a fresh league id',
   run: (scope) =>
     inFreshLeague(scope, (fresh) =>
-      runInScope(createLeague, harnessTx, fresh, newLeagueInput(scope.accountId)),
+      runAsApp(createLeague, harnessTx, fresh, newLeagueInput(scope.accountId)),
     ),
 });
 
