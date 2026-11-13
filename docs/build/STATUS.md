@@ -25,7 +25,6 @@ Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014
 - **1.17 Web app shell** — `.local/lanes/1.17-web-shell` — record 020 / T-232 — builder starting.
 - **2.14 Defined settings** — `.local/lanes/2.14-defined-settings` — none — builder starting.
 - **2.16 Divisions, venues and courts commands** — `.local/lanes/2.16-divisions-venues-commands` — none — builder starting.
-- **2.12 Tracker offline queue** — `.local/lanes/2.12-offline-queue` — none — builder starting.
 - **2.2 People, teams and rosters tables** — `.local/lanes/2.2-people-teams-tables` — migration 0008, record 022 / T-234 — builder starting.
 
 ## Needs the founder
@@ -48,6 +47,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 2.12 done: tracker offline queue in apps/web/src/features/tracker (IndexedDB + in-memory storage, queue with backoff, fetch transport, banner); record 024 / T-236; fake-indexeddb 6.2.7 added as a test-only pinned dev dependency (T-191). Rules: only game-rule refusals mark a tap refused; request-level refusals halt with taps waiting; a 400/413/422 batch is split to isolate the bad tap. Not wired to the page (step 2.34): online event, navigator.storage.persist(), two tabs on one device. `npm ci` needed after landing.
 - 2026-11-13 — Step 1.19 part 2 done (so step 1.19 is complete): the worker sends the invitation email (apps/worker/src/jobs/invitation-email-job.ts, packages/emails template, accept address /{league}/invitation/{token}); record 023 / T-235. Commit-before-send, per-link idempotency key, settings checked before anything opens. Open (recorded in 023): the worker's config.ts, handlers passed to queue.start, delivery row/suppression list/reply-to, PGlite end-to-end test (needs 1.21 seed), React templates deferred. For 1.14/1.17: the accept page must send Referrer-Policy no-referrer and Cache-Control no-store and keep the path out of logs; 'invitation' is a reserved site name.
 - 2026-11-13 — Step 2.13 done: stage 2 permissions in roles.ts (season.settings, divisions.manage, people.import, schedule.import, venues.manage, games.results, bin.restore); every command names its permission in defineCommand; commands.test.ts and the role matrix fail one that names none or the wrong one; allows() fails closed on unknown names; seasons are checked at the program's scope. Open: commands name no scope yet (scope lives in matrix rows); bin restore is admin-only pending the founder (record 014); scorekeepers with 'score any game' can finalize by typing a score (note for 2.27).
 - 2026-11-13 — Step 2.1 done: migration 0007 (divisions with a loop check, venues, courts, setting_values); record 019 / T-231 (setting values live in one table, no row = not set). Reviewer's findings fixed. Open for 2.16 and the nightly purge: bin interactions (live child under a binned parent, no cascade, restore hitting name uniqueness). Loop trigger assumes READ COMMITTED (refuses under repeatable read).
