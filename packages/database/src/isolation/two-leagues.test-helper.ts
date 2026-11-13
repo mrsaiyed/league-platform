@@ -5,7 +5,8 @@
 // harness can spot a leak of it even in a result that carries no id.
 //
 // One more account holds a role in both leagues, with its own profile and a
-// child's. Its texts carry neither marker: it is not either league's to hide.
+// child's. Its texts carry neither marker: it is not either league's to hide. The
+// child is a person in both leagues, and each league's record of them is its own.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { createDatabase } from '../db/create-database.ts';
@@ -47,6 +48,10 @@ export type LeagueRecords = MadeLeague & {
   /** A venue and its court. */
   venueId: string;
   courtId: string;
+  /** A team of the season in the division, with one person on its roster. */
+  teamId: string;
+  personId: string;
+  rosterEntryId: string;
 };
 
 export type TwoLeagues = {
@@ -84,7 +89,12 @@ async function profile(db: Sql, accountId: string, first: string, last: string, 
   return profileId;
 }
 
-async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) {
+async function seededLeague(
+  pglite: PGlite,
+  m: string,
+  sharedAccountId: string,
+  sharedChildProfileId: string,
+) {
   const owner = await person(pglite, `${unique(m)}-owner@example.test`, m, 'Owner');
   const ownerId = owner.accountId;
   const slug = unique(m);
@@ -202,6 +212,54 @@ async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) 
       [leagueId, level, programPlace, seasonPlace, JSON.stringify({ version: 1, value: m })],
     );
   }
+  // A team in the division with a player on its roster, the member as its coach and
+  // an invitation to captain it. The shared account's child is a person in both
+  // leagues, each league's own record of them (R-3).
+  const teamId = await id(
+    pglite,
+    `insert into teams (league_id, season_id, division_id, slug, name, color, stats_visibility)
+     values ($1, $2, $3, $4, $5, '#1a2b3c', 'staff')`,
+    [leagueId, seasonId, divisionId, unique(`${m}-team`), `Team ${m}`],
+  );
+  const personId = await id(
+    pglite,
+    `insert into people (league_id, first_name, last_name, public_name, contact_email, birth_date, is_minor)
+     values ($1, $2, 'Player', $3, $4, '2011-04-05', true)`,
+    [leagueId, m, `Number ${m}`, `${unique(m)}-parent@example.test`],
+  );
+  const rosterEntryId = await id(
+    pglite,
+    `insert into roster_entries (league_id, team_id, person_id, jersey_number, role, joined_on)
+     values ($1, $2, $3, '23', 'captain', '2026-11-01')`,
+    [leagueId, teamId, personId],
+  );
+  const childPersonId = await id(
+    pglite,
+    `insert into people (league_id, profile_id, first_name, last_name) values ($1, $2, $3, 'Child')`,
+    [leagueId, sharedChildProfileId, m],
+  );
+  await pglite.query(
+    `insert into roster_entries (league_id, team_id, person_id, jersey_number, left_on)
+     values ($1, $2, $3, '23', '2026-11-30')`,
+    [leagueId, teamId, childPersonId],
+  );
+  await pglite.query(
+    `insert into role_grants (league_id, account_id, role, scope_type, scope_id, granted_by_account_id)
+     values ($1, $2, 'coach', 'team', $3, $4)`,
+    [leagueId, member.accountId, teamId, ownerId],
+  );
+  await pglite.query(
+    `insert into invitations
+       (league_id, email, role, scope_type, scope_id, token_hash, invited_by_account_id, expires_at)
+     values ($1, $2, 'captain', 'team', $3, $4, $5, now() + interval '7 days')`,
+    [
+      leagueId,
+      `${unique(m)}-captain@example.test`,
+      teamId,
+      createHash('sha256').update(randomBytes(32)).digest('hex'),
+      ownerId,
+    ],
+  );
   // A job a worker holds. It carries ids only (T-131), so no marker: its ids are the league's.
   const jobLeaseToken = randomUUID();
   const jobId = await id(
@@ -232,6 +290,9 @@ async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) 
     divisionId,
     venueId,
     courtId,
+    teamId,
+    personId,
+    rosterEntryId,
   };
 }
 
@@ -239,9 +300,9 @@ async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) 
 export async function openTwoLeagues(): Promise<TwoLeagues> {
   const pglite = await freshSchema();
   const shared = await person(pglite, `${unique('both')}@example.test`, 'Shared', 'Person');
-  await profile(pglite, shared.accountId, 'Shared', 'Child', 'guardian');
-  const a = await seededLeague(pglite, 'alpha', shared.accountId);
-  const b = await seededLeague(pglite, 'bravo', shared.accountId);
+  const childProfileId = await profile(pglite, shared.accountId, 'Shared', 'Child', 'guardian');
+  const a = await seededLeague(pglite, 'alpha', shared.accountId, childProfileId);
+  const b = await seededLeague(pglite, 'bravo', shared.accountId, childProfileId);
   const db = createDatabase({ kind: 'pglite', pglite });
   return {
     pglite,

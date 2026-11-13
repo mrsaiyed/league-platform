@@ -6,6 +6,8 @@ import {
   newAccount,
   newLeague,
   newProgram,
+  newSeason,
+  newTeam,
   one,
   refused,
 } from './schema.test-helper.ts';
@@ -17,6 +19,10 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.close();
 });
+
+/** A team in a new season of the league's default program. */
+const teamOf = async ({ leagueId, defaultProgramId }: Awaited<ReturnType<typeof newLeague>>) =>
+  newTeam(db, leagueId, await newSeason(db, leagueId, defaultProgramId));
 
 const grant = (
   leagueId: string,
@@ -97,15 +103,32 @@ describe('role_grants', () => {
     });
   });
 
-  it('refuse club and team scopes until those tables exist', async () => {
+  it('refuse club scopes until the clubs table exists', async () => {
     const { leagueId } = await newLeague(db);
     const somewhere = '00000000-0000-7000-8000-000000000000';
     await expect(
       grant(leagueId, await newAccount(db), 'club_admin', 'club', somewhere),
     ).rejects.toMatchObject({ ...refused.check, constraint: 'role_grants_scope_available' });
+  });
+
+  it("make a coach or captain for one of the league's teams, never another league's (T-40)", async () => {
+    const a = await newLeague(db);
+    const b = await newLeague(db);
+    const ours = await teamOf(a);
+    await grant(a.leagueId, await newAccount(db), 'coach', 'team', ours);
+    await grant(a.leagueId, await newAccount(db), 'captain', 'team', ours);
+    for (const team of [await teamOf(b), '00000000-0000-7000-8000-000000000000']) {
+      await expect(
+        grant(a.leagueId, await newAccount(db), 'coach', 'team', team),
+      ).rejects.toMatchObject({ ...refused.foreignKey, constraint: 'role_grants_scope_team' });
+    }
+    // A team is not a program, and a program is not a team.
     await expect(
-      grant(leagueId, await newAccount(db), 'coach', 'team', somewhere),
-    ).rejects.toMatchObject({ ...refused.check, constraint: 'role_grants_scope_available' });
+      grant(a.leagueId, await newAccount(db), 'scheduler', 'program', ours),
+    ).rejects.toMatchObject({ ...refused.foreignKey, constraint: 'role_grants_scope_program' });
+    await expect(
+      grant(a.leagueId, await newAccount(db), 'coach', 'team', a.defaultProgramId),
+    ).rejects.toMatchObject({ ...refused.foreignKey, constraint: 'role_grants_scope_team' });
   });
 
   it('hold one active grant of a role at a scope; a revoked one can be granted again', async () => {
@@ -168,6 +191,22 @@ describe('invitations', () => {
     await expect(
       invite(a.leagueId, { scopeType: 'program', scopeId: b.defaultProgramId }),
     ).rejects.toMatchObject({ ...refused.foreignKey, constraint: 'invitations_scope_program' });
+  });
+
+  it("invite a coach or captain to one of the league's teams only (T-40)", async () => {
+    const a = await newLeague(db);
+    const b = await newLeague(db);
+    await invite(a.leagueId, { role: 'coach', scopeType: 'team', scopeId: await teamOf(a) });
+    await expect(
+      invite(a.leagueId, { role: 'captain', scopeType: 'team', scopeId: await teamOf(b) }),
+    ).rejects.toMatchObject({ ...refused.foreignKey, constraint: 'invitations_scope_team' });
+    await expect(
+      invite(a.leagueId, {
+        role: 'club_admin',
+        scopeType: 'club',
+        scopeId: '00000000-0000-7000-8000-000000000000',
+      }),
+    ).rejects.toMatchObject({ ...refused.check, constraint: 'invitations_scope_available' });
   });
 
   it('are accepted by an account, or cancelled, not both', async () => {

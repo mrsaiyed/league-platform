@@ -26,8 +26,10 @@ export const roleScopeTypes: Readonly<Record<Role, readonly ScopeType[]>> = {
 };
 
 /**
- * The scopes a grant can point at today. Clubs and teams have no tables yet, so the
- * database refuses those scopes (0004, *_scope_available) until they do.
+ * The scopes a grant can point at today. Clubs have no table yet, so the database
+ * refuses that scope (*_scope_available). Teams have one (0008), and the database
+ * checks a team scope names a team of the league, but the access commands offer it
+ * only once they can check that the team exists (record 022).
  */
 export const availableScopeTypes: readonly ScopeType[] = ['league', 'program'];
 
