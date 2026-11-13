@@ -24,6 +24,9 @@ Reserved so far: migration 0006 and decision record 012 / T-224 to 1.19 part 1; 
 - **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — whole step.
 - **1.13 Sign-in interface and stand-in** — `.local/lanes/1.13-signin-interface` — record 013 / T-225 — whole step.
 - **1.19 part 1** — `.local/lanes/1.19p1-queue-email` — migration 0006, record 012 / T-224 — queue and email interfaces, stand-ins, adapters, jobs table.
+- **2.5 Season rules document** — `.local/lanes/2.5-season-rules` — none — whole step.
+- **2.7 Standings and tiebreakers** — `.local/lanes/2.7-standings` — none — whole step.
+- **2.8 Statistics totals and leaders** — `.local/lanes/2.8-stats` — none — whole step.
 
 ## Needs the founder
 
