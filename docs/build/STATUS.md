@@ -9,7 +9,7 @@ The one file that says where the build is. Every run reads it first and updates 
 - **Branch:** `build/stage-1`
 - **Gate:** `npm run verify`
 - **Next step:** 1.26 Catch up with main, and at the same time every other step that can be opened ("Side by side" in the stage plan).
-- **Lanes:** up to 5 at once (runbook, section 3). Lower the number if this computer struggles with that many.
+- **Lanes:** up to 6 at once (runbook, section 3). The founder confirmed on 2026-11-12 that many builders at once is what they want. Lower the number if this computer struggles with that many.
 - **Merging to `main`:** not by a run, ever. The founder left this to the lead (2026-11-12). The lead's rule: a finished, checked stage is moved onto `main` by the lead in a session where someone is watching, when GitHub's checks are green on that exact commit and no Al-Hadi game is under way, because every push to `main` republishes the live tracker site. Nothing needs `main` before then: the build branch is on GitHub and checked there.
 - **Pushing to GitHub:** allowed, for the build branch only (`git push origin build/stage-1`). The founder said yes on 2026-11-12 and confirmed that the repository being public is fine. Never push or merge to `main`: every push to `main` republishes the live Al-Hadi tracker site at `mrsaiyed.github.io/league-platform/`, which is in use for real games.
 
