@@ -18,6 +18,7 @@ import {
   type GamesTx,
   type Job,
 } from '@srleagues/core';
+import { defaultSeasonRules } from '@srleagues/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
@@ -133,6 +134,45 @@ describe('the games commands on the database', () => {
       error: { code: 'tie-not-allowed' },
     });
     expect((await rowOf(g.gameId)).status).toBe('scheduled');
+  });
+
+  it('records a tie when the season allows ties (no winner), then reopens and decides again', async () => {
+    const g = await leagueWithGame();
+    const rules = { ...defaultSeasonRules(), allowTies: true };
+    await pglite.query('update seasons set rules = $1::jsonb where id = $2', [
+      JSON.stringify(rules),
+      g.seasonId,
+    ]);
+    expect(
+      await recordFinalScore(
+        g.ctx,
+        { gameId: g.gameId, version: 1, homeScore: 50, awayScore: 50 },
+        deps,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(await rowOf(g.gameId)).toMatchObject({
+      status: 'final',
+      home_score: 50,
+      winner_team_id: null,
+    });
+    expect(
+      await reopenGame(g.ctx, { gameId: g.gameId, version: 2, reason: 'It was not a tie' }, deps),
+    ).toMatchObject({ ok: true });
+    expect(await rowOf(g.gameId)).toMatchObject({ status: 'scheduled', home_score: null });
+    expect(
+      await recordFinalScore(
+        g.ctx,
+        { gameId: g.gameId, version: 3, homeScore: 52, awayScore: 50 },
+        deps,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(await rowOf(g.gameId)).toMatchObject({ status: 'final', winner_team_id: g.home });
+    const corrections = await one<{ n: string }>(
+      pglite,
+      'select count(*)::text as n from game_corrections where game_id = $1',
+      [g.gameId],
+    );
+    expect(corrections.n).toBe('1');
   });
 
   it('records a forfeit at the season forfeit score', async () => {

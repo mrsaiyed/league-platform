@@ -7,7 +7,7 @@ import { decideGame, openGame, type DecideGameError } from '../decide-game.ts';
 import { gameVersion } from '../game-fields.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
-import { seasonRulesOf } from '../season-rules-of.ts';
+import { effectiveRulesOf } from '../season-rules-of.ts';
 
 export type RecordForfeitError = DecideGameError;
 
@@ -35,7 +35,7 @@ export const recordForfeit = defineCommand({
     if (!homeForfeits && input.forfeitingTeamId !== game.awayTeamId) {
       return fail({ code: 'team-not-in-game' });
     }
-    const { forfeit } = await seasonRulesOf(tx, game.seasonId);
+    const { forfeit } = await effectiveRulesOf(tx, game);
     return decideGame({
       context,
       tx,

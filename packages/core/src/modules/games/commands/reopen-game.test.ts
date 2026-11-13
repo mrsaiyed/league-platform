@@ -37,13 +37,17 @@ describe('reopenGame', () => {
     expect(db.state.activity.map((a) => a.action)).toEqual(['games.reopen_game']);
   });
 
-  it('hands a tracked game back live with its score, and a forfeit back unscored', async () => {
+  it('sends every game back to scheduled with no score, tracked live or not, and a forfeit too', async () => {
     const { db, deps, as } = memoryGames({
       games: [finalGame(1, { captureMode: 'live' }), finalGame(2, { status: 'forfeit' })],
     });
     await reopenGame(as(ownerId), input, deps);
     await reopenGame(as(ownerId), { ...input, gameId: gameUuid(2) }, deps);
-    expect(db.state.games[0]).toMatchObject({ status: 'live', homeScore: 52, awayScore: 48 });
+    expect(db.state.games[0]).toMatchObject({
+      status: 'scheduled',
+      homeScore: null,
+      awayScore: null,
+    });
     expect(db.state.games[1]).toMatchObject({ status: 'scheduled', homeScore: null });
   });
 
@@ -67,6 +71,14 @@ describe('reopenGame', () => {
     expect(await code({})).toBe('game-not-decided');
     expect(await code({ gameId: gameUuid(2) })).toBe('changed-since-read');
     expect(await code({ gameId: gameUuid(6) })).toBe('game-not-found');
+  });
+
+  it('refuses a call with no account as not allowed', async () => {
+    const { db, deps, as } = memoryGames({ games: [finalGame(1)] });
+    expect(await reopenGame(as(null), input, deps)).toMatchObject({
+      error: { code: 'not-allowed' },
+    });
+    expect(db.state.corrections).toEqual([]);
   });
 
   it('needs games.correct: a scheduler may, a scorekeeper may not', async () => {

@@ -34,6 +34,26 @@ describe('recordForfeit', () => {
     expect(away.db.state.games[0]).toMatchObject({ homeScore: 20, awayScore: 0 });
   });
 
+  it("uses the game's own forfeit score, not the season's", async () => {
+    const own = rules(
+      (r) => (r.forfeit = { winnerScore: 11, loserScore: 1, countsInPointDifference: false }),
+    );
+    const { db, deps, as } = memoryGames({
+      games: [game(1, { format: own })],
+      seasons: [
+        {
+          id: seasonId,
+          programId: 'p1',
+          rules: rules(
+            (r) => (r.forfeit = { winnerScore: 30, loserScore: 5, countsInPointDifference: true }),
+          ),
+        },
+      ],
+    });
+    await recordForfeit(as(ownerId), input, deps);
+    expect(db.state.games[0]).toMatchObject({ homeScore: 1, awayScore: 11 });
+  });
+
   it('refuses a team that is not in the game, and a game that cannot be decided', async () => {
     const { deps, as } = memoryGames({ games: [game(1), game(2, { status: 'cancelled' })] });
     const code = async (extra: object) => {

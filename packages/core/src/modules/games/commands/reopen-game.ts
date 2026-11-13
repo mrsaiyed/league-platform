@@ -2,9 +2,8 @@
 // it can be fixed and decided again. It needs `games.correct` and a reason, and writes
 // a game_corrections row in the same transaction (S-7): the database refuses to change
 // a decided game's result without one. The row holds the result before and after as
-// numbers only (T-220). A game tracked live goes back to live, keeping its score for
-// the tracker to fix; any other goes back to scheduled with no score, to be entered
-// again. Announces `games.reopened` (T-24), so standings can follow.
+// numbers only (T-220). Every game goes back to scheduled with no score, to be
+// entered or tracked again; step 2.30 can revisit this for tracked games. Announces `games.reopened` (T-24), so standings can follow.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -14,7 +13,7 @@ import { gameScope, mayChangeGames } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
 
 export type ReopenGameError = {
-  readonly code: 'game-not-found' | 'changed-since-read' | 'game-not-decided';
+  readonly code: 'game-not-found' | 'changed-since-read' | 'game-not-decided' | 'not-allowed';
 };
 
 export const reopenGame = defineCommand({
@@ -32,15 +31,13 @@ export const reopenGame = defineCommand({
     const game = await tx.games.find(input.gameId);
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
     if (game.version !== input.version) return fail({ code: 'changed-since-read' });
-    if (!isDecided(game.status) || context.accountId === null) {
-      return fail({ code: 'game-not-decided' });
-    }
-    const backToLive = game.status === 'final' && game.captureMode === 'live';
-    const after = {
-      status: backToLive ? 'live' : 'scheduled',
-      homeScore: backToLive ? game.homeScore : null,
-      awayScore: backToLive ? game.awayScore : null,
-    };
+    // A correction names who made it; with no account there is no one to name.
+    if (context.accountId === null) return fail({ code: 'not-allowed' });
+    if (!isDecided(game.status)) return fail({ code: 'game-not-decided' });
+    // Always back to scheduled with the scores cleared: the result before is kept in the
+    // correction. No tracker state exists yet to hand a live game back to with its
+    // score (step 2.30 can revisit this for tracked games).
+    const after = { status: 'scheduled', homeScore: null, awayScore: null };
     await tx.games.addCorrection({
       gameId: game.id,
       accountId: context.accountId,

@@ -9,7 +9,7 @@ import { decideGame, openGame, type DecideGameError } from '../decide-game.ts';
 import { gameScore, gameVersion } from '../game-fields.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
-import { seasonRulesOf } from '../season-rules-of.ts';
+import { effectiveRulesOf } from '../season-rules-of.ts';
 
 export type RecordFinalScoreError = DecideGameError;
 
@@ -34,7 +34,7 @@ export const recordFinalScore = defineCommand({
     if (!open.ok) return open;
     const game = open.value;
     if (input.homeScore === input.awayScore) {
-      const rules = await seasonRulesOf(tx, game.seasonId);
+      const rules = await effectiveRulesOf(tx, game);
       if (!rules.allowTies) return fail({ code: 'tie-not-allowed' });
     }
     return decideGame({

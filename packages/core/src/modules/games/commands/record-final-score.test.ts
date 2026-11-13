@@ -58,6 +58,25 @@ describe('recordFinalScore', () => {
     expect(await recordFinalScore(loose.as(ownerId), tie, loose.deps)).toMatchObject({ ok: true });
   });
 
+  it("judges a tie by the game's own rules, not the season's", async () => {
+    const tie = { ...input, homeScore: 40, awayScore: 40 };
+    // The season allows ties; the game's own rules do not.
+    const strictGame = memoryGames({
+      games: [game(1, { format: rules((r) => (r.allowTies = false)) })],
+      seasons: [{ id: seasonId, programId: 'p1', rules: rules((r) => (r.allowTies = true)) }],
+    });
+    expect(await recordFinalScore(strictGame.as(ownerId), tie, strictGame.deps)).toMatchObject({
+      error: { code: 'tie-not-allowed' },
+    });
+    // The season forbids ties; the game's own rules allow them.
+    const looseGame = memoryGames({
+      games: [game(1, { format: rules((r) => (r.allowTies = true)) })],
+    });
+    expect(await recordFinalScore(looseGame.as(ownerId), tie, looseGame.deps)).toMatchObject({
+      ok: true,
+    });
+  });
+
   it('refuses a missing, binned, moved-on, decided or cancelled game, and bad scores', async () => {
     const { deps, as } = memoryGames({
       games: [
