@@ -53,6 +53,10 @@ const reachNoLeagueData = new Map<unknown, string>([
   [venueSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [courtSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [teamSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [
+    databasePackage.seedLeaguesInto,
+    'development-only bootstrap: takes a PGlite, not a scope; runs the scoped commands (own cases) per league and writes accounts and role grants directly',
+  ],
   [rosterEntrySummary, 'turns a row already read into the returned shape; runs no SQL'],
   [databasePackage.teamsStore, 'binds the team queries, each with its own cases, to a scope'],
   [
