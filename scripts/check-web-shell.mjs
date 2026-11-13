@@ -3,7 +3,8 @@
 // this computer with made-up settings on the made-up stand-in (APP_ENV=test), asks
 // for addresses as different made-up people, and checks the status and the words of
 // each answer: "you do not have access" for admin addresses without access (U-6),
-// unpublished leagues only for the people who run them (U-9), forwarding (U-7).
+// unpublished leagues only for their owner and admins (U-9), forwarding (U-7), and
+// the security headers on every answer.
 // Then it starts the app as staging with a database address that answers nobody,
 // and checks that it refuses to start (T-60). Nothing leaves this computer.
 import { spawn } from 'node:child_process';
@@ -62,9 +63,11 @@ const cases = [
   ['coach', '/quiet-pines', 404, [notFound]],
   ['stranger', '/quiet-pines/admin', 404, [notFound], [noAccess]],
   ['owner', '/quiet-pines', 200, ['This league is not published.']],
-  ['scheduler', '/quiet-pines/admin', 200, ['Admin areas']],
+  ['scheduler', '/quiet-pines/admin', 404, [notFound], ['Admin areas']],
+  ['owner', '/quiet-pines/admin', 200, ['Admin areas']],
   ['visitor', '/closed-gate', 404, [notFound]],
   ['owner', '/closed-gate/admin', 200, ['This league has been taken down.']],
+  ['scheduler', '/closed-gate', 404, [notFound]],
   ['visitor', '/old-meadow/standings', 200, ['This league is archived.']],
   ['visitor', '/nobody-has-this', 404, [notFound]],
   ['visitor', '/binned-league', 404, [notFound]],
@@ -72,7 +75,24 @@ const cases = [
   ['visitor', '/North-Valley', 308, [], [], '/north-valley'],
   ['visitor', '/Account', 308, [], [], '/account'],
   ['visitor', '/quiet-pine/admin', 404, [notFound]],
-  ['scheduler', '/quiet-pine/admin', 308, [], [], '/quiet-pines/admin'],
+  ['scheduler', '/quiet-pine/admin', 404, [notFound]],
+  ['owner', '/quiet-pine/admin', 308, [], [], '/quiet-pines/admin'],
+];
+
+// Sent with every answer, refusals and forwards included (apps/web/next.config.ts).
+const securityHeaders = {
+  'x-frame-options': 'DENY',
+  'content-security-policy': "frame-ancestors 'none'",
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+};
+
+/** [who, address asked, address header the browser sends]: all must be "not found". */
+const spoofs = [
+  ['visitor', '/quiet-pines', '/north-valley'],
+  ['visitor', '/faviconxico', '/north-valley'],
+  ['owner', '/faviconxico/admin', '/north-valley/admin'],
+  ['owner', '/favicon-ico/admin/settings', '/quiet-pines/admin/settings'],
 ];
 
 const failures = [];
@@ -97,6 +117,12 @@ try {
     for (const words of must) if (!text.includes(words)) failures.push(`${label}: no "${words}"`);
     for (const words of mustNot)
       if (text.includes(words)) failures.push(`${label}: has "${words}"`);
+    for (const [name, value] of Object.entries(securityHeaders)) {
+      if (response.headers.get(name) !== value) failures.push(`${label}: ${name} not "${value}"`);
+    }
+    if (!response.headers.get('permissions-policy')?.includes('camera=()')) {
+      failures.push(`${label}: no permissions-policy`);
+    }
     if (to !== undefined) {
       const location = response.headers.get('location') ?? '';
       if (new URL(location, origin).pathname + new URL(location, origin).search !== to) {
@@ -104,13 +130,25 @@ try {
       }
     }
   }
-  // The address the pages see is the one that arrived, whatever header the browser sends.
-  const spoofed = await fetch(`${origin}/quiet-pines`, {
-    headers: { 'x-srleagues-path': '/north-valley' },
+  // The address the pages see is the one that arrived, whatever header the browser
+  // sends: also at addresses that look like the icon, which the proxy skips.
+  for (const [who, address, header] of spoofs) {
+    const headers = { 'x-srleagues-path': header };
+    if (who !== 'visitor') headers.cookie = `srl_session=${tokens[who]}`;
+    const spoofed = await fetch(origin + address, { headers, redirect: 'manual' });
+    if (spoofed.status !== 404) {
+      failures.push(`${who} ${address}: a sent address header was believed (${spoofed.status})`);
+    }
+  }
+  // An invitation's address is never passed on to another site (record 023).
+  const invitation = await fetch(`${origin}/north-valley/invitation/made-up-token`, {
     redirect: 'manual',
   });
-  if (spoofed.status !== 404)
-    failures.push(`a sent address header was believed: ${spoofed.status}`);
+  if (invitation.headers.get('referrer-policy') !== 'no-referrer') {
+    failures.push(
+      `an invitation address sends referrer-policy "${invitation.headers.get('referrer-policy')}"`,
+    );
+  }
 } finally {
   server.child.kill();
 }
@@ -142,7 +180,9 @@ if (failures.length > 0) {
   console.error(`Web shell check failed:\n  ${failures.join('\n  ')}`);
   process.exit(1);
 }
-console.log(`Web shell check passed: ${cases.length + 2} checks against the built server.`);
+console.log(
+  `Web shell check passed: ${cases.length + spoofs.length + 3} checks against the built server.`,
+);
 
 function start(args, env) {
   let output = '';

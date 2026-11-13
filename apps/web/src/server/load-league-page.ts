@@ -11,12 +11,17 @@
 // not be shown, and the layout then draws only the page, whose own refusal replaces
 // it. A refusal thrown by a layout would make Next.js send a blank page that only
 // the browser's script fills in.
+//
+// Both are given the route's `[league]` value. When it is not the league of the
+// address the proxy wrote down, the proxy did not run for this request, and the
+// answer is "not found" (league-gate.ts, addressMatchesRoute).
 import type { AdminArea } from '@srleagues/core';
 import { forbidden, notFound, permanentRedirect } from 'next/navigation';
 import { cache } from 'react';
 import { getConfig } from './config.ts';
 import { webPorts } from './container.ts';
 import {
+  addressMatchesRoute,
   leaguePageOutcome,
   resolveLeagueRequest,
   type LeagueOutcome,
@@ -27,28 +32,36 @@ import {
 import { requestFacts } from './request-facts.ts';
 
 /** This request, worked out once however many layouts and pages ask (React cache). */
-const resolvedRequest = cache(async (): Promise<ResolvedLeagueRequest> => {
-  const ports = await webPorts();
-  return resolveLeagueRequest(await requestFacts(ports), {
-    ...ports,
-    siteOrigin: getConfig().PUBLIC_BASE_URL,
-  });
-});
+const resolvedRequest = cache(
+  async (): Promise<{ readonly path: string; readonly resolved: ResolvedLeagueRequest }> => {
+    const ports = await webPorts();
+    const facts = await requestFacts(ports);
+    const resolved = await resolveLeagueRequest(facts, {
+      ...ports,
+      siteOrigin: getConfig().PUBLIC_BASE_URL,
+    });
+    return { path: facts.path, resolved };
+  },
+);
 
 async function outcomeFor(
+  routeLeague: string,
   page: LeagueWant['page'],
   area: AdminArea | null,
 ): Promise<LeagueOutcome> {
+  const { path, resolved } = await resolvedRequest();
+  if (!addressMatchesRoute(path, routeLeague)) return { kind: 'not-found' };
   const want: LeagueWant = page === 'admin' ? { page, area } : { page };
-  return leaguePageOutcome(await resolvedRequest(), want);
+  return leaguePageOutcome(resolved, want);
 }
 
-/** For a page: the view, or Next.js's refusal. */
+/** For a page: the view, or Next.js's refusal. `routeLeague` is the route's `[league]`. */
 export async function loadLeaguePage(
+  routeLeague: string,
   page: LeagueWant['page'],
   area: AdminArea | null = null,
 ): Promise<LeagueView> {
-  const outcome = await outcomeFor(page, area);
+  const outcome = await outcomeFor(routeLeague, page, area);
   switch (outcome.kind) {
     case 'show':
       return outcome.view;
@@ -63,9 +76,10 @@ export async function loadLeaguePage(
 
 /** For a layout: the view when the page may be shown, else null (the page refuses). */
 export async function leagueView(
+  routeLeague: string,
   page: LeagueWant['page'],
   area: AdminArea | null = null,
 ): Promise<LeagueView | null> {
-  const outcome = await outcomeFor(page, area);
+  const outcome = await outcomeFor(routeLeague, page, area);
   return outcome.kind === 'show' ? outcome.view : null;
 }

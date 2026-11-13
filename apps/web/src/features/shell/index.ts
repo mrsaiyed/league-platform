@@ -5,3 +5,6 @@ export { AdminNav } from './admin-nav.tsx';
 export { LeagueNotice } from './league-notice.tsx';
 export { LeagueSitePage } from './league-site-page.tsx';
 export { NotBuilt } from './not-built.tsx';
+
+/** What Next.js gives every page and layout under `[league]`. */
+export type LeagueRouteProps = { readonly params: Promise<{ readonly league: string }> };

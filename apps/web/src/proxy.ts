@@ -12,6 +12,10 @@ export function proxy(request: NextRequest): NextResponse {
   return NextResponse.next({ request: { headers } });
 }
 
+// Every address but Next.js's own files and the icon, matched exactly: a looser
+// pattern (`favicon.ico` unanchored) also skipped addresses such as `/faviconXico`,
+// whose pages would then see whatever header the browser sent. The pages check too
+// (league-gate.ts, addressMatchesRoute).
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static/|_next/image|favicon\\.ico$).*)'],
 };

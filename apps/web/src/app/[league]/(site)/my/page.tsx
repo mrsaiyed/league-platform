@@ -1,5 +1,6 @@
-import { LeagueSitePage } from '../../../../features/shell/index.ts';
+import { LeagueSitePage, type LeagueRouteProps } from '../../../../features/shell/index.ts';
 
-export default function Page() {
-  return <LeagueSitePage title="nav.my" />;
+export default async function Page({ params }: LeagueRouteProps) {
+  const { league } = await params;
+  return <LeagueSitePage league={league} title="nav.my" />;
 }

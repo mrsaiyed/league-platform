@@ -4,6 +4,7 @@
 // context and the access module's own query.
 import { describe, expect, it } from 'vitest';
 import {
+  addressMatchesRoute,
   leagueOutcome,
   leaguePageOutcome,
   resolveLeagueRequest,
@@ -12,7 +13,11 @@ import {
 } from './league-gate.ts';
 import { standInPeople, standInPorts } from './stand-in-ports.ts';
 
-const ports = standInPorts({ appEnv: 'test', log: () => {} });
+const ports = standInPorts({
+  appEnv: 'test',
+  publicBaseUrl: 'http://localhost:3000',
+  log: () => {},
+});
 const deps = { ...ports, siteOrigin: 'http://localhost:3000' };
 
 type Who = keyof typeof standInPeople | 'visitor';
@@ -98,15 +103,18 @@ describe('a draft league (U-9)', () => {
     }
   });
 
-  it('is there for the people who run it', async () => {
+  it('is there for its owner and admins only, not for other staff (U-9 read literally)', async () => {
     expect(kind(await ask('owner', '/quiet-pines', site))).toBe('show');
-    expect(kind(await ask('scheduler', '/quiet-pines/admin', adminHome))).toBe('show');
+    expect(kind(await ask('owner', '/quiet-pines/admin', adminHome))).toBe('show');
+    expect(kind(await ask('scheduler', '/quiet-pines/admin', adminHome))).toBe('not-found');
+    expect(kind(await ask('scheduler', '/quiet-pines', site))).toBe('not-found');
   });
 
   it('forwards a former short name only for those who may see it', async () => {
     expect(await ask('visitor', '/quiet-pine/admin', adminHome)).toEqual({ kind: 'not-found' });
     expect(await ask('coach', '/quiet-pine', site)).toEqual({ kind: 'not-found' });
-    expect(await ask('scheduler', '/quiet-pine/admin', adminHome)).toEqual({
+    expect(await ask('scheduler', '/quiet-pine/admin', adminHome)).toEqual({ kind: 'not-found' });
+    expect(await ask('owner', '/quiet-pine/admin', adminHome)).toEqual({
       kind: 'forward',
       to: '/quiet-pines/admin',
     });
@@ -123,6 +131,7 @@ describe('suspended and archived leagues (U-9)', () => {
   it('shows a suspended league only to those who run it', async () => {
     expect(kind(await ask('visitor', '/closed-gate', site))).toBe('not-found');
     expect(kind(await ask('stranger', '/closed-gate/admin', adminHome))).toBe('not-found');
+    expect(kind(await ask('scheduler', '/closed-gate', site))).toBe('not-found');
     expect(kind(await ask('owner', '/closed-gate/admin', adminHome))).toBe('show');
   });
 
@@ -153,6 +162,54 @@ describe('one request', () => {
     expect(kind(leaguePageOutcome(resolved, area('teams')))).toBe('no-access');
     expect(reads).toBe(1);
   });
+
+  it('uses one request id for everything, a forward included', async () => {
+    let made = 0;
+    const seen: string[] = [];
+    const counting = {
+      ...deps,
+      newRequestId: () => `request-${(made += 1)}`,
+      accessOf: (context: Parameters<typeof deps.accessOf>[0]) => {
+        seen.push(context.requestId);
+        return deps.accessOf(context);
+      },
+    };
+    const session = await ports.identify(standInPeople.owner.token);
+    const forwarded = await resolveLeagueRequest(
+      { host: 'localhost:3000', path: '/quiet-pine/admin', session },
+      counting,
+    );
+    expect(forwarded).toEqual({
+      kind: 'settled',
+      outcome: { kind: 'forward', to: '/quiet-pines/admin' },
+    });
+    expect(made).toBe(1);
+    expect(seen).toEqual(['request-1']);
+
+    const shown = await resolveLeagueRequest(
+      { host: 'localhost:3000', path: '/north-valley', session },
+      counting,
+    );
+    expect(shown.kind === 'league' && shown.context.requestId).toBe('request-2');
+    expect(seen).toEqual(['request-1', 'request-2']);
+  });
+});
+
+describe('addressMatchesRoute (the proxy ran)', () => {
+  it("accepts the route's own league, in any capitals or spelling that forwards", () => {
+    expect(addressMatchesRoute('/north-valley/admin', 'north-valley')).toBe(true);
+    expect(addressMatchesRoute('/North-Valley?x=1', 'North-Valley')).toBe(true);
+    expect(addressMatchesRoute('/north%2Dvalley', 'north-valley')).toBe(true);
+    expect(addressMatchesRoute('/north%2Dvalley', 'north%2Dvalley')).toBe(true);
+  });
+
+  it('refuses an address header for another page, or none', () => {
+    expect(addressMatchesRoute('/north-valley', 'quiet-pines')).toBe(false);
+    expect(addressMatchesRoute('/north-valley', 'faviconxico')).toBe(false);
+    expect(addressMatchesRoute('', 'north-valley')).toBe(false);
+    expect(addressMatchesRoute('/', 'north-valley')).toBe(false);
+    expect(addressMatchesRoute('/%E0%A4%A', 'north-valley')).toBe(false);
+  });
 });
 
 describe('everything else', () => {
@@ -178,7 +235,32 @@ describe('everything else', () => {
 
   it('refuses to make the stand-in for staging or production', () => {
     for (const appEnv of ['staging', 'production']) {
-      expect(() => standInPorts({ appEnv, log: () => {} })).toThrow(/local work and tests only/);
+      expect(() =>
+        standInPorts({ appEnv, publicBaseUrl: 'http://localhost:3000', log: () => {} }),
+      ).toThrow(/local work and tests only/);
+    }
+  });
+
+  it('refuses to make the stand-in for a site address that is not local or a test name', () => {
+    for (const publicBaseUrl of [
+      'https://leagues.example.com',
+      'https://localhost.example.com',
+      'https://staging.example.test.com',
+      'http://10.0.0.5:3000',
+      'not an address',
+    ]) {
+      expect(() => standInPorts({ appEnv: 'local', publicBaseUrl, log: () => {} })).toThrow(
+        /PUBLIC_BASE_URL/,
+      );
+    }
+    for (const publicBaseUrl of [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://[::1]:3000',
+      'http://north.localhost:3000',
+      'https://staging.example.test',
+    ]) {
+      expect(() => standInPorts({ appEnv: 'test', publicBaseUrl, log: () => {} })).not.toThrow();
     }
   });
 });

@@ -2,7 +2,10 @@
 //
 // Made-up leagues and people held in this process's memory (T-201), so the shell can
 // be opened and tested with no database and no sign-in service. container.ts uses it
-// only when APP_ENV is local or test, and it refuses to be made for any other.
+// only when APP_ENV is local or test, and it refuses to be made for any other, or
+// for a site address that is not this computer or a test name (PUBLIC_BASE_URL on
+// localhost, 127.0.0.1, [::1], *.localhost or *.test), so a wrong APP_ENV on a real
+// server still cannot hand out its made-up sign-ins.
 //
 // Being someone: until the sign-in screens exist (step 1.14), a person here is
 // "signed in" when the browser's session cookie holds one of the made-up tokens
@@ -147,6 +150,8 @@ function accessTx(leagueId: string): AccessTx {
 export type StandInOptions = {
   /** APP_ENV: the stand-in refuses to be made for anything but local or test. */
   readonly appEnv: string;
+  /** PUBLIC_BASE_URL: the stand-in refuses any host but this computer's or a test name. */
+  readonly publicBaseUrl: string;
   /** Where the access module's T-196 lines go. */
   readonly log: CommandDeps<AccessTx>['log'];
 };
@@ -155,6 +160,12 @@ export function standInPorts(options: StandInOptions): WebPorts {
   if (options.appEnv !== 'local' && options.appEnv !== 'test') {
     throw new Error(
       `The web app's made-up stand-in is for local work and tests only, not "${options.appEnv}".`,
+    );
+  }
+  if (!isLocalOrTestHost(options.publicBaseUrl)) {
+    throw new Error(
+      "The web app's made-up stand-in is for local work and tests only: PUBLIC_BASE_URL " +
+        'must be on localhost, 127.0.0.1, [::1], or a name ending in .localhost or .test.',
     );
   }
   const people: readonly MadeUpPerson[] = Object.values(standInPeople);
@@ -189,4 +200,21 @@ export function standInPorts(options: StandInOptions): WebPorts {
     },
     accessOf: accessOfVia(deps),
   };
+}
+
+/** Whether `address` is on this computer, or on a name kept for tests (`.test`). */
+export function isLocalOrTestHost(address: string): boolean {
+  let host: string;
+  try {
+    host = new URL(address).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '[::1]' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.test')
+  );
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { LeagueNotice } from '../../features/shell/index.ts';
+import { LeagueNotice, type LeagueRouteProps } from '../../features/shell/index.ts';
 import { leagueView } from '../../server/load-league-page.ts';
 
 /**
@@ -7,8 +7,11 @@ import { leagueView } from '../../server/load-league-page.ts';
  * it (U-9); this draws nothing of the league's own unless the page may be shown.
  * The league's design, header, menu and footer come with step 1.18.
  */
-export default async function LeagueLayout({ children }: { readonly children: ReactNode }) {
-  const view = await leagueView('site');
+export default async function LeagueLayout({
+  children,
+  params,
+}: LeagueRouteProps & { readonly children: ReactNode }) {
+  const view = await leagueView((await params).league, 'site');
   if (view === null) return children;
   return (
     <>

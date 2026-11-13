@@ -38,7 +38,11 @@ export type StartupDeps = {
 
 export async function startWebApp(config: Config, deps: StartupDeps): Promise<WebPorts> {
   if (config.APP_ENV === 'local' || config.APP_ENV === 'test') {
-    return standInPorts({ appEnv: config.APP_ENV, log: deps.log });
+    return standInPorts({
+      appEnv: config.APP_ENV,
+      publicBaseUrl: config.PUBLIC_BASE_URL,
+      log: deps.log,
+    });
   }
   const database = await deps.database();
   const db = database.createDatabase({ kind: 'postgres', url: config.DATABASE_URL });

@@ -1,5 +1,6 @@
-import { AdminArea } from '../../../../features/shell/index.ts';
+import { AdminArea, type LeagueRouteProps } from '../../../../features/shell/index.ts';
 
-export default function Page() {
-  return <AdminArea area="standings" />;
+export default async function Page({ params }: LeagueRouteProps) {
+  const { league } = await params;
+  return <AdminArea league={league} area="standings" />;
 }

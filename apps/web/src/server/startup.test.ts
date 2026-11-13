@@ -41,6 +41,17 @@ describe('startWebApp', () => {
     }
   });
 
+  it('refuses the stand-in for a site address that is not local or a test name', async () => {
+    const d = deps([]);
+    const config = loadConfig({
+      ...env,
+      APP_ENV: 'local',
+      PUBLIC_BASE_URL: 'https://leagues.example.com',
+    });
+    await expect(startWebApp(config, d.given)).rejects.toThrow(/PUBLIC_BASE_URL/);
+    expect(d.database).not.toHaveBeenCalled();
+  });
+
   it('checks the login role first in staging and production, and stops on a problem (T-60)', async () => {
     for (const appEnv of ['staging', 'production']) {
       const d = deps(['it is a superuser', 'it bypasses row-level security']);
