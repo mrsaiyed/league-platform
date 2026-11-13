@@ -24,6 +24,7 @@ Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014
 - **2.11 Public names and who sees statistics** — `.local/lanes/2.11-public-names` — none — builder starting.
 - **2.31 Live updates service** — `.local/lanes/2.31-live-updates` — none — builder starting.
 - **1.17 Web app shell** — `.local/lanes/1.17-web-shell` — record 020 / T-232 — builder starting.
+- **2.13 Stage 2 permissions** — `.local/lanes/2.13-permissions` — none — builder starting.
 - **2.9 Schedule drafts and clashes** — `.local/lanes/2.9-schedule-rules` — none — builder starting.
 - **2.1 Divisions, venues, courts, settings tables** — `.local/lanes/2.1-settings-tables` — migration 0007, record 019 / T-231 — builder starting.
 
