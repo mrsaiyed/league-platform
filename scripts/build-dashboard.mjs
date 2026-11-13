@@ -69,7 +69,15 @@ const stagePlans = fs
   .map((name) => {
     const number = Number(name.match(/\d+/)[0]);
     const groups = [];
-    for (const line of read(path.join(buildDir, name)).split(/\r?\n/)) {
+    const planText = read(path.join(buildDir, name));
+    // Older plans keep "what each step needs" in a table instead of on the step's line.
+    const tableNeeds = Object.fromEntries(
+      [...planText.matchAll(/^\| (\d+\.\d+) [^|]*\|([^|]*)\|/gm)].map((m) => [
+        m[1],
+        plain(m[2]).trim(),
+      ]),
+    );
+    for (const line of planText.split(/\r?\n/)) {
       const heading = line.match(/^### ([A-Z])\. (.*)$/);
       if (heading) groups.push({ letter: heading[1], name: plain(heading[2]), steps: [] });
       const step = line.match(/^- \[( |x)\] \*\*(\d+\.\d+) (.*?)\.\*\* (.*)$/);
@@ -92,7 +100,8 @@ const stagePlans = fs
         model: plain(meta.match(/Model: ([^_]*)/)?.[1] ?? '').replace(/\.$/, ''),
         spec: part('Spec'),
         test: part('Done test'),
-        needs: part('Needs'),
+        needs: part('Needs') || tableNeeds[step[2]] || '',
+        blocked: /Blocked on founder/i.test(body),
         state:
           step[1] === 'x' || note
             ? 'done'
@@ -104,6 +113,66 @@ const stagePlans = fs
     }
     return { number, groups };
   });
+
+// ---------- which steps could start right now ----------
+// A step can start when every step it needs has landed, it is not already in a lane, and it
+// is not waiting on the founder. Steps built in parts are judged part by part. This cannot
+// see whether a step's decisions are agreed: the lead still checks that (T-211).
+const byId = new Map();
+for (const plan of stagePlans) {
+  for (const group of plan.groups) {
+    for (const step of group.steps) {
+      step.stage = plan.number;
+      byId.set(step.id, step);
+    }
+  }
+}
+const idsIn = (text, self) => {
+  if (/every other step|everything else/i.test(text)) {
+    return [...byId.values()]
+      .filter((other) => other.stage === self.stage && other.id !== self.id)
+      .map((other) => other.id);
+  }
+  const found = new Set();
+  const rest = text.replace(/(\d+)\.(\d+) to (\d+)\.(\d+)/g, (whole, a, b, c, d) => {
+    for (const other of byId.values()) {
+      const [stage, number] = other.id.split('.').map(Number);
+      if (
+        stage === Number(a) &&
+        stage === Number(c) &&
+        number >= Number(b) &&
+        number <= Number(d)
+      ) {
+        found.add(other.id);
+      }
+    }
+    return '';
+  });
+  for (const m of rest.matchAll(/\d+\.\d+/g)) if (byId.has(m[0])) found.add(m[0]);
+  found.delete(self.id);
+  return [...found];
+};
+const landed = (id) => byId.get(id)?.state === 'done';
+const partLanded = (id, n) =>
+  log.some((entry) => entry.text.startsWith(`Step ${id} part ${n} done`));
+const ready = [];
+for (const step of byId.values()) {
+  step.needIds = idsIn(step.needs, step);
+  if (step.state === 'done' || open.has(step.id) || step.blocked) continue;
+  if (/drafts:/i.test(step.needs)) continue;
+  const parts = [...step.needs.matchAll(/part (\d+):([^·]*)/gi)].map((m) => ({
+    n: Number(m[1]),
+    text: m[2],
+  }));
+  if (parts.length) {
+    const next = parts.find((p) => !partLanded(step.id, p.n));
+    if (next && idsIn(next.text, step).every(landed)) {
+      ready.push({ id: step.id, name: step.name, part: next.n });
+    }
+  } else if (step.needIds.every(landed)) {
+    ready.push({ id: step.id, name: step.name, part: 0 });
+  }
+}
 
 const order = read(path.join(root, 'docs/specs/v1/technical/T10-build-order.md'));
 const stages = [...order.matchAll(/^### Stage (\d+) — (.*?)(?: · (.*))?$/gm)].map((m) => {
@@ -142,6 +211,7 @@ const data = {
   needs,
   lanes,
   laneCount: Number(field('Lanes').match(/\d+/)?.[0] ?? 0),
+  ready,
 };
 
 const css = read(path.join(here, 'dashboard/page.css'));
@@ -211,3 +281,21 @@ const stepCount = stagePlans.reduce(
 console.log(
   `Wrote docs/build/dashboard.html (${stagePlans.length} stage plans, ${stepCount} steps, ${lanes.length} open lanes).`,
 );
+
+// The lead reads this after every landing. It is the guard against sliding back to one
+// builder at a time: free lanes plus steps that can start means lanes must be opened now.
+const free = Math.max(0, data.laneCount - lanes.length);
+const names = ready.map((step) => step.id + (step.part ? ` part ${step.part}` : '')).join(', ');
+console.log(`Lanes: ${lanes.length} of ${data.laneCount} open in STATUS.md.`);
+if (free && ready.length) {
+  console.log(
+    `>>> ${free} lane${free === 1 ? ' is' : 's are'} FREE and ${ready.length} step${ready.length === 1 ? '' : 's'} can start now: ${names}.`,
+  );
+  console.log(
+    ">>> Open lanes for them now, before anything else (runbook, section 3). Check each step's decisions are agreed first.",
+  );
+} else if (ready.length) {
+  console.log(`Lanes are full. Waiting for a free lane: ${names}.`);
+} else {
+  console.log('No step can start until an open lane lands.');
+}

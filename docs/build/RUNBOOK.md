@@ -47,6 +47,8 @@ A **lane** is one step, one builder, and one private copy of the repository. Lan
 
 The "Lanes" line in `STATUS.md` says how many may be open at once. Keep that many open whenever there are steps that can be opened. The moment a lane lands or a builder finishes, look for the next step to open.
 
+**Never slide back to one builder.** Landing the first wave of lanes is not the end of working side by side; it is when the next wave starts. After every landing, and every time you rewrite the lock, count the open lanes against the "Lanes" number. `node scripts/build-dashboard.mjs` does the counting for you: it prints how many lanes are open and lists every step that can start now, across all stage plans. When it prints that lanes are free and steps can start, open those lanes before anything else: before the next review, before the next landing, before ending the run. The only checks left to you are that each step's decisions are agreed (T-211) and that no two open lanes change the same table.
+
 Which steps get the lanes:
 
 1. Steps of the earliest unfinished stage come first.
