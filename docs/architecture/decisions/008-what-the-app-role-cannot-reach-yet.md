@@ -9,7 +9,7 @@ Migration 0005 puts every table behind row-level security. The app's role, `app_
 1. **Finding a league from the short name in a public address**, before any league is set.
 2. **Creating an account and its own profile** at sign-up, and erasing one (T-220). `app_user` has no INSERT or DELETE on `accounts`, `profiles` or `profile_access`.
 3. **Finding an account by email before anyone is signed in** (sign-in, sign-up, a forgotten password), without the screen telling a stranger whether the account exists (T-68).
-4. **Accepting an invitation by its token** when the person arrives from an email link and no league is set yet.
+4. **Accepting an invitation by its token** when the person arrives from an email link and no league is set yet. (Settled by record 014: the link names the league, so it is known.)
 5. **Listing the names on a league's access list.** A league's admins see its `role_grants`, but each grant points at another account, and the fence lets an account see only its own `accounts` row.
 
 ## What
@@ -18,7 +18,7 @@ Migration 0005 puts every table behind row-level security. The app's role, `app_
 - **Everything else goes through narrow owner-run functions, added with the step that needs them**, not by widening a table grant or a policy:
   - account and own-profile creation, and erasure: with sign-in, steps 1.13 and 1.14;
   - finding an account by email: steps 1.13 and 1.14. It answers only what the sign-in flow needs, never whether an address has an account;
-  - accepting an invitation: step 1.12. It takes the token, checks its hash, expiry and that it was not cancelled, and creates the grant for that one league;
+  - accepting an invitation: no function after all (record 014, T-226). The link is a league address, so the league is known: the app finds it by its short name, sets it, and accepts inside that league's fence like any other command;
   - names on an access list: step 1.12. It returns the display names of the accounts holding grants in the league that is set, and nothing else about them.
 - **The rules for every such function** (SECURITY DEFINER, so it runs as the role that owns the tables):
   - it does one job, takes only what that job needs and returns the fewest columns;

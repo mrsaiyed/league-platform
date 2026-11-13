@@ -3,6 +3,7 @@
 // database refuses it to anyone else). Not the name the league shows: that is
 // setLeagueName.
 import { z } from 'zod';
+import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { leagueShortNameChanged } from '../events.ts';
 import { shortNameForwardingMonths } from '../league-values.ts';
@@ -36,6 +37,11 @@ export const renameShortName = defineCommand({
     );
     if (version === undefined) return fail({ code: 'changed-since-read' });
     if (version === 'taken') return fail({ code: 'short-name-taken' });
+    await recordActivity(tx, context, {
+      action: 'leagues.rename_short_name',
+      target: { type: 'league', id: context.leagueId },
+      details: { slug: input.slug },
+    });
     emit({ type: leagueShortNameChanged, leagueId: context.leagueId });
     return ok({ slug: input.slug, version });
   },
