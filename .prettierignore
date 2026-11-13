@@ -22,3 +22,5 @@ apps/varsity-hosted/hooks
 apps/varsity-hosted/examples
 apps/varsity-hosted/drizzle/meta
 apps/varsity-hosted/package-lock.json
+apps/web/.next
+apps/web/next-env.d.ts
