@@ -78,48 +78,63 @@ describe('fairnessReport, worked examples (P7 §4.2)', () => {
         teamId: 'a',
         slot: 'early',
         count: 2,
-        fewest: 0,
-        most: 2,
+        games: 5,
+        fewestShare: 0,
+        mostShare: 2 / 3,
       },
       {
         rule: 'spread-early-and-late-slots',
         teamId: 'b',
         slot: 'early',
         count: 2,
-        fewest: 0,
-        most: 2,
+        games: 3,
+        fewestShare: 0,
+        mostShare: 2 / 3,
       },
       {
         rule: 'spread-early-and-late-slots',
         teamId: 'c',
         slot: 'early',
         count: 0,
-        fewest: 0,
-        most: 2,
+        games: 3,
+        fewestShare: 0,
+        mostShare: 2 / 3,
       },
       {
         rule: 'spread-early-and-late-slots',
         teamId: 'd',
         slot: 'early',
         count: 0,
-        fewest: 0,
-        most: 2,
+        games: 3,
+        fewestShare: 0,
+        mostShare: 2 / 3,
+      },
+      {
+        rule: 'spread-early-and-late-slots',
+        teamId: 'a',
+        slot: 'late',
+        count: 1,
+        games: 5,
+        fewestShare: 0,
+        mostShare: 2 / 3,
       },
       {
         rule: 'spread-early-and-late-slots',
         teamId: 'b',
         slot: 'late',
         count: 0,
-        fewest: 0,
-        most: 2,
+        games: 3,
+        fewestShare: 0,
+        mostShare: 2 / 3,
       },
       {
         rule: 'spread-early-and-late-slots',
         teamId: 'c',
         slot: 'late',
         count: 2,
-        fewest: 0,
-        most: 2,
+        games: 3,
+        fewestShare: 0,
+        mostShare: 2 / 3,
       },
       { rule: 'balance-home-and-away', teamId: 'a', home: 4, away: 1 },
       {
@@ -216,6 +231,45 @@ describe('fairnessReport, worked examples (P7 §4.2)', () => {
         gameIds: ['g5', 'g6'],
       },
     ]);
+  });
+
+  it('spreads early and late slots by share, so a team with fewer games is not flagged', () => {
+    // a and b play six games, half early and half late; c to h play two, one early, one late.
+    const on = (day: number, time: string, homeTeamId: string, awayTeamId: string) =>
+      game(`d${day}-${homeTeamId}`, {
+        roundId: null,
+        date: `2026-10-0${day}`,
+        time,
+        homeTeamId,
+        awayTeamId,
+      });
+    const games = [
+      on(1, '18:00', 'a', 'c'),
+      on(1, '20:00', 'b', 'e'),
+      on(2, '18:00', 'a', 'd'),
+      on(2, '20:00', 'b', 'c'),
+      on(3, '18:00', 'a', 'e'),
+      on(3, '20:00', 'b', 'd'),
+      on(4, '20:00', 'a', 'f'),
+      on(4, '18:00', 'b', 'h'),
+      on(5, '20:00', 'a', 'g'),
+      on(5, '18:00', 'b', 'f'),
+      on(6, '20:00', 'a', 'h'),
+      on(6, '18:00', 'b', 'g'),
+    ];
+    const rules = { ...allOff, spreadEarlyAndLateSlots: true };
+    const report = fairnessReport({ teams: teamsOf('abcdefgh'), rounds: [], games, rules });
+    expect(report.teams.map((t) => [t.teamId, t.games, t.early, t.late])).toEqual([
+      ['a', 6, 3, 3],
+      ['b', 6, 3, 3],
+      ['c', 2, 1, 1],
+      ['d', 2, 1, 1],
+      ['e', 2, 1, 1],
+      ['f', 2, 1, 1],
+      ['g', 2, 1, 1],
+      ['h', 2, 1, 1],
+    ]);
+    expect(report.issues).toEqual([]);
   });
 
   it('leaves out postponed and cancelled games, and empty weeks are no one’s bye', () => {

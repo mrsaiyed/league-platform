@@ -89,10 +89,12 @@ export type FairnessIssue =
       rule: 'spread-early-and-late-slots';
       teamId: string;
       slot: 'early' | 'late';
+      /** This team's early (or late) games, out of `games`. */
       count: number;
-      /** The fewest and the most any team of the report has. */
-      fewest: number;
-      most: number;
+      games: number;
+      /** The smallest and largest share of games in that slot any team of the report has, 0 to 1. */
+      fewestShare: number;
+      mostShare: number;
     }
   | { rule: 'balance-home-and-away'; teamId: string; home: number; away: number }
   | {

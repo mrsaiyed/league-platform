@@ -20,7 +20,10 @@ import type { ScheduleGame } from './schedule-types.ts';
  * - Early and late: on a date with games at two or more times, the earliest time is early and
  *   the latest is late. Games with no time are neither.
  * - Back-to-back: the same two teams meeting in two weeks running.
- * - Early and late slots are spread evenly when no team has two more of either than another.
+ * - Early and late slots are spread evenly when every team's share of them (early or late
+ *   games out of its games) is within one game of every other team's share: a team is flagged
+ *   when it has more than one game more than the fewest share would give it, or more than one
+ *   fewer than the most share would. Teams with no games are left out.
  * - Home and away are balanced when a team's home and away games differ by at most one.
  *
  * Only the rules switched on are reported, except a team's unavailable dates, which are the
@@ -130,21 +133,33 @@ export function fairnessReport(input: FairnessInput): FairnessReport {
     }
   }
 
-  if (rules.spreadEarlyAndLateSlots && report.length > 1) {
+  if (rules.spreadEarlyAndLateSlots) {
+    // Compared as shares of each team's games, so a team with fewer games is not flagged
+    // for having fewer early or late slots. Fractions are compared by cross-multiplying.
+    const playing = report.filter((s) => s.games > 0);
     for (const slot of ['early', 'late'] as const) {
-      const counts = report.map((s) => s[slot]);
-      const fewest = Math.min(...counts);
-      const most = Math.max(...counts);
-      if (most - fewest <= 1) continue;
-      for (const s of report) {
-        if (s[slot] > fewest + 1 || s[slot] < most - 1) {
+      const below = (x: TeamFairness, y: TeamFairness): boolean =>
+        x[slot] * y.games < y[slot] * x.games;
+      let fewest = playing[0];
+      let most = playing[0];
+      for (const s of playing) {
+        if (fewest && below(s, fewest)) fewest = s;
+        if (most && below(most, s)) most = s;
+      }
+      if (!fewest || !most) continue;
+      for (const s of playing) {
+        // More than one game above the fewest share, or more than one below the most.
+        const over = s[slot] * fewest.games > fewest[slot] * s.games + fewest.games;
+        const under = s[slot] * most.games < most[slot] * s.games - most.games;
+        if (over || under) {
           issues.push({
             rule: 'spread-early-and-late-slots',
             teamId: s.teamId,
             slot,
             count: s[slot],
-            fewest,
-            most,
+            games: s.games,
+            fewestShare: fewest[slot] / fewest.games,
+            mostShare: most[slot] / most.games,
           });
         }
       }
