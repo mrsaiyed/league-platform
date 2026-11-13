@@ -13,13 +13,20 @@ export type {
 } from './rules/schedule-types.ts';
 export { summarizePublish, type PublishSummary } from './rules/summarize-publish.ts';
 export { generatePairings, maxTimesEachPair } from './rules/generate-pairings.ts';
+export { fairnessReport } from './rules/fairness-report.ts';
 export type {
+  FairnessInput,
+  FairnessIssue,
+  FairnessReport,
+  FairnessRules,
   Pairing,
   PairingRound,
   PairingTeam,
   PairingsError,
   PairingsInput,
   PairingsResult,
+  TeamFairness,
+  TeamUnavailableDate,
 } from './rules/pairing-types.ts';
 export { createCourt, type CreateCourtError } from './commands/create-court.ts';
 export { createVenue, type CreateVenueError } from './commands/create-venue.ts';
