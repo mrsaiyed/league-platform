@@ -4,7 +4,14 @@
 import type { GameSnapshot, LiveMessage } from '@srleagues/contracts';
 
 export type ViewerGame = Omit<GameSnapshot, 'teams' | 'players' | 'periods' | 'correctedOn'> &
-  Partial<Pick<GameSnapshot, 'teams' | 'players' | 'periods' | 'correctedOn'>>;
+  Partial<Pick<GameSnapshot, 'teams' | 'players' | 'periods' | 'correctedOn'>> & {
+    /** The sequence the players were taken at. Messages do not update players. */
+    playersAsOfSequence?: number;
+  };
+
+/** True only when the players shown are those of the game's current sequence. */
+export const playersAreCurrent = (game: ViewerGame): boolean =>
+  game.players !== undefined && game.playersAsOfSequence === game.sequence;
 
 export type ViewerState = {
   gameId: string;
@@ -41,12 +48,19 @@ export function applyMessage(
   if (message.gameId !== state.gameId) return { state, outcome: 'ignored' };
   if (state.game === null) {
     // No snapshot yet: nothing to number against. The first snapshot is already asked for.
-    return { state, outcome: 'waiting' };
+    // Remember how far the game has got, so a snapshot that is behind asks again.
+    // Step 2.45 needs a slow safety poll: a lost LAST message leaves no later one to
+    // reveal the gap, so the page must refetch now and then even when nothing arrives.
+    const seenSequence = Math.max(state.seenSequence, message.sequence);
+    return { state: { ...state, seenSequence }, outcome: 'waiting' };
   }
   if (message.sequence <= state.game.sequence) return { state, outcome: 'ignored' };
   const seenSequence = Math.max(state.seenSequence, message.sequence);
-  if (state.awaitingSnapshot) return { state: { ...state, seenSequence }, outcome: 'waiting' };
-  if (message.sequence !== state.game.sequence + 1) {
+  const inOrder = message.sequence === state.game.sequence + 1;
+  if (state.awaitingSnapshot && !inOrder) {
+    return { state: { ...state, seenSequence }, outcome: 'waiting' };
+  }
+  if (!inOrder) {
     return {
       state: { ...state, awaitingSnapshot: true, seenSequence },
       outcome: 'ask-for-snapshot',
@@ -57,6 +71,9 @@ export function applyMessage(
     state: {
       ...state,
       seenSequence,
+      // An in-order message after an old snapshot is applied; the wait ends only once
+      // nothing seen is ahead of what is shown.
+      awaitingSnapshot: state.awaitingSnapshot && sequence < seenSequence,
       game: {
         ...state.game,
         gameId,
@@ -75,16 +92,26 @@ export function applyMessage(
 }
 
 /**
- * Adopts a snapshot. One older than what is shown (a cached copy that lagged behind live
- * messages) is ignored; the page keeps waiting if it was waiting.
+ * Adopts a snapshot and says whether the page must fetch another now (`refetch`): true
+ * when the snapshot is behind messages already seen, or is an old cached copy while a
+ * snapshot is still awaited. The page should retry with a pause, not in a tight loop.
  */
-export function applySnapshot(state: ViewerState, snapshot: GameSnapshot): ViewerState {
-  if (snapshot.gameId !== state.gameId) return state;
-  if (state.game !== null && snapshot.sequence < state.game.sequence) return state;
+export function applySnapshot(
+  state: ViewerState,
+  snapshot: GameSnapshot,
+): { state: ViewerState; refetch: boolean } {
+  if (snapshot.gameId !== state.gameId) return { state, refetch: false };
+  if (state.game !== null && snapshot.sequence < state.game.sequence) {
+    return { state, refetch: state.awaitingSnapshot };
+  }
+  const behind = snapshot.sequence < state.seenSequence;
   return {
-    ...state,
-    game: snapshot,
-    awaitingSnapshot: snapshot.sequence < state.seenSequence,
-    seenSequence: Math.max(state.seenSequence, snapshot.sequence),
+    state: {
+      ...state,
+      game: { ...snapshot, playersAsOfSequence: snapshot.sequence },
+      awaitingSnapshot: behind,
+      seenSequence: Math.max(state.seenSequence, snapshot.sequence),
+    },
+    refetch: behind,
   };
 }

@@ -1,6 +1,12 @@
 import type { GameSnapshot, LiveMessage } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
-import { applyMessage, applySnapshot, startViewing } from './viewer-state.ts';
+import type { ViewerState } from './viewer-state.ts';
+import {
+  applyMessage,
+  applySnapshot as adopt,
+  playersAreCurrent,
+  startViewing,
+} from './viewer-state.ts';
 
 const gameId = '0192f000-0000-7000-8000-000000000001';
 const otherGame = '0192f000-0000-7000-8000-000000000002';
@@ -20,9 +26,15 @@ const message = (sequence: number, home = sequence * 2): LiveMessage => ({
 const snapshot = (sequence: number): GameSnapshot => ({
   ...message(sequence),
   periods: 4,
-  teams: { home: { name: 'Home' }, away: { name: 'Away' } },
+  teams: {
+    home: { name: 'Home', statsVisible: true },
+    away: { name: 'Away', statsVisible: true },
+  },
   players: [],
 });
+
+const applySnapshot = (state: ViewerState, snap: GameSnapshot): ViewerState =>
+  adopt(state, snap).state;
 
 const viewing = (sequence: number) => applySnapshot(startViewing(gameId), snapshot(sequence));
 
@@ -81,10 +93,45 @@ describe('a viewer fed numbered messages', () => {
   });
   it('never goes back to a snapshot older than what is shown', () => {
     const s = viewing(7);
-    expect(applySnapshot(s, snapshot(3))).toBe(s);
+    expect(adopt(s, snapshot(3)).state).toBe(s);
   });
   it('shows a game that ended', () => {
     const r = applyMessage(viewing(1), { ...message(2), status: 'final' });
     expect(r.state.game?.status).toBe('final');
+  });
+  it('tells the page to refetch when the snapshot is behind messages seen', () => {
+    let s = applyMessage(viewing(0), message(1)).state;
+    s = applyMessage(s, message(4)).state;
+    expect(adopt(s, snapshot(2)).refetch).toBe(true);
+    expect(adopt(s, snapshot(4)).refetch).toBe(false);
+  });
+  it('still applies in-order messages after an old snapshot, so it never freezes', () => {
+    let s = applyMessage(viewing(0), message(1)).state;
+    s = applyMessage(s, message(4)).state;
+    s = applySnapshot(s, snapshot(2));
+    const r = applyMessage(s, message(3));
+    expect(r.outcome).toBe('applied');
+    expect(r.state.awaitingSnapshot).toBe(true);
+    const r2 = applyMessage(r.state, message(4));
+    expect(r2.outcome).toBe('applied');
+    expect(r2.state.awaitingSnapshot).toBe(false);
+  });
+  it('remembers messages heard before the first snapshot', () => {
+    let s = applyMessage(startViewing(gameId), message(5)).state;
+    s = applyMessage(s, message(3)).state;
+    expect(s.seenSequence).toBe(5);
+    const r = adopt(s, snapshot(2));
+    expect(r.refetch).toBe(true);
+    expect(r.state.awaitingSnapshot).toBe(true);
+    expect(adopt(s, snapshot(5)).refetch).toBe(false);
+  });
+  it('does not show the snapshot players as current once a message is applied', () => {
+    const s = viewing(0);
+    expect(playersAreCurrent(s.game!)).toBe(true);
+    const r = applyMessage(s, message(1));
+    expect(playersAreCurrent(r.state.game!)).toBe(false);
+  });
+  it('ignores a snapshot for another game without a refetch', () => {
+    expect(adopt(startViewing(gameId), { ...snapshot(1), gameId: otherGame }).refetch).toBe(false);
   });
 });

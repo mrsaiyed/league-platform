@@ -37,4 +37,7 @@ describe('clock reference', () => {
     expect(formatClock(0)).toBe('0:00');
     expect(formatClock(-5)).toBe('0:00');
   });
+  it('reads a bad number as zero', () => {
+    expect(formatClock(Number.NaN)).toBe('0:00');
+  });
 });

@@ -2,7 +2,7 @@
 // the shapes that cross between the tracker, the server and the people watching.
 // The commands themselves are the ones in live-stats.ts, reused as they are.
 import { z } from 'zod';
-import { Envelope } from './live-stats.ts';
+import { Envelope, Jersey } from './live-stats.ts';
 
 const Side = z.enum(['home', 'away']);
 const Id = z.uuid();
@@ -23,6 +23,24 @@ export const isAcceptedProtocolVersion = (
 ): boolean =>
   Number.isInteger(version) && version >= 1 && (version === current || version === current - 1);
 
+/**
+ * Read this first, before any other schema: a body from a tracker on another version
+ * may not match the current shapes at all, so only `protocolVersion` is looked at. A
+ * version that fails here, or is not accepted, gets a `VersionRefusal`.
+ *
+ * When `trackerProtocolVersion` goes up, the previous version's shapes must be kept
+ * (as a separate schema the server still parses with), because T-127 promises that
+ * version keeps working.
+ */
+export const ProtocolProbe = z.looseObject({ protocolVersion: z.number().int().min(1) });
+export type ProtocolProbe = z.infer<typeof ProtocolProbe>;
+
+/** The refusal for a version the server does not take, listing the ones it does (T-127). */
+export const buildVersionRefusal = (current: number = trackerProtocolVersion): VersionRefusal => ({
+  error: 'unsupported-protocol-version',
+  accepted: current > 1 ? [current - 1, current] : [current],
+});
+
 // ---------------------------------------------------------------- the batch (T-111)
 
 /** The most commands in one batch: "a few at a time". */
@@ -36,7 +54,13 @@ export type TrackerCommand = z.infer<typeof TrackerCommand>;
 export const CommandBatch = z.strictObject({
   protocolVersion: z.number().int().min(1),
   sessionId: Id,
-  commands: z.array(TrackerCommand).min(1).max(maxCommandsPerBatch),
+  commands: z
+    .array(TrackerCommand)
+    .min(1)
+    .max(maxCommandsPerBatch)
+    .refine((list) => new Set(list.map((c) => c.commandId)).size === list.length, {
+      message: 'A command ID appears twice in the batch.',
+    }),
 });
 export type CommandBatch = z.infer<typeof CommandBatch>;
 
@@ -92,7 +116,13 @@ export const SessionRequest = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('open'), gameId: Id }),
   z.strictObject({ type: z.literal('renew'), sessionId: Id }),
   /** The scorekeeper has confirmed; the other device becomes read-only at once. */
-  z.strictObject({ type: z.literal('take-over'), gameId: Id, confirmed: z.literal(true) }),
+  z.strictObject({
+    type: z.literal('take-over'),
+    gameId: Id,
+    confirmed: z.literal(true),
+    /** The `since` of the holder the scorekeeper saw; the server refuses if it has changed. */
+    expectedHolderSince: Ms,
+  }),
   z.strictObject({ type: z.literal('release'), sessionId: Id }),
 ]);
 export type SessionRequest = z.infer<typeof SessionRequest>;
@@ -100,16 +130,26 @@ export type SessionRequest = z.infer<typeof SessionRequest>;
 const Holder = z.strictObject({ displayName: z.string().max(120), since: Ms });
 
 export const SessionReply = z.discriminatedUnion('status', [
-  /** This device holds the game until `expiresAt` (server time, ms). */
-  z.strictObject({ status: z.literal('held-by-you'), sessionId: Id, expiresAt: Ms }),
+  /** This device holds the game until `expiresAt` (server time, ms). `sentAt` is server time on every reply. */
+  z.strictObject({
+    status: z.literal('held-by-you'),
+    sessionId: Id,
+    expiresAt: Ms,
+    sentAt: Ms,
+  }),
   /** Someone else holds it. The tracker offers to take over. */
-  z.strictObject({ status: z.literal('held-by-other'), holder: Holder }),
+  z.strictObject({ status: z.literal('held-by-other'), holder: Holder, sentAt: Ms }),
   /** This session no longer holds the game: taken over, run out or released. */
   z.strictObject({
     status: z.literal('ended'),
     reason: z.enum(['taken-over', 'expired', 'released']),
+    sentAt: Ms,
   }),
-  z.strictObject({ status: z.literal('refused'), code: z.enum(['not-allowed', 'unknown-game']) }),
+  z.strictObject({
+    status: z.literal('refused'),
+    code: z.enum(['not-allowed', 'unknown-game']),
+    sentAt: Ms,
+  }),
 ]);
 export type SessionReply = z.infer<typeof SessionReply>;
 
@@ -138,12 +178,16 @@ const TeamFouls = z.strictObject({ home: Ms, away: Ms });
 /**
  * The latest play, as facts. Names and numbers are only those the league and the team
  * allow to be shown (T-120); the page words it from its message file (T-187).
+ *
+ * The server must redact this to the most restrictive setting among everything that
+ * receives it (S-22, T-87): one channel carries it to every viewer, so if either team
+ * or the league hides names, numbers or points, it carries null here.
  */
 export const LatestPlay = z.strictObject({
   type: z.enum(['score', 'foul', 'turnover', 'timeout', 'sub', 'period', 'other']),
   side: Side.optional(),
   playerName: z.string().max(120).nullable(),
-  jersey: z.string().max(2).nullable(),
+  jersey: Jersey.min(1).nullable(),
   points: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
 });
 export type LatestPlay = z.infer<typeof LatestPlay>;
@@ -169,8 +213,9 @@ const SnapshotPlayer = z.strictObject({
   side: Side,
   name: z.string().max(120).nullable(),
   jersey: z.string().max(2).nullable(),
-  points: Ms,
-  fouls: Ms,
+  /** Null means hidden for this team (S-22, T-87); never zero standing in for hidden. */
+  points: Ms.nullable(),
+  fouls: Ms.nullable(),
   onCourt: z.boolean(),
 });
 
@@ -182,10 +227,12 @@ const SnapshotPlayer = z.strictObject({
 export const GameSnapshot = LiveMessage.extend({
   periods: z.union([z.literal(2), z.literal(4)]),
   teams: z.strictObject({
-    home: z.strictObject({ name: z.string().max(120) }),
-    away: z.strictObject({ name: z.string().max(120) }),
+    /** `statsVisible` false: this team's players carry null points and fouls (S-22, T-87). */
+    home: z.strictObject({ name: z.string().max(120), statsVisible: z.boolean() }),
+    away: z.strictObject({ name: z.string().max(120), statsVisible: z.boolean() }),
   }),
-  players: z.array(SnapshotPlayer).max(60),
+  /** As of this snapshot's sequence only; later messages do not update players. */
+  players: z.array(SnapshotPlayer).max(200),
   /** Set when the game was reopened and finalised again; the date only (S-7). */
   correctedOn: z.iso.date().optional(),
 });

@@ -5,9 +5,11 @@ import {
   CommandReply,
   GameSnapshot,
   LiveMessage,
+  ProtocolProbe,
   SessionReply,
   SessionRequest,
   VersionRefusal,
+  buildVersionRefusal,
   isAcceptedProtocolVersion,
   maxCommandsPerBatch,
   trackerProtocolVersion,
@@ -65,6 +67,25 @@ describe('protocol version (T-127)', () => {
   });
 });
 
+describe('batch with repeated IDs', () => {
+  it('is refused when two commands share an ID', () => {
+    const dup = { protocolVersion: 1, sessionId: id(99), commands: [tap(1), tap(1)] };
+    expect(CommandBatch.safeParse(dup).success).toBe(false);
+  });
+});
+
+describe('version probe and refusal builder', () => {
+  it('reads only the version, whatever else the body holds', () => {
+    expect(ProtocolProbe.safeParse({ protocolVersion: 9, stuff: [1] }).success).toBe(true);
+    expect(ProtocolProbe.safeParse({ stuff: 1 }).success).toBe(false);
+  });
+  it('lists the versions the server takes', () => {
+    expect(buildVersionRefusal(3).accepted).toEqual([2, 3]);
+    expect(buildVersionRefusal(1).accepted).toEqual([1]);
+    expect(VersionRefusal.safeParse(buildVersionRefusal(1)).success).toBe(true);
+  });
+});
+
 describe('command reply', () => {
   it('carries accepted, duplicate and refused with a reason, and the new sequence', () => {
     const reply = {
@@ -107,27 +128,41 @@ describe('scoring session messages', () => {
     for (const r of [
       { type: 'open', gameId: id(1) },
       { type: 'renew', sessionId: id(2) },
-      { type: 'take-over', gameId: id(1), confirmed: true },
+      { type: 'take-over', gameId: id(1), confirmed: true, expectedHolderSince: 5 },
       { type: 'release', sessionId: id(2) },
     ]) {
       expect(SessionRequest.safeParse(r).success).toBe(true);
     }
   });
   it('will not take over without the scorekeeper confirming', () => {
-    const noConfirm = { type: 'take-over', gameId: id(1), confirmed: false };
+    const noConfirm = {
+      type: 'take-over',
+      gameId: id(1),
+      confirmed: false,
+      expectedHolderSince: 5,
+    };
     expect(SessionRequest.safeParse(noConfirm).success).toBe(false);
-    expect(SessionRequest.safeParse({ type: 'take-over', gameId: id(1) }).success).toBe(false);
+    expect(
+      SessionRequest.safeParse({ type: 'take-over', gameId: id(1), expectedHolderSince: 5 })
+        .success,
+    ).toBe(false);
   });
   it('accepts each reply', () => {
     for (const r of [
-      { status: 'held-by-you', sessionId: id(2), expiresAt: 1_700_000_120_000 },
-      { status: 'held-by-other', holder: { displayName: 'Sam', since: 1_700_000_000_000 } },
-      { status: 'ended', reason: 'taken-over' },
-      { status: 'refused', code: 'not-allowed' },
+      { status: 'held-by-you', sessionId: id(2), expiresAt: 1_700_000_120_000, sentAt: 1 },
+      {
+        status: 'held-by-other',
+        holder: { displayName: 'Sam', since: 1_700_000_000_000 },
+        sentAt: 1,
+      },
+      { status: 'ended', reason: 'taken-over', sentAt: 1 },
+      { status: 'refused', code: 'not-allowed', sentAt: 1 },
     ]) {
       expect(SessionReply.safeParse(r).success).toBe(true);
     }
-    expect(SessionReply.safeParse({ status: 'ended', reason: 'bored' }).success).toBe(false);
+    expect(SessionReply.safeParse({ status: 'ended', reason: 'bored', sentAt: 1 }).success).toBe(
+      false,
+    );
   });
 });
 
@@ -163,6 +198,12 @@ describe('live message and snapshot', () => {
     const hidden = { type: 'foul', side: 'away', playerName: null, jersey: null };
     expect(LiveMessage.safeParse({ ...msg, latestPlay: hidden }).success).toBe(true);
   });
+  it('takes a latest play only with a real jersey or null', () => {
+    const play = (jersey: string | null) => ({ type: 'foul', playerName: null, jersey });
+    expect(LiveMessage.safeParse({ ...msg, latestPlay: play('') }).success).toBe(false);
+    expect(LiveMessage.safeParse({ ...msg, latestPlay: play('123') }).success).toBe(false);
+    expect(LiveMessage.safeParse({ ...msg, latestPlay: play('00') }).success).toBe(true);
+  });
   it('refuses a message missing its number or with extra keys', () => {
     const { sequence: _s, ...noSeq } = msg;
     expect(LiveMessage.safeParse(noSeq).success).toBe(false);
@@ -177,21 +218,27 @@ describe('live message and snapshot', () => {
     const snap = {
       ...msg,
       periods: 4,
-      teams: { home: { name: 'Home' }, away: { name: 'Away' } },
+      teams: {
+        home: { name: 'Home', statsVisible: true },
+        away: { name: 'Away', statsVisible: false },
+      },
       players: [
         {
           playerId: id(5),
           side: 'home',
           name: null,
           jersey: '23',
-          points: 12,
-          fouls: 1,
+          points: null,
+          fouls: null,
           onCourt: true,
         },
       ],
       correctedOn: '2026-11-15',
     };
     expect(GameSnapshot.safeParse(snap).success).toBe(true);
+    const many = Array.from({ length: 200 }, () => snap.players[0]);
+    expect(GameSnapshot.safeParse({ ...snap, players: many }).success).toBe(true);
+    expect(GameSnapshot.safeParse({ ...snap, players: [...many, many[0]] }).success).toBe(false);
     expect(GameSnapshot.safeParse({ ...snap, correctedOn: 'yesterday' }).success).toBe(false);
     expect(GameSnapshot.safeParse({ ...snap, periods: 3 }).success).toBe(false);
   });

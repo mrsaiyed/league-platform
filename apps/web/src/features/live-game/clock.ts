@@ -27,7 +27,7 @@ export function clockIsRunning(clock: ClockReference, serverNowMs: number): bool
 
 /** "7:42". Whole seconds are rounded up, so the clock reads 0:00 only when time is out. */
 export function formatClock(remainingMs: number): string {
-  const seconds = Math.ceil(Math.max(0, remainingMs) / 1000);
+  const seconds = Math.ceil(Math.max(0, Number(remainingMs) || 0) / 1000);
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
