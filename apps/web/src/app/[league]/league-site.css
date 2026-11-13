@@ -1,6 +1,9 @@
 /* The look of a league's pages. Every color, font and size comes from the design's
    variables (packages/site, T-90); nothing here names a league. Logical properties
    only (start, end, inline), so right-to-left pages mirror themselves (T-188). */
+body {
+  margin: 0;
+}
 .league-site {
   min-block-size: 100vh;
   display: flex;
@@ -63,7 +66,8 @@
 }
 .site-header li a:hover,
 .site-footer nav a:hover {
-  background: var(--color-accent);
+  /* text on background always meets AA (checked on save), so the swap does too */
+  background: var(--color-text);
   color: var(--color-background);
 }
 .site-footer nav {
@@ -79,8 +83,8 @@
   padding: calc(var(--space) * 1.5);
   text-align: start;
 }
-.site-body > main,
-.site-body > div {
+/* Public pages are cards; the admin and the scoring screen are not. */
+.site-body > main:not(.score-root) {
   padding: var(--space);
   background: var(--color-panel);
   border: var(--card-border-width) solid var(--color-accent);

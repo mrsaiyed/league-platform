@@ -13,20 +13,39 @@ const cardShadow = {
 } as const;
 const space = { compact: '0.75rem', comfortable: '1rem', roomy: '1.5rem' } as const;
 
+const hex = /^#[0-9a-fA-F]{6}$/;
+
+/** A value looked up in a fixed table; anything not a key of the table is refused. */
+function known<T extends object>(table: T, key: unknown, what: string): T[keyof T] {
+  if (typeof key !== 'string' || !Object.hasOwn(table, key)) {
+    throw new Error(`Unknown ${what}`);
+  }
+  return table[key as keyof T];
+}
+
+function color(value: unknown, what: string): string {
+  if (typeof value !== 'string' || !hex.test(value))
+    throw new Error(`Not a #rrggbb color: ${what}`);
+  return value;
+}
+
+/** Every value is checked again here, so a design that skipped the schema still cannot inject CSS. */
 export function designToCssVariables(design: DesignDocument): Record<string, string> {
+  const base = design.base as unknown;
+  if (base !== 'light' && base !== 'dark') throw new Error('Unknown color scheme');
   return {
-    '--color-background': design.colors.background,
-    '--color-panel': design.colors.panel,
-    '--color-text': design.colors.text,
-    '--color-primary': design.colors.primary,
-    '--color-accent': design.colors.accent,
-    '--font-heading': fontStacks[design.fonts.heading],
-    '--font-body': fontStacks[design.fonts.body],
-    '--radius': radius[design.corners],
-    '--card-border-width': cardBorder[design.cards],
-    '--card-shadow': cardShadow[design.cards],
-    '--space': space[design.spacing],
-    'color-scheme': design.base,
+    '--color-background': color(design.colors.background, 'background'),
+    '--color-panel': color(design.colors.panel, 'panel'),
+    '--color-text': color(design.colors.text, 'text'),
+    '--color-primary': color(design.colors.primary, 'primary'),
+    '--color-accent': color(design.colors.accent, 'accent'),
+    '--font-heading': known(fontStacks, design.fonts.heading, 'font'),
+    '--font-body': known(fontStacks, design.fonts.body, 'font'),
+    '--radius': known(radius, design.corners, 'corners'),
+    '--card-border-width': known(cardBorder, design.cards, 'cards'),
+    '--card-shadow': known(cardShadow, design.cards, 'cards'),
+    '--space': known(space, design.spacing, 'spacing'),
+    'color-scheme': base,
   };
 }
 

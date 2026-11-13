@@ -87,11 +87,12 @@ describe('right to left (T-188)', () => {
     const arabic = renderToStaticMarkup(
       createElement(SiteHeader, { league, name: 'دوري الوادي', signedIn: true }),
     );
-    expect(arabic).toMatch(/class="site-name"[^>]*dir="rtl"/);
+    // dir="auto": the browser reads the name's first strong letter, so any script works
+    expect(arabic).toMatch(/class="site-name"[^>]*dir="auto"/);
     const english = renderToStaticMarkup(
       createElement(SiteHeader, { league, name: 'Valley', signedIn: true }),
     );
-    expect(english).toMatch(/class="site-name"[^>]*dir="ltr"/);
+    expect(english).toMatch(/class="site-name"[^>]*dir="auto"/);
   });
 
   it('turns the whole page around for a right-to-left language', () => {

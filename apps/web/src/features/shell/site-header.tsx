@@ -1,6 +1,4 @@
-import { leagueUrl, type LeagueAddressee } from '@srleagues/core';
-import { platformUrl } from '@srleagues/core';
-import { textDirection } from '@srleagues/site';
+import { leagueUrl, platformUrl, type LeagueAddressee } from '@srleagues/core';
 import { t } from '../../server/messages.ts';
 
 const menu = [
@@ -22,7 +20,7 @@ export function SiteHeader({
 }) {
   return (
     <header className="site-header">
-      <a className="site-name" href={leagueUrl(league, 'home')} dir={textDirection(name)}>
+      <a className="site-name" href={leagueUrl(league, 'home')} dir="auto">
         {name}
       </a>
       <nav aria-label={t('nav.menu')}>
