@@ -3,3 +3,4 @@
 // by path by the code from before stage 1.
 export * from './src/sign-in.ts';
 export * from './src/season-rules.ts';
+export * from './src/tracker-protocol.ts';
