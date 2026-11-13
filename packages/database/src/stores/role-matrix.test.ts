@@ -23,8 +23,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import {
   acceptInvitation,
+  assignScorekeeper,
   cancelInvitation,
   commands,
+  listMyGames,
+  unassignScorekeeper,
   createCourt,
   createDivision,
   cancelGame,
@@ -595,6 +598,41 @@ const gameCommandRows: readonly Row[] = [
     }),
     (c, i) => reopenGame(c, i, gamesDeps),
   ),
+  // Assigning scorekeepers is part of running Games (P4 §3, P7 §5.1): schedulers too.
+  ...gameRows(
+    'games.assign_scorekeeper',
+    'assign a scorekeeper to a game',
+    'games.manage',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      accountId: await grant(league.leagueId, 'scorekeeper'),
+    }),
+    (c, i) => assignScorekeeper(c, i, gamesDeps),
+  ),
+  ...gameRows(
+    'games.unassign_scorekeeper',
+    'take a scorekeeper off a game',
+    'games.manage',
+    async (league, program) => {
+      const { gameId } = await gameIn(league, program);
+      const accountId = await grant(league.leagueId, 'scorekeeper');
+      await pglite.query(
+        'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
+        [league.leagueId, gameId, accountId],
+      );
+      return { gameId, accountId };
+    },
+    (c, i) => unassignScorekeeper(c, i, gamesDeps),
+  ),
+  {
+    command: 'games.list_my_games',
+    name: 'see my games to score this week',
+    needs: 'games.score',
+    // Anyone who scores somewhere may look; the list itself holds what they may score.
+    scope: 'program',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listMyGames(c, i, gamesDeps),
+  },
   {
     command: 'games.list_postponed_games',
     name: 'see the games waiting to be rescheduled',

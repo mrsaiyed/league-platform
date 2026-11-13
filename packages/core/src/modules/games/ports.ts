@@ -3,6 +3,7 @@
 import type { SeasonRules } from '@srleagues/contracts';
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
+import type { StoredSetting } from '../leagues/index.ts';
 
 /** A game of a season, in or out of the bin (T3 §8). */
 export type GameRecord = {
@@ -68,6 +69,25 @@ export type NewGameCorrection = {
   readonly after: GameResultDocument;
 };
 
+/** A game of the coming days, as the scorekeeper's list reads it (P4 §4). */
+export type GameInWindow = {
+  readonly game: GameRecord;
+  /** The program of the game's season: where scoring it is checked. */
+  readonly programId: string;
+  /** The day it is played, in the league's time zone (YYYY-MM-DD). */
+  readonly day: string;
+  /** Whether the account asked about is assigned to score it. */
+  readonly assigned: boolean;
+};
+
+/** The games from the start of the league's today, for a number of days. */
+export type GamesWindow = {
+  /** Today in the league's time zone (YYYY-MM-DD), by the database's clock. */
+  readonly today: string;
+  /** Games not in the bin with a start in the window, soonest first. */
+  readonly games: readonly GameInWindow[];
+};
+
 export type GamesStore = {
   /** The game with this id, in the bin or not, or undefined if it is not in this league. */
   readonly find: (gameId: string) => Promise<GameRecord | undefined>;
@@ -92,6 +112,16 @@ export type GamesStore = {
   readonly findSeason: (
     seasonId: string,
   ) => Promise<{ readonly programId: string; readonly rules: unknown } | undefined>;
+  /** The league's own stored values of one setting (the league level), as a lookup reads them. */
+  readonly leagueSettingRows: (key: string) => Promise<readonly StoredSetting[]>;
+  /** Whether the account is assigned to score the game (T3 §8 `game_assignments`). */
+  readonly isAssigned: (gameId: string, accountId: string) => Promise<boolean>;
+  /** Assigns the account to the game: false if it already was. */
+  readonly assign: (gameId: string, accountId: string) => Promise<boolean>;
+  /** Removes the account's assignment to the game: false if there was none. */
+  readonly unassign: (gameId: string, accountId: string) => Promise<boolean>;
+  /** The games of `days` days from the start of the league's today, with the account's assignments. */
+  readonly listWindow: (accountId: string, days: number) => Promise<GamesWindow>;
 };
 
 /** A games command's transaction: its store, the access reader and the activity log (A-6). */

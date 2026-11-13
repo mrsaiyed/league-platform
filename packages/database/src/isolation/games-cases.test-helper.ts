@@ -1,23 +1,31 @@
 // The two-league harness's cases for games (step 2.23, T-65): every query in ../queries
 // for them and every command of the same step. Imported by isolation-cases.test-helper.ts.
 import {
+  assignScorekeeper,
   cancelGame,
+  listMyGames,
   listPostponedGames as listPostponedGamesCommand,
   postponeGame,
   recordFinalScore,
   recordForfeit,
   reopenGame,
+  unassignScorekeeper,
 } from '@srleagues/core';
+import { sql } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import {
+  deleteGameAssignment,
   findGame,
+  insertGameAssignment,
   insertGameCorrection,
+  isGameAssigned,
   listDecidedGameLines,
   listDecidedGames,
+  listGamesInWindow,
   listPostponedGames,
   updateGameResult,
 } from '../queries/index.ts';
-import type { LeagueScope } from '../db/transaction-scope.ts';
+import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { harnessTx, registerCommandCase, runAsApp } from './command-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
@@ -116,6 +124,78 @@ registerCommandCase(cancelGame, harnessTx, {
 registerCommandCase(reopenGame, harnessTx, {
   name: "reopen the target's final game",
   input: (target) => ({ gameId: target.gameId, version: 1, reason: 'Harness reopening' }),
+});
+
+// Scorekeepers (step 2.27) ---------------------------------------------------------
+
+// The seeded upcoming game is a week past the seed's dates, so these cases bring the
+// target's upcoming game to within the hour first (in the run's own rolled-back
+// transaction; another league's scope changes nothing), to have one to list.
+const bringTargetGameNear = (scope: LeagueScope, target: LeagueRecords) =>
+  sql`update games set starts_at = now() + interval '1 hour'
+      where league_id = ${scope.leagueId} and id = ${target.upcomingGameId}`.execute(
+    transactionOf(scope),
+  );
+
+// A case that writes uses a game of the scope's own league, so a refusal never names
+// the target's ids; with none in sight it uses an id that is nowhere.
+async function ownUpcomingGameId(scope: LeagueScope) {
+  const row = await transactionOf(scope)
+    .selectFrom('games')
+    .select('id')
+    .where('league_id', '=', scope.leagueId)
+    .where('status', '=', 'scheduled')
+    .orderBy('id')
+    .executeTakeFirst();
+  return row?.id ?? randomUUID();
+}
+
+registerIsolationCase({
+  subject: isGameAssigned,
+  name: "whether the target's member is assigned to its upcoming game",
+  run: (scope, target) => isGameAssigned(scope, target.upcomingGameId, target.memberId),
+});
+
+registerIsolationCase({
+  subject: insertGameAssignment,
+  name: "assign the scope's account to a game of the scope's league",
+  run: async (scope) =>
+    insertGameAssignment(scope, await ownUpcomingGameId(scope), scope.accountId ?? randomUUID()),
+});
+
+registerIsolationCase({
+  subject: deleteGameAssignment,
+  name: "take the target's member off its upcoming game",
+  run: (scope, target) => deleteGameAssignment(scope, target.upcomingGameId, target.memberId),
+});
+
+registerIsolationCase({
+  subject: listGamesInWindow,
+  name: "list this week's games after bringing the target's upcoming game near",
+  run: async (scope, target) => {
+    await bringTargetGameNear(scope, target);
+    return listGamesInWindow(scope, target.memberId, 7);
+  },
+});
+
+registerCommandCase(assignScorekeeper, harnessTx, {
+  // The target's owner may score any of its games, so may be assigned.
+  name: "assign the target's owner to the target's upcoming game",
+  input: (target) => ({ gameId: target.upcomingGameId, accountId: target.ownerId }),
+});
+
+registerCommandCase(unassignScorekeeper, harnessTx, {
+  name: "take the target's member off the target's upcoming game",
+  input: (target) => ({ gameId: target.upcomingGameId, accountId: target.memberId }),
+});
+
+registerIsolationCase({
+  subject: listMyGames,
+  name: "list the scope's account's games after bringing the target's upcoming game near",
+  run: async (scope, target) => {
+    await bringTargetGameNear(scope, target);
+    return runAsApp(listMyGames, harnessTx, scope, {});
+  },
 });
 
 registerIsolationCase({

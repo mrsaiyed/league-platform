@@ -119,6 +119,16 @@ export const en = {
     'This person has left the team, so their entry can no longer be changed.',
   'error.teams.mark_left.already-left': 'This person is already marked as having left.',
   'error.teams.mark_left.left-before-joined': 'The leaving date is before the day they joined.',
+  // Why assigning a scorekeeper was refused (T-187).
+  'error.games.assign_scorekeeper.game-not-found': 'That game is not there.',
+  'error.games.assign_scorekeeper.game-closed':
+    'That game is already decided or cancelled, so there is nothing left to score.',
+  'error.games.assign_scorekeeper.cannot-score-game':
+    'That person cannot score this game. Give them the scorekeeper role first.',
+  'error.games.assign_scorekeeper.already-assigned':
+    'That person is already assigned to this game.',
+  'error.games.unassign_scorekeeper.game-not-found': 'That game is not there.',
+  'error.games.unassign_scorekeeper.not-assigned': 'That person is not assigned to this game.',
   // Activity log lines (A-6, T-226): the key is `activity.` and the command's name;
   // the values come from the entry's details. {role} is a role's name from above.
   'activity.access.invite': 'Invited someone as {role}',
@@ -145,6 +155,8 @@ export const en = {
   'activity.games.postpone_game': 'Postponed a game',
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
+  'activity.games.assign_scorekeeper': 'Assigned a scorekeeper to a game',
+  'activity.games.unassign_scorekeeper': 'Took a scorekeeper off a game',
   'activity.standings.rebuild_season': "Worked out a season's standings and totals again",
   'activity.people.create_person': 'Added a person',
   'activity.people.update_person': 'Changed a person',
