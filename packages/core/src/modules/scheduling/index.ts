@@ -12,3 +12,23 @@ export type {
   ScheduleState,
 } from './rules/schedule-types.ts';
 export { summarizePublish, type PublishSummary } from './rules/summarize-publish.ts';
+export { createCourt, type CreateCourtError } from './commands/create-court.ts';
+export { createVenue, type CreateVenueError } from './commands/create-venue.ts';
+export { listVenues } from './commands/list-venues.ts';
+export { removeCourt, type RemoveCourtError } from './commands/remove-court.ts';
+export { removeVenue, type RemoveVenueError } from './commands/remove-venue.ts';
+export { restoreCourt, type RestoreCourtError } from './commands/restore-court.ts';
+export { restoreVenue, type RestoreVenueError } from './commands/restore-venue.ts';
+export { updateCourt, type UpdateCourtError } from './commands/update-court.ts';
+export { updateVenue, type UpdateVenueError } from './commands/update-venue.ts';
+export type {
+  CourtChange,
+  CourtRecord,
+  NewCourt,
+  NewVenue,
+  SchedulingStore,
+  SchedulingTx,
+  VenueChange,
+  VenueRecord,
+  VenueWithCourts,
+} from './ports.ts';

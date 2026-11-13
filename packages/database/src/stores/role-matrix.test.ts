@@ -24,9 +24,24 @@ import {
   acceptInvitation,
   cancelInvitation,
   commands,
+  createCourt,
+  createDivision,
   createLeague,
   createSeason,
+  createVenue,
   invite,
+  listDivisions,
+  listVenues,
+  removeCourt,
+  removeDivision,
+  removeVenue,
+  reorderDivisions,
+  restoreCourt,
+  restoreDivision,
+  restoreVenue,
+  updateCourt,
+  updateDivision,
+  updateVenue,
   listAccess,
   listActivity,
   myAccess,
@@ -43,6 +58,7 @@ import {
   type Job,
   type LeaguesTx,
   type Permission,
+  type SchedulingTx,
 } from '@srleagues/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
@@ -51,16 +67,21 @@ import type { DatabaseHandle } from '../db/database-handle.ts';
 import {
   freshSchema,
   newAccount,
+  newCourt,
+  newDivision,
   newLeague,
   newProgram,
   newSeason,
+  newVenue,
   one,
   unique,
   type MadeLeague,
 } from '../schema/schema.test-helper.ts';
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
+import { divisionsStore } from './divisions-store.ts';
 import { leaguesStore } from './leagues-store.ts';
+import { schedulingStore } from './scheduling-store.ts';
 
 const actors = [
   'owner',
@@ -98,6 +119,7 @@ let db: DatabaseHandle;
 let staffId: string;
 let accessDeps: CommandDeps<AccessTx>;
 let leaguesDeps: CommandDeps<LeaguesTx>;
+let schedulingDeps: CommandDeps<SchedulingTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
@@ -105,12 +127,15 @@ beforeAll(async () => {
   const transaction = commandTransaction(db, (scope) => ({
     jobs: { enqueue: async (_job: Job) => {} },
     leagues: leaguesStore(scope, { platformStaff: [staffId] }),
+    divisions: divisionsStore(scope),
+    scheduling: schedulingStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));
   const rest = { log: () => {}, now: () => 0 };
   accessDeps = { transaction, events: [], ...rest };
   leaguesDeps = { transaction, events: [], ...rest };
+  schedulingDeps = { transaction, events: [], ...rest };
 });
 afterAll(async () => {
   await db.close();
@@ -245,7 +270,184 @@ function expectedActors(needs: CommandRequirement, scope: 'league' | 'program'):
   return allowed;
 }
 
+/** The binned stand-in: a row put in the bin, for the restore commands. */
+async function binned(table: 'divisions' | 'venues' | 'courts', id: string) {
+  await pglite.query(`update ${table} set deleted_at = now() where id = $1`, [id]);
+  return id;
+}
+
+/** A season of the default program, or of the league's other program. */
+const seasonIn = (league: League, program: boolean) =>
+  newSeason(pglite, league.leagueId, program ? league.programId : league.defaultProgramId);
+
+const divisionIn = async (league: League, program: boolean) =>
+  newDivision(pglite, league.leagueId, await seasonIn(league, program));
+
+/** A division command's two rows: a season of the default program, and of the other one. */
+function divisionRows(
+  command: string,
+  name: string,
+  needs: Permission,
+  prepare: (league: League, program: boolean) => Promise<unknown>,
+  run: Row['run'],
+): Row[] {
+  return [false, true].map((program) => ({
+    command,
+    name: `${name} ${program ? 'of one program' : 'of the default program'}`,
+    needs,
+    ...(program ? { scope: 'program' as const } : {}),
+    prepare: async (league) => ({ input: await prepare(league, program) }),
+    run,
+  }));
+}
+
+const divisionAndVenueRows: readonly Row[] = [
+  // Divisions are checked at their season's program (P4 §4): the owner and admins.
+  ...divisionRows(
+    'leagues.create_division',
+    'add a division',
+    'divisions.manage',
+    async (league, program) => ({
+      seasonId: await seasonIn(league, program),
+      name: 'Gold',
+    }),
+    (c, i) => createDivision(c, i, leaguesDeps),
+  ),
+  ...divisionRows(
+    'leagues.update_division',
+    'rename a division',
+    'divisions.manage',
+    async (league, program) => ({
+      divisionId: await divisionIn(league, program),
+      version: 1,
+      name: 'Renamed',
+    }),
+    (c, i) => updateDivision(c, i, leaguesDeps),
+  ),
+  ...divisionRows(
+    'leagues.reorder_divisions',
+    'order divisions',
+    'divisions.manage',
+    async (league, program) => {
+      const seasonId = await seasonIn(league, program);
+      return {
+        seasonId,
+        divisionIds: [await newDivision(pglite, league.leagueId, seasonId)],
+      };
+    },
+    (c, i) => reorderDivisions(c, i, leaguesDeps),
+  ),
+  ...divisionRows(
+    'leagues.remove_division',
+    'remove a division',
+    'divisions.manage',
+    async (league, program) => ({ divisionId: await divisionIn(league, program) }),
+    (c, i) => removeDivision(c, i, leaguesDeps),
+  ),
+  ...divisionRows(
+    'leagues.restore_division',
+    'restore a division',
+    'bin.restore',
+    async (league, program) => ({
+      divisionId: await binned('divisions', await divisionIn(league, program)),
+    }),
+    (c, i) => restoreDivision(c, i, leaguesDeps),
+  ),
+  ...divisionRows(
+    'leagues.list_divisions',
+    'see the divisions',
+    'divisions.manage',
+    async (league, program) => ({ seasonId: await seasonIn(league, program) }),
+    (c, i) => listDivisions(c, i, leaguesDeps),
+  ),
+  // Venues belong to the league, not to a program: league-wide, the scheduler's too.
+  {
+    command: 'scheduling.create_venue',
+    name: 'add a venue',
+    needs: 'venues.manage',
+    prepare: async () => ({ input: { name: 'Main gym' } }),
+    run: (c, i) => createVenue(c, i, schedulingDeps),
+  },
+  {
+    command: 'scheduling.update_venue',
+    name: 'edit a venue',
+    needs: 'venues.manage',
+    prepare: async (league) => ({
+      input: { venueId: await newVenue(pglite, league.leagueId), version: 1, name: 'Renamed' },
+    }),
+    run: (c, i) => updateVenue(c, i, schedulingDeps),
+  },
+  {
+    command: 'scheduling.remove_venue',
+    name: 'remove a venue',
+    needs: 'venues.manage',
+    prepare: async (league) => ({
+      input: { venueId: await newVenue(pglite, league.leagueId) },
+    }),
+    run: (c, i) => removeVenue(c, i, schedulingDeps),
+  },
+  {
+    command: 'scheduling.restore_venue',
+    name: 'restore a venue',
+    needs: 'bin.restore',
+    prepare: async (league) => ({
+      input: { venueId: await binned('venues', await newVenue(pglite, league.leagueId)) },
+    }),
+    run: (c, i) => restoreVenue(c, i, schedulingDeps),
+  },
+  {
+    command: 'scheduling.create_court',
+    name: 'add a court',
+    needs: 'venues.manage',
+    prepare: async (league) => ({
+      input: { venueId: await newVenue(pglite, league.leagueId), name: 'Court 1' },
+    }),
+    run: (c, i) => createCourt(c, i, schedulingDeps),
+  },
+  {
+    command: 'scheduling.update_court',
+    name: 'rename a court',
+    needs: 'venues.manage',
+    prepare: async (league) => {
+      const venueId = await newVenue(pglite, league.leagueId);
+      const courtId = await newCourt(pglite, league.leagueId, venueId);
+      return { input: { courtId, version: 1, name: 'Renamed' } };
+    },
+    run: (c, i) => updateCourt(c, i, schedulingDeps),
+  },
+  {
+    command: 'scheduling.remove_court',
+    name: 'remove a court',
+    needs: 'venues.manage',
+    prepare: async (league) => {
+      const venueId = await newVenue(pglite, league.leagueId);
+      return { input: { courtId: await newCourt(pglite, league.leagueId, venueId) } };
+    },
+    run: (c, i) => removeCourt(c, i, schedulingDeps),
+  },
+  {
+    command: 'scheduling.restore_court',
+    name: 'restore a court',
+    needs: 'bin.restore',
+    prepare: async (league) => {
+      const venueId = await newVenue(pglite, league.leagueId);
+      const courtId = await newCourt(pglite, league.leagueId, venueId);
+      return { input: { courtId: await binned('courts', courtId) } };
+    },
+    run: (c, i) => restoreCourt(c, i, schedulingDeps),
+  },
+  // Reading the schedule: the scheduler, scorekeepers, the owner and admins.
+  {
+    command: 'scheduling.list_venues',
+    name: 'see the venues and courts',
+    needs: 'schedule.read',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listVenues(c, i, schedulingDeps),
+  },
+];
+
 const rows: readonly Row[] = [
+  ...divisionAndVenueRows,
   // League settings (P4 §6) and seasons (P4 §3): the owner and admins (O-7).
   {
     command: 'leagues.set_name',
