@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { findCurrentLeague } from '../queries/index.ts';
 import { freshSchema, newLeague, one, type MadeLeague } from '../schema/schema.test-helper.ts';
-import { leaguesStore } from '../stores/index.ts';
+import { accessStore, activityLogStore, leaguesStore } from '../stores/index.ts';
 import { commandTransaction } from './command-transaction.ts';
 import { createDatabase } from './create-database.ts';
 import type { DatabaseHandle } from './database-handle.ts';
@@ -100,6 +100,8 @@ describe('commandTransaction', () => {
     const transaction = commandTransaction(db, (scope) => ({
       jobs: noJobs,
       leagues: leaguesStore(scope),
+      access: accessStore(scope),
+      activity: activityLogStore(scope),
     }));
     const deps = { transaction, events: [], log: () => {}, now: () => 0 };
     expect(await renameThenRefuse(context(a.leagueId, a.ownerId), {}, deps)).toEqual({

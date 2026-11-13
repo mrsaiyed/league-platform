@@ -18,6 +18,7 @@
 // once the apps wire one (none exists yet); the coverage test fails on a handler
 // exported from core until then.
 import type {
+  AccessTx,
   Command,
   CommandDeps,
   CommandError,
@@ -31,16 +32,21 @@ import type {
 import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import { openScope, transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
-import { jobsStore, leaguesStore } from '../stores/index.ts';
+import { accessStore, activityLogStore, jobsStore, leaguesStore } from '../stores/index.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
 /** Every module's stores, bound to the run's scope. Grows with each module. */
-export function harnessTx(scope: LeagueScope, jobs: JobQueue): LeaguesTx {
+export function harnessTx(scope: LeagueScope, jobs: JobQueue): LeaguesTx & AccessTx {
   // The run's account counts as our staff, so commands only staff may run are tried
   // too: the worst case for isolation.
   const platformStaff = scope.accountId === null ? [] : [scope.accountId];
-  return { jobs, leagues: leaguesStore(scope, { platformStaff }) };
+  return {
+    jobs,
+    leagues: leaguesStore(scope, { platformStaff }),
+    access: accessStore(scope),
+    activity: activityLogStore(scope),
+  };
 }
 
 /**
@@ -112,7 +118,17 @@ export async function runInScope<Tx extends CommandTx>(
   };
   const result = await command(context, input, deps);
   if (!result.ok) throw new CommandRefused(command.commandName, result.error);
-  return { value: result.value, jobs };
+  return { value: result.value, jobs: jobs.map(withoutSecrets) };
+}
+
+/**
+ * A job's link token (an invitation's, T-226) is a fresh random secret, new in each
+ * run as a new row's id is, so it is set aside when runs are compared. No league's
+ * rows hold a token (only its hash), so no leak could be read from it anyway.
+ */
+function withoutSecrets(job: Job): Job {
+  if (!('token' in job.ids)) return job;
+  return { ...job, ids: { ...job.ids, token: '(new token)' } };
 }
 
 /** Adds a command to the harness, with input aimed at the target league's records. */
