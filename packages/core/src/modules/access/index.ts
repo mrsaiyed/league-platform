@@ -68,6 +68,7 @@ export {
   covers,
   leagueScope,
   roleScopeTypes,
+  scopeDetails,
   scopeTypes,
   type Scope,
   type ScopeType,

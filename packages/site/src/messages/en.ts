@@ -87,6 +87,14 @@ export const en = {
   'activity.leagues.set_status': "Changed the league's state to {status}",
   'activity.leagues.create_season': 'Added a season',
   'activity.leagues.set_current_season': 'Changed the current season',
+  'activity.leagues.set_setting': 'Changed a setting',
+  'activity.leagues.clear_setting': 'Went back to the default for a setting',
+  // Setting labels (T5 §6, T-98): `setting.<key>.label`, shown on the admin screen.
+  'setting.members.startPage.label':
+    'Where members land first: the league home or their own team page',
+  // The words for that setting's choices: `setting.<key>.option.<choice>`.
+  'setting.members.startPage.option.leagueHome': 'The league home',
+  'setting.members.startPage.option.myTeam': 'Their own team page',
   // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
   // league's name, {role} a role's name from above, {days} how long a link works.
   'email.invitation.subject': 'You are invited to help run {league}',

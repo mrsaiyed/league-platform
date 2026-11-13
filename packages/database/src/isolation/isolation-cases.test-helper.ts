@@ -4,8 +4,14 @@ import {
   acceptInvitation,
   cancelInvitation,
   createLeague,
+  clearSetting,
+  clearSettingFor,
   createSeason,
+  defineSetting,
   invite,
+  setSetting,
+  setSettingFor,
+  settingRegistry,
   listAccess,
   listActivity,
   myAccess,
@@ -17,7 +23,9 @@ import {
   setLeagueStatus,
 } from '@srleagues/core';
 import { createHash, randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import {
+  deleteSettingValue,
   findCurrentLeague,
   findInvitation,
   findInvitationByTokenHash,
@@ -42,11 +50,13 @@ import {
   insertLeague,
   insertSeason,
   listPrograms,
+  listSettingValues,
   renameLeagueSlug,
   setCurrentSeason,
   settleJob,
   updateLeagueName,
   updateLeagueStatus,
+  writeSettingValue,
 } from '../queries/index.ts';
 import {
   harnessTx,
@@ -124,6 +134,76 @@ registerCommandCase(setLeagueStatus, harnessTx, {
 registerCommandCase(createSeason, harnessTx, {
   name: "add a season to the league's default program",
   input: () => ({ slug: 'harness-season', name: 'Harness season' }),
+});
+
+registerCommandCase(setSetting, harnessTx, {
+  name: "set the league's start page for members as its owner",
+  input: () => ({ level: 'league', key: 'members.startPage', value: 'myTeam', version: 1 }),
+});
+
+registerCommandCase(clearSetting, harnessTx, {
+  name: "clear the league's start page for members as its owner",
+  input: () => ({ level: 'league', key: 'members.startPage', version: 1 }),
+});
+
+// The product declares its one setting at the league only, so the program and season
+// places are tried through the same commands over a setting that allows all three.
+const reminderHours = defineSetting({
+  key: 'notifications.reminderLeadHours',
+  type: z.number().int().min(1).max(72),
+  default: 24,
+  levels: ['league', 'program', 'season'],
+  permission: 'league.settings',
+  label: 'setting.notifications.reminderLeadHours.label',
+});
+const startPageEverywhere = defineSetting({
+  key: 'members.startPage',
+  type: z.enum(['leagueHome', 'myTeam']),
+  default: 'leagueHome',
+  levels: ['league', 'program', 'season'],
+  permission: 'league.settings',
+  label: 'setting.members.startPage.label',
+});
+const allLevels = settingRegistry([reminderHours, startPageEverywhere]);
+const setAtAnyLevel = setSettingFor(allLevels);
+const clearAtAnyLevel = clearSettingFor(allLevels);
+
+registerIsolationCase({
+  subject: setSetting,
+  name: "set a value at the target's program",
+  run: (scope, target) =>
+    runInScope(setAtAnyLevel, harnessTx, scope, {
+      level: 'program',
+      programId: target.programId,
+      key: reminderHours.key,
+      value: 12,
+      version: null,
+    }),
+});
+
+registerIsolationCase({
+  subject: setSetting,
+  name: "set a value at the target's season",
+  run: (scope, target) =>
+    runInScope(setAtAnyLevel, harnessTx, scope, {
+      level: 'season',
+      seasonId: target.seasonId,
+      key: reminderHours.key,
+      value: 12,
+      version: null,
+    }),
+});
+
+registerIsolationCase({
+  subject: clearSetting,
+  name: "clear the target's program value at version 1",
+  run: (scope, target) =>
+    runInScope(clearAtAnyLevel, harnessTx, scope, {
+      level: 'program',
+      programId: target.programId,
+      key: 'members.startPage',
+      version: 1,
+    }),
 });
 
 registerCommandCase(setCurrentSeasonCommand, harnessTx, {
@@ -219,6 +299,100 @@ registerIsolationCase({
   subject: setCurrentSeason,
   name: "make the target's season current",
   run: (scope, target) => setCurrentSeason(scope, target.seasonId),
+});
+
+// Setting values (step 2.14) ---------------------------------------------------------
+
+registerIsolationCase({
+  subject: listSettingValues,
+  name: "read a key at the scope's league and the target's program and season",
+  run: (scope, target) =>
+    listSettingValues(scope, 'members.startPage', {
+      programId: target.programId,
+      seasonId: target.seasonId,
+    }),
+});
+
+registerIsolationCase({
+  subject: writeSettingValue,
+  name: "add a value at the scope's league",
+  run: (scope) =>
+    writeSettingValue(
+      scope,
+      { level: 'league' },
+      'notifications.reminderLeadHours',
+      { version: 1, value: 12 },
+      null,
+    ),
+});
+
+registerIsolationCase({
+  subject: writeSettingValue,
+  name: "change the target's program value at version 1",
+  run: (scope, target) =>
+    writeSettingValue(
+      scope,
+      { level: 'program', programId: target.programId },
+      'members.startPage',
+      { version: 1, value: 'changed' },
+      1,
+    ),
+});
+
+registerIsolationCase({
+  subject: writeSettingValue,
+  name: "add a value at the target's program",
+  run: (scope, target) =>
+    writeSettingValue(
+      scope,
+      { level: 'program', programId: target.programId },
+      'notifications.reminderLeadHours',
+      { version: 1, value: 12 },
+      null,
+    ),
+});
+
+registerIsolationCase({
+  subject: writeSettingValue,
+  name: "add a value at the target's season",
+  run: (scope, target) =>
+    writeSettingValue(
+      scope,
+      { level: 'season', seasonId: target.seasonId },
+      'notifications.reminderLeadHours',
+      { version: 1, value: 12 },
+      null,
+    ),
+});
+
+registerIsolationCase({
+  subject: deleteSettingValue,
+  name: "clear the target's program value at version 1",
+  run: (scope, target) =>
+    deleteSettingValue(
+      scope,
+      { level: 'program', programId: target.programId },
+      'members.startPage',
+      1,
+    ),
+});
+
+registerIsolationCase({
+  subject: deleteSettingValue,
+  name: "clear the target's season value at version 1",
+  run: (scope, target) =>
+    deleteSettingValue(
+      scope,
+      { level: 'season', seasonId: target.seasonId },
+      'members.startPage',
+      1,
+    ),
+});
+
+registerIsolationCase({
+  subject: deleteSettingValue,
+  name: "clear the scope's league value at version 1",
+  run: (scope) => deleteSettingValue(scope, { level: 'league' }, 'members.startPage', 1),
 });
 
 // Access (step 1.12) ------------------------------------------------------------------
