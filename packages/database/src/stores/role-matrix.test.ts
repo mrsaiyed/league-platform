@@ -30,6 +30,7 @@ import {
   createPerson,
   clearSettingFor,
   createSeason,
+  createTeam,
   createVenue,
   invite,
   listDivisions,
@@ -38,6 +39,7 @@ import {
   removeCourt,
   removeDivision,
   removePerson,
+  removeTeam,
   removeVenue,
   reorderDivisions,
   restoreCourt,
@@ -46,6 +48,8 @@ import {
   updateCourt,
   updateDivision,
   updatePerson,
+  setTeamStatsVisibility,
+  updateTeam,
   updateVenue,
   declaredSettings,
   defineSetting,
@@ -70,6 +74,7 @@ import {
   type PeopleTx,
   type SchedulingTx,
   type SettingRegistry,
+  type TeamsTx,
 } from '@srleagues/core';
 import { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -85,6 +90,7 @@ import {
   newPerson,
   newProgram,
   newSeason,
+  newTeam,
   newVenue,
   one,
   unique,
@@ -96,6 +102,7 @@ import { divisionsStore } from './divisions-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 import { peopleStore } from './people-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
+import { teamsStore } from './teams-store.ts';
 
 const actors = [
   'owner',
@@ -137,6 +144,7 @@ let accessDeps: CommandDeps<AccessTx>;
 let leaguesDeps: CommandDeps<LeaguesTx>;
 let schedulingDeps: CommandDeps<SchedulingTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
+let teamsDeps: CommandDeps<TeamsTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
@@ -147,6 +155,7 @@ beforeAll(async () => {
     divisions: divisionsStore(scope),
     scheduling: schedulingStore(scope),
     people: peopleStore(scope),
+    teams: teamsStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));
@@ -155,6 +164,7 @@ beforeAll(async () => {
   leaguesDeps = { transaction, events: [], ...rest };
   schedulingDeps = { transaction, events: [], ...rest };
   peopleDeps = { transaction, events: [], ...rest };
+  teamsDeps = { transaction, events: [], ...rest };
 });
 afterAll(async () => {
   await db.close();
@@ -319,6 +329,67 @@ function divisionRows(
     run,
   }));
 }
+
+/** A team command's two rows: a season of the default program, and of the other one. */
+function teamRows(
+  command: string,
+  name: string,
+  prepare: (league: League, program: boolean) => Promise<unknown>,
+  run: Row['run'],
+): Row[] {
+  return [false, true].map((program) => ({
+    command,
+    name: `${name} ${program ? 'of one program' : 'of the default program'}`,
+    needs: 'teams.manage',
+    ...(program ? { scope: 'program' as const } : {}),
+    prepare: async (league) => ({ input: await prepare(league, program) }),
+    run,
+  }));
+}
+
+const teamIn = async (league: League, program: boolean) =>
+  newTeam(pglite, league.leagueId, await seasonIn(league, program));
+
+// Teams are checked at their season's program (P4 §4): the owner and admins.
+const teamCommandRows: readonly Row[] = [
+  ...teamRows(
+    'teams.create_team',
+    'add a team',
+    async (league, program) => ({
+      seasonId: await seasonIn(league, program),
+      name: 'Hawks',
+      shortName: 'hawks',
+      statsVisibility: 'everyone',
+    }),
+    (c, i) => createTeam(c, i, teamsDeps),
+  ),
+  ...teamRows(
+    'teams.update_team',
+    'rename a team',
+    async (league, program) => ({
+      teamId: await teamIn(league, program),
+      version: 1,
+      name: 'Renamed',
+    }),
+    (c, i) => updateTeam(c, i, teamsDeps),
+  ),
+  ...teamRows(
+    'teams.remove_team',
+    'remove a team',
+    async (league, program) => ({ teamId: await teamIn(league, program) }),
+    (c, i) => removeTeam(c, i, teamsDeps),
+  ),
+  ...teamRows(
+    'teams.set_stats_visibility',
+    "set who sees a team's numbers",
+    async (league, program) => ({
+      teamId: await teamIn(league, program),
+      version: 1,
+      statsVisibility: 'staff',
+    }),
+    (c, i) => setTeamStatsVisibility(c, i, teamsDeps),
+  ),
+];
 
 const divisionAndVenueRows: readonly Row[] = [
   // Divisions are checked at their season's program (P4 §4): the owner and admins.
@@ -586,6 +657,7 @@ const peopleRows: readonly Row[] = [
 const rows: readonly Row[] = [
   ...divisionAndVenueRows,
   ...peopleRows,
+  ...teamCommandRows,
   ...settingRows(declaredSettings),
   ...settingRows(settingRegistry([bannerSetting])),
   // League settings (P4 §6) and seasons (P4 §3): the owner and admins (O-7).

@@ -21,6 +21,7 @@ import { currentLeague } from '../queries/find-current-league.ts';
 import { leagueStatusOf } from '../queries/league-status-of.ts';
 import { divisionSummary } from '../queries/division-summary.ts';
 import { personSummary, personSummaryWithSensitive } from '../queries/person-summary.ts';
+import { teamSummary } from '../queries/team-summary.ts';
 import { programSummary } from '../queries/program-summary.ts';
 import { courtSummary, venueSummary } from '../queries/venue-summary.ts';
 import './isolation-cases.test-helper.ts';
@@ -48,6 +49,8 @@ const reachNoLeagueData = new Map<unknown, string>([
   [divisionSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [venueSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [courtSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [teamSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [databasePackage.teamsStore, 'binds the team queries, each with its own cases, to a scope'],
   [
     databasePackage.divisionsStore,
     'binds the division queries, each with its own cases, to a scope',

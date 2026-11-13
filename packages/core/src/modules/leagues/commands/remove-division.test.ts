@@ -31,6 +31,19 @@ describe('removeDivision', () => {
     });
   });
 
+  it('refuses while a team not in the bin is in it', async () => {
+    const { db, deps, as } = memoryLeagues({
+      seasons,
+      divisions: [division(1)],
+      divisionsWithTeams: [divisionId(1)],
+    });
+    expect(await removeDivision(as(ownerId), { divisionId: divisionId(1) }, deps)).toEqual({
+      ok: false,
+      error: { code: 'division-has-teams' },
+    });
+    expect(db.state.divisions[0]?.binned).toBe(false);
+  });
+
   it('refuses one already in the bin or missing, and non-admins', async () => {
     const { deps, as } = memoryLeagues({ seasons, divisions: [division(1, { binned: true })] });
     expect(await removeDivision(as(ownerId), { divisionId: divisionId(1) }, deps)).toMatchObject({

@@ -159,6 +159,8 @@ export type DivisionsStore = {
   readonly setBinned: (divisionId: string, binned: boolean) => Promise<boolean | 'name-taken'>;
   /** Whether any division not in the bin sits under this one. */
   readonly hasLiveSubdivisions: (divisionId: string) => Promise<boolean>;
+  /** Whether any team not in the bin is in this division. */
+  readonly hasLiveTeams: (divisionId: string) => Promise<boolean>;
 };
 
 /**

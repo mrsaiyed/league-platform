@@ -29,6 +29,7 @@ import type {
   LeaguesTx,
   PeopleTx,
   SchedulingTx,
+  TeamsTx,
   TransactionRunner,
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
@@ -42,6 +43,7 @@ import {
   leaguesStore,
   peopleStore,
   schedulingStore,
+  teamsStore,
 } from '../stores/index.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
@@ -50,7 +52,7 @@ import type { LeagueRecords } from './two-leagues.test-helper.ts';
 export function harnessTx(
   scope: LeagueScope,
   jobs: JobQueue,
-): LeaguesTx & SchedulingTx & PeopleTx & AccessTx {
+): LeaguesTx & SchedulingTx & PeopleTx & TeamsTx & AccessTx {
   // The run's account counts as our staff, so commands only staff may run are tried
   // too: the worst case for isolation.
   const platformStaff = scope.accountId === null ? [] : [scope.accountId];
@@ -60,6 +62,7 @@ export function harnessTx(
     divisions: divisionsStore(scope),
     scheduling: schedulingStore(scope),
     people: peopleStore(scope),
+    teams: teamsStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
   };
