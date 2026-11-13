@@ -23,7 +23,8 @@ Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migrati
 
 - **2.17 People commands** — `.local/lanes/2.17-people-commands` — record 027 / T-239 — just opened.
 
-- **2.66 Engine clock mode and its switch** — `.local/lanes/2.66-clock-mode` — record 029 / T-241 — folder opened but no builder started yet (machine saturated: npm ci timed out); 2.57 was closed again, its numbers (record 030 / T-242) are free.
+- **2.66 Engine clock mode and its switch** — `.local/lanes/2.66-clock-mode` — record 029 / T-241 — builder started (run of 2026-11-13).
+- **1.27 Sturdy timing tests** — `.local/lanes/1.27-sturdy-tests` — none — builder started.
 
 Reserved now: next free migration 0010, record 031, T-243.
 
