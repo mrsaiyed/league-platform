@@ -41,5 +41,11 @@ export {
   mayOpenTracker,
   openAdminAreas,
 } from './rules/admin-area-access.ts';
-export { hiddenLeagueStatuses, isLeagueHidden, mayOpenLeague } from './rules/league-visibility.ts';
+export { platformPages, platformUrl, type PlatformPage } from './rules/platform-url.ts';
+export {
+  hiddenLeagueStatuses,
+  isLeagueHidden,
+  mayOpenLeague,
+  maySeeHiddenLeague,
+} from './rules/league-visibility.ts';
 export { isBlockedShortName, isShortNameFormat, isSystemShortName } from './short-names.ts';
