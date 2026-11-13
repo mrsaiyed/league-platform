@@ -33,6 +33,7 @@ The specification in `docs/specs/v1/` is the description of the product. If code
 - **Made-up data only.** Never hold production secrets, never connect to a production database, never run anything against production or a vendor account (T-201).
 - **The Al-Hadi tracker keeps working.** Do not change the behavior of `apps/live-stats`, `packages/sports` or their tests except as the build plan says. `npm run verify` must pass after every change (T-16).
 - Work on the build branch named in `docs/build/STATUS.md`. Never commit to `main`. Never push, force, rebase shared history or delete branches unless `STATUS.md` says the founder allowed it.
+- **`main` is the live Al-Hadi site.** Every push to `main` republishes `mrsaiyed.github.io/league-platform/` (the tracker at the root, the concept demo under `/demo/`), and it saves real games to the founder's Supabase project. Nothing reaches `main` without the founder's check, and the tracker's address does not change while its season is on.
 - Never skip checks or hooks to get a commit through. If a check fails, fix the cause.
 - Do not install global tools or change anything outside this repository.
 

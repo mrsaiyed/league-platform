@@ -9,7 +9,7 @@ The one file that says where the build is. Every run reads it first and updates 
 - **Branch:** `build/stage-1`
 - **Gate:** `npm run verify`
 - **Next step:** 1.11 Leagues
-- **Pushing to GitHub:** on hold, do not push. The founder said yes on 2026-11-12, but the GitHub repository is public, and a push would publish the specification, the legal brief and the business decisions to anyone. Waiting for the founder to make the repository private or to say that public is fine. Runs push only when this line starts with `allowed`.
+- **Pushing to GitHub:** allowed, for the build branch only (`git push origin build/stage-1`). The founder said yes on 2026-11-12 and confirmed that the repository being public is fine. Never push or merge to `main`: every push to `main` republishes the live Al-Hadi tracker site at `mrsaiyed.github.io/league-platform/`, which is in use for real games.
 
 States: `building` (take the next step) · `waiting-for-founder` (nothing can be done until the list below is answered) · `stage-review` (the stage is finished and waiting for the founder's check).
 
@@ -25,7 +25,8 @@ Open lanes when work runs side by side (runbook, section 3): the step, and the f
 Nothing blocks the next steps. These are wanted before stage 1 can be called done:
 
 - [ ] Turn on two-step sign-in for GitHub and the email account it recovers to (T-83).
-- [ ] Pushing: you said yes (2026-11-12). One thing first: the repository on GitHub is public, so anyone could read what is pushed. Make it private (GitHub → the repository → Settings → General → Danger Zone → Change visibility), or say that public is fine. Then the work is backed up off this computer after every step.
+- [x] Pushing: allowed, and public is fine (2026-11-12). The build branch is on GitHub and each run pushes after every step.
+- [ ] Seeing the new product online: GitHub Pages cannot run it, because Pages only serves fixed files and the product needs a server and a database. It can be seen on this computer once the web app shell exists (step 1.17). An address other people can open needs the Supabase and Render accounts below, with a Supabase project of its own, separate from the Al-Hadi tracker's.
 - [ ] League states (U-9), built as a simple version for you to confirm: owner can publish (draft→live), archive (live→archived) and un-archive; the owner cannot take a live league back to draft; only we can suspend, and lifting a suspension puts the league back to draft so the owner must publish again (recommended: this way a lift can never publish a league by surprise). Archived and suspended leagues are read-only. Also: are "mixed" leagues unlisted by default like youth (recommended yes)? And the offensive-words part of the blocked short-name list needs your word list or a go-ahead for ours.
 - [ ] Vendor accounts (Supabase, Render, Cloudflare, Resend, a domain) — not needed until the stage report asks for them.
 - [ ] Nothing to do now, but not yet checked: the league fence (step 1.7) assumes that the database user Supabase runs our migrations as is allowed to see past the fence, as it is on this computer. If it is not, some checks that must look at every league (is this short name free, does every league have its main program) will refuse to run rather than give a wrong answer, so nothing leaks, but leagues could not be created. One check settles it once a Supabase account exists; it goes on the stage report's checklist (record 008).
@@ -33,6 +34,8 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 ## Log
 
 Newest first. One line per step or event.
+
+- 2026-11-12 — Founder: pushing allowed and public is fine. Build branch pushed to GitHub at d4ccb71. The Al-Hadi tracker stays where it is, at the root of the Pages site, untouched until its season ends; the new product is not put on GitHub Pages (it cannot run there). Pushing the build branch does not republish the Pages site; only a push to `main` does.
 
 - 2026-11-12 — Founder's instructions: work side by side where steps do not have to wait for each other (runbook section 3 "Working side by side", lanes in the stage plan); pushing the build branch allowed but held until the public repository is made private or confirmed.
 
