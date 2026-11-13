@@ -19,7 +19,12 @@ import {
   startGoogle,
   type FlowDeps,
 } from './flows.ts';
-import { renewIfDue, sharedRenewal, sharedRenewalLimit } from './renew-session.ts';
+import {
+  renewIfDue,
+  sharedRenewal,
+  sharedRenewalLimit,
+  sharedRenewalSeconds,
+} from './renew-session.ts';
 import { createSignInMail } from './sign-in-mail.ts';
 
 const origin = 'http://localhost:3000';
@@ -402,6 +407,29 @@ describe('staying signed in (T-69, T-70)', () => {
       accessToken: b.jar.get(cookieNames.session) ?? '',
     });
     expect(who.ok).toBe(true);
+  });
+
+  it('after the shared 30 seconds, the old renewing token ends the session (T4 §3)', async () => {
+    expect(sharedRenewalSeconds).toBe(30);
+    const env = setup();
+    const b = browser();
+    await signUp(env, b, 'me@example.test');
+    const renew = sharedRenewal(
+      (refreshToken) => env.deps.signIn.renew({ refreshToken }),
+      env.deps.now,
+    );
+    env.advanceSeconds(61 * 60);
+    b.jar.delete(cookieNames.session);
+    const oldRenew = b.jar.get(cookieNames.renew) ?? '';
+    const options = b.cookies.get(cookieNames.renew)!.options;
+    await renewIfDue(b.jar, renew, false, env.deps.now);
+    const renewed = b.jar.get(cookieNames.session) ?? '';
+    env.advanceSeconds(sharedRenewalSeconds + 1);
+    const thief = browser('198.51.100.66');
+    thief.jar.set(cookieNames.renew, oldRenew, options);
+    await renewIfDue(thief.jar, renew, false, env.deps.now);
+    expect(thief.jar.get(cookieNames.session)).toBeUndefined();
+    expect((await env.deps.signIn.identify({ accessToken: renewed })).ok).toBe(false);
   });
 
   it('clears the cookies when the session has ended', async () => {

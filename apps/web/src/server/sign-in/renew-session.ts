@@ -8,7 +8,7 @@
 // fetches), all with the same old token: so renewals of one token in this server are
 // shared, and for a short while a late request with the token just used gets the
 // same new tokens instead of ending the session. That window is this server's only:
-// two servers do not share it (record 031).
+// two servers do not share it (record 031, T4 §3 under T-69).
 import type { Result } from '@srleagues/core';
 import type { RenewError, SessionTokens } from '@srleagues/providers';
 import { createHash } from 'node:crypto';
