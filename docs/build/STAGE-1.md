@@ -50,7 +50,7 @@ Each step is done when its done test passes, the gate passes, the independent re
 
 ### F. Proving it
 
-- [ ] **1.21 Seed leagues.** Two made-up leagues with different designs, admins and members, loaded by one command. No real people. _Spec: T-195. Model: haiku._
+- [x] **1.21 Seed leagues.** Two made-up leagues with different designs, admins and members, loaded by one command. No real people. _Spec: T-195. Model: haiku._
 - [ ] **1.22 Browser tests for the exit test.** In a real browser: two leagues at two addresses with different looks; a person signs in, closes the browser, returns and is still signed in; an admin of the first is refused everywhere in the second; an invitation email is captured and its link works. Accessibility checks on each screen (T-186). _Spec: T10 stage 1, T9 §2. Model: sonnet._
 - [x] **1.23 CI.** The GitHub workflow runs the new gate. Nothing is pushed by a run; this only edits the file. _Model: haiku._
 - [ ] **1.24 Records.** A decision record for each choice in T1 that stage 1 used, and for every decision made along the way. `docs/operations/` gets "run it locally" and "apply migrations". _Spec: T9 §5. Model: haiku to draft, lead to check._
