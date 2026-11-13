@@ -52,6 +52,10 @@ const reachNoLeagueData = new Map<unknown, string>([
   [venueSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [courtSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [teamSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [
+    databasePackage.seedLeaguesInto,
+    'loads made-up leagues through the product commands (each with its own cases), one league at a time',
+  ],
   [databasePackage.teamsStore, 'binds the team queries, each with its own cases, to a scope'],
   [
     databasePackage.divisionsStore,
