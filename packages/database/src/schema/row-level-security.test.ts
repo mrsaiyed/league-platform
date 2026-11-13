@@ -401,6 +401,135 @@ const leagueTables: LeagueTable[] = [
       [leagueId, ownerId],
     ],
   },
+  // The live game, the calculated tables and imports (step 2.4). A game has one
+  // scoring session and one state, so each of those takes a game that has none yet
+  // (the games entry above adds one each time); a person has one line per game and
+  // one total per season, so those come with a person of their own.
+  {
+    table: 'scoring_sessions',
+    key: 'league_id',
+    touch: 'update scoring_sessions set device_id = device_id where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId, { ownerId }) => [
+      `insert into scoring_sessions (league_id, game_id, account_id, device_id, held_until)
+       values ($1, (select g.id from games g where g.league_id = $1 and not exists (
+         select 1 from scoring_sessions s where s.game_id = g.id) order by g.id limit 1),
+         $2, 'made-up-device', now() + interval '2 minutes')`,
+      [leagueId, ownerId],
+    ],
+  },
+  {
+    table: 'game_events',
+    key: 'league_id',
+    touch: 'update game_events set type = type where league_id = $1',
+    canUpdate: false,
+    canDelete: false,
+    insert: (leagueId) => [
+      `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at)
+       values ($1, (select id from games where league_id = $1 order by id limit 1),
+         (select coalesce(max(e.seq), 0) + 1 from game_events e where e.game_id =
+           (select id from games where league_id = $1 order by id limit 1)),
+         $2, 'start', '{}', now())`,
+      [leagueId, randomUUID()],
+    ],
+  },
+  {
+    table: 'game_states',
+    key: 'league_id',
+    touch: 'update game_states set seq = seq where league_id = $1',
+    canUpdate: true,
+    // A state stays while its game does.
+    canDelete: false,
+    insert: (leagueId) => [
+      `insert into game_states (league_id, game_id, state)
+       values ($1, (select g.id from games g where g.league_id = $1 and not exists (
+         select 1 from game_states s where s.game_id = g.id) order by g.id limit 1),
+         '{"version": 1}')`,
+      [leagueId],
+    ],
+  },
+  {
+    table: 'player_game_stats',
+    key: 'league_id',
+    touch: 'update player_game_stats set played = played where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId) => [
+      `with person as (
+         insert into people (league_id, first_name, last_name)
+         values ($1, 'Made-up', $2) returning id
+       )
+       insert into player_game_stats (league_id, game_id, team_id, person_id, played, stats)
+       select $1, g.id, g.home_team_id, person.id, true, '{"points": 2}'
+       from person, (select * from games where league_id = $1 order by id limit 1) g`,
+      [leagueId, unique('Player')],
+    ],
+  },
+  {
+    table: 'standings_rows',
+    key: 'league_id',
+    touch: 'update standings_rows set rank = rank where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId, { defaultProgramId }) => [
+      `with season as (
+         insert into seasons (league_id, program_id, slug, name)
+         values ($1, $2, $3, 'Made-up Season') returning id
+       ), team as (
+         insert into teams (league_id, season_id, slug, name, stats_visibility)
+         select $1, season.id, 'first', 'First', 'everyone' from season returning id, season_id
+       )
+       insert into standings_rows (league_id, season_id, team_id, rank, seed, games_played, wins)
+       select $1, team.season_id, team.id, 1, 1, 1, 1 from team`,
+      [leagueId, defaultProgramId, unique('season')],
+    ],
+  },
+  {
+    table: 'standings_adjustments',
+    key: 'league_id',
+    touch: 'update standings_adjustments set reason = reason where league_id = $1',
+    canUpdate: true,
+    // Removed adjustments go to the bin.
+    canDelete: false,
+    insert: (leagueId, { ownerId }) => [
+      `insert into standings_adjustments (league_id, season_id, team_id, points, reason, account_id)
+       values ($1, (select season_id from teams where league_id = $1 order by id limit 1),
+         (select id from teams where league_id = $1 order by id limit 1),
+         -2, 'Late roster', $2)`,
+      [leagueId, ownerId],
+    ],
+  },
+  {
+    table: 'season_player_totals',
+    key: 'league_id',
+    touch: 'update season_player_totals set games_played = games_played where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId) => [
+      `with person as (
+         insert into people (league_id, first_name, last_name)
+         values ($1, 'Made-up', $2) returning id
+       )
+       insert into season_player_totals (league_id, season_id, person_id, games_played)
+       select $1, (select id from seasons where league_id = $1 order by id limit 1), person.id, 1
+       from person`,
+      [leagueId, unique('Player')],
+    ],
+  },
+  {
+    table: 'imports',
+    key: 'league_id',
+    touch: 'update imports set status = status where league_id = $1',
+    canUpdate: true,
+    // The record of what was brought in and undone stays.
+    canDelete: false,
+    insert: (leagueId, { ownerId }) => [
+      `insert into imports (league_id, kind, account_id, file_name)
+       values ($1, 'people', $2, 'people.csv')`,
+      [leagueId, ownerId],
+    ],
+  },
 ];
 
 const count = async (tx: Transaction | PGlite, sql: string, params: unknown[] = []) =>
