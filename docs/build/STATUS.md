@@ -49,6 +49,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Lead: the check that guards main was too wide and too narrow at once. It refused any new file in packages/sports/src (where the stage plan puts standings and statistics), yet missed three files and one library that the tracker's browser code really pulls in. scripts/promote-to-main.mjs now asks the bundler for the exact list and compares those files, the tracker's own folders, the publish workflow, the bundled library versions and the build command; beside the engine it allows new files only. This settles the earlier 'someone has to decide' note: every file the live site is built from is the same as on main. Stage plans ticked to match this log.
 - 2026-11-13 — Step 1.23 done: ci.yml sets NEXT_TELEMETRY_DISABLED (job already ran npm ci and npm run verify on Node 24); YAML checked by eye only.
 - 2026-11-13 — Step 1.18 part 2 done: league design, header, menu, footer in the web shell, T-187 hard-coded-text scan. Stand-in league sites in apps/web/src/server/stand-in-league-sites.ts (TODO for 1.21). Gate green in main folder. Vitest 'Timeout calling onTaskUpdate' and isolation test 90s limit seen under load: a sturdiness step is still wanted.
 - 2026-11-13 — Step 1.23 done: ci.yml sets NEXT_TELEMETRY_DISABLED (the job already ran npm ci and npm run verify on Node 24); YAML checked by eye only.
