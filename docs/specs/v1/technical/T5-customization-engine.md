@@ -123,7 +123,7 @@ defineSetting({
 ```
 
 - **T-98:** the admin screens for settings are generated from these declarations, so a setting cannot exist without a default, limits, a label and a permission.
-- A value is looked up from most specific to least: season, then program, then league, then our default.
+- A value is looked up from most specific to least: season, then program, then league, then our default. The values an admin sets are kept in `setting_values`, one row per key and place ([T3](T3-data-model.md) section 4, T-231).
 - **Wording** (U-4) is the same idea for labels: components ask for `word('division')` and get "Conference" in Faraj.
 - Settings that affect results (season rules) are versioned and locked as described in S-1.
 

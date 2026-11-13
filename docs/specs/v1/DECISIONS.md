@@ -240,6 +240,7 @@ All dated November 12, 2026.
 | T-212                 | Nothing from a later stage is built early                                    | Later-stage work is built early whenever it does not have to wait (record 011)                                | The founder asked for every stage that can be built in parallel to be built in parallel            |
 | T-224                 | New                                                                          | Jobs recorded in our own fenced `jobs` table; pg-boss runs them in production (record 012)                    | Step 1.19: pg-boss's tables have no league fence, so a job there would be open to every league     |
 | T-225                 | New                                                                          | Sign-in numbers and the shape of the sign-in interface (record 013)                                           | Step 1.13 turned "a few" and "for a while" into numbers the stand-in and Supabase share            |
+| T-231                 | New                                                                          | Setting values kept in one `setting_values` table, one row per key and place (record 019)                     | Step 2.1: T3 did not say where the values of T5 section 6's settings are stored                    |
 
 ## The full list
 
@@ -480,6 +481,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-51  | The bin holds soft-deleted rows for 30 days, then a nightly job removes them for good                                                                                             | Agreed (delegated) |         |
 | T-52  | When a person leaves a league (R-17), their `people` row loses its name, contact details and link, and their statistics rows remain attached to the now-nameless record           | Agreed (delegated) |         |
 | T-220 | History keeps ids, so erasure and purging never rewrite it: an erased account's row is emptied in place, and a purged league's history is removed only by one owner-only function | Agreed (delegated) | yes     |
+| T-231 | Setting values an admin sets are kept in one `setting_values` table, one row per key at the league, a program or a season, each a small versioned document (record 019)           | Agreed (delegated) |         |
 
 ### [T4 — Keeping leagues apart, sign-in, security](technical/T4-tenancy-auth-security.md)
 
