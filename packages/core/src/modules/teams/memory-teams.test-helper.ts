@@ -7,7 +7,7 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
-import type { TeamRecord, TeamsTx } from './ports.ts';
+import type { RosterEntryRecord, TeamRecord, TeamsTx } from './ports.ts';
 
 export type MemoryTeams = {
   status: string;
@@ -15,6 +15,11 @@ export type MemoryTeams = {
   seasons: { id: string; programId: string }[];
   divisions: { id: string; seasonId: string; binned: boolean }[];
   teams: TeamRecord[];
+  /** People of the league (not merged away), in or out of the bin. */
+  people: { id: string; firstName: string; lastName: string; binned: boolean }[];
+  roster: RosterEntryRecord[];
+  /** The season asks for unique jersey numbers in a team (0008). */
+  uniqueJerseys: boolean;
   grants: Grant[];
   activity: ActivityEntry[];
 };
@@ -27,6 +32,10 @@ export const seasonId = '01900000-0000-7000-8000-0000000000c1';
 export const otherSeasonId = '01900000-0000-7000-8000-0000000000c2';
 export const divisionId = '01900000-0000-7000-8000-0000000d0001';
 export const otherSeasonDivisionId = '01900000-0000-7000-8000-0000000d0002';
+export const personUuid = (n: number) =>
+  `01900000-0000-7000-8000-0000000b${String(n).padStart(4, '0')}`;
+export const entryUuid = (n: number) =>
+  `01900000-0000-7000-8000-0000000e${String(n).padStart(4, '0')}`;
 export const teamUuid = (n: number) =>
   `01900000-0000-7000-8000-0000000a${String(n).padStart(4, '0')}`;
 
@@ -50,6 +59,25 @@ export function team(n: number, fields: Partial<TeamRecord> = {}): TeamRecord {
     statsVisibility: 'everyone',
     lineageId: `lineage-${n}`,
     binned: false,
+    version: 1,
+    ...fields,
+  };
+}
+
+export function person(n: number, binned = false) {
+  return { id: personUuid(n), firstName: `First${n}`, lastName: `Last${n}`, binned };
+}
+
+export function entry(n: number, fields: Partial<RosterEntryRecord> = {}): RosterEntryRecord {
+  return {
+    id: entryUuid(n),
+    teamId: teamUuid(1),
+    personId: personUuid(n),
+    jerseyNumber: null,
+    role: 'player',
+    joinedOn: null,
+    leftOn: null,
+    sort: n - 1,
     version: 1,
     ...fields,
   };
@@ -81,6 +109,9 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
     seasons,
     divisions,
     teams: [],
+    people: [],
+    roster: [],
+    uniqueJerseys: false,
     grants: [],
     activity: [],
     ...state,
@@ -139,6 +170,69 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
           if (found === undefined) return false;
           s.teams[at] = { ...found, binned, version: found.version + 1 };
           return true;
+        },
+        findPerson: async (id) => s.people.find((p) => p.id === id),
+        findRosterEntry: async (id) => s.roster.find((e) => e.id === id),
+        listRoster: async (teamId) =>
+          s.roster
+            .filter((e) => e.teamId === teamId)
+            .sort(
+              (a, b) => Number(a.leftOn !== null) - Number(b.leftOn !== null) || a.sort - b.sort,
+            )
+            .map((e) => {
+              const p = s.people.find((x) => x.id === e.personId);
+              return {
+                ...e,
+                firstName: p?.firstName ?? '',
+                lastName: p?.lastName ?? '',
+                publicName: null,
+              };
+            }),
+        addRosterEntry: async (e) => {
+          const mine = s.roster.filter((r) => r.teamId === e.teamId);
+          if (mine.some((r) => r.personId === e.personId && r.leftOn === null)) {
+            return 'already-on-team';
+          }
+          if (
+            s.uniqueJerseys &&
+            e.jerseyNumber !== null &&
+            mine.some((r) => r.leftOn === null && r.jerseyNumber === e.jerseyNumber)
+          ) {
+            return 'jersey-taken';
+          }
+          const id = entryUuid(s.roster.length + 1);
+          s.roster.push({
+            id,
+            ...e,
+            leftOn: null,
+            sort: Math.max(-1, ...mine.map((r) => r.sort)) + 1,
+            version: 1,
+          });
+          return id;
+        },
+        updateRosterEntry: async (id, change, version) => {
+          const at = s.roster.findIndex((e) => e.id === id);
+          const found = s.roster[at];
+          if (found === undefined || (version !== undefined && found.version !== version)) {
+            return undefined;
+          }
+          const next = { ...found, ...change, version: found.version + 1 };
+          if (
+            s.uniqueJerseys &&
+            change.jerseyNumber !== undefined &&
+            change.jerseyNumber !== null &&
+            s.roster.some(
+              (r) =>
+                r.id !== id &&
+                r.teamId === found.teamId &&
+                r.leftOn === null &&
+                r.jerseyNumber === change.jerseyNumber,
+            )
+          ) {
+            return 'jersey-taken';
+          }
+          s.roster[at] = next;
+          return next.version;
         },
         seasonProgramId: async (id) => s.seasons.find((x) => x.id === id)?.programId,
         findDivision: async (id) => s.divisions.find((d) => d.id === id),

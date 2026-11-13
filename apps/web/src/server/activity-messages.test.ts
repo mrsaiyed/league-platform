@@ -15,6 +15,7 @@ const reads = new Set([
   'people.list_people',
   'leagues.get_season',
   'scheduling.list_venues',
+  'teams.list_roster',
 ]);
 
 describe('activity log messages', () => {

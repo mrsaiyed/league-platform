@@ -46,8 +46,13 @@ import {
   updateVenue,
 } from './modules/scheduling/index.ts';
 import {
+  addToRoster,
+  changeRosterEntry,
   createTeam,
+  listRoster,
+  markLeft,
   removeTeam,
+  reorderRoster,
   setTeamStatsVisibility,
   updateTeam,
 } from './modules/teams/index.ts';
@@ -86,6 +91,11 @@ export const commands = commandRegistry([
   updateTeam,
   removeTeam,
   setTeamStatsVisibility,
+  addToRoster,
+  changeRosterEntry,
+  reorderRoster,
+  markLeft,
+  listRoster,
   setSetting,
   clearSetting,
   invite,
