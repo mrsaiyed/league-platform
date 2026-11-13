@@ -35,4 +35,11 @@ export {
   type LeaguePage,
   type LeagueUrlOptions,
 } from './rules/league-url.ts';
+export {
+  adminAreaPermissions,
+  holdsAnywhere,
+  mayOpenTracker,
+  openAdminAreas,
+} from './rules/admin-area-access.ts';
+export { hiddenLeagueStatuses, isLeagueHidden, mayOpenLeague } from './rules/league-visibility.ts';
 export { isBlockedShortName, isShortNameFormat, isSystemShortName } from './short-names.ts';
