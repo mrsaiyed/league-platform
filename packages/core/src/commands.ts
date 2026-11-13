@@ -34,12 +34,15 @@ import {
   setSeasonRosterSettings,
 } from './modules/leagues/index.ts';
 import {
+  assignScorekeeper,
   cancelGame,
+  listMyGames,
   listPostponedGames,
   postponeGame,
   recordFinalScore,
   recordForfeit,
   reopenGame,
+  unassignScorekeeper,
 } from './modules/games/index.ts';
 import { createPerson, listPeople, removePerson, updatePerson } from './modules/people/index.ts';
 import { rebuildStandings } from './modules/standings/index.ts';
@@ -116,6 +119,9 @@ export const commands = commandRegistry([
   cancelGame,
   reopenGame,
   listPostponedGames,
+  assignScorekeeper,
+  unassignScorekeeper,
+  listMyGames,
   rebuildStandings,
   createPerson,
   updatePerson,
