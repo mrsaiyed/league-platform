@@ -1,10 +1,10 @@
 // Scorer sign-in with the shared passcode, then back to where the scorer was going.
-import { api, getSession, siteHeader } from '/js/common.js';
+import { api, getSession, link, siteHeader } from './common.js';
 
 const $ = (id) => document.getElementById(id);
 // Only a path on this site, never another site's address.
-const asked = new URLSearchParams(location.search).get('next') ?? '/';
-const next = /^\/(?!\/)/.test(asked) ? asked : '/';
+const asked = new URLSearchParams(location.search).get('next') ?? '';
+const next = /^\/(?!\/)/.test(asked) ? asked : link.home();
 
 async function start() {
   const session = await getSession();

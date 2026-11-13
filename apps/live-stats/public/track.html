@@ -76,6 +76,13 @@
         <div class="lt-sync" id="lt-sync" role="status">Connecting…</div>
       </div>
 
+      <div class="lt-pregame" id="lt-pregame" hidden>
+        <div><b>Before tip-off</b> · <span id="lt-pregame-text"></span></div>
+        <button type="button" class="lt-btn lt-btn-save" id="lt-pregame-players">
+          Enter jersey numbers
+        </button>
+      </div>
+
       <div class="lt-final" id="lt-final" hidden>
         Final. Everything is saved.
         <button type="button" class="lt-btn" id="lt-reopen">Reopen game</button>
@@ -88,8 +95,30 @@
               ><span class="lt-court-team" id="lt-court-name-home"></span
               ><span class="lt-bonus" id="lt-bonus-home" hidden></span
             ></span>
-            <span class="lt-team-fouls" id="lt-fouls-home"></span>
+            <span class="lt-court-counts"
+              ><span class="lt-team-fouls" id="lt-fouls-home"></span
+              ><button
+                type="button"
+                class="lt-team-to lt-team-tmo"
+                id="lt-tmo-home"
+                data-tmo-side="home"
+                aria-expanded="false"
+                aria-controls="lt-tmo-list-home"
+                title="Timeouts left: tap to call one"
+              ></button
+              ><button
+                type="button"
+                class="lt-team-to"
+                id="lt-to-home"
+                data-to-side="home"
+                aria-expanded="false"
+                aria-controls="lt-to-list-home"
+                title="Team turnovers: tap to see each player's"
+              ></button
+            ></span>
           </div>
+          <div class="lt-to-list lt-tmo-list" id="lt-tmo-list-home" hidden></div>
+          <div class="lt-to-list" id="lt-to-list-home" hidden></div>
           <div class="lt-floor" id="lt-floor-home"></div>
           <div class="lt-bench-title">Bench</div>
           <div class="lt-bench" id="lt-bench-home"></div>
@@ -100,8 +129,30 @@
               ><span class="lt-court-team" id="lt-court-name-away"></span
               ><span class="lt-bonus" id="lt-bonus-away" hidden></span
             ></span>
-            <span class="lt-team-fouls" id="lt-fouls-away"></span>
+            <span class="lt-court-counts"
+              ><span class="lt-team-fouls" id="lt-fouls-away"></span
+              ><button
+                type="button"
+                class="lt-team-to lt-team-tmo"
+                id="lt-tmo-away"
+                data-tmo-side="away"
+                aria-expanded="false"
+                aria-controls="lt-tmo-list-away"
+                title="Timeouts left: tap to call one"
+              ></button
+              ><button
+                type="button"
+                class="lt-team-to"
+                id="lt-to-away"
+                data-to-side="away"
+                aria-expanded="false"
+                aria-controls="lt-to-list-away"
+                title="Team turnovers: tap to see each player's"
+              ></button
+            ></span>
           </div>
+          <div class="lt-to-list lt-tmo-list" id="lt-tmo-list-away" hidden></div>
+          <div class="lt-to-list" id="lt-to-list-away" hidden></div>
           <div class="lt-floor" id="lt-floor-away"></div>
           <div class="lt-bench-title">Bench</div>
           <div class="lt-bench" id="lt-bench-away"></div>
@@ -109,15 +160,45 @@
       </div>
 
       <p class="lt-hint">
-        Tap a player for +1, +2, +3, a foul or −Foul. Tap someone on the bench to sub them in, or
-        drag them onto whoever is coming off. Every tap is saved to the database.
+        Tap a player for +1, +2, +3, a foul, −Foul or a turnover (TO). Tap a team's turnovers to see
+        each player's, or its timeouts to call one. A foul or a timeout stops the clock. Tap someone
+        on the bench to sub them in, or drag them onto whoever is coming off. Every tap is saved to
+        the database.
       </p>
 
       <div class="lt-log-wrap">
-        <div class="lt-log-title">Play log</div>
+        <div class="lt-log-title">
+          Play log <span class="lt-log-count" id="lt-log-count"></span>
+        </div>
         <div class="lt-log" id="lt-log"></div>
       </div>
       <div class="lt-msg" id="lt-msg" role="status" aria-live="polite"></div>
+    </div>
+
+    <!-- Over everything while the clock is stopped, but only the card takes taps: the
+         players, subs and buttons around it keep working. -->
+    <div class="lt-go" id="lt-go" hidden>
+      <div class="lt-go-card" role="group" aria-labelledby="lt-go-title">
+        <div class="lt-go-row">
+          <button type="button" class="lt-go-start" id="lt-go-start">
+            <span class="lt-go-icon" aria-hidden="true">▶</span
+            ><span class="lt-go-text"
+              ><span class="lt-go-title" id="lt-go-title">Start clock</span
+              ><span class="lt-go-when" id="lt-go-when"></span
+            ></span>
+          </button>
+          <button
+            type="button"
+            class="lt-go-close"
+            id="lt-go-close"
+            title="Hide: keep scoring with the clock stopped"
+            aria-label="Hide: keep scoring with the clock stopped"
+          >
+            ×
+          </button>
+        </div>
+        <div class="lt-go-note" id="lt-go-note"></div>
+      </div>
     </div>
 
     <div class="lt-drawer-scrim" id="lt-scrim"></div>
@@ -136,8 +217,10 @@
       <form method="dialog" id="lt-format-form">
         <h2 id="lt-format-title">Game format</h2>
         <p class="lt-dialog-note">
-          Set before tip-off. Confirm the league's format; the quarters preset follows high-school
-          rules (team fouls reset each quarter, bonus on the 5th).
+          Set before tip-off. TCSAAL varsity plays NFHS rules: 8-minute quarters, team fouls reset
+          each quarter with the bonus on the 5th, and three full and two 30-second timeouts a game,
+          one more each overtime, none carried over. UIL (NFHS as written) carries unused timeouts
+          into overtime.
         </p>
         <label
           >Periods
@@ -157,8 +240,29 @@
           >Double bonus on team foul
           <input name="double" type="number" min="2" max="40" placeholder="none"
         /></label>
+        <label
+          >Full (60-second) timeouts <input name="full" type="number" min="0" max="10" required
+        /></label>
+        <label
+          >30-second timeouts <input name="short" type="number" min="0" max="10" required
+        /></label>
+        <label
+          >Timeouts are
+          <select name="per">
+            <option value="game">per game</option>
+            <option value="half">per half</option>
+          </select></label
+        >
+        <label
+          >Full timeouts each overtime
+          <input name="otTimeouts" type="number" min="0" max="5" required
+        /></label>
+        <label class="lt-dialog-check"
+          >Unused timeouts carry over <input name="carry" type="checkbox"
+        /></label>
         <div class="lt-dialog-actions">
-          <button type="button" class="lt-btn" id="lt-format-quarters">High school: 4 × 8</button>
+          <button type="button" class="lt-btn" id="lt-format-quarters">TCSAAL: 4 × 8</button>
+          <button type="button" class="lt-btn" id="lt-format-nfhs">UIL (NFHS): 4 × 8</button>
           <button type="button" class="lt-btn" id="lt-format-halves">Halves: 2 × 20</button>
           <span></span>
           <button value="cancel" class="lt-btn" formnovalidate>Cancel</button>

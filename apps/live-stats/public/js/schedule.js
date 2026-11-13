@@ -7,11 +7,12 @@ import {
   gameClockText,
   gameTypeLabel,
   getSession,
+  link,
   ourSide,
   serverClock,
   siteHeader,
   subscribe,
-} from '/js/common.js';
+} from './common.js';
 
 const $ = (id) => document.getElementById(id);
 let team = null;
@@ -36,16 +37,16 @@ function card(g) {
   } else status = '<span class="status">Scheduled</span>';
   const track =
     canScore && g.status !== 'final'
-      ? `<a class="btn btn-primary" href="/game/${esc(g.id)}/track">${g.status === 'live' ? 'Resume tracking' : 'Track live stats'}</a>`
+      ? `<a class="btn btn-primary" href="${esc(link.track(g.id))}">${g.status === 'live' ? 'Resume tracking' : 'Track live stats'}</a>`
       : '';
   return `<li class="game is-${esc(g.status)}">
-    <a class="game-when" href="/game/${esc(g.id)}">${when}</a>
+    <a class="game-when" href="${esc(link.game(g.id))}">${when}</a>
     <div class="game-main">
       <div class="game-title"><span class="ha">${us === 'home' ? 'vs' : '@'}</span>${esc(them.name)}</div>
       <div class="game-meta"><span class="tag">${us === 'home' ? 'Home' : 'Away'}</span>${g.gameType !== 'regular_season' ? `<span class="tag tag-ex">${esc(gameTypeLabel(g.gameType))}</span>` : ''}${esc(g.venue)}${g.venueAddress ? ` · ${esc(g.venueAddress)}` : ''}</div>
     </div>
     <div class="game-status">${status}</div>
-    <div class="game-actions">${track}<a class="btn" href="/game/${esc(g.id)}">${g.status === 'scheduled' ? 'Game page' : g.status === 'live' ? 'Watch live' : 'Box score'}</a></div>
+    <div class="game-actions">${track}<a class="btn" href="${esc(link.game(g.id))}">${g.status === 'scheduled' ? 'Game page' : g.status === 'live' ? 'Watch live' : 'Box score'}</a></div>
   </li>`;
 }
 
@@ -80,6 +81,8 @@ function tickClocks() {
 async function start() {
   session = await getSession();
   canScore = session.canScore;
+  // The header straight away, even if the schedule cannot load.
+  $('site-header').innerHTML = siteHeader('schedule', null, session);
   const data = await api('/api/schedule').catch((err) => {
     $('games').innerHTML = `<li class="empty">${esc(err.message)}</li>`;
     return null;

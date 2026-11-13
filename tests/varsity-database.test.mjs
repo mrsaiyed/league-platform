@@ -63,10 +63,11 @@ test('PostgreSQL persistence: atomic commands, isolation, aggregate rebuild and 
       await send({
         type: 'lineup',
         side,
+        // The five lowest numbers, so the roster's first player (who scores below) starts.
+        // Not the state's own order: jsonb keeps object keys sorted, here by random id.
         playerIds: Object.values(game.state.players)
           .filter((p) => p.side === side)
-          // jsonb reorders keys, so always keep the player scored below on the court
-          .sort((a, b) => Number(b.id === r.players[0].id) - Number(a.id === r.players[0].id))
+          .sort((a, b) => Number(a.jersey) - Number(b.jersey))
           .slice(0, 5)
           .map((p) => p.id),
       });

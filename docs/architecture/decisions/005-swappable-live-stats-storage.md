@@ -14,8 +14,11 @@ Adapters today:
 
 - `PostgresRepository`: embedded PGlite locally, and any hosted PostgreSQL (Supabase first) through the `pg` driver.
 - `MemoryRepository`: documents in memory, for tests and demos, showing nothing depends on SQL.
+- `SupabaseRepository` (added November 2, 2026): the GitHub Pages site, which has no server. The browser runs the same service and rules and reaches Supabase through the database functions in `002-api.sql`, with the public key. Reading is open; changes need a scorer session from the passcode. Recording an action saves only if the game is still at the revision the browser read; otherwise it reads again and decides again, as a transaction retry would.
 
 `tests/live-stats-storage.test.mjs` runs the same behaviour against every adapter, including PostgreSQL reached over the network the way a hosted database is. A new adapter is ready when it passes. `apps/live-stats/storage.ts` picks the adapter from the environment.
+
+Moving records between PostgreSQL databases (this computer's to Supabase, or Supabase's down to a folder as a backup) is a maintenance tool, `npm run stats:copy` (`packages/database/src/live-stats/copy.ts`), not part of the interface. It works on the shared schema directly and is tested in `tests/live-stats-supabase.test.mjs`.
 
 The browser never talks to the database. It talks to this app's server, so moving databases does not change the pages, and no database credentials reach a browser.
 

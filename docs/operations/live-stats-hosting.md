@@ -1,59 +1,136 @@
-# Putting live stats online
+# Live stats on GitHub Pages and Supabase
 
-**October 27, 2026 · Ready to deploy; not deployed yet**
+**November 2, 2026 · Site published and connected to the project `pkyqzruxoeliotnsvjnp`**
 
-The live stat tracker runs online as one small Node server with a hosted database. Anyone with the link can follow games live; only scorers who sign in with the scorer passcode can track stats or edit rosters.
+**The site:** <https://mrsaiyed.github.io/league-platform/>
 
-## What it needs
+Anyone can open it to see the schedule, follow a game live, and see box scores, the play-by-play, season stats and game logs. Scorers sign in with the scorer passcode to track games and edit rosters. The site saves to Supabase straight from the browser; there is no server to run or pay for. The earlier concept demo is now at <https://mrsaiyed.github.io/league-platform/demo/>.
 
-| Piece    | First choice                      | Requirement                                                                                                                              |
-| -------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Database | Supabase (PostgreSQL)             | Any PostgreSQL works. Another kind of database needs an adapter; see [storage](#changing-the-database).                                  |
-| Server   | Any host that runs a Dockerfile   | One always-on instance, HTTPS, long-lived responses (live updates). Render, Railway, Fly.io or a VPS all qualify; check current pricing. |
-| Settings | Environment variables on the host | Below. Keep the two secrets out of the repository.                                                                                       |
+Until Supabase is connected, the site says "This site is not connected to its database yet". The one-time setup below fixes that.
 
-| Variable                     | Value                                                                                                             |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`               | **Secret.** The database connection string.                                                                       |
-| `LIVE_STATS_SCORER_PASSCODE` | **Secret.** The passcode scorers sign in with; 12 characters or more is best (8 minimum).                         |
-| `LIVE_STATS_PUBLIC_URL`      | The site's address, e.g. `https://stats.example.org`. Turns on online mode.                                       |
-| `DATABASE_CA` (optional)     | The database's CA certificate, as text or a file path, so the server's identity is verified as well as encrypted. |
-| `PORT`                       | Set by most hosts automatically; the image defaults to 8080.                                                      |
+## One-time setup (about 15 minutes)
 
-## Steps with Supabase
+### 1. Create the Supabase project
 
-1. Create a Supabase project. Note the database password.
-2. Open **Connect** in the project and copy the **Session pooler** connection string; it works from hosts without IPv6. Put the database password into it.
-3. Optionally download the project's SSL certificate (database settings) for `DATABASE_CA`.
-4. On the host, create a web service from this repository's `Dockerfile` and set the variables above.
-5. Deploy. On first start the server creates its tables in a `live_stats` schema and loads the TCSAAL schedule. `/healthz` answers when it is up.
-6. Scorers open `/sign-in` once on each device they score from. Changing the passcode signs every device out.
+1. Sign in at [supabase.com](https://supabase.com) and choose **New project**.
+2. Name it (for example `alhadi-live-stats`). Choose a **region near Houston**, such as East US or Central US.
+3. Set a **database password** and keep it somewhere safe. The site never needs it; only the optional laptop tools below do.
+4. Choose the **Free** plan, create the project and wait a minute or two while it starts.
 
-The tables are in their own schema, which Supabase's automatic Data API does not publish, so they are reachable only with the database password that the server holds. Do not add `live_stats` to the API's exposed schemas.
+### 2. Create the tables, API and schedule
 
-## Running it well
+1. On GitHub, open [`supabase/setup.sql`](../../supabase/setup.sql), choose **Raw**, then select all and copy.
+2. In Supabase, open **SQL Editor**, start a new query, paste, and choose **Run**. It should finish with "Success. No rows returned".
 
-- **One instance.** Live updates go out from the server that saved the play. Running more than one needs a shared channel first (PostgreSQL `LISTEN/NOTIFY` or Supabase Realtime).
-- **Wake it before warm-ups.** Free plans that sleep when idle take a minute to wake; open the schedule before the game.
-- **Backups.** Check the database plan's backups, or take a `pg_dump` after each game day.
-- **Local games stay local.** Games tracked on a laptop before going online are not copied up automatically.
+It creates the stats tables in their own `live_stats` schema, the functions the site calls, and the ten 2026–27 TCSAAL fixtures. It is safe to run again; nothing tracked is ever changed by it.
+
+### 3. Scorer passcode (optional)
+
+**Until a passcode is set, scoring is open:** anyone with the site's link can track games and edit rosters, with no sign-in. That is handy for trying it out, but anyone who finds the link could change stats. To require a passcode, run this in the SQL Editor (12 characters or more):
+
+```sql
+select live_stats.set_scorer_passcode('choose-a-long-passcode');
+```
+
+From then on, scorers choose **Scorer sign-in** and enter it. Running it again with a new passcode signs every device out. It is stored only as a salted hash, never in the repository. There is no way back to open scoring short of deleting the passcode row (`delete from live_stats.settings where key = 'passcode';`).
+
+### 4. Copy the project address and public key
+
+In Supabase, open **Project Settings → API Keys** (on some dashboards, **Connect** shows them too):
+
+- **Project URL:** `https://<project-ref>.supabase.co`. It is under **Project Settings → Data API** if it is not on the keys page.
+- **Public key:** the **publishable key** (`sb_publishable_…`), or the **anon** key from the legacy keys tab. Either works.
+
+Never use the **secret** or **service_role** key on the site. The site build refuses it.
+
+### 5. Connect the site to it
+
+1. On GitHub, open the repository's **Settings → Secrets and variables → Actions → Variables** tab.
+2. Choose **New repository variable** twice:
+   - `SUPABASE_URL` set to the project URL.
+   - `SUPABASE_ANON_KEY` set to the public key.
+3. Open **Actions → Publish site → Run workflow** on `main`, and wait for the green check (about 3 minutes).
+
+Instead of the two variables, the same values can go in a file committed to `main`, `supabase/site.json`: `{"url": "https://<project-ref>.supabase.co", "key": "<publishable or anon key>"}`. Pushing it publishes the site connected. Both values are public by design (they are in every page the site sends), and the build refuses a secret key. Variables, when set, take priority.
+
+### 6. Check it
+
+1. Open <https://mrsaiyed.github.io/league-platform/>. The schedule shows the ten games.
+2. Choose **Scorer sign-in** and enter the passcode. **Track live stats** appears on each game, and **Sign out** in the header.
+3. Open **Roster & stats** and enter Al-Hadi's roster (number and name). It saves as you type and carries over to every game.
+
+The site is ready. A small daily job (**Keep Supabase awake** in Actions) stops the free project from pausing during long gaps between games, such as mid-December to January. It starts working once the two variables are set.
+
+## Game day
+
+**The day before**
+
+- Open the site and check the schedule loads. If it does not and the Supabase dashboard says the project is paused, choose **Restore** there.
+- On the scoring device (a laptop or tablet, charged), sign in. The sign-in lasts 7 days on that device.
+- Check Al-Hadi's roster and numbers on **Roster & stats**.
+
+**At the gym, before tip-off**
+
+1. Connect the scoring device to Wi-Fi or a phone hotspot.
+2. Open the site, find the game and choose **Track live stats**.
+3. Under **Before tip-off**, choose **Enter jersey numbers**. Check Al-Hadi's numbers and enter the opponent's: type them all into **Several numbers** (`3 5 10 12 14 21`) and choose **Add all**. Names are optional. Choose **Done**.
+4. The format defaults to four 8-minute quarters. If TCSAAL's differs, set it under **Format** now; it is fixed once the game starts.
+5. Tap each team's starting five, then **Start** the clock at tip-off.
+6. Share the game with parents: the **Live page ↗** link at the top of the tracker, or the game on the schedule. It updates every couple of seconds; no sign-in needed.
+
+**During the game**
+
+- Tap a player for +1, +2, +3, Foul, −Foul or TO. Tap a bench player to sub them in, or drag them onto whoever is coming off.
+- Tap a team's turnovers (in its box, beside team fouls) to see each player's, with − to take one back. **+ Team turnover** there records one charged to the team rather than a player, such as a shot-clock or 5-second violation.
+- Watch the line under the buttons. **Saved to the database** means everything is saved. **Not connected — N actions kept on this device** means keep scoring: the taps are kept on the device and saved, once each and in order, when the connection is back. **Signed out** means sign in again from the link; the waiting taps then save.
+- Do not close the tab, clear the browser's data or use a private window while taps are waiting.
+- **Undo** reverses the last play. Tap the clock to correct it. Use one scoring device per game.
+
+**After the final buzzer**
+
+- Choose **End game**. The final goes on the schedule, and the box score counts toward season stats and the game logs. **Reopen game** corrects anything later.
+
+**If something goes wrong**
+
+- **The site will not load the game, or there is no internet at all:** score on a laptop with `npm run dev:stats` (see below), then copy the game up afterwards with `npm run stats:copy`.
+- **"Too many wrong passcodes":** wait 15 minutes. A device that is already signed in keeps scoring.
+- **"Not connected to its database yet" or "key was refused":** check the two GitHub variables, then run **Publish site** again.
+- **"The stats database is not set up yet":** run `supabase/setup.sql` again in the SQL Editor.
+
+## How the data is protected
+
+- The stats tables live in the `live_stats` schema, which Supabase's Data API does not publish. Row-level security is on, and the public roles have no access to them.
+- The site reaches the data only through the functions `setup.sql` creates. Reading (watching) is open. Every change needs a scorer session from the passcode: sessions last 7 days, and there are at most 20 wrong passcodes per 15 minutes.
+- The public key in the site is meant to be public. The database password and the secret key are never used by the site.
+- What is public: the schedule, rosters (names and numbers as entered), box scores and stats. Enter only what the team is comfortable showing; numbers without names work everywhere.
+
+## On a laptop as well (optional)
+
+The same tracker runs on a laptop with Node.js 24 (`npm ci`, then `npm run dev:stats`, then <http://127.0.0.1:4180>). This is useful at a gym with no internet, or to keep scoring if the site cannot be reached.
+
+- **Saving to this laptop:** this is the default. Copy the games up to Supabase afterwards:
+  1. Copy `.env.example` to `.env` and set `DATABASE_URL` to the Supabase **Session pooler** connection string (**Connect → Session pooler**), with the database password in place of `[YOUR-PASSWORD]`.
+  2. Run `npm run stats:db-check`. It connects, checks saving works and reports how fast the database answers.
+  3. Stop the laptop tracker, then run `npm run stats:copy`. It lists what it will copy and asks first. Nothing is doubled, and it is safe to repeat.
+- **Saving to Supabase from the laptop:** with `DATABASE_URL` in `.env`, `npm run dev:stats` saves to the same database as the site. The laptop's scorer passcode is separate (`LIVE_STATS_SCORER_PASSCODE`, only needed for other devices).
+- **Backups:** `npm run stats:copy -- --from DATABASE_URL --to .local/backups/2026-12-02 --yes` copies everything from Supabase into a folder on the laptop.
+
+## How it works
+
+The site is static files on GitHub Pages: the pages, the basketball rules engine and the stats logic, bundled by `npm run build:pages`. In the browser, the same stats service the laptop server runs works against Supabase through the API in `packages/database/src/live-stats/002-api.sql`.
+
+**Saving a tap:** the tracker applies the tap at once and keeps it in an outbox on the device. It reads the game, works out the result with the rules engine, and sends it to `ls_record`. That saves the action, the new state, the score and every box score line in one transaction, and only if the game has not changed since it was read; otherwise it reads again. An action already saved is never saved twice, so retries are always safe.
+
+**Live pages:** watching pages ask every 2 seconds (the schedule every 10) whether the game has changed, and fetch it only when it has.
+
+**Clock:** the game clock runs on the database's time, so every device shows the same clock.
+
+**Checks:** `npm run test:pages:browser` runs the built site under `/league-platform/` against PostgreSQL behind Supabase's REST conventions, and the shared storage tests run against the Supabase adapter. A real Supabase project has not been tested yet; see [verification](verification.md).
+
+## Hosting the server instead (not needed)
+
+The Node server (`Dockerfile`) can still be hosted on Render, Railway, Fly.io or a VPS with `DATABASE_URL`, `LIVE_STATS_PUBLIC_URL` and `LIVE_STATS_SCORER_PASSCODE`. It gives instant live updates rather than polling, but needs an always-on host. The GitHub Pages site makes it unnecessary for now.
 
 ## Changing the database
 
-The tracker stores nothing directly. It talks to the `LiveStatsRepository` interface in `packages/database/src/live-stats/repository.ts`. Today there are two adapters: PostgreSQL, used for both the embedded local database and hosted PostgreSQL such as Supabase, and an in-memory document store that shows nothing needs SQL. Moving to Firestore, MongoDB or another service means:
-
-1. Write an adapter implementing the interface.
-2. Add it to the adapters in `tests/live-stats-storage.test.mjs` and make every test pass.
-3. Add a case for it in `apps/live-stats/storage.ts`, chosen by an environment variable.
-
-How Firestore would map, for example:
-
-| Interface             | Firestore                                                                                                              |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| teams, players        | `teams` and `players` collections                                                                                      |
-| games                 | `games` collection; the game state, score, status and revision on the game document                                    |
-| `record()`            | `runTransaction`: read the game and `games/{id}/actions/{commandId}`; if new, write the action, the game and its lines |
-| lines, `finalLines()` | `games/{id}/lines`, or a map on the game document; query final games for a team and read their lines                   |
-| schedule order        | `orderBy('startsAt')`                                                                                                  |
-
-See [ADR-005](../architecture/decisions/005-swappable-live-stats-storage.md) for the reasoning.
+The tracker talks to the `LiveStatsRepository` interface (`packages/database/src/live-stats/repository.ts`). Adapters today: PostgreSQL (the laptop's embedded database and any hosted PostgreSQL), Supabase from the browser (the static site), and in-memory documents (tests). A new database means a new adapter that passes `tests/live-stats-storage.test.mjs`. See [ADR-005](../architecture/decisions/005-swappable-live-stats-storage.md).

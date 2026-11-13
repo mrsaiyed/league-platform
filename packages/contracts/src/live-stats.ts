@@ -19,6 +19,12 @@ export const Rules = z.strictObject({
   overtimeSeconds: z.number().int().min(60).max(1800),
   bonusFouls: z.number().int().min(1).max(30),
   doubleBonusFouls: z.number().int().min(2).max(40).nullable(),
+  // Optional: a page from before timeouts were tracked sends none, and gets TCSAAL's.
+  fullTimeouts: z.number().int().min(0).max(10).optional(),
+  shortTimeouts: z.number().int().min(0).max(10).optional(),
+  timeoutsPer: z.enum(['game', 'half']).optional(),
+  overtimeTimeouts: z.number().int().min(0).max(5).optional(),
+  timeoutsCarry: z.boolean().optional(),
 });
 
 /** Mirrors `Command` in packages/sports/src/basketball/live.ts, which applies the rules. */
@@ -32,6 +38,16 @@ export const Command = z.discriminatedUnion('type', [
   }),
   z.strictObject({ type: z.literal('foul'), side: Side, playerId: Id }),
   z.strictObject({ type: z.literal('unfoul'), side: Side, playerId: Id }),
+  z.strictObject({ type: z.literal('turnover'), side: Side, playerId: Id }),
+  z.strictObject({ type: z.literal('unturnover'), side: Side, playerId: Id }),
+  z.strictObject({ type: z.literal('team-turnover'), side: Side }),
+  z.strictObject({ type: z.literal('team-unturnover'), side: Side }),
+  z.strictObject({
+    type: z.literal('timeout'),
+    side: Side,
+    seconds: z.union([z.literal(60), z.literal(30)]),
+  }),
+  z.strictObject({ type: z.literal('untimeout'), side: Side }),
   z.strictObject({ type: z.literal('sub'), side: Side, inId: Id, outId: Id }),
   z.strictObject({ type: z.literal('period'), period: z.number().int().min(1).max(20) }),
   z.strictObject({ type: z.literal('start') }),
