@@ -37,6 +37,13 @@ export const en = {
   'activity.leagues.set_status': "Changed the league's state to {status}",
   'activity.leagues.create_season': 'Added a season',
   'activity.leagues.set_current_season': 'Changed the current season',
+  // The tracker's saved banner (T6 §4), chosen from the queue's status by
+  // apps/web/src/features/tracker/queue-banner.ts.
+  'tracker.queue.allSaved': 'All saved',
+  'tracker.queue.waiting_one': '{count} action waiting to send',
+  'tracker.queue.waiting_other': '{count} actions waiting to send',
+  'tracker.queue.notSaved_one': '{count} action not saved',
+  'tracker.queue.notSaved_other': '{count} actions not saved',
 } as const;
 
 export type MessageKey = keyof typeof en;
