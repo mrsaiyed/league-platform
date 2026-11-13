@@ -44,6 +44,8 @@ export const en = {
   'tracker.queue.waiting_other': '{count} actions waiting to send',
   'tracker.queue.notSaved_one': '{count} action not saved',
   'tracker.queue.notSaved_other': '{count} actions not saved',
+  'tracker.queue.storageFailed': 'This device could not save to its storage',
+  'tracker.queue.separator': ' · ',
 } as const;
 
 export type MessageKey = keyof typeof en;
