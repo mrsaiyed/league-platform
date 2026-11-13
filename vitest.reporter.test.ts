@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { everyFileFinishedWell, isProgressReportTimeout } from './vitest.reporter';
+import { everyFileFinishedWell, isProgressReportTimeout } from './vitest.reporter.ts';
 
 describe('progress report timeouts', () => {
   it('recognizes only the onTaskUpdate timeout', () => {
