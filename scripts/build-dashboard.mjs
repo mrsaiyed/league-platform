@@ -174,6 +174,28 @@ for (const step of byId.values()) {
   }
 }
 
+// How much unfinished work waits on each step, directly or through other steps. The lead
+// opens the steps that unblock the most first, so the long chains do not hold the build up.
+const waiting = new Map();
+for (const step of byId.values()) {
+  if (step.state === 'done') continue;
+  const seen = new Set();
+  const walk = (id) => {
+    for (const need of byId.get(id)?.needIds ?? []) {
+      if (seen.has(need) || landed(need)) continue;
+      seen.add(need);
+      walk(need);
+    }
+  };
+  walk(step.id);
+  for (const need of seen) waiting.set(need, (waiting.get(need) ?? 0) + 1);
+}
+const unfinished = [...byId.values()].filter((step) => step.state !== 'done');
+const firstStage = Math.min(...unfinished.map((step) => step.stage));
+const later = (entry) => (byId.get(entry.id).stage === firstStage ? 0 : 1);
+for (const entry of ready) entry.unblocks = waiting.get(entry.id) ?? 0;
+ready.sort((a, b) => later(a) - later(b) || b.unblocks - a.unblocks);
+
 const order = read(path.join(root, 'docs/specs/v1/technical/T10-build-order.md'));
 const stages = [...order.matchAll(/^### Stage (\d+) — (.*?)(?: · (.*))?$/gm)].map((m) => {
   const number = Number(m[1]);
@@ -283,7 +305,15 @@ console.log(
 // The lead reads this after every landing. It is the guard against sliding back to one
 // builder at a time: free lanes plus steps that can start means lanes must be opened now.
 const free = Math.max(0, data.laneCount - lanes.length);
-const names = ready.map((step) => step.id + (step.part ? ` part ${step.part}` : '')).join(', ');
+// Listed most useful first: the number is how many unfinished steps wait on that one.
+const names = ready
+  .map(
+    (step) =>
+      step.id +
+      (step.part ? ` part ${step.part}` : '') +
+      (step.unblocks ? ` (${step.unblocks} wait on it)` : ''),
+  )
+  .join(', ');
 console.log(`Lanes: ${lanes.length} of ${data.laneCount} open in STATUS.md.`);
 if (free && ready.length) {
   console.log(

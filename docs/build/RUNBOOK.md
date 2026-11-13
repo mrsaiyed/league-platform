@@ -10,7 +10,7 @@ The session that reads this is the **lead**. The lead plans, delegates, checks e
 
 1. Read `CLAUDE.md`, this file and `STATUS.md`.
 2. **If `STATUS.md` says the state is `waiting-for-founder`: stop.** Reply with one line saying why, and do nothing else. This keeps idle runs cheap.
-3. **If `docs/build/.lock` exists and its time is less than 40 minutes old: stop.** Another run is working. If it is older, the earlier run died; delete it and carry on.
+3. **If `docs/build/.lock` exists and there has been a sign of life in the last 40 minutes: stop.** Another run is working. A sign of life is the time in the lock, or the newest commit on any branch (`git log -1 --all --format=%cI`): builders commit to their lanes as they work, so a busy run shows there even when its lead is late rewriting the lock. If both are older than 40 minutes, the earlier run died or is stuck; delete the lock and take over.
 4. Write the current time into `docs/build/.lock`. Rewrite it after every landing and at least every 20 minutes, as a heartbeat. Delete it at the end of the run.
 5. **Find what the last run left.** Run `git status` in the main folder and `git worktree list`, and read "In progress" in `STATUS.md`.
    - The main folder should be clean and on the build branch. If it is dirty, an earlier run was cut off there. If the change is a half-finished step, finish it; prefer finishing to redoing. Only if it cannot be understood, set it aside with `git stash push -u -m "rescue <date and time>"`, note that in `STATUS.md`, and redo the step. Never use a bare `git stash` or `git stash pop`: the stash list is shared with every lane. Never discard work silently.
@@ -75,7 +75,7 @@ Every builder's brief says, in these words or close to them:
 
 - Work only inside your lane folder, `<absolute path>`. Start every shell command with `cd "<absolute path>" &&`, and use absolute paths inside that folder for every file you read or write. Never touch the main folder or another lane.
 - Do not edit `docs/build/STATUS.md` or any stage plan. Say what should be recorded in your report.
-- Commit to your lane branch as you go, at least after each part that works, with plain messages. A cut-off run must not lose your work. Never push, never switch branches, never use `git stash`.
+- Commit to your lane branch as you go: one commit for each part that works by itself (an interface, a table, a command with its test, a page). Each commit must type-check and pass its own package's tests, and its message says what that part is and why, in plain words, ending with the attribution line you were given. No "wip" messages: these commits are kept and the founder reads them on GitHub. A cut-off run must not lose your work. Never push, never switch branches, never use `git stash`.
 - Use only the numbers reserved for you. If you need one you were not given, stop and say so.
 - You are done when the step's done test and `npm run verify` pass in your lane. Report what you built, what you left out and why, and anything the lead should know.
 
@@ -90,7 +90,7 @@ When a builder reports done: read its diff, then start its independent reviewer 
 The lead lands lanes one at a time, in the main folder. Nobody else writes to the build branch.
 
 1. **Catch the lane up.** In the lane: `git merge <build branch>`, to take in what has landed since the lane opened. If that brings anything in, the gate must pass in the lane again. Conflicts are settled in the lane, by a builder for that lane, never in the main folder. Generated files (the database types) are made again by their generator, not merged by hand.
-2. **Bring it over as one commit.** In the main folder: `git merge --squash lane/<step>`, then `git commit` with the step's message. One step, one commit. The one exception is a step whose whole point is to bring in another branch's history, such as catching up with `main`: land it with `git merge --no-ff lane/<step>` so that history is kept.
+2. **Bring it over with its commits.** In the main folder: `git merge --no-ff lane/<step> -m "<the step's message>"`. The lane's own commits are kept, so the history shows the step being built part by part, and the merge commit names the step and the decision IDs it carries out. The founder asked for frequent commits (2026-11-13): several small, sound commits for a step are better than one large one. Before landing, read the lane's commit list (`git log --oneline <build branch>..lane/<step>`): if a message is unclear or says "wip", have the builder reword it in the lane first.
 3. **Check the result.** If `package-lock.json` changed, run `npm ci` in the main folder. Then run the gate in the main folder. It takes about two and a half minutes; use them to brief the next lane.
 4. **Record and push** (section 2, item 6).
 5. **Close the lane.** `git worktree remove ".local/lanes/<step>"` and `git branch -D "lane/<step>"`.
@@ -109,6 +109,8 @@ A large step can also be split among builders inside its lane, when their files 
 
 - **A test that fails only when the machine is busy.** Several gates running at once make timing-sensitive tests fail. Run the failing test file once more by itself. If it passes, it is a flaky test: note it in the log and open a small step to make it sturdy. Never delete or weaken it.
 - **A lane fails the gate twice for its own reasons.** The lead takes that step over itself, or closes the lane and splits the step smaller.
+- **A step that will not come right.** Nobody is here to ask. If a step has been tried in two runs and still does not pass, park it: keep its lane branch, write what was tried and what fails under "Needs the founder" in `STATUS.md`, mark the step in its plan as parked, and give the lane to another step. Do not spend a third run on it.
+- **Something outside the build is broken** (GitHub refuses a push, the network is down, a tool is missing). Note it in the log once, carry on with everything that does not need it, and try it again at the start of the next run. Never change a setting, a sign-in or a permission to get past it.
 - **Lanes themselves stop working** (installing fails, the machine runs out of memory, paths break). Close what is open, lower the "Lanes" number in `STATUS.md`, say why in the log, and go on. One step at a time in the main folder is the last resort, not the habit.
 
 Working side by side finishes sooner by the clock. It does not make the usage allowance go further: five builders use it about five times as fast.
@@ -142,7 +144,7 @@ Rules for delegating:
 
 ## 6. What a run must never do
 
-- Commit to `main`, merge into `main`, push `main`, or open a pull request. `main` is the live Al-Hadi site.
+- Commit to `main`, merge into `main`, push `main` by hand, or open a pull request. `main` is the live Al-Hadi site. The only way `main` ever moves is `node scripts/promote-to-main.mjs` (section 7), which refuses unless it is safe.
 - Push anything, unless the "Pushing to GitHub" line in `STATUS.md` starts with `allowed`; and then only the build branch, never a lane branch, never with force.
 - Touch production, a vendor dashboard, real people's data or any secret.
 - Change `apps/live-stats`, `packages/sports` or the Al-Hadi data except where a stage plan says to.
@@ -160,8 +162,9 @@ When one of the real reasons holds:
 2. Land every lane that is built and reviewed. Every other lane keeps its folder and its branch, with its work committed there, for the next run.
 3. Make sure the main folder is clean and its last commit passes the gate.
 4. Update `STATUS.md`: what landed this run, and under "In progress" each lane still open with what is left to do in it.
-5. Delete `docs/build/.lock` and run `node scripts/build-dashboard.mjs`.
-6. Reply with three or four plain lines: what landed, what is open, what is waiting on the founder.
+5. **Move `main` forward if it is safe.** Run `node scripts/promote-to-main.mjs` once. It moves GitHub's `main` up to the newest build commit only when the move is a plain fast-forward, the live tracker's own files are untouched, GitHub's checks have passed on that exact commit, no game is within 24 hours, and `STATUS.md` allows it. This is what makes the founder's commits count in GitHub's statistics. Copy the one line it prints into the log. If it refuses, leave `main` alone: never work around it.
+6. Delete `docs/build/.lock` and run `node scripts/build-dashboard.mjs`.
+7. Reply with three or four plain lines: what landed, what is open, what is waiting on the founder.
 
 ## 8. Planning ahead
 
