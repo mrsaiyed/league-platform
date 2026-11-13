@@ -1,7 +1,8 @@
 // Moves a division to the bin (A-5): its row stays, with `deleted_at` set, and it can
 // be restored for 30 days. Binning a division does not carry its sub-divisions with
 // it, so it is refused while any are not in the bin: the admin removes or moves them
-// first, and nothing goes that they did not choose (record 019).
+// first, and nothing goes that they did not choose (record 019). Teams still in the
+// division are treated the same way (step 2.18): `division-has-teams`.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -9,7 +10,7 @@ import { divisionScope, mayEditLeague } from '../policy.ts';
 import type { LeaguesTx } from '../ports.ts';
 
 export type RemoveDivisionError = {
-  readonly code: 'division-not-found' | 'division-has-subdivisions';
+  readonly code: 'division-not-found' | 'division-has-subdivisions' | 'division-has-teams';
 };
 
 export const removeDivision = defineCommand({
@@ -28,6 +29,7 @@ export const removeDivision = defineCommand({
     if (await tx.divisions.hasLiveSubdivisions(division.id)) {
       return fail({ code: 'division-has-subdivisions' });
     }
+    if (await tx.divisions.hasLiveTeams(division.id)) return fail({ code: 'division-has-teams' });
     await tx.divisions.setBinned(division.id, true);
     await recordActivity(tx, context, {
       action: 'leagues.remove_division',

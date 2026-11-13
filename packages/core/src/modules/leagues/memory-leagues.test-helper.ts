@@ -20,6 +20,8 @@ export type MemoryLeagues = {
   programs: { id: string; slug: string; isDefault: boolean }[];
   seasons: { id: string; programId: string; slug: string; isCurrent: boolean }[];
   divisions: DivisionRecord[];
+  /** Ids of divisions that have a team not in the bin. */
+  divisionsWithTeams: string[];
   /** Role grants in this league (the access module's; read by the policy). */
   grants: Grant[];
   /** Setting values, one per key and place (record 019). */
@@ -70,6 +72,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
     programs: [{ id: 'program-default', slug: 'main', isDefault: true }],
     seasons: [],
     divisions: [],
+    divisionsWithTeams: [],
     grants: [],
     settings: [],
     activity: [],
@@ -136,6 +139,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
         },
         hasLiveSubdivisions: async (id) =>
           s.divisions.some((d) => d.parentDivisionId === id && !d.binned),
+        hasLiveTeams: async (id) => s.divisionsWithTeams.includes(id),
       },
       leagues: {
         currentLeague: async () => (s.league === undefined ? undefined : { ...s.league }),
