@@ -4,9 +4,8 @@
 // Declared:
 //   - the start page for members (U-5; P2 §3 makes "league home" the default);
 //   - whether scorekeepers may score any game or only games assigned to them (P4 §4;
-//     12a: a new league starts with any game and can tighten it; that starting value
-//     is our recommendation, built under the lead's rule pending the founder's
-//     confirmation).
+//     A-13: a new league starts with any game and can tighten it. The founder left
+//     that starting value to the lead on 2026-11-13, who kept the recommendation).
 //
 // Not yet declared, because the spec gives no default for them and a default is a
 // product decision (docs/build/STATUS.md, "Needs the founder"):
