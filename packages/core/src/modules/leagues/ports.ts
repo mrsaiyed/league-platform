@@ -4,6 +4,20 @@
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
 import type { Audience, LeagueStatus } from './league-values.ts';
+import type { SettingLevel } from './settings/define-setting.ts';
+
+/** Where a setting value is kept: the league, one program or one season (record 019). */
+export type SettingPlace =
+  | { readonly level: 'league' }
+  | { readonly level: 'program'; readonly programId: string }
+  | { readonly level: 'season'; readonly seasonId: string };
+
+/** A stored value at a place, as it is kept: `{version, value}`, and the row's own version. */
+export type StoredSettingRow = {
+  readonly level: SettingLevel;
+  readonly document: unknown;
+  readonly version: number;
+};
 
 export type LeagueRecord = {
   readonly id: string;
@@ -69,6 +83,82 @@ export type LeaguesStore = {
   readonly seasonProgramId: (seasonId: string) => Promise<string | undefined>;
   /** Makes the season the current one of its program, and no other: false if it is not found. */
   readonly setCurrentSeason: (seasonId: string) => Promise<boolean>;
+  /**
+   * The stored values of one key at the league, and at the program and season given:
+   * at most one row per place.
+   */
+  readonly settingRows: (
+    key: string,
+    places: { readonly programId?: string; readonly seasonId?: string },
+  ) => Promise<readonly StoredSettingRow[]>;
+  /**
+   * Writes a value at a place. `version` is the row's version when the admin read it,
+   * or null when they saw none (T-46, A-8): the new version, or undefined if it moved.
+   */
+  readonly writeSetting: (
+    place: SettingPlace,
+    key: string,
+    document: { readonly version: number; readonly value: unknown },
+    version: number | null,
+  ) => Promise<number | undefined>;
+  /** Removes the value at a place if it is still at `version`; false if it moved or is not there. */
+  readonly clearSetting: (place: SettingPlace, key: string, version: number) => Promise<boolean>;
+};
+
+/** A division of a season, in or out of the bin (T3 §4, U-12). */
+export type DivisionRecord = {
+  readonly id: string;
+  readonly seasonId: string;
+  /** The division it sits under (a region, later), or null at the top. */
+  readonly parentDivisionId: string | null;
+  readonly name: string;
+  /** Lower-case #rrggbb, or null for the league's own colors. */
+  readonly color: string | null;
+  readonly sort: number;
+  /** In the bin (A-5, T-45). */
+  readonly binned: boolean;
+  readonly version: number;
+};
+
+export type NewDivision = {
+  readonly seasonId: string;
+  readonly parentDivisionId: string | null;
+  readonly name: string;
+  readonly color: string | null;
+  readonly sort: number;
+};
+
+/** What a division change sets; a field left out stays as it is. */
+export type DivisionChange = {
+  readonly name?: string;
+  readonly color?: string | null;
+  readonly sort?: number;
+};
+
+/** Divisions, bound like the rest to the transaction's one league (T-28). */
+export type DivisionsStore = {
+  /** The division with this id, in the bin or not, or undefined if it is not in this league. */
+  readonly find: (divisionId: string) => Promise<DivisionRecord | undefined>;
+  /** The season's divisions not in the bin, in order: by sort, then name. */
+  readonly list: (seasonId: string) => Promise<readonly DivisionRecord[]>;
+  /** Adds one: its id, or 'name-taken' (a sibling not in the bin has the name, in any capitals). */
+  readonly create: (division: NewDivision) => Promise<string | 'name-taken'>;
+  /**
+   * Changes a division not in the bin, only if it is still at `version` when one is
+   * given (T-46): the new version, 'name-taken', or undefined if it is not there or moved on.
+   */
+  readonly update: (
+    divisionId: string,
+    change: DivisionChange,
+    version?: number,
+  ) => Promise<number | 'name-taken' | undefined>;
+  /**
+   * Moves a division to the bin or brings it back. Bringing it back can hit a name
+   * a sibling took meanwhile: 'name-taken'. False if it is not there.
+   */
+  readonly setBinned: (divisionId: string, binned: boolean) => Promise<boolean | 'name-taken'>;
+  /** Whether any division not in the bin sits under this one. */
+  readonly hasLiveSubdivisions: (divisionId: string) => Promise<boolean>;
 };
 
 /**
@@ -77,6 +167,7 @@ export type LeaguesStore = {
  */
 export type LeaguesTx = CommandTx & {
   readonly leagues: LeaguesStore;
+  readonly divisions: DivisionsStore;
   readonly access: AccessReader;
   readonly activity: ActivityLog;
 };

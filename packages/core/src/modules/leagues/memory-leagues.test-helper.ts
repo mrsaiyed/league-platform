@@ -8,7 +8,7 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
-import type { LeagueRecord, LeaguesTx } from './ports.ts';
+import type { DivisionRecord, LeagueRecord, LeaguesTx, SettingPlace } from './ports.ts';
 
 export type MemoryLeagues = {
   /** Undefined until createLeague runs. */
@@ -19,14 +19,40 @@ export type MemoryLeagues = {
   forwarding: { slug: string; months: number }[];
   programs: { id: string; slug: string; isDefault: boolean }[];
   seasons: { id: string; programId: string; slug: string; isCurrent: boolean }[];
+  divisions: DivisionRecord[];
   /** Role grants in this league (the access module's; read by the policy). */
   grants: Grant[];
+  /** Setting values, one per key and place (record 019). */
+  settings: {
+    place: SettingPlace;
+    key: string;
+    document: { version: number; value: unknown };
+    version: number;
+  }[];
   activity: ActivityEntry[];
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const ownerId = '01900000-0000-7000-8000-0000000000a1';
 export const staffId = '01900000-0000-7000-8000-0000000000b1';
+
+/** The database's name rule: siblings differ by name, whatever the capitals, outside the bin. */
+function nameTaken(
+  all: readonly DivisionRecord[],
+  seasonId: string,
+  parentId: string | null,
+  name: string,
+  except?: string,
+) {
+  return all.some(
+    (d) =>
+      d.id !== except &&
+      !d.binned &&
+      d.seasonId === seasonId &&
+      d.parentDivisionId === parentId &&
+      d.name.trim().toLowerCase() === name.trim().toLowerCase(),
+  );
+}
 
 export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
   const db = memoryDatabase<MemoryLeagues>({
@@ -43,7 +69,9 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
     forwarding: [],
     programs: [{ id: 'program-default', slug: 'main', isDefault: true }],
     seasons: [],
+    divisions: [],
     grants: [],
+    settings: [],
     activity: [],
     ...state,
   });
@@ -64,6 +92,50 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
       activity: {
         record: async (entry) => void s.activity.push(entry),
         list: async () => [],
+      },
+      divisions: {
+        find: async (id) => s.divisions.find((d) => d.id === id),
+        list: async (seasonId) =>
+          s.divisions
+            .filter((d) => d.seasonId === seasonId && !d.binned)
+            .sort((x, y) => x.sort - y.sort || x.name.localeCompare(y.name)),
+        create: async (division) => {
+          if (nameTaken(s.divisions, division.seasonId, division.parentDivisionId, division.name)) {
+            return 'name-taken';
+          }
+          const id = `01900000-0000-7000-8000-0000000d${String(s.divisions.length + 1).padStart(4, '0')}`;
+          s.divisions.push({ id, ...division, binned: false, version: 1 });
+          return id;
+        },
+        update: async (id, change, version) => {
+          const at = s.divisions.findIndex((d) => d.id === id);
+          const found = s.divisions[at];
+          if (found === undefined || found.binned) return undefined;
+          if (version !== undefined && found.version !== version) return undefined;
+          if (
+            change.name !== undefined &&
+            nameTaken(s.divisions, found.seasonId, found.parentDivisionId, change.name, id)
+          ) {
+            return 'name-taken';
+          }
+          s.divisions[at] = { ...found, ...change, version: found.version + 1 };
+          return found.version + 1;
+        },
+        setBinned: async (id, binned) => {
+          const at = s.divisions.findIndex((d) => d.id === id);
+          const found = s.divisions[at];
+          if (found === undefined) return false;
+          if (
+            !binned &&
+            nameTaken(s.divisions, found.seasonId, found.parentDivisionId, found.name, id)
+          ) {
+            return 'name-taken';
+          }
+          s.divisions[at] = { ...found, binned, version: found.version + 1 };
+          return true;
+        },
+        hasLiveSubdivisions: async (id) =>
+          s.divisions.some((d) => d.parentDivisionId === id && !d.binned),
       },
       leagues: {
         currentLeague: async () => (s.league === undefined ? undefined : { ...s.league }),
@@ -119,6 +191,41 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           for (const other of s.seasons) {
             if (other.programId === season.programId) other.isCurrent = other === season;
           }
+          return true;
+        },
+        settingRows: async (key, places) =>
+          s.settings
+            .filter(
+              (r) =>
+                r.key === key &&
+                (r.place.level === 'league' ||
+                  (r.place.level === 'program' && r.place.programId === places.programId) ||
+                  (r.place.level === 'season' && r.place.seasonId === places.seasonId)),
+            )
+            .map((r) => ({ level: r.place.level, document: r.document, version: r.version })),
+        writeSetting: async (place, key, document, version) => {
+          const same = (r: MemoryLeagues['settings'][number]) =>
+            r.key === key && JSON.stringify(r.place) === JSON.stringify(place);
+          const row = s.settings.find(same);
+          if (row === undefined) {
+            if (version !== null) return undefined;
+            s.settings.push({ place, key, document, version: 1 });
+            return 1;
+          }
+          if (row.version !== version) return undefined;
+          row.document = document;
+          row.version += 1;
+          return row.version;
+        },
+        clearSetting: async (place, key, version) => {
+          const at = s.settings.findIndex(
+            (r) =>
+              r.key === key &&
+              JSON.stringify(r.place) === JSON.stringify(place) &&
+              r.version === version,
+          );
+          if (at < 0) return false;
+          s.settings.splice(at, 1);
           return true;
         },
       },

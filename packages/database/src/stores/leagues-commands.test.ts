@@ -26,6 +26,7 @@ import {
 } from '../schema/schema.test-helper.ts';
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
+import { divisionsStore } from './divisions-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 
 let pglite: PGlite;
@@ -40,6 +41,7 @@ beforeAll(async () => {
     transaction: commandTransaction(db, (scope) => ({
       jobs: { enqueue: async (_job: Job) => {} },
       leagues: leaguesStore(scope, { platformStaff: [staffId] }),
+      divisions: divisionsStore(scope),
       access: accessStore(scope),
       activity: activityLogStore(scope),
     })),

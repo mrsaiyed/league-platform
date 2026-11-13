@@ -8,6 +8,7 @@ export const en = {
   'nav.teams': 'Teams',
   'nav.signIn': 'Sign in',
   'nav.menu': 'Menu',
+  'footer.label': 'Footer',
   'footer.terms': 'Terms',
   'footer.privacy': 'Privacy',
   'common.loading': 'Loading',
@@ -87,6 +88,27 @@ export const en = {
   'activity.leagues.set_status': "Changed the league's state to {status}",
   'activity.leagues.create_season': 'Added a season',
   'activity.leagues.set_current_season': 'Changed the current season',
+  'activity.leagues.create_division': 'Added a division',
+  'activity.leagues.update_division': 'Changed a division',
+  'activity.leagues.reorder_divisions': 'Changed the order of the divisions',
+  'activity.leagues.remove_division': 'Moved a division to the bin',
+  'activity.leagues.restore_division': 'Restored a division from the bin',
+  'activity.scheduling.create_venue': 'Added a venue',
+  'activity.scheduling.update_venue': 'Changed a venue',
+  'activity.scheduling.remove_venue': 'Moved a venue to the bin',
+  'activity.scheduling.restore_venue': 'Restored a venue from the bin',
+  'activity.scheduling.create_court': 'Added a court',
+  'activity.scheduling.update_court': 'Changed a court',
+  'activity.scheduling.remove_court': 'Moved a court to the bin',
+  'activity.scheduling.restore_court': 'Restored a court from the bin',
+  'activity.leagues.set_setting': 'Changed a setting',
+  'activity.leagues.clear_setting': 'Went back to the default for a setting',
+  // Setting labels (T5 §6, T-98): `setting.<key>.label`, shown on the admin screen.
+  'setting.members.startPage.label':
+    'Where members land first: the league home or their own team page',
+  // The words for that setting's choices: `setting.<key>.option.<choice>`.
+  'setting.members.startPage.option.leagueHome': 'The league home',
+  'setting.members.startPage.option.myTeam': 'Their own team page',
   // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
   // league's name, {role} a role's name from above, {days} how long a link works.
   'email.invitation.subject': 'You are invited to help run {league}',

@@ -45,9 +45,11 @@ export type LeagueRecords = MadeLeague & {
   jobLeaseToken: string;
   /** A top-level division of the season (it has one sub-division). */
   divisionId: string;
-  /** A venue and its court. */
+  subDivisionId: string;
+  /** A venue and its court, and a venue with no court. */
   venueId: string;
   courtId: string;
+  emptyVenueId: string;
   /** A team of the season in the division, with one person on its roster. */
   teamId: string;
   personId: string;
@@ -199,7 +201,8 @@ async function seededLeague(
     'insert into divisions (league_id, season_id, name, color) values ($1, $2, $3, $4)',
     [leagueId, seasonId, `Division ${m}`, '#c8a84b'],
   );
-  await pglite.query(
+  const subDivisionId = await id(
+    pglite,
     `insert into divisions (league_id, season_id, parent_division_id, name)
      values ($1, $2, $3, $4)`,
     [leagueId, seasonId, divisionId, `Sub-division ${m}`],
@@ -213,6 +216,11 @@ async function seededLeague(
     pglite,
     'insert into courts (league_id, venue_id, name) values ($1, $2, $3)',
     [leagueId, venueId, `Court ${m}`],
+  );
+  const emptyVenueId = await id(
+    pglite,
+    'insert into venues (league_id, name, address) values ($1, $2, $3)',
+    [leagueId, `Empty venue ${m}`, `2 ${m} Street`],
   );
   for (const [level, programPlace, seasonPlace] of [
     ['league', null, null],
@@ -370,8 +378,10 @@ async function seededLeague(
     jobId,
     jobLeaseToken,
     divisionId,
+    subDivisionId,
     venueId,
     courtId,
+    emptyVenueId,
     teamId,
     personId,
     rosterEntryId,

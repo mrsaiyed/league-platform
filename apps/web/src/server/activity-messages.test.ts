@@ -2,12 +2,18 @@
 // `activity.<command name>`, and the page turns it into words from the message
 // files (T-187). Only the app sees both packages, so the check that every key core
 // writes has its words, and every role has a name, lives here.
-import { activitySummaryKey, commands, roles } from '@srleagues/core';
+import { activitySummaryKey, commands, declaredSettings, roles } from '@srleagues/core';
 import { en } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
 
 /** Commands that only read, so write no activity entry. */
-const reads = new Set(['access.list_access', 'access.list_activity', 'access.my_access']);
+const reads = new Set([
+  'access.list_access',
+  'access.list_activity',
+  'access.my_access',
+  'leagues.list_divisions',
+  'scheduling.list_venues',
+]);
 
 describe('activity log messages', () => {
   it('has English words for every command that writes an entry, and no others', () => {
@@ -15,6 +21,12 @@ describe('activity log messages', () => {
     const keys = Object.keys(en).filter((key) => key.startsWith('activity.'));
     expect(writes.map(activitySummaryKey).filter((key) => !Object.hasOwn(en, key))).toEqual([]);
     expect(keys.filter((key) => !writes.map(activitySummaryKey).includes(key))).toEqual([]);
+  });
+
+  it('has words for the label of every declared setting (T-98, T-187)', () => {
+    for (const setting of declaredSettings.all()) {
+      expect(Object.hasOwn(en, setting.label), setting.label).toBe(true);
+    }
   });
 
   it('names every role, and the owner', () => {

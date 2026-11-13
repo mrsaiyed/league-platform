@@ -1,0 +1,93 @@
+/* The look of a league's pages. Every color, font and size comes from the design's
+   variables (packages/site, T-90); nothing here names a league. Logical properties
+   only (start, end, inline), so right-to-left pages mirror themselves (T-188). */
+body {
+  margin: 0;
+}
+.league-site {
+  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  line-height: 1.5;
+}
+.league-site h1,
+.league-site h2,
+.league-site h3 {
+  font-family: var(--font-heading);
+}
+.league-site a {
+  color: var(--color-primary);
+}
+.site-header,
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space);
+  padding-block: var(--space);
+  padding-inline: calc(var(--space) * 1.5);
+  background: var(--color-panel);
+  box-shadow: var(--card-shadow);
+}
+.site-header {
+  border-block-end: 3px solid var(--color-primary);
+}
+.site-footer {
+  border-block-start: 1px solid var(--color-accent);
+  font-size: 0.875rem;
+}
+.site-name {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--color-primary);
+}
+.site-header ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.site-header li a,
+.site-footer nav a {
+  display: inline-block;
+  padding-block: 0.25rem;
+  padding-inline: 0.75rem;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.site-header li a:hover,
+.site-footer nav a:hover {
+  /* text on background always meets AA (checked on save), so the swap does too */
+  background: var(--color-text);
+  color: var(--color-background);
+}
+.site-footer nav {
+  display: flex;
+  gap: 0.5rem;
+}
+.powered-by {
+  margin-inline-start: auto;
+  opacity: 0.8;
+}
+.site-body {
+  flex: 1;
+  padding: calc(var(--space) * 1.5);
+  text-align: start;
+}
+/* Public pages are cards; the admin and the scoring screen are not. */
+.site-body > main:not(.score-root) {
+  padding: var(--space);
+  background: var(--color-panel);
+  border: var(--card-border-width) solid var(--color-accent);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+}

@@ -27,23 +27,33 @@ import type {
   Job,
   JobQueue,
   LeaguesTx,
+  SchedulingTx,
   TransactionRunner,
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import { openScope, transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
-import { accessStore, activityLogStore, jobsStore, leaguesStore } from '../stores/index.ts';
+import {
+  accessStore,
+  activityLogStore,
+  divisionsStore,
+  jobsStore,
+  leaguesStore,
+  schedulingStore,
+} from '../stores/index.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
 /** Every module's stores, bound to the run's scope. Grows with each module. */
-export function harnessTx(scope: LeagueScope, jobs: JobQueue): LeaguesTx & AccessTx {
+export function harnessTx(scope: LeagueScope, jobs: JobQueue): LeaguesTx & SchedulingTx & AccessTx {
   // The run's account counts as our staff, so commands only staff may run are tried
   // too: the worst case for isolation.
   const platformStaff = scope.accountId === null ? [] : [scope.accountId];
   return {
     jobs,
     leagues: leaguesStore(scope, { platformStaff }),
+    divisions: divisionsStore(scope),
+    scheduling: schedulingStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
   };

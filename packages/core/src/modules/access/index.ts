@@ -35,6 +35,7 @@ export {
   accessOfAccount,
   allows,
   hasPermission,
+  hasPermissionAnywhere,
   isOpenForNewPeople,
   type AccessHolder,
 } from './policy.ts';
@@ -68,6 +69,7 @@ export {
   covers,
   leagueScope,
   roleScopeTypes,
+  scopeDetails,
   scopeTypes,
   type Scope,
   type ScopeType,

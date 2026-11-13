@@ -1,7 +1,25 @@
 // Typed queries (T1 §1). Each takes the scope withTransaction opened; one that
 // touches league data takes a LeagueScope (T-28), except the few T-221 lookups that
 // must answer before a league is known. Used only through this file.
+export { deleteSettingValue } from './delete-setting-value.ts';
 export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts';
+export { findCourt } from './find-court.ts';
+export { findDivision } from './find-division.ts';
+export { findVenue } from './find-venue.ts';
+export { hasLiveCourts } from './has-live-courts.ts';
+export { hasLiveSubdivisions } from './has-live-subdivisions.ts';
+export { insertCourt, type NewCourtRow } from './insert-court.ts';
+export { insertDivision, type NewDivisionRow } from './insert-division.ts';
+export { insertVenue, type NewVenueRow } from './insert-venue.ts';
+export { listDivisions } from './list-divisions.ts';
+export { listCourts } from './list-courts.ts';
+export { listVenues } from './list-venues.ts';
+export { setCourtBinned } from './set-court-binned.ts';
+export { setDivisionBinned } from './set-division-binned.ts';
+export { setVenueBinned } from './set-venue-binned.ts';
+export { updateCourt, type CourtChangeRow } from './update-court.ts';
+export { updateDivision, type DivisionChangeRow } from './update-division.ts';
+export { updateVenue, type VenueChangeRow } from './update-venue.ts';
 export { findInvitation } from './find-invitation.ts';
 export { findInvitationByTokenHash } from './find-invitation-by-token-hash.ts';
 export { findLeagueByShortName, type LeagueByShortName } from './find-league-by-short-name.ts';
@@ -19,6 +37,7 @@ export { insertSeason, type NewSeasonRow } from './insert-season.ts';
 export { listActiveGrantsOf } from './list-active-grants-of.ts';
 export { listActivityEntries } from './list-activity-entries.ts';
 export { listOpenInvitations } from './list-open-invitations.ts';
+export { listSettingValues, type SettingValueRow } from './list-setting-values.ts';
 export { listPrograms } from './list-programs.ts';
 export { listRoleGrants } from './list-role-grants.ts';
 export { markInvitationAccepted } from './mark-invitation-accepted.ts';
@@ -32,4 +51,7 @@ export { settleJob, type JobSettlement } from './settle-job.ts';
 export { takeJobs, type NoLeagueScope, type TakenJob } from './take-jobs.ts';
 export { updateLeagueName } from './update-league-name.ts';
 export { updateLeagueStatus } from './update-league-status.ts';
+export type { DivisionSummary } from './division-summary.ts';
+export type { CourtSummary, VenueSummary } from './venue-summary.ts';
 export type { ProgramSummary } from './program-summary.ts';
+export { writeSettingValue, type SettingPlaceRow } from './write-setting-value.ts';
