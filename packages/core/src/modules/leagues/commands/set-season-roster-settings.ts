@@ -15,8 +15,8 @@ export type SetSeasonRosterSettingsError =
   | {
       readonly code: 'season-not-found' | 'changed-since-read' | 'unique-jerseys-clash';
     }
-  /** What is wrong with the settings, in plain words. */
-  | { readonly code: 'invalid-rules'; readonly message: string };
+  /** The settings do not pass the rules check; `field` is the setting at fault, if one is. */
+  | { readonly code: 'invalid-rules'; readonly field?: string };
 
 export const setSeasonRosterSettings = defineCommand({
   name: 'leagues.set_season_roster_settings',
@@ -60,10 +60,12 @@ export const setSeasonRosterSettings = defineCommand({
     };
     const checked = SeasonRules.safeParse({ ...before.rules, rosters });
     if (!checked.success) {
-      return fail({
-        code: 'invalid-rules',
-        message: checked.error.issues[0]?.message ?? 'The roster settings are not valid.',
-      });
+      const path = checked.error.issues[0]?.path ?? [];
+      // Paths run rosters, then the setting: only that setting is named.
+      const field = path[0] === 'rosters' ? path[1] : undefined;
+      return fail(
+        typeof field === 'string' ? { code: 'invalid-rules', field } : { code: 'invalid-rules' },
+      );
     }
     if (before.saved && JSON.stringify(rosters) === JSON.stringify(before.rules.rosters)) {
       return ok({ version: season.version });

@@ -43,9 +43,14 @@ describe('setSeasonRosterSettings', () => {
   it('refuses settings that make no sense, saving nothing', async () => {
     const { db, deps, as } = memoryLeagues({ seasons: [season] });
     for (const input of [{ minSize: 9, maxSize: 5 }, { locksOn: '2027-02-30' }, { maxSize: 0 }]) {
-      expect(
-        await setSeasonRosterSettings(as(ownerId), { seasonId: id(1), version: 1, ...input }, deps),
-      ).toMatchObject({ error: { code: 'invalid-rules' } });
+      const result = await setSeasonRosterSettings(
+        as(ownerId),
+        { seasonId: id(1), version: 1, ...input },
+        deps,
+      );
+      // A code, and at most the setting at fault: the wording is in the message file (T-187).
+      expect(result).toMatchObject({ ok: false, error: { code: 'invalid-rules' } });
+      if (!result.ok) expect(Object.keys(result.error).sort()).not.toContain('message');
     }
     expect(db.state.seasons[0]?.rules).toBeUndefined();
   });
