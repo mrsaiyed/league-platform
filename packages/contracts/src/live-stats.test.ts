@@ -24,7 +24,7 @@ describe('clock mode (T-128)', () => {
     expect(takes({ type: 'foul', side: 'home', playerId: id })).toBe(true);
   });
 
-  it('the Al-Hadi shape is unchanged: it refuses the switch and a clock mode in the rules', () => {
+  it('the shape the current tracker uses is unchanged: it refuses the switch and a clock mode in the rules', () => {
     expect(Command.safeParse({ type: 'clock-mode', mode: 'running' }).success).toBe(false);
     expect(Command.safeParse({ type: 'rules', rules }).success).toBe(true);
     expect(
