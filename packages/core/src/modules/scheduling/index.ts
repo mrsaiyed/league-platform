@@ -11,6 +11,16 @@ export type {
   ScheduleSlot,
   ScheduleState,
 } from './rules/schedule-types.ts';
+export {
+  placeRounds,
+  type PublicGame,
+  type PublicGameTeam,
+  type PublicRound,
+  type PublicSchedule,
+  type PublicSeasonChoice,
+  type RoundPhase,
+  type RoundToPlace,
+} from './public-schedule.ts';
 export { summarizePublish, type PublishSummary } from './rules/summarize-publish.ts';
 export { createCourt, type CreateCourtError } from './commands/create-court.ts';
 export { createVenue, type CreateVenueError } from './commands/create-venue.ts';
