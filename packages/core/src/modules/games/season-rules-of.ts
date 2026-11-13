@@ -5,9 +5,12 @@
 // reads them, step 2.5). A format that cannot be read in the current version falls back
 // to the season's rules.
 import { defaultSeasonRules, upgradeSeasonRules, type SeasonRules } from '@srleagues/contracts';
-import type { GameRecord, GamesTx } from './ports.ts';
+import type { GameRecord, GamesStore, GamesTx } from './ports.ts';
 
-export async function seasonRulesOf(tx: GamesTx, seasonId: string): Promise<SeasonRules> {
+export async function seasonRulesOf(
+  tx: { readonly games: Pick<GamesStore, 'findSeason'> },
+  seasonId: string,
+): Promise<SeasonRules> {
   const season = await tx.games.findSeason(seasonId);
   const upgraded = season === undefined ? undefined : upgradeSeasonRules(season.rules);
   return upgraded?.ok === true ? upgraded.rules : defaultSeasonRules();

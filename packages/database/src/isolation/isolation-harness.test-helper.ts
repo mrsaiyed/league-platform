@@ -26,6 +26,9 @@
 //     same, so a count or a total over B is caught though it names nothing of B.
 //     Ids and times no row had before are set aside in that comparison: a
 //     command that adds a row gets a new id and time in each run.
+//   - in what it wrote, for a case that says so (`compareWrites`, the event
+//     handlers, whose work is what they write): the run's own league's rows must
+//     also come out the same once the forbidden leagues' rows are gone.
 // A refusal (an error) is not a leak unless it names something of B. Afterwards
 // the whole database must be as it was before, or a case committed something.
 import { inspect, isDeepStrictEqual } from 'node:util';
@@ -179,6 +182,37 @@ function settled(value: unknown, known: Known, fresh: Map<string, string>): unkn
   return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, again(v)]));
 }
 
+/**
+ * One league's rows, table by table, each row with new ids and times set aside (each
+ * row on its own, so the order of rows does not depend on a new id).
+ */
+function settledRows(rows: DatabaseRows | null, group: string, known: Known) {
+  const tables = rows?.get(group) ?? new Map<string, string[]>();
+  return new Map(
+    [...tables].map(([table, texts]) => [
+      table,
+      texts
+        .map((text) => JSON.stringify(settled(JSON.parse(text), known, new Map())))
+        .sort()
+        .join('\n'),
+    ]),
+  );
+}
+
+/** The tables whose rows in `group` differ between two runs, apart from new ids and times. */
+function differentWrites(
+  x: DatabaseRows | null,
+  y: DatabaseRows | null,
+  group: string,
+  known: Known,
+) {
+  const a = settledRows(x, group, known);
+  const b = settledRows(y, group, known);
+  return [...new Set([...a.keys(), ...b.keys()])]
+    .filter((table) => (a.get(table) ?? '') !== (b.get(table) ?? ''))
+    .sort();
+}
+
 /** Whether two outcomes are the same answer, apart from new ids and times. */
 function same(x: Outcome, y: Outcome, known: Known): boolean {
   const both = (a: unknown, b: unknown) =>
@@ -263,14 +297,29 @@ export async function findIsolationFailures(
             gone.set(table, [...(gone.get(table) ?? []), ...ids]);
           }
         }
+        // A case that writes (an event handler) is also judged by what it wrote in the
+        // run's own league: work done from another league's rows, a total over them
+        // say, is a leak though nothing of theirs comes back or changes.
+        const own =
+          entry.compareWrites === true && run !== 'control' && !forbidden.includes(a)
+            ? a
+            : undefined;
         try {
           const prepare = (trx: Transaction<Database>) => removeRows(trx, gone);
-          const without = await attempt(open, entry, b, { prepare, read: false });
-          if (same(seen.outcome, without.outcome, known)) return null;
+          const without = await attempt(open, entry, b, { prepare, read: own !== undefined });
           const names = forbidden.map((league) => league.marker).join(' and ');
+          if (!same(seen.outcome, without.outcome, known)) {
+            return (
+              `answers differently once league ${names}'s rows are gone: ` +
+              `${show(seen.outcome)} | without: ${show(without.outcome)}`
+            );
+          }
+          if (own === undefined || seen.after === null || without.after === null) return null;
+          const tables = differentWrites(seen.after, without.after, own.leagueId, known);
+          if (tables.length === 0) return null;
           return (
-            `answers differently once league ${names}'s rows are gone: ` +
-            `${show(seen.outcome)} | without: ${show(without.outcome)}`
+            `writes differently once league ${names}'s rows are gone: ` +
+            `league ${own.marker}'s ${tables.join(', ')}`
           );
         } catch (error) {
           return `could not be compared: ${message(error)}`;
