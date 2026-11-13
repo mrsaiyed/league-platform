@@ -65,6 +65,8 @@ export type LeaguesStore = {
     programId: string | undefined,
   ) => Promise<{ readonly id: string } | undefined>;
   readonly createSeason: (season: NewSeason) => Promise<string | 'slug-taken'>;
+  /** The program the season belongs to, or undefined if it is not found. */
+  readonly seasonProgramId: (seasonId: string) => Promise<string | undefined>;
   /** Makes the season the current one of its program, and no other: false if it is not found. */
   readonly setCurrentSeason: (seasonId: string) => Promise<boolean>;
 };

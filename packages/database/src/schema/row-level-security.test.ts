@@ -196,6 +196,54 @@ const leagueTables: LeagueTable[] = [
       [leagueId, JSON.stringify({ noteId: randomUUID() })],
     ],
   },
+  {
+    table: 'divisions',
+    key: 'league_id',
+    touch: 'update divisions set name = name where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    // Into the league's own season, which only that league can see.
+    insert: (leagueId) => [
+      `insert into divisions (league_id, season_id, name)
+       values ($1, (select id from seasons where league_id = $1 order by id limit 1), $2)`,
+      [leagueId, unique('Division')],
+    ],
+  },
+  {
+    table: 'venues',
+    key: 'league_id',
+    touch: 'update venues set name = name where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId) => [
+      'insert into venues (league_id, name) values ($1, $2)',
+      [leagueId, unique('Venue')],
+    ],
+  },
+  {
+    table: 'courts',
+    key: 'league_id',
+    touch: 'update courts set name = name where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId) => [
+      `insert into courts (league_id, venue_id, name)
+       values ($1, (select id from venues where league_id = $1 order by id limit 1), $2)`,
+      [leagueId, unique('Court')],
+    ],
+  },
+  {
+    table: 'setting_values',
+    key: 'league_id',
+    touch: 'update setting_values set value = value where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId) => [
+      `insert into setting_values (league_id, level, key, value)
+       values ($1, 'league', $2, '{"version": 1, "value": 24}')`,
+      [leagueId, `test.setting${fresh()}`],
+    ],
+  },
 ];
 
 const count = async (tx: Transaction | PGlite, sql: string, params: unknown[] = []) =>

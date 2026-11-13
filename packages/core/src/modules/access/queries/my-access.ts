@@ -18,6 +18,7 @@ export type MyAccess = {
 
 export const myAccess = defineCommand({
   name: 'access.my_access',
+  permission: 'signed-in',
   input: z.object({}),
   allowed: (context, _input, tx: AccessTx) => isSignedInHere(context, tx),
   run: async ({ context, tx }): Promise<Result<MyAccess, never>> => {

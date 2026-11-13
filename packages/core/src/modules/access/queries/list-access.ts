@@ -18,6 +18,7 @@ export type AccessList = {
 
 export const listAccess = defineCommand({
   name: 'access.list_access',
+  permission: 'access.manage',
   input: z.object({ scope: scopeInput.default(leagueScope) }),
   allowed: (context, input, tx: AccessTx) =>
     hasPermission(context, tx, 'access.manage', input.scope),

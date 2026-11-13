@@ -17,6 +17,7 @@ const owner: CommandContext = { leagueId, accountId: 'owner', requestId: 'reques
 
 const addNote = defineCommand({
   name: 'notes.add_note',
+  permission: 'notes.write',
   input: z.object({ text: z.string().min(1).max(20), failAfterSaving: z.boolean().default(false) }),
   allowed: async (context, _input, tx: NotesTx) => context.accountId === tx.state.ownerId,
   run: async ({ context, input, tx, emit }): Promise<Result<number, { code: 'too-many' }>> => {
@@ -117,12 +118,28 @@ describe('defineCommand', () => {
     const named = (name: string) => () =>
       defineCommand({
         name,
+        permission: 'notes.write',
         input: z.object({}),
         allowed: async () => true,
         run: async (): Promise<Result<null, never>> => ok(null),
       });
     expect(named('AddNote')).toThrow('is not a command name');
     expect(named('add_note')).toThrow('is not a command name');
+  });
+
+  it('carries the permission it names, and refuses to be made without one (T4 §4)', () => {
+    expect(addNote.permission).toBe('notes.write');
+    const named = (permission: string) => () =>
+      defineCommand({
+        name: 'notes.add_note',
+        permission,
+        input: z.object({}),
+        allowed: async () => true,
+        run: async (): Promise<Result<null, never>> => ok(null),
+      });
+    expect(named('')).toThrow('notes.add_note names no permission');
+    expect(named('  ')).toThrow('notes.add_note names no permission');
+    expect(named(undefined as unknown as string)).toThrow('notes.add_note names no permission');
   });
 
   it('refuses a job for another league, whoever records it', async () => {

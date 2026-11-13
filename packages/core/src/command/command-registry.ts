@@ -2,8 +2,14 @@
 // worker by a job's command name, receipts by theirs), and the two-league harness
 // checks that each one it lists has an isolation case (T-65).
 
-/** What the registry keeps of a command: callable, and its name. */
-export type NamedCommand = ((...args: never[]) => unknown) & { readonly commandName: string };
+/**
+ * What the registry keeps of a command: callable, its name, and the permission it
+ * names (T4 §4; the access module says which names exist).
+ */
+export type NamedCommand = ((...args: never[]) => unknown) & {
+  readonly commandName: string;
+  readonly permission: string;
+};
 
 export type CommandRegistry = ReadonlyMap<string, NamedCommand>;
 

@@ -264,6 +264,7 @@ describe('the harness, with commands (step 1.10)', () => {
   it('catches a planted command that takes the league from its input', async () => {
     const renameNamedLeague = defineCommand({
       name: 'leagues.planted_rename',
+      permission: 'league.settings',
       input: z.object({ leagueId: z.string() }),
       allowed: ownerOnly,
       // The leak: it renames the league its input names, with no league filter.
@@ -287,6 +288,7 @@ describe('the harness, with commands (step 1.10)', () => {
   it("catches a job that names another league's records", async () => {
     const tellAboutProgram = defineCommand({
       name: 'leagues.planted_job',
+      permission: 'league.settings',
       input: z.object({ programId: z.string() }),
       allowed: ownerOnly,
       run: async ({ context, input, tx }): Promise<Result<null, never>> => {

@@ -42,6 +42,11 @@ export type LeagueRecords = MadeLeague & {
   /** A job a worker holds, and the lease it holds it by. */
   jobId: string;
   jobLeaseToken: string;
+  /** A top-level division of the season (it has one sub-division). */
+  divisionId: string;
+  /** A venue and its court. */
+  venueId: string;
+  courtId: string;
 };
 
 export type TwoLeagues = {
@@ -164,6 +169,39 @@ async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) 
       ownerId,
     ],
   );
+  // The season's structure: a division with a sub-division, a venue with a court,
+  // and a setting value at each level.
+  const divisionId = await id(
+    pglite,
+    'insert into divisions (league_id, season_id, name, color) values ($1, $2, $3, $4)',
+    [leagueId, seasonId, `Division ${m}`, '#c8a84b'],
+  );
+  await pglite.query(
+    `insert into divisions (league_id, season_id, parent_division_id, name)
+     values ($1, $2, $3, $4)`,
+    [leagueId, seasonId, divisionId, `Sub-division ${m}`],
+  );
+  const venueId = await id(
+    pglite,
+    'insert into venues (league_id, name, address) values ($1, $2, $3)',
+    [leagueId, `Venue ${m}`, `1 ${m} Street`],
+  );
+  const courtId = await id(
+    pglite,
+    'insert into courts (league_id, venue_id, name) values ($1, $2, $3)',
+    [leagueId, venueId, `Court ${m}`],
+  );
+  for (const [level, programPlace, seasonPlace] of [
+    ['league', null, null],
+    ['program', programId, null],
+    ['season', null, seasonId],
+  ] as const) {
+    await pglite.query(
+      `insert into setting_values (league_id, level, program_id, season_id, key, value)
+       values ($1, $2, $3, $4, 'members.startPage', $5)`,
+      [leagueId, level, programPlace, seasonPlace, JSON.stringify({ version: 1, value: m })],
+    );
+  }
   // A job a worker holds. It carries ids only (T-131), so no marker: its ids are the league's.
   const jobLeaseToken = randomUUID();
   const jobId = await id(
@@ -191,6 +229,9 @@ async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) 
     invitationToken,
     jobId,
     jobLeaseToken,
+    divisionId,
+    venueId,
+    courtId,
   };
 }
 
