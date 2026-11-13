@@ -19,12 +19,14 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
 
-Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Next free: migration 0007, record 019, T-231. Check the folders before trusting these.
+Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Reserved: migration 0007, record 019, T-231 (2.1). Next free: migration 0008, record 020, T-232. Check the folders before trusting these.
 
 - **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — built, reviewed, findings fixed; MID-MERGE with the build branch (conflicts after 1.19 landed in T7 doc, core index, isolation helpers, stores index). A builder was settling them; its job must now carry ids only (UUIDs/dates) so the invitation token cannot ride in job ids: redesign, then gate, then land.
 - **1.16 Address builder and request context** — `.local/lanes/1.16-address-context` — record 017 / T-229 if needed — builder just started; check its lane branch for commits.
 - **1.15 Supabase adapter** — `.local/lanes/1.15-supabase-adapter` — record 018 / T-230 if needed — builder just started; check its lane branch for commits.
 - **2.10 Fixture spreadsheet reader** — `.local/lanes/2.10-fixture-reader` — none — built, gate green in lane (29f6833); needs independent review, catch-up, land. Limits chosen by the builder (rows 5000, etc.) for the lead to confirm.
+- **2.1 Divisions, venues, courts, settings tables** — `.local/lanes/2.1-settings-tables` — migration 0007, record 019 / T-231 — builder starting.
+- **2.6 Tracker protocol and live messages** — `.local/lanes/2.6-tracker-protocol` — none — builder starting.
 
 ## Needs the founder
 
