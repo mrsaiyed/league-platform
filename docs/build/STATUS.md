@@ -8,7 +8,7 @@ The one file that says where the build is. Every run reads it first and updates 
 - **Stage:** 1, foundations — [plan](STAGE-1.md). Stage 2 — [plan](STAGE-2.md) — fills spare lanes.
 - **Branch:** `build/stage-1`
 - **Gate:** `npm run verify`
-- **Next step:** 1.26 Catch up with main, and at the same time every other step that can be opened ("Side by side" in the stage plan).
+- **Next step:** finish stage 1 first: 1.14 Sign-in flows (14 steps wait on it), 1.21 Seed leagues, 1.20 part 2, 1.27 Sturdy timing tests; then 1.22, 1.24, 1.25. Stage 2 steps fill the lanes left over. `node scripts/build-dashboard.mjs` prints what can start.
 - **Lanes:** up to 6 at once (runbook, section 3). The founder confirmed on 2026-11-12 that many builders at once is what they want. Lower the number if this computer struggles with that many.
 - **Moving main forward:** allowed, only through `node scripts/promote-to-main.mjs`, which the lead runs at the end of a run. The founder left `main` to the lead (2026-11-12) and asked on 2026-11-13 to see the commits in GitHub's statistics, which count `main` only. The script moves `main` only when it is a plain fast-forward, the live tracker's own files are untouched, GitHub's checks have passed on that exact commit, and no game is within 24 hours. Never push to `main` any other way, and never by hand in a run.
 - **Pushing to GitHub:** allowed, for the build branch only (`git push origin build/stage-1`). The founder said yes on 2026-11-12 and confirmed that the repository being public is fine. Never push or merge to `main`: every push to `main` republishes the live Al-Hadi tracker site at `mrsaiyed.github.io/league-platform/`, which is in use for real games.
@@ -27,8 +27,7 @@ Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migrati
 - **2.17 People commands** — `.local/lanes/2.17-people-commands` — record 027 / T-239 — just opened.
 - **2.18 Teams commands** — `.local/lanes/2.18-teams-commands` — record 028 / T-240 — just opened.
 
-- **2.66 Engine clock mode and its switch** — `.local/lanes/2.66-clock-mode` — record 029 / T-241 — just opened.
-- **2.57 Al-Hadi transfer reader** — `.local/lanes/2.57-alhadi-reader` — record 030 / T-242 — just opened.
+- **2.66 Engine clock mode and its switch** — `.local/lanes/2.66-clock-mode` — record 029 / T-241 — folder opened but no builder started yet (machine saturated: npm ci timed out); 2.57 was closed again, its numbers (record 030 / T-242) are free.
 
 Reserved now: next free migration 0010, record 031, T-243.
 
