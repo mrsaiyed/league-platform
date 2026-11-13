@@ -6,3 +6,5 @@ export * from './src/email/index.ts';
 export * from './src/jobs/index.ts';
 export * from './src/modules/leagues/index.ts';
 export * from './src/modules/imports/index.ts';
+export * from './src/modules/scheduling/index.ts';
+export * from './src/modules/people/index.ts';

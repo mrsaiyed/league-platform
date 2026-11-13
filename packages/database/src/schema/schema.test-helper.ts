@@ -85,6 +85,42 @@ export async function newSeason(
   return row.id;
 }
 
+/** Adds a division to a season (under `parentId` if given) and returns its id. */
+export async function newDivision(
+  db: Sql,
+  leagueId: string,
+  seasonId: string,
+  options: { name?: string; parentId?: string } = {},
+) {
+  const row = await one<{ id: string }>(
+    db,
+    `insert into divisions (league_id, season_id, parent_division_id, name)
+     values ($1, $2, $3, $4) returning id`,
+    [leagueId, seasonId, options.parentId ?? null, options.name ?? unique('Division')],
+  );
+  return row.id;
+}
+
+/** Adds a venue to a league and returns its id. */
+export async function newVenue(db: Sql, leagueId: string, name = unique('Venue')) {
+  const row = await one<{ id: string }>(
+    db,
+    'insert into venues (league_id, name) values ($1, $2) returning id',
+    [leagueId, name],
+  );
+  return row.id;
+}
+
+/** Adds a court to a venue and returns its id. */
+export async function newCourt(db: Sql, leagueId: string, venueId: string, name = unique('Court')) {
+  const row = await one<{ id: string }>(
+    db,
+    'insert into courts (league_id, venue_id, name) values ($1, $2, $3) returning id',
+    [leagueId, venueId, name],
+  );
+  return row.id;
+}
+
 /** Which league and account a transaction is for (T-61). Missing means not set. */
 export type AppContext = { league?: string; account?: string };
 
