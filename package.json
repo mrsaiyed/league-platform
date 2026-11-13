@@ -33,8 +33,9 @@
     "dev:varsity": "node apps/varsity-preview/server.ts",
     "prepare:varsity:hosted": "node scripts/prepare-varsity-hosted.mjs",
     "prepare:varsity:publish": "node scripts/prepare-varsity-publish.mjs",
-    "typecheck": "tsc --project tsconfig.varsity.json && tsc --project tsconfig.workspaces.json && tsc --project apps/web/tsconfig.json",
+    "typecheck": "tsc --project tsconfig.varsity.json && tsc --project tsconfig.workspaces.json && tsc --project apps/web/tsconfig.json && tsc --project packages/ui/tsconfig.json",
     "test:units": "vitest run",
+    "seed": "node --disable-warning=ExperimentalWarning packages/database/scripts/seed-leagues.ts",
     "db:types": "node packages/database/scripts/generate-schema-types.ts"
   },
   "devDependencies": {

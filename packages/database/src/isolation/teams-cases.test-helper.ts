@@ -161,10 +161,10 @@ registerCommandCase(changeRosterEntry, harnessTx, {
 
 registerCommandCase(reorderRoster, harnessTx, {
   name: "reorder the target team's roster",
-  // The seeded team has two people on it now: the captain and the walk-up player (step 2.4).
+  // The command wants every open entry on the team: the regular player and the walk-up.
   input: (target) => ({
     teamId: target.teamId,
-    rosterEntryIds: [target.rosterEntryId, target.walkUpRosterEntryId],
+    rosterEntryIds: [target.walkUpRosterEntryId, target.rosterEntryId],
   }),
 });
 

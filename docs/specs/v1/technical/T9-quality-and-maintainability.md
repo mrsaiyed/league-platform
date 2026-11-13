@@ -110,6 +110,8 @@ Technical choices that are not obvious are written as a page each in `docs/archi
 
 None contains real people.
 
+_Stage 1 (step 1.21):_ stage 1 seeds two simple made-up leagues (`npm run seed`, data in `packages/database/src/seed/`): different designs, an owner, an admin and other members, one season, divisions, teams and people. The Faraj-like league, the Al-Hadi-like demo league and the generated association above come in later stages, as further entries of the same seed data. Until the design editor exists, a seed league's design is kept in the seed data, not in the database (T-185).
+
 ## 12. What every command records
 
 **T-196:** each command logs its name, league, acting account, how long it took and whether it succeeded, tagged with an ID shared by everything in the same request. When something goes wrong at 8 pm on a Sunday, the question "what happened to this game?" has an answer.
