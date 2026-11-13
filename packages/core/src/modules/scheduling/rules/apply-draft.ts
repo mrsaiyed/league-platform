@@ -17,7 +17,8 @@ export function applyDraft(
   changes: readonly DraftChange[],
   skippedDates: readonly string[],
 ): ApplyDraftResult {
-  let state = published;
+  // A copy, so the result never is the published object even when nothing changes.
+  let state: ScheduleState = { rounds: [...published.rounds], games: [...published.games] };
   const rejected: ApplyDraftResult['rejected'] = [];
   changes.forEach((change, index) => {
     const result = applyDraftChange(state, change, skippedDates);

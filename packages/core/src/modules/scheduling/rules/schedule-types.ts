@@ -26,8 +26,8 @@ export type ScheduleRound = {
 };
 
 export type ScheduleState = {
-  rounds: ScheduleRound[];
-  games: ScheduleGame[];
+  rounds: readonly ScheduleRound[];
+  games: readonly ScheduleGame[];
 };
 
 export type DraftChange =
@@ -44,7 +44,9 @@ export type ChangeError =
   | { code: 'game-exists'; gameId: string }
   | { code: 'team-plays-itself'; gameId: string }
   | { code: 'swap-with-itself'; gameId: string }
-  | { code: 'empty-round-label'; roundId: string };
+  | { code: 'empty-round-label'; roundId: string }
+  | { code: 'invalid-date'; value: string }
+  | { code: 'invalid-time'; value: string };
 
 export type Clash =
   | {

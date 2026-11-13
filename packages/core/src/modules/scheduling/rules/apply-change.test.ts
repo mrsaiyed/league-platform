@@ -88,8 +88,14 @@ describe('applyDraftChange (P7 §4.3)', () => {
   });
 
   it('flags the clash a swap causes and refuses a swap with itself', () => {
-    const s = baseState();
-    s.games.push(game('g4', { homeTeamId: 'a', awayTeamId: 'e', time: '19:00', court: 'Court 2' }));
+    const base = baseState();
+    const s: ScheduleState = {
+      ...base,
+      games: [
+        ...base.games,
+        game('g4', { homeTeamId: 'a', awayTeamId: 'e', time: '19:00', court: 'Court 2' }),
+      ],
+    };
     const swapped = ok(
       applyDraftChange(s, { kind: 'swap-games', gameId: 'g2', otherGameId: 'g3' }, []),
     );
@@ -160,5 +166,85 @@ describe('applyDraftChange (P7 §4.3)', () => {
       [],
     );
     expect(unknown.ok).toBe(false);
+  });
+
+  const toSlot = { roundId: null, date: '2026-10-04', time: null, venueId: null, court: null };
+
+  it('moves nothing in a round with no date, and leaves games on another date alone', () => {
+    const base = baseState();
+    const noDate: ScheduleState = {
+      rounds: base.rounds.map((r) => (r.id === 'r1' ? { ...r, date: null } : r)),
+      games: base.games,
+    };
+    const a = ok(
+      applyDraftChange(
+        noDate,
+        { kind: 'change-round-date', roundId: 'r1', date: '2026-10-18' },
+        [],
+      ),
+    );
+    expect(a.state.rounds[0]?.date).toBe('2026-10-18');
+    expect(a.state.games).toEqual(base.games);
+
+    const other: ScheduleState = {
+      rounds: base.rounds,
+      games: [...base.games, game('g5', { date: '2026-10-06', homeTeamId: 'e', awayTeamId: 'f' })],
+    };
+    const b = ok(
+      applyDraftChange(other, { kind: 'change-round-date', roundId: 'r1', date: '2026-10-18' }, []),
+    );
+    expect(b.state.games.find((g) => g.id === 'g5')?.date).toBe('2026-10-06');
+  });
+
+  it('refuses an unknown round when moving a game', () => {
+    const r = applyDraftChange(
+      baseState(),
+      { kind: 'move-game', gameId: 'g1', to: { ...toSlot, roundId: 'nope' } },
+      [],
+    );
+    expect(r).toEqual({ ok: false, error: { code: 'unknown-round', roundId: 'nope' } });
+  });
+
+  it('refuses a swap with an unknown second game', () => {
+    const r = applyDraftChange(
+      baseState(),
+      { kind: 'swap-games', gameId: 'g1', otherGameId: 'zz' },
+      [],
+    );
+    expect(r).toEqual({ ok: false, error: { code: 'unknown-game', gameId: 'zz' } });
+  });
+
+  it('refuses dates that are not real calendar dates and times that are not HH:MM', () => {
+    const code = (change: Parameters<typeof applyDraftChange>[1]): unknown => {
+      const r = applyDraftChange(baseState(), change, []);
+      return r.ok ? 'ok' : r.error;
+    };
+    const bad = ['2026-02-30', '2026-13-01', '10/04/2026', '2026-1-4', ''];
+    for (const date of bad) {
+      expect(code({ kind: 'add-game', game: game('g9', { homeTeamId: 'x', date }) })).toEqual({
+        code: 'invalid-date',
+        value: date,
+      });
+      expect(code({ kind: 'move-game', gameId: 'g1', to: { ...toSlot, date } })).toEqual({
+        code: 'invalid-date',
+        value: date,
+      });
+      expect(code({ kind: 'change-round-date', roundId: 'r1', date })).toEqual({
+        code: 'invalid-date',
+        value: date,
+      });
+    }
+    for (const time of ['24:00', '9:00', '18:60', '6pm']) {
+      expect(code({ kind: 'add-game', game: game('g9', { homeTeamId: 'x', time }) })).toEqual({
+        code: 'invalid-time',
+        value: time,
+      });
+      expect(code({ kind: 'move-game', gameId: 'g1', to: { ...toSlot, time } })).toEqual({
+        code: 'invalid-time',
+        value: time,
+      });
+    }
+    expect(code({ kind: 'move-game', gameId: 'g1', to: { ...toSlot, time: '00:00' } })).toBe('ok');
+    expect(code({ kind: 'change-round-date', roundId: 'r1', date: '2028-02-29' })).toBe('ok');
   });
 });

@@ -66,4 +66,53 @@ describe('findClashes (P7 §4.3)', () => {
       { kind: 'skipped-date', gameId: 'g3', date: '2026-10-05' },
     ]);
   });
+
+  it('compares a null venue with a court, and does not mix it with a named venue', () => {
+    const other = { homeTeamId: 'c', awayTeamId: 'd', venueId: null };
+    expect(findClashes([game('g1', { venueId: null }), game('g2', other)], [])).toEqual([
+      {
+        kind: 'court-booked-twice',
+        venueId: null,
+        court: 'Court 1',
+        date: '2026-10-04',
+        time: '18:00',
+        gameIds: ['g1', 'g2'],
+      },
+    ]);
+    expect(findClashes([game('g1'), game('g2', other)], [])).toEqual([]);
+  });
+
+  it('does not clash a team with itself when it is on both sides of one game', () => {
+    expect(findClashes([game('g1', { awayTeamId: 'a' })], [])).toEqual([]);
+    const clashes = findClashes(
+      [
+        game('g1', { awayTeamId: 'a' }),
+        game('g2', { homeTeamId: 'a', awayTeamId: 'c', court: 'Court 2' }),
+      ],
+      [],
+    );
+    expect(clashes).toEqual([
+      {
+        kind: 'team-in-two-places',
+        teamId: 'a',
+        date: '2026-10-04',
+        time: '18:00',
+        gameIds: ['g1', 'g2'],
+      },
+    ]);
+  });
+
+  it('ignores a postponed game on a skipped date', () => {
+    expect(findClashes([game('g1', { status: 'postponed' })], ['2026-10-04'])).toEqual([]);
+  });
+
+  it('counts live, final and forfeit games as holding their slot', () => {
+    for (const status of ['live', 'final', 'forfeit'] as const) {
+      const clashes = findClashes(
+        [game('g1', { status }), game('g2', { homeTeamId: 'c', awayTeamId: 'd' })],
+        [],
+      );
+      expect(clashes).toHaveLength(1);
+    }
+  });
 });

@@ -20,6 +20,15 @@ const slotOf = (g: ScheduleSlot): ScheduleSlot => ({
   court: g.court,
 });
 
+const isDate = (v: string): boolean => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const t = new Date(Date.UTC(y, mo - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d;
+};
+const isTime = (v: string): boolean => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+
 const fail = (error: ChangeError): ApplyChangeResult => ({ ok: false, error });
 
 /**
@@ -34,6 +43,13 @@ export function applyDraftChange(
 ): ApplyChangeResult {
   const find = (id: string): ScheduleGame | undefined => state.games.find((g) => g.id === id);
   const hasRound = (id: string): boolean => state.rounds.some((r) => r.id === id);
+  const badSlot = (slot: { date: string; time: string | null }): ApplyChangeResult | undefined => {
+    if (!isDate(slot.date)) return fail({ code: 'invalid-date', value: slot.date });
+    if (slot.time !== null && !isTime(slot.time)) {
+      return fail({ code: 'invalid-time', value: slot.time });
+    }
+    return undefined;
+  };
   const done = (next: ScheduleState, touched: string[]): ApplyChangeResult => ({
     ok: true,
     state: next,
@@ -48,6 +64,8 @@ export function applyDraftChange(
       if (g.roundId !== null && !hasRound(g.roundId)) {
         return fail({ code: 'unknown-round', roundId: g.roundId });
       }
+      const bad = badSlot(g);
+      if (bad) return bad;
       return done({ ...state, games: [...state.games, { ...g }] }, [g.id]);
     }
     case 'move-game': {
@@ -56,6 +74,8 @@ export function applyDraftChange(
       if (to.roundId !== null && !hasRound(to.roundId)) {
         return fail({ code: 'unknown-round', roundId: to.roundId });
       }
+      const bad = badSlot(to);
+      if (bad) return bad;
       const games = state.games.map((g) => (g.id === change.gameId ? { ...g, ...slotOf(to) } : g));
       return done({ ...state, games }, [change.gameId]);
     }
@@ -85,6 +105,7 @@ export function applyDraftChange(
     case 'change-round-date': {
       const round = state.rounds.find((r) => r.id === change.roundId);
       if (!round) return fail({ code: 'unknown-round', roundId: change.roundId });
+      if (!isDate(change.date)) return fail({ code: 'invalid-date', value: change.date });
       const touched: string[] = [];
       const games = state.games.map((g) => {
         if (g.roundId !== round.id || g.date !== round.date) return g;
