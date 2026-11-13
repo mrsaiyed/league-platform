@@ -4,6 +4,20 @@
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
 import type { Audience, LeagueStatus } from './league-values.ts';
+import type { SettingLevel } from './settings/define-setting.ts';
+
+/** Where a setting value is kept: the league, one program or one season (record 019). */
+export type SettingPlace =
+  | { readonly level: 'league' }
+  | { readonly level: 'program'; readonly programId: string }
+  | { readonly level: 'season'; readonly seasonId: string };
+
+/** A stored value at a place, as it is kept: `{version, value}`, and the row's own version. */
+export type StoredSettingRow = {
+  readonly level: SettingLevel;
+  readonly document: unknown;
+  readonly version: number;
+};
 
 export type LeagueRecord = {
   readonly id: string;
@@ -69,6 +83,26 @@ export type LeaguesStore = {
   readonly seasonProgramId: (seasonId: string) => Promise<string | undefined>;
   /** Makes the season the current one of its program, and no other: false if it is not found. */
   readonly setCurrentSeason: (seasonId: string) => Promise<boolean>;
+  /**
+   * The stored values of one key at the league, and at the program and season given:
+   * at most one row per place.
+   */
+  readonly settingRows: (
+    key: string,
+    places: { readonly programId?: string; readonly seasonId?: string },
+  ) => Promise<readonly StoredSettingRow[]>;
+  /**
+   * Writes a value at a place. `version` is the row's version when the admin read it,
+   * or null when they saw none (T-46, A-8): the new version, or undefined if it moved.
+   */
+  readonly writeSetting: (
+    place: SettingPlace,
+    key: string,
+    document: { readonly version: number; readonly value: unknown },
+    version: number | null,
+  ) => Promise<number | undefined>;
+  /** Removes the value at a place if it is still at `version`; false if it moved or is not there. */
+  readonly clearSetting: (place: SettingPlace, key: string, version: number) => Promise<boolean>;
 };
 
 /**

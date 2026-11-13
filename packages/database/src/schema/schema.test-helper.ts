@@ -121,6 +121,66 @@ export async function newCourt(db: Sql, leagueId: string, venueId: string, name 
   return row.id;
 }
 
+/** Adds a person to a league and returns their id. */
+export async function newPerson(
+  db: Sql,
+  leagueId: string,
+  options: { firstName?: string; lastName?: string; profileId?: string } = {},
+) {
+  const row = await one<{ id: string }>(
+    db,
+    `insert into people (league_id, first_name, last_name, profile_id)
+     values ($1, $2, $3, $4) returning id`,
+    [
+      leagueId,
+      options.firstName ?? 'Made-up',
+      options.lastName ?? unique('Player'),
+      options.profileId ?? null,
+    ],
+  );
+  return row.id;
+}
+
+/** Adds a team to a season (in `divisionId` if given) and returns its id. */
+export async function newTeam(
+  db: Sql,
+  leagueId: string,
+  seasonId: string,
+  options: { slug?: string; name?: string; divisionId?: string; lineageId?: string } = {},
+) {
+  const row = await one<{ id: string }>(
+    db,
+    `insert into teams (league_id, season_id, division_id, slug, name, stats_visibility, lineage_id)
+     values ($1, $2, $3, $4, $5, 'everyone', coalesce($6::uuid, public.uuid_v7())) returning id`,
+    [
+      leagueId,
+      seasonId,
+      options.divisionId ?? null,
+      options.slug ?? unique('team'),
+      options.name ?? unique('Team'),
+      options.lineageId ?? null,
+    ],
+  );
+  return row.id;
+}
+
+/** Puts a person on a team and returns the roster entry's id. */
+export async function newRosterEntry(
+  db: Sql,
+  leagueId: string,
+  teamId: string,
+  personId: string,
+  options: { jersey?: string | null; role?: string } = {},
+) {
+  const row = await one<{ id: string }>(
+    db,
+    `insert into roster_entries (league_id, team_id, person_id, jersey_number, role)
+     values ($1, $2, $3, $4, $5) returning id`,
+    [leagueId, teamId, personId, options.jersey ?? null, options.role ?? 'player'],
+  );
+  return row.id;
+}
+
 /** Which league and account a transaction is for (T-61). Missing means not set. */
 export type AppContext = { league?: string; account?: string };
 
