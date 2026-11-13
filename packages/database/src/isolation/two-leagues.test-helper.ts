@@ -39,6 +39,9 @@ export type LeagueRecords = MadeLeague & {
   invitationId: string;
   invitationEmail: string;
   invitationToken: string;
+  /** A job a worker holds, and the lease it holds it by. */
+  jobId: string;
+  jobLeaseToken: string;
 };
 
 export type TwoLeagues = {
@@ -161,6 +164,14 @@ async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) 
       ownerId,
     ],
   );
+  // A job a worker holds. It carries ids only (T-131), so no marker: its ids are the league's.
+  const jobLeaseToken = randomUUID();
+  const jobId = await id(
+    pglite,
+    `insert into jobs (league_id, type, ids, dedupe_key, state, attempts, lease_token, lease_expires_at)
+     values ($1, 'notify.event', $2, $3, 'running', 1, $4, now() + interval '1 hour')`,
+    [leagueId, JSON.stringify({ seasonId }), seasonId, jobLeaseToken],
+  );
   return {
     leagueId,
     ownerId,
@@ -178,6 +189,8 @@ async function seededLeague(pglite: PGlite, m: string, sharedAccountId: string) 
     invitationId,
     invitationEmail,
     invitationToken,
+    jobId,
+    jobLeaseToken,
   };
 }
 

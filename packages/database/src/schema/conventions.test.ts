@@ -52,13 +52,14 @@ async function tables(): Promise<string[]> {
 }
 
 describe('every table', () => {
-  it('is one of the tables of step 1.6', async () => {
+  it('is one of the tables of step 1.6, or the jobs table (step 1.19)', async () => {
     expect(await tables()).toEqual(
       [
         'accounts',
         'activity_log',
         'command_receipts',
         'invitations',
+        'jobs',
         'league_features',
         'league_slug_history',
         'leagues',

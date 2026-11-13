@@ -52,6 +52,18 @@ const reachNoLeagueData = new Map<unknown, string>([
   [invitationFromRow, 'turns a row already read into the returned shape; runs no SQL'],
   [invitationStatus, 'builds a column expression for the queries that use it; runs no SQL'],
   [scopeColumns, 'turns a scope into its two column values; runs no SQL'],
+  [databasePackage.jobsStore, 'binds insertJob, which has its own case, to a scope'],
+  // The worker's one look across leagues, by design (record 012), so no league case
+  // can hold it: it runs in a transaction with no league and no account set, through
+  // the owner-run take_jobs, and returns ids only. Its type (NoLeagueScope) refuses
+  // a league scope at compile time, and take_jobs refuses at run time any
+  // transaction with a league or account set: a check in the database, not proof
+  // that only the worker calls it (both apps act as app_user; a worker role of its
+  // own is the later hardening). Tested in schema/jobs.test.ts and take-jobs.test.ts.
+  [databasePackage.takeJobs, 'the worker taking due jobs of every league (record 012)'],
+  [databasePackage.tableQueue, 'opens its own transactions: takeJobs, then settleJob per job'],
+  [databasePackage.pgBossQueue, 'opens its own transactions: takeJobs, then settleJob per job'],
+  [databasePackage.createPgBoss, "makes pg-boss for its own schema; reads no league's rows"],
   [databasePackage.createDatabase, 'opens connections; reads no rows'],
   [databasePackage.checkLoginRole, "reads the login role's facts from pg_roles only"],
   [databasePackage.applyMigrations, 'the migration runner (T-48): schema, as the owner'],

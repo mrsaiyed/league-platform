@@ -239,6 +239,7 @@ All dated November 12, 2026.
 | T-223                 | New                                                                          | The command shape and where it lives (record 010)                                                             | Step 1.10 needed one shape for every change to data                                                |
 | T-226                 | New                                                                          | Invitation links, accepting in the league's fence, what the activity log holds (record 014); T-221 narrowed   | Step 1.12 needed them; the link names the league, so accepting needs no owner-run function         |
 | T-212                 | Nothing from a later stage is built early                                    | Later-stage work is built early whenever it does not have to wait (record 011)                                | The founder asked for every stage that can be built in parallel to be built in parallel            |
+| T-224                 | New                                                                          | Jobs recorded in our own fenced `jobs` table; pg-boss runs them in production (record 012)                    | Step 1.19: pg-boss's tables have no league fence, so a job there would be open to every league     |
 | T-225                 | New                                                                          | Sign-in numbers and the shape of the sign-in interface (record 013)                                           | Step 1.13 turned "a few" and "for a while" into numbers the stand-in and Supabase share            |
 
 ## The full list
@@ -587,6 +588,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-146 | Fairness: a 20,000-recipient announcement and a small league's reminders queued together; the reminders finish within their 15-minute target                               | Agreed (delegated)  |         |
 | T-147 | A chat is ordinary league data plus the delivery we already have                                                                                                           | Agreed (delegated)  |         |
 | T-148 | Chat safety is enforced by the server, not by the screen                                                                                                                   | Agreed (delegated)  |         |
+| T-224 | Jobs are recorded in our own fenced `jobs` table, ids only; pg-boss runs them in production, the table itself locally (record 012)                                         | Agreed (delegated)  | yes     |
 
 ### [T8 — Scale, reliability and operations](technical/T8-scale-reliability-operations.md)
 

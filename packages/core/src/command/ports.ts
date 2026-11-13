@@ -14,11 +14,23 @@ export type CommandContext = {
   readonly requestId: string;
 };
 
-/** A follow-up job: what to do and the ids it needs, never personal content (T-131). */
+/**
+ * A follow-up job: what to do and the ids it needs, never personal content (T-131).
+ * jobProblem (job-rules.ts) says exactly what each part may hold.
+ */
 export type Job = {
+  /** One of jobTypes (T7 §2): `email.send`. */
   readonly type: string;
   readonly leagueId: string;
+  /** UUIDs under camelCase keys (dates under keys ending Date, Day, On); content is built when it runs. */
   readonly ids: Readonly<Record<string, string>>;
+  /** Wait this many seconds before running it (a recap 10 minutes after the final). */
+  readonly delaySeconds?: number;
+  /**
+   * Built from ids. A second job of this type with this key in the league is not
+   * recorded, however often its cause repeats (T7 §1).
+   */
+  readonly dedupeKey?: string;
 };
 
 /** Records jobs in the transaction it belongs to, so they exist only if it commits (T-130). */

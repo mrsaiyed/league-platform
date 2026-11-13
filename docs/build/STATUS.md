@@ -19,14 +19,14 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
 
-Reserved so far: migration 0006 and decision record 012 / T-224 to 1.19 part 1; decision record 013 / T-225 to 1.13; decision record 014 / T-226 to 1.12; decision record 015 / T-227 to 1.18 part 1; decision record 016 / T-228 to 1.20 part 1. Next free: migration 0007, record 017, T-229. Check the folders before trusting these.
+Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Next free: migration 0007, record 019, T-231. Check the folders before trusting these.
 
-- **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — whole step.
-- **1.13 Sign-in interface and stand-in** — `.local/lanes/1.13-signin-interface` — record 013 / T-225 — whole step.
-- **1.19 part 1** — `.local/lanes/1.19p1-queue-email` — migration 0006, record 012 / T-224 — queue and email interfaces, stand-ins, adapters, jobs table.
-- **2.5 Season rules document** — `.local/lanes/2.5-season-rules` — none — whole step.
-- **2.7 Standings and tiebreakers** — `.local/lanes/2.7-standings` — none — whole step.
-- **2.8 Statistics totals and leaders** — `.local/lanes/2.8-stats` — none — whole step.
+- **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — built and review findings fixed; needs one more catch-up merge with the build branch (a builder was doing it), gate green in the lane, then land (read-only-league behaviour is on the founder list).
+- **1.19 part 1** — `.local/lanes/1.19p1-queue-email` — migration 0006, record 012 / T-224 — built; review findings (take_jobs callable by any app transaction, dedupe key and last_error pattern too loose, narrow INSERT grant, short pg-boss lease, wiring comment) were sent to the builder; then catch up with the build branch (keep 90 s test timeouts), gate green, land. `npm ci` needed after landing (pg-boss).
+- **2.7 Standings and tiebreakers** — `.local/lanes/2.7-standings` — none — built and reviewed; review findings (adjustment checks, allowTies, gamesPlayed, head-to-head points per game, restart test, spec wording) sent to the builder; then catch up (vitest.config.ts keep all globs), gate, land.
+- **1.16 Address builder and request context** — `.local/lanes/1.16-address-context` — record 017 / T-229 if needed — builder just started; check its lane branch for commits.
+- **1.15 Supabase adapter** — `.local/lanes/1.15-supabase-adapter` — record 018 / T-230 if needed — builder just started; check its lane branch for commits.
+- **2.10 Fixture spreadsheet reader** — `.local/lanes/2.10-fixture-reader` — none — builder just started; check its lane branch for commits.
 
 ## Needs the founder
 
@@ -44,6 +44,9 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 1.13 done: sign-in interface (SignInService) and in-memory stand-in in packages/providers, Zod shapes in contracts; record 013, T-225 (code and attempt limits, per address and per network). Reviewer's 12 findings fixed. For 1.14/1.15: networkAddress is required on code calls; the code sender returns a Result; the stand-in needs nodeEnv from config; Supabase has no device or session list (the adapter needs a small store, maybe a migration); Google-only accounts re-confirm through a fresh Google sign-in.
+- 2026-11-13 — Step 2.5 done: season rules document in packages/contracts (presets rec-league = P7 defaults, high-school mirrors the engine's QUARTERS; timeouts added as settings; upgrade chain from an invented v0). Open: statistics set names need a stat list (2.8/2.15); team fouls reset half/game not in the engine yet; uniqueJerseys placement before 2.15; limits duplicated with the tracker's Rules (a test guards drift).
+- 2026-11-13 — Step 2.8 done: statistics totals and leaders in packages/sports/src/stats. The minimum-games rule counts games played by default (option for games with the stat recorded): founder to confirm which a league wants. Step 2.24 must pass hidden team ids to seasonTotals.
 - 2026-11-13 — Step 1.26 done (real merge): origin/main (24d8bfb) is in; tracker code and tests are main's, unchanged; legacyFiles gained live.ts and setup.sql (the one recorded exception); the tracker and the web app both read DATABASE_URL (a copied .env.example would point the tracker at the web app's made-up database: rename one later); nothing contacted the real Supabase project. Under several lanes at once the database tests exceed their 30 s limit; they pass alone.
 - 2026-11-13 — Step 1.18 part 1 done: design document to CSS variables (packages/site), two starting designs (midnight-gold, clean-court), English message catalog with translator and plurals, right-to-left helpers. Reviewer's findings fixed. Open: no JSON catalogs, no scan for hard-coded text (part 2), 7 font keys, fonts not hosted.
 - 2026-11-13 — Step 1.20 part 1 done: logging and error reporting in packages/observability (JSON logs with request ID, redaction of personal content and secrets, error reporter, local adapters, Sentry adapter over an injected client, unverified). Reviewer's findings fixed. To do when real Sentry is wired: sendDefaultPii off, beforeSend running redact, drop breadcrumbs/request data. Open: CommandLine is a copy of core's log-line shape; free-text names under harmless keys cannot be detected; health checks are part 2. Gate: under six concurrent lanes the database tests time out at 30 s (app-role.test.ts); they pass alone.

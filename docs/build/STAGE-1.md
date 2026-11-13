@@ -36,7 +36,7 @@ Each step is done when its done test passes, the gate passes, the independent re
 
 ### D. Sign-in
 
-- [ ] **1.13 The sign-in interface and local stand-in.** An interface in `packages/providers` for: start sign-up with an emailed code, set a password, sign in, sign out, sign out everywhere, list sessions, reset by code. A local stand-in for development and tests only, clearly marked as not for production. _Spec: T-6, T-14, T-67 to T-71, T-85. Model: opus, high._
+- [x] **1.13 The sign-in interface and local stand-in.** An interface in `packages/providers` for: start sign-up with an emailed code, set a password, sign in, sign out, sign out everywhere, list sessions, reset by code. A local stand-in for development and tests only, clearly marked as not for production. _Spec: T-6, T-14, T-67 to T-71, T-85. Model: opus, high._
 - [ ] **1.14 Sign-in flows in the web app.** Sign up (email, code, password), sign in, forgotten password, Google button behind the interface, the session cookie (T-69), no time limit (T-70), the password again for sensitive actions, the new-device email, the device list with "sign out everywhere" (T-71), identical behavior whether or not an account exists (T-68), attempt limits (T-85). _Spec: P6 §2 and §5, T4 §3. Needs: 1.17, 1.19. Model: opus, high._
 - [ ] **1.15 The Supabase adapter.** The real adapter for the same interface, unit-tested against recorded responses. Marked not verified against the live service. _Spec: T-5, T-6. Model: opus._
 

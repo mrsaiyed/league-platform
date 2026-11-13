@@ -160,7 +160,8 @@ The public site is always drawn from the latest `site_releases` row, never from 
 | `email_suppressions` | An address we must not email    | `email`, `reason`                                                                            |
 | `imports`            | A spreadsheet import            | `league_id`, `kind`, `status`, `report` (JSON), what it created (so it can be undone)        |
 | `command_receipts`   | Commands already carried out    | `league_id`, `account_id`, `command_id`, `command`, `result`                                 |
-| job queue tables     | Managed by pg-boss              |                                                                                              |
+| `jobs`               | A job a change left (T-224)     | `league_id`, `type`, `ids` (JSON, ids only, T-131), `dedupe_key`, `state`, `run_after`       |
+| pg-boss's tables     | Jobs handed over to run         | In their own `pgboss` schema, which the app's role cannot use (record 012)                   |
 
 `dedupe_key` is what guarantees "nothing is ever sent twice" (N-8): a recap for game G to account A has one possible key, and the database refuses a second.
 

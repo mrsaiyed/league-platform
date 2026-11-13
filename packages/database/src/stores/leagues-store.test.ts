@@ -92,7 +92,7 @@ describe('setLeagueName on the database', () => {
     const failing = onEvent<LeagueNameChanged, LeaguesTx>(
       'leagues.name_changed',
       async (event, tx) => {
-        await tx.jobs.enqueue({ type: 'site.refresh', leagueId: event.leagueId, ids: {} });
+        await tx.jobs.enqueue({ type: 'cache.clear', leagueId: event.leagueId, ids: {} });
         throw new Error('standings could not be updated');
       },
     );
@@ -107,10 +107,10 @@ describe('setLeagueName on the database', () => {
   it("records a handler's job when the rename commits", async () => {
     const { a, jobs, deps, league, as } = await setUp();
     const queueing = onEvent<LeagueNameChanged, LeaguesTx>('leagues.name_changed', (event, tx) =>
-      tx.jobs.enqueue({ type: 'site.refresh', leagueId: event.leagueId, ids: {} }),
+      tx.jobs.enqueue({ type: 'cache.clear', leagueId: event.leagueId, ids: {} }),
     );
     await setLeagueName(as(a.ownerId), { name: 'Second', version: 1 }, deps([queueing]));
     expect(await league()).toEqual({ name: 'Second', version: 2 });
-    expect(jobs).toEqual([{ type: 'site.refresh', leagueId: a.leagueId, ids: {} }]);
+    expect(jobs).toEqual([{ type: 'cache.clear', leagueId: a.leagueId, ids: {} }]);
   });
 });
