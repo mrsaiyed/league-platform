@@ -14,3 +14,7 @@ export {
   type LocalLiveHub,
   type LocalLiveHubOptions,
 } from './local-live-hub.ts';
+export {
+  supabaseRealtimePublisher,
+  type SupabaseRealtimePublisherOptions,
+} from './supabase-realtime-publisher.ts';
