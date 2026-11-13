@@ -12,4 +12,3 @@ export * from './src/modules/scheduling/index.ts';
 export * from './src/modules/people/index.ts';
 export * from './src/modules/standings/index.ts';
 export * from './src/modules/teams/index.ts';
-export * from './src/modules/standings/index.ts';
