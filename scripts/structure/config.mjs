@@ -112,9 +112,13 @@ export const leagueNamesAllowedIn = ['supabase/seed/', '/seed/', '/fixtures/', '
 /** SQL may be written only here (T2 §1–2). */
 export const sqlAllowedIn = ['packages/database/', 'supabase/'];
 
-/** Database drivers and query builders: importing one is writing SQL. */
+/**
+ * Database drivers, query builders and the job queue that keeps its tables in our
+ * database (pg-boss, record 012): importing one is writing SQL.
+ */
 export const databaseLibraries = [
   'pg',
+  'pg-boss',
   'postgres',
   '@electric-sql/pglite',
   '@electric-sql/pglite-socket',

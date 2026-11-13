@@ -291,7 +291,7 @@ describe('the harness, with commands (step 1.10)', () => {
       allowed: ownerOnly,
       run: async ({ context, input, tx }): Promise<Result<null, never>> => {
         const ids = { program: input.programId };
-        await tx.jobs.enqueue({ type: 'leagues.planted', leagueId: context.leagueId, ids });
+        await tx.jobs.enqueue({ type: 'notify.event', leagueId: context.leagueId, ids });
         return ok(null);
       },
     });

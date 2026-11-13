@@ -1,17 +1,18 @@
 # T7 — Notifications and background jobs
 
-[Spec home](../README.md) · Decisions T-130 to T-148
+[Spec home](../README.md) · Decisions T-130 to T-148, T-224
 
 How reminders, recaps and every other piece of delayed or scheduled work ([P8](../product/P8-notifications.md)) actually happens.
 
 ## 1. The worker and its queue
 
-The **worker** is the second of our two programs (T1 section 2). It does nothing but take jobs from a queue and carry them out. The queue is a set of tables in the same PostgreSQL database as everything else, managed by the pg-boss library.
+The **worker** is the second of our two programs (T1 section 2). It does nothing but take jobs from a queue and carry them out. The queue is tables in the same PostgreSQL database as everything else: our own `jobs` table, where every job is recorded, and, in staging and production, the pg-boss library's tables, where the worker hands each job over to be run.
 
 - **T-130: a job is recorded in the same transaction as the change that causes it.** "Game finalized" and "send its recap at 7:52" are saved together or not at all. A crash between the two cannot happen, so a recap is never lost and never sent for a result that was not saved.
-- **T-131: a job carries identifiers, not content.** It says "recap for game G", not the score. The content is built when the job runs (N-11), which keeps it current and keeps personal data out of the queue.
+- **T-131: a job carries identifiers, not content.** It says "recap for game G", not the score. The content is built when the job runs (N-11), which keeps it current and keeps personal data out of the queue. The database refuses anything else: a job's ids are at most ten UUIDs or dates.
 - A job has a name, the league it belongs to, the earliest time it may run, a count of attempts, and optionally a key that prevents a duplicate of itself being queued.
 - Several workers can run at once. A job is leased to one worker at a time; if that worker dies, the lease expires and another takes it.
+- **T-224: the `jobs` table is behind the league fence** like every other league table, so a request records and sees only its own league's jobs. The worker takes due jobs from every league through one narrow owner-run function that returns ids only. In staging and production it hands each one to pg-boss under the job's own id (a repeated handover is ignored) and pg-boss runs it; for local work and tests the jobs run straight from the table. Detail: [decision record 012](../../../architecture/decisions/012-the-jobs-table-and-pg-boss.md).
 
 ## 2. Every job
 
