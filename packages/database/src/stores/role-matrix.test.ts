@@ -275,19 +275,41 @@ const rows: readonly Row[] = [
     prepare: async () => ({ input: { status: 'suspended', version: 1 } }),
     run: (c, i) => setLeagueStatus(c, i, leaguesDeps),
   },
+  // Seasons are checked at their program (P4 §4): the default program's rows refuse
+  // the admin of another program; the program's rows let that program's admin in.
   {
     command: 'leagues.create_season',
-    name: 'add a season',
+    name: 'add a season to the default program',
     needs: 'season.settings',
     prepare: async () => ({ input: { slug: 'fall', name: 'Fall' } }),
     run: (c, i) => createSeason(c, i, leaguesDeps),
   },
   {
+    command: 'leagues.create_season',
+    name: 'add a season to one program',
+    needs: 'season.settings',
+    scope: 'program',
+    prepare: async (league) => ({
+      input: { programId: league.programId, slug: 'fall', name: 'Fall' },
+    }),
+    run: (c, i) => createSeason(c, i, leaguesDeps),
+  },
+  {
     command: 'leagues.set_current_season',
-    name: 'make a season current',
+    name: 'make a season of the default program current',
     needs: 'season.settings',
     prepare: async (league) => ({
       input: { seasonId: await newSeason(pglite, league.leagueId, league.defaultProgramId) },
+    }),
+    run: (c, i) => setCurrentSeason(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.set_current_season',
+    name: 'make a season of one program current',
+    needs: 'season.settings',
+    scope: 'program',
+    prepare: async (league) => ({
+      input: { seasonId: await newSeason(pglite, league.leagueId, league.programId) },
     }),
     run: (c, i) => setCurrentSeason(c, i, leaguesDeps),
   },
@@ -433,6 +455,16 @@ const rows: readonly Row[] = [
   },
 ];
 
+/**
+ * Rows whose need is not the command's own named permission, each with its reason.
+ * Every other row must need exactly what its command names.
+ */
+const namedExceptions: Readonly<Record<string, readonly CommandRequirement[]>> = {
+  // Names `league.settings` for publishing and archiving; suspending and lifting a
+  // suspension are our staff's (U-9), which its own check decides.
+  'leagues.set_status': ['platform-staff'],
+};
+
 describe('every role against every command (T4 §12)', () => {
   it('has a row for every command in the registry', () => {
     const covered = new Set(rows.map((row) => row.command));
@@ -441,14 +473,20 @@ describe('every role against every command (T4 §12)', () => {
   });
 
   it('runs each command as the permission it names itself (T4 §4)', () => {
-    const wrong = [...commands.values()]
-      .filter((command) =>
-        rows.every(
-          (row) => row.command !== command.commandName || row.needs !== command.permission,
-        ),
-      )
-      .map((command) => `${command.commandName} names "${command.permission}"`);
+    const wrong = rows
+      .filter((row) => {
+        const named = commands.get(row.command)?.permission;
+        if (named === row.needs) return false;
+        return !(namedExceptions[row.command] ?? []).includes(row.needs);
+      })
+      .map((row) => `${row.command} (${row.name}) needs "${row.needs}"`);
     expect(wrong).toEqual([]);
+    // Each exception still has its row, so none can outlive the case it was for.
+    for (const [command, needs] of Object.entries(namedExceptions)) {
+      for (const need of needs) {
+        expect(rows.some((row) => row.command === command && row.needs === need)).toBe(true);
+      }
+    }
   });
 
   for (const row of rows) {

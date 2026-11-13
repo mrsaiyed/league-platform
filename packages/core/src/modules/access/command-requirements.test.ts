@@ -5,11 +5,25 @@ import {
   isCommandRequirement,
   nonRoleRequirements,
 } from './command-requirements.ts';
-import { permissions } from './roles.ts';
+
+// Written by hand from T4 §4, not read from roles.ts, so a permission dropped from
+// core by mistake is caught here.
+const valid = [
+  'league.settings',
+  'access.manage',
+  'activity.read',
+  'season.settings',
+  'people.import',
+  'schedule.publish',
+  'games.score',
+  'games.correct',
+  'bin.restore',
+  'team.lineup',
+];
 
 describe('command requirements', () => {
   it('are the permissions and the two non-role needs, and nothing else', () => {
-    for (const p of [...permissions, ...nonRoleRequirements]) {
+    for (const p of [...valid, ...nonRoleRequirements]) {
       expect(isCommandRequirement(p), p).toBe(true);
     }
     for (const other of [undefined, null, '', 'games', 'games.delete', 'owner', 42]) {
