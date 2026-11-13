@@ -103,7 +103,17 @@ const basis = (
   seasonId: string,
   version: number | null = null,
   basedOnRevision: number | null = null,
-) => ({ seasonId, basedOnRevision, version });
+  draftId: string | null = null,
+) => ({ seasonId, basedOnRevision, version, draftId });
+
+async function draftIdOf(leagueId: string) {
+  const row = await one<{ id: string }>(
+    pglite,
+    'select id from schedule_drafts where league_id = $1',
+    [leagueId],
+  );
+  return row.id;
+}
 
 describe('schedule draft commands against the database', () => {
   it('reads the published schedule in the league time zone, with court names and recording', async () => {
@@ -147,10 +157,11 @@ describe('schedule draft commands against the database', () => {
       deps,
     );
     expect(moved).toMatchObject({ ok: true, value: { version: 1 } });
+    const draftId = await draftIdOf(s.leagueId);
     expect(
       await setDraftRecording(
         s.as,
-        { ...basis(s.seasonId, 1), gameId: s.gameId, recording: 'live' },
+        { ...basis(s.seasonId, 1, null, draftId), gameId: s.gameId, recording: 'live' },
         deps,
       ),
     ).toMatchObject({ ok: true, value: { version: 2 } });
@@ -170,7 +181,9 @@ describe('schedule draft commands against the database', () => {
         summary: { gamesMoved: [s.gameId] },
       },
     });
-    expect(await discardScheduleDraft(s.as, { seasonId: s.seasonId, version: 2 }, deps)).toEqual({
+    expect(
+      await discardScheduleDraft(s.as, { seasonId: s.seasonId, draftId, version: 2 }, deps),
+    ).toEqual({
       ok: true,
       value: {},
     });
@@ -189,6 +202,7 @@ describe('schedule draft commands against the database', () => {
       { ...basis(s.seasonId), roundId: s.roundId, label: 'Opening night' },
       deps,
     );
+    const draftId = await draftIdOf(s.leagueId);
     // A second admin who still sees no draft.
     expect(
       await renameDraftRound(
@@ -206,7 +220,7 @@ describe('schedule draft commands against the database', () => {
     expect(
       await renameDraftRound(
         s.as,
-        { ...basis(s.seasonId, 1), roundId: s.roundId, label: 'Late' },
+        { ...basis(s.seasonId, 1, null, draftId), roundId: s.roundId, label: 'Late' },
         deps,
       ),
     ).toMatchObject({ ok: false, error: { code: 'revision-out-of-date' } });
@@ -214,7 +228,7 @@ describe('schedule draft commands against the database', () => {
     expect(
       await renameDraftRound(
         s.as,
-        { ...basis(s.seasonId, 1, 1), roundId: s.roundId, label: 'Later' },
+        { ...basis(s.seasonId, 1, 1, draftId), roundId: s.roundId, label: 'Later' },
         deps,
       ),
     ).toMatchObject({ ok: false, error: { code: 'revision-out-of-date' } });
@@ -226,6 +240,41 @@ describe('schedule draft commands against the database', () => {
       [s.leagueId],
     );
     expect(draft.version).toBe(1);
+  });
+
+  it('refuses a reader of a draft that was discarded and started again, in the database too (A-8)', async () => {
+    const s = await season();
+    await renameDraftRound(
+      s.as,
+      { ...basis(s.seasonId), roundId: s.roundId, label: 'First draft' },
+      deps,
+    );
+    const oldId = await draftIdOf(s.leagueId);
+    // A holds draft oldId at version 1. B discards it and starts a new one, also at version 1.
+    expect(
+      await discardScheduleDraft(s.as, { seasonId: s.seasonId, draftId: oldId, version: 1 }, deps),
+    ).toMatchObject({ ok: true });
+    expect(
+      await renameDraftRound(
+        s.as,
+        { ...basis(s.seasonId), roundId: s.roundId, label: 'Second draft' },
+        deps,
+      ),
+    ).toMatchObject({ ok: true, value: { version: 1 } });
+    const newId = await draftIdOf(s.leagueId);
+    expect(newId).not.toBe(oldId);
+
+    expect(
+      await renameDraftRound(
+        s.as,
+        { ...basis(s.seasonId, 1, null, oldId), roundId: s.roundId, label: 'As edit' },
+        deps,
+      ),
+    ).toMatchObject({ ok: false, error: { code: 'changed-since-read' } });
+    expect(
+      await discardScheduleDraft(s.as, { seasonId: s.seasonId, draftId: oldId, version: 1 }, deps),
+    ).toMatchObject({ ok: false, error: { code: 'changed-since-read' } });
+    expect(await draftIdOf(s.leagueId)).toBe(newId);
   });
 
   it('adds a game between teams of the season, and refuses a team of another season', async () => {

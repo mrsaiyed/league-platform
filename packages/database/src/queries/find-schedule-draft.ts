@@ -9,13 +9,14 @@ export async function findScheduleDraft(
 ): Promise<DraftRecord | undefined> {
   const row = await transactionOf(scope)
     .selectFrom('schedule_drafts')
-    .select(['season_id', 'changes', 'based_on_revision', 'version'])
+    .select(['id', 'season_id', 'changes', 'based_on_revision', 'version'])
     .where('league_id', '=', scope.leagueId)
     .where('season_id', '=', seasonId)
     .executeTakeFirst();
   return row === undefined
     ? undefined
     : {
+        id: row.id,
         seasonId: row.season_id,
         changes: row.changes,
         basedOnRevision: row.based_on_revision,

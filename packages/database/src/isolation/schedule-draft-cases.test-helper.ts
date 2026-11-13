@@ -74,22 +74,32 @@ registerIsolationCase({
 registerIsolationCase({
   subject: updateScheduleDraft,
   name: "save the target's season's draft",
-  run: (scope, target) => updateScheduleDraft(scope, target.seasonId, emptyDocument, 1),
+  run: (scope, target) =>
+    updateScheduleDraft(scope, target.seasonId, target.scheduleDraftId, emptyDocument, 1),
 });
 
 registerIsolationCase({
   subject: deleteScheduleDraft,
   name: "discard the target's season's draft",
-  run: (scope, target) => deleteScheduleDraft(scope, target.seasonId, 1),
+  run: (scope, target) => deleteScheduleDraft(scope, target.seasonId, target.scheduleDraftId, 1),
 });
 
 registerIsolationCase({
   subject: insertScheduleDraft,
-  name: "start a draft for the scope's own season, after discarding the seeded one",
-  run: async (scope) => {
+  name: "start a draft for the target's season, then for the scope's own after discarding its seeded one",
+  run: async (scope, target) => {
+    // The target's season: it has a draft already, so a run that can reach it is told so,
+    // and one that cannot is told there is no such season, naming nothing of it.
+    const attempt = await insertScheduleDraft(scope, target.seasonId, emptyDocument, 1);
     const seasonId = await ownSeasonId(scope);
-    await deleteScheduleDraft(scope, seasonId, 1);
-    return insertScheduleDraft(scope, seasonId, emptyDocument, 1);
+    const own = await transactionOf(scope)
+      .selectFrom('schedule_drafts')
+      .select('id')
+      .where('league_id', '=', scope.leagueId)
+      .where('season_id', '=', seasonId)
+      .executeTakeFirst();
+    if (own !== undefined) await deleteScheduleDraft(scope, seasonId, own.id, 1);
+    return { attempt, started: await insertScheduleDraft(scope, seasonId, emptyDocument, 1) };
   },
 });
 
@@ -99,6 +109,7 @@ const basis = (target: LeagueRecords) => ({
   seasonId: target.seasonId,
   basedOnRevision: 1,
   version: 1,
+  draftId: target.scheduleDraftId,
 });
 
 const newGameId = '01900000-0000-7000-8000-0000000a0001';
@@ -162,7 +173,11 @@ registerCommandCase(setDraftRecording, harnessTx, {
 
 registerCommandCase(discardScheduleDraft, harnessTx, {
   name: "discard the target's season's draft",
-  input: (target) => ({ seasonId: target.seasonId, version: 1 }),
+  input: (target) => ({
+    seasonId: target.seasonId,
+    draftId: target.scheduleDraftId,
+    version: 1,
+  }),
 });
 
 registerCommandCase(getScheduleDraft, harnessTx, {

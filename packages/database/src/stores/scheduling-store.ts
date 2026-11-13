@@ -33,9 +33,10 @@ export function schedulingStore(scope: LeagueScope): SchedulingStore {
     findDraft: (seasonId) => findScheduleDraft(scope, seasonId),
     insertDraft: (seasonId, changes, basedOn) =>
       insertScheduleDraft(scope, seasonId, changes, basedOn),
-    updateDraft: (seasonId, changes, version) =>
-      updateScheduleDraft(scope, seasonId, changes, version),
-    deleteDraft: (seasonId, version) => deleteScheduleDraft(scope, seasonId, version),
+    updateDraft: (seasonId, draftId, changes, version) =>
+      updateScheduleDraft(scope, seasonId, draftId, changes, version),
+    deleteDraft: (seasonId, draftId, version) =>
+      deleteScheduleDraft(scope, seasonId, draftId, version),
     loadSchedule: (seasonId) => loadSchedule(scope, seasonId),
     teamsOfSeason: (seasonId, teamIds) => listTeamsOfSeason(scope, seasonId, teamIds),
     findVenue: (venueId) => findVenue(scope, venueId),

@@ -560,6 +560,7 @@ const firstEdit = (s: { seasonId: string }) => ({
   seasonId: s.seasonId,
   basedOnRevision: null,
   version: null,
+  draftId: null,
 });
 
 // The schedule draft is edited at its season's program (P4 §3 `schedule.edit`): the owner,
@@ -637,11 +638,12 @@ const scheduleDraftRows: readonly Row[] = [
     'discard the draft',
     'schedule.edit',
     async (s, league) => {
-      await pglite.query('insert into schedule_drafts (league_id, season_id) values ($1, $2)', [
-        league.leagueId,
-        s.seasonId,
-      ]);
-      return { seasonId: s.seasonId, version: 1 };
+      const draft = await one<{ id: string }>(
+        pglite,
+        'insert into schedule_drafts (league_id, season_id) values ($1, $2) returning id',
+        [league.leagueId, s.seasonId],
+      );
+      return { seasonId: s.seasonId, draftId: draft.id, version: 1 };
     },
     (c, i) => discardScheduleDraft(c, i, schedulingDeps),
   ),
