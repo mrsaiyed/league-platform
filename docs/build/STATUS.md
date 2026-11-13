@@ -21,13 +21,11 @@ One line per open lane, written before its builder starts: `- **<step>** — <la
 
 Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migration 0010, record 026, T-238. Check the folders before trusting these.
 
-- **1.18 part 2 Header, menu, footer, hard-coded-text scan** — `.local/lanes/1.18p2-shell-design` — none — BUILT and review findings FIXED (dc71537; gate green in the lane except tests/live-stats-\*.test.mjs not rerun alone). Needs: catch up with the build branch, gate (rerun db/tracker timing tests alone), land. Note: the league name now uses dir=auto; the stand-in league names and designs live in apps/web/src/server/stand-in-league-sites.ts with a TODO for step 1.21.
 - **2.3 Schedule and game tables** — `.local/lanes/2.3-schedule-game-tables` — migration 0009, record 025 / T-237 — BUILT (a0c7594), gate green in the lane (run-migrations lock test flaked under load, passes alone). Needs: independent review (opus), catch up, gate, land. Notes: capture_mode uses T3's final/box/live while the season rules say final-score/box-score (2.20/2.21 must translate); a game's result changes need a game_corrections row in the same transaction (2.21 publishing, 2.22 import undo, 2.23 results/reopen, the Al-Hadi transfer must respect this); no brackets or step 2.4 tables yet; purging binned games needs DELETE on games or an owner-run function.
 
 - **2.15 Seasons and their rules** — `.local/lanes/2.15-season-commands` — record 026 / T-238 — just opened (2026-11-13 run).
 - **2.17 People commands** — `.local/lanes/2.17-people-commands` — record 027 / T-239 — just opened.
 - **2.18 Teams commands** — `.local/lanes/2.18-teams-commands` — record 028 / T-240 — just opened.
-- **1.23 CI** — `.local/lanes/1.23-ci` — none — just opened.
 
 Reserved now: next free migration 0010, record 029, T-241.
 
@@ -51,6 +49,8 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 1.23 done: ci.yml sets NEXT_TELEMETRY_DISABLED (the job already ran npm ci and npm run verify on Node 24); YAML checked by eye only.
+- 2026-11-13 — Step 1.18 part 2 done: league design, header, menu, footer in the web shell, T-187 hard-coded-text scan (scripts/structure/interface-text.mjs). Stand-in league names/designs in apps/web/src/server/stand-in-league-sites.ts (TODO for 1.21). Gate green in main folder. Vitest 'Timeout calling onTaskUpdate' and isolation test 90s limits seen under load: sturdiness step still wanted.
 - 2026-11-13 — Run end: promote-to-main refused: 'Main not moved: the live site's own files differ from main (packages/sports/src/game-status.ts, standings/calculate-standings.generated.test.ts, standings/calculate-standings.test.ts)'. Those changes come from step 2.7 (standings maths, allowed by the stage plan). Main left alone; someone has to decide whether the tracker's files may move (founder or a later run after checking the tracker still behaves). Also: run-migrations 'waits for another run holding the lock' and tests/live-stats-\*.test.mjs (server start-up text, hosted backup) fail under load and pass alone: a small step to make them sturdy is still wanted. Stale lane folders from earlier runs remain under .local/lanes (git ignores them): safe to delete.
 - 2026-11-13 — Step 2.16 done: 15 commands for divisions (leagues module) and venues/courts (scheduling module) with queries and isolation cases; removing a parent is refused while live children exist (no cascade); restore commands use bin.restore (admin-only pending the founder); list_venues readable at any scope by schedule.read; reorder needs the full sibling set. Open: remove/restore do not yet check teams (2.18) or games (2.3); purge order is children first (2.76); list_divisions needs divisions.manage (other roles need a broader read in 2.18/2.52).
 - 2026-11-13 — Step 2.14 done: defined settings in packages/core/src/modules/leagues/settings (defineSetting refuses a missing default/limits/label/permission, optional and transform schemas, unbounded objects; lookup season>program>league>default), commands leagues.set_setting and clear_setting (version check, program-scope checks, activity entries with scope), database queries (SQL-filtered), role matrix row per declared setting. Only members.startPage is declared; the other three S-22/P4 settings wait for the founder's defaults (listed under Needs the founder). Step 2.48 needs words for the option labels (keys added).
