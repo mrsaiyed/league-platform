@@ -1,0 +1,23 @@
+// The activity log stores a message key per entry (T-226, record 014): core writes
+// `activity.<command name>`, and the page turns it into words from the message
+// files (T-187). Only the app sees both packages, so the check that every key core
+// writes has its words, and every role has a name, lives here.
+import { activitySummaryKey, commands, roles } from '@srleagues/core';
+import { en } from '@srleagues/site';
+import { describe, expect, it } from 'vitest';
+
+/** Commands that only read, so write no activity entry. */
+const reads = new Set(['access.list_access', 'access.list_activity', 'access.my_access']);
+
+describe('activity log messages', () => {
+  it('has English words for every command that writes an entry, and no others', () => {
+    const writes = [...commands.keys()].filter((name) => !reads.has(name));
+    const keys = Object.keys(en).filter((key) => key.startsWith('activity.'));
+    expect(writes.map(activitySummaryKey).filter((key) => !Object.hasOwn(en, key))).toEqual([]);
+    expect(keys.filter((key) => !writes.map(activitySummaryKey).includes(key))).toEqual([]);
+  });
+
+  it('names every role, and the owner', () => {
+    for (const role of ['owner', ...roles]) expect(Object.hasOwn(en, `role.${role}`)).toBe(true);
+  });
+});
