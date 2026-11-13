@@ -13,13 +13,19 @@
  * running total, so it can never drift from what is displayed. The game clock
  * is anchored to a timestamp while it runs, so a sleeping tablet never stops
  * game time, and minutes are credited from the cumulative running time stamped
- * on each play. A foul or a timeout stops a running clock, as the officials'
- * whistle does (NFHS 5-8-1); only the scorer starts it again.
+ * on each play. Under a stop clock, a foul or a timeout stops a running clock,
+ * as the officials' whistle does (NFHS 5-8-1); only the scorer starts it again.
+ * Under a running clock they do not. The scorer can switch between the two at
+ * any moment of the game (S-21, T-128).
  */
 
 export type Side = 'home' | 'away';
 export const SIDES: readonly Side[] = ['home', 'away'];
 export const otherSide = (side: Side): Side => (side === 'home' ? 'away' : 'home');
+
+/** Stop: a foul or a timeout stops the clock. Running: the clock keeps going through them. */
+export type ClockMode = 'stop' | 'running';
+export const CLOCK_MODES: readonly ClockMode[] = ['stop', 'running'];
 
 export type Rules = {
   /** Regulation periods: 2 halves or 4 quarters. */
@@ -41,6 +47,11 @@ export type Rules = {
   overtimeTimeouts?: number;
   /** Whether unused timeouts carry into the next half or overtime. */
   timeoutsCarry?: boolean;
+  /**
+   * The clock the game starts with. Absent means a stop clock, which is how every
+   * game saved before the mode existed was played; read it through `clockModeOf`.
+   */
+  clockMode?: ClockMode;
 };
 export type TimeoutRules = Required<
   Pick<
@@ -109,6 +120,10 @@ export function timeoutRules(rules: Rules): TimeoutRules {
   };
 }
 
+/** The clock mode a format starts the game with: a stop clock unless it says otherwise. */
+export const clockModeOf = (rules: Rules): ClockMode =>
+  rules.clockMode === 'running' ? 'running' : 'stop';
+
 /** Players on the floor per team. */
 export const LINEUP_SIZE = 5;
 const MAX_PERIOD = 20;
@@ -131,9 +146,11 @@ export type Play =
   /** Takes back the team's latest timeout, recorded by mistake. */
   | { type: 'untimeout'; side: Side }
   | { type: 'sub'; side: Side; inId: string; outId: string }
-  | { type: 'period'; period: number };
+  | { type: 'period'; period: number }
+  /** The scorer switches the clock mode mid-game, whatever the format says (S-21). */
+  | { type: 'clock-mode'; mode: ClockMode };
 
-/** Plays that stop a running clock, as the officials' whistle does. */
+/** Plays that stop a running clock under a stop clock, as the officials' whistle does. */
 const STOPS_CLOCK: ReadonlySet<Play['type']> = new Set(['foul', 'timeout']);
 
 export type Command =
@@ -158,7 +175,7 @@ export type Stamp = {
   elapsedMs: number;
   /** On a period change, the clock it replaced, so undoing the change puts it back. */
   prevClockMs?: number;
-  /** This play stopped the running clock (a foul or a timeout). */
+  /** This play stopped the running clock (a foul or a timeout under a stop clock). */
   stoppedClock?: true;
 };
 export type LoggedPlay = Play & Stamp;
@@ -222,6 +239,8 @@ export type TeamView = {
 };
 export type Derived = {
   period: number;
+  /** The clock mode now: the format's, or the latest switch still standing. */
+  clockMode: ClockMode;
   periodStartElapsedMs: number;
   teams: Record<Side, TeamView>;
   players: Record<string, Line>;
@@ -302,6 +321,7 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
   const standing: Record<string, number[]> = {};
   let period = 1;
   let periodStartElapsedMs = 0;
+  let clockMode = clockModeOf(state.rules);
   const line = (id: string, side: Side) => (players[id] ??= emptyLine(side));
   const bank = (id: string, side: Side, at: number) => {
     const from = since[id];
@@ -391,6 +411,9 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
         period = play.period;
         periodStartElapsedMs = play.elapsedMs;
         break;
+      case 'clock-mode':
+        clockMode = play.mode;
+        break;
     }
   }
 
@@ -411,7 +434,7 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
     teams[side].bonus = bonusLevel(teams[otherSide(side)].periodFouls, state.rules);
     teams[side].timeoutsLeft = timeoutsLeft(state.rules, teams[side].timeouts, period);
   }
-  return { period, periodStartElapsedMs, teams, players, standing };
+  return { period, periodStartElapsedMs, clockMode, teams, players, standing };
 }
 
 /**
@@ -506,6 +529,7 @@ export function apply(state: GameState, command: Command, { id, now }: Context):
     case 'untimeout':
     case 'sub':
     case 'period':
+    case 'clock-mode':
       record(s, command, id, at);
       break;
     case 'start':
@@ -588,14 +612,16 @@ function record(s: GameState, input: Play, id: string, at: number) {
       clockMs: s.clock.remainingMs,
       prevClockMs,
     });
-  } else if (STOPS_CLOCK.has(play.type) && s.clock.running) {
+  } else if (STOPS_CLOCK.has(play.type) && s.clock.running && d.clockMode === 'stop') {
     // The whistle stops the clock where the play happened; the scorer starts it again.
     s.clock = { ...s.clock, running: false };
     s.plays.push({ ...play, ...stamp, stoppedClock: true });
   } else s.plays.push({ ...play, ...stamp });
   s.redo = [];
-  // Setting lineups before tip-off does not make the game live for viewers; anything else does.
-  if (s.status === 'scheduled' && play.type !== 'lineup') s.status = 'live';
+  // Setting lineups or the clock mode before tip-off does not make the game live for
+  // viewers; anything else does.
+  if (s.status === 'scheduled' && play.type !== 'lineup' && play.type !== 'clock-mode')
+    s.status = 'live';
 }
 
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length < 100;
@@ -608,6 +634,17 @@ function checkPlay(input: Play, d: Derived, rules: Rules): Play {
     if (!Number.isInteger(period) || period < 1 || period > MAX_PERIOD) fail('Pick a period.');
     if (period === d.period) fail(`It is already ${periodLabel(period, rules.periods)}.`);
     return { type: 'period', period };
+  }
+  if (input.type === 'clock-mode') {
+    const mode = input.mode;
+    if (mode !== 'stop' && mode !== 'running') fail('Pick a stop clock or a running clock.');
+    if (mode === d.clockMode)
+      fail(
+        mode === 'running'
+          ? 'The clock is already running through fouls.'
+          : 'The clock already stops on fouls.',
+      );
+    return { type: 'clock-mode', mode };
   }
   if (!isSide(input.side)) fail('Unknown team.');
   const side = input.side;
@@ -683,6 +720,8 @@ function checkRules(rules: Rules): Rules {
     fail('Timeouts are per game or per half.');
   if (!whole(t.overtimeTimeouts, 0, 5)) fail('Allow 0 to 5 timeouts each overtime.');
   if (typeof t.timeoutsCarry !== 'boolean') fail('Say whether unused timeouts carry over.');
+  if (r.clockMode !== undefined && r.clockMode !== 'stop' && r.clockMode !== 'running')
+    fail('Pick a stop clock or a running clock.');
   return {
     periods: r.periods,
     periodSeconds: r.periodSeconds,
@@ -690,6 +729,8 @@ function checkRules(rules: Rules): Rules {
     bonusFouls: r.bonusFouls,
     doubleBonusFouls: r.doubleBonusFouls ?? null,
     ...t,
+    // Kept only when given, so a format from before the mode existed stays as it was.
+    ...(r.clockMode !== undefined ? { clockMode: r.clockMode } : {}),
   };
 }
 
@@ -777,6 +818,8 @@ export function describePlay(
       return `${teamOf(play.side)} starting lineup: ${play.playerIds.map(nameOf).join(', ')}`;
     case 'period':
       return `Start of ${periodLabel(play.period, periods)}`;
+    case 'clock-mode':
+      return play.mode === 'running' ? 'Running clock on' : 'Stop clock on';
   }
 }
 
