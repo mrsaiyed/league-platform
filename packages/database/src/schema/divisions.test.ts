@@ -96,6 +96,25 @@ describe('divisions', () => {
     ).rejects.toMatchObject({ ...refused.check, constraint: 'divisions_no_parent_loop' });
   });
 
+  it('refuse a parent change under repeatable read, where the loop check could miss a move', async () => {
+    const { leagueId, seasonId } = await season();
+    const top = await newDivision(db, leagueId, seasonId);
+    const other = await newDivision(db, leagueId, seasonId);
+    const inIsolation = (level: string) =>
+      db.transaction(async (tx) => {
+        await tx.exec(`set transaction isolation level ${level}`);
+        await tx.query('update divisions set parent_division_id = $1 where id = $2', [top, other]);
+        await tx.query('update divisions set parent_division_id = null where id = $1', [other]);
+      });
+    await expect(inIsolation('repeatable read')).rejects.toMatchObject({
+      code: '25000',
+      constraint: 'divisions_parent_isolation',
+    });
+    // Read committed (the default) and serializable are fine.
+    await inIsolation('read committed');
+    await inIsolation('serializable');
+  });
+
   it('have names unique among their siblings, whatever the capitals, while not in the bin', async () => {
     const { leagueId, seasonId, defaultProgramId } = await season();
     const east = await newDivision(db, leagueId, seasonId, { name: 'East' });

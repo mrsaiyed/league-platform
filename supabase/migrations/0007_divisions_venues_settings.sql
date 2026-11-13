@@ -68,6 +68,12 @@ comment on table public.divisions is
 -- which the fence lets the app see whole, so this runs as the caller. One season's
 -- tree is changed one transaction at a time, so two moves at once cannot make a
 -- loop that each alone would not.
+--
+-- That relies on READ COMMITTED, the default isolation level: there, the search
+-- below takes a fresh snapshot after the lock, so it sees a move another
+-- transaction committed while this one waited. Under REPEATABLE READ the snapshot
+-- is older than the lock and would miss that move, so a parent change is refused
+-- there. SERIALIZABLE is fine: Postgres itself fails one of two clashing moves.
 create or replace function public.check_division_parent_chain() returns trigger
 language plpgsql
 set search_path = pg_catalog, pg_temp
@@ -76,6 +82,10 @@ begin
   -- No parent, or itself (divisions_not_own_parent answers that).
   if new.parent_division_id is null or new.parent_division_id = new.id then
     return new;
+  end if;
+  if current_setting('transaction_isolation') = 'repeatable read' then
+    raise exception 'a division''s parent cannot change in a repeatable read transaction'
+      using errcode = 'invalid_transaction_state', constraint = 'divisions_parent_isolation';
   end if;
   perform pg_advisory_xact_lock(hashtextextended('division_tree:' || new.season_id::text, 0));
   if exists (
@@ -196,9 +206,14 @@ create table public.setting_values (
     length(key) <= 100 and key ~ '^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$'
   ),
   constraint setting_values_value_document check (
-    public.is_versioned_document(value)
-    and coalesce(jsonb_typeof(value -> 'value') <> 'null', false)
-    and (value - 'version' - 'value') = '{}'::jsonb
+    -- The case makes the object test come first: a check's "and" may be worked
+    -- out in any order, and `-` on a bare string or number fails rather than
+    -- answering false.
+    case when jsonb_typeof(value) = 'object' then (
+      public.is_versioned_document(value)
+      and coalesce(jsonb_typeof(value -> 'value') <> 'null', false)
+      and (value - 'version' - 'value') = '{}'::jsonb
+    ) else false end
   ),
   constraint setting_values_value_size check (octet_length(value::text) <= 8192),
   constraint setting_values_version_positive check (version > 0)

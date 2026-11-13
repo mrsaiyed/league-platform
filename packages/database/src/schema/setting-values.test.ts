@@ -154,6 +154,8 @@ describe('setting values', () => {
       '{"version": 0, "value": 24}',
       '{"version": 1, "value": 24, "note": "extra"}',
       '[1]',
+      '"text"',
+      'null',
     ]) {
       await expect(set(bad)).rejects.toMatchObject({
         ...refused.check,
