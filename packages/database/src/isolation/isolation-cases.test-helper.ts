@@ -65,6 +65,7 @@ import {
   runInScope,
 } from './command-cases.test-helper.ts';
 import './divisions-venues-cases.test-helper.ts';
+import './seasons-cases.test-helper.ts';
 import './teams-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 
@@ -210,7 +211,7 @@ registerIsolationCase({
 
 registerCommandCase(setCurrentSeasonCommand, harnessTx, {
   name: "make the target's season current",
-  input: (target) => ({ seasonId: target.seasonId }),
+  input: (target) => ({ seasonId: target.seasonId, version: 1 }),
 });
 
 // Creating a league acts in a league that does not exist yet (its id is set first,

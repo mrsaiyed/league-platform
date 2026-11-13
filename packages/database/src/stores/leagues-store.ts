@@ -1,9 +1,11 @@
 // The leagues module's store (core's LeaguesStore), bound to one league scope.
-import type { LeagueStatus, LeaguesStore } from '@srleagues/core';
-import type { JsonValue } from '../db/schema-types.ts';
+import type { LeagueStatus, LeaguesStore, SeasonStatus } from '@srleagues/core';
+import type { JsonObject, JsonValue } from '../db/schema-types.ts';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
+  countPrograms,
   deleteSettingValue,
+  findSeason,
   findCurrentLeague,
   findProgramId,
   findSeasonProgramId,
@@ -14,6 +16,8 @@ import {
   setCurrentSeason,
   updateLeagueName,
   updateLeagueStatus,
+  updateSeason,
+  type SeasonChangeRow,
   writeSettingValue,
 } from '../queries/index.ts';
 
@@ -43,6 +47,20 @@ export function leaguesStore(
       return id === undefined ? undefined : { id };
     },
     createSeason: (season) => insertSeason(scope, season),
+    findSeason: async (seasonId) => {
+      const season = await findSeason(scope, seasonId);
+      return season === undefined
+        ? undefined
+        : { ...season, status: season.status as SeasonStatus };
+    },
+    programCount: () => countPrograms(scope),
+    updateSeason: (seasonId, change, version) => {
+      // The rules are a typed document in core and plain JSON in the database.
+      const { rules, ...others } = change;
+      const row: SeasonChangeRow =
+        rules === undefined ? others : { ...others, rules: toJson(rules) as JsonObject };
+      return updateSeason(scope, seasonId, row, version);
+    },
     seasonProgramId: (seasonId) => findSeasonProgramId(scope, seasonId),
     setCurrentSeason: (seasonId) => setCurrentSeason(scope, seasonId),
     settingRows: (key, places) => listSettingValues(scope, key, places),
