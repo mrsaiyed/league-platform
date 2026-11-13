@@ -60,6 +60,7 @@ describe('fairnessReport, worked examples (P7 §4.2)', () => {
       ...handBuilt(),
       rules: allOn,
       timesEachPair: 2,
+      withinDivisions: true,
       unavailableDates: [{ teamId: 'd', date: '2026-10-18' }],
     });
 
@@ -150,12 +151,25 @@ describe('fairnessReport, worked examples (P7 §4.2)', () => {
     expect(report.teams.map((t) => t.backToBack)).toEqual([1, 1, 1, 1]);
   });
 
-  it('counts meetings across divisions when cross-division games are allowed', () => {
+  it('counts meetings across divisions when the pairings were generated league-wide', () => {
     const report = fairnessReport({ ...handBuilt(), rules: allOff, timesEachPair: 1 });
     expect(report.issues).toEqual([
       { rule: 'times-each-pair', teamIds: ['a', 'b'], expected: 1, actual: 3 },
       { rule: 'times-each-pair', teamIds: ['b', 'c'], expected: 1, actual: 0 },
       { rule: 'times-each-pair', teamIds: ['b', 'd'], expected: 1, actual: 0 },
+      { rule: 'times-each-pair', teamIds: ['c', 'd'], expected: 1, actual: 2 },
+    ]);
+  });
+
+  it('counts meetings only within divisions when generated so, whatever the division rule', () => {
+    const report = fairnessReport({
+      ...handBuilt(),
+      rules: allOff,
+      timesEachPair: 1,
+      withinDivisions: true,
+    });
+    expect(report.issues).toEqual([
+      { rule: 'times-each-pair', teamIds: ['a', 'b'], expected: 1, actual: 3 },
       { rule: 'times-each-pair', teamIds: ['c', 'd'], expected: 1, actual: 2 },
     ]);
   });
@@ -205,6 +219,7 @@ describe('fairnessReport on generated pairings (T-182)', () => {
       ...pairingsAsSchedule(result.rounds),
       rules: { ...allOn, keepGamesWithinDivision: withinDivisions },
       timesEachPair,
+      withinDivisions,
     });
 
     // The byes the report counts are the byes the pairings list.

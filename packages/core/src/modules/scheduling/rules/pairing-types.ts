@@ -54,8 +54,14 @@ export type FairnessInput = {
   rounds: readonly ScheduleRound[];
   games: readonly ScheduleGame[];
   rules: FairnessRules;
-  /** When set, every pair the rules allow should meet exactly this many times. */
+  /** When set, every pair that should meet (see `withinDivisions`) should meet exactly this many times. */
   timesEachPair?: number | null;
+  /**
+   * Which pairs `timesEachPair` counts, as the pairings were generated (`PairingsInput.withinDivisions`).
+   * True: only teams of the same division should meet. False or absent: every pair in the league.
+   * Separate from the `keepGamesWithinDivision` rule, which only flags cross-division games.
+   */
+  withinDivisions?: boolean;
   unavailableDates?: readonly TeamUnavailableDate[];
 };
 

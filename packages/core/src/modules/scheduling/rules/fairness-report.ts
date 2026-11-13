@@ -24,7 +24,8 @@ import type { ScheduleGame } from './schedule-types.ts';
  *
  * Only the rules switched on are reported, except a team's unavailable dates, which are the
  * team's own requests and always reported, and the number of meetings, reported whenever
- * `timesEachPair` is given. The input is never changed.
+ * `timesEachPair` is given. Which pairs should meet follows `withinDivisions` (how the pairings
+ * were generated), not the `keepGamesWithinDivision` rule. The input is never changed.
  */
 export function fairnessReport(input: FairnessInput): FairnessReport {
   const { rules } = input;
@@ -187,7 +188,7 @@ export function fairnessReport(input: FairnessInput): FairnessReport {
     }
     for (const [i, a] of teams.entries()) {
       for (const b of teams.slice(i + 1)) {
-        if (rules.keepGamesWithinDivision && a.divisionId !== b.divisionId) continue;
+        if (input.withinDivisions === true && a.divisionId !== b.divisionId) continue;
         const actual = met.get(pairKey(a.id, b.id)) ?? 0;
         if (actual !== expected) {
           issues.push({ rule: 'times-each-pair', teamIds: [a.id, b.id], expected, actual });
