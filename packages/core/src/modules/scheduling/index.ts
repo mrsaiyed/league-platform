@@ -13,6 +13,27 @@ export type {
   ScheduleState,
 } from './rules/schedule-types.ts';
 export { summarizePublish, type PublishSummary } from './rules/summarize-publish.ts';
+export { addDraftGame, type AddDraftGameError } from './commands/add-draft-game.ts';
+export {
+  changeDraftRoundDate,
+  type ChangeDraftRoundDateError,
+} from './commands/change-draft-round-date.ts';
+export {
+  discardScheduleDraft,
+  type DiscardScheduleDraftError,
+} from './commands/discard-schedule-draft.ts';
+export {
+  getScheduleDraft,
+  type GetScheduleDraftError,
+  type ScheduleDraftView,
+} from './commands/get-schedule-draft.ts';
+export { moveDraftGame, type MoveDraftGameError } from './commands/move-draft-game.ts';
+export { removeDraftGame, type RemoveDraftGameError } from './commands/remove-draft-game.ts';
+export { renameDraftRound, type RenameDraftRoundError } from './commands/rename-draft-round.ts';
+export { setDraftRecording, type SetDraftRecordingError } from './commands/set-draft-recording.ts';
+export { swapDraftGames, type SwapDraftGamesError } from './commands/swap-draft-games.ts';
+export { parseDraftDocument, type DraftDocument } from './draft-document.ts';
+export type { DraftEditError, DraftEditValue } from './draft-edit.ts';
 export { createCourt, type CreateCourtError } from './commands/create-court.ts';
 export { createVenue, type CreateVenueError } from './commands/create-venue.ts';
 export { listVenues } from './commands/list-venues.ts';
@@ -25,6 +46,7 @@ export { updateVenue, type UpdateVenueError } from './commands/update-venue.ts';
 export type {
   CourtChange,
   CourtRecord,
+  DraftRecord,
   NewCourt,
   NewVenue,
   SchedulingStore,
