@@ -1,12 +1,14 @@
 // The league the scope is for, unless it is in the bin. What the leagues module's
 // policy and commands read before changing it.
+import type { LeagueStatus } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
+import { leagueStatusOf } from './league-status-of.ts';
 
 export type CurrentLeague = {
   id: string;
   name: string;
   slug: string;
-  status: 'draft' | 'live' | 'archived' | 'suspended';
+  status: LeagueStatus;
   ownerAccountId: string;
   version: number;
 };
@@ -31,15 +33,11 @@ type LeagueRow = {
 
 /** The league row as the module sees it, field by field (T-29). */
 export function currentLeague(row: LeagueRow): CurrentLeague {
-  const status = row.status;
-  if (status !== 'draft' && status !== 'live' && status !== 'archived' && status !== 'suspended') {
-    throw new Error('A league has a state the leagues table does not allow.');
-  }
   return {
     id: row.id,
     name: row.name,
     slug: row.slug,
-    status,
+    status: leagueStatusOf(row.status),
     ownerAccountId: row.owner_account_id,
     version: row.version,
   };
