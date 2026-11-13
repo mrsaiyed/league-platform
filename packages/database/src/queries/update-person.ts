@@ -11,7 +11,7 @@ export type PersonChangeRow = {
   isMinor?: boolean | null;
 };
 
-/** The new version, or undefined if the person is not there, is in the bin or moved on. */
+/** The new version, or undefined if the person is not there, is in the bin, was merged into another or moved on. */
 export async function updatePerson(
   scope: LeagueScope,
   personId: string,
@@ -31,6 +31,7 @@ export async function updatePerson(
     .where('league_id', '=', scope.leagueId)
     .where('id', '=', personId)
     .where('deleted_at', 'is', null)
+    .where('merged_into_id', 'is', null)
     .where('version', '=', version)
     .returning('version')
     .executeTakeFirst();

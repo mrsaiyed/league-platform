@@ -1,5 +1,5 @@
 // A person of the scope's league by id, in the bin or not (the commands decide what a
-// binned one means). The sensitive columns are selected only when `sensitive` (T-76).
+// binned one means), but never one merged into another, who counts as not there. The sensitive columns are selected only when `sensitive` (T-76).
 // Undefined if the person is not in the scope's league.
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
@@ -18,7 +18,8 @@ export async function findPerson(
   const base = transactionOf(scope)
     .selectFrom('people')
     .where('league_id', '=', scope.leagueId)
-    .where('id', '=', personId);
+    .where('id', '=', personId)
+    .where('merged_into_id', 'is', null);
   if (sensitive) {
     const row = await base.select(allPersonColumns).executeTakeFirst();
     return row === undefined ? undefined : personSummaryWithSensitive(row);

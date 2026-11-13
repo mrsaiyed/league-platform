@@ -3,7 +3,7 @@
 // person while not in the bin (0008); that is for the restore command (step 2.76).
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
-/** False if the person is not in the scope's league. */
+/** False if the person is not in the scope's league or was merged into another. */
 export async function setPersonBinned(
   scope: LeagueScope,
   personId: string,
@@ -14,6 +14,7 @@ export async function setPersonBinned(
     .set({ deleted_at: binned ? new Date() : null })
     .where('league_id', '=', scope.leagueId)
     .where('id', '=', personId)
+    .where('merged_into_id', 'is', null)
     .returning('id')
     .executeTakeFirst();
   return row !== undefined;

@@ -307,4 +307,45 @@ describe('the people commands on the database', () => {
     const withEmail = await listPeople(l.as(l.ownerId), { search: 'test@example' }, deps);
     expect(withEmail).toMatchObject({ value: [{ id: personId }] });
   });
+
+  it('treats a person merged into another as not found, in find, update and remove', async () => {
+    const l = await league();
+    const keeper = await newPerson(pglite, l.leagueId);
+    const merged = await newPerson(pglite, l.leagueId);
+    await pglite.query('update people set merged_into_id = $1 where id = $2', [keeper, merged]);
+    const before = await one<{ version: number }>(
+      pglite,
+      'select version from people where id = $1',
+      [merged],
+    );
+    for (const sensitive of [false, true]) {
+      const found = await withTransaction(
+        db,
+        { leagueId: l.leagueId, accountId: l.ownerId },
+        (scope) => findPerson(scope, merged, sensitive),
+      );
+      expect(found).toBeUndefined();
+    }
+    expect(
+      await updatePerson(
+        l.as(l.ownerId),
+        { personId: merged, version: before.version, firstName: 'X' },
+        deps,
+      ),
+    ).toMatchObject({ error: { code: 'person-not-found' } });
+    expect(await removePerson(l.as(l.ownerId), { personId: merged }, deps)).toMatchObject({
+      error: { code: 'person-not-found' },
+    });
+    const row = await one<{ first_name: string; deleted_at: Date | null; version: number }>(
+      pglite,
+      'select first_name, deleted_at, version from people where id = $1',
+      [merged],
+    );
+    expect(row.first_name).not.toBe('X');
+    expect(row.deleted_at).toBeNull();
+    expect(row.version).toBe(before.version);
+    expect(await removePerson(l.as(l.ownerId), { personId: keeper }, deps)).toMatchObject({
+      ok: true,
+    });
+  });
 });
