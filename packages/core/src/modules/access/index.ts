@@ -35,6 +35,7 @@ export {
   accessOfAccount,
   allows,
   hasPermission,
+  hasPermissionAnywhere,
   isOpenForNewPeople,
   type AccessHolder,
 } from './policy.ts';

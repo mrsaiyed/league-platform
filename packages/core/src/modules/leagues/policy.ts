@@ -51,3 +51,20 @@ export async function mayEditLeague(
 export function programScope(programId: string): Scope {
   return { type: 'program', id: programId };
 }
+
+/**
+ * Where a season's divisions are checked: at the season's program, so an admin
+ * limited to one program manages that program's divisions (P4 §4). A season that
+ * is not there is checked league-wide, so only those who may manage any program's
+ * learn it is missing.
+ */
+export async function seasonScope(tx: LeaguesTx, seasonId: string): Promise<Scope> {
+  const programId = await tx.leagues.seasonProgramId(seasonId);
+  return programId === undefined ? leagueScope : programScope(programId);
+}
+
+/** Where a division's things are checked: at its season's program. */
+export async function divisionScope(tx: LeaguesTx, divisionId: string): Promise<Scope> {
+  const division = await tx.divisions.find(divisionId);
+  return division === undefined ? leagueScope : seasonScope(tx, division.seasonId);
+}

@@ -13,7 +13,13 @@ import {
   newSeason,
   type MadeLeague,
 } from '../schema/schema.test-helper.ts';
-import { accessStore, activityLogStore, jobsStore, leaguesStore } from '../stores/index.ts';
+import {
+  accessStore,
+  activityLogStore,
+  divisionsStore,
+  jobsStore,
+  leaguesStore,
+} from '../stores/index.ts';
 
 let pglite: PGlite;
 let db: DatabaseHandle;
@@ -62,6 +68,7 @@ const run = (input: { name: string; version: number; refuse: boolean }) =>
     transaction: commandTransaction(db, (scope) => ({
       jobs: jobsStore(scope),
       leagues: leaguesStore(scope),
+      divisions: divisionsStore(scope),
       access: accessStore(scope),
       activity: activityLogStore(scope),
     })),

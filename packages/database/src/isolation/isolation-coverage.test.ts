@@ -19,7 +19,9 @@ import {
 import { constraintOf } from '../queries/constraint-of.ts';
 import { currentLeague } from '../queries/find-current-league.ts';
 import { leagueStatusOf } from '../queries/league-status-of.ts';
+import { divisionSummary } from '../queries/division-summary.ts';
 import { programSummary } from '../queries/program-summary.ts';
+import { courtSummary, venueSummary } from '../queries/venue-summary.ts';
 import './isolation-cases.test-helper.ts';
 import {
   exportedFunctions,
@@ -40,6 +42,14 @@ const coreScanned = ['../core/index.ts', '../core/src'];
 /** Exported functions that read or write no league data, and why. */
 const reachNoLeagueData = new Map<unknown, string>([
   [programSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [divisionSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [venueSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [courtSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [
+    databasePackage.divisionsStore,
+    'binds the division queries, each with its own cases, to a scope',
+  ],
+  [databasePackage.schedulingStore, 'binds the venue and court queries (own cases) to a scope'],
   [currentLeague, 'turns a row already read into the returned shape; runs no SQL'],
   [leagueStatusOf, "checks a state already read against core's list; runs no SQL"],
   [constraintOf, 'reads the code and constraint name off an error already thrown; runs no SQL'],
