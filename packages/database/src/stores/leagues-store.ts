@@ -13,7 +13,7 @@ import {
 } from '../queries/index.ts';
 
 export type LeaguesStoreOptions = {
-  /** Our own staff, by account id, from the app's settings (until roles exist, step 1.12). */
+  /** Our own staff, by account id, from the app's settings. Staff are not a league role (A-3, T-77). */
   platformStaff?: readonly string[];
 };
 
