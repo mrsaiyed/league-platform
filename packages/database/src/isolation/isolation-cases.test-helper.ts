@@ -5,9 +5,13 @@ import {
   cancelInvitation,
   createLeague,
   clearSetting,
+  clearSettingFor,
   createSeason,
+  defineSetting,
   invite,
   setSetting,
+  setSettingFor,
+  settingRegistry,
   listAccess,
   listActivity,
   myAccess,
@@ -19,6 +23,7 @@ import {
   setLeagueStatus,
 } from '@srleagues/core';
 import { createHash, randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import {
   deleteSettingValue,
   findCurrentLeague,
@@ -139,6 +144,66 @@ registerCommandCase(setSetting, harnessTx, {
 registerCommandCase(clearSetting, harnessTx, {
   name: "clear the league's start page for members as its owner",
   input: () => ({ level: 'league', key: 'members.startPage', version: 1 }),
+});
+
+// The product declares its one setting at the league only, so the program and season
+// places are tried through the same commands over a setting that allows all three.
+const reminderHours = defineSetting({
+  key: 'notifications.reminderLeadHours',
+  type: z.number().int().min(1).max(72),
+  default: 24,
+  levels: ['league', 'program', 'season'],
+  permission: 'league.settings',
+  label: 'setting.notifications.reminderLeadHours.label',
+});
+const startPageEverywhere = defineSetting({
+  key: 'members.startPage',
+  type: z.enum(['leagueHome', 'myTeam']),
+  default: 'leagueHome',
+  levels: ['league', 'program', 'season'],
+  permission: 'league.settings',
+  label: 'setting.members.startPage.label',
+});
+const allLevels = settingRegistry([reminderHours, startPageEverywhere]);
+const setAtAnyLevel = setSettingFor(allLevels);
+const clearAtAnyLevel = clearSettingFor(allLevels);
+
+registerIsolationCase({
+  subject: setSetting,
+  name: "set a value at the target's program",
+  run: (scope, target) =>
+    runInScope(setAtAnyLevel, harnessTx, scope, {
+      level: 'program',
+      programId: target.programId,
+      key: reminderHours.key,
+      value: 12,
+      version: null,
+    }),
+});
+
+registerIsolationCase({
+  subject: setSetting,
+  name: "set a value at the target's season",
+  run: (scope, target) =>
+    runInScope(setAtAnyLevel, harnessTx, scope, {
+      level: 'season',
+      seasonId: target.seasonId,
+      key: reminderHours.key,
+      value: 12,
+      version: null,
+    }),
+});
+
+registerIsolationCase({
+  subject: clearSetting,
+  name: "clear the target's program value at version 1",
+  run: (scope, target) =>
+    runInScope(clearAtAnyLevel, harnessTx, scope, {
+      level: 'program',
+      programId: target.programId,
+      key: 'members.startPage',
+      version: 1,
+    }),
 });
 
 registerCommandCase(setCurrentSeasonCommand, harnessTx, {
@@ -270,6 +335,44 @@ registerIsolationCase({
       { level: 'program', programId: target.programId },
       'members.startPage',
       { version: 1, value: 'changed' },
+      1,
+    ),
+});
+
+registerIsolationCase({
+  subject: writeSettingValue,
+  name: "add a value at the target's program",
+  run: (scope, target) =>
+    writeSettingValue(
+      scope,
+      { level: 'program', programId: target.programId },
+      'notifications.reminderLeadHours',
+      { version: 1, value: 12 },
+      null,
+    ),
+});
+
+registerIsolationCase({
+  subject: writeSettingValue,
+  name: "add a value at the target's season",
+  run: (scope, target) =>
+    writeSettingValue(
+      scope,
+      { level: 'season', seasonId: target.seasonId },
+      'notifications.reminderLeadHours',
+      { version: 1, value: 12 },
+      null,
+    ),
+});
+
+registerIsolationCase({
+  subject: deleteSettingValue,
+  name: "clear the target's program value at version 1",
+  run: (scope, target) =>
+    deleteSettingValue(
+      scope,
+      { level: 'program', programId: target.programId },
+      'members.startPage',
       1,
     ),
 });
