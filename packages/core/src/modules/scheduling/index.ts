@@ -13,6 +13,22 @@ export type {
   ScheduleState,
 } from './rules/schedule-types.ts';
 export { summarizePublish, type PublishSummary } from './rules/summarize-publish.ts';
+export { generatePairings, maxTimesEachPair } from './rules/generate-pairings.ts';
+export { fairnessReport } from './rules/fairness-report.ts';
+export type {
+  FairnessInput,
+  FairnessIssue,
+  FairnessReport,
+  FairnessRules,
+  Pairing,
+  PairingRound,
+  PairingTeam,
+  PairingsError,
+  PairingsInput,
+  PairingsResult,
+  TeamFairness,
+  TeamUnavailableDate,
+} from './rules/pairing-types.ts';
 export { addDraftGame, type AddDraftGameError } from './commands/add-draft-game.ts';
 export {
   changeDraftRoundDate,
