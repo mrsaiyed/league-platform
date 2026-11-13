@@ -23,8 +23,8 @@ export const displayCss = String.raw`/* The look of the shared display pieces. E
   padding-block: 0.1em;
   padding-inline: 0.6em;
   border-radius: var(--radius);
-  background: var(--color-accent);
-  color: var(--color-background);
+  border: 2px solid var(--color-accent);
+  color: var(--color-text);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -101,7 +101,11 @@ export const displayCss = String.raw`/* The look of the shared display pieces. E
   opacity: 0.8;
 }
 .ui-game-link {
-  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  color: var(--color-text);
+  text-decoration: underline;
 }
 
 .ui-scoreboard {
@@ -137,7 +141,7 @@ export const displayCss = String.raw`/* The look of the shared display pieces. E
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  color: var(--color-primary);
+  color: var(--color-text);
 }
 .ui-scoreboard-middle {
   display: grid;
@@ -191,7 +195,17 @@ export const displayCss = String.raw`/* The look of the shared display pieces. E
   border-inline-start: 4px solid var(--team-color, transparent);
 }
 .ui-note-mark a {
-  color: var(--color-primary);
+  display: inline-block;
+  min-inline-size: 1.5rem;
+  min-block-size: 1.5rem;
+  text-align: center;
+  line-height: 1.5rem;
+  color: var(--color-text);
+  text-decoration: underline;
+}
+.ui-table-wrap:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
 }
 .ui-footnotes,
 .ui-table-notice {
@@ -201,7 +215,9 @@ export const displayCss = String.raw`/* The look of the shared display pieces. E
   display: inline-flex;
   align-items: center;
   gap: 0.35em;
-  padding: 0;
+  padding-inline: 0.25rem;
+  min-block-size: 2.75rem;
+  min-inline-size: 2.75rem;
   border: 0;
   background: none;
   color: inherit;
@@ -217,11 +233,11 @@ export const displayCss = String.raw`/* The look of the shared display pieces. E
   outline-offset: 2px;
 }
 th[aria-sort='ascending'] .ui-sort-button::after {
-  content: '\25B2';
+  content: '\25B2' / '';
   font-size: 0.7em;
 }
 th[aria-sort='descending'] .ui-sort-button::after {
-  content: '\25BC';
+  content: '\25BC' / '';
   font-size: 0.7em;
 }
 
@@ -243,8 +259,7 @@ th[aria-sort='descending'] .ui-sort-button::after {
   min-block-size: 2.75rem;
 }
 .ui-picker button {
-  background: var(--color-primary);
-  color: var(--color-background);
+  border: 2px solid var(--color-primary);
   cursor: pointer;
 }
 `;
