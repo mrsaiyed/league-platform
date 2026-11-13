@@ -125,7 +125,7 @@ Inside a league, a program or custom page cannot use a name the site already use
 - The same mark is in the footer of every email and on the tracker's opening screen. No league can remove it.
 - A league shows its own sponsors, and can let its teams show theirs on team pages (B-13).
 
-**U-9 (agreed): a league is not visible until its organizer publishes it.** States are: **draft** (only admins can see it), **live**, **archived** (read-only, still viewable), and **suspended** (taken down by us for abuse or non-payment, with notice; data is kept and exportable). We never delete a league's history because a payment failed.
+**U-9 (agreed): a league is not visible until its organizer publishes it.** States are: **draft** (only the league's own staff can see it: the owner, admins and everyone with an admin area, so they can prepare before launch), **live**, **archived** (read-only, still viewable), and **suspended** (taken down by us for abuse or non-payment, with notice; data is kept and exportable). We never delete a league's history because a payment failed.
 
 **U-10 (agreed): being listed in `/find` is the league's choice**, on by default for adult leagues and off by default for youth leagues. Any league can also ask search engines not to index it.
 

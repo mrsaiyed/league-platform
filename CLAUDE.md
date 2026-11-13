@@ -13,8 +13,8 @@ The specification in `docs/specs/v1/` is the description of the product. If code
 ## Who decides what
 
 - **Technical decisions** (IDs starting `T-`): the lead decides, records the decision, and tells the founder plainly. Do not ask the founder to choose between technical options.
-- **Product and business decisions** (every other ID): only the founder. Never mark one agreed and never build something whose decision is still "Recommended" or "Needs your answer" in `docs/specs/v1/DECISIONS.md`. If you need one, write it under "Needs the founder" in `docs/build/STATUS.md` and work on something else.
-- Anything that costs the founder money or time is the founder's call.
+- **Product and business decisions** (every other ID): the founder's. But the founder is often away, and said on 2026-11-13: "stop stalling by asking me questions… come up with the answers and if you need me to approve later I will". So the lead does not ask and does not wait. When a step needs a product decision that is not settled, the lead answers it: the written recommendation if there is one, otherwise the answer that leaves a league's admin the most choice and is the easiest to change later. In the same commit the lead marks it "Decided for you" in `docs/specs/v1/DECISIONS.md` with the reason, corrects the spec, and then builds on it. Only the founder's own words make a decision "Agreed": never mark one agreed yourself. A builder never decides one: it reports the question to the lead.
+- **What always waits for the founder:** anything that costs them money or signs them up to something, anything that needs their own hands or time, anything on the live sites or with real people's data, anything sent to real people or organizations in their name, and a legal sign-off. Write it under "Needs the founder" in `docs/build/STATUS.md` and work on something else.
 
 ## Rules for all code (from `docs/specs/v1/technical/T2-repo-and-code-structure.md`)
 

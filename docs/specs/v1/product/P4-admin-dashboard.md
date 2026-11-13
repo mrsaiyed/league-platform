@@ -70,7 +70,7 @@ What each role sees is trimmed to what they can use. A scorekeeper who opens the
 
 **A-4: "Saved" always means stored on our servers.** If a save fails, the screen says so and keeps what was typed.
 
-**A-5: nothing important is lost by one wrong tap.** Deleting a team, a game, a person's league record or a page moves it to a **bin** for 30 days, from which it can be restored. Things with consequences for other people (a finished game's result, an approved registration) cannot be deleted, only corrected or cancelled with a reason.
+**A-5: nothing important is lost by one wrong tap.** Deleting a team, a game, a person's league record or a page moves it to a **bin** for 30 days, from which it can be restored. Things with consequences for other people (a finished game's result, an approved registration) cannot be deleted, only corrected or cancelled with a reason. Whoever may remove a kind of thing may also restore it from the bin (a scheduler a game, a registrar a person's league record); admins and the owner can restore anything.
 
 **A-6: an activity log records who changed what and when**, visible to the owner and admins. It covers settings, schedule changes, score corrections, role changes and exports.
 
