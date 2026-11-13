@@ -19,9 +19,14 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
 
-Reserved so far: nothing. Next free numbers: migration 0006, decision record 012, T-224. Check the folders before trusting these.
+Reserved so far: migration 0006 and decision record 012 / T-224 to 1.19 part 1; decision record 013 / T-225 to 1.13; decision record 014 / T-226 to 1.12; decision record 015 / T-227 to 1.18 part 1; decision record 016 / T-228 to 1.20 part 1. Next free: migration 0007, record 017, T-229. Check the folders before trusting these.
 
-- No lane is open.
+- **1.26 Catch up with main** — `.local/lanes/1.26-catch-up` — none — merge origin/main into the lane, keep main's tracker tests unchanged.
+- **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — whole step.
+- **1.13 Sign-in interface and stand-in** — `.local/lanes/1.13-signin-interface` — record 013 / T-225 — whole step.
+- **1.18 part 1** — `.local/lanes/1.18p1-design-messages` — record 015 / T-227 — design values to CSS variables, message loader, right-to-left.
+- **1.19 part 1** — `.local/lanes/1.19p1-queue-email` — migration 0006, record 012 / T-224 — queue and email interfaces, stand-ins, adapters, jobs table.
+- **1.20 part 1** — `.local/lanes/1.20p1-logging` — record 016 / T-228 — logging and error-reporting library.
 
 ## Needs the founder
 
