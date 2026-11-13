@@ -77,6 +77,7 @@ The tracker sends commands to `POST /api/v1/games/{game}/commands`.
 - **T-119:** if the live connection cannot be made at all (some school and office networks block it), the page silently re-fetches the snapshot every 5 seconds. The snapshot address is cached for 2 seconds at Cloudflare, so a thousand viewers polling cost us one database read every 2 seconds.
 - A second, lighter channel per league carries only scores of live games, for the "Live now" markers on the home and schedule pages.
 - **T-120:** only our server can publish to these channels, and messages contain only public information (names and numbers as the league's and each team's settings allow, T-81 and T-87).
+- **T-233 (record 021):** the publishing half is in `packages/providers` with the other outside services; the subscribing half is browser code, so it lives in the web app (`apps/web/src/features/live-updates`), because `packages/providers` is server-only (T-30). Channel names and the message shapes are in `packages/contracts`, shared by both. The server takes the league from the saved game, makes the latest play's name follow the strictest statistics setting, and sends one game's messages in order. A viewer's page retries with random spread and waits much longer after a refusal. Before the platform's Supabase project is used, its `realtime.messages` policies must let browsers receive only on published, visible leagues, refuse every browser broadcast, and "Allow public access" must be off.
 
 ### The clock
 
