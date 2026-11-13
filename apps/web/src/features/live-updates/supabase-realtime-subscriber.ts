@@ -12,6 +12,9 @@
 // private channels and the project's policies make sure no browser can, either.
 import { liveChannelName, liveEventName } from '@srleagues/contracts';
 import {
+  defaultRefusedDelaysMs,
+  defaultRetryDelaysMs,
+  defaultStableMs,
   liveSubscriberFrom,
   nextDelay,
   parseJson,
@@ -42,8 +45,22 @@ export type SupabaseRealtimeSubscriberOptions = {
   readonly heartbeatMs?: number;
   /** How long a join may go unanswered before it is tried again. Default 10 s. */
   readonly joinTimeoutMs?: number;
-  /** Waits before trying again after a failure. Default 1, 2, 5, 10 s. */
+  /** Waits before trying again after a failure. Default 1, 2, 5, 10 s, each spread at random. */
   readonly retryDelaysMs?: readonly number[];
+  /**
+   * Waits before joining again after the service refused a join (not allowed, bad
+   * request). Default 30 s, 1, 2, then 5 min, each spread at random.
+   */
+  readonly refusedDelaysMs?: readonly number[];
+  /** How long a connection or channel must stay up before its failures are forgotten. Default 30 s. */
+  readonly stableMs?: number;
+  /**
+   * Most channels one page may watch at once. One more is reported 'unavailable'
+   * and not joined, so a page cannot pile joins onto the service. Default 50.
+   */
+  readonly maxChannels?: number;
+  /** Stand-in for Math.random, for tests. */
+  readonly random?: () => number;
 };
 
 /** The only events this subscriber ever sends. */
@@ -65,6 +82,7 @@ type Topic = {
   readonly entries: Set<ChannelEvents>;
   joinRef: string | null;
   joined: boolean;
+  joinedAt: number | undefined;
   failures: number;
   timer: ReturnType<typeof setTimeout> | undefined;
 };
@@ -77,7 +95,11 @@ export function supabaseRealtimeSubscriber(
   const openSocket = options.open ?? ((url: string) => new WebSocket(url));
   const heartbeatMs = options.heartbeatMs ?? 25_000;
   const joinTimeoutMs = options.joinTimeoutMs ?? 10_000;
-  const delays = options.retryDelaysMs ?? [1_000, 2_000, 5_000, 10_000];
+  const delays = options.retryDelaysMs ?? defaultRetryDelaysMs;
+  const refusedDelays = options.refusedDelaysMs ?? defaultRefusedDelaysMs;
+  const stableMs = options.stableMs ?? defaultStableMs;
+  const maxChannels = Math.max(1, options.maxChannels ?? 50);
+  const random = options.random ?? Math.random;
   const address =
     `${options.url.replace(/\/+$/, '').replace(/^http/i, 'ws')}/realtime/v1/websocket` +
     `?apikey=${encodeURIComponent(options.publishableKey)}&vsn=1.0.0`;
@@ -86,6 +108,7 @@ export function supabaseRealtimeSubscriber(
   let socket: WebSocketLike | undefined;
   let socketOpen = false;
   let socketFailures = 0;
+  let socketOpenedAt: number | undefined;
   let lastRef = 0;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   let heartbeatRef: string | null = null;
@@ -121,13 +144,22 @@ export function supabaseRealtimeSubscriber(
     topic.timer = setTimeout(() => failTopic(topic), joinTimeoutMs);
   }
 
-  /** The channel was refused, lost or not answered: say so and join again later. */
-  function failTopic(topic: Topic): void {
+  /**
+   * The channel was refused, lost or not answered: say so and join again later, much
+   * later after a refusal. Failures are forgotten only once the channel had stayed
+   * joined a while, so one that is joined and dropped at once waits longer each time.
+   */
+  function failTopic(topic: Topic, refused = false): void {
     clearTopicTimer(topic);
+    if (topic.joinedAt !== undefined && Date.now() - topic.joinedAt >= stableMs) {
+      topic.failures = 0;
+    }
     topic.joined = false;
+    topic.joinedAt = undefined;
     topic.joinRef = null;
     tell(topic, 'unavailable');
-    topic.timer = setTimeout(() => join(topic), nextDelay(delays, topic.failures));
+    const wait = nextDelay(refused ? refusedDelays : delays, topic.failures, random);
+    topic.timer = setTimeout(() => join(topic), wait);
     topic.failures += 1;
   }
 
@@ -137,14 +169,31 @@ export function supabaseRealtimeSubscriber(
     heartbeatRef = null;
   }
 
+  function scheduleReconnect(): void {
+    if (topics.size === 0 || reconnect !== undefined) return;
+    reconnect = setTimeout(connect, nextDelay(delays, socketFailures, random));
+    socketFailures += 1;
+  }
+
   function connect(): void {
     reconnect = undefined;
-    const current = openSocket(address);
+    if (topics.size === 0) return;
+    let current: WebSocketLike;
+    try {
+      current = openSocket(address);
+    } catch {
+      // The browser would not even start (a blocked or malformed address): every
+      // channel is unavailable and the connection is tried again later.
+      socket = undefined;
+      for (const topic of topics.values()) tell(topic, 'unavailable');
+      scheduleReconnect();
+      return;
+    }
     socket = current;
     current.addEventListener('open', () => {
       if (socket !== current) return;
       socketOpen = true;
-      socketFailures = 0;
+      socketOpenedAt = Date.now();
       heartbeat = setInterval(() => {
         // No answer to the last heartbeat: the connection is dead, though not closed.
         if (heartbeatRef !== null) {
@@ -169,16 +218,19 @@ export function supabaseRealtimeSubscriber(
     socket = undefined;
     socketOpen = false;
     stopHeartbeat();
+    // Failures are forgotten only once a connection had stayed up a while.
+    if (socketOpenedAt !== undefined && Date.now() - socketOpenedAt >= stableMs) {
+      socketFailures = 0;
+    }
+    socketOpenedAt = undefined;
     for (const topic of topics.values()) {
       clearTopicTimer(topic);
       topic.joined = false;
+      topic.joinedAt = undefined;
       topic.joinRef = null;
       tell(topic, 'unavailable');
     }
-    if (topics.size > 0 && reconnect === undefined) {
-      reconnect = setTimeout(connect, nextDelay(delays, socketFailures));
-      socketFailures += 1;
-    }
+    scheduleReconnect();
   }
 
   function receive(data: unknown): void {
@@ -201,10 +253,11 @@ export function supabaseRealtimeSubscriber(
       if (payload.status === 'ok') {
         clearTopicTimer(topic);
         topic.joined = true;
-        topic.failures = 0;
+        topic.joinedAt = Date.now();
         tell(topic, 'open');
       } else {
-        failTopic(topic);
+        // An explicit refusal: not allowed to read this channel, or a bad join.
+        failTopic(topic, true);
       }
       return;
     }
@@ -241,14 +294,20 @@ export function supabaseRealtimeSubscriber(
   }
 
   const openChannel: ChannelOpener = (channel, events) => {
+    // Throws for an ID that is not one; the page is then told 'unavailable'.
     const name = liveChannelName(channel);
     let topic = topics.get(name);
+    if (topic === undefined && topics.size >= maxChannels) {
+      events.connection('unavailable');
+      return () => {};
+    }
     if (topic === undefined) {
       topic = {
         name,
         entries: new Set(),
         joinRef: null,
         joined: false,
+        joinedAt: undefined,
         failures: 0,
         timer: undefined,
       };

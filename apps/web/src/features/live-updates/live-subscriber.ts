@@ -10,7 +10,8 @@ import { LeagueScoreMessage, LiveMessage, type LiveChannel } from '@srleagues/co
 
 /**
  * Where the connection stands. `connecting`: the first attempt. `open`: messages
- * arrive. `unavailable`: lost or refused, and being tried again; meanwhile the page
+ * arrive. `unavailable`: lost or refused, and being tried again (never, for a game
+ * or league ID that is not an ID, or past the page's channel limit); meanwhile the page
  * re-fetches the snapshot every few seconds (T-119), and fetches one when the
  * connection opens again, since messages may have been missed.
  */
@@ -66,16 +67,24 @@ export function liveSubscriberFrom(open: ChannelOpener): LiveSubscriber {
     read: (data: unknown) => M | null,
   ): LiveSubscription {
     let closed = false;
-    const stop = open(channel, {
-      message: (data) => {
-        if (closed) return;
-        const message = read(data);
-        if (message !== null) handlers.onMessage(message);
-      },
-      connection: (state) => {
-        if (!closed) handlers.onConnection?.(state);
-      },
-    });
+    let stop: () => void;
+    try {
+      stop = open(channel, {
+        message: (data) => {
+          if (closed) return;
+          const message = read(data);
+          if (message !== null) handlers.onMessage(message);
+        },
+        connection: (state) => {
+          if (!closed) handlers.onConnection?.(state);
+        },
+      });
+    } catch {
+      // An ID that is not one (a mistyped address) or a channel that cannot be opened:
+      // the page is told live updates are unavailable and keeps polling (T-119).
+      stop = () => {};
+      handlers.onConnection?.('unavailable');
+    }
     return {
       close: () => {
         if (closed) return;
@@ -104,6 +113,29 @@ export function parseJson(text: unknown): unknown {
   }
 }
 
-/** How long to wait before the next attempt: the delays in turn, then the last one. */
-export const nextDelay = (delays: readonly number[], attempt: number): number =>
-  delays[Math.min(attempt, delays.length - 1)] ?? 5_000;
+/**
+ * How long to wait before the next attempt: the delays in turn, then the last one,
+ * each spread at random between half and all of it, so a thousand pages that lost
+ * the same connection do not all come back in the same instant.
+ */
+export function nextDelay(
+  delays: readonly number[],
+  attempt: number,
+  random: () => number = Math.random,
+): number {
+  const base = delays[Math.min(attempt, delays.length - 1)] ?? 5_000;
+  const spread = Math.min(1, Math.max(0, random()));
+  return Math.round(base / 2 + (base / 2) * spread);
+}
+
+/** How long a connection must have stayed up before its failures are forgotten. */
+export const defaultStableMs = 30_000;
+
+/** Delays after a plain failure: 1, 2, 5, 10 s. */
+export const defaultRetryDelaysMs: readonly number[] = [1_000, 2_000, 5_000, 10_000];
+
+/**
+ * Delays after an explicit refusal (a channel not allowed, a bad request): slower,
+ * since asking again soon will most likely be refused again. 30 s, 1, 2, then 5 min.
+ */
+export const defaultRefusedDelaysMs: readonly number[] = [30_000, 60_000, 120_000, 300_000];

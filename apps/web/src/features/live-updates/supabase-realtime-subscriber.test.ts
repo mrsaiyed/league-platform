@@ -13,6 +13,7 @@ import type { LiveConnection } from './live-subscriber.ts';
 import {
   sentRealtimeEvents,
   supabaseRealtimeSubscriber,
+  type SupabaseRealtimeSubscriberOptions,
   type WebSocketLike,
 } from './supabase-realtime-subscriber.ts';
 
@@ -134,7 +135,7 @@ class FakeSocket implements WebSocketLike {
 let sockets: FakeSocket[];
 const allSent = () => sockets.flatMap((s) => s.sent);
 
-function subscriber(extra: { heartbeatMs?: number; joinTimeoutMs?: number } = {}) {
+function subscriber(extra: Partial<SupabaseRealtimeSubscriberOptions> = {}) {
   return supabaseRealtimeSubscriber({
     url: 'https://project.supabase.test/',
     publishableKey: key,
@@ -144,6 +145,9 @@ function subscriber(extra: { heartbeatMs?: number; joinTimeoutMs?: number } = {}
       return socket;
     },
     retryDelaysMs: [100, 500],
+    refusedDelaysMs: [1_000, 5_000],
+    // No spread, so the waits are exact; the spread has its own test.
+    random: () => 1,
     ...extra,
   });
 }
@@ -247,18 +251,128 @@ describe('supabaseRealtimeSubscriber', () => {
     expect(third.states).toEqual(['open']);
   });
 
-  it('says unavailable when a join is refused, and joins again later', () => {
+  it('says unavailable when a join is refused, and joins again only much later', () => {
     const page = watchGame(subscriber());
     const socket = sockets[0]!;
     socket.opened();
     socket.receive(joinRefused(gameTopic, socket.joinRef(gameTopic)));
     expect(page.states).toEqual(['connecting', 'unavailable']);
-    vi.advanceTimersByTime(99);
+    vi.advanceTimersByTime(999);
     expect(socket.sent).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(socket.sent).toHaveLength(2);
+    // Refused again: the wait grows.
+    socket.receive(joinRefused(gameTopic, socket.joinRef(gameTopic)));
+    vi.advanceTimersByTime(4_999);
+    expect(socket.sent).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(socket.sent).toHaveLength(3);
     socket.receive(joinOk(gameTopic, socket.joinRef(gameTopic)));
-    expect(page.states).toEqual(['connecting', 'unavailable', 'open']);
+    expect(page.states).toEqual(['connecting', 'unavailable', 'unavailable', 'open']);
+  });
+
+  it('keeps waiting longer for a channel that is joined and dropped at once', () => {
+    watchGame(subscriber({ stableMs: 1_000 }));
+    const socket = sockets[0]!;
+    socket.opened();
+    const joins = () => socket.sent.filter((f) => f.event === 'phx_join').length;
+    socket.receive(joinOk(gameTopic, socket.joinRef(gameTopic)));
+    socket.receive(channelError(gameTopic, socket.joinRef(gameTopic)));
+    vi.advanceTimersByTime(100);
+    expect(joins()).toBe(2);
+    socket.receive(joinOk(gameTopic, socket.joinRef(gameTopic)));
+    socket.receive(channelError(gameTopic, socket.joinRef(gameTopic)));
+    vi.advanceTimersByTime(499);
+    expect(joins()).toBe(2);
+    vi.advanceTimersByTime(1);
+    expect(joins()).toBe(3);
+    // Joined for longer than the stable time: the next failure starts from the first wait.
+    socket.receive(joinOk(gameTopic, socket.joinRef(gameTopic)));
+    vi.advanceTimersByTime(1_000);
+    socket.receive(channelError(gameTopic, socket.joinRef(gameTopic)));
+    vi.advanceTimersByTime(100);
+    expect(joins()).toBe(4);
+  });
+
+  it('keeps waiting longer for a connection that opens and closes at once', () => {
+    watchGame(subscriber({ stableMs: 1_000 }));
+    sockets[0]!.opened();
+    sockets[0]!.close();
+    vi.advanceTimersByTime(100);
+    expect(sockets).toHaveLength(2);
+    sockets[1]!.opened();
+    sockets[1]!.close();
+    vi.advanceTimersByTime(499);
+    expect(sockets).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(sockets).toHaveLength(3);
+    sockets[2]!.opened();
+    vi.advanceTimersByTime(1_000);
+    sockets[2]!.close();
+    vi.advanceTimersByTime(100);
+    expect(sockets).toHaveLength(4);
+  });
+
+  it('spreads each wait at random between half and all of it', () => {
+    watchGame(subscriber({ random: () => 0 }));
+    sockets[0]!.close();
+    vi.advanceTimersByTime(49);
+    expect(sockets).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(sockets).toHaveLength(2);
+  });
+
+  it('says unavailable, and opens nothing, for an ID that is not one', () => {
+    const live = subscriber();
+    const states: LiveConnection[] = [];
+    const handlers = { onMessage: () => {}, onConnection: (s: LiveConnection) => states.push(s) };
+    expect(() => live.subscribeGame(league, 'not-a-game', handlers).close()).not.toThrow();
+    expect(() => live.subscribeLeagueScores('not-a-league', handlers).close()).not.toThrow();
+    expect(states).toEqual(['unavailable', 'unavailable']);
+    expect(sockets).toEqual([]);
+  });
+
+  it('keeps trying when the browser will not even open the connection', () => {
+    let refuseOpen = true;
+    const page = watchGame(
+      subscriber({
+        open: (url) => {
+          if (refuseOpen) throw new SyntaxError('blocked');
+          const socket = new FakeSocket(url);
+          sockets.push(socket);
+          return socket;
+        },
+      }),
+    );
+    expect(page.states).toEqual(['connecting', 'unavailable']);
+    vi.advanceTimersByTime(100);
+    expect(page.states).toEqual(['connecting', 'unavailable', 'unavailable']);
+    refuseOpen = false;
+    vi.advanceTimersByTime(500);
+    expect(sockets).toHaveLength(1);
+    sockets[0]!.opened();
+    sockets[0]!.receive(joinOk(gameTopic, sockets[0]!.joinRef(gameTopic)));
+    expect(page.states.at(-1)).toBe('open');
+  });
+
+  it('joins no more channels than its limit', () => {
+    const live = subscriber({ maxChannels: 2 });
+    watchGame(live, game1);
+    watchGame(live, game2);
+    const third = live.subscribeLeagueScores(league, {
+      onMessage: () => {},
+      onConnection: (s) => expect(s).toBe('unavailable'),
+    });
+    const socket = sockets[0]!;
+    socket.opened();
+    expect(socket.sent.map((f) => f.topic)).toEqual([
+      gameTopic,
+      `realtime:${gameChannelName(league, game2)}`,
+    ]);
+    // A page already on a joined channel is not counted again.
+    const again = watchGame(live, game1);
+    expect(again.states).toEqual(['connecting']);
+    third.close();
   });
 
   it('tries a join again when it goes unanswered', () => {

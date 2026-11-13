@@ -13,6 +13,7 @@ import type { LiveConnection } from './live-subscriber.ts';
 import {
   serverSentEventsSubscriber,
   type EventSourceLike,
+  type ServerSentEventsSubscriberOptions,
 } from './server-sent-events-subscriber.ts';
 
 const leagueA = '0192f000-0000-7000-8000-00000000000a';
@@ -140,7 +141,7 @@ class HandSource implements EventSourceLike {
   }
 }
 
-function handDriven() {
+function handDriven(extra: Partial<ServerSentEventsSubscriberOptions> = {}) {
   const sources: HandSource[] = [];
   const subscriber = serverSentEventsSubscriber({
     address: '/api/v1/live?v=1',
@@ -150,6 +151,9 @@ function handDriven() {
       return source;
     },
     retryDelaysMs: [100, 400],
+    // No spread, so the waits are exact; the spread has its own test.
+    random: () => 1,
+    ...extra,
   });
   return { sources, subscriber };
 }
@@ -213,6 +217,105 @@ describe('server-sent events subscriber, on its own', () => {
     expect(sources).toHaveLength(3);
     sources[2]!.emit('open');
     expect(states).toEqual(['connecting', 'unavailable', 'unavailable', 'open']);
+  });
+
+  it('keeps waiting longer for a connection that opens and is refused at once', () => {
+    vi.useFakeTimers();
+    const { sources, subscriber } = handDriven({ stableMs: 1_000 });
+    subscriber.subscribeGame(leagueA, game1, { onMessage: () => {} });
+    const refuse = (source: HandSource) => {
+      source.readyState = 2;
+      source.emit('error');
+    };
+    sources[0]!.emit('open');
+    refuse(sources[0]!);
+    vi.advanceTimersByTime(100);
+    expect(sources).toHaveLength(2);
+    sources[1]!.emit('open');
+    refuse(sources[1]!);
+    vi.advanceTimersByTime(399);
+    expect(sources).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(sources).toHaveLength(3);
+    // Open for longer than the stable time: the next refusal starts from the first wait.
+    sources[2]!.emit('open');
+    vi.advanceTimersByTime(1_000);
+    refuse(sources[2]!);
+    vi.advanceTimersByTime(100);
+    expect(sources).toHaveLength(4);
+  });
+
+  it('spreads each wait at random between half and all of it', () => {
+    vi.useFakeTimers();
+    const { sources, subscriber } = handDriven({ random: () => 0 });
+    subscriber.subscribeGame(leagueA, game1, { onMessage: () => {} });
+    sources[0]!.readyState = 2;
+    sources[0]!.emit('error');
+    vi.advanceTimersByTime(49);
+    expect(sources).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(sources).toHaveLength(2);
+  });
+
+  it('waits slowly by default after a refusal', () => {
+    vi.useFakeTimers();
+    const sources: HandSource[] = [];
+    const subscriber = serverSentEventsSubscriber({
+      address: '/api/v1/live',
+      open: (url) => {
+        const source = new HandSource(url);
+        sources.push(source);
+        return source;
+      },
+      random: () => 1,
+    });
+    subscriber.subscribeGame(leagueA, game1, { onMessage: () => {} });
+    sources[0]!.readyState = 2;
+    sources[0]!.emit('error');
+    vi.advanceTimersByTime(29_999);
+    expect(sources).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(sources).toHaveLength(2);
+  });
+
+  it('says unavailable, and opens nothing, for an ID that is not one', () => {
+    const { sources, subscriber } = handDriven();
+    const states: LiveConnection[] = [];
+    const handlers = { onMessage: () => {}, onConnection: (s: LiveConnection) => states.push(s) };
+    expect(() => subscriber.subscribeGame('nope', game1, handlers).close()).not.toThrow();
+    expect(() => subscriber.subscribeLeagueScores(leagueA.slice(1), handlers)).not.toThrow();
+    expect(states).toEqual(['unavailable', 'unavailable']);
+    expect(sources).toEqual([]);
+  });
+
+  it('keeps trying when the browser will not even open the source', () => {
+    vi.useFakeTimers();
+    const sources: HandSource[] = [];
+    let refuseOpen = true;
+    const subscriber = serverSentEventsSubscriber({
+      address: '/api/v1/live',
+      open: (url) => {
+        if (refuseOpen) throw new SyntaxError('blocked');
+        const source = new HandSource(url);
+        sources.push(source);
+        return source;
+      },
+      retryDelaysMs: [100, 400],
+      random: () => 1,
+    });
+    const states: LiveConnection[] = [];
+    subscriber.subscribeGame(leagueA, game1, {
+      onMessage: () => {},
+      onConnection: (s) => states.push(s),
+    });
+    expect(states).toEqual(['connecting', 'unavailable']);
+    vi.advanceTimersByTime(100);
+    expect(states).toEqual(['connecting', 'unavailable', 'unavailable']);
+    refuseOpen = false;
+    vi.advanceTimersByTime(400);
+    expect(sources).toHaveLength(1);
+    sources[0]!.emit('open');
+    expect(states.at(-1)).toBe('open');
   });
 
   it('after close, hands nothing more, closes the source and does not open again', () => {
