@@ -6,7 +6,7 @@
 import type { CommandContext } from '../../command/index.ts';
 import { readOnlyLeagueStatuses } from './access-values.ts';
 import type { AccessTx, Grant, Invitation, PermissionsTx } from './ports.ts';
-import { roleHasPermission, type Permission } from './roles.ts';
+import { isPermission, roleHasPermission, type Permission } from './roles.ts';
 import { covers, leagueScope, type Scope } from './scopes.ts';
 
 /** What one account holds in the league: owner or not, and its grants in force. */
@@ -44,8 +44,13 @@ export async function accessOfAccount(
   return { accountId, isOwner, grants };
 }
 
-/** Whether what `holder` holds allows `permission` at `scope`. */
+/**
+ * Whether what `holder` holds allows `permission` at `scope`. Fails closed: a name
+ * that is not one of the permissions (a typo that got past the types, a value read
+ * from outside) is allowed to no one, the owner included.
+ */
 export function allows(holder: AccessHolder, permission: Permission, scope: Scope): boolean {
+  if (!isPermission(permission)) return false;
   if (holder.isOwner) return true;
   return holder.grants.some(
     (grant) =>

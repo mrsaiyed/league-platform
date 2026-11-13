@@ -10,6 +10,7 @@ import { leagueScope, scopeInput } from '../scopes.ts';
 
 export const listActivity = defineCommand({
   name: 'access.list_activity',
+  permission: 'activity.read',
   input: z.object({
     limit: z.number().int().min(1).max(activityPageLimit).default(50),
     /** The last entry already shown; the page continues after it. */

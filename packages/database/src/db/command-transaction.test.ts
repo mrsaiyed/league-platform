@@ -90,6 +90,7 @@ describe('commandTransaction', () => {
   it('rolls back what a command wrote before it returned an expected error', async () => {
     const renameThenRefuse = defineCommand({
       name: 'leagues.rename_then_refuse',
+      permission: 'league.settings',
       input: z.object({}),
       allowed: async () => true,
       run: async ({ tx }: { tx: LeaguesTx }): Promise<Result<null, { code: 'too-late' }>> => {

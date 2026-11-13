@@ -9,3 +9,4 @@ export {
 export { emailSenderFor, type EmailSettings } from './src/email/email-sender-for.ts';
 export { resendEmail, type ResendEmailOptions } from './src/email/resend-email.ts';
 export * from './src/sign-in/index.ts';
+export * from './src/live-updates/index.ts';

@@ -30,6 +30,7 @@ export type InviteError = {
 
 export const invite = defineCommand({
   name: 'access.invite',
+  permission: 'access.manage',
   // The same limits as the invitations table (0004). Emails are kept in lower case.
   input: z.object({
     email: z

@@ -2,7 +2,13 @@
 import { describe, expect, it } from 'vitest';
 import { allows, hasPermission, type AccessHolder } from './policy.ts';
 import type { Grant, PermissionsTx } from './ports.ts';
-import { ownerOnlyPermissions, permissions, rolePermissions, roles } from './roles.ts';
+import {
+  ownerOnlyPermissions,
+  permissions,
+  rolePermissions,
+  roles,
+  type Permission,
+} from './roles.ts';
 import type { Scope } from './scopes.ts';
 
 const me = '01900000-0000-7000-8000-0000000000a1';
@@ -58,6 +64,15 @@ describe('allows', () => {
     expect(allows(holder(grant('coach', team)), 'team.lineup', { ...team, id: program.id })).toBe(
       false,
     );
+  });
+
+  it('allows a permission that is not in the table to no one, the owner included', () => {
+    const owner = { accountId: me, isOwner: true, grants: [] };
+    for (const name of ['games.delete_everything', '', 'GAMES.SCORE', 'signed-in']) {
+      const unknown = name as Permission;
+      expect(allows(owner, unknown, { type: 'league' }), name).toBe(false);
+      expect(allows(holder(grant('admin')), unknown, { type: 'league' }), name).toBe(false);
+    }
   });
 
   it('ignores a revoked grant and one for someone else', () => {
