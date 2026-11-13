@@ -232,6 +232,8 @@ export const en = {
     'A game the draft adds already exists (it may be in the bin or have no date).',
   'error.scheduling.publish_schedule.game-without-time':
     'A game in the draft has no time yet. Give every added or moved game a time before publishing.',
+  'error.scheduling.publish_schedule.round-cannot-be-updated':
+    'A round the draft renames or re-dates is no longer in this season. Discard the draft and start again.',
   'error.scheduling.publish_schedule.unknown-team':
     'A game in the draft names a team that is no longer in this season.',
   'error.scheduling.publish_schedule.unknown-venue':

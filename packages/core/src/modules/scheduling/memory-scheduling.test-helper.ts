@@ -49,6 +49,8 @@ export type MemoryScheduling = {
   binned: string[];
   roundChanges: { roundId: string; label?: string; date?: string }[];
   revisions: NewScheduleRevision[];
+  /** Makes every round update find no such round, to test the refusal. */
+  roundsMissing?: boolean;
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -194,6 +196,7 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           return ids.length;
         },
         updateRound: async (_season, roundId, change) => {
+          if (s.roundsMissing === true) return false;
           s.roundChanges.push({ roundId, ...change });
           return true;
         },

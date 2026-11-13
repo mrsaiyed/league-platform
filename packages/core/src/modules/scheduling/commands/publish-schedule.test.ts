@@ -114,6 +114,14 @@ describe('publishing the schedule', () => {
     expect(db.state.activity.map((a) => a.action)).toEqual(['scheduling.publish_schedule']);
   });
 
+  it('refuses, changing nothing, when a round it edits is gone', async () => {
+    const { db, deps, as } = world(fullDraft, { roundsMissing: true });
+    const result = await publishSchedule(as(ownerId), input, deps);
+    expect(result).toMatchObject({ ok: false, error: { code: 'round-cannot-be-updated' } });
+    expect(db.state.draft).toBeDefined();
+    expect(db.state.revisions).toHaveLength(0);
+  });
+
   it('numbers the first publication 1', async () => {
     const { db, deps, as } = world([fullDraft[0] as DraftChange], {
       latestRevision: null,

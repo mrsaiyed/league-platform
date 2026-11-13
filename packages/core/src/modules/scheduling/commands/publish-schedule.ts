@@ -19,7 +19,9 @@ export type PublishScheduleError =
         | 'season-not-found'
         | 'draft-not-found'
         /** The draft was saved by someone else since the admin read it, or was discarded. */
-        | 'changed-since-read';
+        | 'changed-since-read'
+        /** A round the plan edits is gone from the season. */
+        | 'round-cannot-be-updated';
     }
   | PublishBlocker;
 
@@ -82,10 +84,11 @@ export const publishSchedule = defineCommand({
       const label = old.label !== round.label ? round.label : undefined;
       const date = old.date !== round.date && round.date !== null ? round.date : undefined;
       if (label === undefined && date === undefined) continue;
-      await store.updateRound(input.seasonId, round.id, {
+      const updated = await store.updateRound(input.seasonId, round.id, {
         ...(label === undefined ? {} : { label }),
         ...(date === undefined ? {} : { date }),
       });
+      if (!updated) return fail({ code: 'round-cannot-be-updated' });
     }
 
     await store.insertPublishedGames(input.seasonId, plan.newGames);
