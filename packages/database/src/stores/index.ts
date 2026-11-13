@@ -2,6 +2,7 @@
 export { accessStore } from './access-store.ts';
 export { activityLogStore } from './activity-log-store.ts';
 export { divisionsStore } from './divisions-store.ts';
+export { gamesStore } from './games-store.ts';
 export { jobsStore } from './jobs-store.ts';
 export { leaguesStore } from './leagues-store.ts';
 export { peopleStore } from './people-store.ts';
