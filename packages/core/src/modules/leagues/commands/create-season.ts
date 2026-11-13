@@ -2,9 +2,9 @@
 // named it goes in the league's default program, which is all a single-program
 // league ever sees (U-3). A season is not current until setCurrentSeason says so.
 import { z } from 'zod';
-import { recordActivity } from '../../access/index.ts';
+import { leagueScope, recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
-import { mayEditLeague } from '../policy.ts';
+import { mayEditLeague, programScope } from '../policy.ts';
 import type { LeaguesTx } from '../ports.ts';
 
 export type CreateSeasonError = { readonly code: 'program-not-found' | 'season-slug-taken' };
@@ -29,7 +29,13 @@ export const createSeason = defineCommand({
     .refine((s) => s.startsOn === undefined || s.endsOn === undefined || s.endsOn >= s.startsOn, {
       path: ['endsOn'],
     }),
-  allowed: (context, _input, tx: LeaguesTx) => mayEditLeague(context, tx, 'season.settings'),
+  // Checked at the season's program (P4 §4). A program that is not there is checked
+  // league-wide, so only those who may add to any program learn it is missing.
+  allowed: async (context, input, tx: LeaguesTx) => {
+    const program = await tx.leagues.findProgram(input.programId);
+    const scope = program === undefined ? leagueScope : programScope(program.id);
+    return mayEditLeague(context, tx, 'season.settings', scope);
+  },
   run: async ({ context, input, tx }): Promise<Result<{ seasonId: string }, CreateSeasonError>> => {
     const program = await tx.leagues.findProgram(input.programId);
     if (program === undefined) return fail({ code: 'program-not-found' });

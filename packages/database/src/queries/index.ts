@@ -8,6 +8,7 @@ export { findLeagueByShortName, type LeagueByShortName } from './find-league-by-
 export { findProgramBySlug } from './find-program-by-slug.ts';
 export { findProgramId } from './find-program-id.ts';
 export { findRoleGrant } from './find-role-grant.ts';
+export { findSeasonProgramId } from './find-season-program-id.ts';
 export { hasPendingInvitation } from './has-pending-invitation.ts';
 export { insertActivity } from './insert-activity.ts';
 export { insertInvitation } from './insert-invitation.ts';
