@@ -1,14 +1,19 @@
-// Loads the made-up seed leagues (T-195, seed-data.ts) into a PGlite database that has
-// every migration applied. Made-up data only (T-201): this takes a PGlite, never an
-// address, so it cannot reach a real database.
+// Development-only bootstrap (T-195): loads the made-up seed leagues (seed-data.ts) into
+// a PGlite database that has every migration applied. Made-up data only (T-201): it
+// takes a PGlite, never an address or a scope, so it cannot reach a real database, and
+// it is not one of the product's commands.
 //
-// Everything about a league goes through the same commands the product uses (create
-// league, season, divisions, teams, people), run as the people the data names: our own
-// staff creates the league, its owner does the rest. Accounts are the one thing written
-// directly, since an account comes from signing in, which has no command here.
+// For each league it runs the product's own commands, each in its own scoped
+// transaction for that league (create league, status, season, divisions, teams,
+// people), acting as the people the data names: our own staff creates the league and
+// its owner does the rest. Two things are written directly, not by a command: accounts
+// (they come from signing in, which has no command here) and role grants (through the
+// access store, as the owner; the invite and accept commands need email tokens).
 //
-// Loading is safe to repeat: a league whose short name is already there is left alone
-// and reported as such.
+// Loading is NOT one transaction, since each command has its own, so a load that stops
+// part-way leaves a partly loaded league. A rerun checks each existing league against
+// the data: a whole one is left alone ("Already there"); anything else stops with a
+// plain message, never a false "Already there". Start again from a fresh database.
 import type { PGlite } from '@electric-sql/pglite';
 import {
   createDivision,
@@ -70,6 +75,29 @@ async function accountId(pglite: PGlite, email: string, displayName: string): Pr
   return made.rows[0]!.id;
 }
 
+/** Whether a league row holds everything its data lists, as opposed to a partial load. */
+async function holdsEverything(
+  pglite: PGlite,
+  leagueId: string,
+  league: SeedLeague,
+): Promise<boolean> {
+  const count = async (table: string, extra = '') =>
+    (
+      await pglite.query<{ n: number }>(
+        `select count(*)::int as n from ${table} where league_id = $1${extra}`,
+        [leagueId],
+      )
+    ).rows[0]!.n;
+  const teams = league.divisions.reduce((sum, d) => sum + d.teams.length, 0);
+  return (
+    (await count('seasons')) === 1 &&
+    (await count('divisions')) === league.divisions.length &&
+    (await count('teams')) === teams &&
+    (await count('people')) === league.people.length &&
+    (await count('role_grants', ' and revoked_at is null')) === league.members.length
+  );
+}
+
 function must<T>(what: string, result: { ok: true; value: T } | { ok: false; error: unknown }): T {
   if (!result.ok) throw new Error(`Seeding failed at ${what}: ${JSON.stringify(result.error)}`);
   return result.value;
@@ -86,6 +114,11 @@ async function loadLeague(
     league.slug,
   ]);
   if (existing.rows[0] !== undefined) {
+    if (!(await holdsEverything(pglite, existing.rows[0].id, league))) {
+      throw new Error(
+        `The seed league ${league.slug} is only partly loaded (an earlier load stopped part-way). Start again from a fresh database.`,
+      );
+    }
     return { slug: league.slug, leagueId: existing.rows[0].id, created: false };
   }
   const ownerId = await accountId(pglite, league.owner.email, league.owner.displayName);
@@ -153,7 +186,10 @@ async function loadLeague(
 }
 
 /** Loads every seed league that is not there yet. */
-export async function seedLeaguesInto(pglite: PGlite): Promise<SeededLeague[]> {
+export async function seedLeaguesInto(
+  pglite: PGlite,
+  leagues: readonly SeedLeague[] = seedLeagues,
+): Promise<SeededLeague[]> {
   const db = createDatabase({ kind: 'pglite', pglite });
   try {
     const staffId = await accountId(pglite, seedStaff.email, seedStaff.displayName);
@@ -174,7 +210,7 @@ export async function seedLeaguesInto(pglite: PGlite): Promise<SeededLeague[]> {
     };
     const deps: Deps = { leagues: one, people: one, teams: one };
     const loaded: SeededLeague[] = [];
-    for (const league of seedLeagues) {
+    for (const league of leagues) {
       loaded.push(await loadLeague(pglite, db, deps, staffId, league));
     }
     return loaded;
