@@ -42,6 +42,28 @@ export const en = {
   // Setting labels (T5 §6, T-98): `setting.<key>.label`, shown on the admin screen.
   'setting.members.startPage.label':
     'Where members land first: the league home or their own team page',
+  // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
+  // league's name, {role} a role's name from above, {days} how long a link works.
+  'email.invitation.subject': 'You are invited to help run {league}',
+  'email.invitation.intro': 'You have been invited to help run {league} as {role}.',
+  'email.invitation.action': 'Accept the invitation',
+  'email.invitation.howTo':
+    'Open the link, then sign in or create your account, and you are in. The link works once.',
+  'email.invitation.expiry':
+    'It stops working {days} days after the invitation was sent, or as soon as it is re-sent or cancelled.',
+  'email.invitation.notExpected':
+    'If you were not expecting this, you can ignore this email and nothing will happen.',
+  'email.invitation.linkFallback':
+    'If the button does not work, copy this address into your browser:',
+  // The tracker's saved banner (T6 §4), chosen from the queue's status by
+  // apps/web/src/features/tracker/queue-banner.ts.
+  'tracker.queue.allSaved': 'All saved',
+  'tracker.queue.waiting_one': '{count} action waiting to send',
+  'tracker.queue.waiting_other': '{count} actions waiting to send',
+  'tracker.queue.notSaved_one': '{count} action not saved',
+  'tracker.queue.notSaved_other': '{count} actions not saved',
+  'tracker.queue.storageFailed': 'This device could not save to its storage',
+  'tracker.queue.separator': ' · ',
 } as const;
 
 export type MessageKey = keyof typeof en;

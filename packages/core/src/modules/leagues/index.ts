@@ -53,6 +53,7 @@ export type {
 } from './ports.ts';
 export {
   adminAreas,
+  checkedSiteOrigin,
   forwardedLeagueUrl,
   isLeagueIdFormat,
   isLeagueSiteName,

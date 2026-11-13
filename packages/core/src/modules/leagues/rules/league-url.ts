@@ -66,6 +66,14 @@ export const leaguePages = {
   'admin-area': { path: ['admin', ':area'], level: 'private' },
   /** The courtside tracker for one game. */
   score: { path: ['score', ':game'], level: 'private' },
+  /**
+   * Accepting an invitation (P4 §4, T-226): the link in the invitation's email, built
+   * only by the worker as it sends. `token` is the link's secret, in the path (record
+   * 023): the page that opens it must answer with `Referrer-Policy: no-referrer` and
+   * `Cache-Control: no-store`, and the path is left out of our request logs and
+   * analytics (steps 1.14 and 1.17).
+   */
+  invitation: { path: ['invitation', ':token'], level: 'private' },
 } as const satisfies Record<string, PageSpec>;
 
 export type LeaguePage = keyof typeof leaguePages;
@@ -256,17 +264,23 @@ function leagueRoot(league: LeagueAddressee, origin: string | undefined): string
   if (!isShortNameFormat(league.slug)) {
     throw new TypeError('leagueUrl: the league has no short name of the right form.');
   }
-  return `${origin === undefined ? '' : siteOrigin(origin)}/${league.slug}`;
+  return `${origin === undefined ? '' : checkedSiteOrigin(origin)}/${league.slug}`;
 }
 
-function siteOrigin(origin: string): string {
+/**
+ * Our site's origin as addresses use it: `https://site` or `http://site`, nothing
+ * after the host. Throws on anything else, as leagueUrl does with `origin`; a
+ * setting can be checked with this once, at startup, before it is used.
+ */
+export function checkedSiteOrigin(origin: string): string {
   let url: URL;
   try {
     url = new URL(origin);
   } catch {
     throw new TypeError('leagueUrl: origin is not an address.');
   }
-  const bare = url.pathname === '/' && url.search === '' && url.hash === '' && !url.username;
+  const bare =
+    url.pathname === '/' && url.search === '' && url.hash === '' && !url.username && !url.password;
   if (!bare || (url.protocol !== 'https:' && url.protocol !== 'http:')) {
     throw new TypeError('leagueUrl: origin must be only a scheme and host, like https://site.');
   }

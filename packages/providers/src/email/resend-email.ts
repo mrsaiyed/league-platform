@@ -1,7 +1,11 @@
 // Resend (T-11), production only (T-140, emailSenderFor). Not verified against the
 // live service: written from Resend's published API (POST /emails, an
-// Idempotency-Key header so one email is sent once however often its job runs,
-// T-137) and tested only against recorded-style answers, never over the network.
+// Idempotency-Key header so one email is sent once however often it is handed
+// over, T-137) and tested only against recorded-style answers, never over the
+// network. The key is the caller's: for the invitation email it is per link, and
+// each run of that job makes a new link, so a retry after `unavailable` or
+// `unexpected-answer` (Resend may have accepted the first) can send a second
+// email, whose link ends the first (record 023).
 //
 // Errors carry a fixed code and the HTTP status, never the response text, the
 // address, the content or the key (T-86).

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   adminAreas,
+  checkedSiteOrigin,
   forwardedLeagueUrl,
   isLeagueIdFormat,
   isLeagueSiteName,
@@ -41,6 +42,15 @@ describe('leagueUrl (T-34)', () => {
       expect(leagueUrl(north, 'admin-area', { area })).toBe(`/north-league/admin/${area}`);
     }
     expect(leagueUrl(north, 'score', { game: 'g1' })).toBe('/north-league/score/g1');
+  });
+
+  it("builds an invitation's link, a full address for its email (T-226)", () => {
+    const token = 'Ab3_-xYz0123456789abcdefghijklmnopqrstuvwxy';
+    expect(leagueUrl(north, 'invitation', { token, origin: 'https://site.example.test' })).toBe(
+      `https://site.example.test/north-league/invitation/${token}`,
+    );
+    // @ts-expect-error: the link takes no season.
+    leagueUrl(north, 'invitation', { token, season: 'fall-2025' });
   });
 
   it('builds pages inside an admin area, each part encoded and checked', () => {
@@ -103,9 +113,13 @@ describe('leagueUrl (T-34)', () => {
       'https://site.example.test/?x=1',
       'ftp://site.example.test',
       'https://user@site.example.test',
+      'https://:secret@site.example.test',
     ]) {
       expect(() => leagueUrl(north, 'home', { origin })).toThrow(TypeError);
+      // The same check, alone, for a setting read at startup.
+      expect(() => checkedSiteOrigin(origin)).toThrow(TypeError);
     }
+    expect(checkedSiteOrigin('http://localhost:3000/')).toBe('http://localhost:3000');
   });
 
   it('encodes values, so a value cannot add a segment or a query', () => {
@@ -160,6 +174,7 @@ describe('the names the site uses under a league', () => {
         'clubs',
         'draft',
         'games',
+        'invitation',
         'media',
         'my',
         'news',
