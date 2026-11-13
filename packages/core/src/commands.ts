@@ -42,6 +42,7 @@ import {
   reopenGame,
 } from './modules/games/index.ts';
 import { createPerson, listPeople, removePerson, updatePerson } from './modules/people/index.ts';
+import { rebuildStandings } from './modules/standings/index.ts';
 import {
   createCourt,
   createVenue,
@@ -97,6 +98,7 @@ export const commands = commandRegistry([
   cancelGame,
   reopenGame,
   listPostponedGames,
+  rebuildStandings,
   createPerson,
   updatePerson,
   removePerson,

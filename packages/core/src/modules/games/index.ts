@@ -7,7 +7,9 @@ export { recordForfeit, type RecordForfeitError } from './commands/record-forfei
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
 export { gameFinalized, gameReopened, type GameFinalized, type GameReopened } from './events.ts';
 export { recordingOf } from './game-fields.ts';
+export { seasonResults, type SeasonResults } from './season-results.ts';
 export type {
+  GameLine,
   GameRecord,
   GameResultDocument,
   GameResultChange,
