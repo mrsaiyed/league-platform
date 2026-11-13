@@ -532,6 +532,29 @@ describe('after review', () => {
     expect(notices.map((m) => m.to)).toEqual(['held@example.test']);
   });
 
+  it('ends the session on the server too when the password again finds it expired', async () => {
+    const env = setup();
+    const b = browser();
+    await signUp(env, b, 'me@example.test');
+    const accessToken = b.jar.get(cookieNames.session) ?? '';
+    const service = env.deps.signIn;
+    const signOutCalls = vi.fn(service.signOut);
+    const deps: FlowDeps = {
+      ...env.deps,
+      signIn: {
+        ...service,
+        confirmPassword: async () => ({ ok: false, error: { code: 'access-expired' } }) as const,
+        signOut: signOutCalls,
+      },
+    };
+    expect(await confirmPassword({ password }, b.visit, deps)).toEqual({
+      to: '/signin?problem=signInAgain',
+    });
+    expect(signOutCalls).toHaveBeenCalledTimes(1);
+    expect(b.names()).toEqual([cookieNames.device]);
+    expect((await service.identify({ accessToken })).ok).toBe(false);
+  });
+
   it('forgets a sign-up under way when a session starts or ends', async () => {
     const env = setup();
     await signUp(env, browser(), 'me@example.test');

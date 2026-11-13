@@ -256,7 +256,8 @@ export async function confirmPassword(
       return goTo(screenUrl('confirmPassword', { ...tooMany(error.retryAfterSeconds), next }));
     case 'access-expired':
     case 'session-ended':
-      clearSessionCookies(visit.jar);
+      // Ended on the server too, as signing out does: the renewing token must not outlive it.
+      await endSessionIn(visit.jar, deps);
       return goTo(screenUrl('signin', { problem: 'signInAgain', next }));
   }
 }
