@@ -7,7 +7,9 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
-import type { CourtRecord, SchedulingTx, VenueRecord } from './ports.ts';
+import type { DraftDocument } from './draft-document.ts';
+import type { CourtRecord, DraftRecord, SchedulingTx, VenueRecord } from './ports.ts';
+import type { ScheduleState } from './rules/schedule-types.ts';
 
 export type MemoryScheduling = {
   status: string;
@@ -15,11 +17,30 @@ export type MemoryScheduling = {
   courts: CourtRecord[];
   grants: Grant[];
   activity: ActivityEntry[];
+  /** Seasons that exist, with their program. */
+  seasons: { id: string; programId: string }[];
+  /** The published revision numbers of the season (a revision is published by raising this). */
+  latestRevision: number | null;
+  draft: DraftRecord | undefined;
+  /** How many drafts have been started, for their ids. */
+  draftsStarted: number;
+  /** The published schedule as the rules read it. */
+  schedule: ScheduleState;
+  /** The teams of the season. */
+  teamIds: string[];
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const ownerId = '01900000-0000-7000-8000-0000000000a1';
 export const schedulerId = '01900000-0000-7000-8000-0000000000a2';
+export const seasonId = '01900000-0000-7000-8000-0000000d0001';
+export const programId = '01900000-0000-7000-8000-0000000c0001';
+const uuidOf = (kind: string, n: number) =>
+  `01900000-0000-7000-8000-${kind}${String(n).padStart(7, '0')}`;
+export const roundUuid = (n: number) => uuidOf('0000b', n);
+export const gameUuid = (n: number) => uuidOf('0000c', n);
+export const draftUuid = (n: number) => uuidOf('0000e', n);
+export const teamUuid = (n: number) => uuidOf('0000d', n);
 export const venueUuid = (n: number) =>
   `01900000-0000-7000-8000-0000000e${String(n).padStart(4, '0')}`;
 export const courtUuid = (n: number) =>
@@ -68,6 +89,12 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
     courts: [],
     grants: [],
     activity: [],
+    seasons: [{ id: seasonId, programId }],
+    latestRevision: null,
+    draft: undefined,
+    draftsStarted: 0,
+    schedule: { rounds: [], games: [] },
+    teamIds: [],
     ...state,
   });
   const transaction = memoryTransaction(db, (s, jobs): SchedulingTx => {
@@ -90,6 +117,33 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
         list: async () => [],
       },
       scheduling: {
+        findSeason: async (id) => s.seasons.find((x) => x.id === id),
+        latestRevision: async () => s.latestRevision,
+        findDraft: async () => s.draft,
+        insertDraft: async (season, changes: DraftDocument, basedOnRevision) => {
+          if (!s.seasons.some((x) => x.id === season)) return 'no-season';
+          if (s.draft !== undefined) return 'exists';
+          s.draftsStarted += 1;
+          const id = draftUuid(s.draftsStarted);
+          s.draft = { id, seasonId: season, changes, basedOnRevision, version: 1 };
+          return { id, version: 1 };
+        },
+        updateDraft: async (_season, draftId, changes: DraftDocument, version) => {
+          if (s.draft === undefined || s.draft.id !== draftId || s.draft.version !== version) {
+            return undefined;
+          }
+          s.draft = { ...s.draft, changes, version: version + 1 };
+          return version + 1;
+        },
+        deleteDraft: async (_season, draftId, version) => {
+          if (s.draft === undefined || s.draft.id !== draftId || s.draft.version !== version) {
+            return false;
+          }
+          s.draft = undefined;
+          return true;
+        },
+        loadSchedule: async () => structuredClone(s.schedule),
+        teamsOfSeason: async (_season, ids) => ids.filter((t) => s.teamIds.includes(t)),
         findVenue: async (id) => s.venues.find((v) => v.id === id),
         listVenues: async () =>
           s.venues

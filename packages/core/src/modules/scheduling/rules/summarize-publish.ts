@@ -5,6 +5,8 @@ export type PublishSummary = {
   gamesRemoved: string[];
   /** Games whose round, date, time, venue or court differ. */
   gamesMoved: string[];
+  /** Games whose recording mode differs and that did not move (a moved game is already counted). */
+  gamesRecordingChanged: string[];
   roundsRenamed: string[];
   roundsDateChanged: string[];
   /** Every team in an added, removed or moved game. The caller finds the people from these. */
@@ -25,6 +27,7 @@ export function summarizePublish(published: ScheduleState, draft: ScheduleState)
   const gamesAdded: string[] = [];
   const gamesRemoved: string[] = [];
   const gamesMoved: string[] = [];
+  const gamesRecordingChanged: string[] = [];
   const teams = new Set<string>();
   const addTeams = (g: ScheduleGame): void => {
     teams.add(g.homeTeamId);
@@ -40,6 +43,8 @@ export function summarizePublish(published: ScheduleState, draft: ScheduleState)
       gamesMoved.push(id);
       addTeams(old);
       addTeams(g);
+    } else if ((old.recording ?? null) !== (g.recording ?? null)) {
+      gamesRecordingChanged.push(id);
     }
   }
   for (const [id, g] of before) {
@@ -63,6 +68,7 @@ export function summarizePublish(published: ScheduleState, draft: ScheduleState)
     gamesAdded: gamesAdded.sort(),
     gamesRemoved: gamesRemoved.sort(),
     gamesMoved: gamesMoved.sort(),
+    gamesRecordingChanged: gamesRecordingChanged.sort(),
     roundsRenamed: roundsRenamed.sort(),
     roundsDateChanged: roundsDateChanged.sort(),
     teamsAffected: [...teams].sort(),
