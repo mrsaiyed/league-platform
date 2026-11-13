@@ -42,6 +42,13 @@ import {
   reopenGame,
 } from './modules/games/index.ts';
 import { createPerson, listPeople, removePerson, updatePerson } from './modules/people/index.ts';
+import {
+  applyFixtureImport,
+  getFixtureImport,
+  recordImportedScores,
+  startFixtureImport,
+  undoFixtureImport,
+} from './modules/imports/index.ts';
 import { rebuildStandings } from './modules/standings/index.ts';
 import {
   addDraftGame,
@@ -117,6 +124,11 @@ export const commands = commandRegistry([
   reopenGame,
   listPostponedGames,
   rebuildStandings,
+  startFixtureImport,
+  applyFixtureImport,
+  undoFixtureImport,
+  recordImportedScores,
+  getFixtureImport,
   createPerson,
   updatePerson,
   removePerson,

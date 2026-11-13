@@ -48,7 +48,12 @@ export { removeDraftGame, type RemoveDraftGameError } from './commands/remove-dr
 export { renameDraftRound, type RenameDraftRoundError } from './commands/rename-draft-round.ts';
 export { setDraftRecording, type SetDraftRecordingError } from './commands/set-draft-recording.ts';
 export { swapDraftGames, type SwapDraftGamesError } from './commands/swap-draft-games.ts';
-export { parseDraftDocument, type DraftDocument } from './draft-document.ts';
+export {
+  emptyDraft,
+  maxDraftBytes,
+  parseDraftDocument,
+  type DraftDocument,
+} from './draft-document.ts';
 export type { DraftEditError, DraftEditValue } from './draft-edit.ts';
 export { createCourt, type CreateCourtError } from './commands/create-court.ts';
 export { createVenue, type CreateVenueError } from './commands/create-venue.ts';
