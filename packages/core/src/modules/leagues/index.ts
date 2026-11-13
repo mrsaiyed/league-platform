@@ -24,6 +24,7 @@ export { audiences, leagueStatuses, type Audience, type LeagueStatus } from './l
 export type { LeagueRecord, LeaguesStore, LeaguesTx, NewLeague, NewSeason } from './ports.ts';
 export {
   adminAreas,
+  checkedSiteOrigin,
   forwardedLeagueUrl,
   isLeagueIdFormat,
   isLeagueSiteName,
@@ -35,4 +36,17 @@ export {
   type LeaguePage,
   type LeagueUrlOptions,
 } from './rules/league-url.ts';
+export {
+  adminAreaPermissions,
+  holdsAnywhere,
+  mayOpenTracker,
+  openAdminAreas,
+} from './rules/admin-area-access.ts';
+export { platformPages, platformUrl, type PlatformPage } from './rules/platform-url.ts';
+export {
+  hiddenLeagueStatuses,
+  isLeagueHidden,
+  mayOpenLeague,
+  maySeeHiddenLeague,
+} from './rules/league-visibility.ts';
 export { isBlockedShortName, isShortNameFormat, isSystemShortName } from './short-names.ts';

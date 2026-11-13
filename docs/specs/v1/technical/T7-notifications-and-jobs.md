@@ -62,6 +62,7 @@ Every notification follows the same five steps inside the `notifications` module
 ## 5. Not failing, and failing safely
 
 - **T-137: jobs may run more than once; their effects may not.** Every job is written so that running it twice does no harm: dedupe keys for notifications, a recorded delivery row checked before an email is sent, the email service's own duplicate protection.
+  - The invitation email is the agreed exception (record 014): each run makes a new link, so a second run sends a second email whose link ends the first. Its duplicate protection is per link, and it records no delivery row yet; the delivery row and its outcome come with the deliveries table (record 023).
 - A failed job is retried with increasing waits (about five attempts over an hour). After that it goes to a failed list that we are alerted about and can re-run.
 - **T-138: fairness between leagues.** Jobs run in three priority classes: account and registration messages first, then reminders and recaps, then announcements. Large sends are cut into batches, and one league may only occupy a share of the workers at a time. A big league's announcement to 20,000 people cannot delay a small league's game-day reminders.
 - If the email service is down, `email.send` jobs wait and retry; inbox notifications are unaffected.
@@ -72,7 +73,7 @@ Every notification follows the same five steps inside the `notifications` module
 - The sender name is the league's; replies go to the league's contact address.
 - Every non-essential email carries the standard one-click unsubscribe header as well as the link in the body.
 - Bounces and spam complaints come back to `email.status`, in messages verified by the email service's signature. A hard bounce or a complaint adds the address to `email_suppressions`; we never send to it again until its owner fixes or re-confirms it.
-- Templates are React components in `packages/emails`, drawn with the league's logo and colors, each with a plain-text version.
+- Templates live in `packages/emails`, drawn with the league's logo and colors, each with a plain-text version. They are to be React Email components; until the repository has a React toolchain they are plain TypeScript functions that return HTML text, with every value escaped, and the first ones carry no logo or colors yet (record 023, T-235). The template's callers do not change when it moves to React Email.
 - **T-140: outside production, no email leaves the building.** Messages are captured to a viewer for inspection. Together with T-13 this makes it impossible to email real people from a test.
 - **T-141:** each league has a monthly email allowance: a fair-use limit, adjustable in what is agreed with it (B-4). A league approaching it is warned; essential messages are never blocked by it.
 
