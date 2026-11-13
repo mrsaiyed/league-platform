@@ -19,11 +19,14 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
 
-Reserved so far: migration 0006 and decision record 012 / T-224 to 1.19 part 1; decision record 013 / T-225 to 1.13; decision record 014 / T-226 to 1.12; decision record 015 / T-227 to 1.18 part 1; decision record 016 / T-228 to 1.20 part 1. Next free: migration 0007, record 017, T-229. Check the folders before trusting these.
+Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Reserved: migration 0007, record 019, T-231 (2.1). Next free: migration 0008, record 020, T-232. Check the folders before trusting these.
 
-- **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — whole step.
-- **1.19 part 1** — `.local/lanes/1.19p1-queue-email` — migration 0006, record 012 / T-224 — queue and email interfaces, stand-ins, adapters, jobs table.
-- **2.7 Standings and tiebreakers** — `.local/lanes/2.7-standings` — none — whole step.
+- **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — built, reviewed, findings fixed; MID-MERGE with the build branch (conflicts after 1.19 landed in T7 doc, core index, isolation helpers, stores index). A builder was settling them; its job must now carry ids only (UUIDs/dates) so the invitation token cannot ride in job ids: redesign, then gate, then land.
+- **1.16 Address builder and request context** — `.local/lanes/1.16-address-context` — record 017 / T-229 if needed — builder just started; check its lane branch for commits.
+- **1.15 Supabase adapter** — `.local/lanes/1.15-supabase-adapter` — record 018 / T-230 if needed — builder just started; check its lane branch for commits.
+- **2.10 Fixture spreadsheet reader** — `.local/lanes/2.10-fixture-reader` — none — built, gate green in lane (29f6833); needs independent review, catch-up, land. Limits chosen by the builder (rows 5000, etc.) for the lead to confirm.
+- **2.1 Divisions, venues, courts, settings tables** — `.local/lanes/2.1-settings-tables` — migration 0007, record 019 / T-231 — builder starting.
+- **2.6 Tracker protocol and live messages** — `.local/lanes/2.6-tracker-protocol` — none — builder starting.
 
 ## Needs the founder
 
@@ -41,6 +44,8 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 1.19 part 1 done: jobs table (migration 0006), take_jobs refused inside league or account transactions, fixed job-type and error-code lists, table queue and pg-boss queue (pg-boss runs on PGlite; not verified on hosted PostgreSQL), email interface with capture and unverified Resend adapters. Open: who creates the pgboss schema on the hosted database; a worker role of its own; reportQueueError is temporary until the logger is wired. `npm ci` needed after landing.
+- 2026-11-13 — Step 2.7 done: standings maths in packages/sports/src/standings; tiebreaker procedure in T3 §9. Product choices still open for the founder: restart among still-tied teams, head-to-head only when every tied team has met, coin-flip scope, still-tied seeds by id, forfeit not counted in point difference adds nothing, points deductions do nothing in win-percentage leagues. No place to store coin flips yet.
 - 2026-11-13 — Step 1.13 done: sign-in interface (SignInService) and in-memory stand-in in packages/providers, Zod shapes in contracts; record 013, T-225 (code and attempt limits, per address and per network). Reviewer's 12 findings fixed. For 1.14/1.15: networkAddress is required on code calls; the code sender returns a Result; the stand-in needs nodeEnv from config; Supabase has no device or session list (the adapter needs a small store, maybe a migration); Google-only accounts re-confirm through a fresh Google sign-in.
 - 2026-11-13 — Step 2.5 done: season rules document in packages/contracts (presets rec-league = P7 defaults, high-school mirrors the engine's QUARTERS; timeouts added as settings; upgrade chain from an invented v0). Open: statistics set names need a stat list (2.8/2.15); team fouls reset half/game not in the engine yet; uniqueJerseys placement before 2.15; limits duplicated with the tracker's Rules (a test guards drift).
 - 2026-11-13 — Step 2.8 done: statistics totals and leaders in packages/sports/src/stats. The minimum-games rule counts games played by default (option for games with the stat recorded): founder to confirm which a league wants. Step 2.24 must pass hidden team ids to seasonTotals.

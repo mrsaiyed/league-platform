@@ -13,11 +13,13 @@ import {
   findCurrentLeague,
   findProgramBySlug,
   findProgramId,
+  insertJob,
   insertLeague,
   insertSeason,
   listPrograms,
   renameLeagueSlug,
   setCurrentSeason,
+  settleJob,
   updateLeagueName,
   updateLeagueStatus,
 } from '../queries/index.ts';
@@ -51,6 +53,24 @@ registerIsolationCase({
   subject: findCurrentLeague,
   name: "read the scope's league",
   run: (scope) => findCurrentLeague(scope),
+});
+
+registerIsolationCase({
+  subject: insertJob,
+  name: "record a job naming the target's season, keyed by the target's program",
+  run: (scope, target) =>
+    insertJob(scope, {
+      type: 'notify.event',
+      leagueId: scope.leagueId,
+      ids: { seasonId: target.seasonId },
+      dedupeKey: target.programId,
+    }),
+});
+
+registerIsolationCase({
+  subject: settleJob,
+  name: "settle the target's held job with its own lease",
+  run: (scope, target) => settleJob(scope, target.jobId, target.jobLeaseToken, { outcome: 'done' }),
 });
 
 registerIsolationCase({
