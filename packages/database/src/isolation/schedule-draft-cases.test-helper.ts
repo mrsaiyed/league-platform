@@ -8,6 +8,8 @@ import {
   discardScheduleDraft,
   getScheduleDraft,
   moveDraftGame,
+  previewSchedulePublish,
+  publishSchedule,
   removeDraftGame,
   renameDraftRound,
   setDraftRecording,
@@ -17,15 +19,23 @@ import {
 import { randomUUID } from 'node:crypto';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
+  binPublishedGames,
+  countPeopleOnTeams,
   deleteScheduleDraft,
   findScheduleDraft,
+  findSeasonRules,
+  insertPublishedGames,
   insertScheduleDraft,
+  insertScheduleRevision,
   latestScheduleRevision,
+  listGamesById,
   listTeamsOfSeason,
   loadSchedule,
+  updatePublishedGame,
+  updateRound,
   updateScheduleDraft,
 } from '../queries/index.ts';
-import { harnessTx, registerCommandCase } from './command-cases.test-helper.ts';
+import { harnessTx, registerCommandCase, runAsApp } from './command-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
@@ -183,4 +193,122 @@ registerCommandCase(discardScheduleDraft, harnessTx, {
 registerCommandCase(getScheduleDraft, harnessTx, {
   name: "read the target's season's draft",
   input: (target) => ({ seasonId: target.seasonId }),
+});
+
+// Publishing (step 2.21) -----------------------------------------------------------------
+
+registerIsolationCase({
+  subject: findSeasonRules,
+  name: "read the target's season's rules",
+  run: (scope, target) => findSeasonRules(scope, target.seasonId),
+});
+
+registerIsolationCase({
+  subject: listGamesById,
+  name: "look up the target's two games",
+  run: (scope, target) =>
+    listGamesById(scope, target.seasonId, [target.gameId, target.upcomingGameId]),
+});
+
+registerIsolationCase({
+  subject: countPeopleOnTeams,
+  name: "count the people on the target's teams",
+  run: (scope, target) =>
+    countPeopleOnTeams(scope, target.seasonId, [target.teamId, target.opponentId]),
+});
+
+registerIsolationCase({
+  subject: insertPublishedGames,
+  name: "create a game between the target's teams in its season",
+  run: (scope, target) =>
+    insertPublishedGames(scope, target.seasonId, [
+      {
+        id: randomUUID(),
+        roundId: target.roundId,
+        date: '2026-12-20',
+        time: '20:00',
+        venueId: target.venueId,
+        court: null,
+        homeTeamId: target.teamId,
+        awayTeamId: target.opponentId,
+        captureMode: 'final',
+      },
+    ]),
+});
+
+registerIsolationCase({
+  subject: updatePublishedGame,
+  name: "move the target's upcoming game",
+  run: (scope, target) =>
+    updatePublishedGame(scope, target.seasonId, target.upcomingGameId, {
+      slot: {
+        roundId: target.roundId,
+        date: '2026-12-21',
+        time: '19:00',
+        venueId: target.venueId,
+        court: null,
+      },
+      captureMode: 'live',
+    }),
+});
+
+registerIsolationCase({
+  subject: binPublishedGames,
+  name: "bin the target's upcoming game",
+  run: (scope, target) => binPublishedGames(scope, target.seasonId, [target.upcomingGameId]),
+});
+
+registerIsolationCase({
+  subject: updateRound,
+  name: "rename the target's round",
+  run: (scope, target) =>
+    updateRound(scope, target.seasonId, target.roundId, { label: 'Opening night' }),
+});
+
+registerIsolationCase({
+  subject: insertScheduleRevision,
+  name: "write the target's season's second revision",
+  run: (scope, target) =>
+    insertScheduleRevision(scope, target.seasonId, {
+      number: 2,
+      publishedByAccountId: null,
+      summary: { version: 1 },
+    }),
+});
+
+registerCommandCase(previewSchedulePublish, harnessTx, {
+  name: "preview publishing the target's season's draft",
+  input: (target) => ({ seasonId: target.seasonId }),
+});
+
+// The seeded draft changes nothing, so the case first puts one move into it (a run in
+// another league finds no such draft and changes nothing), then publishes it.
+registerIsolationCase({
+  subject: publishSchedule,
+  name: "publish the target's season's draft holding a move of its upcoming game",
+  run: async (scope, target) => {
+    const move: DraftDocument = {
+      version: 1,
+      changes: [
+        {
+          kind: 'move-game',
+          gameId: target.upcomingGameId,
+          to: {
+            roundId: target.roundId,
+            date: '2026-12-20',
+            time: '18:00',
+            venueId: target.venueId,
+            court: null,
+          },
+        },
+      ],
+    };
+    await updateScheduleDraft(scope, target.seasonId, target.scheduleDraftId, move, 1);
+    return runAsApp(publishSchedule, harnessTx, scope, {
+      seasonId: target.seasonId,
+      basedOnRevision: 1,
+      draftId: target.scheduleDraftId,
+      version: 2,
+    });
+  },
 });
