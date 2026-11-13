@@ -5,8 +5,14 @@ import { defineConfig } from 'vitest/config';
 // stores core's commands use and the two-league isolation harness), and the new
 // statistics code in packages/sports/src/stats. The older node --test suites (tests/,
 // the rest of packages/sports, contracts, the legacy database adapters) keep their own runner.
+// Several lanes run the whole gate at the same time on one computer (docs/build/RUNBOOK.md).
+// Left alone, each run starts a worker for every processor core, and six runs fight over
+// the machine until tests time out. Inside a lane folder a run takes a small share instead.
+const inLane = process.cwd().split('\\').join('/').includes('/.local/lanes/');
+
 export default defineConfig({
   test: {
+    ...(inLane ? { maxWorkers: 4, minWorkers: 1 } : {}),
     include: [
       'apps/web/**/*.test.ts',
       'apps/worker/**/*.test.ts',

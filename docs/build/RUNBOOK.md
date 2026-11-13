@@ -10,7 +10,7 @@ The session that reads this is the **lead**. The lead plans, delegates, checks e
 
 1. Read `CLAUDE.md`, this file and `STATUS.md`.
 2. **If `STATUS.md` says the state is `waiting-for-founder`: stop.** Reply with one line saying why, and do nothing else. This keeps idle runs cheap.
-3. **If `docs/build/.lock` exists and its time is less than 40 minutes old: stop.** Another run is working. If it is older, the earlier run died; delete it and carry on.
+3. **If `docs/build/.lock` exists and there has been a sign of life in the last 40 minutes: stop.** Another run is working. A sign of life is the time in the lock, or the newest commit on any branch (`git log -1 --all --format=%cI`): builders commit to their lanes as they work, so a busy run shows there even when its lead is late rewriting the lock. If both are older than 40 minutes, the earlier run died or is stuck; delete the lock and take over.
 4. Write the current time into `docs/build/.lock`. Rewrite it after every landing and at least every 20 minutes, as a heartbeat. Delete it at the end of the run.
 5. **Find what the last run left.** Run `git status` in the main folder and `git worktree list`, and read "In progress" in `STATUS.md`.
    - The main folder should be clean and on the build branch. If it is dirty, an earlier run was cut off there. If the change is a half-finished step, finish it; prefer finishing to redoing. Only if it cannot be understood, set it aside with `git stash push -u -m "rescue <date and time>"`, note that in `STATUS.md`, and redo the step. Never use a bare `git stash` or `git stash pop`: the stash list is shared with every lane. Never discard work silently.
@@ -109,6 +109,8 @@ A large step can also be split among builders inside its lane, when their files 
 
 - **A test that fails only when the machine is busy.** Several gates running at once make timing-sensitive tests fail. Run the failing test file once more by itself. If it passes, it is a flaky test: note it in the log and open a small step to make it sturdy. Never delete or weaken it.
 - **A lane fails the gate twice for its own reasons.** The lead takes that step over itself, or closes the lane and splits the step smaller.
+- **A step that will not come right.** Nobody is here to ask. If a step has been tried in two runs and still does not pass, park it: keep its lane branch, write what was tried and what fails under "Needs the founder" in `STATUS.md`, mark the step in its plan as parked, and give the lane to another step. Do not spend a third run on it.
+- **Something outside the build is broken** (GitHub refuses a push, the network is down, a tool is missing). Note it in the log once, carry on with everything that does not need it, and try it again at the start of the next run. Never change a setting, a sign-in or a permission to get past it.
 - **Lanes themselves stop working** (installing fails, the machine runs out of memory, paths break). Close what is open, lower the "Lanes" number in `STATUS.md`, say why in the log, and go on. One step at a time in the main folder is the last resort, not the habit.
 
 Working side by side finishes sooner by the clock. It does not make the usage allowance go further: five builders use it about five times as fast.

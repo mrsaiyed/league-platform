@@ -427,7 +427,11 @@ if (preview) {
     if (s.state !== 'done') s.state = ids.has(s.id) ? 'now' : 'todo';
   });
 }
-const lockAge = D.lock ? (Date.now() - new Date(D.lock)) / 60000 : Infinity;
+// The newest sign that the team is alive: the lead's own time stamp, or newer saved work.
+const newestSave = D.commits[0] ? D.commits[0].time : '';
+const lastSign =
+  D.lock && newestSave && new Date(newestSave) > new Date(D.lock) ? newestSave : D.lock;
+const lockAge = D.lock ? (Date.now() - new Date(lastSign)) / 60000 : Infinity;
 const building = D.state === 'building';
 const working = preview || (building && lockAge < 35);
 const quiet = !preview && building && lockAge >= 35 && lockAge < 600;
@@ -492,11 +496,13 @@ const pill = preview
   : D.state === 'waiting-for-founder'
     ? ['wait', 'Waiting on you']
     : working
-      ? ['go', 'The team is working (last sign of life ' + ago(D.lock) + ')']
+      ? ['go', 'The team is working (last save or check-in ' + ago(lastSign) + ')']
       : quiet
         ? [
             'wait',
-            'Paused since ' + ago(D.lock) + ', most likely the usage limit. It resumes by itself.',
+            'Paused since ' +
+              ago(lastSign) +
+              ', most likely the usage limit. It resumes by itself.',
           ]
         : ['', 'Between runs: the next one starts by itself'];
 $('pill').className = 'pill ' + pill[0];
