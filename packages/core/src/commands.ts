@@ -28,6 +28,10 @@ import {
   setCurrentSeason,
   setLeagueName,
   setLeagueStatus,
+  getSeason,
+  updateSeason,
+  setSeasonRules,
+  setSeasonRosterSettings,
 } from './modules/leagues/index.ts';
 import { createPerson, listPeople, removePerson, updatePerson } from './modules/people/index.ts';
 import {
@@ -55,6 +59,10 @@ export const commands = commandRegistry([
   setLeagueStatus,
   createSeason,
   setCurrentSeason,
+  getSeason,
+  updateSeason,
+  setSeasonRules,
+  setSeasonRosterSettings,
   createDivision,
   updateDivision,
   reorderDivisions,

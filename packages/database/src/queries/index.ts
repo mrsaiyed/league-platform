@@ -1,6 +1,7 @@
 // Typed queries (T1 §1). Each takes the scope withTransaction opened; one that
 // touches league data takes a LeagueScope (T-28), except the few T-221 lookups that
 // must answer before a league is known. Used only through this file.
+export { countPrograms } from './count-programs.ts';
 export { deleteSettingValue } from './delete-setting-value.ts';
 export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts';
 export { findCourt } from './find-court.ts';
@@ -38,6 +39,7 @@ export { findLeagueByShortName, type LeagueByShortName } from './find-league-by-
 export { findProgramBySlug } from './find-program-by-slug.ts';
 export { findProgramId } from './find-program-id.ts';
 export { findRoleGrant } from './find-role-grant.ts';
+export { findSeason, type SeasonRow } from './find-season.ts';
 export { findSeasonProgramId } from './find-season-program-id.ts';
 export { hasPendingInvitation } from './has-pending-invitation.ts';
 export { insertActivity } from './insert-activity.ts';
@@ -61,6 +63,7 @@ export { revokeRoleGrant } from './revoke-role-grant.ts';
 export { setCurrentSeason } from './set-current-season.ts';
 export { settleJob, type JobSettlement } from './settle-job.ts';
 export { takeJobs, type NoLeagueScope, type TakenJob } from './take-jobs.ts';
+export { updateSeason, type SeasonChangeRow } from './update-season.ts';
 export { updateLeagueName } from './update-league-name.ts';
 export { updateLeagueStatus } from './update-league-status.ts';
 export type { DivisionSummary } from './division-summary.ts';

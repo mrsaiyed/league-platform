@@ -4,6 +4,10 @@
 export const leagueStatuses = ['draft', 'live', 'archived', 'suspended'] as const;
 export type LeagueStatus = (typeof leagueStatuses)[number];
 
+/** Where a season is in its life (T3 �4): being set up, running, or over and still shown. */
+export const seasonStatuses = ['draft', 'active', 'completed'] as const;
+export type SeasonStatus = (typeof seasonStatuses)[number];
+
 export const audiences = ['adult', 'youth', 'mixed'] as const;
 export type Audience = (typeof audiences)[number];
 

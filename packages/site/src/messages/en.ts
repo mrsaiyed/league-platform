@@ -75,6 +75,15 @@ export const en = {
   'role.club_admin': 'Club admin',
   'role.coach': 'Coach',
   'role.captain': 'Captain',
+  // Why a season's roster settings were refused (T-187): `error.`, the command's name,
+  // the code, and the setting at fault when there is one.
+  'error.leagues.set_season_roster_settings.invalid-rules': 'These roster settings are not valid.',
+  'error.leagues.set_season_roster_settings.invalid-rules.minSize':
+    'The smallest roster is not a valid number.',
+  'error.leagues.set_season_roster_settings.invalid-rules.maxSize':
+    'The largest roster is not a valid number, or is smaller than the smallest.',
+  'error.leagues.set_season_roster_settings.invalid-rules.locksOn':
+    'The day rosters lock is not a valid date.',
   // Activity log lines (A-6, T-226): the key is `activity.` and the command's name;
   // the values come from the entry's details. {role} is a role's name from above.
   'activity.access.invite': 'Invited someone as {role}',
@@ -88,6 +97,9 @@ export const en = {
   'activity.leagues.set_status': "Changed the league's state to {status}",
   'activity.leagues.create_season': 'Added a season',
   'activity.leagues.set_current_season': 'Changed the current season',
+  'activity.leagues.update_season': 'Changed a season',
+  'activity.leagues.set_season_rules': "Changed a season's rules",
+  'activity.leagues.set_season_roster_settings': "Changed a season's roster settings",
   'activity.leagues.create_division': 'Added a division',
   'activity.leagues.update_division': 'Changed a division',
   'activity.leagues.reorder_divisions': 'Changed the order of the divisions',

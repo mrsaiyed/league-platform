@@ -8,6 +8,7 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
+import type { SeasonStatus } from './league-values.ts';
 import type { DivisionRecord, LeagueRecord, LeaguesTx, SettingPlace } from './ports.ts';
 
 export type MemoryLeagues = {
@@ -18,7 +19,20 @@ export type MemoryLeagues = {
   otherLeaguesSlugs: string[];
   forwarding: { slug: string; months: number }[];
   programs: { id: string; slug: string; isDefault: boolean }[];
-  seasons: { id: string; programId: string; slug: string; isCurrent: boolean }[];
+  seasons: {
+    id: string;
+    programId: string;
+    slug: string;
+    isCurrent: boolean;
+    name?: string;
+    startsOn?: string | null;
+    endsOn?: string | null;
+    status?: SeasonStatus;
+    rules?: unknown;
+    version?: number;
+    /** A team of the season already has a number worn twice (the database refuses the switch). */
+    jerseyClash?: boolean;
+  }[];
   divisions: DivisionRecord[];
   /** Ids of divisions that have a team not in the bin. */
   divisionsWithTeams: string[];
@@ -187,6 +201,48 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           const id = `season-${s.seasons.length + 1}`;
           s.seasons.push({ id, programId: season.programId, slug: season.slug, isCurrent: false });
           return id;
+        },
+        findSeason: async (seasonId) => {
+          const x = s.seasons.find((season) => season.id === seasonId);
+          if (x === undefined) return undefined;
+          return {
+            id: x.id,
+            programId: x.programId,
+            slug: x.slug,
+            name: x.name ?? x.slug,
+            startsOn: x.startsOn ?? null,
+            endsOn: x.endsOn ?? null,
+            status: x.status ?? 'draft',
+            isCurrent: x.isCurrent,
+            rules: x.rules ?? { version: 1 },
+            version: x.version ?? 1,
+          };
+        },
+        programCount: async () => s.programs.length,
+        updateSeason: async (seasonId, change, version) => {
+          const x = s.seasons.find((season) => season.id === seasonId);
+          if (x === undefined || (x.version ?? 1) !== version) return undefined;
+          const turnsOn =
+            change.rules !== undefined &&
+            change.rules.rosters.uniqueJerseys &&
+            !(x.rules as { rosters?: { uniqueJerseys?: boolean } } | undefined)?.rosters
+              ?.uniqueJerseys;
+          if (turnsOn && x.jerseyClash === true) return 'unique-jerseys-clash';
+          if (change.name !== undefined) x.name = change.name;
+          if (change.startsOn !== undefined) x.startsOn = change.startsOn;
+          if (change.endsOn !== undefined) x.endsOn = change.endsOn;
+          if (change.status !== undefined) x.status = change.status;
+          if (change.rules !== undefined) x.rules = change.rules;
+          if (change.isCurrent !== undefined) {
+            if (change.isCurrent) {
+              for (const other of s.seasons) {
+                if (other.programId === x.programId) other.isCurrent = false;
+              }
+            }
+            x.isCurrent = change.isCurrent;
+          }
+          x.version = version + 1;
+          return x.version;
         },
         seasonProgramId: async (seasonId) => s.seasons.find((x) => x.id === seasonId)?.programId,
         setCurrentSeason: async (seasonId) => {
