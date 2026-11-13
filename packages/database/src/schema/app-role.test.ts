@@ -26,12 +26,13 @@ afterAll(async () => {
 /** Tables that belong to a person, not a league (T-62). Every other table is a league table. */
 const personalTables = ['accounts', 'profiles', 'profile_access'];
 const historyTables = ['activity_log', 'command_receipts', 'support_access_log'];
-/** The only functions that run as their owner, each reviewed (T-221, record 008). */
+/** The only functions that run as their owner, each reviewed (T-221, records 008 and 012). */
 const definerFunctions = [
   'check_league_has_default_program',
   'check_league_slug_free',
   'check_old_slug_free',
   'find_league_by_slug',
+  'take_jobs',
 ];
 
 const publicTables = async (sql: PGlite) =>
@@ -429,6 +430,14 @@ describe('owner-run checks refuse to run where the owner is fenced', () => {
   it('the default-program check refuses instead of passing', async () => {
     await ownedByFencedRole('check_league_has_default_program()', async () => {
       await expect(newLeague(other)).rejects.toMatchObject(fencedRefusal);
+    });
+  });
+
+  it("the worker's take of due jobs refuses instead of taking only some (record 012)", async () => {
+    await ownedByFencedRole('take_jobs(integer, integer)', async () => {
+      await expect(other.query('select * from public.take_jobs(10, 60)')).rejects.toMatchObject(
+        fencedRefusal,
+      );
     });
   });
 

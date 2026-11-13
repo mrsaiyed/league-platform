@@ -13,8 +13,8 @@
 // expected error is thrown as a refusal, as the app would roll it back: a refusal in
 // the target's own league fails the control run, and one naming B is a leak.
 //
-// Not verified until step 1.19: jobs here are collected in memory, not written in
-// the same database transaction. Event handlers: pass the app's list as `events`
+// Jobs are written to the jobs table in the run's transaction (jobsStore, step
+// 1.19), and kept for the harness to judge as well. Event handlers: pass the app's list as `events`
 // once the apps wire one (none exists yet); the coverage test fails on a handler
 // exported from core until then.
 import type {
@@ -31,7 +31,7 @@ import type {
 import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import { openScope, transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
-import { leaguesStore } from '../stores/index.ts';
+import { jobsStore, leaguesStore } from '../stores/index.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
@@ -76,7 +76,17 @@ function inScope<Tx extends CommandTx>(
     if (context.leagueId !== scope.leagueId || context.accountId !== scope.accountId) {
       throw new Error('The command was given a context other than the harness run.');
     }
-    return work(makeTx(scope, { enqueue: async (job) => void jobs.push(job) }));
+    const recorded = jobsStore(scope);
+    return work(
+      makeTx(scope, {
+        // Kept for the harness to judge, and written in the run's transaction as the
+        // app's command transaction writes it (T-130).
+        enqueue: async (job) => {
+          jobs.push(job);
+          await recorded.enqueue(job);
+        },
+      }),
+    );
   };
 }
 

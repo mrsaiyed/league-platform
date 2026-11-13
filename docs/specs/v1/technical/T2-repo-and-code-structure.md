@@ -46,7 +46,7 @@ league-platform/
 | `apps/worker`        | Job startup and dispatch                                             | A second copy of any rule                                |
 | `packages/contracts` | Zod schemas and the types derived from them                          | Database access; anything that reads settings or secrets |
 | `packages/core`      | Every decision the product makes: who may do what, what happens when | React, Next.js, SQL text, vendor libraries               |
-| `packages/database`  | Queries and transactions                                             | Decisions; calls to outside services                     |
+| `packages/database`  | Queries and transactions; the job queue and pg-boss (record 012)     | Decisions; calls to outside services                     |
 | `packages/sports`    | Scoring engines, standings maths, stat formulas                      | Anything about users, leagues, network or storage        |
 | `packages/site`      | Section definitions and the page renderer                            | Private data; arbitrary HTML from users                  |
 | `packages/ui`        | Presentational components                                            | Data fetching; knowledge of leagues                      |

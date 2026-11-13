@@ -184,6 +184,18 @@ const leagueTables: LeagueTable[] = [
       [leagueId, randomUUID()],
     ],
   },
+  {
+    table: 'jobs',
+    key: 'league_id',
+    // A job's progress is what the app may change (the worker settling it).
+    touch: 'update jobs set run_after = run_after where league_id = $1',
+    canUpdate: true,
+    canDelete: false,
+    insert: (leagueId) => [
+      `insert into jobs (league_id, type, ids) values ($1, 'email.send', $2)`,
+      [leagueId, JSON.stringify({ noteId: randomUUID() })],
+    ],
+  },
 ];
 
 const count = async (tx: Transaction | PGlite, sql: string, params: unknown[] = []) =>
@@ -327,8 +339,9 @@ describe("with league A set, league B's rows", () => {
 
   it("cannot be reached by moving one of A's rows to B even without that rule (WITH CHECK)", async () => {
     // The tables the app may change the league column of, were it not fixed.
+    // app_user may change only support_access_log.ended_at, and only a job's progress.
     const movable = leagueTables.filter(
-      (t) => t.canUpdate && t.table !== 'support_access_log', // app_user may change ended_at only
+      (t) => t.canUpdate && t.table !== 'support_access_log' && t.table !== 'jobs',
     );
     expect(movable.length).toBeGreaterThanOrEqual(7);
     for (const table of movable) {

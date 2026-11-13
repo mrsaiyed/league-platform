@@ -1,6 +1,14 @@
 // The command shape every module uses (T-23, T-24, T-74, T-196).
 export { commandRegistry, type CommandRegistry, type NamedCommand } from './command-registry.ts';
 export { defineCommand, type Command, type CommandDefinition } from './define-command.ts';
+export {
+  isIsoDate,
+  jobProblem,
+  jobTypes,
+  maxJobDelaySeconds,
+  maxJobIds,
+  type JobType,
+} from './job-rules.ts';
 export { onEvent } from './on-event.ts';
 export type {
   CommandContext,

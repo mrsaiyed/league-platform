@@ -65,6 +65,25 @@ export interface InvitationsTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface JobsTable {
+  id: Generated<string>;
+  league_id: string;
+  type: string;
+  ids: ColumnType<JsonValue, JsonObject | undefined, JsonObject>;
+  dedupe_key: string | null;
+  state: Generated<string>;
+  run_after: ColumnType<Date, Date | string | undefined, Date | string>;
+  attempts: Generated<number>;
+  max_attempts: Generated<number>;
+  lease_token: string | null;
+  lease_expires_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  last_error: string | null;
+  finished_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface LeagueFeaturesTable {
   id: Generated<string>;
   league_id: string;
@@ -188,6 +207,7 @@ export interface Database {
   activity_log: ActivityLogTable;
   command_receipts: CommandReceiptsTable;
   invitations: InvitationsTable;
+  jobs: JobsTable;
   league_features: LeagueFeaturesTable;
   league_slug_history: LeagueSlugHistoryTable;
   leagues: LeaguesTable;
