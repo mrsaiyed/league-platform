@@ -26,7 +26,6 @@ Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014
 - **1.19 part 2 Invitation email job** — `.local/lanes/1.19p2-invitation-job` — none — builder starting.
 - **2.12 Tracker offline queue** — `.local/lanes/2.12-offline-queue` — none — builder starting.
 - **2.2 People, teams and rosters tables** — `.local/lanes/2.2-people-teams-tables` — migration 0008, record 022 / T-234 — builder starting.
-- **2.13 Stage 2 permissions** — `.local/lanes/2.13-permissions` — none — builder starting.
 
 ## Needs the founder
 
@@ -46,6 +45,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 2.13 done: stage 2 permissions in roles.ts (season.settings, divisions.manage, people.import, schedule.import, venues.manage, games.results, bin.restore); every command names its permission in defineCommand; commands.test.ts and the role matrix fail one that names none or the wrong one; allows() fails closed on unknown names; seasons are checked at the program's scope. Open: commands name no scope yet (scope lives in matrix rows); bin restore is admin-only pending the founder (record 014); scorekeepers with 'score any game' can finalize by typing a score (note for 2.27).
 - 2026-11-13 — Step 2.1 done: migration 0007 (divisions with a loop check, venues, courts, setting_values); record 019 / T-231 (setting values live in one table, no row = not set). Reviewer's findings fixed. Open for 2.16 and the nightly purge: bin interactions (live child under a binned parent, no cascade, restore hitting name uniqueness). Loop trigger assumes READ COMMITTED (refuses under repeatable read).
 - 2026-11-13 — Step 2.31 done (Supabase Realtime adapters NOT verified): live updates in packages/providers/src/live-updates (publisher interface, local SSE hub, Supabase publisher) and apps/web/src/features/live-updates (browser subscribers); channel names and LeagueScoreMessage in packages/contracts; record 021 / T-233 (browser half lives in apps/web because providers is server-only). Open: no web route mounts the hub yet (2.32/2.45); the realtime.messages policies (receive only for visible leagues, refuse browser broadcast, Allow public access off) are a migration that does not exist yet; web route must check league visibility via the hub's authorize hook. The migration lock test (run-migrations.test.ts) failed again under load, passes alone: a sturdiness step is still wanted.
 - 2026-11-13 — Step 2.11 done: showName, statsShown, Viewer (with leagueId), private-field scan in packages/core/src/modules/people (fail closed everywhere; T-81 reworded to follow R-14). Founder to confirm: 'players may ask for initials' (R-15) starts off; unknown age counts as a child in youth/mixed leagues. For 2.39/2.40/2.32: public queries must call showName/statsShown (store public_name or run it in the query layer); live latestPlay must be redacted to the strictest setting; scan helper needs privateValues from made-up people.
