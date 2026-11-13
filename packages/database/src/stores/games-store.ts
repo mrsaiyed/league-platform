@@ -2,12 +2,17 @@
 import type { GamesStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
+  deleteGameAssignment,
   findGame,
   findSeason,
+  insertGameAssignment,
   insertGameCorrection,
+  isGameAssigned,
   listDecidedGameLines,
   listDecidedGames,
+  listGamesInWindow,
   listPostponedGames,
+  listSettingValues,
   updateGameResult,
 } from '../queries/index.ts';
 
@@ -25,5 +30,11 @@ export function gamesStore(scope: LeagueScope): GamesStore {
         ? undefined
         : { programId: season.programId, rules: season.rules };
     },
+    // The league level only: no program or season is named, so only the league's row comes back.
+    leagueSettingRows: (key) => listSettingValues(scope, key, {}),
+    isAssigned: (gameId, accountId) => isGameAssigned(scope, gameId, accountId),
+    assign: (gameId, accountId) => insertGameAssignment(scope, gameId, accountId),
+    unassign: (gameId, accountId) => deleteGameAssignment(scope, gameId, accountId),
+    listWindow: (accountId, days) => listGamesInWindow(scope, accountId, days),
   };
 }

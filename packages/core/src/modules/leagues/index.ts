@@ -34,7 +34,13 @@ export {
   type SettingSaved,
 } from './commands/set-setting.ts';
 export { clearSetting, clearSettingFor, type ClearSettingError } from './commands/clear-setting.ts';
-export { declaredSettings, membersStartPage, startPageChoices } from './settings/declarations.ts';
+export {
+  declaredSettings,
+  membersStartPage,
+  startPageChoices,
+  whoMayScore,
+  whoMayScoreChoices,
+} from './settings/declarations.ts';
 export {
   defineSetting,
   hasLimits,

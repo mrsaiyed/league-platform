@@ -30,7 +30,17 @@ export type MemoryOptions = {
   readonly failSaving?: Error;
 };
 
-type ReadGames = Pick<StandingsTx['games'], 'findSeason' | 'listDecided' | 'listDecidedLines'>;
+type ReadGames = Pick<
+  StandingsTx['games'],
+  | 'findSeason'
+  | 'listDecided'
+  | 'listDecidedLines'
+  | 'leagueSettingRows'
+  | 'isAssigned'
+  | 'assign'
+  | 'unassign'
+  | 'listWindow'
+>;
 
 const byId = <T extends { id: string }>(a: T, b: T) => a.id.localeCompare(b.id);
 
@@ -50,6 +60,13 @@ export function standingsStores(
         return s.lines.filter((l) => ids.has(l.gameId));
       },
       findSeason: async (id) => s.seasons.find((x) => x.id === id),
+      // Scorekeeper assignments play no part in standings: the league keeps the
+      // starting choice (any scorekeeper may score) and has none.
+      leagueSettingRows: async () => [],
+      isAssigned: async () => false,
+      assign: async () => false,
+      unassign: async () => false,
+      listWindow: async () => ({ today: '2026-12-20', games: [] }),
     },
     standings: {
       lockSeason: async (season) => void s.locked.push(season),

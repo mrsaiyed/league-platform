@@ -71,3 +71,20 @@ export type {
   VenueRecord,
   VenueWithCourts,
 } from './ports.ts';
+export {
+  previewSchedulePublish,
+  type PreviewSchedulePublishError,
+  type SchedulePublishPreview,
+} from './commands/preview-schedule-publish.ts';
+export {
+  publishSchedule,
+  type PublishScheduleError,
+  type PublishScheduleValue,
+} from './commands/publish-schedule.ts';
+export type { PublishBlocker } from './publish-plan.ts';
+export type {
+  GameFacts,
+  NewPublishedGame,
+  NewScheduleRevision,
+  PublishedGameChange,
+} from './ports.ts';

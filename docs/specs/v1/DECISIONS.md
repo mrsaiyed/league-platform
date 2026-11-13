@@ -9,7 +9,7 @@ Every decision in the v1 specification, in one place. This is the list we argue 
 - **Recommended**: my answer, waiting for your yes.
 - **Agreed**: you said yes.
 - **Changed**: you wanted something different, the spec file was edited, and the change log below says what it was before. A changed decision is agreed in its new form.
-- **Agreed (delegated)** and **Changed (delegated)**: a technical decision. On November 12 you handed approval of these to me as technical lead. I reviewed them (see "Technical sign-off" below). You can reopen any of them at any time.
+- **Agreed (delegated)** and **Changed (delegated)**: a technical decision. On November 12 you handed approval of these to me as technical lead. I reviewed them (see "Technical sign-off" below). You can reopen any of them at any time. One product default carries the same mark because you left it to me by name: A-13 (November 13).
 - **Needs your answer**: I did not simply do what you said, or your answer raised a new question.
 - **Open**: a call that has not been made yet. **Later**: deliberately not part of the first stages. **Dropped** and **Closed**: no longer a decision.
 - To disagree, name the ID and say what you want instead.
@@ -312,20 +312,21 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 
 ### [P4 — Admin dashboard](product/P4-admin-dashboard.md)
 
-| ID   | Decision                                                                                                                                                                 | Status | Stage 1 |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ | ------- |
-| A-1  | The admin has a dashboard for running the league, and an "edit the site" mode for changing what the public sees                                                          | Agreed |         |
-| A-2  | Everything works on a phone. Organizers run leagues from the gym. Game-day tasks (entering a score, moving a game, messaging teams) are designed for a phone first. The… | Agreed |         |
-| A-3  | Start with fixed roles; add build-your-own roles only when an association needs them                                                                                     | Agreed |         |
-| A-4  | "Saved" always means stored on our servers                                                                                                                               | Agreed |         |
-| A-5  | Nothing important is lost by one wrong tap                                                                                                                               | Agreed |         |
-| A-6  | An activity log records who changed what and when, visible to the owner and admins                                                                                       | Agreed |         |
-| A-7  | Changes the public will feel are previewed before they go out                                                                                                            | Agreed |         |
-| A-8  | Two admins editing the same thing do not silently overwrite each other                                                                                                   | Agreed |         |
-| A-9  | The public never sees half-finished work                                                                                                                                 | Agreed |         |
-| A-10 | Every screen has help where it is needed                                                                                                                                 | Agreed |         |
-| A-11 | No place to paste code, scripts or custom CSS (U-1, B-3)                                                                                                                 | Agreed |         |
-| A-12 | No direct editing of calculated things                                                                                                                                   | Agreed |         |
+| ID   | Decision                                                                                                                                                                                                                                      | Status             | Stage 1 |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------- |
+| A-1  | The admin has a dashboard for running the league, and an "edit the site" mode for changing what the public sees                                                                                                                               | Agreed             |         |
+| A-2  | Everything works on a phone. Organizers run leagues from the gym. Game-day tasks (entering a score, moving a game, messaging teams) are designed for a phone first. The…                                                                      | Agreed             |         |
+| A-3  | Start with fixed roles; add build-your-own roles only when an association needs them                                                                                                                                                          | Agreed             |         |
+| A-4  | "Saved" always means stored on our servers                                                                                                                                                                                                    | Agreed             |         |
+| A-5  | Nothing important is lost by one wrong tap                                                                                                                                                                                                    | Agreed             |         |
+| A-6  | An activity log records who changed what and when, visible to the owner and admins                                                                                                                                                            | Agreed             |         |
+| A-7  | Changes the public will feel are previewed before they go out                                                                                                                                                                                 | Agreed             |         |
+| A-8  | Two admins editing the same thing do not silently overwrite each other                                                                                                                                                                        | Agreed             |         |
+| A-9  | The public never sees half-finished work                                                                                                                                                                                                      | Agreed             |         |
+| A-10 | Every screen has help where it is needed                                                                                                                                                                                                      | Agreed             |         |
+| A-11 | No place to paste code, scripts or custom CSS (U-1, B-3)                                                                                                                                                                                      | Agreed             |         |
+| A-12 | No direct editing of calculated things                                                                                                                                                                                                        | Agreed             |         |
+| A-13 | A new league starts with any scorekeeper able to score any game; the league can switch to assigned scorekeepers only (P4 section 4). You left the starting value to me on November 13, 2026 ("up to the lead"), and I kept the recommendation | Agreed (delegated) |         |
 
 ### [P5 — Site customization](product/P5-site-customization.md)
 
@@ -345,6 +346,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | C-12 | Every page has a title and description for search engines and link previews, filled in sensibly by default and editable                                                   | Agreed  |         |
 | C-13 | Design is set once for the whole league                                                                                                                                   | Agreed  |         |
 | C-14 | A club page (a member school) uses a fixed layout showing that school's teams across programs, with the school's logo and colors                                          | Later   |         |
+| C-15 | New, your direction (November 13): a league has a third color, a highlight used sparingly to make a few things stand out; the admin can change it like the others         | Agreed  |         |
 
 ### [P6 — Registration and accounts](product/P6-registration-and-accounts.md)
 
