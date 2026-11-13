@@ -16,11 +16,15 @@ import {
   listTeamStatTotals,
 } from '../queries/index.ts';
 
+/** The seasons whose standings, statistics and games the public may read. */
+export const publicSeasonStatuses: readonly string[] = ['active', 'completed'];
+
 export function standingsReadStore(scope: LeagueScope): StandingsReadStore {
   return {
     findSeason: async (seasonId) => {
       const season = await findSeason(scope, seasonId);
-      return season === undefined
+      // A season still being set up (or retired) is not there at all, like in 2.39.
+      return season === undefined || !publicSeasonStatuses.includes(season.status)
         ? undefined
         : { id: season.id, name: season.name, rules: season.rules };
     },

@@ -1,5 +1,5 @@
 // The statistics a season keeps, in its order; undefined if the season is not in the
-// scope's league or is in the bin.
+// scope's league or is in the bin or not active or completed (the public reads, like 2.39).
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
 export async function listSeasonStatKeys(
@@ -12,6 +12,7 @@ export async function listSeasonStatKeys(
     .where('league_id', '=', scope.leagueId)
     .where('id', '=', seasonId)
     .where('deleted_at', 'is', null)
+    .where('status', 'in', ['active', 'completed'])
     .executeTakeFirst();
   return row === undefined ? undefined : row.stat_keys.filter((key): key is string => key !== null);
 }

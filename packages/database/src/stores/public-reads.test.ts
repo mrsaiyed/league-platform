@@ -25,10 +25,18 @@ const openPlayerId = randomUUID();
 const openPoints = 8765;
 const otherHiddenPoints = 1000;
 const otherHiddenPlayerId = randomUUID();
+const mixedPlayerId = randomUUID();
+const mixedHiddenPoints = 4040;
+const mixedOpenPoints = 7;
 
 beforeAll(async () => {
   leagues = await openTwoLeagues();
   const { pglite, a } = leagues;
+  // The seeded season is still being set up; a published one is what a visitor can read.
+  await pglite.query(`update seasons set status = 'active' where id = $1`, [a.seasonId]);
+  await pglite.query(`update leagues set time_zone = 'America/Chicago' where id = $1`, [
+    a.leagueId,
+  ]);
   // The staff-only team's player (the seed's) gets numbers and plays worth searching for.
   await pglite.query(
     `update player_game_stats set stats = $1 where game_id = $2 and person_id = $3`,
@@ -79,6 +87,49 @@ beforeAll(async () => {
       a.seasonId,
       openPlayerId,
       JSON.stringify({ version: 1, stats: { points: { total: openPoints, gamesRecorded: 1 } } }),
+    ],
+  );
+  // A player of the staff-only team who also scored in a game of the open team: their
+  // stored totals hold both (record 033), so only the open team's game may show.
+  await pglite.query(
+    `insert into people (id, league_id, first_name, last_name, is_minor) values ($1, $2, 'Mina', 'Mixed', false)`,
+    [mixedPlayerId, a.leagueId],
+  );
+  const secondGame = await pglite.query<{ id: string }>(
+    `insert into games (league_id, season_id, stage_id, home_team_id, away_team_id, status, capture_mode,
+       home_score, away_score, format, finalized_at)
+     values ($1, $2, (select id from stages where season_id = $2), $3, $4, 'final', 'box', 50, 45, '{"version": 1, "periods": 2}',
+       '2026-12-13T19:30:00Z') returning id`,
+    [a.leagueId, a.seasonId, a.opponentId, a.teamId],
+  );
+  const secondGameId = secondGame.rows[0]?.id;
+  await pglite.query(
+    `insert into player_game_stats (league_id, game_id, team_id, person_id, jersey_number, played, stats)
+     values ($1, $2, $3, $4, '5', true, $5), ($1, $6, $7, $4, '5', true, $8)`,
+    [
+      a.leagueId,
+      a.gameId,
+      a.teamId,
+      mixedPlayerId,
+      JSON.stringify({ points: mixedHiddenPoints }),
+      secondGameId,
+      a.opponentId,
+      JSON.stringify({ points: mixedOpenPoints }),
+    ],
+  );
+  await pglite.query(
+    `insert into season_player_totals (league_id, season_id, person_id, games_played, stats)
+     values ($1, $2, $3, 2, $4)`,
+    [
+      a.leagueId,
+      a.seasonId,
+      mixedPlayerId,
+      JSON.stringify({
+        version: 1,
+        stats: {
+          points: { total: mixedHiddenPoints + mixedOpenPoints, gamesRecorded: 2 },
+        },
+      }),
     ],
   );
   await pglite.query(`update game_states set state = $1 where game_id = $2`, [
@@ -143,7 +194,9 @@ describe('the public reads against the database (S-22, T-87)', () => {
     expect(text).toContain(openPlayerId);
     expect(text).toContain('Olive Open');
     expect(text).toContain('Team alpha');
-    expect(text).toContain('"points":{"total":' + (hiddenPoints + otherHiddenPoints));
+    expect(text).toContain(
+      '"points":{"total":' + (hiddenPoints + otherHiddenPoints + mixedHiddenPoints),
+    );
   });
 
   it("show the team's coach and an admin the numbers, and another team's coach does not", async () => {
@@ -168,5 +221,66 @@ describe('the public reads against the database (S-22, T-87)', () => {
     expect(text).toMatch(/"correctedOn":"\d{4}-\d{2}-\d{2}"/);
     expect(text).not.toContain('was missed');
     expect(text).toContain('Late roster for alpha');
+  });
+
+  it("counts a player of a public team who also sits on the staff-only team only for the public team's game", async () => {
+    const { a } = leagues;
+    const text = await everythingFor(publicViewer(a.leagueId));
+    expect(text).not.toContain(String(mixedHiddenPoints));
+    expect(text).not.toContain(String(mixedHiddenPoints + mixedOpenPoints));
+    const table = await withTransaction(leagues.db, { leagueId: a.leagueId }, (scope) =>
+      readStatisticsTable(standingsReadStore(scope), {
+        seasonId: a.seasonId,
+        viewing: viewing(publicViewer(a.leagueId)),
+      }),
+    );
+    const mixed = table.ok
+      ? table.value.players.find((p) => p.personId === mixedPlayerId)
+      : undefined;
+    expect(mixed?.stats['points']?.total).toBe(mixedOpenPoints);
+    expect(mixed?.teamIds).toEqual([a.opponentId]);
+  });
+
+  it("gives the correction's date in the league's time zone", async () => {
+    const { a, pglite } = leagues;
+    // 03:30 UTC on the 7th is the evening of the 6th in Chicago.
+    await pglite.query(
+      `insert into game_corrections (league_id, game_id, account_id, reason, before, after, created_at)
+       values ($1, $2, (select owner_account_id from leagues where id = $1), 'later fix',
+         '{"version": 1, "homeScore": 52}', '{"version": 1, "homeScore": 52}', '2030-12-07T03:30:00Z')`,
+      [a.leagueId, a.gameId],
+    );
+    const page = await withTransaction(leagues.db, { leagueId: a.leagueId }, (scope) =>
+      readGamePage(gamesReadStore(scope), { gameId: a.gameId }, viewing(publicViewer(a.leagueId))),
+    );
+    expect(page.ok && page.value.game.correctedOn).toBe('2030-12-06');
+  });
+
+  it('finds nothing at all of a season that is still being set up', async () => {
+    const { a, pglite } = leagues;
+    try {
+      for (const status of ['draft']) {
+        await pglite.query(`update seasons set status = $1 where id = $2`, [status, a.seasonId]);
+        const results = await withTransaction(
+          leagues.db,
+          { leagueId: a.leagueId },
+          async (scope) => {
+            const standings = standingsReadStore(scope);
+            const input = { seasonId: a.seasonId };
+            const v = viewing(publicViewer(a.leagueId));
+            return [
+              await readStandings(standings, input),
+              await readTeamRecords(standings, input),
+              await readStatisticsTable(standings, { ...input, viewing: v }),
+              await readStatLeaders(standings, { ...input, measure: 'points' }, v),
+              await readGamePage(gamesReadStore(scope), { gameId: a.gameId }, v),
+            ];
+          },
+        );
+        for (const result of results) expect(result.ok).toBe(false);
+      }
+    } finally {
+      await pglite.query(`update seasons set status = 'active' where id = $1`, [a.seasonId]);
+    }
   });
 });

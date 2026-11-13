@@ -1,5 +1,8 @@
 // The two-league harness's cases for the public standings, statistics and game reads
 // (step 2.40, T-65): every query behind them, and the reads themselves run as a visitor.
+// The seeded season is still being set up, which a public read may not show, so the cases
+// that reach a season or a game first open the scope's own season to the public (inside
+// the run's rolled-back transaction), as a published season would be.
 // Imported by isolation-cases.test-helper.ts.
 import {
   defaultNamePolicy,
@@ -25,13 +28,27 @@ import {
   listStandingsRows,
   listTeamStatTotals,
 } from '../queries/index.ts';
+import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { gamesReadStore, standingsReadStore } from '../stores/index.ts';
+import type { LeagueRecords } from './two-leagues.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
+
+async function openTargetSeason(scope: LeagueScope, target: LeagueRecords) {
+  await transactionOf(scope)
+    .updateTable('seasons')
+    .set({ status: 'active' })
+    .where('league_id', '=', scope.leagueId)
+    .where('id', '=', target.seasonId)
+    .execute();
+}
 
 registerIsolationCase({
   subject: listSeasonTeams,
   name: "list the target's season's teams",
-  run: (scope, target) => listSeasonTeams(scope, target.seasonId),
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return listSeasonTeams(scope, target.seasonId);
+  },
 });
 registerIsolationCase({
   subject: listSeasonDivisions,
@@ -71,7 +88,10 @@ registerIsolationCase({
 registerIsolationCase({
   subject: listSeasonStatKeys,
   name: "read the target's season's statistics",
-  run: (scope, target) => listSeasonStatKeys(scope, target.seasonId),
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return listSeasonStatKeys(scope, target.seasonId);
+  },
 });
 registerIsolationCase({
   subject: findGameState,
@@ -105,35 +125,47 @@ const viewing = (leagueId: string) => ({
 registerIsolationCase({
   subject: standingsReadStore,
   name: "read the target's season's standings",
-  run: (scope, target) => readStandings(standingsReadStore(scope), { seasonId: target.seasonId }),
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return readStandings(standingsReadStore(scope), { seasonId: target.seasonId });
+  },
 });
 registerIsolationCase({
   subject: standingsReadStore,
   name: "read the target's season's team records",
-  run: (scope, target) => readTeamRecords(standingsReadStore(scope), { seasonId: target.seasonId }),
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return readTeamRecords(standingsReadStore(scope), { seasonId: target.seasonId });
+  },
 });
 registerIsolationCase({
   subject: standingsReadStore,
   name: "read the target's season's statistics as a visitor",
-  run: (scope, target) =>
-    readStatisticsTable(standingsReadStore(scope), {
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return readStatisticsTable(standingsReadStore(scope), {
       seasonId: target.seasonId,
       viewing: viewing(target.leagueId),
-    }),
+    });
+  },
 });
 registerIsolationCase({
   subject: standingsReadStore,
   name: "read the target's season's leaders as a visitor",
-  run: (scope, target) =>
-    readStatLeaders(
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return readStatLeaders(
       standingsReadStore(scope),
       { seasonId: target.seasonId, measure: 'points' },
       viewing(target.leagueId),
-    ),
+    );
+  },
 });
 registerIsolationCase({
   subject: gamesReadStore,
   name: "read the target's final game's page as a visitor",
-  run: (scope, target) =>
-    readGamePage(gamesReadStore(scope), { gameId: target.gameId }, viewing(target.leagueId)),
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return readGamePage(gamesReadStore(scope), { gameId: target.gameId }, viewing(target.leagueId));
+  },
 });

@@ -1,8 +1,10 @@
 // The games module's public reads (core's GamesReadStore), bound to one league scope.
 import type { GamesReadStore } from '@srleagues/core';
+import { publicSeasonStatuses } from './standings-read-store.ts';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
   findGame,
+  findSeason,
   findGameCorrectedDate,
   findGameState,
   listGamePlayerLines,
@@ -14,7 +16,10 @@ export function gamesReadStore(scope: LeagueScope): GamesReadStore {
   return {
     findGame: async (gameId) => {
       const game = await findGame(scope, gameId);
-      return game === undefined
+      if (game === undefined) return undefined;
+      // A game of a season still being set up (or retired) is not there at all.
+      const season = await findSeason(scope, game.seasonId);
+      return season === undefined || !publicSeasonStatuses.includes(season.status)
         ? undefined
         : {
             id: game.id,
