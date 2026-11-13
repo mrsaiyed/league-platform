@@ -11,6 +11,7 @@ import { showName, type PersonForDisplay, type ShownName } from './show-name.ts'
 import { statsVisibilities, type TeamStatsSetting } from './stats-shown.ts';
 import { publicViewer, type Viewer } from './viewer.ts';
 
+const leagueId = 'league-1';
 const teamId = 'team-a';
 
 function person(overrides: Partial<PersonForDisplay> = {}): PersonForDisplay {
@@ -31,8 +32,8 @@ function where(
   return {
     audience,
     policy: { ...defaultNamePolicy, ...policy },
-    viewer: extra.viewer ?? publicViewer,
-    ...(extra.statsOf ? { statsOf: extra.statsOf } : {}),
+    viewer: extra.viewer ?? publicViewer(leagueId),
+    statsOf: extra.statsOf ?? null,
   };
 }
 
@@ -99,7 +100,7 @@ describe('showName: the league display policy (R-14, R-15)', () => {
 });
 
 describe('showName: who sees statistics (S-22, T-87)', () => {
-  const staffOnly: TeamStatsSetting = { teamId, statsVisibility: 'staff' };
+  const staffOnly: TeamStatsSetting = { leagueId, teamId, statsVisibility: 'staff' };
 
   it("drops a staff-only team's player names beside its numbers for the public", () => {
     expect(showName(person(), where('adult', {}, { statsOf: staffOnly }))).toEqual({
@@ -113,8 +114,8 @@ describe('showName: who sees statistics (S-22, T-87)', () => {
   });
 
   it("names them for the team's staff and the league's admins", () => {
-    const staff: Viewer = { leagueAdmin: false, staffOfTeamIds: [teamId] };
-    const admin: Viewer = { leagueAdmin: true, staffOfTeamIds: [] };
+    const staff: Viewer = { leagueId, leagueAdmin: false, staffOfTeamIds: [teamId] };
+    const admin: Viewer = { leagueId, leagueAdmin: true, staffOfTeamIds: [] };
     expect(showName(person(), where('adult', {}, { statsOf: staffOnly, viewer: staff }))).toEqual(
       named('Amina Yusuf'),
     );
@@ -126,14 +127,14 @@ describe('showName: who sees statistics (S-22, T-87)', () => {
 
 describe('showName: every combination of policy, setting and viewer', () => {
   const viewers: ReadonlyArray<readonly [string, Viewer, boolean]> = [
-    ['the public', publicViewer, false],
-    ["another team's staff", { leagueAdmin: false, staffOfTeamIds: ['team-b'] }, false],
-    ["the team's staff", { leagueAdmin: false, staffOfTeamIds: [teamId] }, true],
-    ['a league admin', { leagueAdmin: true, staffOfTeamIds: [] }, true],
+    ['the public', publicViewer(leagueId), false],
+    ["another team's staff", { leagueId, leagueAdmin: false, staffOfTeamIds: ['team-b'] }, false],
+    ["the team's staff", { leagueId, leagueAdmin: false, staffOfTeamIds: [teamId] }, true],
+    ['a league admin', { leagueId, leagueAdmin: true, staffOfTeamIds: [] }, true],
   ];
   const settings: ReadonlyArray<TeamStatsSetting | undefined> = [
     undefined,
-    ...statsVisibilities.map((statsVisibility) => ({ teamId, statsVisibility })),
+    ...statsVisibilities.map((statsVisibility) => ({ leagueId, teamId, statsVisibility })),
   ];
   const ages: ReadonlyArray<boolean | null> = [true, false, null];
 
@@ -172,7 +173,7 @@ describe('showName: every combination of policy, setting and viewer', () => {
                     audience,
                     policy,
                     viewer,
-                    ...(setting ? { statsOf: setting } : {}),
+                    statsOf: setting ?? null,
                   });
                   const want = expected(
                     audience,
@@ -203,5 +204,50 @@ describe('showName: every combination of policy, setting and viewer', () => {
           const child = isMinor === true || (isMinor === null && audience !== 'adult');
           if (child && result.shown) expect(result.text).not.toContain('Yusuf');
         }
+  });
+});
+
+describe('showName: fails closed on values it does not know', () => {
+  it('counts an isMinor that is neither true nor false as not known', () => {
+    for (const odd of ['true', 'false', 0, 1, undefined, 'yes']) {
+      const p = person({ isMinor: odd as unknown as boolean | null });
+      expect(showName(p, where('youth')), String(odd)).toEqual(named('Amina Y.'));
+      expect(showName(p, where('mixed')), String(odd)).toEqual(named('Amina Y.'));
+      expect(showName(p, where('adult')), String(odd)).toEqual(named('Amina Yusuf'));
+    }
+  });
+
+  it('counts an unknown name request as a request to be taken off (R-17)', () => {
+    for (const odd of ['hidden', 'NONE', '', null, undefined]) {
+      const p = person({ nameRequest: odd as unknown as NameRequest });
+      expect(showName(p, where('adult')), String(odd)).toEqual({ shown: false, why: 'removed' });
+    }
+  });
+
+  it('hides the name beside numbers for a level it does not know or another league', () => {
+    const admin: Viewer = { leagueId, leagueAdmin: true, staffOfTeamIds: [teamId] };
+    const restricted = { shown: false, why: 'restricted' };
+    const stage4 = { leagueId, teamId, statsVisibility: 'members' } as unknown as TeamStatsSetting;
+    expect(showName(person(), where('adult', {}, { statsOf: stage4, viewer: admin }))).toEqual(
+      restricted,
+    );
+    const elsewhere: TeamStatsSetting = {
+      leagueId: 'league-2',
+      teamId,
+      statsVisibility: 'everyone',
+    };
+    expect(showName(person(), where('adult', {}, { statsOf: elsewhere }))).toEqual(restricted);
+  });
+
+  it('hides the name when a caller leaves out where it is shown', () => {
+    const missing = {
+      audience: 'adult',
+      policy: defaultNamePolicy,
+      viewer: publicViewer(leagueId),
+    };
+    expect(showName(person(), missing as unknown as Parameters<typeof showName>[1])).toEqual({
+      shown: false,
+      why: 'restricted',
+    });
   });
 });

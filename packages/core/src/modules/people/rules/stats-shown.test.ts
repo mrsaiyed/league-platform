@@ -4,17 +4,19 @@ import {
   statsVisibilities,
   type StatsShown,
   type StatsVisibility,
+  type TeamStatsSetting,
 } from './stats-shown.ts';
 import { publicViewer, type Viewer } from './viewer.ts';
 
+const leagueId = 'league-1';
 const team = 'team-a';
 
 const viewers: ReadonlyArray<readonly [string, Viewer]> = [
-  ['anyone', publicViewer],
-  ['a signed-in visitor with no role', { leagueAdmin: false, staffOfTeamIds: [] }],
-  ["another team's staff", { leagueAdmin: false, staffOfTeamIds: ['team-b'] }],
-  ["the team's own staff", { leagueAdmin: false, staffOfTeamIds: ['team-b', team] }],
-  ['a league admin', { leagueAdmin: true, staffOfTeamIds: [] }],
+  ['anyone', publicViewer(leagueId)],
+  ['a signed-in visitor with no role', { leagueId, leagueAdmin: false, staffOfTeamIds: [] }],
+  ["another team's staff", { leagueId, leagueAdmin: false, staffOfTeamIds: ['team-b'] }],
+  ["the team's own staff", { leagueId, leagueAdmin: false, staffOfTeamIds: ['team-b', team] }],
+  ['a league admin', { leagueId, leagueAdmin: true, staffOfTeamIds: [] }],
 ];
 
 const expected: Record<StatsVisibility, Record<string, StatsShown>> = {
@@ -34,13 +36,15 @@ const expected: Record<StatsVisibility, Record<string, StatsShown>> = {
   },
 };
 
+function setting(statsVisibility: StatsVisibility): TeamStatsSetting {
+  return { leagueId, teamId: team, statsVisibility };
+}
+
 describe('statsShown (S-22, T-87)', () => {
   for (const visibility of statsVisibilities) {
     for (const [who, viewer] of viewers) {
       it(`a team set to "${visibility}" shows ${expected[visibility][who]} to ${who}`, () => {
-        expect(statsShown({ teamId: team, statsVisibility: visibility }, viewer)).toBe(
-          expected[visibility][who],
-        );
+        expect(statsShown(setting(visibility), viewer)).toBe(expected[visibility][who]);
       });
     }
   }
@@ -49,8 +53,32 @@ describe('statsShown (S-22, T-87)', () => {
     expect(statsVisibilities).toEqual(['everyone', 'staff']);
   });
 
+  it('shows only team totals for a level it does not know, including the stage 4 levels', () => {
+    const admin: Viewer = { leagueId, leagueAdmin: true, staffOfTeamIds: [team] };
+    for (const level of ['members', 'team', 'league_members', 'EVERYONE', '', null, undefined, 3]) {
+      const odd = { leagueId, teamId: team, statsVisibility: level } as unknown as TeamStatsSetting;
+      expect(statsShown(odd, admin), String(level)).toBe('team_totals');
+    }
+  });
+
+  it('shows only team totals when the setting or the viewer is missing', () => {
+    expect(statsShown(null as unknown as TeamStatsSetting, publicViewer(leagueId))).toBe(
+      'team_totals',
+    );
+    expect(statsShown(setting('everyone'), undefined as unknown as Viewer)).toBe('team_totals');
+  });
+
+  it("refuses a viewer from another league, even that league's admin", () => {
+    const otherAdmin: Viewer = { leagueId: 'league-2', leagueAdmin: true, staffOfTeamIds: [team] };
+    expect(statsShown(setting('staff'), otherAdmin)).toBe('team_totals');
+    expect(statsShown(setting('everyone'), publicViewer('league-2'))).toBe('team_totals');
+    const noLeague = { teamId: team, statsVisibility: 'everyone' } as unknown as TeamStatsSetting;
+    expect(statsShown(noLeague, publicViewer(leagueId))).toBe('team_totals');
+  });
+
   it('the public viewer cannot be changed', () => {
-    expect(Object.isFrozen(publicViewer)).toBe(true);
-    expect(Object.isFrozen(publicViewer.staffOfTeamIds)).toBe(true);
+    const viewer = publicViewer(leagueId);
+    expect(Object.isFrozen(viewer)).toBe(true);
+    expect(Object.isFrozen(viewer.staffOfTeamIds)).toBe(true);
   });
 });

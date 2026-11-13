@@ -35,9 +35,11 @@ export const defaultNamePolicy: NamePolicy = Object.freeze({
 /**
  * Whether a person is shown under the children's rule. A league that never asks for a
  * date of birth may not know (`isMinor` is null): then a youth or mixed league treats
- * the person as a child and an adult league as an adult.
+ * the person as a child and an adult league as an adult. Any value other than true or
+ * false counts as not known.
  */
 export function shownAsChild(isMinor: boolean | null, audience: Audience): boolean {
-  if (isMinor !== null) return isMinor;
+  if (isMinor === true) return true;
+  if (isMinor === false) return false;
   return audience !== 'adult';
 }

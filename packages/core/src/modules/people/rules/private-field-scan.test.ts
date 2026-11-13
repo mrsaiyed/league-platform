@@ -19,7 +19,7 @@ const amina: PrivatePersonFields & { isMinor: boolean | null } = {
 
 const shown = showName(
   { ...amina, nameRequest: 'none' },
-  { audience: 'youth', policy: defaultNamePolicy, viewer: publicViewer },
+  { audience: 'youth', policy: defaultNamePolicy, viewer: publicViewer('league-1'), statsOf: null },
 );
 const privateValues = privateValuesOf(amina, shown);
 
@@ -101,7 +101,12 @@ describe('findPrivateFields (T-81, T4 §12)', () => {
   it('does not treat a full name as private where the policy shows it', () => {
     const adult = showName(
       { ...amina, isMinor: false, nameRequest: 'none' },
-      { audience: 'adult', policy: defaultNamePolicy, viewer: publicViewer },
+      {
+        audience: 'adult',
+        policy: defaultNamePolicy,
+        viewer: publicViewer('league-1'),
+        statsOf: null,
+      },
     );
     expect(privateValuesOf(amina, adult)).toEqual([
       '2011-04-09',

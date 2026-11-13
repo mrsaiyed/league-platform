@@ -22,9 +22,10 @@ export interface WhereShown {
   readonly viewer: Viewer;
   /**
    * The team whose numbers the name stands beside: a box score line, a season total,
-   * a stat leader or a play. Leave it out where no statistics are shown, as on a roster.
+   * a stat leader or a play. Null only where no statistics are shown, as on a roster:
+   * every caller says which.
    */
-  readonly statsOf?: TeamStatsSetting;
+  readonly statsOf: TeamStatsSetting | null;
 }
 
 /**
@@ -46,10 +47,13 @@ function initial(part: string): string {
 }
 
 export function showName(person: PersonForDisplay, where: WhereShown): ShownName {
-  if (where.statsOf && statsShown(where.statsOf, where.viewer) === 'team_totals') {
+  if (where.statsOf !== null && statsShown(where.statsOf, where.viewer) !== 'player_lines') {
     return { shown: false, why: 'restricted' };
   }
-  if (person.nameRequest === 'removed') return { shown: false, why: 'removed' };
+  // Anything but a known request counts as a request to be taken off (R-17).
+  if (person.nameRequest !== 'none' && person.nameRequest !== 'initials') {
+    return { shown: false, why: 'removed' };
+  }
 
   const first = tidy(person.firstName);
   const last = tidy(person.lastName);
