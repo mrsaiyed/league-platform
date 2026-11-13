@@ -61,11 +61,16 @@ describe('openTwoLeagues', () => {
         ...(await texts('select name as t from leagues where id = $1', [leagueId])),
         ...(await texts('select name as t from programs where league_id = $1', [leagueId])),
         ...(await texts('select name as t from seasons where league_id = $1', [leagueId])),
+        ...(await texts('select name as t from divisions where league_id = $1', [leagueId])),
+        ...(await texts('select name || address as t from venues where league_id = $1', [
+          leagueId,
+        ])),
+        ...(await texts('select name as t from courts where league_id = $1', [leagueId])),
         ...(await texts('select email || display_name as t from accounts where id = $1', [
           ownerId,
         ])),
       ];
-      expect(found.length).toBe(5);
+      expect(found.length).toBe(9);
       for (const text of found) expect(text.toLowerCase()).toContain(marker);
     }
     const shared = await texts(

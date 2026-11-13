@@ -46,6 +46,32 @@ export interface CommandReceiptsTable {
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface CourtsTable {
+  id: Generated<string>;
+  league_id: string;
+  venue_id: string;
+  name: string;
+  sort: Generated<number>;
+  deleted_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface DivisionsTable {
+  id: Generated<string>;
+  league_id: string;
+  season_id: string;
+  parent_division_id: string | null;
+  name: string;
+  color: string | null;
+  sort: Generated<number>;
+  deleted_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface InvitationsTable {
   id: Generated<string>;
   league_id: string;
@@ -190,6 +216,19 @@ export interface SeasonsTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface SettingValuesTable {
+  id: Generated<string>;
+  league_id: string;
+  level: string;
+  program_id: string | null;
+  season_id: string | null;
+  key: string;
+  value: ColumnType<JsonValue, JsonObject, JsonObject>;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface SupportAccessLogTable {
   id: Generated<string>;
   league_id: string;
@@ -201,11 +240,25 @@ export interface SupportAccessLogTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface VenuesTable {
+  id: Generated<string>;
+  league_id: string;
+  name: string;
+  address: string | null;
+  map_link: string | null;
+  deleted_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 /** Every table in the public schema, for Kysely. */
 export interface Database {
   accounts: AccountsTable;
   activity_log: ActivityLogTable;
   command_receipts: CommandReceiptsTable;
+  courts: CourtsTable;
+  divisions: DivisionsTable;
   invitations: InvitationsTable;
   jobs: JobsTable;
   league_features: LeagueFeaturesTable;
@@ -216,5 +269,7 @@ export interface Database {
   programs: ProgramsTable;
   role_grants: RoleGrantsTable;
   seasons: SeasonsTable;
+  setting_values: SettingValuesTable;
   support_access_log: SupportAccessLogTable;
+  venues: VenuesTable;
 }

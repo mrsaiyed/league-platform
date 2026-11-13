@@ -63,11 +63,16 @@ A person added by hand is a `people` row with an empty `profile_id`. Claiming or
 | `seasons`             | One running of a program             | `program_id`, `slug`, `name`, `starts_on`, `ends_on`, `status`, `is_current`, `rules` (JSON, versioned), `stat_keys`, `logo`                                                                                                                                                                     |
 | `divisions`           | A group of teams sharing standings   | `season_id`, `name`, `color`, `sort`, `parent_division_id`                                                                                                                                                                                                                                       |
 | `clubs`               | A member organization (a school)     | `league_id`, `slug`, `name`, `logo`, `colors`                                                                                                                                                                                                                                                    |
-| `venues`, `courts`    | Where games are played               | `name`, `address`, `map_link`; a court belongs to a venue                                                                                                                                                                                                                                        |
+| `venues`, `courts`    | Where games are played               | `name`, `address`, `map_link`; a court belongs to a venue and has a `sort`                                                                                                                                                                                                                       |
+| `setting_values`      | A value an admin set for one setting | `league_id`, `level` (league, program, season), `program_id` or `season_id`, `key`, `value` (JSON: `{"version", "value"}`)                                                                                                                                                                       |
 
 Every league gets one program with `is_default` set when it is created. Single-program leagues never see it (U-3, U-12).
 
 `seasons.logo` is not built yet: it will link to an uploaded image, so it waits for the `assets` table (section 10).
+
+A division's parent is in the same season, and a division is never its own ancestor. A court stays at its venue. Names are unique where people pick by name: a division among its siblings in its season, a venue in its league, a court at its venue, while not in the bin. Divisions, venues and courts go to the bin (`deleted_at`).
+
+**Setting values** (T5 section 6, T-231, [decision record 019](../../../architecture/decisions/019-where-setting-values-are-stored.md)). Settings are declared in code; `setting_values` holds only the values an admin has set, one per key at each place (the league, one program or one season). "Not set" is no row, so clearing a value removes it and the lookup falls back to the next level. `value` is a small versioned document whose version is the setting's declared format; the declaration's schema checks what is inside.
 
 ## 5. Access
 
