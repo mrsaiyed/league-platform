@@ -19,7 +19,7 @@ async function invited(role = 'scheduler', scope: object = volleyball) {
     made.deps,
   );
   if (!result.ok) throw new Error('not invited');
-  const token = made.db.jobs[0]?.ids['token'] ?? '';
+  const token = await made.linkFor(result.value.invitationId);
   return { ...made, token };
 }
 

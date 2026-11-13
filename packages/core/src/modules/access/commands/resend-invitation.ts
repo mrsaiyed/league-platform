@@ -1,10 +1,10 @@
-// Re-sends an invitation (P4 §4), pending or expired: a new link that works for
-// the full time again, emailed by a new job. The old link stops working at once,
-// so a link sent to the wrong place can be replaced (T-226).
+// Re-sends an invitation (P4 §4), pending or expired: the full time again, and a
+// new email whose link the worker makes as it sends. The old link stops working at
+// once, so a link sent to the wrong place can be replaced (T-226).
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { recordActivity } from '../activity.ts';
-import { invitationLifetimeDays, sendInvitationJob } from '../access-values.ts';
+import { invitationLifetimeDays, invitationEmailJob } from '../access-values.ts';
 import { newInvitationToken } from '../invitation-token.ts';
 import { isOpenForNewPeople, mayManageInvitation } from '../policy.ts';
 import type { AccessTx } from '../ports.ts';
@@ -29,13 +29,14 @@ export const resendInvitation = defineCommand({
       return fail({ code: 'invitation-closed' });
     }
     if (!(await isOpenForNewPeople(tx))) return fail({ code: 'league-read-only' });
-    const { token, tokenHash } = await newInvitationToken();
+    // No link yet: the email job makes it as it sends (issueInvitationLink, T-226).
+    const { tokenHash } = await newInvitationToken();
     const renewed = await tx.access.renewInvitation(found.id, tokenHash, invitationLifetimeDays);
     if (renewed === undefined) return fail({ code: 'invitation-closed' });
     await tx.jobs.enqueue({
-      type: sendInvitationJob,
+      type: invitationEmailJob,
       leagueId: context.leagueId,
-      ids: { invitationId: renewed.id, token },
+      ids: { invitationId: renewed.id },
     });
     await recordActivity(tx, context, {
       action: 'access.resend_invitation',

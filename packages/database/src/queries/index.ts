@@ -14,6 +14,7 @@ export { listRoleGrants } from './list-role-grants.ts';
 export { markInvitationAccepted } from './mark-invitation-accepted.ts';
 export { markInvitationCancelled } from './mark-invitation-cancelled.ts';
 export { renewInvitationLink } from './renew-invitation-link.ts';
+export { replaceInvitationLink } from './replace-invitation-link.ts';
 export { revokeRoleGrant } from './revoke-role-grant.ts';
 export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts';
 export { findProgramBySlug } from './find-program-by-slug.ts';

@@ -17,6 +17,7 @@ import {
   markInvitationAccepted,
   markInvitationCancelled,
   renewInvitationLink,
+  replaceInvitationLink,
   revokeRoleGrant,
 } from '../queries/index.ts';
 
@@ -32,6 +33,8 @@ export function accessStore(scope: LeagueScope): AccessStore {
     findInvitationByTokenHash: (tokenHash) => findInvitationByTokenHash(scope, tokenHash),
     renewInvitation: (invitationId, tokenHash, days) =>
       renewInvitationLink(scope, invitationId, tokenHash, days),
+    replaceInvitationLink: (invitationId, tokenHash) =>
+      replaceInvitationLink(scope, invitationId, tokenHash),
     cancelInvitation: (invitationId) => markInvitationCancelled(scope, invitationId),
     acceptInvitation: (invitationId, tokenHash, accountId) =>
       markInvitationAccepted(scope, invitationId, tokenHash, accountId),

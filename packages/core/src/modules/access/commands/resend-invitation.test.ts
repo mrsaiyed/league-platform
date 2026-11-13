@@ -17,15 +17,18 @@ async function invited() {
 
 describe('resendInvitation', () => {
   it('gives the invitation a new link and a new expiry; the old link stops working', async () => {
-    const { db, deps, as, invitationId } = await invited();
-    const first = db.jobs[0]?.ids['token'] ?? '';
+    const { db, deps, as, invitationId, linkFor } = await invited();
+    const first = await linkFor(invitationId);
     const stored = db.state.invitations[0];
     if (stored !== undefined) stored.expired = true;
     expect(await resendInvitation(as(adminId), { invitationId }, deps)).toMatchObject({
       ok: true,
       value: { invitationId, expiresAt: 'in 14 days' },
     });
-    const second = db.jobs[1]?.ids['token'] ?? '';
+    // The old link ends at once, before the new email goes.
+    expect(db.state.invitations[0]?.tokenHash).not.toBe(await hashInvitationToken(first));
+    expect(db.jobs.map((job) => job.ids)).toEqual([{ invitationId }, { invitationId }]);
+    const second = await linkFor(invitationId);
     expect(second).not.toBe(first);
     expect(db.state.invitations[0]).toMatchObject({
       expired: false,

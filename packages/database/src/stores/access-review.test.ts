@@ -15,6 +15,7 @@ import {
   acceptInvitation,
   cancelInvitation,
   invite,
+  issueInvitationLink,
   resendInvitation,
   revokeGrant,
   type AccessTx,
@@ -70,7 +71,14 @@ afterAll(async () => {
 
 const as = (leagueId: string, accountId: string) => ({ leagueId, accountId, requestId: 'r' });
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
-const lastToken = () => jobs.at(-1)?.ids['token'] ?? '';
+/** What the email job does as it sends (T-226): makes the invitation's link. */
+async function linkFor(leagueId: string, invitationId: string): Promise<string> {
+  const link = await deps.transaction({ leagueId, accountId: null, requestId: 'r' }, (tx) =>
+    issueInvitationLink(tx, invitationId),
+  );
+  if (link === undefined) throw new Error('no link: the invitation is not pending');
+  return link.token;
+}
 
 /** A league, an admin in it, and an invitation the admin sent. */
 async function adminInvited(scope?: object) {
@@ -92,7 +100,7 @@ async function adminInvited(scope?: object) {
     adminId,
     adminGrantId,
     invitationId: sent.value.invitationId,
-    token: lastToken(),
+    token: await linkFor(league.leagueId, sent.value.invitationId),
   };
 }
 
@@ -139,12 +147,13 @@ describe('accepting checks the offer again', () => {
     const league = await newLeague(pglite);
     const program = await newProgram(pglite, league.leagueId);
     const owner = as(league.leagueId, league.ownerId);
-    await invite(
+    const sent = await invite(
       owner,
       { email: 'p@example.test', role: 'scheduler', scope: { type: 'program', id: program } },
       deps,
     );
-    const token = lastToken();
+    if (!sent.ok) throw new Error(`not invited: ${sent.error.code}`);
+    const token = await linkFor(league.leagueId, sent.value.invitationId);
     await pglite.query('update programs set deleted_at = now() where id = $1', [program]);
     const joiner = await newAccount(pglite);
     expect(await acceptInvitation(as(league.leagueId, joiner), { token }, deps)).toMatchObject({
@@ -184,13 +193,13 @@ describe('links and grants under a race', () => {
     expect(await acceptInvitation(as(league.leagueId, second), { token }, deps)).toMatchObject({
       error: { code: 'invitation-closed' },
     });
-    const { league: other, invitationId } = await adminInvited();
+    const { league: other, invitationId, token: otherToken } = await adminInvited();
     const twice = await withTransaction(
       db,
       { leagueId: other.leagueId, accountId: first },
       async (scope) => [
-        await markInvitationAccepted(scope, invitationId, sha256(lastToken()), first),
-        await markInvitationAccepted(scope, invitationId, sha256(lastToken()), second),
+        await markInvitationAccepted(scope, invitationId, sha256(otherToken), first),
+        await markInvitationAccepted(scope, invitationId, sha256(otherToken), second),
       ],
     );
     expect(twice).toEqual([true, false]);

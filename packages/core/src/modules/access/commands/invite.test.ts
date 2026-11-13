@@ -15,8 +15,8 @@ import { invite } from './invite.ts';
 const volleyball = { type: 'program', id: programId } as const;
 
 describe('invite', () => {
-  it('stores only the hash of the link, and emails the link by a job (T-226)', async () => {
-    const { db, deps, as } = memoryAccess();
+  it('records an email job with the id only; the link is made as it sends (T-226)', async () => {
+    const { db, deps, as, linkFor } = memoryAccess();
     const result = await invite(
       as(adminId),
       { email: '  Helper@Example.TEST ', role: 'scorekeeper' },
@@ -30,12 +30,14 @@ describe('invite', () => {
       scope: { type: 'league' },
       invitedByAccountId: adminId,
     });
-    const [job] = db.jobs;
-    expect(job).toMatchObject({ type: 'access.send_invitation', leagueId });
-    const token = job?.ids['token'] ?? '';
+    expect(db.jobs).toEqual([{ type: 'email.send', leagueId, ids: { invitationId: stored?.id } }]);
+    // Until the email goes, no link works; then only the hash of the new one is kept.
+    const before = stored?.tokenHash;
+    const token = await linkFor(stored?.id ?? '');
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(stored?.tokenHash).toBe(await hashInvitationToken(token));
-    expect(JSON.stringify(db.state.invitations)).not.toContain(token);
+    expect(db.state.invitations[0]?.tokenHash).not.toBe(before);
+    expect(db.state.invitations[0]?.tokenHash).toBe(await hashInvitationToken(token));
+    expect(JSON.stringify(db)).not.toContain(token);
     expect(db.state.activity).toEqual([
       {
         actorAccountId: adminId,

@@ -1,12 +1,12 @@
-// Invites someone to a role (P4 §4): an email, a role, and where it applies. The
-// invitation keeps only the hash of its link's token; the token goes into the job
-// that emails the link, recorded in the same transaction (T-130, T-226). Whoever
+// Invites someone to a role (P4 §4): an email, a role, and where it applies. It
+// records the invitation and an `email.send` job holding its id, in the same
+// transaction (T-130); the worker makes the link as it sends (T-226). Whoever
 // may manage access at a scope may invite to it, so a program's admin can invite to
 // that program and not to the whole league.
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { recordActivity } from '../activity.ts';
-import { invitationLifetimeDays, sendInvitationJob } from '../access-values.ts';
+import { invitationLifetimeDays, invitationEmailJob } from '../access-values.ts';
 import { newInvitationToken } from '../invitation-token.ts';
 import { hasPermission, isOpenForNewPeople } from '../policy.ts';
 import type { AccessTx } from '../ports.ts';
@@ -63,7 +63,8 @@ export const invite = defineCommand({
     // allowed() refused a visitor, so someone is signed in.
     const invitedBy = context.accountId;
     if (invitedBy === null) throw new Error('access.invite: nobody is signed in.');
-    const { token, tokenHash } = await newInvitationToken();
+    // No link yet: the email job makes it as it sends (issueInvitationLink, T-226).
+    const { tokenHash } = await newInvitationToken();
     const invitation = await tx.access.createInvitation({
       email,
       role,
@@ -73,9 +74,9 @@ export const invite = defineCommand({
       lifetimeDays: invitationLifetimeDays,
     });
     await tx.jobs.enqueue({
-      type: sendInvitationJob,
+      type: invitationEmailJob,
       leagueId: context.leagueId,
-      ids: { invitationId: invitation.id, token },
+      ids: { invitationId: invitation.id },
     });
     await recordActivity(tx, context, {
       action: 'access.invite',

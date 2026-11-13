@@ -33,6 +33,7 @@ import {
   markInvitationAccepted,
   markInvitationCancelled,
   renewInvitationLink,
+  replaceInvitationLink,
   revokeRoleGrant,
   findProgramBySlug,
   findProgramId,
@@ -292,6 +293,12 @@ registerIsolationCase({
   subject: renewInvitationLink,
   name: "renew the target's invitation",
   run: (scope, target) => renewInvitationLink(scope, target.invitationId, sha256('renewed'), 14),
+});
+
+registerIsolationCase({
+  subject: replaceInvitationLink,
+  name: "replace the link of the target's invitation",
+  run: (scope, target) => replaceInvitationLink(scope, target.invitationId, sha256('replaced')),
 });
 
 registerIsolationCase({

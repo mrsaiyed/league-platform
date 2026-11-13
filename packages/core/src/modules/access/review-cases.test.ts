@@ -32,10 +32,8 @@ async function sentBy(made: ReturnType<typeof memoryAccess>, by: string, scope: 
     made.deps,
   );
   if (!result.ok) throw new Error(`not invited: ${result.error.code}`);
-  return {
-    invitationId: result.value.invitationId,
-    token: made.db.jobs.at(-1)?.ids['token'] ?? '',
-  };
+  const { invitationId } = result.value;
+  return { invitationId, token: await made.linkFor(invitationId) };
 }
 
 describe('removing someone cancels the invitations they sent', () => {

@@ -33,7 +33,10 @@ export type NewInvitation = {
   readonly email: string;
   readonly role: Role;
   readonly scope: Scope;
-  /** SHA-256 of the link's token, as hex. The token itself is never stored. */
+  /**
+   * SHA-256 of a token no one has: the invitation has no working link until its
+   * email is sent (issueInvitationLink). The token itself is never stored.
+   */
   readonly tokenHash: string;
   readonly invitedByAccountId: string;
   /** The link works for this many days from now (the database's now). */
@@ -76,6 +79,14 @@ export type AccessStore = AccessReader & {
     invitationId: string,
     tokenHash: string,
     lifetimeDays: number,
+  ) => Promise<Invitation | undefined>;
+  /**
+   * A new link (token hash) for a pending, unexpired invitation, ending the one
+   * before; the expiry stays. Undefined if it is not pending.
+   */
+  readonly replaceInvitationLink: (
+    invitationId: string,
+    tokenHash: string,
   ) => Promise<Invitation | undefined>;
   /** Cancels an invitation not accepted or cancelled: false if it was. */
   readonly cancelInvitation: (invitationId: string) => Promise<boolean>;

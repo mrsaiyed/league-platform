@@ -17,11 +17,12 @@ export {
   invitationLifetimeDays,
   invitationStatuses,
   readOnlyLeagueStatuses,
-  sendInvitationJob,
+  invitationEmailJob,
   type InvitationStatus,
 } from './access-values.ts';
 export { activitySummaryKey, recordActivity, type ActivityChange } from './activity.ts';
 export { roleGranted, roleRevoked, type RoleGranted, type RoleRevoked } from './events.ts';
+export { issueInvitationLink, type InvitationLink } from './invitation-link.ts';
 export { hashInvitationToken } from './invitation-token.ts';
 export {
   accessOfAccount,

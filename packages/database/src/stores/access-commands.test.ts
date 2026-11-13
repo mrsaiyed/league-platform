@@ -7,6 +7,7 @@ import {
   acceptInvitation,
   cancelInvitation,
   invite,
+  issueInvitationLink,
   listAccess,
   listActivity,
   resendInvitation,
@@ -30,6 +31,7 @@ import {
 } from '../schema/schema.test-helper.ts';
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
+import { jobsStore } from './jobs-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 
 let pglite: PGlite;
@@ -41,7 +43,13 @@ beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
   const transaction = commandTransaction(db, (scope) => ({
-    jobs: { enqueue: async (job: Job) => void jobs.push(job) },
+    // Into the real jobs table too, which takes ids and nothing else (T-131).
+    jobs: {
+      enqueue: async (job: Job) => {
+        jobs.push(job);
+        await jobsStore(scope).enqueue(job);
+      },
+    },
     leagues: leaguesStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
@@ -60,7 +68,14 @@ const as = (leagueId: string, accountId: string | null) => ({
   accountId,
   requestId: 'r-1',
 });
-const lastToken = () => jobs.at(-1)?.ids['token'] ?? '';
+/** What the email job does as it sends (T-226): makes the invitation's link. */
+async function linkFor(leagueId: string, invitationId: string): Promise<string> {
+  const link = await deps.transaction(as(leagueId, null), (tx) =>
+    issueInvitationLink(tx, invitationId),
+  );
+  if (link === undefined) throw new Error('no link: the invitation is not pending');
+  return link.token;
+}
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
 
 async function invited(role = 'admin', scope?: object) {
@@ -68,7 +83,8 @@ async function invited(role = 'admin', scope?: object) {
   const owner = as(league.leagueId, league.ownerId);
   const result = await invite(owner, { email: 'Helper@Example.test', role, scope }, deps);
   if (!result.ok) throw new Error(`not invited: ${result.error.code}`);
-  return { league, owner, invitationId: result.value.invitationId, token: lastToken() };
+  const { invitationId } = result.value;
+  return { league, owner, invitationId, token: await linkFor(league.leagueId, invitationId) };
 }
 
 describe('invitations on the database', () => {
@@ -109,6 +125,60 @@ describe('invitations on the database', () => {
     });
   });
 
+  it('records the email job with the id only; each sending makes a new link (T-226)', async () => {
+    const league = await newLeague(pglite);
+    const owner = as(league.leagueId, league.ownerId);
+    const sent = await invite(owner, { email: 'job@example.test', role: 'editor' }, deps);
+    if (!sent.ok) throw new Error(`not invited: ${sent.error.code}`);
+    const { invitationId } = sent.value;
+    const job = await one<{ type: string; ids: unknown }>(
+      pglite,
+      'select type, ids from jobs where league_id = $1',
+      [league.leagueId],
+    );
+    expect(job).toEqual({ type: 'email.send', ids: { invitationId } });
+    const before = await one<{ token_hash: string }>(
+      pglite,
+      'select token_hash from invitations where id = $1',
+      [invitationId],
+    );
+
+    // A retried job sends a new link, and the earlier one stops working.
+    const first = await linkFor(league.leagueId, invitationId);
+    const second = await linkFor(league.leagueId, invitationId);
+    const after = await one<{ token_hash: string; days: number }>(
+      pglite,
+      `select token_hash, round(extract(epoch from expires_at - created_at) / 86400)::int as days
+       from invitations where id = $1`,
+      [invitationId],
+    );
+    expect(after).toEqual({ token_hash: sha256(second), days: 14 });
+    expect(after.token_hash).not.toBe(before.token_hash);
+    const someone = as(league.leagueId, await newAccount(pglite));
+    expect(await acceptInvitation(someone, { token: first }, deps)).toMatchObject({
+      error: { code: 'invitation-not-found' },
+    });
+    expect(await acceptInvitation(someone, { token: second }, deps)).toMatchObject({ ok: true });
+
+    // Nothing to send once it is used, cancelled or expired.
+    expect(
+      await deps.transaction(as(league.leagueId, null), (tx) =>
+        issueInvitationLink(tx, invitationId),
+      ),
+    ).toBeUndefined();
+    const { id: expiredId } = await one<{ id: string }>(
+      pglite,
+      `insert into invitations (league_id, email, role, token_hash, invited_by_account_id,
+                                created_at, expires_at)
+       values ($1, 'gone@example.test', 'editor', $2, $3, now() - interval '20 days',
+               now() - interval '1 minute') returning id`,
+      [league.leagueId, sha256('expired'), league.ownerId],
+    );
+    expect(
+      await deps.transaction(as(league.leagueId, null), (tx) => issueInvitationLink(tx, expiredId)),
+    ).toBeUndefined();
+  });
+
   it("finds no invitation from another league's link", async () => {
     const { token } = await invited();
     const other = await newLeague(pglite);
@@ -139,7 +209,9 @@ describe('invitations on the database', () => {
     expect(await acceptInvitation(asSomeone, { token }, deps)).toMatchObject({
       error: { code: 'invitation-not-found' },
     });
-    expect(await acceptInvitation(asSomeone, { token: lastToken() }, deps)).toMatchObject({
+    expect(
+      await acceptInvitation(asSomeone, { token: await linkFor(league.leagueId, id) }, deps),
+    ).toMatchObject({
       ok: true,
       value: { role: 'editor' },
     });

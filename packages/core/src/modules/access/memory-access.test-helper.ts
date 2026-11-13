@@ -7,6 +7,7 @@ import {
   memoryTransaction,
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
+import { issueInvitationLink } from './invitation-link.ts';
 import type { AccessTx, ActivityEntry, Grant, Invitation } from './ports.ts';
 import { sameScope, type Scope } from './scopes.ts';
 
@@ -133,6 +134,12 @@ export function memoryAccess(state: Partial<MemoryAccess> = {}) {
           Object.assign(found, { tokenHash, expired: false, expiresAt: `in ${days} days` });
           return view(found);
         },
+        replaceInvitationLink: async (id, tokenHash) => {
+          const found = s.invitations.find((i) => i.id === id);
+          if (found === undefined || statusOf(found) !== 'pending') return undefined;
+          found.tokenHash = tokenHash;
+          return view(found);
+        },
         cancelInvitation: async (id) => {
           const found = s.invitations.find((i) => i.id === id);
           if (found === undefined || found.acceptedBy !== null || found.cancelled) return false;
@@ -174,5 +181,11 @@ export function memoryAccess(state: Partial<MemoryAccess> = {}) {
   );
   const deps = testDeps(transaction);
   const as = (account: string | null) => ({ leagueId, accountId: account, requestId: 'r-1' });
-  return { db, deps, as };
+  /** What the worker does as it sends the invitation's email: makes its link. */
+  const linkFor = async (invitationId: string) => {
+    const link = await transaction(as(null), (tx) => issueInvitationLink(tx, invitationId));
+    if (link === undefined) throw new Error('no link: the invitation is not pending');
+    return link.token;
+  };
+  return { db, deps, as, linkFor };
 }

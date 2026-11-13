@@ -6,10 +6,11 @@ import { invite } from './invite.ts';
 
 describe('cancelInvitation', () => {
   it('cancels an open invitation, after which its link does nothing', async () => {
-    const { db, deps, as } = memoryAccess();
+    const { db, deps, as, linkFor } = memoryAccess();
     const made = await invite(as(ownerId), { email: 'a@example.test', role: 'editor' }, deps);
     if (!made.ok) throw new Error('not invited');
     const { invitationId } = made.value;
+    const token = await linkFor(invitationId);
     expect(await cancelInvitation(as(ownerId), { invitationId }, deps)).toEqual({
       ok: true,
       value: { invitationId },
@@ -21,7 +22,6 @@ describe('cancelInvitation', () => {
     expect(await cancelInvitation(as(ownerId), { invitationId }, deps)).toMatchObject({
       error: { code: 'invitation-closed' },
     });
-    const token = db.jobs[0]?.ids['token'];
     expect(await acceptInvitation(as(strangerId), { token }, deps)).toMatchObject({
       error: { code: 'invitation-closed' },
     });
