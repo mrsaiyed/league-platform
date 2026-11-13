@@ -5,10 +5,10 @@
 //                 change something of B); a case that cannot reach its target
 //                 proves nothing.
 //   app           league A's scope as the app opens it (withTransaction: both fences).
-//   code-only     league A's scope with row-level security out of the way: only the
-//                 query's own league filter (T-28) keeps B out. A query that forgot
-//                 its `where league_id` is caught here, though the database would
-//                 have hidden it in the app run.
+//   code-only     league A's scope, acting as A's owner, with row-level security out
+//                 of the way: only the query's own league filter (T-28) keeps B out.
+//                 A query that forgot its `where league_id` is caught here, though
+//                 the database would have hidden it in the app run.
 //   both-leagues  the database set to league A and to an account with roles in
 //                 both leagues, while the scope names B: only row-level security
 //                 keeps B out, so a policy that lets an account's other leagues
@@ -24,6 +24,8 @@
 //   - in the answer at all: the run is repeated with the forbidden leagues' rows
 //     deleted (inside that same rolled-back transaction) and must come out the
 //     same, so a count or a total over B is caught though it names nothing of B.
+//     Ids and times no row had before are set aside in that comparison: a
+//     command that adds a row gets a new id and time in each run.
 // A refusal (an error) is not a leak unless it names something of B. Afterwards
 // the whole database must be as it was before, or a case committed something.
 import { inspect, isDeepStrictEqual } from 'node:util';
@@ -39,6 +41,8 @@ import {
   outside,
   readRows,
   removeRows,
+  uuidPattern,
+  uuidsIn,
   type DatabaseRows,
 } from './database-rows.test-helper.ts';
 import type { IsolationCase } from './isolation-registry.test-helper.ts';
@@ -120,10 +124,68 @@ const show = (outcome: Outcome) =>
   'returned' in outcome
     ? inspect(outcome.returned, { depth: 4, breakLength: Infinity }).slice(0, 160)
     : `refused: ${message(outcome.refused)}`;
-const same = (x: Outcome, y: Outcome) =>
-  'returned' in x && 'returned' in y
-    ? isDeepStrictEqual(x.returned, y.returned)
-    : 'refused' in x && 'refused' in y && message(x.refused) === message(y.refused);
+const timestamp = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)?/g;
+const timestampParts =
+  /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
+
+/** A timestamp text as milliseconds (the precision a Date keeps), or null. */
+function timeOf(text: string): number | null {
+  const parts = timestampParts.exec(text);
+  if (parts === null) return null;
+  const [, day, clock, fraction = '', zone = 'Z'] = parts;
+  const offset =
+    zone === 'Z' ? zone : `${zone.slice(0, 3)}:${zone.slice(3).replace(':', '') || '00'}`;
+  const ms = Date.parse(`${day}T${clock}.${fraction.padEnd(3, '0').slice(0, 3)}${offset}`);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/** What a reading of the database already held: its ids and its times. */
+type Known = { ids: ReadonlySet<string>; times: ReadonlySet<number> };
+
+function knownIn(rows: DatabaseRows): Known {
+  const texts = [...rows.values()].flatMap((tables) => [...tables.values()].flat());
+  const times = texts.flatMap((text) => [...text.matchAll(timestamp)].map(([t]) => timeOf(t)));
+  return {
+    ids: new Set(texts.flatMap(uuidsIn)),
+    times: new Set(times.filter((t): t is number => t !== null)),
+  };
+}
+
+/**
+ * A value with every id and every time that no row had before replaced by a
+ * placeholder: a new row's id and time differ in each run. Ids and times the rows
+ * already held are kept, so an answer taken from another league's rows still differs.
+ */
+function settled(value: unknown, known: Known, fresh: Map<string, string>): unknown {
+  const again = (inner: unknown) => settled(inner, known, fresh);
+  if (value instanceof Date) return known.times.has(value.getTime()) ? value : '(new time)';
+  if (typeof value === 'string') {
+    const time = timeOf(value);
+    if (time !== null) return known.times.has(time) ? value : '(new time)';
+    return value.replace(uuidPattern, (match) => {
+      const id = match.toLowerCase();
+      if (known.ids.has(id)) return match;
+      if (!fresh.has(id)) fresh.set(id, `(new id ${fresh.size + 1})`);
+      return fresh.get(id) ?? match;
+    });
+  }
+  if (Array.isArray(value)) return value.map(again);
+  if (value instanceof Map) return new Map([...value].map(([k, v]) => [again(k), again(v)]));
+  if (value instanceof Set) return new Set([...value].map(again));
+  if (typeof value !== 'object' || value === null) return value;
+  const proto: unknown = Object.getPrototypeOf(value);
+  // Errors and other class instances are compared as they are.
+  if (proto !== Object.prototype && proto !== null) return value;
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, again(v)]));
+}
+
+/** Whether two outcomes are the same answer, apart from new ids and times. */
+function same(x: Outcome, y: Outcome, known: Known): boolean {
+  const both = (a: unknown, b: unknown) =>
+    isDeepStrictEqual(settled(a, known, new Map()), settled(b, known, new Map()));
+  if ('returned' in x && 'returned' in y) return both(x.returned, y.returned);
+  return 'refused' in x && 'refused' in y && both(message(x.refused), message(y.refused));
+}
 
 /**
  * Runs every case against leagues A and B and returns what went wrong; an empty
@@ -138,6 +200,7 @@ export async function findIsolationFailures(
   const before = await read();
   const markers = new Map([a, b].map((league) => [league.leagueId, league.marker]));
   const prints = footprints(before, markers);
+  const known = knownIn(before);
   const footprint = (league: LeagueRecords) => {
     const found = prints.get(league.leagueId);
     if (found === undefined) throw new Error(`no footprint for league ${league.marker}`);
@@ -149,7 +212,11 @@ export async function findIsolationFailures(
   const runs: { run: IsolationRun; open: Open; forbidden: LeagueRecords[] }[] = [
     { run: 'control', open: (work) => withTransaction(db, asB, work), forbidden: [b] },
     { run: 'app', open: (work) => withTransaction(db, asA, work), forbidden: [b] },
-    { run: 'code-only', open: (work) => withUnfencedScope(db, a.leagueId, work), forbidden: [b] },
+    {
+      run: 'code-only',
+      open: (work) => withUnfencedScope(db, a.leagueId, work, a.ownerId),
+      forbidden: [b],
+    },
     {
       run: 'both-leagues',
       open: (work) => withFenceSetTo(db, shared, b.leagueId, work),
@@ -199,7 +266,7 @@ export async function findIsolationFailures(
         try {
           const prepare = (trx: Transaction<Database>) => removeRows(trx, gone);
           const without = await attempt(open, entry, b, { prepare, read: false });
-          if (same(seen.outcome, without.outcome)) return null;
+          if (same(seen.outcome, without.outcome, known)) return null;
           const names = forbidden.map((league) => league.marker).join(' and ');
           return (
             `answers differently once league ${names}'s rows are gone: ` +

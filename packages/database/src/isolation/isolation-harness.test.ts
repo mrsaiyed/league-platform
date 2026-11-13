@@ -1,11 +1,26 @@
 // The harness catches what it is for: planted leaky reads and writes, a leak that
 // names nothing, an error naming the other league, a policy hole, a case that
-// commits, and a case that cannot reach its target. A refusal is not a leak.
+// commits, a case that cannot reach its target, planted leaky commands and jobs, and
+// a command refused in its own league. A refusal is not a leak, and nor is a new
+// id or time; a time the rows already held is still compared.
+import {
+  defineCommand,
+  ok,
+  setLeagueName,
+  type Command,
+  type CommandContext,
+  type CommandError,
+  type CommandTx,
+  type JobQueue,
+  type Result,
+} from '@srleagues/core';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withFenceSetTo } from '../db/db.test-helper.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
-import { findProgramBySlug, listPrograms } from '../queries/index.ts';
+import { z } from 'zod';
+import { findCurrentLeague, findProgramBySlug, listPrograms } from '../queries/index.ts';
+import { harnessTx, runInScope } from './command-cases.test-helper.ts';
 import { findIsolationFailures } from './isolation-harness.test-helper.ts';
 import type { IsolationCase } from './isolation-registry.test-helper.ts';
 import { openTwoLeagues, type LeagueRecords, type TwoLeagues } from './two-leagues.test-helper.ts';
@@ -136,6 +151,38 @@ describe('the harness', () => {
     );
   });
 
+  it('does not count new ids and times as a different answer', async () => {
+    const adding = planted('add a program, returning its new id and time', (scope) =>
+      transactionOf(scope)
+        .insertInto('programs')
+        .values({
+          league_id: scope.leagueId,
+          slug: 'added',
+          name: 'Added',
+          sport_key: 'volleyball',
+        })
+        .returning(['id', 'created_at'])
+        .execute(),
+    );
+    expect(await check(adding)).toEqual([]);
+  });
+
+  it('still compares times the rows already held: the latest across leagues is caught', async () => {
+    await onThrowaway(async (fresh) => {
+      await fresh.pglite.exec(`
+        set session_replication_role = replica;
+        update programs set created_at = '2030-01-01T00:00:00Z'
+          where league_id = '${fresh.b.leagueId}';
+        set session_replication_role = origin;`);
+      const latest = planted('the newest program, in any league', async (scope) => {
+        const { rows } = await sql<{
+          at: Date;
+        }>`select max(created_at) as at from programs`.execute(transactionOf(scope));
+        return rows[0]?.at;
+      });
+      expect(await check(latest, fresh)).toEqual([{ run: 'code-only', problem: differs }]);
+    });
+  });
   it('reports a case that never reaches its target, since it proves nothing', async () => {
     expect(await check(planted('aims at nothing', async () => []))).toEqual([
       { run: 'control', problem: expect.stringContaining('proves nothing') },
@@ -190,5 +237,81 @@ describe('the harness', () => {
         problem: 'programs (league bravo) changed for good: a case committed',
       });
     });
+  });
+});
+
+describe('the harness, with commands (step 1.10)', () => {
+  type PlantedTx = CommandTx & { scope: LeagueScope };
+  const plantedTx = (scope: LeagueScope, jobs: JobQueue): PlantedTx => ({ scope, jobs });
+  // A correct policy: only the owner of the context's league.
+  const ownerOnly = async (context: CommandContext, _input: unknown, tx: PlantedTx) =>
+    (await findCurrentLeague(tx.scope))?.ownerAccountId === context.accountId;
+  const commandCase = <Tx extends CommandTx>(
+    command: Command<unknown, CommandError, Tx>,
+    makeTx: (scope: LeagueScope, jobs: JobQueue) => Tx,
+    input: (target: LeagueRecords) => unknown,
+  ): IsolationCase => ({
+    subject: command,
+    name: command.commandName,
+    run: (scope, target) => runInScope(command, makeTx, scope, input(target)),
+  });
+
+  it('passes the real command', async () => {
+    const real = commandCase(setLeagueName, harnessTx, () => ({ name: 'Renamed', version: 1 }));
+    expect(await check(real)).toEqual([]);
+  });
+
+  it('catches a planted command that takes the league from its input', async () => {
+    const renameNamedLeague = defineCommand({
+      name: 'leagues.planted_rename',
+      input: z.object({ leagueId: z.string() }),
+      allowed: ownerOnly,
+      // The leak: it renames the league its input names, with no league filter.
+      run: async ({ input, tx }): Promise<Result<number, never>> => {
+        const { rows } = await sql`update leagues set name = 'Planted'
+                                   where id = ${input.leagueId} returning id`.execute(
+          transactionOf(tx.scope),
+        );
+        return ok(rows.length);
+      },
+    });
+    const leaky = commandCase(renameNamedLeague, plantedTx, (target) => ({
+      leagueId: target.leagueId,
+    }));
+    expect(await check(leaky)).toEqual([
+      { run: 'code-only', problem: "changed league bravo's leagues" },
+      { run: 'code-only', problem: differs },
+    ]);
+  });
+
+  it("catches a job that names another league's records", async () => {
+    const tellAboutProgram = defineCommand({
+      name: 'leagues.planted_job',
+      input: z.object({ programId: z.string() }),
+      allowed: ownerOnly,
+      run: async ({ context, input, tx }): Promise<Result<null, never>> => {
+        const ids = { program: input.programId };
+        await tx.jobs.enqueue({ type: 'leagues.planted', leagueId: context.leagueId, ids });
+        return ok(null);
+      },
+    });
+    const leaky = commandCase(tellAboutProgram, plantedTx, (target) => ({
+      programId: target.programId,
+    }));
+    const leak = `returned "${leagues.b.programId}" of league bravo`;
+    expect(await check(leaky)).toEqual([
+      { run: 'app', problem: leak },
+      { run: 'code-only', problem: leak },
+    ]);
+  });
+
+  it("counts an expected error in the target's own league as proving nothing", async () => {
+    const stale = commandCase(setLeagueName, harnessTx, () => ({ name: 'Renamed', version: 7 }));
+    expect(await check(stale)).toEqual([
+      {
+        run: 'control',
+        problem: "refused in the target's own league: leagues.set_name refused: changed-since-read",
+      },
+    ]);
   });
 });

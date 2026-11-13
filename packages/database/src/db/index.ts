@@ -3,6 +3,7 @@
 // transaction. The query files in ../queries are inside this package and reach those
 // through kyselyOf and transactionOf on purpose; nothing outside the package can.
 export { checkLoginRole } from './check-login-role.ts';
+export { commandTransaction } from './command-transaction.ts';
 export { createDatabase, type DatabaseSource } from './create-database.ts';
 export type { DatabaseHandle } from './database-handle.ts';
 export type { AppScope, LeagueScope } from './transaction-scope.ts';

@@ -2,3 +2,4 @@
 export * from './src/db/index.ts';
 export * from './src/migrations/index.ts';
 export * from './src/queries/index.ts';
+export * from './src/stores/index.ts';

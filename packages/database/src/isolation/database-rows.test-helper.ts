@@ -58,8 +58,9 @@ export function changedTables(before: DatabaseRows, after: DatabaseRows, group: 
     .sort();
 }
 
-const uuidPattern = /[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi;
-const uuidsIn = (text: string) =>
+export const uuidPattern = /[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi;
+/** Every UUID in a text, in lower case. */
+export const uuidsIn = (text: string) =>
   [...text.matchAll(uuidPattern)].flatMap(([match]) => normalizedUuid(match) ?? []);
 
 /**

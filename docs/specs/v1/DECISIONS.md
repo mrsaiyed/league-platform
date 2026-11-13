@@ -236,6 +236,7 @@ All dated November 12, 2026.
 | T-220                 | New                                                                          | History keeps ids; erasure empties the account row in place; an owner-only function purges a league's history | History could not be kept unchanged while accounts are erased and leagues purged (step 1.6 review) |
 | T-221                 | New                                                                          | Lookups before a league or account is known go through a few narrow owner-run functions, never a wider policy | The league fence (step 1.7) left sign-up, sign-in, invitations and access lists with no way in     |
 | T-222                 | New                                                                          | Typed queries and the transaction helper (record 009)                                                         | Step 1.8 needed a transaction helper that cannot leak a league across pooled requests              |
+| T-223                 | New                                                                          | The command shape and where it lives (record 010)                                                             | Step 1.10 needed one shape for every change to data                                                |
 
 ## The full list
 
@@ -511,6 +512,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-87  | Who may see statistics (S-22) is enforced in the same one function as names, and never leaks through the cache or live updates                                                                                            | Agreed (delegated)  |         |
 | T-221 | What must happen before a league or account is known (short-name lookup, sign-up, sign-in by email, accepting an invitation, names on an access list) goes through a few narrow owner-run functions, never a wider policy | Agreed (delegated)  | yes     |
 | T-222 | Typed queries use Kysely behind a hidden handle; one transaction helper sets league and account for that transaction only and refuses stray queries after commit; `date` columns read as text (record 009)                | Agreed (delegated)  | yes     |
+| T-223 | The command shape: Zod input, one transaction, permission inside it, events inside it, jobs through the transaction object, one log line; core defines ports, database implements them (record 010)                       | Agreed (delegated)  | yes     |
 
 ### [T5 — Customization engine](technical/T5-customization-engine.md)
 

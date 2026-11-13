@@ -8,7 +8,7 @@ The one file that says where the build is. Every run reads it first and updates 
 - **Stage:** 1, foundations — [plan](STAGE-1.md)
 - **Branch:** `build/stage-1`
 - **Gate:** `npm run verify`
-- **Next step:** 1.10 The command shape
+- **Next step:** 1.11 Leagues
 - **Pushing to GitHub:** not allowed. The founder has not said yes.
 
 States: `building` (take the next step) · `waiting-for-founder` (nothing can be done until the list below is answered) · `stage-review` (the stage is finished and waiting for the founder's check).
@@ -26,6 +26,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 1.10 done: command shape in packages/core/src/command (defineCommand, registry, ports), example `leagues.set_name`, database adapter commandTransaction, harness runs commands (jobs scanned, refusal fails control), coverage scan over all of core; record 010 / T-223. Reviewer's 10 findings fixed. Open: jobs not in a real database transaction until 1.19; harness runs no event handlers yet (a check trips at the first); zod not declared in packages/core/package.json; PGlite only.
 - 2026-11-13 — Step 1.9 done: two-league harness in packages/database/src/isolation (test helpers; runs each registered case as control, app, code-only, no-league and both-leagues, each also compared with the other league's rows deleted; snapshots all tables incl. accounts/profiles; recursive coverage scan fails on a new uncovered query). Reviewer's findings fixed. Step 1.10 must decide how command cases run (a command opening its own transaction is refused as nested), normalise new ids/times in the comparison, and add its folders to the scan. Open: not run on real PostgreSQL; A's own rows not compared; driver error detail fields not scanned; helpers ~680 lines.
 - 2026-11-13 — Step 1.8 done: Kysely 0.29.7 typed queries in packages/database/src/db (hidden handle, PGlite + pg dialects, generated schema-types with drift test, withTransaction with transaction-local league/account, guarded driver refusing stray queries after commit, checkLoginRole) and src/queries examples; record 009 / T-222. Reviewer's 7 findings fixed. Open: pg path only run against PGlite, not a hosted database; checkLoginRole must be called at startup in step 1.17; no streaming/savepoints.
 - 2026-11-13 — Step 1.7 done: migration 0005 row-level security (restricted `app_user`, one forced policy per table, league and account fences). Reviewer's findings fixed: strict one-policy gate with planted-violation tests, WITH CHECK proven, decision record 008 / T-221 written, role-exists safe, encoding. Step 1.8 must set the league one-transaction-only.

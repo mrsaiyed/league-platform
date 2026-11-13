@@ -29,7 +29,7 @@ Each step is done when its done test passes, the gate passes, the independent re
 
 ### C. Rules of the product
 
-- [ ] **1.10 The command shape.** `command(context, input, deps) → result | error` with typed results, typed expected errors, permission check, one transaction, follow-up jobs recorded in the same transaction, and the log line of T-196. Events (T-24). The command registry the harness reads. _Spec: T2 §3, T-23 to T-26, T-74, T-196. Model: opus._
+- [x] **1.10 The command shape.** `command(context, input, deps) → result | error` with typed results, typed expected errors, permission check, one transaction, follow-up jobs recorded in the same transaction, and the log line of T-196. Events (T-24). The command registry the harness reads. _Spec: T2 §3, T-23 to T-26, T-74, T-196. Model: opus._
 - [ ] **1.11 Leagues.** Module `leagues`: create a league (internal tool only for now), short-name rules and the blocked list (U-7), rename with forwarding, states draft, live, archived, suspended (U-9), the hidden default program (U-3, U-12), season records. _Spec: P2 §5–6, T3 §4. Model: sonnet._
 - [ ] **1.12 Access.** Module `access`: the fixed roles and their permissions (A-3, O-7), role grants with scope, invitations (create, accept, re-send, cancel, expire), removing access takes effect at once (T-75), the activity log (A-6). A test of every role against every command (T4 §12). _Spec: P4 §4, T4 §4, T3 §5. Model: opus._
 
