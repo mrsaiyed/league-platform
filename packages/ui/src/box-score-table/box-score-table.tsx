@@ -22,6 +22,8 @@ export type BoxScoreLabels = {
 export type BoxScoreTableProps = {
   /** Names the table: the team's name. */
   readonly teamName: string;
+  /** Names the scrollable region for screen readers; the team's name is used when left out. */
+  readonly regionLabel?: string;
   readonly columns: readonly BoxScoreColumn[];
   /** Null when this team's player numbers are hidden from the viewer: only the total shows (S-22). */
   readonly players: readonly BoxScorePlayer[] | null;
@@ -34,6 +36,7 @@ export type BoxScoreTableProps = {
 /** One team's box score: players in the order given, then the team's totals. */
 export function BoxScoreTable({
   teamName,
+  regionLabel,
   columns,
   players,
   totals,
@@ -41,7 +44,7 @@ export function BoxScoreTable({
   labels,
 }: BoxScoreTableProps) {
   return (
-    <div className="ui-table-wrap">
+    <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? teamName}>
       <table className="ui-table ui-box-score">
         <caption dir="auto">{teamName}</caption>
         <thead>
@@ -59,7 +62,12 @@ export function BoxScoreTable({
             {columns.map((c) => (
               <th key={c.key} scope="col" className="ui-num" title={c.fullName}>
                 {c.label}
-                {c.fullName ? <span className="ui-visually-hidden">{c.fullName}</span> : null}
+                {c.fullName ? (
+                  <>
+                    {' '}
+                    <span className="ui-visually-hidden">{c.fullName}</span>
+                  </>
+                ) : null}
               </th>
             ))}
           </tr>

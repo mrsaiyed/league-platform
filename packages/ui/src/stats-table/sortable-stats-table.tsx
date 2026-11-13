@@ -18,6 +18,8 @@ export type StatsTableLabels = {
 
 export type SortableStatsTableProps = {
   readonly caption: string;
+  /** Names the scrollable region for screen readers; the caption is used when left out. */
+  readonly regionLabel?: string;
   /** The first column is the row heading (the player or team name). */
   readonly columns: readonly StatsColumn[];
   readonly rows: readonly StatRow[];
@@ -30,6 +32,7 @@ export type SortableStatsTableProps = {
 /** A table of statistics the reader can sort by any column. Shows the initial sort without scripts. */
 export function SortableStatsTable({
   caption,
+  regionLabel,
   columns,
   rows,
   initialSort = null,
@@ -39,7 +42,7 @@ export function SortableStatsTable({
   const [sort, setSort] = useState<Sort | null>(initialSort);
   const sorted = sortStatRows(rows, sort, locale);
   return (
-    <div className="ui-table-wrap">
+    <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? caption}>
       <table className="ui-table ui-stats">
         <caption dir="auto">{caption}</caption>
         <thead>
@@ -58,9 +61,13 @@ export function SortableStatsTable({
                     className="ui-sort-button"
                     onClick={() => setSort(nextSort(sort, c.key, c.numeric === true))}
                   >
-                    <span className="ui-visually-hidden">{labels.sortBy}</span>
-                    {c.label}
-                    {c.fullName ? <span className="ui-visually-hidden">{c.fullName}</span> : null}
+                    <span className="ui-visually-hidden">{labels.sortBy}</span> {c.label}
+                    {c.fullName ? (
+                      <>
+                        {' '}
+                        <span className="ui-visually-hidden">{c.fullName}</span>
+                      </>
+                    ) : null}
                   </button>
                 </th>
               );

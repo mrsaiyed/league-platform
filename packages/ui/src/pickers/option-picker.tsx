@@ -1,8 +1,12 @@
+import { useId } from 'react';
+
 // Round and season pickers. A plain form that goes to an address with the choice in it, so
 // it works before any script has loaded and the page decides what each choice shows.
 export type PickerOption = { readonly value: string; readonly label: string };
 
 export type OptionPickerProps = {
+  /** Makes the field's id unique when a page holds several pickers; one is made when left out. */
+  readonly id?: string;
   /** The name of the choice in the address, for example "round". */
   readonly name: string;
   /** The words beside the picker, for example "Round". */
@@ -18,6 +22,7 @@ export type OptionPickerProps = {
 };
 
 export function OptionPicker({
+  id: givenId,
   name,
   label,
   options,
@@ -26,7 +31,8 @@ export function OptionPicker({
   action,
   keep = {},
 }: OptionPickerProps) {
-  const id = `ui-picker-${name}`;
+  const generated = useId();
+  const id = givenId ?? `ui-picker-${name}-${generated}`;
   return (
     <form className="ui-picker" method="get" action={action}>
       {Object.entries(keep)

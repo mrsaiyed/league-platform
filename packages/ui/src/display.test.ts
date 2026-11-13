@@ -252,15 +252,90 @@ describe('pickers', () => {
   it('is a labelled form that works without scripts and keeps other choices', () => {
     const html = render(createElement(RoundPicker, props));
     expect(html).toContain('method="get"');
-    expect(html).toContain('for="ui-picker-round"');
-    expect(html).toContain('id="ui-picker-round"');
+    const id = /<select id="([^"]+)"/.exec(html)?.[1];
+    expect(id).toBeTruthy();
+    expect(html).toContain(`for="${id}"`);
     expect(html).toContain('name="round"');
     expect(html).toContain('name="team" value="t1"');
     expect(html).not.toContain('value="old"');
     expect(html).toContain('type="submit"');
   });
+  it('gives two pickers on one page different ids, or the id it is given', () => {
+    const page = render(
+      createElement(
+        'div',
+        null,
+        createElement(RoundPicker, props),
+        createElement(RoundPicker, props),
+      ),
+    );
+    const ids = [...page.matchAll(/<select id="([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(ids).size).toBe(2);
+    expect(render(createElement(RoundPicker, { ...props, id: 'mine' }))).toContain('id="mine"');
+  });
   it('the season picker asks for season', () => {
     expect(render(createElement(SeasonPicker, props))).toContain('name="season"');
+  });
+});
+
+describe('review fixes', () => {
+  const labels = { jersey: 'No.', player: 'Player', total: 'Total' };
+  it('scrollable tables are keyboard reachable named regions', () => {
+    const html = render(
+      createElement(BoxScoreTable, {
+        teamName: 'Hawks',
+        regionLabel: 'Hawks box score',
+        columns: [{ key: 'pts', label: 'PTS', fullName: 'Points' }],
+        players: [],
+        totals: { pts: 1 },
+        labels,
+      }),
+    );
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="Hawks box score"');
+    expect(html).toContain('PTS <span class="ui-visually-hidden">Points</span>');
+  });
+  it('keeps a space between hidden and visible words', () => {
+    const stats = render(
+      createElement(SortableStatsTable, {
+        caption: 'Leaders',
+        columns: [{ key: 'n', label: 'Player' }],
+        rows: [],
+        labels: { sortBy: 'Sort by' },
+      }),
+    );
+    expect(stats).toContain('Sort by</span> Player');
+    const standings = render(
+      createElement(StandingsTable, {
+        caption: 'D',
+        idPrefix: 'd',
+        columns: [],
+        rows: [{ id: 'a', team: 'A', cells: {}, notes: ['x'] }],
+        footnotes: [{ id: 'x', text: 'Why' }],
+        labels: { seed: 'Seed', team: 'Team', note: 'Note', notes: 'Notes' },
+      }),
+    );
+    expect(standings).toContain('Note</span> 1');
+  });
+  it('the box score link names both teams', () => {
+    const html = render(
+      createElement(GameCard, {
+        home: { name: 'Hawks', score: 1 },
+        away: { name: 'Owls', score: 2 },
+        status: 'final',
+        whenText: 'x',
+        detailsHref: '/g',
+        labels: gameLabels,
+      }),
+    );
+    expect(html).toMatch(/View box score <span[^>]*>Owls vs Hawks<\/span><\/a>/);
+  });
+  it('sort arrows are silent and tap targets are big enough', () => {
+    expect(displayCss).toContain(String.raw`'\25B2' / ''`);
+    expect(displayCss).toContain(String.raw`'\25BC' / ''`);
+    expect(displayCss).toMatch(/\.ui-sort-button \{[^}]*min-block-size: 2\.75rem/);
+    expect(displayCss).toMatch(/\.ui-note-mark a \{[^}]*min-block-size: 1\.5rem/);
   });
 });
 

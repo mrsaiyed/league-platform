@@ -111,7 +111,10 @@ export function GameCard({
       </ul>
       {detailsHref ? (
         <a className="ui-game-link" href={detailsHref}>
-          {labels.viewBoxScore}
+          {labels.viewBoxScore}{' '}
+          <span className="ui-visually-hidden" dir="auto">
+            {away.name} {labels.versus} {home.name}
+          </span>
         </a>
       ) : null}
     </article>

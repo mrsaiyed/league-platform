@@ -30,6 +30,8 @@ export type StandingsTableLabels = {
 export type StandingsTableProps = {
   /** Names the table: the division's name. */
   readonly caption: string;
+  /** Names the scrollable region for screen readers; the caption is used when left out. */
+  readonly regionLabel?: string;
   readonly columns: readonly StandingsColumn[];
   readonly rows: readonly StandingsRow[];
   readonly footnotes?: readonly StandingsFootnote[];
@@ -41,6 +43,7 @@ export type StandingsTableProps = {
 /** One division's table, in the order given: the page ranks, this only shows. */
 export function StandingsTable({
   caption,
+  regionLabel,
   columns,
   rows,
   footnotes = [],
@@ -50,7 +53,7 @@ export function StandingsTable({
   const numberOf = new Map(footnotes.map((n, i) => [n.id, i + 1]));
   const hasSeeds = rows.some((r) => r.seed !== undefined && r.seed !== null);
   return (
-    <div className="ui-table-wrap">
+    <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? caption}>
       <table className="ui-table ui-standings">
         <caption dir="auto">{caption}</caption>
         <thead>
@@ -86,8 +89,7 @@ export function StandingsTable({
                   {marks.map((m) => (
                     <sup key={m.id} className="ui-note-mark">
                       <a href={`#${idPrefix}-note-${m.id}`}>
-                        <span className="ui-visually-hidden">{labels.note}</span>
-                        {m.n}
+                        <span className="ui-visually-hidden">{labels.note}</span> {m.n}
                       </a>
                     </sup>
                   ))}
