@@ -12,6 +12,8 @@ import { randomUUID } from 'node:crypto';
 import {
   findGame,
   insertGameCorrection,
+  listDecidedGameLines,
+  listDecidedGames,
   listPostponedGames,
   updateGameResult,
 } from '../queries/index.ts';
@@ -45,6 +47,19 @@ registerIsolationCase({
     await postponeTargetGame(scope, target);
     return listPostponedGames(scope);
   },
+});
+
+// A season's results, as the games module gives them to standings (step 2.24).
+registerIsolationCase({
+  subject: listDecidedGames,
+  name: "list the target's season's decided games",
+  run: (scope, target) => listDecidedGames(scope, target.seasonId),
+});
+
+registerIsolationCase({
+  subject: listDecidedGameLines,
+  name: "list the lines of the target's season's decided games",
+  run: (scope, target) => listDecidedGameLines(scope, target.seasonId),
 });
 
 registerIsolationCase({

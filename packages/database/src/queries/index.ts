@@ -79,3 +79,5 @@ export { gameSummary } from './game-summary.ts';
 export { insertGameCorrection } from './insert-game-correction.ts';
 export { listPostponedGames } from './list-postponed-games.ts';
 export { updateGameResult } from './update-game-result.ts';
+export { listDecidedGames } from './list-decided-games.ts';
+export { listDecidedGameLines } from './list-decided-game-lines.ts';
