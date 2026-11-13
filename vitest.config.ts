@@ -20,7 +20,7 @@ try {
 
 export default defineConfig({
   test: {
-    ...(inLane ? { maxWorkers: 3, minWorkers: 1 } : {}),
+    ...(inLane ? { maxWorkers: 2, minWorkers: 1 } : {}),
     include: [
       'apps/web/**/*.test.ts',
       'apps/worker/**/*.test.ts',
