@@ -17,3 +17,5 @@ playwright-report/
 *.key
 docs/build/.lock
 docs/build/dashboard.html
+.next/
+next-env.d.ts
