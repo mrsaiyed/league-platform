@@ -27,6 +27,7 @@ Next free: migration 0012, record 033, T-245 (0011 / 031 / T-243 belong to 1.14;
 - **2.20 Schedule draft commands** — `.local/lanes/2.20-draft-commands` — none — builder starting.
 - **2.40 Public queries for standings, statistics and games** — `.local/lanes/2.40-public-queries` — none — builder starting.
 - **2.41 Shared display pieces** — `.local/lanes/2.41-display-pieces` — none — builder starting.
+- **Fix: reorder_roster isolation case** — `.local/lanes/fix-reorder-case` — none — main gate failed after 2.19 landed: case 'reorder the target team's roster' is refused with roster-incomplete in its control run.
 
 ## Needs the founder
 
