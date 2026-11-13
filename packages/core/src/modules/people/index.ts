@@ -8,6 +8,12 @@ export {
   type NameRequest,
 } from './rules/name-policy.ts';
 export {
+  findPrivateFields,
+  privateValuesOf,
+  type PrivateFieldFinding,
+  type PrivatePersonFields,
+} from './rules/private-field-scan.ts';
+export {
   showName,
   type PersonForDisplay,
   type ShownName,
