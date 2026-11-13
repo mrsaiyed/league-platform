@@ -244,6 +244,49 @@ const leagueTables: LeagueTable[] = [
       [leagueId, `test.setting${fresh()}`],
     ],
   },
+  {
+    table: 'people',
+    key: 'league_id',
+    touch: 'update people set first_name = first_name where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId) => [
+      `insert into people (league_id, first_name, last_name) values ($1, 'Made-up', $2)`,
+      [leagueId, unique('Person')],
+    ],
+  },
+  {
+    table: 'teams',
+    key: 'league_id',
+    touch: 'update teams set name = name where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId) => [
+      `insert into teams (league_id, season_id, slug, name, stats_visibility)
+       values ($1, (select id from seasons where league_id = $1 order by id limit 1), $2, $3,
+         'everyone')`,
+      [leagueId, unique('team'), unique('Team')],
+    ],
+  },
+  {
+    table: 'roster_entries',
+    key: 'league_id',
+    touch: 'update roster_entries set sort = sort where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    // A new person each time, on the league's own team, so the once-at-a-time rule
+    // never answers first.
+    insert: (leagueId) => [
+      `with person as (
+         insert into people (league_id, first_name, last_name)
+         values ($1, 'Made-up', $2) returning id
+       )
+       insert into roster_entries (league_id, team_id, person_id, jersey_number)
+       select $1, (select id from teams where league_id = $1 order by id limit 1), person.id, '23'
+       from person`,
+      [leagueId, unique('Player')],
+    ],
+  },
 ];
 
 const count = async (tx: Transaction | PGlite, sql: string, params: unknown[] = []) =>

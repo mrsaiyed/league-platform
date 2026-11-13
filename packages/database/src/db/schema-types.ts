@@ -89,6 +89,7 @@ export interface InvitationsTable {
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  scope_team_id: GeneratedAlways<string | null>;
 }
 
 export interface JobsTable {
@@ -149,6 +150,24 @@ export interface LeaguesTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface PeopleTable {
+  id: Generated<string>;
+  league_id: string;
+  profile_id: string | null;
+  first_name: Generated<string>;
+  last_name: Generated<string>;
+  public_name: string | null;
+  contact_email: string | null;
+  birth_date: string | null;
+  is_minor: boolean | null;
+  visibility: Generated<string>;
+  merged_into_id: string | null;
+  deleted_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface ProfileAccessTable {
   id: Generated<string>;
   account_id: string;
@@ -196,6 +215,22 @@ export interface RoleGrantsTable {
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  scope_team_id: GeneratedAlways<string | null>;
+}
+
+export interface RosterEntriesTable {
+  id: Generated<string>;
+  league_id: string;
+  team_id: string;
+  person_id: string;
+  jersey_number: string | null;
+  role: Generated<string>;
+  joined_on: string | null;
+  left_on: string | null;
+  sort: Generated<number>;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
 export interface SeasonsTable {
@@ -214,6 +249,7 @@ export interface SeasonsTable {
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  unique_jerseys: GeneratedAlways<boolean>;
 }
 
 export interface SettingValuesTable {
@@ -236,6 +272,22 @@ export interface SupportAccessLogTable {
   reason: string;
   started_at: ColumnType<Date, Date | string | undefined, Date | string>;
   ended_at: ColumnType<Date, Date | string, Date | string>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface TeamsTable {
+  id: Generated<string>;
+  league_id: string;
+  season_id: string;
+  division_id: string | null;
+  slug: string;
+  name: string;
+  color: string | null;
+  stats_visibility: string;
+  lineage_id: Generated<string>;
+  deleted_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
@@ -264,12 +316,15 @@ export interface Database {
   league_features: LeagueFeaturesTable;
   league_slug_history: LeagueSlugHistoryTable;
   leagues: LeaguesTable;
+  people: PeopleTable;
   profile_access: ProfileAccessTable;
   profiles: ProfilesTable;
   programs: ProgramsTable;
   role_grants: RoleGrantsTable;
+  roster_entries: RosterEntriesTable;
   seasons: SeasonsTable;
   setting_values: SettingValuesTable;
   support_access_log: SupportAccessLogTable;
+  teams: TeamsTable;
   venues: VenuesTable;
 }
