@@ -225,6 +225,9 @@ export function supabaseRealtimeSubscriber(
     socketOpenedAt = undefined;
     for (const topic of topics.values()) {
       clearTopicTimer(topic);
+      if (topic.joinedAt !== undefined && Date.now() - topic.joinedAt >= stableMs) {
+        topic.failures = 0;
+      }
       topic.joined = false;
       topic.joinedAt = undefined;
       topic.joinRef = null;
