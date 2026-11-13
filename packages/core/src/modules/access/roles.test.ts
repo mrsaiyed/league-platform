@@ -18,14 +18,19 @@ const p4 = {
     'people.read',
     'people.manage',
     'people.read_sensitive',
+    'people.import',
   ],
-  // "Schedule and Games" (P4 §3: games is entering and correcting scores too)
+  // "Schedule and Games" (P4 §3: the schedule is venues and time slots too; games is
+  // assigning scorekeepers, entering and correcting scores, recording a forfeit)
   scheduler: [
     'schedule.read',
     'schedule.edit',
     'schedule.publish',
+    'schedule.import',
+    'venues.manage',
     'games.manage',
     'games.score',
+    'games.results',
     'games.correct',
   ],
   // "Site, news, media, awards, sponsors"
@@ -64,6 +69,28 @@ describe('the fixed roles (A-3, O-7, P4 §4)', () => {
       expect(rolePermissions[role].includes('access.manage')).toBe(role === 'admin');
       expect(rolePermissions[role].includes('activity.read')).toBe(role === 'admin');
     }
+  });
+
+  it('give season settings, divisions, teams, standings and the bin to no role but admin', () => {
+    // P4 §3 areas that P4 §4 gives no role of their own. A club admin's teams and
+    // rosters are their own club's (its scope), not the league's.
+    const adminOnly = [
+      'season.settings',
+      'divisions.manage',
+      'standings.adjust',
+      'bin.restore',
+    ] as const;
+    for (const role of roles) {
+      for (const p of adminOnly)
+        expect(rolePermissions[role].includes(p), `${role} ${p}`).toBe(role === 'admin');
+      expect(rolePermissions[role].includes('teams.manage'), role).toBe(
+        role === 'admin' || role === 'club_admin',
+      );
+    }
+  });
+
+  it('give a scorekeeper scoring only: no results, corrections or changes to the schedule', () => {
+    expect([...rolePermissions.scorekeeper].sort()).toEqual(['games.score', 'schedule.read']);
   });
 
   it('name no permission twice', () => {

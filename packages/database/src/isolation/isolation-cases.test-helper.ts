@@ -37,6 +37,7 @@ import {
   revokeRoleGrant,
   findProgramBySlug,
   findProgramId,
+  findSeasonProgramId,
   insertJob,
   insertLeague,
   insertSeason,
@@ -206,6 +207,12 @@ registerIsolationCase({
       endsOn: null,
     });
   },
+});
+
+registerIsolationCase({
+  subject: findSeasonProgramId,
+  name: "find the program of the target's season",
+  run: (scope, target) => findSeasonProgramId(scope, target.seasonId),
 });
 
 registerIsolationCase({

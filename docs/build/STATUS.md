@@ -19,13 +19,14 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane, written before its builder starts: `- **<step>** — <lane folder> — reserved numbers — what is left`. A run that is cut off leaves this as the map for the next run.
 
-Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Reserved: migration 0007, record 019, T-231 (2.1). Reserved: record 020, T-232 (1.17). Reserved: record 021, T-233 (2.31). Next free: migration 0008, record 022, T-234. Check the folders before trusting these.
+Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014 / T-226 (1.12); record 017 / T-229 (1.16); record 018 / T-230 (1.15). Reserved: migration 0007, record 019, T-231 (2.1). Reserved: record 020, T-232 (1.17). Reserved: record 021, T-233 (2.31). Reserved: migration 0008, record 022, T-234 (2.2). Reserved: record 023, T-235 (1.19 part 2). Reserved: record 024, T-236 (2.12). Next free: migration 0009, record 025, T-237. Check the folders before trusting these.
 
 - **2.31 Live updates service** — `.local/lanes/2.31-live-updates` — none — builder starting.
 - **1.17 Web app shell** — `.local/lanes/1.17-web-shell` — record 020 / T-232 — builder starting.
 - **1.19 part 2 Invitation email job** — `.local/lanes/1.19p2-invitation-job` — none — builder starting.
+- **2.14 Defined settings** — `.local/lanes/2.14-defined-settings` — none — builder starting.
 - **2.12 Tracker offline queue** — `.local/lanes/2.12-offline-queue` — none — builder starting.
-- **2.13 Stage 2 permissions** — `.local/lanes/2.13-permissions` — none — builder starting.
+- **2.2 People, teams and rosters tables** — `.local/lanes/2.2-people-teams-tables` — migration 0008, record 022 / T-234 — builder starting.
 
 ## Needs the founder
 
@@ -38,6 +39,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 - [ ] Access in read-only leagues (U-9): the build refuses inviting, re-sending and accepting invitations in archived and suspended leagues, but still lets an owner or admin cancel an invitation or remove someone (removing access must always work). Recommended: keep it that way. Tell us if you want it different.
 - [ ] Who may restore things from the bin (O-10 / A-5): for now only admins (and the owner). Recommended: each area's own role restores its own items (a scheduler a removed game, a registrar a removed person), admins restore everything, because removing already needs that role. Tell us if you want it different.
 - [ ] Players asking for initials (R-15): built to start OFF, and a person of unknown age counts as a child in youth and mixed leagues. Confirm. Also: does Supabase's leaked-password protection need a paid plan (T-85)? Costs money, so yours to decide once the account exists.
+- [ ] Who sees a draft (not yet live) league (U-9 says 'only admins'): built narrowly, owner and admin roles only. Recommended: widen to anyone with an admin area (scheduler, registrar, editor, scorekeeper) so staff can prepare before launch. Tell us which you want.
 - [ ] Vendor accounts (Supabase, Render, Cloudflare, Resend, a domain) — not needed until the stage report asks for them.
 - [ ] Nothing to do now, but not yet checked: the league fence (step 1.7) assumes that the database user Supabase runs our migrations as is allowed to see past the fence, as it is on this computer. If it is not, some checks that must look at every league (is this short name free, does every league have its main program) will refuse to run rather than give a wrong answer, so nothing leaks, but leagues could not be created. One check settles it once a Supabase account exists; it goes on the stage report's checklist (record 008).
 
@@ -45,6 +47,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 2.13 done: stage 2 permissions in roles.ts (season.settings, divisions.manage, people.import, schedule.import, venues.manage, games.results, bin.restore); every command names its permission in defineCommand; commands.test.ts and the role matrix fail one that names none or the wrong one; allows() fails closed on unknown names; seasons are checked at the program's scope. Open: commands name no scope yet (scope lives in matrix rows); bin restore is admin-only pending the founder (record 014); scorekeepers with 'score any game' can finalize by typing a score (note for 2.27).
 - 2026-11-13 — Step 2.1 done: migration 0007 (divisions with a loop check, venues, courts, setting_values); record 019 / T-231 (setting values live in one table, no row = not set). Reviewer's findings fixed. Open for 2.16 and the nightly purge: bin interactions (live child under a binned parent, no cascade, restore hitting name uniqueness). Loop trigger assumes READ COMMITTED (refuses under repeatable read).
 - 2026-11-13 — Step 2.31 done (Supabase Realtime adapters NOT verified): live updates in packages/providers/src/live-updates (publisher interface, local SSE hub, Supabase publisher) and apps/web/src/features/live-updates (browser subscribers); channel names and LeagueScoreMessage in packages/contracts; record 021 / T-233 (browser half lives in apps/web because providers is server-only). Open: no web route mounts the hub yet (2.32/2.45); the realtime.messages policies (receive only for visible leagues, refuse browser broadcast, Allow public access off) are a migration that does not exist yet; web route must check league visibility via the hub's authorize hook. The migration lock test (run-migrations.test.ts) failed again under load, passes alone: a sturdiness step is still wanted.
 - 2026-11-13 — Step 2.11 done: showName, statsShown, Viewer (with leagueId), private-field scan in packages/core/src/modules/people (fail closed everywhere; T-81 reworded to follow R-14). Founder to confirm: 'players may ask for initials' (R-15) starts off; unknown age counts as a child in youth/mixed leagues. For 2.39/2.40/2.32: public queries must call showName/statsShown (store public_name or run it in the query layer); live latestPlay must be redacted to the strictest setting; scan helper needs privateValues from made-up people.
