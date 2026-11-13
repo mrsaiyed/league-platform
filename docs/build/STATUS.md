@@ -24,7 +24,6 @@ Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migrati
 
 - **2.15 Seasons and their rules** — `.local/lanes/2.15-season-commands` — record 026 / T-238 — just opened (2026-11-13 run).
 - **2.17 People commands** — `.local/lanes/2.17-people-commands` — record 027 / T-239 — just opened.
-- **2.18 Teams commands** — `.local/lanes/2.18-teams-commands` — record 028 / T-240 — just opened.
 
 - **2.66 Engine clock mode and its switch** — `.local/lanes/2.66-clock-mode` — record 029 / T-241 — folder opened but no builder started yet (machine saturated: npm ci timed out); 2.57 was closed again, its numbers (record 030 / T-242) are free.
 
@@ -50,6 +49,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 2.18 done: teams module (create, update, remove to bin, set who sees numbers; admin only for now), queries/store, isolation cases; removing a division is refused while live teams are in it. Open: no setting declared for teams choosing their own level (founder's default, listed under Needs the founder); renaming a team's short name has no forwarding; restore belongs to 2.76 (must handle taken short name/name and bring the roster back); small race between removing a division and creating a team in it. Gate: 1488 tests pass, vitest worker timeout error under load (step 1.27).
 - 2026-11-13 — Step 2.3 done: migration 0009 (schedule and game tables, game_corrections, publish history), record 025 / T-237. Reviewer's findings fixed (any change to a decided game's result, teams, division, stage, finalized_at or bin state needs a game_corrections row; format required and fixed once a game starts, format_fixed_at). Notes for 2.20/2.21/2.22/2.23/2.30: capture_mode uses final/box/live while the season rules say final-score/box-score (translate); unfenced system sessions must set the league before correcting a game; no brackets or step 2.4 tables yet; purging binned games needs DELETE or an owner-run function. Gate: all 1461 tests passed; vitest printed the worker 'Timeout calling onTaskUpdate' error under load (step 1.27 will fix).
 - 2026-11-13 — Lead: the check that guards main was too wide and too narrow at once. It refused any new file in packages/sports/src (where the stage plan puts standings and statistics), yet missed three files and one library that the tracker's browser code really pulls in. scripts/promote-to-main.mjs now asks the bundler for the exact list and compares those files, the tracker's own folders, the publish workflow, the bundled library versions and the build command; beside the engine it allows new files only. This settles the earlier 'someone has to decide' note: every file the live site is built from is the same as on main. Stage plans ticked to match this log.
 - 2026-11-13 — Step 1.23 done: ci.yml sets NEXT_TELEMETRY_DISABLED (job already ran npm ci and npm run verify on Node 24); YAML checked by eye only.
