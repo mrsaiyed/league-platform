@@ -287,6 +287,120 @@ const leagueTables: LeagueTable[] = [
       [leagueId, unique('Player')],
     ],
   },
+  {
+    table: 'rounds',
+    key: 'league_id',
+    touch: 'update rounds set label = label where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId) => [
+      `insert into rounds (league_id, season_id, number)
+       values ($1, (select id from seasons where league_id = $1 order by id limit 1), $2)`,
+      [leagueId, fresh()],
+    ],
+  },
+  // A season holds one stage, one draft and revisions from 1, so these rows each come
+  // with a season of their own.
+  {
+    table: 'stages',
+    key: 'league_id',
+    touch: 'update stages set name = name where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId, { defaultProgramId }) => [
+      `with season as (
+         insert into seasons (league_id, program_id, slug, name)
+         values ($1, $2, $3, 'Made-up Season') returning id
+       )
+       insert into stages (league_id, season_id, name)
+       select $1, season.id, 'Regular season' from season`,
+      [leagueId, defaultProgramId, unique('season')],
+    ],
+  },
+  {
+    table: 'games',
+    key: 'league_id',
+    touch: 'update games set starts_at = starts_at where league_id = $1',
+    canUpdate: true,
+    // A game leaves only through the bin.
+    canDelete: false,
+    insert: (leagueId, { defaultProgramId }) => [
+      `with season as (
+         insert into seasons (league_id, program_id, slug, name)
+         values ($1, $2, $3, 'Made-up Season') returning id
+       ), stage as (
+         insert into stages (league_id, season_id, name)
+         select $1, season.id, 'Regular season' from season returning id, season_id
+       ), home as (
+         insert into teams (league_id, season_id, slug, name, stats_visibility)
+         select $1, season.id, 'home', 'Home', 'everyone' from season returning id
+       ), away as (
+         insert into teams (league_id, season_id, slug, name, stats_visibility)
+         select $1, season.id, 'away', 'Away', 'everyone' from season returning id
+       )
+       insert into games (league_id, season_id, stage_id, home_team_id, away_team_id, capture_mode)
+       select $1, stage.season_id, stage.id, home.id, away.id, 'live' from stage, home, away`,
+      [leagueId, defaultProgramId, unique('season')],
+    ],
+  },
+  {
+    table: 'schedule_revisions',
+    key: 'league_id',
+    touch: 'update schedule_revisions set summary = summary where league_id = $1',
+    canUpdate: false,
+    canDelete: false,
+    insert: (leagueId, { defaultProgramId }) => [
+      `with season as (
+         insert into seasons (league_id, program_id, slug, name)
+         values ($1, $2, $3, 'Made-up Season') returning id
+       )
+       insert into schedule_revisions (league_id, season_id, number)
+       select $1, season.id, 1 from season`,
+      [leagueId, defaultProgramId, unique('season')],
+    ],
+  },
+  {
+    table: 'schedule_drafts',
+    key: 'league_id',
+    touch: 'update schedule_drafts set changes = changes where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    insert: (leagueId, { defaultProgramId }) => [
+      `with season as (
+         insert into seasons (league_id, program_id, slug, name)
+         values ($1, $2, $3, 'Made-up Season') returning id
+       )
+       insert into schedule_drafts (league_id, season_id)
+       select $1, season.id from season`,
+      [leagueId, defaultProgramId, unique('season')],
+    ],
+  },
+  {
+    table: 'game_assignments',
+    key: 'league_id',
+    touch: 'update game_assignments set account_id = account_id where league_id = $1',
+    canUpdate: true,
+    canDelete: true,
+    // A new account each time, so the once-per-game rule never answers first.
+    insert: (leagueId) => [
+      `insert into game_assignments (league_id, game_id, account_id)
+       values ($1, (select id from games where league_id = $1 order by id limit 1), $2)`,
+      [leagueId, nextAccount()],
+    ],
+  },
+  {
+    table: 'game_corrections',
+    key: 'league_id',
+    touch: 'update game_corrections set reason = reason where league_id = $1',
+    canUpdate: false,
+    canDelete: false,
+    insert: (leagueId, { ownerId }) => [
+      `insert into game_corrections (league_id, game_id, account_id, reason, before, after)
+       values ($1, (select id from games where league_id = $1 order by id limit 1), $2,
+         'Wrong score', '{"version": 1}', '{"version": 1}')`,
+      [leagueId, ownerId],
+    ],
+  },
 ];
 
 const count = async (tx: Transaction | PGlite, sql: string, params: unknown[] = []) =>
@@ -295,7 +409,7 @@ const count = async (tx: Transaction | PGlite, sql: string, params: unknown[] = 
 let a: Seeded;
 let b: Seeded;
 beforeAll(async () => {
-  for (let i = 0; i < 20; i++) spareAccounts.push(await newAccount(db));
+  for (let i = 0; i < 30; i++) spareAccounts.push(await newAccount(db));
   a = await leagueWithEverything();
   b = await leagueWithEverything();
 });

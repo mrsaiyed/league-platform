@@ -1,10 +1,14 @@
-// The shell's screens (step 1.17): placeholders for pages not built yet, the
-// admin's navigation and the notice on a league that is not public.
+// The shell's screens (steps 1.17 and 1.18): placeholders for pages not built yet, the
+// admin's navigation, the notice on a league that is not public, and the league's
+// design, header and footer.
 export { AdminArea } from './admin-area.tsx';
 export { AdminNav } from './admin-nav.tsx';
+export { DesignStyle } from './design-style.tsx';
 export { LeagueNotice } from './league-notice.tsx';
 export { LeagueSitePage } from './league-site-page.tsx';
 export { NotBuilt } from './not-built.tsx';
+export { SiteFooter } from './site-footer.tsx';
+export { SiteHeader } from './site-header.tsx';
 
 /** What Next.js gives every page and layout under `[league]`. */
 export type LeagueRouteProps = { readonly params: Promise<{ readonly league: string }> };

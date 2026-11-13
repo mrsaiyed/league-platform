@@ -1,6 +1,6 @@
 // Each structure check (scripts/structure) is proven two ways: it catches a
 // violation planted in a throwaway repository (and nothing else fires), and the
-// real repository passes. Every fixture runs all seven checks, so a false positive
+// real repository passes. Every fixture runs every check, so a false positive
 // from any rule fails the test that planted something else.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -304,6 +304,7 @@ test('T-27 catches a league named in code but not in comments, seed or fixtures'
       ['packages/core/src/a.ts:2 [T-27]', 'names the league "faraj"'],
       ['packages/core/src/b.ts:1 [T-27]', 'names the league "AlHadi"'],
       ['packages/site/src/c.tsx:1 [T-27]', 'names the league "TCSAAL"'],
+      ['packages/site/src/c.tsx:1 [T-187]', 'interface text "TCSAAL standings"'],
       ['supabase/migrations/001.sql:2 [T-27]', 'names the league "al-hadi"'],
       ['packages/ui/messages.json:1 [T-27]', 'names the league "Faraj"'],
       ['apps/web/public/about.html:1 [T-27]', 'names the league "al_hadi"'],
@@ -767,6 +768,7 @@ test('a planted violation of any rule fails the gate', (t) => {
     'T-30': { 'packages/ui/src/a.ts': 'const u = process.env.X;\n' },
     'T-183': { 'supabase/migrations/0001_a.sql': 'drop table teams;\n' },
     'T-226': { 'apps/web/src/a.ts': 'issueInvitationLink(tx, id);\n' },
+    'T-187': { 'apps/web/src/a.tsx': 'export const A = () => <p>Save changes</p>;\n' },
   };
   const quiet = () => {};
   for (const [rule, files] of Object.entries(plants)) {
