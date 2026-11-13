@@ -24,9 +24,9 @@ Reserved so far: migration 0006 and record 012 / T-224 (1.19 part 1); record 014
 - **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — built, reviewed, findings fixed; MID-MERGE with the build branch (conflicts after 1.19 landed in T7 doc, core index, isolation helpers, stores index). A builder was settling them; its job must now carry ids only (UUIDs/dates) so the invitation token cannot ride in job ids: redesign, then gate, then land.
 - **1.16 Address builder and request context** — `.local/lanes/1.16-address-context` — record 017 / T-229 if needed — builder just started; check its lane branch for commits.
 - **1.15 Supabase adapter** — `.local/lanes/1.15-supabase-adapter` — record 018 / T-230 if needed — builder just started; check its lane branch for commits.
-- **2.10 Fixture spreadsheet reader** — `.local/lanes/2.10-fixture-reader` — none — built, gate green in lane (29f6833); needs independent review, catch-up, land. Limits chosen by the builder (rows 5000, etc.) for the lead to confirm.
+- **2.11 Public names and who sees statistics** — `.local/lanes/2.11-public-names` — none — builder starting.
+- **2.31 Live updates service** — `.local/lanes/2.31-live-updates` — none — builder starting.
 - **2.1 Divisions, venues, courts, settings tables** — `.local/lanes/2.1-settings-tables` — migration 0007, record 019 / T-231 — builder starting.
-- **2.6 Tracker protocol and live messages** — `.local/lanes/2.6-tracker-protocol` — none — builder starting.
 
 ## Needs the founder
 
@@ -44,6 +44,8 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 2.10 done: fixture CSV reader in packages/core/src/modules/imports (review's 11 findings fixed). Open: formula-looking cells pass through unchanged, so any later spreadsheet export (P9) must neutralise cells starting with = + - @; ambiguous dates read month first with a warning; messages are English text inside core (to be returned as codes by screens 2.54 if wanted).
+- 2026-11-13 — Step 2.6 done: tracker protocol contracts (packages/contracts/src/tracker-protocol.ts) and viewer rules in apps/web/src/features/live-game. Reviewer's findings fixed. For 2.29/2.45: server must clamp tap times, redact latestPlay to the most restrictive stats setting, and a slow safety poll is needed for a lost last live message.
 - 2026-11-13 — Step 1.19 part 1 done: jobs table (migration 0006), take_jobs refused inside league or account transactions, fixed job-type and error-code lists, table queue and pg-boss queue (pg-boss runs on PGlite; not verified on hosted PostgreSQL), email interface with capture and unverified Resend adapters. Open: who creates the pgboss schema on the hosted database; a worker role of its own; reportQueueError is temporary until the logger is wired. `npm ci` needed after landing.
 - 2026-11-13 — Step 2.7 done: standings maths in packages/sports/src/standings; tiebreaker procedure in T3 §9. Product choices still open for the founder: restart among still-tied teams, head-to-head only when every tied team has met, coin-flip scope, still-tied seeds by id, forfeit not counted in point difference adds nothing, points deductions do nothing in win-percentage leagues. No place to store coin flips yet.
 - 2026-11-13 — Step 1.13 done: sign-in interface (SignInService) and in-memory stand-in in packages/providers, Zod shapes in contracts; record 013, T-225 (code and attempt limits, per address and per network). Reviewer's 12 findings fixed. For 1.14/1.15: networkAddress is required on code calls; the code sender returns a Result; the stand-in needs nodeEnv from config; Supabase has no device or session list (the adapter needs a small store, maybe a migration); Google-only accounts re-confirm through a fresh Google sign-in.
