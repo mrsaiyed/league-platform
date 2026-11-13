@@ -185,6 +185,8 @@ try {
 const staging = start(['start', '--port', String(await freePort())], {
   APP_ENV: 'staging',
   PUBLIC_BASE_URL: 'https://staging.example.test',
+  // Required outside local and test (config-schema.ts), so the database is reached.
+  TRUSTED_PROXY: 'one',
 });
 const code = await new Promise((resolve) => {
   const timer = setTimeout(() => {

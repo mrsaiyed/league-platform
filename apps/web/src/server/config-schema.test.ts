@@ -49,6 +49,39 @@ describe('loadConfig', () => {
     expect(failure({ ...valid, TRUSTED_PROXY: 'all' }).invalid.join()).toContain('TRUSTED_PROXY');
   });
 
+  it('keeps the TRUSTED_PROXY default for local and test only (record 031)', () => {
+    for (const appEnv of ['local', 'test']) {
+      expect(
+        loadConfig({ ...valid, APP_ENV: appEnv, TRUSTED_PROXY: undefined }).TRUSTED_PROXY,
+      ).toBe('none');
+    }
+    for (const appEnv of ['staging', 'production']) {
+      for (const blank of [undefined, '  ']) {
+        const error = failure({ ...valid, APP_ENV: appEnv, TRUSTED_PROXY: blank });
+        expect(error.missing).toEqual([]);
+        expect(error.invalid).toEqual([
+          `TRUSTED_PROXY: missing, must be set explicitly when APP_ENV is ${appEnv}`,
+        ]);
+      }
+      for (const set of ['none', 'one'] as const) {
+        expect(loadConfig({ ...valid, APP_ENV: appEnv, TRUSTED_PROXY: set }).TRUSTED_PROXY).toBe(
+          set,
+        );
+      }
+    }
+  });
+
+  it('names a missing TRUSTED_PROXY beside the other problems', () => {
+    const error = failure({
+      ...valid,
+      APP_ENV: 'production',
+      TRUSTED_PROXY: undefined,
+      DATABASE_URL: undefined,
+    });
+    expect(error.missing).toEqual(['DATABASE_URL']);
+    expect(error.invalid.join()).toContain('TRUSTED_PROXY');
+  });
+
   it('ignores variables it does not know', () => {
     expect(loadConfig({ ...valid, PATH: '/bin' }).APP_ENV).toBe('test');
   });

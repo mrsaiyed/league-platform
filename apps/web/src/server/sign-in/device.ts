@@ -63,9 +63,11 @@ export const unknownNetwork = '0.0.0.0';
 
 /**
  * Whether X-Forwarded-For is believed (TRUSTED_PROXY, config-schema.ts):
- * - `none` (the default): never. Next.js fills the header from the connection only
- *   when the browser did not send one, so on its own the header is whatever the
- *   browser claims. Every request then shares one key (unknownNetwork).
+ * - `none` (the default in local and test only): never. Next.js fills the header
+ *   from the connection only when the browser did not send one, so on its own the
+ *   header is whatever the browser claims. Every request then shares one key
+ *   (unknownNetwork), so one person's wrong guesses can lock out everyone; staging
+ *   and production therefore refuse to start until the setting is chosen.
  * - `one`: exactly one proxy of the host's stands in front of the app and appends
  *   the address it was reached from; its entry, the last one, is believed. Entries
  *   before it are what the browser claimed.

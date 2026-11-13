@@ -37,8 +37,10 @@ const schema = z.object({
   PUBLIC_BASE_URL: webUrl,
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   // Whether X-Forwarded-For is believed for the sign-in attempt limits (record 031):
-  // 'none' (default) never; 'one' when exactly one proxy of the host appends the
-  // address it was reached from.
+  // 'none' never; 'one' when exactly one proxy of the host appends the address it
+  // was reached from. The default 'none' is for local and test only: in staging and
+  // production it must be set (mustBeExplicit), because with 'none' every visitor
+  // shares one address and one person's wrong guesses lock out everyone.
   TRUSTED_PROXY: z.enum(['none', 'one']).default('none'),
   DATABASE_URL: z
     .string()
@@ -57,6 +59,11 @@ export type Config = Readonly<z.infer<typeof schema>>;
 
 /** Optional variables: absent or blank means "use the default", not "missing". */
 const optional: readonly ConfigName[] = ['LOG_LEVEL', 'TRUSTED_PROXY'];
+
+/** Optional in local and test, but required in these, so its choice is a decision. */
+const mustBeExplicit: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
+  TRUSTED_PROXY: ['staging', 'production'],
+};
 
 export class ConfigError extends Error {
   readonly missing: readonly string[];
@@ -87,12 +94,18 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     const value = env[name];
     given[name] = value === undefined || value.trim() === '' ? undefined : value;
   }
-  const result = schema.safeParse(given);
-  if (result.success) return Object.freeze(result.data);
-
   const missing = new Set<string>();
   const invalid = new Map<string, string>();
-  for (const issue of result.error.issues) {
+  for (const [name, environments] of Object.entries(mustBeExplicit)) {
+    const appEnv = given['APP_ENV'];
+    if (given[name] === undefined && appEnv !== undefined && environments.includes(appEnv)) {
+      invalid.set(name, `${name}: missing, must be set explicitly when APP_ENV is ${appEnv}`);
+    }
+  }
+  const result = schema.safeParse(given);
+  if (result.success && invalid.size === 0) return Object.freeze(result.data);
+
+  for (const issue of result.success ? [] : result.error.issues) {
     const name = String(issue.path[0]);
     if (given[name] === undefined && !optional.includes(name as ConfigName)) missing.add(name);
     else if (!invalid.has(name)) invalid.set(name, `${name}: invalid, ${reason(issue)}`);
