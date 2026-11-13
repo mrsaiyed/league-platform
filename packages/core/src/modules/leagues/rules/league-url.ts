@@ -68,8 +68,10 @@ export const leaguePages = {
   score: { path: ['score', ':game'], level: 'private' },
   /**
    * Accepting an invitation (P4 §4, T-226): the link in the invitation's email, built
-   * only by the worker as it sends. `token` is the link's secret; the page that
-   * opens it should send no Referer (`Referrer-Policy: no-referrer`).
+   * only by the worker as it sends. `token` is the link's secret, in the path (record
+   * 023): the page that opens it must answer with `Referrer-Policy: no-referrer` and
+   * `Cache-Control: no-store`, and the path is left out of our request logs and
+   * analytics (steps 1.14 and 1.17).
    */
   invitation: { path: ['invitation', ':token'], level: 'private' },
 } as const satisfies Record<string, PageSpec>;

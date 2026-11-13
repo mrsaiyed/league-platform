@@ -114,7 +114,7 @@ A past season is the same address with `?season=fall-2025`. Without it, you get 
 - An organizer can change it. The old address forwards to the new one for 12 months and is not given to anyone else during that time.
 - We can take back a name that impersonates another organization. This is in the terms.
 
-Inside a league, a program or custom page cannot use a name the site already uses (`schedule`, `teams`, `admin` and so on). The admin is told at the moment they type it.
+Inside a league, a program or custom page cannot use a name the site already uses (`schedule`, `teams`, `admin`, `invitation` and so on). The admin is told at the moment they type it.
 
 ## 6. What a league's site looks like from our side
 

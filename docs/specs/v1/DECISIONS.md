@@ -243,6 +243,7 @@ All dated November 12, 2026.
 | T-225                 | New                                                                          | Sign-in numbers and the shape of the sign-in interface (record 013)                                           | Step 1.13 turned "a few" and "for a while" into numbers the stand-in and Supabase share            |
 | T-229                 | New                                                                          | Agreed (delegated): endpoints name their league by id; one spelling per address (record 017)                  | Step 1.16 review: endpoints had no league; other spellings were served                             |
 | T-230                 | New                                                                          | The Supabase adapter and the small store of our own it needs (record 018)                                     | Step 1.15: Supabase has no session list, devices or per-address limits                             |
+| T-235                 | New                                                                          | Templates in plain TypeScript until React is in; the invitation link stays in the path, unlogged (record 023) | Step 1.19 part 2 review: no React toolchain yet; the link must not leak or be lost                 |
 
 ## The full list
 
@@ -628,6 +629,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-147 | A chat is ordinary league data plus the delivery we already have                                                                                                           | Agreed (delegated)  |         |
 | T-148 | Chat safety is enforced by the server, not by the screen                                                                                                                   | Agreed (delegated)  |         |
 | T-224 | Jobs are recorded in our own fenced `jobs` table, ids only; pg-boss runs them in production, the table itself locally (record 012)                                         | Agreed (delegated)  | yes     |
+| T-235 | Templates are plain TypeScript until React is in; the invitation link stays in the path, never sent on, cached or logged; its email is built before it commits (rec. 023)  | Agreed (delegated)  | yes     |
 
 ### [T8 — Scale, reliability and operations](technical/T8-scale-reliability-operations.md)
 
