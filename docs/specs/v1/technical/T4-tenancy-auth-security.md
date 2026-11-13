@@ -1,6 +1,6 @@
 # T4 — Keeping leagues apart, sign-in, and security
 
-[Spec home](../README.md) · Decisions T-60 to T-87
+[Spec home](../README.md) · Decisions T-60 to T-87, T-221
 
 ## 1. What we are protecting against
 
@@ -28,10 +28,11 @@ All leagues share one database (T-4), so separation is the most important proper
 **Fence 3 — the database itself.** PostgreSQL row-level security is switched on for every league table.
 
 - **T-60:** the web app and worker connect as a restricted database user that cannot change the schema and cannot bypass row-level security.
-- **T-61:** at the start of each transaction the app tells the database which league and account it is acting for. Every table's policy allows only rows whose `league_id` matches. A query that forgot its `WHERE league_id = ...` returns nothing from other leagues, because the database filters it anyway.
+- **T-61:** at the start of each transaction the app tells the database which league and account it is acting for, for that transaction only. Every table's policy allows only rows whose `league_id` matches (for `leagues` itself, its `id`), for reading and writing alike. A query that forgot its `WHERE league_id = ...` returns nothing from other leagues, because the database filters it anyway; a transaction that set no league sees and writes nothing.
 - **T-62:** tables that belong to a person and not a league (`accounts`, `profiles`, `notifications`) have policies keyed to the account instead.
 - **T-63:** jobs that must look across leagues (finding today's games for reminders) run as a list of per-league steps, each inside its own league's fence. A separate, more powerful database user exists only for migrations.
 - **T-64:** Supabase's feature that lets browsers query the database directly is given no access to our tables. All access goes through our web app (T-5).
+- **T-221: what must happen before a league or account is known goes through a few narrow functions, never a wider policy.** Finding a league from the short name in an address, creating and erasing an account, finding an account by email at sign-in (without revealing whether it exists, T-68), accepting an invitation by its token, and showing the names on a league's access list each get one function that runs as the tables' owner, does one job and returns the fewest columns. Each is reviewed and listed in a test that fails on any it does not know. The short-name lookup exists from step 1.7; the others come with the access and sign-in steps. Detail: [decision record 008](../../../architecture/decisions/008-what-the-app-role-cannot-reach-yet.md).
 
 **And we prove it continuously.**
 

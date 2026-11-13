@@ -19,7 +19,7 @@ Every decision in the v1 specification, in one place. This is the list we argue 
 Three rounds are done. You answered the "start here" list and most of the product files, delegated the technical files, answered the remaining real choices, and accepted the list of defaults with changes.
 
 - **Stage 1 can start.** Every decision it depends on is settled (listed further down).
-- Of 309 decisions: 114 are settled by you, 166 are settled by delegation, 8 are waiting for your answer, and 21 are later, open, dropped or closed.
+- Of 310 decisions: 114 are settled by you, 167 are settled by delegation, 8 are waiting for your answer, and 21 are later, open, dropped or closed.
 - The biggest changes from your answers: Faraj first, with a TCSAAL demo at the end of Al-Hadi's season; the demo is the whole TCSAAL league; no single-team sites; no published prices; classic email and password; signed in with no time limit; reminders 24 hours ahead; group chats inside the product; league rules that drive the tracker, with a running-clock switch at the table; each team chooses who sees its players' statistics; a "Faraj test" season before the real league moves; no outside engineer for now.
 
 ## Needs your answer
@@ -234,6 +234,7 @@ All dated November 12, 2026.
 | S-22, T-87            | New                                                                          | Each team chooses who can see its players' statistics                                                         | Founder                                                                                            |
 | F-6                   | The demo league was Al-Hadi's district                                       | The demo is the whole TCSAAL league; other schools start with hidden player statistics                        | Founder                                                                                            |
 | T-220                 | New                                                                          | History keeps ids; erasure empties the account row in place; an owner-only function purges a league's history | History could not be kept unchanged while accounts are erased and leagues purged (step 1.6 review) |
+| T-221                 | New                                                                          | Lookups before a league or account is known go through a few narrow owner-run functions, never a wider policy | The league fence (step 1.7) left sign-up, sign-in, invitations and access lists with no way in     |
 
 ## The full list
 
@@ -477,36 +478,37 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 
 ### [T4 — Keeping leagues apart, sign-in, security](technical/T4-tenancy-auth-security.md)
 
-| ID   | Decision                                                                                                                                               | Status              | Stage 1 |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- | ------- |
-| T-60 | The web app and worker connect as a restricted database user that cannot change the schema and cannot bypass row-level security                        | Agreed (delegated)  | yes     |
-| T-61 | At the start of each transaction the app tells the database which league and account it is acting for                                                  | Agreed (delegated)  | yes     |
-| T-62 | Tables that belong to a person and not a league (`accounts`, `profiles`, `notifications`) have policies keyed to the account instead                   | Agreed (delegated)  | yes     |
-| T-63 | Jobs that must look across leagues (finding today's games for reminders) run as a list of per-league steps, each inside its own league's fence         | Agreed (delegated)  | yes     |
-| T-64 | Supabase's feature that lets browsers query the database directly is given no access to our tables                                                     | Agreed (delegated)  | yes     |
-| T-65 | An automated test creates two leagues and, for every command and every query in the product, tries to use league A's access against league B's records | Agreed (delegated)  | yes     |
-| T-66 | Anything cached is keyed by league, and nothing personal or private is ever cached where another visitor could be served it                            | Agreed (delegated)  | yes     |
-| T-67 | Email and password, or Google; a new address is proved with an emailed 6-digit code, which is also the forgotten-password route                        | Changed (delegated) | yes     |
-| T-68 | The sign-in screen behaves identically whether or not an account exists, so it cannot be used to discover who has an account                           | Agreed (delegated)  | yes     |
-| T-69 | The session is a cookie the page's scripts cannot read, sent only over HTTPS, and not sent on requests started by other websites                       | Agreed (delegated)  | yes     |
-| T-70 | Staying signed in follows R-9: no time limit; the password again for sensitive actions; an email on a new device                                       | Changed (delegated) | yes     |
-| T-71 | The account page lists active sessions by device and time, with "sign out everywhere"                                                                  | Agreed (delegated)  | yes     |
-| T-72 | A second sign-in step (an authenticator app) is offered to league owners at launch and required for owners once a league collects money (stage 5)      | Agreed (delegated)  |         |
-| T-73 | Changing an account's email needs confirmation from the new address and sends a notice to the old one                                                  | Agreed (delegated)  |         |
-| T-74 | Permissions are checked on the server, inside each command                                                                                             | Agreed (delegated)  |         |
-| T-75 | Roles are read from the database on every request, so removing someone's access works immediately                                                      | Agreed (delegated)  |         |
-| T-76 | Private fields are filtered by permission in the query, not in the page                                                                                | Agreed (delegated)  |         |
-| T-77 | Staff have no standing access to any league                                                                                                            | Agreed (delegated)  |         |
-| T-78 | No league-supplied HTML, JavaScript or CSS exists anywhere in the system                                                                               | Agreed (delegated)  |         |
-| T-79 | A content security policy tells browsers to run scripts only from us and to show embedded frames only from the approved list (C-9)                     | Agreed (delegated)  |         |
-| T-80 | Stored uploads are images only, re-encoded and served from a separate address; import spreadsheets are read once and never served                      | Changed (delegated) |         |
-| T-81 | Public pages get names only through one function that applies the league's display policy and the guardian's consent                                   | Agreed (delegated)  |         |
-| T-82 | Card details are entered only on Stripe's pages                                                                                                        | Agreed (delegated)  |         |
-| T-83 | Two-step sign-in must be on for every account that controls the business                                                                               | Agreed              |         |
-| T-84 | A written incident procedure before the first outside league joins                                                                                     | Agreed (delegated)  |         |
-| T-85 | Password rules: a one-way hash held by the sign-in service, at least 8 characters, leaked passwords refused, guesses limited                           | Agreed (delegated)  | yes     |
-| T-86 | Logs and error reports carry no personal content and are kept for a fixed time; exports are delivered by an expiring link                              | Agreed (delegated)  |         |
-| T-87 | Who may see statistics (S-22) is enforced in the same one function as names, and never leaks through the cache or live updates                         | Agreed (delegated)  |         |
+| ID    | Decision                                                                                                                                                                                                                  | Status              | Stage 1 |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------- |
+| T-60  | The web app and worker connect as a restricted database user that cannot change the schema and cannot bypass row-level security                                                                                           | Agreed (delegated)  | yes     |
+| T-61  | At the start of each transaction the app tells the database which league and account it is acting for                                                                                                                     | Agreed (delegated)  | yes     |
+| T-62  | Tables that belong to a person and not a league (`accounts`, `profiles`, `notifications`) have policies keyed to the account instead                                                                                      | Agreed (delegated)  | yes     |
+| T-63  | Jobs that must look across leagues (finding today's games for reminders) run as a list of per-league steps, each inside its own league's fence                                                                            | Agreed (delegated)  | yes     |
+| T-64  | Supabase's feature that lets browsers query the database directly is given no access to our tables                                                                                                                        | Agreed (delegated)  | yes     |
+| T-65  | An automated test creates two leagues and, for every command and every query in the product, tries to use league A's access against league B's records                                                                    | Agreed (delegated)  | yes     |
+| T-66  | Anything cached is keyed by league, and nothing personal or private is ever cached where another visitor could be served it                                                                                               | Agreed (delegated)  | yes     |
+| T-67  | Email and password, or Google; a new address is proved with an emailed 6-digit code, which is also the forgotten-password route                                                                                           | Changed (delegated) | yes     |
+| T-68  | The sign-in screen behaves identically whether or not an account exists, so it cannot be used to discover who has an account                                                                                              | Agreed (delegated)  | yes     |
+| T-69  | The session is a cookie the page's scripts cannot read, sent only over HTTPS, and not sent on requests started by other websites                                                                                          | Agreed (delegated)  | yes     |
+| T-70  | Staying signed in follows R-9: no time limit; the password again for sensitive actions; an email on a new device                                                                                                          | Changed (delegated) | yes     |
+| T-71  | The account page lists active sessions by device and time, with "sign out everywhere"                                                                                                                                     | Agreed (delegated)  | yes     |
+| T-72  | A second sign-in step (an authenticator app) is offered to league owners at launch and required for owners once a league collects money (stage 5)                                                                         | Agreed (delegated)  |         |
+| T-73  | Changing an account's email needs confirmation from the new address and sends a notice to the old one                                                                                                                     | Agreed (delegated)  |         |
+| T-74  | Permissions are checked on the server, inside each command                                                                                                                                                                | Agreed (delegated)  |         |
+| T-75  | Roles are read from the database on every request, so removing someone's access works immediately                                                                                                                         | Agreed (delegated)  |         |
+| T-76  | Private fields are filtered by permission in the query, not in the page                                                                                                                                                   | Agreed (delegated)  |         |
+| T-77  | Staff have no standing access to any league                                                                                                                                                                               | Agreed (delegated)  |         |
+| T-78  | No league-supplied HTML, JavaScript or CSS exists anywhere in the system                                                                                                                                                  | Agreed (delegated)  |         |
+| T-79  | A content security policy tells browsers to run scripts only from us and to show embedded frames only from the approved list (C-9)                                                                                        | Agreed (delegated)  |         |
+| T-80  | Stored uploads are images only, re-encoded and served from a separate address; import spreadsheets are read once and never served                                                                                         | Changed (delegated) |         |
+| T-81  | Public pages get names only through one function that applies the league's display policy and the guardian's consent                                                                                                      | Agreed (delegated)  |         |
+| T-82  | Card details are entered only on Stripe's pages                                                                                                                                                                           | Agreed (delegated)  |         |
+| T-83  | Two-step sign-in must be on for every account that controls the business                                                                                                                                                  | Agreed              |         |
+| T-84  | A written incident procedure before the first outside league joins                                                                                                                                                        | Agreed (delegated)  |         |
+| T-85  | Password rules: a one-way hash held by the sign-in service, at least 8 characters, leaked passwords refused, guesses limited                                                                                              | Agreed (delegated)  | yes     |
+| T-86  | Logs and error reports carry no personal content and are kept for a fixed time; exports are delivered by an expiring link                                                                                                 | Agreed (delegated)  |         |
+| T-87  | Who may see statistics (S-22) is enforced in the same one function as names, and never leaks through the cache or live updates                                                                                            | Agreed (delegated)  |         |
+| T-221 | What must happen before a league or account is known (short-name lookup, sign-up, sign-in by email, accepting an invitation, names on an access list) goes through a few narrow owner-run functions, never a wider policy | Agreed (delegated)  | yes     |
 
 ### [T5 — Customization engine](technical/T5-customization-engine.md)
 

@@ -388,14 +388,19 @@ describe('purging a league from the bin removes its history (T-51, T-220)', () =
     ).rejects.toMatchObject(refused.restrict);
 
     // A role that is not the owner may set the setting itself, and it changes nothing.
+    // It is let through row-level security for that league, so the history trigger is
+    // what refuses.
     await db.exec(`
       create role history_tester;
+      grant usage on schema public to history_tester;
+      grant execute on function public.current_league_id() to history_tester;
       grant select, delete on public.activity_log to history_tester;
     `);
     try {
       await expect(
         db.transaction(async (tx) => {
           await tx.query('set local role history_tester');
+          await tx.query("select set_config('app.league_id', $1, true)", [binned.leagueId]);
           await tx.query("select set_config('srleagues.history_purge', $1, true)", [
             binned.leagueId,
           ]);
@@ -411,6 +416,8 @@ describe('purging a league from the bin removes its history (T-51, T-220)', () =
     } finally {
       await db.exec(`
         revoke all on public.activity_log from history_tester;
+        revoke all on function public.current_league_id() from history_tester;
+        revoke all on schema public from history_tester;
         drop role history_tester;
       `);
     }

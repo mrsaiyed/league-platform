@@ -4,7 +4,7 @@ This file is the resume point for work on the v1 specification.
 
 ## Where things stand (November 12, 2026)
 
-**Three rounds of the argument are done.** The founder answered the main product decisions, delegated the technical files to the technical lead, answered the remaining real choices, and accepted the list of defaults with changes. [DECISIONS.md](DECISIONS.md) has the outcome: what each round settled, the change log, and the full list of 309 decisions with their statuses.
+**Three rounds of the argument are done.** The founder answered the main product decisions, delegated the technical files to the technical lead, answered the remaining real choices, and accepted the list of defaults with changes. [DECISIONS.md](DECISIONS.md) has the outcome: what each round settled, the change log, and the full list of 310 decisions with their statuses.
 
 **Stage 1 can start when the founder says so.** Every decision it depends on is settled ([build order](technical/T10-build-order.md) section 4).
 

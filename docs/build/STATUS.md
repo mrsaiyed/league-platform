@@ -8,7 +8,7 @@ The one file that says where the build is. Every run reads it first and updates 
 - **Stage:** 1, foundations — [plan](STAGE-1.md)
 - **Branch:** `build/stage-1`
 - **Gate:** `npm run verify`
-- **Next step:** 1.7 Row-level security
+- **Next step:** 1.8 Typed queries
 - **Pushing to GitHub:** not allowed. The founder has not said yes.
 
 States: `building` (take the next step) · `waiting-for-founder` (nothing can be done until the list below is answered) · `stage-review` (the stage is finished and waiting for the founder's check).
@@ -20,11 +20,13 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 - [ ] Turn on two-step sign-in for GitHub and the email account it recovers to (T-83).
 - [ ] Say whether build branches may be pushed to GitHub, so the work is backed up off this computer and the automatic checks run there.
 - [ ] Vendor accounts (Supabase, Render, Cloudflare, Resend, a domain) — not needed until the stage report asks for them.
+- [ ] Nothing to do now, but not yet checked: the league fence (step 1.7) assumes that the database user Supabase runs our migrations as is allowed to see past the fence, as it is on this computer. If it is not, some checks that must look at every league (is this short name free, does every league have its main program) will refuse to run rather than give a wrong answer, so nothing leaks, but leagues could not be created. One check settles it once a Supabase account exists; it goes on the stage report's checklist (record 008).
 
 ## Log
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 1.7 done: migration 0005 row-level security (restricted `app_user`, one forced policy per table, league and account fences). Reviewer's findings fixed: strict one-policy gate with planted-violation tests, WITH CHECK proven, decision record 008 / T-221 written, role-exists safe, encoding. Step 1.8 must set the league one-transaction-only.
 - 2026-11-12 — Step 1.6 done: migrations 0002-0004 (uuid_v7, version/updated_at trigger, 13 tables, cross-league composite keys, slug/default-program/current-season rules, append-only history, support-visit rules) with 58+ constraint tests in packages/database/src/schema; record 007 (history erasure and purge, T-220). Reviewer findings fixed except: TRUNCATE not blockable (1.7 must not grant it to the app role; the app role must not own tables), caller-settable created_at, no test on PostgreSQL 15-17 (PGlite is 18.6), slug history expiry has no upper cap, activity_log.target_id has no foreign key, seasons.logo waits for assets.
 - 2026-11-12 — Step 1.5 done: migration runner in packages/database/src/migrations (PGlite + pg adapter, checksums, advisory lock, one transaction per file) and the T-183 check in the gate; record: architecture/decisions/006. Reviewer's 14 findings fixed. Open: DROP POLICY/DEFAULT still allowed; no release command yet (needs config wiring); pg adapter not run against a hosted database; one unexplained one-off node test failure during a verify run (passed in 3 reruns), watch for flakiness. Also fixed a flaky varsity-database test (jsonb key order).
 - 2026-11-12 — Step 1.4 done: apps/web/src/server/config-schema.ts (Zod, names every missing/invalid setting, never prints values) and config.ts (the only process.env read, enforced by the T-30 check via settingsReaderFiles), `.env.example` with made-up values and a test tying it to the schema. Reviewer's findings fixed except: startup wiring (assertConfig has no caller until the web app has an entry point, step 1.17); no production-vs-localhost cross-check (optional); `secret` flag only used in tests for now.

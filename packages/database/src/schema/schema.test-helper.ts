@@ -1,6 +1,7 @@
 // A fresh database with every migration in supabase/migrations applied, and small
 // helpers that make the made-up rows the schema tests need.
 import { PGlite, type Transaction } from '@electric-sql/pglite';
+import { expect } from 'vitest';
 import { applyMigrations, pgliteDriver } from '../migrations/index.ts';
 
 export type Sql = PGlite | Transaction;
@@ -84,6 +85,30 @@ export async function newSeason(
   return row.id;
 }
 
+/** Which league and account a transaction is for (T-61). Missing means not set. */
+export type AppContext = { league?: string; account?: string };
+
+/**
+ * Runs `work` in one transaction as the app's restricted role (app_user, T-60),
+ * with the league and account set for that transaction only, as the app does.
+ */
+export function asApp<T>(
+  db: PGlite,
+  context: AppContext,
+  work: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.query('set local role app_user');
+    if (context.league !== undefined) {
+      await tx.query("select set_config('app.league_id', $1, true)", [context.league]);
+    }
+    if (context.account !== undefined) {
+      await tx.query("select set_config('app.account_id', $1, true)", [context.account]);
+    }
+    return work(tx);
+  });
+}
+
 /** PostgreSQL error codes the tests expect. */
 export const refused = {
   unique: { code: '23505' },
@@ -91,4 +116,8 @@ export const refused = {
   foreignKey: { code: '23503' },
   notNull: { code: '23502' },
   restrict: { code: '23001' },
+  /** The role lacks the privilege, or must own the object. */
+  privilege: { code: '42501' },
+  /** A written row fails a row-level security policy (WITH CHECK). */
+  policy: { code: '42501', message: expect.stringContaining('row-level security') },
 } as const;
