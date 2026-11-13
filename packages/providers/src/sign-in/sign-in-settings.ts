@@ -28,6 +28,12 @@ export type SignInSettings = {
   readonly guessesPerEmail: AttemptLimits;
   /** T-85, T-225: wrong passwords and wrong codes per network. */
   readonly guessesPerNetwork: AttemptLimits;
+  /**
+   * T-68: the least time a password check takes, in milliseconds, so a wrong address
+   * and a wrong password answer alike however fast the service is. Used by the
+   * Supabase adapter; the local stand-in hashes every try itself.
+   */
+  readonly passwordMinMilliseconds: number;
 };
 
 export const signInDefaults: SignInSettings = {
@@ -50,4 +56,5 @@ export const signInDefaults: SignInSettings = {
     lockAfter: 100,
     lockMinutes: 15,
   },
+  passwordMinMilliseconds: 750,
 };

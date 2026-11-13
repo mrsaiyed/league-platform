@@ -79,6 +79,44 @@ describe('the Supabase Auth client', () => {
     expect(String(error)).not.toMatch(/ana@|r-1|not-a-jwt/);
   });
 
+  it('gives up on a call with no answer in time, and stops the timer after one that answers', async () => {
+    const timers: { ms: number; fire: () => void; stopped: boolean }[] = [];
+    const startTimer = (ms: number, fire: () => void) => {
+      const timer = { ms, fire, stopped: false };
+      timers.push(timer);
+      return () => {
+        timer.stopped = true;
+      };
+    };
+    let signal: AbortSignal | undefined;
+    // A fetch that never answers and ignores the signal.
+    const hanging: FetchLike = (_url, init) => {
+      signal = init.signal;
+      return new Promise<Response>(() => {});
+    };
+    const client = createGoTrueClient({
+      projectUrl,
+      secretKey,
+      fetch: hanging,
+      timeoutMs: 1234,
+      startTimer,
+    });
+    const pending = client.user(accessToken);
+    expect(timers[0]?.ms).toBe(1234);
+    timers[0]?.fire();
+    await expect(pending).rejects.toThrow(/no answer in time/);
+    expect(signal?.aborted).toBe(true);
+
+    const answering = createGoTrueClient({
+      projectUrl,
+      secretKey,
+      fetch: async () => Response.json({ id: 'u-1', email: 'ana@example.test' }),
+      startTimer,
+    });
+    expect((await answering.user(accessToken)).ok).toBe(true);
+    expect(timers[1]).toMatchObject({ ms: 10_000, stopped: true });
+  });
+
   it('reads a generated code in the newer and the older shape', async () => {
     const newer = clientAnswering(() =>
       Response.json({

@@ -14,8 +14,17 @@ export type FetchLike = (
     readonly method: string;
     readonly headers: Record<string, string>;
     readonly body?: string;
+    readonly signal?: AbortSignal;
   },
 ) => Promise<Response>;
+
+/** Calls `fire` after `ms`; the function returned stops it. Injected so tests need not wait. */
+export type StartTimer = (ms: number, fire: () => void) => () => void;
+
+const realTimer: StartTimer = (ms, fire) => {
+  const handle = setTimeout(fire, ms);
+  return () => clearTimeout(handle);
+};
 
 export type GoTrueUser = {
   readonly id: string;
@@ -79,7 +88,13 @@ export type GoTrueClientOptions = {
   readonly projectUrl: string;
   readonly secretKey: string;
   readonly fetch: FetchLike;
+  /** The longest one call may take, answer included, before it is thrown as unexpected. */
+  readonly timeoutMs?: number;
+  readonly startTimer?: StartTimer;
 };
+
+/** Ten seconds: a sign-in page should not hang longer on Supabase. */
+export const goTrueTimeoutMs = 10_000;
 
 type Json = Record<string, unknown>;
 
@@ -158,10 +173,57 @@ export type GoTrueClient = ReturnType<typeof createGoTrueClient>;
 
 export function createGoTrueClient(options: GoTrueClientOptions) {
   const base = `${options.projectUrl.replace(/\/+$/, '')}/auth/v1`;
+  const timeoutMs = options.timeoutMs ?? goTrueTimeoutMs;
+  const startTimer = options.startTimer ?? realTimer;
+
+  /** Sends and reads the answer, giving up after `timeoutMs` even if `fetch` ignores the signal. */
+  async function send(
+    what: string,
+    url: string,
+    init: Parameters<FetchLike>[1],
+  ): Promise<{ response: Response; raw: string }> {
+    const controller = new AbortController();
+    let timedOut = false;
+    let giveUp: () => void = () => {};
+    const timeout = new Promise<never>((_, reject) => {
+      giveUp = () => reject(new SupabaseAuthUnexpected(`${what}: no answer in time`));
+    });
+    const stop = startTimer(timeoutMs, () => {
+      timedOut = true;
+      controller.abort();
+      giveUp();
+    });
+    const exchange = (async () => {
+      let response: Response;
+      try {
+        response = await options.fetch(url, { ...init, signal: controller.signal });
+      } catch {
+        throw new SupabaseAuthUnexpected(
+          timedOut ? `${what}: no answer in time` : `${what}: no connection`,
+        );
+      }
+      try {
+        return { response, raw: await response.text() };
+      } catch {
+        throw new SupabaseAuthUnexpected(
+          timedOut ? `${what}: no answer in time` : `${what}: the answer was cut off`,
+        );
+      }
+    })();
+    // The loser of the race must not be left rejecting with no one listening.
+    exchange.catch(() => {});
+    timeout.catch(() => {});
+    try {
+      return await Promise.race([exchange, timeout]);
+    } finally {
+      stop();
+    }
+  }
 
   /**
    * One call. `bearer` is the person's access token, or the secret key for the admin
-   * calls. A 4xx comes back as a refusal; a 5xx or a failed connection is thrown.
+   * calls. A 4xx comes back as a refusal; a 5xx, a failed connection or no answer in
+   * time is thrown.
    */
   async function call(
     what: string,
@@ -178,17 +240,11 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
       accept: 'application/json',
     };
     if (body !== undefined) headers['content-type'] = 'application/json';
-    let response: Response;
-    try {
-      response = await options.fetch(`${base}${path}`, {
-        method,
-        headers,
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
-    } catch {
-      throw new SupabaseAuthUnexpected(`${what}: no connection`);
-    }
-    const raw = await response.text();
+    const { response, raw } = await send(what, `${base}${path}`, {
+      method,
+      headers,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
     let parsed: unknown = undefined;
     if (raw.length) {
       try {
