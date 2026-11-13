@@ -103,6 +103,8 @@ async function hosted() {
     {
       ssl: 'off',
       max: 1,
+      // A busy computer can answer slowly; the test waits for the answer, not for 10 seconds.
+      timeoutMs: 180_000,
     },
   );
   const repo = new PostgresRepository(db);

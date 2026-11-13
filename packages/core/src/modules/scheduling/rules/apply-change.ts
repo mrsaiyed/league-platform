@@ -94,6 +94,13 @@ export function applyDraftChange(
       if (!find(change.gameId)) return fail({ code: 'unknown-game', gameId: change.gameId });
       return done({ ...state, games: state.games.filter((g) => g.id !== change.gameId) }, []);
     }
+    case 'set-recording': {
+      if (!find(change.gameId)) return fail({ code: 'unknown-game', gameId: change.gameId });
+      const games = state.games.map((g) =>
+        g.id === change.gameId ? { ...g, recording: change.recording } : g,
+      );
+      return done({ ...state, games }, []);
+    }
     case 'rename-round': {
       if (!hasRound(change.roundId))
         return fail({ code: 'unknown-round', roundId: change.roundId });

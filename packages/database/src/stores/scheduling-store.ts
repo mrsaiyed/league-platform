@@ -2,7 +2,15 @@
 import type { SchedulingStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
+  deleteScheduleDraft,
   findCourt,
+  findScheduleDraft,
+  findSeasonProgramId,
+  insertScheduleDraft,
+  latestScheduleRevision,
+  listTeamsOfSeason,
+  loadSchedule,
+  updateScheduleDraft,
   findVenue,
   hasLiveCourts,
   insertCourt,
@@ -17,6 +25,20 @@ import {
 
 export function schedulingStore(scope: LeagueScope): SchedulingStore {
   return {
+    findSeason: async (seasonId) => {
+      const programId = await findSeasonProgramId(scope, seasonId);
+      return programId === undefined ? undefined : { programId };
+    },
+    latestRevision: (seasonId) => latestScheduleRevision(scope, seasonId),
+    findDraft: (seasonId) => findScheduleDraft(scope, seasonId),
+    insertDraft: (seasonId, changes, basedOn) =>
+      insertScheduleDraft(scope, seasonId, changes, basedOn),
+    updateDraft: (seasonId, draftId, changes, version) =>
+      updateScheduleDraft(scope, seasonId, draftId, changes, version),
+    deleteDraft: (seasonId, draftId, version) =>
+      deleteScheduleDraft(scope, seasonId, draftId, version),
+    loadSchedule: (seasonId) => loadSchedule(scope, seasonId),
+    teamsOfSeason: (seasonId, teamIds) => listTeamsOfSeason(scope, seasonId, teamIds),
     findVenue: (venueId) => findVenue(scope, venueId),
     listVenues: () => listVenues(scope),
     createVenue: (venue) => insertVenue(scope, venue),
