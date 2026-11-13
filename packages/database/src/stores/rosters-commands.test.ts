@@ -140,13 +140,32 @@ describe('rosters', () => {
       version: 2,
     });
 
-    value(
+    const reordered = value(
       await reorderRoster(
         l.as,
         {
           teamId: l.teamId,
           rosterEntryIds: [third.rosterEntryId, first.rosterEntryId, second.rosterEntryId],
         },
+        deps,
+      ),
+    );
+    // The database moved every touched entry's version; the result carries the new ones.
+    for (const v of reordered.versions) {
+      expect((await entryRow(v.rosterEntryId)).version).toBe(v.version);
+    }
+    const firstNow = reordered.versions.find((v) => v.rosterEntryId === first.rosterEntryId);
+    expect(
+      await changeRosterEntry(
+        l.as,
+        { rosterEntryId: first.rosterEntryId, version: 1, role: 'player' },
+        deps,
+      ),
+    ).toEqual({ ok: false, error: { code: 'changed-since-read' } });
+    value(
+      await changeRosterEntry(
+        l.as,
+        { rosterEntryId: first.rosterEntryId, version: firstNow?.version ?? 0, role: 'player' },
         deps,
       ),
     );

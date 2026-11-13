@@ -3,7 +3,11 @@ export { addToRoster, type AddToRosterError } from './commands/add-to-roster.ts'
 export { changeRosterEntry, type ChangeRosterEntryError } from './commands/change-roster-entry.ts';
 export { listRoster, type ListRosterError } from './commands/list-roster.ts';
 export { markLeft, type MarkLeftError } from './commands/mark-left.ts';
-export { reorderRoster, type ReorderRosterError } from './commands/reorder-roster.ts';
+export {
+  reorderRoster,
+  type ReorderRosterError,
+  type ReorderRosterResult,
+} from './commands/reorder-roster.ts';
 export { createTeam, type CreateTeamError } from './commands/create-team.ts';
 export { removeTeam, type RemoveTeamError } from './commands/remove-team.ts';
 export {

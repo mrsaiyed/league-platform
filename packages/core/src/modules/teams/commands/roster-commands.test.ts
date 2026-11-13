@@ -215,9 +215,42 @@ describe('reorderRoster', () => {
         { teamId: teamUuid(1), rosterEntryIds: [entryUuid(2), entryUuid(1)] },
         deps,
       ),
-    ).toEqual({ ok: true, value: { count: 2 } });
+    ).toEqual({
+      ok: true,
+      value: {
+        count: 2,
+        versions: [
+          { rosterEntryId: entryUuid(2), version: 2 },
+          { rosterEntryId: entryUuid(1), version: 2 },
+        ],
+      },
+    });
     const sorts = Object.fromEntries(db.state.roster.map((e) => [e.id, e.sort]));
     expect(sorts).toEqual({ [entryUuid(2)]: 0, [entryUuid(1)]: 1, [entryUuid(3)]: 2 });
+  });
+
+  it('gives the new version of every entry moved: those work next, the old ones are refused', async () => {
+    const { deps, as } = memoryTeams({ ...base(), roster: [entry(1), entry(2), entry(3)] });
+    const result = await reorderRoster(
+      as(ownerId),
+      { teamId: teamUuid(1), rosterEntryIds: [entryUuid(3), entryUuid(1), entryUuid(2)] },
+      deps,
+    );
+    if (!result.ok) throw new Error('refused');
+    // All three moved; none kept version 1.
+    expect(result.value.versions).toHaveLength(3);
+    const change = (n: number, version: number) =>
+      changeRosterEntry(as(ownerId), { rosterEntryId: entryUuid(n), version, role: 'coach' }, deps);
+    expect(await change(1, 1)).toMatchObject({ error: { code: 'changed-since-read' } });
+    const fresh = result.value.versions.find((v) => v.rosterEntryId === entryUuid(1));
+    expect((await change(1, fresh?.version ?? 0)).ok).toBe(true);
+    // An entry that did not move keeps its version, so its old screen still works.
+    const same = await reorderRoster(
+      as(ownerId),
+      { teamId: teamUuid(1), rosterEntryIds: [entryUuid(3), entryUuid(1), entryUuid(2)] },
+      deps,
+    );
+    expect(same).toMatchObject({ ok: true, value: { versions: [] } });
   });
 
   it('refuses a partial list, an entry of another team and a list with a repeat', async () => {
@@ -246,6 +279,20 @@ describe('reorderRoster', () => {
 });
 
 describe('listRoster', () => {
+  it('puts those who left after the others, by leaving date then place', async () => {
+    const { deps, as } = memoryTeams({
+      ...base(),
+      roster: [
+        entry(1, { leftOn: '2026-11-05', sort: 0 }),
+        entry(2, { leftOn: '2026-11-01', sort: 5 }),
+        entry(3, { sort: 9 }),
+      ],
+    });
+    const result = await listRoster(as(ownerId), { teamId: teamUuid(1) }, deps);
+    if (!result.ok) throw new Error('refused');
+    expect(result.value.map((l) => l.id)).toEqual([entryUuid(3), entryUuid(2), entryUuid(1)]);
+  });
+
   it('lists everyone who is or was on the team, with leaving dates and no private fields', async () => {
     const { db, deps, as } = memoryTeams({
       ...base(),

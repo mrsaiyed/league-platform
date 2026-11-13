@@ -176,8 +176,13 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
         listRoster: async (teamId) =>
           s.roster
             .filter((e) => e.teamId === teamId)
+            // As queries/list-roster.ts: current first, then those who left by date, then place, then id.
             .sort(
-              (a, b) => Number(a.leftOn !== null) - Number(b.leftOn !== null) || a.sort - b.sort,
+              (a, b) =>
+                Number(a.leftOn !== null) - Number(b.leftOn !== null) ||
+                (a.leftOn ?? '').localeCompare(b.leftOn ?? '') ||
+                a.sort - b.sort ||
+                a.id.localeCompare(b.id),
             )
             .map((e) => {
               const p = s.people.find((x) => x.id === e.personId);
