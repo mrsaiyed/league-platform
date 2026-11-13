@@ -21,7 +21,6 @@ One line per open lane, written before its builder starts: `- **<step>** — <la
 
 Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migration 0010, record 026, T-238. Check the folders before trusting these.
 
-
 - **2.15 Seasons and their rules** — `.local/lanes/2.15-season-commands` — record 026 / T-238 — just opened (2026-11-13 run).
 - **2.17 People commands** — `.local/lanes/2.17-people-commands` — record 027 / T-239 — just opened.
 
