@@ -22,9 +22,12 @@ One line per open lane. A run that is cut off leaves this as the map for the nex
 Next free: migration 0012, record 033, T-245 (0011 / 031 / T-243 belong to 1.14; 0010 / 030 / T-242 to 2.4).
 
 - **1.14 Sign-in flows** — `.local/lanes/1.14-signin-flows` — migration 0011 (unused so far), record 031 / T-243 — built (541dfc0, 103f385); security review found 2 high faults (open redirect via next=, spoofable X-Forwarded-For) and 6 more; ALL 8 are now fixed in the lane (head dc03926, build branch merged in; verify green apart from load flakes; new setting TRUSTED_PROXY, T-69/T4 §3 reworded, T-243 still to add to DECISIONS.md). Then: independent re-review of the fixes (opus), gate, land.
-- **2.4 Live game, calculated and import tables** — `.local/lanes/2.4-live-tables` — migration 0010, record 030 / T-242 — built and reviewed; builder was fixing findings (takeover must delete+re-insert the scoring session, binned scored games rule, walk-up roster entry game check, standings division check, notes). Then: catch up, gate, land.
 - **2.19 Rosters commands** — `.local/lanes/2.19-roster-commands` — none — built, reviewed, findings fixed; a builder was catching it up with build/stage-1 (conflicts in en.ts after 2.23 landed). Then: gate, land. Note: people.remove_person checks roster membership unlocked; reorder_roster returns {count, versions}.
 - **1.27 Sturdy timing tests** — `.local/lanes/1.27-sturdy-tests` — none — builder working; no report yet.
+- **1.21 Seed leagues** — `.local/lanes/1.21-seed-leagues` — none — builder starting.
+- **1.20 part 2 Health checks** — `.local/lanes/1.20-health-checks` — none — builder starting.
+- **1.21 Seed leagues** — `.local/lanes/1.21-seed-leagues` — none — builder starting.
+- **1.20 part 2 Health checks** — `.local/lanes/1.20-health-checks` — none — builder starting.
 
 ## Needs the founder
 
@@ -46,6 +49,7 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 2.4 done: migration 0010 (live game, calculated and import tables), record 030 / T-242; reviewer's findings fixed (takeover deletes and re-inserts the scoring session, scored games cannot be binned, walk-up roster entries must join a team in that game, standings rows match their team's division). For later steps: takeover command must delete+insert in one transaction; commands must never bin a scored or decided game; a team changing division needs its standings rebuilt. Gate: all vitest tests passed apart from load flakes.
 - 2026-11-13 — promote-to-main refused: 'files the live site is built from differ from main (packages/contracts/src/live-stats.ts, packages/sports/src/basketball/live.ts)': these are step 2.66's allowed changes; main left alone, the tracker has to be checked before main moves.
 - 2026-11-13 — Run end (usage limit): landed 1.18 part 2, 1.23, 2.3, 2.18, 2.15, 2.17, 2.66, 2.23. Open lanes listed under In progress. Skipped on purpose: 2.27 (needs the founder's scorekeeper setting default). Known load flakes still failing the gate on this computer: isolation-cases 90 s limit, vitest 'Timeout calling onTaskUpdate', run-migrations lock, live-stats start-up text (step 1.27 is the fix). Stray untracked file .verify-215.log in the main folder (a builder's mistake; the permission system refused its deletion): safe to delete.
 - 2026-11-13 — Step 2.23 done: games module (record final score, forfeit, postpone, cancel, reopen with a reason + game_corrections row, list postponed) with events games.finalized/games.reopened (T-24). A game's format is the season's whole rules document copied on first decision, and ties/forfeit scores are judged by the game's own rules. Every reopened game (also a forfeit) goes back to 'scheduled' with its score cleared; step 2.30 may revisit tracked games. Postpone keeps starts_at. Scorekeeper 'own games only' is 2.27/2.55. .prettierignore now ignores .claude (another session's worktree lives there and broke format:check). Gate: all tests pass in the main folder apart from load flakes (isolation-cases timeout, live-stats start-up text), both pass alone.

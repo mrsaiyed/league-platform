@@ -30,9 +30,16 @@ const historyTables = [
   'support_access_log',
   'schedule_revisions',
   'game_corrections',
+  'game_events',
 ];
 // History that is never changed at all, so no updated_at either.
-const neverChanged = ['activity_log', 'command_receipts', 'schedule_revisions', 'game_corrections'];
+const neverChanged = [
+  'activity_log',
+  'command_receipts',
+  'schedule_revisions',
+  'game_corrections',
+  'game_events',
+];
 
 type Column = {
   table_name: string;
@@ -58,7 +65,7 @@ async function tables(): Promise<string[]> {
 }
 
 describe('every table', () => {
-  it('is one of the tables of steps 1.6, 1.19 (jobs), 2.1 (divisions to settings), 2.2 (people to rosters) and 2.3 (schedule and games)', async () => {
+  it('is one of the tables of steps 1.6, 1.19 (jobs), 2.1 (divisions to settings), 2.2 (people to rosters), 2.3 (schedule and games) and 2.4 (live game, calculated tables, imports)', async () => {
     expect(await tables()).toEqual(
       [
         'accounts',
@@ -68,13 +75,17 @@ describe('every table', () => {
         'divisions',
         'game_assignments',
         'game_corrections',
+        'game_events',
+        'game_states',
         'games',
+        'imports',
         'invitations',
         'jobs',
         'league_features',
         'league_slug_history',
         'leagues',
         'people',
+        'player_game_stats',
         'profile_access',
         'profiles',
         'programs',
@@ -83,9 +94,13 @@ describe('every table', () => {
         'rounds',
         'schedule_drafts',
         'schedule_revisions',
+        'scoring_sessions',
+        'season_player_totals',
         'seasons',
         'setting_values',
         'stages',
+        'standings_adjustments',
+        'standings_rows',
         'support_access_log',
         'teams',
         'venues',
