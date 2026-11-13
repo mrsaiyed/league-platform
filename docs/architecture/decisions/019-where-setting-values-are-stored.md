@@ -15,6 +15,14 @@ T5 §6 says every setting is declared once in code (key, schema, default, the le
 - **The key is a dotted camelCase name** (`notifications.reminderLeadHours`), at most 100 characters. The database does not hold the list of keys: settings are declared in code (T-98). A value whose key is no longer declared is ignored when read; removing such rows is tidying, not a schema change.
 - Behind the league fence like every league table, with its one forced policy; `version` for two admins saving at once (T-46, A-8).
 
+## Left for later steps: the bin
+
+Divisions, venues and courts go to the bin (`deleted_at`, T-45), and the database does not carry a bin move down to children. Step 2.16 (the commands that bin and restore them) and the nightly purge must handle:
+
+- **A live child under a binned parent**: a sub-division whose parent is in the bin, or a court whose venue is. Binning a parent does not bin its children; the command decides whether to bin them too or refuse while live children remain.
+- **No cascade on purge**: purging a parent for good fails while its children (or anything naming it) still exist, so the purge must remove or refuse in the right order.
+- **Restore hitting a name**: a name in the bin lets its place go, so restoring it fails on the name rule (`divisions_name_key`, `venues_name_key`, `courts_name_key`) if a live row has taken that name since. Restore must say so plainly and offer a rename.
+
 ## Considered
 
 - **A JSON column on `leagues`, `programs` and `seasons`.** One read per level, but a save rewrites the whole document, so two admins changing two different settings would collide on one version, and nothing in the database could say which keys exist at which level.

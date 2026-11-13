@@ -109,7 +109,7 @@ Clearing by label is a Cloudflare feature, and which plans include it is checked
 
 ## 6. Defined settings
 
-Every setting in the product (reminder timing, tiebreaker order, whether player pages exist) is declared once in code:
+Every setting in the product (reminder timing, whether player pages exist) is declared once in code. Rules that change results, such as the tiebreaker order, are not settings: they are season rules (S-1, [decision record 019](../../../architecture/decisions/019-where-setting-values-are-stored.md)). A declaration looks like this:
 
 ```ts
 defineSetting({
