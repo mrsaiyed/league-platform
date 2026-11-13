@@ -141,6 +141,80 @@ export const en = {
     'If you were not expecting this, you can ignore this email and nothing will happen.',
   'email.invitation.linkFallback':
     'If the button does not work, copy this address into your browser:',
+  // Sign-in emails (T-67, T-70, T-85), built by packages/emails. {code} is the 6-digit
+  // code, {minutes} how long it works, {device} a device's name, {when} a time, {url}
+  // an address of ours.
+  'email.signInCode.subjectSignUp': 'Your code to create your account',
+  'email.signInCode.subjectReset': 'Your code to choose a new password',
+  'email.signInCode.code': 'Your code is {code}. It works for {minutes} minutes.',
+  'email.signInCode.existing':
+    'You already have an account with this address. Entering this code lets you choose a new password.',
+  'email.signInCode.notExpected':
+    'If you did not ask for this, you can ignore this email. Nobody can use the code without your mailbox.',
+  'email.newDevice.subject': 'Your account was signed in on a new device',
+  'email.newDevice.body': 'Your account was signed in on {device} at {when}.',
+  'email.newDevice.notYou':
+    'If this was not you, choose a new password and use "Sign out everywhere" on your account page:',
+  'email.passwordChanged.subject': 'Your password was changed',
+  'email.passwordChanged.body':
+    'The password of your account was changed at {when}, and every other device was signed out.',
+  'email.passwordChanged.notYou':
+    'If this was not you, choose a new password with "Forgot your password?" on the sign-in page:',
+  // The sign-in screens (step 1.14, P6 §2 and §5). The same words whether or not an
+  // account exists (T-68).
+  'signIn.email': 'Email',
+  'signIn.password': 'Password',
+  'signIn.submit': 'Sign in',
+  'signIn.or': 'or',
+  'signIn.google': 'Continue with Google',
+  'signIn.forgot': 'Forgot your password?',
+  'signIn.createAccount': 'New here? Create an account',
+  'signIn.haveAccount': 'Already have an account? Sign in',
+  'signUp.title': 'Create your account',
+  'signUp.intro': 'Enter your email. We will send a 6-digit code to prove it is yours.',
+  'signUp.sendCode': 'Email me a code',
+  'forgot.title': 'Forgot your password',
+  'forgot.intro':
+    'Enter your email. If that address can sign in, we will send it a code to choose a new password.',
+  'code.title': 'Enter your code',
+  'code.sent':
+    'If that address can sign in, we have sent it a code. It works for {minutes} minutes.',
+  'code.label': 'Code',
+  'code.submit': 'Continue',
+  'code.again': 'Send a new code',
+  'password.title': 'Choose your password',
+  'password.rules': 'At least 8 characters. Passwords that have leaked are refused.',
+  'password.submit': 'Save and sign in',
+  'confirm.title': 'Enter your password again',
+  'confirm.intro': 'This needs your password when you have not entered it in the last hour.',
+  'confirm.submit': 'Continue',
+  'confirm.google': 'Sign in with Google again',
+  'account.devices': 'Signed-in devices',
+  'account.thisDevice': 'This device',
+  'account.signedInAt': 'Signed in {when}',
+  'account.lastActive': 'Last active {when}',
+  'account.signOut': 'Sign out',
+  'account.signOutEverywhere': 'Sign out everywhere',
+  'account.signOutEverywhereHelp': 'Signs out every device that uses your account, this one too.',
+  'device.label': '{browser} on {system}',
+  'device.unknown': 'A web browser',
+  'problem.invalidEmail': 'That does not look like an email address.',
+  'problem.tooManyAttempts_one': 'Too many tries. Please wait {count} second and try again.',
+  'problem.tooManyAttempts_other': 'Too many tries. Please wait {count} seconds and try again.',
+  'problem.codeUsedUp': 'Too many tries with this code. Ask for a new one.',
+  'problem.codeNotSent': 'We could not send the email just now. Please try again in a minute.',
+  'problem.codeWrong': 'That code is not right. Check the email and try again.',
+  'problem.codeExpired': 'That code has run out. Ask for a new one.',
+  'problem.proofInvalid': 'That took too long. Ask for a new code.',
+  'problem.passwordTooShort': 'Your password needs at least 8 characters.',
+  'problem.passwordTooLong': 'Your password is too long. Please choose a shorter one.',
+  'problem.passwordLeaked':
+    'That password appears in lists of leaked passwords. Please choose another.',
+  'problem.wrongEmailOrPassword': 'Wrong email or password.',
+  'problem.wrongPassword': 'Wrong password.',
+  'problem.googleFailed': 'Signing in with Google did not work. Please try again.',
+  'problem.signInAgain': 'Please sign in again.',
+  'problem.noPassword': 'Your account has no password. Sign in with Google again instead.',
   // The tracker's saved banner (T6 §4), chosen from the queue's status by
   // apps/web/src/features/tracker/queue-banner.ts.
   'tracker.queue.allSaved': 'All saved',

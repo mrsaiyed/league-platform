@@ -34,6 +34,8 @@ export type StartupDeps = {
   readonly database: () => Promise<DatabasePackage>;
   /** Where the access module's T-196 lines go. */
   readonly log: (line: CommandLogLine) => void;
+  /** NODE_ENV as config.ts read it (the sign-in stand-in refuses "production"). */
+  readonly nodeEnv: string | undefined;
 };
 
 export async function startWebApp(config: Config, deps: StartupDeps): Promise<WebPorts> {
@@ -42,6 +44,8 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       appEnv: config.APP_ENV,
       publicBaseUrl: config.PUBLIC_BASE_URL,
       log: deps.log,
+      nodeEnv: deps.nodeEnv,
+      emailFrom: config.EMAIL_FROM,
     });
   }
   const database = await deps.database();

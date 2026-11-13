@@ -2,12 +2,20 @@
 // adapters to core). container.ts chooses which adapters fill it: the made-up
 // stand-ins for local work and tests, or the database for staging and production.
 import type { AccessHolder, CommandContext, Result } from '@srleagues/core';
-import type { SessionError, SessionIdentity } from '@srleagues/providers';
+import type { SessionError, SessionIdentity, SignInService } from '@srleagues/providers';
+import type { Renew } from './sign-in/renew-session.ts';
+import type { SignInMail } from './sign-in/sign-in-mail.ts';
 import type { ContextDeps } from './context.ts';
 
 export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   /** "Who is this?" for a session cookie's access token (T-6). */
   readonly identify: (accessToken: string) => Promise<Result<SessionIdentity, SessionError>>;
+  /** The sign-in service (T-6): the local stand-in, or Supabase (record 018). */
+  readonly signIn: SignInService;
+  /** The sign-in emails, through our own email service (T4 §3). */
+  readonly signInMail: SignInMail;
+  /** The service's renew, shared for requests sent at once (renew-session.ts). */
+  readonly renewSession: Renew;
   /**
    * What the signed-in account holds in the context's league, read fresh by the
    * access module's own query (myAccess, T-75); undefined for a visitor, or when the

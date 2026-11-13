@@ -9,7 +9,7 @@
 // database (staging and production), not bundled by Next.js: it runs TypeScript
 // directly as the tracker does, and its migration runner finds its folder on disk.
 import { consoleSink, createLogger } from '@srleagues/observability';
-import { getConfig } from './config.ts';
+import { getConfig, nodeEnv } from './config.ts';
 import type { WebPorts } from './ports.ts';
 import { startWebApp } from './startup.ts';
 
@@ -29,5 +29,6 @@ function start(): Promise<WebPorts> {
   return startWebApp(config, {
     database: () => import(/* turbopackIgnore: true */ '@srleagues/database'),
     log: (line) => logger.info('command', line),
+    nodeEnv: nodeEnv(),
   });
 }

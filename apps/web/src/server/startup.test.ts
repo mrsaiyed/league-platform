@@ -27,7 +27,7 @@ function deps(problems: string[] | Error) {
     return problems;
   });
   const database = vi.fn(async () => ({ createDatabase, checkLoginRole }));
-  const given: StartupDeps = { database, log: () => {} };
+  const given: StartupDeps = { database, log: () => {}, nodeEnv: 'test' };
   return { given, database, createDatabase, checkLoginRole, close };
 }
 
