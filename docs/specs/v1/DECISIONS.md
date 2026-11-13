@@ -11,6 +11,7 @@ Every decision in the v1 specification, in one place. This is the list we argue 
 - **Changed**: you wanted something different, the spec file was edited, and the change log below says what it was before. A changed decision is agreed in its new form.
 - **Agreed (delegated)** and **Changed (delegated)**: a technical decision. On November 12 you handed approval of these to me as technical lead. I reviewed them (see "Technical sign-off" below). You can reopen any of them at any time. One product default carries the same mark because you left it to me by name: A-13 (November 13).
 - **Needs your answer**: I did not simply do what you said, or your answer raised a new question.
+- **Decided for you**: you were away and told me on November 13: "stop stalling by asking me questions… come up with the answers and if you need me to approve later I will". I answered as lead, the build goes ahead on it, and it waits for your yes in the table "Decided for you, waiting for your yes" below. Name the ID to change one. This never covers spending your money, anything on the live sites or with real people's data, anything sent in your name, or a legal sign-off.
 - **Open**: a call that has not been made yet. **Later**: deliberately not part of the first stages. **Dropped** and **Closed**: no longer a decision.
 - To disagree, name the ID and say what you want instead.
 
@@ -22,7 +23,32 @@ Three rounds are done. You answered the "start here" list and most of the produc
 - Of 310 decisions: 114 are settled by you, 167 are settled by delegation, 8 are waiting for your answer, and 21 are later, open, dropped or closed.
 - The biggest changes from your answers: Faraj first, with a TCSAAL demo at the end of Al-Hadi's season; the demo is the whole TCSAAL league; no single-team sites; no published prices; classic email and password; signed in with no time limit; reminders 24 hours ahead; group chats inside the product; league rules that drive the tracker, with a running-clock switch at the table; each team chooses who sees its players' statistics; a "Faraj test" season before the real league moves; no outside engineer for now.
 
+## Decided for you, waiting for your yes
+
+Answered by me as lead on November 13, 2026, because you said not to stop for questions. Every answer is the one I had recommended. The build goes ahead on them; say the ID to change one.
+
+| ID   | What was open                                          | My answer                                                                                                                                                                                                                                      | If you want it different later                                        |
+| ---- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| R-11 | A child under 13 in a youth league                     | Registered by a parent, with no sign-in of their own. It follows United States law and is on the lawyer's list                                                                                                                                 | The lawyer's word decides. Nothing is built on it yet                 |
+| R-12 | Teenagers                                              | From 13 up a player has their own account like anyone else                                                                                                                                                                                     | Nothing is built on it yet (registration is stage 4)                  |
+| B-13 | Sponsors                                               | Showing sponsors is free. Our cut applies only to sponsor money paid through us, a later feature                                                                                                                                               | Nothing is built on it yet                                            |
+| N-15 | Group chats: all at once, or in steps                  | Announcement chats first (stage 4). Open chats after sign-up opens to strangers                                                                                                                                                                | Nothing is built on it yet                                            |
+| N-16 | Rules for chats                                        | Text only at first, no private one-to-one messages, parents stand in for children under 13, admins can remove and mute, members can report                                                                                                     | Nothing is built on it yet                                            |
+| F-10 | What the demo league calls itself before TCSAAL agrees | It carries an "unofficial demo, not run by TCSAAL" notice, uses no TCSAAL logo and stays out of search                                                                                                                                         | The notice and "stay out of search" are league settings: one tap each |
+| O-1  | A site before it is published                          | Never blank: empty sections show placeholders that only the league's staff see. The player draft is a separate optional feature                                                                                                                | A small change                                                        |
+| F-2  | When the real Faraj League moves                       | Between two seasons, never during one, after the "Faraj test" season (F-11)                                                                                                                                                                    | It is a date, not code                                                |
+| S-24 | May teams choose who sees their players' statistics    | A league starts with teams allowed to choose (S-22). The league can switch that off                                                                                                                                                            | A setting: one tap                                                    |
+| U-9  | The states of a league                                 | The owner publishes, archives and un-archives. A live league cannot go back to draft. Only we suspend, and lifting a suspension returns the league to draft, so nothing is published by surprise. Archived and suspended leagues are read-only | The rules sit in one place: a contained change                        |
+| U-9  | Who sees a league before it is published               | Everyone with an admin area in it (owner, admins, scheduler, registrar, editor, scorekeeper), so staff can prepare. Nobody else                                                                                                                | A small change (step 2.87 builds it)                                  |
+| U-9  | Invitations in a read-only league                      | Inviting, re-sending and accepting are refused. Cancelling an invitation and removing someone always work                                                                                                                                      | A small change                                                        |
+| U-9  | Mixed-age leagues in the league finder                 | Unlisted unless the league chooses to be listed, as for youth leagues                                                                                                                                                                          | The starting value of a setting                                       |
+| U-9  | Short names refused as offensive                       | Our own word list, kept with the product                                                                                                                                                                                                       | The list is data: edit it any time                                    |
+| A-5  | Who may restore something from the bin                 | Whoever may remove a kind of thing may restore it. Admins and the owner restore anything                                                                                                                                                       | A small change (the bin is step 2.76, not built yet)                  |
+| R-15 | Players asking to appear as initials                   | Off until the league switches it on. A person of unknown age counts as a child in youth and mixed leagues                                                                                                                                      | The starting value of a setting                                       |
+
 ## Needs your answer
+
+Everything in this section was answered for you on November 13 (the table above). It is kept as the record of why.
 
 ### Where I did not simply do what you said
 
@@ -275,7 +301,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | B-10 | Children's data: a lawyer confirms our legal duties before any youth league other than our own demo uses the product  | Agreed                        |         |
 | B-11 | Payment terms and tax treatment of the platform fee, confirmed by an accountant before billing is switched on         | Agreed                        |         |
 | B-12 | The working name is "SR Leagues"; the final name and domain come later                                                | Changed                       |         |
-| B-13 | Showing sponsors is free, and our cut applies only to sponsor money that is paid through us                           | Needs your answer             |         |
+| B-13 | Showing sponsors is free, and our cut applies only to sponsor money that is paid through us                           | Decided for you               |         |
 
 ### [P2 — Leagues and URLs](product/P2-leagues-and-urls.md)
 
@@ -297,18 +323,18 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 
 ### [P3 — Organizer sign-up and setup](product/P3-organizer-signup-and-setup.md)
 
-| ID   | Decision                                                                                                                                                              | Status            | Stage 1 |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------- |
-| O-1  | Before it is published, the site is never blank: empty sections show placeholders only admins see (this is not about the player draft)                                | Needs your answer |         |
-| O-2  | An organizer can fill the unpublished site with sample teams and games in one click, and remove them in one click                                                     | Agreed            |         |
-| O-3  | Publishing the site and opening registration are separate switches                                                                                                    | Agreed            |         |
-| O-4  | Import is part of the first release, not an extra                                                                                                                     | Agreed            |         |
-| O-5  | The admin home always shows "what needs you now" for the current point in this cycle, not a wall of charts (P4 section 2)                                             | Agreed            |         |
-| O-6  | A limit or a missed payment never interrupts a season in progress                                                                                                     | Agreed            |         |
-| O-7  | A league has exactly one owner, any number of admins with the same access, and a captain or coach for every team                                                      | Agreed            |         |
-| O-8  | If an owner disappears (no sign-in for a long period and no response), another admin can ask us to transfer ownership                                                 | Agreed            |         |
-| O-9  | An owner can export everything at any time                                                                                                                            | Agreed            |         |
-| O-10 | An owner can delete the league. It is hidden at once, kept for 30 days in case of regret, then erased. People's accounts are not deleted; only their records in that… | Agreed            |         |
+| ID   | Decision                                                                                                                                                              | Status          | Stage 1 |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------- |
+| O-1  | Before it is published, the site is never blank: empty sections show placeholders only admins see (this is not about the player draft)                                | Decided for you |         |
+| O-2  | An organizer can fill the unpublished site with sample teams and games in one click, and remove them in one click                                                     | Agreed          |         |
+| O-3  | Publishing the site and opening registration are separate switches                                                                                                    | Agreed          |         |
+| O-4  | Import is part of the first release, not an extra                                                                                                                     | Agreed          |         |
+| O-5  | The admin home always shows "what needs you now" for the current point in this cycle, not a wall of charts (P4 section 2)                                             | Agreed          |         |
+| O-6  | A limit or a missed payment never interrupts a season in progress                                                                                                     | Agreed          |         |
+| O-7  | A league has exactly one owner, any number of admins with the same access, and a captain or coach for every team                                                      | Agreed          |         |
+| O-8  | If an owner disappears (no sign-in for a long period and no response), another admin can ask us to transfer ownership                                                 | Agreed          |         |
+| O-9  | An owner can export everything at any time                                                                                                                            | Agreed          |         |
+| O-10 | An owner can delete the league. It is hidden at once, kept for 30 days in case of regret, then erased. People's accounts are not deleted; only their records in that… | Agreed          |         |
 
 ### [P4 — Admin dashboard](product/P4-admin-dashboard.md)
 
@@ -350,55 +376,57 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 
 ### [P6 — Registration and accounts](product/P6-registration-and-accounts.md)
 
-| ID   | Decision                                                                                                                                   | Status            | Stage 1 |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- | ------- |
-| R-1  | Ask for the email first, not last                                                                                                          | Agreed            |         |
-| R-2  | Classic email and password, plus Google; an emailed code proves a new address and resets a forgotten password                              | Changed           | yes     |
-| R-3  | A league's record of a person and the person's account are separate things that get linked                                                 | Agreed            |         |
-| R-4  | The admin decides what to do about a waiver for someone added by hand, and can mark it collected by the league                             | Changed           |         |
-| R-5  | One account per person, for the whole site (U-11)                                                                                          | Agreed            | yes     |
-| R-6  | The account is identified by a verified email address                                                                                      | Agreed            |         |
-| R-7  | One account can manage several people                                                                                                      | Agreed            |         |
-| R-8  | If someone loses their email address, we restore access only after checking with a league admin who knows them                             | Agreed            |         |
-| R-9  | Once signed in on a device, a person stays signed in until they sign out, with no time limit; dangerous actions ask for the password again | Changed           | yes     |
-| R-10 | Fans can follow a team, and nobody needs an account just to look                                                                           | Agreed            |         |
-| R-11 | In a youth league, a child under 13 is registered by a parent and has no sign-in of their own                                              | Needs your answer |         |
-| R-12 | From 13 up, a player can have their own account like anyone else                                                                           | Needs your answer |         |
-| R-13 | A child can have more than one guardian                                                                                                    | Agreed            |         |
-| R-14 | Public pages show little about children by default; the league's admin can change it                                                       | Changed           |         |
-| R-15 | Adults are shown by full name by default, and the league decides whether a player may ask to appear as initials                            | Agreed            |         |
-| R-16 | Sensitive answers are seen only by those who need them                                                                                     | Agreed            |         |
-| R-17 | Leaving is not erasing: a player who leaves stays in the history with their name; a name is removed only on request                        | Changed           |         |
-| R-18 | A person on the waitlist is not charged until they accept a place                                                                          | Agreed            |         |
-| R-19 | A league can also mark someone "paid in person"                                                                                            | Agreed            |         |
-| R-20 | Returning players register in one tap, with last season's answers filled in and only the agreements and anything changed to confirm        | Agreed            |         |
+| ID   | Decision                                                                                                                                   | Status          | Stage 1 |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | ------- |
+| R-1  | Ask for the email first, not last                                                                                                          | Agreed          |         |
+| R-2  | Classic email and password, plus Google; an emailed code proves a new address and resets a forgotten password                              | Changed         | yes     |
+| R-3  | A league's record of a person and the person's account are separate things that get linked                                                 | Agreed          |         |
+| R-4  | The admin decides what to do about a waiver for someone added by hand, and can mark it collected by the league                             | Changed         |         |
+| R-5  | One account per person, for the whole site (U-11)                                                                                          | Agreed          | yes     |
+| R-6  | The account is identified by a verified email address                                                                                      | Agreed          |         |
+| R-7  | One account can manage several people                                                                                                      | Agreed          |         |
+| R-8  | If someone loses their email address, we restore access only after checking with a league admin who knows them                             | Agreed          |         |
+| R-9  | Once signed in on a device, a person stays signed in until they sign out, with no time limit; dangerous actions ask for the password again | Changed         | yes     |
+| R-10 | Fans can follow a team, and nobody needs an account just to look                                                                           | Agreed          |         |
+| R-11 | In a youth league, a child under 13 is registered by a parent and has no sign-in of their own                                              | Decided for you |         |
+| R-12 | From 13 up, a player can have their own account like anyone else                                                                           | Decided for you |         |
+| R-13 | A child can have more than one guardian                                                                                                    | Agreed          |         |
+| R-14 | Public pages show little about children by default; the league's admin can change it                                                       | Changed         |         |
+| R-15 | Adults are shown by full name by default, and the league decides whether a player may ask to appear as initials                            | Agreed          |         |
+| R-16 | Sensitive answers are seen only by those who need them                                                                                     | Agreed          |         |
+| R-17 | Leaving is not erasing: a player who leaves stays in the history with their name; a name is removed only on request                        | Changed         |         |
+| R-18 | A person on the waitlist is not charged until they accept a place                                                                          | Agreed          |         |
+| R-19 | A league can also mark someone "paid in person"                                                                                            | Agreed          |         |
+| R-20 | Returning players register in one tap, with last season's answers filled in and only the agreements and anything changed to confirm        | Agreed          |         |
 
 ### [P7 — Teams, schedule and game day](product/P7-teams-schedule-gameday.md)
 
-| ID   | Decision                                                                                                                                                                    | Status  | Stage 1 |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ------- |
-| S-1  | The admin can change the rules at any time, and is shown what a change will do before it applies                                                                            | Changed |         |
-| S-2  | In the first release the admin runs the draft from one screen, as Faraj does now                                                                                            | Agreed  |         |
-| S-3  | The admin decides the schedule's format; any schedule can be built or imported by hand, and what we automate grows over time                                                | Changed |         |
-| S-4  | The admin chooses the playoff format: single elimination, double elimination, best-of series, pool play, or custom                                                          | Changed |         |
-| S-5  | One device scores a game at a time, a second device can take over, and a game can be saved to a file                                                                        | Agreed  |         |
-| S-6  | The league decides whether players can be added at the scorer's table                                                                                                       | Changed |         |
-| S-7  | Every correction is logged with who, when and why                                                                                                                           | Agreed  |         |
-| S-8  | If a correction changes the winner or the score, people who got the recap get a short correction notice                                                                     | Agreed  |         |
-| S-9  | Standings are always calculated from final games                                                                                                                            | Agreed  |         |
-| S-10 | An admin can add an adjustment (a points deduction, a forfeit win awarded by ruling) with a reason                                                                          | Agreed  |         |
-| S-11 | Only final games count. A live game's numbers show on its own page but not in season totals until it ends                                                                   | Agreed  |         |
-| S-12 | Marking the season's champion fills the champion banner and adds a plate to the trophy display (P5 section 6)                                                               | Agreed  |         |
-| S-13 | Captains drafting from their own phones                                                                                                                                     | Later   |         |
-| S-14 | Referee and official assignment                                                                                                                                             | Later   |         |
-| S-15 | Availability polls ("who is coming Sunday?")                                                                                                                                | Later   |         |
-| S-16 | Live tracking for sports other than basketball                                                                                                                              | Later   |         |
-| S-17 | Shot charts and fuller basketball stats (rebounds, assists, steals, blocks, turnovers, missed shots)                                                                        | Later   |         |
-| S-18 | Linking a team site's games to an official league on the platform (dropped: there are no team sites)                                                                        | Dropped |         |
-| S-19 | Multi-venue travel-aware scheduling                                                                                                                                         | Later   |         |
-| S-20 | Video attached to plays                                                                                                                                                     | Later   |         |
-| S-21 | Every game rule that differs between leagues is a setting, and the scorekeeper can override anything automatic at the table, including switching the running clock mid-game | Agreed  |         |
-| S-22 | Who can see players' statistics is a setting, and each team can choose for itself                                                                                           | Agreed  |         |
+| ID   | Decision                                                                                                                                                                    | Status          | Stage 1 |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------- |
+| S-1  | The admin can change the rules at any time, and is shown what a change will do before it applies                                                                            | Changed         |         |
+| S-2  | In the first release the admin runs the draft from one screen, as Faraj does now                                                                                            | Agreed          |         |
+| S-3  | The admin decides the schedule's format; any schedule can be built or imported by hand, and what we automate grows over time                                                | Changed         |         |
+| S-4  | The admin chooses the playoff format: single elimination, double elimination, best-of series, pool play, or custom                                                          | Changed         |         |
+| S-5  | One device scores a game at a time, a second device can take over, and a game can be saved to a file                                                                        | Agreed          |         |
+| S-6  | The league decides whether players can be added at the scorer's table                                                                                                       | Changed         |         |
+| S-7  | Every correction is logged with who, when and why                                                                                                                           | Agreed          |         |
+| S-8  | If a correction changes the winner or the score, people who got the recap get a short correction notice                                                                     | Agreed          |         |
+| S-9  | Standings are always calculated from final games                                                                                                                            | Agreed          |         |
+| S-10 | An admin can add an adjustment (a points deduction, a forfeit win awarded by ruling) with a reason                                                                          | Agreed          |         |
+| S-11 | Only final games count. A live game's numbers show on its own page but not in season totals until it ends                                                                   | Agreed          |         |
+| S-12 | Marking the season's champion fills the champion banner and adds a plate to the trophy display (P5 section 6)                                                               | Agreed          |         |
+| S-13 | Captains drafting from their own phones                                                                                                                                     | Later           |         |
+| S-14 | Referee and official assignment                                                                                                                                             | Later           |         |
+| S-15 | Availability polls ("who is coming Sunday?")                                                                                                                                | Later           |         |
+| S-16 | Live tracking for sports other than basketball                                                                                                                              | Later           |         |
+| S-17 | Shot charts and fuller basketball stats (rebounds, assists, steals, blocks, turnovers, missed shots)                                                                        | Later           |         |
+| S-18 | Linking a team site's games to an official league on the platform (dropped: there are no team sites)                                                                        | Dropped         |         |
+| S-19 | Multi-venue travel-aware scheduling                                                                                                                                         | Later           |         |
+| S-20 | Video attached to plays                                                                                                                                                     | Later           |         |
+| S-21 | Every game rule that differs between leagues is a setting, and the scorekeeper can override anything automatic at the table, including switching the running clock mid-game | Agreed          |         |
+| S-22 | Who can see players' statistics is a setting, and each team can choose for itself                                                                                           | Agreed          |         |
+| S-23 | A new league starts with players' statistics visible to everyone; a team can make its own more private (the founder, November 13: "yes everyone")                           | Agreed          |         |
+| S-24 | A league starts with teams allowed to choose their own statistics level; the league can switch that off                                                                     | Decided for you |         |
 
 ### [P8 — Notifications](product/P8-notifications.md)
 
@@ -418,24 +446,24 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | N-12 | Delivery does not depend on anyone having a page open                                                                                                                 | Agreed                           |         |
 | N-13 | Emails come from an address on our own mail domain with the league's name shown, for example `Faraj League <farajleague@mail.oursite.com>`                            | Agreed                           |         |
 | N-14 | In order of likely value: phone push notifications (people add the league site to their home screen and allow notifications; no app store needed); text messages for… | Later                            |         |
-| N-15 | Group chats arrive in two steps: announcement chats at stage 4, open chats after stage 5                                                                              | Needs your answer                |         |
-| N-16 | Rules for every chat: text only, no private one-to-one messages, parents stand in for children under 13, moderation and reporting                                     | Needs your answer                |         |
+| N-15 | Group chats arrive in two steps: announcement chats at stage 4, open chats after stage 5                                                                              | Decided for you                  |         |
+| N-16 | Rules for every chat: text only, no private one-to-one messages, parents stand in for children under 13, moderation and reporting                                     | Decided for you                  |         |
 
 ### [P9 — Faraj, TCSAAL and Al-Hadi](product/P9-faraj-and-tcsaal.md)
 
-| ID   | Decision                                                                                                   | Status            | Stage 1 |
-| ---- | ---------------------------------------------------------------------------------------------------------- | ----------------- | ------- |
-| F-1  | This table is the acceptance list for "Faraj can run on the platform"                                      | Agreed            |         |
-| F-2  | Move Faraj between seasons, never during one                                                               | Recommended       |         |
-| F-3  | There is no target Faraj season, and every past season is kept as it is                                    | Changed           |         |
-| F-4  | We show TCSAAL a demo when Al-Hadi's season ends, and ask for a pilot, not the whole association           | Changed           |         |
-| F-5  | Prove the size before promising it                                                                         | Agreed            |         |
-| F-6  | The demo is the whole TCSAAL league, with Al-Hadi as one team in it                                        | Changed           |         |
-| F-7  | Games already recorded in the current tracker are transferred, not re-entered                              | Agreed            |         |
-| F-8  | More Al-Hadi teams (junior varsity, girls, other sports) would be further programs in the same demo league | Agreed            |         |
-| F-9  | "any size" at launch means "any size we have tested"                                                       | Agreed            |         |
-| F-10 | Until TCSAAL agrees, the demo league does not present itself as TCSAAL                                     | Needs your answer |         |
-| F-11 | A "Faraj test" league runs a whole test season before the real league moves                                | Agreed            |         |
+| ID   | Decision                                                                                                   | Status          | Stage 1 |
+| ---- | ---------------------------------------------------------------------------------------------------------- | --------------- | ------- |
+| F-1  | This table is the acceptance list for "Faraj can run on the platform"                                      | Agreed          |         |
+| F-2  | Move Faraj between seasons, never during one                                                               | Decided for you |         |
+| F-3  | There is no target Faraj season, and every past season is kept as it is                                    | Changed         |         |
+| F-4  | We show TCSAAL a demo when Al-Hadi's season ends, and ask for a pilot, not the whole association           | Changed         |         |
+| F-5  | Prove the size before promising it                                                                         | Agreed          |         |
+| F-6  | The demo is the whole TCSAAL league, with Al-Hadi as one team in it                                        | Changed         |         |
+| F-7  | Games already recorded in the current tracker are transferred, not re-entered                              | Agreed          |         |
+| F-8  | More Al-Hadi teams (junior varsity, girls, other sports) would be further programs in the same demo league | Agreed          |         |
+| F-9  | "any size" at launch means "any size we have tested"                                                       | Agreed          |         |
+| F-10 | Until TCSAAL agrees, the demo league does not present itself as TCSAAL                                     | Decided for you |         |
+| F-11 | A "Faraj test" league runs a whole test season before the real league moves                                | Agreed          |         |
 
 ### [T1 — Stack and architecture](technical/T1-stack-and-architecture.md)
 
@@ -742,7 +770,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | ID    | Decision                                                                                                                                                                                                                   | Status              | Stage 1 |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------- |
 | T-210 | Each stage ends with a real league really using what was built, not with a demo                                                                                                                                            | Agreed (delegated)  |         |
-| T-211 | A stage starts only when the decisions it depends on are marked agreed in DECISIONS.md                                                                                                                                     | Agreed (delegated)  |         |
+| T-211 | A stage or step starts only when the decisions it depends on are agreed, or were decided for the founder while away and listed for their yes (changed November 13)                                                         | Changed (delegated) |         |
 | T-212 | Work from a later stage is built early whenever it does not have to wait; the earliest stage gets builders first, exit tests stay in order, nothing reaches main or a real service before the founder's check (record 011) | Changed (delegated) |         |
 | T-213 | The Al-Hadi tracker keeps running as it is until stage 2 has passed its exit test (T-16)                                                                                                                                   | Agreed (delegated)  |         |
 | T-214 | Stage 3 before stage 4, because Faraj cannot move until its site can be rebuilt, and Faraj's first season on the platform is stage 4's exit test                                                                           | Agreed (delegated)  |         |
