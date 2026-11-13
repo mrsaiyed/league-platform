@@ -61,7 +61,9 @@ export function summarizePublish(published: ScheduleState, draft: ScheduleState)
     const old = oldRounds.get(r.id);
     if (!old) continue;
     if (old.label !== r.label) roundsRenamed.push(r.id);
-    if (old.date !== r.date) roundsDateChanged.push(r.id);
+    // A round never loses its date through a draft (a date change always names a date), and
+    // publishing never clears one, so a missing date is not counted as a change.
+    if (r.date !== null && old.date !== r.date) roundsDateChanged.push(r.id);
   }
 
   return {

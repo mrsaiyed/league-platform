@@ -285,6 +285,16 @@ describe('previewing a publication', () => {
     expect(published.value.peopleCount).toBe(preview.value.peopleCount);
   });
 
+  it('counts the round dates it will write, the same in the preview and the publication', async () => {
+    const { deps, as, db } = world(fullDraft);
+    const preview = await previewSchedulePublish(as(ownerId), { seasonId }, deps);
+    const published = await publishSchedule(as(ownerId), input, deps);
+    if (!preview.ok || !published.ok) throw new Error('expected both to work');
+    const written = db.state.roundChanges.filter((c) => c.date !== undefined);
+    expect(preview.value.summary.roundsDateChanged).toHaveLength(written.length);
+    expect(published.value.summary.roundsDateChanged).toHaveLength(written.length);
+  });
+
   it('lists every blocker, the first of which publishing refuses with', async () => {
     const changes: DraftChange[] = [
       { kind: 'add-game', game: game(9, { time: null }) },
