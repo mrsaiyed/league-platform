@@ -21,10 +21,8 @@ One line per open lane, written before its builder starts: `- **<step>** — <la
 
 Reserved so far: migration 0006 and decision record 012 / T-224 to 1.19 part 1; decision record 013 / T-225 to 1.13; decision record 014 / T-226 to 1.12; decision record 015 / T-227 to 1.18 part 1; decision record 016 / T-228 to 1.20 part 1. Next free: migration 0007, record 017, T-229. Check the folders before trusting these.
 
-- **1.26 Catch up with main** — `.local/lanes/1.26-catch-up` — none — merge origin/main into the lane, keep main's tracker tests unchanged.
 - **1.12 Access** — `.local/lanes/1.12-access` — record 014 / T-226 — whole step.
 - **1.13 Sign-in interface and stand-in** — `.local/lanes/1.13-signin-interface` — record 013 / T-225 — whole step.
-- **1.18 part 1** — `.local/lanes/1.18p1-design-messages` — record 015 / T-227 — design values to CSS variables, message loader, right-to-left.
 - **1.19 part 1** — `.local/lanes/1.19p1-queue-email` — migration 0006, record 012 / T-224 — queue and email interfaces, stand-ins, adapters, jobs table.
 
 ## Needs the founder
@@ -42,6 +40,8 @@ Nothing blocks the next steps. These are wanted before stage 1 can be called don
 
 Newest first. One line per step or event.
 
+- 2026-11-13 — Step 1.26 done (real merge): origin/main (24d8bfb) is in; tracker code and tests are main's, unchanged; legacyFiles gained live.ts and setup.sql (the one recorded exception); the tracker and the web app both read DATABASE_URL (a copied .env.example would point the tracker at the web app's made-up database: rename one later); nothing contacted the real Supabase project. Under several lanes at once the database tests exceed their 30 s limit; they pass alone.
+- 2026-11-13 — Step 1.18 part 1 done: design document to CSS variables (packages/site), two starting designs (midnight-gold, clean-court), English message catalog with translator and plurals, right-to-left helpers. Reviewer's findings fixed. Open: no JSON catalogs, no scan for hard-coded text (part 2), 7 font keys, fonts not hosted.
 - 2026-11-13 — Step 1.20 part 1 done: logging and error reporting in packages/observability (JSON logs with request ID, redaction of personal content and secrets, error reporter, local adapters, Sentry adapter over an injected client, unverified). Reviewer's findings fixed. To do when real Sentry is wired: sendDefaultPii off, beforeSend running redact, drop breadcrumbs/request data. Open: CommandLine is a copy of core's log-line shape; free-text names under harmless keys cannot be detected; health checks are part 2. Gate: under six concurrent lanes the database tests time out at 30 s (app-role.test.ts); they pass alone.
 
 - 2026-11-12 — Founder: no more one step at a time; as many builders as realistic, on every stage that does not have to wait; the founder is away and the build needs no permission from them. Runbook rewritten: each step is built in its own lane (a private copy of the repository under `.local/lanes`), up to 5 at once, landed one at a time by the lead; the end of a stage no longer stops the build; later stages fill spare lanes (T-212 changed, record 011). A trial lane installed in 8 seconds and ran the gate in about two and a half minutes; one timing test in the migration runner failed under load and passed alone (flaky under load: make it sturdy).
