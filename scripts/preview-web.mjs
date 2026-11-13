@@ -1,16 +1,16 @@
 // Shows the new product on this computer, as it stands at the newest commit of this folder:
-//   node scripts/preview-web.mjs            then open http://localhost:3210
+//   node scripts/preview-web.mjs            then open http://127.0.0.1:3210/north-valley
 //   node scripts/preview-web.mjs --prepare  only gets the copy ready (first time: minutes)
 //
 // It runs the web app on its made-up stand-in (APP_ENV=test): made-up leagues, made-up
-// people, no database, no outside service. Nothing leaves this computer and nothing real
-// is read. Places to look: /north-valley and /harbor-city (two leagues, each with its own
-// look), /signin, /signup, /find.
+// people, no database, no outside service. It answers only this computer (127.0.0.1), so
+// nothing leaves it and nothing real is read. Places to look: /north-valley and
+// /harbor-city (two leagues, each with its own look), /signin, /signup, /find.
 //
 // It runs from a private copy under .local/preview, never from this folder: a server
-// running here holds files open, and the build's own `npm ci` would then fail. The copy
-// is moved to this folder's newest commit, and built again, each time this starts. So to
-// see newer work, stop it and start it again.
+// running here holds files open, and the build's own `npm ci` would then fail. Each time
+// this starts, the copy is moved to this folder's newest commit, and built again if the
+// product's code changed. So to see newer work, stop it and start it again.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const copy = path.join(root, '.local', 'preview');
+const host = '127.0.0.1';
 const port = process.env.PREVIEW_PORT ?? '3210';
 const say = (text) => console.log(`[preview] ${text}`);
 const run = (command, args, options = {}) => {
@@ -59,14 +60,15 @@ if (!fs.existsSync(lockNote) || fs.readFileSync(lockNote, 'utf8') !== lock) {
   fs.writeFileSync(lockNote, lock);
 }
 
-// 3. Build it, when the commit changed. All settings are made up (as in the app's own
-// check, scripts/check-web-shell.mjs).
+// 3. Build it, when the product's code changed: the web app, the packages it is made of,
+// or the libraries. All settings are made up (as in the app's own check,
+// scripts/check-web-shell.mjs).
 const app = path.join(copy, 'apps', 'web');
 const env = {
   ...process.env,
   NEXT_TELEMETRY_DISABLED: '1',
   APP_ENV: 'test',
-  PUBLIC_BASE_URL: `http://localhost:${port}`,
+  PUBLIC_BASE_URL: `http://${host}:${port}`,
   LOG_LEVEL: 'warn',
   DATABASE_URL: 'postgres://made-up:made-up-password@127.0.0.1:1/nowhere',
   SESSION_SECRET: 'made-up-session-secret-0123456789abcdef',
@@ -78,23 +80,25 @@ const env = {
   STRIPE_WEBHOOK_SECRET: 'made-up-webhook-key',
 };
 const nextBin = createRequire(path.join(app, 'package.json')).resolve('next/dist/bin/next');
-const builtNote = path.join(app, '.next', 'preview-commit');
-if (!fs.existsSync(builtNote) || fs.readFileSync(builtNote, 'utf8') !== commit) {
+const code = git('rev-parse', `${commit}:apps/web`, `${commit}:packages`).replace(/\s+/g, ' ');
+const built = `${code} ${lock}`;
+const builtNote = path.join(app, '.next', 'preview-built');
+if (!fs.existsSync(builtNote) || fs.readFileSync(builtNote, 'utf8') !== built) {
   say(`Building the web app at ${commit.slice(0, 7)} (a few minutes when the lanes are busy).`);
   run(process.execPath, [nextBin, 'build'], { cwd: app, env });
-  fs.writeFileSync(builtNote, commit);
+  fs.writeFileSync(builtNote, built);
 }
 if (process.argv.includes('--prepare')) {
   say(`Ready at ${commit.slice(0, 7)}. Start it with: node scripts/preview-web.mjs`);
   process.exit(0);
 }
 
-// 4. Serve it.
-say(`The product as of ${commit.slice(0, 7)}: http://localhost:${port}/north-valley`);
-const server = spawn(process.execPath, [nextBin, 'start', '--port', port], {
+// 4. Serve it, to this computer only.
+say(`The product as of ${commit.slice(0, 7)}: http://${host}:${port}/north-valley`);
+const server = spawn(process.execPath, [nextBin, 'start', '--hostname', host, '--port', port], {
   cwd: app,
   env,
   stdio: 'inherit',
 });
-server.on('exit', (code, signal) => process.exit(signal ? 1 : (code ?? 1)));
+server.on('exit', (status, signal) => process.exit(signal ? 1 : (status ?? 1)));
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.kill(signal));
