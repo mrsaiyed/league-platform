@@ -14,16 +14,16 @@ Each step is done when its done test passes, the gate passes, the independent re
 
 ### A. Skeleton
 
-- [ ] **1.1 Workspaces.** Turn the repository into npm workspaces as in T2 section 1: `apps/web`, `apps/worker`, `packages/core`, `site`, `ui`, `emails`, `providers`, `observability`, beside the existing `contracts`, `database`, `sports`. Empty packages with a `package.json`, `tsconfig.json` and an `index.ts`. The existing apps and every existing script keep working unchanged. _Spec: T2 §1–2, T-20. Done test: `npm run verify` passes; `npm ls --workspaces` lists them. Model: sonnet._
-- [ ] **1.2 Strict TypeScript and the test runner.** One shared strict config (T-32). Add Vitest for the new packages; the existing `node --test` suites stay as they are. `npm run verify` runs both. _Spec: T1 §1, T9 §2. Done test: a sample test in `packages/core` runs in the gate. Model: sonnet._
-- [ ] **1.3 Structure checks.** Automatic checks for: import directions (T-21), modules used only through `index.ts` (T-22), no league named in code (T-27), no SQL outside `packages/database`, no hand-written league addresses (T-34), no secrets in browser code (T-30). Each check has a test that proves it catches a planted violation. _Spec: T2 §2 and §6, T9 §3. Done test: planting each violation fails the gate. Model: opus._
+- [x] **1.1 Workspaces.** Turn the repository into npm workspaces as in T2 section 1: `apps/web`, `apps/worker`, `packages/core`, `site`, `ui`, `emails`, `providers`, `observability`, beside the existing `contracts`, `database`, `sports`. Empty packages with a `package.json`, `tsconfig.json` and an `index.ts`. The existing apps and every existing script keep working unchanged. _Spec: T2 §1–2, T-20. Done test: `npm run verify` passes; `npm ls --workspaces` lists them. Model: sonnet._
+- [x] **1.2 Strict TypeScript and the test runner.** One shared strict config (T-32). Add Vitest for the new packages; the existing `node --test` suites stay as they are. `npm run verify` runs both. _Spec: T1 §1, T9 §2. Done test: a sample test in `packages/core` runs in the gate. Model: sonnet._
+- [x] **1.3 Structure checks.** Automatic checks for: import directions (T-21), modules used only through `index.ts` (T-22), no league named in code (T-27), no SQL outside `packages/database`, no hand-written league addresses (T-34), no secrets in browser code (T-30). Each check has a test that proves it catches a planted violation. _Spec: T2 §2 and §6, T9 §3. Done test: planting each violation fails the gate. Model: opus._
 - [x] **1.4 Settings and secrets in one place.** A config module read once at startup, checked against a Zod schema; the app refuses to start if a value is missing. `.env.example` lists every value with made-up contents. _Spec: T-30. Model: sonnet._
 
 ### B. The database and the league fence
 
 - [x] **1.5 Migration runner.** Numbered SQL files in `supabase/migrations/`; a runner that applies them to PGlite for local work and tests, and can apply them to any PostgreSQL address later. A check rejects a migration that drops or renames in one step (T-183). _Spec: T3 §13, T-48, T-49. Model: opus._
 - [x] **1.6 First tables.** `accounts`, `profiles`, `profile_access`, `leagues`, `league_slug_history`, `league_features`, `programs`, `seasons`, `role_grants`, `invitations`, `activity_log`, `support_access_log`, `command_receipts`, with the conventions of T-40 to T-47: `league_id` on every league table and in every link, UUID version 7 keys, UTC times, `deleted_at`, `version`. One default program per league. _Spec: T3 §1–5, §12. Done test: constraint tests for each rule in T3 §12 that applies to these tables. Model: opus._
-- [ ] **1.7 Row-level security.** A restricted database role for the app (T-60). Policies on every league table keyed to the league set at the start of each transaction (T-61); account-keyed policies for personal tables (T-62). _Spec: T4 §2. Done test: as the restricted role, a query with no league set returns nothing; with league A set, league B's rows are invisible and cannot be written. Model: opus, high._
+- [x] **1.7 Row-level security.** A restricted database role for the app (T-60). Policies on every league table keyed to the league set at the start of each transaction (T-61); account-keyed policies for personal tables (T-62). _Spec: T4 §2. Done test: as the restricted role, a query with no league set returns nothing; with league A set, league B's rows are invisible and cannot be written. Model: opus, high._
 - [x] **1.8 Typed queries.** Kysely over the schema, types generated from the migrations. Every function that touches league data requires a league ID (T-28). A transaction helper that sets league and account, used by everything. The helper always sets them with `set_config(..., true)`, for that one transaction only, never for the whole session: a pooled connection would otherwise carry one league into the next request. A test proves it: a league set in one transaction is gone in the next one on the same connection. _Spec: T1 §1, T2 §6, T-61. Model: opus._
 - [x] **1.9 The two-league test harness.** A harness that creates two leagues and, for every registered command and query, tries league A's access against league B's records; any success fails the gate. New commands are picked up automatically from the registry. _Spec: T-65. Done test: a deliberately leaky command planted in a test is caught. Model: opus, high._ The harness and its case registry live in `packages/database/src/isolation/`; hooking up commands is finished in step 1.10, whose commands add their cases to the same registry and whose command folders join the coverage scan.
 
@@ -54,6 +54,24 @@ Each step is done when its done test passes, the gate passes, the independent re
 - [ ] **1.23 CI.** The GitHub workflow runs the new gate. Nothing is pushed by a run; this only edits the file. _Model: haiku._
 - [ ] **1.24 Records.** A decision record for each choice in T1 that stage 1 used, and for every decision made along the way. `docs/operations/` gets "run it locally" and "apply migrations". _Spec: T9 §5. Model: haiku to draft, lead to check._
 - [ ] **1.25 Whole-stage review and report.** As in the runbook, section 7. The report's founder checklist includes at least: turn on two-step sign-in for the business accounts (T-83); create the Supabase, Render, Cloudflare and Resend accounts and a domain; set up the shared password vault (T-166); then one supervised session to connect staging, switch on continuous backup, ship a release and reverse it. _Model: opus, xhigh._
+
+## Side by side
+
+Which steps can be built at the same time, as lanes (runbook, section 3). Each lane runs top to bottom; lanes in the same wave run together. The lead may regroup when it sees the real files: the rule is that two open lanes never share a file.
+
+| Wave | Lane A: rules of the product          | Lane B: outside services                                         | Lane C: looks, logs, records                                                          |
+| ---- | ------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 1    | 1.11 Leagues, then 1.12 Access        | 1.13 Sign-in interface and stand-in, then 1.15 Supabase adapter  | 1.20 Logging and errors (the library part), then 1.23 CI                              |
+| 2    | 1.16 Address builder, then 1.17 Shell | 1.19 Worker and queue (its invitation email job needs 1.12 done) | 1.18 Design values and message files (the parts that need no page first), 1.24 drafts |
+| 3    | 1.14 Sign-in flows in the web app     | 1.21 Seed leagues                                                | The rest of 1.18 and 1.20 that needed the shell (header, footer, health checks)       |
+| 4    | 1.22 Browser tests                    | 1.24 Records, finished                                           |                                                                                       |
+| 5    | 1.25 Whole-stage review, alone        |                                                                  |                                                                                       |
+
+Folders each lane owns in waves 1 and 2:
+
+- **Lane A:** `packages/core`, `packages/database` (its queries, stores, isolation cases and any migration), `packages/site`, `apps/web`.
+- **Lane B:** `packages/providers`, `apps/worker`. Step 1.19 also needs a jobs table and the same-transaction hookup in `packages/database`: that part is done when lane A has no migration or database work open, never beside it.
+- **Lane C:** `packages/observability`, `packages/ui`, `packages/emails`, `.github`, `docs/architecture`, `docs/operations`.
 
 ## What stage 1 cannot finish without the founder
 

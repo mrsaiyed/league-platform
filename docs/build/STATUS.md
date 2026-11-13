@@ -9,22 +9,31 @@ The one file that says where the build is. Every run reads it first and updates 
 - **Branch:** `build/stage-1`
 - **Gate:** `npm run verify`
 - **Next step:** 1.11 Leagues
-- **Pushing to GitHub:** not allowed. The founder has not said yes.
+- **Pushing to GitHub:** on hold, do not push. The founder said yes on 2026-11-12, but the GitHub repository is public, and a push would publish the specification, the legal brief and the business decisions to anyone. Waiting for the founder to make the repository private or to say that public is fine. Runs push only when this line starts with `allowed`.
 
 States: `building` (take the next step) · `waiting-for-founder` (nothing can be done until the list below is answered) · `stage-review` (the stage is finished and waiting for the founder's check).
+
+## In progress
+
+Open lanes when work runs side by side (runbook, section 3): the step, and the folders that lane owns. Keep this true before starting builders, so a run that is cut off leaves a map.
+
+- Step 1.11 Leagues: half built and uncommitted in `packages/core/src/modules/leagues` and `packages/database/src/queries`, `stores`, `isolation`. Finish it, do not redo it.
 
 ## Needs the founder
 
 Nothing blocks the next steps. These are wanted before stage 1 can be called done:
 
 - [ ] Turn on two-step sign-in for GitHub and the email account it recovers to (T-83).
-- [ ] Say whether build branches may be pushed to GitHub, so the work is backed up off this computer and the automatic checks run there.
+- [ ] Pushing: you said yes (2026-11-12). One thing first: the repository on GitHub is public, so anyone could read what is pushed. Make it private (GitHub → the repository → Settings → General → Danger Zone → Change visibility), or say that public is fine. Then the work is backed up off this computer after every step.
+- [ ] League states (U-9), built as a simple version for you to confirm: owner can publish (draft→live), archive (live→archived) and un-archive; the owner cannot take a live league back to draft; only we can suspend, and lifting a suspension puts the league back to draft so the owner must publish again (recommended: this way a lift can never publish a league by surprise). Archived and suspended leagues are read-only. Also: are "mixed" leagues unlisted by default like youth (recommended yes)? And the offensive-words part of the blocked short-name list needs your word list or a go-ahead for ours.
 - [ ] Vendor accounts (Supabase, Render, Cloudflare, Resend, a domain) — not needed until the stage report asks for them.
 - [ ] Nothing to do now, but not yet checked: the league fence (step 1.7) assumes that the database user Supabase runs our migrations as is allowed to see past the fence, as it is on this computer. If it is not, some checks that must look at every league (is this short name free, does every league have its main program) will refuse to run rather than give a wrong answer, so nothing leaks, but leagues could not be created. One check settles it once a Supabase account exists; it goes on the stage report's checklist (record 008).
 
 ## Log
 
 Newest first. One line per step or event.
+
+- 2026-11-12 — Founder's instructions: work side by side where steps do not have to wait for each other (runbook section 3 "Working side by side", lanes in the stage plan); pushing the build branch allowed but held until the public repository is made private or confirmed.
 
 - 2026-11-13 — Step 1.10 done: command shape in packages/core/src/command (defineCommand, registry, ports), example `leagues.set_name`, database adapter commandTransaction, harness runs commands (jobs scanned, refusal fails control), coverage scan over all of core; record 010 / T-223. Reviewer's 10 findings fixed. Open: jobs not in a real database transaction until 1.19; harness runs no event handlers yet (a check trips at the first); zod not declared in packages/core/package.json; PGlite only.
 - 2026-11-13 — Step 1.9 done: two-league harness in packages/database/src/isolation (test helpers; runs each registered case as control, app, code-only, no-league and both-leagues, each also compared with the other league's rows deleted; snapshots all tables incl. accounts/profiles; recursive coverage scan fails on a new uncovered query). Reviewer's findings fixed. Step 1.10 must decide how command cases run (a command opening its own transaction is refused as nested), normalise new ids/times in the comparison, and add its folders to the scan. Open: not run on real PostgreSQL; A's own rows not compared; driver error detail fields not scanned; helpers ~680 lines.

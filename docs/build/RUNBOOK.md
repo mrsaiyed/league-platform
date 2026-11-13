@@ -25,6 +25,7 @@ The stage plan lists steps in order. Take the first one that is not done and who
 5. **Independent review.** Start a fresh sub-agent that did not write the change and has not seen how it was written. Give it only the diff, the spec sections and this instruction: "Find faults. Check it against the spec and against the rules in CLAUDE.md. List concrete problems with file and line, or say there are none." Every finding is fixed, or answered in one line in the commit message. (T-181.)
 6. **Commit** on the build branch with a message that says what changed and which decision IDs it carries out. End the message with the attribution line your session was given.
 7. **Update `STATUS.md`**: tick the step, add one line to the log, rewrite the lock time.
+8. **Push, only if allowed.** If the "Pushing to GitHub" line in `STATUS.md` says `allowed`, run `git push origin <build branch>` after the commit. Only the build branch, never `main`, never with force. If that line says anything else, do not push. A push that fails (no network, sign-in needed) is noted in the log and never retried in a loop.
 
 **Then take the next step, in the same run.** Finishing one step is not the end of a run: keep going, step after step, until section 6 says to stop. A run can be cut off at any moment by the usage limit, so the tree must be committed and `STATUS.md` true after every step, not at the end of the run.
 
@@ -47,6 +48,24 @@ Rules for delegating:
 - The reviewer is never the author, and is never given the author's reasoning.
 - If a sub-agent's work fails the gate twice, the lead does that step itself.
 
+### Working side by side
+
+The founder asked for this on 2026-11-12: the lead oversees, and work that does not have to wait for other work is done at the same time. A lead that sits waiting on one sub-agent while nothing else moves is doing it wrong.
+
+**Inside a step.** Split the building by files that do not overlap (the commands in `packages/core`, the queries in `packages/database`, the tests of each) and start those builders in one message so they run together. Split a large review the same way: one reviewer per area, started together.
+
+**Across steps: lanes.** The stage plan has a "Side by side" section saying which steps can be built at the same time. A lane is one step, one builder and one set of folders. Up to three lanes are open at once.
+
+1. **Write the lanes down first.** Before starting the builders, list each open lane under "In progress" in `STATUS.md`: the step and the folders it owns. A run can be cut off at any moment, and this list is how the next run knows whose half-finished files are whose.
+2. **A builder stays in its folders.** Its brief names them and says to touch nothing else: no other lane's folders, and none of the shared files (`STATUS.md`, the stage plan, `DECISIONS.md`, the root `package.json`, `package-lock.json`, the shared TypeScript and test configs, `scripts/structure/config.mjs`). If a lane needs a new dependency, a shared file changed or a decision record, the builder says so in its report and the lead does it, one lane at a time. The lead hands out decision record numbers and `T-` numbers, so two lanes never take the same one.
+3. **Builders check their own package.** While lanes are open the tree holds half-finished work from more than one step, so a builder runs its own package's tests and type check, not the whole gate.
+4. **Review as soon as a lane is built.** When a builder reports done, read its diff and start its independent reviewer at once, while the other lanes keep building. Findings go back to a builder for that lane only.
+5. **Commit one lane at a time.** Each lane is its own commit holding only that lane's files: `git add` by path, never `git add -A` while lanes are open. The whole gate must pass on the tree before each commit. If another lane's unfinished work is what breaks the gate, wait for that lane. Never move a lane's files aside while its builder is still running.
+6. **Some things are never done side by side.** Two migrations are never written at the same time, because their numbers are in order. Two steps that both touch the league fence, sign-in, sessions or permissions are never open together. The whole-stage review runs alone.
+7. **Fall back when it goes wrong.** If lanes collide twice in a run (the same file edited by two lanes, or a broken gate nobody can pin on one lane), finish the open lanes one by one and work one step at a time for the rest of the run. Say so in the log.
+
+Working side by side finishes sooner by the clock. It does not make the usage allowance go further: three builders use it about three times as fast.
+
 ## 4. Decisions that come up while building
 
 - **Technical, and the spec is silent or wrong:** the lead decides. Write a short record in `docs/architecture/decisions/` (what, what else was considered, what would make us revisit), correct the spec file in the same commit, and add a row to the change log in `docs/specs/v1/DECISIONS.md` with status "Agreed (delegated)" or "Changed (delegated)".
@@ -55,7 +74,7 @@ Rules for delegating:
 
 ## 5. What a run must never do
 
-- Commit to `main`, push, or open a pull request, unless `STATUS.md` records that the founder allowed it.
+- Commit to `main`, or open a pull request. Push anything, unless the "Pushing to GitHub" line in `STATUS.md` says `allowed`; and then only the build branch, never `main`, never with force.
 - Touch production, a vendor dashboard, real people's data or any secret.
 - Change `apps/live-stats`, `packages/sports` or the Al-Hadi data except where the stage plan says to.
 - Weaken or delete a test to make the gate pass, or skip a hook.
