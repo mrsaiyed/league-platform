@@ -93,8 +93,7 @@ describe('issueInvitationLink', () => {
     expect(made.db.state.invitations[0]?.tokenHash).toBe(hash);
 
     const { db, deps, as, invitationId: ownersId } = await invited();
-    const stored = db.state.invitations[0];
-    if (stored !== undefined) stored.invitedByAccountId = null;
+    db.state.invitations = db.state.invitations.map((i) => ({ ...i, invitedByAccountId: null }));
     expect(
       await deps.transaction(as(null), (tx) => issueInvitationLink(tx, ownersId)),
     ).toBeUndefined();
