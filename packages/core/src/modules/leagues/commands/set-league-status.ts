@@ -16,6 +16,7 @@ export type SetLeagueStatusError = {
 
 export const setLeagueStatus = defineCommand({
   name: 'leagues.set_status',
+  permission: 'league.settings',
   input: z.object({ status: z.enum(leagueStatuses), version: z.number().int().positive() }),
   allowed: async (context, input, tx: LeaguesTx) => {
     const league = await tx.leagues.currentLeague();

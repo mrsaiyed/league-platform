@@ -18,6 +18,7 @@ export type RevokeGrantError = { readonly code: 'grant-not-found' | 'grant-alrea
 
 export const revokeGrant = defineCommand({
   name: 'access.revoke_grant',
+  permission: 'access.manage',
   input: z.object({ grantId: z.uuid().transform((id) => id.toLowerCase()) }),
   allowed: (context, input, tx: AccessTx) => mayManageGrant(context, tx, input.grantId),
   run: async ({

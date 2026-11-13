@@ -10,8 +10,9 @@ export type SetCurrentSeasonError = { readonly code: 'season-not-found' };
 
 export const setCurrentSeason = defineCommand({
   name: 'leagues.set_current_season',
+  permission: 'season.settings',
   input: z.object({ seasonId: z.uuid() }),
-  allowed: (context, _input, tx: LeaguesTx) => mayEditLeague(context, tx),
+  allowed: (context, _input, tx: LeaguesTx) => mayEditLeague(context, tx, 'season.settings'),
   run: async ({
     context,
     input,

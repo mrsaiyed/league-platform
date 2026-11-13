@@ -13,6 +13,7 @@ const day = z.iso.date();
 
 export const createSeason = defineCommand({
   name: 'leagues.create_season',
+  permission: 'season.settings',
   // The same limits as the seasons table (0003).
   input: z
     .object({
@@ -28,7 +29,7 @@ export const createSeason = defineCommand({
     .refine((s) => s.startsOn === undefined || s.endsOn === undefined || s.endsOn >= s.startsOn, {
       path: ['endsOn'],
     }),
-  allowed: (context, _input, tx: LeaguesTx) => mayEditLeague(context, tx),
+  allowed: (context, _input, tx: LeaguesTx) => mayEditLeague(context, tx, 'season.settings'),
   run: async ({ context, input, tx }): Promise<Result<{ seasonId: string }, CreateSeasonError>> => {
     const program = await tx.leagues.findProgram(input.programId);
     if (program === undefined) return fail({ code: 'program-not-found' });

@@ -2,9 +2,17 @@
 // are refused with "not-allowed". Against the real database as the app's role, each
 // run in a league of its own, so one run cannot change what the next one sees.
 //
-// Who may run what is written out here from the spec (P4 §4, O-7, A-6, U-9), not
-// read from the permission table in core, so a command that checks the wrong
-// permission fails. A command in core's registry with no row here fails too.
+// Each row says which permission the spec gives the command (T4 §4) and where it
+// applies. Who holds each permission is written out here from the spec (P4 §3 and
+// §4, O-7, A-6, U-9), not read from the permission table in core, and who should
+// succeed follows from those two. So a command that checks the wrong permission
+// fails, and so does a role given the wrong permissions in core. A command in core's
+// registry with no row here fails, and so does one whose own named permission is
+// not what its rows say the spec needs, or that names none.
+//
+// A new command joins by adding its row: its name, the permission, the scope, and
+// how to make a valid input. Every permission of stage 2 is already in the table of
+// who holds what, so the expected outcomes follow with nothing more to write.
 //
 // Club admins, coaches and captains are not here: their scopes (a club, a team)
 // cannot be granted until those tables exist (0004). Their permissions are tested
@@ -30,9 +38,11 @@ import {
   setLeagueStatus,
   type AccessTx,
   type CommandContext,
+  type CommandRequirement,
   type CommandDeps,
   type Job,
   type LeaguesTx,
+  type Permission,
 } from '@srleagues/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
@@ -60,6 +70,7 @@ const actors = [
   'scheduler',
   'editor',
   'scorekeeper',
+  'program_scheduler',
   'no_role',
   'revoked_admin',
   'staff',
@@ -73,7 +84,10 @@ type Outcome = { readonly ok: boolean; readonly error?: { readonly code: string 
 type Row = {
   readonly command: string;
   readonly name: string;
-  readonly allowed: readonly Actor[];
+  /** The permission the spec says this needs (T4 §4), written from the spec. */
+  readonly needs: CommandRequirement;
+  /** Where this call applies: the whole league (the default) or the league's program. */
+  readonly scope?: 'league' | 'program';
   /** The input, made valid for this league, and the league the call is for. */
   readonly prepare: (league: League) => Promise<{ input: unknown; leagueId?: string }>;
   readonly run: (context: CommandContext, input: unknown) => Promise<Outcome>;
@@ -127,6 +141,7 @@ async function leagueWithActors(): Promise<League> {
     ['scheduler', await grant(made.leagueId, 'scheduler')],
     ['editor', await grant(made.leagueId, 'editor')],
     ['scorekeeper', await grant(made.leagueId, 'scorekeeper')],
+    ['program_scheduler', await grant(made.leagueId, 'scheduler', programId)],
     ['no_role', await newAccount(pglite)],
     ['revoked_admin', await grant(made.leagueId, 'admin')],
     ['staff', staffId],
@@ -171,51 +186,106 @@ async function grantId(leagueId: string, role: string, scope: string | null = nu
   return row.id;
 }
 
-const programAdmins: readonly Actor[] = ['owner', 'admin', 'program_admin'];
+/** O-7: what not even an admin may do. */
+const ownerOnly: readonly Permission[] = [
+  'league.payout',
+  'league.transfer_ownership',
+  'league.delete',
+];
 
-const ownerAndAdmins: readonly Actor[] = ['owner', 'admin'];
+type LesserRole = 'registrar' | 'scheduler' | 'editor' | 'scorekeeper';
+
+/**
+ * P4 §4, for the roles below the admin that this matrix grants (the areas of P4 §3
+ * as T4 §4 names their permissions). The owner holds everything; an admin all but
+ * `ownerOnly`. Written again, by hand, from the spec: not read from core.
+ */
+const heldBy: Readonly<Record<LesserRole, readonly Permission[]>> = {
+  // "Registration and People"
+  registrar: [
+    'registration.manage',
+    'registration.read_answers',
+    'people.read',
+    'people.manage',
+    'people.read_sensitive',
+    'people.import',
+  ],
+  // "Schedule and Games": venues, the draft, publishing, importing; assigning
+  // scorekeepers, scoring, forfeits and postponements, corrections.
+  scheduler: [
+    'schedule.read',
+    'schedule.edit',
+    'schedule.publish',
+    'schedule.import',
+    'venues.manage',
+    'games.manage',
+    'games.score',
+    'games.results',
+    'games.correct',
+  ],
+  // "Site, news, media, awards, sponsors"
+  editor: ['site.edit', 'site.publish', 'content.edit'],
+  // "Score games", and see the list of their games
+  scorekeeper: ['games.score', 'schedule.read'],
+};
+
+/** Who should succeed at a command needing `needs` at `scope`, from the tables above. */
+function expectedActors(needs: CommandRequirement, scope: 'league' | 'program'): Actor[] {
+  if (needs === 'signed-in') return [...signedIn];
+  if (needs === 'platform-staff') return ['staff'];
+  const allowed: Actor[] = ['owner'];
+  if (!ownerOnly.includes(needs)) {
+    allowed.push('admin');
+    if (scope === 'program') allowed.push('program_admin');
+  }
+  for (const role of ['registrar', 'scheduler', 'editor', 'scorekeeper'] as const) {
+    if (heldBy[role].includes(needs)) allowed.push(role);
+  }
+  if (scope === 'program' && heldBy.scheduler.includes(needs)) allowed.push('program_scheduler');
+  return allowed;
+}
 
 const rows: readonly Row[] = [
-  // League settings (P4 §6): the owner and admins (O-7).
+  // League settings (P4 §6) and seasons (P4 §3): the owner and admins (O-7).
   {
     command: 'leagues.set_name',
     name: "set the league's name",
-    allowed: ownerAndAdmins,
+    needs: 'league.settings',
     prepare: async () => ({ input: { name: 'Renamed', version: 1 } }),
     run: (c, i) => setLeagueName(c, i, leaguesDeps),
   },
   {
     command: 'leagues.rename_short_name',
     name: "change the league's short name",
-    allowed: ownerAndAdmins,
+    needs: 'league.settings',
     prepare: async () => ({ input: { slug: unique('renamed'), version: 1 } }),
     run: (c, i) => renameShortName(c, i, leaguesDeps),
   },
   {
     command: 'leagues.set_status',
     name: 'publish the league',
-    allowed: ownerAndAdmins,
+    needs: 'league.settings',
     prepare: async () => ({ input: { status: 'live', version: 1 } }),
     run: (c, i) => setLeagueStatus(c, i, leaguesDeps),
   },
   {
     command: 'leagues.set_status',
     name: 'suspend the league (our staff only, U-9)',
-    allowed: ['staff'],
+    needs: 'platform-staff',
     prepare: async () => ({ input: { status: 'suspended', version: 1 } }),
     run: (c, i) => setLeagueStatus(c, i, leaguesDeps),
   },
   {
     command: 'leagues.create_season',
     name: 'add a season',
-    allowed: ownerAndAdmins,
+    needs: 'season.settings',
     prepare: async () => ({ input: { slug: 'fall', name: 'Fall' } }),
     run: (c, i) => createSeason(c, i, leaguesDeps),
   },
   {
     command: 'leagues.set_current_season',
     name: 'make a season current',
-    allowed: ownerAndAdmins,
+    needs: 'season.settings',
     prepare: async (league) => ({
       input: { seasonId: await newSeason(pglite, league.leagueId, league.defaultProgramId) },
     }),
@@ -224,7 +294,7 @@ const rows: readonly Row[] = [
   {
     command: 'leagues.create',
     name: 'create a league (our staff only)',
-    allowed: ['staff'],
+    needs: 'platform-staff',
     prepare: async (league) => ({
       leagueId: randomUUID(),
       input: {
@@ -242,14 +312,15 @@ const rows: readonly Row[] = [
   {
     command: 'access.invite',
     name: 'invite someone to the whole league',
-    allowed: ownerAndAdmins,
+    needs: 'access.manage',
     prepare: async () => ({ input: { email: 'new@example.test', role: 'editor' } }),
     run: (c, i) => invite(c, i, accessDeps),
   },
   {
     command: 'access.invite',
     name: 'invite someone to one program',
-    allowed: ['owner', 'admin', 'program_admin'],
+    needs: 'access.manage',
+    scope: 'program',
     prepare: async (league) => ({
       input: {
         email: 'new@example.test',
@@ -262,14 +333,15 @@ const rows: readonly Row[] = [
   {
     command: 'access.resend_invitation',
     name: 're-send an invitation',
-    allowed: ownerAndAdmins,
+    needs: 'access.manage',
     prepare: async (league) => ({ input: { invitationId: await invitationIn(league) } }),
     run: (c, i) => resendInvitation(c, i, accessDeps),
   },
   {
     command: 'access.resend_invitation',
     name: 're-send an invitation to one program',
-    allowed: programAdmins,
+    needs: 'access.manage',
+    scope: 'program',
     prepare: async (league) => ({
       input: { invitationId: await invitationIn(league, { program: true }) },
     }),
@@ -278,14 +350,15 @@ const rows: readonly Row[] = [
   {
     command: 'access.cancel_invitation',
     name: 'cancel an invitation',
-    allowed: ownerAndAdmins,
+    needs: 'access.manage',
     prepare: async (league) => ({ input: { invitationId: await invitationIn(league) } }),
     run: (c, i) => cancelInvitation(c, i, accessDeps),
   },
   {
     command: 'access.cancel_invitation',
     name: 'cancel an invitation to one program',
-    allowed: programAdmins,
+    needs: 'access.manage',
+    scope: 'program',
     prepare: async (league) => ({
       input: { invitationId: await invitationIn(league, { program: true }) },
     }),
@@ -294,14 +367,15 @@ const rows: readonly Row[] = [
   {
     command: 'access.revoke_grant',
     name: "remove someone's access",
-    allowed: ownerAndAdmins,
+    needs: 'access.manage',
     prepare: async (league) => ({ input: { grantId: await grantId(league.leagueId, 'editor') } }),
     run: (c, i) => revokeGrant(c, i, accessDeps),
   },
   {
     command: 'access.revoke_grant',
     name: "remove someone's access to one program",
-    allowed: programAdmins,
+    needs: 'access.manage',
+    scope: 'program',
     prepare: async (league) => ({
       input: { grantId: await grantId(league.leagueId, 'editor', league.programId) },
     }),
@@ -310,14 +384,15 @@ const rows: readonly Row[] = [
   {
     command: 'access.list_access',
     name: 'see who has access',
-    allowed: ownerAndAdmins,
+    needs: 'access.manage',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listAccess(c, i, accessDeps),
   },
   {
     command: 'access.list_access',
     name: 'see who has access to one program',
-    allowed: programAdmins,
+    needs: 'access.manage',
+    scope: 'program',
     prepare: async (league) => ({ input: { scope: { type: 'program', id: league.programId } } }),
     run: (c, i) => listAccess(c, i, accessDeps),
   },
@@ -325,14 +400,15 @@ const rows: readonly Row[] = [
   {
     command: 'access.list_activity',
     name: 'read the activity log',
-    allowed: ownerAndAdmins,
+    needs: 'activity.read',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listActivity(c, i, accessDeps),
   },
   {
     command: 'access.list_activity',
     name: "read one program's activity",
-    allowed: programAdmins,
+    needs: 'activity.read',
+    scope: 'program',
     prepare: async (league) => ({ input: { scope: { type: 'program', id: league.programId } } }),
     run: (c, i) => listActivity(c, i, accessDeps),
   },
@@ -340,7 +416,7 @@ const rows: readonly Row[] = [
   {
     command: 'access.accept_invitation',
     name: 'accept an invitation with its link',
-    allowed: signedIn,
+    needs: 'signed-in',
     prepare: async (league) => {
       const token = 'a'.repeat(22) + randomUUID().replace(/-/g, '').slice(0, 21);
       await invitationIn(league, { token });
@@ -351,7 +427,7 @@ const rows: readonly Row[] = [
   {
     command: 'access.my_access',
     name: "read one's own access",
-    allowed: signedIn,
+    needs: 'signed-in',
     prepare: async () => ({ input: {} }),
     run: (c, i) => myAccess(c, i, accessDeps),
   },
@@ -364,8 +440,19 @@ describe('every role against every command (T4 §12)', () => {
     expect([...covered].filter((name) => !commands.has(name))).toEqual([]);
   });
 
+  it('runs each command as the permission it names itself (T4 §4)', () => {
+    const wrong = [...commands.values()]
+      .filter((command) =>
+        rows.every(
+          (row) => row.command !== command.commandName || row.needs !== command.permission,
+        ),
+      )
+      .map((command) => `${command.commandName} names "${command.permission}"`);
+    expect(wrong).toEqual([]);
+  });
+
   for (const row of rows) {
-    it(`${row.command}: ${row.name}`, async () => {
+    it(`${row.command}: ${row.name} (${row.needs})`, async () => {
       const outcomes: Partial<Record<Actor, string>> = {};
       for (const actor of actors) {
         const league = await leagueWithActors();
@@ -378,8 +465,9 @@ describe('every role against every command (T4 §12)', () => {
         const result = await row.run(context, input);
         outcomes[actor] = result.ok ? 'ok' : (result.error?.code ?? 'failed');
       }
+      const allowed = expectedActors(row.needs, row.scope ?? 'league');
       const expected = Object.fromEntries(
-        actors.map((actor) => [actor, row.allowed.includes(actor) ? 'ok' : 'not-allowed']),
+        actors.map((actor) => [actor, allowed.includes(actor) ? 'ok' : 'not-allowed']),
       );
       expect(outcomes).toEqual(expected);
     });
