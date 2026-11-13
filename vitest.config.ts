@@ -22,6 +22,7 @@ export default defineConfig({
   test: {
     ...(inLane ? { maxWorkers: 2, minWorkers: 1 } : {}),
     include: [
+      'vitest.reporter.test.ts',
       'apps/web/**/*.test.ts',
       'apps/worker/**/*.test.ts',
       'packages/{core,site,ui,emails,providers,observability}/**/*.test.ts',
@@ -37,7 +38,7 @@ export default defineConfig({
     // Alone that takes a second or two; with every test file running at once it
     // can pass the 5 and 10 second defaults, and grows with each new migration. A test that
     // is working passes however long it takes; the limit only stops one that is stuck.
-    testTimeout: 300_000,
-    hookTimeout: 300_000,
+    testTimeout: 180_000,
+    hookTimeout: 180_000,
   },
 });
