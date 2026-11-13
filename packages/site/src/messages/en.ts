@@ -173,6 +173,10 @@ export const en = {
   // The words for that setting's choices: `setting.<key>.option.<choice>`.
   'setting.members.startPage.option.leagueHome': 'The league home',
   'setting.members.startPage.option.myTeam': 'Their own team page',
+  'setting.games.whoMayScore.label':
+    'Which games a scorekeeper may score: any game, or only the games they are assigned to',
+  'setting.games.whoMayScore.option.anyScorekeeper': 'Any game',
+  'setting.games.whoMayScore.option.assignedOnly': 'Only games they are assigned to',
   // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
   // league's name, {role} a role's name from above, {days} how long a link works.
   'email.invitation.subject': 'You are invited to help run {league}',

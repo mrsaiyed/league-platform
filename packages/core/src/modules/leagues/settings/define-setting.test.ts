@@ -154,4 +154,11 @@ describe('the settings stage 2 declares', () => {
   it('start members at the league home (P2 section 3)', () => {
     expect(declaredSettings.get('members.startPage')?.default).toBe('leagueHome');
   });
+
+  it('let any scorekeeper score any game until the league tightens it (P4 section 4, 12a)', () => {
+    const setting = declaredSettings.get('games.whoMayScore');
+    expect(setting?.default).toBe('anyScorekeeper');
+    expect(setting?.type.safeParse('assignedOnly').success).toBe(true);
+    expect(setting?.type.safeParse('nobody').success).toBe(false);
+  });
 });
