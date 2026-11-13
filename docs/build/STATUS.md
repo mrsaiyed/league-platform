@@ -22,7 +22,7 @@ One line per open lane, written before its builder starts: `- **<step>** — <la
 Reserved so far: migration 0009 and record 025 / T-237 (2.3). Next free: migration 0010, record 026, T-238. Check the folders before trusting these.
 
 - **1.18 part 2 Header, menu, footer, hard-coded-text scan** — `.local/lanes/1.18p2-shell-design` — none — built and reviewed; a builder was fixing the reviewer's findings (stronger T-187 scan, design values re-validated in the style block, contrast, refusal pages). Then: catch up with the build branch, gate (rerun db/tracker timing tests alone), land.
-- **2.3 Schedule and game tables** — `.local/lanes/2.3-schedule-game-tables` — migration 0009, record 025 / T-237 — builder was working (check the lane branch for commits); then independent review (opus), catch up, gate, land.
+- **2.3 Schedule and game tables** — `.local/lanes/2.3-schedule-game-tables` — migration 0009, record 025 / T-237 — BUILT (a0c7594), gate green in the lane (run-migrations lock test flaked under load, passes alone). Needs: independent review (opus), catch up, gate, land. Notes: capture_mode uses T3's final/box/live while the season rules say final-score/box-score (2.20/2.21 must translate); a game's result changes need a game_corrections row in the same transaction (2.21 publishing, 2.22 import undo, 2.23 results/reopen, the Al-Hadi transfer must respect this); no brackets or step 2.4 tables yet; purging binned games needs DELETE on games or an owner-run function.
 
 ## Needs the founder
 
