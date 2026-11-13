@@ -96,7 +96,9 @@ export const publishSchedule = defineCommand({
     for (const id of new Set([...summary.gamesMoved, ...summary.gamesRecordingChanged])) {
       const game = after.get(id);
       const old = before.get(id);
-      if (game === undefined || old === undefined || game.time === null) continue;
+      if (game === undefined || old === undefined) continue;
+      // The plan blocks a moved game without a time, so this is only a defence.
+      if (game.time === null) return fail({ code: 'game-without-time', gameId: id });
       const moved = summary.gamesMoved.includes(id);
       const recording =
         game.recording !== null && game.recording !== undefined && game.recording !== old.recording
