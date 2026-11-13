@@ -246,6 +246,7 @@ All dated November 12, 2026.
 | T-81                  | The name function applies the display policy and the guardian's consent      | The league's one switch (R-14), the person's own request (`people.visibility`) and the team's stats setting   | R-14 became a league setting the admin controls; no per-guardian consent (step 2.11 review)        |
 | T-233                 | New                                                                          | The browser half of live updates lives in the web app; Realtime policies listed before use (record 021)       | Step 2.31: the providers package is server-only, so pages cannot subscribe through it              |
 | T-231                 | New                                                                          | Setting values kept in one `setting_values` table, one row per key and place (record 019)                     | Step 2.1: T3 did not say where the values of T5 section 6's settings are stored                    |
+| T-235                 | New                                                                          | Templates in plain TypeScript until React is in; the invitation link stays in the path, unlogged (record 023) | Step 1.19 part 2 review: no React toolchain yet; the link must not leak or be lost                 |
 | T-236                 | New                                                                          | Tracker queue: only game rules refuse a tap; storage failures apart; fake-indexeddb (record 024)              | Step 2.12 review: request refusals lost taps; IndexedDB was untested                               |
 
 ## The full list
@@ -669,6 +670,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-147 | A chat is ordinary league data plus the delivery we already have                                                                                                           | Agreed (delegated)  |         |
 | T-148 | Chat safety is enforced by the server, not by the screen                                                                                                                   | Agreed (delegated)  |         |
 | T-224 | Jobs are recorded in our own fenced `jobs` table, ids only; pg-boss runs them in production, the table itself locally (record 012)                                         | Agreed (delegated)  | yes     |
+| T-235 | Templates are plain TypeScript until React is in; the invitation link stays in the path, never sent on, cached or logged; its email is built before it commits (rec. 023)  | Agreed (delegated)  | yes     |
 
 ### [T8 — Scale, reliability and operations](technical/T8-scale-reliability-operations.md)
 
