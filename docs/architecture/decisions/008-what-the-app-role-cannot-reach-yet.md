@@ -36,6 +36,6 @@ Migration 0005 puts every table behind row-level security. The app's role, `app_
 
 ## Revisit if
 
-- The role that runs migrations on Supabase turns out not to bypass row-level security. 0005 assumes it does: the owner-run checks refuse to run otherwise. This is not yet checked against a live Supabase project (see `docs/build/STATUS.md`).
+- The role that runs migrations on Supabase turns out not to bypass row-level security. 0005 assumes it does: the owner-run checks refuse to run otherwise. Checked on 2026-11-13 against the staging Supabase project (PostgreSQL 17.11, session pooler): the `postgres` role there is not a superuser but does bypass row-level security, `require_view_of_every_league()` accepts it, and all nine migrations applied. So this has not happened. One thing learned there: `postgres` cannot `set role app_user` (PostgreSQL 16 and later give a role's creator the right to grant it, not to act as it), so only a login that is a member of `app_user` can open the app's transactions; the staging login `app_login` is one, and `checkLoginRole` passes it.
 - The list of owner-run functions grows past about a dozen, or one needs to return rows of more than one league. The first that does is `take_jobs` (step 1.19, record 012): it returns ids only and refuses any transaction with a league or account set, but the web app and the worker both act as `app_user`, so that is a check, not a wall. The later hardening is a role of the worker's own, the only one given `take_jobs`.
 - The sign-in vendor (step 1.15) needs to write to our tables directly.
