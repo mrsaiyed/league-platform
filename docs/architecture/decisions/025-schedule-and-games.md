@@ -34,4 +34,4 @@ T3 §8 lists the columns of `rounds`, `stages`, `games`, `schedule_drafts`, `sch
 
 ## Revisit if
 
-Brackets need games with teams not yet known, a league needs scores above 999, a game must change rules after it starts other than by plays, a correction must be made by the system rather than a person, or removing binned games for good is built (then decide who may delete a game).
+Brackets need games with teams not yet known, a league needs scores above 999, a game must change rules after it starts other than by plays, a correction must be made by the system rather than a person, or removing binned games for good is built (then decide who may delete a game). The correction check reads `game_corrections` as the caller, under forced row-level security, so it sees only the league the session has set: a system session that is not fenced to one league (the Al-Hadi transfer or an import, steps 2.23 and 2.30) must set the league before it corrects a decided game, or its own correction is invisible and the change is refused.
