@@ -6,7 +6,7 @@ import {
   leagueScoresChannelName,
   type LiveMessage,
 } from '@srleagues/contracts';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLocalLiveHub, type LocalLiveHub } from './local-live-hub.ts';
 import { LivePublishError, type LiveDelivery } from './live-publisher.ts';
 
@@ -77,7 +77,7 @@ describe('local live hub', () => {
   it('delivers every message in order to many pages and listeners at once', async () => {
     hub = createLocalLiveHub();
     const channel = gameChannelName(leagueA, game1);
-    const streams = Array.from({ length: 25 }, () => listenTo(hub, channel));
+    const streams = await Promise.all(Array.from({ length: 25 }, () => listenTo(hub, channel)));
     const heard: number[][] = Array.from({ length: 5 }, () => []);
     heard.forEach((list) =>
       hub.listen(channel, (d) => list.push((d.payload as LiveMessage).sequence)),
@@ -120,7 +120,7 @@ describe('local live hub', () => {
 
   it('carries league scores to pages over the stream', async () => {
     hub = createLocalLiveHub();
-    const stream = listenTo(hub, leagueScoresChannelName(leagueA));
+    const stream = await listenTo(hub, leagueScoresChannelName(leagueA));
     const reading = readEvents(stream, 2);
     await hub.publishLeagueScore(leagueA, leagueScoreFrom(message(3, game1)));
     await hub.publishLeagueScore(leagueA, leagueScoreFrom(message(1, game2)));
@@ -136,7 +136,7 @@ describe('local live hub', () => {
     const heard: LiveDelivery[] = [];
     hub.listen(channel, (d) => heard.push(d));
     for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
-      const answer = listenTo(hub, channel, { method, body: JSON.stringify(message(1)) });
+      const answer = await listenTo(hub, channel, { method, body: JSON.stringify(message(1)) });
       expect(answer.status).toBe(405);
       expect(answer.headers.get('Allow')).toBe('GET');
     }
@@ -147,14 +147,14 @@ describe('local live hub', () => {
   it('refuses a channel that is not one of ours', async () => {
     hub = createLocalLiveHub();
     for (const channel of ['', 'everything', `league:${leagueA}:game:nope`]) {
-      expect(listenTo(hub, channel).status).toBe(400);
+      expect((await listenTo(hub, channel)).status).toBe(400);
     }
-    expect(hub.serve(new Request('http://local.test/api/v1/live')).status).toBe(400);
+    expect((await hub.serve(new Request('http://local.test/api/v1/live'))).status).toBe(400);
   });
 
-  it('answers with an event stream that is never cached', () => {
+  it('answers with an event stream that is never cached', async () => {
     hub = createLocalLiveHub();
-    const answer = listenTo(hub, gameChannelName(leagueA, game1));
+    const answer = await listenTo(hub, gameChannelName(leagueA, game1));
     expect(answer.status).toBe(200);
     expect(answer.headers.get('Content-Type')).toBe('text/event-stream; charset=utf-8');
     expect(answer.headers.get('Cache-Control')).toBe('no-store, no-transform');
@@ -164,13 +164,13 @@ describe('local live hub', () => {
     hub = createLocalLiveHub();
     const channel = gameChannelName(leagueA, game1);
     const leaving = new AbortController();
-    const stream = listenTo(hub, channel, { signal: leaving.signal });
+    const stream = await listenTo(hub, channel, { signal: leaving.signal });
     expect(hub.listenerCount(channel)).toBe(1);
     leaving.abort();
     expect(hub.listenerCount(channel)).toBe(0);
     await stream.body!.cancel();
 
-    const other = listenTo(hub, channel);
+    const other = await listenTo(hub, channel);
     expect(hub.listenerCount(channel)).toBe(1);
     await other.body!.cancel();
     expect(hub.listenerCount(channel)).toBe(0);
@@ -179,8 +179,8 @@ describe('local live hub', () => {
   it('ends the stream of a page that stopped reading, without holding up the rest', async () => {
     hub = createLocalLiveHub({ maxWaiting: 3 });
     const channel = gameChannelName(leagueA, game1);
-    listenTo(hub, channel); // never read
-    const reader = listenTo(hub, channel);
+    await listenTo(hub, channel); // never read
+    const reader = await listenTo(hub, channel);
     const reading = readEvents(reader, 10);
     for (let n = 1; n <= 10; n += 1) await hub.publishGame(leagueA, message(n));
     expect((await reading).map((e) => (e.data as LiveMessage).sequence)).toEqual([
@@ -189,9 +189,80 @@ describe('local live hub', () => {
     expect(hub.listenerCount(channel)).toBe(0);
   });
 
+  it('ends a stalled stream on keep-alives alone, and stops its timer', async () => {
+    vi.useFakeTimers();
+    try {
+      hub = createLocalLiveHub({ keepAliveMs: 10, maxWaiting: 3 });
+      const channel = gameChannelName(leagueA, game1);
+      const stalled = await listenTo(hub, channel); // never read, and no messages sent
+      expect(hub.streamCount(channel)).toBe(1);
+      expect(vi.getTimerCount()).toBe(1);
+      vi.advanceTimersByTime(100);
+      expect(hub.listenerCount(channel)).toBe(0);
+      expect(hub.streamCount()).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+      await expect(stalled.body!.getReader().read()).rejects.toThrow('fell too far behind');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('asks authorize before a page may listen, and refuses when it says no', async () => {
+    const asked: string[] = [];
+    hub = createLocalLiveHub({
+      authorize: async (channel, request) => {
+        asked.push(`${channel.kind}:${channel.leagueId}:${new URL(request.url).pathname}`);
+        return channel.leagueId === leagueA;
+      },
+    });
+    const open = await listenTo(hub, gameChannelName(leagueA, game1));
+    const hidden = await listenTo(hub, leagueScoresChannelName(leagueB));
+    expect(open.status).toBe(200);
+    expect(hidden.status).toBe(403);
+    expect(asked).toEqual([
+      `game:${leagueA}:/api/v1/live`,
+      `league-scores:${leagueB}:/api/v1/live`,
+    ]);
+    expect(hub.listenerCount(leagueScoresChannelName(leagueB))).toBe(0);
+    await open.body!.cancel();
+  });
+
+  it('answers 503 when authorize fails, rather than letting the page in', async () => {
+    hub = createLocalLiveHub({
+      authorize: () => {
+        throw new Error('database down');
+      },
+    });
+    const answer = await listenTo(hub, gameChannelName(leagueA, game1));
+    expect(answer.status).toBe(503);
+    expect(await answer.text()).not.toContain('database');
+    expect(hub.streamCount()).toBe(0);
+  });
+
+  it('caps streams per channel and in all', async () => {
+    hub = createLocalLiveHub({ maxStreamsPerChannel: 2, maxStreams: 3 });
+    const a1 = gameChannelName(leagueA, game1);
+    const a2 = gameChannelName(leagueA, game2);
+    const first = await listenTo(hub, a1);
+    await listenTo(hub, a1);
+    const third = await listenTo(hub, a1);
+    expect(third.status).toBe(503);
+    expect(third.headers.get('Retry-After')).toBe('30');
+    expect((await listenTo(hub, a2)).status).toBe(200);
+    expect((await listenTo(hub, leagueScoresChannelName(leagueA))).status).toBe(503);
+    expect(hub.streamCount()).toBe(3);
+    // A page leaving makes room again.
+    await first.body!.cancel();
+    expect(hub.streamCount(a1)).toBe(1);
+    expect((await listenTo(hub, a1)).status).toBe(200);
+  });
+
   it('keeps the connection open with comments and tells the page when to retry', async () => {
     hub = createLocalLiveHub({ keepAliveMs: 5, retryMs: 1500 });
-    const text = await readUntil(listenTo(hub, gameChannelName(leagueA, game1)), ': keep-alive');
+    const text = await readUntil(
+      await listenTo(hub, gameChannelName(leagueA, game1)),
+      ': keep-alive',
+    );
     expect(text.startsWith('retry: 1500\n\n')).toBe(true);
   });
 
@@ -242,7 +313,7 @@ describe('local live hub', () => {
   it('ends every stream when closed', async () => {
     hub = createLocalLiveHub();
     const channel = gameChannelName(leagueA, game1);
-    const stream = listenTo(hub, channel);
+    const stream = await listenTo(hub, channel);
     hub.close();
     expect(hub.listenerCount(channel)).toBe(0);
     expect(await readEvents(stream, 1)).toEqual([]);

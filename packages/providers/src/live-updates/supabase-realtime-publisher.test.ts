@@ -128,6 +128,50 @@ describe('supabaseRealtimePublisher', () => {
     });
   });
 
+  it('says unavailable when the answer breaks off while it is let go', async () => {
+    const broken = () => {
+      const response = new Response('{}', { status: 202 });
+      Object.defineProperty(response, 'body', {
+        value: {
+          cancel: () => Promise.reject(new Error(`socket hang up ${secretKey}`)),
+        },
+      });
+      return response;
+    };
+    const { fetch } = standIn(broken);
+    const publisher = supabaseRealtimePublisher({ url: 'https://p.test', secretKey, fetch });
+    const error = await publisher.publishGame(league, message).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(LivePublishError);
+    expect(error).toMatchObject({ code: 'unavailable', retryable: true, status: 202 });
+    expect(String((error as Error).message)).not.toContain(secretKey);
+  });
+
+  it('sends the game ID in lower case, as the channel has it', async () => {
+    const { calls, fetch } = standIn(accepted);
+    const publisher = supabaseRealtimePublisher({ url: 'https://p.test', secretKey, fetch });
+    await publisher.publishGame(league.toUpperCase(), { ...message, gameId: game.toUpperCase() });
+    await publisher.publishLeagueScore(league, {
+      ...leagueScoreFrom(message),
+      gameId: game.toUpperCase(),
+    });
+    const sent = calls.map(
+      (c) =>
+        (
+          JSON.parse(String(c.init.body)) as {
+            messages: { topic: string; payload: { gameId: string } }[];
+          }
+        ).messages[0]!,
+    );
+    expect(sent[0]).toMatchObject({
+      topic: gameChannelName(league, game),
+      payload: { gameId: game },
+    });
+    expect(sent[1]?.payload.gameId).toBe(game);
+  });
+
   it('sends nothing for a message with anything its shape does not have', async () => {
     const { calls, fetch } = standIn(accepted);
     const publisher = supabaseRealtimePublisher({ url: 'https://p.test', secretKey, fetch });

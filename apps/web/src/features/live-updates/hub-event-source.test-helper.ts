@@ -11,23 +11,26 @@ class HubEventSource implements EventSourceLike {
 
   constructor(hub: LocalLiveHub, url: string) {
     this.url = url;
-    const response = hub.serve(
+    void this.start(hub, url);
+  }
+
+  private async start(hub: LocalLiveHub, url: string): Promise<void> {
+    const response = await hub.serve(
       new Request(new URL(url, 'http://local.test'), { signal: this.leaving.signal }),
     );
+    if (this.readyState === 2) {
+      await response.body?.cancel();
+      return;
+    }
     const isStream = response.headers.get('Content-Type')?.startsWith('text/event-stream');
     if (response.status !== 200 || !isStream) {
       // The browser gives up on a refusal and does not try again.
-      queueMicrotask(() => {
-        this.readyState = 2;
-        this.emit('error', new Event('error'));
-      });
+      this.readyState = 2;
+      this.emit('error', new Event('error'));
       return;
     }
-    queueMicrotask(() => {
-      if (this.readyState === 2) return;
-      this.readyState = 1;
-      this.emit('open', new Event('open'));
-    });
+    this.readyState = 1;
+    this.emit('open', new Event('open'));
     void this.read(response);
   }
 

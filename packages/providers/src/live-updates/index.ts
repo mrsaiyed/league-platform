@@ -10,6 +10,7 @@ export {
 } from './live-publisher.ts';
 export {
   createLocalLiveHub,
+  type LiveAuthorize,
   type LiveListener,
   type LocalLiveHub,
   type LocalLiveHubOptions,

@@ -16,6 +16,22 @@ import {
   liveEventName,
 } from '@srleagues/contracts';
 
+/**
+ * What every caller must do, because the publisher cannot check it:
+ *
+ * - **The league is trusted as given.** The publisher builds the channel from
+ *   `leagueId` and checks only that it is an ID. The caller takes it from the saved
+ *   game or the server's own context (T-23), never from a request, so a message
+ *   cannot be put on another league's channel.
+ * - **Only what everyone may see.** The shape keeps out whole fields (player lists),
+ *   but not a name inside `latestPlay`. Before publishing, the caller passes
+ *   `latestPlay` through the one names-and-statistics function at the strictest
+ *   setting any viewer has (T-81, T-87, S-22): a hidden team's player becomes
+ *   `playerName: null, jersey: null`. The live message is the same for everyone.
+ * - **One game's messages one after another.** Messages on a channel arrive in the
+ *   order they were sent, so the caller awaits each publish of a game before the
+ *   next (after each saved batch, in sequence order). Different games may go at once.
+ */
 export type LivePublisher = {
   /** Publishes a game's message on that game's channel, inside its league. */
   readonly publishGame: (leagueId: string, message: LiveMessage) => Promise<void>;
@@ -69,19 +85,27 @@ function checked<T>(build: () => T): T {
   }
 }
 
+// The game ID goes out in lower case, as in the channel name, so a page that compares
+// it with its own game finds the two the same however the caller wrote it.
 export const gameDelivery = (leagueId: string, message: LiveMessage): LiveDelivery =>
-  checked(() => ({
-    channel: gameChannelName(leagueId, message.gameId),
-    event: liveEventName,
-    payload: LiveMessage.parse(message),
-  }));
+  checked(() => {
+    const payload = LiveMessage.parse(message);
+    return {
+      channel: gameChannelName(leagueId, payload.gameId),
+      event: liveEventName,
+      payload: { ...payload, gameId: payload.gameId.toLowerCase() },
+    };
+  });
 
 export const leagueScoreDelivery = (leagueId: string, message: LeagueScoreMessage): LiveDelivery =>
-  checked(() => ({
-    channel: leagueScoresChannelName(leagueId),
-    event: liveEventName,
-    payload: LeagueScoreMessage.parse(message),
-  }));
+  checked(() => {
+    const payload = LeagueScoreMessage.parse(message);
+    return {
+      channel: leagueScoresChannelName(leagueId),
+      event: liveEventName,
+      payload: { ...payload, gameId: payload.gameId.toLowerCase() },
+    };
+  });
 
 /** A publisher from one way of carrying a checked message: what every adapter shares. */
 export const livePublisherFrom = (

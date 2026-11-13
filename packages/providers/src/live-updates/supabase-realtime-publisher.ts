@@ -62,8 +62,15 @@ export function supabaseRealtimePublisher(
       // Unreachable, or no answer in time.
       throw new LivePublishError('unavailable', true);
     }
-    // Realtime answers 202 Accepted with no body; any success is taken.
-    await response.body?.cancel();
+    // Realtime answers 202 Accepted with no body; any success is taken. The body is
+    // let go either way; if even that fails, the connection broke mid-answer.
+    let bodyLost = false;
+    try {
+      await response.body?.cancel();
+    } catch {
+      bodyLost = true;
+    }
     if (!response.ok) throw refusal(response.status);
+    if (bodyLost) throw new LivePublishError('unavailable', true, response.status);
   });
 }
