@@ -346,6 +346,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | C-12 | Every page has a title and description for search engines and link previews, filled in sensibly by default and editable                                                   | Agreed  |         |
 | C-13 | Design is set once for the whole league                                                                                                                                   | Agreed  |         |
 | C-14 | A club page (a member school) uses a fixed layout showing that school's teams across programs, with the school's logo and colors                                          | Later   |         |
+| C-15 | New, your direction (November 13): a league has a third color, a highlight used sparingly to make a few things stand out; the admin can change it like the others         | Agreed  |         |
 
 ### [P6 — Registration and accounts](product/P6-registration-and-accounts.md)
 
