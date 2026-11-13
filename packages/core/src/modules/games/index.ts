@@ -7,6 +7,22 @@ export { recordForfeit, type RecordForfeitError } from './commands/record-forfei
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
 export { gameFinalized, gameReopened, type GameFinalized, type GameReopened } from './events.ts';
 export { recordingOf } from './game-fields.ts';
+export {
+  readGamePage,
+  type BoxScore,
+  type BoxScorePlayer,
+  type GamePage,
+  type GameViewing,
+  type PlayLine,
+  type PlayerRef,
+  type ReadGamePageError,
+} from './queries/read-game-page.ts';
+export type {
+  GamePageTeam,
+  GamePersonRecord,
+  GamePlayerLine,
+  GamesReadStore,
+} from './read-ports.ts';
 export type {
   GameRecord,
   GameResultDocument,
