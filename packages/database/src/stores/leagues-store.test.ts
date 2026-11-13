@@ -22,6 +22,8 @@ import {
   one,
   type MadeLeague,
 } from '../schema/schema.test-helper.ts';
+import { accessStore } from './access-store.ts';
+import { activityLogStore } from './activity-log-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 
 let pglite: PGlite;
@@ -50,6 +52,8 @@ async function setUp() {
     transaction: commandTransaction(db, (scope) => ({
       jobs: { enqueue: async (job: Job) => void jobs.push(job) },
       leagues: leaguesStore(scope),
+      access: accessStore(scope),
+      activity: activityLogStore(scope),
     })),
     events,
     log: (line) => void lines.push(line),

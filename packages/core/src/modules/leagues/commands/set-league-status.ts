@@ -2,6 +2,7 @@
 // allowed changes in league-states.ts. The owner publishes and archives; only our
 // staff suspend and lift a suspension. Anything else is an "illegal-transition".
 import { z } from 'zod';
+import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { leagueStatusChanged } from '../events.ts';
 import { findTransition } from '../league-states.ts';
@@ -40,6 +41,11 @@ export const setLeagueStatus = defineCommand({
     }
     const version = await tx.leagues.setStatus(input.status, input.version);
     if (version === undefined) return fail({ code: 'changed-since-read' });
+    await recordActivity(tx, context, {
+      action: 'leagues.set_status',
+      target: { type: 'league', id: context.leagueId },
+      details: { status: input.status },
+    });
     emit({ type: leagueStatusChanged, leagueId: context.leagueId });
     return ok({ status: input.status, version });
   },

@@ -24,6 +24,8 @@ import {
   one,
   unique,
 } from '../schema/schema.test-helper.ts';
+import { accessStore } from './access-store.ts';
+import { activityLogStore } from './activity-log-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 
 let pglite: PGlite;
@@ -38,6 +40,8 @@ beforeAll(async () => {
     transaction: commandTransaction(db, (scope) => ({
       jobs: { enqueue: async (_job: Job) => {} },
       leagues: leaguesStore(scope, { platformStaff: [staffId] }),
+      access: accessStore(scope),
+      activity: activityLogStore(scope),
     })),
     events: [],
     log: () => {},

@@ -4,6 +4,7 @@
 // caller before the call (record 008: row-level security needs it set first). The
 // first season is not created here; an organizer adds it (createSeason).
 import { z } from 'zod';
+import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { leagueCreated } from '../events.ts';
 import { audiences, defaultProgramSlug, listedByDefault } from '../league-values.ts';
@@ -49,6 +50,10 @@ export const createLeague = defineCommand({
       defaultProgram: { slug: defaultProgramSlug, name: input.name, sportKey: input.sportKey },
     });
     if (typeof created === 'string') return fail({ code: created });
+    await recordActivity(tx, context, {
+      action: 'leagues.create',
+      target: { type: 'league', id: context.leagueId },
+    });
     emit({ type: leagueCreated, leagueId: context.leagueId });
     return ok(created);
   },

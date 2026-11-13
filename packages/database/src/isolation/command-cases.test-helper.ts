@@ -18,6 +18,7 @@
 // once the apps wire one (none exists yet); the coverage test fails on a handler
 // exported from core until then.
 import type {
+  AccessTx,
   Command,
   CommandDeps,
   CommandError,
@@ -31,16 +32,21 @@ import type {
 import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import { openScope, transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
-import { leaguesStore } from '../stores/index.ts';
+import { accessStore, activityLogStore, leaguesStore } from '../stores/index.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
 /** Every module's stores, bound to the run's scope. Grows with each module. */
-export function harnessTx(scope: LeagueScope, jobs: JobQueue): LeaguesTx {
+export function harnessTx(scope: LeagueScope, jobs: JobQueue): LeaguesTx & AccessTx {
   // The run's account counts as our staff, so commands only staff may run are tried
   // too: the worst case for isolation.
   const platformStaff = scope.accountId === null ? [] : [scope.accountId];
-  return { jobs, leagues: leaguesStore(scope, { platformStaff }) };
+  return {
+    jobs,
+    leagues: leaguesStore(scope, { platformStaff }),
+    access: accessStore(scope),
+    activity: activityLogStore(scope),
+  };
 }
 
 /**

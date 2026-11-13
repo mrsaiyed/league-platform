@@ -1,5 +1,20 @@
 // Typed queries (T1 §1). Each takes the scope withTransaction opened; one that
 // touches league data takes a LeagueScope (T-28). Used only through this file.
+export { findInvitation } from './find-invitation.ts';
+export { findInvitationByTokenHash } from './find-invitation-by-token-hash.ts';
+export { findRoleGrant } from './find-role-grant.ts';
+export { hasPendingInvitation } from './has-pending-invitation.ts';
+export { insertActivity } from './insert-activity.ts';
+export { insertInvitation } from './insert-invitation.ts';
+export { insertRoleGrant } from './insert-role-grant.ts';
+export { listActiveGrantsOf } from './list-active-grants-of.ts';
+export { listActivityEntries } from './list-activity-entries.ts';
+export { listOpenInvitations } from './list-open-invitations.ts';
+export { listRoleGrants } from './list-role-grants.ts';
+export { markInvitationAccepted } from './mark-invitation-accepted.ts';
+export { markInvitationCancelled } from './mark-invitation-cancelled.ts';
+export { renewInvitationLink } from './renew-invitation-link.ts';
+export { revokeRoleGrant } from './revoke-role-grant.ts';
 export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts';
 export { findProgramBySlug } from './find-program-by-slug.ts';
 export { findProgramId } from './find-program-id.ts';

@@ -2,6 +2,7 @@
 // to one transaction for one league, so none of these take a league id: they can
 // only ever reach the league the transaction is for (T-28).
 import type { CommandTx } from '../../command/index.ts';
+import type { AccessReader, ActivityLog } from '../access/index.ts';
 import type { Audience, LeagueStatus } from './league-values.ts';
 
 export type LeagueRecord = {
@@ -68,4 +69,12 @@ export type LeaguesStore = {
   readonly setCurrentSeason: (seasonId: string) => Promise<boolean>;
 };
 
-export type LeaguesTx = CommandTx & { readonly leagues: LeaguesStore };
+/**
+ * A leagues command's transaction: its own store, the access reader its policy
+ * checks permissions with (T-74, T-75), and the activity log it writes (A-6).
+ */
+export type LeaguesTx = CommandTx & {
+  readonly leagues: LeaguesStore;
+  readonly access: AccessReader;
+  readonly activity: ActivityLog;
+};
