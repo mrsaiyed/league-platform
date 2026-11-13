@@ -8,14 +8,22 @@
 // for the session cookie (identify), and a way to look a short name up. The Next.js
 // side (step 1.17) reads those from the request, calls this, and acts on a refusal.
 //
-// Today the league is the first part of the path (U-1). Moving to league subdomains
-// (U-13) or a league's own domain (U-2) changes this file and the address builder
-// (leagueUrl), and nothing else.
+// Today a page's league is the first part of the path (U-1). Moving to league
+// subdomains (U-13) or a league's own domain (U-2) changes this file and the address
+// builder (leagueUrl), and nothing else.
+//
+// The JSON endpoints (T-26) name their league by its id instead:
+// `/api/v1/leagues/{leagueId}/...` (record 017, T-229). An id never changes, so a
+// tracker's queued commands still reach the league after a change of short name. A
+// handler under that address gets its league here like any page; one under any other
+// `/api/...` address gets a platform context, with no league.
 import {
   fail,
   forwardedLeagueUrl,
-  isBlockedShortName,
+  isLeagueIdFormat,
   isShortNameFormat,
+  isSystemShortName,
+  leagueApiBase,
   ok,
   type CommandContext,
   type LeagueStatus,
@@ -25,8 +33,6 @@ import type { SessionError, SessionIdentity } from '@srleagues/providers';
 
 /** What the request itself says, before anything is believed. */
 export type RequestFacts = {
-  /** Shared by everything done for this request, so its log lines go together (T-196). */
-  readonly requestId: string;
   /** The Host the request was sent to, as received. */
   readonly host: string;
   /** The path and query as received, still percent-encoded: `/north-league/teams?season=x`. */
@@ -46,11 +52,28 @@ export type FoundLeague = {
   readonly forwarded: boolean;
 };
 
+/** The league an endpoint's id names, as the league's own transaction reads it. */
+export type LeagueById = {
+  readonly id: string;
+  readonly slug: string;
+  readonly status: LeagueStatus;
+};
+
 export type ContextDeps = {
   /** Our site's origin, PUBLIC_BASE_URL (T-30). Requests to any other host are refused. */
   readonly siteOrigin: string;
   /** The league a short name names: current or forwarding, or undefined. */
   readonly findLeague: (shortName: string) => Promise<FoundLeague | undefined>;
+  /**
+   * The league with this id, read in a transaction for that league; undefined when
+   * there is none or it is in the bin (the database's findCurrentLeague answers this).
+   */
+  readonly findLeagueById: (leagueId: string) => Promise<LeagueById | undefined>;
+  /**
+   * A new id for this request, shared by everything done for it so its log lines go
+   * together (T-196). Made by the server: never taken from a header the browser sent.
+   */
+  readonly newRequestId: () => string;
 };
 
 /**
@@ -97,16 +120,28 @@ export type RequestContext = PlatformRequestContext | LeagueRequestContext;
  *   build the context again.
  * - `session-ended`: the session is over; clear its cookies and build the context again
  *   with no session.
- * - `league-not-found`: no league has that short name, or it is in the bin.
- * - `league-moved`: a former short name or other capitals; forward permanently to `to`,
- *   the same page under the league's current name (U-7).
+ * - `league-not-found`: no league has that short name or id, or it is in the bin.
+ * - `league-moved`: a former short name, other capitals or another spelling of the
+ *   name (`%2D` for `-`); forward permanently to `to`, the same page under the
+ *   league's one proper address (U-7). The league's id and state come with it: a
+ *   draft or suspended league is forwarded only for those who may see it, and is
+ *   "not found" for everyone else (U-9, step 1.17), so a forward never shows that
+ *   such a league exists.
+ * - `forward`: one of our own pages spelled another way (`/Account`, `/%61ccount`);
+ *   forward permanently to `to`, its one proper address.
  */
 export type ContextRefusal =
   | { readonly code: 'unknown-host' }
   | { readonly code: 'renew-session' }
   | { readonly code: 'session-ended' }
   | { readonly code: 'league-not-found' }
-  | { readonly code: 'league-moved'; readonly to: string };
+  | {
+      readonly code: 'league-moved';
+      readonly to: string;
+      readonly leagueId: string;
+      readonly status: LeagueStatus;
+    }
+  | { readonly code: 'forward'; readonly to: string };
 
 export async function requestContext(
   facts: RequestFacts,
@@ -123,13 +158,19 @@ export async function requestContext(
     }
     account = signedInAccount(facts.session.value);
   }
-  const { requestId } = facts;
 
   const address = splitPath(facts.path);
   if (address === undefined) return fail({ code: 'league-not-found' });
-  const { first, below } = address;
-  if (first === '' || isBlockedShortName(first)) {
-    return ok({ kind: 'platform', requestId, account });
+  const { raw, first, below } = address;
+  if (first === '') return ok({ kind: 'platform', requestId: deps.newRequestId(), account });
+
+  // Our own words are our pages, never a league. Only those: a name refused for being
+  // offensive is not a page of ours, and simply finds no league.
+  if (isSystemShortName(first)) {
+    const word = first.toLowerCase();
+    if (raw !== word) return fail({ code: 'forward', to: `/${word}${below}` });
+    if (word === leagueApiBase[0]) return apiContext(facts.path, account, deps);
+    return ok({ kind: 'platform', requestId: deps.newRequestId(), account });
   }
 
   // Short names are lower case (U-7): other capitals find the league and forward.
@@ -137,14 +178,48 @@ export async function requestContext(
   if (!isShortNameFormat(shortName)) return fail({ code: 'league-not-found' });
   const found = await deps.findLeague(shortName);
   if (found === undefined || found.inBin) return fail({ code: 'league-not-found' });
-  if (found.slug !== first) {
-    return fail({ code: 'league-moved', to: forwardedLeagueUrl({ slug: found.slug }, below) });
+  // Served only at its one proper spelling; anything else forwards there.
+  if (raw !== found.slug) {
+    // A name the address builder would refuse is a fault in the data, not a page.
+    if (!isShortNameFormat(found.slug)) return fail({ code: 'league-not-found' });
+    return fail({
+      code: 'league-moved',
+      to: forwardedLeagueUrl({ slug: found.slug }, below),
+      leagueId: found.leagueId.toLowerCase(),
+      status: found.status,
+    });
   }
   return ok({
     kind: 'league',
-    requestId,
+    requestId: deps.newRequestId(),
     account,
     league: { id: found.leagueId.toLowerCase(), slug: found.slug, status: found.status },
+  });
+}
+
+/**
+ * An endpoint's context. `/api/v1/leagues/{leagueId}/...` is about that league, the
+ * id spelled exactly as leagueApiUrl spells it; any other `/api/...` address has none.
+ */
+async function apiContext(
+  path: string,
+  account: SignedInAccount | null,
+  deps: ContextDeps,
+): Promise<Result<RequestContext, ContextRefusal>> {
+  const parts = (path.split(/[?#]/)[0] ?? '').slice(1).split('/');
+  const underLeagues = leagueApiBase.every((part, index) => parts[index] === part);
+  if (!underLeagues) return ok({ kind: 'platform', requestId: deps.newRequestId(), account });
+  const leagueId = parts[leagueApiBase.length] ?? '';
+  if (!isLeagueIdFormat(leagueId)) return fail({ code: 'league-not-found' });
+  const found = await deps.findLeagueById(leagueId);
+  if (found === undefined || found.id.toLowerCase() !== leagueId) {
+    return fail({ code: 'league-not-found' });
+  }
+  return ok({
+    kind: 'league',
+    requestId: deps.newRequestId(),
+    account,
+    league: { id: leagueId, slug: found.slug, status: found.status },
   });
 }
 
@@ -181,17 +256,18 @@ function isOurHost(host: string, siteOrigin: string): boolean {
 }
 
 /**
- * The first part of the path, decoded, and everything after it exactly as it came:
- * `/north-league/teams?x=1` is `north-league` and `/teams?x=1`. Undefined for a path
- * that is not one (it does not start with `/`, or its first part cannot be decoded).
+ * The first part of the path as it came (`raw`) and decoded (`first`), and everything
+ * after it exactly as it came: `/north-league/teams?x=1` is `north-league` and
+ * `/teams?x=1`. Undefined for a path that is not one (it does not start with `/`, or
+ * its first part cannot be decoded).
  */
-function splitPath(path: string): { first: string; below: string } | undefined {
+function splitPath(path: string): { raw: string; first: string; below: string } | undefined {
   if (!path.startsWith('/')) return undefined;
   const end = path.slice(1).search(/[/?#]/);
   const raw = end === -1 ? path.slice(1) : path.slice(1, end + 1);
   const below = end === -1 ? '' : path.slice(end + 1);
   try {
-    return { first: decodeURIComponent(raw), below: below.startsWith('#') ? '' : below };
+    return { raw, first: decodeURIComponent(raw), below: below.startsWith('#') ? '' : below };
   } catch {
     return undefined;
   }
