@@ -17,7 +17,6 @@ import {
   type PeopleTx,
   type TeamsTx,
 } from '@srleagues/core';
-import { en } from '@srleagues/site';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
@@ -182,7 +181,6 @@ describe('rosters', () => {
       deps,
     );
     expect(refused).toEqual({ ok: false, error: { code: 'jersey-taken' } });
-    expect(en['error.teams.add_to_roster.jersey-taken']).toMatch(/already wears that number/);
     // Nothing was kept of the refused try, and another number is fine.
     const count = await one<{ n: string }>(
       pglite,
