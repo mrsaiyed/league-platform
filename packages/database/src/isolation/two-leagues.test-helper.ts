@@ -52,6 +52,19 @@ export type LeagueRecords = MadeLeague & {
   teamId: string;
   personId: string;
   rosterEntryId: string;
+  /** The season's regular-season stage and its first round. */
+  stageId: string;
+  roundId: string;
+  /** A second team of the season, the team's opponent. */
+  opponentId: string;
+  /** The schedule's first published revision, and a draft based on it. */
+  scheduleRevisionId: string;
+  scheduleDraftId: string;
+  /** A final game (team at home), corrected once, at the venue's court. */
+  gameId: string;
+  /** A game still to play, with the member assigned to score it. */
+  upcomingGameId: string;
+  gameAssignmentId: string;
 };
 
 export type TwoLeagues = {
@@ -260,6 +273,75 @@ async function seededLeague(
       ownerId,
     ],
   );
+  // The season's schedule: its regular-season stage, a round, a second team, one
+  // published revision with a draft on top of it, a game decided and then corrected
+  // (with its correction), a game still to play with the member assigned to score it.
+  const stageId = await id(
+    pglite,
+    'insert into stages (league_id, season_id, name) values ($1, $2, $3)',
+    [leagueId, seasonId, `Regular season ${m}`],
+  );
+  const roundId = await id(
+    pglite,
+    `insert into rounds (league_id, season_id, number, label, date)
+     values ($1, $2, 1, $3, '2026-12-06')`,
+    [leagueId, seasonId, `Week 1 ${m}`],
+  );
+  const opponentId = await id(
+    pglite,
+    `insert into teams (league_id, season_id, division_id, slug, name, stats_visibility)
+     values ($1, $2, $3, $4, $5, 'everyone')`,
+    [leagueId, seasonId, divisionId, unique(`${m}-opponent`), `Opponent ${m}`],
+  );
+  const scheduleRevisionId = await id(
+    pglite,
+    `insert into schedule_revisions (league_id, season_id, number, published_by_account_id, summary)
+     values ($1, $2, 1, $3, '{"version": 1, "gamesAdded": 2}')`,
+    [leagueId, seasonId, ownerId],
+  );
+  const scheduleDraftId = await id(
+    pglite,
+    `insert into schedule_drafts (league_id, season_id, based_on_revision, changes)
+     values ($1, $2, 1, $3)`,
+    [leagueId, seasonId, JSON.stringify({ version: 1, changes: [{ renameRound: `Week 1 ${m}` }] })],
+  );
+  const gameId = await id(
+    pglite,
+    `insert into games (league_id, season_id, stage_id, division_id, round_id, game_number,
+       home_team_id, away_team_id, starts_at, venue_id, court_id, status, capture_mode,
+       home_score, away_score, format, finalized_at, external_ref)
+     values ($1, $2, $3, $4, $5, 1, $6, $7, '2026-12-06T18:00:00Z', $8, $9, 'final', 'live',
+       52, 48, '{"version": 1, "periods": 2}', '2026-12-06T19:30:00Z', $10)`,
+    [
+      leagueId,
+      seasonId,
+      stageId,
+      divisionId,
+      roundId,
+      teamId,
+      opponentId,
+      venueId,
+      courtId,
+      `${m}-fixture-1`,
+    ],
+  );
+  await pglite.query(
+    `insert into game_corrections (league_id, game_id, account_id, reason, before, after)
+     values ($1, $2, $3, $4, '{"version": 1, "homeScore": 50}', '{"version": 1, "homeScore": 52}')`,
+    [leagueId, gameId, ownerId, `A basket for ${m} was missed`],
+  );
+  const upcomingGameId = await id(
+    pglite,
+    `insert into games (league_id, season_id, stage_id, round_id, game_number, home_team_id,
+       away_team_id, starts_at, venue_id, capture_mode)
+     values ($1, $2, $3, $4, 2, $5, $6, '2026-12-13T18:00:00Z', $7, 'final')`,
+    [leagueId, seasonId, stageId, roundId, opponentId, teamId, venueId],
+  );
+  const gameAssignmentId = await id(
+    pglite,
+    'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
+    [leagueId, upcomingGameId, member.accountId],
+  );
   // A job a worker holds. It carries ids only (T-131), so no marker: its ids are the league's.
   const jobLeaseToken = randomUUID();
   const jobId = await id(
@@ -293,6 +375,14 @@ async function seededLeague(
     teamId,
     personId,
     rosterEntryId,
+    stageId,
+    roundId,
+    opponentId,
+    scheduleRevisionId,
+    scheduleDraftId,
+    gameId,
+    upcomingGameId,
+    gameAssignmentId,
   };
 }
 

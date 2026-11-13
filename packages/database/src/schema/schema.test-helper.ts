@@ -181,6 +181,63 @@ export async function newRosterEntry(
   return row.id;
 }
 
+/** Adds a season's regular-season stage and returns its id. */
+export async function newStage(
+  db: Sql,
+  leagueId: string,
+  seasonId: string,
+  name = 'Regular season',
+) {
+  const row = await one<{ id: string }>(
+    db,
+    'insert into stages (league_id, season_id, name) values ($1, $2, $3) returning id',
+    [leagueId, seasonId, name],
+  );
+  return row.id;
+}
+
+/** Adds a round to a season and returns its id. */
+export async function newRound(db: Sql, leagueId: string, seasonId: string, roundNumber: number) {
+  const row = await one<{ id: string }>(
+    db,
+    'insert into rounds (league_id, season_id, number) values ($1, $2, $3) returning id',
+    [leagueId, seasonId, roundNumber],
+  );
+  return row.id;
+}
+
+/** A game's place and teams, and any columns to set besides. */
+export type GameOptions = {
+  leagueId: string;
+  seasonId: string;
+  stageId: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  /** Further columns and their values, such as `{ status: 'final', home_score: 50 }`. */
+  columns?: Record<string, unknown>;
+};
+
+/** Adds a game (scheduled, final score only, unless `columns` says otherwise) and returns its id. */
+export async function newGame(db: Sql, game: GameOptions) {
+  const columns: Record<string, unknown> = {
+    league_id: game.leagueId,
+    season_id: game.seasonId,
+    stage_id: game.stageId,
+    home_team_id: game.homeTeamId,
+    away_team_id: game.awayTeamId,
+    capture_mode: 'final',
+    ...game.columns,
+  };
+  const names = Object.keys(columns);
+  const row = await one<{ id: string }>(
+    db,
+    `insert into games (${names.join(', ')})
+     values (${names.map((_, k) => `$${k + 1}`).join(', ')}) returning id`,
+    Object.values(columns),
+  );
+  return row.id;
+}
+
 /** Which league and account a transaction is for (T-61). Missing means not set. */
 export type AppContext = { league?: string; account?: string };
 
