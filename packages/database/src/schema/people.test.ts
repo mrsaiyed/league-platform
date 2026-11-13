@@ -92,6 +92,14 @@ describe('people', () => {
         constraint: `people_${column}_length`,
       });
     }
+    // Empty after erasure, but never only spaces.
+    await set(person, 'first_name', '');
+    for (const column of ['first_name', 'last_name']) {
+      await expect(set(person, column, '   ')).rejects.toMatchObject({
+        ...refused.check,
+        constraint: `people_${column}_length`,
+      });
+    }
     await set(person, 'public_name', 'Big Mo');
     await set(person, 'public_name', null);
     for (const name of ['', '  ', 'x'.repeat(101)]) {
@@ -102,7 +110,7 @@ describe('people', () => {
     }
   });
 
-  it('have a contact email that looks like one and a plausible birth date, or none', async () => {
+  it('have a contact email that looks like one and a plausible, past birth date, or none', async () => {
     const { leagueId } = await newLeague(db);
     const person = await newPerson(db, leagueId);
     await set(person, 'contact_email', 'parent@example.test');
@@ -115,6 +123,18 @@ describe('people', () => {
       ...refused.check,
       constraint: 'people_birth_date_plausible',
     });
+    await set(person, 'birth_date', null);
+    await set(person, 'birth_date', new Date().toISOString().slice(0, 10));
+    await expect(set(person, 'birth_date', '2999-01-01')).rejects.toMatchObject({
+      ...refused.check,
+      constraint: 'people_birth_date_not_future',
+    });
+    await expect(
+      db.query(
+        "insert into people (league_id, first_name, birth_date) values ($1, 'Made-up', '2999-01-01')",
+        [leagueId],
+      ),
+    ).rejects.toMatchObject({ ...refused.check, constraint: 'people_birth_date_not_future' });
   });
 
   it('are erased in place: the row and its id stay, nothing personal is left (T-52)', async () => {

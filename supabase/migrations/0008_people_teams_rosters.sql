@@ -58,8 +58,13 @@ create table public.people (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint people_league_id_key unique (league_id, id),
-  constraint people_first_name_length check (length(first_name) <= 100),
-  constraint people_last_name_length check (length(last_name) <= 100),
+  -- Empty (erased) or a real name, never only spaces.
+  constraint people_first_name_length check (
+    first_name = '' or length(btrim(first_name)) between 1 and 100
+  ),
+  constraint people_last_name_length check (
+    last_name = '' or length(btrim(last_name)) between 1 and 100
+  ),
   constraint people_public_name_length check (
     public_name is null or length(btrim(public_name)) between 1 and 100
   ),
@@ -84,6 +89,29 @@ create unique index people_profile_once
 create index people_profile_lookup on public.people (profile_id) where profile_id is not null;
 create index people_merged_into_lookup
   on public.people (merged_into_id) where merged_into_id is not null;
+
+-- A birth date is not in the future. A check constraint cannot use current_date (it
+-- must give the same answer forever), so a trigger looks when the date is written;
+-- a date that was in the past stays in the past.
+create or replace function public.check_person_birth_date() returns trigger
+language plpgsql
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if new.birth_date is not null and new.birth_date > current_date then
+    raise exception 'a birth date cannot be in the future'
+      using errcode = 'check_violation', constraint = 'people_birth_date_not_future';
+  end if;
+  return new;
+end
+$$;
+
+comment on function public.check_person_birth_date() is
+  'BEFORE INSERT OR UPDATE of birth_date on people: refuses a birth date after today.';
+
+create trigger people_birth_date_not_future
+  before insert or update of birth_date on public.people
+  for each row execute function public.check_person_birth_date();
 
 comment on table public.people is
   'A person as one league knows them (T3 §3, R-3). profile_id is empty until the person is claimed or registers; erasure (T-52) empties the personal columns in place.';
@@ -207,11 +235,15 @@ comment on column public.seasons.unique_jerseys is
 -- with a number and a season switching the rule on take the same per-season lock,
 -- then look. That relies on READ COMMITTED, the default: the look after the lock
 -- takes a fresh snapshot, so it sees what another transaction committed while this
--- one waited. Under REPEATABLE READ the snapshot is older than the lock and could
--- miss a number or the switch, so those writes are refused there (as for division
--- parents, 0007). SERIALIZABLE is fine: Postgres itself fails one of two clashing
--- transactions. These run as the caller: a team, its season and its roster are one
--- league's, which the fence lets the app see whole.
+-- one waited. Under REPEATABLE READ and SERIALIZABLE the snapshot is older than the
+-- lock and could miss a number or the switch, so those writes are refused there.
+-- (Serializable's own conflict checks would likely catch the clash, but proving that
+-- for every pair of writers is harder than refusing.) The roster trigger refuses
+-- before it reads the season: an old snapshot could show the switch off just after
+-- another transaction switched it on, so "only when the season asks" would not be
+-- safe there. The season trigger runs only when the switch goes on. These run as the
+-- caller: a team, its season and its roster are one league's, which the fence lets
+-- the app see whole.
 create or replace function public.check_roster_jersey() returns trigger
 language plpgsql
 set search_path = pg_catalog, pg_temp
@@ -229,8 +261,8 @@ begin
   if team_season is null then
     return new;
   end if;
-  if current_setting('transaction_isolation') = 'repeatable read' then
-    raise exception 'a jersey number cannot be set in a repeatable read transaction'
+  if current_setting('transaction_isolation') in ('repeatable read', 'serializable') then
+    raise exception 'a jersey number can only be set in a read committed transaction'
       using errcode = 'invalid_transaction_state', constraint = 'roster_entries_jersey_isolation';
   end if;
   perform pg_advisory_xact_lock(hashtextextended('roster_jerseys:' || team_season::text, 0));
@@ -238,7 +270,8 @@ begin
     select 1 from public.seasons s where s.id = team_season and s.unique_jerseys
   ) and exists (
     select 1 from public.roster_entries r
-    where r.team_id = new.team_id
+    where r.league_id = new.league_id
+      and r.team_id = new.team_id
       and r.jersey_number = new.jersey_number
       and r.left_on is null
       and r.id <> new.id
@@ -263,8 +296,8 @@ language plpgsql
 set search_path = pg_catalog, pg_temp
 as $$
 begin
-  if current_setting('transaction_isolation') = 'repeatable read' then
-    raise exception 'the unique-jersey rule cannot be switched on in a repeatable read transaction'
+  if current_setting('transaction_isolation') in ('repeatable read', 'serializable') then
+    raise exception 'the unique-jersey rule can only be switched on in a read committed transaction'
       using errcode = 'invalid_transaction_state', constraint = 'roster_entries_jersey_isolation';
   end if;
   perform pg_advisory_xact_lock(hashtextextended('roster_jerseys:' || new.id::text, 0));

@@ -197,9 +197,11 @@ describe('invitations', () => {
     const a = await newLeague(db);
     const b = await newLeague(db);
     await invite(a.leagueId, { role: 'coach', scopeType: 'team', scopeId: await teamOf(a) });
-    await expect(
-      invite(a.leagueId, { role: 'captain', scopeType: 'team', scopeId: await teamOf(b) }),
-    ).rejects.toMatchObject({ ...refused.foreignKey, constraint: 'invitations_scope_team' });
+    for (const team of [await teamOf(b), '00000000-0000-7000-8000-000000000000']) {
+      await expect(
+        invite(a.leagueId, { role: 'captain', scopeType: 'team', scopeId: team }),
+      ).rejects.toMatchObject({ ...refused.foreignKey, constraint: 'invitations_scope_team' });
+    }
     await expect(
       invite(a.leagueId, {
         role: 'club_admin',

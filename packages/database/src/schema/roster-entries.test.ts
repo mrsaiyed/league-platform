@@ -237,7 +237,35 @@ describe('unique jersey numbers in a team (T3 §12)', () => {
     ).rejects.toMatchObject({ ...refused.unique, constraint: 'roster_entries_unique_jersey' });
   });
 
-  it('refuse a number under repeatable read, where the check could miss a change', async () => {
+  it('switch the rule on for the fenced app role too, refused while a team has a clash', async () => {
+    const { leagueId, seasonId, teamId } = await team();
+    const first = await newRosterEntry(db, leagueId, teamId, await newPerson(db, leagueId), {
+      jersey: '7',
+    });
+    await newRosterEntry(db, leagueId, teamId, await newPerson(db, leagueId), { jersey: '7' });
+    const switchOn = () =>
+      asApp(db, { league: leagueId }, (tx) =>
+        tx.query(
+          `update seasons set rules = '{"version": 1, "rosters": {"uniqueJerseys": true}}'
+           where id = $1`,
+          [seasonId],
+        ),
+      );
+    await expect(switchOn()).rejects.toMatchObject({
+      ...refused.unique,
+      constraint: 'seasons_unique_jerseys_clash',
+    });
+    await set(first, 'jersey_number', '8');
+    await switchOn();
+    const row = await one<{ unique_jerseys: boolean }>(
+      db,
+      'select unique_jerseys from seasons where id = $1',
+      [seasonId],
+    );
+    expect(row.unique_jerseys).toBe(true);
+  });
+
+  it('refuse a number, or switching the rule on, unless the transaction is read committed', async () => {
     const { leagueId, seasonId, teamId } = await team();
     const inIsolation = (level: string, work: (tx: Transaction) => Promise<unknown>) =>
       db.transaction(async (tx) => {
@@ -246,22 +274,21 @@ describe('unique jersey numbers in a team (T3 §12)', () => {
       });
     const joins = async (tx: Transaction, jersey: string | null) =>
       newRosterEntry(tx, leagueId, teamId, await newPerson(tx, leagueId), { jersey });
-    await expect(inIsolation('repeatable read', (tx) => joins(tx, '4'))).rejects.toMatchObject({
-      code: '25000',
-      constraint: 'roster_entries_jersey_isolation',
-    });
-    await expect(
-      inIsolation('repeatable read', (tx) =>
-        tx.query(
-          `update seasons set rules = '{"version": 1, "rosters": {"uniqueJerseys": true}}'
-           where id = $1`,
-          [seasonId],
+    const isolation = { code: '25000', constraint: 'roster_entries_jersey_isolation' };
+    for (const level of ['repeatable read', 'serializable']) {
+      await expect(inIsolation(level, (tx) => joins(tx, '4'))).rejects.toMatchObject(isolation);
+      await expect(
+        inIsolation(level, (tx) =>
+          tx.query(
+            `update seasons set rules = '{"version": 1, "rosters": {"uniqueJerseys": true}}'
+             where id = $1`,
+            [seasonId],
+          ),
         ),
-      ),
-    ).rejects.toMatchObject({ code: '25000', constraint: 'roster_entries_jersey_isolation' });
-    // Without a number nothing is checked; read committed and serializable are fine.
-    await inIsolation('repeatable read', (tx) => joins(tx, null));
+      ).rejects.toMatchObject(isolation);
+      // Without a number nothing is checked.
+      await inIsolation(level, (tx) => joins(tx, null));
+    }
     await inIsolation('read committed', (tx) => joins(tx, '4'));
-    await inIsolation('serializable', (tx) => joins(tx, '5'));
   });
 });

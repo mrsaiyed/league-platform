@@ -159,6 +159,22 @@ describe('teams', () => {
     });
   });
 
+  it('free their lineage slot in a season when they go to the bin', async () => {
+    const { leagueId, seasonId } = await season();
+    const binned = await newTeam(db, leagueId, seasonId);
+    const { lineage_id: lineageId } = await one<{ lineage_id: string }>(
+      db,
+      'select lineage_id from teams where id = $1',
+      [binned],
+    );
+    await expect(newTeam(db, leagueId, seasonId, { lineageId })).rejects.toMatchObject({
+      ...refused.unique,
+      constraint: 'teams_one_per_lineage',
+    });
+    await set(binned, 'deleted_at', new Date().toISOString());
+    await newTeam(db, leagueId, seasonId, { lineageId });
+  });
+
   it('never move to another season', async () => {
     const { leagueId, seasonId, defaultProgramId } = await season();
     const team = await newTeam(db, leagueId, seasonId);
