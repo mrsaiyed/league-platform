@@ -10,6 +10,7 @@ import {
   listPostponedGames as listPostponedGamesCommand,
   openScoringSession,
   postponeGame,
+  readTrackerRosters,
   readTrackerState,
   recordFinalScore,
   recordForfeit,
@@ -519,6 +520,14 @@ registerIsolationCase({
 registerCommandCase(readTrackerState, harnessTx, {
   name: "load the tracker's state of the target's final game",
   input: (target) => ({ gameId: target.gameId }),
+});
+
+// The rosters for the scorekeeper's device (record 054, T-258): the target's upcoming
+// game has a player on a roster, with a name and a number to leak. Anywhere else the
+// read is refused or finds no game.
+registerCommandCase(readTrackerRosters, harnessTx, {
+  name: "read the rosters of the target's upcoming game for the tracker",
+  input: (target) => ({ gameId: target.upcomingGameId }),
 });
 
 registerIsolationCase({

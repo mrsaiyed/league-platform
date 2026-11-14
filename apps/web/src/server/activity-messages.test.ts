@@ -33,6 +33,8 @@ const reads = new Set([
   'games.apply_tracker_commands',
   // The engine's state for the tracker to load (T-253): a read.
   'games.read_tracker_state',
+  // The rosters stored on the scorekeeper's device when it opens a game (T-258): a read.
+  'games.read_tracker_rosters',
 ]);
 
 describe('activity log messages', () => {

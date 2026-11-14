@@ -52,6 +52,7 @@ import {
   applyTrackerCommands,
   endTrackedGame,
   readTrackerState,
+  readTrackerRosters,
   unassignScorekeeper,
 } from './modules/games/index.ts';
 import { createPerson, listPeople, removePerson, updatePerson } from './modules/people/index.ts';
@@ -153,6 +154,7 @@ export const commands = commandRegistry([
   releaseScoringSession,
   applyTrackerCommands,
   readTrackerState,
+  readTrackerRosters,
   endTrackedGame,
   rebuildStandings,
   addAdjustment,

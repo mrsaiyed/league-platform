@@ -80,6 +80,11 @@ export {
   type ReadTrackerStateError,
   type TrackerGameState,
 } from './commands/read-tracker-state.ts';
+export {
+  readTrackerRosters,
+  type ReadTrackerRostersError,
+  type TrackerRosters,
+} from './commands/read-tracker-rosters.ts';
 export { engineRulesOf } from './engine-rules.ts';
 export {
   leaseMs,
