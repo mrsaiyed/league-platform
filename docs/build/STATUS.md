@@ -19,11 +19,14 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane. A run that is cut off leaves this as the map for the next run. Check the lane branches for commits: builders were still working when the usage limit hit.
 
-Next free: migration 0012, record 040, T-252 (038/T-250 to 2.30, 039/T-251 to 2.32; 034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 was reserved for 1.14, which landed without a migration; the runner refuses gaps, so 0011 went to the game-corrections fix of 2026-11-14; 0010 / 030 / T-242 to 2.4).
+Next free: migration 0012, record 041, T-253 (040/T-252 to 2.67; 038/T-250 to 2.30, 039/T-251 to 2.32; 034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 was reserved for 1.14, which landed without a migration; the runner refuses gaps, so 0011 went to the game-corrections fix of 2026-11-14; 0010 / 030 / T-242 to 2.4).
 
 - **2.52 The schedule grid** — `.local/lanes/2.52-schedule-grid` — none reserved — merged with build, import link added, reviewed; findings fixed and pushed (14f62e5 FAILED on GitHub with no test names; re-checked as lane/2.52-schedule-grid-again, delete that branch afterwards). No drag: form-based edits only for now (P7 §4.3 says drag; a later step). Then push, GitHub PASS, land.
 - **2.64 Box score entry** — `.local/lanes/2.64-box-score` — none reserved — merged with build, reviewed; findings fixed (forfeit/import clear lines, binned people, reopen form, messages, empty score = player points), merged with build, pushed f0b7383, waiting for GitHub. Lead owns S-25 to S-27 ('Decided for you'). Then land.
 - **2.32 Tracker endpoints and publishing plays** — `.local/lanes/2.32-tracker-endpoints` — record 039, T-251 — builder (opus) started 2026-11-14; check the lane, push, review, GitHub, land.
+- **2.67 Engine last-minutes stop clock, mercy rule, foul limit** — `.local/lanes/2.67-engine-rules` — record 040, T-252 — builder (opus) started 2026-11-14; check the lane, push, review, GitHub, land.
+- **2.48 League settings screen** — `.local/lanes/2.48-league-settings` — none reserved — builder (sonnet) started 2026-11-14; check the lane, push, review, GitHub, land.
+- **2.76 The bin** — `.local/lanes/2.76-bin` — none reserved (no migration) — builder (sonnet) started 2026-11-14; check the lane, push, review, GitHub, land.
 
 ## Needs the founder
 
