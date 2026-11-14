@@ -35,6 +35,7 @@ export function gamesReadStore(scope: LeagueScope): GameSnapshotStore {
             awayScore: game.awayScore,
             finalizedAt: game.finalizedAt,
             binned: game.binned,
+            rules: game.format ?? season.rules,
           };
     },
     teams: (teamIds) => listGameTeams(scope, teamIds),

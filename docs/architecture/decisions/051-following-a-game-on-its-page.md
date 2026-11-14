@@ -1,0 +1,38 @@
+# 051 — Following a game on its page
+
+Date: 2026-11-14. Step 2.45; serves P7 §5.3, T6 §6, T-117 to T-121, S-7. Decided by the lead (technical). T-255.
+
+## Problem
+
+T-118 says a page that notices a gap fetches a snapshot, and T-119 that a page that cannot make the live connection re-fetches it every 5 seconds. That leaves four cases where the page would show something wrong for as long as nothing else happens: messages sent between the page being drawn and its live connection opening; a lost last message, which no later message reveals; the players, which messages do not carry (only the score, period, clock, team fouls and latest play); and a snapshot that is itself a cached copy older than what the page has seen. It also left open how the device lines its clock up with the server's (T-121) when a snapshot may be up to 2 seconds old.
+
+## What
+
+- **The page arrives drawn** from the game's snapshot and the game page (`readGameSnapshot`, `readGamePage`), both read as a visitor, so it is the same for everyone and a hidden team's players never reach it (T-87, S-22). Its live part (`apps/web/src/features/live-game/live-game-view.tsx`) then follows the game with `followGame` (`follow-game.ts`), which applies step 2.6's rules (`viewer-state.ts`) and decides when to fetch a snapshot. One fetch at a time.
+- **When a snapshot is fetched:**
+  - at once, on a gap in the numbers (T-118);
+  - at once, each time the live connection opens, because messages may have been missed while it was connecting or lost;
+  - every 5 seconds while the live connection is not open and the game is live (T-119), silently, and every 60 seconds for a game not live (scheduled, postponed or cancelled), enough to see it start;
+  - again 2 seconds after a snapshot that is behind messages already seen (the snapshot address is cached for 2 seconds);
+  - at most every 5 seconds while the players shown are older than the score;
+  - every 30 seconds while the live connection is open and the game is quiet or not yet started, so a lost last message, or a lost message that starts the game, is found.
+  - every 5 seconds (60 for a game not live), as if the connection were not open, once a snapshot fetched while it is open shows plays no message brought (other than the catch-up on its opening): the connection says it is open but is not delivering. This lasts until a message arrives again or the connection changes.
+- **A final game is not listened to**: a page that arrives on one opens no live connection, and a page whose game becomes final closes its connection. Its snapshot is still fetched every 30 seconds for 10 minutes after the page first sees it final, so a game the scorekeeper reopens shows: the page is then drawn again and listens again.
+- **The clock** (T-121) is lined up by the page's own snapshot, each message and each fetched snapshot. Each measurement of `sentAt` minus the time it arrived is at most the true offset (anything sent takes time to arrive, and a cached snapshot was sent earlier still), so the page keeps the largest seen and a slow or stale one never lowers it. Until the page runs on the device, the server and the device's first drawing show the clock as it stood when the snapshot was read.
+- **The play-by-play** (S-33) is the one the page arrived with, newest first, with a link to load newer plays while the game is live: messages carry only the latest play, and that play repeats or goes back after clock taps and undos, so it cannot be appended safely. The latest play is shown live above it.
+- **When the game starts or ends** (scheduled to live or final, live to final, final back to live when reopened, by a message or snapshot newer than the page), the page is drawn again from the server, once: its play-by-play, its "Show newer plays" link and its box scores stand on how the game was when the page was read. That is two page reads per viewer per game, not one per play. So that the viewers of a game do not all ask at the same moment, each page waits a random 0 to 5 seconds, then asks for the page and reloads only if it answers OK; otherwise the scoreboard it has keeps working. It remembers, for the browser session, the sequence number it reloaded for and does not reload again for that one, so a stale cached page cannot loop.
+- **Corrected games** show "Corrected on" and the date (S-7), from the snapshot's `correctedOn`, never the reason.
+- The page listens on the local hub (`/api/v1/live`) as the schedule pages do; where that address is absent the connection is refused and the page polls.
+
+## Considered
+
+- **Only T-118 and T-119.** Simplest, but a page drawn a moment before a play, or one that lost the last message of a quiet spell, would show a wrong score until the next play, possibly for minutes.
+- **Re-fetch the players after every message.** Players would be current within a second, but every viewer would fetch once per play, several times the polling load T-119 budgets for; at most one per 5 seconds keeps it to the same rate as a blocked page.
+- **Building the play-by-play from messages.** Cheap, but wrong after undos and clock taps, and incomplete after a gap.
+- **Redrawing the server part of the page after each play** (`router.refresh`). Always complete, but every viewer would cost a full page read per play, with nothing cached. Drawing it again only when the game starts or ends keeps the cost to two reads per viewer per game. It reloads the page rather than using `router.refresh`, because the live part is also drawn outside Next.js's router in tests.
+
+## Revisit if
+
+- Step 2.104 makes the play-by-play update live (P7 §5.3, S-33): the snapshot and the live message carry the recent plays, as the visitor sees them, so the page can append and correct them.
+- The polling load is measured in staging (F-5) and the 5-second or 30-second rates prove too costly or too slow.
+- Pages listen to Supabase Realtime: the page then needs that subscriber and the project's address, as the schedule pages will.

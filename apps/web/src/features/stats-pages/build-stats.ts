@@ -36,6 +36,9 @@ function isKnown(key: string): key is keyof typeof known {
   return Object.hasOwn(known, key);
 }
 
+/** True when the message file has words for this statistic. */
+export const hasStatLabel = (key: string): boolean => isKnown(key);
+
 /** A statistic's name and short name; a statistic we have no words for shows its own key. */
 export function statLabel(key: string): { readonly full: string; readonly short: string } {
   return isKnown(key)
