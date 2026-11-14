@@ -32,7 +32,8 @@ export const Rules = z.strictObject({
  * mode, which is absent for a stop clock as every game before the mode existed, and the
  * last-minutes stop clock, the mercy lead and the personal foul limit, each off when
  * absent or null. Their limits match the season rules document (./season-rules.ts); a
- * test keeps the two in step. The engine also keeps the stop clock within a period.
+ * test keeps the two in step. Like the engine and the document, the last-minutes stop
+ * clock is no longer than a period.
  */
 export const PlatformRules = Rules.extend({
   clockMode: z.enum(['stop', 'running']).optional(),
@@ -40,6 +41,13 @@ export const PlatformRules = Rules.extend({
   stopClockScope: z.enum(['period', 'half', 'game']).optional(),
   mercyLead: z.number().int().min(1).max(100).nullable().optional(),
   playerFoulLimit: z.number().int().min(1).max(20).nullable().optional(),
+}).superRefine((r, ctx) => {
+  if (r.stopClockLastSeconds != null && r.stopClockLastSeconds > r.periodSeconds)
+    ctx.addIssue({
+      code: 'custom',
+      path: ['stopClockLastSeconds'],
+      message: 'The stop-clock time cannot be longer than a period.',
+    });
 });
 
 /** The commands both trackers send. */

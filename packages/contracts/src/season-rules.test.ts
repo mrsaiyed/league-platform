@@ -173,6 +173,23 @@ describe('season rules presets', () => {
     }
     expect(PlatformRules.safeParse({ ...base, stopClockScope: 'quarter' }).success).toBe(false);
   });
+
+  it('keeps the platform last-minutes stop clock within a period, as the engine does', () => {
+    const base = {
+      periods: 4,
+      periodSeconds: 300,
+      overtimeSeconds: 180,
+      bonusFouls: 5,
+      doubleBonusFouls: null,
+    };
+    expect(PlatformRules.safeParse({ ...base, stopClockLastSeconds: 300 }).success).toBe(true);
+    expect(PlatformRules.safeParse({ ...base, stopClockLastSeconds: 301 }).success).toBe(false);
+    expect(PlatformRules.safeParse({ ...base, stopClockLastSeconds: null }).success).toBe(true);
+    const doc = structuredClone(defaultSeasonRules());
+    doc.gameFormat.periodSeconds = 300;
+    doc.clock = { ...doc.clock, mode: 'running', stopClockLastSeconds: 301 };
+    expect(SeasonRules.safeParse(doc).success).toBe(false);
+  });
 });
 
 describe('season rules limits', () => {
