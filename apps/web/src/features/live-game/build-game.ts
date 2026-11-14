@@ -123,6 +123,22 @@ export function startText(
   return t(status === 'live' ? 'game.scheduledFor' : 'game.startsAt', { when });
 }
 
+/**
+ * The line under the page's title. A game under way has none: the time it was set for is
+ * not the time it started, which the page does not have, and the board shows its clock.
+ * A game with no day yet has none either: the board says "Date to be announced", once.
+ * Every other game says when it starts, was played, or was set for (startText).
+ */
+export function titleLine(
+  startsAt: string | null,
+  timeZone: string,
+  status: string,
+): string | null {
+  if (status === 'live') return null;
+  if (status === 'scheduled' && startsAt === null) return null;
+  return startText(startsAt, timeZone, status);
+}
+
 /** "Corrected on 14 Nov 2026": the date only, never the reason (S-7); null if never corrected. */
 export function correctedText(correctedOn: string | null | undefined): string | null {
   if (correctedOn === null || correctedOn === undefined) return null;

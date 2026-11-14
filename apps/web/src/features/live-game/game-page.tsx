@@ -26,7 +26,7 @@ import {
   correctedText,
   gameTitle,
   gameWords,
-  startText,
+  titleLine,
 } from './build-game.ts';
 import { GameContent } from './game-content.tsx';
 
@@ -77,7 +77,7 @@ export async function GamePage({
         leagueId: addressee.id,
         title: gameTitle(page.value),
         status: page.value.game.status,
-        start: startText(page.value.game.startsAt, clock.timeZone, page.value.game.status),
+        start: titleLine(page.value.game.startsAt, clock.timeZone, page.value.game.status),
         corrected: correctedText(snapshot.value.correctedOn ?? page.value.game.correctedOn),
         snapshot: snapshot.value,
         snapshotAddress: leagueApiUrl(addressee, ['games', snapshot.value.gameId, 'snapshot']),

@@ -33,6 +33,7 @@ import {
   gameTitle,
   gameWords,
   startText,
+  titleLine,
 } from './build-game.ts';
 import { GameContent, type GameView } from './game-content.tsx';
 import { latestPlayText, redrawsFor } from './live-game-view.tsx';
@@ -203,6 +204,27 @@ describe('a game page', () => {
     for (const status of ['live', 'final', 'forfeit']) {
       expect(startText(null, 'UTC', status)).toBeNull();
     }
+  });
+
+  it('puts no line under the title of a game under way, or of one with no day: the board says it', async () => {
+    const when = '2026-11-20T18:00:00Z';
+    // A live game: the time it was set for is not when it started, and the board has the clock.
+    expect(titleLine(when, 'UTC', 'live')).toBeNull();
+    // No day yet: the board says "Date to be announced", once.
+    expect(titleLine(null, 'UTC', 'scheduled')).toBeNull();
+    expect(boardWhen(null, 'UTC', 'scheduled')).toEqual({ day: 'Date to be announced' });
+    // Every other game keeps its line.
+    expect(titleLine(when, 'UTC', 'scheduled')).toBe(startText(when, 'UTC', 'scheduled'));
+    expect(titleLine(when, 'UTC', 'final')).toMatch(/^Played /);
+    expect(titleLine(when, 'UTC', 'postponed')).toMatch(/^It was set for /);
+    // Drawn: a live game's page has its title and then the board, nothing between.
+    const world = trackerWorld();
+    await scoreHawksBears(world);
+    const { view } = await viewOf(world, games.hawksBears);
+    const html = draw({ ...view, start: titleLine(when, 'UTC', 'live') });
+    expect(html).not.toContain('Scheduled for');
+    expect(html).not.toContain('ui-page-sub');
+    expect(html).toContain('Half 1 20:00');
   });
 
   it('is drawn again from the server when its game starts, ends or is reopened, and only then', () => {
