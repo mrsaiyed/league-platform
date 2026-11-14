@@ -4,12 +4,21 @@
 //
 // What it covers: two leagues at two addresses with different looks; a made-up member
 // signing in with an email and password, the browser closing, and the person still being
-// signed in when a new browser opens with the cookies a real browser keeps; an admin of
-// the first league refused everywhere in the second; accessibility checks on every
-// screen it visits (T-186).
-// What it does not cover, because the stand-in cannot: an invitation email being
-// captured and its link followed (the stand-in has no invitations: stand-in-ports.ts),
-// and signing in as the made-up league people (they are given only by their cookie).
+// signed in when a new browser opens with the cookies a real browser keeps (the session
+// and renewal cookies must both last days); signing out everywhere, after which the old
+// cookies replayed in a fresh browser are refused; accessibility checks on every screen
+// it visits (T-186); and a person who is only a SCHEDULER of the first league (not its
+// owner: the made-up scheduler has the narrowest admin role, so being refused in the
+// second league shows more than being refused as an owner would not) being refused at
+// every admin address and the scoring address of the second league.
+// A part that throws (a wait that times out, a build that fails) is recorded by name and
+// the other parts still run and print.
+// Not covered: (1) the invitation email being captured and its link followed: the
+// stand-in has no invitations (stand-in-ports.ts); (2) axe: it is not a dependency, so
+// the accessibility checks are the hand-written ones below; (3) signing in as the made-up
+// league people (they are given only by their cookie; only the made-up member signs in
+// with a password); (4) renewing an access token that has run out: the stand-in cannot
+// be made to expire one from outside, so only the renewal cookie's lasting is checked.
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -72,10 +81,32 @@ async function waitFor(url, server) {
   throw new Error(`the server did not answer within 90 seconds:\n${server.output()}`);
 }
 
+const failures = [];
+const checked = [];
+const note = (label, ok, detail = '') => {
+  checked.push(label);
+  if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ''}`);
+};
+/** Runs one part; a throw (a wait that timed out, say) is recorded under the part's name. */
+const step = async (name, run) => {
+  try {
+    await run();
+  } catch (error) {
+    failures.push(`${name}: ${String(error?.message ?? error).split('\n')[0]}`);
+  }
+};
+
+let built = true;
 if (!process.argv.includes('--no-build')) {
-  const build = start(['build'], { APP_ENV: 'test' });
-  const code = await new Promise((r) => build.child.on('exit', r));
-  if (code !== 0) throw new Error(`next build failed:\n${build.output()}`);
+  built = false;
+  await step('building the web app', async () => {
+    const build = start(['build'], { APP_ENV: 'test' });
+    const timer = setTimeout(() => build.child.kill(), 10 * 60_000);
+    const code = await new Promise((r) => build.child.on('exit', r));
+    clearTimeout(timer);
+    if (code !== 0) throw new Error(`next build failed or took over 10 minutes`);
+    built = true;
+  });
 }
 
 /**
@@ -176,94 +207,109 @@ async function accessibilityProblems(page) {
   });
 }
 
-const failures = [];
-const checked = [];
-const note = (label, ok, detail = '') => {
-  checked.push(label);
-  if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ''}`);
-};
-
-const port = await freePort();
-const origin = `http://localhost:${port}`;
-const server = start(['start', '--port', String(port)], {
-  APP_ENV: 'test',
-  PUBLIC_BASE_URL: origin,
-});
+let server;
 let browser;
-try {
-  await waitFor(`${origin}/`, server);
-  browser = await launch();
+const origin = built ? `http://localhost:${await freePort()}` : '';
+/** Opens `address` and waits until the page has drawn its main area. */
+async function open(page, address) {
+  const response = await page.goto(origin + address);
+  await page.locator('main').first().waitFor();
+  return response;
+}
+async function accessible(page, label) {
+  const problems = await accessibilityProblems(page);
+  note(`accessibility: ${label}`, problems.length === 0, problems.join('; '));
+}
+const pathOf = (page) => new URL(page.url()).pathname;
+const week = 7 * 24 * 3600;
 
-  /** Opens `address` and waits until the page has drawn its main area. */
-  async function open(page, address) {
-    const response = await page.goto(origin + address);
-    await page.locator('main').first().waitFor();
-    return response;
-  }
-  async function accessible(page, label) {
-    const problems = await accessibilityProblems(page);
-    note(`accessibility: ${label}`, problems.length === 0, problems.join('; '));
-  }
+if (built) {
+  server = start(['start', '--port', new URL(origin).port], {
+    APP_ENV: 'test',
+    PUBLIC_BASE_URL: origin,
+  });
+  await step('starting the server and the browser', async () => {
+    await waitFor(`${origin}/`, server);
+    browser = await launch();
+  });
+}
 
-  // 1. Two leagues, two addresses, two looks.
-  {
+if (browser) {
+  await step('two leagues, two looks', async () => {
     const context = await browser.newContext();
-    const page = await context.newPage();
-    const looks = {};
-    for (const [league, name] of [
-      ['north-valley', 'North Valley League'],
-      ['harbor-city', 'Harbor City League'],
-    ]) {
-      await open(page, `/${league}`);
-      await page.getByText(name).first().waitFor();
-      await page.getByText('Powered by SR Leagues').first().waitFor();
-      looks[league] = await page.evaluate(() =>
-        getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim(),
-      );
-      note(`${league} shows its own name`, true);
-      await accessible(page, `/${league}`);
-      for (const sub of ['standings', 'stats', 'schedule', 'teams']) {
-        await open(page, `/${league}/${sub}`);
-        await accessible(page, `/${league}/${sub}`);
+    try {
+      const page = await context.newPage();
+      const looks = {};
+      for (const [league, name] of [
+        ['north-valley', 'North Valley League'],
+        ['harbor-city', 'Harbor City League'],
+      ]) {
+        await open(page, `/${league}`);
+        note(
+          `${league} shows its own name and the platform mark`,
+          (await page.getByText(name).count()) > 0 &&
+            (await page.getByText('Powered by SR Leagues').count()) > 0,
+        );
+        looks[league] = await page.evaluate(() =>
+          getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim(),
+        );
+        await accessible(page, `/${league}`);
+        for (const sub of ['standings', 'stats', 'schedule', 'teams']) {
+          await open(page, `/${league}/${sub}`);
+          await accessible(page, `/${league}/${sub}`);
+        }
       }
+      note(
+        'the two leagues have different looks',
+        looks['north-valley'] === '#c8a84b' && looks['harbor-city'] === '#1f5fbf',
+        JSON.stringify(looks),
+      );
+    } finally {
+      await context.close();
     }
-    note(
-      'the two leagues have different looks',
-      looks['north-valley'] === '#c8a84b' && looks['harbor-city'] === '#1f5fbf',
-      JSON.stringify(looks),
-    );
-    await context.close();
-  }
+  });
 
-  // 2. Sign in, close the browser, come back, still signed in.
-  {
+  await step('sign in, close the browser, come back', async () => {
     const first = await launch();
-    const context = await first.newContext();
-    const page = await context.newPage();
-    await open(page, '/account');
-    note('a visitor is sent to sign in', new URL(page.url()).pathname === '/signin');
-    await page.getByRole('heading', { name: 'Sign in' }).waitFor();
-    await accessible(page, '/signin');
-    await page.getByLabel('Email').fill(member.email);
-    await page.getByLabel('Password').fill(member.password);
-    await Promise.all([
-      page.waitForURL((url) => url.pathname === '/account'),
-      page.getByRole('button', { name: 'Sign in', exact: true }).click(),
-    ]);
-    await page.getByRole('heading', { name: 'Your account' }).waitFor();
-    await accessible(page, '/account');
-    const cookies = await context.cookies(origin);
-    const session = cookies.find((c) => c.name === 'srl_session');
-    note('signing in sets a session cookie', session !== undefined);
-    note(
-      'the session cookie is kept after the browser closes',
-      session !== undefined && session.expires > Date.now() / 1000,
-      `expires ${session?.expires}`,
-    );
-    note('the session cookie cannot be read by page scripts', session?.httpOnly === true);
-    // What a real browser keeps when it closes: the cookies that have an end date.
-    const kept = cookies.filter((c) => c.expires > Date.now() / 1000);
-    await first.close();
+    let kept;
+    try {
+      const context = await first.newContext();
+      const page = await context.newPage();
+      await open(page, '/account');
+      note('a visitor is sent to sign in', pathOf(page) === '/signin');
+      await page.getByRole('heading', { name: 'Sign in' }).waitFor();
+      await accessible(page, '/signin');
+      await page.getByLabel('Email').fill(member.email);
+      await page.getByLabel('Password').fill(member.password);
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === '/account'),
+        page.getByRole('button', { name: 'Sign in', exact: true }).click(),
+      ]);
+      await page.getByRole('heading', { name: 'Your account' }).waitFor();
+      await accessible(page, '/account');
+      const cookies = await context.cookies(origin);
+      const now = Date.now() / 1000;
+      for (const name of ['srl_session', 'srl_renew']) {
+        const cookie = cookies.find((c) => c.name === name);
+        note(`signing in sets the ${name} cookie`, cookie !== undefined);
+        note(`${name} cannot be read by page scripts`, cookie?.httpOnly === true);
+      }
+      // What a real browser keeps when it closes: only cookies that have an end date.
+      const renew = cookies.find((c) => c.name === 'srl_renew');
+      note(
+        'srl_renew is kept after the browser closes, for days',
+        renew !== undefined && renew.expires > now + week,
+        `expires in ${renew ? Math.round((renew.expires - now) / 3600) : '?'} hours`,
+      );
+      const session = cookies.find((c) => c.name === 'srl_session');
+      note(
+        'srl_session is kept after the browser closes',
+        session !== undefined && session.expires > now,
+      );
+      kept = cookies.filter((c) => c.expires > now);
+    } finally {
+      await first.close();
+    }
 
     const second = await launch();
     try {
@@ -272,59 +318,75 @@ try {
       const again = await back.newPage();
       await open(again, '/account');
       await again.getByRole('heading', { name: 'Your account' }).waitFor();
-      note('back in a new browser, still signed in', new URL(again.url()).pathname === '/account');
+      note('back in a new browser, still signed in', pathOf(again) === '/account');
       await again.getByRole('button', { name: 'Sign out everywhere' }).click();
-      await again.waitForURL((url) => url.pathname !== '/account');
+      // Either the sign-in page, or the account page showing the signed-out state.
+      await again.waitForFunction(
+        () =>
+          location.pathname === '/signin' ||
+          (location.pathname === '/account' && !document.body.innerText.includes('Your account')),
+      );
       await open(again, '/account');
-      note('after signing out, sent to sign in', new URL(again.url()).pathname === '/signin');
+      note('after signing out, sent to sign in', pathOf(again) === '/signin');
     } finally {
       await second.close();
     }
-  }
 
-  // 3. An admin of the first league is refused everywhere in the second.
-  {
-    const context = await browser.newContext();
-    await context.addCookies([
-      { name: 'srl_session', value: 'local-scheduler-token', url: origin },
-    ]);
-    const page = await context.newPage();
-    await open(page, '/north-valley/admin');
-    await page.getByRole('navigation', { name: 'Admin areas' }).waitFor();
-    note('the scheduler can open their own league admin area', true);
-    await accessible(page, '/north-valley/admin (as its admin)');
-    const areas = [
-      '',
-      '/schedule',
-      '/games',
-      '/teams',
-      '/people',
-      '/season',
-      '/registration',
-      '/standings',
-      '/messages',
-      '/site',
-      '/settings',
-    ];
-    for (const area of areas) {
-      const response = await open(page, `/harbor-city/admin${area}`);
-      await page.getByText(noAccess).first().waitFor();
-      note(`refused at /harbor-city/admin${area}`, response?.status() === 403);
-      note(
-        `no admin words at /harbor-city/admin${area}`,
-        (await page.getByRole('navigation', { name: 'Admin areas' }).count()) === 0,
-      );
+    // The old cookies, replayed, must now be refused.
+    const third = await launch();
+    try {
+      const replay = await third.newContext();
+      await replay.addCookies(kept);
+      const page = await replay.newPage();
+      await open(page, '/account');
+      note('the old cookies are refused after signing out everywhere', pathOf(page) === '/signin');
+    } finally {
+      await third.close();
     }
-    const response = await open(page, '/harbor-city/score/game-1');
-    await page.getByText(noAccess).first().waitFor();
-    note('refused at /harbor-city/score/game-1', response?.status() === 403);
-    await accessible(page, '/harbor-city/admin (refused)');
-    await context.close();
-  }
-} finally {
-  await browser?.close();
-  server.child.kill();
+  });
+
+  await step('a scheduler of the first league in the second', async () => {
+    const context = await browser.newContext();
+    try {
+      await context.addCookies([
+        { name: 'srl_session', value: 'local-scheduler-token', url: origin },
+      ]);
+      const page = await context.newPage();
+      const nav = page.getByRole('navigation', { name: 'Admin areas' });
+      await open(page, '/north-valley/admin');
+      await nav.waitFor();
+      await accessible(page, '/north-valley/admin (as its scheduler)');
+      const areas = [
+        '',
+        '/schedule',
+        '/games',
+        '/teams',
+        '/people',
+        '/season',
+        '/registration',
+        '/standings',
+        '/messages',
+        '/site',
+        '/settings',
+      ];
+      for (const area of areas) {
+        const response = await open(page, `/harbor-city/admin${area}`);
+        await page.getByText(noAccess).first().waitFor();
+        note(`scheduler refused at /harbor-city/admin${area}`, response?.status() === 403);
+        note(`no admin navigation at /harbor-city/admin${area}`, (await nav.count()) === 0);
+      }
+      const response = await open(page, '/harbor-city/score/game-1');
+      await page.getByText(noAccess).first().waitFor();
+      note('scheduler refused at /harbor-city/score/game-1', response?.status() === 403);
+      await accessible(page, '/harbor-city/admin (refused)');
+    } finally {
+      await context.close();
+    }
+  });
 }
+
+await browser?.close();
+server?.child.kill();
 
 if (failures.length > 0) {
   console.error(`Browser exit-test check failed:\n  ${failures.join('\n  ')}`);
