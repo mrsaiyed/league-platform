@@ -136,7 +136,8 @@ export class LiveStats {
       const lines = Object.entries(d.players).flatMap(([playerId, l]): LineRecord[] => {
         const p = players.get(playerId);
         if (!p) return [];
-        const { side: _side, ms, ...stats } = l;
+        // The foul-out mark (a platform rule) is not part of the stored line, which keeps its format.
+        const { side: _side, ms, fouledOut: _fouledOut, ...stats } = l;
         return [
           {
             playerId,

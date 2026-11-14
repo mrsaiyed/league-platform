@@ -17,6 +17,12 @@
  * as the officials' whistle does (NFHS 5-8-1); only the scorer starts it again.
  * Under a running clock they do not. The scorer can switch between the two at
  * any moment of the game (S-21, T-128).
+ *
+ * Three more rules, each off when the format leaves it out (step 2.67): a stop
+ * clock in the last seconds of a period, a half or the game, which a foul or a
+ * timeout stops even under a running clock; a mercy lead, at which a basket
+ * switches a stop clock to a running clock; and a personal foul limit, at which
+ * a player is marked out. The scorer's own switch overrides the first two.
  */
 
 export type Side = 'home' | 'away';
@@ -26,6 +32,10 @@ export const otherSide = (side: Side): Side => (side === 'home' ? 'away' : 'home
 /** Stop: a foul or a timeout stops the clock. Running: the clock keeps going through them. */
 export type ClockMode = 'stop' | 'running';
 export const CLOCK_MODES: readonly ClockMode[] = ['stop', 'running'];
+
+/** Where a last-minutes stop clock applies: the end of every period, of each half, or of the game. */
+export type StopClockScope = 'period' | 'half' | 'game';
+export const STOP_CLOCK_SCOPES: readonly StopClockScope[] = ['period', 'half', 'game'];
 
 export type Rules = {
   /** Regulation periods: 2 halves or 4 quarters. */
@@ -52,6 +62,19 @@ export type Rules = {
    * game saved before the mode existed was played; read it through `clockModeOf`.
    */
   clockMode?: ClockMode;
+  // The three rules below are off when absent or null, as in every game saved before them.
+  /**
+   * A stop clock in the last seconds of the scope: there a foul or a timeout stops
+   * the clock even under a running clock. Each overtime period counts, whatever the
+   * scope, since any of them can end the game. Read through `inLastMinutes`.
+   */
+  stopClockLastSeconds?: number | null;
+  /** Where those last seconds are. Absent means each half. */
+  stopClockScope?: StopClockScope;
+  /** A lead at which a basket switches a stop clock to a running clock. */
+  mercyLead?: number | null;
+  /** Personal fouls that mark a player out (`Line.fouledOut`). */
+  playerFoulLimit?: number | null;
 };
 export type TimeoutRules = Required<
   Pick<
@@ -124,6 +147,49 @@ export function timeoutRules(rules: Rules): TimeoutRules {
 export const clockModeOf = (rules: Rules): ClockMode =>
   rules.clockMode === 'running' ? 'running' : 'stop';
 
+/**
+ * Is `remainingMs` in `period` inside the format's last-minutes stop clock? Each
+ * half ends at the middle and the last regulation period (Q2 and Q4, or H1 and
+ * H2); each overtime period is always in scope.
+ */
+export function inLastMinutes(rules: Rules, period: number, remainingMs: number): boolean {
+  const seconds = rules.stopClockLastSeconds;
+  if (seconds == null || remainingMs > seconds * 1000) return false;
+  if (period > rules.periods) return true;
+  const scope = rules.stopClockScope ?? 'half';
+  if (scope === 'period') return true;
+  if (scope === 'game') return period === rules.periods;
+  return period === rules.periods || period === rules.periods / 2;
+}
+
+/**
+ * The clock mode in force at `remainingMs` of the current period: what the format,
+ * the mercy rule or the scorer chose (`Derived.clockMode`), except that inside the
+ * last-minutes stop clock it is a stop clock, unless the scorer switched to a
+ * running clock there themselves (S-21: the scorer overrides anything automatic).
+ * That switch holds for the rest of the window it was made in: it carries the
+ * `lastMinutes` flag from when it was made, so setting the clock back does not undo
+ * it, and any later change of period ends it. The tracker's switch shows this mode,
+ * and a foul or a timeout follows it.
+ */
+export function clockModeAt(
+  state: GameState,
+  d: Derived = derive(state),
+  remainingMs: number = state.clock.remainingMs,
+): ClockMode {
+  if (d.clockMode === 'stop') return 'stop';
+  if (!inLastMinutes(state.rules, d.period, remainingMs)) return 'running';
+  for (let i = state.plays.length - 1; i >= 0; i--) {
+    const p = state.plays[i]!;
+    // The mercy rule's switch is automatic, so the stop clock still holds after it.
+    if (p.mercyClock) break;
+    // A new period is a new window.
+    if (p.type === 'period') break;
+    if (p.type === 'clock-mode') return p.lastMinutes ? 'running' : 'stop';
+  }
+  return 'stop';
+}
+
 /** Players on the floor per team. */
 export const LINEUP_SIZE = 5;
 const MAX_PERIOD = 20;
@@ -177,6 +243,17 @@ export type Stamp = {
   prevClockMs?: number;
   /** This play stopped the running clock (a foul or a timeout under a stop clock). */
   stoppedClock?: true;
+  /**
+   * This basket brought the lead up to the mercy rule's and switched a stop clock to
+   * a running clock. The tracker says so; undoing the basket undoes the switch.
+   */
+  mercyClock?: true;
+  /**
+   * This switch to a running clock was made inside the last-minutes stop clock, so it
+   * holds for the rest of that window (`clockModeAt`). Set when made, so restamping
+   * the play's clock time later does not change it.
+   */
+  lastMinutes?: true;
 };
 export type LoggedPlay = Play & Stamp;
 
@@ -213,6 +290,12 @@ export type Line = {
   turnovers: number;
   ms: number;
   appeared: boolean;
+  /**
+   * The player has the format's personal foul limit or more fouls standing. Only set
+   * then, so a game without a limit reads as before. It marks the player; it does not
+   * take them off the floor or stop them coming back, which stays the scorer's call.
+   */
+  fouledOut?: true;
 };
 export type TeamView = {
   score: number;
@@ -239,7 +322,11 @@ export type TeamView = {
 };
 export type Derived = {
   period: number;
-  /** The clock mode now: the format's, or the latest switch still standing. */
+  /**
+   * The game's clock mode: the format's, or the latest switch still standing, the
+   * scorer's own or the mercy rule's. Inside the last-minutes stop clock the mode in
+   * force can differ: read that through `clockModeAt`.
+   */
   clockMode: ClockMode;
   periodStartElapsedMs: number;
   teams: Record<Side, TeamView>;
@@ -350,6 +437,7 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
         else l.fg3 += 1;
         l.appeared = true;
         teams[play.side].score += play.points;
+        if (play.mercyClock) clockMode = 'running';
         break;
       }
       case 'foul': {
@@ -422,6 +510,10 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
       const from = since[id];
       if (from !== undefined) line(id, side).ms += Math.max(0, elapsedNowMs - from);
     }
+
+  const limit = state.rules.playerFoulLimit;
+  if (limit != null)
+    for (const l of Object.values(players)) if (l.fouls >= limit) l.fouledOut = true;
 
   // Team fouls reset each period; overtime continues the last regulation period's count.
   const bucket = (p: number) => Math.min(p, state.rules.periods);
@@ -594,7 +686,8 @@ export function apply(state: GameState, command: Command, { id, now }: Context):
 
 function record(s: GameState, input: Play, id: string, at: number) {
   const d = derive(s);
-  const play = checkPlay(input, d, s.rules);
+  const mode = clockModeAt(s, d);
+  const play = checkPlay(input, d, s.rules, mode);
   const stamp = {
     id,
     at,
@@ -612,10 +705,18 @@ function record(s: GameState, input: Play, id: string, at: number) {
       clockMs: s.clock.remainingMs,
       prevClockMs,
     });
-  } else if (STOPS_CLOCK.has(play.type) && s.clock.running && d.clockMode === 'stop') {
+  } else if (STOPS_CLOCK.has(play.type) && s.clock.running && mode === 'stop') {
     // The whistle stops the clock where the play happened; the scorer starts it again.
     s.clock = { ...s.clock, running: false };
     s.plays.push({ ...play, ...stamp, stoppedClock: true });
+  } else if (play.type === 'score' && reachesMercy(s.rules, d, play)) {
+    s.plays.push({ ...play, ...stamp, mercyClock: true });
+  } else if (
+    play.type === 'clock-mode' &&
+    play.mode === 'running' &&
+    inLastMinutes(s.rules, d.period, s.clock.remainingMs)
+  ) {
+    s.plays.push({ ...play, ...stamp, lastMinutes: true });
   } else s.plays.push({ ...play, ...stamp });
   s.redo = [];
   // Setting lineups or the clock mode before tip-off does not make the game live for
@@ -624,11 +725,28 @@ function record(s: GameState, input: Play, id: string, at: number) {
     s.status = 'live';
 }
 
+/**
+ * Does this basket switch the game to a running clock under the mercy rule? Only when
+ * the clock stops on fouls and the lead goes from below the mercy lead to it or past it.
+ * A lead already there does not switch again, so a scorer who switched back keeps a
+ * stop clock until the lead drops below and reaches it once more.
+ */
+function reachesMercy(rules: Rules, d: Derived, play: Extract<Play, { type: 'score' }>): boolean {
+  const lead = rules.mercyLead;
+  if (lead == null || d.clockMode !== 'stop') return false;
+  const own = d.teams[play.side].score;
+  const other = d.teams[otherSide(play.side)].score;
+  return Math.abs(own - other) < lead && Math.abs(own + play.points - other) >= lead;
+}
+
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length < 100;
 const isSide = (v: unknown): v is Side => v === 'home' || v === 'away';
 
-/** A clean copy of a play, holding only the fields it should, or a TrackerError. */
-function checkPlay(input: Play, d: Derived, rules: Rules): Play {
+/**
+ * A clean copy of a play, holding only the fields it should, or a TrackerError.
+ * `mode` is the clock mode in force (`clockModeAt`), which a switch must change.
+ */
+function checkPlay(input: Play, d: Derived, rules: Rules, mode: ClockMode): Play {
   if (input.type === 'period') {
     const period = input.period;
     if (!Number.isInteger(period) || period < 1 || period > MAX_PERIOD) fail('Pick a period.');
@@ -636,15 +754,15 @@ function checkPlay(input: Play, d: Derived, rules: Rules): Play {
     return { type: 'period', period };
   }
   if (input.type === 'clock-mode') {
-    const mode = input.mode;
-    if (mode !== 'stop' && mode !== 'running') fail('Pick a stop clock or a running clock.');
-    if (mode === d.clockMode)
+    const next = input.mode;
+    if (next !== 'stop' && next !== 'running') fail('Pick a stop clock or a running clock.');
+    if (next === mode)
       fail(
-        mode === 'running'
+        next === 'running'
           ? 'The clock is already running through fouls.'
           : 'The clock already stops on fouls.',
       );
-    return { type: 'clock-mode', mode };
+    return { type: 'clock-mode', mode: next };
   }
   if (!isSide(input.side)) fail('Unknown team.');
   const side = input.side;
@@ -722,6 +840,18 @@ function checkRules(rules: Rules): Rules {
   if (typeof t.timeoutsCarry !== 'boolean') fail('Say whether unused timeouts carry over.');
   if (r.clockMode !== undefined && r.clockMode !== 'stop' && r.clockMode !== 'running')
     fail('Pick a stop clock or a running clock.');
+  const given = <T>(v: T | null | undefined): v is T => v !== undefined && v !== null;
+  if (
+    given(r.stopClockLastSeconds) &&
+    !whole(r.stopClockLastSeconds, 1, Math.min(600, r.periodSeconds))
+  )
+    fail('The last-minutes stop clock runs 1 second to 10 minutes, and no longer than a period.');
+  if (r.stopClockScope !== undefined && !STOP_CLOCK_SCOPES.includes(r.stopClockScope))
+    fail('The last-minutes stop clock is at the end of each period, each half or the game.');
+  if (given(r.mercyLead) && !whole(r.mercyLead, 1, 100))
+    fail('The mercy rule starts at a lead of 1 to 100 points.');
+  if (given(r.playerFoulLimit) && !whole(r.playerFoulLimit, 1, 20))
+    fail('A player fouls out after 1 to 20 fouls, or never.');
   return {
     periods: r.periods,
     periodSeconds: r.periodSeconds,
@@ -731,6 +861,11 @@ function checkRules(rules: Rules): Rules {
     ...t,
     // Kept only when given, so a format from before the mode existed stays as it was.
     ...(r.clockMode !== undefined ? { clockMode: r.clockMode } : {}),
+    // The same for each rule below; null, which also means off, is dropped.
+    ...(given(r.stopClockLastSeconds) ? { stopClockLastSeconds: r.stopClockLastSeconds } : {}),
+    ...(r.stopClockScope !== undefined ? { stopClockScope: r.stopClockScope } : {}),
+    ...(given(r.mercyLead) ? { mercyLead: r.mercyLead } : {}),
+    ...(given(r.playerFoulLimit) ? { playerFoulLimit: r.playerFoulLimit } : {}),
   };
 }
 

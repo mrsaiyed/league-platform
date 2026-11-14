@@ -133,6 +133,7 @@ How the grid works (built in step 2.64):
 - A single game can be given different rules before it starts.
 - During a game the clock mode can be switched at any moment, and the clock, period, fouls and score can always be corrected by hand.
 - Built first: the clock mode and its switch, stopping on fouls, the mercy rule, a stop clock in the last minutes, and the personal foul limit. Timeouts and technical fouls follow when a league asks for them.
+- How those rules meet (decided for you, S-28 to S-32): every overtime period ends in the last-minutes stop clock; the scorekeeper's switch to a running clock inside those last minutes lasts until they end; inside them the stop clock wins over the mercy rule; the mercy rule switches again only after the lead drops below the number, and the scorekeeper switches back by hand; a player at the foul limit is marked out, but the tracker does not take them off the floor or keep them off.
 - This is built in stage 2, after the demo cut. It does not hold up the demo, because the clock can always be stopped by hand, as it is today.
 
 ### 5.3 What fans see
