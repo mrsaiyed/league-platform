@@ -1,6 +1,12 @@
 // T-30: every setting and secret the web app needs, and the one function that checks
 // them. It takes the environment as an argument and never reads process.env itself,
 // so tests can hand it any set of values. config.ts reads the real environment once.
+import {
+  platformDatabaseProblem,
+  platformServiceProblem,
+  trackerProjectProblem,
+  type TrackerGuardFacts,
+} from '@srleagues/providers';
 import { z } from 'zod';
 
 export type ConfigField = {
@@ -113,28 +119,13 @@ const platformAddresses = ['PLATFORM_DATABASE_URL', 'SUPABASE_URL'] as const;
 export type ConfigGuard = {
   /**
    * The project reference of the tracker's Supabase project, from supabase/site.json
-   * (config.ts reads it when the app starts), or null when that file could not be
-   * read: then staging and production refuse to start, since their addresses cannot
-   * be checked against it. That project holds real games; the platform never uses it.
+   * (config.ts reads it when the app starts, trackerProjectFor), or null when that
+   * file could not be read: then staging and production refuse to start, since their
+   * addresses cannot be checked against it. That project holds real games; the
+   * platform never uses it.
    */
   readonly trackerProject: string | null;
 };
-
-/**
- * The project reference in supabase/site.json's text (`https://{ref}.supabase.co`),
- * or null for anything else. Reads text only; never opens the address.
- */
-export function trackerProjectOf(siteJson: string): string | null {
-  let url: unknown;
-  try {
-    url = (JSON.parse(siteJson) as { url?: unknown } | null)?.url;
-  } catch {
-    return null;
-  }
-  if (typeof url !== 'string' || !URL.canParse(url)) return null;
-  const ref = /^([a-z0-9]{15,})\.supabase\.co$/.exec(new URL(url).hostname)?.[1];
-  return ref ?? null;
-}
 
 export class ConfigError extends Error {
   readonly missing: readonly string[];
@@ -161,8 +152,9 @@ export class ConfigError extends Error {
  *
  * The platform's database and Supabase addresses must be neither the tracker's
  * DATABASE_URL nor any address naming the tracker's Supabase project (`guard`), so
- * the app refuses to start before it opens any connection. Without a guard (tests of
- * other rules) only DATABASE_URL is compared.
+ * the app refuses to start before it opens any connection; the tracker's database
+ * guard (packages/providers, record 055) says every spelling it refuses. Without a
+ * guard (tests of other rules) the project is not compared.
  */
 export function loadConfig(
   env: Readonly<Record<string, string | undefined>>,
@@ -186,26 +178,20 @@ export function loadConfig(
       invalid.set(name, `${name}: missing, must be set when APP_ENV is ${appEnv}`);
     }
   }
-  const trackerDatabase = env['DATABASE_URL']?.trim();
-  const trackerProject = guard?.trackerProject?.toLowerCase();
-  for (const name of platformAddresses) {
-    const value = given[name]?.trim();
-    if (value === undefined) continue;
-    if (trackerDatabase !== undefined && trackerDatabase !== '' && value === trackerDatabase) {
-      invalid.set(name, `${name}: invalid, must not be the tracker's database (DATABASE_URL)`);
-    } else if (trackerProject !== undefined && value.toLowerCase().includes(trackerProject)) {
-      invalid.set(
-        name,
-        `${name}: invalid, must not name the tracker's Supabase project (supabase/site.json)`,
-      );
-    }
-  }
-  if (guard?.trackerProject === null && (appEnv === 'staging' || appEnv === 'production')) {
-    invalid.set(
-      'supabase/site.json',
-      `supabase/site.json: could not be read, so ${platformAddresses.join(' and ')} cannot be checked against the tracker's project`,
-    );
-  }
+  // The tracker's database guard (packages/providers, shared with the worker).
+  const facts: TrackerGuardFacts = { env, appEnv, trackerProject: guard?.trackerProject };
+  const database = given['PLATFORM_DATABASE_URL'];
+  const databaseProblem =
+    database === undefined
+      ? undefined
+      : platformDatabaseProblem('PLATFORM_DATABASE_URL', database, facts);
+  if (databaseProblem !== undefined) invalid.set('PLATFORM_DATABASE_URL', databaseProblem);
+  const service = given['SUPABASE_URL'];
+  const serviceProblem =
+    service === undefined ? undefined : platformServiceProblem('SUPABASE_URL', service, facts);
+  if (serviceProblem !== undefined) invalid.set('SUPABASE_URL', serviceProblem);
+  const fileProblem = trackerProjectProblem(platformAddresses, facts);
+  if (fileProblem !== undefined) invalid.set('supabase/site.json', fileProblem);
   // Only for a known APP_ENV: an unknown one is reported as itself, not as this.
   const knownEnv = appEnvs.find((known) => known === appEnv);
   for (const [name, environments] of Object.entries(onlyIn)) {

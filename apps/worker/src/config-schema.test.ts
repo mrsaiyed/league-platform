@@ -1,5 +1,6 @@
 // T-30: the worker's settings are checked once at start-up; a problem names the
 // setting and never its value. All values here are made up.
+import { trackerProjectOf } from '@srleagues/providers';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
@@ -7,6 +8,7 @@ import {
   loadWorkerConfig,
   WorkerConfigError,
   workerFields,
+  type WorkerConfigGuard,
 } from './config-schema.ts';
 
 const local = {
@@ -22,9 +24,12 @@ const production = {
   RESEND_API_KEY: 're_made_up_key',
 };
 
-function failure(env: Record<string, string | undefined>): WorkerConfigError {
+function failure(
+  env: Record<string, string | undefined>,
+  guard?: WorkerConfigGuard,
+): WorkerConfigError {
   try {
-    loadWorkerConfig(env);
+    loadWorkerConfig(env, guard);
   } catch (error) {
     if (error instanceof WorkerConfigError) return error;
     throw error;
@@ -70,6 +75,64 @@ describe('loadWorkerConfig', () => {
     expect(Object.values(loadWorkerConfig({ ...local, DATABASE_URL: tracker }))).not.toContain(
       tracker,
     );
+  });
+
+  it('refuses the tracker’s database before anything connects, as the web app does (record 055)', () => {
+    const tracker = 'postgres://postgres:tracker-made-up@tracker.example.test:5432/postgres';
+    for (const url of [
+      tracker,
+      'postgres://postgres:other-made-up@TRACKER.example.test/postgres',
+    ]) {
+      for (const appEnv of ['local', 'staging', 'production']) {
+        const error = failure({
+          ...production,
+          APP_ENV: appEnv,
+          PLATFORM_DATABASE_URL: url,
+          DATABASE_URL: tracker,
+        });
+        expect(error.invalid).toEqual([
+          "PLATFORM_DATABASE_URL: invalid, must not be the tracker's database (DATABASE_URL)",
+        ]);
+        expect(error.message).not.toContain('made-up');
+      }
+    }
+  });
+
+  it('refuses the tracker’s Supabase project however the address spells it (record 055)', () => {
+    const site = readFileSync(new URL('../../../supabase/site.json', import.meta.url), 'utf8');
+    const ref = trackerProjectOf(site) ?? 'none';
+    const guard = { trackerProject: ref };
+    const encoded = `%${ref.charCodeAt(0).toString(16)}${ref.slice(1)}`;
+    for (const url of [
+      `postgres://postgres:made-up-pw@db.${ref}.supabase.co:5432/postgres`,
+      `postgres://postgres.${encoded}:made-up-pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres`,
+      `postgres://made-up:made-up-pw@pooler.example.test:6543/postgres?user=postgres.${ref}`,
+    ]) {
+      const error = failure({ ...production, PLATFORM_DATABASE_URL: url }, guard);
+      expect(error.invalid).toEqual([
+        "PLATFORM_DATABASE_URL: invalid, must not name the tracker's Supabase project (supabase/site.json)",
+      ]);
+      expect(error.message).not.toContain('made-up-pw');
+      expect(error.message).not.toContain(ref);
+    }
+    expect(
+      failure({ ...production, PLATFORM_DATABASE_URL: 'postgres://a:made-up-pw@10.0.0.1/x' }, guard)
+        .invalid,
+    ).toEqual([
+      'PLATFORM_DATABASE_URL: invalid, must name its server by a host name, not an IP address, when APP_ENV is production',
+    ]);
+    expect(loadWorkerConfig(production, guard).APP_ENV).toBe('production');
+  });
+
+  it('refuses staging and production when supabase/site.json could not be read', () => {
+    for (const appEnv of ['staging', 'production']) {
+      expect(failure({ ...production, APP_ENV: appEnv }, { trackerProject: null }).invalid).toEqual(
+        [
+          "supabase/site.json: could not be read, so PLATFORM_DATABASE_URL cannot be checked against the tracker's project",
+        ],
+      );
+    }
+    expect(loadWorkerConfig(local, { trackerProject: null }).APP_ENV).toBe('local');
   });
 
   it('takes health port 0 (any free port) only in tests', () => {

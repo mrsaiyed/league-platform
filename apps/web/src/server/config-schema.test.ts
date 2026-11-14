@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { trackerProjectOf } from '@srleagues/providers';
 import {
   ConfigError,
   fields,
   loadConfig,
-  trackerProjectOf,
   type ConfigGuard,
   type ConfigName,
 } from './config-schema.ts';
@@ -212,6 +212,43 @@ describe('loadConfig', () => {
     expect(loadConfig(production, guard).APP_ENV).toBe('production');
   });
 
+  it('refuses the tracker’s project however the database address spells it (record 055)', () => {
+    const site = readFileSync(new URL('../../../../supabase/site.json', import.meta.url), 'utf8');
+    const ref = trackerProjectOf(site) ?? 'none';
+    const guard = { trackerProject: ref };
+    const encoded = `%${ref.charCodeAt(0).toString(16)}${ref.slice(1)}`;
+    const refusal =
+      "PLATFORM_DATABASE_URL: invalid, must not name the tracker's Supabase project (supabase/site.json)";
+    for (const url of [
+      `postgres://postgres.${encoded}:made-up-pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres`,
+      `postgres://made-up:made-up-pw@pooler.example.test:6543/postgres?user=postgres.${encoded}`,
+      `postgres://made-up:made-up-pw@elsewhere.example.test/postgres?host=db.${ref}.supabase.co`,
+    ]) {
+      const error = failure({ ...production, PLATFORM_DATABASE_URL: url }, guard);
+      expect(error.invalid).toEqual([refusal]);
+      expect(error.message).not.toContain('made-up-pw');
+      expect(error.message).not.toContain(ref);
+    }
+    // In staging and production: no address as the host, nor a place left to PGHOST.
+    for (const appEnv of ['staging', 'production']) {
+      const env = { ...production, APP_ENV: appEnv, RESEND_API_KEY: valid.RESEND_API_KEY };
+      expect(
+        failure({ ...env, PLATFORM_DATABASE_URL: 'postgres://a:made-up-pw@[::1]:5432/x' }, guard)
+          .invalid,
+      ).toEqual([
+        `PLATFORM_DATABASE_URL: invalid, must name its server by a host name, not an IP address, when APP_ENV is ${appEnv}`,
+      ]);
+      expect(
+        failure(
+          { ...env, PLATFORM_DATABASE_URL: 'postgres:///postgres', PGHOST: 'db.example.test' },
+          guard,
+        ).invalid,
+      ).toEqual([
+        'PLATFORM_DATABASE_URL: invalid, must give its own host: PGHOST is set and would decide it',
+      ]);
+    }
+  });
+
   it('refuses staging and production when the tracker’s project could not be read', () => {
     const guard = { trackerProject: null };
     for (const appEnv of ['staging', 'production']) {
@@ -220,23 +257,6 @@ describe('loadConfig', () => {
       ]);
     }
     expect(loadConfig(localOnly, guard).APP_ENV).toBe('local');
-  });
-
-  it('reads the project reference only from a Supabase address in site.json', () => {
-    expect(trackerProjectOf('{"url":"https://abcdefghijklmnopqrst.supabase.co"}')).toBe(
-      'abcdefghijklmnopqrst',
-    );
-    for (const bad of [
-      'not json',
-      'null',
-      '{}',
-      '{"url":42}',
-      '{"url":"not an address"}',
-      '{"url":"https://short.supabase.co"}',
-      '{"url":"https://abcdefghijklmnopqrst.example.test"}',
-    ]) {
-      expect(trackerProjectOf(bad)).toBeNull();
-    }
   });
 
   it('takes LOCAL_DATA in local work and tests only (record 055)', () => {

@@ -453,9 +453,10 @@ const staging = start(['start', '--port', String(await freePort())], {
   APP_ENV: 'staging',
   PUBLIC_BASE_URL: 'https://staging.example.test',
   // Required in staging (config-schema.ts), so the settings check passes and the
-  // database is reached. All made up: the address answers nobody on this computer.
+  // database is reached. All made up: the address answers nobody on this computer. A
+  // host name, as staging refuses an IP address as the host (record 055).
   TRUSTED_PROXY: 'one',
-  PLATFORM_DATABASE_URL: 'postgres://made-up:made-up-password@127.0.0.1:1/nowhere',
+  PLATFORM_DATABASE_URL: 'postgres://made-up:made-up-password@localhost:1/nowhere',
   SUPABASE_URL: 'http://localhost:54321',
   SUPABASE_SECRET_KEY: 'made-up-supabase-secret-key',
 });
