@@ -44,11 +44,13 @@ The split between these tables is what makes "one account, many leagues", "admin
 
 | Table            | What a row is                                              | Key columns                                                                                                                                                                  |
 | ---------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `accounts`       | A sign-in. One per email. Not tied to any league.          | `email`, `display_name`, `phone`, `last_seen_at`                                                                                                                             |
+| `accounts`       | A sign-in. One per email. Not tied to any league.          | `email`, `display_name`, `phone`, `last_seen_at`, `sign_in_id` (the sign-in service's own id for the person, T-256)                                                          |
 | `profiles`       | A human being an account can act for: yourself, or a child | `first_name`, `last_name`, `birth_date`                                                                                                                                      |
 | `profile_access` | Which account may act for which profile                    | `account_id`, `profile_id`, `relation` (self or guardian)                                                                                                                    |
 | `people`         | A person **as one league knows them**                      | `league_id`, `profile_id` (empty until linked), `first_name`, `last_name`, `public_name`, `contact_email`, `birth_date`, `is_minor`, `visibility`, `photo`, `merged_into_id` |
 | `follows`        | An account following a team                                | `account_id`, `league_id`, `team_id`                                                                                                                                         |
+
+Our account ids are our own (T-41); the sign-in service's id is only a link beside them, written by owner-run functions, and an account made before its owner first signs in is linked by its address then ([record 052](../../../architecture/decisions/052-accounts-on-the-real-database.md), T-256). What the sign-in adapter keeps for itself (devices, sessions, counts) is in a schema of its own, `sign_in`, outside these tables.
 
 A person added by hand is a `people` row with an empty `profile_id`. Claiming or registering fills it in. Statistics and rosters point at `people`, so nothing moves when the link is made.
 
