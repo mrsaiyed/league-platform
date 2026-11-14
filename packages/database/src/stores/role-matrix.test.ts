@@ -1063,7 +1063,8 @@ const divisionAndVenueRows: readonly Row[] = [
   ...divisionRows(
     'leagues.restore_team',
     'restore a team',
-    'bin.restore',
+    // A-5: what removing a team needs.
+    'teams.manage',
     async (league, program) => {
       const seasonId = await seasonIn(league, program);
       const teamId = await newTeam(pglite, league.leagueId, seasonId);
@@ -1075,7 +1076,8 @@ const divisionAndVenueRows: readonly Row[] = [
   ...divisionRows(
     'leagues.restore_game',
     'restore a game',
-    'bin.restore',
+    // A-5: what removing a game needs (only publishing removes one).
+    'schedule.publish',
     async (league, program) => {
       const { gameId } = await gameIn(league, program, { deleted_at: new Date() });
       return { gameId };
@@ -1085,7 +1087,8 @@ const divisionAndVenueRows: readonly Row[] = [
   {
     command: 'leagues.restore_person',
     name: 'restore a person',
-    needs: 'bin.restore',
+    // A-5: what removing a person needs.
+    needs: 'people.manage',
     prepare: async (league) => {
       const personId = await newPerson(pglite, league.leagueId);
       await pglite.query('update people set deleted_at = now() where id = $1', [personId]);

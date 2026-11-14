@@ -3,6 +3,8 @@
 // or reopened, not restored (S-7). The game number and outside reference do not hold
 // their place in the bin, so another game may have taken one; a game whose team,
 // division, venue or court is still in the bin stays there until that is back.
+// Whoever may remove a game may restore it (A-5): only publishing removes one, so
+// `schedule.publish` at its season's program, as `scheduling.publish_schedule` needs.
 import { z } from 'zod';
 import { leagueScope, recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -22,13 +24,14 @@ const neverPlayed = ['scheduled', 'postponed', 'cancelled'];
 
 export const restoreGame = defineCommand({
   name: 'leagues.restore_game',
-  permission: 'bin.restore',
+  permission: 'schedule.publish',
   input: z.object({ gameId: z.uuid() }),
   allowed: async (context, input, tx: BinTx) => {
     const game = await tx.bin.findGame(input.gameId);
     return mayRestore(
       context,
       tx,
+      'schedule.publish',
       game === undefined ? leagueScope : await binSeasonScope(tx, game.seasonId),
     );
   },

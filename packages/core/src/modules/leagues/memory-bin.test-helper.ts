@@ -5,7 +5,7 @@ import {
   memoryTransaction,
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
-import type { ActivityEntry, Grant } from '../access/index.ts';
+import type { ActivityEntry, Grant, Role } from '../access/index.ts';
 import { binCutoff, type BinCounts, type BinTx } from './bin.ts';
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -37,6 +37,16 @@ export type MemoryBin = {
   grants: Grant[];
   activity: ActivityEntry[];
 };
+
+/** A league-wide grant of `role` to `accountId`, in force. */
+export const grantOf = (accountId: string, role: Role): Grant => ({
+  id: `g-${accountId}`,
+  accountId,
+  role,
+  scope: { type: 'league' },
+  grantedByAccountId: null,
+  revokedAt: null,
+});
 
 export function memoryBin(state: Partial<MemoryBin> = {}) {
   const db = memoryDatabase<MemoryBin>({

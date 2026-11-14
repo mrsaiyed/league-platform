@@ -1,7 +1,8 @@
 // Brings a person's league record back from the bin (A-5). A person is linked to one
 // account at most (0008), and the link lets go while they are in the bin, so the
 // account may belong to another person now: then this says so. Restoring a person who
-// is not in the bin changes nothing.
+// is not in the bin changes nothing. Whoever may remove a person may restore them
+// (A-5): `people.manage`, as `people.remove_person` needs, so a registrar can.
 import { z } from 'zod';
 import { leagueScope, recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -12,10 +13,10 @@ export type RestorePersonError = { readonly code: 'person-not-found' | 'person-p
 
 export const restorePerson = defineCommand({
   name: 'leagues.restore_person',
-  permission: 'bin.restore',
+  permission: 'people.manage',
   input: z.object({ personId: z.uuid() }),
   // People are the league's, not a program's (P4 §3): checked league-wide.
-  allowed: (context, _input, tx: BinTx) => mayRestore(context, tx, leagueScope),
+  allowed: (context, _input, tx: BinTx) => mayRestore(context, tx, 'people.manage', leagueScope),
   run: async ({
     context,
     input,

@@ -2,7 +2,8 @@
 // touched. A short name or name in the bin does not hold its place, so another team
 // may have taken it since: then this says so and the admin renames one of them. A team
 // whose division is still in the bin stays there until the division is back. Restoring
-// a team that is not in the bin changes nothing.
+// a team that is not in the bin changes nothing. Whoever may remove a team may restore
+// it (A-5): `teams.manage` at its season's program, as `teams.remove_team` needs.
 import { z } from 'zod';
 import { leagueScope, recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -19,13 +20,14 @@ export type RestoreTeamError = {
 
 export const restoreTeam = defineCommand({
   name: 'leagues.restore_team',
-  permission: 'bin.restore',
+  permission: 'teams.manage',
   input: z.object({ teamId: z.uuid() }),
   allowed: async (context, input, tx: BinTx) => {
     const team = await tx.bin.findTeam(input.teamId);
     return mayRestore(
       context,
       tx,
+      'teams.manage',
       team === undefined ? leagueScope : await binSeasonScope(tx, team.seasonId),
     );
   },

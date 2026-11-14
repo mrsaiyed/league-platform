@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { memoryBin, ownerId, teamId } from '../memory-bin.test-helper.ts';
+import { grantOf, memoryBin, ownerId, teamId } from '../memory-bin.test-helper.ts';
 import { restoreGame } from './restore-game.ts';
 
 const binnedAt = '2026-01-01T00:00:00.000Z';
@@ -47,5 +47,16 @@ describe('restoreGame', () => {
     expect(await restoreGame(as('someone'), { gameId: id }, deps)).toMatchObject({
       error: { code: 'not-allowed' },
     });
+  });
+
+  it('lets a scheduler restore, as their publish removed it (A-5), but not a registrar', async () => {
+    const { deps, as } = memoryBin({
+      things: [{ id, kind: 'game', name: 'A v B', binnedAt, status: 'scheduled' }],
+      grants: [grantOf('reg', 'registrar'), grantOf('sch', 'scheduler')],
+    });
+    expect(await restoreGame(as('reg'), { gameId: id }, deps)).toMatchObject({
+      error: { code: 'not-allowed' },
+    });
+    expect(await restoreGame(as('sch'), { gameId: id }, deps)).toMatchObject({ ok: true });
   });
 });
