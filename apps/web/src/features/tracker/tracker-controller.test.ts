@@ -69,6 +69,8 @@ function device(
     deviceId,
     storage,
     clock,
+    // The device never sleeps here: its wall clock keeps pace with its steady clock.
+    wallClock: clock.now,
     newCommandId,
     random: () => 1,
     transport: createFetchCommandTransport({
@@ -1681,7 +1683,7 @@ describe('tracker controller: which taps wait, and the last save (finding L1)', 
  * A server whose clock is `aheadMs` ahead of the device's, answering a session request
  * `up` ms after it is sent (when it stamps its time) and `down` ms after that.
  */
-function timedServer(clock: ManualClock, aheadMs: number) {
+function timedServer(clock: ManualClock, aheadMs: number, slept: () => number = () => 0) {
   const legs = { up: 100, down: 100 };
   const sessionId = '01900000-0000-7000-8000-0000000000c1';
   const server: TrackerServer = {
@@ -1690,7 +1692,8 @@ function timedServer(clock: ManualClock, aheadMs: number) {
         const up = legs.up;
         const down = legs.down;
         clock.after(up, () => {
-          const sentAt = clock.now() + aheadMs;
+          // The server's clock ran on while the device slept; the device's steady one did not.
+          const sentAt = clock.now() + aheadMs + slept();
           const value = {
             status: 'held-by-you' as const,
             sessionId,
@@ -1716,6 +1719,115 @@ async function until(clock: ManualClock, work: Promise<unknown>) {
   await work;
 }
 
+/**
+ * A controller on a timed server whose device can sleep: `sleep(ms)` moves the wall
+ * clock and the server's clock on while the steady clock stands still, as an iPad's
+ * does; `setWall(ms)` changes the wall clock by hand.
+ */
+function sleepyDevice() {
+  const clock = createManualClock();
+  const ahead = 30_000;
+  let slept = 0;
+  let handChange = 0;
+  const { legs, server } = timedServer(clock, ahead, () => slept);
+  const sessions: number[] = [];
+  const counted: TrackerServer = {
+    session: (request, signal) => {
+      sessions.push(clock.now());
+      return server.session(request, signal);
+    },
+    loadState: (signal) => server.loadState(signal),
+  };
+  const queueServer = createFakeServer(clock);
+  const controller = createTrackerController({
+    gameId,
+    deviceId: 'tablet-1',
+    storage: createMemoryQueueStorage(),
+    transport: queueServer.transport,
+    server: counted,
+    clock,
+    wallClock: () => clock.now() + slept + handChange,
+    newCommandId,
+    random: () => 1,
+  });
+  return {
+    clock,
+    legs,
+    controller,
+    queueServer,
+    sessions,
+    serverTime: () => clock.now() + ahead + slept,
+    sleep: (ms: number) => void (slept += ms),
+    setWall: (ms: number) => void (handChange += ms),
+  };
+}
+
+describe('tracker controller: a device that sleeps (the second review’s Medium)', () => {
+  it('a five-minute sleep with no signal: taps are timed right before any reply', async () => {
+    const d = sleepyDevice();
+    d.legs.up = 20;
+    d.legs.down = 20;
+    await until(d.clock, d.controller.start());
+    await until(d.clock, d.controller.idle());
+    await tapAll(d.controller, tipOff);
+    expect(d.controller.status().now()).toBe(d.serverTime());
+    // No signal from here on: nothing will answer.
+    d.legs.up = 60_000;
+    // Locked at half-time for five minutes; the steady clock stood still.
+    d.sleep(5 * minute);
+    expect(d.controller.status().now()).toBe(d.serverTime());
+    const expected = d.serverTime();
+    await tapAll(d.controller, [basket('home', hawks[0] ?? '')]);
+    const sent = () =>
+      d.queueServer.received
+        .flatMap((batch) => batch.commands)
+        .find((c) => c.input.type === 'score');
+    await expect.poll(sent).toBeDefined();
+    expect(sent()?.at).toBe(expected);
+    // Less sure than measured, by the margin a sleep is told by.
+    expect(d.controller.status().clockErrorMs).toBe(20 + 3_000);
+    // The release gets no answer either: it is given up after its time.
+    await until(d.clock, d.controller.leave());
+  });
+
+  it('a wall clock put back an hour by hand, set right again, or on by a second, does not move now()', async () => {
+    const d = sleepyDevice();
+    d.legs.up = 20;
+    d.legs.down = 20;
+    await until(d.clock, d.controller.start());
+    await until(d.clock, d.controller.idle());
+    const before = d.controller.status().now();
+    d.setWall(-60 * minute);
+    expect(d.controller.status().now()).toBe(before);
+    // Set right again an hour later (by hand, or the network's time): not a sleep.
+    d.setWall(60 * minute);
+    expect(d.controller.status().now()).toBe(before);
+    d.setWall(1_000);
+    expect(d.controller.status().now()).toBe(before);
+    expect(d.controller.status().clockErrorMs).toBe(20);
+    await until(d.clock, d.controller.leave());
+  });
+
+  it('awake() carries the time on across the sleep, and renews the session at once', async () => {
+    const d = sleepyDevice();
+    d.legs.up = 20;
+    d.legs.down = 20;
+    await until(d.clock, d.controller.start());
+    await until(d.clock, d.controller.idle());
+    const asked = d.sessions.length;
+    d.sleep(5 * minute);
+    // The page is shown again: nobody has read the time yet.
+    d.controller.awake();
+    expect(d.sessions.length).toBe(asked + 1);
+    expect(d.controller.status().now()).toBe(d.serverTime());
+    await until(d.clock, d.controller.idle());
+    // Measured again: as close as before the sleep.
+    expect(d.controller.status().clockErrorMs).toBe(20);
+    expect(d.controller.status().now()).toBe(d.serverTime());
+    await until(d.clock, d.controller.leave());
+  });
+});
+
 describe('tracker controller: the server’s time (finding M1)', () => {
   it('with the device 30 seconds slow, now() gives the server’s time within the measured error', async () => {
     const clock = createManualClock();
@@ -1729,6 +1841,7 @@ describe('tracker controller: the server’s time (finding M1)', () => {
       transport: queueServer.transport,
       server,
       clock,
+      wallClock: clock.now,
       newCommandId,
       random: () => 1,
     });
@@ -1784,6 +1897,7 @@ describe('tracker controller: the server’s time (finding M1)', () => {
       transport: createFakeServer(clock).transport,
       server,
       clock,
+      wallClock: clock.now,
       newCommandId,
       random: () => 1,
     });

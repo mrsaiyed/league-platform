@@ -30,8 +30,10 @@
 //   changing the device's clock moves nothing). The closest measurement is kept, and it
 //   counts as less sure as it ages, so a fresh one still replaces it in time; one that
 //   disagrees with it beyond both their errors replaces it at once (finding L4). `now()`
-//   never goes backwards, so the painted clock never ticks back. Taps are timed by it,
-//   and the screens paint the clock from it.
+//   never goes backwards, so the painted clock never ticks back. A sleep that stopped
+//   the steady clock (iPads, Macs) is told from the wall clock running ahead of it and
+//   carried over at once; `awake()` then measures again. Taps are timed by it, and the
+//   screens paint the clock from it.
 import {
   sessionRenewSeconds,
   type SessionReply,
@@ -180,6 +182,11 @@ export type TrackerControllerOptions = {
   readonly server: TrackerServer;
   /** The steady clock the server's time is measured against (finding M3), and the timers. */
   readonly clock?: QueueClock;
+  /**
+   * The device's wall clock (Date.now()), read only to tell that the device slept while
+   * its steady clock stood still; never to time anything.
+   */
+  readonly wallClock?: () => number;
   /** A new command ID, a UUID in lower case. */
   readonly newCommandId?: () => string;
   readonly random?: () => number;
@@ -207,6 +214,13 @@ export type TrackerController = {
   openAgain(): Promise<void>;
   /** The network is back: send now and renew the session. */
   online(): void;
+  /**
+   * The page is shown again (`visibilitychange` to visible): the device may have slept.
+   * The server's time is carried on across the sleep at once, then the session renewed
+   * and what waits sent, as `online` does, so the time is measured again. The tracker
+   * page wires it (step 2.38); this lane has no page.
+   */
+  awake(): void;
   /** The scorekeeper has seen the refused taps: they are dropped for good. */
   dismissNotApplied(): Promise<void>;
   /** The scorekeeper has seen the taps not saved: they are dropped for good. */
@@ -300,6 +314,13 @@ const lowerUuid = (): string => globalThis.crypto.randomUUID().toLowerCase();
  */
 const clockAgingPerMs = 1 / 900;
 
+/**
+ * How far the wall clock must run ahead of the steady clock between two looks before
+ * the device is taken to have slept (the review's Medium): well above the jitter of
+ * either clock, well below a locked tablet's sleep.
+ */
+const sleepMarginMs = 3_000;
+
 export function createTrackerController(options: TrackerControllerOptions): TrackerController {
   const {
     gameId,
@@ -313,6 +334,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     retry = defaultRetryTiming,
     requestTimeoutMs = 15_000,
     renewEveryMs = sessionRenewSeconds * 1000,
+    wallClock = () => Date.now(),
   } = options;
 
   let sessionId: string | null = null;
@@ -323,9 +345,42 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    */
   let offsetMs = 0;
   let measured: { readonly errorMs: number; readonly at: number } | null = null;
+  /**
+   * How far the wall clock has been ahead of the steady clock, at most, at any look: a
+   * sleep shows as that lead growing. The most, not the last, so a wall clock put back
+   * by hand and later set right again is never taken for a sleep.
+   */
+  let wallLead: number | null = null;
+  /** Looks at both clocks; the lead the wall clock has grown by since, beyond the most seen. */
+  const lookNow = (): number => {
+    const lead = wallClock() - clock.now();
+    const grown = wallLead === null ? 0 : lead - wallLead;
+    wallLead = wallLead === null ? lead : Math.max(wallLead, lead);
+    return grown;
+  };
+  /**
+   * Did the device sleep since the last look? On some devices (iPads, Macs) the steady
+   * clock stands still while the device sleeps, so a tablet locked at half-time would
+   * wake with `now()` behind by the whole sleep, and time every tap that early until a
+   * session reply came back. When the wall clock has gone on by clearly more than the
+   * steady clock (`sleepMarginMs`), the difference is the sleep: it is added to the
+   * offset, and the error widened by the margin, so `now()` carries on from the right
+   * time. A wall clock that went back, on by less than the margin, or back to where it
+   * was after being put back, is not trusted. (A hand change of the device's clock
+   * forward, past where it ever was, while the tracker is open looks like a sleep, and
+   * is corrected by the next session reply.)
+   */
+  const noticeSleep = (): void => {
+    const slept = lookNow();
+    if (measured === null || slept <= sleepMarginMs) return;
+    offsetMs += Math.round(slept);
+    measured = { errorMs: measured.errorMs + sleepMarginMs, at: clock.now() };
+    update({ clockErrorMs: measured.errorMs });
+  };
   /** The latest `now()` given: it never goes back (L4). */
   let latestNow = 0;
   const serverNow = (): number => {
+    noticeSleep();
     latestNow = Math.max(latestNow, Math.round(clock.now() + offsetMs));
     return latestNow;
   };
@@ -438,6 +493,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     }
     offsetMs = offset;
     measured = { errorMs, at: received };
+    // A sleep before this measurement is in it already: look from here, adding nothing.
+    lookNow();
     // A save made since this request went out is put on this measurement: the one
     // before may no longer hold (after the device slept offline, say), and the time of
     // the last save is the server's, not the device's (finding L5).
@@ -867,6 +924,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     }
   });
 
+  /** The network is back: send now and renew the session. */
+  const backOnline = (): void => {
+    queue.wake();
+    // Waiting to ask again: ask now.
+    askAgainNow();
+    if (sessionId !== null) void track(renew());
+  };
+
   /** True once the queue has read what the device holds. */
   let begun = false;
 
@@ -1014,11 +1079,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       await track(begun ? open() : begin());
     },
 
-    online() {
-      queue.wake();
-      // Waiting to ask again: ask now.
-      askAgainNow();
-      if (sessionId !== null) void track(renew());
+    online: backOnline,
+
+    awake() {
+      noticeSleep();
+      backOnline();
     },
 
     async dismissNotApplied() {
