@@ -31,6 +31,6 @@ T-118 says a page that notices a gap fetches a snapshot, and T-119 that a page t
 
 ## Revisit if
 
-- Step 2.101 makes the play-by-play update live (P7 §5.3, S-33): the snapshot and the live message carry the recent plays, as the visitor sees them, so the page can append and correct them.
+- Step 2.104 makes the play-by-play update live (P7 §5.3, S-33): the snapshot and the live message carry the recent plays, as the visitor sees them, so the page can append and correct them.
 - The polling load is measured in staging (F-5) and the 5-second or 30-second rates prove too costly or too slow.
 - Pages listen to Supabase Realtime: the page then needs that subscriber and the project's address, as the schedule pages will.
