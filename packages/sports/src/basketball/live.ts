@@ -178,6 +178,8 @@ export function clockModeAt(
   if (!inLastMinutes(state.rules, d.period, remainingMs)) return 'running';
   for (let i = state.plays.length - 1; i >= 0; i--) {
     const p = state.plays[i]!;
+    // The mercy rule's switch is automatic, so the stop clock still holds after it.
+    if (p.mercyClock) break;
     if (p.type === 'clock-mode')
       return p.period === d.period && inLastMinutes(state.rules, p.period, p.clockMs)
         ? 'running'
@@ -239,6 +241,11 @@ export type Stamp = {
   prevClockMs?: number;
   /** This play stopped the running clock (a foul or a timeout under a stop clock). */
   stoppedClock?: true;
+  /**
+   * This basket brought the lead up to the mercy rule's and switched a stop clock to
+   * a running clock. The tracker says so; undoing the basket undoes the switch.
+   */
+  mercyClock?: true;
 };
 export type LoggedPlay = Play & Stamp;
 
@@ -412,6 +419,7 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
         else l.fg3 += 1;
         l.appeared = true;
         teams[play.side].score += play.points;
+        if (play.mercyClock) clockMode = 'running';
         break;
       }
       case 'foul': {
@@ -679,12 +687,28 @@ function record(s: GameState, input: Play, id: string, at: number) {
     // The whistle stops the clock where the play happened; the scorer starts it again.
     s.clock = { ...s.clock, running: false };
     s.plays.push({ ...play, ...stamp, stoppedClock: true });
+  } else if (play.type === 'score' && reachesMercy(s.rules, d, play)) {
+    s.plays.push({ ...play, ...stamp, mercyClock: true });
   } else s.plays.push({ ...play, ...stamp });
   s.redo = [];
   // Setting lineups or the clock mode before tip-off does not make the game live for
   // viewers; anything else does.
   if (s.status === 'scheduled' && play.type !== 'lineup' && play.type !== 'clock-mode')
     s.status = 'live';
+}
+
+/**
+ * Does this basket switch the game to a running clock under the mercy rule? Only when
+ * the clock stops on fouls and the lead goes from below the mercy lead to it or past it.
+ * A lead already there does not switch again, so a scorer who switched back keeps a
+ * stop clock until the lead drops below and reaches it once more.
+ */
+function reachesMercy(rules: Rules, d: Derived, play: Extract<Play, { type: 'score' }>): boolean {
+  const lead = rules.mercyLead;
+  if (lead == null || d.clockMode !== 'stop') return false;
+  const own = d.teams[play.side].score;
+  const other = d.teams[otherSide(play.side)].score;
+  return Math.abs(own - other) < lead && Math.abs(own + play.points - other) >= lead;
 }
 
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length < 100;
@@ -796,6 +820,8 @@ function checkRules(rules: Rules): Rules {
     fail('The last-minutes stop clock runs 1 second to 10 minutes, and no longer than a period.');
   if (r.stopClockScope !== undefined && !STOP_CLOCK_SCOPES.includes(r.stopClockScope))
     fail('The last-minutes stop clock is at the end of each period, each half or the game.');
+  if (given(r.mercyLead) && !whole(r.mercyLead, 1, 100))
+    fail('The mercy rule starts at a lead of 1 to 100 points.');
   return {
     periods: r.periods,
     periodSeconds: r.periodSeconds,
@@ -808,6 +834,7 @@ function checkRules(rules: Rules): Rules {
     // The same for each rule below; null, which also means off, is dropped.
     ...(given(r.stopClockLastSeconds) ? { stopClockLastSeconds: r.stopClockLastSeconds } : {}),
     ...(r.stopClockScope !== undefined ? { stopClockScope: r.stopClockScope } : {}),
+    ...(given(r.mercyLead) ? { mercyLead: r.mercyLead } : {}),
   };
 }
 
