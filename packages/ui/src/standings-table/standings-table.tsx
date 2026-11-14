@@ -53,67 +53,71 @@ export function StandingsTable({
   const numberOf = new Map(footnotes.map((n, i) => [n.id, i + 1]));
   const hasSeeds = rows.some((r) => r.seed !== undefined && r.seed !== null);
   return (
-    <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? caption}>
-      <table className="ui-table ui-standings">
-        <caption dir="auto">{caption}</caption>
-        <thead>
-          <tr>
-            {hasSeeds ? (
-              <th scope="col" className="ui-num">
-                {labels.seed}
-              </th>
-            ) : null}
-            <th scope="col">{labels.team}</th>
-            {columns.map((c) => (
-              <th key={c.key} scope="col" className="ui-num">
-                {c.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const color = safeColor(row.color);
-            const marks = (row.notes ?? []).flatMap((id) => {
-              const n = numberOf.get(id);
-              return n === undefined ? [] : [{ id, n }];
-            });
-            return (
-              <tr
-                key={row.id}
-                style={color ? ({ '--team-color': color } as CSSProperties) : undefined}
-              >
-                {hasSeeds ? <td className="ui-num">{row.seed ?? ''}</td> : null}
-                <th scope="row" className="ui-team-cell">
-                  <span className="ui-team-chip" aria-hidden="true" />
-                  <span dir="auto">{row.team}</span>
-                  {marks.map((m) => (
-                    <sup key={m.id} className="ui-note-mark">
-                      <a href={`#${idPrefix}-note-${m.id}`}>
-                        <span className="ui-visually-hidden">{labels.note}</span> {m.n}
-                      </a>
-                    </sup>
-                  ))}
+    <div className="ui-table-frame">
+      <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? caption}>
+        <table className="ui-table ui-standings">
+          <caption dir="auto">{caption}</caption>
+          <thead>
+            <tr>
+              {hasSeeds ? (
+                <th scope="col" className="ui-num">
+                  {labels.seed}
                 </th>
-                {columns.map((c) => (
-                  <td key={c.key} className="ui-num">
-                    {row.cells[c.key] ?? ''}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {footnotes.length > 0 ? (
-        <ol className="ui-footnotes" aria-label={labels.notes}>
-          {footnotes.map((n) => (
-            <li key={n.id} id={`${idPrefix}-note-${n.id}`} dir="auto">
-              {n.text}
-            </li>
-          ))}
-        </ol>
-      ) : null}
+              ) : null}
+              <th scope="col" className="ui-team-cell">
+                {labels.team}
+              </th>
+              {columns.map((c) => (
+                <th key={c.key} scope="col" className="ui-num">
+                  {c.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const color = safeColor(row.color);
+              const marks = (row.notes ?? []).flatMap((id) => {
+                const n = numberOf.get(id);
+                return n === undefined ? [] : [{ id, n }];
+              });
+              return (
+                <tr
+                  key={row.id}
+                  style={color ? ({ '--team-color': color } as CSSProperties) : undefined}
+                >
+                  {hasSeeds ? <td className="ui-num">{row.seed ?? ''}</td> : null}
+                  <th scope="row" className="ui-team-cell">
+                    <span className="ui-team-chip" aria-hidden="true" />
+                    <span dir="auto">{row.team}</span>
+                    {marks.map((m) => (
+                      <sup key={m.id} className="ui-note-mark">
+                        <a href={`#${idPrefix}-note-${m.id}`}>
+                          <span className="ui-visually-hidden">{labels.note}</span> {m.n}
+                        </a>
+                      </sup>
+                    ))}
+                  </th>
+                  {columns.map((c) => (
+                    <td key={c.key} className="ui-num">
+                      {row.cells[c.key] ?? ''}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {footnotes.length > 0 ? (
+          <ol className="ui-footnotes" aria-label={labels.notes}>
+            {footnotes.map((n) => (
+              <li key={n.id} id={`${idPrefix}-note-${n.id}`} dir="auto">
+                {n.text}
+              </li>
+            ))}
+          </ol>
+        ) : null}
+      </div>
     </div>
   );
 }

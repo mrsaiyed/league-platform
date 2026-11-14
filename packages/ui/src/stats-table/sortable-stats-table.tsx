@@ -62,66 +62,68 @@ export function SortableStatsTable({
   const [sort, setSort] = useState<Sort | null>(initialSort);
   const sorted = sortStatRows(rows, sort, locale);
   return (
-    <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? caption}>
-      <table className="ui-table ui-stats">
-        <caption dir="auto" className={captionHidden ? 'ui-visually-hidden' : undefined}>
-          {caption}
-        </caption>
-        <thead>
-          <tr>
-            {columns.map((c) => {
-              const active = sort && sort.key === c.key ? sort.direction : undefined;
-              return (
-                <th
-                  key={c.key}
-                  scope="col"
-                  className={c.numeric ? 'ui-num' : undefined}
-                  aria-sort={active ?? 'none'}
-                >
-                  <button
-                    type="button"
-                    className="ui-sort-button"
-                    onClick={() => setSort(nextSort(sort, c.key, c.numeric === true))}
+    <div className="ui-table-frame">
+      <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? caption}>
+        <table className="ui-table ui-stats">
+          <caption dir="auto" className={captionHidden ? 'ui-visually-hidden' : undefined}>
+            {caption}
+          </caption>
+          <thead>
+            <tr>
+              {columns.map((c, i) => {
+                const active = sort && sort.key === c.key ? sort.direction : undefined;
+                return (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    className={i === 0 ? 'ui-team-cell' : c.numeric ? 'ui-num' : undefined}
+                    aria-sort={active ?? 'none'}
                   >
-                    <span className="ui-visually-hidden">{labels.sortBy}</span> {c.label}
-                    {c.fullName ? (
-                      <>
-                        {' '}
-                        <span className="ui-visually-hidden">{c.fullName}</span>
-                      </>
-                    ) : null}
-                  </button>
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row) => (
-            <tr key={row.id}>
-              {columns.map((c, i) =>
-                i === 0 ? (
-                  <th key={c.key} scope="row" className="ui-team-cell">
-                    {chipOf(row, c.key)}
-                    <span dir="auto">{row.cells[c.key] ?? ''}</span>
+                    <button
+                      type="button"
+                      className="ui-sort-button"
+                      onClick={() => setSort(nextSort(sort, c.key, c.numeric === true))}
+                    >
+                      <span className="ui-visually-hidden">{labels.sortBy}</span> {c.label}
+                      {c.fullName ? (
+                        <>
+                          {' '}
+                          <span className="ui-visually-hidden">{c.fullName}</span>
+                        </>
+                      ) : null}
+                    </button>
                   </th>
-                ) : (
-                  <td key={c.key} className={c.numeric ? 'ui-num' : undefined}>
-                    {c.numeric ? (
-                      (row.cells[c.key] ?? '')
-                    ) : (
-                      <>
-                        {chipOf(row, c.key)}
-                        <span dir="auto">{row.cells[c.key] ?? ''}</span>
-                      </>
-                    )}
-                  </td>
-                ),
-              )}
+                );
+              })}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sorted.map((row) => (
+              <tr key={row.id}>
+                {columns.map((c, i) =>
+                  i === 0 ? (
+                    <th key={c.key} scope="row" className="ui-team-cell">
+                      {chipOf(row, c.key)}
+                      <span dir="auto">{row.cells[c.key] ?? ''}</span>
+                    </th>
+                  ) : (
+                    <td key={c.key} className={c.numeric ? 'ui-num' : undefined}>
+                      {c.numeric ? (
+                        (row.cells[c.key] ?? '')
+                      ) : (
+                        <>
+                          {chipOf(row, c.key)}
+                          <span dir="auto">{row.cells[c.key] ?? ''}</span>
+                        </>
+                      )}
+                    </td>
+                  ),
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

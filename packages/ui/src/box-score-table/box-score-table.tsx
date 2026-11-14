@@ -44,65 +44,74 @@ export function BoxScoreTable({
   labels,
 }: BoxScoreTableProps) {
   return (
-    <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? teamName}>
-      <table className="ui-table ui-box-score">
-        <caption dir="auto">{teamName}</caption>
-        <thead>
-          <tr>
-            {players ? (
-              <>
-                <th scope="col" className="ui-num">
-                  {labels.jersey}
+    <div className="ui-table-frame">
+      <div
+        className="ui-table-wrap"
+        tabIndex={0}
+        role="region"
+        aria-label={regionLabel ?? teamName}
+      >
+        <table className="ui-table ui-box-score">
+          <caption dir="auto">{teamName}</caption>
+          <thead>
+            <tr>
+              {players ? (
+                <>
+                  <th scope="col" className="ui-num">
+                    {labels.jersey}
+                  </th>
+                  <th scope="col" className="ui-team-cell">
+                    {labels.player}
+                  </th>
+                </>
+              ) : (
+                <td aria-hidden="true" />
+              )}
+              {columns.map((c) => (
+                <th key={c.key} scope="col" className="ui-num" title={c.fullName}>
+                  {c.label}
+                  {c.fullName ? (
+                    <>
+                      {' '}
+                      <span className="ui-visually-hidden">{c.fullName}</span>
+                    </>
+                  ) : null}
                 </th>
-                <th scope="col">{labels.player}</th>
-              </>
-            ) : (
-              <td aria-hidden="true" />
-            )}
-            {columns.map((c) => (
-              <th key={c.key} scope="col" className="ui-num" title={c.fullName}>
-                {c.label}
-                {c.fullName ? (
-                  <>
-                    {' '}
-                    <span className="ui-visually-hidden">{c.fullName}</span>
-                  </>
-                ) : null}
+              ))}
+            </tr>
+          </thead>
+          {players ? (
+            <tbody>
+              {players.map((p) => (
+                <tr key={p.id}>
+                  <td className="ui-num">{p.jersey ?? ''}</td>
+                  <th scope="row" className="ui-team-cell">
+                    <span dir="auto">{p.name}</span>
+                  </th>
+                  {columns.map((c) => (
+                    <td key={c.key} className="ui-num">
+                      {p.cells[c.key] ?? ''}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          ) : null}
+          <tfoot>
+            <tr>
+              <th scope="row" colSpan={players ? 2 : 1}>
+                {labels.total}
               </th>
-            ))}
-          </tr>
-        </thead>
-        {players ? (
-          <tbody>
-            {players.map((p) => (
-              <tr key={p.id}>
-                <td className="ui-num">{p.jersey ?? ''}</td>
-                <th scope="row" className="ui-team-cell">
-                  <span dir="auto">{p.name}</span>
-                </th>
-                {columns.map((c) => (
-                  <td key={c.key} className="ui-num">
-                    {p.cells[c.key] ?? ''}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        ) : null}
-        <tfoot>
-          <tr>
-            <th scope="row" colSpan={players ? 2 : 1}>
-              {labels.total}
-            </th>
-            {columns.map((c) => (
-              <td key={c.key} className="ui-num">
-                {totals[c.key] ?? ''}
-              </td>
-            ))}
-          </tr>
-        </tfoot>
-      </table>
-      {!players && hiddenNotice ? <p className="ui-table-notice">{hiddenNotice}</p> : null}
+              {columns.map((c) => (
+                <td key={c.key} className="ui-num">
+                  {totals[c.key] ?? ''}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+        {!players && hiddenNotice ? <p className="ui-table-notice">{hiddenNotice}</p> : null}
+      </div>
     </div>
   );
 }

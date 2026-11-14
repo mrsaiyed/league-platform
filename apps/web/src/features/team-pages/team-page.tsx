@@ -30,32 +30,36 @@ function RosterTable({
   readonly caption: string;
 }) {
   return (
-    <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={caption}>
-      <table className="ui-table">
-        <caption className="ui-visually-hidden">{caption}</caption>
-        <thead>
-          <tr>
-            <th scope="col" className="ui-num">
-              {t('team.jersey')}
-            </th>
-            <th scope="col">{t('team.player')}</th>
-            <th scope="col" className="ui-fit">
-              {t('team.role')}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key}>
-              <td className="ui-num">{row.number}</td>
-              <th scope="row" className="ui-team-cell" dir="auto">
-                {row.name}
+    <div className="ui-table-frame">
+      <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={caption}>
+        <table className="ui-table">
+          <caption className="ui-visually-hidden">{caption}</caption>
+          <thead>
+            <tr>
+              <th scope="col" className="ui-num">
+                {t('team.jersey')}
               </th>
-              <td className="ui-fit">{row.role}</td>
+              <th scope="col" className="ui-team-cell">
+                {t('team.player')}
+              </th>
+              <th scope="col" className="ui-fit">
+                {t('team.role')}
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <td className="ui-num">{row.number}</td>
+                <th scope="row" className="ui-team-cell" dir="auto">
+                  {row.name}
+                </th>
+                <td className="ui-fit">{row.role}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

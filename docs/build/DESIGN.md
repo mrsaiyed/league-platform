@@ -84,7 +84,7 @@ A screen is finished when every line below is true for it, at 390 and at 1280, f
 **Tables**
 
 13. Column headings are small uppercase labels. Rows are separated by hairlines at low strength and light up on hover. Number columns are right-aligned and only as wide as they need; the team column takes the spare width, so a table is not six numbers scattered across a wide page.
-14. A team has its color chip beside its name. On a phone the table scrolls inside its box and the team column stays put.
+14. A team has its color chip beside its name. On a phone the table scrolls inside its box, and the team column, its heading and the table's name stay put. While there are more columns out of sight, the far edge of the box says so: the last column in view fades and a small arrow points on.
 
 **Filters**
 

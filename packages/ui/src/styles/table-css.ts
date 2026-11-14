@@ -1,14 +1,27 @@
 // Tables: standings, statistics, box scores, rosters (docs/build/DESIGN.md, section 4,
 // lines 13 and 14). Each sits in its own panel and scrolls inside it on a phone, with the
-// name column staying put. Number columns are only as wide as they need, so the name
-// column takes the spare width.
+// name column staying put and a sign at the far edge while there are more columns that
+// way. Number columns are only as wide as they need, so the name column takes the spare
+// width.
 export const tableCss = String.raw`
+/* The box a table sits in. The table scrolls inside it; the box itself stays still, so it
+   can show at its far edge that the table goes on. */
+.ui-table-frame {
+  position: relative;
+  isolation: isolate;
+  max-inline-size: 100%;
+  border: var(--card-border-width) solid var(--color-line);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  timeline-scope: --ui-table-scroll;
+}
 .ui-table-wrap {
   /* Words kept only for screen readers are placed out of the flow; this keeps the ones in
      columns scrolled out of sight inside the box, so the page itself never scrolls sideways. */
   position: relative;
   max-inline-size: 100%;
   overflow-x: auto;
+  scroll-timeline: --ui-table-scroll inline;
   /* When columns are scrolled out of sight, a soft shadow at that edge says so. The two
      panel-colored covers move with the table and hide the shadow at an edge with nothing
      beyond it. The same on both sides, so it is right in either reading direction. */
@@ -22,9 +35,68 @@ export const tableCss = String.raw`
     linear-gradient(to left, var(--scroll-shadow), transparent) right / var(--step-3) 100%
       no-repeat scroll,
     var(--color-panel);
-  border: var(--card-border-width) solid var(--color-line);
-  border-radius: var(--radius);
-  box-shadow: var(--card-shadow);
+  border-radius: inherit;
+}
+/* The sign that a table goes on past the edge of its box: the last column in view fades
+   out and a small arrow points on. Both follow the table's own sideways scroll, so they
+   are there only while there is more to see that way, and a table that fits shows neither.
+   A browser that cannot follow the scroll keeps the soft shadow above. */
+@supports (timeline-scope: --ui-table-scroll) {
+  .ui-table-frame::before,
+  .ui-table-frame::after {
+    content: '';
+    position: absolute;
+    z-index: 2;
+    opacity: 0;
+    pointer-events: none;
+    animation: ui-table-more linear both;
+    animation-timeline: --ui-table-scroll;
+  }
+  /* The fade, with a clear patch behind the arrow so no heading shows through it. */
+  .ui-table-frame::before {
+    inset-block: 0;
+    inset-inline-end: 0;
+    inline-size: var(--step-6);
+    border-start-end-radius: inherit;
+    border-end-end-radius: inherit;
+    background:
+      radial-gradient(
+        circle at 50% calc(var(--step-4) + var(--step-1)),
+        var(--color-panel) var(--step-3),
+        transparent var(--step-4)
+      ),
+      linear-gradient(to right, transparent, var(--color-panel) 75%);
+  }
+  [dir='rtl'] .ui-table-frame::before {
+    background:
+      radial-gradient(
+        circle at 50% calc(var(--step-4) + var(--step-1)),
+        var(--color-panel) var(--step-3),
+        transparent var(--step-4)
+      ),
+      linear-gradient(to left, transparent, var(--color-panel) 75%);
+  }
+  .ui-table-frame::after {
+    inset-block-start: var(--step-4);
+    inset-inline-end: var(--step-3);
+    inline-size: var(--step-2);
+    block-size: var(--step-2);
+    border-block-end: 2px solid var(--color-text);
+    border-inline-end: 2px solid var(--color-text);
+    transform: rotate(-45deg);
+  }
+  [dir='rtl'] .ui-table-frame::after {
+    transform: rotate(45deg);
+  }
+}
+@keyframes ui-table-more {
+  0%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 .ui-table {
   inline-size: 100%;
@@ -43,6 +115,13 @@ export const tableCss = String.raw`
   letter-spacing: var(--label-tracking);
   text-align: start;
   text-transform: uppercase;
+}
+/* A table's name stays in view while its columns scroll under it. */
+.ui-table caption:not(.ui-visually-hidden) {
+  position: sticky;
+  inset-inline-start: 0;
+  inline-size: fit-content;
+  background: var(--color-panel);
 }
 .ui-table th,
 .ui-table td {
@@ -97,7 +176,8 @@ export const tableCss = String.raw`
   color: var(--color-text);
   font-weight: 600;
 }
-/* The name a row is about: it stays in view while the numbers scroll under it. */
+/* The name a row is about, and the heading over it: they stay in view while the numbers
+   scroll under them. */
 .ui-team-cell {
   position: sticky;
   inset-inline-start: 0;
@@ -129,11 +209,14 @@ export const tableCss = String.raw`
   font-weight: 400;
   text-decoration: underline;
 }
+/* Notes under a table stay put while it scrolls, and are never faded by the sign above. */
 .ui-footnotes,
 .ui-table-notice {
   position: sticky;
+  z-index: 3;
   inset-inline-start: 0;
   margin: 0;
+  background: var(--color-panel);
   padding-block: var(--step-3);
   padding-inline: var(--step-4);
   border-block-start: 1px solid var(--color-line);

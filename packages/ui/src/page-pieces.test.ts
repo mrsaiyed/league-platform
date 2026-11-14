@@ -5,6 +5,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
+  BoxScoreTable,
   Emblem,
   EmptyPanel,
   FilterToolbar,
@@ -349,6 +350,61 @@ describe('tables', () => {
       /\.ui-team-cell \{[^}]*position: sticky;[^}]*inset-inline-start: 0;/,
     );
     expect(displayCss).toMatch(/\.ui-table \.ui-num \{[^}]*inline-size: 1%;[^}]*text-align: end;/);
+  });
+  it('show at the far edge of their box that they go on, only while they do', () => {
+    // The box stays still and the table scrolls inside it, so the box can carry the sign.
+    const standings = render(
+      createElement(StandingsTable, {
+        caption: 'East',
+        idPrefix: 'east',
+        columns: [{ key: 'w', label: 'W' }],
+        rows: [{ id: 'a', team: 'Owls', cells: { w: 5 }, notes: ['n'] }],
+        footnotes: [{ id: 'n', text: 'A note' }],
+        labels: { seed: 'Seed', team: 'Team', note: 'Note', notes: 'Notes' },
+      }),
+    );
+    const stats = render(
+      createElement(SortableStatsTable, {
+        caption: 'All players',
+        columns: [{ key: 'player', label: 'Player' }],
+        rows: [],
+        labels: { sortBy: 'Sort by' },
+      }),
+    );
+    const boxScore = render(
+      createElement(BoxScoreTable, {
+        teamName: 'Owls',
+        columns: [{ key: 'pts', label: 'PTS' }],
+        players: [],
+        totals: { pts: 0 },
+        labels: { jersey: 'No.', player: 'Player', total: 'Total' },
+      }),
+    );
+    for (const html of [standings, stats, boxScore]) {
+      expect(html).toMatch(/^<div class="ui-table-frame"><div class="ui-table-wrap" tabindex="0"/);
+    }
+    // The sign follows the table's own sideways scroll, and is not drawn without it.
+    expect(displayCss).toMatch(/\.ui-table-frame \{[^}]*timeline-scope: --ui-table-scroll;/);
+    expect(displayCss).toMatch(/\.ui-table-wrap \{[^}]*scroll-timeline: --ui-table-scroll inline;/);
+    expect(displayCss).toMatch(
+      /\.ui-table-frame::before,\s*\.ui-table-frame::after \{[^}]*opacity: 0;[^}]*animation-timeline: --ui-table-scroll;/,
+    );
+    expect(displayCss).toMatch(/@keyframes ui-table-more \{[^@]*100% \{\s*opacity: 0;/);
+    // It never takes a tap from the table, and never fades the notes under it.
+    expect(displayCss).toMatch(/\.ui-table-frame::after \{[^}]*pointer-events: none;/);
+    expect(displayCss).toMatch(
+      /\.ui-footnotes,\s*\.ui-table-notice \{[^}]*z-index: 3;[^}]*background: var\(--color-panel\);/,
+    );
+    // A browser that cannot follow the scroll keeps the soft shadow at the edge.
+    expect(displayCss).toMatch(/\.ui-table-wrap \{[^}]*var\(--scroll-shadow\)/);
+    // The heading of the name column stays over the names, so a number's heading is never
+    // read as theirs once the table is scrolled; and the table's own name stays in view.
+    expect(standings).toContain('<th scope="col" class="ui-team-cell">Team</th>');
+    expect(stats).toMatch(/<th scope="col" class="ui-team-cell" aria-sort="none">/);
+    expect(boxScore).toContain('<th scope="col" class="ui-team-cell">Player</th>');
+    expect(displayCss).toMatch(
+      /\.ui-table caption:not\(\.ui-visually-hidden\) \{[^}]*position: sticky;[^}]*inset-inline-start: 0;/,
+    );
   });
 });
 
