@@ -168,6 +168,61 @@ describe('databasePorts (record 055)', () => {
     expect(await ports.accessOf({ ...context, accountId: null })).toBeUndefined();
   });
 
+  it('gives one league’s owner nothing in another league', async () => {
+    const lake = lakeside();
+    const maple = seedLeague('maple-street');
+    expect(lake.ownerAccountId).not.toBe(maple.ownerAccountId);
+    const inMaple = await ports.accessOf({
+      leagueId: maple.leagueId,
+      accountId: lake.ownerAccountId,
+      requestId: randomUUID(),
+    });
+    expect(inMaple?.isOwner ?? false).toBe(false);
+    expect(inMaple?.grants ?? []).toEqual([]);
+    // Each owner holds their own league, and only it.
+    expect(
+      await ports.accessOf({
+        leagueId: maple.leagueId,
+        accountId: maple.ownerAccountId,
+        requestId: randomUUID(),
+      }),
+    ).toMatchObject({ isOwner: true });
+  });
+
+  it('finds a league in the bin only as in the bin, and gives no one anything in it', async () => {
+    const binnedMade = await database.madeUpDatabase({ inBin: ['maple-street'] });
+    const binnedDb = database.createDatabase(binnedMade.source);
+    try {
+      const binnedPorts = databasePorts({
+        database,
+        db: binnedDb,
+        signIn: {} as SignInService,
+        signInMail: {} as SignInMail,
+        log: () => {},
+        warn: () => {},
+      });
+      const maple = binnedMade.leagues.find((l) => l.slug === 'maple-street');
+      if (maple === undefined) throw new Error('the seed has no maple-street league');
+      expect(await binnedPorts.findLeague('maple-street')).toMatchObject({
+        leagueId: maple.leagueId,
+        inBin: true,
+      });
+      expect(await binnedPorts.findLeagueById(maple.leagueId)).toBeUndefined();
+      expect(
+        await binnedPorts.accessOf({
+          leagueId: maple.leagueId,
+          accountId: maple.ownerAccountId,
+          requestId: randomUUID(),
+        }),
+      ).toBeUndefined();
+      // The other league is untouched.
+      expect(await binnedPorts.findLeague('lakeside')).toMatchObject({ inBin: false });
+    } finally {
+      await binnedDb.close();
+      await binnedMade.close();
+    }
+  }, 120_000);
+
   it('refuses each area not yet on the database when it is reached, not before', async () => {
     const areas = [
       ports.publicStats,

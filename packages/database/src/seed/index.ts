@@ -5,6 +5,7 @@ export {
   madeUpLoginRole,
   type MadeUpDatabase,
   type MadeUpLeague,
+  type MadeUpOptions,
 } from './made-up-database.ts';
 export { seedLeagues, seedStaff, type SeedLeague } from './seed-data.ts';
 export { seedLeaguesInto, type SeededLeague } from './seed-leagues.ts';

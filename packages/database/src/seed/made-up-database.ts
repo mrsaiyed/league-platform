@@ -34,13 +34,28 @@ export type MadeUpDatabase = {
   readonly close: () => Promise<void>;
 };
 
+export type MadeUpOptions = {
+  /** Seed leagues, by short name, to put in the bin once loaded: for tests of the bin. */
+  readonly inBin?: readonly string[];
+};
+
 /** Opens a new made-up database in memory. Close it when done. */
-export async function madeUpDatabase(): Promise<MadeUpDatabase> {
+export async function madeUpDatabase(options: MadeUpOptions = {}): Promise<MadeUpDatabase> {
   const pglite = new PGlite();
   try {
     const run = await applyMigrations(pgliteDriver(pglite));
     if (!run.ok) throw new Error(`The made-up database could not be built: ${run.error.code}.`);
     await seedLeaguesInto(pglite);
+    const inBin = options.inBin ?? [];
+    if (inBin.length > 0) {
+      const binned = await pglite.query(
+        'update leagues set deleted_at = now() where slug = any($1::text[])',
+        [inBin],
+      );
+      if (binned.affectedRows !== new Set(inBin).size) {
+        throw new Error('The made-up database has no seed league of one of those short names.');
+      }
+    }
     const { rows } = await pglite.query<MadeUpLeague>(
       `select slug, id as "leagueId", owner_account_id as "ownerAccountId"
        from leagues order by slug`,
