@@ -19,6 +19,8 @@ import { mayScoreUnder, scoringRuleOf } from '../scoring-access.ts';
 export type MyGame = {
   readonly id: string;
   readonly seasonId: string;
+  /** The program of the game's season, where changing its result is checked. */
+  readonly programId: string;
   readonly divisionId: string | null;
   readonly homeTeamId: string;
   readonly awayTeamId: string;
@@ -27,6 +29,9 @@ export type MyGame = {
   readonly day: string;
   readonly isToday: boolean;
   readonly status: string;
+  /** The score so far, or null while there is none. */
+  readonly homeScore: number | null;
+  readonly awayScore: number | null;
   readonly recording: ReturnType<typeof recordingOf>;
   /** Whether the person is assigned to score it. */
   readonly assignedToMe: boolean;
@@ -42,9 +47,14 @@ export type MyGames = {
   readonly games: readonly MyGame[];
 };
 
-const view = ({ game, day, assigned }: GameInWindow, today: string, scorable: boolean): MyGame => ({
+const view = (
+  { game, day, assigned, programId }: GameInWindow,
+  today: string,
+  scorable: boolean,
+): MyGame => ({
   id: game.id,
   seasonId: game.seasonId,
+  programId,
   divisionId: game.divisionId,
   homeTeamId: game.homeTeamId,
   awayTeamId: game.awayTeamId,
@@ -52,6 +62,8 @@ const view = ({ game, day, assigned }: GameInWindow, today: string, scorable: bo
   day,
   isToday: day === today,
   status: game.status,
+  homeScore: game.homeScore,
+  awayScore: game.awayScore,
   recording: recordingOf(game.captureMode),
   assignedToMe: assigned,
   scorable,
