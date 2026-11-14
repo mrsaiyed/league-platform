@@ -16,3 +16,8 @@ export * from './tracker-controller.ts';
 export * from './tracker-notice.ts';
 export * from './tracker-queue.ts';
 export * from './tracker-server.ts';
+export * from './format-text.ts';
+export * from './my-games.ts';
+export * from './tracker-catalog.ts';
+export { MyGamesPage } from './my-games-page.tsx';
+export { TrackerPage } from './tracker-page.tsx';

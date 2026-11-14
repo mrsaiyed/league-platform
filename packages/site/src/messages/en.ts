@@ -383,6 +383,11 @@ export const en = {
   'error.people.remove_person.person-not-found': 'That person is not in the league list.',
   'error.people.remove_person.person-on-a-roster':
     'That person is still on a roster. Mark them as having left their team first, then take them off the list.',
+  // A scorekeeper's admin: only their games, each with a way to the tracker (P4 §4, step 2.33).
+  'admin.myGames.title': 'Your games',
+  'admin.myGames.intro': 'Your games today and in the week ahead. Open one to score it.',
+  'admin.myGames.empty': 'You have no games to score this week.',
+  'admin.myGames.score': 'Score this game',
   // The games area (step 2.55).
   'admin.games.intro': 'The games of today and the week ahead.',
   'admin.games.listProblem':
@@ -575,8 +580,33 @@ export const en = {
   'access.noAccess.title': 'You do not have access',
   'access.noAccess.body':
     'This page is for the people who run this league. If you should have access, ask the league to invite you.',
-  // The courtside tracker (P2 §4), rebuilt here in a later step.
+  // The courtside tracker (P2 §4): opening a game on the device (step 2.33). The
+  // scoring screens come with steps 2.35 to 2.37.
   'tracker.title': 'Score a game',
+  'tracker.matchup': '{away} at {home}',
+  'tracker.opening': 'Opening the game…',
+  'tracker.noStorage':
+    'This device cannot keep the game: its browser gives no storage here (a private window, say). Open the tracker in an ordinary browser window to score.',
+  'tracker.storeFailed':
+    'This device could not save the latest state of the game. Scoring still works; what you enter is kept apart.',
+  'tracker.takeOver': 'Take over scoring',
+  'tracker.openAgain': 'Open the game again',
+  'tracker.leave': 'Leave the game',
+  'tracker.back': 'Back to your games',
+  'tracker.format.title': 'Check the game format',
+  'tracker.format.intro': 'This game is set up to be played like this. Check it before you start.',
+  'tracker.format.halves': '2 halves of {minutes} minutes',
+  'tracker.format.quarters': '4 quarters of {minutes} minutes',
+  'tracker.format.overtime': 'Overtime periods of {minutes} minutes',
+  'tracker.format.clock.stop': 'Stop clock: fouls and timeouts stop the clock',
+  'tracker.format.clock.running': 'Running clock: the clock keeps going through fouls and timeouts',
+  'tracker.format.wrong':
+    'If this is not how the game is being played, ask a league admin to change the game format before you start.',
+  'tracker.format.confirm': 'Confirm and start scoring',
+  'tracker.ready':
+    'This device is scoring the game. The scoring screen will appear here in a later version.',
+  'tracker.savedOnDevice':
+    'Saved on this device: {home} ({homeCount} players) and {away} ({awayCount} players), and the game as it stands.',
   // The fixed roles (A-3, P4 §4), by the name the access module gives each.
   'role.owner': 'Owner',
   'role.admin': 'Admin',

@@ -48,6 +48,9 @@ const tokens = {
 // The made-up leagues' ids (stand-in-ports.ts), which name the cookie of a device's "my team".
 const northValley = '01900000-0000-7000-8000-000000000001';
 const harborCity = '01900000-0000-7000-8000-000000000002';
+// Two of the made-up games of the first league (stand-in-games.ts).
+const liveGame = '01900000-0000-7000-8000-006a00000002';
+const unassignedGame = '01900000-0000-7000-8000-006a00000003';
 
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
 // browser's script fills with the not-found or forbidden screen (record 020), so
@@ -278,8 +281,27 @@ const cases = [
   ],
   ['scheduler', '/north-valley/admin/settings', 403, [noAccess]],
   ['coach', '/north-valley/admin/settings', 403, [noAccess]],
-  ['scheduler', '/north-valley/score/game-1', 200, ['Score a game']],
-  ['coach', '/north-valley/score/game-1', 403, [noAccess]],
+  // The tracker (step 2.33): a signed-in account allowed to score that game, and nobody
+  // else, another league's admin included (U-6). Hawks v Bears is live; Lions v Tigers is
+  // the scorekeeper's; game 3 is assigned to nobody (any scorekeeper may score it).
+  ['scheduler', `/north-valley/score/${liveGame}`, 200, ['Score a game', 'Bears at Hawks']],
+  ['scorekeeper', `/north-valley/score/${liveGame}`, 200, ['Bears at Hawks', 'Opening the game']],
+  ['scorekeeper', `/north-valley/score/${unassignedGame}`, 200, ['Lions at Hawks']],
+  ['owner', `/north-valley/score/${liveGame}`, 200, ['Bears at Hawks']],
+  ['coach', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
+  ['visitor', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
+  ['otherAdmin', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
+  ['owner', '/north-valley/score/game-1', 404, [notFound]],
+  // Another league's game asked for through this league's address is not there.
+  ['owner', `/harbor-city/score/${liveGame}`, 404, [notFound], ['Bears at Hawks']],
+  // A scorekeeper's admin: their games, each with a button to the tracker (P4 §4).
+  [
+    'scorekeeper',
+    '/north-valley/admin',
+    200,
+    ['Your games', 'Score this game', `href="/north-valley/score/${liveGame}"`],
+    ['Nothing here yet.'],
+  ],
   ['visitor', '/quiet-pines', 404, [notFound]],
   ['coach', '/quiet-pines', 404, [notFound]],
   ['stranger', '/quiet-pines/admin', 404, [notFound], [noAccess]],
@@ -320,7 +342,7 @@ const cases = [
     [adminLink('quiet-pines', 'site')],
     [adminLink('quiet-pines', 'schedule')],
   ],
-  ['scorekeeper', '/quiet-pines/score/game-1', 200, ['Score a game']],
+  ['scorekeeper', `/quiet-pines/score/${liveGame}`, 404, [notFound], ['Bears at Hawks']],
   [
     'clubAdmin',
     '/quiet-pines/admin/teams',
