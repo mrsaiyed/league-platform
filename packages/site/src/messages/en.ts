@@ -137,6 +137,8 @@ export const en = {
   'error.games.take_over_scoring.game-closed':
     'That game is already decided or cancelled. Reopen it first to correct it.',
   'error.games.renew_scoring_session.game-not-found': 'That game is not there.',
+  'error.games.renew_scoring_session.game-closed':
+    'That game is now decided or cancelled, so scoring it has stopped.',
   'error.games.release_scoring_session.game-not-found': 'That game is not there.',
   // Why a schedule draft edit was refused (T-187).
   'error.scheduling.add_draft_game.changed-since-read':

@@ -103,4 +103,18 @@ describe('renewScoringSession (T-116)', () => {
       await renewScoringSession(as(scorekeeperId), { ...own, gameId: gameUuid(9) }, deps),
     ).toEqual({ ok: false, error: { code: 'game-not-found' } });
   });
+
+  it('refuses once the game is decided or cancelled, so the tracker turns read-only', async () => {
+    for (const status of ['final', 'forfeit', 'cancelled']) {
+      const { db, deps, as } = await heldByTablet();
+      const at = db.state.games.findIndex((g) => g.id === gameUuid(1));
+      db.state.games[at] = game(1, { status });
+      expect(await renewScoringSession(as(scorekeeperId), own, deps)).toEqual({
+        ok: false,
+        error: { code: 'game-closed' },
+      });
+      // Nothing moved: the lease runs out by itself.
+      expect(db.state.sessions[0]?.heldUntil).toBe(startOfTest + leaseMs);
+    }
+  });
 });
