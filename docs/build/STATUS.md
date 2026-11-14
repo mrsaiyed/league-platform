@@ -26,6 +26,7 @@ Next free: migration 0012, record 049, T-254 (records 041-048 were written by 1.
 - **2.48 League settings screen** — `.local/lanes/2.48-league-settings` — none reserved — builder (sonnet) started 2026-11-14; check the lane, push, review, GitHub, land.
 - **2.76 The bin** — `.local/lanes/2.76-bin` — none — built, pushed, opus review running. Not done: purging binned games needs a migration (DELETE on games or an owner-run purge function), the nightly fan-out per league (T-63), standings adjustments in the bin. Decided by the lead: restoring stays admin-only (bin.restore) for now; a restored game reappears at once without a preview; people with history stay in the bin for good (T-52). Then GitHub, land.
 - **2.34 Tracker controller** — `.local/lanes/2.34-tracker-controller` — record 041, T-253 — builder (opus) started 2026-11-14; check the lane, push, review, GitHub, land.
+- **1.25 Whole-stage review and report** — `.local/lanes/1.25-stage-review` — none — opus (xhigh) started 2026-11-14: reviews everything stage 1 added, writes docs/build/STAGE-1-REPORT.md and the founder's checklist; findings that need code become steps in lanes.
 
 ## Needs the founder
 
