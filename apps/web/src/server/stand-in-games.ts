@@ -18,7 +18,6 @@ import {
   type EventHandler,
   type GameRecord,
   type GameSnapshotStore,
-  type GamesTx,
   type NewGameCorrection,
   type StoredSetting,
   type TrackerTx,
@@ -324,10 +323,12 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     liveGames: liveGamesOf(s.tracker, (gameId) => teamsOf(s, gameId)),
   });
 
-  const noticeOnly: EventHandler<GamesTx>[] = ['games.finalized', 'games.reopened'].map((type) => ({
-    type,
-    handle: async () => {},
-  }));
+  const noticeOnly: EventHandler<TrackerTx>[] = ['games.finalized', 'games.reopened'].map(
+    (type) => ({
+      type,
+      handle: async () => {},
+    }),
+  );
   // One transaction at a time, as the database's lock on a game would hold the others.
   let queue: Promise<unknown> = Promise.resolve();
   const transaction: TransactionRunner<TrackerTx> = (context, work) => {
@@ -343,7 +344,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     queue = run.catch(() => undefined);
     return run;
   };
-  const deps: CommandDeps<GamesTx> = {
+  const deps: CommandDeps<TrackerTx> = {
     transaction,
     events: noticeOnly,
     log: options.log,
