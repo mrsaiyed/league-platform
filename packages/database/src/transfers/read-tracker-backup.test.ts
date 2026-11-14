@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { copyFolder } from './copy-folder.ts';
+import { writeDataFolder } from './data-folder.test-helper.ts';
 import type { TrackerBackup } from './index.ts';
 import { TrackerBackupError, readTrackerBackup } from './index.ts';
 
@@ -28,11 +30,12 @@ const ids = {
 
 /**
  * A made-up backup: two teams, three players, three games, one of them tracked to the end.
- * Starting a fresh embedded database is the slow part, so this is done once; the variants
- * the tests need are copies of it with `change` applied (see `variant`).
+ * Starting a fresh embedded database is the slow part, so this is done once, in memory,
+ * and its folder written out (see writeDataFolder); the variants the tests need are copies
+ * of it with `change` applied (see `variant`).
  */
 async function makeBackup(dir: string) {
-  const db = new PGlite(dir);
+  const db = new PGlite();
   await db.exec(await readFile(schemaFile, 'utf8'));
   await db.query(
     `INSERT INTO live_stats.teams(id, slug, name, school, tracked, source_url) VALUES
@@ -80,27 +83,36 @@ async function makeBackup(dir: string) {
        ($1, $3, $5, '', '12', true, 2, 2, 0, 0, 0, 900000, 0)`,
     [ids.final, ids.p1, ids.p3, ids.home, ids.away],
   );
-  await db.close();
+  try {
+    await writeDataFolder(db, dir);
+  } finally {
+    await db.close();
+  }
 }
 
 /** A copy of the finished backup with `change` (damage, or an older shape) applied to it. */
 async function variant(dir: string, change: string) {
-  await cp(backup, dir, { recursive: true });
+  await copyFolder(backup, dir);
   const db = new PGlite(dir);
   await db.exec(change);
   await db.close();
 }
 
-/** Every file under `dir` with the hash of its bytes. */
+/** Every file under `dir` with the hash of its bytes (eight read at a time: there are many). */
 async function fingerprint(dir: string) {
+  const files = (await readdir(dir, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.join(entry.parentPath, entry.name));
   const out: Record<string, string> = {};
-  for (const entry of await readdir(dir, { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile()) continue;
-    const file = path.join(entry.parentPath, entry.name);
-    out[path.relative(dir, file)] = createHash('sha256')
-      .update(await readFile(file))
-      .digest('hex');
-  }
+  let next = 0;
+  const reader = async () => {
+    for (let file = files[next++]; file !== undefined; file = files[next++]) {
+      out[path.relative(dir, file)] = createHash('sha256')
+        .update(await readFile(file))
+        .digest('hex');
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, reader));
   return out;
 }
 
@@ -133,9 +145,25 @@ let results: {
   beside: Awaited<ReturnType<typeof outcome>>;
 };
 
+// The setup's work, kept so that the clean-up can wait for it: if the setup fails or runs
+// out of time, reads may still be copying into this test's folder, and removing it under
+// them fails (Windows refuses: EPERM) and leaves it behind.
+let setup: Promise<void> | undefined;
+
 beforeAll(async () => {
   root = await mkdtemp(path.join(tmpdir(), 'tracker-backup-test-'));
+  setup = prepare();
+  await setup;
+}, 150_000);
+
+afterAll(async () => {
+  await setup?.catch(() => undefined);
+  if (root !== undefined) await rm(root, { recursive: true, force: true, maxRetries: 5 });
+});
+
+async function prepare() {
   backup = path.join(root, 'backup');
+  // Every read works in this test's own folder, never in the shared temporary folder.
   work = path.join(root, 'work');
   await makeBackup(backup);
   const deepWork = `${backup}-work/deeper`;
@@ -167,10 +195,10 @@ beforeAll(async () => {
   await writeFile(`${folders.old}.lock`, '999999999');
   const [whole, old, other, noVenue, failing, beside] = await Promise.all([
     outcome(() => readTrackerBackup(backup, { workDir: work })),
-    outcome(() => readTrackerBackup(folders.old)),
-    outcome(() => readTrackerBackup(folders.other)),
-    outcome(() => readTrackerBackup(folders.noVenue)),
-    outcome(() => readTrackerBackup(folders.failing)),
+    outcome(() => readTrackerBackup(folders.old, { workDir: work })),
+    outcome(() => readTrackerBackup(folders.other, { workDir: work })),
+    outcome(() => readTrackerBackup(folders.noVenue, { workDir: work })),
+    outcome(() => readTrackerBackup(folders.failing, { workDir: work })),
     // A folder beside the backup whose name only starts the same is a fine working folder,
     // and one that does not exist yet is made.
     outcome(() => readTrackerBackup(backup, { workDir: deepWork })),
@@ -188,11 +216,7 @@ beforeAll(async () => {
     failing,
     beside,
   };
-}, 150_000);
-
-afterAll(async () => {
-  await rm(root, { recursive: true, force: true });
-});
+}
 
 describe('readTrackerBackup', () => {
   it('reads a whole backup into plain data', async () => {
@@ -317,7 +341,7 @@ describe('readTrackerBackup', () => {
 
   it('says plainly why a folder cannot be read', async () => {
     const problem = (folder: string) =>
-      readTrackerBackup(folder).then(
+      readTrackerBackup(folder, { workDir: work }).then(
         () => 'read',
         (error: unknown) => (error instanceof TrackerBackupError ? error.problem : 'other'),
       );
@@ -340,6 +364,14 @@ describe('readTrackerBackup', () => {
     expect(results.noVenue.problem).toBe('not-a-tracker-backup');
     expect(results.failing.problem).toBe('not-a-tracker-backup');
 
+    // A folder holding a link: the copy, opened as a database, could write through it.
+    const linked = path.join(root, 'linked');
+    await mkdir(path.join(linked, 'base'), { recursive: true });
+    await writeFile(path.join(linked, 'PG_VERSION'), '17\n');
+    await symlink(path.join(root, 'empty'), path.join(linked, 'base', 'elsewhere'), 'junction');
+    expect(await problem(linked)).toBe('unreadable');
+    expect(await readdir(work)).toEqual([]);
+
     // A folder a running stats server holds (this test's own process stands in for it).
     await writeFile(`${backup}.lock`, String(process.pid));
     try {
@@ -355,7 +387,7 @@ describe('readTrackerBackup', () => {
     const corrupt = path.join(root, 'corrupt-cause');
     await mkdir(corrupt);
     await writeFile(path.join(corrupt, 'PG_VERSION'), '17\n');
-    const error = await readTrackerBackup(corrupt).catch((e: unknown) => e);
+    const error = await readTrackerBackup(corrupt, { workDir: work }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(TrackerBackupError);
     expect((error as TrackerBackupError).cause).toBeDefined();
   });

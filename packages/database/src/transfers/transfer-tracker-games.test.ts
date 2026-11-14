@@ -26,6 +26,7 @@ import {
   newStage,
   newTeam,
 } from '../schema/schema.test-helper.ts';
+import { writeDataFolder } from './data-folder.test-helper.ts';
 import { transferTrackerGames, type TransferTrackerGamesOptions } from './index.ts';
 
 const schemaFile = fileURLToPath(new URL('../live-stats/001-schema.sql', import.meta.url));
@@ -146,9 +147,22 @@ function actionsOf(g: number, home: string[], away: string[]): Input[] {
   return list;
 }
 
-/** A made-up backup, written as the tracker's server writes its rows. */
+/**
+ * A made-up backup, written as the tracker's server writes its rows. It is built in
+ * memory and its folder written out once (see writeDataFolder): the hundreds of rows
+ * written straight into a folder on disk were most of this file's setup time.
+ */
 async function makeBackup(dir: string) {
-  const db = new PGlite(dir);
+  const db = new PGlite();
+  try {
+    await fillBackup(db);
+    await writeDataFolder(db, dir);
+  } finally {
+    await db.close();
+  }
+}
+
+async function fillBackup(db: PGlite) {
   await db.exec(await readFile(schemaFile, 'utf8'));
   for (const key of Object.keys(teamNames) as TeamKey[]) {
     await db.query(
@@ -239,7 +253,6 @@ async function makeBackup(dir: string) {
      VALUES ($1, '2025-26', $2, $3, '2026-02-20T00:30:00Z', 'scheduled', '{}')`,
     [randomUUID(), teamIds.owls, teamIds.foxes],
   );
-  await db.close();
 }
 
 /** A made-up league with the season, its four teams and its published games. */
@@ -327,8 +340,11 @@ beforeAll(async () => {
   pglite = await freshSchema();
 });
 afterAll(async () => {
-  await pglite.close();
-  await rm(root, { recursive: true, force: true });
+  try {
+    await pglite?.close();
+  } finally {
+    if (root !== undefined) await rm(root, { recursive: true, force: true, maxRetries: 5 });
+  }
 });
 
 const optionsFor = (

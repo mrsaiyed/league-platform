@@ -35,7 +35,8 @@ export const setupProblems = {
 
 export const backupProblems = {
   missing: 'There is no backup folder there.',
-  unreadable: 'The backup folder could not be copied: a file in it cannot be read.',
+  unreadable:
+    'The backup folder could not be copied: a file in it cannot be read, or it holds a link.',
   'not-a-database': 'That folder holds no tracker database, or one that will not open.',
   'not-a-tracker-backup': 'That database is not a backup of the tracker: its tables are missing.',
   'in-use': 'A running stats server has the backup open. Stop it first.',

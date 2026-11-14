@@ -1,8 +1,9 @@
 import { existsSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { copyFolder } from './copy-folder.ts';
 import type {
   BackupEvent,
   BackupGame,
@@ -57,7 +58,7 @@ export async function readTrackerBackup(
   try {
     const copy = path.join(work, 'db');
     try {
-      await cp(source, copy, { recursive: true });
+      await copyFolder(source, copy);
     } catch (error) {
       throw new TrackerBackupError('unreadable', source, error);
     }
@@ -66,7 +67,9 @@ export async function readTrackerBackup(
     if (await heldByRunningServer(source)) throw new TrackerBackupError('in-use', source);
     return await readCopy(copy, source);
   } finally {
-    await rm(work, { recursive: true, force: true });
+    // Windows can refuse for a moment to remove a file that was just closed (while it is
+    // scanned, say): a read that worked must not fail for that, nor leave the copy behind.
+    await rm(work, { recursive: true, force: true, maxRetries: 5 });
   }
 }
 
