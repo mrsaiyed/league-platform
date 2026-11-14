@@ -295,6 +295,8 @@ describe('the bin: the nightly emptying', () => {
     await age('people', loose, 90);
     // The bin says beforehand which of them the purge leaves.
     const listed = value(await listBin(l.as, {}, deps)).items;
+    // Names through the one name function (T-81), in full for the admin.
+    expect(listed.map((i) => i.name).sort()).toEqual(['Lee Gone', 'Sam Player']);
     expect(listed.find((i) => i.id === personId)?.removedForGoodAt).toBeNull();
     expect(listed.find((i) => i.id === loose)?.removedForGoodAt).toBe(
       new Date(Date.parse(daysAgo(90)) + 30 * day).toISOString(),
