@@ -33,6 +33,9 @@ export const renewScoringSession = defineCommand({
     input,
     tx,
   }): Promise<Result<ScoringSessionReply, RenewScoringSessionError>> => {
+    // The game first, then its session, as every command that writes either does
+    // (ScoringSessionsStore.lockGame).
+    await tx.scoringSessions.lockGame(input.gameId);
     const game = await scorableGame(tx, input.gameId);
     if (!game.ok) return game;
     const now = tx.clock.now();

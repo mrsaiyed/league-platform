@@ -44,17 +44,9 @@ const teamsOf = (s: MemoryGames, gameId: string) => {
   return game === undefined ? [] : [game.homeTeamId, game.awayTeamId];
 };
 
-/** The live game over one state; `lock` is the stand-in's, or none. */
-export function liveGamesOf(
-  s: MemoryTracker,
-  lock: (gameId: string) => Promise<void> = async () => {},
-): LiveGamesStore {
+/** The live game over one state. */
+export function liveGamesOf(s: MemoryTracker): LiveGamesStore {
   return {
-    lock: async (gameId) => {
-      if (!s.games.some((g) => g.id === gameId)) return false;
-      await lock(gameId);
-      return true;
-    },
     findState: async (gameId) => {
       const found = s.states.find((x) => x.gameId === gameId);
       return found === undefined
@@ -103,8 +95,9 @@ const trackerTxOf = (
 ): TrackerTx => ({
   ...gamesTxOf(s, jobs),
   clock,
-  scoringSessions: sessionsOf(s),
-  liveGames: liveGamesOf(s, lock),
+  // The session commands take the same lock, so a takeover and a batch race for real.
+  scoringSessions: sessionsOf(s, lock === undefined ? {} : { lockGame: lock }),
+  liveGames: liveGamesOf(s),
 });
 
 /** Each transaction works on a copy, kept only if it returns (nothing kept on a refusal). */

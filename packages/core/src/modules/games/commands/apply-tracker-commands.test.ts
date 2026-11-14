@@ -52,7 +52,7 @@ const roster: GamePlayer[] = [
   ...awayIds.map((personId, i) => ({ personId, teamId: awayTeamId, jerseyNumber: String(i + 20) })),
 ];
 
-const holding = (fields: Partial<ScoringSession> = {}): ScoringSession => ({
+const holdingSession = (fields: Partial<ScoringSession> = {}): ScoringSession => ({
   id: sessionId,
   gameId,
   accountId: scorekeeperId,
@@ -68,7 +68,7 @@ function setUp(state: Partial<MemoryTracker> = {}) {
     seasons: [{ id: seasonId, programId: 'p1', rules: seasonRulesPreset('high-school') }],
     games: [game(1, { captureMode: 'live' })],
     grants: [scorekeeperGrant, editorGrant],
-    sessions: [holding()],
+    sessions: [holdingSession()],
     players: roster,
     ...state,
   });
@@ -358,7 +358,7 @@ describe('one scorer at a time (T-116, T6 §5)', () => {
   });
 
   it('a session someone else’s account holds is refused, and so is a released one', async () => {
-    const t = setUp({ sessions: [holding({ accountId: editorId })] });
+    const t = setUp({ sessions: [holdingSession({ accountId: editorId })] });
     const theirs = await applyTrackerCommands(t.as(scorekeeperId), batchOf(taps(tipOff)), t.deps);
     expect(statuses(theirs)).toEqual(['refused', 'refused', 'refused']);
     const none = setUp({ sessions: [] });
@@ -587,7 +587,7 @@ describe('a long offline queue replayed (T6 §4, §11)', () => {
 
 describe('forty games at once (T-112)', () => {
   const games = Array.from({ length: 40 }, (_, i) => game(i + 1, { captureMode: 'live' }));
-  const sessions = games.map((g, i) => holding({ id: sessionUuid(i + 1), gameId: g.id }));
+  const sessions = games.map((g, i) => holdingSession({ id: sessionUuid(i + 1), gameId: g.id }));
   const batchFor = (n: number, first = 1) => ({
     gameId: gameUuid(n),
     protocolVersion: 1,
@@ -658,5 +658,82 @@ describe('forty games at once (T-112)', () => {
       ['accepted'],
     ]);
     expect(t.db.state.events.map((e) => e.seq)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe('a takeover and a batch at the same moment (T-111, T-116)', () => {
+  it('a takeover holding the game makes a batch from the old session wait, then refuses it', async () => {
+    let locks = 0;
+    let takeoverHolds = () => {};
+    const holding = new Promise<void>((resolve) => (takeoverHolds = resolve));
+    let letGo = () => {};
+    const gate = new Promise<void>((resolve) => (letGo = resolve));
+    const t = lockingTracker(
+      {
+        games: [game(1, { captureMode: 'live' })],
+        sessions: [holdingSession()],
+        grants: [scorekeeperGrant, { ...scorekeeperGrant, id: 'g2', accountId: editorId }],
+        players: roster,
+      },
+      async () => {
+        locks += 1;
+        // The first to lock is the takeover: it waits there until the batch is queued.
+        if (locks === 1) {
+          takeoverHolds();
+          await gate;
+        }
+      },
+    );
+    const takeover = takeOverScoring(
+      t.as(editorId),
+      { gameId, deviceId: 'phone', confirmed: true, expectedHolderSince: startOfTest },
+      t.deps,
+    );
+    await holding;
+    const late = applyTrackerCommands(t.as(scorekeeperId), batchOf(taps(tipOff)), t.deps);
+    // Give the batch every chance to run: it must still be waiting for the game.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(t.db.state.events).toEqual([]);
+    letGo();
+    expect(await takeover).toMatchObject({ value: { status: 'held-by-you' } });
+    expect(statuses(await late)).toEqual(['refused', 'refused', 'refused']);
+    expect(t.counts.mostHeld).toBe(1);
+    expect(t.db.state.events).toEqual([]);
+  });
+
+  it('a batch holding the game finishes before a takeover touches the session', async () => {
+    let locks = 0;
+    let batchHolds = () => {};
+    const holding = new Promise<void>((resolve) => (batchHolds = resolve));
+    let letGo = () => {};
+    const gate = new Promise<void>((resolve) => (letGo = resolve));
+    const t = lockingTracker(
+      {
+        games: [game(1, { captureMode: 'live' })],
+        sessions: [holdingSession()],
+        grants: [scorekeeperGrant, { ...scorekeeperGrant, id: 'g2', accountId: editorId }],
+        players: roster,
+      },
+      async () => {
+        locks += 1;
+        if (locks === 1) {
+          batchHolds();
+          await gate;
+        }
+      },
+    );
+    const batch = applyTrackerCommands(t.as(scorekeeperId), batchOf(taps(tipOff)), t.deps);
+    await holding;
+    const takeover = takeOverScoring(
+      t.as(editorId),
+      { gameId, deviceId: 'phone', confirmed: true, expectedHolderSince: startOfTest },
+      t.deps,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(t.db.state.sessions.map((x) => x.accountId)).toEqual([scorekeeperId]);
+    letGo();
+    expect(statuses(await batch)).toEqual(['accepted', 'accepted', 'accepted']);
+    expect(await takeover).toMatchObject({ value: { status: 'held-by-you' } });
+    expect(t.db.state.sessions.map((x) => x.accountId)).toEqual([editorId]);
   });
 });

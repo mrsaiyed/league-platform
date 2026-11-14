@@ -29,6 +29,8 @@ export type MemoryScoringOptions = {
   readonly beforeStart?: (state: MemoryScoring) => void;
   /** Runs just before a session is ended: another request ending it first. */
   readonly beforeEnd?: (state: MemoryScoring) => void;
+  /** The stand-in's lock of one game, held until the transaction ends; none by default. */
+  readonly lockGame?: (gameId: string) => Promise<void>;
 };
 
 export function testClock() {
@@ -57,6 +59,11 @@ export function sessionsOf(
   options: MemoryScoringOptions = {},
 ): ScoringSessionsStore {
   return {
+    lockGame: async (gameId) => {
+      if (!s.games.some((g) => g.id === gameId)) return false;
+      await options.lockGame?.(gameId);
+      return true;
+    },
     findForGame: async (gameId) => s.sessions.find((x) => x.gameId === gameId),
     start: async (session) => {
       options.beforeStart?.(s);

@@ -121,7 +121,7 @@ export const applyTrackerCommands = defineCommand({
       );
 
     // T-111: this game only, held to the end of the transaction.
-    if (!(await tx.liveGames.lock(gameId))) {
+    if (!(await tx.scoringSessions.lockGame(gameId))) {
       return ok(reply(0, refuseAll('unknown-game', messages['unknown-game'], new Set())));
     }
     const game = await tx.games.find(gameId);

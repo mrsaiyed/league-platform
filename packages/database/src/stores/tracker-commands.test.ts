@@ -16,6 +16,9 @@ import type { PGlite } from '@electric-sql/pglite';
 import { seasonRulesPreset } from '@srleagues/contracts';
 import {
   applyTrackerCommands,
+  openScoringSession,
+  releaseScoringSession,
+  renewScoringSession,
   engineRulesOf,
   takeOverScoring,
   type AccessTx,
@@ -59,6 +62,10 @@ const clock = { at: startOfTest, now: () => clock.at };
 let pglite: PGlite;
 let db: DatabaseHandle;
 let deps: CommandDeps<Tx>;
+/** Every call to the scoring sessions store, in order, while recording is on. */
+const calls: string[] = [];
+let recording = false;
+let recorded: CommandDeps<Tx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
@@ -77,6 +84,31 @@ beforeAll(async () => {
     }),
   );
   deps = { transaction, events: [], log: () => {}, now: () => 0 };
+  // The same stores, with the sessions store's calls written down in order.
+  const watched = commandTransaction(db, (scope): Tx => {
+    const sessions = scoringSessionsStore(scope);
+    const spied = Object.fromEntries(
+      Object.entries(sessions).map(([name, call]) => [
+        name,
+        (...args: never[]) => {
+          if (recording) calls.push(name);
+          return (call as (...a: never[]) => unknown)(...args);
+        },
+      ]),
+    ) as typeof sessions;
+    return {
+      jobs: { enqueue: async (_job: Job) => {} },
+      games: gamesStore(scope),
+      scoringSessions: spied,
+      liveGames: liveGamesStore(scope),
+      clock,
+      leagues: leaguesStore(scope, { platformStaff: [] }),
+      divisions: divisionsStore(scope),
+      access: accessStore(scope),
+      activity: activityLogStore(scope),
+    };
+  });
+  recorded = { transaction: watched, events: [], log: () => {}, now: () => 0 };
 });
 afterAll(async () => {
   await db.close();
@@ -415,5 +447,60 @@ describe('the tracker’s commands on the database (T6 §1, §3)', () => {
       [l.leagueId],
     );
     expect(counts.rows[0]).toEqual({ games: 40, events: 80 });
+  });
+});
+
+// T-111 with T-116: a batch and a takeover of one game must go one after the other.
+// PGlite runs one transaction at a time, so what can be shown here is the order each
+// command works in: the game's lock (a row lock, lock-live-game.ts) before anything
+// touches the session. On PostgreSQL the second to arrive then waits for the first to
+// commit; the overlap itself is tried in core (apply-tracker-commands.test.ts).
+describe('every command takes the game before its session (T-111, T-116)', () => {
+  it('opening, renewing, taking over, sending taps and leaving all lock the game first', async () => {
+    const l = await leagueWithGames();
+    const [gameId = '', sessionId = ''] = [l.gameIds[0], l.sessionIds[0]];
+    const firstCall = async (run: () => Promise<unknown>) => {
+      calls.length = 0;
+      recording = true;
+      try {
+        await run();
+      } finally {
+        recording = false;
+      }
+      return calls[0];
+    };
+    expect(
+      await firstCall(() =>
+        applyTrackerCommands(
+          l.as(l.first),
+          batch(gameId, sessionId, taps([{ type: 'start' }])),
+          recorded,
+        ),
+      ),
+    ).toBe('lockGame');
+    expect(
+      await firstCall(() =>
+        openScoringSession(l.as(l.second), { gameId, deviceId: 'phone' }, recorded),
+      ),
+    ).toBe('lockGame');
+    expect(
+      await firstCall(() => renewScoringSession(l.as(l.first), { gameId, sessionId }, recorded)),
+    ).toBe('lockGame');
+    let taken = '';
+    expect(
+      await firstCall(async () => {
+        const reply = await takeOverScoring(
+          l.as(l.second),
+          { gameId, deviceId: 'phone', confirmed: true, expectedHolderSince: startOfTest },
+          recorded,
+        );
+        taken = reply.ok && reply.value.status === 'held-by-you' ? reply.value.sessionId : '';
+      }),
+    ).toBe('lockGame');
+    expect(
+      await firstCall(() =>
+        releaseScoringSession(l.as(l.second), { gameId, sessionId: taken }, recorded),
+      ),
+    ).toBe('lockGame');
   });
 });

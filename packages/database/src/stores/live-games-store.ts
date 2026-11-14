@@ -7,14 +7,12 @@ import {
   insertGameEvents,
   listGamePlayers,
   listTakenCommands,
-  lockLiveGame,
   saveGameLines,
   saveGameState,
 } from '../queries/index.ts';
 
 export function liveGamesStore(scope: LeagueScope): LiveGamesStore {
   return {
-    lock: (gameId) => lockLiveGame(scope, gameId),
     findState: (gameId) => findSavedGameState(scope, gameId),
     takenCommands: (gameId, commandIds) => listTakenCommands(scope, gameId, commandIds),
     addEvents: (events) => insertGameEvents(scope, events),

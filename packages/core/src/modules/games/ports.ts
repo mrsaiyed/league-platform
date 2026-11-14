@@ -153,6 +153,15 @@ export type ScoringSession = {
 export type NewScoringSession = Omit<ScoringSession, 'id'>;
 
 export type ScoringSessionsStore = {
+  /**
+   * Holds this one game until the transaction ends (T-111): another transaction that
+   * locks it waits here, while every other game goes on (T-112). Every command that
+   * writes a game's session or its live game takes it first, then touches the session,
+   * always in that order: a batch of taps and a takeover of the same game go one after
+   * the other, so a batch from a displaced session can never commit after the takeover.
+   * False if the game is not in this league.
+   */
+  readonly lockGame: (gameId: string) => Promise<boolean>;
   /** The game's session, whether its lease has run out or not. */
   readonly findForGame: (gameId: string) => Promise<ScoringSession | undefined>;
   /**
@@ -204,14 +213,11 @@ export type GamePlayer = {
 /** A box score line as the live game writes it: a line with the number worn in this game. */
 export type LiveGameLine = GameLine & { readonly jerseyNumber: string | null };
 
-/** The live game's storage (T3 §8, T6 §1): its lock, state, events and box score lines. */
+/**
+ * The live game's storage (T3 §8, T6 §1): its state, events and box score lines. Its
+ * lock is the game's (ScoringSessionsStore.lockGame), shared with the session commands.
+ */
 export type LiveGamesStore = {
-  /**
-   * Holds this one game until the transaction ends (T-111): another batch for it waits
-   * here, while batches for every other game go on (T-112). False if the game is not
-   * in this league.
-   */
-  readonly lock: (gameId: string) => Promise<boolean>;
   readonly findState: (gameId: string) => Promise<SavedGameState | undefined>;
   /** Of these command ids, the ones the game has already taken (T3 §12). */
   readonly takenCommands: (
