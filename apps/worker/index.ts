@@ -8,3 +8,4 @@ export {
   type WorkerHealth,
 } from './src/health.ts';
 export { jobHandlers, type JobHandlerDeps } from './src/jobs/job-handlers.ts';
+export { runImport, BadImportJobError, type ImportJobDeps } from './src/jobs/import-job.ts';
