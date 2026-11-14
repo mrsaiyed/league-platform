@@ -7,10 +7,12 @@ import {
   extendScoringSession,
   findScoringSession,
   insertScoringSession,
+  lockLiveGame,
 } from '../queries/index.ts';
 
 export function scoringSessionsStore(scope: LeagueScope): ScoringSessionsStore {
   return {
+    lockGame: (gameId) => lockLiveGame(scope, gameId),
     findForGame: (gameId) => findScoringSession(scope, gameId),
     start: (session) => insertScoringSession(scope, session),
     extend: (gameId, sessionId, heldUntil) =>

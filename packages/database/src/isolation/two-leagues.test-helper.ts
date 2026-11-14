@@ -71,6 +71,8 @@ export type LeagueRecords = MadeLeague & {
   gameAssignmentId: string;
   /** The final game's two events, its state, the player's line in it, and a session scoring the upcoming game. */
   gameEventIds: string[];
+  /** The command ids of those two events, as the tracker sent them. */
+  gameCommandIds: string[];
   gameStateId: string;
   playerGameStatsId: string;
   scoringSessionId: string;
@@ -390,16 +392,19 @@ async function seededLeague(
   // The live game: the final game's events, state and the player's line; a session
   // scoring the upcoming game; a walk-up player added at the final game's table.
   const gameEventIds: string[] = [];
+  const gameCommandIds: string[] = [];
   for (const [seq, type, payload] of [
     [1, 'start', {}],
     [2, 'score', { side: 'home', playerId: personId, points: 2 }],
   ] as const) {
+    const commandId = randomUUID();
+    gameCommandIds.push(commandId);
     gameEventIds.push(
       await id(
         pglite,
         `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at, account_id)
          values ($1, $2, $3, $4, $5, $6, '2026-12-06T18:05:00Z', $7)`,
-        [leagueId, gameId, seq, randomUUID(), type, JSON.stringify(payload), member.accountId],
+        [leagueId, gameId, seq, commandId, type, JSON.stringify(payload), member.accountId],
       ),
     );
   }
@@ -561,6 +566,7 @@ async function seededLeague(
     upcomingGameId,
     gameAssignmentId,
     gameEventIds,
+    gameCommandIds,
     gameStateId,
     playerGameStatsId,
     scoringSessionId,

@@ -95,6 +95,7 @@ import {
   releaseScoringSession,
   renewScoringSession,
   takeOverScoring,
+  applyTrackerCommands,
   renameShortName,
   resendInvitation,
   revokeGrant,
@@ -117,6 +118,7 @@ import {
   type PeopleTx,
   type SchedulingTx,
   type ScoringTx,
+  type TrackerTx,
   type SettingRegistry,
   type StandingsTx,
   type TeamsTx,
@@ -157,6 +159,7 @@ import { peopleStore } from './people-store.ts';
 import { importsStore } from './imports-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
 import { scoringSessionsStore } from './scoring-sessions-store.ts';
+import { liveGamesStore } from './live-games-store.ts';
 import { standingsStore } from './standings-store.ts';
 import { teamsStore } from './teams-store.ts';
 
@@ -204,6 +207,7 @@ let leaguesDeps: CommandDeps<LeaguesTx & StandingsTx>;
 let schedulingDeps: CommandDeps<SchedulingTx>;
 let gamesDeps: CommandDeps<GamesTx>;
 let scoringDeps: CommandDeps<ScoringTx>;
+let trackerDeps: CommandDeps<TrackerTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
 let teamsDeps: CommandDeps<TeamsTx>;
 let standingsDeps: CommandDeps<StandingsTx>;
@@ -220,6 +224,7 @@ beforeAll(async () => {
     imports: importsStore(scope),
     games: gamesStore(scope),
     scoringSessions: scoringSessionsStore(scope),
+    liveGames: liveGamesStore(scope),
     clock: { now: () => matrixNow },
     people: peopleStore(scope),
     teams: teamsStore(scope),
@@ -234,6 +239,7 @@ beforeAll(async () => {
   schedulingDeps = { transaction, events: [], ...rest };
   gamesDeps = { transaction, events: [], ...rest };
   scoringDeps = { transaction, events: [], ...rest };
+  trackerDeps = { transaction, events: [], ...rest };
   peopleDeps = { transaction, events: [], ...rest };
   teamsDeps = { transaction, events: [], ...rest };
   importsDeps = { transaction, events: [], ...rest };
@@ -932,6 +938,20 @@ const gameCommandRows: readonly Row[] = [
       return { gameId, deviceId: 'matrix-tablet', confirmed: true, expectedHolderSince: since };
     },
     (c, i) => takeOverScoring(c, i, scoringDeps),
+  ),
+  // The tracker's taps (T6 §3): whoever may score the game. With no session held, each
+  // command is answered refused, which is an allowed call that changes nothing.
+  ...gameRows(
+    'games.apply_tracker_commands',
+    'send the tracker’s taps',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      protocolVersion: 1,
+      sessionId: randomUUID(),
+      commands: [{ commandId: randomUUID(), at: matrixNow, input: { type: 'start' } }],
+    }),
+    (c, i) => applyTrackerCommands(c, i, trackerDeps),
   ),
 ];
 
