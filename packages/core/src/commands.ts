@@ -47,6 +47,7 @@ import {
 import { createPerson, listPeople, removePerson, updatePerson } from './modules/people/index.ts';
 import {
   applyFixtureImport,
+  discardFixtureImport,
   getFixtureImport,
   recordImportedScores,
   startFixtureImport,
@@ -137,6 +138,7 @@ export const commands = commandRegistry([
   startFixtureImport,
   applyFixtureImport,
   undoFixtureImport,
+  discardFixtureImport,
   recordImportedScores,
   getFixtureImport,
   createPerson,

@@ -4,6 +4,7 @@ export {
   type ApplyFixtureImportError,
   type FixtureImportApplied,
 } from './apply-fixture-import.ts';
+export { discardFixtureImport, type DiscardFixtureImportError } from './discard-fixture-import.ts';
 export {
   getFixtureImport,
   previewGameLimit,
@@ -23,6 +24,7 @@ export type {
   NewImport,
 } from './ports.ts';
 export {
+  discardUnreadImport,
   importsRunJob,
   readFixtureImport,
   type ReadFixtureImportResult,

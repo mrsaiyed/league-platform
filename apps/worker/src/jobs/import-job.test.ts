@@ -2,6 +2,7 @@
 // run does no harm. On a one-import stand-in; the real stores run it in
 // packages/database (fixture-import-commands.test.ts).
 import {
+  maxJobAttempts,
   type ImportRecord,
   type ImportsTx,
   type QueuedJob,
@@ -17,7 +18,7 @@ const importId = '01900000-0000-7000-8000-0000001a0001';
 const teamA = '01900000-0000-7000-8000-0000000d0011';
 const teamB = '01900000-0000-7000-8000-0000000d0012';
 
-function world(text: string) {
+function world(text: string, options: { readFails?: boolean } = {}) {
   const state: { record: ImportRecord; opened: { accountId: string | null }[] } = {
     opened: [],
     record: {
@@ -40,13 +41,16 @@ function world(text: string) {
     const tx = {
       imports: {
         find: async (id: string) => (id === state.record.id ? state.record : undefined),
-        seasonNames: async () => ({
-          teams: [
-            { id: teamA, name: 'Team A' },
-            { id: teamB, name: 'Team B' },
-          ],
-          venues: [],
-        }),
+        seasonNames: async () => {
+          if (options.readFails) throw new Error('the database went away');
+          return {
+            teams: [
+              { id: teamA, name: 'Team A' },
+              { id: teamB, name: 'Team B' },
+            ],
+            venues: [],
+          };
+        },
         save: async (
           _id: string,
           change: { status: ImportRecord['status']; report?: unknown },
@@ -117,5 +121,20 @@ describe('the imports.run job', () => {
       'email.send',
       'imports.run',
     ]);
+  });
+
+  it('keeps the text while the read may still be retried, and drops it when the last attempt fails', async () => {
+    const { state, handler, job } = world('Date,Home,Away\n2027-01-02,Team A,Team B', {
+      readFails: true,
+    });
+    await expect(handler({ ...job({ importId }), attempt: 1 })).rejects.toThrow('went away');
+    expect(state.record.status).toBe('reading');
+    expect(JSON.stringify(state.record.report)).toContain('upload');
+    await expect(handler({ ...job({ importId }), attempt: maxJobAttempts })).rejects.toThrow(
+      'went away',
+    );
+    expect(state.record.status).toBe('failed');
+    expect(JSON.stringify(state.record.report)).not.toContain('upload');
+    expect(JSON.stringify(state.record.report)).not.toContain('Team A');
   });
 });

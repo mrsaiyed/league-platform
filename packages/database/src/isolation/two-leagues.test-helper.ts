@@ -84,6 +84,8 @@ export type LeagueRecords = MadeLeague & {
   importId: string;
   /** A fixtures import read and ready to apply: one game between the team and its opponent. */
   readyImportId: string;
+  /** A fixtures import still waiting to be read, holding the uploaded text. */
+  readingImportId: string;
 };
 
 export type TwoLeagues = {
@@ -481,6 +483,18 @@ async function seededLeague(
       JSON.stringify(readyReport(teamId, opponentId, venueId)),
     ],
   );
+  const readingImportId = await id(
+    pglite,
+    `insert into imports (league_id, season_id, kind, status, account_id, file_name, report)
+     values ($1, $2, 'fixtures', 'reading', $3, $4, $5)`,
+    [
+      leagueId,
+      seasonId,
+      ownerId,
+      `${m}-reading.csv`,
+      JSON.stringify({ version: 1, upload: 'Date,Home,Away' }),
+    ],
+  );
   // A job a worker holds. It carries ids only (T-131), so no marker: its ids are the league's.
   const jobLeaseToken = randomUUID();
   const jobId = await id(
@@ -535,6 +549,7 @@ async function seededLeague(
     seasonPlayerTotalsId,
     importId,
     readyImportId,
+    readingImportId,
   };
 }
 

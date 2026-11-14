@@ -299,6 +299,9 @@ export const en = {
     'There is no schedule draft to publish.',
   'error.scheduling.preview_schedule_publish.draft-unreadable':
     'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.imports.discard_fixture_import.import-not-found': 'That import is not there.',
+  'error.imports.discard_fixture_import.not-reading':
+    'This import is not waiting to be read, so there is nothing to discard.',
   // Activity log lines (A-6, T-226): the key is `activity.` and the command's name;
   // the values come from the entry's details. {role} is a role's name from above.
   'activity.access.invite': 'Invited someone as {role}',
@@ -350,6 +353,7 @@ export const en = {
   'activity.imports.start_fixture_import': 'Uploaded a fixtures file to import',
   'activity.imports.apply_fixture_import':
     'Added the games of a fixtures file to the schedule draft',
+  'activity.imports.discard_fixture_import': 'Gave up on a fixtures file that was not read',
   'activity.imports.undo_fixture_import': 'Undid a fixtures import',
   'activity.imports.record_imported_scores': 'Recorded final scores from a fixtures import',
   'activity.scheduling.publish_schedule': 'Published the schedule',

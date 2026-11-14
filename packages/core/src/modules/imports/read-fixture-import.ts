@@ -52,3 +52,24 @@ export async function readFixtureImport(
   );
   return 'read';
 }
+
+/**
+ * Gives up on an import still `reading`: marks it failed and replaces the uploaded text with
+ * a report that holds none (T-80). Used when the read can never succeed (the job failed for
+ * good, or was lost) so the text does not stay in the row. False if it is not `reading`.
+ */
+export async function discardUnreadImport(tx: ImportsTx, importId: string): Promise<boolean> {
+  const found = await tx.imports.find(importId);
+  if (found === undefined || found.kind !== 'fixtures' || found.status !== 'reading') {
+    return false;
+  }
+  const saved = await tx.imports.save(
+    found.id,
+    {
+      status: 'failed',
+      report: failedReport('The file could not be read in time. Upload it again.'),
+    },
+    found.version,
+  );
+  return saved !== undefined;
+}

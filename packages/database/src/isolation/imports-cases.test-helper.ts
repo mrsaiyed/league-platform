@@ -4,6 +4,7 @@
 // change, a score waiting for the upcoming game) and a ready one with a single game.
 import {
   applyFixtureImport,
+  discardFixtureImport,
   getFixtureImport,
   recordImportedScores,
   startFixtureImport,
@@ -83,4 +84,9 @@ registerCommandCase(recordImportedScores, harnessTx, {
 registerCommandCase(getFixtureImport, harnessTx, {
   name: "read the target's ready import",
   input: (target) => ({ importId: target.readyImportId }),
+});
+
+registerCommandCase(discardFixtureImport, harnessTx, {
+  name: "give up on the target's unread import",
+  input: (target) => ({ importId: target.readingImportId }),
 });

@@ -17,7 +17,7 @@ export type ImportRecord = {
   readonly status: ImportStatus;
   readonly accountId: string;
   readonly fileName: string | null;
-  /** While `reading`, holds the uploaded text (see upload-document.ts); once read, the report. */
+  /** While `reading`, holds the uploaded text (see import-documents.ts); once read, the report. */
   readonly report: unknown;
   readonly created: unknown;
   readonly appliedAt: string | null;
