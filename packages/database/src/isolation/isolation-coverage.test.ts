@@ -109,6 +109,10 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.createPgBoss, "makes pg-boss for its own schema; reads no league's rows"],
   [databasePackage.createDatabase, 'opens connections; reads no rows'],
   [databasePackage.checkLoginRole, "reads the login role's facts from pg_roles only"],
+  [
+    databasePackage.createDatabaseSignInStore,
+    'the sign-in store (record 052): runs as sign_in_store, which reaches only schema sign_in and no league table (schema/app-role.test.ts)',
+  ],
   [databasePackage.applyMigrations, 'the migration runner (T-48): schema, as the owner'],
   [databasePackage.runMigrations, 'the migration runner (T-48): schema, as the owner'],
   [databasePackage.loadMigrations, 'reads migration files from disk'],
@@ -134,6 +138,24 @@ const narrowLookups = new Map<unknown, string>([
   [
     databasePackage.findLeagueByShortName,
     'the league one short name in an address names (find_league_by_slug): id, short name, state',
+  ],
+  // Record 052: the account functions of record 008. None reads or writes a league's
+  // data for another league; each answers for one sign-in or one account only.
+  [
+    databasePackage.findAccountOfSignIn,
+    'the account one sign-in id is (account_of_sign_in): the account id only, no email taken',
+  ],
+  [
+    databasePackage.accountForSignIn,
+    'the account for a proved sign-in (account_for_sign_in): finds, links or makes; returns an id only',
+  ],
+  [
+    databasePackage.createOwnProfile,
+    "the own profile of the account set (create_own_profile): that account's personal rows only",
+  ],
+  [
+    databasePackage.eraseAccount,
+    'erases the account set (erase_account): its personal rows, its sign-in rows, and its own grants in every league ended, by design (T-52); tested in erase-account.test.ts',
   ],
 ]);
 
