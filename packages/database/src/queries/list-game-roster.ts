@@ -1,7 +1,8 @@
 // The players (not coaches) on the rosters of a game's two teams in the scope's league,
 // for the box score grid (step 2.64): those who have left the team since included
 // (R-17), as they may have played the game. A person with several entries on one team
-// is listed once, by the entry still open if there is one. Only names and the jersey
+// is listed once, by the entry still open if there is one. A person in the bin, and a
+// team in the bin, are not listed (A-5, T-45). Only names and the jersey
 // are read, never birth dates or contact details (R-16). Every table is filtered to
 // the league (T-28).
 import type { GameRosterPlayer } from '@srleagues/core';
@@ -23,6 +24,9 @@ export async function listGameRoster(
           ]),
         ),
     )
+    .innerJoin('teams as t', (join) =>
+      join.onRef('t.league_id', '=', 'r.league_id').onRef('t.id', '=', 'r.team_id'),
+    )
     .innerJoin('people as p', (join) =>
       join.onRef('p.league_id', '=', 'r.league_id').onRef('p.id', '=', 'r.person_id'),
     )
@@ -37,7 +41,10 @@ export async function listGameRoster(
     ])
     .where('g.league_id', '=', scope.leagueId)
     .where('r.league_id', '=', scope.leagueId)
+    .where('t.league_id', '=', scope.leagueId)
     .where('p.league_id', '=', scope.leagueId)
+    .where('t.deleted_at', 'is', null)
+    .where('p.deleted_at', 'is', null)
     .where('g.id', '=', gameId)
     .where('r.role', 'in', ['player', 'captain'])
     .orderBy('r.left_on', (o) => o.asc().nullsFirst())

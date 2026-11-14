@@ -181,6 +181,24 @@ describe('a box score entered afterwards (step 2.64)', () => {
     ]);
   });
 
+  it('lists neither a person in the bin nor a team in the bin', async () => {
+    const s = await season();
+    await pglite.query('update people set deleted_at = now() where league_id = $1 and id = $2', [
+      s.l.leagueId,
+      s.ada,
+    ]);
+    expect(await getBoxScoreSheet(s.ctx, { gameId: s.paper }, deps)).toMatchObject({
+      value: { players: [{ teamId: s.away, personId: s.bo }] },
+    });
+    await pglite.query('update teams set deleted_at = now() where league_id = $1 and id = $2', [
+      s.l.leagueId,
+      s.away,
+    ]);
+    expect(await getBoxScoreSheet(s.ctx, { gameId: s.paper }, deps)).toMatchObject({
+      value: { players: [] },
+    });
+  });
+
   it('shows the sheet, refuses a tracked game, and is corrected by reopening', async () => {
     const s = await season();
     const sheet = await getBoxScoreSheet(s.ctx, { gameId: s.paper }, deps);
