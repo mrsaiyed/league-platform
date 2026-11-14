@@ -25,6 +25,11 @@ export type QueuedCommand = {
   | { readonly state: 'waiting' }
   /** Refused: kept so the scorekeeper can be told, never sent again. */
   | { readonly state: 'refused'; readonly refusal: CommandRefusal }
+  /**
+   * Not saved: made under a session that lost the game, so never sent (T6 §5). Kept
+   * until the scorekeeper has seen the list, so a reload does not lose it.
+   */
+  | { readonly state: 'not-saved' }
 );
 
 /** What one answer from the server changes, written together or not at all. */
@@ -32,6 +37,8 @@ export type QueueSettlement = {
   /** Commands to drop: the server has them (accepted or duplicate), or they are given up. */
   readonly remove?: readonly string[];
   readonly refuse?: readonly { readonly commandId: string; readonly refusal: CommandRefusal }[];
+  /** Commands to keep as not saved: never sent again, kept until they are removed. */
+  readonly notSaved?: readonly string[];
 };
 
 /**

@@ -10,8 +10,9 @@
 // The connection is let go when another tab opens a newer version (versionchange) or
 // the browser closes it (close), and opened again on the next use (record 024).
 //
-// The stored shape is QueuedCommand. Its `sessionId` came later and is optional, so
-// rows stored before it are read as they are, with no step. If a later release changes
+// The stored shape is QueuedCommand. Its `sessionId` and the `not-saved` state came
+// later; rows stored before them are read as they are, with no step, and an older build
+// sends only `waiting` rows, so it never sends a `not-saved` one. If a later release changes
 // the shape in a way older rows do not fit, add a step to
 // `upgradeSteps`, converting the old rows through the upgrade's transaction: a queue
 // left on a device before the release must still be read (T-127). A device may skip
@@ -152,10 +153,11 @@ export async function openIndexedDbQueueStorage(
       });
     },
 
-    async settle(gameId, { remove = [], refuse = [] }: QueueSettlement) {
+    async settle(gameId, { remove = [], refuse = [], notSaved = [] }: QueueSettlement) {
       const dropped = new Set(remove);
       const refusals = new Map(refuse.map((r) => [r.commandId, r.refusal]));
-      if (dropped.size === 0 && refusals.size === 0) return;
+      const setAside = new Set(notSaved);
+      if (dropped.size === 0 && refusals.size === 0 && setAside.size === 0) return;
       await write(undefined, (commands) => {
         const walk = commands.index(byGame).openCursor(gameId);
         walk.onsuccess = () => {
@@ -166,6 +168,10 @@ export async function openIndexedDbQueueStorage(
           const refusal = refusals.get(id);
           if (dropped.has(id)) cursor.delete();
           else if (refusal !== undefined) cursor.update({ ...row, state: 'refused', refusal });
+          else if (setAside.has(id)) {
+            const { refusal: _refusal, ...kept } = row as Row & { refusal?: unknown };
+            cursor.update({ ...kept, state: 'not-saved' });
+          }
           cursor.continue();
         };
       });

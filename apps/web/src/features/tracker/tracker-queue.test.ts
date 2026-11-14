@@ -430,6 +430,54 @@ describe('tracker queue: the done test, each case left in a known state', () => 
     expect(server.saved).toEqual([commandId(3)]);
   });
 
+  it('keeps taps set aside as not saved, never sends them, and a new queue does not either', async () => {
+    const { queue, server, storage, clock, open } = setup();
+    for (const n of [1, 2, 3]) server.refuse.set(commandId(n), 'session-not-held');
+    for (const n of [1, 2, 3]) await queue.enqueue(tap(n));
+    await queue.start();
+    await queue.idle();
+    await queue.setAside([commandId(1), commandId(2)]);
+    expect(queue.status().halted).not.toBeNull();
+    await queue.setAside([commandId(3)]);
+    expect(queue.status()).toMatchObject({ waiting: 0, waitingTaps: [], halted: null });
+    server.refuse.clear();
+    await queue.idle();
+    expect(server.saved).toEqual([]);
+
+    // The page is reloaded: the taps are still held as not saved, and still not sent.
+    queue.stop();
+    const reloaded = open();
+    await reloaded.start();
+    await reloaded.idle();
+    expect(reloaded.status()).toMatchObject({ waiting: 0, refused: [] });
+    expect(await held(storage)).toEqual([1, 2, 3].map((n) => [commandId(n), 'not-saved']));
+    await reloaded.forget([commandId(1)]);
+    expect((await held(storage)).map(([id]) => id)).toEqual([commandId(2), commandId(3)]);
+    await clock.advance(minute);
+    expect(server.saved).toEqual([]);
+  });
+
+  it('says which taps are waiting, and when the server last said it had some (L1)', async () => {
+    const { queue, server, clock } = setup();
+    server.mode = 'down';
+    await queue.start();
+    for (const n of [1, 2]) await queue.enqueue(tap(n));
+    expect(queue.status().waitingTaps).toEqual([tap(1), tap(2)]);
+    expect(queue.status().savedAt).toBeNull();
+    await clock.advance(minute);
+    server.mode = 'up';
+    const when = clock.now();
+    queue.wake();
+    await queue.idle();
+    expect(queue.status()).toMatchObject({ waiting: 0, waitingTaps: [], savedAt: when });
+    // A refusal is an answer, but saves nothing: the time stays.
+    server.refuse.set(commandId(3), 'rule');
+    await clock.advance(minute);
+    await queue.enqueue(tap(3));
+    await queue.idle();
+    expect(queue.status().savedAt).toBe(when);
+  });
+
   it('a halt after an outage clears the offline clock: the server did answer', async () => {
     const { queue, server, clock } = setup();
     server.mode = 'down';

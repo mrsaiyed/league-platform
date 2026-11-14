@@ -32,16 +32,21 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
     async list(gameId) {
       return structuredClone(held.filter((entry) => entry.gameId === gameId));
     },
-    async settle(gameId, { remove = [], refuse = [] }: QueueSettlement) {
+    async settle(gameId, { remove = [], refuse = [], notSaved = [] }: QueueSettlement) {
       const dropped = new Set(remove);
       const refusals = new Map(refuse.map((r) => [r.commandId, r.refusal]));
+      const setAside = new Set(notSaved);
       held = held.flatMap((entry): QueuedCommand[] => {
         if (entry.gameId !== gameId) return [entry];
-        if (dropped.has(entry.command.commandId)) return [];
-        const refusal = refusals.get(entry.command.commandId);
-        if (refusal === undefined) return [entry];
-        const { state: _state, ...kept } = entry;
-        return [structuredClone({ ...kept, state: 'refused', refusal })];
+        const id = entry.command.commandId;
+        if (dropped.has(id)) return [];
+        const { gameId: game, protocolVersion, command } = entry;
+        const madeUnder = entry.sessionId === undefined ? {} : { sessionId: entry.sessionId };
+        const kept = { gameId: game, protocolVersion, command, ...madeUnder };
+        const refusal = refusals.get(id);
+        if (refusal !== undefined) return [structuredClone({ ...kept, state: 'refused', refusal })];
+        if (setAside.has(id)) return [structuredClone({ ...kept, state: 'not-saved' })];
+        return [entry];
       });
     },
     all: () => structuredClone(held),

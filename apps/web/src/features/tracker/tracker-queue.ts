@@ -75,6 +75,11 @@ export type RefusedCommand = {
 export type QueueStatus = {
   /** Taps stored and not yet answered for, including any being sent now. */
   readonly waiting: number;
+  /**
+   * Those taps, oldest first, so the screens can say which plays are not on the server
+   * yet (finding L1). Read with the count, so the two always agree.
+   */
+  readonly waitingTaps: readonly TrackerCommand[];
   /** Taps the server refused, oldest first, until `forget` drops them. */
   readonly refused: readonly RefusedCommand[];
   /** True while the queue is sending or about to. */
@@ -93,6 +98,11 @@ export type QueueStatus = {
   readonly storageFailure: StorageFailure | null;
   /** The game's sequence number in the server's latest answer. */
   readonly sequence: number | null;
+  /**
+   * When the server last answered that it has taps of this queue (accepted or
+   * duplicate), in clock milliseconds; null until it has (finding L1).
+   */
+  readonly savedAt: number | null;
 };
 
 export type StorageFailure = { readonly code: QueueErrorCode; readonly since: number };
@@ -137,6 +147,11 @@ export type TrackerQueue = {
    * A halt is cleared once no waiting tap is left for it to hold back.
    */
   forget(commandIds: readonly string[]): Promise<void>;
+  /**
+   * Keeps waiting taps as not saved: never sent, still stored until `forget`, so the
+   * list survives a reload (T6 §5). A halt is cleared as `forget` clears it.
+   */
+  setAside(commandIds: readonly string[]): Promise<void>;
   status(): QueueStatus;
   /** Called with the new status after every change. Returns the unsubscribe. */
   subscribe(listener: (status: QueueStatus) => void): () => void;
@@ -167,12 +182,14 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
 
   let current: QueueStatus = {
     waiting: 0,
+    waitingTaps: [],
     refused: [],
     sending: false,
     halted: null,
     unansweredSince: null,
     storageFailure: null,
     sequence: null,
+    savedAt: null,
   };
   const listeners = new Set<(status: QueueStatus) => void>();
   let started = false;
@@ -216,8 +233,12 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     const list = await stored('storage-read-failed', () => storage.list(gameId));
     if (ticket > readsShown) {
       readsShown = ticket;
+      const waitingTaps = list.flatMap((entry) =>
+        entry.state === 'waiting' ? [entry.command] : [],
+      );
       update({
-        waiting: list.filter((entry) => entry.state === 'waiting').length,
+        waiting: waitingTaps.length,
+        waitingTaps,
         refused: list.flatMap((entry) =>
           entry.state === 'refused' ? [{ command: entry.command, refusal: entry.refusal }] : [],
         ),
@@ -262,8 +283,12 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     update({ unansweredSince: null, ...change });
   };
 
-  const settle = (remove: readonly string[], refuse: readonly RefusedEntry[]): Promise<void> =>
-    stored('storage-write-failed', () => storage.settle(gameId, { remove, refuse }));
+  const settle = (
+    remove: readonly string[],
+    refuse: readonly RefusedEntry[],
+    notSaved: readonly string[] = [],
+  ): Promise<void> =>
+    stored('storage-write-failed', () => storage.settle(gameId, { remove, refuse, notSaved }));
 
   const nextBatch = (list: readonly QueuedCommand[], session: string): CommandBatch | null => {
     const waiting = list.filter((entry) => entry.state === 'waiting');
@@ -356,6 +381,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     answered({
       sequence: Math.max(current.sequence ?? 0, outcome.reply.sequence),
       ...(halt === null ? {} : { halted: halt }),
+      ...(remove.length === 0 ? {} : { savedAt: clock.now() }),
     });
     await refresh();
     return halt === null;
@@ -387,6 +413,17 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     }
   };
 
+  /** Drops taps, or keeps them as not saved; either way they are never sent. */
+  const putAway = async (remove: readonly string[], notSaved: readonly string[]) => {
+    await settle(remove, [], notSaved);
+    const list = await refresh();
+    // Nothing left for the halt to hold back: the queue is free again.
+    if (current.halted !== null && !list.some((entry) => entry.state === 'waiting')) {
+      update({ halted: null });
+    }
+    kick();
+  };
+
   return {
     async start() {
       if (started || stopped) return;
@@ -409,7 +446,9 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       try {
         await refresh();
       } catch {
-        if (added === 'added' && readsShown === shown) update({ waiting: current.waiting + 1 });
+        if (added === 'added' && readsShown === shown) {
+          update({ waiting: current.waiting + 1, waitingTaps: [...current.waitingTaps, command] });
+        }
       }
       kick();
     },
@@ -425,15 +464,9 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       kick();
     },
 
-    async forget(commandIds) {
-      await settle(commandIds, []);
-      const list = await refresh();
-      // Nothing left for the halt to hold back: the queue is free again.
-      if (current.halted !== null && !list.some((entry) => entry.state === 'waiting')) {
-        update({ halted: null });
-      }
-      kick();
-    },
+    forget: (commandIds) => putAway(commandIds, []),
+
+    setAside: (commandIds) => putAway([], commandIds),
 
     status: () => current,
 
