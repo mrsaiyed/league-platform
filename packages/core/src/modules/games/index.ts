@@ -64,6 +64,12 @@ export {
 } from './commands/release-scoring-session.ts';
 export { takeOverScoring, type TakeOverScoringError } from './commands/take-over-scoring.ts';
 export {
+  applyTrackerCommands,
+  batchReaders,
+  type ApplyTrackerCommandsError,
+} from './commands/apply-tracker-commands.ts';
+export { engineRulesOf } from './engine-rules.ts';
+export {
   leaseMs,
   sessionStanding,
   type ScoringHolder,
@@ -76,6 +82,14 @@ export type {
   ScoringSession,
   ScoringSessionsStore,
   ScoringTx,
+} from './ports.ts';
+export type {
+  GamePlayer,
+  LiveGameLine,
+  LiveGamesStore,
+  NewGameEvent,
+  SavedGameState,
+  TrackerTx,
 } from './ports.ts';
 export type {
   GameInWindow,

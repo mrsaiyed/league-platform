@@ -27,6 +27,9 @@ const reads = new Set([
   'games.open_scoring_session',
   'games.renew_scoring_session',
   'games.release_scoring_session',
+  // The tracker's taps (step 2.29): every one is already kept as a game event with who
+  // sent it, and a game sends hundreds, so they are not copied into the activity log.
+  'games.apply_tracker_commands',
 ]);
 
 describe('activity log messages', () => {

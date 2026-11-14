@@ -157,7 +157,7 @@ describe('requestContext: which league (T-34, T4 §2 fence 1)', () => {
     });
   });
 
-  it("carries the league's id and state, so a draft's forward can be kept to its admins (U-9)", async () => {
+  it("carries the league's id and state, so a draft's forward can be kept to its staff (U-9)", async () => {
     const { build } = setup();
     expect(await build({ path: '/Draft-League/admin' })).toEqual({
       ok: false,

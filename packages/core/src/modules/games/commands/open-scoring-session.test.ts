@@ -194,9 +194,14 @@ describe('openScoringSession (T6 §5, T-116)', () => {
     expect(db.state.sessions.map((s) => s.id)).toEqual([sessionUuid(99)]);
   });
 
-  it('refuses a game that is missing, binned, decided or cancelled', async () => {
+  it('refuses a game that is missing, binned, decided, cancelled or postponed', async () => {
     const { db, deps, as } = memoryScoring({
-      games: [game(2, { binned: true }), finalGame(3), game(4, { status: 'cancelled' })],
+      games: [
+        game(2, { binned: true }),
+        finalGame(3),
+        game(4, { status: 'cancelled' }),
+        game(5, { status: 'postponed' }),
+      ],
       grants,
     });
     const code = async (n: number) => {
@@ -211,6 +216,8 @@ describe('openScoringSession (T6 §5, T-116)', () => {
     expect(await code(2)).toBe('game-not-found');
     expect(await code(3)).toBe('game-closed');
     expect(await code(4)).toBe('game-closed');
+    // Its taps would all be refused (game-not-live), so it does not open either.
+    expect(await code(5)).toBe('game-postponed');
     expect(db.state.sessions).toEqual([]);
   });
 
