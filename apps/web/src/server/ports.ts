@@ -10,9 +10,12 @@ import type { FixtureImportPorts } from './fixture-import-ports.ts';
 import type { GamesAreaPorts } from './games-area-ports.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
+import type { ScheduleAdminPorts } from './schedule-admin.ts';
 import type { PublicTeamsPorts } from './public-teams.ts';
 import type { AdminTeamsPorts } from './admin-teams.ts';
 import type { AdminSettingsPorts } from './admin-settings.ts';
+import type { PublishPlays } from './tracker-commands-endpoint.ts';
+import type { TrackerPorts } from './tracker-ports.ts';
 
 export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   /** "Who is this?" for a session cookie's access token (T-6). */
@@ -37,10 +40,21 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly fixtureImport: FixtureImportPorts;
   /** What the public home and schedule pages read (step 2.42). */
   readonly publicSchedule: PublicSchedulePorts;
+  /** What Admin → Schedule runs its commands on (step 2.52). */
+  readonly scheduleAdmin: ScheduleAdminPorts;
   /** What the public teams pages and the members' start page read (step 2.44). */
   readonly publicTeams: PublicTeamsPorts;
   /** What the admin's Teams screens read and run (step 2.51). */
   readonly adminTeams: AdminTeamsPorts;
   /** What the admin's League settings screen runs on (step 2.48). */
   readonly adminSettings: AdminSettingsPorts;
+  /** What the tracker's endpoints run on (step 2.32). */
+  readonly tracker: TrackerPorts;
+  /** Publishes a game's newest state for the people watching, after a batch is saved (T-117). */
+  readonly publishPlays: PublishPlays;
+  /**
+   * The page-facing door of the local live hub (`GET /api/v1/live`, record 021), which
+   * only lets a page listen; null where pages listen to the live service itself (T-8).
+   */
+  readonly liveFeed: ((request: Request) => Promise<Response>) | null;
 };
