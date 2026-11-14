@@ -2,8 +2,9 @@
 // recorded games, made the way the tracker's server makes its rows (the engine applies
 // each action, then the state, the event and every line are saved), is transferred into
 // a made-up league in a local database. Every box score line matches; a second run
-// changes nothing; a game that differs stops the run with a plain report; and a dry run
-// changes nothing at all.
+// changes nothing; a game that differs stops the run with a plain report; a dry run
+// changes nothing at all; a run cut off part-way is carried on by the next one, adding
+// no one twice; and another league is never touched.
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -512,9 +513,76 @@ describe('the tracker transfer (step 2.58)', () => {
     expect(await fingerprint(pglite, league.leagueId)).toEqual(start);
   });
 
+  it('carries on after a run cut off part-way, and leaves another league alone', async () => {
+    const bystander = await makeLeague(pglite, 'made-up-bystander');
+    const league = await makeLeague(pglite, 'made-up-cut-off');
+    const untouched = await fingerprint(pglite, bystander.leagueId);
+
+    // The clock stops answering part-way through the games, as if the computer died: the
+    // command in flight is rolled back and the run ends there.
+    let calls = 0;
+    const dying = {
+      now: () => {
+        calls += 1;
+        if (calls > 130) throw new Error('cut off');
+        return Date.now();
+      },
+    };
+    await expect(
+      transferTrackerGames(optionsFor(league, 'made-up-cut-off', { clock: dying })),
+    ).rejects.toThrow('cut off');
+    const finalCount = async () =>
+      (
+        await pglite.query<{ n: number }>(
+          `select count(*)::int as n from games where league_id = $1 and status = 'final'`,
+          [league.leagueId],
+        )
+      ).rows[0]!.n;
+    const finalsAtCut = await finalCount();
+    expect(finalsAtCut).toBeGreaterThan(0);
+    expect(finalsAtCut).toBeLessThan(10);
+
+    // Run again: it picks up where it was and ends with every game here, once.
+    const again = await run(optionsFor(league, 'made-up-cut-off'));
+    expect(again.plan.ready).toBe(true);
+    expect(again.report?.stopped, again.reportText).toBeNull();
+    expect(again.report?.added).toEqual([]);
+    expect(again.report?.checked).toHaveLength(finalsAtCut);
+    expect(again.report?.transferred).toHaveLength(10 - finalsAtCut);
+    expect(again.reportText).toContain('Done: every box score line of 10 games matches');
+    expect(await finalCount()).toBe(10);
+    const people = await pglite.query<{ n: number }>(
+      'select count(*)::int as n from people where league_id = $1',
+      [league.leagueId],
+    );
+    // Jo, who was there, and the 21 the first run added: no one twice.
+    expect(people.rows[0]!.n).toBe(1 + 21);
+    // No game still to score is held. One the cut caught as its session was being let go
+    // is final already, so nothing is sent to it again; that session lapses by itself.
+    const held = await pglite.query<{ status: string }>(
+      `select g.status from scoring_sessions s
+       join games g on g.league_id = s.league_id and g.id = s.game_id
+       where s.league_id = $1`,
+      [league.leagueId],
+    );
+    expect(held.rows.filter((row) => row.status !== 'final')).toEqual([]);
+    expect(held.rows.length).toBeLessThanOrEqual(1);
+
+    // Nothing in the other league changed.
+    expect(await fingerprint(pglite, bystander.leagueId)).toEqual(untouched);
+  });
+
   it('says so when the league, the season or the account is not there', async () => {
-    const league = { email: 'nobody@example.test' };
-    const missing = await transferTrackerGames(optionsFor(league, 'no-such-league'));
+    const nobody = { email: 'nobody@example.test' };
+    const missing = await transferTrackerGames(optionsFor(nobody, 'no-such-league'));
     expect(missing).toEqual({ ok: false, problem: { kind: 'league-not-found' } });
+
+    const l = await newLeague(pglite, 'made-up-no-season');
+    const noSeason = await transferTrackerGames(optionsFor(nobody, 'made-up-no-season'));
+    expect(noSeason).toEqual({ ok: false, problem: { kind: 'season-not-found' } });
+
+    await newSeason(pglite, l.leagueId, l.defaultProgramId, { slug: '2025-26' });
+    const noAccount = await transferTrackerGames(optionsFor(nobody, 'made-up-no-season'));
+    expect(noAccount).toEqual({ ok: false, problem: { kind: 'account-not-found' } });
   });
 });
