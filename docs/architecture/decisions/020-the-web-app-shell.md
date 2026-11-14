@@ -39,4 +39,6 @@ Date: 2026-11-13. Step 1.17; carries out T-3, T-25, T-30, T-34, T-60, U-6 and U-
 - TypeScript 7 gains the interface Next.js's own check needs.
 - Sign-in arrives (1.14, 1.15): `identify` moves to the sign-in service, staging and production get their database ports, and renewing a session replaces "draw it as for a visitor".
 - The founder wants a draft league seen by fewer or more people than those with an admin area (U-9, step 2.87): change `maySeeDraftLeague`, and the draft cases in `league-visibility.test.ts`, `league-gate.test.ts` and `scripts/check-web-shell.mjs`.
+- The invitation page is built for a draft league: someone invited before launch holds no grant until they accept, so `mayOpenLeague` would answer "not found" for them. The step that builds that page must let the holder of a valid invitation reach it in a hidden league, without opening anything else of the league to them.
+- The live-updates authorize hook is wired (record 021): it must call `mayOpenLeague` with the subscriber's access in that league, so a draft or suspended league's live scores reach no one who may not see the league.
 - A newer Next.js release has been out two weeks.

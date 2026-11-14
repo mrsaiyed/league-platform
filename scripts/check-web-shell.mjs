@@ -51,6 +51,10 @@ const tokens = {
 const noAccess = 'NEXT_HTTP_ERROR_FALLBACK;403';
 const notFound = 'NEXT_HTTP_ERROR_FALLBACK;404';
 
+// A link in the admin's own navigation (features/shell/admin-nav.tsx). The area's
+// name alone is no proof: the site's menu has "Schedule" and "Teams" too.
+const adminLink = (league, area) => `href="/${league}/admin/${area}"`;
+
 /** [who, path, status, words that must be there, words that must not, forward to] */
 const cases = [
   ['visitor', '/', 200, ['Find your league, or start one']],
@@ -126,11 +130,27 @@ const cases = [
   ['visitor', '/north-valley/admin', 403, [noAccess], ['Admin areas']],
   ['stranger', '/north-valley/admin', 403, [noAccess]],
   ['coach', '/north-valley/admin/teams', 403, [noAccess]],
-  ['scheduler', '/north-valley/admin', 200, ['Admin areas', 'Schedule', 'Games'], ['People']],
-  ['scheduler', '/north-valley/admin/schedule', 200, ['Schedule', 'Nothing here yet.']],
+  [
+    'scheduler',
+    '/north-valley/admin',
+    200,
+    ['Admin areas', adminLink('north-valley', 'schedule'), adminLink('north-valley', 'games')],
+    [adminLink('north-valley', 'people')],
+  ],
+  [
+    'scheduler',
+    '/north-valley/admin/schedule',
+    200,
+    [adminLink('north-valley', 'schedule'), 'Nothing here yet.'],
+  ],
   ['scheduler', '/north-valley/admin/teams', 403, [noAccess]],
   ['scheduler', '/harbor-city/admin', 403, [noAccess]],
-  ['owner', '/north-valley/admin/settings', 200, ['League settings', 'People', 'Teams']],
+  [
+    'owner',
+    '/north-valley/admin/settings',
+    200,
+    ['League settings', adminLink('north-valley', 'people'), adminLink('north-valley', 'teams')],
+  ],
   ['scheduler', '/north-valley/score/game-1', 200, ['Score a game']],
   ['coach', '/north-valley/score/game-1', 403, [noAccess]],
   ['visitor', '/quiet-pines', 404, [notFound]],
@@ -141,17 +161,50 @@ const cases = [
   ['owner', '/quiet-pines', 200, ['This league is not published.']],
   ['owner', '/quiet-pines/admin', 200, ['Admin areas']],
   // Everyone with an admin area in a draft league may open it (step 2.87).
-  ['admin', '/quiet-pines/admin', 200, ['Admin areas', 'League settings']],
+  ['admin', '/quiet-pines/admin', 200, [adminLink('quiet-pines', 'settings')]],
   ['scheduler', '/quiet-pines', 200, ['This league is not published.']],
-  ['scheduler', '/quiet-pines/admin', 200, ['Admin areas', 'Schedule'], ['People']],
-  ['programScheduler', '/quiet-pines/admin/schedule', 200, ['Schedule']],
-  ['registrar', '/quiet-pines/admin', 200, ['Admin areas', 'People'], ['Games', 'League settings']],
+  [
+    'scheduler',
+    '/quiet-pines/admin',
+    200,
+    [adminLink('quiet-pines', 'schedule'), adminLink('quiet-pines', 'games')],
+    [adminLink('quiet-pines', 'people')],
+  ],
+  [
+    'programScheduler',
+    '/quiet-pines/admin/schedule',
+    200,
+    [adminLink('quiet-pines', 'schedule'), 'Nothing here yet.'],
+  ],
+  [
+    'registrar',
+    '/quiet-pines/admin',
+    200,
+    [adminLink('quiet-pines', 'registration'), adminLink('quiet-pines', 'people')],
+    [adminLink('quiet-pines', 'games'), adminLink('quiet-pines', 'settings')],
+  ],
   ['registrar', '/quiet-pines/admin/schedule', 403, [noAccess]],
   ['editor', '/quiet-pines', 200, ['This league is not published.']],
-  ['editor', '/quiet-pines/admin', 200, ['Admin areas']],
+  [
+    'editor',
+    '/quiet-pines/admin',
+    200,
+    [adminLink('quiet-pines', 'site')],
+    [adminLink('quiet-pines', 'schedule')],
+  ],
   ['scorekeeper', '/quiet-pines/score/game-1', 200, ['Score a game']],
-  ['clubAdmin', '/quiet-pines/admin/teams', 200, ['Teams', 'Nothing here yet.']],
-  ['otherAdmin', '/still-waters/admin', 200, ['Admin areas']],
+  [
+    'clubAdmin',
+    '/quiet-pines/admin/teams',
+    200,
+    [
+      adminLink('quiet-pines', 'teams'),
+      adminLink('quiet-pines', 'registration'),
+      'Nothing here yet.',
+    ],
+    [adminLink('quiet-pines', 'people')],
+  ],
+  ['otherAdmin', '/still-waters/admin', 200, [adminLink('still-waters', 'settings')]],
   ['scheduler', '/still-waters', 404, [notFound]],
   ['registrar', '/closed-gate', 404, [notFound]],
   ['visitor', '/closed-gate', 404, [notFound]],
@@ -239,6 +292,7 @@ try {
       `an invitation address sends referrer-policy "${invitation.headers.get('referrer-policy')}"`,
     );
   }
+  failures.push(...(await sameAsNoLeague(origin)));
   failures.push(...(await checkSignIn(origin)));
 } finally {
   server.child.kill();
@@ -274,7 +328,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Web shell check passed: ${cases.length + spoofs.length + 3} checks against the built server.`,
+  `Web shell check passed: ${cases.length + spoofs.length + 4} checks against the built server.`,
 );
 
 function start(args, env) {
@@ -322,6 +376,46 @@ function freePort() {
       probe.close(() => resolve(port));
     });
   });
+}
+
+/**
+ * A draft league is "not found" for someone who may not see it, byte for byte the
+ * answer for a name nobody has (U-9, step 2.87): the same status, headers and body,
+ * once each name is put in the same place.
+ */
+async function sameAsNoLeague(origin) {
+  const ask = async (name) => {
+    const response = await fetch(`${origin}/${name}/admin`, {
+      headers: { cookie: `srl_session=${tokens.otherAdmin}` },
+      redirect: 'manual',
+    });
+    const headers = [...response.headers]
+      .filter(([header]) => !['date', 'content-length'].includes(header))
+      .map(([header, value]) => `${header}: ${value.replaceAll(name, '{name}')}`)
+      .join('\n');
+    const body = (await response.text()).replaceAll(name, '{name}');
+    return { status: response.status, headers, body };
+  };
+  const draft = await ask('quiet-pines');
+  const nobody = await ask('nobody-has-this');
+  const found = [];
+  if (draft.status !== 404 || nobody.status !== 404) {
+    found.push(`draft and no league answer ${draft.status} and ${nobody.status}, not 404`);
+  }
+  if (draft.headers !== nobody.headers) {
+    found.push(
+      `a draft's headers differ from no league's:\n${draft.headers}\n---\n${nobody.headers}`,
+    );
+  }
+  if (draft.body !== nobody.body) {
+    let at = 0;
+    while (draft.body[at] === nobody.body[at]) at += 1;
+    found.push(
+      `a draft's page differs from no league's at ${at}: ` +
+        `"${draft.body.slice(at, at + 80)}" / "${nobody.body.slice(at, at + 80)}"`,
+    );
+  }
+  return found;
 }
 
 /**
