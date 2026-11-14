@@ -2,7 +2,8 @@
 // final. A tie is refused unless the season allows ties (P7 §5.6). The game keeps or
 // takes the rules it is played under (S-1). Announces `games.finalized` (T-24), so
 // standings can follow. A game already decided is changed only by reopening it, with
-// a reason (S-7).
+// a reason (S-7). A game that was a box score and is saved now with two numbers only
+// loses its old lines in the same transaction (S-27), so they no longer count.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
 import { decideGame, openGame, type DecideGameError } from '../decide-game.ts';
@@ -37,6 +38,10 @@ export const recordFinalScore = defineCommand({
       const rules = await effectiveRulesOf(tx, game);
       if (!rules.allowTies) return fail({ code: 'tie-not-allowed' });
     }
+    // A reopened box score game saved now as a final score only: its old lines are
+    // cleared in this transaction, so they no longer count in totals (P7 §5.2, S-27).
+    const wasBox = game.captureMode === 'box';
+    if (wasBox) await tx.games.replaceLines(game.id, []);
     return decideGame({
       context,
       tx,
@@ -47,6 +52,7 @@ export const recordFinalScore = defineCommand({
       status: 'final',
       homeScore: input.homeScore,
       awayScore: input.awayScore,
+      ...(wasBox ? { captureMode: 'final' as const } : {}),
     });
   },
 });
