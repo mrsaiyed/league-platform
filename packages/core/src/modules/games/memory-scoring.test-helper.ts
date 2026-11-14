@@ -31,7 +31,7 @@ export type MemoryScoringOptions = {
   readonly beforeEnd?: (state: MemoryScoring) => void;
 };
 
-function testClock() {
+export function testClock() {
   const clock = {
     at: startOfTest,
     now: () => clock.at,
@@ -41,7 +41,7 @@ function testClock() {
   return clock;
 }
 
-const initial = (state: Partial<MemoryScoring>): MemoryScoring => ({
+export const initialScoring = (state: Partial<MemoryScoring>): MemoryScoring => ({
   ...emptyGames(),
   sessions: [],
   started: 0,
@@ -52,7 +52,10 @@ const initial = (state: Partial<MemoryScoring>): MemoryScoring => ({
  * The sessions over one state. Each call checks and writes without waiting in
  * between, as the database's one-session-per-game rule does in a single statement.
  */
-function sessionsOf(s: MemoryScoring, options: MemoryScoringOptions = {}): ScoringSessionsStore {
+export function sessionsOf(
+  s: MemoryScoring,
+  options: MemoryScoringOptions = {},
+): ScoringSessionsStore {
   return {
     findForGame: async (gameId) => s.sessions.find((x) => x.gameId === gameId),
     start: async (session) => {
@@ -85,7 +88,7 @@ export function memoryScoring(
   state: Partial<MemoryScoring> = {},
   options: MemoryScoringOptions = {},
 ) {
-  const db = memoryDatabase<MemoryScoring>(initial(state));
+  const db = memoryDatabase<MemoryScoring>(initialScoring(state));
   const clock = testClock();
   const transaction = memoryTransaction(
     db,
@@ -120,7 +123,7 @@ function barrier(count: number): () => Promise<void> {
  * committed. Nothing is rolled back: use it only for commands that succeed.
  */
 export function racingScoring(racers: number, state: Partial<MemoryScoring> = {}) {
-  const db = memoryDatabase<MemoryScoring>(initial(state));
+  const db = memoryDatabase<MemoryScoring>(initialScoring(state));
   const clock = testClock();
   const arrive = barrier(racers);
   const jobs: JobQueue = { enqueue: async (job) => void db.jobs.push(job) };

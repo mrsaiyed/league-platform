@@ -175,3 +175,61 @@ export type ScoringTx = GamesTx & {
   readonly scoringSessions: ScoringSessionsStore;
   readonly clock: Clock;
 };
+
+/** A game's saved engine state (T3 §8 `game_states`): the last event it applied, and the document. */
+export type SavedGameState = { readonly seq: number; readonly state: unknown };
+
+/** One tap the server took (T3 §8 `game_events`): the engine's command split into its type and the rest. */
+export type NewGameEvent = {
+  readonly gameId: string;
+  /** Its place in the game: 1, 2, 3 with no gaps. */
+  readonly seq: number;
+  readonly commandId: string;
+  readonly type: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+  /** When it counts as tapped (ms): the device's time, never later than the server's. */
+  readonly tappedAt: number;
+  /** Who scored it. */
+  readonly accountId: string;
+};
+
+/** Someone who may appear in a game's box score: a player on one of its two teams' rosters. */
+export type GamePlayer = {
+  readonly personId: string;
+  readonly teamId: string;
+  /** The number they wear, from their roster entry; null if they have none. */
+  readonly jerseyNumber: string | null;
+};
+
+/** A box score line as the live game writes it: a line with the number worn in this game. */
+export type LiveGameLine = GameLine & { readonly jerseyNumber: string | null };
+
+/** The live game's storage (T3 §8, T6 §1): its lock, state, events and box score lines. */
+export type LiveGamesStore = {
+  /**
+   * Holds this one game until the transaction ends (T-111): another batch for it waits
+   * here, while batches for every other game go on (T-112). False if the game is not
+   * in this league.
+   */
+  readonly lock: (gameId: string) => Promise<boolean>;
+  readonly findState: (gameId: string) => Promise<SavedGameState | undefined>;
+  /** Of these command ids, the ones the game has already taken (T3 §12). */
+  readonly takenCommands: (
+    gameId: string,
+    commandIds: readonly string[],
+  ) => Promise<readonly string[]>;
+  readonly addEvents: (events: readonly NewGameEvent[]) => Promise<void>;
+  /** Writes the game's state as of event `seq`: the first time, or over the last one. */
+  readonly saveState: (gameId: string, seq: number, state: unknown) => Promise<void>;
+  /** The players of the game's two teams, as their rosters have them. */
+  readonly players: (gameId: string) => Promise<readonly GamePlayer[]>;
+  /** Writes these lines, each added or replaced, and removes the lines of `removed` (person ids). */
+  readonly saveLines: (
+    gameId: string,
+    lines: readonly LiveGameLine[],
+    removed: readonly string[],
+  ) => Promise<void>;
+};
+
+/** The tracker's commands' transaction (step 2.29): the scoring one and the live game. */
+export type TrackerTx = ScoringTx & { readonly liveGames: LiveGamesStore };
