@@ -742,7 +742,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-148 | Chat safety is enforced by the server, not by the screen                                                                                                                   | Agreed (delegated)  |         |
 | T-224 | Jobs are recorded in our own fenced `jobs` table, ids only; pg-boss runs them in production, the table itself locally (record 012)                                         | Agreed (delegated)  | yes     |
 | T-235 | Templates are plain TypeScript until React is in; the invitation link stays in the path, never sent on, cached or logged; its email is built before it commits (rec. 023)  | Agreed (delegated)  | yes     |
-| T-257 | pg-boss's schema is made by the release for a no-login queue_owner, granted to the worker's login only; pg-boss makes its tables there; the worker checks first (rec. 053) | Agreed (delegated)  |         |
+| T-257 | pg-boss's schema is made by the release for a no-login queue_owner, granted to the worker's login only; pg-boss makes its tables there; the worker checks first (rec. 053) | Agreed (delegated)  | yes     |
 
 ### [T8 — Scale, reliability and operations](technical/T8-scale-reliability-operations.md)
 
