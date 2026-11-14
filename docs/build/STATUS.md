@@ -26,6 +26,7 @@ Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.
 - **2.28 Scoring sessions and takeover** — `.local/lanes/2.28-scoring-sessions` — none (no migration; record 036 / T-248 if needed) — opened.
 - **2.73 Slots and fairness rules** — `.local/lanes/2.73-slots` — none (no migration; record 037 / T-249 if needed) — opened.
 - **2.43 Standings and statistics pages** — `.local/lanes/2.43-standings-pages` — none (no migration; record 038 / T-250 if needed) — opened (founder priority: real pages in the preview).
+- **2.84 Highlight color** — `.local/lanes/2.84-highlight` — none (no migration; record 038 / T-250 if needed) — opened (founder priority, C-15).
 
 ## Needs the founder
 
