@@ -138,7 +138,7 @@ How the grid works (built in step 2.64):
 
 ### 5.3 What fans see
 
-`/{league}/games/{game}` shows the scoreboard and clock, both teams' box scores and the play-by-play, updating within about two seconds of each tap, with no refreshing. **S-33:** until step 2.101 the play-by-play is the list as it stood when the page was opened, with a "Show newer plays" link; the latest play, the score, the team fouls and the clock update live. The league home and schedule show a **Live** marker and the running score.
+`/{league}/games/{game}` shows the scoreboard and clock, both teams' box scores and the play-by-play, updating within about two seconds of each tap, with no refreshing. **S-33:** until step 2.104 the play-by-play is the list as it stood when the page was opened, with a "Show newer plays" link; the latest play, the score, the team fouls and the clock update live. The league home and schedule show a **Live** marker and the running score.
 
 ### 5.4 When the game ends
 

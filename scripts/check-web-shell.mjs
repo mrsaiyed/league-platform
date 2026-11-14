@@ -268,8 +268,20 @@ const cases = [
     'owner',
     '/north-valley/admin/settings',
     200,
-    ['League settings', adminLink('north-valley', 'people'), adminLink('north-valley', 'teams')],
+    [
+      'League settings',
+      adminLink('north-valley', 'people'),
+      adminLink('north-valley', 'teams'),
+      // Drawn from the declarations (step 2.48): label, default and what it accepts.
+      'Where members land first',
+      'The league home',
+      'Default: Any game',
+      'Accepts yes or no.',
+      'Accepts one of the choices shown.',
+    ],
   ],
+  ['scheduler', '/north-valley/admin/settings', 403, [noAccess]],
+  ['coach', '/north-valley/admin/settings', 403, [noAccess]],
   // A game's page (step 2.45): drawn with how the game stands, its live part ready to
   // follow it; a finished game's result; a game not started; a game that is not this
   // league's, not public yet, or not an id is not found. The Bears show their players'
@@ -438,6 +450,7 @@ try {
   failures.push(...(await sameAsNoLeague(origin)));
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
+  failures.push(...(await checkSettings(origin)));
 } finally {
   server.child.kill();
 }
@@ -727,6 +740,98 @@ async function checkTeams(origin) {
     (await pageOf('owner', '/north-valley/admin/teams')).includes('Sneaky')
   ) {
     problems.push('the scheduler changed the north valley teams');
+  }
+  return problems;
+}
+
+/**
+ * The admin League settings forms over HTTP (step 2.48), as a browser with no script
+ * posts them: the owner saves a setting and goes back to its default; a value outside
+ * the limits and a stale version are refused with their own words; someone who may not
+ * open the settings area changes nothing. The commands' own rules are tested beside
+ * the code (apps/web/src/features/settings-area/settings-area.test.ts).
+ */
+async function checkSettings(origin) {
+  const problems = [];
+  const as = (who) => ({ cookie: `srl_session=${tokens[who]}` });
+  const page = '/north-valley/admin/settings';
+  const pageOf = async (who) => (await fetch(origin + page, { headers: as(who) })).text();
+  async function post(who, index, fields) {
+    const html = await pageOf('owner');
+    const id = [...html.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
+    if (id === undefined) {
+      problems.push(`settings: no form ${index}`);
+      return undefined;
+    }
+    const body = new FormData();
+    body.set(id, '');
+    for (const [name, value] of Object.entries(fields)) body.set(name, value);
+    const response = await fetch(origin + page, {
+      method: 'POST',
+      body,
+      headers: { origin, ...as(who) },
+      redirect: 'manual',
+    });
+    const location = new URL(response.headers.get('location') ?? '/nowhere', origin);
+    return { status: response.status, to: location.pathname + location.search };
+  }
+  const key = 'games.whoMayScore';
+  const saved = await post('owner', 1, {
+    league: 'north-valley',
+    key,
+    version: '',
+    value: 'assignedOnly',
+  });
+  if (saved?.to !== `${page}?done=saved`) {
+    problems.push(`saving a setting answers ${saved?.status} to ${saved?.to}`);
+    return problems;
+  }
+  const after = await pageOf('owner');
+  if (!after.includes('Now: set for this league.') || !after.includes('Go back to the default')) {
+    problems.push('the settings page does not show the saved value');
+  }
+  const stale = await post('owner', 1, {
+    league: 'north-valley',
+    key,
+    version: '',
+    value: 'anyScorekeeper',
+  });
+  if (!stale?.to.includes('problem=leagues.set_setting.changed-since-read')) {
+    problems.push(`a stale version was not refused (${stale?.to})`);
+  }
+  const outside = await post('owner', 1, {
+    league: 'north-valley',
+    key,
+    version: '1',
+    value: 'nobody',
+  });
+  if (!outside?.to.includes('problem=leagues.set_setting.invalid-value')) {
+    problems.push(`a value outside the limits was not refused (${outside?.to})`);
+  }
+  const cleared = await post('owner', 1, {
+    league: 'north-valley',
+    key,
+    version: '1',
+    intent: 'clear',
+  });
+  if (cleared?.to !== `${page}?done=cleared`) {
+    problems.push(`going back to the default answers ${cleared?.to}`);
+  }
+  if ((await pageOf('owner')).includes('Go back to the default')) {
+    problems.push('the settings page still shows a value after going back to the default');
+  }
+  // A scheduler may not open the area, so the post is refused and nothing is saved.
+  const refused = await post('scheduler', 1, {
+    league: 'north-valley',
+    key,
+    version: '',
+    value: 'assignedOnly',
+  });
+  if (refused !== undefined && refused.status === 303) {
+    problems.push(`a scheduler's setting was taken (${refused.to})`);
+  }
+  if ((await pageOf('owner')).includes('Now: set for this league.')) {
+    problems.push('the scheduler changed a setting');
   }
   return problems;
 }

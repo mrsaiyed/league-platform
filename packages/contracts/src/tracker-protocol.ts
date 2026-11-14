@@ -165,6 +165,31 @@ export const SessionReply = z.discriminatedUnion('status', [
 ]);
 export type SessionReply = z.infer<typeof SessionReply>;
 
+// ---------------------------------------------------------------- the engine's state (T-113, T-253)
+
+/**
+ * What `GET /api/v1/leagues/{leagueId}/games/{game}/state` answers a scorekeeper
+ * (record 049): the engine's state as the server holds it, which the tracker loads on
+ * opening the game and reloads after a refusal (T-113). The state is the engine's own
+ * document (packages/sports), which this package cannot name: only the marks of its
+ * version 1 are checked here, and the tracker reads it as the engine's. Never cached,
+ * and never for visitors: it names every player by id.
+ */
+export const TrackerGameState = z.strictObject({
+  /** The sequence number of the last tap in the state; 0 while there is none. */
+  sequence: Ms,
+  state: z.looseObject({
+    version: z.literal(1),
+    status: z.enum(['scheduled', 'live', 'final']),
+    rules: z.looseObject({ periods: z.number().int().min(1) }),
+    clock: z.looseObject({ remainingMs: z.number(), running: z.boolean() }),
+    plays: z.array(z.unknown()),
+    redo: z.array(z.unknown()),
+    recent: z.array(z.string()),
+  }),
+});
+export type TrackerGameState = z.infer<typeof TrackerGameState>;
+
 // ---------------------------------------------------------------- the clock (T-121)
 
 /**

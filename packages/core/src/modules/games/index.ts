@@ -75,6 +75,11 @@ export {
   batchReaders,
   type ApplyTrackerCommandsError,
 } from './commands/apply-tracker-commands.ts';
+export {
+  readTrackerState,
+  type ReadTrackerStateError,
+  type TrackerGameState,
+} from './commands/read-tracker-state.ts';
 export { engineRulesOf } from './engine-rules.ts';
 export {
   leaseMs,

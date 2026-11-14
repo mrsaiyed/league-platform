@@ -13,6 +13,7 @@ import type { PublicStatsPorts } from './public-stats.ts';
 import type { ScheduleAdminPorts } from './schedule-admin.ts';
 import type { PublicTeamsPorts } from './public-teams.ts';
 import type { AdminTeamsPorts } from './admin-teams.ts';
+import type { AdminSettingsPorts } from './admin-settings.ts';
 import type { PublishPlays } from './tracker-commands-endpoint.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
@@ -45,6 +46,8 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly publicTeams: PublicTeamsPorts;
   /** What the admin's Teams screens read and run (step 2.51). */
   readonly adminTeams: AdminTeamsPorts;
+  /** What the admin's League settings screen runs on (step 2.48). */
+  readonly adminSettings: AdminSettingsPorts;
   /** What the tracker's endpoints run on (step 2.32). */
   readonly tracker: TrackerPorts;
   /** Publishes a game's newest state for the people watching, after a batch is saved (T-117). */

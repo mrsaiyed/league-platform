@@ -383,6 +383,36 @@ export const en = {
   'error.short-name-needed':
     'A short name could not be made from this name. Type a short name: lower-case letters and numbers, with single hyphens.',
   'error.unknown': 'That could not be done.',
+  // The admin's League settings screen (step 2.48). The words for each setting itself are
+  // `setting.<key>.label` and `setting.<key>.option.<choice>`, declared with the setting.
+  'adminSettings.intro':
+    'These settings apply to the whole league. Each shows what it is set to now, its default and what it accepts.',
+  'adminSettings.none': 'This league has no settings to change yet.',
+  'adminSettings.default': 'Default: {value}',
+  'adminSettings.defaultMark': '{choice} (the default)',
+  'adminSettings.yes': 'Yes',
+  'adminSettings.no': 'No',
+  'adminSettings.usingDefault': 'Now: the default.',
+  'adminSettings.usingOwn': 'Now: set for this league.',
+  'adminSettings.limits.whole': 'Accepts a whole number from {min} to {max}.',
+  'adminSettings.limits.number': 'Accepts a number from {min} to {max}.',
+  'adminSettings.limits.text': 'Accepts up to {max} characters.',
+  'adminSettings.limits.choice': 'Accepts one of the choices shown.',
+  'adminSettings.limits.toggle': 'Accepts yes or no.',
+  'adminSettings.limits.other': 'This setting cannot be changed on this screen.',
+  'adminSettings.field.value': 'Value',
+  'adminSettings.save': 'Save',
+  'adminSettings.clear': 'Go back to the default',
+  'adminSettings.done.saved': 'The setting was saved.',
+  'adminSettings.done.cleared': 'The setting is back to its default.',
+  'error.leagues.set_setting.invalid-value':
+    'That value is not allowed for this setting. Check what it accepts and try again.',
+  'error.leagues.set_setting.changed-since-read':
+    'Someone else changed this setting while you were looking, so yours was not saved. The page now shows the latest value; change it again if you still want to.',
+  'error.leagues.clear_setting.changed-since-read':
+    'Someone else changed this setting while you were looking, so it was not put back to the default. The page now shows the latest value.',
+  'error.leagues.set_setting.unknown-setting': 'That setting does not exist.',
+  'error.leagues.clear_setting.unknown-setting': 'That setting does not exist.',
   'error.teams.create_team.season-not-found': 'That season is not there.',
   'error.teams.create_team.division-not-found': 'That division is not there.',
   'error.teams.create_team.team-short-name-taken':
@@ -1012,6 +1042,35 @@ export const en = {
   'tracker.queue.notSaved_other': '{count} actions not saved',
   'tracker.queue.storageFailed': 'This device could not save to its storage',
   'tracker.queue.separator': ' · ',
+  // What the tracker says about holding the game and refused taps (T6 §5, T-113),
+  // chosen from the controller's status by apps/web/src/features/tracker/tracker-notice.ts.
+  'tracker.readOnly.taken-over':
+    'Another device has taken over scoring this game. This one is now read-only.',
+  'tracker.readOnly.expired':
+    'This device was away too long and another device has had the game since. This one is now read-only.',
+  'tracker.readOnly.released':
+    'This device has left the game. It is read-only until you open it again.',
+  'tracker.readOnly.not-held': 'This device no longer holds the game, so it is read-only.',
+  'tracker.readOnly.game-not-live':
+    'This game cannot be scored now: it is over, cancelled or postponed.',
+  'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
+  'tracker.readOnly.unknown-game': 'This game could not be found.',
+  'tracker.readOnly.request-refused':
+    'The server could not take what this device asked for. Open the game again to try once more.',
+  'tracker.readOnly.storage-failed':
+    'This device could not read what it has saved, so it is read-only. Open the game again to try once more.',
+  'tracker.readOnly.signed-out':
+    'You are signed out. Sign in again to keep scoring. What you entered on this device is kept and sent once you are back, so do not enter it again.',
+  'tracker.readOnly.update-needed':
+    'This tracker needs an update. Reload the page to keep scoring.',
+  'tracker.heldByOther': '{name} is scoring this game on another device.',
+  'tracker.notApplied_one': '{count} action was not applied. The game now shows what was saved.',
+  'tracker.notApplied_other':
+    '{count} actions were not applied. The game now shows what was saved.',
+  'tracker.notSaved_one':
+    '{count} action on this device was not saved. Enter it again if it is needed.',
+  'tracker.notSaved_other':
+    '{count} actions on this device were not saved. Enter them again if they are needed.',
   // Admin → Schedule: the grid of rounds and games (step 2.52).
   'schedule.admin.title': 'Schedule',
   'schedule.admin.intro':
