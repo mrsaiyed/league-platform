@@ -12,6 +12,7 @@ import type { PublicSchedulePorts } from './public-schedule.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 import type { PublicTeamsPorts } from './public-teams.ts';
 import type { AdminTeamsPorts } from './admin-teams.ts';
+import type { AdminSettingsPorts } from './admin-settings.ts';
 
 export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   /** "Who is this?" for a session cookie's access token (T-6). */
@@ -40,4 +41,6 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly publicTeams: PublicTeamsPorts;
   /** What the admin's Teams screens read and run (step 2.51). */
   readonly adminTeams: AdminTeamsPorts;
+  /** What the admin's League settings screen runs on (step 2.48). */
+  readonly adminSettings: AdminSettingsPorts;
 };
