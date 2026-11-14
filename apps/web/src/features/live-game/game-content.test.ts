@@ -25,6 +25,8 @@ import {
 import { standInLeagues } from '../../server/stand-in-ports.ts';
 import { standInSeasonIds } from '../../server/stand-in-public-stats.ts';
 import {
+  boardStateText,
+  boardWhen,
   buildBoxScores,
   buildPlays,
   correctedText,
@@ -312,6 +314,98 @@ describe('a game page', () => {
     expect(built.tables[0]?.players).toBeNull();
     expect(built.tables[1]?.players?.[0]?.name).toBe('Name not shown');
     expect(built.tables[0]?.columns.map((c) => c.label)).toEqual(['PTS']);
+  });
+
+  it('draws the play-by-play as a table a period: clock, team mark, and the score after a basket', async () => {
+    const world = trackerWorld();
+    await scoreHawksBears(world);
+    const { view, page } = await viewOf(world, games.hawksBears);
+    const plays = buildPlays(page, gameWords());
+    // Newest first, under the period they were played in.
+    expect(plays.map((period) => period.title)).toEqual(['Half 1']);
+    const rows = plays[0]?.rows ?? [];
+    expect(rows[0]?.text).toBe('Foul on Bears');
+    expect(rows[0]?.clock).toBe('20:00');
+    // Only a basket carries the score, away team first as on the scoreboard.
+    expect(rows.filter((row) => row.score !== undefined).map((row) => row.score?.text)).toEqual([
+      '2–3',
+      '0–3',
+    ]);
+    expect(rows.find((row) => row.score !== undefined)?.score?.spoken).toBe('Bears 2, Hawks 3');
+    // Every play of a team has that team's mark.
+    expect(rows.every((row) => row.team !== undefined)).toBe(true);
+    const html = draw(view);
+    expect(html).toContain('<table class="ui-table ui-plays"><caption dir="auto">Half 1</caption>');
+    expect(html).toContain('<td class="ui-num">20:00</td>');
+    // No browser list anywhere on the page, and every table in the table frame.
+    expect(html).not.toMatch(/<ol|<ul/);
+    expect(html.match(/<table/g)?.length).toBe(html.match(/class="ui-table-frame"/g)?.length);
+    // The players' tables of a game under way sit under their own heading.
+    expect(html).toContain('<h2 id="game-players">Points and fouls</h2>');
+  });
+
+  it('draws a game still to play as a finished board: teams, when, where, and one sentence', async () => {
+    const world = trackerWorld();
+    const { view } = await viewOf(world, games.lionsTigers);
+    const when = '2026-11-21T16:00:00Z';
+    const html = draw({
+      ...view,
+      scheduleAddress: '/north-valley/schedule',
+      numberText: 'Game 8',
+      board: {
+        colors: { home: '#c8862a', away: null },
+        when: boardWhen(when, 'UTC', 'scheduled'),
+        placeText: 'Central Gym, Court 1',
+      },
+    });
+    expect(html).toContain('<a href="/north-valley/schedule">Schedule</a>');
+    expect(html).toContain('<p class="ui-eyebrow">Game 8</p>');
+    expect(html).toContain('aria-label="Scoreboard" data-state="other"');
+    expect(html).toContain('<span class="ui-scoreboard-day">Sat, Nov 21</span>');
+    expect(html).toContain('<span class="ui-scoreboard-time">4:00 PM</span>');
+    expect(html).toContain('Central Gym, Court 1');
+    expect(html).toContain('--team-color:#c8862a');
+    expect(html).toContain('<p class="ui-scoreboard-note">This game has not started yet.</p>');
+    expect(html).not.toContain('ui-scoreboard-score');
+    // A game with no date says so where the time would be.
+    expect(boardWhen(null, 'UTC', 'scheduled')).toEqual({ day: 'Date to be announced' });
+  });
+
+  it('never draws the old date of a game not going ahead as if it were coming', async () => {
+    const world = trackerWorld();
+    const { view } = await viewOf(world, games.lionsTigers);
+    const when = '2026-10-31T19:00:00Z';
+    for (const [status, pill] of [
+      ['postponed', 'Postponed'],
+      ['cancelled', 'Cancelled'],
+    ] as const) {
+      expect(boardWhen(when, 'UTC', status)).toBeUndefined();
+      const html = draw({
+        ...view,
+        status,
+        start: startText(when, 'UTC', status),
+        board: { colors: { home: null, away: null } },
+      });
+      expect(html).toContain(`<span class="ui-game-state">${pill}</span>`);
+      expect(html).not.toContain('ui-scoreboard-when');
+    }
+    expect(boardWhen(when, 'UTC', 'final')).toBeUndefined();
+    expect(boardStateText('forfeit')).toBe('Forfeit');
+    expect(boardStateText('final')).toBeUndefined();
+  });
+
+  it('shows the latest play only while the game is played', async () => {
+    const world = trackerWorld();
+    await scoreHawksBears(world);
+    const { view } = await viewOf(world, games.hawksBears);
+    expect(draw(view)).toContain('<p role="status" aria-live="polite" class="game-latest-play">');
+    const { view: decided } = await viewOf(world, games.decided);
+    const html = draw(decided);
+    expect(html).not.toContain('Latest play');
+    // The spoken result is still there for a screen reader.
+    expect(html).toMatch(
+      /<p role="status" aria-live="polite" class="game-latest-play ui-visually-hidden"><span class="ui-visually-hidden">Lions 50, Bears 44\. <\/span><\/p>/,
+    );
   });
 
   it('leaves out a statistic with no words, and has no stats if that was all', () => {

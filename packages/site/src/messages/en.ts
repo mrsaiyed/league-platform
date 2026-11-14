@@ -64,6 +64,7 @@ export const en = {
   'display.note': 'Note',
   'display.notes': 'Notes',
   'display.jersey': 'Number',
+  'display.jerseyShort': '#',
   'display.player': 'Player',
   'display.total': 'Total',
   'display.sortBy': 'Sort by',
@@ -272,8 +273,17 @@ export const en = {
   'game.noPlays': 'No plays have been recorded yet.',
   'game.playsAsOpened': 'These are the plays up to when you opened this page.',
   'game.newerPlays': 'Show newer plays',
-  'game.playLine': '{clock}: {play} ({away} {awayScore}, {home} {homeScore})',
-  'game.playLineNoClock': '{play} ({away} {awayScore}, {home} {homeScore})',
+  // The play-by-play is one table a period (step 2.85): when on the clock, the play, and
+  // the score after a basket, away team first as on the board above it.
+  'game.col.time': 'Time',
+  'game.col.play': 'Play',
+  'game.col.score': 'Score',
+  'game.playScore': '{awayScore}–{homeScore}',
+  'game.playScoreSpoken': '{away} {awayScore}, {home} {homeScore}',
+  'game.playsBeforeStart': 'Before the start',
+  // The players' tables of a game under way hold two numbers each.
+  'game.liveStats': 'Points and fouls',
+  'game.back': 'Schedule',
   'stat.points': 'Points',
   'stat.points.short': 'PTS',
   'stat.rebounds': 'Rebounds',

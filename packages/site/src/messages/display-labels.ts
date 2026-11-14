@@ -31,6 +31,7 @@ export function displayLabels(t: Translate) {
     },
     boxScore: {
       jersey: t('display.jersey'),
+      jerseyShort: t('display.jerseyShort'),
       player: t('display.player'),
       total: t('display.total'),
     },

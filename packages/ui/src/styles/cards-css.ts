@@ -97,7 +97,7 @@ export const cardsCss = String.raw`
 .ui-facts dd {
   margin: 0;
   color: var(--color-text);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   font-weight: 600;
 }
 .ui-team-card-figure {
@@ -106,7 +106,7 @@ export const cardsCss = String.raw`
   font-family: var(--font-heading);
   font-size: var(--text-22);
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   line-height: 1;
 }
 

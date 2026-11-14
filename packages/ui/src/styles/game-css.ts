@@ -135,7 +135,7 @@ export const gameCss = String.raw`
   flex: none;
   min-inline-size: 2ch;
   font-size: var(--text-22);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   line-height: 1;
   text-align: end;
 }
@@ -155,11 +155,9 @@ export const gameCss = String.raw`
   white-space: nowrap;
 }
 
+/* The big board of a game's page. The teams and what stands between them are held to a
+   width the eye takes in at once, however wide the panel is. */
 .ui-scoreboard {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--step-4);
   padding-block: var(--step-5);
   padding-inline: var(--space);
   background: var(--color-panel);
@@ -167,12 +165,26 @@ export const gameCss = String.raw`
   border: var(--card-border-width) solid var(--color-line);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
+  text-align: center;
+}
+.ui-scoreboard-teams {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--step-3);
+  max-inline-size: 40rem;
+  margin-inline: auto;
+}
+@media (min-width: 40rem) {
+  .ui-scoreboard-teams {
+    gap: var(--step-5);
+  }
 }
 .ui-scoreboard-side {
   display: grid;
   justify-items: center;
   gap: var(--step-2);
-  text-align: center;
+  min-inline-size: 0;
 }
 .ui-scoreboard-role {
   color: var(--color-muted);
@@ -182,30 +194,109 @@ export const gameCss = String.raw`
   text-transform: uppercase;
 }
 .ui-scoreboard-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--step-2);
+  max-inline-size: 100%;
   font-family: var(--font-heading);
   font-size: var(--text-18);
   font-weight: 700;
+  letter-spacing: var(--heading-tracking);
   line-height: 1.2;
+  text-transform: var(--heading-case);
 }
+.ui-scoreboard-name > [dir] {
+  min-inline-size: 0;
+}
+@media (min-width: 48rem) {
+  .ui-scoreboard-name {
+    font-size: var(--text-22);
+  }
+}
+/* A score is set in the reading face, whose figures are lining and even-width on every
+   device: two scores side by side are compared digit by digit. */
 .ui-scoreboard-score {
-  font-family: var(--font-heading);
+  font-family: var(--font-body);
   font-size: var(--text-36);
   font-weight: 700;
   line-height: 1;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   color: var(--color-text);
 }
 .ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score {
   color: var(--color-highlight);
 }
+/* What stands between the teams never crowds their names: on a phone its words wrap. */
 .ui-scoreboard-middle {
   display: grid;
   justify-items: center;
   gap: var(--step-2);
+  max-inline-size: 7rem;
+  text-wrap: balance;
+}
+@media (min-width: 40rem) {
+  .ui-scoreboard-middle {
+    max-inline-size: 12rem;
+  }
 }
 .ui-scoreboard-period {
   color: var(--color-muted);
   font-size: var(--text-14);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+/* A game still to play: its day, and its time the larger of the two. */
+.ui-scoreboard-when {
+  display: grid;
+  justify-items: center;
+  gap: var(--step-1);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.ui-scoreboard-day {
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.ui-scoreboard-time {
+  font-size: var(--text-18);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+@media (min-width: 48rem) {
+  .ui-scoreboard-time {
+    font-size: var(--text-22);
+  }
+}
+/* Under the teams, quietly: where the game is played, and what else the page has to say. */
+.ui-scoreboard-foot > * {
+  margin-block: var(--step-1) 0;
+  margin-inline: auto;
+  max-inline-size: 40rem;
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.ui-scoreboard-foot > :first-child {
+  margin-block-start: var(--step-4);
+}
+.ui-scoreboard-foot > .ui-scoreboard-note {
+  color: var(--color-text);
+}
+
+/* One play of a game: its team's color, then the play in words, which wrap under themselves. */
+.ui-play {
+  display: grid;
+  grid-template-columns: var(--step-3) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--step-2);
+}
+.ui-play-mark {
+  display: flex;
+}
+.ui-table .ui-play .ui-team-chip {
+  margin: 0;
+}
+.ui-plays tr[data-scored='true'] > .ui-num:last-child {
+  font-weight: 700;
 }
 `;

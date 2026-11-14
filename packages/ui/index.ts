@@ -7,6 +7,7 @@ export * from './src/game-card/game-card.tsx';
 export * from './src/scoreboard/scoreboard.tsx';
 export * from './src/standings-table/standings-table.tsx';
 export * from './src/box-score-table/box-score-table.tsx';
+export * from './src/play-table/play-table.tsx';
 export * from './src/stats-table/sortable-stats-table.tsx';
 export * from './src/stats-table/sort-stat-rows.ts';
 export * from './src/pickers/option-picker.tsx';

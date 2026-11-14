@@ -104,7 +104,7 @@ export const tableCss = String.raw`
   border-spacing: 0;
   color: var(--color-text);
   font-size: var(--text-14);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 .ui-table caption {
   padding-block: var(--step-3) var(--step-1);

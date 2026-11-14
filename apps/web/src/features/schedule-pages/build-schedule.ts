@@ -84,7 +84,7 @@ function whenOf(game: PublicGame, clock: LeagueClock): string {
 }
 
 /** The venue, and the court when the game has one; undefined for a game with no place yet. */
-function placeOf(game: PublicGame): string | undefined {
+export function placeOf(game: Pick<PublicGame, 'venue' | 'courtName'>): string | undefined {
   if (game.venue === null) return undefined;
   return game.courtName === null
     ? game.venue.name

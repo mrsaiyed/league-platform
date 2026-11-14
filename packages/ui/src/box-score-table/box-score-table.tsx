@@ -15,6 +15,11 @@ export type BoxScorePlayer = {
 
 export type BoxScoreLabels = {
   readonly jersey: string;
+  /**
+   * The same heading drawn short, for example "#", so the narrowest column is not the widest
+   * heading. The full word stays for screen readers and on hover.
+   */
+  readonly jerseyShort?: string | undefined;
   readonly player: string;
   readonly total: string;
 };
@@ -57,9 +62,16 @@ export function BoxScoreTable({
             <tr>
               {players ? (
                 <>
-                  <th scope="col" className="ui-num">
-                    {labels.jersey}
-                  </th>
+                  {labels.jerseyShort ? (
+                    <th scope="col" className="ui-num" title={labels.jersey}>
+                      <span aria-hidden="true">{labels.jerseyShort}</span>
+                      <span className="ui-visually-hidden">{labels.jersey}</span>
+                    </th>
+                  ) : (
+                    <th scope="col" className="ui-num">
+                      {labels.jersey}
+                    </th>
+                  )}
                   <th scope="col" className="ui-team-cell">
                     {labels.player}
                   </th>

@@ -410,6 +410,23 @@ html {
   font-size: var(--text-14);
 }
 
+/* A game's page: its tables (the two teams' box scores, the periods of the play-by-play)
+   sit two across on a laptop, so a row's numbers stay near the name they belong to and no
+   line of words runs the width of the screen. */
+.game-tables {
+  display: grid;
+  gap: var(--step-4);
+}
+.game-tables > * {
+  min-inline-size: 0;
+}
+@media (min-width: 64rem) {
+  .game-tables {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
 /* The box score grid (step 2.64): on a phone it scrolls sideways in its own box, and
    the page never does (A-2). */
 .box-score-grid {

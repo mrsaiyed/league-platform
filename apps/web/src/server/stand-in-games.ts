@@ -84,12 +84,16 @@ const teamNames: Readonly<Record<string, string>> = {
 const [lions, tigers, hawks, bears] = Object.keys(teamNames) as [string, string, string, string];
 
 const player = (firstName: string, lastName: string) => ({ firstName, lastName });
-/** The made-up rosters. The Bears show their players' numbers to their staff only (S-22). */
+/**
+ * The made-up rosters, each team with a color of its own for its chip on a game's page.
+ * The Bears show their players' numbers to their staff only (S-22).
+ */
 const madeUpTeams: readonly MadeUpTeam[] = [
   {
     id: lions,
     name: 'Lions',
     slug: 'lions',
+    color: '#c8862a',
     statsVisibility: 'everyone',
     players: ['Ada', 'Ben', 'Cy', 'Dee', 'Eli', 'Fay'].map((n) => player(n, 'Lionel')),
   },
@@ -97,6 +101,7 @@ const madeUpTeams: readonly MadeUpTeam[] = [
     id: tigers,
     name: 'Tigers',
     slug: 'tigers',
+    color: '#d2562c',
     statsVisibility: 'everyone',
     players: ['Gus', 'Hal', 'Ivy', 'Jo', 'Kit', 'Lu'].map((n) => player(n, 'Tigerton')),
   },
@@ -104,6 +109,7 @@ const madeUpTeams: readonly MadeUpTeam[] = [
     id: hawks,
     name: 'Hawks',
     slug: 'hawks',
+    color: '#2f7fb8',
     statsVisibility: 'everyone',
     players: ['Max', 'Ned', 'Oz', 'Pia', 'Quin', 'Ray'].map((n) => player(n, 'Hawkins')),
   },
@@ -111,6 +117,7 @@ const madeUpTeams: readonly MadeUpTeam[] = [
     id: bears,
     name: 'Bears',
     slug: 'bears',
+    color: '#6a4c93',
     statsVisibility: 'staff',
     players: ['Sol', 'Tam', 'Uma', 'Vic', 'Wes', 'Xan'].map((n) => player(n, 'Bearsley')),
   },
