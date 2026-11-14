@@ -238,6 +238,38 @@ describe('sortable statistics table', () => {
   });
 });
 
+describe('highlight in the markup', () => {
+  const team = (name: string, score: number) => ({ name, score });
+  it('marks only the winner score of a game card, and no one when level', () => {
+    const card = (h: number, a: number) =>
+      render(
+        createElement(GameCard, {
+          home: team('Home', h),
+          away: team('Away', a),
+          status: 'final',
+          whenText: 'Today',
+          labels: gameLabels,
+        }),
+      );
+    expect(card(3, 1).match(/data-winner="true"/g)).toHaveLength(1);
+    expect(card(2, 2)).not.toContain('data-winner');
+  });
+  it('marks only the winning side of a finished scoreboard', () => {
+    const labels = {
+      scoreboard: 'Scoreboard',
+      home: 'Home',
+      away: 'Away',
+      live: 'Live',
+      final: 'Final',
+    };
+    const board = (state: 'live' | 'final', h: number, a: number) =>
+      render(createElement(Scoreboard, { home: team('H', h), away: team('A', a), state, labels }));
+    expect(board('final', 5, 2).match(/data-winner="true"/g)).toHaveLength(1);
+    expect(board('final', 2, 2)).not.toContain('data-winner');
+    expect(board('live', 5, 2)).not.toContain('data-winner');
+  });
+});
+
 describe('pickers', () => {
   const props = {
     label: 'Round',
@@ -350,6 +382,23 @@ describe('the stylesheet', () => {
     expect(css).not.toMatch(
       /(^|[\s{;])(margin|padding|border)-(left|right)\b|(^|[\s{;])(left|right)\s*:|text-align:\s*(left|right)|float:/m,
     );
+  });
+  it('uses the highlight only for the Live marker, the winner score and the chosen picker item', () => {
+    const used = [...css.matchAll(/([^{}]+){([^{}]*)}/g)]
+      .filter((m) => (m[2] ?? '').includes('var(--color-highlight)'))
+      .map((m) => (m[1] ?? '').trim().replace(/\s+/g, ' '))
+      .sort();
+    expect(used).toEqual(
+      [
+        '.ui-live',
+        ".ui-game-team[data-winner='true'] .ui-game-team-score",
+        ".ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score",
+        '.ui-picker select',
+        '.ui-picker option:checked',
+      ].sort(),
+    );
+    // Never body text: no rule for text, tables or links takes it.
+    expect(css).not.toMatch(/\.ui-(table|note-mark|game-link)[^{]*\{[^}]*--color-highlight/);
   });
   it('lets readers turn movement off', () => {
     expect(css).toContain('prefers-reduced-motion: reduce');

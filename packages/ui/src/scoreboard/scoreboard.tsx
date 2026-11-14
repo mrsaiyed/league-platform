@@ -20,9 +20,17 @@ export type ScoreboardProps = {
   readonly labels: ScoreboardLabels;
 };
 
-function Side({ team, role }: { readonly team: ScoreboardTeam; readonly role: string }) {
+function Side({
+  team,
+  role,
+  isWinner,
+}: {
+  readonly team: ScoreboardTeam;
+  readonly role: string;
+  readonly isWinner: boolean;
+}) {
   return (
-    <div className="ui-scoreboard-side">
+    <div className="ui-scoreboard-side" data-winner={isWinner ? 'true' : undefined}>
       <span className="ui-scoreboard-role">{role}</span>
       <span className="ui-scoreboard-name" dir="auto">
         {team.name}
@@ -34,15 +42,18 @@ function Side({ team, role }: { readonly team: ScoreboardTeam; readonly role: st
 
 /** The big score for a game page: both teams, the period and clock, and the state. */
 export function Scoreboard({ home, away, state, periodText, labels }: ScoreboardProps) {
+  // Only a finished game has a winner; the highlight goes to that score alone.
+  const homeWins = state === 'final' && home.score > away.score;
+  const awayWins = state === 'final' && away.score > home.score;
   return (
     <section className="ui-scoreboard" aria-label={labels.scoreboard} data-state={state}>
-      <Side team={away} role={labels.away} />
+      <Side team={away} role={labels.away} isWinner={awayWins} />
       <div className="ui-scoreboard-middle">
         {state === 'live' ? <LiveMarker label={labels.live} /> : null}
         {state === 'final' ? <span className="ui-game-state">{labels.final}</span> : null}
         {periodText ? <span className="ui-scoreboard-period">{periodText}</span> : null}
       </div>
-      <Side team={home} role={labels.home} />
+      <Side team={home} role={labels.home} isWinner={homeWins} />
     </section>
   );
 }
