@@ -294,14 +294,28 @@ class Board {
   private readonly early = new Map<string, number>();
   private readonly late = new Map<string, number>();
 
+  private readonly weeks: readonly SeasonWeek[];
+  private readonly times: readonly string[];
+  private readonly courts: readonly SeasonCourt[];
+  private readonly rules: FairnessRules;
+  private readonly unavailable: ReadonlyMap<string, ReadonlySet<string>>;
+  private readonly newId: () => string;
+
   constructor(
-    private readonly weeks: readonly SeasonWeek[],
-    private readonly times: readonly string[],
-    private readonly courts: readonly SeasonCourt[],
-    private readonly rules: FairnessRules,
-    private readonly unavailable: ReadonlyMap<string, ReadonlySet<string>>,
-    private readonly newId: () => string,
-  ) {}
+    weeks: readonly SeasonWeek[],
+    times: readonly string[],
+    courts: readonly SeasonCourt[],
+    rules: FairnessRules,
+    unavailable: ReadonlyMap<string, ReadonlySet<string>>,
+    newId: () => string,
+  ) {
+    this.weeks = weeks;
+    this.times = times;
+    this.courts = courts;
+    this.rules = rules;
+    this.unavailable = unavailable;
+    this.newId = newId;
+  }
 
   addLocked(g: ScheduleGame, week: number | null): void {
     if (g.time !== null && g.court !== null) {
