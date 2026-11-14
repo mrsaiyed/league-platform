@@ -377,6 +377,8 @@ export const en = {
   'admin.boxScore.done.reopen': 'The game is reopened. Fix the grid and save it again.',
   'admin.boxScore.error.invalid-input':
     'Enter every number as a whole number from 0 to 999 (minutes up to 1440), and both scores (or the players’ points).',
+  'admin.boxScore.error.reopen-reason':
+    'Say why the game needs correcting (up to 1000 characters) to reopen it.',
   'admin.boxScore.error.game-is-tracked':
     'This game was scored with the live tracker, so it is corrected there.',
   'admin.boxScore.error.player-not-on-team':

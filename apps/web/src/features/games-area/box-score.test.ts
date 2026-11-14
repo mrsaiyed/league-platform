@@ -143,8 +143,11 @@ describe('the box score grid', () => {
     const reopen = { gameId: target?.id, version: String(after.game.version) };
     expect(await runBoxScoreAction('reopen', reopen, ctx, ports.deps)).toEqual({
       ok: false,
-      code: 'invalid-input',
+      code: 'reopen-reason',
     });
+    expect(
+      await runBoxScoreAction('reopen', { ...reopen, reason: '   ' }, ctx, ports.deps),
+    ).toEqual({ ok: false, code: 'reopen-reason' });
     expect(
       await runBoxScoreAction('reopen', { ...reopen, reason: 'Misread' }, ctx, ports.deps),
     ).toEqual({ ok: true });
@@ -204,6 +207,9 @@ describe('the box score grid', () => {
     });
     expect(boxScoreNotice({ problem: 'game-is-tracked' })?.key).toBe(
       'admin.boxScore.error.game-is-tracked',
+    );
+    expect(boxScoreNotice({ problem: 'reopen-reason' })?.key).toBe(
+      'admin.boxScore.error.reopen-reason',
     );
     expect(boxScoreNotice({ problem: 'tie-not-allowed' })?.key).toBe(
       'admin.games.error.tie-not-allowed',

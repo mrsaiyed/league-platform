@@ -33,7 +33,11 @@ export async function runBoxScoreAction(
   const version = versionOf(fields['version']);
   if (action === 'reopen') {
     const reopened = await reopenGame(context, { gameId, version, reason: fields['reason'] }, deps);
-    return reopened.ok ? { ok: true } : { ok: false, code: reopened.error.code };
+    if (reopened.ok) return { ok: true };
+    // The reopen form's one typed field is the reason, so input it refuses is the reason
+    // missing or too long: say that, not the grid's message about numbers.
+    const code = reopened.error.code === 'invalid-input' ? 'reopen-reason' : reopened.error.code;
+    return { ok: false, code };
   }
   const sheet = await getBoxScoreSheet(context, { gameId }, deps);
   if (!sheet.ok) return { ok: false, code: sheet.error.code };

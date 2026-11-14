@@ -10,6 +10,7 @@ const first = (value: string | string[] | undefined) =>
 
 const problemKeys: readonly TextKey[] = [
   'admin.boxScore.error.invalid-input',
+  'admin.boxScore.error.reopen-reason',
   'admin.boxScore.error.game-is-tracked',
   'admin.boxScore.error.player-not-on-team',
   'admin.boxScore.error.player-listed-twice',
