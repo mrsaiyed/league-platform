@@ -80,8 +80,12 @@ export type LeagueRecords = MadeLeague & {
   standingsRowId: string;
   standingsAdjustmentId: string;
   seasonPlayerTotalsId: string;
-  /** A fixtures import, applied, with what it created. */
+  /** A fixtures import, applied, with what it created: the draft's one change and a score waiting for the upcoming game. */
   importId: string;
+  /** A fixtures import read and ready to apply: one game between the team and its opponent. */
+  readyImportId: string;
+  /** A fixtures import still waiting to be read, holding the uploaded text. */
+  readingImportId: string;
 };
 
 export type TwoLeagues = {
@@ -448,13 +452,47 @@ async function seededLeague(
     pglite,
     `insert into imports (league_id, season_id, kind, status, account_id, file_name, report,
        created, applied_at)
-     values ($1, $2, 'fixtures', 'applied', $3, $4, '{"version": 1, "rows": 2}', $5, now())`,
+     values ($1, $2, 'fixtures', 'applied', $3, $4, $5, $6, now())`,
     [
       leagueId,
       seasonId,
       ownerId,
       `${m}-fixtures.csv`,
-      JSON.stringify({ version: 1, games: [upcomingGameId] }),
+      JSON.stringify(readyReport(teamId, opponentId, venueId)),
+      JSON.stringify({
+        version: 1,
+        draftId: scheduleDraftId,
+        draftStarted: false,
+        changesBefore: 1,
+        changesAdded: 0,
+        draftVersion: 1,
+        gameIds: [],
+        scores: [{ gameId: upcomingGameId, home: 50, away: 40, recorded: false }],
+      }),
+    ],
+  );
+  const readyImportId = await id(
+    pglite,
+    `insert into imports (league_id, season_id, kind, status, account_id, file_name, report)
+     values ($1, $2, 'fixtures', 'ready', $3, $4, $5)`,
+    [
+      leagueId,
+      seasonId,
+      ownerId,
+      `${m}-ready.csv`,
+      JSON.stringify(readyReport(teamId, opponentId, venueId)),
+    ],
+  );
+  const readingImportId = await id(
+    pglite,
+    `insert into imports (league_id, season_id, kind, status, account_id, file_name, report)
+     values ($1, $2, 'fixtures', 'reading', $3, $4, $5)`,
+    [
+      leagueId,
+      seasonId,
+      ownerId,
+      `${m}-reading.csv`,
+      JSON.stringify({ version: 1, upload: 'Date,Home,Away' }),
     ],
   );
   // A job a worker holds. It carries ids only (T-131), so no marker: its ids are the league's.
@@ -510,6 +548,37 @@ async function seededLeague(
     standingsAdjustmentId,
     seasonPlayerTotalsId,
     importId,
+    readyImportId,
+    readingImportId,
+  };
+}
+
+/** The report of a read fixtures file with one game and one problem, in the shape core reads. */
+function readyReport(homeTeamId: string, awayTeamId: string, venueId: string) {
+  return {
+    version: 1,
+    fileProblem: null,
+    fixtures: [
+      {
+        rowNumber: 2,
+        date: '2027-01-09',
+        time: '19:00',
+        homeTeamId,
+        awayTeamId,
+        venueId,
+        court: null,
+        round: null,
+        gameNumber: null,
+        outsideReference: null,
+        finalScore: null,
+      },
+    ],
+    problems: [{ rowNumber: 3, message: 'Row 3: the date is empty.' }],
+    omittedProblems: 0,
+    problemsNote: null,
+    warnings: [],
+    rowsRead: 2,
+    columnsFound: ['date', 'home team', 'away team'],
   };
 }
 
