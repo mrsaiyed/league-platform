@@ -657,7 +657,7 @@ function drawVillage() {
           TOP,
           'Leo · The lead',
           busy
-            ? lanes.length + ' of ' + (D.laneCount || lanes.length) + ' desks busy'
+            ? lanes.length + ' of ' + (D.laneCount || lanes.length) + ' desks have work open'
             : working
               ? 'handing out work'
               : 'resting',
@@ -942,7 +942,10 @@ function showLead() {
   const open = D.needs.filter((n) => !n.done);
   cols.append(
     column2(
-      'At work now (' + lanes.length + (D.laneCount ? ' of ' + D.laneCount + ' desks' : '') + ')',
+      'Work that is open now (' +
+        lanes.length +
+        (D.laneCount ? ' of ' + D.laneCount + ' desks' : '') +
+        '). Open means started and not yet finished: some are being built this minute, others wait for a check or a review.',
       busy
         ? lanes
             .map((l) => stepOf(l.id))
