@@ -1,4 +1,4 @@
-// GET /api/v1/leagues/{leagueId}/games/{game}/state (T6 §1, §3; T-113; record 041,
+// GET /api/v1/leagues/{leagueId}/games/{game}/state (T6 §1, §3; T-113; record 049,
 // T-253): the engine's state as the server holds it, for the scorekeeper's device to
 // load when it opens the game and to reload after a refused tap. A thin handler (T-25,
 // T-26): who and which league from the context (T-23), the game from the address, and

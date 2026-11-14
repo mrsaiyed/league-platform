@@ -1,5 +1,5 @@
 // The game as the tracker's engine holds it on the server (T6 §1, §3; T-113; record
-// 041, T-253): the saved state and its sequence number, for a scorekeeper's device to
+// 049, T-253): the saved state and its sequence number, for a scorekeeper's device to
 // load when it opens the game and to reload when the server refused a tap. The server's
 // record is the truth; the device rebuilds its screen on top of it.
 //

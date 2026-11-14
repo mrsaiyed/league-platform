@@ -293,7 +293,7 @@ All dated November 12, 2026.
 | T-249                 | New                                                                          | Placing a schedule: strict rules never broken, the rest best effort, unplaced games returned (rec. 037)                                         | Step 2.73: P7 §4 did not say what happens when the fairness rules cannot all be met                |
 | T-250                 | New                                                                          | A tracked game ends by the tracker's tap or a command; did-not-play lines; a reopened one goes back to its tracker (rec. 038)                   | Step 2.30: T6 §7, §8 did not say which door ends a game or where a reopened one goes               |
 | T-251                 | New                                                                          | Tracker endpoints: one session address naming the device; errors as HTTP; a live message per batch from a visitor snapshot (rec. 039)           | Step 2.32: T6 §3, §5, §6 gave no session bodies, statuses or messages per batch                    |
-| T-253                 | New                                                                          | The device loads the engine's state from a staff read; the tracker's controller on the device (rec. 041)                                        | Step 2.34: T-113 says reload the server's state, but no door gave it                               |
+| T-253                 | New                                                                          | The device loads the engine's state from a staff read; the tracker's controller on the device (rec. 049)                                        | Step 2.34: T-113 says reload the server's state, but no door gave it                               |
 
 ## The full list
 
@@ -714,7 +714,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-249 | Schedules never break strict rules (twice a day, same matchup two weeks running, division, requests); the rest is best effort; unplaced games are returned (rec. 037)                                                                                                   | Agreed (delegated) |         |
 | T-250 | A tracked game is ended by the tracker's End game tap or a command, with did-not-play lines; reopening hands it back to its tracker (record 038)                                                                                                                        | Agreed (delegated) |         |
 | T-251 | Tracker endpoints: commands, one session address (open, renew, take over, release; names the device) and the snapshot; errors as HTTP; after a batch, one live message cut from the visitor's snapshot; hub at /api/v1/live (rec. 039)                                  | Agreed (delegated) |         |
-| T-253 | The tracker loads and reloads the engine's state through `GET …/games/{game}/state` (whoever may score the game, never cached); its controller applies each tap at once, rebuilds on the server's state after a refusal, and turns read-only on a takeover (record 041) | Agreed (delegated) |         |
+| T-253 | The tracker loads and reloads the engine's state through `GET …/games/{game}/state` (whoever may score the game, never cached); its controller applies each tap at once, rebuilds on the server's state after a refusal, and turns read-only on a takeover (record 049) | Agreed (delegated) |         |
 
 ### [T7 — Notifications and jobs](technical/T7-notifications-and-jobs.md)
 

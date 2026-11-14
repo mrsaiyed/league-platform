@@ -1,4 +1,4 @@
-// The engine's state for the scorekeeper's device (record 041, T-253): what the next
+// The engine's state for the scorekeeper's device (record 049, T-253): what the next
 // batch would start from, for whoever may score the game and nobody else. The same
 // read against the real database is in packages/database (the two-league harness and
 // the role matrix).

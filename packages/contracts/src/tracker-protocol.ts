@@ -169,7 +169,7 @@ export type SessionReply = z.infer<typeof SessionReply>;
 
 /**
  * What `GET /api/v1/leagues/{leagueId}/games/{game}/state` answers a scorekeeper
- * (record 041): the engine's state as the server holds it, which the tracker loads on
+ * (record 049): the engine's state as the server holds it, which the tracker loads on
  * opening the game and reloads after a refusal (T-113). The state is the engine's own
  * document (packages/sports), which this package cannot name: only the marks of its
  * version 1 are checked here, and the tracker reads it as the engine's. Never cached,

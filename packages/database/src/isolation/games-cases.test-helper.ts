@@ -512,7 +512,7 @@ registerIsolationCase({
   run: scoreTargetUpcomingGame,
 });
 
-// The engine's state for the scorekeeper's device (record 041, T-253): the target's
+// The engine's state for the scorekeeper's device (record 049, T-253): the target's
 // final game has a saved state; the target's upcoming game is read once it is scored
 // (in the run's own rolled-back transaction), so both a saved state and its sequence
 // number are there to leak. Anywhere else the read is refused or finds no game.

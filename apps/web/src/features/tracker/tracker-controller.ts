@@ -1,5 +1,5 @@
 // The tracker's logic on the device, with no drawing (T6 §1, §3, §4, §5; T-113, T-114,
-// T-116; record 041). The screens of steps 2.35 to 2.37 read `status()` and call the
+// T-116; record 049). The screens of steps 2.35 to 2.37 read `status()` and call the
 // methods below; this holds no words and no markup.
 //
 // - Opening takes the scoring session (T-116) and loads the engine's state from the
