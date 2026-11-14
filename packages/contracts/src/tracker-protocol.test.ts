@@ -126,24 +126,31 @@ describe('command reply', () => {
 describe('scoring session messages', () => {
   it('accepts each request', () => {
     for (const r of [
-      { type: 'open', gameId: id(1) },
+      { type: 'open', deviceId: 'tablet-1' },
       { type: 'renew', sessionId: id(2) },
-      { type: 'take-over', gameId: id(1), confirmed: true, expectedHolderSince: 5 },
+      { type: 'take-over', deviceId: 'tablet-1', confirmed: true, expectedHolderSince: 5 },
       { type: 'release', sessionId: id(2) },
     ]) {
       expect(SessionRequest.safeParse(r).success).toBe(true);
     }
   });
+  it('names the device, never the game: the address names that', () => {
+    expect(SessionRequest.safeParse({ type: 'open' }).success).toBe(false);
+    expect(SessionRequest.safeParse({ type: 'open', deviceId: '  ' }).success).toBe(false);
+    expect(
+      SessionRequest.safeParse({ type: 'open', deviceId: 'tablet-1', gameId: id(1) }).success,
+    ).toBe(false);
+  });
   it('will not take over without the scorekeeper confirming', () => {
     const noConfirm = {
       type: 'take-over',
-      gameId: id(1),
+      deviceId: 'tablet-1',
       confirmed: false,
       expectedHolderSince: 5,
     };
     expect(SessionRequest.safeParse(noConfirm).success).toBe(false);
     expect(
-      SessionRequest.safeParse({ type: 'take-over', gameId: id(1), expectedHolderSince: 5 })
+      SessionRequest.safeParse({ type: 'take-over', deviceId: 'tablet-1', expectedHolderSince: 5 })
         .success,
     ).toBe(false);
   });
@@ -157,6 +164,7 @@ describe('scoring session messages', () => {
       },
       { status: 'ended', reason: 'taken-over', sentAt: 1 },
       { status: 'refused', code: 'not-allowed', sentAt: 1 },
+      { status: 'refused', code: 'game-not-live', sentAt: 1 },
     ]) {
       expect(SessionReply.safeParse(r).success).toBe(true);
     }

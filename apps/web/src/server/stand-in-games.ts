@@ -3,34 +3,56 @@
 // Made-up games in this process's memory (T-201), so the admin's games area can be opened
 // and used with no database. It runs the real games commands over an in-memory games
 // store, so what they refuse and record is what the database-backed store is held to.
-// Like the database, a transaction works on a copy and keeps it only if the work returns.
-// Only one made-up league has games; every other league has none.
+// Like the database, a transaction works on a copy and keeps it only if the work returns,
+// and transactions run one at a time, so two at once cannot lose either's work.
+// Only one made-up league has games; every other league has none. The tracker's
+// endpoints (step 2.32) run on the same games, with made-up rosters (stand-in-tracker.ts).
 import { defaultSeasonRules } from '@srleagues/contracts';
-import type {
-  AccessReader,
-  ActivityEntry,
-  CommandDeps,
-  CommandLogLine,
-  EventHandler,
-  GameLine,
-  GameRecord,
-  GamesTx,
-  NewGameCorrection,
-  StoredSetting,
+import {
+  defaultNamePolicy,
+  systemClock,
+  type AccessReader,
+  type ActivityEntry,
+  type CommandDeps,
+  type CommandLogLine,
+  type EventHandler,
+  type GameLine,
+  type GameRecord,
+  type GameSnapshotStore,
+  type GamesTx,
+  type NewGameCorrection,
+  type StoredSetting,
+  type TrackerTx,
+  type TransactionRunner,
 } from '@srleagues/core';
 import type { GameNames, GamesAreaPorts } from './games-area-ports.ts';
+import {
+  emptyTracker,
+  liveGamesOf,
+  scoringSessionsOf,
+  seedTracker,
+  type MadeUpTeam,
+  type TrackerState,
+} from './stand-in-tracker.ts';
+import type { TrackerPorts } from './tracker-ports.ts';
 
 const id = (kind: number, n: number) =>
   `01900000-0000-7000-8000-${kind.toString(16).padStart(4, '0')}${n.toString(16).padStart(8, '0')}`;
 
 type State = {
-  seasons: { id: string; programId: string; rules: unknown }[];
+  seasons: {
+    id: string;
+    programId: string;
+    rules: unknown;
+    status: 'draft' | 'active' | 'completed';
+  }[];
   games: GameRecord[];
   lines: GameLine[];
   corrections: NewGameCorrection[];
   assignments: { gameId: string; accountId: string }[];
   settings: Record<string, StoredSetting[]>;
   activity: ActivityEntry[];
+  tracker: TrackerState;
 };
 
 export type StandInGamesOptions = {
@@ -55,6 +77,42 @@ const teamNames: Readonly<Record<string, string>> = {
 };
 const [lions, tigers, hawks, bears] = Object.keys(teamNames) as [string, string, string, string];
 
+const player = (firstName: string, lastName: string) => ({ firstName, lastName });
+/** The made-up rosters. The Bears show their players' numbers to their staff only (S-22). */
+const madeUpTeams: readonly MadeUpTeam[] = [
+  {
+    id: lions,
+    name: 'Lions',
+    slug: 'lions',
+    statsVisibility: 'everyone',
+    players: ['Ada', 'Ben', 'Cy', 'Dee', 'Eli', 'Fay'].map((n) => player(n, 'Lionel')),
+  },
+  {
+    id: tigers,
+    name: 'Tigers',
+    slug: 'tigers',
+    statsVisibility: 'everyone',
+    players: ['Gus', 'Hal', 'Ivy', 'Jo', 'Kit', 'Lu'].map((n) => player(n, 'Tigerton')),
+  },
+  {
+    id: hawks,
+    name: 'Hawks',
+    slug: 'hawks',
+    statsVisibility: 'everyone',
+    players: ['Max', 'Ned', 'Oz', 'Pia', 'Quin', 'Ray'].map((n) => player(n, 'Hawkins')),
+  },
+  {
+    id: bears,
+    name: 'Bears',
+    slug: 'bears',
+    statsVisibility: 'staff',
+    players: ['Sol', 'Tam', 'Uma', 'Vic', 'Wes', 'Xan'].map((n) => player(n, 'Bearsley')),
+  },
+];
+
+/** A made-up player's person id: team 1 to 4 (Lions, Tigers, Hawks, Bears), player 1 to 6. */
+export const standInPlayerId = (team: number, n: number) => id(0x70 + team, n);
+
 /** An ISO time `days` days from now at this hour (UTC), so the games are always this week's. */
 function at(days: number, hour: number): string {
   const day = new Date();
@@ -72,11 +130,14 @@ function emptyState(): State {
     assignments: [],
     settings: {},
     activity: [],
+    tracker: emptyTracker(),
   };
 }
 
 function seed(options: StandInGamesOptions): State {
   const seasonId = id(0x5e, 1);
+  /** A season still being set up, with one game and no date yet (hidden from the public). */
+  const draftSeasonId = id(0x5e, 2);
   const game = (n: number, fields: Partial<GameRecord>): GameRecord => ({
     id: id(0x6a, n),
     seasonId,
@@ -97,8 +158,17 @@ function seed(options: StandInGamesOptions): State {
   const [first, second] = options.assignees;
   return {
     ...emptyState(),
+    tracker: seedTracker(madeUpTeams, standInPlayerId),
     settings: { ...options.settings },
-    seasons: [{ id: seasonId, programId: id(0x9a, 1), rules: defaultSeasonRules() }],
+    seasons: [
+      { id: seasonId, programId: id(0x9a, 1), rules: defaultSeasonRules(), status: 'active' },
+      {
+        id: draftSeasonId,
+        programId: id(0x9a, 1),
+        rules: defaultSeasonRules(),
+        status: 'draft',
+      },
+    ],
     games: [
       game(1, {}),
       game(2, { homeTeamId: hawks, awayTeamId: bears, status: 'live', captureMode: 'live' }),
@@ -115,6 +185,7 @@ function seed(options: StandInGamesOptions): State {
         finalizedAt: at(0, 10),
         version: 2,
       }),
+      game(6, { seasonId: draftSeasonId, startsAt: null }),
     ],
     assignments: [
       { gameId: id(0x6a, 1), accountId: first },
@@ -124,14 +195,27 @@ function seed(options: StandInGamesOptions): State {
   };
 }
 
+/** The seasons whose games the public may read, as the database store reads them
+ * (games-read-store.ts, publicSeasonStatuses). */
+const publicSeasonStatuses: readonly string[] = ['active', 'completed'];
+
 const isAssigned = (s: State, gameId: string, accountId: string) =>
   s.assignments.some((a) => a.gameId === gameId && a.accountId === accountId);
 
-export function standInGames(options: StandInGamesOptions): GamesAreaPorts {
+/** The games area's ports, and the tracker's but for the live publisher, which the app adds. */
+export type StandInGames = GamesAreaPorts & {
+  readonly tracker: Omit<TrackerPorts, 'publisher'>;
+};
+
+export function standInGames(options: StandInGamesOptions): StandInGames {
   let state = seed(options);
   const stateOf = (leagueId: string) => (leagueId === options.leagueId ? state : emptyState());
+  const teamsOf = (s: State, gameId: string) => {
+    const game = s.games.find((g) => g.id === gameId);
+    return game === undefined ? [] : [game.homeTeamId, game.awayTeamId];
+  };
 
-  const txOf = (leagueId: string, s: State): GamesTx => ({
+  const txOf = (leagueId: string, s: State): TrackerTx => ({
     jobs: { enqueue: async () => {} },
     access: options.accessOf(leagueId),
     activity: { record: async (entry) => void s.activity.push(entry), list: async () => [] },
@@ -204,14 +288,19 @@ export function standInGames(options: StandInGamesOptions): GamesAreaPorts {
         };
       },
     },
+    clock: systemClock,
+    scoringSessions: scoringSessionsOf(s.tracker, (gameId) => s.games.some((g) => g.id === gameId)),
+    liveGames: liveGamesOf(s.tracker, (gameId) => teamsOf(s, gameId)),
   });
 
   const noticeOnly: EventHandler<GamesTx>[] = ['games.finalized', 'games.reopened'].map((type) => ({
     type,
     handle: async () => {},
   }));
-  const deps: CommandDeps<GamesTx> = {
-    transaction: async (context, work) => {
+  // One transaction at a time, as the database's lock on a game would hold the others.
+  let queue: Promise<unknown> = Promise.resolve();
+  const transaction: TransactionRunner<TrackerTx> = (context, work) => {
+    const run = queue.then(async () => {
       const draft = structuredClone(stateOf(context.leagueId));
       const result = await work(txOf(context.leagueId, draft));
       // Kept only when the command succeeded: a refusal leaves nothing behind.
@@ -219,13 +308,67 @@ export function standInGames(options: StandInGamesOptions): GamesAreaPorts {
         typeof result === 'object' && result !== null && 'ok' in result && result.ok === false;
       if (!refused && context.leagueId === options.leagueId) state = draft;
       return result;
-    },
+    });
+    queue = run.catch(() => undefined);
+    return run;
+  };
+  const deps: CommandDeps<GamesTx> = {
+    transaction,
     events: noticeOnly,
     log: options.log,
     now: () => performance.now(),
   };
+  const snapshotStoreOf = (leagueId: string): GameSnapshotStore => {
+    const s = () => stateOf(leagueId);
+    return {
+      // A game of a season still being set up (or retired) is not there at all, as in
+      // the database store (games-read-store.ts).
+      findGame: async (gameId) => {
+        const game = s().games.find((g) => g.id === gameId);
+        const season = s().seasons.find((x) => x.id === game?.seasonId);
+        return season === undefined || !publicSeasonStatuses.includes(season.status)
+          ? undefined
+          : game;
+      },
+      teams: async (teamIds) => s().tracker.teams.filter((t) => teamIds.includes(t.id)),
+      state: async (gameId) => s().tracker.states.find((x) => x.gameId === gameId)?.state,
+      savedState: async (gameId) => {
+        const found = s().tracker.states.find((x) => x.gameId === gameId);
+        return found === undefined ? undefined : { seq: found.seq, state: found.state };
+      },
+      // Every rostered player of the game's teams, with their number, as the database
+      // reads a game's lines once the tracker has written them.
+      lines: async (gameId) => {
+        const teams = teamsOf(s(), gameId);
+        const saved = s().tracker.lines.filter((l) => l.gameId === gameId);
+        return s()
+          .tracker.players.filter((p) => teams.includes(p.teamId))
+          .map((p) => {
+            const line = saved.find((l) => l.personId === p.personId);
+            return {
+              teamId: p.teamId,
+              personId: p.personId,
+              jerseyNumber: line?.jerseyNumber ?? p.jerseyNumber,
+              played: line?.played ?? false,
+              secondsPlayed: line?.secondsPlayed ?? null,
+              stats: line?.stats ?? {},
+            };
+          });
+      },
+      people: async (personIds) => s().tracker.people.filter((p) => personIds.includes(p.id)),
+      correctedOn: async () => undefined,
+    };
+  };
   return {
     deps,
+    tracker: {
+      deps: { transaction, events: [], log: options.log, now: () => performance.now() },
+      snapshotStoreOf,
+      namesShownOf: async () => ({ audience: 'adult', policy: defaultNamePolicy }),
+      displayNameOf: async (leagueId, accountId) =>
+        leagueId === options.leagueId ? (options.people[accountId] ?? '') : '',
+      clock: systemClock,
+    },
     namesOf: async (leagueId): Promise<GameNames> => {
       if (leagueId !== options.leagueId) return { teams: {}, scorekeepers: {} };
       const scorekeepers: Record<string, string[]> = {};
