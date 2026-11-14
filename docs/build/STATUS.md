@@ -19,12 +19,14 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane. A run that is cut off leaves this as the map for the next run. Check the lane branches for commits: builders were still working when the usage limit hit.
 
-Next free: migration 0012, record 049, T-254 (records 041-048 were written by 1.24; 2.34 was given 041 and T-253: if it writes a record, renumber it to 049; 040/T-252 to 2.67; 038/T-250 to 2.30, 039/T-251 to 2.32; 034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 was reserved for 1.14, which landed without a migration; the runner refuses gaps, so 0011 went to the game-corrections fix of 2026-11-14; 0010 / 030 / T-242 to 2.4).
+Next free: migration 0012, record 052, T-256 (049 to 2.34 (renumbered from 041), 050/T-254 to 2.58, 051/T-255 to 2.45; records 041-048 were written by 1.24; 2.34 was given 041 and T-253: if it writes a record, renumber it to 049; 040/T-252 to 2.67; 038/T-250 to 2.30, 039/T-251 to 2.32; 034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 was reserved for 1.14, which landed without a migration; the runner refuses gaps, so 0011 went to the game-corrections fix of 2026-11-14; 0010 / 030 / T-242 to 2.4).
 
 - **2.48 League settings screen** — `.local/lanes/2.48-league-settings` — none reserved — builder (sonnet) started 2026-11-14; check the lane, push, review, GitHub, land.
 - **2.76 The bin** — `.local/lanes/2.76-bin` — none — built, pushed, opus review running. Not done: purging binned games needs a migration (DELETE on games or an owner-run purge function), the nightly fan-out per league (T-63), standings adjustments in the bin. Decided by the lead: restoring stays admin-only (bin.restore) for now; a restored game reappears at once without a preview; people with history stay in the bin for good (T-52). Then GitHub, land.
 - **2.34 Tracker controller** — `.local/lanes/2.34-tracker-controller` — record 041, T-253 — builder (opus) started 2026-11-14; check the lane, push, review, GitHub, land.
 - **1.25 Whole-stage review and report** — `.local/lanes/1.25-stage-review` — none — opus (xhigh) started 2026-11-14: reviews everything stage 1 added, writes docs/build/STAGE-1-REPORT.md and the founder's checklist; findings that need code become steps in lanes.
+- **2.45 The game page, live** — `.local/lanes/2.45-game-page` — record 051, T-255 — builder (opus) started 2026-11-14; check the lane, push, review, GitHub, land.
+- **2.58 Al-Hadi transfer runner** — `.local/lanes/2.58-transfer-runner` — record 050, T-254 — builder (opus) started 2026-11-14; check the lane, push, review, GitHub, land.
 
 ## Needs the founder
 
