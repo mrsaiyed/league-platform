@@ -258,7 +258,7 @@ export function LiveGameView({
             })}{' '}
           </span>
         )}
-        {latest}
+        {latest === '' ? null : <span>{latest}</span>}
       </p>
       {showPlayers && game.status !== 'scheduled' ? (
         <>
