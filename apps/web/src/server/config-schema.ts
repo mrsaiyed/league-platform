@@ -106,6 +106,36 @@ const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   LOCAL_DATA: ['local', 'test'],
 };
 
+/** The settings that name a database or a Supabase project of the platform's own. */
+const platformAddresses = ['PLATFORM_DATABASE_URL', 'SUPABASE_URL'] as const;
+
+/** What loadConfig checks the platform's addresses against, beside the environment. */
+export type ConfigGuard = {
+  /**
+   * The project reference of the tracker's Supabase project, from supabase/site.json
+   * (config.ts reads it when the app starts), or null when that file could not be
+   * read: then staging and production refuse to start, since their addresses cannot
+   * be checked against it. That project holds real games; the platform never uses it.
+   */
+  readonly trackerProject: string | null;
+};
+
+/**
+ * The project reference in supabase/site.json's text (`https://{ref}.supabase.co`),
+ * or null for anything else. Reads text only; never opens the address.
+ */
+export function trackerProjectOf(siteJson: string): string | null {
+  let url: unknown;
+  try {
+    url = (JSON.parse(siteJson) as { url?: unknown } | null)?.url;
+  } catch {
+    return null;
+  }
+  if (typeof url !== 'string' || !URL.canParse(url)) return null;
+  const ref = /^([a-z0-9]{15,})\.supabase\.co$/.exec(new URL(url).hostname)?.[1];
+  return ref ?? null;
+}
+
 export class ConfigError extends Error {
   readonly missing: readonly string[];
   readonly invalid: readonly string[];
@@ -128,8 +158,16 @@ export class ConfigError extends Error {
  * Checks `env` against the schema. Returns the settings, or throws one ConfigError
  * naming every missing or invalid variable. Only names and fixed reasons are put in
  * the error, never the value that was given.
+ *
+ * The platform's database and Supabase addresses must be neither the tracker's
+ * DATABASE_URL nor any address naming the tracker's Supabase project (`guard`), so
+ * the app refuses to start before it opens any connection. Without a guard (tests of
+ * other rules) only DATABASE_URL is compared.
  */
-export function loadConfig(env: Readonly<Record<string, string | undefined>>): Config {
+export function loadConfig(
+  env: Readonly<Record<string, string | undefined>>,
+  guard?: ConfigGuard,
+): Config {
   const given: Record<string, string | undefined> = {};
   for (const name of Object.keys(fields)) {
     const value = env[name];
@@ -147,6 +185,26 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     if (given[name] === undefined && appEnv !== undefined && environments.includes(appEnv)) {
       invalid.set(name, `${name}: missing, must be set when APP_ENV is ${appEnv}`);
     }
+  }
+  const trackerDatabase = env['DATABASE_URL']?.trim();
+  const trackerProject = guard?.trackerProject?.toLowerCase();
+  for (const name of platformAddresses) {
+    const value = given[name]?.trim();
+    if (value === undefined) continue;
+    if (trackerDatabase !== undefined && trackerDatabase !== '' && value === trackerDatabase) {
+      invalid.set(name, `${name}: invalid, must not be the tracker's database (DATABASE_URL)`);
+    } else if (trackerProject !== undefined && value.toLowerCase().includes(trackerProject)) {
+      invalid.set(
+        name,
+        `${name}: invalid, must not name the tracker's Supabase project (supabase/site.json)`,
+      );
+    }
+  }
+  if (guard?.trackerProject === null && (appEnv === 'staging' || appEnv === 'production')) {
+    invalid.set(
+      'supabase/site.json',
+      `supabase/site.json: could not be read, so ${platformAddresses.join(' and ')} cannot be checked against the tracker's project`,
+    );
   }
   // Only for a known APP_ENV: an unknown one is reported as itself, not as this.
   const knownEnv = appEnvs.find((known) => known === appEnv);

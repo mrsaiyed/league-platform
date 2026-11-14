@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigError, fields, loadConfig, type ConfigName } from './config-schema.ts';
+import { readFileSync } from 'node:fs';
+import {
+  ConfigError,
+  fields,
+  loadConfig,
+  trackerProjectOf,
+  type ConfigGuard,
+  type ConfigName,
+} from './config-schema.ts';
 
 const longValue = (name: string) => `value-of-${name.toLowerCase()}-0123456789-abcdefghij`;
 const valid: Record<ConfigName, string> = {
@@ -47,9 +55,9 @@ const production = {
   RESEND_API_KEY: valid.RESEND_API_KEY,
 };
 
-function failure(env: Record<string, string | undefined>): ConfigError {
+function failure(env: Record<string, string | undefined>, guard?: ConfigGuard): ConfigError {
   try {
-    loadConfig(env);
+    loadConfig(env, guard);
   } catch (error) {
     if (error instanceof ConfigError) return error;
     throw error;
@@ -156,6 +164,79 @@ describe('loadConfig', () => {
     ]);
     expect(error.message).not.toContain('tracker-made-up');
     expect(Object.values(loadConfig({ ...valid, DATABASE_URL: tracker }))).not.toContain(tracker);
+  });
+
+  it('refuses a platform address that is the tracker’s DATABASE_URL, before connecting', () => {
+    const tracker = 'postgres://postgres:tracker-made-up@tracker.example.test:5432/postgres';
+    for (const appEnv of ['test', 'staging', 'production']) {
+      const error = failure({
+        ...production,
+        APP_ENV: appEnv,
+        PLATFORM_DATABASE_URL: `  ${tracker} `,
+        DATABASE_URL: tracker,
+      });
+      expect(error.invalid).toEqual([
+        "PLATFORM_DATABASE_URL: invalid, must not be the tracker's database (DATABASE_URL)",
+      ]);
+      expect(error.message).not.toContain('tracker-made-up');
+    }
+    const web = 'https://made-up-project.supabase.example.test';
+    expect(failure({ ...production, DATABASE_URL: web }).invalid).toEqual([
+      "SUPABASE_URL: invalid, must not be the tracker's database (DATABASE_URL)",
+    ]);
+  });
+
+  it('refuses a platform address that names the tracker’s Supabase project (supabase/site.json)', () => {
+    const site = readFileSync(new URL('../../../../supabase/site.json', import.meta.url), 'utf8');
+    const ref = trackerProjectOf(site);
+    expect(ref).toMatch(/^[a-z0-9]{15,}$/);
+    if (ref === null) return;
+    const guard = { trackerProject: ref };
+    const named = [
+      `postgres://postgres:made-up-pw@db.${ref}.supabase.co:5432/postgres`,
+      `postgres://postgres.${ref.toUpperCase()}:made-up-pw@pooler.example.test:6543/postgres`,
+    ];
+    for (const url of named) {
+      const error = failure({ ...production, PLATFORM_DATABASE_URL: url }, guard);
+      expect(error.invalid).toEqual([
+        "PLATFORM_DATABASE_URL: invalid, must not name the tracker's Supabase project (supabase/site.json)",
+      ]);
+      expect(error.message).not.toContain('made-up-pw');
+    }
+    expect(
+      failure({ ...production, SUPABASE_URL: `https://${ref}.supabase.co` }, guard).invalid,
+    ).toEqual([
+      "SUPABASE_URL: invalid, must not name the tracker's Supabase project (supabase/site.json)",
+    ]);
+    // Another project is the platform's to use.
+    expect(loadConfig(production, guard).APP_ENV).toBe('production');
+  });
+
+  it('refuses staging and production when the tracker’s project could not be read', () => {
+    const guard = { trackerProject: null };
+    for (const appEnv of ['staging', 'production']) {
+      expect(failure({ ...production, APP_ENV: appEnv }, guard).invalid).toEqual([
+        "supabase/site.json: could not be read, so PLATFORM_DATABASE_URL and SUPABASE_URL cannot be checked against the tracker's project",
+      ]);
+    }
+    expect(loadConfig(localOnly, guard).APP_ENV).toBe('local');
+  });
+
+  it('reads the project reference only from a Supabase address in site.json', () => {
+    expect(trackerProjectOf('{"url":"https://abcdefghijklmnopqrst.supabase.co"}')).toBe(
+      'abcdefghijklmnopqrst',
+    );
+    for (const bad of [
+      'not json',
+      'null',
+      '{}',
+      '{"url":42}',
+      '{"url":"not an address"}',
+      '{"url":"https://short.supabase.co"}',
+      '{"url":"https://abcdefghijklmnopqrst.example.test"}',
+    ]) {
+      expect(trackerProjectOf(bad)).toBeNull();
+    }
   });
 
   it('takes LOCAL_DATA in local work and tests only (record 055)', () => {
