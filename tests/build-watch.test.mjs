@@ -45,6 +45,27 @@ test('it is no sign when the earliest stage has the lanes, or has nothing that c
   assert.deepEqual(keys({ ...moving, ready: [{ id: '2.50' }], lanes: [{ id: '2.42' }] }), []);
 });
 
+test('the earliest stage has steps left that nothing builds and nothing lists', () => {
+  const facts = {
+    ...moving,
+    firstStageLeft: ['1.24', '1.25'],
+    ready: [{ id: '2.50' }],
+    lanes: [{ id: '2.42' }],
+  };
+  const [sign] = stallSigns(facts);
+  assert.equal(sign.key, 'stage-1-knot');
+  assert.match(
+    sign.text,
+    /STAGE 1 IS NOT DONE AND NOTHING IS BUILDING IT: 1\.24, 1\.25 are unticked/,
+  );
+  assert.match(sign.text, /complete only when every step in its plan is ticked/);
+  assert.match(stallSigns({ ...facts, firstStageLeft: ['1.25'] })[0].text, /1\.25 is unticked/);
+  // One of them in a lane is no knot; one able to start is the other sign; none left is none.
+  assert.deepEqual(keys({ ...facts, lanes: [{ id: '1.24' }] }), []);
+  assert.deepEqual(keys({ ...facts, ready: [{ id: '1.24' }] }), ['stage-1-waits']);
+  assert.deepEqual(keys({ ...facts, firstStageLeft: [] }), []);
+});
+
 test('a working run that lands nothing for two hours is stuck; an idle build is not', () => {
   const quiet = { ...moving, lastLanding: ago(limits.landingMinutes) };
   assert.deepEqual(keys(quiet), ['nothing-landing']);
