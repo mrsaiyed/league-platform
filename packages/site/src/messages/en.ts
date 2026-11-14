@@ -184,6 +184,8 @@ export const en = {
   'team.role.captain': 'Captain',
   'team.role.coach': 'Coach',
   'team.nameNotShown': 'Name not shown',
+  // A child the league shows by number only (R-24).
+  'team.byNumber': '#{number}',
   'team.nameLeft': '{name} (left {date})',
   'team.schedule': 'Schedule',
   'team.noSchedule': 'No games are coming up for this team.',
@@ -470,6 +472,9 @@ export const en = {
   'error.people.create_person.sensitive-fields-not-allowed':
     'You are not allowed to enter those details.',
   'error.people.remove_person.person-not-found': 'That person is not in the league list.',
+  'error.people.set_name_request.person-not-found': 'That person is not in the league list.',
+  'error.people.set_name_request.initials-not-offered':
+    'This league does not offer initials for adults, so nothing was changed. You can still choose "removed" to take their name off the public pages.',
   'error.people.remove_person.person-on-a-roster':
     'That person is still on a roster. Mark them as having left their team first, then take them off the list.',
   // The games area (step 2.55).
@@ -983,13 +988,15 @@ export const en = {
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
   'setting.privacy.publicNames.label':
-    "Names on public pages: how children's names are shown (adults are always shown by full name)",
-  'setting.privacy.publicNames.option.firstNameLastInitial': 'First name and last initial',
+    "Names on public pages. This decides how children are shown, and, in a youth or mixed league, anyone whose age we don't know. Adults are shown by their full name unless they ask for less. If a parent or player asks for less (initials, or their name taken off), that always wins over this setting.",
   'setting.privacy.publicNames.option.fullName': 'Full names',
+  'setting.privacy.publicNames.option.firstNameLastInitial': 'First name and last initial',
+  'setting.privacy.publicNames.option.hidden':
+    'Hidden: shown by jersey number only, like "#12", and with no name at all where there is no number',
   'setting.privacy.publicNames.confirm':
     'I confirm this league has the permission it needs to show children by their full names, for example from their parents on the registration form.',
   'setting.privacy.playersMayAskForInitials.label':
-    'Players may ask to appear as initials on public pages',
+    'Adults may ask to appear as initials on public pages. Children always can, whatever this says: a request from a parent is always followed. Anyone can ask to have their name taken off.',
   // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
   // league's name, {role} a role's name from above, {days} how long a link works.
   'email.invitation.subject': 'You are invited to help run {league}',

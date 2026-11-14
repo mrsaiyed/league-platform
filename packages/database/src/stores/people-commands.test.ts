@@ -376,4 +376,56 @@ describe('the people commands on the database', () => {
     );
     expect(logged.details).toEqual({ showAs: 'removed', reason: 'guardianAsked' });
   });
+
+  it("reads the person's age, the league's audience and its settings for initials (R-25)", async () => {
+    const l = await league();
+    const versionOf = async (personId: string) =>
+      (
+        await one<{ version: number }>(pglite, 'select version from people where id = $1', [
+          personId,
+        ])
+      ).version;
+    const ask = async (personId: string) =>
+      setNameRequest(
+        l.as(l.ownerId),
+        { personId, version: await versionOf(personId), showAs: 'initials', reason: 'personAsked' },
+        deps,
+      );
+    // A child: always. An adult (and, in this adult league, a person of unknown age): only
+    // once the league lets adults ask.
+    const child = await newSensitivePerson(l.leagueId);
+    const adult = await newPerson(pglite, l.leagueId);
+    expect(await ask(child)).toMatchObject({ ok: true });
+    expect(await ask(adult)).toEqual({ ok: false, error: { code: 'initials-not-offered' } });
+    await pglite.query(
+      `insert into setting_values (league_id, level, key, value)
+       values ($1, 'league', 'privacy.playersMayAskForInitials', '{"version": 1, "value": true}')`,
+      [l.leagueId],
+    );
+    expect(await ask(adult)).toMatchObject({ ok: true });
+    const rows = await pglite.query<{ visibility: string }>(
+      'select visibility from people where id = any($1) order by id = $2 desc',
+      [[child, adult], child],
+    );
+    expect(rows.rows.map((r) => r.visibility)).toEqual(['initials', 'initials']);
+  });
+
+  it('lets a request show less, and only less, in an archived league (R-26)', async () => {
+    const l = await league();
+    const personId = await newPerson(pglite, l.leagueId);
+    await pglite.query("update leagues set status = 'archived' where id = $1", [l.leagueId]);
+    const removed = await setNameRequest(
+      l.as(l.ownerId),
+      { personId, version: 1, showAs: 'removed', reason: 'guardianAsked' },
+      deps,
+    );
+    expect(removed).toEqual({ ok: true, value: { version: 2 } });
+    expect(
+      await setNameRequest(
+        l.as(l.ownerId),
+        { personId, version: 2, showAs: 'none', reason: 'leagueDecided' },
+        deps,
+      ),
+    ).toMatchObject({ error: { code: 'not-allowed' } });
+  });
 });

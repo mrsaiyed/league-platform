@@ -9,6 +9,7 @@ import {
   updatePerson as updatePersonCommand,
 } from '@srleagues/core';
 import {
+  findLeagueAudience,
   findPerson,
   insertPerson,
   isPersonOnRoster,
@@ -60,6 +61,12 @@ registerIsolationCase({
 });
 
 registerIsolationCase({
+  subject: findLeagueAudience,
+  name: "read who plays in the scope's league",
+  run: (scope) => findLeagueAudience(scope),
+});
+
+registerIsolationCase({
   subject: isPersonOnRoster,
   name: "ask whether the target's person is on a roster",
   run: (scope, target) => isPersonOnRoster(scope, target.personId),
@@ -84,6 +91,17 @@ registerCommandCase(setNameRequest, harnessTx, {
     version: 1,
     showAs: 'removed',
     reason: 'personAsked',
+  }),
+});
+
+// Initials read the person's age, the league's audience and its name settings (R-25).
+registerCommandCase(setNameRequest, harnessTx, {
+  name: "show the target's person as initials",
+  input: (target) => ({
+    personId: target.personId,
+    version: 1,
+    showAs: 'initials',
+    reason: 'guardianAsked',
   }),
 });
 

@@ -1,23 +1,27 @@
-// How a league shows its people's names on public pages (R-14, R-15, R-17).
+// How a league shows its people's names on public pages (R-14, R-15, R-17, R-24, R-25).
 // Product rules live here as data; `show-name.ts` applies them.
 import type { Audience } from '../../leagues/index.ts';
 
-/** R-14: how children appear. The league's admin may switch to full names. */
-export const childNameForms = ['first_name_last_initial', 'full_name'] as const;
+/**
+ * R-24: how children appear (and, in a youth or mixed league, people whose age is not
+ * known), from the most shown to the least: full names, first name and last initial
+ * (the start in every league), or hidden (by jersey number only). The admin chooses.
+ */
+export const childNameForms = ['full_name', 'first_name_last_initial', 'hidden'] as const;
 export type ChildNameForm = (typeof childNameForms)[number];
 
 /**
- * What a person has asked for themselves: nothing, to appear as initials (R-15, only
- * where the league allows it), or to be taken off the league's public pages (R-17:
- * their numbers stay, as a nameless entry).
+ * What a person has asked for themselves: nothing, to appear as initials (R-15 for an
+ * adult, only where the league allows it; always for a child, R-25), or to be taken off
+ * the league's public pages (R-17: their numbers stay, as a nameless entry).
  */
 export const nameRequests = ['none', 'initials', 'removed'] as const;
 export type NameRequest = (typeof nameRequests)[number];
 
-/** The league's display policy. Adults are always shown by full name unless they ask (R-15). */
+/** The league's display policy. Adults are shown by full name unless they ask (R-15). */
 export interface NamePolicy {
   readonly children: ChildNameForm;
-  /** R-15: the league decides whether a player may ask to appear as initials. */
+  /** R-15: whether an adult may ask to appear as initials. A child always may (R-25). */
   readonly playersMayAskForInitials: boolean;
 }
 
@@ -42,4 +46,32 @@ export function shownAsChild(isMinor: boolean | null, audience: Audience): boole
   if (isMinor === true) return true;
   if (isMinor === false) return false;
   return audience !== 'adult';
+}
+
+/**
+ * R-25: whether a person's request takes effect. "Removed" and "as the league shows
+ * everyone" always do (R-17). "Initials" always does for a child (shown under the
+ * children's rule): a guardian asking for less of their child to be public is never
+ * overruled by a league setting. For an adult it does only while the league lets
+ * players ask for initials (R-15). The command refuses a request that would not take
+ * effect, so none is saved to do nothing.
+ */
+export function nameRequestTakesEffect(
+  request: NameRequest,
+  person: { readonly isMinor: boolean | null },
+  audience: Audience,
+  policy: NamePolicy,
+): boolean {
+  if (request !== 'initials') return true;
+  return shownAsChild(person.isMinor, audience) || policy.playersMayAskForInitials;
+}
+
+/** How much of a name shows, from the most to the least (R-26 compares two requests). */
+const requestOrder: readonly NameRequest[] = ['none', 'initials', 'removed'];
+
+/** Whether `to` shows less of a person than `from` (R-26: allowed in a read-only league). */
+export function requestShowsLess(from: string, to: NameRequest): boolean {
+  const before = requestOrder.indexOf(from as NameRequest);
+  // A stored value we do not know counts as removed already (showName), so nothing is less.
+  return before >= 0 && requestOrder.indexOf(to) > before;
 }

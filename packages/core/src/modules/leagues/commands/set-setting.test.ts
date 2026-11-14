@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { memoryLeagues, ownerId, leagueId } from '../memory-leagues.test-helper.ts';
 import { defineSetting, settingRegistry } from '../settings/define-setting.ts';
 import { getSetting } from '../settings/get-setting.ts';
-import { clearSettingFor } from './clear-setting.ts';
-import { setSettingFor } from './set-setting.ts';
+import { clearSetting, clearSettingFor } from './clear-setting.ts';
+import { setSetting, setSettingFor } from './set-setting.ts';
 
 const programId = '01900000-0000-7000-8000-0000000000c1';
 const seasonId = '01900000-0000-7000-8000-0000000000d1';
@@ -28,7 +28,7 @@ const leagueOnly = defineSetting({
 });
 const names = defineSetting({
   key: 'privacy.publicNames',
-  type: z.enum(['firstNameLastInitial', 'fullName']),
+  type: z.enum(['fullName', 'firstNameLastInitial', 'hidden']),
   default: 'firstNameLastInitial',
   levels: ['league'],
   permission: 'league.settings',
@@ -211,6 +211,107 @@ describe('setSetting', () => {
       },
     );
   });
+});
+
+describe('the names setting in an archived or suspended league (R-26)', () => {
+  const key = 'privacy.publicNames';
+  const at = (value: unknown, version: number | null, confirmed?: boolean) => ({
+    level: 'league',
+    key,
+    value,
+    version,
+    ...(confirmed === undefined ? {} : { confirmed }),
+  });
+  /** A league whose names setting is `start`, then put in `status`. */
+  async function readOnly(status: 'archived' | 'suspended', start?: string) {
+    const m = setUp();
+    if (start !== undefined) {
+      const saved = await setSetting(m.as(ownerId), at(start, null, true), m.deps);
+      if (!saved.ok) throw new Error('expected the starting value to save');
+    }
+    if (m.db.state.league !== undefined) m.db.state.league = { ...m.db.state.league, status };
+    m.db.state.activity = [];
+    return m;
+  }
+  const valueOf = (m: Awaited<ReturnType<typeof readOnly>>) =>
+    m.db.state.settings.find((s) => s.key === key)?.document.value ?? 'firstNameLastInitial';
+
+  it.each(['archived', 'suspended'] as const)(
+    'lets the owner move it toward less shown while %s, one step at a time',
+    async (status) => {
+      const m = await readOnly(status, 'fullName');
+      expect(await setSetting(m.as(ownerId), at('firstNameLastInitial', 1), m.deps)).toEqual({
+        ok: true,
+        value: { key, version: 2 },
+      });
+      expect(await setSetting(m.as(ownerId), at('hidden', 2), m.deps)).toMatchObject({ ok: true });
+      expect(valueOf(m)).toBe('hidden');
+      expect(m.db.state.activity).toHaveLength(2);
+      // From the start (no value saved), straight to hidden.
+      const fresh = await readOnly(status);
+      expect(await setSetting(fresh.as(ownerId), at('hidden', null), fresh.deps)).toMatchObject({
+        ok: true,
+      });
+      // Going back to the default from full names shows less too.
+      const full = await readOnly(status, 'fullName');
+      expect(
+        await clearSetting(full.as(ownerId), { level: 'league', key, version: 1 }, full.deps),
+      ).toMatchObject({ ok: true });
+      expect(valueOf(full)).toBe('firstNameLastInitial');
+    },
+  );
+
+  it.each(['archived', 'suspended'] as const)(
+    'refuses any move toward more shown while %s',
+    async (status) => {
+      const hidden = await readOnly(status, 'hidden');
+      for (const [value, confirmed] of [
+        ['firstNameLastInitial', undefined],
+        ['fullName', true],
+      ] as const) {
+        expect(
+          await setSetting(hidden.as(ownerId), at(value, 1, confirmed), hidden.deps),
+        ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+      }
+      // Going back to the default from hidden would show more.
+      expect(
+        await clearSetting(hidden.as(ownerId), { level: 'league', key, version: 1 }, hidden.deps),
+      ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+      expect(valueOf(hidden)).toBe('hidden');
+      const fresh = await readOnly(status);
+      expect(
+        await setSetting(fresh.as(ownerId), at('fullName', null, true), fresh.deps),
+      ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+      // Saving the same value again is not a move toward less.
+      expect(
+        await setSetting(fresh.as(ownerId), at('firstNameLastInitial', null), fresh.deps),
+      ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+      expect(hidden.db.state.activity).toEqual([]);
+      expect(fresh.db.state.settings).toEqual([]);
+    },
+  );
+
+  it.each(['archived', 'suspended'] as const)(
+    'still refuses every other setting, and anyone without the permission, while %s',
+    async (status) => {
+      const m = await readOnly(status);
+      for (const other of [
+        { level: 'league', key: 'privacy.playersMayAskForInitials', value: true, version: null },
+        { level: 'league', key: 'privacy.playersMayAskForInitials', value: false, version: null },
+        { level: 'league', key: 'members.startPage', value: 'myTeam', version: null },
+      ]) {
+        expect(await setSetting(m.as(ownerId), other, m.deps)).toMatchObject({
+          error: { code: 'not-allowed' },
+        });
+      }
+      for (const account of ['someone-else', null]) {
+        expect(await setSetting(m.as(account), at('hidden', null), m.deps)).toMatchObject({
+          error: { code: 'not-allowed' },
+        });
+      }
+      expect(m.db.state.settings).toEqual([]);
+    },
+  );
 });
 
 describe('program admins and the activity log', () => {

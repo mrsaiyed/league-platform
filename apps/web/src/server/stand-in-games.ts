@@ -25,7 +25,7 @@ import {
   type TransactionRunner,
 } from '@srleagues/core';
 import type { GameNames, GamesAreaPorts } from './games-area-ports.ts';
-import { startingNamePolicy, type NamePolicyOf } from './name-policy-of.ts';
+import { namesShownOf, startingNamePolicy, type NamesShownOf } from './name-policy-of.ts';
 import type { StandInListedGame } from './stand-in-public-schedule.ts';
 import {
   emptyTracker,
@@ -70,8 +70,12 @@ export type StandInGamesOptions = {
   readonly log: (line: CommandLogLine) => void;
   /** The league's own stored settings to start with, by key (for checks). */
   readonly settings?: Readonly<Record<string, StoredSetting[]>>;
-  /** How the league shows names on live messages: its privacy settings (T-81). */
-  readonly namePolicyOf?: NamePolicyOf;
+  /**
+   * Who plays in each league and how it shows names, for the game's page, its snapshot
+   * and its live messages: the league's privacy settings (T-81). Where not given, our
+   * starting policy, and every league counts as youth (the careful reading).
+   */
+  readonly namesShownOf?: NamesShownOf;
   /** The public schedule's made-up games of a league (stand-in-public-schedule.ts), which a
    * game's page reads too; only the final score was kept for them. */
   readonly listedGames?: (leagueId: string) => readonly StandInListedGame[];
@@ -107,7 +111,12 @@ const madeUpTeams: readonly MadeUpTeam[] = [
     name: 'Hawks',
     slug: 'hawks',
     statsVisibility: 'everyone',
-    players: ['Max', 'Ned', 'Oz', 'Pia', 'Quin', 'Ray'].map((n) => player(n, 'Hawkins')),
+    // Pia is a child playing in the adult league, so the league's names setting shows on
+    // its game pages and live messages too (R-14, R-24).
+    players: ['Max', 'Ned', 'Oz', 'Pia', 'Quin', 'Ray'].map((n) => ({
+      ...player(n, 'Hawkins'),
+      ...(n === 'Pia' ? { isMinor: true } : {}),
+    })),
   },
   {
     id: bears,
@@ -416,10 +425,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     tracker: {
       deps: { transaction, events: [], log: options.log, now: () => performance.now() },
       snapshotStoreOf,
-      namesShownOf: async (leagueId) => ({
-        audience: 'adult',
-        policy: await (options.namePolicyOf ?? startingNamePolicy)(leagueId),
-      }),
+      namesShownOf: options.namesShownOf ?? namesShownOf(startingNamePolicy, () => undefined),
       displayNameOf: async (leagueId, accountId) =>
         leagueId === options.leagueId ? (options.people[accountId] ?? '') : '',
       clock: systemClock,

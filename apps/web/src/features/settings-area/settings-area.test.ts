@@ -109,11 +109,26 @@ describe('the settings form', () => {
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
     const privacy = html.slice(html.indexOf('data-area="privacy"'));
     expect(privacy).toMatch(/^data-area="privacy"><h2>Privacy<\/h2>/);
-    expect(privacy).toContain('First name and last initial (the default)');
-    expect(privacy).toContain('Full names');
+    // Three choices, from the most shown to the least (R-24).
+    const full = privacy.indexOf('Full names');
+    const initial = privacy.indexOf('First name and last initial (the default)');
+    const hidden = privacy.indexOf('Hidden: shown by jersey number only');
+    expect(full).toBeGreaterThan(0);
+    expect(initial).toBeGreaterThan(full);
+    expect(hidden).toBeGreaterThan(initial);
+    expect(privacy.match(/value="(fullName|firstNameLastInitial|hidden)"/g)).toEqual([
+      'value="fullName"',
+      'value="firstNameLastInitial"',
+      'value="hidden"',
+    ]);
     expect(privacy).toContain('Choosing Full names asks you to confirm first.');
     expect(privacy).toContain('name="confirmed" value="yes"');
-    expect(privacy).toContain('Players may ask to appear as initials on public pages');
+    // The words say who each setting changes, and that a parent's request always wins.
+    expect(privacy).toContain('This decides how children are shown');
+    expect(privacy).toContain('Adults are shown by their full name unless they ask for less.');
+    expect(privacy).toContain('that always wins over this setting');
+    expect(privacy).toContain('Adults may ask to appear as initials on public pages.');
+    expect(privacy).toContain('Children always can, whatever this says');
     // Only the names setting asks to confirm.
     expect(html.match(/name="confirmed"/g)).toHaveLength(1);
   });

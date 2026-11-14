@@ -1,6 +1,6 @@
 // The league's display policy, read from its two declared privacy settings (T-81):
-// how children's names show (R-14) and whether a player may ask to appear as initials
-// (R-15). Every public page, live message and statistic gets its policy from here and
+// how children's names show (R-14, R-24: full names, first name and last initial, or
+// hidden) and whether an adult may ask to appear as initials (R-15, R-25). Every public page, live message and statistic gets its policy from here and
 // hands it to the one name function (showName). Not a command: it changes nothing,
 // and a public page reads it with no permission. The settings are set for the whole
 // league only, so only the league's own value or our default is read.
@@ -19,6 +19,7 @@ export type NamePolicySettings = Pick<LeaguesStore, 'settingRows'>;
 const childFormOf: Readonly<Record<(typeof publicNames)['default'], ChildNameForm>> = {
   firstNameLastInitial: 'first_name_last_initial',
   fullName: 'full_name',
+  hidden: 'hidden',
 };
 
 export async function readNamePolicy(settings: NamePolicySettings): Promise<NamePolicy> {

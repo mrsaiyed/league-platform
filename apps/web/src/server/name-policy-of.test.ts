@@ -1,7 +1,9 @@
 // Step 2.126: what the admin saves on League settings → Privacy is what the public pages
 // show. On the made-up stand-ins: the settings store the admin screen saves to, the
 // statistics settings the team and statistics pages read, a youth team's roster and the
-// T-81 scan of it under each setting.
+// T-81 scan of it under each setting. The same through the whole web wiring, for every
+// surface, is names-through-ports.test.ts; across every surface and every person's
+// request, core's modules/name-policy-scan.test.ts.
 import {
   findPrivateFields,
   privateValuesOf,
@@ -11,7 +13,7 @@ import {
   type CommandContext,
 } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
-import { namePolicyOf } from './name-policy-of.ts';
+import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
 import { standInPublicStats, youthTeams } from './stand-in-public-stats.ts';
 import { standInPublicTeams } from './stand-in-public-teams.ts';
@@ -100,23 +102,46 @@ describe("the league's privacy settings on its public pages (T-81)", () => {
       { firstName: 'Jay', lastName: 'Whitaker', nameRequest: 'none' as const },
       { firstName: 'Tess', lastName: 'Moreno', nameRequest: 'none' as const },
     ];
-    for (const [names, initials] of [
-      ['firstNameLastInitial', false],
-      ['fullName', false],
-      ['firstNameLastInitial', true],
-      ['fullName', true],
-    ] as const) {
-      const { rosterNames, set } = made();
-      await set('privacy.publicNames', names, { confirmed: true });
-      await set('privacy.playersMayAskForInitials', initials);
-      const lines = await rosterNames();
-      const privateValues = people.flatMap((p, i) =>
-        privateValuesOf(p, lines[i]?.name ?? { shown: false, why: 'no_name' }),
-      );
-      expect(findPrivateFields(lines, { privateValues }), `${names}, ${initials}`).toEqual([]);
-      expect(texts(lines)[0], `${names}, ${initials}`).toBe(
-        names === 'fullName' ? 'Noor Haddad' : 'Noor H.',
-      );
+    const expected = {
+      fullName: 'Noor Haddad',
+      firstNameLastInitial: 'Noor H.',
+      hidden: null,
+    } as const;
+    for (const names of ['fullName', 'firstNameLastInitial', 'hidden'] as const) {
+      for (const initials of [false, true]) {
+        const { rosterNames, set } = made();
+        await set('privacy.publicNames', names, { confirmed: true });
+        await set('privacy.playersMayAskForInitials', initials);
+        const lines = await rosterNames();
+        // Built from what the settings say is shown, not from the lines themselves.
+        const privateValues = people.flatMap((p) =>
+          privateValuesOf(
+            p,
+            names === 'hidden'
+              ? { shown: false, why: 'hidden' }
+              : names === 'fullName'
+                ? { shown: true, text: `${p.firstName} ${p.lastName}` }
+                : { shown: true, text: `${p.firstName} ${p.lastName[0]}.` },
+          ),
+        );
+        expect(findPrivateFields(lines, { privateValues }), `${names}, ${initials}`).toEqual([]);
+        expect(texts(lines)[0], `${names}, ${initials}`).toBe(expected[names]);
+      }
     }
+  });
+});
+
+describe('namesShownOf', () => {
+  it("gives the league's audience and policy, and reads a league it does not know as youth", async () => {
+    const settings = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const names = namesShownOf(namePolicyOf(settings.deps), (leagueId) =>
+      leagueId === adult ? 'adult' : undefined,
+    );
+    expect((await names(adult)).audience).toBe('adult');
+    expect((await names(youth)).audience).toBe('youth');
+    expect((await names(youth)).policy).toEqual({
+      children: 'first_name_last_initial',
+      playersMayAskForInitials: false,
+    });
   });
 });

@@ -1,5 +1,6 @@
 // readNamePolicy over made-up stored settings, and the T-81 scan of a youth league's
-// roster under each value of the two privacy settings (step 2.126).
+// roster under each value of the two privacy settings (step 2.126). The scan of every
+// other public surface under each value is modules/name-policy-scan.test.ts.
 import { describe, expect, it } from 'vitest';
 import type { StoredSettingRow } from '../../leagues/index.ts';
 import { publicRosterLine, type RosterLineSource } from '../../teams/index.ts';
@@ -38,6 +39,10 @@ describe('readNamePolicy', () => {
       children: 'full_name',
       playersMayAskForInitials: true,
     });
+    expect(await readNamePolicy(stored({ 'privacy.publicNames': 'hidden' }).settings)).toEqual({
+      children: 'hidden',
+      playersMayAskForInitials: false,
+    });
   });
 
   it('ignores a stored value its setting refuses, and one stored anywhere but the league', async () => {
@@ -75,14 +80,20 @@ describe('a youth roster under each name setting (T-81)', () => {
     birthDate: `2011-0${i + 1}-05`,
   }));
 
+  // Yusuf is a child who asked for initials: that always takes effect (R-25), and never
+  // shows more than "hidden". Lena is an adult, shown by full name whatever the setting.
   const cases = [
     {
       values: {},
-      shown: ['Mariam O.', 'Yusuf H.', 'Lena Fischer', null],
+      shown: ['Mariam O.', 'Y. H.', 'Lena Fischer', null],
     },
     {
       values: { 'privacy.publicNames': 'fullName' },
-      shown: ['Mariam Okafor', 'Yusuf Haddad', 'Lena Fischer', null],
+      shown: ['Mariam Okafor', 'Y. H.', 'Lena Fischer', null],
+    },
+    {
+      values: { 'privacy.publicNames': 'hidden' },
+      shown: [null, null, 'Lena Fischer', null],
     },
     {
       values: { 'privacy.playersMayAskForInitials': true },
@@ -91,6 +102,10 @@ describe('a youth roster under each name setting (T-81)', () => {
     {
       values: { 'privacy.publicNames': 'fullName', 'privacy.playersMayAskForInitials': true },
       shown: ['Mariam Okafor', 'Y. H.', 'Lena Fischer', null],
+    },
+    {
+      values: { 'privacy.publicNames': 'hidden', 'privacy.playersMayAskForInitials': true },
+      shown: [null, null, 'Lena Fischer', null],
     },
   ];
 

@@ -64,7 +64,7 @@ describe('showName: the league display policy (R-14, R-15)', () => {
     expect(showName(person({ isMinor: true }), where('adult'))).toEqual(named('Amina Y.'));
   });
 
-  it('shows initials only when the player asked and the league allows asking', () => {
+  it("shows an adult's initials only when they asked and the league allows asking", () => {
     const asked = person({ nameRequest: 'initials' });
     expect(showName(asked, where('adult'))).toEqual(named('Amina Yusuf'));
     expect(showName(asked, where('adult', { playersMayAskForInitials: true }))).toEqual(
@@ -73,6 +73,44 @@ describe('showName: the league display policy (R-14, R-15)', () => {
     expect(showName(asked, where('youth', { playersMayAskForInitials: true }))).toEqual(
       named('A. Y.'),
     );
+  });
+
+  it("always honours a child's request for initials, whatever the league's settings (R-25)", () => {
+    const asked = person({ nameRequest: 'initials' });
+    // Unknown age in a youth or mixed league counts as a child; a known child anywhere.
+    for (const [who, audience] of [
+      [asked, 'youth'],
+      [asked, 'mixed'],
+      [person({ isMinor: true, nameRequest: 'initials' }), 'adult'],
+    ] as const) {
+      for (const children of ['full_name', 'first_name_last_initial'] as const) {
+        expect(showName(who, where(audience, { children })), `${audience} ${children}`).toEqual(
+          named('A. Y.'),
+        );
+      }
+      // Asking for initials never shows more than the league's "hidden".
+      expect(showName(who, where(audience, { children: 'hidden' }))).toEqual({
+        shown: false,
+        why: 'hidden',
+      });
+    }
+  });
+
+  it('hides children by name, not by number, when the league chooses hidden (R-24)', () => {
+    const hidden = where('youth', { children: 'hidden' });
+    expect(showName(person(), hidden)).toEqual({ shown: false, why: 'hidden' });
+    expect(showName(person({ isMinor: true }), where('adult', { children: 'hidden' }))).toEqual({
+      shown: false,
+      why: 'hidden',
+    });
+    // Adults are shown by full name whatever the league chooses for children (R-15).
+    expect(showName(person({ isMinor: false }), hidden)).toEqual(named('Amina Yusuf'));
+    expect(showName(person(), where('adult', { children: 'hidden' }))).toEqual(
+      named('Amina Yusuf'),
+    );
+    // A form it does not know shows the least.
+    const odd = where('youth', { children: 'everything' as unknown as 'hidden' });
+    expect(showName(person(), odd)).toEqual({ shown: false, why: 'hidden' });
   });
 
   it('leaves a name off when the person asked for it to be taken off (R-17)', () => {
@@ -151,9 +189,15 @@ describe('showName: every combination of policy, setting and viewer', () => {
       return { shown: false, why: 'restricted' };
     }
     if (request === 'removed') return { shown: false, why: 'removed' };
-    if (request === 'initials' && policy.playersMayAskForInitials) return named('A. Y.');
     const child = isMinor === true || (isMinor === null && audience !== 'adult');
-    if (child && policy.children === 'first_name_last_initial') return named('Amina Y.');
+    if (child) {
+      // The league's choice, or initials if asked for, whichever shows less (R-24, R-25).
+      if (policy.children === 'hidden') return { shown: false, why: 'hidden' };
+      if (request === 'initials') return named('A. Y.');
+      if (policy.children === 'first_name_last_initial') return named('Amina Y.');
+      return named('Amina Yusuf');
+    }
+    if (request === 'initials' && policy.playersMayAskForInitials) return named('A. Y.');
     return named('Amina Yusuf');
   }
 
@@ -193,7 +237,7 @@ describe('showName: every combination of policy, setting and viewer', () => {
                   }
                 }
     expect(mismatches).toEqual([]);
-    expect(count).toBe(3 * 2 * 2 * 3 * 3 * 3 * 4);
+    expect(count).toBe(3 * 3 * 2 * 3 * 3 * 3 * 4);
   });
 
   it('never shows the full surname under the children rule or an initials request', () => {

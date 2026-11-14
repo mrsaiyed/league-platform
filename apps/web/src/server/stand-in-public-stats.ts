@@ -7,7 +7,12 @@
 // children by first name and last initial.
 import type { PersonDisplayRecord, StandingsReadStore } from '@srleagues/core';
 import { defaultSeasonRules, SeasonRules } from '@srleagues/contracts';
-import { startingNamePolicy, type NamePolicyOf } from './name-policy-of.ts';
+import {
+  namesShownOf,
+  startingNamePolicy,
+  type AudienceOf,
+  type NamePolicyOf,
+} from './name-policy-of.ts';
 import type { PublicSeason, PublicStatsPorts, PublicStatsSettings } from './public-stats.ts';
 
 const id = (kind: number, n: number) =>
@@ -525,15 +530,28 @@ export const standInSeasonRulesOf = (seasonId: string): unknown =>
 const bySeasonOf = (all: SeasonData[]): PublicSeason[] =>
   all.map((s) => ({ id: s.id, name: s.name, slug: s.slug, isCurrent: s.isCurrent }));
 
+/** The two made-up leagues, by id. */
+export type StandInLeagueIds = {
+  readonly adultLeagueId: string;
+  readonly youthLeagueId: string;
+};
+
+/**
+ * Who plays in each made-up league: the adult one's adults, the youth one's youth. Any
+ * other league is not known here (undefined), which the name function's callers read as
+ * youth, the careful reading (name-policy-of.ts). Every stand-in reads it from here.
+ */
+export function standInAudienceOf(ids: StandInLeagueIds): AudienceOf {
+  return (leagueId) =>
+    leagueId === ids.adultLeagueId ? 'adult' : leagueId === ids.youthLeagueId ? 'youth' : undefined;
+}
+
 /**
  * The made-up standings and statistics for two leagues, given their ids: an adult league
  * with divisions and a youth league without. Any other league has no seasons.
  */
 export function standInPublicStats(
-  ids: {
-    readonly adultLeagueId: string;
-    readonly youthLeagueId: string;
-  },
+  ids: StandInLeagueIds,
   /** How each league shows names: its own privacy settings (T-81), or our starting values. */
   namePolicyOf: NamePolicyOf = startingNamePolicy,
 ): PublicStatsPorts {
@@ -543,11 +561,10 @@ export function standInPublicStats(
       : leagueId === ids.youthLeagueId
         ? [youthSeason]
         : [];
+  const names = namesShownOf(namePolicyOf, standInAudienceOf(ids));
   const settings = async (leagueId: string): Promise<PublicStatsSettings> => {
-    const namePolicy = await namePolicyOf(leagueId);
-    return leagueId === ids.youthLeagueId
-      ? { audience: 'youth', namePolicy, minimumGames: 2 }
-      : { audience: 'adult', namePolicy, minimumGames: 3 };
+    const { audience, policy } = await names(leagueId);
+    return { audience, namePolicy: policy, minimumGames: audience === 'adult' ? 3 : 2 };
   };
   return {
     seasonsOf: async (leagueId) => bySeasonOf(data(leagueId)),

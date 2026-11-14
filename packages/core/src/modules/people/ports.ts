@@ -2,6 +2,7 @@
 // one transaction for one league, so none of these take a league id (T-28).
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
+import type { Audience, StoredSettingRow } from '../leagues/index.ts';
 import type { NameRequest } from './rules/name-policy.ts';
 
 /** What only people allowed to see sensitive fields are given (R-16, T-76). */
@@ -80,6 +81,14 @@ export type PeopleStore = {
   readonly setBinned: (personId: string, binned: boolean) => Promise<boolean>;
   /** Whether the person is on a team's roster now (an entry with no leaving date). */
   readonly isOnRoster: (personId: string) => Promise<boolean>;
+  /**
+   * Who plays in the league (adult, youth or mixed), which decides who counts as a child
+   * when their age is not known (R-15, R-25). A league whose audience cannot be read
+   * counts as youth: the careful reading.
+   */
+  readonly leagueAudience: () => Promise<Audience>;
+  /** The league's own stored values of one setting (the name policy's, R-25). */
+  readonly leagueSettingRows: (key: string) => Promise<readonly StoredSettingRow[]>;
 };
 
 /** A people command's transaction: its store, the permission reader and the activity log. */

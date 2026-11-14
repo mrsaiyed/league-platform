@@ -2,7 +2,8 @@
 // T-98). The key must be declared, the level one the declaration allows and the
 // value must pass its schema; the save names the version it started from (A-8). A value
 // the declaration asks to confirm (R-14: full names) is saved only when the admin has
-// confirmed it, and the activity entry says so.
+// confirmed it, and the activity entry says so. In an archived or suspended league only
+// a change that shows less of people works (R-26, `protectiveOrder`).
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -53,7 +54,8 @@ export function setSettingFor(registry: SettingRegistry) {
         confirmed: z.boolean().optional(),
       }),
     ),
-    allowed: (context, input, tx: LeaguesTx) => mayChangeSetting(context, tx, registry, input),
+    allowed: (context, input, tx: LeaguesTx) =>
+      mayChangeSetting(context, tx, registry, input, { value: input.value }),
     run: async ({ context, input, tx }): Promise<Result<SettingSaved, SetSettingError>> => {
       const setting = registry.get(input.key);
       if (setting === undefined) return fail({ code: 'unknown-setting' });

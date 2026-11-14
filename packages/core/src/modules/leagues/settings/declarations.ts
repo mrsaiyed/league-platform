@@ -9,10 +9,11 @@
 //   - the statistics level a new team starts with (S-22; S-23, the founder: everyone
 //     can see its players' statistics), and whether teams may choose their own (S-24:
 //     yes, the league can switch it off);
-//   - how names show on public pages (R-14: first name and last initial for children
-//     to start with; switching to full names asks the admin to confirm the league has
-//     the permission it needs), and whether a player may ask to appear as initials
-//     (R-15: off to start). The people module reads both (readNamePolicy, T-81).
+//   - how names show on public pages (R-14, R-24: full names, first name and last
+//     initial, which every league starts with, or hidden; switching to full names asks
+//     the admin to confirm the league has the permission it needs), and whether an
+//     adult may ask to appear as initials (R-15: off to start; R-25: a child always
+//     may). The people module reads both (readNamePolicy, T-81).
 import { z } from 'zod';
 import { defineSetting, settingRegistry } from './define-setting.ts';
 
@@ -75,11 +76,13 @@ export const teamsMayChooseStatsLevel = defineSetting({
 });
 
 /**
- * How children's names show on public pages (R-14, T-81): first name and last initial,
- * or full names. Adults are shown by full name whatever this says (R-15). A person whose
- * age the league does not know counts as a child in a youth or mixed league.
+ * How children's names show on public pages (R-14, R-24, T-81): full names, first name
+ * and last initial (the start), or hidden (by jersey number only). Adults are shown by
+ * full name unless they ask otherwise (R-15). A person whose age the league does not
+ * know counts as a child in a youth or mixed league. A child's own request for less
+ * (initials, or removed) always wins over this (R-25).
  */
-export const publicNamesChoices = ['firstNameLastInitial', 'fullName'] as const;
+export const publicNamesChoices = ['fullName', 'firstNameLastInitial', 'hidden'] as const;
 
 export const publicNames = defineSetting({
   key: 'privacy.publicNames',
@@ -90,9 +93,15 @@ export const publicNames = defineSetting({
   label: 'setting.privacy.publicNames.label',
   // R-14: the admin confirms the league has the permission it needs for full names.
   confirm: ['fullName'],
+  // R-26: from the most shown to the least; a move down the list works even while the
+  // league is archived or suspended.
+  protectiveOrder: ['fullName', 'firstNameLastInitial', 'hidden'],
 });
 
-/** R-15: whether a player may ask to appear as initials. Off until the league switches it on. */
+/**
+ * R-15: whether an adult may ask to appear as initials. Off until the league switches it
+ * on. A request for a child always takes effect, whatever this says (R-25).
+ */
 export const playersMayAskForInitials = defineSetting({
   key: 'privacy.playersMayAskForInitials',
   type: z.boolean(),

@@ -10,6 +10,7 @@ import {
   scorekeeperId,
 } from '../memory-people.test-helper.ts';
 import { setNameRequest } from './set-name-request.ts';
+import { updatePerson } from './update-person.ts';
 
 const setUp = (status = 'draft') =>
   memoryPeople({
@@ -95,7 +96,7 @@ describe('setNameRequest (R-23)', () => {
     }
   });
 
-  it('refuses a scorekeeper, a visitor and a league that is archived', async () => {
+  it('refuses a scorekeeper and a visitor', async () => {
     const { db, deps, as } = setUp();
     for (const who of [scorekeeperId, null, 'someone']) {
       expect(await setNameRequest(as(who), input(), deps)).toMatchObject({
@@ -103,9 +104,152 @@ describe('setNameRequest (R-23)', () => {
       });
     }
     expect(db.state.people[0]?.visibility).toBe('none');
-    const archived = setUp('archived');
-    expect(await setNameRequest(archived.as(ownerId), input(), archived.deps)).toMatchObject({
-      error: { code: 'not-allowed' },
+  });
+});
+
+/** A league with one child, one adult and one person of unknown age. */
+function league(
+  options: {
+    audience?: 'adult' | 'youth' | 'mixed';
+    settings?: Record<string, unknown>;
+    status?: string;
+  } = {},
+) {
+  const age = (isMinor: boolean | null) => ({
+    contactEmail: null,
+    birthDate: null,
+    isMinor,
+  });
+  return memoryPeople({
+    status: options.status ?? 'live',
+    audience: options.audience ?? 'youth',
+    settings: options.settings ?? {},
+    people: [
+      person(1, { sensitiveFields: age(true) }),
+      person(2, { sensitiveFields: age(false) }),
+      person(3, { sensitiveFields: age(null) }),
+    ],
+    grants: [registrarGrant, scorekeeperGrant],
+  });
+}
+const child = personUuid(1);
+const adult = personUuid(2);
+const unknownAge = personUuid(3);
+const ask = (personId: string, showAs: string, version = 1) => ({
+  personId,
+  version,
+  showAs,
+  reason: 'guardianAsked',
+});
+const codeOf = (result: { ok: boolean; error?: { code: string } }) =>
+  result.ok ? 'ok' : result.error?.code;
+
+describe('setNameRequest: initials for children always, for adults where offered (R-25)', () => {
+  it("saves a child's initials in a full-names league with initials not offered", async () => {
+    const { db, deps, as } = league({ settings: { 'privacy.publicNames': 'fullName' } });
+    expect(codeOf(await setNameRequest(as(ownerId), ask(child, 'initials'), deps))).toBe('ok');
+    expect(db.state.people[0]?.visibility).toBe('initials');
+  });
+
+  it('saves initials for a person of unknown age in a youth or mixed league', async () => {
+    for (const audience of ['youth', 'mixed'] as const) {
+      const { db, deps, as } = league({ audience });
+      expect(codeOf(await setNameRequest(as(ownerId), ask(unknownAge, 'initials'), deps))).toBe(
+        'ok',
+      );
+      expect(db.state.people[2]?.visibility, audience).toBe('initials');
+    }
+  });
+
+  it("refuses an adult's initials where the league does not offer them, and logs nothing", async () => {
+    for (const [who, audience] of [
+      [adult, 'youth'],
+      [adult, 'adult'],
+      // In an adult league a person of unknown age counts as an adult (R-15).
+      [unknownAge, 'adult'],
+    ] as const) {
+      const { db, deps, as } = league({ audience });
+      expect(await setNameRequest(as(registrarId), ask(who, 'initials'), deps)).toEqual({
+        ok: false,
+        error: { code: 'initials-not-offered' },
+      });
+      expect(db.state.people.map((p) => p.visibility)).toEqual(['none', 'none', 'none']);
+      expect(db.state.activity).toEqual([]);
+    }
+  });
+
+  it("saves an adult's initials where the league lets adults ask", async () => {
+    const { db, deps, as } = league({
+      audience: 'adult',
+      settings: { 'privacy.playersMayAskForInitials': true },
     });
+    expect(codeOf(await setNameRequest(as(ownerId), ask(adult, 'initials'), deps))).toBe('ok');
+    expect(db.state.people[1]?.visibility).toBe('initials');
+  });
+
+  it('always saves removed, for anyone, whatever the settings (R-17)', async () => {
+    const { db, deps, as } = league({ audience: 'adult' });
+    for (const [i, who] of [child, adult, unknownAge].entries()) {
+      expect(codeOf(await setNameRequest(as(ownerId), ask(who, 'removed'), deps))).toBe('ok');
+      expect(db.state.people[i]?.visibility).toBe('removed');
+    }
+  });
+});
+
+describe('setNameRequest in a read-only league (R-26)', () => {
+  it.each(['archived', 'suspended'])(
+    'lets a request show less of the person in a league that is %s',
+    async (status) => {
+      const { db, deps, as } = league({ status });
+      expect(codeOf(await setNameRequest(as(ownerId), ask(child, 'initials'), deps))).toBe('ok');
+      expect(codeOf(await setNameRequest(as(ownerId), ask(child, 'removed', 2), deps))).toBe('ok');
+      expect(codeOf(await setNameRequest(as(registrarId), ask(adult, 'removed'), deps))).toBe('ok');
+      expect(db.state.people.map((p) => p.visibility)).toEqual(['removed', 'removed', 'none']);
+      expect(db.state.activity).toHaveLength(3);
+    },
+  );
+
+  it.each(['archived', 'suspended'])(
+    'refuses a request that shows more in a league that is %s',
+    async (status) => {
+      const { db, deps, as } = league({ status });
+      db.state.people[0] = { ...db.state.people[0]!, visibility: 'removed' };
+      db.state.people[1] = { ...db.state.people[1]!, visibility: 'initials' };
+      for (const change of [ask(child, 'initials'), ask(child, 'none'), ask(adult, 'none')]) {
+        expect(await setNameRequest(as(ownerId), change, deps)).toMatchObject({
+          error: { code: 'not-allowed' },
+        });
+      }
+      expect(db.state.people.map((p) => p.visibility)).toEqual(['removed', 'initials', 'none']);
+      expect(db.state.activity).toEqual([]);
+    },
+  );
+
+  it.each(['archived', 'suspended'])(
+    'still refuses a scorekeeper in a league that is %s',
+    async (status) => {
+      const { deps, as } = league({ status });
+      expect(await setNameRequest(as(scorekeeperId), ask(child, 'removed'), deps)).toMatchObject({
+        error: { code: 'not-allowed' },
+      });
+    },
+  );
+});
+
+describe("people.update_person never writes a person's request", () => {
+  it('ignores a visibility field, and refuses one sent alone', async () => {
+    const { db, deps, as } = league();
+    expect(
+      await updatePerson(
+        as(ownerId),
+        { personId: child, version: 1, firstName: 'Renamed', visibility: 'removed' },
+        deps,
+      ),
+    ).toEqual({ ok: true, value: { version: 2 } });
+    expect(db.state.people[0]).toMatchObject({ firstName: 'Renamed', visibility: 'none' });
+    expect(
+      await updatePerson(as(ownerId), { personId: child, version: 2, visibility: 'removed' }, deps),
+    ).toMatchObject({ ok: false, error: { code: 'invalid-input' } });
+    expect(db.state.people[0]?.visibility).toBe('none');
   });
 });
