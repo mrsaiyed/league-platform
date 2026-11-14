@@ -1,6 +1,6 @@
 # P6 — Registration and accounts
 
-[Spec home](../README.md) · Decisions R-1 to R-20
+[Spec home](../README.md) · Decisions R-1 to R-22
 
 This covers how people get into a league, how that gives them an account, and how they stay signed in. It is the centre of the vision: "through each registration an account is built, and when that person visits the site again it should keep them logged in."
 
@@ -43,6 +43,8 @@ Progress saves at every step. Someone who stops midway finds it waiting when the
 - **Forgot the password:** "Email me a code" signs them in and lets them set a new one.
 - **What makes it safe** (T-85): we never store or see a password, only a one-way scramble of it held by the sign-in service. A password must be at least 8 characters and is refused if it appears in the public lists of leaked passwords. Wrong guesses are slowed and then locked out. Changing a password signs out every other device.
 - In practice people will rarely type it, because they stay signed in (R-9).
+
+**R-21 (decided for you, November 14): a person is asked their name once, on the screen right after choosing a password** (or right after Google, if Google did not give one): first and last name, made into their own profile. Anyone who signs up, a player or someone invited to help run a league, then has a name the league's staff can see on the Admins page and in the activity log, and every later form fills it in (step 3). The account is made at step 1 without a name, so asking at the first registration instead is a small change.
 
 ## 3. A captain signs up a team
 
@@ -115,6 +117,7 @@ The founder's view (November 12): no age monitoring is needed, because nothing o
 - **R-15: adults are shown by full name by default**, and the league decides whether a player may ask to appear as initials.
 - **R-16: sensitive answers are seen only by those who need them.** Dates of birth, medical notes and emergency contacts are visible to league admins and registrars, not to scorekeepers, coaches of other teams or the public.
 - **R-17 (agreed, changed November 12): leaving is not erasing.** A player who leaves a team or the league, or is replaced mid-season, stays in its history with their name. The games they played, their box score lines and their season totals remain for anyone to see, and the roster shows them as a former player. Faraj's Season 2 already works this way. Separately, a person can ask for their name to be taken off a league's public pages, or for their whole account to be deleted. Only then does the name go, and even then the numbers stay as a nameless entry so team totals still add up. How far that right reaches is question 11 for the lawyer.
+- **R-22 (decided for you, November 14): when a parent deletes their account, a child's profile goes with it only if no other guardian manages it.** A child another guardian also manages (R-13) stays with that guardian, and so does a teenager's own profile that a parent also manages. A profile still on a league's roster is first removed from that league by the league (R-17), so deleting an account never changes a league's records behind its back.
 
 ## 8. Capacity and the waitlist
 
