@@ -120,3 +120,23 @@ export {
   maySeeSuspendedLeague,
 } from './rules/league-visibility.ts';
 export { isBlockedShortName, isShortNameFormat, isSystemShortName } from './short-names.ts';
+export {
+  binCutoff,
+  binKeepDays,
+  binKinds,
+  removedForGoodAt,
+  type BinCounts,
+  type BinKind,
+  type BinListing,
+  type BinnedItem,
+  type BinStore,
+  type BinTx,
+  type GameInBin,
+  type PersonInBin,
+  type TeamInBin,
+} from './bin.ts';
+export { binEmptyJob, emptyBin } from './empty-bin.ts';
+export { listBin, type BinList } from './commands/list-bin.ts';
+export { restoreGame, type RestoreGameError } from './commands/restore-game.ts';
+export { restorePerson, type RestorePersonError } from './commands/restore-person.ts';
+export { restoreTeam, type RestoreTeamError } from './commands/restore-team.ts';
