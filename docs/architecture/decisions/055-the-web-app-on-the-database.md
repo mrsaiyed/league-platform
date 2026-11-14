@@ -17,6 +17,8 @@ The web app's every page reads through `WebPorts` (`apps/web/src/server/ports.ts
 - **Areas not yet moved refuse.** Each area's ports throw `NotOnTheDatabaseYet` the moment any part of them is reached, so such a page shows the error page, never made-up data that is not in the database. `liveFeed` is null and `publishPlays` refuses until the tracker moves.
 - **Staging and production still refuse to start** after the login check, as before: they must not serve until every area has moved.
 
+- **A stale address after a change at the service.** Once a sign-in user is linked, `identify` finds their account by the link alone and never compares addresses, and the app may not change `accounts.email` (R9, record 052). So if a person's address changes at the sign-in service, our account keeps the old one. The web app offers no way to change an address today (it sends Supabase only a password change), so this happens only if it is changed at Supabase by hand, until T-73's confirmed change is built. What follows: the person still signs in to the same account, with the same leagues and roles; whatever we send by email goes to the old address; and if someone later proves the old address at the service as a new user, their first sign-in is refused as a link conflict (`sign-in-link-conflict` above), logged with their sign-in user id, and put right by hand (record 052). It is never another person's account. T-73's change, an owner-run function that changes `accounts.email` once the service has confirmed the new address, closes it; until then, an address changed at Supabase by hand is changed in `accounts` by hand too.
+
 ## Considered
 
 - **Mixing: the database for what has moved, the stand-in for the rest.** The stand-in's leagues and ids are not the database's, so its pages would show leagues that do not exist next to ones that do.
@@ -32,5 +34,6 @@ The web app's every page reads through `WebPorts` (`apps/web/src/server/ports.ts
 
 ## Revisit if
 
+- An address is changed at the sign-in service before T-73 is built (above: change `accounts.email` by hand to match).
 - An area cannot move without the stand-in's made-up people (the made-up database has its own seed staff, record 048).
 - Linking in `identify` shows up as slow: it is one extra query per signed-in request, and a write only the first time.
