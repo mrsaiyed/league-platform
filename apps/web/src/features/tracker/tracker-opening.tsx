@@ -4,7 +4,7 @@
 // then holds the place where the scoring screens of steps 2.35 to 2.37 will draw. Plain
 // forms and messages only. The words come from the page, from the message files (T-187).
 import { createTranslator, type Catalog } from '@srleagues/site';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
@@ -52,7 +52,11 @@ export function TrackerOpening({
   const [phase, setPhase] = useState<Phase>({ kind: 'preparing' });
   const [storeFailed, setStoreFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  // What `busy` will be once drawn: read here, so a double tap before the next drawing
+  // cannot run the same step twice.
+  const working = useRef(false);
   const opened = useRef<OpenedTrackerGame | null>(null);
+  const leaving = useRef(false);
 
   useEffect(() => {
     let gone = false;
@@ -101,11 +105,13 @@ export function TrackerOpening({
 
   const act = (work: (game: OpenedTrackerGame) => Promise<unknown>) => async () => {
     const game = opened.current;
-    if (game === null || busy) return;
+    if (game === null || working.current || leaving.current) return;
+    working.current = true;
     setBusy(true);
     try {
       await work(game);
     } finally {
+      working.current = false;
       setBusy(false);
       setPhase((now) =>
         now.kind === 'open'
@@ -113,6 +119,29 @@ export function TrackerOpening({
           : now,
       );
     }
+  };
+
+  // Leaving the game, by its button or by "back to your games": the session is released
+  // first (T6 §5), as a page that is simply left would hold the game until it runs out.
+  // It runs once however often it is tapped, and goes back even if the release fails.
+  const leaveGame = async () => {
+    const game = opened.current;
+    if (leaving.current) return;
+    leaving.current = true;
+    working.current = true;
+    setBusy(true);
+    try {
+      await game?.controller.leave();
+    } finally {
+      window.location.assign(backHref);
+    }
+  };
+  const back = (event: MouseEvent<HTMLAnchorElement>) => {
+    // A link opened in a new tab or window leaves this page as it is.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return;
+    event.preventDefault();
+    void leaveGame();
   };
 
   const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
@@ -132,15 +161,14 @@ export function TrackerOpening({
           onTakeOver={act((game) => game.controller.takeOver())}
           onOpenAgain={act((game) => game.controller.openAgain())}
           onConfirm={(format) => act((game) => game.confirmFormat(format))()}
-          onLeave={act(async (game) => {
-            await game.controller.leave();
-            window.location.assign(backHref);
-          })}
+          onLeave={() => void leaveGame()}
         />
       ) : null}
       {storeFailed ? <p role="alert">{t('tracker.storeFailed')}</p> : null}
       <p>
-        <a href={backHref}>{t('tracker.back')}</a>
+        <a href={backHref} onClick={back}>
+          {t('tracker.back')}
+        </a>
       </p>
     </main>
   );
