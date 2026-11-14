@@ -9,6 +9,9 @@
 //   scorekeeper limited to assigned games is refused one not theirs the same way. A
 //   game that is not this league's is "not found".
 //
+// In a league that is archived or suspended nothing is scored (U-9): the page says so, in
+// the games list's words, rather than "you do not have access".
+//
 // Only a game recorded live is scored here: one recorded as a final score or a box score
 // is shown a message saying so, and nothing of it goes to the device.
 //
@@ -24,7 +27,7 @@ import { isGameIdFormat } from '../../server/league-api.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { deviceRosters } from './device-rosters.ts';
-import { scoresOnly } from './my-games.ts';
+import { leagueScores, scoresOnly } from './my-games.ts';
 import { trackerCatalog } from './tracker-catalog.ts';
 import { TrackerOpening } from './tracker-opening.tsx';
 
@@ -40,15 +43,19 @@ export async function TrackerPage({
   const view = await loadLeaguePage(league, 'score');
   const here = view.context.league;
   if (!isGameIdFormat(game)) return notFound();
+  const backHref = scoresOnly(view.areas)
+    ? leagueUrl(here, 'admin')
+    : leagueUrl(here, 'admin-area', { area: 'games' });
+  // The league's gate let only someone who scores here this far; nothing of the game is read.
+  if (!leagueScores(here.status)) {
+    return <TrackerRefusal message="admin.games.notScorable" backHref={backHref} />;
+  }
   const ports = await webPorts();
   const context = commandContextOf(view.context);
   const read = await readTrackerRosters(context, { gameId: game }, ports.games.deps);
   if (!read.ok) return read.error.code === 'not-allowed' ? forbidden() : notFound();
   // Only a signed-in account may score, so the read above already refused a visitor.
   if (context.accountId === null) return forbidden();
-  const backHref = scoresOnly(view.areas)
-    ? leagueUrl(here, 'admin')
-    : leagueUrl(here, 'admin-area', { area: 'games' });
   if (read.value.recording !== 'live') {
     return <TrackerRefusal message="tracker.notLive" backHref={backHref} />;
   }

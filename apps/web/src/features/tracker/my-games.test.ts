@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { opensInTracker, scoresOnly } from './my-games.ts';
+import { leagueScores, opensInTracker, scoresOnly } from './my-games.ts';
 
 describe('the scorekeeper’s admin (P4 §4)', () => {
   it('is for those whose only area of the admin is Games', () => {
@@ -22,5 +22,10 @@ describe('the scorekeeper’s admin (P4 §4)', () => {
     for (const recording of ['final-score', 'box-score', undefined] as const) {
       expect(opensInTracker({ recording, status: 'scheduled', scorable: true })).toBe(false);
     }
+  });
+
+  it('scores in a league that is not archived or suspended', () => {
+    for (const status of ['live', 'draft']) expect(leagueScores(status)).toBe(true);
+    for (const status of ['archived', 'suspended']) expect(leagueScores(status)).toBe(false);
   });
 });
