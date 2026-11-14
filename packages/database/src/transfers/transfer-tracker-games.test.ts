@@ -361,6 +361,12 @@ async function run(options: TransferTrackerGamesOptions) {
 describe('the tracker transfer (step 2.58)', () => {
   it('transfers ten games with every line matching, and a second run changes nothing', async () => {
     const league = await makeLeague(pglite, 'made-up-transfer');
+    // An earlier run was cut off after making Sam a person, before putting them on the
+    // team: this run finds them in the league's list and does not add them twice.
+    const orphan = await newPerson(pglite, league.leagueId, {
+      firstName: 'Sam',
+      lastName: 'Example',
+    });
     const start = await fingerprint(pglite, league.leagueId);
 
     // A dry run shows the plan and changes nothing.
@@ -375,7 +381,10 @@ describe('the tracker transfer (step 2.58)', () => {
     ).toEqual(['date', 'date']);
     expect(dry.planText).toContain('10 games to transfer, 0 already here, 1 not transferred');
     expect(dry.planText).toContain('Jo Testing (#6): on the roster already');
-    expect(dry.planText).toContain('Sam Example (#4): to be added as Sam Example, number 4');
+    expect(dry.planText).toContain(
+      'Sam Example (#4): in the league’s list as Sam Example but on no team: to be put on the roster, number 4',
+    );
+    expect(dry.planText).toContain('Kai Sample (#5): to be added as Kai Sample, number 5');
     expect(dry.report).toBeNull();
     expect(await fingerprint(pglite, league.leagueId)).toEqual(start);
 
@@ -386,6 +395,21 @@ describe('the tracker transfer (step 2.58)', () => {
     expect(first.reportText).toContain('Done: every box score line of 10 games matches');
     // 6 owls added (Jo was there) and 15 opponents' players.
     expect(first.report?.added).toHaveLength(6 + 15);
+    // Sam is the one person they were, now on the team with their number.
+    const sams = await pglite.query<{ id: string; jersey_number: string | null }>(
+      `select p.id, r.jersey_number from people p
+       left join roster_entries r on r.league_id = p.league_id and r.person_id = p.id
+       where p.league_id = $1 and p.first_name = 'Sam' and p.last_name = 'Example'`,
+      [league.leagueId],
+    );
+    expect(sams.rows).toEqual([{ id: orphan, jersey_number: '4' }]);
+    // Every person the run made is on a roster: none is left behind.
+    const orphans = await pglite.query(
+      `select id from people p where league_id = $1 and not exists (
+         select 1 from roster_entries r where r.league_id = p.league_id and r.person_id = p.id)`,
+      [league.leagueId],
+    );
+    expect(orphans.rows).toEqual([]);
     for (const [g, gameId] of league.games.entries()) {
       const row = (
         await pglite.query<{ status: string; home_score: number; away_score: number }>(
@@ -439,8 +463,18 @@ describe('the tracker transfer (step 2.58)', () => {
 
   it('brings in only the tracked team unless asked, and changes nothing while a game is blocked', async () => {
     const league = await makeLeague(pglite, 'made-up-owls-only');
+    // The season asks for unique numbers, and someone on the owls wears Kai's.
+    await pglite.query(
+      `update seasons set rules = jsonb_set(rules, '{rosters,uniqueJerseys}', 'true') where id = $1`,
+      [league.seasonId],
+    );
+    const pat = await newPerson(pglite, league.leagueId, { firstName: 'Pat', lastName: 'Other' });
+    await newRosterEntry(pglite, league.leagueId, league.teams.owls, pat, { jersey: '5' });
     const start = await fingerprint(pglite, league.leagueId);
     const outcome = await run(optionsFor(league, 'made-up-owls-only', { withOpponents: false }));
+    expect(outcome.planText).toContain(
+      'Kai Sample (#5): cannot be added: this season asks for unique jersey numbers',
+    );
     expect(outcome.plan.ready).toBe(false);
     expect(outcome.plan.games.slice(0, 10).every((g) => g.outcome.kind === 'blocked')).toBe(true);
     expect(outcome.planText).toContain('brought in only with --with-opponents');

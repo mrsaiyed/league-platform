@@ -153,13 +153,29 @@ export type PlayerMatch =
       readonly firstName: string;
       readonly lastName: string;
       readonly jerseyNumber: string | null;
+      /**
+       * A person already in the league's list but on no roster, who is put on the team
+       * instead of a new one (an earlier run added them and was cut off), or null.
+       */
+      readonly personId: string | null;
     }
   | {
       readonly kind: 'problem';
-      readonly reason: 'no-name' | 'one-name' | 'several-on-roster' | 'same-person';
+      readonly reason:
+        | 'no-name'
+        | 'one-name'
+        | 'several-on-roster'
+        | 'same-person'
+        /** Someone on the team here wears the number, and the season wants unique ones. */
+        | 'number-taken'
+        /** Not a number a roster holds: 0 to 99, or 00. */
+        | 'number-not-allowed';
     };
 
 const jerseyOf = (player: TrackerPlayer) => (player.jersey === '' ? null : player.jersey);
+
+/** A number a roster entry may hold (0008): 0 to 99, or 00. */
+export const isRosterNumber = (jersey: string) => /^(0|00|[1-9][0-9]?)$/u.test(jersey);
 
 /**
  * Where each tracker player of one team is on its platform team's roster. Someone whose
@@ -201,11 +217,14 @@ export function matchTrackerPlayers(
       });
     } else {
       const split = splitName(player.name);
+      const jersey = jerseyOf(player);
       matches.set(
         player.id,
         split === undefined
           ? { kind: 'problem', reason: key === '' ? 'no-name' : 'one-name' }
-          : { kind: 'add', ...split, jerseyNumber: jerseyOf(player) },
+          : jersey !== null && !isRosterNumber(jersey)
+            ? { kind: 'problem', reason: 'number-not-allowed' }
+            : { kind: 'add', ...split, jerseyNumber: jersey, personId: null },
       );
     }
   }

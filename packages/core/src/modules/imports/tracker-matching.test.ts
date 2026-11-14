@@ -159,6 +159,7 @@ describe('matching tracker players', () => {
     lastName,
     publicName,
     jerseyNumber,
+    leftOn: null,
   });
 
   it('finds people by name or shown name, adds the rest, and names its problems', () => {
@@ -183,6 +184,7 @@ describe('matching tracker players', () => {
       firstName: 'Sam',
       lastName: 'Example',
       jerseyNumber: '4',
+      personId: null,
     });
     expect(matches.get('p3')).toEqual({
       kind: 'on-roster',

@@ -27,6 +27,7 @@ import {
   matchTrackerGame,
   matchTrackerPlayers,
   matchTrackerTeams,
+  nameKey,
   type GameMatch,
   type PlayerMatch,
   type TeamMatch,
@@ -41,6 +42,7 @@ import {
 } from './tracker-replay.ts';
 import type {
   PlatformGameFact,
+  RosterPersonFact,
   TrackerData,
   TrackerGame,
   TrackerPlayer,
@@ -233,6 +235,77 @@ const willBeHere = (person: PlannedPerson, options: Pick<PlanOptions, 'withOppon
 const jerseyOfMatch = (match: PlayerMatch | undefined) =>
   match?.kind === 'on-roster' || match?.kind === 'add' ? match.jerseyNumber : null;
 
+/**
+ * Each player to be added who is already a person in the league's list, on no roster:
+ * the one an earlier run added just before it was cut off, so a rerun puts them on the
+ * team rather than adding them twice. Only the whole first and last name is theirs, and
+ * each listed person goes to one player only, in the plan's order; anyone over is added.
+ */
+async function findListedPeople(
+  people: Map<string, PlannedPerson>,
+  reads: TrackerTransferReads,
+  options: Pick<PlanOptions, 'withOpponents'>,
+): Promise<void> {
+  const used = new Set<string>();
+  for (const person of people.values()) {
+    if (person.match.kind === 'on-roster') used.add(lower(person.match.personId));
+  }
+  const listed = new Map<string, string[]>();
+  for (const [id, person] of people) {
+    const match = person.match;
+    if (match.kind !== 'add' || !isToAdd(person, options)) continue;
+    const key = nameKey(`${match.firstName} ${match.lastName}`);
+    let free = listed.get(key);
+    if (free === undefined) {
+      free = (await reads.peopleOffRosters(`${match.firstName} ${match.lastName}`))
+        .filter((p) => nameKey(`${p.firstName} ${p.lastName}`) === key)
+        .map((p) => lower(p.personId))
+        .sort();
+      listed.set(key, free);
+    }
+    const personId = free.find((candidate) => !used.has(candidate));
+    if (personId === undefined) continue;
+    used.add(personId);
+    people.set(id, { ...person, match: { ...match, personId } });
+  }
+}
+
+/**
+ * Where the season asks for unique jersey numbers, a player to be added with a number
+ * someone on the team here wears now, or another player to be added on the team has
+ * too, cannot be: the roster would refuse them after they were made a person (0008).
+ */
+function checkNumbers(
+  people: Map<string, PlannedPerson>,
+  rosters: ReadonlyMap<string, readonly RosterPersonFact[]>,
+  uniqueJerseys: boolean,
+  options: Pick<PlanOptions, 'withOpponents'>,
+): void {
+  if (!uniqueJerseys) return;
+  const wearers = new Map<string, number>();
+  const count = (teamId: string, jersey: string) => {
+    const key = `${teamId}:${jersey}`;
+    wearers.set(key, (wearers.get(key) ?? 0) + 1);
+  };
+  for (const [teamId, roster] of rosters) {
+    for (const entry of roster) {
+      if (entry.leftOn === null && entry.jerseyNumber !== null) count(teamId, entry.jerseyNumber);
+    }
+  }
+  const adding = [...people].filter(([, person]) => isToAdd(person, options));
+  for (const [, person] of adding) {
+    if (person.match.kind === 'add' && person.match.jerseyNumber !== null) {
+      count(person.teamId, person.match.jerseyNumber);
+    }
+  }
+  for (const [id, person] of adding) {
+    const jersey = person.match.kind === 'add' ? person.match.jerseyNumber : null;
+    if (jersey !== null && (wearers.get(`${person.teamId}:${jersey}`) ?? 0) > 1) {
+      people.set(id, { ...person, match: { kind: 'problem', reason: 'number-taken' } });
+    }
+  }
+}
+
 /** Works out the whole transfer, reading the platform but writing nothing. */
 export async function planTrackerTransfer(
   data: TrackerData,
@@ -275,10 +348,13 @@ export async function planTrackerTransfer(
   for (const player of wanted.values()) {
     byTeam.set(player.teamId, [...(byTeam.get(player.teamId) ?? []), player]);
   }
+  const rosters = new Map<string, readonly RosterPersonFact[]>();
   for (const [trackerTeamId, players] of byTeam) {
     const team = teams.get(trackerTeamId);
     if (team?.kind !== 'matched') continue;
-    const matches = matchTrackerPlayers(players, await reads.roster(team.teamId));
+    const roster = await reads.roster(team.teamId);
+    rosters.set(team.teamId, roster);
+    const matches = matchTrackerPlayers(players, roster);
     for (const player of players) {
       const match = matches.get(player.id);
       if (match === undefined) continue;
@@ -286,6 +362,8 @@ export async function planTrackerTransfer(
       people.set(lower(player.id), { player, teamId: team.teamId, tracked: isTracked, match });
     }
   }
+  await findListedPeople(people, reads, options);
+  checkNumbers(people, rosters, reads.uniqueJerseys, options);
   /** Whether a player will be a person here once the people are added. */
   const usable = (id: string) => {
     const person = people.get(id);

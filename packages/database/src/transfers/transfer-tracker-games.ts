@@ -127,8 +127,28 @@ async function readsOf(
     );
   const names = await scoped((scope) => importsStore(scope).seasonNames(seasonId));
   const games = await scoped((scope) => listPublicGames(scope, seasonId));
+  const season = await scoped((scope) => gamesStore(scope).findSeason(seasonId));
   return {
     timeZone,
+    uniqueJerseys: rulesOfGame(null, season?.rules).rosters.uniqueJerseys,
+    peopleOffRosters: (name) =>
+      scoped(async (scope) => {
+        const people = peopleStore(scope);
+        const found: { personId: string; firstName: string; lastName: string }[] = [];
+        const page = 100;
+        for (let offset = 0; ; offset += page) {
+          const listed = await people.list({ search: name, limit: page, offset, sensitive: false });
+          for (const person of listed) {
+            if (await people.isOnRoster(person.id)) continue;
+            found.push({
+              personId: person.id,
+              firstName: person.firstName,
+              lastName: person.lastName,
+            });
+          }
+          if (listed.length < page) return found;
+        }
+      }),
     teams: names.teams.map((team) => ({ id: team.id, name: team.name })),
     games: games.map((game) => ({
       id: game.id,
@@ -146,6 +166,7 @@ async function readsOf(
           lastName: entry.lastName,
           publicName: entry.publicName,
           jerseyNumber: entry.jerseyNumber,
+          leftOn: entry.leftOn,
         })),
       ),
     game: (gameId, commandIds) =>

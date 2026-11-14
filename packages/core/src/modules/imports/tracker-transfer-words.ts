@@ -187,8 +187,12 @@ function personWords(match: PlayerMatch): string {
   switch (match.kind) {
     case 'on-roster':
       return 'on the roster already';
-    case 'add':
-      return `to be added as ${match.firstName} ${match.lastName}${match.jerseyNumber === null ? ', no number' : `, number ${match.jerseyNumber}`}`;
+    case 'add': {
+      const number = match.jerseyNumber === null ? ', no number' : `, number ${match.jerseyNumber}`;
+      return match.personId === null
+        ? `to be added as ${match.firstName} ${match.lastName}${number}`
+        : `in the league’s list as ${match.firstName} ${match.lastName} but on no team: to be put on the roster${number}`;
+    }
     case 'problem':
       switch (match.reason) {
         case 'no-name':
@@ -199,6 +203,10 @@ function personWords(match: PlayerMatch): string {
           return 'more than one person on the roster here could be them';
         case 'same-person':
           return 'another of the team’s players in the tracker has the same name or person here';
+        case 'number-taken':
+          return 'cannot be added: this season asks for unique jersey numbers, and someone on the team here (or another player to be added) has the same number; change one of the numbers first';
+        case 'number-not-allowed':
+          return 'cannot be added: the tracker’s number is not one a roster here takes (0 to 99, or 00); put them on the roster here by hand first';
       }
   }
 }

@@ -7,6 +7,7 @@ import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import { planTrackerTransfer, type PlanOptions } from './plan-tracker-transfer.ts';
 import type {
+  ListedPersonFact,
   PlatformGameFact,
   RosterPersonFact,
   SeasonGameFact,
@@ -111,7 +112,7 @@ type Season = {
   games?: readonly SeasonGameFact[];
   rosters?: Readonly<Record<string, readonly RosterPersonFact[]>>;
   facts?: Readonly<Record<string, Partial<PlatformGameFact>>>;
-  offRoster?: Readonly<Record<string, readonly string[]>>;
+  offRoster?: readonly ListedPersonFact[];
   uniqueJerseys?: boolean;
 };
 
@@ -133,8 +134,23 @@ function readsOf(season: Season = {}): TrackerTransferReads {
       ...season.facts?.[gameId],
     }),
     lines: async () => [],
+    uniqueJerseys: season.uniqueJerseys ?? false,
+    peopleOffRosters: async (name) =>
+      (season.offRoster ?? []).filter((p) =>
+        `${p.firstName} ${p.lastName}`.toLowerCase().includes(name.toLowerCase()),
+      ),
   };
 }
+
+const rosterEntry = (
+  personId: string,
+  name: string,
+  jerseyNumber: string | null,
+  over: Partial<RosterPersonFact> = {},
+): RosterPersonFact => {
+  const [firstName = '', lastName = ''] = name.split(' ');
+  return { personId, firstName, lastName, publicName: null, jerseyNumber, leftOn: null, ...over };
+};
 
 const options: PlanOptions = { withOpponents: true, now: start + 100 * 86_400_000 };
 
@@ -148,6 +164,7 @@ describe('the transfer plan', () => {
       firstName: 'Sam',
       lastName: 'Example',
       jerseyNumber: '4',
+      personId: null,
     });
   });
 
@@ -163,6 +180,100 @@ describe('the transfer plan', () => {
       expect.objectContaining({ kind: 'transfer' }),
       { kind: 'blocked', gameId: null, problem: { kind: 'not-matched', reason: 'not-found' } },
       { kind: 'skip', reason: 'still-live' },
+    ]);
+    expect(plan.ready).toBe(false);
+  });
+
+  it('puts on the roster a person an earlier run added to the list but not to the team', async () => {
+    const orphan = gameUuid(900);
+    const twin = gameUuid(901);
+    const plan = await planTrackerTransfer(
+      data([trackerGame(1, played())]),
+      readsOf({
+        offRoster: [
+          { personId: orphan, firstName: 'Sam', lastName: 'Example' },
+          // Only a whole name is the player's: a longer one is someone else.
+          { personId: twin, firstName: 'Sam', lastName: 'Examples' },
+        ],
+      }),
+      options,
+    );
+    expect(plan.ready).toBe(true);
+    expect(plan.people.get(sam.id.toLowerCase())?.match).toMatchObject({
+      kind: 'add',
+      personId: orphan,
+    });
+    expect(plan.people.get(kai.id.toLowerCase())?.match).toMatchObject({ personId: null });
+  });
+
+  it('gives one listed person to one player only, however many share the name', async () => {
+    const otherSam = player(randomUUID(), 'foxes', 'Sam Example', '31');
+    const inputs: Input[] = [
+      ...played().slice(0, 1),
+      { type: 'lineup', side: 'away', playerIds: [fox.id, otherSam.id] },
+      ...played().slice(2),
+    ];
+    const backup = { ...data([trackerGame(1, inputs)]), players: [sam, kai, fox, otherSam] };
+    const orphan = gameUuid(900);
+    const plan = await planTrackerTransfer(
+      backup,
+      readsOf({ offRoster: [{ personId: orphan, firstName: 'Sam', lastName: 'Example' }] }),
+      options,
+    );
+    const taken = [sam, otherSam].map((p) => {
+      const match = plan.people.get(p.id.toLowerCase())?.match;
+      return match?.kind === 'add' ? match.personId : 'not added';
+    });
+    expect(taken.filter((id) => id === orphan)).toHaveLength(1);
+    expect(taken.filter((id) => id === null)).toHaveLength(1);
+  });
+
+  it('blocks a player whose number someone on the team wears, when numbers must be unique', async () => {
+    const rosters = {
+      [homeId]: [
+        rosterEntry(gameUuid(800), 'Pat Other', '5'),
+        // Someone who left wore 4: that number is free again.
+        rosterEntry(gameUuid(801), 'Lee Gone', '4', { leftOn: '2025-12-01' }),
+      ],
+    };
+    const unique = await planTrackerTransfer(
+      data([trackerGame(1, played())]),
+      readsOf({ rosters, uniqueJerseys: true }),
+      options,
+    );
+    expect(unique.people.get(kai.id.toLowerCase())?.match).toEqual({
+      kind: 'problem',
+      reason: 'number-taken',
+    });
+    expect(unique.people.get(sam.id.toLowerCase())?.match.kind).toBe('add');
+    expect(unique.games[0]?.outcome).toMatchObject({
+      kind: 'blocked',
+      problem: { kind: 'players-not-here', playerIds: [kai.id.toLowerCase()] },
+    });
+    expect(unique.ready).toBe(false);
+    // Where the season does not ask for unique numbers, two may wear one.
+    const shared = await planTrackerTransfer(
+      data([trackerGame(1, played())]),
+      readsOf({ rosters }),
+      options,
+    );
+    expect(shared.ready).toBe(true);
+  });
+
+  it('blocks two players to be added with one number, and a number a roster cannot hold', async () => {
+    const twin = player(randomUUID(), 'owls', 'Ari Madeup', '4');
+    const odd = player(randomUUID(), 'owls', 'Jo Testing', '123');
+    const backup = { ...data([trackerGame(1, played())]), players: [sam, kai, fox, twin, odd] };
+    const plan = await planTrackerTransfer(backup, readsOf({ uniqueJerseys: true }), options);
+    const reason = (p: TrackerPlayer) => {
+      const match = plan.people.get(p.id.toLowerCase())?.match;
+      return match?.kind === 'problem' ? match.reason : match?.kind;
+    };
+    expect([sam, twin, odd, kai].map(reason)).toEqual([
+      'number-taken',
+      'number-taken',
+      'number-not-allowed',
+      'add',
     ]);
     expect(plan.ready).toBe(false);
   });

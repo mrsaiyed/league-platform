@@ -1,7 +1,8 @@
 // Carries out a transfer plan (plan-tracker-transfer.ts, step 2.58), only through the
 // product's own commands, each its own transaction: people are added with
 // people.create_person and put on their team's roster with their numbers
-// (teams.add_to_roster); each game is opened to score on one device
+// (teams.add_to_roster), and one the plan found in the league's list on no roster (a
+// run cut off between the two) is only put on the roster; each game is opened to score on one device
 // (games.open_scoring_session), its actions are sent a few at a time through the
 // tracker's door (games.apply_tracker_commands), which ends the game when it meets the
 // tracker's own End game, settles its lines and works out the standings (T6 §7); a game
@@ -184,30 +185,32 @@ export async function runTrackerTransfer<Tx extends TrackerTransferTx>(
   }
   for (const [playerId, person] of plan.people) {
     if (!isToAdd(person, options) || person.match.kind !== 'add') continue;
-    const made = await createPerson(
-      context,
-      { firstName: person.match.firstName, lastName: person.match.lastName },
-      deps,
-    );
-    if (!made.ok) {
-      const stop: TransferStop = { kind: 'person-not-added', playerId, code: made.error.code };
-      return report({ trackerGameId: null, stop });
+    // Someone an earlier run made a person and was cut off before putting on the team is
+    // found again by the plan and only put on the roster now: a rerun never adds twice.
+    let personId = person.match.personId;
+    if (personId === null) {
+      const made = await createPerson(
+        context,
+        { firstName: person.match.firstName, lastName: person.match.lastName },
+        deps,
+      );
+      if (!made.ok) {
+        const stop: TransferStop = { kind: 'person-not-added', playerId, code: made.error.code };
+        return report({ trackerGameId: null, stop });
+      }
+      personId = made.value.personId;
     }
     const jersey = person.match.jerseyNumber;
     const placed = await addToRoster(
       context,
-      {
-        teamId: person.teamId,
-        personId: made.value.personId,
-        ...(jersey === null ? {} : { jerseyNumber: jersey }),
-      },
+      { teamId: person.teamId, personId, ...(jersey === null ? {} : { jerseyNumber: jersey }) },
       deps,
     );
     if (!placed.ok) {
       const stop: TransferStop = { kind: 'person-not-added', playerId, code: placed.error.code };
       return report({ trackerGameId: null, stop });
     }
-    personOfPlayer.set(playerId, lower(made.value.personId));
+    personOfPlayer.set(playerId, lower(personId));
     added.push(playerId);
   }
   const playerOfPerson = new Map([...personOfPlayer].map(([player, person]) => [person, player]));

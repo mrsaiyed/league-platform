@@ -95,6 +95,15 @@ export type RosterPersonFact = {
   readonly lastName: string;
   readonly publicName: string | null;
   readonly jerseyNumber: string | null;
+  /** The day they left the team (YYYY-MM-DD), or null while they are on it. */
+  readonly leftOn: string | null;
+};
+
+/** A person in the league's list, by name. */
+export type ListedPersonFact = {
+  readonly personId: string;
+  readonly firstName: string;
+  readonly lastName: string;
 };
 
 /** Where one platform game stands, for the commands the transfer would send it. */
@@ -127,4 +136,12 @@ export type TrackerTransferReads = {
   ) => Promise<PlatformGameFact | undefined>;
   /** A game's box score lines as saved now. */
   readonly lines: (gameId: string) => Promise<readonly LiveGameLine[]>;
+  /** Whether the season asks for unique jersey numbers in a team (0008). */
+  readonly uniqueJerseys: boolean;
+  /**
+   * People in the league's list (not in the bin) who are on no team's roster now and
+   * whose name holds this text: a person a run added just before it was cut off, before
+   * they were put on their team, is found again here rather than added twice.
+   */
+  readonly peopleOffRosters: (name: string) => Promise<readonly ListedPersonFact[]>;
 };
