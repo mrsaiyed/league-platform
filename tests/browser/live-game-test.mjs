@@ -12,7 +12,11 @@
 //   shows each play (T-119);
 // - the Bears show their players' numbers to their staff only, so none of their names
 //   reaches a viewer (S-22); accessibility checks (T-186) and no sideways scrolling at
-//   phone width (A-2).
+//   phone width (A-2);
+// - a game card on the home and schedule pages opens its game's page;
+// - a page opened before tip-off of Hawks v Lions, a halves game, says "Half 1" once it
+//   starts, and is drawn again with its play-by-play when it starts and with both box
+//   scores when it ends.
 import { randomUUID } from 'node:crypto';
 import {
   accessibilityProblems,
@@ -47,9 +51,13 @@ const player = (team, n) =>
     .padStart(8, '0')}`;
 const hawks = [1, 2, 3, 4, 5].map((n) => player(3, n));
 const bears = [1, 2, 3, 4, 5].map((n) => player(4, n));
+const lions = [1, 2, 3, 4, 5].map((n) => player(1, n));
+// Hawks v Lions, scheduled for tomorrow and scored live; the made-up owner may score it.
+const laterGameId = '01900000-0000-7000-8000-006a00000003';
 const bearsNames = ['Sol', 'Tam', 'Uma', 'Vic', 'Wes', 'Xan', 'Bearsley'];
 const gamePage = `/north-valley/games/${gameId}`;
-const api = `/api/v1/leagues/${leagueId}/games/${gameId}`;
+const apiOf = (game) => `/api/v1/leagues/${leagueId}/games/${game}`;
+const api = apiOf(gameId);
 
 let built = true;
 if (!process.argv.includes('--no-build')) {
@@ -75,15 +83,15 @@ if (built) {
 }
 
 /** The scorekeeper's tracker, as plain requests to its endpoints (step 2.32). */
-function scorekeeper() {
+function scorekeeper({ game = gameId, token = 'local-scorekeeper-token' } = {}) {
   let sessionId;
   let sequence = 0;
   const post = async (path, body) => {
-    const answer = await fetch(origin + api + path, {
+    const answer = await fetch(origin + apiOf(game) + path, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        cookie: 'srl_session=local-scorekeeper-token',
+        cookie: `srl_session=${token}`,
         origin,
       },
       body: JSON.stringify(body),
@@ -128,7 +136,7 @@ const homeScore = (page) =>
   page.locator('.ui-scoreboard-side').last().locator('.ui-scoreboard-score').textContent();
 
 /** A viewer's screen, at phone width, opened on the game and waiting for its live part. */
-async function viewer({ dropMessages = false, blockLive = false } = {}) {
+async function viewer({ dropMessages = false, blockLive = false, at = gamePage } = {}) {
   const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
   if (blockLive) await context.route('**/api/v1/live**', (route) => route.abort());
   if (dropMessages) {
@@ -161,7 +169,7 @@ async function viewer({ dropMessages = false, blockLive = false } = {}) {
   page.on('request', (request) => {
     if (request.url().includes(`${api}/snapshot`)) snapshots.push(Date.now());
   });
-  await page.goto(origin + gamePage);
+  await page.goto(origin + at);
   await page.locator('main').first().waitFor();
   return { context, page, snapshots };
 }
@@ -289,6 +297,86 @@ if (browser) {
       await screen.context.close();
     }
   });
+
+  await step('a game card on the home and schedule pages opens its game', async () => {
+    const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+    try {
+      const page = await context.newPage();
+      for (const from of ['/north-valley', '/north-valley/schedule']) {
+        await page.goto(origin + from);
+        // The first card a visitor can see: a past round's cards may be folded away.
+        const card = page.locator('main a[href*="/games/"]:visible').first();
+        const shows = (await card.textContent()) ?? '';
+        const [answer] = await Promise.all([
+          page.waitForResponse(
+            (r) => r.request().isNavigationRequest() && r.url().includes('/games/'),
+          ),
+          card.click(),
+        ]);
+        await page.waitForURL(/\/games\//);
+        note(
+          `a card on ${from} opens a game page`,
+          answer?.status() === 200,
+          `${answer?.status()}`,
+        );
+        const title = (await page.locator('h1').first().textContent()) ?? '';
+        const [away = '', home = ''] = title.split(' at ');
+        note(
+          `the game page opened from ${from} is the card's game`,
+          away !== '' && home !== '' && shows.includes(away) && shows.includes(home),
+          `"${title}" from a card saying "${shows}"`,
+        );
+      }
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step(
+    'a page opened before tip-off is drawn again when the game starts and ends',
+    async () => {
+      const screen = await viewer({ at: `/north-valley/games/${laterGameId}` });
+      const { page } = screen;
+      const playsHeading = () => page.getByRole('heading', { name: 'Play by play' }).count();
+      try {
+        note(
+          'before tip-off the page says the game has not started',
+          (await page.getByText('This game has not started yet.').count()) > 0,
+        );
+        note('before tip-off there is no play-by-play', (await playsHeading()) === 0);
+        await page.locator('[data-live-connection="open"]').waitFor({ timeout: 10_000 });
+        const owner = scorekeeper({ game: laterGameId, token: 'local-owner-token' });
+        await owner.open();
+        await owner.tap(
+          { type: 'lineup', side: 'home', playerIds: hawks },
+          { type: 'lineup', side: 'away', playerIds: lions },
+          { type: 'start' },
+          { type: 'score', side: 'home', playerId: hawks[0], points: 2 },
+        );
+        await page.getByRole('link', { name: 'Show newer plays' }).waitFor({ timeout: 10_000 });
+        note('once it starts the page shows its play-by-play', (await playsHeading()) === 1);
+        const period = (await page.locator('.ui-scoreboard-period').textContent()) ?? '';
+        note('a halves game says Half 1 from tip-off', period.startsWith('Half 1'), period);
+        await page.locator('[data-live-connection="open"]').waitFor({ timeout: 10_000 });
+        await owner.tap({ type: 'end' });
+        await page.getByRole('heading', { name: 'Box scores' }).waitFor({ timeout: 10_000 });
+        note('once it ends the page shows the box scores', true);
+        note(
+          'both teams have a box score',
+          (await page.locator('table').count()) >= 2,
+          `${await page.locator('table').count()} tables`,
+        );
+        note(
+          'a finished game has no link to newer plays',
+          (await page.getByRole('link', { name: 'Show newer plays' }).count()) === 0,
+        );
+        const problems = await accessibilityProblems(page);
+        note('accessibility: a game ended while open', problems.length === 0, problems.join('; '));
+      } finally {
+        await screen.context.close();
+      }
+    },
+  );
 
   await step('a finished game is drawn and not followed', async () => {
     const context = await browser.newContext();
