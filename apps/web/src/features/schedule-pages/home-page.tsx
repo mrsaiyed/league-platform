@@ -29,9 +29,9 @@ export function compactStandings(table: StandingsTableView): StandingsTableView 
 
 /**
  * `/{league}`: the league's name and season (the season is picked in the header), the season
- * in four numbers, a live game under
- * its own heading, then recent results and upcoming games with the compact standings beside
- * them on a laptop and beneath them on a phone.
+ * in four numbers, then the games: a live game first under its own heading, recent results
+ * and upcoming games, with the compact standings beside them on a laptop and beneath them on
+ * a phone.
  */
 export async function HomePage({
   league,
@@ -90,13 +90,13 @@ export async function HomePage({
           />
         </Section>
       ) : null}
-      {live.length > 0 ? (
-        <Section title={t('home.liveNow')}>
-          <GameList leagueId={addressee.id} games={live} />
-        </Section>
-      ) : null}
       <div className="home-layout">
         <div>
+          {live.length > 0 ? (
+            <Section title={t('home.liveNow')}>
+              <GameList leagueId={addressee.id} games={live} />
+            </Section>
+          ) : null}
           {empty ? null : (
             <Section title={t('home.recentResults')}>
               {games.recent.length === 0 ? (
