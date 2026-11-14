@@ -3,7 +3,8 @@
 // this computer with made-up settings on the made-up stand-in (APP_ENV=test), asks
 // for addresses as different made-up people, and checks the status and the words of
 // each answer, the league's own design, name and the "Powered by" mark (step 1.18): "you do not have access" for admin addresses without access (U-6),
-// unpublished leagues only for their owner and admins (U-9), forwarding (U-7), and
+// a draft league only for those with an admin area in it and a suspended one only
+// for its owner and admins (U-9, step 2.87), forwarding (U-7), and
 // the security headers on every answer.
 // Then it starts the app as staging with a database address that answers nobody,
 // and checks that it refuses to start (T-60). Nothing leaves this computer.
@@ -35,6 +36,13 @@ const tokens = {
   scheduler: 'local-scheduler-token',
   coach: 'local-coach-token',
   stranger: 'local-stranger-token',
+  admin: 'local-admin-token',
+  registrar: 'local-registrar-token',
+  editor: 'local-editor-token',
+  scorekeeper: 'local-scorekeeper-token',
+  clubAdmin: 'local-club-admin-token',
+  programScheduler: 'local-program-scheduler-token',
+  otherAdmin: 'local-other-admin-token',
 };
 
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
@@ -128,9 +136,24 @@ const cases = [
   ['visitor', '/quiet-pines', 404, [notFound]],
   ['coach', '/quiet-pines', 404, [notFound]],
   ['stranger', '/quiet-pines/admin', 404, [notFound], [noAccess]],
+  ['otherAdmin', '/quiet-pines', 404, [notFound], ['This league is not published.']],
+  ['otherAdmin', '/quiet-pines/admin', 404, [notFound], [noAccess, 'Admin areas']],
   ['owner', '/quiet-pines', 200, ['This league is not published.']],
-  ['scheduler', '/quiet-pines/admin', 404, [notFound], ['Admin areas']],
   ['owner', '/quiet-pines/admin', 200, ['Admin areas']],
+  // Everyone with an admin area in a draft league may open it (step 2.87).
+  ['admin', '/quiet-pines/admin', 200, ['Admin areas', 'League settings']],
+  ['scheduler', '/quiet-pines', 200, ['This league is not published.']],
+  ['scheduler', '/quiet-pines/admin', 200, ['Admin areas', 'Schedule'], ['People']],
+  ['programScheduler', '/quiet-pines/admin/schedule', 200, ['Schedule']],
+  ['registrar', '/quiet-pines/admin', 200, ['Admin areas', 'People'], ['Games', 'League settings']],
+  ['registrar', '/quiet-pines/admin/schedule', 403, [noAccess]],
+  ['editor', '/quiet-pines', 200, ['This league is not published.']],
+  ['editor', '/quiet-pines/admin', 200, ['Admin areas']],
+  ['scorekeeper', '/quiet-pines/score/game-1', 200, ['Score a game']],
+  ['clubAdmin', '/quiet-pines/admin/teams', 200, ['Teams', 'Nothing here yet.']],
+  ['otherAdmin', '/still-waters/admin', 200, ['Admin areas']],
+  ['scheduler', '/still-waters', 404, [notFound]],
+  ['registrar', '/closed-gate', 404, [notFound]],
   ['visitor', '/closed-gate', 404, [notFound]],
   ['owner', '/closed-gate/admin', 200, ['This league has been taken down.']],
   ['scheduler', '/closed-gate', 404, [notFound]],
@@ -141,7 +164,8 @@ const cases = [
   ['visitor', '/North-Valley', 308, [], [], '/north-valley'],
   ['visitor', '/Account', 308, [], [], '/account'],
   ['visitor', '/quiet-pine/admin', 404, [notFound]],
-  ['scheduler', '/quiet-pine/admin', 404, [notFound]],
+  ['otherAdmin', '/quiet-pine/admin', 404, [notFound]],
+  ['scheduler', '/quiet-pine/admin', 308, [], [], '/quiet-pines/admin'],
   ['owner', '/quiet-pine/admin', 308, [], [], '/quiet-pines/admin'],
 ];
 
