@@ -165,4 +165,125 @@ describe('startWorker', () => {
     await expect(start).rejects.toThrow('WORKER_HEALTH_PORT');
     expect(closed()).toBe(true);
   }, 60_000);
+
+  it('refuses a login unfit for the app (T-60), and closes everything', async () => {
+    const { made, closed } = await trackedDatabase();
+    // Back to the superuser that built it, the login a hosted database must never use.
+    // (PGlite ignores `reset session authorization`, so the superuser is named.)
+    if (made.source.kind !== 'pglite') throw new Error('a made-up database is PGlite');
+    await made.source.pglite.exec('set session authorization postgres');
+    const { logger, parsed } = logged();
+
+    const start = startWorker(settings(), { logger, madeUpDatabase: async () => made });
+    await expect(start).rejects.toThrow(WorkerStartError);
+    await expect(start).rejects.toThrow('not fit for the worker');
+    await expect(start).rejects.toThrow('it is a superuser');
+    expect(closed()).toBe(true);
+    expect(parsed().some((line) => line['msg'] === 'worker.started')).toBe(false);
+  }, 60_000);
+
+  it('stops when the database cannot be reached, never repeating the driver message', async () => {
+    const { made, closed } = await trackedDatabase();
+    // A database that is gone: every query fails in the driver.
+    await made.close();
+    const { logger, parsed } = logged();
+
+    const start = startWorker(settings(), { logger, madeUpDatabase: async () => made });
+    await expect(start).rejects.toThrow(WorkerStartError);
+    await expect(start).rejects.toThrow('could not be reached');
+    expect(closed()).toBe(true);
+    const unreachable = parsed().filter((line) => line['msg'] === 'worker.database_unreachable');
+    expect(unreachable).toHaveLength(1);
+    // Only its kind: the driver's own words are not passed on.
+    expect(unreachable[0]).toMatchObject({ level: 'error', kind: expect.any(String) });
+    expect(Object.keys(unreachable[0] ?? {})).not.toContain('message');
+    expect(Object.keys(unreachable[0] ?? {})).not.toContain('error');
+  }, 60_000);
+});
+
+describe('startWorker on a hosted database (staging and production)', () => {
+  // A made-up address nothing listens on. The checks are replaced, so it is never
+  // reached: nothing here connects (T-201).
+  const address = 'postgres://worker:made-up-password@db.example.test:5432/league';
+  const hosted = (appEnv: 'staging' | 'production') =>
+    loadWorkerConfig({
+      APP_ENV: appEnv,
+      PUBLIC_BASE_URL: 'https://leagues.example.test',
+      EMAIL_FROM: 'leagues@mail.example.test',
+      DATABASE_URL: address,
+      RESEND_API_KEY: 're_made_up_key',
+      WORKER_HEALTH_PORT: '3001',
+    });
+
+  it('checks pg-boss schema after the login role, and refuses with its words', async () => {
+    for (const appEnv of ['staging', 'production'] as const) {
+      const asked: string[] = [];
+      const { logger, parsed } = logged();
+      const start = startWorker(hosted(appEnv), {
+        logger,
+        checkLoginRole: async () => {
+          asked.push('login role');
+          return [];
+        },
+        checkQueueSchema: async () => {
+          asked.push('queue schema');
+          return ['the pgboss schema does not exist (the release makes it, record 053)'];
+        },
+      });
+      await expect(start).rejects.toThrow(WorkerStartError);
+      await expect(start).rejects.toThrow('the pgboss schema does not exist');
+      expect(asked).toEqual(['login role', 'queue schema']);
+      expect(parsed().some((line) => line['msg'] === 'worker.started')).toBe(false);
+    }
+  });
+
+  it('does not check pg-boss schema when the login role is already unfit', async () => {
+    const asked: string[] = [];
+    const start = startWorker(hosted('staging'), {
+      logger: logged().logger,
+      checkLoginRole: async () => ['the login role is a superuser'],
+      checkQueueSchema: async () => {
+        asked.push('queue schema');
+        return [];
+      },
+    });
+    await expect(start).rejects.toThrow('the login role is a superuser');
+    expect(asked).toEqual([]);
+  });
+
+  it('stops when the schema check fails in the driver, never repeating the address', async () => {
+    const { logger, parsed } = logged();
+    const start = startWorker(hosted('production'), {
+      logger,
+      checkLoginRole: async () => [],
+      checkQueueSchema: async () => {
+        throw new Error(`connect ECONNREFUSED ${address}`);
+      },
+    });
+    await expect(start).rejects.toThrow('could not be reached');
+    await start.catch((error: unknown) => {
+      expect(String(error)).not.toContain('made-up-password');
+      expect(String(error)).not.toContain('db.example.test');
+    });
+    expect(parsed()).toContainEqual(
+      expect.objectContaining({ msg: 'worker.database_unreachable', kind: 'Error' }),
+    );
+    expect(JSON.stringify(parsed())).not.toContain('db.example.test');
+  });
+
+  it('runs no pg-boss schema check on the table queue (local work and tests)', async () => {
+    const { made } = await trackedDatabase();
+    const asked: string[] = [];
+    const running = await startWorker(settings(), {
+      logger: logged().logger,
+      madeUpDatabase: async () => made,
+      checkQueueSchema: async () => {
+        asked.push('queue schema');
+        return ['should not be asked'];
+      },
+    });
+    cleanup.push(() => running.stop());
+    expect(running.queue).toBe('table');
+    expect(asked).toEqual([]);
+  }, 60_000);
 });

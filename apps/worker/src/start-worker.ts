@@ -47,6 +47,10 @@ export type StartWorkerDeps = {
   readonly pollMs?: number;
   /** A last look older than this makes the health check answer 503. Default 60 seconds. */
   readonly heartbeatMaxAgeMs?: number;
+  /** The login role check (T-60), replaceable in tests. Default: checkLoginRole. */
+  readonly checkLoginRole?: (db: DatabaseHandle) => Promise<string[]>;
+  /** pg-boss's schema check (T-257), replaceable in tests. Default: checkQueueSchema. */
+  readonly checkQueueSchema?: (db: DatabaseHandle) => Promise<string[]>;
 };
 
 export type RunningWorker = {
@@ -103,7 +107,8 @@ export async function startWorker(
           database: source,
           resendApiKey: config.RESEND_API_KEY,
           captureDirectory: config.EMAIL_CAPTURE_DIR,
-          siteOrigin: new URL(config.PUBLIC_BASE_URL).origin,
+          // Only a scheme and host (config-schema.ts): the web app has no base path.
+          siteOrigin: config.PUBLIC_BASE_URL,
           sendingAddress: config.EMAIL_FROM,
           queue: {
             onPolled: heartbeat.beat,
@@ -122,14 +127,16 @@ export async function startWorker(
 
     let problems: string[];
     try {
-      problems = await checkLoginRole(wired.db);
+      problems = await (deps.checkLoginRole ?? checkLoginRole)(wired.db);
       if (problems.length === 0 && queueKind === 'pg-boss' && source.kind === 'postgres') {
-        problems = await checkQueueSchema(wired.db);
+        problems = await (deps.checkQueueSchema ?? checkQueueSchema)(wired.db);
       }
     } catch (error) {
       // The driver's message may hold the address; it is not repeated here.
       deps.logger.error('worker.database_unreachable', { kind: kindOf(error) });
-      throw new WorkerStartError('the database could not be reached to check its login role.');
+      throw new WorkerStartError(
+        'the database could not be reached to check its login role and queue schema.',
+      );
     }
     if (problems.length > 0) {
       throw new WorkerStartError(
