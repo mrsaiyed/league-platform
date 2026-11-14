@@ -128,6 +128,8 @@ function readsOf(season: Season = {}): TrackerTransferReads {
     game: async (gameId) => ({
       status: 'scheduled',
       version: 1,
+      homeScore: null,
+      awayScore: null,
       tracked: false,
       taken: new Set(),
       rules: seasonRulesPreset('high-school'),

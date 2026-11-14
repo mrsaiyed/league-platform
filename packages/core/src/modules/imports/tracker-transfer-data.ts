@@ -114,6 +114,9 @@ export type ListedPersonFact = {
 export type PlatformGameFact = {
   readonly status: string;
   readonly version: number;
+  /** The game's score here, or null where it has none. */
+  readonly homeScore: number | null;
+  readonly awayScore: number | null;
   /** Whether the game has a saved tracker state (some play recorded here). */
   readonly tracked: boolean;
   /** Of the command ids asked about, those the game has already taken. */

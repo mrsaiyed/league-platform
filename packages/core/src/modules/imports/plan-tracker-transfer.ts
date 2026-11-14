@@ -80,8 +80,15 @@ export type GameProblem =
       readonly tracker: { readonly home: number; readonly away: number };
       readonly here: { readonly home: number; readonly away: number };
     }
-  /** Players the actions name who are not here and will not be added. */
-  | { readonly kind: 'players-not-here'; readonly playerIds: readonly string[] }
+  /**
+   * Players the actions name who are not here and will not be added; of them, those
+   * `withOpponents` would bring in (the rest cannot be added as they are).
+   */
+  | {
+      readonly kind: 'players-not-here';
+      readonly playerIds: readonly string[];
+      readonly withOpponents: readonly string[];
+    }
   | { readonly kind: 'lines-differ'; readonly differences: readonly LineDifference[] };
 
 export type GameOutcome =
@@ -435,7 +442,10 @@ export async function planTrackerTransfer(
       outcome: { kind: 'blocked', gameId: match.gameId, problem },
     });
     const missing = [...playersNamed(replay)].filter((id) => !usable(id));
-    if (missing.length > 0) return blocked({ kind: 'players-not-here', playerIds: missing });
+    if (missing.length > 0) {
+      const addable = missing.filter((id) => people.get(id)?.match.kind === 'add');
+      return blocked({ kind: 'players-not-here', playerIds: missing, withOpponents: addable });
+    }
     const homeTeam = teams.get(game.homeTeamId);
     const awayTeam = teams.get(game.awayTeamId);
     const sides = {

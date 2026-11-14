@@ -10,9 +10,11 @@
 // tracker's own action ids are kept, so a run that stopped part-way picks up where it
 // was, and a second run is told every action is a duplicate and changes nothing (T-137).
 //
-// After each game its box score lines here are compared with the tracker's, and the run
-// stops at the first difference, at any action the door refuses, or at any command that
-// says no, with what it was. A game transferred before is only compared again.
+// After each game it must be final here with the tracker's score and its box score lines
+// are compared with the tracker's; the run stops at the first difference, at any action
+// the door refuses, or at any command that says no, with what it was. The scoring
+// session it held is let go however a game's sending ends. A game transferred before is
+// only compared again.
 import { maxCommandsPerBatch, trackerProtocolVersion } from '@srleagues/contracts';
 import type { CommandContext, CommandDeps } from '../../command/index.ts';
 import {
@@ -27,7 +29,11 @@ import { addToRoster, type TeamsTx } from '../teams/index.ts';
 import { isToAdd, type PlanOptions, type TransferPlan } from './plan-tracker-transfer.ts';
 import { compareLines, type ComparableLine, type LineDifference } from './tracker-lines.ts';
 import { withPeople, type Replay, type ReplayStep } from './tracker-replay.ts';
-import type { TrackerGame, TrackerTransferReads } from './tracker-transfer-data.ts';
+import type {
+  PlatformGameFact,
+  TrackerGame,
+  TrackerTransferReads,
+} from './tracker-transfer-data.ts';
 import { transferReopenReason } from './tracker-transfer-words.ts';
 
 /** Everything the transfer's commands need in their transaction. */
@@ -43,6 +49,15 @@ export type TransferStop =
   | { readonly kind: 'reopen-refused'; readonly code: string }
   | { readonly kind: 'not-sent'; readonly code: string }
   | { readonly kind: 'action-refused'; readonly seq: number; readonly message: string }
+  /** The scoring session the run held could not be let go (it lapses by itself). */
+  | { readonly kind: 'not-released'; readonly code: string }
+  /** After its actions, the game here is not final with the tracker's score. */
+  | {
+      readonly kind: 'result-differs';
+      readonly status: string;
+      readonly here: { readonly home: number | null; readonly away: number | null };
+      readonly tracker: { readonly home: number; readonly away: number };
+    }
   | { readonly kind: 'lines-differ'; readonly differences: readonly LineDifference[] };
 
 export type TransferReport = {
@@ -83,6 +98,26 @@ function clockAt<Tx extends TrackerTransferTx>(deps: CommandDeps<Tx>, at: number
   };
 }
 
+/** Why a game here does not end as the tracker's did: final, with its score. */
+export function resultProblem(
+  here: Pick<PlatformGameFact, 'status' | 'homeScore' | 'awayScore'>,
+  tracker: Pick<TrackerGame, 'homeScore' | 'awayScore'>,
+): Extract<TransferStop, { kind: 'result-differs' }> | null {
+  if (
+    here.status === 'final' &&
+    here.homeScore === tracker.homeScore &&
+    here.awayScore === tracker.awayScore
+  ) {
+    return null;
+  }
+  return {
+    kind: 'result-differs',
+    status: here.status,
+    here: { home: here.homeScore, away: here.awayScore },
+    tracker: { home: tracker.homeScore, away: tracker.awayScore },
+  };
+}
+
 /** Sends one game's actions; how many were sent, or why it stopped. */
 async function sendGame<Tx extends TrackerTransferTx>(
   args: Args<Tx>,
@@ -91,7 +126,7 @@ async function sendGame<Tx extends TrackerTransferTx>(
   personOf: (playerId: string) => string,
 ): Promise<{ readonly sent: number } | TransferStop> {
   const { context, deps, reads } = args;
-  let sent = 0;
+  const counted = { sent: 0 };
   for (const [index, segment] of replay.segments.entries()) {
     const fact = await reads.game(
       gameId,
@@ -111,51 +146,78 @@ async function sendGame<Tx extends TrackerTransferTx>(
       );
       if (!reopened.ok) return { kind: 'reopen-refused', code: reopened.error.code };
     }
-    let sessionId: string | undefined;
-    for (let from = 0; from < untaken.length; from += maxCommandsPerBatch) {
-      // Opened before every batch: it carries on with this device's session and keeps it held.
-      const opened = await openScoringSession(
-        context,
-        { gameId, deviceId: transferDeviceId },
-        deps,
-      );
-      if (!opened.ok) return { kind: 'not-opened', code: opened.error.code };
-      if (opened.value.status !== 'held-by-you') {
-        return { kind: 'not-opened', code: opened.value.status };
-      }
-      sessionId = opened.value.sessionId;
-      const batch: readonly ReplayStep[] = untaken.slice(from, from + maxCommandsPerBatch);
-      const result = await applyTrackerCommands(
-        context,
-        {
-          gameId,
-          protocolVersion: trackerProtocolVersion,
-          sessionId,
-          commands: batch.map((step) => ({
-            commandId: step.commandId,
-            at: step.at,
-            input: withPeople(step.input, personOf),
-          })),
-        },
-        deps,
-      );
-      if (!result.ok) return { kind: 'not-sent', code: result.error.code };
-      for (const [index, answer] of result.value.results.entries()) {
-        if (answer.status === 'refused') {
-          return {
-            kind: 'action-refused',
-            seq: batch[index]?.seq ?? 0,
-            message: answer.reason.message,
-          };
-        }
-        if (answer.status === 'accepted') sent += 1;
+    // The session is let go however the part ends, stopped early or thrown out of, so
+    // the game is free at once rather than when the lease runs out.
+    const held: { sessionId?: string } = {};
+    let stop: TransferStop | undefined;
+    try {
+      stop = await sendPart(args, gameId, untaken, personOf, held, counted);
+    } finally {
+      if (held.sessionId !== undefined) {
+        const released = await releaseScoringSession(
+          context,
+          { gameId, sessionId: held.sessionId },
+          deps,
+        );
+        // A stop already found is the one to report; the session lapses by itself.
+        if (!released.ok) stop ??= { kind: 'not-released', code: released.error.code };
       }
     }
-    if (sessionId !== undefined) {
-      await releaseScoringSession(context, { gameId, sessionId }, deps);
+    if (stop !== undefined) return stop;
+  }
+  return { sent: counted.sent };
+}
+
+/** Sends one part's actions, a batch at a time; why it stopped, if it did. */
+async function sendPart<Tx extends TrackerTransferTx>(
+  args: Args<Tx>,
+  gameId: string,
+  untaken: readonly ReplayStep[],
+  personOf: (playerId: string) => string,
+  held: { sessionId?: string },
+  counted: { sent: number },
+): Promise<TransferStop | undefined> {
+  const { context, deps } = args;
+  for (let from = 0; from < untaken.length; from += maxCommandsPerBatch) {
+    // Opened before every batch: it carries on with this device's session and keeps it held.
+    const opened = await openScoringSession(context, { gameId, deviceId: transferDeviceId }, deps);
+    if (!opened.ok) return { kind: 'not-opened', code: opened.error.code };
+    if (opened.value.status !== 'held-by-you') {
+      return { kind: 'not-opened', code: opened.value.status };
+    }
+    const sessionId = opened.value.sessionId;
+    held.sessionId = sessionId;
+    const batch: readonly ReplayStep[] = untaken.slice(from, from + maxCommandsPerBatch);
+    const result = await applyTrackerCommands(
+      context,
+      {
+        gameId,
+        protocolVersion: trackerProtocolVersion,
+        sessionId,
+        commands: batch.map((step) => ({
+          commandId: step.commandId,
+          at: step.at,
+          input: withPeople(step.input, personOf),
+        })),
+      },
+      deps,
+    );
+    if (!result.ok) return { kind: 'not-sent', code: result.error.code };
+    // The door takes the rest of a batch after one it refused; the plan reads the roster
+    // and plays the engine as the door does, so none is refused, and the run stops here
+    // if one ever is.
+    for (const [index, answer] of result.value.results.entries()) {
+      if (answer.status === 'refused') {
+        return {
+          kind: 'action-refused',
+          seq: batch[index]?.seq ?? 0,
+          message: answer.reason.message,
+        };
+      }
+      if (answer.status === 'accepted') counted.sent += 1;
     }
   }
-  return { sent };
+  return undefined;
 }
 
 /** The game's lines here compared with the tracker's. */
@@ -243,6 +305,13 @@ export async function runTrackerTransfer<Tx extends TrackerTransferTx>(
       if ('kind' in sent) return report({ trackerGameId: game.id, stop: sent });
       transferred.push({ trackerGameId: game.id, sent: sent.sent });
     }
+    // The game here is final with the tracker's score, and then every line is the same.
+    const fact = await reads.game(outcome.gameId, []);
+    if (fact === undefined) {
+      return report({ trackerGameId: game.id, stop: { kind: 'not-sent', code: 'game-not-found' } });
+    }
+    const result = resultProblem(fact, game);
+    if (result !== null) return report({ trackerGameId: game.id, stop: result });
     const differences = await compareGame(reads, plan, outcome.gameId, game, playerOfPerson);
     if (differences.length > 0) {
       return report({ trackerGameId: game.id, stop: { kind: 'lines-differ', differences } });

@@ -183,6 +183,8 @@ async function readsOf(
         return {
           status: game.status,
           version: game.version,
+          homeScore: game.homeScore,
+          awayScore: game.awayScore,
           tracked: state !== undefined,
           taken: new Set(taken.map((id) => id.toLowerCase())),
           rules: rulesOfGame(game.format, season?.rules),

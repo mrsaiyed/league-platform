@@ -72,6 +72,20 @@ Nothing in the web app reads `.local/seed-db` yet. The web app's local mode uses
 
 The seed script opens a folder on this computer, never a network address (T-201).
 
+## Bring tracker games into the made-up database
+
+```sh
+npm run transfer:tracker -- --backup <folder> --league <short name> --season <season> --as <email>
+```
+
+This brings the games the old live tracker recorded into one league and season of the local database (step 2.58), through the product's own commands. `--backup` is a folder that `npm run stats:copy -- --to <folder>` wrote; the backup is read from a working copy (`--work`, by default `.local/transfer-work`), never changed. `--as` is the email of an admin of that league, whom the transfer acts as. `--db` names another database folder than `.local/seed-db`.
+
+Without `--run` it only shows the plan and changes nothing: which teams and players it found here, which players it will add with their numbers, and for each game whether it will be transferred, is already here, is not ended in the tracker yet, or has a problem (with what to put right). A game the tracker ended that cannot be found in the season's schedule is a problem, so nothing is left behind unnoticed. The run starts only when no game has a problem. With `--run` it carries the plan out, then checks that every game is final with the tracker's score and that every box score line matches. Only the tracked team's players are added unless `--with-opponents` is given. The command ends with exit code 0 only when the plan had no problem and the run went through.
+
+It is safe to run again: a game already brought over is only compared, and a run that was stopped part-way carries on where it was (a person it had added but not yet put on their team is put on it, not added twice).
+
+It opens a database folder on this computer and refuses anything that reads as a network address (T-201). Use it on made-up backups: a backup of the live tracker holds real people's names, and bringing one over waits for the founder.
+
 ## Checks
 
 These are the commands to run before a change is committed.

@@ -414,6 +414,11 @@ describe('the tracker transfer (step 2.58)', () => {
       [league.leagueId],
     );
     expect(orphans.rows).toEqual([]);
+    // Every game's scoring session was let go: none is held.
+    const held = await pglite.query('select id from scoring_sessions where league_id = $1', [
+      league.leagueId,
+    ]);
+    expect(held.rows).toEqual([]);
     for (const [g, gameId] of league.games.entries()) {
       const row = (
         await pglite.query<{ status: string; home_score: number; away_score: number }>(
@@ -481,7 +486,10 @@ describe('the tracker transfer (step 2.58)', () => {
     );
     expect(outcome.plan.ready).toBe(false);
     expect(outcome.plan.games.slice(0, 10).every((g) => g.outcome.kind === 'blocked')).toBe(true);
-    expect(outcome.planText).toContain('brought in only with --with-opponents');
+    // Kai cannot be added at all, so only the opponents are left to --with-opponents.
+    expect(outcome.planText).toContain(
+      '--with-opponents brings in 5 of them; put the others on their team’s roster here by hand first',
+    );
     expect(outcome.report?.stopped?.stop.kind).toBe('not-ready');
     expect(outcome.reportText).toContain('Nothing was changed');
     expect(await fingerprint(pglite, league.leagueId)).toEqual(start);

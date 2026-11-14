@@ -112,10 +112,14 @@ function problemLines(words: Words, problem: GameProblem): string[] {
       return [
         `Its actions name ${plural(problem.playerIds.length, 'player', 'players')} who ${problem.playerIds.length === 1 ? 'is' : 'are'} not on a roster here and will not be added:`,
         ...problem.playerIds.map((id) => `    ${playerName(words, id)}`),
-        ...(words.withOpponents
-          ? []
+        ...(problem.withOpponents.length > 0 && !words.withOpponents
+          ? [
+              problem.withOpponents.length === problem.playerIds.length
+                ? '  Another team’s players are brought in only with --with-opponents, or put them on their team’s roster here by hand first.'
+                : `  --with-opponents brings in ${problem.withOpponents.length} of them; put the others on their team’s roster here by hand first (the Players list above says why they cannot be added).`,
+            ]
           : [
-              '  Another team’s players are brought in only with --with-opponents, or put them on their team’s roster here by hand first.',
+              '  Put them on their team’s roster here by hand first (the Players list above says why they cannot be added).',
             ]),
       ];
     case 'lines-differ':
@@ -270,6 +274,17 @@ function stopLines(words: Words, stop: TransferStop): string[] {
       return [`The game’s actions could not be sent (${stop.code}).`];
     case 'action-refused':
       return [`Action ${stop.seq} was refused here: ${stop.message}`];
+    case 'not-released':
+      return [
+        `The game could not be let go after scoring it (${stop.code}); it is free again by itself within two minutes.`,
+      ];
+    case 'result-differs': {
+      const score = (home: number | null, away: number | null) =>
+        home === null || away === null ? 'no score' : `${home}–${away}`;
+      return [
+        `The game here is ${stop.status} at ${score(stop.here.home, stop.here.away)}; the tracker ended it ${score(stop.tracker.home, stop.tracker.away)}.`,
+      ];
+    }
     case 'lines-differ':
       return [
         'These box score lines differ from the tracker’s:',
