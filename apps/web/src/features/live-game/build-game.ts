@@ -98,8 +98,9 @@ export const gameTitle = (page: GamePage): string =>
   t('game.title', { away: page.scoreboard.away.name, home: page.scoreboard.home.name });
 
 /**
- * When the game starts, in the league's own zone. A postponed or cancelled game says
- * when it was set for, or nothing when it had no date.
+ * When the game starts, in the league's own zone: "Starts" before it does, "Started"
+ * while it is live, "Played" once decided. A postponed or cancelled game says when it
+ * was set for, or nothing when it had no date.
  */
 export function startText(
   startsAt: string | null,
@@ -107,7 +108,8 @@ export function startText(
   status: string,
 ): string | null {
   const notPlayed = status === 'postponed' || status === 'cancelled';
-  if (startsAt === null) return notPlayed ? null : t('game.noDate');
+  const decided = status === 'final' || status === 'forfeit';
+  if (startsAt === null) return notPlayed || decided || status === 'live' ? null : t('game.noDate');
   const when = new Intl.DateTimeFormat(locale, {
     weekday: 'long',
     month: 'long',
@@ -116,7 +118,9 @@ export function startText(
     minute: '2-digit',
     timeZone,
   }).format(new Date(startsAt));
-  return t(notPlayed ? 'game.wasSetFor' : 'game.startsAt', { when });
+  if (notPlayed) return t('game.wasSetFor', { when });
+  if (decided) return t('game.playedOn', { when });
+  return t(status === 'live' ? 'game.startedAt' : 'game.startsAt', { when });
 }
 
 /** "Corrected on 14 Nov 2026": the date only, never the reason (S-7); null if never corrected. */

@@ -202,6 +202,8 @@ export const en = {
   // A game's page (step 2.45, P7 §5.3). Words with {braces} are filled on the device too.
   'game.title': '{away} at {home}',
   'game.startsAt': 'Starts {when}',
+  'game.startedAt': 'Started {when}',
+  'game.playedOn': 'Played {when}',
   'game.noDate': 'Date to be announced',
   'game.corrected': 'Corrected on {date}',
   'game.notStarted': 'This game has not started yet.',
