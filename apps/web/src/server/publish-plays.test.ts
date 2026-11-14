@@ -31,6 +31,7 @@ function world(publisher: LivePublisher) {
             awayScore: 0,
             finalizedAt: null,
             binned: false,
+            rules: null,
           }
         : undefined,
     teams: async () => [

@@ -7,6 +7,8 @@
 // and transactions run one at a time, so two at once cannot lose either's work.
 // Only one made-up league has games; every other league has none. The tracker's
 // endpoints (step 2.32) run on the same games, with made-up rosters (stand-in-tracker.ts).
+// A game's page also reads the games of the public schedule's stand-in (`listedGames`),
+// so every card on the home and schedule pages opens the game it shows.
 import { defaultSeasonRules } from '@srleagues/contracts';
 import {
   defaultNamePolicy,
@@ -24,6 +26,7 @@ import {
   type TransactionRunner,
 } from '@srleagues/core';
 import type { GameNames, GamesAreaPorts } from './games-area-ports.ts';
+import type { StandInListedGame } from './stand-in-public-schedule.ts';
 import {
   emptyTracker,
   liveGamesOf,
@@ -67,6 +70,9 @@ export type StandInGamesOptions = {
   readonly log: (line: CommandLogLine) => void;
   /** The league's own stored settings to start with, by key (for checks). */
   readonly settings?: Readonly<Record<string, StoredSetting[]>>;
+  /** The public schedule's made-up games of a league (stand-in-public-schedule.ts), which a
+   * game's page reads too; only the final score was kept for them. */
+  readonly listedGames?: (leagueId: string) => readonly StandInListedGame[];
 };
 
 const teamNames: Readonly<Record<string, string>> = {
@@ -352,17 +358,29 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
   };
   const snapshotStoreOf = (leagueId: string): GameSnapshotStore => {
     const s = () => stateOf(leagueId);
+    const listed = () => options.listedGames?.(leagueId) ?? [];
     return {
       // A game of a season still being set up (or retired) is not there at all, as in
-      // the database store (games-read-store.ts).
+      // the database store (games-read-store.ts). Its rules are its own once fixed,
+      // else its season's.
       findGame: async (gameId) => {
         const game = s().games.find((g) => g.id === gameId);
-        const season = s().seasons.find((x) => x.id === game?.seasonId);
+        if (game === undefined) {
+          const other = listed().find((l) => l.game.id === gameId);
+          return other === undefined ? undefined : { ...other.game, rules: other.seasonRules };
+        }
+        const season = s().seasons.find((x) => x.id === game.seasonId);
         return season === undefined || !publicSeasonStatuses.includes(season.status)
           ? undefined
-          : game;
+          : { ...game, rules: game.format ?? season.rules };
       },
-      teams: async (teamIds) => s().tracker.teams.filter((t) => teamIds.includes(t.id)),
+      teams: async (teamIds) => {
+        const own = s().tracker.teams.filter((t) => teamIds.includes(t.id));
+        const others = listed()
+          .flatMap((l) => l.teams)
+          .filter((t) => teamIds.includes(t.id) && !own.some((o) => o.id === t.id));
+        return [...own, ...others.filter((t, i) => others.findIndex((o) => o.id === t.id) === i)];
+      },
       state: async (gameId) => s().tracker.states.find((x) => x.gameId === gameId)?.state,
       savedState: async (gameId) => {
         const found = s().tracker.states.find((x) => x.gameId === gameId);

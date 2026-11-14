@@ -32,9 +32,31 @@ Nobody writes a look, and nobody passes one, without having looked at the pictur
 
 ## 3. The standard
 
-The founder named two things that already feel right. Neither is copied, and no league is ever named in code (CLAUDE.md): what makes them good is turned into design values and shared pieces, so that any league's own colors drop into a finished layout.
+The founder has named three things that feel right. None is copied, and no league is ever named in code (CLAUDE.md): what makes them good is turned into design values and shared pieces, so that any league's own colors drop into a finished layout.
 
-**Faraj's public site is the standard for the dark starting design.** What makes it work:
+**The founder's direction, 2026-11-14, after seeing three pictures of step 2.85** (C-16): "the 3 pictures were better but not great. the initial build we had for the alhadi demo looked better than this… for the ui we want to prioritize simplicity but not make it boring. different color pops or something. lets start with alhadi branding how we did for the initial demo with the maroon and white and their specific gold accent, see if we can build a page around that; then the idea is that the admin can switch those colors to whatever he wants. so better but still boring."
+
+So the rule for every screen is **simple, not boring**: generous space and few elements on a page, and color where the eye should land. Flat single-color boxes with colored dots for teams are what the founder called boring.
+
+### The first standard: the first Al-Hadi demo
+
+It is in this repository: `examples/alhadi-school` (static, fictional data; `styles/public.css`, `styles/commissioner.css`, `src/views/public.js`, `src/views/commissioner.js`). Read it, never change it. Pictures of it are on this computer in `.local/reference/first-demo/` (`1280-home`, `1280-schedule`, `1280-standings`, `1280-teams`, `1280-stats`, `1280-admin`, `390-home`, `390-standings`, all `.jpg`); `shoot.mjs` beside them takes them again. **The design lead and the design reviewer open these pictures before anything else.** It is the standard for the first starting design (dark) and its light sibling, and for the staff area. What makes it work:
+
+1. **Color with warmth.** A wine-black page (`#170e13`), panels one step lighter with a faint wine tint and a gradient (`#24171e`), cream text (`#f6f1e9`), the brand maroon (`#96062d`) for identity and the main button, a soft rose (`#b77d8c`) as the second color, and gold (`#d3b780`, lighter `#f3dfb7`) for the numbers and words the eye should land on. The staff side is the reverse: a white and cream workspace (`#fffefa`, `#eee7e8`) with a dark wine side menu.
+2. **Display type with character.** A serif for every title, team name, score and big number; a plain sans for body text. Titles are short phrases with a full stop ("The standings.", "The next matchups", "Leading the way"), each under a small "kicker": a short rule and a tiny letter-spaced label.
+3. **A hero.** A full-width band with a very large two-line serif title, the second line in gold, one sentence, a filled gold button and an outlined one. Under it a strip of four gold serif numbers with tiny labels.
+4. **Team emblems.** Each team has a shield with its initial, drawn in the team's color. Dots are gone.
+5. **Match cards laid out like a scoreboard.** Emblem and name on each side, and in the middle "VS" or the score in large gold serif figures ("51 : 45"); a quiet line above (week, state, time) and below (place, the way to the box score).
+6. **Leader cards.** One very large gold number ("17.0 PPG"), the player's name in serif, team and games played, the team's emblem in the corner; the first card carries a wine gradient.
+7. **A header with presence.** Emblem or logo, the name letter-spaced with a small line under it, the season picker as an outlined box, one call to action in gold with an arrow, and the menu as small widely spaced capitals with a gold underline on the current page.
+8. **Small things.** Line icons, status pills in soft color (green "Paid", amber "Pending"), and a filled band near the foot with one call to action.
+9. **The staff workspace** (`1280-admin.jpg`): a side menu with icons and the current item filled; a greeting title with one line under it and the main action at the top right; four number cards; a table with pills; a checklist; a progress line with steps. Calm, light, and clearly the same brand.
+
+Three limits. **Nothing real is copied:** the demo's photographs show real students and its crest is the school's, so nothing from `examples/alhadi-school/assets` goes into the product or its made-up leagues; the hero must look finished with no photograph (a gradient and a pattern) and take a league's own picture later. **The colors are the admin's:** the maroon, white and gold are the first starting design's values, not the product's; an admin who changes the main color, the accent and the highlight gets the same quality in their own colors, and that is proved with pictures in at least three color sets, one of them light (section 4, line 28). **Figures:** the big display numbers (the number strip, a leader's number) may use the display face's own figures as the demo does; a score, and any number that is compared with another beside or beneath it, uses lining, even-width figures (line 6).
+
+### The second standard: Faraj's public site
+
+**Faraj's public site is the standard for the second dark starting design.** What makes it work:
 
 - A near-black navy page with panels one step lighter. Borders are hairlines in the main color at about a fifth strength, not bright lines around every box.
 - Gold is spent on names, numbers and the current tab. Teal is the quiet second color, used for small labels. Everything else is off-white and grey.
@@ -43,7 +65,9 @@ The founder named two things that already feel right. Neither is copied, and no 
 - The home page opens with the league's name large and a season badge, then a strip of four big numbers, then sections. Each section has a title with a short rule under it.
 - Teams are cards with a round emblem. Leaders are three cards with one big number each. The schedule is grouped under round headings, with the current round picked out.
 
-**The Al-Hadi tracker's public pages are the standard for the light starting design.** Their styles are in this repository (`apps/live-stats/public/css/site.css`; read it, never change it):
+### The third standard: the Al-Hadi tracker's public pages
+
+**The Al-Hadi tracker's public pages are the standard for the plain light starting design.** Their styles are in this repository (`apps/live-stats/public/css/site.css`; read it, never change it):
 
 - A quiet paper background, white panels, and one strong bar of the league's color across the top that holds the logo, the name and the menu as rounded links, the current one filled.
 - The content is held to about 1080 wide and centered. It never runs edge to edge on a laptop.
@@ -114,7 +138,14 @@ A screen is finished when every line below is true for it, at 390 and at 1280, f
 **Unchanged rules that still hold**
 
 25. Every color, font, corner and space comes from the design's variables (T-90). Text comes from message files (T-187). Logical properties only, so right-to-left pages mirror (T-188). Contrast meets AA (checked on save). Focus is always visible. Everything works at phone width (A-2) and with scripts off wherever it did before.
-26. The two starting designs look clearly different from each other, and each looks finished.
+26. The starting designs look clearly different from each other, and each looks finished.
+
+**Simple, not boring (the founder, 2026-11-14; C-16)**
+
+27. A page has few elements and generous space, and color where the eye should land: the hero's second line, the big numbers, a score, the current tab, the one button that matters. A team is shown by its emblem (a shield with its initial in the team's color, or the team's own logo), never by a colored dot. A game is a scoreboard: emblem and name on each side, the score or "VS" large in the middle. A page of flat single-color boxes is not finished. The reviewer puts each picture beside the matching picture of the first demo (section 3) and says in words whether a person would call it at least as good.
+28. Every shared piece takes its colors from the design's variables, and that is proved, not assumed: the pictures look finished in at least three different color sets, one of them light (the first starting design, its light sibling, and one color set that is neither, such as a green or a blue league).
+
+**The staff area follows the first demo's workspace** (`.local/reference/first-demo/1280-admin.jpg`): lines 20 to 23 are read against that picture, with the side menu in a dark shade of the league's main color, icons beside its items and the current one filled; a title that greets, one line under it and the main action at the top right; number cards; tables with soft-colored pills; a checklist and a progress line where a job has steps.
 
 ## 5. How a design step is built
 
