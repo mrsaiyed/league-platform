@@ -273,6 +273,13 @@ describe('the tracker’s commands on the database (T6 §1, §3)', () => {
       commands.map((c, i) => [i + 1, c.input.type, c.commandId]),
     );
     expect(rows.events[3]?.payload).toEqual({ side: 'away', playerId: l.away[2], points: 3 });
+    // Each tap names the scorer's account: the activity log leaves taps out because
+    // this column already says who made them.
+    const tappedBy = await pglite.query<{ account_id: string | null }>(
+      'select account_id from game_events where game_id = $1 order by seq',
+      [gameId],
+    );
+    expect(tappedBy.rows.map((r) => r.account_id)).toEqual(commands.map(() => l.first));
     expect(rows.state?.seq).toBe(5);
     expect(rows.state?.state.rules).toEqual(engineRulesOf(seasonRulesPreset('high-school')));
     expect(rows.lines).toHaveLength(10);
