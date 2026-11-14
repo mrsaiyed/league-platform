@@ -54,6 +54,10 @@ export function createFetchTrackerServer(options: FetchTrackerServerOptions): Tr
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(request),
         signal,
+        // Sent even as the page goes away: leaving by closing the tab or going elsewhere
+        // releases the session (tracker-opening.tsx, on "pagehide") rather than holding
+        // the game until its lease runs out (T6 §5). The request is a few bytes.
+        keepalive: true,
       });
       if (answer === null) return unanswered;
       // A refusal comes with 403, 404 or 409 and still carries the reply.

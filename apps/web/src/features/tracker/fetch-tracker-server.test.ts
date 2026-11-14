@@ -34,6 +34,13 @@ describe('fetch tracker server: the session', () => {
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual(request);
   });
 
+  it('is sent even as the page goes away, so leaving the page releases the session', async () => {
+    const reply: SessionReply = { status: 'ended', reason: 'released', sentAt: 5 };
+    const { calls, server } = serverAnswering(() => json(200, reply));
+    await server.session({ type: 'release', sessionId }, signal);
+    expect(calls[0]?.init?.keepalive).toBe(true);
+  });
+
   it('reads a refusal from its body, whatever the status', async () => {
     const reply: SessionReply = { status: 'refused', code: 'game-not-live', sentAt: 5 };
     const { server } = serverAnswering(() => json(409, reply));

@@ -65,6 +65,16 @@ export function TrackerOpening({
     let gone = false;
     let unsubscribe = () => {};
     const online = () => opened.current?.controller.online();
+    // The page going away (the tab closed, another address typed) releases the session,
+    // as leaving by a button does (T6 §5): the release is sent with keepalive
+    // (fetch-tracker-server.ts). A page brought back from the browser's back-forward
+    // cache has let go of the game, so it is opened afresh.
+    const hidden = () => void opened.current?.controller.leave();
+    const shown = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener('pagehide', hidden);
+    window.addEventListener('pageshow', shown);
     void (async () => {
       const result = await openTrackerGame({
         gameId,
@@ -101,6 +111,8 @@ export function TrackerOpening({
       gone = true;
       unsubscribe();
       window.removeEventListener('online', online);
+      window.removeEventListener('pagehide', hidden);
+      window.removeEventListener('pageshow', shown);
       void opened.current?.controller.leave();
       opened.current = null;
     };
@@ -124,10 +136,11 @@ export function TrackerOpening({
     }
   };
 
-  // Leaving the game, by its button or by "back to your games": the session is released
-  // first (T6 §5), as a page that is simply left would hold the game until it runs out.
-  // It runs once however often it is tapped, and goes back even if the release fails.
-  const leaveGame = async () => {
+  // Leaving the game, by its button, by "back to your games" or by the link to sign out:
+  // the session is released first (T6 §5), as a page that is simply left would hold the
+  // game until it runs out. It runs once however often it is tapped, and goes on to `to`
+  // even if the release fails.
+  const leaveGame = async (to: string) => {
     const game = opened.current;
     if (leaving.current) return;
     leaving.current = true;
@@ -136,15 +149,15 @@ export function TrackerOpening({
     try {
       await game?.controller.leave();
     } finally {
-      window.location.assign(backHref);
+      window.location.assign(to);
     }
   };
-  const back = (event: MouseEvent<HTMLAnchorElement>) => {
+  const leaveBy = (to: string) => (event: MouseEvent<HTMLAnchorElement>) => {
     // A link opened in a new tab or window leaves this page as it is.
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
       return;
     event.preventDefault();
-    void leaveGame();
+    void leaveGame(to);
   };
 
   const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
@@ -164,17 +177,20 @@ export function TrackerOpening({
           onTakeOver={act((game) => game.controller.takeOver())}
           onOpenAgain={act((game) => game.controller.openAgain())}
           onConfirm={(format) => act((game) => game.confirmFormat(format))()}
-          onLeave={() => void leaveGame()}
+          onLeave={() => void leaveGame(backHref)}
         />
       ) : null}
       {storeFailed ? <p role="alert">{t('tracker.storeFailed')}</p> : null}
       <p>
-        <a href={backHref} onClick={back}>
+        <a href={backHref} onClick={leaveBy(backHref)}>
           {t('tracker.back')}
         </a>
       </p>
       <p data-shared-device="">
-        {t('tracker.sharedDevice.text')} <a href={accountHref}>{t('tracker.sharedDevice.link')}</a>
+        {t('tracker.sharedDevice.text')}{' '}
+        <a href={accountHref} onClick={leaveBy(accountHref)}>
+          {t('tracker.sharedDevice.link')}
+        </a>
       </p>
     </main>
   );
