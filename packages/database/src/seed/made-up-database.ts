@@ -3,7 +3,10 @@
 // and then logged in as a login role fit for the app (T-60): a member of app_user that
 // is not a superuser and owns nothing, as a hosted login is meant to be. So the app's
 // start-up check (checkLoginRole) passes here for the same reasons it must pass on a
-// hosted database, and every query runs with no more powers than there.
+// hosted database, and the app's queries run as that login, not as the superuser.
+// That shows the app needs no more than the login's powers; it is not a wall. The
+// session was opened by the superuser, so SQL run on it could switch back (`set
+// session authorization postgres`), which a hosted login cannot do.
 //
 // It takes nothing and opens no address, so it cannot reach a real database. It is
 // gone when closed: nothing is written to disk.
