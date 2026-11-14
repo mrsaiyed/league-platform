@@ -78,11 +78,28 @@ export { leagueTransitions, readOnlyStatuses, type Transition } from './league-s
 export {
   audiences,
   leagueStatuses,
+  offeredSports,
   seasonStatuses,
   type Audience,
   type LeagueStatus,
+  type OfferedSport,
   type SeasonStatus,
 } from './league-values.ts';
+export {
+  newLeagueFields,
+  planNewLeague,
+  seasonPartOf,
+  seasonParts,
+  seasonSlugOf,
+  whoPlaysChoices,
+  type NewLeagueAnswers,
+  type NewLeagueField,
+  type NewLeaguePlan,
+  type NewLeaguePlanResult,
+  type NewLeagueProblem,
+  type SeasonPart,
+  type WhoPlays,
+} from './rules/new-league-plan.ts';
 export type {
   DivisionChange,
   DivisionRecord,
