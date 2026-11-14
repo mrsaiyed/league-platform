@@ -2,7 +2,7 @@
 // commands' dependencies, the season a file is imported into, and the names a page shows
 // beside the ids an import's report holds. The league comes from each call's context,
 // never from the request body. Today only the made-up stand-in fills it; the
-// database-backed one comes with the web app's start on a database (steps 1.14 and 1.15).
+// database-backed one comes in its own part of step 2.93 (record 055).
 import type { CommandDeps, ImportsTx } from '@srleagues/core';
 
 /** The season a league's fixtures are imported into: its current one. */

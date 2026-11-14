@@ -13,7 +13,8 @@
 //    DATABASE_URL, R8) and check the login role it uses
 //    (checkLoginRole, T-60): a superuser, a role that bypasses row-level security,
 //    or the tables' owner stops the start. They then stop anyway, with a plain
-//    reason, until sign-in on the real service is wired (steps 1.14 and 1.15).
+//    reason, until sign-in on the real service is wired and every area has moved
+//    onto the database (step 2.93's later parts, record 055).
 import type { CommandLogLine } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
@@ -87,7 +88,7 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       );
     }
     throw new StartupError(
-      `sign-in on the real service is not wired yet (steps 1.14 and 1.15), so "${config.APP_ENV}" cannot serve anyone.`,
+      `sign-in on the real service is not wired yet and not every area runs on the database (step 2.93, record 055), so "${config.APP_ENV}" cannot serve anyone.`,
     );
   } finally {
     await db.close();

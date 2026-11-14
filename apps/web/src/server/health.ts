@@ -19,8 +19,8 @@ export type WebHealthDeps = {
   readonly now?: () => number;
 };
 
-// It does not ping the database on each call: that waits for the sign-in wiring
-// (steps 1.14 and 1.15), until which staging and production do not serve at all.
+// It does not ping the database on each call: that comes with step 2.93's part 2
+// (record 055), until which staging and production do not serve at all.
 export async function webHealth(
   deps: WebHealthDeps,
 ): Promise<{ httpStatus: 200 | 503; body: WebHealth }> {
