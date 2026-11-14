@@ -24,6 +24,7 @@ Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.
 - **2.55 The games area** — `.local/lanes/2.55-games-area` — none used — builder started; check the lane for commits, then merge build, push, review, GitHub, land.
 - **1.22 Browser tests for the exit test** — `.local/lanes/1.22-browser-tests` — none used — builder started; check the lane, merge build, push, review, GitHub, land.
 - **2.29 Applying tracker commands** — `.local/lanes/2.29-apply-tracker` — none reserved — opus builder started; check the lane, merge build, push, review, GitHub, land.
+- **1.27 Sturdy timing tests (rest)** — `.local/lanes/1.27-sturdy-again` — none used — builder started: make scripts/check-pages-browser.mjs wait for what it tests; then the five-green-runs proof (lane/1.27-again1..5, lead pushes).
 - **2.86 Statistics-level settings** — `.local/lanes/2.86-stat-level-settings` — none used — builder started; check the lane, merge build, push, review, GitHub, land.
 - **2.73 Slots and fairness rules** — `.local/lanes/2.73-slots` — T-249 / record 037 written — cause of GitHub failure fixed (parameter properties refused by the web app's strip-only TypeScript: never use them in core), pushed af1922d; a second reviewer is reading it. Then: fixes, GitHub PASS, land.
 
