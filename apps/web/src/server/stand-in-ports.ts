@@ -32,6 +32,7 @@ import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import type { WebPorts } from './ports.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
+import { standInFixtureImport } from './stand-in-fixture-import.ts';
 import { standInGames } from './stand-in-games.ts';
 import { standInPublicSchedule } from './stand-in-public-schedule.ts';
 import { standInPublicStats } from './stand-in-public-stats.ts';
@@ -290,6 +291,11 @@ export function standInPorts(options: StandInOptions): StandInPorts {
         [scorekeeper.accountId]: 'Sam Scorekeeper',
       },
       assignees: [scorekeeper.accountId, owner.accountId],
+      accessOf: (leagueId) => accessTx(leagueId).access,
+      log: options.log,
+    }),
+    fixtureImport: standInFixtureImport({
+      leagueId: standInLeagues.live.id,
       accessOf: (leagueId) => accessTx(leagueId).access,
       log: options.log,
     }),

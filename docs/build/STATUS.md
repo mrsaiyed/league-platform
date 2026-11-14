@@ -19,14 +19,14 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane. A run that is cut off leaves this as the map for the next run. Check the lane branches for commits: builders were still working when the usage limit hit.
 
-Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 / 031 / T-243 belong to 1.14; 0010 / 030 / T-242 to 2.4).
+Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 was reserved for 1.14, which landed without a migration; the runner refuses gaps, so 0011 went to the game-corrections fix of 2026-11-14; 0010 / 030 / T-242 to 2.4).
 
 - **2.44 Team pages and the start page** — `.local/lanes/2.44-team-pages` — none reserved — builder started; check the lane, merge build, push, review, GitHub, land.
 - **2.52 The schedule grid** — `.local/lanes/2.52-schedule-grid` — none reserved — builder started; check the lane, merge build, push, review, GitHub, land.
 - **2.29 Applying tracker commands** — `.local/lanes/2.29-apply-tracker` — none used — built (opus), reviewed by opus: one medium (takeover/release must take the game lock first), four low; a fixer was fixing them. GitHub FAILED on 8956400 (no names; check test:web and tests after merging build). Then: push, GitHub PASS, land. Record when landing: decided by the lead: the tracker's `rules` command is refused; a game in final-score/box-score mode may still be tracked live, mode unchanged; end and reopen refused until 2.30; 2.32 maps error codes to HTTP; 2.68 carries new rules and clock-mode through batchReaders; engine ignores fouls.teamFoulsReset (gap for 2.68).
 - **2.87 A draft league for all its staff** — `.local/lanes/2.87-draft-staff` — none used — built, opus-reviewed (no security faults), GitHub PASSED 111fe58; a fixer was making review fixes (stale comments, a sturdier shell check, club admin in DECISIONS.md U-9, notes in record 020). Check the lane for new commits, merge build, push, GitHub PASS, land. Decided by the lead: club admins count as staff; the tiny timing difference for a signed-in non-staff asker is accepted.
-- **2.54 (step 2.54, see STAGE-2.md)** — `.local/lanes/2.54-*` (builder creating it) — none reserved — builder started 2026-11-14; check the lane, push, review, GitHub, land.
 - **2.64 (step 2.64, see STAGE-2.md)** — `.local/lanes/2.64-*` (builder creating it) — none reserved — builder started 2026-11-14; check the lane, push, review, GitHub, land.
+- **2.57 (step 2.57, see STAGE-2.md)** — `.local/lanes/2.57-*` (builder creating it) — none reserved — builder started 2026-11-14; check the lane, push, review, GitHub, land.
 
 ## Needs the founder
 
@@ -45,6 +45,9 @@ Nothing here stops the build. Since 2026-11-13 the lead answers open product que
 - [x] The test copy's sign-in settings: checked on 2026-11-13 after the founder changed them. Codes have 6 digits and last 10 minutes; a password needs at least 8 characters.
 
 ## Log
+
+- 2026-11-14 — Fixed the flaky GitHub failure "with no test names" (cca1387; also e65f9fc, 37f6dd1 and several lanes). The log, read signed in, named it: `game-corrections.test.ts` > "not with an older correction" failed because a correction from an earlier transaction counted. The S-7 check (0009) found "this transaction's correction" by `at = now()`, and two transactions can start in the same instant (PGlite's clock ticks in milliseconds; fast on GitHub's machines). Real flaw, not only a test one: migration 0011 records each correction's transaction (`game_corrections.written_in`, `pg_current_xact_id()`) and the check asks for that. New test dates an older correction the same instant on purpose and is refused (fails on the old check). Also seen here: vitest's 'Timeout calling onTaskUpdate' under load, which vitest.reporter.ts already forgives when every file passes.
+- 2026-11-14 — Step 2.54 done (fixture import screen at Admin → Schedule → import; stand-in only; passed GitHub on 3bfbb99 and review; review fixes: 2 MB body limit so the friendly too-large notice shows, season check on apply/undo/discard, size text from the limit). Not done: no link from Admin → Schedule to the import screen (2.52 owns that page: whoever lands second adds it; record as part of 2.52 when it lands), no list of past imports, no database adapter. Decided (technical, T-226): the stand-in reads the file inside the web app so the screen works with no worker; core row-problem text is still English (T-187 gap).
 
 - 2026-11-14 — Step 2.51 done (built on the stand-in; passed GitHub on d4768a6 and an independent review, all findings fixed except two now in step 2.90). Review fixes: failed add undoes the new person and says so if it cannot; short-name message for non-Latin names; move needs one direction; failed reads show an alert. Gaps: no browser test, no database adapter for the Teams ports, no paging past 200 people. New step 2.90.
 
