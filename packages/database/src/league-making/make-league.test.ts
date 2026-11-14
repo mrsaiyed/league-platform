@@ -1,10 +1,12 @@
 // Step 2.125 part 1's done test, on PGlite only (T-201): the tool makes a draft league,
-// with its first season as the current one, for an owner whose email has no account
-// yet; when that person first signs in, the account is theirs and owns the league.
-import type { PGlite } from '@electric-sql/pglite';
+// with its first season as the current one, in one step by our staff, for an owner
+// whose email has no account yet; when that person first signs in, the account is
+// theirs and owns the league. A run that makes no league leaves no account it made.
+import { PGlite } from '@electric-sql/pglite';
 import { getSeason, planNewLeague, setLeagueName, type NewLeaguePlan } from '@srleagues/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
+import { createDatabase } from '../db/create-database.ts';
 import { withTransaction } from '../db/with-transaction.ts';
 import { accountForSignIn } from '../queries/index.ts';
 import { freshSchema, newAccount, one, unique } from '../schema/schema.test-helper.ts';
@@ -42,6 +44,7 @@ function planFor(change: Record<string, string> = {}): NewLeaguePlan {
     contactEmail: 'hello@example.test',
     ownerEmail: `${unique('owner')}@example.test`,
     seasonName: 'Fall 2026',
+    staffEmail,
     ...change,
   });
   if (!result.ok) throw new Error(JSON.stringify(result.problems));
@@ -50,22 +53,28 @@ function planFor(change: Record<string, string> = {}): NewLeaguePlan {
 
 const countOf = async (text: string, params: unknown[] = []) =>
   (await one<{ n: number }>(pglite, text, params)).n;
+const accountCount = () => countOf('select count(*)::int as n from accounts');
+const leagueCount = () => countOf('select count(*)::int as n from leagues');
 
 describe('makeLeague', () => {
-  it('makes a draft league with its first season as current, for an email with no account', async () => {
-    const plan = planFor({ ownerEmail: 'new.owner@example.test' });
-    expect(await previewNewLeague(target, plan, staffEmail)).toEqual({
-      schemaReady: true,
+  it('makes a draft league with its first season as current, in one step by our staff', async () => {
+    const plan = planFor({
+      ownerEmail: 'new.owner@example.test',
+      seasonStartsOn: '2026-09-01',
+      seasonEndsOn: '2027-02-28',
+    });
+    expect(await previewNewLeague(target, plan)).toEqual({
+      ready: true,
       shortNameHeld: false,
-      ownerHasAccount: false,
-      staffHasAccount: false,
+      owner: 'none',
+      staff: 'none',
     });
 
-    const outcome = await makeLeague(target, plan, { staffEmail });
+    const outcome = await makeLeague(target, plan);
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
     const { leagueId, seasonId, ownerAccountId } = outcome.made;
-    expect(outcome.made.ownerAccountMade).toBe(true);
+    expect(outcome.made.owner).toBe('none');
 
     expect(
       await one(
@@ -88,7 +97,8 @@ describe('makeLeague', () => {
     expect(
       await one(
         pglite,
-        `select s.name, s.slug, s.status, s.is_current, p.is_default, p.sport_key
+        `select s.name, s.slug, s.status, s.is_current, s.starts_on::text as starts_on,
+                s.ends_on::text as ends_on, p.is_default, p.sport_key
          from seasons s join programs p on p.id = s.program_id where s.id = $1`,
         [seasonId],
       ),
@@ -97,6 +107,8 @@ describe('makeLeague', () => {
       slug: 'fall-2026',
       status: 'draft',
       is_current: true,
+      starts_on: '2026-09-01',
+      ends_on: '2027-02-28',
       is_default: true,
       sport_key: 'basketball',
     });
@@ -106,17 +118,18 @@ describe('makeLeague', () => {
         ownerAccountId,
       ]),
     ).toEqual({ email: 'new.owner@example.test', display_name: null, sign_in_id: null });
-    // Each step is in the league's activity log, under who took it.
-    const { rows } = await pglite.query<{ action: string; is_owner: boolean }>(
-      `select a.action, a.actor_account_id = l.owner_account_id as is_owner
-       from activity_log a join leagues l on l.id = a.league_id
-       where a.league_id = $1 order by a.at, a.id`,
+    // The league and its season are both in the log under our staff: nothing under the
+    // owner, who has never signed in.
+    const staffId = (
+      await one<{ id: string }>(pglite, 'select id from accounts where email = $1', [staffEmail])
+    ).id;
+    const { rows } = await pglite.query<{ action: string; actor_account_id: string }>(
+      `select action, actor_account_id from activity_log where league_id = $1 order by at, id`,
       [leagueId],
     );
     expect(rows).toEqual([
-      { action: 'leagues.create', is_owner: false },
-      { action: 'leagues.create_season', is_owner: true },
-      { action: 'leagues.set_current_season', is_owner: true },
+      { action: 'leagues.create', actor_account_id: staffId },
+      { action: 'leagues.create_season', actor_account_id: staffId },
     ]);
 
     // The person signs up with that email (any capitals): the account is theirs, and
@@ -144,9 +157,6 @@ describe('makeLeague', () => {
       value: { name: 'Made-up Hoops Two', version: 2 },
     });
     // Our staff hold nothing in the league once the run is over (T-77).
-    const staffId = (
-      await one<{ id: string }>(pglite, 'select id from accounts where email = $1', [staffEmail])
-    ).id;
     expect(await getSeason({ ...asOwner, accountId: staffId }, { seasonId }, deps)).toEqual({
       ok: false,
       error: { code: 'not-allowed' },
@@ -155,24 +165,50 @@ describe('makeLeague', () => {
 
   it('uses the accounts already there, whatever the capitals of their emails', async () => {
     const ownerId = await newAccount(pglite, 'Has.Account@example.test');
-    const plan = planFor({ ownerEmail: 'has.account@EXAMPLE.test' });
-    expect(await previewNewLeague(target, plan, 'STAFF@example.test')).toMatchObject({
-      ownerHasAccount: true,
-      staffHasAccount: true,
+    const plan = planFor({
+      ownerEmail: 'has.account@EXAMPLE.test',
+      staffEmail: 'STAFF@example.test',
     });
-    const before = await countOf('select count(*)::int as n from accounts');
-    const outcome = await makeLeague(target, plan, { staffEmail: 'STAFF@example.test' });
-    expect(outcome).toMatchObject({
+    expect(await previewNewLeague(target, plan)).toMatchObject({
+      owner: 'never-signed-in',
+      staff: 'never-signed-in',
+    });
+    const before = await accountCount();
+    const outcome = await makeLeague(target, plan);
+    expect(outcome).toMatchObject({ ok: true, made: { ownerAccountId: ownerId } });
+    expect(await accountCount()).toBe(before);
+  });
+
+  it('tells an account made earlier that nobody signed in with from one somebody has', async () => {
+    // A first run made the owner's account; the league was made. Nobody has signed in.
+    const first = planFor({ ownerEmail: 'waiting.owner@example.test' });
+    expect((await makeLeague(target, first)).ok).toBe(true);
+    const again = planFor({ ownerEmail: 'waiting.owner@example.test' });
+    expect(await previewNewLeague(target, again)).toMatchObject({ owner: 'never-signed-in' });
+    expect(await makeLeague(target, again)).toMatchObject({
       ok: true,
-      made: { ownerAccountId: ownerId, ownerAccountMade: false },
+      made: { owner: 'never-signed-in' },
     });
-    expect(await countOf('select count(*)::int as n from accounts')).toBe(before);
+    // Once somebody signs in with it, it is an account somebody signed up with.
+    await withTransaction(target.db, {}, (scope) =>
+      accountForSignIn(scope, 'made-up-sign-in-user-2', 'waiting.owner@example.test'),
+    );
+    const third = planFor({ ownerEmail: 'waiting.owner@example.test' });
+    expect(await previewNewLeague(target, third)).toMatchObject({ owner: 'signed-up' });
+    expect(await makeLeague(target, third)).toMatchObject({
+      ok: true,
+      made: { owner: 'signed-up' },
+    });
   });
 
   it('lets our staff member be the owner too', async () => {
-    const plan = planFor({ ownerEmail: staffEmail, whoPlays: 'under-18s' });
-    const outcome = await makeLeague(target, plan, { staffEmail });
-    expect(outcome.ok).toBe(true);
+    const plan = planFor({
+      ownerEmail: 'staff.owner@example.test',
+      staffEmail: 'staff.owner@example.test',
+      whoPlays: 'under-18s',
+    });
+    const outcome = await makeLeague(target, plan);
+    expect(outcome).toMatchObject({ ok: true, made: { owner: 'none' } });
     if (!outcome.ok) return;
     expect(
       await one(pglite, 'select audience, listed from leagues where id = $1', [
@@ -181,57 +217,160 @@ describe('makeLeague', () => {
     ).toEqual({ audience: 'youth', listed: false });
   });
 
-  it('makes nothing, not even an account, when the short name is held', async () => {
-    const first = planFor();
-    expect((await makeLeague(target, first, { staffEmail })).ok).toBe(true);
-    const again = planFor({ shortName: first.slug, ownerEmail: 'nobody.yet@example.test' });
-    expect(await previewNewLeague(target, again, staffEmail)).toMatchObject({
-      shortNameHeld: true,
-    });
-    const accounts = await countOf('select count(*)::int as n from accounts');
-    const leagues = await countOf('select count(*)::int as n from leagues');
-    expect(await makeLeague(target, again, { staffEmail })).toEqual({
-      ok: false,
-      problem: { kind: 'short-name-held' },
-    });
-    expect(await countOf('select count(*)::int as n from accounts')).toBe(accounts);
-    expect(await countOf('select count(*)::int as n from leagues')).toBe(leagues);
+  it('makes the listing the plan chose', async () => {
+    const plan = planFor({ whoPlays: 'under-18s', listed: 'yes' });
+    const outcome = await makeLeague(target, plan);
+    if (!outcome.ok) throw new Error(JSON.stringify(outcome));
+    expect(
+      await one(pglite, 'select listed from leagues where id = $1', [outcome.made.leagueId]),
+    ).toEqual({ listed: true });
   });
 
-  it('says which step refused, and the league already made', async () => {
-    // A season short name longer than seasons.slug allows is refused by createSeason.
-    const plan = { ...planFor(), season: { name: 'Fall 2026', slug: 'x'.repeat(61) } };
-    const outcome = await makeLeague(target, plan, { staffEmail });
+  it('makes nothing, not even an account, when the short name is held', async () => {
+    const first = planFor();
+    expect((await makeLeague(target, first)).ok).toBe(true);
+    const again = planFor({
+      shortName: first.slug,
+      ownerEmail: 'nobody.yet@example.test',
+      staffEmail: 'staff.nobody@example.test',
+    });
+    expect(await previewNewLeague(target, again)).toMatchObject({ shortNameHeld: true });
+    const accounts = await accountCount();
+    const leagues = await leagueCount();
+    expect(await makeLeague(target, again)).toEqual({
+      ok: false,
+      problem: { kind: 'short-name-held' },
+      accounts: { removed: [], left: [] },
+    });
+    expect(await accountCount()).toBe(accounts);
+    expect(await leagueCount()).toBe(leagues);
+  });
+
+  it('when the league is refused, removes the accounts this run made and keeps the others', async () => {
+    // An existing owner and a new staff member. A short name that is blocked passes the
+    // check of held names but is refused by createLeague, after the accounts were made.
+    const ownerId = await newAccount(pglite, 'kept.owner@example.test');
+    const plan = {
+      ...planFor({ ownerEmail: 'kept.owner@example.test', staffEmail: 'new.staff@example.test' }),
+      slug: 'admin',
+    };
+    const accounts = await accountCount();
+    const leagues = await leagueCount();
+    const outcome = await makeLeague(target, plan);
     expect(outcome).toMatchObject({
       ok: false,
-      problem: { kind: 'refused', step: 'season', code: 'invalid-input' },
+      problem: { kind: 'refused', code: 'short-name-blocked' },
+      accounts: { removed: [{ email: 'new.staff@example.test' }], left: [] },
     });
-    if (outcome.ok || outcome.problem.kind !== 'refused') return;
-    expect(
-      await one(pglite, 'select status from leagues where id = $1', [outcome.problem.leagueId]),
-    ).toEqual({ status: 'draft' });
+    expect(await accountCount()).toBe(accounts);
+    expect(await leagueCount()).toBe(leagues);
+    expect(await countOf('select count(*)::int as n from accounts where id = $1', [ownerId])).toBe(
+      1,
+    );
+  });
+
+  it('makes no league and no season when the season is refused: all in one step', async () => {
+    // A season short name longer than seasons.slug allows: createLeague refuses it.
+    const plan = {
+      ...planFor({ ownerEmail: 'season.refused@example.test' }),
+      season: { name: 'Fall 2026', slug: 'x'.repeat(61), startsOn: null, endsOn: null },
+    };
+    const accounts = await accountCount();
+    const leagues = await leagueCount();
+    const seasons = await countOf('select count(*)::int as n from seasons');
+    expect(await makeLeague(target, plan)).toMatchObject({
+      ok: false,
+      problem: { kind: 'refused', code: 'invalid-input' },
+      accounts: { removed: [{ email: 'season.refused@example.test' }], left: [] },
+    });
+    expect(await leagueCount()).toBe(leagues);
+    expect(await countOf('select count(*)::int as n from seasons')).toBe(seasons);
+    expect(await accountCount()).toBe(accounts);
+  });
+
+  it('says what was made when something unexpected stops it, and never throws', async () => {
+    // The commands' side reaches a database that is already closed: the command's
+    // transaction cannot start, after the login made the accounts.
+    const gone = new PGlite();
+    const dead = createDatabase({ kind: 'pglite', pglite: gone });
+    await gone.close();
+    const broken: LeagueMakingTarget = { ...target, db: dead };
+    const plan = planFor({ ownerEmail: 'broken.run@example.test' });
+    const accounts = await accountCount();
+    const outcome = await makeLeague(broken, plan);
+    await dead.close().catch(() => {});
+    expect(outcome).toMatchObject({
+      ok: false,
+      problem: { kind: 'failed', league: 'not-made' },
+      accounts: { removed: [{ email: 'broken.run@example.test' }], left: [] },
+    });
+    expect(await accountCount()).toBe(accounts);
   });
 });
 
-describe('makeLeague on a database without migration 0014', () => {
-  it('makes nothing and says the migrations are missing', async () => {
-    const old = await freshSchema();
-    await old.exec('alter table leagues drop column city');
-    const opened = await openLeagueMakingTarget({ kind: 'pglite', pglite: old });
+describe('makeLeague on a database not at this code’s migrations', () => {
+  const refusedOn = async (db: PGlite) => {
+    const opened = await openLeagueMakingTarget({ kind: 'pglite', pglite: db });
     if (!opened.ok) throw new Error(opened.problem);
     try {
       const plan = planFor();
-      expect(await previewNewLeague(opened.target, plan, staffEmail)).toMatchObject({
-        schemaReady: false,
-      });
-      expect(await makeLeague(opened.target, plan, { staffEmail })).toEqual({
-        ok: false,
-        problem: { kind: 'schema-not-ready' },
-      });
-      expect((await one<{ n: number }>(old, 'select count(*)::int as n from accounts')).n).toBe(0);
+      const preview = await previewNewLeague(opened.target, plan);
+      const outcome = await makeLeague(opened.target, plan);
+      return { preview, outcome };
     } finally {
       await opened.target.close();
+    }
+  };
+
+  it('refuses one with no migrations at all, in plain words, not with a crash', async () => {
+    const empty = new PGlite();
+    try {
+      expect(await refusedOn(empty)).toEqual({
+        preview: { ready: false, migrations: 'none' },
+        outcome: {
+          ok: false,
+          problem: { kind: 'migrations', state: 'none' },
+          accounts: { removed: [], left: [] },
+        },
+      });
+    } finally {
+      await empty.close();
+    }
+  });
+
+  it('refuses one behind this code (its newest migration not applied), making nothing', async () => {
+    const old = await freshSchema();
+    try {
+      await old.exec(
+        'delete from migration_log.applied where version = (select max(version) from migration_log.applied)',
+      );
+      const accounts = (await one<{ n: number }>(old, 'select count(*)::int as n from accounts')).n;
+      expect(await refusedOn(old)).toMatchObject({
+        preview: { ready: false, migrations: 'behind' },
+        outcome: { ok: false, problem: { kind: 'migrations', state: 'behind' } },
+      });
+      expect((await one<{ n: number }>(old, 'select count(*)::int as n from accounts')).n).toBe(
+        accounts,
+      );
+    } finally {
       await old.close();
+    }
+  });
+
+  it('refuses one ahead of this code (a migration newer than its newest), making nothing', async () => {
+    const newer = await freshSchema();
+    try {
+      await newer.exec(
+        `insert into migration_log.applied (version, name, checksum)
+         values (9999, '9999_from_a_later_version.sql', repeat('0', 64))`,
+      );
+      expect(await refusedOn(newer)).toMatchObject({
+        preview: { ready: false, migrations: 'ahead' },
+        outcome: { ok: false, problem: { kind: 'migrations', state: 'ahead' } },
+      });
+      expect((await one<{ n: number }>(newer, 'select count(*)::int as n from leagues')).n).toBe(0);
+    } finally {
+      await newer.close();
     }
   });
 });

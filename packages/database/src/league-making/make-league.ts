@@ -2,23 +2,25 @@
 // internal version of the four steps of P3 §1, for our own staff. `previewNewLeague`
 // says what would happen and changes nothing; `makeLeague` makes it.
 //
-// It makes, in this order, each through the product's own commands:
-//   1. the staff member's account and the owner's, by email, if either has none. The
-//      owner's first sign-in later links that account (record 052), so the person who
-//      signs up with that email owns the league;
-//   2. the league, in draft (createLeague, as our staff);
-//   3. its first season in the default program (createSeason), and makes it the
-//      current one (setCurrentSeason), as the league's owner: the owner holds those
-//      permissions, our staff hold none in a league (T-77), and these are the owner's
-//      own steps (P3 §1 step 4), which we take for them until self-serve sign-up.
-// Each command is its own transaction. A stop part-way says what was made; nothing is
-// undone, and the league, once made, is shown so it can be finished by hand.
+// `makeLeague`, in this order:
+//   1. checks the database is at this code's migrations (migration-state.ts) and that
+//      no league holds the short name, so either refusal makes nothing at all;
+//   2. finds the staff member's and the owner's accounts by email, and makes any that
+//      is missing, with no name and no sign-in link, as the migration login (the
+//      app's role may not add an account). The owner's first sign-in with that
+//      email, once the sign-in service has proved the mailbox, links that account
+//      (record 052), so whoever first signs in with it owns the league;
+//   3. runs createLeague, as our staff, with the first season: the league, its
+//      default program and its current season in one transaction (T-260). Nothing
+//      is ever done as the owner.
+// Step 2's accounts cannot share step 3's transaction: they are written by the
+// migration login on its own connection, outside the league's fence, and the
+// commands run as the app's role. So when the league is not made, the accounts THIS
+// run made are removed again, never one that was there before; one that cannot be
+// removed is named in the outcome. It never throws: anything unexpected comes back
+// as an outcome that says what was and was not made.
 import {
   createLeague,
-  createSeason,
-  getSeason,
-  setCurrentSeason,
-  type CommandContext,
   type CommandDeps,
   type LeaguesTx,
   type NewLeaguePlan,
@@ -32,33 +34,45 @@ import { jobsStore } from '../stores/jobs-store.ts';
 import { leaguesStore } from '../stores/leagues-store.ts';
 import type { LeagueMakingTarget } from './league-making-target.ts';
 import {
+  accountByEmail,
   accountForEmail,
-  findAccountByEmail,
-  hasLeagueCity,
-  isShortNameHeld,
+  leagueHoldingShortName,
   newLeagueId,
+  removeUnusedAccount,
 } from './login-queries.ts';
+import { migrationState, type MigrationState } from './migration-state.ts';
 
-export type NewLeaguePreview = {
-  /** False when migration 0014 is not applied: nothing can be made. */
-  readonly schemaReady: boolean;
-  readonly shortNameHeld: boolean;
-  readonly ownerHasAccount: boolean;
-  readonly staffHasAccount: boolean;
-};
+/**
+ * Where an email stands: no account; an account made earlier (by this tool) that
+ * nobody has signed in with yet; or an account someone has signed in with.
+ */
+export type AccountState = 'none' | 'never-signed-in' | 'signed-up';
 
-/** What would happen. Reads only. */
+export type NewLeaguePreview =
+  /** The database is not at this code's migrations: nothing else was read. */
+  | { readonly ready: false; readonly migrations: Exclude<MigrationState, 'ready'> }
+  | {
+      readonly ready: true;
+      readonly shortNameHeld: boolean;
+      readonly owner: AccountState;
+      readonly staff: AccountState;
+    };
+
+const stateOf = (account: { readonly signedUp: boolean } | undefined): AccountState =>
+  account === undefined ? 'none' : account.signedUp ? 'signed-up' : 'never-signed-in';
+
+/** What would happen. Reads only; the accounts only once the migrations are right. */
 export async function previewNewLeague(
   target: LeagueMakingTarget,
   plan: NewLeaguePlan,
-  staffEmail: string,
 ): Promise<NewLeaguePreview> {
-  const schemaReady = await hasLeagueCity(target.login);
+  const migrations = await migrationState(target.login);
+  if (migrations !== 'ready') return { ready: false, migrations };
   return {
-    schemaReady,
-    shortNameHeld: schemaReady && (await isShortNameHeld(target.login, plan.slug)),
-    ownerHasAccount: (await findAccountByEmail(target.login, plan.ownerEmail)) !== undefined,
-    staffHasAccount: (await findAccountByEmail(target.login, staffEmail)) !== undefined,
+    ready: true,
+    shortNameHeld: (await leagueHoldingShortName(target.login, plan.slug)) !== undefined,
+    owner: stateOf(await accountByEmail(target.login, plan.ownerEmail)),
+    staff: stateOf(await accountByEmail(target.login, plan.staffEmail)),
   };
 }
 
@@ -67,115 +81,191 @@ export type MadeLeague = {
   readonly slug: string;
   readonly seasonId: string;
   readonly ownerAccountId: string;
-  /** Whether the owner's account was made now (they have not signed up yet). */
-  readonly ownerAccountMade: boolean;
+  /** Where the owner's account stood: 'none' means it was made by this run. */
+  readonly owner: AccountState;
+};
+
+/** An account this run made, by its email. */
+export type MadeAccount = { readonly email: string; readonly accountId: string };
+
+/** The accounts this run made, when no league was: removed again, or left. */
+export type AccountsLeft = {
+  readonly removed: readonly MadeAccount[];
+  readonly left: readonly MadeAccount[];
 };
 
 export type MakeLeagueProblem =
-  | { readonly kind: 'schema-not-ready' }
+  | { readonly kind: 'migrations'; readonly state: Exclude<MigrationState, 'ready'> }
   | { readonly kind: 'short-name-held' }
-  /** A command refused; `leagueId` is set once the league itself was made. */
+  /** createLeague refused: nothing of the league was made. */
+  | { readonly kind: 'refused'; readonly code: string }
+  /**
+   * Something unexpected stopped it. `league` says whether the league is there: when
+   * it is, it is whole (one transaction) and `leagueId` names it; 'unknown' when even
+   * that could not be checked. `reason` is a database or system error code, never a
+   * message (a message can repeat an address or a login).
+   */
   | {
-      readonly kind: 'refused';
-      readonly step: 'league' | 'season' | 'current-season';
-      readonly code: string;
+      readonly kind: 'failed';
+      readonly league: 'not-made' | 'made' | 'unknown';
       readonly leagueId?: string;
+      readonly reason?: string;
     };
 
 export type MakeLeagueOutcome =
   | { readonly ok: true; readonly made: MadeLeague }
-  | { readonly ok: false; readonly problem: MakeLeagueProblem };
+  | { readonly ok: false; readonly problem: MakeLeagueProblem; readonly accounts: AccountsLeft };
 
-export type MakeLeagueOptions = {
-  /**
-   * The email of the member of our staff who makes it (P3 §8), named as staff for this
-   * run only. It may be the owner's own (the founder making their own league).
-   */
-  readonly staffEmail: string;
-  readonly now?: () => number;
-};
+export type MakeLeagueOptions = { readonly now?: () => number };
 
-/** Makes the league in draft with its first season as the current one. */
+/** A short error code (SQLSTATE such as 23505, or a system code such as ECONNRESET). */
+function reasonOf(error: unknown): string | undefined {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+  return typeof code === 'string' && /^[A-Z0-9_]{2,24}$/.test(code) ? code : undefined;
+}
+
+const nothingLeft: AccountsLeft = { removed: [], left: [] };
+
+/** Removes the accounts this run made, each in its own transaction; any refusal leaves it. */
+async function removeMadeAccounts(
+  target: LeagueMakingTarget,
+  made: readonly MadeAccount[],
+): Promise<AccountsLeft> {
+  const removed: MadeAccount[] = [];
+  const left: MadeAccount[] = [];
+  for (const account of made) {
+    let gone = false;
+    try {
+      gone = await target.login.transaction((tx) => removeUnusedAccount(tx, account));
+    } catch {
+      gone = false;
+    }
+    (gone ? removed : left).push(account);
+  }
+  return { removed, left };
+}
+
+/** Makes the league in draft with its first season as the current one. Never throws. */
 export async function makeLeague(
   target: LeagueMakingTarget,
   plan: NewLeaguePlan,
-  { staffEmail, now = () => Date.now() }: MakeLeagueOptions,
+  { now = () => Date.now() }: MakeLeagueOptions = {},
 ): Promise<MakeLeagueOutcome> {
-  if (!(await hasLeagueCity(target.login))) {
-    return { ok: false, problem: { kind: 'schema-not-ready' } };
+  const madeNow: MadeAccount[] = [];
+  let leagueId: string | undefined;
+  try {
+    const migrations = await migrationState(target.login);
+    if (migrations !== 'ready') {
+      return {
+        ok: false,
+        problem: { kind: 'migrations', state: migrations },
+        accounts: nothingLeft,
+      };
+    }
+    // Checked before any account is made, so a short name already held makes nothing.
+    if ((await leagueHoldingShortName(target.login, plan.slug)) !== undefined) {
+      return { ok: false, problem: { kind: 'short-name-held' }, accounts: nothingLeft };
+    }
+    const accountFor = async (email: string) => {
+      const account = await target.login.transaction((tx) => accountForEmail(tx, email));
+      if (account.made) madeNow.push({ email, accountId: account.accountId });
+      return account;
+    };
+    // How the owner's address stood before this run made anything (the staff member's
+    // account, made first, may be the owner's own).
+    const ownerBefore = stateOf(await accountByEmail(target.login, plan.ownerEmail));
+    const staff = await accountFor(plan.staffEmail);
+    const owner = await accountFor(plan.ownerEmail);
+    leagueId = await newLeagueId(target.login);
+
+    const deps: CommandDeps<LeaguesTx> = {
+      transaction: commandTransaction(target.db, (scope: LeagueScope) => ({
+        jobs: jobsStore(scope),
+        // Our staff member is platform staff for this run only, in memory: no grant.
+        leagues: leaguesStore(scope, { platformStaff: [staff.accountId] }),
+        divisions: divisionsStore(scope),
+        access: accessStore(scope),
+        activity: activityLogStore(scope),
+      })),
+      events: [],
+      log: () => {},
+      now,
+    };
+    const league = await createLeague(
+      { leagueId, accountId: staff.accountId, requestId: `make-league-${plan.slug}` },
+      {
+        slug: plan.slug,
+        name: plan.name,
+        timeZone: plan.timeZone,
+        audience: plan.audience,
+        listed: plan.listed,
+        ownerAccountId: owner.accountId,
+        sportKey: plan.sportKey,
+        contactEmail: plan.contactEmail,
+        city: plan.city,
+        firstSeason: {
+          name: plan.season.name,
+          slug: plan.season.slug,
+          ...(plan.season.startsOn === null ? {} : { startsOn: plan.season.startsOn }),
+          ...(plan.season.endsOn === null ? {} : { endsOn: plan.season.endsOn }),
+        },
+      },
+      deps,
+    );
+    if (!league.ok) {
+      return {
+        ok: false,
+        problem: { kind: 'refused', code: league.error.code },
+        accounts: await removeMadeAccounts(target, madeNow),
+      };
+    }
+    const seasonId = league.value.firstSeasonId;
+    if (seasonId === null) throw new Error('makeLeague: the league came back with no season.');
+    return {
+      ok: true,
+      made: {
+        leagueId,
+        slug: plan.slug,
+        seasonId,
+        ownerAccountId: owner.accountId,
+        owner: ownerBefore,
+      },
+    };
+  } catch (error) {
+    return failed(target, plan, leagueId, madeNow, reasonOf(error));
   }
-  // Checked before any account is made, so a short name already held makes nothing.
-  if (await isShortNameHeld(target.login, plan.slug)) {
-    return { ok: false, problem: { kind: 'short-name-held' } };
+}
+
+/** After something unexpected: whether the league is there, and the accounts made. */
+async function failed(
+  target: LeagueMakingTarget,
+  plan: NewLeaguePlan,
+  leagueId: string | undefined,
+  madeNow: readonly MadeAccount[],
+  reason: string | undefined,
+): Promise<MakeLeagueOutcome> {
+  const because = reason === undefined ? {} : { reason };
+  let league: 'not-made' | 'made' | 'unknown' = 'not-made';
+  if (leagueId !== undefined) {
+    try {
+      const holder = await leagueHoldingShortName(target.login, plan.slug);
+      league = holder === leagueId ? 'made' : 'not-made';
+    } catch {
+      league = 'unknown';
+    }
   }
-  const staff = await target.login.transaction((tx) => accountForEmail(tx, staffEmail.trim()));
-  const owner = await target.login.transaction((tx) => accountForEmail(tx, plan.ownerEmail));
-  const leagueId = await newLeagueId(target.login);
-
-  const deps: CommandDeps<LeaguesTx> = {
-    transaction: commandTransaction(target.db, (scope: LeagueScope) => ({
-      jobs: jobsStore(scope),
-      leagues: leaguesStore(scope, { platformStaff: [staff.accountId] }),
-      divisions: divisionsStore(scope),
-      access: accessStore(scope),
-      activity: activityLogStore(scope),
-    })),
-    events: [],
-    log: () => {},
-    now,
-  };
-  const as = (accountId: string): CommandContext => ({
-    leagueId,
-    accountId,
-    requestId: `make-league-${plan.slug}`,
-  });
-  const refused = (
-    step: 'league' | 'season' | 'current-season',
-    code: string,
-  ): MakeLeagueOutcome => ({
-    ok: false,
-    problem:
-      step === 'league'
-        ? { kind: 'refused', step, code }
-        : { kind: 'refused', step, code, leagueId },
-  });
-
-  const league = await createLeague(
-    as(staff.accountId),
-    {
-      slug: plan.slug,
-      name: plan.name,
-      timeZone: plan.timeZone,
-      audience: plan.audience,
-      listed: plan.listed,
-      ownerAccountId: owner.accountId,
-      sportKey: plan.sportKey,
-      contactEmail: plan.contactEmail,
-      city: plan.city,
-    },
-    deps,
-  );
-  if (!league.ok) return refused('league', league.error.code);
-
-  const season = await createSeason(as(owner.accountId), { ...plan.season }, deps);
-  if (!season.ok) return refused('season', season.error.code);
-  const view = await getSeason(as(owner.accountId), { seasonId: season.value.seasonId }, deps);
-  if (!view.ok) return refused('current-season', view.error.code);
-  const current = await setCurrentSeason(
-    as(owner.accountId),
-    { seasonId: season.value.seasonId, version: view.value.version },
-    deps,
-  );
-  if (!current.ok) return refused('current-season', current.error.code);
-
-  return {
-    ok: true,
-    made: {
-      leagueId,
-      slug: plan.slug,
-      seasonId: season.value.seasonId,
-      ownerAccountId: owner.accountId,
-      ownerAccountMade: owner.made,
-    },
-  };
+  if (league === 'made' && leagueId !== undefined) {
+    return {
+      ok: false,
+      problem: { kind: 'failed', league, leagueId, ...because },
+      accounts: nothingLeft,
+    };
+  }
+  // Only when the league is surely not there are its accounts taken away again.
+  const accounts =
+    league === 'not-made'
+      ? await removeMadeAccounts(target, madeNow)
+      : { removed: [], left: [...madeNow] };
+  return { ok: false, problem: { kind: 'failed', league, ...because }, accounts };
 }

@@ -150,11 +150,11 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.placeOfAddress, 'reads the host and database name off an address; runs nothing'],
   [
     databasePackage.previewNewLeague,
-    'staff tool (step 2.125): as the migration login, reads whether one short name is held (find_league_by_slug) and whether two emails have accounts; no league rows',
+    'staff tool (step 2.125): as the migration login, reads the migration log, then whether one short name is held (find_league_by_slug) and whether two emails have accounts; no league rows',
   ],
   [
     databasePackage.makeLeague,
-    'staff tool (step 2.125): as the migration login makes accounts by email and checks one short name, then reaches the one new league only through its commands (createLeague, createSeason, getSeason, setCurrentSeason: own cases), each fenced to that league',
+    'staff tool (step 2.125): as the migration login reads the migration log, checks one short name and makes accounts by email (removing those it made if no league is made), then reaches the one new league only through createLeague with its first season (own case), fenced to that league',
   ],
 ]);
 

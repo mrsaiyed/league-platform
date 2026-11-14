@@ -91,11 +91,13 @@ export {
   type SeasonStatus,
 } from './league-values.ts';
 export {
+  dayIn,
   newLeagueFields,
   planNewLeague,
   seasonPartOf,
   seasonParts,
   seasonSlugOf,
+  suggestedSeason,
   whoPlaysChoices,
   type NewLeagueAnswers,
   type NewLeagueField,
@@ -103,6 +105,7 @@ export {
   type NewLeaguePlanResult,
   type NewLeagueProblem,
   type SeasonPart,
+  type SeasonSuggestion,
   type WhoPlays,
 } from './rules/new-league-plan.ts';
 export type {

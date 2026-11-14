@@ -11,9 +11,13 @@ export {
 export {
   makeLeague,
   previewNewLeague,
+  type AccountsLeft,
+  type AccountState,
+  type MadeAccount,
   type MadeLeague,
   type MakeLeagueOptions,
   type MakeLeagueOutcome,
   type MakeLeagueProblem,
   type NewLeaguePreview,
 } from './make-league.ts';
+export { type MigrationState } from './migration-state.ts';

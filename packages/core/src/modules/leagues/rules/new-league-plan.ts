@@ -1,10 +1,12 @@
 // What the internal tool that makes a league (P3 §8, step 2.125) is asked, checked
 // before anything is made: the questions of P3 §1 step 2 (name, short name, sport,
-// who plays, where), the contact email, the owner's email, and the first season's
-// name (step 4, suggested from today's date). Pure: it reads nothing and makes
-// nothing. The commands check everything again when they run.
+// who plays, where), whether it is listed, the contact email, the owner's email, the
+// first season's name and rough dates (step 4: "Rough dates: optional"), and the email
+// of the member of our staff who makes it. Pure: it reads nothing and makes nothing.
+// The commands check everything again when they run.
 import { z } from 'zod';
 import { isBlockedShortName, shortNameSchema } from '../short-names.ts';
+import { namedTimeZone } from '../time-zone.ts';
 import {
   listedByDefault,
   offeredSports,
@@ -30,11 +32,19 @@ export type NewLeagueAnswers = {
   readonly shortName?: string | undefined;
   readonly sport?: string | undefined;
   readonly whoPlays?: string | undefined;
+  /** "yes" or "no"; when left out, U-10's rule by who plays decides. */
+  readonly listed?: string | undefined;
   readonly city?: string | undefined;
   readonly timeZone?: string | undefined;
   readonly contactEmail?: string | undefined;
   readonly ownerEmail?: string | undefined;
   readonly seasonName?: string | undefined;
+  /** YYYY-MM-DD, optional. */
+  readonly seasonStartsOn?: string | undefined;
+  /** YYYY-MM-DD, optional; not before the start. */
+  readonly seasonEndsOn?: string | undefined;
+  /** The member of our staff who makes it (P3 §8). */
+  readonly staffEmail?: string | undefined;
 };
 
 export const newLeagueFields = [
@@ -42,18 +52,22 @@ export const newLeagueFields = [
   'shortName',
   'sport',
   'whoPlays',
+  'listed',
   'city',
   'timeZone',
   'contactEmail',
   'ownerEmail',
   'seasonName',
+  'seasonStartsOn',
+  'seasonEndsOn',
+  'staffEmail',
 ] as const;
 export type NewLeagueField = (typeof newLeagueFields)[number];
 
 /** Why one answer cannot be used. */
 export type NewLeagueProblem = {
   readonly field: NewLeagueField;
-  readonly problem: 'missing' | 'invalid' | 'blocked';
+  readonly problem: 'missing' | 'invalid' | 'blocked' | 'before-start';
 };
 
 /** A league ready to make, with its first season. */
@@ -62,44 +76,77 @@ export type NewLeaguePlan = {
   readonly slug: string;
   readonly sportKey: OfferedSport;
   readonly audience: Audience;
-  /** U-10: listed in /find by default for adult leagues only. */
+  /** Listed in the league finder, /find. */
   readonly listed: boolean;
+  /** True when the answers chose `listed`; false when U-10's rule by who plays did. */
+  readonly listedChosen: boolean;
   readonly city: string;
+  /** A named zone, by its canonical name (time-zone.ts). */
   readonly timeZone: string;
   readonly contactEmail: string;
   /** Written as given, spaces dropped; accounts are matched whatever its capitals. */
   readonly ownerEmail: string;
-  readonly season: { readonly name: string; readonly slug: string };
+  /** The same, for the member of our staff who makes it. */
+  readonly staffEmail: string;
+  readonly season: {
+    readonly name: string;
+    readonly slug: string;
+    readonly startsOn: string | null;
+    readonly endsOn: string | null;
+  };
 };
 
 export type NewLeaguePlanResult =
   | { readonly ok: true; readonly plan: NewLeaguePlan }
   | { readonly ok: false; readonly problems: readonly NewLeagueProblem[] };
 
-const validTimeZone = (value: string) => {
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: value });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 const email = z.email().max(320);
 const leagueName = z.string().min(1).max(120);
 const cityName = z.string().min(1).max(100);
 const seasonName = z.string().min(1).max(120);
 
+/** A real calendar date written YYYY-MM-DD: 2026-02-30 is not one. */
+function isCalendarDay(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** Today's date (YYYY-MM-DD) at `at` (milliseconds) in a time zone the runtime knows. */
+export function dayIn(timeZone: string, at: number): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(at));
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+/** A suggested season: the part of the year, and the year or the two years it spans. */
+export type SeasonSuggestion = {
+  readonly part: SeasonPart;
+  readonly years: readonly [number] | readonly [number, number];
+};
+
 /**
- * The part of the year a date (YYYY-MM-DD) falls in, by its month (December to
- * February is winter), and the date's own year: a suggestion, which can be changed.
+ * The part of the year a date (YYYY-MM-DD) falls in, by its month, and its year. A
+ * winter runs from December into the next year, so it names both years: December
+ * 2026, January and February 2027 all give Winter 2026–2027. A suggestion, which can
+ * be changed.
  */
-export function seasonPartOf(day: string): { part: SeasonPart; year: number } {
+export function seasonPartOf(day: string): SeasonSuggestion {
   const year = Number(day.slice(0, 4));
   const month = Number(day.slice(5, 7));
-  const part: SeasonPart =
-    month <= 2 || month === 12 ? 'winter' : month <= 5 ? 'spring' : month <= 8 ? 'summer' : 'fall';
-  return { part, year };
+  if (month === 12) return { part: 'winter', years: [year, year + 1] };
+  if (month <= 2) return { part: 'winter', years: [year - 1, year] };
+  return { part: month <= 5 ? 'spring' : month <= 8 ? 'summer' : 'fall', years: [year] };
+}
+
+/** The season suggested at `at` for a league in `timeZone`: by the league's own date. */
+export function suggestedSeason(at: number, timeZone: string): SeasonSuggestion {
+  return seasonPartOf(dayIn(timeZone, at));
 }
 
 /**
@@ -110,7 +157,8 @@ export function seasonPartOf(day: string): { part: SeasonPart; year: number } {
 export function seasonSlugOf(name: string): string {
   const slug = name
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
+    // The combining accents NFKD splits off ("é" becomes "e" and an accent).
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -133,15 +181,12 @@ const isRefusal = (value: unknown): value is Refusal => value === invalid || val
 /** Checks every answer at once, so all the problems are told together. */
 export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
   const problems: NewLeagueProblem[] = [];
-  const need = <T>(
+  const check = <T>(
     field: NewLeagueField,
     value: string | undefined,
     read: (value: string) => T | Refusal,
   ): T | undefined => {
-    if (value === undefined) {
-      problems.push({ field, problem: 'missing' });
-      return undefined;
-    }
+    if (value === undefined) return undefined;
     const result = read(value);
     if (isRefusal(result)) {
       problems.push({ field, problem: result.refused });
@@ -149,12 +194,25 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
     }
     return result;
   };
+  const need = <T>(
+    field: NewLeagueField,
+    value: string | undefined,
+    read: (value: string) => T | Refusal,
+  ): T | undefined => {
+    if (value === undefined) problems.push({ field, problem: 'missing' });
+    return check(field, value, read);
+  };
   const parsed =
     <T>(schema: z.ZodType<T>) =>
     (value: string): T | Refusal => {
       const result = schema.safeParse(value);
       return result.success ? result.data : invalid;
     };
+  // Erased accounts keep a placeholder on the reserved .invalid domain (record 007),
+  // and a sign-in is refused there (0012): such an address can never sign in.
+  const personEmail = (value: string) =>
+    /\.invalid$/i.test(value) ? invalid : parsed(email)(value);
+  const calendarDay = (value: string) => (isCalendarDay(value) ? value : invalid);
 
   const name = need('name', text(answers.name), parsed(leagueName));
   const slug = need('shortName', text(answers.shortName)?.toLowerCase(), (value) => {
@@ -169,22 +227,31 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
   const audience = need('whoPlays', text(answers.whoPlays)?.toLowerCase(), (value) =>
     Object.hasOwn(whoPlaysChoices, value) ? whoPlaysChoices[value as WhoPlays] : invalid,
   );
+  const listedAnswer = text(answers.listed)?.toLowerCase();
+  const listedChoice = check('listed', listedAnswer, (value) =>
+    value === 'yes' ? true : value === 'no' ? false : invalid,
+  );
   const city = need('city', text(answers.city), parsed(cityName));
-  const timeZone = need('timeZone', text(answers.timeZone), (value) =>
-    value.length <= 64 && validTimeZone(value) ? value : invalid,
+  const timeZone = need(
+    'timeZone',
+    text(answers.timeZone),
+    (value) => namedTimeZone(value) ?? invalid,
   );
   const contactEmail = need('contactEmail', text(answers.contactEmail), parsed(email));
-  const ownerEmail = need('ownerEmail', text(answers.ownerEmail), (value) => {
-    // Erased accounts keep a placeholder on the reserved .invalid domain (record 007).
-    if (/\.invalid$/i.test(value)) return invalid;
-    return parsed(email)(value);
-  });
+  const ownerEmail = need('ownerEmail', text(answers.ownerEmail), personEmail);
   const season = need('seasonName', text(answers.seasonName), (value) => {
     const result = seasonName.safeParse(value);
     return result.success ? { name: result.data, slug: seasonSlugOf(result.data) } : invalid;
   });
+  const startsOn = check('seasonStartsOn', text(answers.seasonStartsOn), calendarDay);
+  const endsOn = check('seasonEndsOn', text(answers.seasonEndsOn), calendarDay);
+  if (startsOn !== undefined && endsOn !== undefined && endsOn < startsOn) {
+    problems.push({ field: 'seasonEndsOn', problem: 'before-start' });
+  }
+  const staffEmail = need('staffEmail', text(answers.staffEmail), personEmail);
 
   if (
+    problems.length > 0 ||
     name === undefined ||
     slug === undefined ||
     sportKey === undefined ||
@@ -193,7 +260,8 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
     timeZone === undefined ||
     contactEmail === undefined ||
     ownerEmail === undefined ||
-    season === undefined
+    season === undefined ||
+    staffEmail === undefined
   ) {
     return { ok: false, problems };
   }
@@ -204,12 +272,14 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
       slug,
       sportKey,
       audience,
-      listed: listedByDefault[audience],
+      listed: listedChoice ?? listedByDefault[audience],
+      listedChosen: listedChoice !== undefined,
       city,
       timeZone,
       contactEmail,
       ownerEmail,
-      season,
+      staffEmail,
+      season: { ...season, startsOn: startsOn ?? null, endsOn: endsOn ?? null },
     },
   };
 }
