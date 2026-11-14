@@ -109,6 +109,14 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.createPgBoss, "makes pg-boss for its own schema; reads no league's rows"],
   [databasePackage.createDatabase, 'opens connections; reads no rows'],
   [databasePackage.checkLoginRole, "reads the login role's facts from pg_roles only"],
+  [
+    databasePackage.checkQueueSchema,
+    "reads whether pg-boss's schema exists and the login may make tables in it, from the catalog only",
+  ],
+  [
+    databasePackage.madeUpDatabase,
+    'development-only: a new in-memory database built as its owner (migrations, seedLeaguesInto), then used as a member of app_user; takes nothing and reads no league for anyone',
+  ],
   [databasePackage.applyMigrations, 'the migration runner (T-48): schema, as the owner'],
   [databasePackage.runMigrations, 'the migration runner (T-48): schema, as the owner'],
   [databasePackage.loadMigrations, 'reads migration files from disk'],
