@@ -23,8 +23,8 @@ export const displayCss = String.raw`/* The look of the shared display pieces. E
   padding-block: 0.1em;
   padding-inline: 0.6em;
   border-radius: var(--radius);
-  border: 2px solid var(--color-accent);
-  color: var(--color-text);
+  border: 2px solid var(--color-highlight);
+  color: var(--color-highlight);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -95,6 +95,9 @@ export const displayCss = String.raw`/* The look of the shared display pieces. E
   font-variant-numeric: tabular-nums;
   font-size: 1.25rem;
 }
+.ui-game-team[data-winner='true'] .ui-game-team-score {
+  color: var(--color-highlight);
+}
 .ui-game-versus {
   font-size: 0.75rem;
   text-align: center;
@@ -142,6 +145,9 @@ export const displayCss = String.raw`/* The look of the shared display pieces. E
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--color-text);
+}
+.ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score {
+  color: var(--color-highlight);
 }
 .ui-scoreboard-middle {
   display: grid;
@@ -257,6 +263,19 @@ th[aria-sort='descending'] .ui-sort-button::after {
   color: var(--color-text);
   font: inherit;
   min-block-size: 2.75rem;
+}
+.ui-picker select {
+  color: var(--color-highlight);
+  font-weight: 700;
+}
+.ui-picker option {
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-weight: 400;
+}
+.ui-picker option:checked {
+  color: var(--color-highlight);
+  font-weight: 700;
 }
 .ui-picker button {
   border: 2px solid var(--color-primary);
