@@ -239,12 +239,20 @@ describe('following a game', () => {
     expect(w.seen).toHaveLength(before);
   });
 
-  it('lines the clock up by messages, not by fetched snapshots', async () => {
-    const w = world();
+  it('keeps the largest clock offset seen, from messages and fetched snapshots', async () => {
+    const w = world(); // the page's snapshot: sent at 1_000_000, received at 0
+    w.serverIs({ ...snapshot(0), sentAt: 1_000_500 }); // the catch-up: sent at 1_000_500, received at 0
     w.connect('open');
     await settle();
+    expect(w.last()?.offsetMs).toBe(1_000_500);
     await w.advance(1_000);
-    w.send(message(1)); // sent at 1_000_001, received at 1_000
-    expect(w.last()?.offsetMs).toBe(999_001);
+    w.send(message(1)); // sent at 1_000_001, received at 1_000: a slow arrival
+    expect(w.last()?.offsetMs).toBe(1_000_500);
+    w.send({ ...message(2), sentAt: 1_002_000 }); // sent at 1_002_000, received at 1_000
+    expect(w.last()?.offsetMs).toBe(1_001_000);
+    w.serverIs({ ...snapshot(2), sentAt: 1_000_002 }); // a cached copy, sent long ago
+    await w.advance(5_000);
+    expect(w.fetches.length).toBeGreaterThan(1);
+    expect(w.last()?.offsetMs).toBe(1_001_000);
   });
 });

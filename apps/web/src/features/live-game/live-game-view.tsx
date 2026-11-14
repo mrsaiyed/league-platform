@@ -140,6 +140,8 @@ export function LiveGameView({
   useEffect(() => {
     const arrivedAt = Date.now();
     setDeviceNow(arrivedAt);
+    // The first measurement: the 0 drawn before this is a stand-in, not a measurement.
+    // followGame starts from the same one and only ever raises it (largestOffsetMs).
     setFollowed((f) => ({ ...f, offsetMs: serverOffsetMs(initial.sentAt, arrivedAt) }));
     const handle = followGame({
       leagueId,

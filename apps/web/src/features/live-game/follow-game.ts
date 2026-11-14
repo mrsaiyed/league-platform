@@ -19,7 +19,7 @@
 // One fetch at a time; a final game is not followed at all.
 import type { GameSnapshot, LiveMessage } from '@srleagues/contracts';
 import type { LiveConnection, LiveSubscriber, LiveSubscription } from '../live-updates/index.ts';
-import { serverOffsetMs } from './clock.ts';
+import { largestOffsetMs, serverOffsetMs } from './clock.ts';
 import {
   applyMessage,
   applySnapshot,
@@ -33,7 +33,7 @@ import {
 export type FollowedGame = {
   readonly game: ViewerGame;
   readonly connection: LiveConnection;
-  /** Server time minus this device's time (clock.ts), from the newest message. */
+  /** Server time minus this device's time (clock.ts): the largest measured (largestOffsetMs). */
   readonly offsetMs: number;
 };
 
@@ -159,10 +159,12 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
     fetching = false;
     if (stopped) return;
     if (snapshot !== null) {
-      // A snapshot may be a cached copy up to 2 seconds old, so the device's clock is
-      // lined up by the messages and the page's own snapshot, never by a fetched one.
+      // A cached snapshot was sent earlier than it arrived, so it can only under-measure
+      // the offset; keeping the largest measurement makes it harmless.
+      const before = offsetMs;
+      offsetMs = largestOffsetMs(offsetMs, snapshot.sentAt, timers.now());
       const adopted = applySnapshot(state, snapshot).state;
-      if (adopted !== state) {
+      if (adopted !== state || offsetMs !== before) {
         state = adopted;
         emit();
       }
@@ -180,7 +182,7 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
     const { state: next, outcome } = applyMessage(state, message);
     state = next;
     if (outcome === 'applied') {
-      offsetMs = serverOffsetMs(message.sentAt, timers.now());
+      offsetMs = largestOffsetMs(offsetMs, message.sentAt, timers.now());
       emit();
       plan();
     } else if (outcome === 'ask-for-snapshot') {
