@@ -375,9 +375,22 @@ const cases = [
     [adminLink('quiet-pines', 'schedule')],
   ],
   // The draft league has the same games, scores assigned games only and gives the live
-  // one to its admin (stand-in-ports.ts): its scorekeeper is refused it (P7 §5.1, U-6).
-  ['scorekeeper', `/quiet-pines/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
-  ['scorekeeper', `/quiet-pines/score/${unassignedGame}`, 403, [noAccess], ['Lions at Hawks']],
+  // one to its admin (stand-in-ports.ts): its scorekeeper is refused it (P7 §5.1), with the
+  // tracker's own words and the way back, not the league's "no access" (step 2.33).
+  [
+    'scorekeeper',
+    `/quiet-pines/score/${liveGame}`,
+    200,
+    ['You are not assigned to score this game.', 'href="/quiet-pines/admin"'],
+    ['Bears at Hawks', noAccess],
+  ],
+  [
+    'scorekeeper',
+    `/quiet-pines/score/${unassignedGame}`,
+    200,
+    ['You are not assigned to score this game.'],
+    ['Lions at Hawks', noAccess],
+  ],
   [
     'clubAdmin',
     '/quiet-pines/admin/teams',
