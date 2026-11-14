@@ -120,6 +120,31 @@ describe('the fixture import screen actions', () => {
     ).toMatchObject({ ok: false });
   });
 
+  it("refuses to add, undo or forget an import that is not the current season's", async () => {
+    const { as, ports, seasonOf, upload, view } = setup();
+    const season = (await seasonOf()) ?? '';
+    const started = await upload();
+    const importId = started.ok ? started.importId : '';
+    const version = String((await view(importId)).version);
+    const otherSeason = '01900000-0000-7000-8000-0000000000f9';
+    for (const action of ['apply', 'undo', 'discard'] as const) {
+      for (const current of [otherSeason, undefined]) {
+        expect(
+          await runImportAction(
+            action,
+            { text: { importId, version } },
+            as(scheduler),
+            ports.deps,
+            current,
+          ),
+        ).toEqual({ ok: false, code: 'import-not-found', importId });
+      }
+    }
+    // Nothing was changed: the import still waits and the draft is empty.
+    expect((await view(importId)).status).toBe('ready');
+    expect(await ports.draftChangeCount(leagueId, season)).toBe(0);
+  });
+
   it('says plainly when there is no file or no season', async () => {
     const { as, ports, seasonOf } = setup();
     const season = await seasonOf();

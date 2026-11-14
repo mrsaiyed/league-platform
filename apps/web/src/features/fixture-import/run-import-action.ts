@@ -2,9 +2,12 @@
 // command's input, and the command runs with the context the server worked out from the
 // session (T-23). Which season a file goes into is the server's answer (the league's
 // current season), never the form's; nothing here reads who is asking from the form.
+// The screen shows only imports into the current season, so adding, undoing or forgetting
+// one is refused, as not there, when it belongs to another season.
 import {
   applyFixtureImport,
   discardFixtureImport,
+  getFixtureImport,
   maxReportBytes,
   startFixtureImport,
   undoFixtureImport,
@@ -38,7 +41,9 @@ export type ImportActionResult =
 /**
  * The largest file the screen reads: the import keeps the text in its row until the worker
  * has read it, and refuses more than this (startFixtureImport), so a larger file is refused
- * before it is read. It is under Next.js's own 1 MB limit for a form sent to the server.
+ * before it is read. The web app lets a server action's form be up to 2 MB
+ * (next.config.ts), so a file a little over this limit reaches this check and gets our
+ * notice instead of the framework's error.
  */
 export const maxUploadBytes = maxReportBytes;
 
@@ -55,6 +60,17 @@ export async function runImportAction(
   seasonId: string | undefined,
 ): Promise<ImportActionResult> {
   const importId = fields.text['importId'];
+  if (action !== 'upload') {
+    const refused: ImportActionResult = {
+      ok: false,
+      code: 'import-not-found',
+      ...(importId ? { importId } : {}),
+    };
+    if (seasonId === undefined || importId === undefined) return refused;
+    const found = await getFixtureImport(context, { importId }, deps);
+    if (!found.ok) return { ok: false, code: found.error.code, importId };
+    if (found.value.seasonId !== seasonId) return refused;
+  }
   switch (action) {
     case 'upload': {
       if (seasonId === undefined) return { ok: false, code: 'no-season' };

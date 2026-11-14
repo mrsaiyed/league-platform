@@ -35,8 +35,9 @@ async function act(action: ImportAction, form: FormData): Promise<never> {
       upload === undefined || upload.size === 0
         ? undefined
         : { name: upload.name, text: await upload.text() };
-    const season =
-      action === 'upload' ? await fixtureImport.currentSeasonOf(context.leagueId) : undefined;
+    // Uploads go into the current season, and only its imports may be changed (as the page
+    // shows only those).
+    const season = await fixtureImport.currentSeasonOf(context.leagueId);
     return runImportAction(action, { text, file }, context, fixtureImport.deps, season?.id);
   })();
   const query = new URLSearchParams();
