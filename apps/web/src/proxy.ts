@@ -47,6 +47,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     else headers.set('cookie', cookie);
   }
   const response = NextResponse.next({ request: { headers } });
+  // An answer that sets cookies is never kept by a shared cache (the snapshot endpoint
+  // also answers private to any request carrying a sign-in cookie).
+  if (changes.length > 0) response.headers.set('Cache-Control', 'private, no-store');
   for (const change of changes) {
     if (change.value === null) response.cookies.delete(change.name);
     else response.cookies.set(change.name, change.value, change.options);

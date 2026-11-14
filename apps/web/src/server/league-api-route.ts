@@ -2,12 +2,14 @@
 // account from context.ts through resolveLeagueApi, the body read as JSON with a limit,
 // and an answer turned into a Response. Next.js's side only; the decisions are in
 // league-api.ts and each endpoint's own file, tested without a server.
+import { cookies } from 'next/headers';
 import { getConfig } from './config.ts';
 import { webPorts } from './container.ts';
 import type { LeagueRequestContext } from './context.ts';
 import { resolveLeagueApi, type ApiAnswer, type ApiRefusal } from './league-api.ts';
 import type { WebPorts } from './ports.ts';
 import { requestFacts } from './request-facts.ts';
+import { cookieNames } from './sign-in/cookies.ts';
 
 /** The most a request body may hold. A full batch of 50 taps is a few kilobytes. */
 const maxBodyBytes = 64 * 1024;
@@ -26,6 +28,15 @@ export async function leagueEndpoint(
     siteOrigin: getConfig().PUBLIC_BASE_URL,
   });
   return resolved.ok ? { ok: true, context: resolved.context, ports } : resolved;
+}
+
+/**
+ * Whether the request carried a sign-in cookie: a session, or the renewing token the
+ * proxy may have just used to set new cookies on this request's answer (proxy.ts).
+ */
+export async function carriesSignInCookies(): Promise<boolean> {
+  const jar = await cookies();
+  return [cookieNames.session, cookieNames.renew].some((name) => jar.has(name));
 }
 
 /** The body as JSON, or undefined when it is not JSON or is too large. */

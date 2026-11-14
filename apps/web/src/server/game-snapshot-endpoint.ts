@@ -6,6 +6,11 @@
 // front of the site (T-119), so a thousand viewers polling cost one read every 2
 // seconds. A draft or suspended league's is never cached: only its staff may see it
 // (mayOpenLeague, U-9), and anyone else is told "not found", as by its pages.
+//
+// A request that carries any sign-in cookie is answered private, never cached: the
+// proxy may renew its session on the way in and set new cookies on this very answer
+// (proxy.ts, renew-session.ts), and an answer that sets cookies must never be kept by
+// a shared cache, which would hand one person's session to the next viewer.
 import { mayOpenLeague, publicViewer, readGameSnapshot } from '@srleagues/core';
 import { isGameIdFormat, type ApiAnswer, type LeagueApiRequest } from './league-api.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
@@ -17,7 +22,10 @@ const notFound: ApiAnswer = {
 };
 
 export async function gameSnapshot(
-  request: LeagueApiRequest,
+  request: LeagueApiRequest & {
+    /** Whether the request carried a sign-in cookie (session or renewing token). */
+    readonly carriesSignIn: boolean;
+  },
   game: string,
   ports: Pick<TrackerPorts, 'snapshotStoreOf' | 'namesShownOf' | 'clock'>,
 ): Promise<ApiAnswer> {
@@ -37,7 +45,8 @@ export async function gameSnapshot(
     ports.clock.now(),
   );
   if (!read.ok) return notFound;
-  const shared = league.status === 'live' || league.status === 'archived';
+  const shared =
+    (league.status === 'live' || league.status === 'archived') && !request.carriesSignIn;
   return {
     status: 200,
     body: read.value,

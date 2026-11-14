@@ -16,14 +16,24 @@ import {
 
 async function read(
   world: ReturnType<typeof trackerWorld>,
-  { as = 'visitor', league = 'live', game = games.hawksBears } = {} as {
+  {
+    as = 'visitor',
+    league = 'live',
+    game = games.hawksBears,
+    carriesSignIn = as !== 'visitor',
+  } = {} as {
     as?: Person;
     league?: League;
     game?: string;
+    carriesSignIn?: boolean;
   },
 ) {
   const context = await world.contextAs(as, league, ['games', game, 'snapshot']);
-  return gameSnapshot({ context, holder: await world.holderOf(context) }, game, world.tracker);
+  return gameSnapshot(
+    { context, holder: await world.holderOf(context), carriesSignIn },
+    game,
+    world.tracker,
+  );
 }
 
 /** Tip-off and a basket by each team, through the tracker's own endpoints. */
@@ -90,6 +100,18 @@ describe('GET …/games/{game}/snapshot', () => {
     const owner = await read(world, { as: 'owner' });
     const withoutTime = (body: unknown) => ({ ...(body as object), sentAt: 0 });
     expect(withoutTime(owner.body)).toEqual(withoutTime(visitor.body));
+  });
+
+  it('is never cached publicly when the request carried a sign-in cookie', async () => {
+    const world = trackerWorld();
+    await play(world);
+    // Signed in, or a visitor whose renewing token the proxy may have just used: the
+    // answer may set cookies on its way out, so no shared cache may keep it.
+    for (const as of ['owner', 'visitor'] as const) {
+      const answer = await read(world, { as, carriesSignIn: true });
+      expect(answer.status).toBe(200);
+      expect(answer.headers).toEqual({ 'Cache-Control': 'private, no-store' });
+    }
   });
 
   it("refuses league B's game asked for through league A's address", async () => {
