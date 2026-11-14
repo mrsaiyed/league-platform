@@ -12,6 +12,7 @@ const reads = new Set([
   'access.list_activity',
   'access.my_access',
   'leagues.list_divisions',
+  'leagues.list_bin',
   'people.list_people',
   'games.list_postponed_games',
   'games.list_my_games',
@@ -35,12 +36,16 @@ const reads = new Set([
   'games.read_tracker_state',
 ]);
 
+/** Entries the nightly worker writes itself, not through a registered command (T-51). */
+const workerActions = ['leagues.empty_bin'];
+
 describe('activity log messages', () => {
   it('has English words for every command that writes an entry, and no others', () => {
     const writes = [...commands.keys()].filter((name) => !reads.has(name));
     const keys = Object.keys(en).filter((key) => key.startsWith('activity.'));
-    expect(writes.map(activitySummaryKey).filter((key) => !Object.hasOwn(en, key))).toEqual([]);
-    expect(keys.filter((key) => !writes.map(activitySummaryKey).includes(key))).toEqual([]);
+    const written = [...writes, ...workerActions].map(activitySummaryKey);
+    expect(written.filter((key) => !Object.hasOwn(en, key))).toEqual([]);
+    expect(keys.filter((key) => !written.includes(key))).toEqual([]);
   });
 
   it('has words for the label of every declared setting (T-98, T-187)', () => {
