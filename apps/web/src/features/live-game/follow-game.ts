@@ -14,8 +14,9 @@
 //   snapshot address is cached for 2 seconds, T-119);
 // - at most every 5 seconds while the players shown are older than the score, because
 //   messages carry the score and not the players;
-// - every 30 seconds while a live game is open and quiet, because a lost LAST message
-//   leaves no later one to show the gap;
+// - every 30 seconds while the live connection is open and the game is quiet or not
+//   started, because a lost LAST message (or the one that starts it) leaves no later one
+//   to show the gap;
 // - every 5 seconds, as if the connection were not open, once a snapshot fetched while
 //   it is open shows plays no message brought: the connection says it is open but is
 //   not delivering. This lasts until a message arrives again.
@@ -142,8 +143,9 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
       return game.status === 'live' ? pollMs : slowPollMs;
     }
     if (game.status === 'live' && !playersAreCurrent(game)) return playersMs;
-    if (game.status === 'live') return quietMs;
-    return undefined;
+    // Quiet, or not started: a lost message (the one that starts the game, say) leaves
+    // no later one to show the gap.
+    return quietMs;
   }
 
   /** Listens while the game is not final, and stops once it is. */

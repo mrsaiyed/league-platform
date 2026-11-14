@@ -173,6 +173,18 @@ describe('following a game', () => {
     expect(w.fetches).toEqual([60_000, 120_000, 125_000]);
   });
 
+  it('checks a game not started every 30 seconds while connected, to see it start', async () => {
+    const w = world(snapshot(0, 'scheduled'));
+    w.connect('open');
+    await settle();
+    w.serverIs(snapshot(1, 'live')); // the message that started it was lost
+    await w.advance(29_999);
+    expect(w.fetches).toEqual([0]);
+    await w.advance(1);
+    expect(w.fetches).toEqual([0, 30_000]);
+    expect(w.last()?.game.status).toBe('live');
+  });
+
   it('catches up when the connection opens again, then stops polling', async () => {
     const w = world();
     w.connect('unavailable');
