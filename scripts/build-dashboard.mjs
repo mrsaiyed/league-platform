@@ -126,11 +126,14 @@ const stagePlans = fs
 // A step can start when every step it needs has landed, it is not already in a lane, and it
 // is not waiting on the founder. Steps built in parts are judged part by part. This cannot
 // see whether a step's decisions are agreed: the lead still checks that (T-211).
+// A number given out twice hides one of the two steps: only the later one is followed.
+const duplicates = [];
 const byId = new Map();
 for (const plan of stagePlans) {
   for (const group of plan.groups) {
     for (const step of group.steps) {
       step.stage = plan.number;
+      if (byId.has(step.id)) duplicates.push(step.id);
       byId.set(step.id, step);
     }
   }
@@ -351,6 +354,7 @@ const watched = withAges(
   stallSigns({
     now: nowIso,
     firstStage,
+    duplicates,
     firstStageLeft: unfinished
       .filter((step) => step.stage === firstStage && !step.blocked)
       .map((step) => step.id),
