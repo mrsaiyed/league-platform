@@ -349,6 +349,15 @@ export const en = {
   'adminSettings.clear': 'Go back to the default',
   'adminSettings.done.saved': 'The setting was saved.',
   'adminSettings.done.cleared': 'The setting is back to its default.',
+  // A heading for each group of settings, by the first part of their keys.
+  'adminSettings.area.members': 'Start page for members',
+  'adminSettings.area.games': 'Scoring',
+  'adminSettings.area.teams': 'Team statistics',
+  'adminSettings.area.privacy': 'Privacy',
+  // Beside a setting whose value asks to be confirmed (its `setting.<key>.confirm`).
+  'adminSettings.confirmNote': 'Choosing {choice} asks you to confirm first.',
+  'error.leagues.set_setting.confirmation-needed':
+    'This choice needs you to tick the box to confirm before it is saved. Nothing was changed.',
   'error.leagues.set_setting.invalid-value':
     'That value is not allowed for this setting. Check what it accepts and try again.',
   'error.leagues.set_setting.changed-since-read':
@@ -862,6 +871,7 @@ export const en = {
   'activity.people.create_person': 'Added a person',
   'activity.people.update_person': 'Changed a person',
   'activity.people.remove_person': 'Moved a person to the bin',
+  'activity.people.set_name_request': "Changed how a person's name shows on public pages",
   'activity.teams.create_team': 'Added a team',
   'activity.teams.update_team': 'Changed a team',
   'activity.teams.remove_team': 'Moved a team to the bin',
@@ -911,6 +921,14 @@ export const en = {
   'setting.teams.startingStatsLevel.option.staff': "Only the team's staff and the league's admins",
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
+  'setting.privacy.publicNames.label':
+    "Names on public pages: how children's names are shown (adults are always shown by full name)",
+  'setting.privacy.publicNames.option.firstNameLastInitial': 'First name and last initial',
+  'setting.privacy.publicNames.option.fullName': 'Full names',
+  'setting.privacy.publicNames.confirm':
+    'I confirm this league has the permission it needs to show children by their full names, for example from their parents on the registration form.',
+  'setting.privacy.playersMayAskForInitials.label':
+    'Players may ask to appear as initials on public pages',
   // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
   // league's name, {role} a role's name from above, {days} how long a link works.
   'email.invitation.subject': 'You are invited to help run {league}',

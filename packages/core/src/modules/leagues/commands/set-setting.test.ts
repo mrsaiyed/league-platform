@@ -26,7 +26,16 @@ const leagueOnly = defineSetting({
   permission: 'league.settings',
   label: 'setting.members.startPage.label',
 });
-const registry = settingRegistry([hours, leagueOnly]);
+const names = defineSetting({
+  key: 'privacy.publicNames',
+  type: z.enum(['firstNameLastInitial', 'fullName']),
+  default: 'firstNameLastInitial',
+  levels: ['league'],
+  permission: 'league.settings',
+  label: 'setting.privacy.publicNames.label',
+  confirm: ['fullName'],
+});
+const registry = settingRegistry([hours, leagueOnly, names]);
 const set = setSettingFor(registry);
 const clear = clearSettingFor(registry);
 
@@ -90,6 +99,25 @@ describe('setSetting', () => {
       });
     }
     expect(db.state.settings).toEqual([]);
+  });
+
+  it('saves a value it asks to confirm only once confirmed, and logs that it was (R-14)', async () => {
+    const { db, deps, context } = setUp();
+    const at = (extra: Record<string, unknown>) =>
+      input({ key: names.key, value: 'fullName', ...extra });
+    for (const confirmed of [undefined, false]) {
+      expect(await set(context, at({ confirmed }), deps)).toEqual({
+        ok: false,
+        error: { code: 'confirmation-needed' },
+      });
+    }
+    expect(db.state.settings).toEqual([]);
+    expect(await set(context, at({ confirmed: true }), deps)).toMatchObject({ ok: true });
+    expect(db.state.activity[0]?.details).toMatchObject({ key: names.key, confirmed: true });
+    // Going back needs no confirming, and its entry does not say it was confirmed.
+    const back = await set(context, at({ value: 'firstNameLastInitial', version: 1 }), deps);
+    expect(back).toMatchObject({ ok: true });
+    expect(db.state.activity[1]?.details).not.toHaveProperty('confirmed');
   });
 
   it('refuses a level the declaration does not allow', async () => {

@@ -9,6 +9,7 @@ import {
   listPeople,
   rolePermissions,
   removePerson,
+  setNameRequest,
   updatePerson,
   type CommandDeps,
   type Job,
@@ -347,5 +348,32 @@ describe('the people commands on the database', () => {
     expect(await removePerson(l.as(l.ownerId), { personId: keeper }, deps)).toMatchObject({
       ok: true,
     });
+  });
+
+  it("writes a person's request about their name to people.visibility (R-23)", async () => {
+    const l = await league();
+    const personId = await newPerson(pglite, l.leagueId);
+    const registrar = await accountWith(l.leagueId, 'registrar');
+    const scorekeeper = await accountWith(l.leagueId, 'scorekeeper');
+    const input = { personId, version: 1, showAs: 'removed', reason: 'guardianAsked' };
+    expect(await setNameRequest(l.as(scorekeeper), input, deps)).toMatchObject({
+      error: { code: 'not-allowed' },
+    });
+    expect(await setNameRequest(l.as(registrar), input, deps)).toEqual({
+      ok: true,
+      value: { version: 2 },
+    });
+    const row = await one<{ visibility: string; version: number }>(
+      pglite,
+      'select visibility, version from people where id = $1',
+      [personId],
+    );
+    expect(row).toEqual({ visibility: 'removed', version: 2 });
+    const logged = await one<{ details: unknown }>(
+      pglite,
+      "select details from activity_log where action = 'people.set_name_request' and target_id = $1",
+      [personId],
+    );
+    expect(logged.details).toEqual({ showAs: 'removed', reason: 'guardianAsked' });
   });
 });

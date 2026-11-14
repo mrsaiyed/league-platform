@@ -89,6 +89,7 @@ import {
   updateCourt,
   updateDivision,
   updatePerson,
+  setNameRequest,
   setTeamStatsVisibility,
   updateTeam,
   updateVenue,
@@ -1327,6 +1328,20 @@ const peopleRows: readonly Row[] = [
       },
     }),
     run: (c, i) => updatePerson(c, i, peopleDeps),
+  },
+  {
+    command: 'people.set_name_request',
+    name: "set how a person's name shows (R-23)",
+    needs: 'people.manage',
+    prepare: async (league) => ({
+      input: {
+        personId: await newPerson(pglite, league.leagueId),
+        version: 1,
+        showAs: 'initials',
+        reason: 'personAsked',
+      },
+    }),
+    run: (c, i) => setNameRequest(c, i, peopleDeps),
   },
   {
     command: 'people.remove_person',

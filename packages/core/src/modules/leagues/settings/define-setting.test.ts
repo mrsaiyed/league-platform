@@ -6,6 +6,7 @@ import { declaredSettings } from './declarations.ts';
 import {
   defineSetting,
   hasLimits,
+  needsConfirming,
   settingRegistry,
   SettingDeclarationError,
 } from './define-setting.ts';
@@ -115,6 +116,17 @@ describe('defineSetting', () => {
     expect(() => declare({ type: z.custom<number>(() => true), default: 1 })).toThrow();
   });
 
+  it('keeps the values to confirm, and refuses ones its schema refuses', () => {
+    expect(defineSetting(good).confirm).toEqual([]);
+    const asked = defineSetting({ ...good, confirm: [72] });
+    expect(asked.confirm).toEqual([72]);
+    expect(needsConfirming(asked, 72)).toBe(true);
+    expect(needsConfirming(asked, 24)).toBe(false);
+    expect(() => declare({ confirm: [100] })).toThrow(/confirm/);
+    expect(declare({ confirm: [] }).confirm).toEqual([]);
+    expect(() => declare({ confirm: 72 })).toThrow(/confirm/);
+  });
+
   it('refuses the same key twice in one list', () => {
     const one = defineSetting(good);
     expect(() => settingRegistry([one, one])).toThrow(/twice/);
@@ -172,5 +184,23 @@ describe('the settings stage 2 declares', () => {
     expect(may?.default).toBe(true);
     expect(may?.type.safeParse(false).success).toBe(true);
     expect(may?.type.safeParse('no').success).toBe(false);
+  });
+
+  it('show children by first name and last initial until the admin confirms full names (R-14)', () => {
+    const names = declaredSettings.get('privacy.publicNames');
+    expect(names?.default).toBe('firstNameLastInitial');
+    expect(names?.levels).toEqual(['league']);
+    expect(names?.permission).toBe('league.settings');
+    expect(names !== undefined && needsConfirming(names, 'fullName')).toBe(true);
+    expect(names !== undefined && needsConfirming(names, 'firstNameLastInitial')).toBe(false);
+    expect(names?.type.safeParse('hidden').success).toBe(false);
+  });
+
+  it('let no player ask to appear as initials until the league switches it on (R-15)', () => {
+    const initials = declaredSettings.get('privacy.playersMayAskForInitials');
+    expect(initials?.default).toBe(false);
+    expect(initials?.levels).toEqual(['league']);
+    expect(initials?.permission).toBe('league.settings');
+    expect(initials?.confirm).toEqual([]);
   });
 });

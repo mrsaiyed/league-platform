@@ -8,7 +8,11 @@
 //     that starting value to the lead on 2026-11-13, who kept the recommendation);
 //   - the statistics level a new team starts with (S-22; S-23, the founder: everyone
 //     can see its players' statistics), and whether teams may choose their own (S-24:
-//     yes, the league can switch it off).
+//     yes, the league can switch it off);
+//   - how names show on public pages (R-14: first name and last initial for children
+//     to start with; switching to full names asks the admin to confirm the league has
+//     the permission it needs), and whether a player may ask to appear as initials
+//     (R-15: off to start). The people module reads both (readNamePolicy, T-81).
 import { z } from 'zod';
 import { defineSetting, settingRegistry } from './define-setting.ts';
 
@@ -70,9 +74,39 @@ export const teamsMayChooseStatsLevel = defineSetting({
   label: 'setting.teams.mayChooseStatsLevel.label',
 });
 
+/**
+ * How children's names show on public pages (R-14, T-81): first name and last initial,
+ * or full names. Adults are shown by full name whatever this says (R-15). A person whose
+ * age the league does not know counts as a child in a youth or mixed league.
+ */
+export const publicNamesChoices = ['firstNameLastInitial', 'fullName'] as const;
+
+export const publicNames = defineSetting({
+  key: 'privacy.publicNames',
+  type: z.enum(publicNamesChoices),
+  default: 'firstNameLastInitial',
+  levels: ['league'],
+  permission: 'league.settings',
+  label: 'setting.privacy.publicNames.label',
+  // R-14: the admin confirms the league has the permission it needs for full names.
+  confirm: ['fullName'],
+});
+
+/** R-15: whether a player may ask to appear as initials. Off until the league switches it on. */
+export const playersMayAskForInitials = defineSetting({
+  key: 'privacy.playersMayAskForInitials',
+  type: z.boolean(),
+  default: false,
+  levels: ['league'],
+  permission: 'league.settings',
+  label: 'setting.privacy.playersMayAskForInitials.label',
+});
+
 export const declaredSettings = settingRegistry([
   membersStartPage,
   whoMayScore,
   startingStatsLevel,
   teamsMayChooseStatsLevel,
+  publicNames,
+  playersMayAskForInitials,
 ]);

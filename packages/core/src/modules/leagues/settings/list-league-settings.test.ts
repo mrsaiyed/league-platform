@@ -33,6 +33,7 @@ describe('listLeagueSettings', () => {
         label: hours.label,
         default: 24,
         field: { kind: 'number', min: 1, max: 72, whole: true },
+        confirm: [],
         value: 24,
         source: 'default',
         version: null,

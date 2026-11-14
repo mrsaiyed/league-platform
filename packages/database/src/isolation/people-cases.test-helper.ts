@@ -5,6 +5,7 @@ import {
   createPerson,
   listPeople as listPeopleCommand,
   removePerson,
+  setNameRequest,
   updatePerson as updatePersonCommand,
 } from '@srleagues/core';
 import {
@@ -74,6 +75,16 @@ registerCommandCase(createPerson, harnessTx, {
 registerCommandCase(updatePersonCommand, harnessTx, {
   name: "rename the target's person",
   input: (target) => ({ personId: target.personId, version: 1, firstName: 'Harness' }),
+});
+
+registerCommandCase(setNameRequest, harnessTx, {
+  name: "take the target's person's name off public pages",
+  input: (target) => ({
+    personId: target.personId,
+    version: 1,
+    showAs: 'removed',
+    reason: 'personAsked',
+  }),
 });
 
 registerCommandCase(removePerson, harnessTx, {

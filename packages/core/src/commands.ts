@@ -58,7 +58,13 @@ import {
   readTrackerState,
   unassignScorekeeper,
 } from './modules/games/index.ts';
-import { createPerson, listPeople, removePerson, updatePerson } from './modules/people/index.ts';
+import {
+  createPerson,
+  listPeople,
+  removePerson,
+  setNameRequest,
+  updatePerson,
+} from './modules/people/index.ts';
 import {
   applyFixtureImport,
   discardFixtureImport,
@@ -173,6 +179,7 @@ export const commands = commandRegistry([
   getFixtureImport,
   createPerson,
   updatePerson,
+  setNameRequest,
   removePerson,
   listPeople,
   createTeam,

@@ -2,6 +2,7 @@
 // one transaction for one league, so none of these take a league id (T-28).
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
+import type { NameRequest } from './rules/name-policy.ts';
 
 /** What only people allowed to see sensitive fields are given (R-16, T-76). */
 export type PersonSensitiveFields = {
@@ -46,6 +47,8 @@ export type PersonChange = {
   readonly contactEmail?: string | null;
   readonly birthDate?: string | null;
   readonly isMinor?: boolean | null;
+  /** What they asked for on public pages (R-23): set only by setNameRequest. */
+  readonly visibility?: NameRequest;
 };
 
 export type PeopleSearch = {

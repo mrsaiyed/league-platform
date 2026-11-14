@@ -31,6 +31,13 @@ export { publicViewer, type Viewer } from './rules/viewer.ts';
 export { createPerson, type CreatePersonError } from './commands/create-person.ts';
 export { listPeople } from './commands/list-people.ts';
 export { removePerson, type RemovePersonError } from './commands/remove-person.ts';
+export {
+  nameRequestReasons,
+  setNameRequest,
+  type NameRequestReason,
+  type SetNameRequestError,
+} from './commands/set-name-request.ts';
+export { readNamePolicy, type NamePolicySettings } from './queries/read-name-policy.ts';
 export { updatePerson, type UpdatePersonError } from './commands/update-person.ts';
 export type {
   NewPerson,

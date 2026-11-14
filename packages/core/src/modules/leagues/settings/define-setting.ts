@@ -28,6 +28,12 @@ export type SettingDeclaration<Schema extends z.ZodType> = {
   readonly version?: number;
   /** Brings a value stored at an older version to the current one. */
   readonly upgrade?: (fromVersion: number, value: unknown) => unknown;
+  /**
+   * Values the admin must confirm before saving (R-14: full names, confirming the league
+   * has the permission it needs). The words of what they confirm are the message
+   * `setting.<key>.confirm`; the command refuses such a value unless it is confirmed.
+   */
+  readonly confirm?: readonly z.output<Schema>[];
 };
 
 export type Setting<Value = unknown> = {
@@ -39,6 +45,8 @@ export type Setting<Value = unknown> = {
   readonly label: string;
   readonly version: number;
   readonly upgrade: ((fromVersion: number, value: unknown) => unknown) | undefined;
+  /** Values that need confirming before they are saved; empty for most settings. */
+  readonly confirm: readonly Value[];
 };
 
 export class SettingDeclarationError extends Error {
@@ -131,6 +139,20 @@ function check(declaration: Record<string, unknown>): void {
   if (!declaration.type.safeParse(declaration.default).success) {
     throw refuse('its default does not pass its own schema');
   }
+  const { confirm } = declaration;
+  const schema = declaration.type;
+  if (
+    confirm !== undefined &&
+    (!Array.isArray(confirm) || confirm.some((value) => !schema.safeParse(value).success))
+  ) {
+    throw refuse('the values it asks to confirm must be a list of values that pass its schema');
+  }
+}
+
+/** Whether saving this value asks the admin to confirm first (R-14). */
+export function needsConfirming(setting: Setting, value: unknown): boolean {
+  const typed = JSON.stringify(value);
+  return setting.confirm.some((candidate) => JSON.stringify(candidate) === typed);
 }
 
 export function defineSetting<Schema extends z.ZodType>(
@@ -146,6 +168,7 @@ export function defineSetting<Schema extends z.ZodType>(
     label: declaration.label,
     version: declaration.version ?? 1,
     upgrade: declaration.upgrade,
+    confirm: Object.freeze([...(declaration.confirm ?? [])]),
   });
 }
 
