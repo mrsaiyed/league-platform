@@ -358,7 +358,7 @@ async function run(options: TransferTrackerGamesOptions) {
   };
 }
 
-describe('the Al-Hadi transfer (step 2.58)', () => {
+describe('the tracker transfer (step 2.58)', () => {
   it('transfers ten games with every line matching, and a second run changes nothing', async () => {
     const league = await makeLeague(pglite, 'made-up-transfer');
     const start = await fingerprint(pglite, league.leagueId);

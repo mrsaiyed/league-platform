@@ -69,6 +69,10 @@ export type TransferTrackerGamesOptions = {
 
 /** Why the transfer could not start: what it was told to find is not there. */
 export type TransferSetupProblem =
+  /** The database was named by an address: the transfer works on a local folder only (T-201). */
+  | { readonly kind: 'address-not-allowed' }
+  /** The folder holds no database. */
+  | { readonly kind: 'no-database' }
   | { readonly kind: 'league-not-found' }
   | { readonly kind: 'season-not-found' }
   | { readonly kind: 'several-seasons' }

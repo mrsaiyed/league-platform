@@ -4,6 +4,7 @@
 export { readTrackerBackup } from './read-tracker-backup.ts';
 export type { ReadTrackerBackupOptions } from './read-tracker-backup.ts';
 export { TrackerBackupError } from './tracker-backup.ts';
+export { isDatabaseAddress, transferTrackerGamesInFolder } from './transfer-in-folder.ts';
 export { transferTrackerGames } from './transfer-tracker-games.ts';
 export type {
   TransferOutcome,

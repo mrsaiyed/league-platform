@@ -16,6 +16,7 @@
     "dev:stats": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning apps/live-stats/server.ts",
     "stats:db-check": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning apps/live-stats/db-check.ts",
     "stats:copy": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning apps/live-stats/copy.ts",
+    "transfer:tracker": "node --disable-warning=ExperimentalWarning scripts/transfer-tracker-games.mjs",
     "build:demo": "node scripts/build-demo.mjs",
     "build:pages": "node scripts/build-pages.mjs",
     "build:supabase": "node --disable-warning=ExperimentalWarning scripts/build-supabase-sql.mjs",

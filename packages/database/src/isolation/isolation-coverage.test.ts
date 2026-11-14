@@ -125,6 +125,11 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.transferTrackerGames,
     'development tool (step 2.58): takes a PGlite, not a scope; finds one league, season and account by name, then reads and writes only through scoped stores and commands (own cases) of that league',
   ],
+  [
+    databasePackage.transferTrackerGamesInFolder,
+    'opens a PGlite folder on disk (never an address) and runs transferTrackerGames on it',
+  ],
+  [databasePackage.isDatabaseAddress, 'tells an address from a folder name; runs nothing'],
 ]);
 
 /**
