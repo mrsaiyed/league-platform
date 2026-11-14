@@ -906,6 +906,9 @@ export const en = {
   'schedule.admin.otherGames': 'Games with no round',
   'schedule.admin.gameVs': '{away} at {home}',
   'schedule.admin.gameWhen': '{date}, {time}',
+  'schedule.admin.gameDetails': '{when}, {place}',
+  'schedule.admin.gameDetailsRecording': '{when}, {place}, {recording}',
+  'schedule.admin.swapOption': '{game}, {date}',
   'schedule.admin.gameWhere': '{venue}, {court}',
   'schedule.admin.gameLocked':
     'This game has started or been decided, so it cannot be edited here.',

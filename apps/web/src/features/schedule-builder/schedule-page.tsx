@@ -1,5 +1,7 @@
 import {
+  allows,
   getScheduleDraft,
+  leagueScope,
   leagueUrl,
   listVenues,
   previewSchedulePublish,
@@ -41,6 +43,9 @@ type Basis = {
   readonly basedOnRevision: number | null;
   readonly version: number | null;
   readonly draftId: string | null;
+  /** What the viewer may do; the commands check again, this only hides what cannot work. */
+  readonly canEdit: boolean;
+  readonly canPublish: boolean;
 };
 
 const recordings = ['final-score', 'box-score', 'live'] as const;
@@ -113,7 +118,12 @@ export async function ScheduleBuilderPage({
   const draft = drafted.value;
   const venues = listed.ok ? listed.value : [];
   const grid = buildGrid(draft, teams, venues);
+  const holder = await ports.accessOf(context);
+  const mayDo = (permission: 'schedule.edit' | 'schedule.publish'): boolean =>
+    holder !== undefined && allows(holder, permission, leagueScope);
   const basis: Basis = {
+    canEdit: mayDo('schedule.edit'),
+    canPublish: mayDo('schedule.publish'),
     league,
     seasonSlug: season.slug,
     seasonId: season.id,
@@ -165,20 +175,22 @@ export async function ScheduleBuilderPage({
         />
       ))}
       <LooseGames grid={grid} teams={teams} venues={venues} basis={basis} />
-      {draft.draft === null ? null : (
+      {draft.draft === null || !(basis.canEdit || basis.canPublish) ? null : (
         <section aria-labelledby="publish-heading">
           <h2 id="publish-heading">{t('schedule.admin.publish')}</h2>
-          {preview === undefined || !preview.ok ? null : (
+          {!basis.canPublish || preview === undefined || !preview.ok ? null : (
             <PublishPanel preview={preview.value} basis={basis} />
           )}
-          <details>
-            <summary>{t('schedule.admin.discard')}</summary>
-            <p>{t('schedule.admin.discardNote')}</p>
-            <form action={discardAction}>
-              <BasisFields basis={basis} />
-              <button type="submit">{t('schedule.admin.discardSubmit')}</button>
-            </form>
-          </details>
+          {basis.canEdit ? (
+            <details>
+              <summary>{t('schedule.admin.discard')}</summary>
+              <p>{t('schedule.admin.discardNote')}</p>
+              <form action={discardAction}>
+                <BasisFields basis={basis} />
+                <button type="submit">{t('schedule.admin.discardSubmit')}</button>
+              </form>
+            </details>
+          ) : null}
         </section>
       )}
     </main>
@@ -301,26 +313,40 @@ function RoundSection({
           : t('schedule.admin.roundDate', { date: round.date })}{' '}
         {t.plural('schedule.admin.roundGames', round.games.length)}
       </p>
-      <details>
-        <summary>{t('schedule.admin.renameRound')}</summary>
-        <form action={renameRoundAction}>
-          <BasisFields basis={basis} />
-          <input type="hidden" name="roundId" value={round.id} />
-          <Field label={t('schedule.admin.renameRound')}>
-            <input name="label" defaultValue={round.label} required maxLength={120} style={wide} />
-          </Field>
-          <button type="submit">{t('schedule.admin.renameRoundSubmit')}</button>
-        </form>
-        <form action={changeRoundDateAction}>
-          <BasisFields basis={basis} />
-          <input type="hidden" name="roundId" value={round.id} />
-          <Field label={t('schedule.admin.changeRoundDate')}>
-            <input type="date" name="date" defaultValue={round.date ?? ''} required style={wide} />
-          </Field>
-          <p>{t('schedule.admin.changeRoundDateNote')}</p>
-          <button type="submit">{t('schedule.admin.changeRoundDateSubmit')}</button>
-        </form>
-      </details>
+      {basis.canEdit ? (
+        <details>
+          <summary>{t('schedule.admin.renameRound')}</summary>
+          <form action={renameRoundAction}>
+            <BasisFields basis={basis} />
+            <input type="hidden" name="roundId" value={round.id} />
+            <Field label={t('schedule.admin.renameRound')}>
+              <input
+                name="label"
+                defaultValue={round.label}
+                required
+                maxLength={120}
+                style={wide}
+              />
+            </Field>
+            <button type="submit">{t('schedule.admin.renameRoundSubmit')}</button>
+          </form>
+          <form action={changeRoundDateAction}>
+            <BasisFields basis={basis} />
+            <input type="hidden" name="roundId" value={round.id} />
+            <Field label={t('schedule.admin.changeRoundDate')}>
+              <input
+                type="date"
+                name="date"
+                defaultValue={round.date ?? ''}
+                required
+                style={wide}
+              />
+            </Field>
+            <p>{t('schedule.admin.changeRoundDateNote')}</p>
+            <button type="submit">{t('schedule.admin.changeRoundDateSubmit')}</button>
+          </form>
+        </details>
+      ) : null}
       {round.games.length === 0 ? <p>{t('schedule.admin.noGamesInRound')}</p> : null}
       <GameList
         games={round.games}
@@ -330,7 +356,7 @@ function RoundSection({
         basis={basis}
         rounds={rounds}
       />
-      <AddGame round={round} teams={teams} venues={venues} basis={basis} />
+      {basis.canEdit ? <AddGame round={round} teams={teams} venues={venues} basis={basis} /> : null}
     </section>
   );
 }
@@ -357,7 +383,7 @@ function LooseGames({
         basis={basis}
         rounds={grid.rounds}
       />
-      <AddGame round={null} teams={teams} venues={venues} basis={basis} />
+      {basis.canEdit ? <AddGame round={null} teams={teams} venues={venues} basis={basis} /> : null}
     </section>
   );
 }
@@ -414,24 +440,26 @@ function GameItem({
     date: game.date === '' ? t('schedule.admin.noDate') : game.date,
     time: game.time ?? t('schedule.admin.noTime'),
   });
+  const place = game.placeLabel ?? t('schedule.admin.noPlace');
   return (
     <li data-game={game.id} data-clash={game.clashed ? 'yes' : 'no'}>
       <p>
         <strong>{t('schedule.admin.gameVs', { away: game.awayName, home: game.homeName })}</strong>
         <br />
-        {when}
-        {', '}
-        {game.placeLabel ?? t('schedule.admin.noPlace')}
         {game.recording === null || game.recording === undefined
-          ? null
-          : `, ${t(`schedule.admin.recording.${game.recording}`)}`}
+          ? t('schedule.admin.gameDetails', { when, place })
+          : t('schedule.admin.gameDetailsRecording', {
+              when,
+              place,
+              recording: t(`schedule.admin.recording.${game.recording}`),
+            })}
       </p>
       {game.clashed ? (
         <p role="status">
           <strong>{t('schedule.admin.clashFlag')}</strong>
         </p>
       ) : null}
-      {!game.editable ? (
+      {!basis.canEdit ? null : !game.editable ? (
         <p>
           {game.status === 'postponed' || game.status === 'cancelled'
             ? t('schedule.admin.gameNotScheduled', { status: game.status })
@@ -485,7 +513,10 @@ function GameItem({
                   <option value="">{t('schedule.admin.swapChoose')}</option>
                   {others.map((o) => (
                     <option key={o.id} value={o.id}>
-                      {`${t('schedule.admin.gameVs', { away: o.awayName, home: o.homeName })}, ${o.date}`}
+                      {t('schedule.admin.swapOption', {
+                        game: t('schedule.admin.gameVs', { away: o.awayName, home: o.homeName }),
+                        date: o.date,
+                      })}
                     </option>
                   ))}
                 </select>
