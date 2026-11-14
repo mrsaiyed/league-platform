@@ -31,6 +31,7 @@ import {
   type GridRound,
   type GridTeam,
 } from './build-grid.ts';
+import { importLinkOf } from './import-link.ts';
 import { noticeOf } from './notice.ts';
 
 type Basis = {
@@ -90,6 +91,9 @@ export async function ScheduleBuilderPage({
       />
       <p>{t('schedule.admin.seasonName', { name: season.name })}</p>
       <p>{t('schedule.admin.intro')}</p>
+      <p>
+        <a href={importLinkOf(addressee)}>{t('schedule.admin.importLink')}</a>
+      </p>
       {notice === undefined ? null : (
         <p role="status" data-notice={notice.kind}>
           {notice.text}

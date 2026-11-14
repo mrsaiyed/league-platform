@@ -869,6 +869,7 @@ export const en = {
   'schedule.admin.title': 'Schedule',
   'schedule.admin.intro':
     'Build the schedule here, round by round. Every change is saved to a draft that only you and the other schedulers see. Nothing reaches the public site until you publish it.',
+  'schedule.admin.importLink': 'Import fixtures from a spreadsheet',
   'schedule.admin.noSeason': 'There is no season to schedule yet.',
   'schedule.admin.seasonName': 'Season: {name}',
   'schedule.admin.noDraft': 'There is no draft yet. You are looking at the published schedule.',
