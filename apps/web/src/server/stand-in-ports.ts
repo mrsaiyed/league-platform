@@ -26,11 +26,18 @@ import {
   type Role,
   type Scope,
 } from '@srleagues/core';
-import { captureEmail, createLocalSignInStandIn, type SessionIdentity } from '@srleagues/providers';
+import {
+  captureEmail,
+  createLocalLiveHub,
+  createLocalSignInStandIn,
+  type SessionIdentity,
+} from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
+import { liveListenAuthorize } from './live-listen.ts';
 import type { WebPorts } from './ports.ts';
+import { createPlayPublisher } from './publish-plays.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import { standInFixtureImport } from './stand-in-fixture-import.ts';
 import { standInGames } from './stand-in-games.ts';
@@ -45,6 +52,7 @@ import { standInSchedule } from './stand-in-schedule.ts';
 import { standInPublicTeams } from './stand-in-public-teams.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
+import type { TrackerPorts } from './tracker-ports.ts';
 
 type MadeUpLeague = {
   readonly id: string;
@@ -263,6 +271,39 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     log: options.log,
     now: () => performance.now(),
   };
+  const findLeagueById = async (leagueId: string): Promise<LeagueById | undefined> => {
+    const found = leagues.find((l) => l.id === leagueId && !l.inBin);
+    return found === undefined
+      ? undefined
+      : { id: found.id, slug: found.slug, status: found.status };
+  };
+  const identify: WebPorts['identify'] = async (accessToken) => {
+    const person = people.find((p) => p.token === accessToken);
+    return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
+  };
+  const accessOf = accessOfVia(deps);
+  const games = standInGames({
+    leagueId: standInLeagues.live.id,
+    people: {
+      [owner.accountId]: 'Olive Owner',
+      [scheduler.accountId]: 'Sky Scheduler',
+      [scorekeeper.accountId]: 'Sam Scorekeeper',
+    },
+    assignees: [scorekeeper.accountId, owner.accountId],
+    accessOf: (leagueId) => accessTx(leagueId).access,
+    log: options.log,
+  });
+  // One live hub for this process (record 021): the tracker's endpoints publish to it,
+  // and GET /api/v1/live lets a page listen, only to a league it may open.
+  const hub = createLocalLiveHub({
+    authorize: liveListenAuthorize({
+      identify,
+      findLeagueById,
+      accessOf,
+      newRequestId: () => randomUUID(),
+    }),
+  });
+  const tracker: TrackerPorts = { ...games.tracker, publisher: hub };
   return {
     findLeague: async (shortName): Promise<FoundLeague | undefined> => {
       const found = leagues.find((l) => l.slug === shortName || l.formerSlugs.includes(shortName));
@@ -275,32 +316,20 @@ export function standInPorts(options: StandInOptions): StandInPorts {
         forwarded: found.slug !== shortName,
       };
     },
-    findLeagueById: async (leagueId): Promise<LeagueById | undefined> => {
-      const found = leagues.find((l) => l.id === leagueId && !l.inBin);
-      return found === undefined
-        ? undefined
-        : { id: found.id, slug: found.slug, status: found.status };
-    },
+    findLeagueById,
     newRequestId: () => randomUUID(),
-    identify: async (accessToken) => {
-      const person = people.find((p) => p.token === accessToken);
-      return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
-    },
+    identify,
     signIn,
     signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
-    accessOf: accessOfVia(deps),
-    games: standInGames({
-      leagueId: standInLeagues.live.id,
-      people: {
-        [owner.accountId]: 'Olive Owner',
-        [scheduler.accountId]: 'Sky Scheduler',
-        [scorekeeper.accountId]: 'Sam Scorekeeper',
-      },
-      assignees: [scorekeeper.accountId, owner.accountId],
-      accessOf: (leagueId) => accessTx(leagueId).access,
-      log: options.log,
+    accessOf,
+    games,
+    tracker,
+    publishPlays: createPlayPublisher({
+      ...tracker,
+      warn: (message, fields) => options.warn?.(message, { kind: fields.reason }),
     }),
+    liveFeed: (request) => hub.serve(request),
     fixtureImport: standInFixtureImport({
       leagueId: standInLeagues.live.id,
       accessOf: (leagueId) => accessTx(leagueId).access,

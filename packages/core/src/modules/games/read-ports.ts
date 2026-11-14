@@ -55,3 +55,14 @@ export type GamesReadStore = {
   /** The date (YYYY-MM-DD) of the game's latest correction, never its reason (S-7). */
   readonly correctedOn: (gameId: string) => Promise<string | undefined>;
 };
+
+/**
+ * What a game's snapshot reads (step 2.32, T-118): the game page's reads, and the
+ * saved state with the number of the last event it applied, read together so the
+ * snapshot's sequence and its state always agree.
+ */
+export type GameSnapshotStore = GamesReadStore & {
+  readonly savedState: (
+    gameId: string,
+  ) => Promise<{ readonly seq: number; readonly state: unknown } | undefined>;
+};

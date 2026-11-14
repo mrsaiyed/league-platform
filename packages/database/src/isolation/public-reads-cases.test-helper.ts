@@ -8,6 +8,7 @@ import {
   defaultNamePolicy,
   publicViewer,
   readGamePage,
+  readGameSnapshot,
   readStandings,
   readStatisticsTable,
   readStatLeaders,
@@ -167,5 +168,18 @@ registerIsolationCase({
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return readGamePage(gamesReadStore(scope), { gameId: target.gameId }, viewing(target.leagueId));
+  },
+});
+registerIsolationCase({
+  subject: gamesReadStore,
+  name: "read the target's game's live snapshot as a visitor",
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return readGameSnapshot(
+      gamesReadStore(scope),
+      { gameId: target.gameId },
+      viewing(target.leagueId),
+      Date.parse('2026-12-06T18:10:00Z'),
+    );
   },
 });
