@@ -16,7 +16,7 @@ import {
   type BoxScorePlayer,
   type ScoreboardLabels,
 } from '@srleagues/ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { serverSentEventsSubscriber } from '../live-updates/index.ts';
 import { clockIsRunning, clockRemainingMs, serverOffsetMs } from './clock.ts';
 import { followGame, type FollowedGame } from './follow-game.ts';
@@ -28,6 +28,7 @@ import {
   playerText,
   type GameWords,
 } from './game-words.ts';
+import { browserRedrawDevice, redrawPage } from './redraw-page.ts';
 import type { ViewerGame } from './viewer-state.ts';
 
 /** The words this part shows, from the message file (T-187). */
@@ -173,11 +174,17 @@ export function LiveGameView({
 
   const game = followed.game;
   const redraw = redrawsFor(initial, game);
+  const sequence = useRef(game.sequence);
+  useEffect(() => {
+    sequence.current = game.sequence;
+  });
   useEffect(() => {
     // The server reads the same store the change came from, so the page drawn again
-    // arrives at least this new and does not draw itself again.
-    if (redraw) window.location.reload();
-  }, [redraw]);
+    // arrives at least this new. Spread over a few seconds, only when the page answers,
+    // and once per sequence number (redraw-page.ts).
+    if (!redraw) return undefined;
+    return redrawPage({ gameId, sequence: sequence.current }, browserRedrawDevice);
+  }, [redraw, gameId]);
   const serverNow = deviceNow === null ? initial.sentAt : deviceNow + followed.offsetMs;
   const running = game.status === 'live' && clockIsRunning(game.clock, serverNow);
   useEffect(() => {
