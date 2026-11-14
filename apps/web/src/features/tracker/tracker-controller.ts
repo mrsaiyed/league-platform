@@ -329,6 +329,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     latestNow = Math.max(latestNow, Math.round(clock.now() + offsetMs));
     return latestNow;
   };
+  /** A moment on the steady clock, on the server's clock as last measured. */
+  const onServerClock = (steady: number): number => Math.max(0, Math.round(steady + offsetMs));
+  /** When the queue last said the server has taps of this device (steady clock). */
+  let seenSavedAt: number | null = null;
   let base: ServerState | null = null;
   /** This device's taps since `base`, in order: the ones the server took and the waiting. */
   let made: TrackerCommand[] = [];
@@ -434,7 +438,15 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     }
     offsetMs = offset;
     measured = { errorMs, at: received };
-    if (current.clockErrorMs !== errorMs) update({ clockErrorMs: errorMs });
+    // A save made since this request went out is put on this measurement: the one
+    // before may no longer hold (after the device slept offline, say), and the time of
+    // the last save is the server's, not the device's (finding L5).
+    const savedSince = seenSavedAt !== null && seenSavedAt >= sent ? seenSavedAt : null;
+    if (savedSince !== null) {
+      update({ clockErrorMs: errorMs, lastSavedAt: onServerClock(savedSince) });
+    } else if (current.clockErrorMs !== errorMs) {
+      update({ clockErrorMs: errorMs });
+    }
   };
 
   const session = (request: SessionRequest) => {
@@ -814,13 +826,12 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** The queue's sequence when last seen, to tell when the server took a batch. */
   let seenSequence: number | null = null;
-  let seenSavedAt: number | null = null;
 
   queue.subscribe((status) => {
     // The time of the last save, on the server's clock (L1).
     const saved =
       status.savedAt !== null && status.savedAt !== seenSavedAt
-        ? { lastSavedAt: Math.max(0, Math.round(status.savedAt + offsetMs)) }
+        ? { lastSavedAt: onServerClock(status.savedAt) }
         : {};
     seenSavedAt = status.savedAt;
     update({ queue: status, notApplied: status.refused, waiting: status.waitingTaps, ...saved });

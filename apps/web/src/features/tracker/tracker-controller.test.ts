@@ -4,7 +4,7 @@
 // taps waiting, a refusal (T-113) and a takeover (T6 §5).
 import { TrackerGameState } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import {
   bears,
@@ -1497,14 +1497,21 @@ describe('tracker controller: a play the server took is never listed as not save
 
 describe('tracker controller: which taps wait, and the last save (finding L1)', () => {
   it('names each waiting tap, the plays still to save, and when the last one was saved', async () => {
+    // The server keeps its own clock, far from the device's and moved apart from it:
+    // the stand-in reads the system clock, which the device's controller never does
+    // (finding M3), so the system clock here is the server's.
+    const serverClock = createManualClock(1_900_000_000_000);
+    const onTheServer = vi.spyOn(Date, 'now').mockImplementation(() => serverClock.now());
+    onTestFinished(() => onTheServer.mockRestore());
     const network = endpointNetwork();
     const { controller, clock } = device(network);
     await controller.start();
     await tapAll(controller, tipOff);
     await controller.idle();
     const firstSave = controller.status().lastSavedAt ?? 0;
-    // On the server's clock (the stand-in's is the real one): within a second of now.
-    expect(Math.abs(firstSave - controller.status().now())).toBeLessThan(1_000);
+    // On the server's clock, exactly: nothing moves during a request here.
+    expect(controller.status().clockErrorMs).toBe(0);
+    expect(firstSave).toBe(serverClock.now());
 
     network.mode = 'down';
     const offline = [basket('home', hawks[0] ?? ''), basket('away', bears[1] ?? '', 3)];
@@ -1518,7 +1525,10 @@ describe('tracker controller: which taps wait, and the last save (finding L1)', 
       'lineup',
       'lineup',
     ]);
+    // Five minutes pass on the device while offline; the server's clock moves two (the
+    // device's clock is not the server's: it may stand still asleep, or run on).
     await clock.advance(5 * minute);
+    await serverClock.advance(2 * minute);
     expect(controller.status().lastSavedAt).toBe(firstSave);
 
     network.mode = 'up';
@@ -1526,10 +1536,45 @@ describe('tracker controller: which taps wait, and the last save (finding L1)', 
     await controller.idle();
     status = controller.status();
     expect(status.waiting).toEqual([]);
+    // The save is timed by the server's clock: two minutes after the first, not five.
     const lastSave = status.lastSavedAt ?? 0;
-    expect(Math.abs(lastSave - status.now())).toBeLessThan(1_000);
-    // The device's five minutes offline are not the server's: only its own clock counts.
-    expect(lastSave).toBeGreaterThanOrEqual(firstSave);
+    expect(lastSave).toBe(serverClock.now());
+    expect(lastSave - firstSave).toBe(2 * minute);
+    expect(status.now()).toBe(serverClock.now());
+  });
+
+  it('a save answered before the renewal that measures the server’s time again is put on that measurement', async () => {
+    const serverClock = createManualClock(1_900_000_000_000);
+    const onTheServer = vi.spyOn(Date, 'now').mockImplementation(() => serverClock.now());
+    onTestFinished(() => onTheServer.mockRestore());
+    const network = endpointNetwork();
+    let renewing: ReturnType<typeof gate> | null = null;
+    const { controller, clock } = device(network, {
+      askServer: (ask) => async (input, init) => {
+        const held = String(init?.body).includes('"renew"') ? renewing : null;
+        const answer = await ask(input, init);
+        if (held !== null) await held.shut;
+        return answer;
+      },
+    });
+    await controller.start();
+    await tapAll(controller, tipOff);
+    await controller.idle();
+    const firstSave = controller.status().lastSavedAt ?? 0;
+    network.mode = 'down';
+    await tapAll(controller, [basket('home', hawks[0] ?? '')]);
+    await clock.advance(5 * minute);
+    await serverClock.advance(2 * minute);
+    network.mode = 'up';
+    // The renewal's answer is held back until the tap is saved.
+    const renewal = gate();
+    renewing = renewal;
+    controller.online();
+    await expect.poll(() => controller.status().waiting.length).toBe(0);
+    renewal.open();
+    await controller.idle();
+    expect(controller.status().lastSavedAt).toBe(serverClock.now());
+    expect((controller.status().lastSavedAt ?? 0) - firstSave).toBe(2 * minute);
   });
 });
 
