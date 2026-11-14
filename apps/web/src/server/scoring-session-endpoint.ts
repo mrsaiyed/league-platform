@@ -38,16 +38,23 @@ const refused = (code: Refusal, sentAt: number): ApiAnswer => ({
   body: { status: 'refused', code, sentAt } satisfies SessionReply,
 });
 
-/** The command's error codes as the tracker is told them. */
-const refusalOf = (code: string): Refusal => {
+/** Every error the four commands may answer, from their own types. */
+type SessionCommandError = Extract<Awaited<ReturnType<typeof run>>, { ok: false }>['error'];
+
+/**
+ * The commands' error codes as the tracker is told them, every one named: a code a
+ * command gains later fails the type check here rather than turning into a refusal
+ * it does not mean.
+ */
+const refusalOf = (code: Exclude<SessionCommandError['code'], 'invalid-input'>): Refusal => {
   switch (code) {
+    case 'not-allowed':
+      return 'not-allowed';
     case 'game-not-found':
       return 'unknown-game';
     case 'game-closed':
     case 'game-postponed':
       return 'game-not-live';
-    default:
-      return 'not-allowed';
   }
 };
 

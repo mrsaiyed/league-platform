@@ -102,6 +102,21 @@ describe('POST …/games/{game}/session', () => {
     expect(decided.reply.data).toMatchObject({ status: 'refused', code: 'game-not-live' });
   });
 
+  it('tells each command\'s "no such game" as unknown-game, never as not allowed', async () => {
+    const world = trackerWorld();
+    const missing = '01900000-0000-7000-8000-0000000fffff';
+    const sessionId = '01900000-0000-7000-8000-0000000eeeee';
+    for (const body of [
+      { type: 'open', deviceId: 'laptop' },
+      { type: 'renew', sessionId },
+      { type: 'release', sessionId },
+    ]) {
+      const answer = await ask(world, body, { as: 'owner', game: missing });
+      expect(answer.status).toBe(404);
+      expect(answer.reply.data).toMatchObject({ status: 'refused', code: 'unknown-game' });
+    }
+  });
+
   it('turns away a visitor, someone who may not score, and a request that is not one', async () => {
     const world = trackerWorld();
     const open = { type: 'open', deviceId: 'tablet-1' };
