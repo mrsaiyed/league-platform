@@ -65,6 +65,28 @@ export const pickerCss = String.raw`
 .ui-picker button:hover {
   color: var(--color-text);
 }
+/* On a phone each picker has a row of its own: its label in a column all the toolbar's
+   pickers share, its field filling the rest, so two pickers line up whatever their words. */
+@media (max-width: 39.99rem) {
+  .ui-toolbar {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--step-2) var(--step-3);
+  }
+  .ui-toolbar .ui-picker {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+  }
+  .ui-toolbar .ui-picker select {
+    inline-size: 100%;
+  }
+  .ui-toolbar .ui-picker button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
 /* Where scripts can run, the "Show" button hangs under its picker instead of standing
    beside it: it takes no room, so nothing on the page moves when it comes or goes. It is
    put away only once the page's script has said it is running and applying choices

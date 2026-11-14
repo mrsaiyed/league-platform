@@ -132,10 +132,18 @@ html {
 .site-season {
   flex: none;
 }
-.site-season .ui-toolbar,
-.site-season .ui-picker {
+/* In the header the picker is always one compact row, at any width: the label (hidden on a
+   phone), the field as wide as its season's name, and its button. */
+.site-header .site-season .ui-toolbar,
+.site-header .site-season .ui-picker {
+  display: flex;
   flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--step-2);
   margin: 0;
+}
+.site-header .site-season .ui-picker select {
+  inline-size: auto;
 }
 .site-header .site-season label {
   position: absolute;

@@ -256,6 +256,18 @@ describe('filter toolbar', () => {
     expect(css).not.toMatch(/\.ui-picker button \{[^}]*display: none/);
     expect(css).not.toMatch(/\.ui-picker button \{[^}]*(opacity: 0|pointer-events: none)/);
   });
+  it('on a phone gives each picker its own row, labels in one shared column, so they line up', () => {
+    const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    const phone = css.slice(css.indexOf('@media (max-width: 39.99rem) {\n  .ui-toolbar {'));
+    expect(phone.startsWith('@media')).toBe(true);
+    expect(phone).toMatch(
+      /\.ui-toolbar \{[^}]*grid-template-columns: max-content minmax\(0, 1fr\);/,
+    );
+    expect(phone).toMatch(
+      /\.ui-toolbar \.ui-picker \{[^}]*grid-column: 1 \/ -1;[^}]*grid-template-columns: subgrid;/,
+    );
+    expect(phone).toMatch(/\.ui-toolbar \.ui-picker select \{\s*inline-size: 100%;/);
+  });
   it('sets that mark only when it is running in the browser, never in the page as sent', () => {
     const source = readFileSync(
       new URL('./filter-toolbar/filter-toolbar.tsx', import.meta.url),
