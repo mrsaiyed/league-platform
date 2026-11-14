@@ -7,6 +7,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import {
   applyFixtureImport,
   getFixtureImport,
+  maxReportBytes,
   parseDraftDocument,
   readFixtureImport,
   recordImportedScores,
@@ -233,5 +234,49 @@ describe('fixture import against the database', () => {
     const result = await applyFixtureImport(other.as, { importId, version: view.version }, deps);
     expect(result).toEqual({ ok: false, error: { code: 'import-not-found' } });
     expect(await importRow(importId)).toMatchObject({ status: 'ready' });
+  });
+});
+
+describe('the size limits against the database’s own', () => {
+  // The code stops a report or an upload at maxReportBytes of JSON text; the database
+  // refuses a report whose jsonb text form (which adds a space after each colon and comma)
+  // passes a megabyte. The most the code allows must fit, with the most spacing.
+  async function fits(report: unknown) {
+    const w = await season();
+    const row = await one<{ size: number }>(
+      pglite,
+      `insert into imports (league_id, season_id, kind, account_id, report)
+       select $1, $2, 'fixtures', $3, $4::jsonb returning octet_length(report::text) as size`,
+      [w.leagueId, w.seasonId, w.as.accountId, JSON.stringify(report)],
+    );
+    return row.size;
+  }
+
+  it('holds the largest report the code allows', async () => {
+    // Many tiny fixtures: the most colons and commas for the bytes.
+    const tiny = { rowNumber: 1, date: 'a', time: null, homeTeamId: 'b', awayTeamId: 'c' };
+    const fixtures: unknown[] = [];
+    const report = () => ({
+      version: 1,
+      fileProblem: null,
+      fixtures,
+      problems: [],
+      omittedProblems: 0,
+      problemsNote: null,
+      warnings: [],
+      rowsRead: 0,
+      columnsFound: [],
+    });
+    while (JSON.stringify(report()).length + 70 < maxReportBytes) fixtures.push(tiny);
+    expect(JSON.stringify(report()).length).toBeLessThanOrEqual(maxReportBytes);
+    expect(await fits(report())).toBeLessThanOrEqual(1_048_576);
+  });
+
+  it('holds the largest upload the code allows', async () => {
+    // Characters that JSON escapes keep the text form and the JSON the same size.
+    const text = '\n'.repeat(Math.floor((maxReportBytes - 40) / 2));
+    const upload = { version: 1, upload: text };
+    expect(JSON.stringify(upload).length).toBeLessThanOrEqual(maxReportBytes);
+    expect(await fits(upload)).toBeLessThanOrEqual(1_048_576);
   });
 });

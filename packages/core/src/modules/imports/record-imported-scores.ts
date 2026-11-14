@@ -25,11 +25,17 @@ export type ImportedScoresRecorded = {
 
 export const recordImportedScores = defineCommand({
   name: 'imports.record_imported_scores',
-  permission: 'games.score',
+  permission: 'schedule.import',
   input: z.object({ importId: z.uuid() }),
   allowed: async (context, input, tx: ImportScoresTx) => {
     const found = await tx.imports.find(input.importId);
-    return mayImportInto(context, tx, 'games.score', found?.seasonId ?? null);
+    // An import's scores are the importer's to record: scoring a game is also needed, but
+    // scoring alone (a scorekeeper limited to assigned games) is not enough to record many.
+    const seasonId = found?.seasonId ?? null;
+    return (
+      (await mayImportInto(context, tx, 'schedule.import', seasonId)) &&
+      (await mayImportInto(context, tx, 'games.score', seasonId))
+    );
   },
   run: async ({
     context,
@@ -76,10 +82,17 @@ export const recordImportedScores = defineCommand({
       } else if (result.error.code === 'tie-not-allowed') {
         refused += 1;
         scores.push(score);
-      } else {
+      } else if (
+        result.error.code === 'game-already-decided' ||
+        result.error.code === 'game-cancelled'
+      ) {
         // Decided by hand or cancelled since: nothing more for this import to do.
         leftAlone += 1;
         scores.push({ ...score, recorded: true });
+      } else {
+        // Anything else (the game moved on while this ran, say) stays waiting.
+        waiting += 1;
+        scores.push(score);
       }
     }
     if (recorded + leftAlone > 0) {

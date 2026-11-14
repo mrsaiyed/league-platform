@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../command/index.ts';
 import { parseCreatedFixtures, parseFixtureReport } from './import-documents.ts';
-import { mayImportInto } from './policy.ts';
+import { maySeeImport } from './policy.ts';
 import type { ImportStatus, ImportsTx } from './ports.ts';
 import type { DraftFixture, RowProblem } from './read-fixtures.ts';
 
@@ -43,7 +43,7 @@ export const getFixtureImport = defineCommand({
   input: z.object({ importId: z.uuid() }),
   allowed: async (context, input, tx: ImportsTx) => {
     const found = await tx.imports.find(input.importId);
-    return mayImportInto(context, tx, 'schedule.import', found?.seasonId ?? null);
+    return maySeeImport(context, tx, found?.seasonId ?? null);
   },
   run: async ({ input, tx }): Promise<Result<FixtureImportView, GetFixtureImportError>> => {
     const found = await tx.imports.find(input.importId);

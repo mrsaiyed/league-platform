@@ -32,6 +32,7 @@ export type MemoryImports = {
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const ownerId = '01900000-0000-7000-8000-0000000000a1';
 export const schedulerId = '01900000-0000-7000-8000-0000000000a2';
+export const scorekeeperId = '01900000-0000-7000-8000-0000000000a3';
 export const editorId = '01900000-0000-7000-8000-0000000000a4';
 export const seasonId = '01900000-0000-7000-8000-0000000d0001';
 export const otherSeasonId = '01900000-0000-7000-8000-0000000d0002';
@@ -46,6 +47,15 @@ export const schedulerGrant = {
   id: '01900000-0000-7000-8000-0000000000f1',
   accountId: schedulerId,
   role: 'scheduler',
+  scope: { type: 'league' },
+  grantedByAccountId: ownerId,
+  revokedAt: null,
+} as const satisfies Grant;
+
+export const scorekeeperGrant = {
+  id: '01900000-0000-7000-8000-0000000000f3',
+  accountId: scorekeeperId,
+  role: 'scorekeeper',
   scope: { type: 'league' },
   grantedByAccountId: ownerId,
   revokedAt: null,

@@ -38,6 +38,7 @@ import {
   addDraftGame,
   addToRoster,
   applyFixtureImport,
+  discardFixtureImport,
   getFixtureImport,
   recordImportedScores,
   startFixtureImport,
@@ -1137,7 +1138,11 @@ const standingsRows: readonly Row[] = gameRows(
 );
 
 /** An import of a season, ready to apply or applied (with the empty draft it names). */
-async function importIn(league: League, s: { seasonId: string }, state: 'ready' | 'applied') {
+async function importIn(
+  league: League,
+  s: { seasonId: string },
+  state: 'reading' | 'ready' | 'applied',
+) {
   const created: Record<string, unknown> = { version: 1 };
   if (state === 'applied') {
     const draft = await one<{ id: string }>(
@@ -1155,17 +1160,20 @@ async function importIn(league: League, s: { seasonId: string }, state: 'ready' 
       scores: [],
     });
   }
-  const report = {
-    version: 1,
-    fileProblem: null,
-    fixtures: [],
-    problems: [],
-    omittedProblems: 0,
-    problemsNote: null,
-    warnings: [],
-    rowsRead: 0,
-    columnsFound: [],
-  };
+  const report =
+    state === 'reading'
+      ? { version: 1, upload: 'Date,Home,Away' }
+      : {
+          version: 1,
+          fileProblem: null,
+          fixtures: [],
+          problems: [],
+          omittedProblems: 0,
+          problemsNote: null,
+          warnings: [],
+          rowsRead: 0,
+          columnsFound: [],
+        };
   const row = await one<{ id: string }>(
     pglite,
     `insert into imports (league_id, season_id, kind, status, account_id, file_name, report, created, applied_at)
@@ -1185,7 +1193,7 @@ async function importIn(league: League, s: { seasonId: string }, state: 'ready' 
 
 // A fixtures import is run at its season's program (P4 §3 `schedule.import`): the owner,
 // admins and schedulers; a scheduler limited to one program only in its seasons. Its scores
-// are recorded by those who may score games there (`games.score`).
+// are recorded by those who may import and score games there (a scorekeeper alone may not).
 const fixtureImportRows: readonly Row[] = [
   ...scheduleRows(
     'imports.start_fixture_import',
@@ -1215,9 +1223,16 @@ const fixtureImportRows: readonly Row[] = [
   ...scheduleRows(
     'imports.record_imported_scores',
     'record the scores of an applied import',
-    'games.score',
+    'schedule.import',
     async (s, league) => ({ importId: await importIn(league, s, 'applied') }),
     (c, i) => recordImportedScores(c, i, importsDeps),
+  ),
+  ...scheduleRows(
+    'imports.discard_fixture_import',
+    'give up on an unread import',
+    'schedule.import',
+    async (s, league) => ({ importId: await importIn(league, s, 'reading') }),
+    (c, i) => discardFixtureImport(c, i, importsDeps),
   ),
   ...scheduleRows(
     'imports.get_fixture_import',

@@ -32,3 +32,15 @@ export async function mayImportInto(
   const status = await tx.access.leagueStatus();
   return status !== undefined && !readOnlyLeagueStatuses.includes(status);
 }
+
+/**
+ * Seeing an import: the permission at the season's program, in any state of the league
+ * (as for the draft), so an archived league's admin can still read what was imported.
+ */
+export async function maySeeImport(
+  context: CommandContext,
+  tx: ImportsTx,
+  seasonId: string | null,
+): Promise<boolean> {
+  return hasPermission(context, tx, 'schedule.import', await seasonScopeOf(tx, seasonId));
+}
