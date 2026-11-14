@@ -156,6 +156,48 @@ test('an override lasts for that window only; the next half ends in a stop clock
   assert.equal(t.clock.running, false);
 });
 
+test('a switch inside the window keeps to that window, whatever the period selector or clock do', () => {
+  const rules = { ...QUARTERS, clockMode: 'running', stopClockLastSeconds: 120 };
+  // Q4 to Q3 and back to Q4 is a new window: the switch made in the first one is over.
+  let s = late(rules, 4, 60_000);
+  s = at(s, running, 2_000);
+  assert.equal(s.plays.at(-1).lastMinutes, true);
+  assert.equal(clockModeAt(s), 'running');
+  s = at(s, { type: 'pause' }, 2_500);
+  s = at(s, { type: 'period', period: 3 }, 3_000);
+  s = at(s, { type: 'period', period: 4 }, 3_500);
+  s = at(s, { type: 'set-clock', ms: 60_000 }, 4_000);
+  s = at(s, { type: 'start' }, 5_000);
+  assert.equal(clockModeAt(s), 'stop');
+  s = at(s, foul, 6_000);
+  assert.equal(s.clock.running, false);
+  // Undoing a mistaken change of period brings the switch back with its window.
+  let u = late(rules, 4, 60_000);
+  u = at(u, running, 2_000);
+  u = at(u, { type: 'pause' }, 2_500);
+  u = at(u, { type: 'period', period: 3 }, 3_000);
+  u = at(u, { type: 'undo' }, 3_500);
+  assert.equal(clockModeAt(u), 'running');
+  // Setting the clock back past the window restamps the switch but does not undo it.
+  let t = late(rules, 4, 60_000);
+  t = at(t, running, 2_000);
+  t = at(t, { type: 'set-clock', ms: 300_000 }, 3_000);
+  assert.equal(t.plays.at(-1).clockMs, 300_000, 'the switch moved out of the window');
+  assert.equal(clockModeAt(t), 'running');
+  t = at(t, { type: 'set-clock', ms: 30_000 }, 4_000);
+  t = at(t, { type: 'start' }, 5_000);
+  assert.equal(clockModeAt(t), 'running');
+  t = at(t, foul, 6_000);
+  assert.equal(t.clock.running, true, 'still the rest of the window the switch was made in');
+});
+
+test('without the rule a switch carries no window flag, so the state reads as before', () => {
+  let s = late({ ...HALVES, clockMode: 'running' }, 2, 30_000);
+  s = at(s, stop, 2_000);
+  s = at(s, running, 3_000);
+  assert.equal('lastMinutes' in s.plays.at(-1), false);
+});
+
 test('clockModeAt reads the window at any moment of the running clock', () => {
   const s = late(REC, 2, 125_000);
   assert.equal(clockModeAt(s, derive(s), clockAt(s, 3_000).remainingMs), 'running');

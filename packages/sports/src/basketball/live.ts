@@ -167,7 +167,10 @@ export function inLastMinutes(rules: Rules, period: number, remainingMs: number)
  * the mercy rule or the scorer chose (`Derived.clockMode`), except that inside the
  * last-minutes stop clock it is a stop clock, unless the scorer switched to a
  * running clock there themselves (S-21: the scorer overrides anything automatic).
- * The tracker's switch shows this mode, and a foul or a timeout follows it.
+ * That switch holds for the rest of the window it was made in: it carries the
+ * `lastMinutes` flag from when it was made, so setting the clock back does not undo
+ * it, and any later change of period ends it. The tracker's switch shows this mode,
+ * and a foul or a timeout follows it.
  */
 export function clockModeAt(
   state: GameState,
@@ -180,10 +183,9 @@ export function clockModeAt(
     const p = state.plays[i]!;
     // The mercy rule's switch is automatic, so the stop clock still holds after it.
     if (p.mercyClock) break;
-    if (p.type === 'clock-mode')
-      return p.period === d.period && inLastMinutes(state.rules, p.period, p.clockMs)
-        ? 'running'
-        : 'stop';
+    // A new period is a new window.
+    if (p.type === 'period') break;
+    if (p.type === 'clock-mode') return p.lastMinutes ? 'running' : 'stop';
   }
   return 'stop';
 }
@@ -246,6 +248,12 @@ export type Stamp = {
    * a running clock. The tracker says so; undoing the basket undoes the switch.
    */
   mercyClock?: true;
+  /**
+   * This switch to a running clock was made inside the last-minutes stop clock, so it
+   * holds for the rest of that window (`clockModeAt`). Set when made, so restamping
+   * the play's clock time later does not change it.
+   */
+  lastMinutes?: true;
 };
 export type LoggedPlay = Play & Stamp;
 
@@ -699,6 +707,12 @@ function record(s: GameState, input: Play, id: string, at: number) {
     s.plays.push({ ...play, ...stamp, stoppedClock: true });
   } else if (play.type === 'score' && reachesMercy(s.rules, d, play)) {
     s.plays.push({ ...play, ...stamp, mercyClock: true });
+  } else if (
+    play.type === 'clock-mode' &&
+    play.mode === 'running' &&
+    inLastMinutes(s.rules, d.period, s.clock.remainingMs)
+  ) {
+    s.plays.push({ ...play, ...stamp, lastMinutes: true });
   } else s.plays.push({ ...play, ...stamp });
   s.redo = [];
   // Setting lineups or the clock mode before tip-off does not make the game live for
