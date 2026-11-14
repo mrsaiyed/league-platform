@@ -10,7 +10,11 @@
 // it visits (T-186); and a person who is only a SCHEDULER of the first league (not its
 // owner: the made-up scheduler has the narrowest admin role, so being refused in the
 // second league shows more than being refused as an owner would not) being refused at
-// every admin address and the scoring address of the second league.
+// every admin address and the scoring address of the second league. And the frame every
+// league page has (step 2.85): the season picker in the header moves the page to another
+// season and keeps the page's other choices, the header is one row high on a phone, and a
+// page that is not there keeps the league's header and leads back to the league home, while
+// a league that may not be seen gets the plain screen.
 // A part that throws (a wait that times out, a build that fails) is recorded by name and
 // the other parts still run and print.
 // Not covered: (1) the invitation email being captured and its link followed: the
@@ -264,6 +268,82 @@ if (browser) {
         looks['north-valley'] === '#c8a84b' && looks['harbor-city'] === '#1f5fbf',
         JSON.stringify(looks),
       );
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step("the league's frame: season picker, phone header, not found", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    try {
+      const page = await context.newPage();
+      await open(page, '/north-valley/schedule?team=owls');
+      const header = await page.locator('.site-header').boundingBox();
+      note(
+        'the header is one row high on a phone',
+        (header?.height ?? 999) <= 60,
+        `${header?.height}`,
+      );
+      const picker = page.locator('.site-header select[name=season]');
+      note('the season picker is in the header', (await picker.count()) === 1);
+      note(
+        'no page repeats the season picker',
+        (await page.locator('select[name=season]').count()) === 1,
+      );
+      await picker.selectOption({ label: 'Spring 2026' });
+      await page.waitForURL(/season=spring-2026/);
+      await page.locator('main').first().waitFor();
+      const moved = new URL(page.url());
+      note(
+        'choosing a season shows the same page of that season and keeps the team',
+        moved.pathname === '/north-valley/schedule' &&
+          moved.searchParams.get('season') === 'spring-2026' &&
+          moved.searchParams.get('team') === 'owls',
+        page.url(),
+      );
+      note(
+        'the picker shows the season the page is on',
+        (await page.locator('.site-header select[name=season]').inputValue()) === 'spring-2026',
+      );
+      await accessible(page, '/north-valley/schedule (phone, another season)');
+      await open(page, '/harbor-city/schedule');
+      note(
+        'a league with one season has no season picker',
+        (await page.locator('select[name=season]').count()) === 0,
+      );
+
+      for (const address of ['/north-valley/teams/lions', '/north-valley/no-such-page/at-all']) {
+        const response = await open(page, address);
+        note(`${address} is not found`, response?.status() === 404);
+        note(
+          `${address} keeps the league's header and menu`,
+          (await page.locator('.site-header .site-name').textContent()) === 'North Valley League' &&
+            (await page.locator('.site-footer').count()) === 1,
+        );
+        const back = page.getByRole('link', { name: 'Back to the league home' });
+        note(`${address} leads back to the league home`, (await back.count()) === 1);
+        note(
+          `${address} does not send the visitor off to the start page`,
+          (await page.getByRole('link', { name: 'Go to the SR Leagues start page' }).count()) === 0,
+        );
+        await accessible(page, `${address} (not found)`);
+      }
+      await page.getByRole('link', { name: 'Back to the league home' }).click();
+      await page.getByRole('heading', { level: 1, name: 'North Valley League' }).waitFor();
+      note('the way on from "not found" is the league home', pathOf(page) === '/north-valley');
+
+      // A league that may not be seen, and no league at all: the plain screen, no frame.
+      for (const address of ['/quiet-pines/teams/lions', '/nobody-has-this/no-such-page/at-all']) {
+        const response = await open(page, address);
+        note(`${address} is not found`, response?.status() === 404);
+        note(
+          `${address} shows no league's frame`,
+          (await page.locator('.site-header').count()) === 0 &&
+            (await page.getByRole('link', { name: 'Back to the league home' }).count()) === 0 &&
+            (await page.getByRole('link', { name: 'Go to the SR Leagues start page' }).count()) ===
+              1,
+        );
+      }
     } finally {
       await context.close();
     }

@@ -100,7 +100,8 @@ const cases = [
     ['Owls', 'Falcons', '5-1', 'East', 'Seed', 'Record'],
     ['This page is not built yet.'],
   ],
-  ['visitor', '/harbor-city/teams', 200, ['Comets', 'Rockets', 'Meteors']],
+  // A league with no divisions says nothing about divisions on its team cards.
+  ['visitor', '/harbor-city/teams', 200, ['Comets', 'Rockets', 'Meteors'], ['No division']],
   [
     'visitor',
     '/north-valley/teams/falcons',
@@ -127,6 +128,27 @@ const cases = [
   ],
   ['visitor', '/north-valley/teams/lions', 404, [notFound]],
   ['visitor', '/north-valley/teams/falcons?season=nope', 404, [notFound]],
+  // Any address under a league that is no page of it is refused by the league's own gate
+  // (step 2.85): "not found" for a league the visitor may see and for one they may not.
+  ['visitor', '/north-valley/no-such-page/at-all', 404, [notFound]],
+  [
+    'visitor',
+    '/quiet-pines/no-such-page/at-all',
+    404,
+    [notFound],
+    ['This league is not published.', 'site-header'],
+  ],
+  ['owner', '/north-valley/admin/no-such-area/at-all', 404, [notFound]],
+  // The season picker is in the header of the menu's pages, once, and carries the page's
+  // other choices; a league with one season has none (step 2.85).
+  [
+    'visitor',
+    '/north-valley/schedule?team=owls',
+    200,
+    ['id="site-season"', 'name="team" value="owls"', 'Spring 2026'],
+  ],
+  ['visitor', '/harbor-city/schedule', 200, ['Opening day'], ['id="site-season"']],
+  ['owner', '/north-valley/admin/teams', 200, ['Add a team'], ['id="site-season"']],
   // The start page for members (step 2.44, U-5, R-10). North Valley keeps the league home;
   // Harbor City starts members on their team: a member with a roster place, or the team a
   // device remembers. The league home is always one tap away (start=league).
