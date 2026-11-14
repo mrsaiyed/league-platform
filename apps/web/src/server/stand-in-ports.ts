@@ -42,7 +42,7 @@ import { createPlayPublisher } from './publish-plays.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import { standInFixtureImport } from './stand-in-fixture-import.ts';
 import { standInGames } from './stand-in-games.ts';
-import { standInPublicSchedule } from './stand-in-public-schedule.ts';
+import { standInListedGames, standInPublicSchedule } from './stand-in-public-schedule.ts';
 import {
   adultTeams,
   standInPublicStats,
@@ -283,6 +283,10 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
   };
   const accessOf = accessOfVia(deps);
+  const scheduled = {
+    adultLeagueId: standInLeagues.live.id,
+    youthLeagueId: standInLeagues.other.id,
+  };
   const games = standInGames({
     leagueId: standInLeagues.live.id,
     people: {
@@ -293,6 +297,8 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     assignees: [scorekeeper.accountId, owner.accountId],
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
+    // The home and schedule pages' games, so each card opens its game's page.
+    listedGames: standInListedGames(scheduled, now),
   });
   // One live hub for this process (record 021): the tracker's endpoints publish to it,
   // and GET /api/v1/live lets a page listen, only to a league it may open.
@@ -349,10 +355,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       accessOf: (leagueId) => accessTx(leagueId).access,
       log: options.log,
     }),
-    publicSchedule: standInPublicSchedule(
-      { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
-      now,
-    ),
+    publicSchedule: standInPublicSchedule(scheduled, now),
     scheduleAdmin: standInSchedule({
       leagues: [
         {

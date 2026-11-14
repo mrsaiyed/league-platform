@@ -7,16 +7,26 @@ import {
   type LiveMessage,
 } from '@srleagues/contracts';
 import { createLocalLiveHub, type LocalLiveHub } from '@srleagues/providers';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hubEventSources } from './hub-event-source.test-helper.ts';
 import type { LiveConnection } from './live-subscriber.ts';
 import {
   serverSentEventsSubscriber,
+  webLiveAddress,
   type EventSourceLike,
   type ServerSentEventsSubscriberOptions,
 } from './server-sent-events-subscriber.ts';
 
 const leagueA = '0192f000-0000-7000-8000-00000000000a';
+
+describe('the web live address', () => {
+  it('is the address of the live route of the web app', () => {
+    const route = new URL(`../../app${webLiveAddress}/route.ts`, import.meta.url);
+    expect(existsSync(fileURLToPath(route))).toBe(true);
+  });
+});
 const leagueB = '0192f000-0000-7000-8000-00000000000b';
 const game1 = '0192f000-0000-7000-8000-000000000001';
 const game2 = '0192f000-0000-7000-8000-000000000002';

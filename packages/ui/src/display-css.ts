@@ -158,7 +158,10 @@ export const displayCss = String.raw`/* The look of the shared display pieces. E
   font-variant-numeric: tabular-nums;
 }
 
+/* Positioned so text hidden for screen readers (.ui-visually-hidden, absolute) in a wide
+   table stays inside this scrolling box instead of widening the page (A-2). */
 .ui-table-wrap {
+  position: relative;
   overflow-x: auto;
   max-inline-size: 100%;
 }

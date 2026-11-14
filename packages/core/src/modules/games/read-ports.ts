@@ -44,6 +44,9 @@ export type GamesReadStore = {
         readonly awayScore: number | null;
         readonly finalizedAt: string | null;
         readonly binned: boolean;
+        /** The rules it is played under, as stored: its own once fixed (`format`), else
+         * its season's; null or undefined when neither is stored (the starting set). */
+        readonly rules: unknown;
       }
     | undefined
   >;
