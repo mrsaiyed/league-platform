@@ -465,11 +465,11 @@ export const en = {
   'setting.games.whoMayScore.option.anyScorekeeper': 'Any game',
   'setting.games.whoMayScore.option.assignedOnly': 'Only games they are assigned to',
   'setting.teams.startingStatsLevel.label':
-    'Who sees a new team�s players� statistics until the team chooses',
+    "Who sees a new team's players' statistics until the team chooses",
   'setting.teams.startingStatsLevel.option.everyone': 'Everyone',
-  'setting.teams.startingStatsLevel.option.staff': 'Only the team�s staff and the league�s admins',
+  'setting.teams.startingStatsLevel.option.staff': "Only the team's staff and the league's admins",
   'setting.teams.mayChooseStatsLevel.label':
-    'Whether each team may choose who sees its players� statistics',
+    "Whether each team may choose who sees its players' statistics",
   // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
   // league's name, {role} a role's name from above, {days} how long a link works.
   'email.invitation.subject': 'You are invited to help run {league}',
