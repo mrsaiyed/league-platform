@@ -8,7 +8,7 @@ import {
   recordForfeit,
   type CommandContext,
   type CommandDeps,
-  type GamesTx,
+  type TrackerTx,
 } from '@srleagues/core';
 
 export const gameActions = ['final', 'forfeit', 'postpone', 'cancel'] as const;
@@ -35,7 +35,7 @@ export async function runGameAction(
   action: GameAction,
   fields: GameFields,
   context: CommandContext,
-  deps: CommandDeps<GamesTx>,
+  deps: CommandDeps<TrackerTx>,
 ): Promise<GameActionResult> {
   const base = { gameId: fields['gameId'], version: numberOf(fields['version']) };
   const result = await (async () => {

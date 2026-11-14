@@ -8,17 +8,28 @@ import {
   memoryTransaction,
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
+import { boxScoreStores } from '../../command/testing/memory-box-scores.ts';
 import type { DomainEvent, EventHandler, JobQueue } from '../../command/index.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { StoredSetting } from '../leagues/index.ts';
 import { isDecided } from './game-fields.ts';
-import type { GameLine, GameRecord, GamesTx, NewGameCorrection } from './ports.ts';
+import type {
+  GameLine,
+  GameRecord,
+  GameRosterPlayer,
+  GamesTx,
+  NewGameCorrection,
+} from './ports.ts';
 
 export type MemoryGames = {
   status: string;
   seasons: { id: string; programId: string; rules: unknown }[];
   games: GameRecord[];
   lines: GameLine[];
+  /** Players on teams' rosters, by team. */
+  roster: GameRosterPlayer[];
+  /** Games the tracker has recorded plays for. */
+  tracked: string[];
   corrections: NewGameCorrection[];
   grants: Grant[];
   activity: ActivityEntry[];
@@ -128,6 +139,8 @@ export const emptyGames = (): MemoryGames => ({
   ],
   games: [],
   lines: [],
+  roster: [],
+  tracked: [],
   corrections: [],
   grants: [],
   activity: [],
@@ -176,11 +189,13 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
           awayScore: change.awayScore,
           finalizedAt: change.decided ? '2026-12-06T20:00:00.000Z' : null,
           format: found.format ?? change.format ?? null,
+          captureMode: change.captureMode ?? found.captureMode,
           version: found.version + 1,
         };
         return found.version + 1;
       },
       addCorrection: async (correction) => void s.corrections.push(correction),
+      ...boxScoreStores(s),
       listPostponed: async (season) =>
         s.games
           .filter(

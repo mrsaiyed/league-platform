@@ -73,10 +73,12 @@ function Controls({
   league,
   game,
   trackerHref,
+  boxScoreHref,
 }: {
   readonly league: string;
   readonly game: GameRowView;
   readonly trackerHref: string;
+  readonly boxScoreHref: string;
 }) {
   return (
     <div className="admin-game-controls">
@@ -105,6 +107,7 @@ function Controls({
         </form>
       ) : null}
       {game.trackerLink ? <a href={trackerHref}>{t('admin.games.openTracker')}</a> : null}
+      {game.boxScoreLink ? <a href={boxScoreHref}>{t('admin.games.boxScore')}</a> : null}
       {game.canForfeit ? (
         <details>
           <summary>{t('admin.games.otherActions')}</summary>
@@ -193,6 +196,10 @@ export async function GamesPage({
                 league={league}
                 game={game}
                 trackerHref={leagueUrl(addressee, 'score', { game: game.id })}
+                boxScoreHref={leagueUrl(addressee, 'admin-area', {
+                  area: 'games',
+                  subpath: [game.id],
+                })}
               />
             </li>
           ))}

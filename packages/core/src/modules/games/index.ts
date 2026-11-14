@@ -18,6 +18,17 @@ export { listPostponedGames, type PostponedGame } from './commands/list-postpone
 export { postponeGame, type PostponeGameError } from './commands/postpone-game.ts';
 export { recordFinalScore, type RecordFinalScoreError } from './commands/record-final-score.ts';
 export { recordForfeit, type RecordForfeitError } from './commands/record-forfeit.ts';
+export {
+  setBoxScore,
+  type BoxScoreLineInput,
+  type SetBoxScoreError,
+} from './commands/set-box-score.ts';
+export {
+  getBoxScoreSheet,
+  type BoxScoreSheet,
+  type GetBoxScoreSheetError,
+} from './commands/get-box-score-sheet.ts';
+export { boxScoreColumns } from './box-score-columns.ts';
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
 export { endTrackedGame, type EndTrackedGameError } from './commands/end-tracked-game.ts';
 export { recordFinalScoreWithin } from './record-score-within.ts';
@@ -92,6 +103,8 @@ export type {
   GamesWindow,
   GameLine,
   GameRecord,
+  GameRosterPlayer,
+  NewGameLine,
   GameResultDocument,
   GameResultChange,
   GamesStore,

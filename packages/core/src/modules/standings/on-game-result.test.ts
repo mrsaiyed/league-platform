@@ -3,7 +3,7 @@ import { recordFinalScore, recordForfeit, reopenGame } from '../games/index.ts';
 import { rebuildStandings } from './commands/rebuild-standings.ts';
 import {
   fourTeams,
-  game,
+  game as scheduledGame,
   gameId,
   line,
   memoryStandings,
@@ -13,6 +13,13 @@ import {
   seasonId,
   teamId,
 } from './memory-standings.test-helper.ts';
+
+// These games carry player lines before their result is saved, as a game the live
+// tracker kept does: a final score keeps a tracked game's lines. (A box score game saved
+// again with two numbers only loses its lines, S-27, so it would carry none here; that
+// case has its own tests in box-score-result.test.ts and record-final-score.test.ts.)
+const game: typeof scheduledGame = (n, home, away, fields = {}) =>
+  scheduledGame(n, home, away, { captureMode: 'live', ...fields });
 
 const score = (n: number, version: number, homeScore: number, awayScore: number) => ({
   gameId: gameId(n),
