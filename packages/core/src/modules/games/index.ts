@@ -81,6 +81,7 @@ export {
   type TrackerGameState,
 } from './commands/read-tracker-state.ts';
 export { engineRulesOf } from './engine-rules.ts';
+export { rulesOfGame } from './season-rules-of.ts';
 export {
   leaseMs,
   sessionStanding,

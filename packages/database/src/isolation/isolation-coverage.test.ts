@@ -130,6 +130,15 @@ const reachNoLeagueData = new Map<unknown, string>([
     'reads a copy of a tracker backup folder on disk with its own embedded database; no league, no platform tables (step 2.57)',
   ],
   [databasePackage.TrackerBackupError, 'the reader error class; runs nothing'],
+  [
+    databasePackage.transferTrackerGames,
+    'development tool (step 2.58): takes a PGlite, not a scope; finds one league, season and account by name, then reaches that one league only through stores fenced to it (each transaction sets its league) and its commands (own cases)',
+  ],
+  [
+    databasePackage.transferTrackerGamesInFolder,
+    'opens a PGlite folder on disk (never an address) and runs transferTrackerGames on it',
+  ],
+  [databasePackage.isDatabaseAddress, 'tells an address from a folder name; runs nothing'],
 ]);
 
 /**
