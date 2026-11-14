@@ -68,6 +68,7 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 - A second scorekeeper opening the same game sees who holds it and can **take over** after confirming. The first device immediately becomes read-only and says why.
 - Commands from a session that no longer holds the game are refused. Anything that device had not yet sent is shown to its user as "not saved", so the new scorekeeper can re-enter it.
 - If a device simply disappears, its lease runs out after about two minutes and the game is free.
+- **T-248 (record 036):** a lease that ran out frees the game for anyone else, but if nobody has taken it, the same device coming back carries on with its own session, so taps it queued while offline are still accepted. Leases are timed by the server's clock, never the device's. Leaving the game releases it at once; only taking over is written to the activity log.
 
 ## 6. Getting each play to the people watching
 

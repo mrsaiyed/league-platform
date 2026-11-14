@@ -130,3 +130,48 @@ export type GamesTx = CommandTx & {
   readonly access: AccessReader;
   readonly activity: ActivityLog;
 };
+
+/**
+ * The server's clock: milliseconds since 1970. Leases (T-116) are worked out from it,
+ * never from the device's clock; a test passes one it moves by hand.
+ */
+export type Clock = { readonly now: () => number };
+
+/** The one device scoring a game (T3 §8 `scoring_sessions`, T-116). Times in milliseconds. */
+export type ScoringSession = {
+  readonly id: string;
+  readonly gameId: string;
+  readonly accountId: string;
+  /** The device's own id for itself, made by the tracker. */
+  readonly deviceId: string;
+  /** When this session began: the `since` a takeover names. Never moves. */
+  readonly since: number;
+  /** When its lease runs out unless it is renewed. */
+  readonly heldUntil: number;
+};
+
+export type NewScoringSession = Omit<ScoringSession, 'id'>;
+
+export type ScoringSessionsStore = {
+  /** The game's session, whether its lease has run out or not. */
+  readonly findForGame: (gameId: string) => Promise<ScoringSession | undefined>;
+  /**
+   * Starts the game's session unless it already has one, even one another request
+   * started a moment ago: the new session, or undefined. Never throws for that, so
+   * the transaction stays usable to read who won.
+   */
+  readonly start: (session: NewScoringSession) => Promise<ScoringSession | undefined>;
+  /** Moves the lease of the game's session `sessionId` on to `heldUntil`: false if it is gone. */
+  readonly extend: (gameId: string, sessionId: string, heldUntil: number) => Promise<boolean>;
+  /**
+   * Ends the game's session `sessionId`. With `lapsedBy`, only if its lease had run out
+   * by then, so a session renewed a moment ago is kept. False if nothing was ended.
+   */
+  readonly end: (gameId: string, sessionId: string, lapsedBy?: number) => Promise<boolean>;
+};
+
+/** The scoring session commands' transaction: the games one, the sessions and the clock. */
+export type ScoringTx = GamesTx & {
+  readonly scoringSessions: ScoringSessionsStore;
+  readonly clock: Clock;
+};
