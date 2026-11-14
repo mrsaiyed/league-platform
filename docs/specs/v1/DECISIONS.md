@@ -280,6 +280,7 @@ All dated November 12, 2026.
 | T-242                 | New                                                                          | Live game, calculated and import tables stored; each tap once, in order, never changed (rec. 030)             | Step 2.4: T3 did not map the tracker's tables or say where the S-6 walk-up mark lives              |
 | T-243                 | New                                                                          | Sign-in screens, session cookies, a 30-second shared renewal, `TRUSTED_PROXY` (record 031)                    | Step 1.14: T4 did not say how the web app keeps a session or tells visitors' networks apart        |
 | T-245                 | New                                                                          | Standings and totals rebuilt by event handlers in the result's transaction, one season at a time (rec. 033)   | Step 2.24: T3 did not say how handlers get their stores, how two results at once agree, or S-22    |
+| T-249                 | New                                                                          | Placing a schedule: strict rules never broken, the rest best effort, unplaced games returned (rec. 037)       | Step 2.73: P7 §4 did not say what happens when the fairness rules cannot all be met                |
 
 ## The full list
 
@@ -530,6 +531,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-237 | A game's winner comes from its scores, its rules are fixed once it starts, and a decided result changes only with a correction; revisions and corrections are history (rec. 025)  | Agreed (delegated) |         |
 | T-242 | Each tap is saved once per game, in order, never changed; stat counts are whole numbers; a walk-up player is marked on their roster entry; imports keep what they made (rec. 030) | Agreed (delegated) |         |
 | T-245 | Standings and totals are rebuilt per season by event handlers in the result's transaction, one at a time; totals hold every team's numbers (rec. 033)                             | Agreed (delegated) |         |
+| T-249 | Schedules never break strict rules (twice a day, same matchup two weeks running, division, requests); the rest is best effort; unplaced games are returned (rec. 037)             | Agreed (delegated) |         |
 
 ### [T4 — Keeping leagues apart, sign-in, security](technical/T4-tenancy-auth-security.md)
 
