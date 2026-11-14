@@ -6,6 +6,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  limits,
+  openOrders,
+  span,
+  stallSigns,
+  watchLines,
+  withAges,
+} from './build-watch-rules.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -313,6 +321,79 @@ console.log(
   `Wrote docs/build/dashboard.html (${stagePlans.length} stage plans, ${stepCount} steps, ${lanes.length} open lanes).`,
 );
 
+// ---------- is anything stuck? ----------
+// Nobody should have to come and look. These are the signs that the build has stopped
+// moving (scripts/build-watch-rules.mjs) and the orders the hourly overseer left for the
+// lead in .local/overseer-orders.md. When each sign was first seen is kept between runs.
+const local = path.join(root, '.local');
+const laneFolders = fs.existsSync(path.join(local, 'lanes'))
+  ? fs.readdirSync(path.join(local, 'lanes'))
+  : [];
+const openedAt = (id) => {
+  const folder = laneFolders.find((name) => name === id || name.startsWith(`${id}-`));
+  return folder ? fs.statSync(path.join(local, 'lanes', folder)).birthtime.toISOString() : '';
+};
+const nowIso = new Date().toISOString();
+const minutesSince = (time) => Math.floor((Date.parse(nowIso) - Date.parse(time)) / 60000);
+const landings = (...range) =>
+  git('log', '--first-parent', '--format=%cI', '--grep=^Land step', ...range)
+    .split('\n')
+    .filter(Boolean);
+const lastLanding = landings('-1', 'HEAD')[0] ?? '';
+const oldestOffMain = landings('--reverse', 'origin/main..HEAD')[0] ?? '';
+const seenFile = path.join(local, 'build-watch.json');
+let seenBefore = {};
+try {
+  seenBefore = JSON.parse(read(seenFile) || '{}');
+} catch {
+  seenBefore = {};
+}
+const watched = withAges(
+  stallSigns({
+    now: nowIso,
+    firstStage,
+    ready,
+    lanes: lanes.map((lane) => ({ id: lane.id, openedAt: openedAt(lane.id) })),
+    lockTime: data.lock,
+    lastLanding,
+    oldestOffMain,
+  }),
+  seenBefore,
+  nowIso,
+);
+fs.mkdirSync(local, { recursive: true });
+fs.writeFileSync(seenFile, JSON.stringify(watched.seen, null, 2));
+const orders = openOrders(read(path.join(local, 'overseer-orders.md')));
+
+// `--watch` is what the hourly overseer runs: the facts, then what is stuck, and nothing
+// that tells it to open lanes.
+if (process.argv.includes('--watch')) {
+  const runLive = Boolean(data.lock) && minutesSince(data.lock) < limits.lockMinutes;
+  const perStage = stagePlans
+    .map((plan) => {
+      const steps = plan.groups.flatMap((group) => group.steps);
+      const done = steps.filter((step) => step.state === 'done').length;
+      return `stage ${plan.number}: ${done} of ${steps.length} steps`;
+    })
+    .join(', ');
+  console.log(
+    [
+      `FACTS: ${runLive ? 'a run is working' : 'NO run is working'} (lock: ${data.lock || 'none'})`,
+      `last landing ${lastLanding ? `${span(minutesSince(lastLanding))} ago` : 'unknown'}`,
+      `newest saved work ${newestWork ? `${span(minutesSince(newestWork))} ago` : 'unknown'}`,
+      `${lanes.length} of ${data.laneCount} lanes open`,
+      perStage,
+    ].join('; ') + '.',
+  );
+  console.log(
+    watched.signs.length || orders.length
+      ? `WATCH: ${watched.signs.length} stall sign(s), ${orders.length} open order(s).`
+      : 'WATCH: nothing is stuck.',
+  );
+  for (const line of watchLines(orders, watched.signs)) console.log(line);
+  process.exit(0);
+}
+
 // The lead reads this after every landing. It is the guard against sliding back to one
 // builder at a time: free lanes plus steps that can start means lanes must be opened now.
 const free = Math.max(0, data.laneCount - lanes.length);
@@ -341,3 +422,5 @@ if (free && ready.length) {
 } else {
   console.log('No step can start until an open lane lands.');
 }
+// Orders from the overseer and stall signs: the lead deals with these before anything else.
+for (const line of watchLines(orders, watched.signs)) console.log(line);
