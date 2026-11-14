@@ -397,8 +397,11 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
 
     async enqueue(command) {
       if (stopped) throw new QueueError('queue-stopped');
+      // Each tap keeps the session it was made under (T6 §5, record 049).
+      const session = sessionId();
+      const madeUnder = session === null ? {} : { sessionId: session };
       const added = await stored('storage-write-failed', () =>
-        storage.add(gameId, { protocolVersion, command }),
+        storage.add(gameId, { protocolVersion, command, ...madeUnder }),
       );
       // Stored: whatever happens next, the tap is kept. If the read after it fails, the
       // count goes up by hand, so the screen never shows fewer waiting than are held.

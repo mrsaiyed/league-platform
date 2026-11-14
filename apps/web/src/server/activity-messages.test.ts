@@ -31,6 +31,8 @@ const reads = new Set([
   // The tracker's taps (step 2.29): every one is already kept as a game event with who
   // sent it, and a game sends hundreds, so they are not copied into the activity log.
   'games.apply_tracker_commands',
+  // The engine's state for the tracker to load (T-253): a read.
+  'games.read_tracker_state',
 ]);
 
 describe('activity log messages', () => {

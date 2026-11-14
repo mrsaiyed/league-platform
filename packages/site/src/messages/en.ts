@@ -956,6 +956,35 @@ export const en = {
   'tracker.queue.notSaved_other': '{count} actions not saved',
   'tracker.queue.storageFailed': 'This device could not save to its storage',
   'tracker.queue.separator': ' · ',
+  // What the tracker says about holding the game and refused taps (T6 §5, T-113),
+  // chosen from the controller's status by apps/web/src/features/tracker/tracker-notice.ts.
+  'tracker.readOnly.taken-over':
+    'Another device has taken over scoring this game. This one is now read-only.',
+  'tracker.readOnly.expired':
+    'This device was away too long and another device has had the game since. This one is now read-only.',
+  'tracker.readOnly.released':
+    'This device has left the game. It is read-only until you open it again.',
+  'tracker.readOnly.not-held': 'This device no longer holds the game, so it is read-only.',
+  'tracker.readOnly.game-not-live':
+    'This game cannot be scored now: it is over, cancelled or postponed.',
+  'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
+  'tracker.readOnly.unknown-game': 'This game could not be found.',
+  'tracker.readOnly.request-refused':
+    'The server could not take what this device asked for. Open the game again to try once more.',
+  'tracker.readOnly.storage-failed':
+    'This device could not read what it has saved, so it is read-only. Open the game again to try once more.',
+  'tracker.readOnly.signed-out':
+    'You are signed out. Sign in again to keep scoring. What you entered on this device is kept and sent once you are back, so do not enter it again.',
+  'tracker.readOnly.update-needed':
+    'This tracker needs an update. Reload the page to keep scoring.',
+  'tracker.heldByOther': '{name} is scoring this game on another device.',
+  'tracker.notApplied_one': '{count} action was not applied. The game now shows what was saved.',
+  'tracker.notApplied_other':
+    '{count} actions were not applied. The game now shows what was saved.',
+  'tracker.notSaved_one':
+    '{count} action on this device was not saved. Enter it again if it is needed.',
+  'tracker.notSaved_other':
+    '{count} actions on this device were not saved. Enter them again if they are needed.',
   // Admin → Schedule: the grid of rounds and games (step 2.52).
   'schedule.admin.title': 'Schedule',
   'schedule.admin.intro':

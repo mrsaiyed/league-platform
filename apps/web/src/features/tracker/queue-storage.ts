@@ -15,6 +15,12 @@ export type QueuedCommand = {
    */
   readonly protocolVersion: number;
   readonly command: TrackerCommand;
+  /**
+   * The scoring session the tap was made under (T-116), so it is never sent under
+   * another one once that session lost the game (T6 §5, record 049). Absent on a tap
+   * stored with no session, or before this was kept.
+   */
+  readonly sessionId?: string;
 } & (
   | { readonly state: 'waiting' }
   /** Refused: kept so the scorekeeper can be told, never sent again. */
@@ -69,7 +75,11 @@ export interface QueueStorage {
    */
   add(
     gameId: string,
-    entry: { readonly protocolVersion: number; readonly command: TrackerCommand },
+    entry: {
+      readonly protocolVersion: number;
+      readonly command: TrackerCommand;
+      readonly sessionId?: string;
+    },
   ): Promise<AddResult>;
   /** The game's queue, oldest tap first. */
   list(gameId: string): Promise<readonly QueuedCommand[]>;
