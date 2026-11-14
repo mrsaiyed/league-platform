@@ -6,6 +6,7 @@ import type { SessionError, SessionIdentity, SignInService } from '@srleagues/pr
 import type { Renew } from './sign-in/renew-session.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
 import type { ContextDeps } from './context.ts';
+import type { PublicStatsPorts } from './public-stats.ts';
 
 export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   /** "Who is this?" for a session cookie's access token (T-6). */
@@ -22,4 +23,6 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * league is in the bin.
    */
   readonly accessOf: (context: CommandContext) => Promise<AccessHolder | undefined>;
+  /** What the public standings and statistics pages read (step 2.43). */
+  readonly publicStats: PublicStatsPorts;
 };

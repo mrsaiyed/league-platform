@@ -30,6 +30,7 @@ import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import type { WebPorts } from './ports.ts';
+import { standInPublicStats } from './stand-in-public-stats.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
 
@@ -245,6 +246,10 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf: accessOfVia(deps),
+    publicStats: standInPublicStats({
+      adultLeagueId: standInLeagues.live.id,
+      youthLeagueId: standInLeagues.other.id,
+    }),
     signUpMadeUpMember: async () => {
       const here = '127.0.0.1';
       const { email, password } = standInMember;
