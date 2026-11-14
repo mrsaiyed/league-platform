@@ -6,7 +6,7 @@ import { activitySummaryKey, commands, declaredSettings, roles } from '@srleague
 import { en } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
 
-/** Commands that only read, so write no activity entry. */
+/** Commands that write no activity entry: those that only read, and the few named below. */
 const reads = new Set([
   'access.list_access',
   'access.list_activity',
@@ -22,6 +22,11 @@ const reads = new Set([
   'imports.get_fixture_import',
   'scheduling.preview_schedule_publish',
   'teams.list_roster',
+  // Holding a game to score (T-116): the tracker opens, renews every half minute and
+  // leaves, which would flood the log. Only taking over a game from someone is logged.
+  'games.open_scoring_session',
+  'games.renew_scoring_session',
+  'games.release_scoring_session',
 ]);
 
 describe('activity log messages', () => {
