@@ -79,6 +79,15 @@ function dayOf(game: PublicGame, clock: LeagueClock): string | null {
   }).format(new Date(game.startsAt));
 }
 
+/** "Oct 31": a day without its weekday, short enough to sit on a card's first line. */
+function shortDayText(day: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${day}T12:00:00Z`));
+}
+
 function whenOf(game: PublicGame, clock: LeagueClock): string {
   // A postponed game has no day to come: its old day is said as the day it was postponed
   // from, never bare, as if the game were still on it.
@@ -86,7 +95,7 @@ function whenOf(game: PublicGame, clock: LeagueClock): string {
     const day = dayOf(game, clock);
     return day === null
       ? t('schedule.postponedNoDate')
-      : t('schedule.postponedFrom', { date: dayText(day) });
+      : t('schedule.postponedFrom', { date: shortDayText(day) });
   }
   if (game.startsAt !== null) {
     return new Intl.DateTimeFormat(locale, {

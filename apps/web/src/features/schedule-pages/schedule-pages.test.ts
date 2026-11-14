@@ -141,7 +141,8 @@ describe('upcoming games', () => {
   it('says a postponed game was postponed from its old day, never the bare day', async () => {
     const { home } = await upcomingOf();
     const card = home.upcoming.find((g) => g.status === 'postponed');
-    expect(card?.whenText).toMatch(/^Postponed from [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}$/);
+    // Short enough for a card's first line: the month and the day, no weekday.
+    expect(card?.whenText).toMatch(/^Postponed from [A-Z][a-z]{2} \d{1,2}$/);
     // The same card on the schedule page, in the round it was to be played in.
     const { clock, schedule } = await load(adult);
     const listed = buildScheduleView(schedule, clock, addressee, {})
