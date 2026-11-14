@@ -288,6 +288,34 @@ describe('ending a tracked game on the database (T6 §7)', () => {
     expect(await actions(g)).toEqual(['games.end_tracked_game']);
   });
 
+  it("did-not-play lines follow the roster on the game's day, not today's (step 2.58)", async () => {
+    const g = await trackedGame();
+    // The game was played on 13 December (Chicago). The player who left on 1 December
+    // is still off it; one who left after the game and one who joined before it with
+    // no leaving date are on it; one who joined after the game and one who left on the
+    // game's own day are not; a missing joining date is open.
+    const entry = async (dates: { joined?: string; left?: string }) => {
+      const personId = await newPerson(pglite, g.leagueId);
+      const id = await newRosterEntry(pglite, g.leagueId, g.homeTeamId, personId);
+      await pglite.query('update roster_entries set joined_on = $2, left_on = $3 where id = $1', [
+        id,
+        dates.joined ?? null,
+        dates.left ?? null,
+      ]);
+      return personId;
+    };
+    const leftAfter = await entry({ joined: '2026-09-01', left: '2026-12-20' });
+    const joinedBefore = await entry({ joined: '2026-12-13' });
+    const joinedAfter = await entry({ joined: '2026-12-14' });
+    const leftThatDay = await entry({ left: '2026-12-13' });
+    expect(await tap(g, [...firstHalf(g), { type: 'end' }])).toContain('accepted');
+    const benched = (await rowsOf(g)).lines.filter((l) => !l.played).map((l) => l.person_id);
+    expect(benched.sort()).toEqual([g.home[5], g.away[5], leftAfter, joinedBefore].sort());
+    expect(benched).not.toContain(joinedAfter);
+    expect(benched).not.toContain(leftThatDay);
+    expect(benched).not.toContain(g.leftId);
+  });
+
   it('games.end_tracked_game gives the same result, and refuses a tie the season does not allow', async () => {
     const g = await trackedGame();
     await tap(g, [

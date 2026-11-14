@@ -54,13 +54,13 @@ const roster: GamePlayer[] = [
     personId,
     teamId: homeTeamId,
     jerseyNumber: String(i + 10),
-    current: true,
+    onGameDay: true,
   })),
   ...awayIds.map((personId, i) => ({
     personId,
     teamId: awayTeamId,
     jerseyNumber: String(i + 20),
-    current: true,
+    onGameDay: true,
   })),
 ];
 
@@ -581,7 +581,7 @@ describe('the End game tap (step 2.30, T6 §7)', () => {
   const leftId = '01900000-0000-7000-8000-000000019999';
   const withLeaver = [
     ...roster,
-    { personId: leftId, teamId: homeTeamId, jerseyNumber: '99', current: false },
+    { personId: leftId, teamId: homeTeamId, jerseyNumber: '99', onGameDay: false },
   ];
 
   it('ends the game in the batch’s transaction: final, lines settled, logged and announced', async () => {

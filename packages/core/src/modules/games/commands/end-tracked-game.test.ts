@@ -43,13 +43,13 @@ const roster: GamePlayer[] = [
     personId,
     teamId: homeTeamId,
     jerseyNumber: String(i + 10),
-    current: true,
+    onGameDay: true,
   })),
   ...awayIds.map((personId, i) => ({
     personId,
     teamId: awayTeamId,
     jerseyNumber: String(i + 20),
-    current: true,
+    onGameDay: true,
   })),
 ];
 

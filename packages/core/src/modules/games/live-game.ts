@@ -123,7 +123,7 @@ export function rosterOf(players: readonly GamePlayer[]): ReadonlyMap<string, Ga
   const byKey = new Map<string, GamePlayer>();
   for (const player of players) {
     const key = keyOf(player.teamId, player.personId.toLowerCase());
-    // Listed with the current entry first (one who left and rejoined): keep that one.
+    // Listed with the game day's entry first (one who left and rejoined): keep that one.
     if (!byKey.has(key)) byKey.set(key, player);
   }
   return byKey;
@@ -178,9 +178,10 @@ export function linesOf(
 
 /**
  * The box score lines of a game that has ended (T6 §7): the lines its state gives, and
- * a "did not play" line for everyone on either team's roster now who never entered,
- * so the game's page lists them (P7 §5.6). A did-not-play line has no time and no
- * counts, and never counts as a game played.
+ * a "did not play" line for everyone on either team's roster on the game's day who
+ * never entered, so the game's page lists them (P7 §5.6). The game's day, not today:
+ * an old game transferred later (step 2.58) lists the roster it was played with. A
+ * did-not-play line has no time and no counts, and never counts as a game played.
  */
 export function settledLines(
   game: GameRecord,
@@ -191,7 +192,7 @@ export function settledLines(
   const lines = new Map(linesOf(game, roster, state));
   for (const player of roster.values()) {
     const personId = player.personId.toLowerCase();
-    if (!player.current || lines.has(personId)) continue;
+    if (!player.onGameDay || lines.has(personId)) continue;
     lines.set(personId, {
       gameId: game.id,
       teamId: player.teamId,
