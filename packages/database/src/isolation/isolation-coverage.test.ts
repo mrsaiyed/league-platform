@@ -118,6 +118,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.madeUpDatabase,
     'development-only: a new in-memory database built as its owner (migrations, seedLeaguesInto), then used as a member of app_user; takes nothing and reads no league for anyone',
   ],
+  [
+    databasePackage.createDatabaseSignInStore,
+    'the sign-in store (record 052): runs as sign_in_store, which reaches only schema sign_in and no league table (schema/app-role.test.ts)',
+  ],
   [databasePackage.applyMigrations, 'the migration runner (T-48): schema, as the owner'],
   [databasePackage.runMigrations, 'the migration runner (T-48): schema, as the owner'],
   [databasePackage.loadMigrations, 'reads migration files from disk'],
@@ -152,6 +156,27 @@ const narrowLookups = new Map<unknown, string>([
   [
     databasePackage.findLeagueByShortName,
     'the league one short name in an address names (find_league_by_slug): id, short name, state',
+  ],
+  // Record 052: the account functions of record 008. Each answers for one sign-in or
+  // one account only. The first three read or write no league's data; eraseAccount
+  // does write across leagues, by design: in every league it ends that one account's
+  // grants, removes its game assignments and scoring sessions, and empties the email
+  // on the invitations it accepted, and nothing of anyone else's.
+  [
+    databasePackage.findAccountOfSignIn,
+    'the account one sign-in id is (account_of_sign_in): the account id only, no email taken',
+  ],
+  [
+    databasePackage.accountForSignIn,
+    'the account for a proved sign-in (account_for_sign_in): finds, links or makes; returns an id only',
+  ],
+  [
+    databasePackage.createOwnProfile,
+    "the own profile of the account set (create_own_profile): that account's personal rows only",
+  ],
+  [
+    databasePackage.eraseAccount,
+    "erases the account set (erase_account): its personal rows and sign-in rows, and writes across leagues by design (T-52): that account's grants ended, its game assignments and scoring sessions removed, its accepted invitations' email emptied; tested in erase-account.test.ts",
   ],
 ]);
 
