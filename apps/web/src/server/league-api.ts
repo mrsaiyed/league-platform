@@ -11,7 +11,7 @@
 // - A session cookie that no longer works is "signed out" (401): the proxy renews a
 //   session before any endpoint sees it, so one still failing here has ended. A public
 //   read (the snapshot) treats it as a visitor instead, as pages do.
-import type { TrackerRefusal } from '@srleagues/contracts';
+import { trackerRefusalStatus, type TrackerRefusal } from '@srleagues/contracts';
 import { leagueApiUrl, type AccessHolder } from '@srleagues/core';
 import {
   requestContext,
@@ -27,16 +27,20 @@ export type ApiAnswer = {
   readonly headers?: Readonly<Record<string, string>>;
 };
 
-export type ApiRefusal = { readonly status: 401 | 404; readonly error: 'signed-out' | 'not-found' };
+/** Why there is no league request: each error with its own status, never another pairing. */
+export type ApiRefusal =
+  | { readonly status: 401; readonly error: 'signed-out' }
+  | { readonly status: 404; readonly error: 'not-found' };
 
 /**
  * The refusal as the endpoint answers it: the same body the tracker's endpoints give,
- * the contract's `TrackerRefusal` (a tracker takes nothing else as the server's word).
+ * the contract's `TrackerRefusal` at the contract's status for it (a tracker takes
+ * nothing else as the server's word, so a wrong pairing would be no answer for ever).
  */
-export const refusalAnswer = (refusal: ApiRefusal): ApiAnswer => ({
-  status: refusal.status,
-  body: { error: refusal.error } satisfies TrackerRefusal,
-});
+export const refusalAnswer = (refusal: ApiRefusal): ApiAnswer => {
+  const body = { error: refusal.error } satisfies TrackerRefusal;
+  return { status: trackerRefusalStatus[body.error], body };
+};
 
 const notFound: ApiRefusal = { status: 404, error: 'not-found' };
 

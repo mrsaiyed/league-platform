@@ -808,15 +808,18 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** Drops the taps listed as not saved: the scorekeeper has seen them. */
   const forgetNotSaved = async (): Promise<void> => {
-    const ids = current.notSaved.map((t) => t.command.commandId);
+    const shown = current.notSaved;
+    const ids = shown.map((t) => t.command.commandId);
     // Known as dismissed before the storage is written, so a read of it already under
     // way (a loss being listed, say) cannot bring them back (finding L3).
     for (const id of ids) dismissed.add(id);
     try {
       if (ids.length > 0) await queue.forget(ids);
     } catch (thrown) {
-      // Still stored, so still listed: the scorekeeper can dismiss them again.
+      // Still stored, so still listed, even if a listing meanwhile left them out: the
+      // scorekeeper can dismiss them again.
       for (const id of ids) dismissed.delete(id);
+      listNotSaved(withTaps(shown, current.notSaved));
       throw thrown;
     }
     const dropped = new Set(ids);
@@ -936,8 +939,18 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
               (list) => list.find((e) => e.command.commandId === command.commandId)?.state,
               () => 'waiting' as const,
             );
-            // Taken by the server: saved, and the game shown is the server's.
-            if (still === undefined) return { ok: true, commandId: command.commandId };
+            // Taken by the server: saved. Shown on the game unless the server's state it
+            // was rebuilt on already has it (the reload after the loss may have gone
+            // unanswered): the game shown is never short of a saved play.
+            if (still === undefined) {
+              const id = command.commandId.toLowerCase();
+              const inBase = base?.state.recent.some((r) => r.toLowerCase() === id) ?? false;
+              if (!inBase && !made.some((c) => c.commandId === command.commandId)) {
+                made.push(command);
+                showGame();
+              }
+              return { ok: true, commandId: command.commandId };
+            }
             if (still === 'waiting' && !isListed()) {
               listNotSaved(withTaps(current.notSaved, [{ command, moment }]));
             }

@@ -1389,6 +1389,105 @@ describe('tracker controller: a play the server took is never listed as not save
     expect(await inner.list(gameId)).toEqual([]);
   });
 
+  it('that tap, taken by the server, stays shown when the reload after the loss gets no answer', async () => {
+    const network = endpointNetwork();
+    const inner = createMemoryQueueStorage();
+    const storing = gate();
+    let armed = false;
+    let holdNextRead = false;
+    let stateDown = false;
+    const storage: QueueStorage = {
+      add: async (g, e) => {
+        const added = await inner.add(g, e);
+        if (armed) {
+          armed = false;
+          holdNextRead = true;
+        }
+        return added;
+      },
+      list: async (g) => {
+        if (holdNextRead) {
+          holdNextRead = false;
+          await storing.shut;
+        }
+        return inner.list(g);
+      },
+      settle: (g, s) => inner.settle(g, s),
+    };
+    const tablet = device(network, {
+      storage,
+      askServer: (ask) => (input, init) =>
+        stateDown && String(input).endsWith('/state')
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : ask(input, init),
+    });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    armed = true;
+    const tapping = tablet.controller.tap(a);
+    await expect.poll(() => armed || holdNextRead).toBe(false);
+    tablet.controller.online();
+    await expect.poll(async () => (await serverGame(network)).sequence).toBe(3);
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    // The loss's reload of the server's state gets no answer.
+    stateDown = true;
+    tablet.controller.online();
+    await expect.poll(() => tablet.controller.status().mode.kind).toBe('read-only');
+    storing.open();
+    expect(await tapping).toMatchObject({ ok: true });
+    await tablet.controller.idle();
+    expect(tablet.controller.status().notSaved).toEqual([]);
+    // Saved on the server, so shown here too: the game is not short of it.
+    expect(scoreOf(tablet.controller.status().game)).toEqual({ home: 2, away: 0 });
+  });
+
+  it('a dismissal that fails while a loss is listed leaves the plays listed (the review’s Low 1)', async () => {
+    const network = endpointNetwork();
+    const inner = createMemoryQueueStorage();
+    let failNextSettle: ReturnType<typeof gate> | null = null;
+    const storage: QueueStorage = {
+      add: (g, e) => inner.add(g, e),
+      list: (g) => inner.list(g),
+      // The next write is held back, then fails: the dismissal is not stored.
+      settle: async (g, s) => {
+        const held = failNextSettle;
+        if (held === null) return inner.settle(g, s);
+        failNextSettle = null;
+        await held.shut;
+        throw new Error('disk full');
+      },
+    };
+    const { tablet, laptop } = await tabletLosesTheGame(network, [a], storage);
+    await takeBack(tablet.controller);
+    network.mode = 'down';
+    await tapAll(tablet.controller, [b]);
+    network.mode = 'up';
+    laptop.controller.online();
+    await laptop.controller.idle();
+    await takeBack(laptop.controller);
+
+    const writing = gate();
+    failNextSettle = writing;
+    const dismissing = tablet.controller.dismissNotSaved();
+    // While the dismissal is being written, the tablet loses the game again and lists it.
+    tablet.controller.online();
+    await expect.poll(() => tablet.controller.status().notSaved.map(inputOf)).toEqual([b]);
+    writing.open();
+    await expect(dismissing).rejects.toThrow();
+    await tablet.controller.idle();
+    // Still stored as not saved, so still listed.
+    expect(tablet.controller.status().notSaved.map(inputOf)).toEqual([a, b]);
+    expect((await inner.list(gameId)).map((e) => [e.command.input, e.state])).toEqual([
+      [a, 'not-saved'],
+      [b, 'not-saved'],
+    ]);
+  });
+
   it('a takeover turned away (signed out) finishes the loss: the server’s game is shown (finding L2)', async () => {
     const network = endpointNetwork();
     let stateGate: ReturnType<typeof gate> | null = null;
