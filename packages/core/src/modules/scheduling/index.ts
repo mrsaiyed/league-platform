@@ -15,6 +15,15 @@ export type {
 export { summarizePublish, type PublishSummary } from './rules/summarize-publish.ts';
 export { generatePairings, maxTimesEachPair } from './rules/generate-pairings.ts';
 export { fairnessReport } from './rules/fairness-report.ts';
+export { placeSchedule, strictRules } from './rules/place-schedule.ts';
+export type {
+  PlacementError,
+  PlacementInput,
+  PlacementResult,
+  SeasonCourt,
+  StrictRule,
+} from './rules/placement-types.ts';
+export { maxSeasonDays } from './rules/season-weeks.ts';
 export type {
   FairnessInput,
   FairnessIssue,
