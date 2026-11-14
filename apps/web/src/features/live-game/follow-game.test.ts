@@ -186,6 +186,32 @@ describe('following a game', () => {
     expect(w.fetches).toHaveLength(2);
   });
 
+  it('polls every 5 seconds while the connection is open but not delivering', async () => {
+    const w = world(snapshot(5));
+    w.connect('open');
+    await settle();
+    w.serverIs(snapshot(6)); // a play the open connection never brought
+    await w.advance(30_000);
+    expect(w.last()?.game.sequence).toBe(6);
+    await w.advance(10_000);
+    expect(w.fetches).toEqual([0, 30_000, 35_000, 40_000]);
+    w.serverIs(snapshot(7));
+    w.send(message(7)); // messages come again: back to the slow check
+    await w.advance(5_000); // the players, now older than the score
+    await w.advance(29_000);
+    expect(w.fetches).toEqual([0, 30_000, 35_000, 40_000, 45_000]);
+  });
+
+  it('does not count the catch-up on opening as the connection falling behind', async () => {
+    const w = world(snapshot(5));
+    w.serverIs(snapshot(7)); // sent while the connection was being made
+    w.connect('open');
+    await settle();
+    expect(w.last()?.game.sequence).toBe(7);
+    await w.advance(29_999);
+    expect(w.fetches).toEqual([0]);
+  });
+
   it('refreshes the players at most every 5 seconds after messages', async () => {
     const w = world();
     w.connect('open');

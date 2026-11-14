@@ -15,7 +15,10 @@
 // - at most every 5 seconds while the players shown are older than the score, because
 //   messages carry the score and not the players;
 // - every 30 seconds while a live game is open and quiet, because a lost LAST message
-//   leaves no later one to show the gap.
+//   leaves no later one to show the gap;
+// - every 5 seconds, as if the connection were not open, once a snapshot fetched while
+//   it is open shows plays no message brought: the connection says it is open but is
+//   not delivering. This lasts until a message arrives again.
 // One fetch at a time; a final game is not followed at all.
 import type { GameSnapshot, LiveMessage } from '@srleagues/contracts';
 import type { LiveConnection, LiveSubscriber, LiveSubscription } from '../live-updates/index.ts';
@@ -94,6 +97,10 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
   let fetching = false;
   let fetchAgain = false;
   let lastFetchAt = timers.now();
+  /** The next fetch is the catch-up on the connection opening. */
+  let catchingUp = false;
+  /** The connection is open but a snapshot showed plays no message brought. */
+  let messagesBehind = false;
   let timer: unknown;
   let timerSet = false;
   let subscription: LiveSubscription | undefined;
@@ -117,7 +124,9 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
     if (stopped || game === null) return undefined;
     if (state.awaitingSnapshot) return retryMs;
     if (finished()) return undefined;
-    if (connection !== 'open') return game.status === 'live' ? pollMs : slowPollMs;
+    if (connection !== 'open' || messagesBehind) {
+      return game.status === 'live' ? pollMs : slowPollMs;
+    }
     if (game.status === 'live' && !playersAreCurrent(game)) return playersMs;
     if (game.status === 'live') return quietMs;
     return undefined;
@@ -148,6 +157,9 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
       return;
     }
     fetching = true;
+    const catchUp = catchingUp;
+    const openAtStart = connection === 'open';
+    catchingUp = false;
     clearTimer();
     lastFetchAt = timers.now();
     let snapshot: GameSnapshot | null;
@@ -163,6 +175,16 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
       // the offset; keeping the largest measurement makes it harmless.
       const before = offsetMs;
       offsetMs = largestOffsetMs(offsetMs, snapshot.sentAt, timers.now());
+      // Ahead of every message seen while the connection was open, other than on its
+      // opening (messages sent while it connected never come): it is not delivering.
+      if (
+        openAtStart &&
+        connection === 'open' &&
+        !catchUp &&
+        snapshot.sequence > state.seenSequence
+      ) {
+        messagesBehind = true;
+      }
       const adopted = applySnapshot(state, snapshot).state;
       if (adopted !== state || offsetMs !== before) {
         state = adopted;
@@ -181,6 +203,7 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
     if (stopped) return;
     const { state: next, outcome } = applyMessage(state, message);
     state = next;
+    if (outcome !== 'ignored') messagesBehind = false;
     if (outcome === 'applied') {
       offsetMs = largestOffsetMs(offsetMs, message.sentAt, timers.now());
       emit();
@@ -195,8 +218,11 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
     const before = connection;
     connection = next;
     if (next !== before) emit();
-    if (next === 'open' && before !== 'open') void fetchNow();
-    else plan();
+    if (next !== 'open') messagesBehind = false;
+    if (next === 'open' && before !== 'open') {
+      catchingUp = true;
+      void fetchNow();
+    } else plan();
   }
 
   if (!finished()) {
