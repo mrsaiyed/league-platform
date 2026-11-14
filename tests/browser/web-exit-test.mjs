@@ -556,6 +556,168 @@ if (browser) {
     }
   });
 
+  await step(
+    'on a phone: what a thumb taps, a long name in a table, one live connection',
+    async () => {
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      try {
+        const page = await context.newPage();
+        const live = [];
+        page.on('request', (request) => {
+          if (request.url().includes('/api/v1/live')) live.push(request.url());
+        });
+        // Everything a thumb taps is at least 44 high. A link in a sentence or in a row of a
+        // table is not a thing by itself and is left out; a card that is one link counts as
+        // the card its link covers.
+        for (const address of [
+          '/north-valley',
+          '/north-valley/schedule',
+          '/north-valley/standings',
+          '/north-valley/stats',
+          '/north-valley/teams',
+          '/north-valley/teams/owls',
+          '/harbor-city',
+          '/harbor-city/teams',
+        ]) {
+          await open(page, address);
+          const short = await page.evaluate(() => {
+            const found = [];
+            const tapped =
+              '.league-site :is(a[href], button, summary, select, input:not([type=hidden]))';
+            for (const el of document.querySelectorAll(tapped)) {
+              if (
+                el.closest(
+                  'p, td, th, sup, li.ui-leader, .ui-footnotes, details:not([open]) > :not(summary)',
+                )
+              )
+                continue;
+              const style = getComputedStyle(el);
+              if (style.display === 'none' || style.visibility === 'hidden') continue;
+              if (style.opacity === '0' || style.pointerEvents === 'none') continue;
+              let box = el.getBoundingClientRect();
+              const cover = getComputedStyle(el, '::after');
+              if (cover.position === 'absolute' && cover.content !== 'none') {
+                box = (el.offsetParent ?? el).getBoundingClientRect();
+              }
+              if (box.width === 0 || box.height === 0) continue;
+              if (box.height < 43.5) {
+                found.push(
+                  `${el.tagName.toLowerCase()} "${(el.textContent ?? '').trim().slice(0, 24)}" is ${Math.round(box.height)} high`,
+                );
+              }
+            }
+            return found;
+          });
+          note(
+            `everything a thumb taps on ${address} is 44 high`,
+            short.length === 0,
+            short.join('; '),
+          );
+        }
+        // One connection to the league's live scores, though the home page of a league with
+        // a game under way holds two lists of games.
+        live.length = 0;
+        await open(page, '/north-valley');
+        note(
+          'the home page shows a live game under its own heading and the games to come',
+          (await page.getByRole('heading', { name: 'Live now' }).count()) === 1 &&
+            (await page.locator('main .ui-card-grid').count()) >= 2,
+        );
+        await page.waitForTimeout(1500);
+        note('the home page opens one live connection', live.length === 1, `${live.length}`);
+        // The shared stylesheet is linked, not written into the page, and comes after the
+        // frame's own, as when it was written in.
+        const html = await (await fetch(`${origin}/north-valley`)).text();
+        note('the shared styles are not written into a page', !html.includes('.ui-table-frame {'));
+        const sheets = await page.evaluate(() =>
+          [...document.styleSheets].map((sheet) => sheet.href ?? 'inline'),
+        );
+        const shared = sheets.findIndex((href) => href.includes('/display.css?v='));
+        const frame = sheets.findIndex((href) => href.includes('/_next/'));
+        note(
+          "the shared stylesheet is linked after the frame's own",
+          shared > -1 && frame > -1 && frame < shared,
+          sheets.join(', '),
+        );
+        const answer = await fetch(sheets[shared] ?? `${origin}/display.css`);
+        note(
+          'the shared stylesheet may be kept by the browser for good',
+          answer.status === 200 &&
+            (answer.headers.get('cache-control') ?? '').includes('immutable'),
+          `${answer.status} ${answer.headers.get('cache-control')}`,
+        );
+      } finally {
+        await context.close();
+      }
+      // A team name of 36 letters at 320 wide: the column that stays put takes about half the
+      // box at most, and the last column of numbers can be brought into view beside it.
+      const narrow = await browser.newContext({ viewport: { width: 320, height: 700 } });
+      try {
+        const page = await narrow.newPage();
+        await open(page, '/north-valley/standings');
+        const measured = await page.evaluate(() => {
+          const table = document.querySelector('table.ui-standings');
+          const box = table.closest('.ui-table-wrap');
+          const name = table.querySelector('tbody .ui-team-cell > [dir]');
+          name.textContent = 'The Northside Community Thunderbolts';
+          box.scrollLeft = box.scrollWidth;
+          const cell = name.closest('.ui-team-cell').getBoundingClientRect();
+          const last = table.querySelector('tbody tr > :last-child').getBoundingClientRect();
+          const frame = box.getBoundingClientRect();
+          return {
+            share: cell.width / frame.width,
+            lastInView: last.left >= cell.right - 1 && last.right <= frame.right + 1,
+            whole: name.scrollWidth <= name.clientWidth + 1,
+            pageScrolls: document.documentElement.scrollWidth > window.innerWidth,
+          };
+        });
+        note(
+          'a long team name leaves the column that stays put about half the box at most',
+          measured.share <= 0.55,
+          `${Math.round(measured.share * 100)}%`,
+        );
+        note(
+          'with a long team name the last column can still be brought into view',
+          measured.lastInView,
+        );
+        note('a long team name wraps whole, with nothing cut off', measured.whole);
+        note('a long team name does not make the page scroll sideways', !measured.pageScrolls);
+        // A heading's sort button, reached backwards by the keyboard, is scrolled clear of the
+        // column that stays put, and its ring is drawn inside it.
+        await open(page, '/north-valley/stats');
+        await page.keyboard.press('Tab');
+        const buttons = page.locator('main table .ui-sort-button');
+        const table = buttons.first().locator('xpath=ancestor::table');
+        const own = table.locator('.ui-sort-button');
+        await own.last().focus();
+        for (let i = (await own.count()) - 1; i > 1; i -= 1) await page.keyboard.press('Shift+Tab');
+        const reached = await table.evaluate((el) => {
+          const focused = document.activeElement;
+          const stays = el.querySelector('thead .ui-team-cell').getBoundingClientRect();
+          const box = focused.getBoundingClientRect();
+          const style = getComputedStyle(focused);
+          return {
+            isButton:
+              focused.classList.contains('ui-sort-button') && !focused.closest('.ui-team-cell'),
+            clear: box.left >= stays.right - 1,
+            inside: parseFloat(style.outlineOffset) < 0 && style.outlineStyle === 'solid',
+          };
+        });
+        note(
+          'a sort button reached backwards by the keyboard is clear of the column that stays put',
+          reached.isButton && reached.clear,
+          JSON.stringify(reached),
+        );
+        note(
+          "a sort button's focus ring is drawn inside it, where the box cannot cut it",
+          reached.inside,
+        );
+      } finally {
+        await narrow.close();
+      }
+    },
+  );
+
   await step('sign in, close the browser, come back', async () => {
     const first = await launch();
     let kept;
