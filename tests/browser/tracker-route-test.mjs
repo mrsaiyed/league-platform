@@ -10,6 +10,8 @@
 // - The made-up owner, who runs the league, opens a game the scorekeeper is holding: told
 //   who holds it, takes over after confirming, and confirms the format.
 // - Another league's admin, a coach and a visitor are refused: "you do not have access" (U-6).
+// - In the draft league, which scores assigned games only, the scorekeeper is refused a
+//   game assigned to its admin, and does not see it on their games (P7 §5.1).
 // - Signing out on the account page clears the games the device kept (T-115).
 // Accessibility checks on each screen (T-186), and no sideways scrolling at phone width (A-2).
 import {
@@ -38,7 +40,11 @@ const step = async (name, run) => {
 // The made-up games of the first league (apps/web/src/server/stand-in-games.ts).
 const liveGame = '01900000-0000-7000-8000-006a00000002'; // Hawks v Bears, live
 const otherGame = '01900000-0000-7000-8000-006a00000003'; // Hawks v Lions, assigned to nobody
+const finalScoreGame = '01900000-0000-7000-8000-006a00000001'; // Lions v Tigers, final score only
 const tracker = (game) => `/north-valley/score/${game}`;
+// The draft league has the same games, scores assigned games only, and gives the live
+// game to its admin (apps/web/src/server/stand-in-ports.ts, moreLeagues).
+const assignedOnlyTracker = (game) => `/quiet-pines/score/${game}`;
 const noAccess = /you do not have access/i;
 
 let built = true;
@@ -302,6 +308,60 @@ if (browser) {
 }
 
 if (browser) {
+  await step('a game not recorded live is not opened in the tracker', async () => {
+    const { context, page } = await signedInAs('local-scorekeeper-token');
+    try {
+      await page.goto(`${origin}/north-valley/admin`);
+      await page.getByRole('heading', { level: 1, name: 'Your games' }).waitFor();
+      note(
+        'a game recorded as a final score has no button to the tracker',
+        (await page
+          .locator(`li[data-game="${finalScoreGame}"]`)
+          .getByRole('link', { name: 'Score this game' })
+          .count()) === 0,
+      );
+      await page.goto(origin + tracker(finalScoreGame));
+      await page.getByText('This game is not recorded live').waitFor();
+      note(
+        'its tracker page says so and keeps nothing on the device',
+        (await keptOnDevice(page, finalScoreGame)) === null,
+      );
+      await accessible(page, 'a game not recorded live');
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('a scorekeeper is refused a game assigned to someone else', async () => {
+    const { context, page } = await signedInAs('local-scorekeeper-token');
+    try {
+      await page.goto(`${origin}/quiet-pines/admin`);
+      await page.getByRole('heading', { level: 1, name: 'Your games' }).waitFor();
+      note(
+        "a game assigned to someone else is not on the scorekeeper's games",
+        (await page.locator(`li[data-game="${liveGame}"]`).count()) === 0,
+      );
+      const response = await page.goto(origin + assignedOnlyTracker(liveGame));
+      note(
+        'assigned games only: 403 for a game assigned to someone else',
+        response?.status() === 403,
+        String(response?.status()),
+      );
+      await page.getByRole('heading', { level: 1 }).filter({ hasText: noAccess }).waitFor();
+      note(
+        'assigned games only: nothing of the game shown',
+        (await page.getByText('Bears at Hawks').count()) === 0,
+      );
+      note(
+        'assigned games only: nothing of the game kept on the device',
+        (await keptOnDevice(page, liveGame)) === null,
+      );
+      await accessible(page, 'a game assigned to someone else refused');
+    } finally {
+      await context.close();
+    }
+  });
+
   // Last, as it ends the made-up scorekeeper's session.
   await step('signing out clears the games kept on the device', async () => {
     const { context, page } = await signedInAs('local-scorekeeper-token');

@@ -25,6 +25,7 @@ import {
   type LeagueStatus,
   type Role,
   type Scope,
+  whoMayScore,
 } from '@srleagues/core';
 import {
   captureEmail,
@@ -289,8 +290,22 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       [owner.accountId]: 'Olive Owner',
       [scheduler.accountId]: 'Sky Scheduler',
       [scorekeeper.accountId]: 'Sam Scorekeeper',
+      [standInPeople.admin.accountId]: 'Avery Admin',
     },
     assignees: [scorekeeper.accountId, owner.accountId],
+    // The draft league has the same games, but scores assigned games only, and its
+    // admin is given the live ones: its scorekeeper is refused those (P7 §5.1).
+    moreLeagues: [
+      {
+        leagueId: standInLeagues.draft.id,
+        assignees: [standInPeople.admin.accountId, scorekeeper.accountId],
+        settings: {
+          [whoMayScore.key]: [
+            { level: 'league', document: { version: whoMayScore.version, value: 'assignedOnly' } },
+          ],
+        },
+      },
+    ],
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
   });

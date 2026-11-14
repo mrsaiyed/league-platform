@@ -5,7 +5,8 @@
 // store, so what they refuse and record is what the database-backed store is held to.
 // Like the database, a transaction works on a copy and keeps it only if the work returns,
 // and transactions run one at a time, so two at once cannot lose either's work.
-// Only one made-up league has games; every other league has none. The tracker's
+// Only one made-up league has games, and any named in `moreLeagues` the same games of
+// their own (one that scores assigned games only, say); every other league has none. The tracker's
 // endpoints (step 2.32) run on the same games, with made-up rosters (stand-in-tracker.ts).
 import { defaultSeasonRules } from '@srleagues/contracts';
 import {
@@ -67,7 +68,12 @@ export type StandInGamesOptions = {
   readonly log: (line: CommandLogLine) => void;
   /** The league's own stored settings to start with, by key (for checks). */
   readonly settings?: Readonly<Record<string, StoredSetting[]>>;
+  /** Other leagues given the same made-up games, each its own copy, assignees and settings. */
+  readonly moreLeagues?: readonly LeagueSeed[];
 };
+
+/** What one league's made-up games are seeded with. */
+export type LeagueSeed = Pick<StandInGamesOptions, 'leagueId' | 'assignees' | 'settings'>;
 
 const teamNames: Readonly<Record<string, string>> = {
   [id(0x7e, 1)]: 'Lions',
@@ -134,7 +140,7 @@ function emptyState(): State {
   };
 }
 
-function seed(options: StandInGamesOptions): State {
+function seed(options: LeagueSeed): State {
   const seasonId = id(0x5e, 1);
   /** A season still being set up, with one game and no date yet (hidden from the public). */
   const draftSeasonId = id(0x5e, 2);
@@ -210,8 +216,10 @@ export type StandInGames = GamesAreaPorts & {
 };
 
 export function standInGames(options: StandInGamesOptions): StandInGames {
-  let state = seed(options);
-  const stateOf = (leagueId: string) => (leagueId === options.leagueId ? state : emptyState());
+  const states = new Map<string, State>(
+    [options, ...(options.moreLeagues ?? [])].map((l) => [l.leagueId, seed(l)]),
+  );
+  const stateOf = (leagueId: string) => states.get(leagueId) ?? emptyState();
   const teamsOf = (s: State, gameId: string) => {
     const game = s.games.find((g) => g.id === gameId);
     return game === undefined ? [] : [game.homeTeamId, game.awayTeamId];
@@ -338,7 +346,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
       // Kept only when the command succeeded: a refusal leaves nothing behind.
       const refused =
         typeof result === 'object' && result !== null && 'ok' in result && result.ok === false;
-      if (!refused && context.leagueId === options.leagueId) state = draft;
+      if (!refused && states.has(context.leagueId)) states.set(context.leagueId, draft);
       return result;
     });
     queue = run.catch(() => undefined);
@@ -398,11 +406,12 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
       snapshotStoreOf,
       namesShownOf: async () => ({ audience: 'adult', policy: defaultNamePolicy }),
       displayNameOf: async (leagueId, accountId) =>
-        leagueId === options.leagueId ? (options.people[accountId] ?? '') : '',
+        states.has(leagueId) ? (options.people[accountId] ?? '') : '',
       clock: systemClock,
     },
     namesOf: async (leagueId): Promise<GameNames> => {
-      if (leagueId !== options.leagueId) return { teams: {}, scorekeepers: {} };
+      const state = states.get(leagueId);
+      if (state === undefined) return { teams: {}, scorekeepers: {} };
       const scorekeepers: Record<string, string[]> = {};
       for (const a of state.assignments) {
         (scorekeepers[a.gameId] ??= []).push(options.people[a.accountId] ?? '');
