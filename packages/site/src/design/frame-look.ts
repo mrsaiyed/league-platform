@@ -28,6 +28,7 @@ export const frameVariables = {
     '--label-tracking': '0.14em',
     '--hero-align': 'center',
     '--overlay-shadow': '0 16px 32px rgba(0, 0, 0, 0.45)',
+    '--scroll-shadow': 'rgba(0, 0, 0, 0.5)',
   },
   light: {
     '--color-line': 'color-mix(in srgb, var(--color-text) 14%, transparent)',
@@ -51,5 +52,6 @@ export const frameVariables = {
     '--label-tracking': '0.08em',
     '--hero-align': 'start',
     '--overlay-shadow': '0 16px 32px rgba(0, 0, 0, 0.18)',
+    '--scroll-shadow': 'rgba(0, 0, 0, 0.14)',
   },
 } as const;

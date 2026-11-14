@@ -9,7 +9,19 @@ export const tableCss = String.raw`
   position: relative;
   max-inline-size: 100%;
   overflow-x: auto;
-  background: var(--color-panel);
+  /* When columns are scrolled out of sight, a soft shadow at that edge says so. The two
+     panel-colored covers move with the table and hide the shadow at an edge with nothing
+     beyond it. The same on both sides, so it is right in either reading direction. */
+  background:
+    linear-gradient(to right, var(--color-panel) 40%, transparent) left / var(--step-6) 100%
+      no-repeat local,
+    linear-gradient(to left, var(--color-panel) 40%, transparent) right / var(--step-6) 100%
+      no-repeat local,
+    linear-gradient(to right, var(--scroll-shadow), transparent) left / var(--step-3) 100%
+      no-repeat scroll,
+    linear-gradient(to left, var(--scroll-shadow), transparent) right / var(--step-3) 100%
+      no-repeat scroll,
+    var(--color-panel);
   border: var(--card-border-width) solid var(--color-line);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
@@ -137,6 +149,8 @@ export const tableCss = String.raw`
 .ui-sort-button {
   display: inline-flex;
   align-items: center;
+  /* A short heading starts where its column's words start, not in the middle of the button. */
+  justify-content: flex-start;
   gap: 0.35em;
   padding-block: 0;
   padding-inline: 0;
