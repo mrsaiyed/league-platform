@@ -175,7 +175,6 @@ const ready = [];
 for (const step of byId.values()) {
   step.needIds = idsIn(step.needs, step);
   if (step.state === 'done' || open.has(step.id) || step.blocked) continue;
-  if (/drafts:/i.test(step.needs)) continue;
   const parts = partsOf(step);
   if (parts.length) {
     const next = parts.find((p) => !partLanded(step.id, p.n));
@@ -352,6 +351,9 @@ const watched = withAges(
   stallSigns({
     now: nowIso,
     firstStage,
+    firstStageLeft: unfinished
+      .filter((step) => step.stage === firstStage && !step.blocked)
+      .map((step) => step.id),
     ready,
     lanes: lanes.map((lane) => ({ id: lane.id, openedAt: openedAt(lane.id) })),
     lockTime: data.lock,
