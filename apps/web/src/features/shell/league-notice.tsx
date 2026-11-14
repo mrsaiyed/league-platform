@@ -11,5 +11,9 @@ const notices: Readonly<Record<LeagueStatus, TextKey | null>> = {
 /** Says plainly when a league is not public, or is kept as it was (U-9). */
 export function LeagueNotice({ status }: { readonly status: LeagueStatus }) {
   const notice = notices[status];
-  return notice === null ? null : <p role="status">{t(notice)}</p>;
+  return notice === null ? null : (
+    <p className="site-notice" role="status">
+      {t(notice)}
+    </p>
+  );
 }

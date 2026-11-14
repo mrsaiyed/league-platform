@@ -1,88 +1,326 @@
-/* The look of a league's pages. Every color, font and size comes from the design's
-   variables (packages/site, T-90); nothing here names a league. Logical properties
-   only (start, end, inline), so right-to-left pages mirror themselves (T-188). */
-body {
-  margin: 0;
+/* The frame of a league's pages: the header that stays on top, its menu, the centered
+   column, the footer, and the layout of each public page. The pieces a page is made of
+   (cards, tables, pickers, buttons) are styled in packages/ui. Every color, font, size and
+   gap comes from the design's variables (packages/site, T-90); nothing here names a
+   league. Logical properties only (start, end, inline, block), so right-to-left pages
+   mirror themselves (T-188). */
+html {
+  /* A link to a place on the page stops below the header, not under it. */
+  scroll-padding-block-start: 8rem;
 }
 .league-site {
+  --gutter: var(--step-4);
   min-block-size: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--color-background);
-  color: var(--color-text);
-  font-family: var(--font-body);
-  line-height: 1.5;
 }
-.league-site h1,
-.league-site h2,
-.league-site h3 {
-  font-family: var(--font-heading);
+@media (min-width: 40rem) {
+  .league-site {
+    --gutter: var(--step-5);
+  }
 }
-.league-site a {
-  color: var(--color-primary);
+@media (min-width: 64rem) {
+  .league-site {
+    --gutter: var(--step-6);
+  }
 }
-.site-header,
-.site-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space);
-  padding-block: var(--space);
-  padding-inline: calc(var(--space) * 1.5);
+/* The centered column: content is never wider than 1120, with the gutter beside it. */
+.site-column {
+  inline-size: 100%;
+  max-inline-size: calc(70rem + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+.league-site .site-skip {
+  position: absolute;
+  inset-block-start: var(--step-2);
+  inset-inline-start: var(--step-2);
+  z-index: 30;
+  padding-block: var(--step-2);
+  padding-inline: var(--step-4);
+  border-radius: var(--radius-small);
   background: var(--color-panel);
-  box-shadow: var(--card-shadow);
+  color: var(--color-text);
+  font-weight: 600;
+  transform: translateY(-200%);
 }
+.league-site .site-skip:focus {
+  transform: none;
+}
+
+/* The header: the league's name and sign-in on the first row, the menu on the second. */
 .site-header {
-  border-block-end: 3px solid var(--color-primary);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
+  background: var(--header-background);
+  color: var(--header-text);
+  border-block-end: 1px solid var(--header-line);
 }
-.site-footer {
-  border-block-start: 1px solid var(--color-accent);
-  font-size: 0.875rem;
+.site-header :focus-visible {
+  outline-color: var(--header-text);
 }
-.site-name {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 700;
-  text-decoration: none;
-  color: var(--color-primary);
-}
-.site-header ul {
+.site-header-top {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space);
+  align-items: center;
+  gap: var(--step-3);
+  min-block-size: 3.5rem;
+  padding-block: var(--step-1);
+}
+.site-header .site-name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  padding-block: var(--step-2);
+  color: var(--header-name);
+  font-family: var(--font-heading);
+  font-size: var(--text-18);
+  font-weight: 700;
+  letter-spacing: var(--heading-tracking);
+  line-height: 1.2;
+  text-decoration: none;
+  text-transform: var(--heading-case);
+}
+.site-header .site-sign-in,
+.site-menu > summary {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--step-2);
+  min-block-size: 2.75rem;
+  padding-inline: var(--step-3);
+  border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+  border-radius: var(--radius-small);
+  color: var(--header-text);
+  font-size: var(--text-14);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.site-header .site-sign-in:hover,
+.site-menu > summary:hover,
+.site-menu[open] > summary {
+  border-color: var(--header-text);
+}
+
+/* The menu on a phone: one button that opens a panel. A plain disclosure, so it works
+   with scripts switched off. */
+.site-menu > summary {
+  list-style: none;
+  user-select: none;
+}
+.site-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.site-menu-icon {
+  position: relative;
+  inline-size: var(--step-4);
+  block-size: var(--step-3);
+  border-block: 2px solid currentColor;
+}
+.site-menu-icon::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: calc(50% - 1px);
+  border-block-start: 2px solid currentColor;
+}
+.site-menu-panel {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 100%;
+  max-block-size: calc(100vh - 3.5rem);
+  overflow-y: auto;
+  padding-block: var(--step-2) var(--step-4);
+  background: var(--header-background);
+  border-block: 1px solid var(--header-line);
+  box-shadow: var(--overlay-shadow);
+}
+.site-menu-panel ul,
+.site-tabs ul {
+  display: flex;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.site-header li a,
-.site-footer nav a {
-  display: inline-block;
-  padding-block: 0.25rem;
-  padding-inline: 0.75rem;
-  border-radius: var(--radius);
-  color: var(--color-text);
-  text-decoration: none;
+.site-menu-panel ul {
+  flex-direction: column;
+  gap: var(--step-1);
+  padding-inline: var(--gutter);
 }
-.site-header li a:hover,
-.site-footer nav a:hover {
-  /* text on background always meets AA (checked on save), so the swap does too */
-  background: var(--color-text);
-  color: var(--color-background);
+.site-header .site-menu-panel a,
+.site-header .site-tabs a {
+  display: flex;
+  align-items: center;
+  color: var(--header-text);
+  font-size: var(--text-14);
+  font-weight: 600;
+  letter-spacing: var(--tab-tracking);
+  text-decoration: none;
+  text-transform: var(--tab-case);
+  border-radius: var(--tab-radius);
+}
+.site-header .site-menu-panel a {
+  min-block-size: var(--step-7);
+  padding-inline: var(--step-4);
+  border-inline-start: 2px solid transparent;
+}
+.site-header .site-menu-panel a[aria-current='page'] {
+  background: var(--tab-current-background);
+  color: var(--tab-current-text);
+  border-inline-start-color: var(--tab-current-line);
+}
+
+/* The menu on a laptop: tabs. The current page has a line under it in a dark design and
+   is a filled pill in a light one. */
+.site-tabs {
+  display: none;
+  padding-block-end: var(--tabs-pad);
+}
+.site-tabs ul {
+  flex-wrap: wrap;
+  gap: var(--step-1);
+}
+.site-header .site-tabs a {
+  min-block-size: 2.75rem;
+  padding-inline: var(--step-4);
+  border-block-end: 2px solid transparent;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.site-header .site-tabs a:hover {
+  background: var(--tab-hover-background);
+  color: var(--tab-hover-text);
+}
+.site-header .site-tabs a[aria-current='page'] {
+  background: var(--tab-current-background);
+  color: var(--tab-current-text);
+  border-block-end-color: var(--tab-current-line);
+}
+@media (min-width: 48rem) {
+  .site-header .site-name {
+    font-size: var(--text-22);
+  }
+  .site-menu {
+    display: none;
+  }
+  .site-tabs {
+    display: block;
+  }
+  /* The first tab's words line up with the league's name above them. */
+  .site-tabs ul {
+    margin-inline-start: calc(-1 * var(--step-4));
+  }
+}
+
+/* A league that is not public says so, in one line under the header. */
+.league-site .site-notice {
+  margin: 0;
+  padding-block: var(--step-3);
+  padding-inline: var(--gutter);
+  border-block-end: 1px solid var(--color-line);
+  background: var(--color-panel);
+  font-size: var(--text-14);
+  text-align: center;
+}
+
+.site-body {
+  flex: 1;
+  padding-block: var(--step-5) var(--step-8);
+}
+.site-body:focus {
+  outline: none;
+}
+
+.site-footer {
+  border-block-start: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.site-footer .site-column {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-2) var(--step-5);
+  padding-block: var(--step-4);
 }
 .site-footer nav {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: var(--step-5);
+}
+.site-footer nav a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+.site-footer nav a:hover {
+  color: var(--color-text);
+  text-decoration: underline;
 }
 .powered-by {
-  margin-inline-start: auto;
-  opacity: 0.8;
+  font-size: var(--text-12);
+  letter-spacing: 0.04em;
 }
-.site-body {
-  flex: 1;
-  padding: calc(var(--space) * 1.5);
-  text-align: start;
+
+/* The home page: on a laptop the games use two thirds of the width, in cards two across,
+   and the standings sit beside them in their own panel. */
+.home-layout {
+  display: grid;
+  gap: 0 var(--step-6);
 }
+.home-layout > * {
+  min-inline-size: 0;
+}
+@media (min-width: 64rem) {
+  .home-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+.home-numbers {
+  margin-block-start: var(--step-5);
+}
+
+/* A team's page: the games take the width, the roster sits beside them. */
+.team-layout {
+  display: grid;
+  gap: 0 var(--step-6);
+}
+.team-layout > * {
+  min-inline-size: 0;
+}
+@media (min-width: 64rem) {
+  .team-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .team-layout > .team-games {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .team-layout > .team-roster {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+/* "Make this my team": a quiet choice beside the team's name. */
+.league-site .team-mine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-2) var(--step-3);
+  margin: 0;
+}
+.team-mine p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+
 /* The box score grid (step 2.64): on a phone it scrolls sideways in its own box, and
    the page never does (A-2). */
 .box-score-grid {
@@ -112,12 +350,4 @@ body {
   border-inline-start: 0.25rem solid currentColor;
   padding-inline-start: 0.5rem;
   font-weight: 600;
-}
-/* Public pages are cards; the admin and the scoring screen are not. */
-.site-body > main:not(.score-root) {
-  padding: var(--space);
-  background: var(--color-panel);
-  border: var(--card-border-width) solid var(--color-accent);
-  border-radius: var(--radius);
-  box-shadow: var(--card-shadow);
 }
