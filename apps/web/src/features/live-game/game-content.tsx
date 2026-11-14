@@ -7,6 +7,7 @@ import { t } from '../../server/messages.ts';
 import { gameWords, liveGameLabels, statusNote, type BoxScoresView } from './build-game.ts';
 import { webLiveAddress } from '../live-updates/index.ts';
 import { LiveGameView } from './live-game-view.tsx';
+import { NewerPlaysLink } from './newer-plays-link.tsx';
 
 export type GameView = {
   readonly leagueId: string;
@@ -23,6 +24,9 @@ export type GameView = {
   readonly boxScores: BoxScoresView | null;
   readonly plays: readonly string[];
 };
+
+/** The play-by-play's own id: "Show newer plays" lands on it, not on the top of the page. */
+const playsId = 'game-plays';
 
 /** The page's content, drawn from what the server worked out. Nothing here reads anything. */
 export function GameContent({ view }: { readonly view: GameView }) {
@@ -70,11 +74,14 @@ export function GameContent({ view }: { readonly view: GameView }) {
       {/* No plays and none to come: a game not started, or decided with only its final
           score or box score kept, has no play-by-play section at all. */}
       {view.snapshot.status !== 'live' && view.plays.length === 0 ? null : (
-        <section aria-labelledby="game-plays">
-          <h2 id="game-plays">{t('game.plays')}</h2>
+        <section aria-labelledby={playsId}>
+          <h2 id={playsId}>{t('game.plays')}</h2>
           {view.snapshot.status === 'live' ? (
             <p>
-              {t('game.playsAsOpened')} <a href={view.selfAddress}>{t('game.newerPlays')}</a>
+              {t('game.playsAsOpened')}{' '}
+              <NewerPlaysLink href={`${view.selfAddress}#${playsId}`}>
+                {t('game.newerPlays')}
+              </NewerPlaysLink>
             </p>
           ) : null}
           {view.plays.length === 0 ? (

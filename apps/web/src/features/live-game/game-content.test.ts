@@ -124,6 +124,9 @@ describe('a game page', () => {
     expect(html).toContain('scored 3 for Hawks');
     expect(html).toContain('Only this team&#x27;s total is shown.');
     expect(html).toContain('These are the plays up to when you opened this page.');
+    // "Show newer plays" lands on the play-by-play, not the top of the page.
+    expect(html).toContain('<a href="/self#game-plays">Show newer plays</a>');
+    expect(html).toContain('<h2 id="game-plays">');
     for (const name of bearsNames) expect(html).not.toContain(name);
   });
 
