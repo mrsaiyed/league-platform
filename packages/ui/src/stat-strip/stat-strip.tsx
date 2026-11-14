@@ -12,16 +12,21 @@ export type StatStripProps = {
   readonly items: readonly StatStripItem[];
 };
 
-/** A strip of big numbers, each with a small label under it. */
+/**
+ * A strip of big numbers, each with a small label under it. A list of terms takes no name
+ * of its own, so the strip's name is on a group around it, which screen readers read.
+ */
 export function StatStrip({ label, items }: StatStripProps) {
   return (
-    <dl className="ui-stat-strip" aria-label={label}>
-      {items.map((item) => (
-        <div key={item.key} className="ui-stat">
-          <dt>{item.label}</dt>
-          <dd>{item.value}</dd>
-        </div>
-      ))}
-    </dl>
+    <div role="group" aria-label={label}>
+      <dl className="ui-stat-strip">
+        {items.map((item) => (
+          <div key={item.key} className="ui-stat">
+            <dt>{item.label}</dt>
+            <dd>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
