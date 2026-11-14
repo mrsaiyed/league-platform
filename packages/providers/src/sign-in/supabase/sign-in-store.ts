@@ -9,11 +9,16 @@
 // in one statement or transaction. The adapter's guarantees about requests at once
 // (record 013) rest on that. Tokens are never kept, only their SHA-256 (`...Hash`),
 // except the tokens of the proof's Supabase session. Those are kept until the proof is
-// taken or has run out, and a store must then forget them (record 018); the production
-// store also ends the session at Supabase, which otherwise stays alive there.
+// taken or has run out, and a store must then forget them (record 018). The session
+// stays alive at Supabase: ending it there needs a sweep that is not built yet
+// (record 052).
 //
 // Two implementations: `createMemorySignInStore` (development and tests, one process)
-// and, for production, one backed by our own tables, which is not built yet.
+// and, for production, `createDatabaseSignInStore` in packages/database, backed by our
+// own tables (migration 0012, record 052). That package may not import this one
+// (T-21), so it writes the same shape out itself (DatabaseSignInStore); change both
+// together. Its `accountId` is, as here, the sign-in service's user id: the database
+// turns it into our account id (public.account_of_sign_in).
 import type { AttemptLimits } from '../sign-in-settings.ts';
 
 /** A wait, in whole seconds. */

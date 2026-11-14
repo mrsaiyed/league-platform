@@ -33,13 +33,37 @@ const historyTables = [
   'game_corrections',
   'game_events',
 ];
-/** The only functions that run as their owner, each reviewed (T-221, records 008 and 012). */
+/**
+ * The only functions that run as their owner, each reviewed (T-221, records 008, 012
+ * and 052). Step 2.92 added the account functions: account_of_sign_in (one sign-in
+ * id, returns an account id only), account_for_sign_in (after the sign-in service
+ * proved the mailbox; returns an id, never says whether it found or made it),
+ * create_own_profile and erase_account (only the account set for the transaction),
+ * and access_list_names (display names on the set league's access list only).
+ */
 const definerFunctions = [
+  'access_list_names',
+  'account_for_sign_in',
+  'account_of_sign_in',
   'check_league_has_default_program',
   'check_league_slug_free',
   'check_old_slug_free',
+  'create_own_profile',
+  'erase_account',
   'find_league_by_slug',
   'take_jobs',
+];
+/** The sign-in store's tables (record 052): schema sign_in, reached only by sign_in_store. */
+const signInTables = [
+  'code_requests',
+  'codes',
+  'devices',
+  'guess_locks',
+  'guesses',
+  'proofs',
+  'refresh_tokens',
+  'sessions',
+  'users',
 ];
 
 const publicTables = async (sql: PGlite) =>
@@ -176,6 +200,75 @@ describe('the app role (T-60)', () => {
     expect(columns.rows.map((r) => r.column_name)).toEqual(['ended_at']);
   });
 
+  it('may change only the name, phone and last-seen time of its own account (R9, T-73)', async () => {
+    const { rows } = await db.query<{ column_name: string }>(
+      `select column_name from information_schema.column_privileges
+       where grantee = 'app_user' and table_name = 'accounts' and privilege_type = 'UPDATE'
+       order by 1`,
+    );
+    expect(rows.map((r) => r.column_name)).toEqual(['display_name', 'last_seen_at', 'phone']);
+    const { tableWide } = await one<{ tableWide: boolean }>(
+      db,
+      `select exists (
+         select 1 from information_schema.table_privileges
+         where grantee = 'app_user' and table_name = 'accounts' and privilege_type = 'UPDATE'
+       ) as "tableWide"`,
+    );
+    expect(tableWide).toBe(false);
+    const own = league.ownerId;
+    await asApp(db, { account: own }, async (tx) => {
+      const renamed = await tx.query("update accounts set display_name = 'Renamed' where id = $1", [
+        own,
+      ]);
+      expect(renamed.affectedRows).toBe(1);
+    });
+    for (const sql of [
+      "update accounts set email = 'elsewhere@example.test'",
+      "update accounts set sign_in_id = 'someone-else'",
+      'update accounts set version = 99',
+    ]) {
+      await expect(asApp(db, { account: own }, (tx) => tx.query(sql))).rejects.toMatchObject(
+        refused.privilege,
+      );
+    }
+  });
+
+  it('cannot reach the sign-in store, which reaches nothing of the app (record 052)', async () => {
+    const { appReaches } = await one<{ appReaches: string[] }>(
+      db,
+      `select coalesce(array_agg(t.tablename::text order by 1), '{}') as "appReaches"
+       from pg_tables t
+       where t.schemaname = 'sign_in'
+         and has_table_privilege('app_user', format('%I.%I', t.schemaname, t.tablename),
+               'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')`,
+    );
+    expect(appReaches).toEqual([]);
+    const { storeReaches } = await one<{ storeReaches: string[] }>(
+      db,
+      `select coalesce(array_agg(t.tablename::text order by 1), '{}') as "storeReaches"
+       from pg_tables t
+       where t.schemaname = 'public'
+         and has_table_privilege('sign_in_store', format('%I.%I', t.schemaname, t.tablename),
+               'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')`,
+    );
+    expect(storeReaches).toEqual([]);
+    const usage = await one<{ app: boolean; store: boolean }>(
+      db,
+      `select has_schema_privilege('app_user', 'sign_in', 'USAGE') as app,
+              has_schema_privilege('sign_in_store', 'public', 'USAGE') as store`,
+    );
+    expect(usage).toEqual({ app: false, store: false });
+    const store = await one(
+      db,
+      `select rolsuper, rolbypassrls, rolcreatedb, rolcreaterole, rolreplication, rolcanlogin
+       from pg_roles where rolname = 'sign_in_store'`,
+    );
+    expect(store).toEqual(noPowers);
+    await expect(
+      asApp(db, {}, (tx) => tx.query('select * from sign_in.sessions')),
+    ).rejects.toMatchObject(refused.privilege);
+  });
+
   it('cannot purge history, and nothing in public is open to everyone (record 007, T-64)', async () => {
     await expect(
       asApp(db, { league: league.leagueId }, (tx) =>
@@ -254,15 +347,52 @@ async function fenceProblems(tx: Transaction): Promise<string[]> {
        and nspname <> 'information_schema' and nspname not like 'pg\\_%'`,
   );
 
+  const { rows: storeTables } = await tx.query<{
+    name: string;
+    enabled: boolean;
+    forced: boolean;
+  }>(
+    `select c.relname as name, c.relrowsecurity as enabled, c.relforcerowsecurity as forced
+     from pg_class c
+     where c.relnamespace = 'sign_in'::regnamespace and c.relkind in ('r', 'p')`,
+  );
+
   const problems: string[] = [];
   if (tables.length < 13) problems.push(`only ${tables.length} tables found in public`);
   for (const schema of schemas) {
     if (schema.name !== 'public') problems.push(`app_user may use schema ${schema.name}`);
   }
   const names = new Set(tables.map((t) => t.name));
+  const storeNames = new Set(storeTables.map((t) => t.name));
   for (const policy of policies) {
-    if (policy.schema !== 'public' || !names.has(policy.table)) {
+    const onPublic = policy.schema === 'public' && names.has(policy.table);
+    const onStore = policy.schema === 'sign_in' && storeNames.has(policy.table);
+    if (!onPublic && !onStore) {
       problems.push(`${policy.schema}.${policy.table}.${policy.name} is not on a public table`);
+    }
+  }
+  // The sign-in store's tables (record 052): forced, with one policy for its role only.
+  const found = storeTables.map((t) => t.name).sort();
+  if (found.join(',') !== signInTables.join(',')) {
+    problems.push(`sign_in has tables ${found.join(', ')}, not ${signInTables.join(', ')}`);
+  }
+  for (const table of storeTables) {
+    const where = `sign_in.${table.name}`;
+    if (!table.enabled || !table.forced) {
+      problems.push(`${where}: row-level security must be enabled and forced`);
+    }
+    const own = policies.filter((p) => p.schema === 'sign_in' && p.table === table.name);
+    if (own.length !== 1)
+      problems.push(`${where} must have exactly one policy, and has ${own.length}`);
+    for (const policy of own) {
+      if (policy.permissive !== 'PERMISSIVE') problems.push(`${where} must be PERMISSIVE`);
+      if (policy.command !== 'ALL') problems.push(`${where} must apply to ALL commands`);
+      if (policy.roles.join(',') !== 'sign_in_store') {
+        problems.push(`${where} must apply to sign_in_store only`);
+      }
+      if (policy.using !== 'true' || policy.check !== 'true') {
+        problems.push(`${where} must let sign_in_store reach every row and no one else`);
+      }
     }
   }
   for (const table of tables) {
@@ -357,6 +487,21 @@ describe('every table is behind row-level security (gate for future tables)', ()
         'migration_log.planted.planted is not on a public table',
       ],
       ['grant usage on schema migration_log to app_user', 'app_user may use schema migration_log'],
+      ['grant usage on schema sign_in to app_user', 'app_user may use schema sign_in'],
+      [
+        'alter table sign_in.proofs no force row level security',
+        'sign_in.proofs: row-level security must be enabled and forced',
+      ],
+      [
+        `drop policy sessions_store_only on sign_in.sessions;
+         create policy sessions_store_only on sign_in.sessions using (true) with check (true)`,
+        'sign_in.sessions must apply to sign_in_store only',
+      ],
+      [
+        'create policy extra on sign_in.codes to sign_in_store using (true)',
+        'sign_in.codes must have exactly one policy, and has 2',
+      ],
+      ['create table sign_in.planted (id int)', 'sign_in has tables'],
     ];
     for (const [planted, problem] of plants) {
       const problems = await plantedProblems(planted);
@@ -448,6 +593,24 @@ describe('owner-run checks refuse to run where the owner is fenced', () => {
     });
   });
 
+  it('the account for a sign-in and erasure refuse instead of reaching only some (record 052)', async () => {
+    await ownedByFencedRole('account_for_sign_in(text, text)', async () => {
+      await expect(
+        other.query("select public.account_for_sign_in('user-1', 'fenced@example.test')"),
+      ).rejects.toMatchObject(fencedRefusal);
+    });
+    const { leagueId, ownerId } = await newLeague(other);
+    expect(leagueId).toBeTruthy();
+    await ownedByFencedRole('erase_account()', async () => {
+      await expect(
+        other.transaction(async (tx) => {
+          await tx.query("select set_config('app.account_id', $1, true)", [ownerId]);
+          await tx.query('select public.erase_account()');
+        }),
+      ).rejects.toMatchObject(fencedRefusal);
+    });
+  });
+
   it('the short-name lookup, fenced, finds nothing rather than something wrong', async () => {
     const { leagueId } = await newLeague(other);
     const { slug } = await one<{ slug: string }>(other, 'select slug from leagues where id = $1', [
@@ -494,10 +657,17 @@ describe("Supabase's API roles get nothing (T-64)", () => {
          where r.rolname in ('anon', 'authenticated', 'service_role')
            and p.pronamespace = 'public'::regnamespace and has_function_privilege(r.oid, p.oid, 'EXECUTE')
          union all
-         select r.rolname, 'schema public'
-         from pg_roles r
+         select r.rolname, t.relname
+         from pg_roles r cross join pg_class t
          where r.rolname in ('anon', 'authenticated', 'service_role')
-           and has_schema_privilege(r.oid, 'public', 'USAGE')
+           and t.relnamespace = 'sign_in'::regnamespace and t.relkind in ('r', 'p')
+           and (has_table_privilege(r.oid, t.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'))
+         union all
+         select r.rolname, 'schema ' || s.nspname
+         from pg_roles r cross join pg_namespace s
+         where r.rolname in ('anon', 'authenticated', 'service_role')
+           and s.nspname in ('public', 'sign_in')
+           and has_schema_privilege(r.oid, s.oid, 'USAGE')
          union all
          select r.rolname, 'default privileges'
          from pg_roles r, pg_default_acl d, aclexplode(d.defaclacl) acl

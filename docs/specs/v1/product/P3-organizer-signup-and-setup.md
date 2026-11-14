@@ -1,6 +1,6 @@
 # P3 — Organizer sign-up and setup
 
-[Spec home](../README.md) · Decisions O-1 to O-10
+[Spec home](../README.md) · Decisions O-1 to O-11
 
 This is the path from "I want to host a league" to a live league. The targets: an organizer sees a draft of their own site within **5 minutes**, and can publish within **30 minutes**, without talking to us.
 
@@ -109,6 +109,7 @@ A league's life after setup repeats:
 - **O-8:** if an owner disappears (no sign-in for a long period and no response), another admin can ask us to transfer ownership. We verify with the league's contact details and wait 14 days before acting.
 - **O-9 (agreed):** an owner can export everything at any time: teams, people, registrations, games, statistics, site content, as spreadsheet files. In plain terms: a league's data is never trapped with us. If they leave, they take all of it.
 - **O-10:** an owner can delete the league. It is hidden at once, kept for 30 days in case of regret, then erased. People's accounts are not deleted; only their records in that league are.
+- **O-11 (decided for you, November 14): an owner cannot delete their own account while they own a league.** The league would be left with no one to run it. They first hand the league to another admin (O-7) or delete it (O-10), whichever they prefer, and the screen says so. Nothing is decided for them.
 
 ## 8. Before self-serve sign-up exists
 

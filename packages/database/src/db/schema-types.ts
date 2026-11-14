@@ -21,6 +21,7 @@ export interface AccountsTable {
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  sign_in_id: string | null;
 }
 
 export interface ActivityLogTable {
@@ -563,4 +564,90 @@ export interface Database {
   support_access_log: SupportAccessLogTable;
   teams: TeamsTable;
   venues: VenuesTable;
+}
+
+export interface SignInCodeRequestsTable {
+  id: string;
+  scope: string;
+  subject: string;
+  asked_at: ColumnType<Date, Date | string, Date | string>;
+}
+
+export interface SignInCodesTable {
+  email: string;
+  verify_type: string | null;
+  expires_at: ColumnType<Date, Date | string, Date | string>;
+  attempts_left: number;
+}
+
+export interface SignInDevicesTable {
+  user_id: string;
+  device_id: string;
+  first_seen_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface SignInGuessLocksTable {
+  scope: string;
+  subject: string;
+  locked_until: ColumnType<Date, Date | string, Date | string>;
+  by_guess_id: string;
+}
+
+export interface SignInGuessesTable {
+  id: string;
+  ticket: string;
+  scope: string;
+  subject: string;
+  counted_at: ColumnType<Date, Date | string, Date | string>;
+}
+
+export interface SignInProofsTable {
+  proof_hash: string;
+  email: string;
+  user_id: string;
+  expires_at: ColumnType<Date, Date | string, Date | string>;
+  access_token: string;
+  refresh_token: string;
+  access_expires_at: ColumnType<Date, Date | string, Date | string>;
+  vendor_session_id: string;
+}
+
+export interface SignInRefreshTokensTable {
+  token_hash: string;
+  session_id: string;
+  used: Generated<boolean>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface SignInSessionsTable {
+  session_id: string;
+  user_id: string;
+  device_label: string;
+  signed_in_at: ColumnType<Date, Date | string, Date | string>;
+  last_active_at: ColumnType<Date, Date | string, Date | string>;
+  last_sign_in_at: ColumnType<Date, Date | string, Date | string>;
+  password_entered_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  access_token_hash: string;
+  access_expires_at: ColumnType<Date, Date | string, Date | string>;
+  refresh_token_hash: string;
+  ended: Generated<boolean>;
+}
+
+export interface SignInUsersTable {
+  user_id: string;
+  has_password: Generated<boolean>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+/** Every table in the sign_in schema, for Kysely. */
+export interface SignInDatabase {
+  'sign_in.code_requests': SignInCodeRequestsTable;
+  'sign_in.codes': SignInCodesTable;
+  'sign_in.devices': SignInDevicesTable;
+  'sign_in.guess_locks': SignInGuessLocksTable;
+  'sign_in.guesses': SignInGuessesTable;
+  'sign_in.proofs': SignInProofsTable;
+  'sign_in.refresh_tokens': SignInRefreshTokensTable;
+  'sign_in.sessions': SignInSessionsTable;
+  'sign_in.users': SignInUsersTable;
 }

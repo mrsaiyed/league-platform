@@ -38,6 +38,7 @@ import {
   listActivityEntries,
   listOpenInvitations,
   listRoleGrants,
+  listAccessNames,
   markInvitationAccepted,
   markInvitationCancelled,
   renewInvitationLink,
@@ -67,6 +68,7 @@ import {
 import './divisions-venues-cases.test-helper.ts';
 import './games-cases.test-helper.ts';
 import './imports-cases.test-helper.ts';
+import './bin-cases.test-helper.ts';
 import './people-cases.test-helper.ts';
 import './public-schedule-cases.test-helper.ts';
 import './public-reads-cases.test-helper.ts';
@@ -421,6 +423,12 @@ registerIsolationCase({
   subject: listRoleGrants,
   name: "list the scope's grants",
   run: (scope) => listRoleGrants(scope),
+});
+
+registerIsolationCase({
+  subject: listAccessNames,
+  name: "list the names on the scope's access list (record 052)",
+  run: (scope) => listAccessNames(scope),
 });
 
 registerIsolationCase({

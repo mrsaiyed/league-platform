@@ -61,6 +61,7 @@ const reachNoLeagueData = new Map<unknown, string>([
     'development-only bootstrap: takes a PGlite, not a scope; runs the scoped commands (own cases) per league and writes accounts and role grants directly',
   ],
   [rosterEntrySummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [databasePackage.binStore, 'binds the bin queries (own cases) to a scope'],
   [databasePackage.teamsStore, 'binds the team queries, each with its own cases, to a scope'],
   [
     databasePackage.divisionsStore,
@@ -109,6 +110,18 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.createPgBoss, "makes pg-boss for its own schema; reads no league's rows"],
   [databasePackage.createDatabase, 'opens connections; reads no rows'],
   [databasePackage.checkLoginRole, "reads the login role's facts from pg_roles only"],
+  [
+    databasePackage.checkQueueSchema,
+    "reads whether pg-boss's schema exists and the login may make tables in it, from the catalog only",
+  ],
+  [
+    databasePackage.madeUpDatabase,
+    'development-only: a new in-memory database built as its owner (migrations, seedLeaguesInto), then used as a member of app_user; takes nothing and reads no league for anyone',
+  ],
+  [
+    databasePackage.createDatabaseSignInStore,
+    'the sign-in store (record 052): runs as sign_in_store, which reaches only schema sign_in and no league table (schema/app-role.test.ts)',
+  ],
   [databasePackage.applyMigrations, 'the migration runner (T-48): schema, as the owner'],
   [databasePackage.runMigrations, 'the migration runner (T-48): schema, as the owner'],
   [databasePackage.loadMigrations, 'reads migration files from disk'],
@@ -121,6 +134,15 @@ const reachNoLeagueData = new Map<unknown, string>([
     'reads a copy of a tracker backup folder on disk with its own embedded database; no league, no platform tables (step 2.57)',
   ],
   [databasePackage.TrackerBackupError, 'the reader error class; runs nothing'],
+  [
+    databasePackage.transferTrackerGames,
+    'development tool (step 2.58): takes a PGlite, not a scope; finds one league, season and account by name, then reaches that one league only through stores fenced to it (each transaction sets its league) and its commands (own cases)',
+  ],
+  [
+    databasePackage.transferTrackerGamesInFolder,
+    'opens a PGlite folder on disk (never an address) and runs transferTrackerGames on it',
+  ],
+  [databasePackage.isDatabaseAddress, 'tells an address from a folder name; runs nothing'],
 ]);
 
 /**
@@ -134,6 +156,27 @@ const narrowLookups = new Map<unknown, string>([
   [
     databasePackage.findLeagueByShortName,
     'the league one short name in an address names (find_league_by_slug): id, short name, state',
+  ],
+  // Record 052: the account functions of record 008. Each answers for one sign-in or
+  // one account only. The first three read or write no league's data; eraseAccount
+  // does write across leagues, by design: in every league it ends that one account's
+  // grants, removes its game assignments and scoring sessions, and empties the email
+  // on the invitations it accepted, and nothing of anyone else's.
+  [
+    databasePackage.findAccountOfSignIn,
+    'the account one sign-in id is (account_of_sign_in): the account id only, no email taken',
+  ],
+  [
+    databasePackage.accountForSignIn,
+    'the account for a proved sign-in (account_for_sign_in): finds, links or makes; returns an id only',
+  ],
+  [
+    databasePackage.createOwnProfile,
+    "the own profile of the account set (create_own_profile): that account's personal rows only",
+  ],
+  [
+    databasePackage.eraseAccount,
+    "erases the account set (erase_account): its personal rows and sign-in rows, and writes across leagues by design (T-52): that account's grants ended, its game assignments and scoring sessions removed, its accepted invitations' email emptied; tested in erase-account.test.ts",
   ],
 ]);
 

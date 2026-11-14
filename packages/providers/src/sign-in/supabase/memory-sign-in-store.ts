@@ -2,7 +2,8 @@
 //
 // It keeps everything in this process and forgets it on restart (everyone would be
 // signed out, and every device would look new), and two web servers would each keep
-// their own. Production needs the store backed by our own tables (record 018). No
+// their own. Production uses the store backed by our own tables (packages/database,
+// createDatabaseSignInStore, record 052). No
 // method awaits anything, so each runs to its end before another starts: each is one
 // atomic step, as `SupabaseSignInStore` asks. Proofs that have run out are forgotten
 // whenever a proof is looked up; the Supabase sessions they held are not ended here

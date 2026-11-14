@@ -134,17 +134,20 @@ Working side by side finishes sooner by the clock. It does not make the usage al
 
 Use sub-agents for the building and the reviewing. Keep the lead's own context for planning, checking and landing: a lead that does the building itself fills its context and has to end the run early. Choose the model and effort by the kind of work:
 
-| Kind of work                                                                                       | Model                                    | Effort  |
-| -------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------- |
-| Mechanical: moving files, renames, formatting, boilerplate, config, doc indexes                    | haiku                                    | low     |
-| Ordinary building from a clear brief: a command, a query, a page, a test file                      | sonnet                                   | medium  |
-| Anything touching the league fence, sign-in, sessions, permissions, migrations, money, the tracker | opus                                     | high    |
-| The independent review of a change                                                                 | sonnet, or opus if the row above applies | high    |
-| Fixing a reviewer's findings                                                                       | the model that built it                  | medium  |
-| Writing a stage plan (section 8)                                                                   | opus                                     | high    |
-| The whole-stage review at the end of a stage                                                       | opus                                     | xhigh   |
-| The look of a screen: a design step, or the design review of any step that adds a screen           | fable                                    | high    |
-| Finding where something is in the code                                                             | the Explore agent                        | its own |
+| Kind of work                                                                                       | Model                   | Effort  |
+| -------------------------------------------------------------------------------------------------- | ----------------------- | ------- |
+| Mechanical: moving files, renames, formatting, boilerplate, config, doc indexes                    | sonnet                  | low     |
+| Ordinary building from a clear brief: a command, a query, a page, a test file                      | opus                    | medium  |
+| Anything touching the league fence, sign-in, sessions, permissions, migrations, money, the tracker | opus                    | high    |
+| The independent review of a change                                                                 | opus                    | high    |
+| Fixing a reviewer's findings                                                                       | the model that built it | medium  |
+| Writing a stage plan (section 8)                                                                   | fable                   | high    |
+| The whole-stage review at the end of a stage                                                       | fable                   | xhigh   |
+| An area lead's audit or review, and the chief of quality (LEADS.md)                                | fable                   | high    |
+| The look of a screen: a design step, or the design review of any step that adds a screen           | fable                   | high    |
+| Finding where something is in the code                                                             | the Explore agent       | its own |
+
+**Every result has an owner, and nothing is built below `opus`.** The founder, 2026-11-14: "this isn't about UI, it's about not compromising on ANY part of this". [LEADS.md](LEADS.md) is the rule: eight areas, each with a lead on `fable` that audits the whole area and reviews what a person will see or rely on before it lands; a chief of quality on `fable` at the start of every run; and the brief check before a step opens. The table above is the floor since that day. Where a step's own line names a weaker model than the table gives for its kind of work, the table wins: read `haiku` as `sonnet`, and `sonnet` as `opus`. A lane lands only when its code review is closed and, where LEADS.md asks for one, its area lead's review is closed too; the landing's log line says which reviews it had. If the Agent tool refuses `fable`, use `opus` at xhigh and say so in the log.
 
 **Screens are looked at.** The founder opened the product on 2026-11-14 and found the UI awful: the look had been left to one late step, and no builder or reviewer had ever seen a screen. [DESIGN.md](DESIGN.md) is the rule now. Design steps are built by the design lead, a builder on `fable` at high effort. Any step that adds or changes a screen gets a design review as well as its code review: when its builder reports done, run `node scripts/shots.mjs --dev --only=<its screens>` in the lane, and a fresh `fable` sub-agent reads the pictures against DESIGN.md's section 4 and lists what breaks it; the builder fixes that before the lane lands. If the Agent tool refuses `fable`, use `opus` at xhigh and say so in the log. Before you write that a design step is done, open the home page pictures of both made-up leagues at both widths yourself.
 

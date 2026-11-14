@@ -1,6 +1,6 @@
 # P4 — The admin dashboard
 
-[Spec home](../README.md) · Decisions A-1 to A-12
+[Spec home](../README.md) · Decisions A-1 to A-14
 
 The admin lives at `oursite.com/{league}/admin`. This file describes every area in it, who can use each one, and the rules that apply everywhere.
 
@@ -65,6 +65,8 @@ A person can hold several roles. A role can be limited to **one program** ("voll
 What each role sees is trimmed to what they can use. A scorekeeper who opens the admin sees a list of their games and nothing else. Coaches and captains do not use the admin at all; their tools are on the team page under `/{league}/my`.
 
 **Inviting someone:** enter an email, pick a role, send. They get a link, sign in (or create their account), and they are in. Pending invitations can be re-sent or cancelled. Access can be removed at any time and takes effect immediately.
+
+**A-14 (decided for you, November 14): someone on the Admins page who has not given their name yet is shown as "No name yet".** Not their email address: the page shows names and roles, and an address is personal. Everyone is asked their name right after signing up (R-21), so this is rare.
 
 ## 5. Rules that apply everywhere
 

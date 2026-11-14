@@ -4,5 +4,6 @@ export * from './src/migrations/index.ts';
 export * from './src/queries/index.ts';
 export * from './src/queue/index.ts';
 export * from './src/seed/index.ts';
+export * from './src/sign-in/index.ts';
 export * from './src/stores/index.ts';
 export * from './src/transfers/index.ts';

@@ -20,7 +20,8 @@ export type Role = (typeof roles)[number];
 
 // Each permission belongs to one area of the admin (P4 §3); the role table below
 // gives each role the areas P4 §4 names. Removing something to the bin needs the
-// permission of its area; restoring it needs `bin.restore`.
+// permission of its area, and so does restoring a team, a person or a game (A-5).
+// `bin.restore` is seeing the whole bin, and restoring divisions, venues and courts.
 export const permissions = [
   // League settings (P4 §6): profile, address, state, features, wording, privacy.
   'league.settings',

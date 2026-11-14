@@ -20,6 +20,7 @@ Migration 0005 puts every table behind row-level security. The app's role, `app_
   - finding an account by email: steps 1.13 and 1.14. It answers only what the sign-in flow needs, never whether an address has an account;
   - accepting an invitation: no function after all (record 014, T-226). The link is a league address, so the league is known: the app finds it by its short name, sets it, and accepts inside that league's fence like any other command;
   - names on an access list: step 1.12. It returns the display names of the accounts holding grants in the league that is set, and nothing else about them.
+  - **Built in step 2.92, not in 1.12 to 1.14** (migration 0012, [record 052](052-accounts-on-the-real-database.md)): `account_of_sign_in` and `account_for_sign_in` (finding by email, linking or creating, without saying which), `create_own_profile`, `erase_account` and `access_list_names`. The Supabase adapter's own store is not reached through functions but by a database role of its own, `sign_in_store`, in a schema `app_user` cannot use (record 052).
 - **The rules for every such function** (SECURITY DEFINER, so it runs as the role that owns the tables):
   - it does one job, takes only what that job needs and returns the fewest columns;
   - `set search_path = pg_catalog, pg_temp`, every name written in full;

@@ -1,5 +1,7 @@
 // The in-memory store's own promises, the ones the adapter's parallel-call guarantees
-// rest on (record 018). A store backed by our tables must pass the same.
+// rest on (record 018). The store backed by our tables passes the same: its test,
+// packages/database/src/sign-in/database-sign-in-store.test.ts, runs a copy of these
+// cases on PGlite (record 052). Change both together.
 import { describe, expect, it } from 'vitest';
 import { createMemorySignInStore } from './memory-sign-in-store.ts';
 

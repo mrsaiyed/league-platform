@@ -23,7 +23,12 @@ export function teamsStore(scope: LeagueScope): TeamsStore {
     find: (teamId) => findTeam(scope, teamId),
     create: (team) => insertTeam(scope, team),
     update: (teamId, change, version) => updateTeam(scope, teamId, change, version),
-    setBinned: (teamId, binned) => setTeamBinned(scope, teamId, binned),
+    setBinned: async (teamId, binned) => {
+      const done = await setTeamBinned(scope, teamId, binned);
+      // Only bringing a team back can meet its lineage, and that is the bin store's.
+      if (done === 'lineage-taken') throw new Error('teams_one_per_lineage');
+      return done;
+    },
     findPerson: async (personId) => {
       const person = await findPerson(scope, personId, false);
       return person === undefined ? undefined : { id: person.id, binned: person.binned };
