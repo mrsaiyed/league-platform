@@ -11,7 +11,8 @@ import { binCutoff, type BinCounts, type BinTx } from './bin.ts';
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const ownerId = '01900000-0000-7000-8000-0000000000a1';
 export const seasonId = '01900000-0000-7000-8000-0000000000c1';
-export const teamId = (n: number) => `01900000-0000-7000-8000-0000000e${String(n).padStart(4, '0')}`;
+export const teamId = (n: number) =>
+  `01900000-0000-7000-8000-0000000e${String(n).padStart(4, '0')}`;
 
 type Thing = {
   id: string;

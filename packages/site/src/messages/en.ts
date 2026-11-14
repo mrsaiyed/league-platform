@@ -354,8 +354,7 @@ export const en = {
   'error.leagues.restore_game.game-part-in-bin':
     'A team, division, venue or court of this game is in the bin. Bring it back first.',
   'error.leagues.restore_game.game-number-taken': 'Another game now has this game number.',
-  'error.leagues.restore_game.game-reference-taken':
-    'Another game now has this outside reference.',
+  'error.leagues.restore_game.game-reference-taken': 'Another game now has this outside reference.',
   'error.teams.set_stats_visibility.team-not-found': 'That team is not there.',
   'error.teams.set_stats_visibility.teams-may-not-choose':
     'This league decides who sees the numbers; teams may not choose.',

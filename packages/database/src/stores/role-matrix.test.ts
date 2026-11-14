@@ -57,9 +57,14 @@ import {
   swapDraftGames,
   changeRosterEntry,
   createTeam,
+  listBin,
   listRoster,
   markLeft,
   reorderRoster,
+  restoreGame,
+  restorePerson,
+  restoreTeam,
+  type BinTx,
   createVenue,
   invite,
   listDivisions,
@@ -154,6 +159,7 @@ import {
   type MadeLeague,
 } from '../schema/schema.test-helper.ts';
 import { accessStore } from './access-store.ts';
+import { binStore } from './bin-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { gamesStore } from './games-store.ts';
 import { divisionsStore } from './divisions-store.ts';
@@ -213,6 +219,7 @@ let scoringDeps: CommandDeps<ScoringTx>;
 let trackerDeps: CommandDeps<TrackerTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
 let teamsDeps: CommandDeps<TeamsTx>;
+let binDeps: CommandDeps<BinTx>;
 let standingsDeps: CommandDeps<StandingsTx>;
 let importsDeps: CommandDeps<ImportScoresTx>;
 beforeAll(async () => {
@@ -231,6 +238,7 @@ beforeAll(async () => {
     clock: { now: () => matrixNow },
     people: peopleStore(scope),
     teams: teamsStore(scope),
+    bin: binStore(scope),
     standings: standingsStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
@@ -245,6 +253,7 @@ beforeAll(async () => {
   trackerDeps = { transaction, events: [], ...rest };
   peopleDeps = { transaction, events: [], ...rest };
   teamsDeps = { transaction, events: [], ...rest };
+  binDeps = { transaction, events: [], ...rest };
   importsDeps = { transaction, events: [], ...rest };
 });
 afterAll(async () => {
@@ -1051,6 +1060,46 @@ const divisionAndVenueRows: readonly Row[] = [
     }),
     (c, i) => restoreDivision(c, i, leaguesDeps),
   ),
+  ...divisionRows(
+    'leagues.restore_team',
+    'restore a team',
+    'bin.restore',
+    async (league, program) => {
+      const seasonId = await seasonIn(league, program);
+      const teamId = await newTeam(pglite, league.leagueId, seasonId);
+      await pglite.query('update teams set deleted_at = now() where id = $1', [teamId]);
+      return { teamId };
+    },
+    (c, i) => restoreTeam(c, i, binDeps),
+  ),
+  ...divisionRows(
+    'leagues.restore_game',
+    'restore a game',
+    'bin.restore',
+    async (league, program) => {
+      const { gameId } = await gameIn(league, program, { deleted_at: new Date() });
+      return { gameId };
+    },
+    (c, i) => restoreGame(c, i, binDeps),
+  ),
+  {
+    command: 'leagues.restore_person',
+    name: 'restore a person',
+    needs: 'bin.restore',
+    prepare: async (league) => {
+      const personId = await newPerson(pglite, league.leagueId);
+      await pglite.query('update people set deleted_at = now() where id = $1', [personId]);
+      return { input: { personId } };
+    },
+    run: (c, i) => restorePerson(c, i, binDeps),
+  },
+  {
+    command: 'leagues.list_bin',
+    name: 'see the bin',
+    needs: 'bin.restore',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listBin(c, i, binDeps),
+  },
   ...divisionRows(
     'leagues.list_divisions',
     'see the divisions',

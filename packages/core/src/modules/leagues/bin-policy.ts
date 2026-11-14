@@ -1,11 +1,6 @@
 // Who may use the bin (A-5, T-74), read from the database on every call (T-75).
 import type { CommandContext } from '../../command/index.ts';
-import {
-  hasPermission,
-  leagueScope,
-  readOnlyLeagueStatuses,
-  type Scope,
-} from '../access/index.ts';
+import { hasPermission, leagueScope, readOnlyLeagueStatuses, type Scope } from '../access/index.ts';
 import type { BinTx } from './bin.ts';
 
 /**

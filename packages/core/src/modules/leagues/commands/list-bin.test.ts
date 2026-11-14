@@ -20,6 +20,8 @@ describe('listBin', () => {
 
   it('is for admins and the owner only', async () => {
     const { deps, as } = memoryBin();
-    expect(await listBin(as('someone'), {}, deps)).toMatchObject({ error: { code: 'not-allowed' } });
+    expect(await listBin(as('someone'), {}, deps)).toMatchObject({
+      error: { code: 'not-allowed' },
+    });
   });
 });
