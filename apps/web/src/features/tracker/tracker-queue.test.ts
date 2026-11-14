@@ -153,6 +153,22 @@ describe('tracker queue: sending', () => {
     expect(server.saved).toEqual([commandId(1)]);
   });
 
+  it('never sends a tap under a session other than the one it was made under', async () => {
+    let current: string | null = session;
+    const { queue, server, storage } = setup({ sessionId: () => current });
+    server.mode = 'down';
+    await queue.start();
+    await queue.enqueue(tap(1));
+    current = '00000000-0000-4000-8000-0000000000c2';
+    await queue.enqueue(tap(2));
+    server.mode = 'up';
+    queue.wake();
+    await queue.idle();
+    expect(server.saved).toEqual([commandId(2)]);
+    expect(await held(storage)).toEqual([[commandId(1), 'waiting']]);
+    expect(server.received.at(-1)?.sessionId).toBe(current);
+  });
+
   it('sends taps stored before a release under the version they were made with (T-127)', async () => {
     const { queue, server, storage } = setup({ protocolVersion: 2 });
     await storage.add(game, { protocolVersion: 1, command: tap(1) });

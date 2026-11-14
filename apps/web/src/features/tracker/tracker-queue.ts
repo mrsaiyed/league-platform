@@ -291,7 +291,12 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     stored('storage-write-failed', () => storage.settle(gameId, { remove, refuse, notSaved }));
 
   const nextBatch = (list: readonly QueuedCommand[], session: string): CommandBatch | null => {
-    const waiting = list.filter((entry) => entry.state === 'waiting');
+    // A tap made under another session is never sent under this one (T6 §5, record 049):
+    // it stays waiting until the tracker sets it aside as not saved.
+    const waiting = list.filter(
+      (entry) =>
+        entry.state === 'waiting' && (entry.sessionId === undefined || entry.sessionId === session),
+    );
     const first = waiting[0];
     if (first === undefined) return null;
     // A batch carries one version: taps stored before a release go out as they were made.
