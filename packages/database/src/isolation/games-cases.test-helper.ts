@@ -36,7 +36,7 @@ import {
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { harnessTx, registerCommandCase, runAsApp } from './command-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
-import type { LeagueRecords } from './two-leagues.test-helper.ts';
+import { harnessNow, type LeagueRecords } from './two-leagues.test-helper.ts';
 
 // Queries -----------------------------------------------------------------------------
 
@@ -217,8 +217,10 @@ registerIsolationCase({
 
 // Scoring sessions (step 2.28) -------------------------------------------------------
 
-// The target's member holds its upcoming game on a tablet, for two minutes from when
-// the seed ran; the harness's clock is the real one, so the lease has not run out.
+// The target's member holds its upcoming game on a tablet. The seed sets when that
+// session began and when its lease runs out, and the harness's clock is fixed half a
+// minute into it (harnessNow), so in every run the lease holds and a takeover naming
+// its start succeeds, whatever the time of day.
 
 registerIsolationCase({
   subject: findScoringSession,
@@ -258,7 +260,7 @@ registerIsolationCase({
       scope,
       target.upcomingGameId,
       target.scoringSessionId,
-      Date.now() + 120_000,
+      harnessNow + 120_000,
     ),
 });
 

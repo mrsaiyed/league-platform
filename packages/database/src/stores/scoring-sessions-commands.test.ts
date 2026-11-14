@@ -1,7 +1,18 @@
 // Step 2.28 against the real database: one scorer at a time (T6 §5, S-5, T-116).
-// Two devices racing for one game, taking over, a lease running out, and leaving the
+// Two devices opening one game, taking over, a lease running out, and leaving the
 // game, all with a clock the test moves by hand. Each call is one transaction
 // (commandTransaction). The isolation cases are in ../isolation.
+//
+// PGlite has one connection and runs transactions one after another, so two
+// requests cannot truly overlap here: the requests that read the same game before
+// either writes are tried in core (racingScoring, open-scoring-session.test.ts and
+// take-over-scoring.test.ts). What this file proves of the database's part is that
+// starting a session on a game that has one returns nothing without an error, in
+// the same transaction, which is what the losing request relies on. On PostgreSQL
+// itself, the second of two overlapping inserts waits for the first to commit and
+// then does nothing (`on conflict do nothing`); that is PostgreSQL's documented
+// behavior, not tested here, and the platform's first real-database test run
+// (staging) should open one game from two connections at once to confirm it.
 import type { PGlite } from '@electric-sql/pglite';
 import {
   leaseMs,
@@ -107,7 +118,8 @@ async function leagueWithGame() {
 }
 
 describe('scoring sessions on the database (T6 §5, T-116)', () => {
-  it('two devices race to open one game: only one wins, the other is told who has it', async () => {
+  // Sent together, but PGlite runs them one after another (see the top of the file).
+  it('two devices opening one game together: only one gets it, the other is told who has it', async () => {
     const l = await leagueWithGame();
     const [tablet, phone] = await Promise.all([
       openScoringSession(l.as(l.first), { gameId: l.gameId, deviceId: 'tablet' }, deps),

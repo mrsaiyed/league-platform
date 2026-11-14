@@ -99,6 +99,15 @@ export type TwoLeagues = {
 const id = async (db: Sql, text: string, params: unknown[]) =>
   (await one<{ id: string }>(db, `${text} returning id`, params)).id;
 
+/** When each league's seeded scoring session began; its lease runs two minutes from then. */
+const seededSessionSince = Date.UTC(2026, 11, 13, 18, 0, 0);
+
+/**
+ * The harness's clock (T-116 leases): fixed half a minute into the seeded sessions'
+ * leases, so whether a lease has run out never depends on when the tests run.
+ */
+export const harnessNow = seededSessionSince + 30_000;
+
 /** An account with its own (self) profile. */
 async function person(db: Sql, email: string, first: string, last: string) {
   const accountId = await id(db, 'insert into accounts (email, display_name) values ($1, $2)', [
@@ -402,18 +411,20 @@ async function seededLeague(
      values ($1, $2, $3, $4, '23', true, 1200, '{"points": 2, "fg2": 1}')`,
     [leagueId, gameId, teamId, personId],
   );
-  // Begun at a set moment, so a takeover can name it; held for two minutes from now.
-  const scoringSessionSince = Date.UTC(2026, 11, 13, 18, 0, 0);
+  // Begun and held at set moments, so a takeover can name it and, by the harness's
+  // fixed clock (harnessNow), its lease has not run out, whatever the time of day.
+  const scoringSessionSince = seededSessionSince;
   const scoringSessionId = await id(
     pglite,
     `insert into scoring_sessions (league_id, game_id, account_id, device_id, created_at, held_until)
-     values ($1, $2, $3, $4, $5, now() + interval '2 minutes')`,
+     values ($1, $2, $3, $4, $5, $6)`,
     [
       leagueId,
       upcomingGameId,
       member.accountId,
       `${m}-tablet`,
       new Date(scoringSessionSince).toISOString(),
+      new Date(scoringSessionSince + 120_000).toISOString(),
     ],
   );
   const walkUpPersonId = await id(

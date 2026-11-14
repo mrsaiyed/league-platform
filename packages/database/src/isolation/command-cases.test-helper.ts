@@ -22,7 +22,6 @@
 // command aimed at the target is refused there before any handler runs.
 import {
   eventHandlers,
-  systemClock,
   type AccessTx,
   type Command,
   type CommandDeps,
@@ -58,7 +57,7 @@ import {
   teamsStore,
 } from '../stores/index.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
-import type { LeagueRecords } from './two-leagues.test-helper.ts';
+import { harnessNow, type LeagueRecords } from './two-leagues.test-helper.ts';
 
 /** Every module's store, as the apps' transaction offers them. Grows with each module. */
 export type HarnessTx = LeaguesTx &
@@ -82,7 +81,8 @@ export function harnessTx(scope: LeagueScope, jobs: JobQueue): HarnessTx {
     scheduling: schedulingStore(scope),
     games: gamesStore(scope),
     scoringSessions: scoringSessionsStore(scope),
-    clock: systemClock,
+    // Fixed, so the seeded sessions' leases read the same at any time of day.
+    clock: { now: () => harnessNow },
     people: peopleStore(scope),
     teams: teamsStore(scope),
     standings: standingsStore(scope),

@@ -87,7 +87,6 @@ import {
   openScoringSession,
   releaseScoringSession,
   renewScoringSession,
-  systemClock,
   takeOverScoring,
   renameShortName,
   resendInvitation,
@@ -183,6 +182,9 @@ type Row = {
   readonly run: (context: CommandContext, input: unknown) => Promise<Outcome>;
 };
 
+/** The scoring session commands' clock (T-116): fixed, so leases never depend on the time of day. */
+const matrixNow = Date.UTC(2026, 11, 6, 18, 0, 30);
+
 let pglite: PGlite;
 let db: DatabaseHandle;
 let staffId: string;
@@ -205,7 +207,7 @@ beforeAll(async () => {
     scheduling: schedulingStore(scope),
     games: gamesStore(scope),
     scoringSessions: scoringSessionsStore(scope),
-    clock: systemClock,
+    clock: { now: () => matrixNow },
     people: peopleStore(scope),
     teams: teamsStore(scope),
     standings: standingsStore(scope),
@@ -900,15 +902,17 @@ const gameCommandRows: readonly Row[] = [
     'games.score',
     async (league, program) => {
       const { gameId } = await gameIn(league, program);
-      const since = Date.UTC(2026, 11, 6, 18, 0, 0);
+      // Begun half a minute before the matrix's fixed clock, so its lease still holds.
+      const since = matrixNow - 30_000;
       await pglite.query(
         `insert into scoring_sessions (league_id, game_id, account_id, device_id, created_at, held_until)
-         values ($1, $2, $3, 'matrix-phone', $4, now() + interval '2 minutes')`,
+         values ($1, $2, $3, 'matrix-phone', $4, $5)`,
         [
           league.leagueId,
           gameId,
           await grant(league.leagueId, 'scorekeeper'),
           new Date(since).toISOString(),
+          new Date(since + 120_000).toISOString(),
         ],
       );
       return { gameId, deviceId: 'matrix-tablet', confirmed: true, expectedHolderSince: since };
