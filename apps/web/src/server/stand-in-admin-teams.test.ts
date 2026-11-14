@@ -272,26 +272,72 @@ describe('the admin Teams screens over the stand-in', () => {
       team: teamId,
       entry: 'not-an-entry',
       order: open,
+      moveDown: '',
     });
     expect(stranger.answer).toMatchObject({ kind: 'refused', code: 'roster-entry-not-found' });
     const stale = await moveEntry(m.owner, m.ports.deps, {
       team: teamId,
       entry: entries[0] ?? '',
       order: entries.slice(1).join(','),
+      moveDown: '',
     });
     expect(stale.answer).toMatchObject({ kind: 'refused', code: 'roster-incomplete' });
     const reordered = await moveEntry(m.owner, m.ports.deps, {
       team: teamId,
       entry: entries[0] ?? '',
       order: [...entries].reverse().join(','),
+      moveDown: '',
     });
     expect(reordered.answer).toMatchObject({ kind: 'refused', code: 'roster-incomplete' });
     const moved = await moveEntry(m.owner, m.ports.deps, {
       team: teamId,
       entry: entries[0] ?? '',
       order: open,
+      moveDown: '',
     });
     expect(moved.answer).toEqual({ kind: 'done', done: 'moved' });
+  });
+
+  it('refuses a move post that names no direction, or both', async () => {
+    const m = made();
+    const { teamId, entries } = await teamOfTen(m);
+    const post = { team: teamId, entry: entries[1] ?? '', order: entries.join(',') };
+    for (const fields of [post, { ...post, moveUp: '', moveDown: '' }]) {
+      const answer = await moveEntry(m.owner, m.ports.deps, fields);
+      expect(answer.answer).toMatchObject({ kind: 'refused', code: 'invalid-input' });
+    }
+    const roster = await listRoster(m.owner, { teamId }, m.ports.deps);
+    expect(roster.ok && roster.value.map((line) => line.id)).toEqual(entries);
+  });
+
+  it('says so truthfully when the new person cannot be taken off the list again', async () => {
+    const m = made(true);
+    const { teamId } = await teamOfTen(m);
+    const before = await listPeopleCount(m);
+    // The fourth transaction of addNewPerson is the undo (list, make, add, undo): it fails.
+    let calls = 0;
+    const deps = {
+      ...m.ports.deps,
+      transaction: (async (context, work) => {
+        calls += 1;
+        if (calls === 4) throw new Error('made-up outage');
+        return m.ports.deps.transaction(context, work);
+      }) as typeof m.ports.deps.transaction,
+    };
+    const answer = await addNewPerson(m.owner, deps, {
+      team: teamId,
+      firstName: 'Stuck',
+      lastName: 'Test',
+      jerseyNumber: '3',
+      role: 'player',
+    });
+    expect(calls).toBe(4);
+    expect(answer.answer).toEqual({
+      kind: 'refused',
+      command: 'teams.add_new_person',
+      code: 'not-undone',
+    });
+    expect(await listPeopleCount(m)).toBe(before + 1);
   });
 });
 

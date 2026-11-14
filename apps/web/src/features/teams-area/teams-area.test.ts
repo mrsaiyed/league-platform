@@ -104,6 +104,9 @@ describe('answers in the address', () => {
       ['people.remove_person', 'person-on-a-roster'],
       ['teams.add_to_roster', 'invalid-input'],
       ['teams.add_to_roster', 'not-allowed'],
+      ['teams.add_new_person', 'not-undone'],
+      ['teams.list_roster', 'team-not-found'],
+      ['teams.reorder_roster', 'invalid-input'],
     ];
     for (const [command, code] of codes) {
       const key = problemKey({ problem: `${command}.${code}` });

@@ -268,6 +268,9 @@ export const en = {
   'error.teams.add_new_person.already-on-team':
     'That person is already on this team, so the new person was not kept in the league list.',
   'error.teams.add_new_person.not-allowed': 'You are not allowed to do that.',
+  'error.teams.add_new_person.not-undone':
+    'The person could not be put on the roster, and could not be taken off the league list again either, so they are still in the league list. Remove them there if they should not be.',
+  'error.teams.list_roster.team-not-found': 'That team is not there.',
   'error.unknown': 'That could not be done.',
   'error.teams.create_team.season-not-found': 'That season is not there.',
   'error.teams.create_team.division-not-found': 'That division is not there.',
