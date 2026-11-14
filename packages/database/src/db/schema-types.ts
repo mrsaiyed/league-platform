@@ -92,6 +92,7 @@ export interface GameCorrectionsTable {
   after: ColumnType<JsonValue, JsonObject, JsonObject>;
   at: ColumnType<Date, Date | string | undefined, Date | string>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  written_in: string | null;
 }
 
 export interface GameEventsTable {
