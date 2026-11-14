@@ -24,6 +24,8 @@ Set in **Admin → Season settings**. This is the first thing an organizer settl
 
 **S-1 (agreed, changed November 12): the admin can change the rules at any time, and is shown what a change will do before it applies.** The league is the admin's to run. Before the first game, changes simply save. After it, a change that would move anything (a tiebreaker that reorders the standings, a forfeit score that alters point difference) shows what will move, asks for confirmation, and is logged. Game rules (clock, fouls, period length) apply to games that have not started; a game already played keeps the rules it was played under.
 
+**S-41 (decided for you, November 14): what the roster rules do.** A team's roster cannot grow past the season's largest size. After the lock date only the owner and admins change rosters. A roster under the smallest size is a warning, never a refusal. A player added at the scorer's table (S-6) is refused by neither rule, so a game is never stopped by them, and is marked for the admin to review.
+
 ## 2. Teams
 
 Teams come from three places: created by hand, registered by captains ([P6](P6-registration-and-accounts.md) section 3), or carried over from last season. Each has a name, color, optional logo, a division, and a captain or coach. A team's roster is built by dragging registered people onto it, or by the draft. Jersey numbers are set on the roster and can be changed at the scorer's table by whoever is scoring that game (**S-37**, decided for you); where the season wants unique numbers, a number already worn on the team is refused with a sentence naming who wears it. A player who leaves or is replaced mid-season stays in the team's history with every game they played (R-17).
