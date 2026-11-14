@@ -7,7 +7,8 @@
 // two bad rows, read the report (each bad row named in plain words, the good games listed),
 // add the games to the schedule draft, and undo that, with the draft's count of changes
 // going 0, 3, 0. Accessibility checks on each screen (T-186), and no sideways scrolling of
-// the page at phone width (A-2). A coach of the same league and the scheduler in another
+// the page at phone width (A-2). A file just over the import's size limit gets the screen's
+// own "too large" notice, not the framework's error. A coach of the same league and the scheduler in another
 // league are refused (U-6).
 import {
   accessibilityProblems,
@@ -172,6 +173,39 @@ if (browser) {
           .count()) === 0,
       );
       await accessible(page, 'after undoing');
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('a file just over the import limit gets our own notice', async () => {
+    // About 850 KB: over the import's limit (800 KB), under the 2 MB a server action may
+    // read (next.config.ts), so it must reach our check and not the framework's error.
+    const row = '2027-01-09,18:00,Lions,Tigers,Central Gym,Court 1,,\n';
+    const big = `Date,Time,Home,Away,Venue,Court,Home score,Away score\n${row.repeat(
+      Math.ceil(850_000 / row.length),
+    )}`;
+    const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+    try {
+      await context.addCookies([
+        { name: 'srl_session', value: 'local-scheduler-token', url: origin },
+      ]);
+      const page = await context.newPage();
+      await open(page, screen);
+      await page.getByLabel('Spreadsheet file (CSV)').setInputFiles({
+        name: 'too-big.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from(big),
+      });
+      await Promise.all([
+        page.waitForURL((url) => url.searchParams.get('problem') === 'file-too-large'),
+        page.getByRole('button', { name: 'Upload and check' }).click(),
+      ]);
+      note(
+        'a file over the limit is refused in plain words',
+        await shows(page, 'The file is too large to import at once'),
+      );
+      await accessible(page, 'the too-large notice');
     } finally {
       await context.close();
     }
