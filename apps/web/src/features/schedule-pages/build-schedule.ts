@@ -42,6 +42,11 @@ export type RoundView = {
   readonly number: number | null;
   readonly title: string;
   readonly phase: 'past' | 'current' | 'upcoming' | null;
+  /**
+   * What a finished round's mark does not say: that it still holds a game waiting for a new
+   * day ("1 game postponed"). Left out for every other round.
+   */
+  readonly note?: string | undefined;
   readonly summary: string;
   readonly open: boolean;
   readonly games: readonly GameView[];
@@ -200,16 +205,21 @@ export function buildScheduleView(
     // round list matches the league's own.
     if (choices.team !== undefined && games.length === 0) continue;
     const dateText = round.date === null ? null : dayText(round.date);
+    // A finished round that still holds a game waiting for a new day is not finished for
+    // that game's teams: it says so beside its mark, and is not folded shut.
+    const waiting =
+      round.phase === 'past' ? games.filter((g) => g.status === 'postponed').length : 0;
     rounds.push({
       key: round.id,
       number: round.number,
       title: roundTitle(round),
       phase: round.phase,
+      ...(waiting === 0 ? {} : { note: t.plural('schedule.postponedCount', waiting) }),
       summary:
         dateText === null
           ? t.plural('schedule.gamesNoDate', games.length)
           : t.plural('schedule.games', games.length, { date: dateText }),
-      open: oneRound !== undefined || round.phase !== 'past',
+      open: oneRound !== undefined || round.phase !== 'past' || waiting > 0,
       games,
     });
   }

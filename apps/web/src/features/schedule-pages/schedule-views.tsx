@@ -54,8 +54,9 @@ export function GameList({
 
 /**
  * The rounds of a season: finished ones closed, the current and coming ones open, the
- * current one picked out. Each is a plain disclosure, so it opens and closes without any
- * script.
+ * current one picked out. A finished round that still holds a postponed game says so
+ * beside its mark and is open. Each is a plain disclosure, so it opens and closes without
+ * any script.
  */
 export function RoundSections({
   leagueId,
@@ -71,6 +72,7 @@ export function RoundSections({
           key={round.key}
           title={round.title}
           mark={round.phase === null ? undefined : t(`schedule.phase.${round.phase}`)}
+          note={round.note}
           summary={round.summary}
           open={round.open}
           phase={round.phase ?? 'other'}

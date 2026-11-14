@@ -247,6 +247,13 @@ export const cardsCss = String.raw`
   background: var(--color-primary);
   color: var(--color-on-primary);
 }
+/* What the mark does not say, beside it ("1 game postponed"): drawn like a game's own
+   state pill, so it is read as news about the games inside, in any round. */
+.ui-group .ui-group-mark[data-kind='note'] {
+  border-color: var(--color-line-strong);
+  background: transparent;
+  color: var(--color-text);
+}
 .ui-group-summary {
   margin-inline-start: auto;
   color: var(--color-muted);

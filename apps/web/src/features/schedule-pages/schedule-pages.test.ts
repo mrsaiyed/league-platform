@@ -39,6 +39,56 @@ describe('schedule', () => {
     expect(view.seasonIsEmpty).toBe(false);
   });
 
+  it('a finished round that still holds a postponed game says so, and is not folded shut', async () => {
+    const { clock, schedule } = await load(adult);
+    const view = buildScheduleView(schedule, clock, addressee, {});
+    const held = view.rounds.filter((r) => r.games.some((g) => g.status === 'postponed'));
+    // The made-up season has one: round 2, two weeks ago, with one of its two games off.
+    expect(held.map((r) => [r.number, r.phase, r.note, r.open])).toEqual([
+      [2, 'past', '1 game postponed', true],
+    ]);
+    // Every other finished round is folded shut and has nothing more to say.
+    const others = view.rounds.filter((r) => r.phase === 'past' && r.number !== 2);
+    expect(others.length).toBeGreaterThan(0);
+    expect(others.every((r) => !r.open && r.note === undefined)).toBe(true);
+    // Two of them: the words count.
+    const both = {
+      ...schedule,
+      rounds: schedule.rounds.map((r) =>
+        r.number === 2 ? { ...r, games: r.games.map((g) => ({ ...g, status: 'postponed' })) } : r,
+      ),
+    };
+    expect(
+      buildScheduleView(both, clock, addressee, {}).rounds.find((r) => r.number === 2)?.note,
+    ).toBe('2 games postponed');
+    // A round that is not finished says nothing beside its mark: its cards are in view.
+    const coming = {
+      ...schedule,
+      rounds: schedule.rounds.map((r) =>
+        r.phase === 'upcoming'
+          ? { ...r, games: r.games.map((g) => ({ ...g, status: 'postponed' })) }
+          : r,
+      ),
+    };
+    const upcoming = buildScheduleView(coming, clock, addressee, {}).rounds.filter(
+      (r) => r.phase === 'upcoming',
+    );
+    expect(upcoming.every((r) => r.note === undefined && r.open)).toBe(true);
+    // A team's own list counts only the games it shows.
+    const falcons = buildScheduleView(schedule, clock, addressee, { team: 'falcons' });
+    expect(falcons.rounds.every((r) => r.note === undefined)).toBe(true);
+    const herons = buildScheduleView(schedule, clock, addressee, { team: 'herons' });
+    expect(herons.rounds.find((r) => r.number === 2)?.note).toBe('1 game postponed');
+    // Drawn beside the round's mark, in the open round.
+    const html = renderToStaticMarkup(
+      createElement(RoundSections, { leagueId: adult, rounds: view.rounds }),
+    );
+    expect(html).toMatch(
+      /<details class="ui-group" open="" data-phase="past"><summary><h2 dir="auto">Round 2<\/h2><span class="ui-group-mark">Finished<\/span> <span class="ui-group-mark" data-kind="note">1 game postponed<\/span>/,
+    );
+    expect(html.match(/data-kind="note"/g)).toHaveLength(1);
+  });
+
   it('the two leagues look different', async () => {
     const a = await load(adult);
     const y = await load(youth);

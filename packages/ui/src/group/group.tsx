@@ -4,6 +4,8 @@ export type GroupProps = {
   readonly title: string;
   /** A small pill beside the title: "This round". */
   readonly mark?: string | undefined;
+  /** Something the mark does not say, beside it: "1 game postponed" in a finished round. */
+  readonly note?: string | undefined;
   /** A quiet line at the end of the heading row: "3 games on Sat, Nov 14". */
   readonly summary?: string | undefined;
   readonly open: boolean;
@@ -16,12 +18,19 @@ export type GroupProps = {
  * A group that opens and closes: a round of the schedule. A plain disclosure, so it works
  * without any script.
  */
-export function Group({ title, mark, summary, open, phase, children }: GroupProps) {
+export function Group({ title, mark, note, summary, open, phase, children }: GroupProps) {
   return (
     <details className="ui-group" open={open} data-phase={phase}>
       <summary>
         <h2 dir="auto">{title}</h2>
         {mark ? <span className="ui-group-mark">{mark}</span> : null}{' '}
+        {note ? (
+          <>
+            <span className="ui-group-mark" data-kind="note">
+              {note}
+            </span>{' '}
+          </>
+        ) : null}
         {summary ? <span className="ui-group-summary">{summary}</span> : null}
       </summary>
       <div className="ui-group-body">{children}</div>
