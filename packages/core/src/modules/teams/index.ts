@@ -15,6 +15,16 @@ export {
   type SetTeamStatsVisibilityError,
 } from './commands/set-team-stats-visibility.ts';
 export { updateTeam, type UpdateTeamError } from './commands/update-team.ts';
+export {
+  publicRosterLine,
+  publicTeam,
+  type PublicDisplay,
+  type PublicDivision,
+  type PublicRoster,
+  type PublicRosterLine,
+  type PublicTeam,
+  type RosterLineSource,
+} from './public-team.ts';
 export { statsVisibilityChoices, type TeamStatsVisibility } from './team-fields.ts';
 export { rosterRoles } from './roster-fields.ts';
 export type {

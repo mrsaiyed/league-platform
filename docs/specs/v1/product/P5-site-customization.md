@@ -27,7 +27,7 @@ There are six layers of customization. From most used to least:
 
 One screen, with a live preview beside it.
 
-- **Colors**: background, panels, text, a main color and an accent. Each division and each team can also have its own color (Faraj's gold Mecca and teal Medina). We warn when text would be hard to read against its background and suggest the nearest readable shade.
+- **Colors**: background, panels, text, a main color, an accent and a highlight. The highlight is a third color used sparingly, on the few things that should catch the eye (a live marker, a winning score, the button that matters most on a page), and never for body text (C-15). Each division and each team can also have its own color (Faraj's gold Mecca and teal Medina). We warn when text would be hard to read against its background and suggest the nearest readable shade.
 - **Fonts**: a heading font and a body font from a curated list of about 30. No font uploads at first.
 - **Logo and icon**: uploaded once, used in the header, browser tab, share images and emails.
 - **Style options**: square or rounded corners, flat or outlined cards, compact or roomy spacing, light or dark base.

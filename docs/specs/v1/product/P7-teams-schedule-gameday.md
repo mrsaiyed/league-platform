@@ -162,7 +162,7 @@ When the regular season ends, the admin creates a **bracket**: choose how many t
 - **S-11: only final games count.** A live game's numbers show on its own page but not in season totals until it ends.
 - **S-22 (new, the founder's direction, November 12): who can see players' statistics is a setting, and each team can choose for itself.**
   - Four levels: everyone; signed-in members of the league; the team's own players, parents and staff; or only the team's staff and the league's admins.
-  - The league sets the starting level and whether teams may choose their own. A team's coach or admin then picks for their team.
+  - The league sets the starting level and whether teams may choose their own. A team's coach or admin then picks for their team. A new league starts at "everyone" (S-23, the founder, November 13) with teams allowed to choose (S-24).
   - It covers individual numbers: box score lines, season totals, stat leaders, and players' names in the play-by-play.
   - Scores, results and standings stay visible to everyone, because a game belongs to both teams. Where a team's numbers are hidden from a viewer, the box score shows that team's total only.
   - "Everyone" and "staff only" are built with the first statistics pages (stage 2). The two middle levels need registered members, so they arrive with accounts (stage 4).

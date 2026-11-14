@@ -25,7 +25,7 @@ The session that reads this is the **lead**. The lead plans, delegates, checks e
 A stage plan lists steps. Each step says what it **needs**: the steps that must have landed before it can start. A step can be **opened** when all of these are true:
 
 - every step it needs has landed on the build branch;
-- every decision it rests on is agreed in `docs/specs/v1/DECISIONS.md` (T-211);
+- every decision it rests on is agreed, or decided for the founder, in `docs/specs/v1/DECISIONS.md` (T-211; section 5 says what the lead does with one that is neither);
 - it is not marked as waiting on the founder.
 
 Every step goes through the same six things:
@@ -152,7 +152,8 @@ Rules for delegating:
 ## 5. Decisions that come up while building
 
 - **Technical, and the spec is silent or wrong:** the lead decides. Write a short record in `docs/architecture/decisions/` (what, what else was considered, what would make us revisit), correct the spec file in the same commit, and add a row to the change log in `docs/specs/v1/DECISIONS.md` with status "Agreed (delegated)" or "Changed (delegated)". Use the numbers reserved for that lane.
-- **Product or business:** do not decide. Add it to "Needs the founder" in `STATUS.md` with the question in plain words and your recommendation, and open a different step. A step that rests on an unsettled decision is skipped, never guessed.
+- **Product or business:** the founder's, but do not ask and do not wait (the founder, 2026-11-13: "stop stalling by asking me questions… come up with the answers and if you need me to approve later I will"). The lead answers it: the written recommendation if there is one; otherwise the answer that leaves a league's admin the most choice and is the easiest to change later. In the same commit: mark it "Decided for you" in `docs/specs/v1/DECISIONS.md` (the status in the full list, and a row in the table "Decided for you, waiting for your yes" with the answer and what changing it later would take), correct the spec file, and write one log line in `STATUS.md`. Then build on it. A builder never decides one: it reports the question and the lead decides. Never mark it "Agreed": only the founder's own words do that.
+- **What always waits for the founder:** anything that costs them money or signs them up to something, anything on the live sites or with real people's data, anything sent to real people or organizations in their name, and a legal sign-off. Write it under "Needs the founder" in `STATUS.md` in plain words with your recommendation, and open a different step.
 - **Needs the founder's hands** (a vendor account, a key, a real device, a payment, real people's data, a review by eye): same list. Build everything up to that point, with the outside service behind its interface and a local stand-in, so the founder's part is a short checklist.
 
 ## 6. What a run must never do
@@ -163,7 +164,7 @@ Rules for delegating:
 - Touch production, a vendor dashboard, real people's data or any secret.
 - Change `apps/live-stats`, `packages/sports` or the Al-Hadi data except where a stage plan says to.
 - Weaken or delete a test to make the gate pass, or skip a hook.
-- Mark a product decision agreed, or build on one that is not.
+- Mark a product decision agreed. The lead's own answer is marked "Decided for you" (section 5), and a builder never decides one.
 - Call a stage finished. A stage is finished when the founder has checked it (section 9); the building carries on meanwhile.
 
 ## 7. End of a run
