@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
@@ -28,8 +28,10 @@ export type ReadTrackerBackupOptions = {
  * read-only transaction, and the copy is deleted. The backup is byte-for-byte the same
  * afterwards (F-7, T-16).
  *
- * Throws TrackerBackupError when the folder is missing, holds no database, holds no
- * tracker tables, or is open in a running stats server.
+ * Every failure comes out as a TrackerBackupError saying which problem it is: the folder
+ * is missing or cannot be copied, holds no database or one that will not open, lacks the
+ * tracker's tables or columns, is open in a running stats server, or the working folder
+ * cannot be used.
  */
 export async function readTrackerBackup(
   folder: string,
@@ -41,29 +43,122 @@ export async function readTrackerBackup(
     throw new TrackerBackupError('not-a-database', source);
   if (await heldByRunningServer(source)) throw new TrackerBackupError('in-use', source);
 
-  const work = await mkdtemp(path.join(options.workDir ?? tmpdir(), 'tracker-backup-'));
+  const workRoot = await prepareWorkDir(options.workDir ?? tmpdir(), source);
+  let work: string;
+  try {
+    work = await mkdtemp(path.join(workRoot, 'tracker-backup-'));
+  } catch (error) {
+    throw new TrackerBackupError('work-dir-unusable', workRoot, error);
+  }
   try {
     const copy = path.join(work, 'db');
-    await cp(source, copy, { recursive: true });
-    const db = new PGlite(copy);
     try {
-      return await db.transaction(async (tx) => {
-        await tx.exec('SET TRANSACTION READ ONLY');
-        return readAll(tx, source);
-      });
-    } finally {
-      await db.close();
+      await cp(source, copy, { recursive: true });
+    } catch (error) {
+      throw new TrackerBackupError('unreadable', source, error);
     }
+    // A server that opened the folder while it was being copied may have been writing to
+    // it, so the copy cannot be trusted.
+    if (await heldByRunningServer(source)) throw new TrackerBackupError('in-use', source);
+    return await readCopy(copy, source);
   } finally {
     await rm(work, { recursive: true, force: true });
   }
+}
+
+async function readCopy(copy: string, source: string): Promise<TrackerBackup> {
+  const db = new PGlite(copy);
+  try {
+    try {
+      await db.waitReady;
+    } catch (error) {
+      throw new TrackerBackupError('not-a-database', source, error);
+    }
+    return await db.transaction(async (tx) => {
+      await tx.exec('SET TRANSACTION READ ONLY');
+      return readAll(tx, source);
+    });
+  } catch (error) {
+    if (error instanceof TrackerBackupError) throw error;
+    throw new TrackerBackupError('not-a-tracker-backup', source, error);
+  } finally {
+    // The copy is thrown away, so a failure to close it matters to no one, and must not
+    // hide the error that brought us here.
+    await db.close().catch(() => undefined);
+  }
+}
+
+/**
+ * Makes sure the working folder exists and is not inside the backup: the copy would then
+ * be written into the backup itself.
+ */
+async function prepareWorkDir(dir: string, source: string): Promise<string> {
+  const resolved = path.resolve(dir);
+  if (isInside(resolved, source)) throw new TrackerBackupError('work-dir-unusable', resolved);
+  let real: string;
+  try {
+    await mkdir(resolved, { recursive: true });
+    real = await realpath(resolved);
+    // Through a link the working folder can still land inside the backup.
+    if (isInside(real, await realpath(source)))
+      throw new TrackerBackupError('work-dir-unusable', resolved);
+  } catch (error) {
+    if (error instanceof TrackerBackupError) throw error;
+    throw new TrackerBackupError('work-dir-unusable', resolved, error);
+  }
+  return real;
+}
+
+function isInside(child: string, parent: string): boolean {
+  const relative = path.relative(parent, child);
+  return (
+    relative === '' ||
+    (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+  );
 }
 
 type Query = {
   query<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 };
 
-const TABLES = ['teams', 'players', 'games', 'game_events', 'player_game_lines'];
+/** The columns read from each tracker table; `turnovers` may be missing (see below). */
+const COLUMNS: Record<string, string[]> = {
+  teams: ['id', 'slug', 'name', 'school', 'tracked', 'source_url'],
+  players: ['id', 'team_id', 'name', 'jersey', 'active'],
+  games: [
+    'id',
+    'season',
+    'home_team_id',
+    'away_team_id',
+    'starts_at',
+    'venue',
+    'venue_address',
+    'game_type',
+    'source',
+    'source_ref',
+    'source_url',
+    'status',
+    'home_score',
+    'away_score',
+    'revision',
+    'state',
+  ],
+  game_events: ['game_id', 'sequence', 'command_id', 'command', 'accepted_at'],
+  player_game_lines: [
+    'game_id',
+    'player_id',
+    'team_id',
+    'name',
+    'jersey',
+    'appeared',
+    'points',
+    'fg1',
+    'fg2',
+    'fg3',
+    'fouls',
+    'ms',
+  ],
+};
 
 async function readAll(db: Query, source: string): Promise<TrackerBackup> {
   const columns = new Map<string, Set<string>>();
@@ -77,8 +172,11 @@ async function readAll(db: Query, source: string): Promise<TrackerBackup> {
     set.add(row.column_name);
     columns.set(row.table_name, set);
   }
-  if (!TABLES.every((t) => columns.has(t)))
-    throw new TrackerBackupError('not-a-tracker-backup', source);
+  const complete = Object.entries(COLUMNS).every(([table, needed]) => {
+    const found = columns.get(table);
+    return found !== undefined && needed.every((c) => found.has(c));
+  });
+  if (!complete) throw new TrackerBackupError('not-a-tracker-backup', source);
 
   const teams = (
     await db.query<TeamRow>(

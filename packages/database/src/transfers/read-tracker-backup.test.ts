@@ -26,7 +26,7 @@ const ids = {
 };
 
 /** A made-up backup: two teams, three players, three games, one of them tracked to the end. */
-async function makeBackup(dir: string, { oldLines = false } = {}) {
+async function makeBackup(dir: string, { oldLines = false, change = '' } = {}) {
   const db = new PGlite(dir);
   await db.exec(await readFile(schemaFile, 'utf8'));
   // A backup from before turnovers were kept.
@@ -80,6 +80,8 @@ async function makeBackup(dir: string, { oldLines = false } = {}) {
        ($1, $3, $5, '', '12', true, 2, 2, 0, 0, 0, 900000${oldLines ? '' : ', 0'})`,
     [ids.final, ids.p1, ids.p3, ids.home, ids.away],
   );
+  // Damage done to a test backup after it is filled.
+  if (change) await db.exec(change);
   await db.close();
 }
 
@@ -253,6 +255,28 @@ describe('readTrackerBackup', () => {
     await db.close();
     expect(await problem(other)).toBe('not-a-tracker-backup');
 
+    // A folder that looks like a database but will not open.
+    const corrupt = path.join(root, 'corrupt');
+    await mkdir(path.join(corrupt, 'base'), { recursive: true });
+    await writeFile(path.join(corrupt, 'PG_VERSION'), '17\n');
+    await writeFile(path.join(corrupt, 'base', 'junk'), 'not a database page');
+    expect(await problem(corrupt)).toBe('not-a-database');
+
+    // The tracker's tables, but one lacks a column the reader needs.
+    const noVenue = path.join(root, 'no-venue');
+    await makeBackup(noVenue, { change: 'ALTER TABLE live_stats.games DROP COLUMN venue' });
+    expect(await problem(noVenue)).toBe('not-a-tracker-backup');
+
+    // Every column is there, but reading one fails.
+    const failing = path.join(root, 'failing');
+    await makeBackup(failing, {
+      change: `ALTER TABLE live_stats.teams RENAME TO teams_kept;
+        CREATE VIEW live_stats.teams AS
+          SELECT id, slug, name, school, tracked, (1 / 0)::text AS source_url
+          FROM live_stats.teams_kept`,
+    });
+    expect(await problem(failing)).toBe('not-a-tracker-backup');
+
     // A folder a running stats server holds (this test's own process stands in for it).
     await writeFile(`${backup}.lock`, String(process.pid));
     try {
@@ -267,5 +291,43 @@ describe('readTrackerBackup', () => {
     } finally {
       await rm(`${backup}.lock`);
     }
+  });
+
+  it('keeps what caused the error, for logs', async () => {
+    const corrupt = path.join(root, 'corrupt-cause');
+    await mkdir(corrupt);
+    await writeFile(path.join(corrupt, 'PG_VERSION'), '17\n');
+    const error = await readTrackerBackup(corrupt).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TrackerBackupError);
+    expect((error as TrackerBackupError).cause).toBeDefined();
+  });
+
+  it('makes a working folder that does not exist yet', async () => {
+    const work = path.join(root, 'new-work', 'deeper');
+    await readTrackerBackup(backup, { workDir: work });
+    expect(await readdir(work)).toEqual([]);
+  });
+
+  it('refuses a working folder it cannot use', async () => {
+    const problem = (workDir: string) =>
+      readTrackerBackup(backup, { workDir }).then(
+        () => 'read',
+        (error: unknown) => (error instanceof TrackerBackupError ? error.problem : 'other'),
+      );
+    const before = await fingerprint(backup);
+
+    // Inside the backup: the copy would be written into it.
+    expect(await problem(backup)).toBe('work-dir-unusable');
+    expect(await problem(path.join(backup, 'work'))).toBe('work-dir-unusable');
+    expect(await fingerprint(backup)).toEqual(before);
+    expect(existsSync(path.join(backup, 'work'))).toBe(false);
+
+    // A file, not a folder.
+    const file = path.join(root, 'a-file');
+    await writeFile(file, '');
+    expect(await problem(file)).toBe('work-dir-unusable');
+
+    // A folder beside the backup whose name only starts the same is fine.
+    expect(await problem(`${backup}-work`)).toBe('read');
   });
 });
