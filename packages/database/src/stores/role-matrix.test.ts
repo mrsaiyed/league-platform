@@ -37,6 +37,13 @@ import {
   createSeason,
   addDraftGame,
   addToRoster,
+  applyFixtureImport,
+  discardFixtureImport,
+  getFixtureImport,
+  recordImportedScores,
+  startFixtureImport,
+  undoFixtureImport,
+  type ImportScoresTx,
   changeDraftRoundDate,
   discardScheduleDraft,
   getScheduleDraft,
@@ -139,6 +146,7 @@ import { gamesStore } from './games-store.ts';
 import { divisionsStore } from './divisions-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 import { peopleStore } from './people-store.ts';
+import { importsStore } from './imports-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
 import { standingsStore } from './standings-store.ts';
 import { teamsStore } from './teams-store.ts';
@@ -186,6 +194,7 @@ let gamesDeps: CommandDeps<GamesTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
 let teamsDeps: CommandDeps<TeamsTx>;
 let standingsDeps: CommandDeps<StandingsTx>;
+let importsDeps: CommandDeps<ImportScoresTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
@@ -195,6 +204,7 @@ beforeAll(async () => {
     leagues: leaguesStore(scope, { platformStaff: [staffId] }),
     divisions: divisionsStore(scope),
     scheduling: schedulingStore(scope),
+    imports: importsStore(scope),
     games: gamesStore(scope),
     people: peopleStore(scope),
     teams: teamsStore(scope),
@@ -210,6 +220,7 @@ beforeAll(async () => {
   gamesDeps = { transaction, events: [], ...rest };
   peopleDeps = { transaction, events: [], ...rest };
   teamsDeps = { transaction, events: [], ...rest };
+  importsDeps = { transaction, events: [], ...rest };
 });
 afterAll(async () => {
   await db.close();
@@ -1126,6 +1137,112 @@ const standingsRows: readonly Row[] = gameRows(
   (c, i) => rebuildStandings(c, i, standingsDeps),
 );
 
+/** An import of a season, ready to apply or applied (with the empty draft it names). */
+async function importIn(
+  league: League,
+  s: { seasonId: string },
+  state: 'reading' | 'ready' | 'applied',
+) {
+  const created: Record<string, unknown> = { version: 1 };
+  if (state === 'applied') {
+    const draft = await one<{ id: string }>(
+      pglite,
+      'insert into schedule_drafts (league_id, season_id) values ($1, $2) returning id',
+      [league.leagueId, s.seasonId],
+    );
+    Object.assign(created, {
+      draftId: draft.id,
+      draftStarted: true,
+      changesBefore: 0,
+      changesAdded: 0,
+      draftVersion: 1,
+      gameIds: [],
+      scores: [],
+    });
+  }
+  const report =
+    state === 'reading'
+      ? { version: 1, upload: 'Date,Home,Away' }
+      : {
+          version: 1,
+          fileProblem: null,
+          fixtures: [],
+          problems: [],
+          omittedProblems: 0,
+          problemsNote: null,
+          warnings: [],
+          rowsRead: 0,
+          columnsFound: [],
+        };
+  const row = await one<{ id: string }>(
+    pglite,
+    `insert into imports (league_id, season_id, kind, status, account_id, file_name, report, created, applied_at)
+     values ($1, $2, 'fixtures', $3, $4, 'fixtures.csv', $5, $6, ${state === 'applied' ? 'now()' : 'null'})
+     returning id`,
+    [
+      league.leagueId,
+      s.seasonId,
+      state,
+      league.ownerId,
+      JSON.stringify(report),
+      JSON.stringify(created),
+    ],
+  );
+  return row.id;
+}
+
+// A fixtures import is run at its season's program (P4 §3 `schedule.import`): the owner,
+// admins and schedulers; a scheduler limited to one program only in its seasons. Its scores
+// are recorded by those who may import and score games there (a scorekeeper alone may not).
+const fixtureImportRows: readonly Row[] = [
+  ...scheduleRows(
+    'imports.start_fixture_import',
+    'upload a fixtures file',
+    'schedule.import',
+    (s) => ({
+      seasonId: s.seasonId,
+      fileName: 'fixtures.csv',
+      fileText: 'Date,Home,Away\n2027-01-02,A,B',
+    }),
+    (c, i) => startFixtureImport(c, i, importsDeps),
+  ),
+  ...scheduleRows(
+    'imports.apply_fixture_import',
+    'apply a previewed import',
+    'schedule.import',
+    async (s, league) => ({ importId: await importIn(league, s, 'ready'), version: 1 }),
+    (c, i) => applyFixtureImport(c, i, importsDeps),
+  ),
+  ...scheduleRows(
+    'imports.undo_fixture_import',
+    'undo an applied import',
+    'schedule.import',
+    async (s, league) => ({ importId: await importIn(league, s, 'applied'), version: 1 }),
+    (c, i) => undoFixtureImport(c, i, importsDeps),
+  ),
+  ...scheduleRows(
+    'imports.record_imported_scores',
+    'record the scores of an applied import',
+    'schedule.import',
+    async (s, league) => ({ importId: await importIn(league, s, 'applied') }),
+    (c, i) => recordImportedScores(c, i, importsDeps),
+  ),
+  ...scheduleRows(
+    'imports.discard_fixture_import',
+    'give up on an unread import',
+    'schedule.import',
+    async (s, league) => ({ importId: await importIn(league, s, 'reading') }),
+    (c, i) => discardFixtureImport(c, i, importsDeps),
+  ),
+  ...scheduleRows(
+    'imports.get_fixture_import',
+    'see an import',
+    'schedule.import',
+    async (s, league) => ({ importId: await importIn(league, s, 'ready') }),
+    (c, i) => getFixtureImport(c, i, importsDeps),
+  ),
+];
+
 const rows: readonly Row[] = [
   ...divisionAndVenueRows,
   ...peopleRows,
@@ -1134,6 +1251,7 @@ const rows: readonly Row[] = [
   ...teamCommandRows,
   ...rosterCommandRows,
   ...scheduleDraftRows,
+  ...fixtureImportRows,
   ...settingRows(declaredSettings),
   ...settingRows(settingRegistry([bannerSetting])),
   // League settings (P4 §6) and seasons (P4 §3): the owner and admins (O-7).
