@@ -111,14 +111,22 @@ export const sessionLeaseSeconds = 120;
 /** The tracker renews this often while it is open. */
 export const sessionRenewSeconds = 30;
 
+/** The tracker's own id for its device, made once and kept on the device (T-116). */
+export const DeviceId = z.string().trim().min(1).max(200);
+
+/**
+ * What the tracker posts to `POST /api/v1/leagues/{leagueId}/games/{game}/session`
+ * (record 039, T-251). The address names the game, as for the commands, so no
+ * request carries it again; opening and taking over name the device.
+ */
 export const SessionRequest = z.discriminatedUnion('type', [
   /** Open the game to score. Answered `held-by-other` if another device holds it. */
-  z.strictObject({ type: z.literal('open'), gameId: Id }),
+  z.strictObject({ type: z.literal('open'), deviceId: DeviceId }),
   z.strictObject({ type: z.literal('renew'), sessionId: Id }),
   /** The scorekeeper has confirmed; the other device becomes read-only at once. */
   z.strictObject({
     type: z.literal('take-over'),
-    gameId: Id,
+    deviceId: DeviceId,
     confirmed: z.literal(true),
     /** The `since` of the holder the scorekeeper saw; the server refuses if it has changed. */
     expectedHolderSince: Ms,
@@ -145,9 +153,13 @@ export const SessionReply = z.discriminatedUnion('status', [
     reason: z.enum(['taken-over', 'expired', 'released']),
     sentAt: Ms,
   }),
+  /**
+   * Not opened: the person may not score it, there is no such game, or it cannot be
+   * scored now (decided, cancelled or postponed).
+   */
   z.strictObject({
     status: z.literal('refused'),
-    code: z.enum(['not-allowed', 'unknown-game']),
+    code: z.enum(['not-allowed', 'unknown-game', 'game-not-live']),
     sentAt: Ms,
   }),
 ]);

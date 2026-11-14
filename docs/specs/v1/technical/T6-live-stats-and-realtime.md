@@ -53,6 +53,7 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 - **T-112:** the lock is per game. Forty games being scored at once do not wait for each other.
 - **T-113:** a refused command (for example a foul on a player the server knows was substituted out by a command the device never saw) makes the tracker reload the server's state and tell the scorekeeper what was not applied. The server's record is always the truth.
 - Commands are small and are sent a few at a time; a full offline game replays in seconds.
+- **T-251 (record 039):** the server answers a batch it took with 200 and the reply; a batch that is not one, or an old protocol version, with 400; no session with 401; someone who may not score the game with 403; a game that is not in the league the address names with 404. The game is always the address's, never the body's.
 
 ## 4. Offline
 
@@ -70,6 +71,7 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 - A second scorekeeper opening the same game sees who holds it and can **take over** after confirming. The first device immediately becomes read-only and says why.
 - Commands from a session that no longer holds the game are refused. Anything that device had not yet sent is shown to its user as "not saved", so the new scorekeeper can re-enter it.
 - If a device simply disappears, its lease runs out after about two minutes and the game is free.
+- **T-251 (record 039):** the tracker opens, renews, takes over and releases its session at `POST /api/v1/leagues/{leagueId}/games/{game}/session`; opening and taking over name the device, and another scorekeeper is shown the holder's name, never their account.
 - **T-248 (record 036):** a lease that ran out frees the game for anyone else, but if nobody has taken it, the same device coming back carries on with its own session, so taps it queued while offline are still accepted. Leases are timed by the server's clock, never the device's. Leaving the game releases it at once; only taking over is written to the activity log.
 
 ## 6. Getting each play to the people watching
@@ -79,6 +81,7 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 - **T-118:** messages are numbered. If a viewer notices a gap (a missed message), the page fetches a fresh snapshot instead of guessing.
 - **T-119:** if the live connection cannot be made at all (some school and office networks block it), the page silently re-fetches the snapshot every 5 seconds. The snapshot address is cached for 2 seconds at Cloudflare, so a thousand viewers polling cost us one database read every 2 seconds.
 - A second, lighter channel per league carries only scores of live games, for the "Live now" markers on the home and schedule pages.
+- **T-251 (record 039):** one message per saved batch, carrying the batch's last sequence number; a replayed queue is a jump a viewer answers with a snapshot. The message is cut from the snapshot as a visitor sees it, which is the same for everyone (`GET /api/v1/leagues/{leagueId}/games/{game}/snapshot`); a hidden team's players are left out of it, and the latest play names nobody while either team is hidden. A draft or suspended league's snapshot is never cached and is not found by anyone who may not open the league. Locally, pages listen at `GET /api/v1/live`, only to leagues they may open.
 - **T-120:** only our server can publish to these channels, and messages contain only public information (names and numbers as the league's and each team's settings allow, T-81 and T-87).
 - **T-233 (record 021):** the publishing half is in `packages/providers` with the other outside services; the subscribing half is browser code, so it lives in the web app (`apps/web/src/features/live-updates`), because `packages/providers` is server-only (T-30). Channel names and the message shapes are in `packages/contracts`, shared by both. The server takes the league from the saved game, makes the latest play's name follow the strictest statistics setting, and sends one game's messages in order. A viewer's page retries with random spread and waits much longer after a refusal. Before the platform's Supabase project is used, its `realtime.messages` policies must let browsers receive only on published, visible leagues, refuse every browser broadcast, and "Allow public access" must be off.
 
