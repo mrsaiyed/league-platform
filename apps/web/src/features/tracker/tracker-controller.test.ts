@@ -580,6 +580,73 @@ describe('tracker controller: signed out mid-game', () => {
   });
 });
 
+/** A storage that fails to read while `broken` is true. */
+function flakyStorage() {
+  const inner = createMemoryQueueStorage();
+  const flaky: { broken: boolean; readonly storage: QueueStorage } = {
+    broken: false,
+    storage: {
+      add: (g, e) => inner.add(g, e),
+      list: (g) => (flaky.broken ? Promise.reject(new Error('disk gone')) : inner.list(g)),
+      settle: (g, s) => inner.settle(g, s),
+    },
+  };
+  return flaky;
+}
+
+describe('tracker controller: the device storage fails', () => {
+  it('opens read-only when the storage cannot be read, and opens again once it can', async () => {
+    const network = endpointNetwork();
+    const flaky = flakyStorage();
+    flaky.broken = true;
+    const { controller } = device(network, { storage: flaky.storage });
+    await controller.start();
+    await controller.idle();
+    expect(controller.status().mode).toEqual({ kind: 'read-only', reason: 'storage-failed' });
+    flaky.broken = false;
+    await controller.openAgain();
+    await controller.idle();
+    expect(controller.status().mode).toEqual({ kind: 'scoring' });
+  });
+
+  it('taking the game back when the storage fails: read-only, and nothing lost is sent', async () => {
+    const network = endpointNetwork();
+    const flaky = flakyStorage();
+    const tablet = device(network, { storage: flaky.storage });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet.controller, [basket('home', hawks[0] ?? '')]);
+    await tablet.controller.idle();
+    network.mode = 'up';
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    tablet.controller.online();
+    await tablet.controller.idle();
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toMatchObject({ kind: 'held-by-other' });
+
+    flaky.broken = true;
+    expect(await tablet.controller.takeOver()).toEqual({ ok: true });
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({
+      kind: 'read-only',
+      reason: 'storage-failed',
+    });
+    flaky.broken = false;
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
+    expect(tablet.controller.status().notSaved).toHaveLength(1);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 0 });
+  });
+});
+
 describe('tracker controller: a game it may not score', () => {
   it('is read-only and says why: signed out, not allowed, or not a game to score now', async () => {
     const network = endpointNetwork();

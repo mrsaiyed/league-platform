@@ -969,6 +969,10 @@ export const en = {
     'This game cannot be scored now: it is over, cancelled or postponed.',
   'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
   'tracker.readOnly.unknown-game': 'This game could not be found.',
+  'tracker.readOnly.request-refused':
+    'The server could not take what this device asked for. Open the game again to try once more.',
+  'tracker.readOnly.storage-failed':
+    'This device could not read what it has saved, so it is read-only. Open the game again to try once more.',
   'tracker.readOnly.signed-out':
     'You are signed out. Sign in again to keep scoring. What you entered on this device is kept and sent once you are back, so do not enter it again.',
   'tracker.readOnly.update-needed':

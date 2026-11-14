@@ -16,6 +16,8 @@ const reasons: readonly ReadOnlyReason[] = [
   'unknown-game',
   'signed-out',
   'update-needed',
+  'request-refused',
+  'storage-failed',
 ];
 const texts = (status: Parameters<typeof trackerNotices>[0]) =>
   trackerNotices(status).map((notice) => trackerNoticeText(notice, t));

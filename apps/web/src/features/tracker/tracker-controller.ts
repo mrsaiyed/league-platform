@@ -62,7 +62,12 @@ export type ReadOnlyReason =
   /** The game is decided, cancelled or postponed. */
   | 'game-not-live'
   | 'not-allowed'
+  /** No such game (404). */
   | 'unknown-game'
+  /** The server turned the request away for another reason (400, say): open it again. */
+  | 'request-refused'
+  /** The device's storage could not be read or written: open it again to try once more. */
+  | 'storage-failed'
   /** Signed out: signing in again and `openAgain` carries on with the same taps. */
   | 'signed-out'
   /** The server no longer speaks this tracker's version (T-127): reload the page. */
@@ -165,8 +170,9 @@ const isTapInput = (input: TrackerCommand['input']): input is TapInput =>
 const reasonOfStatus = (httpStatus: number): ReadOnlyReason => {
   if (httpStatus === 401) return 'signed-out';
   if (httpStatus === 403) return 'not-allowed';
+  if (httpStatus === 404) return 'unknown-game';
   if (httpStatus === 409) return 'game-not-live';
-  return 'unknown-game';
+  return 'request-refused';
 };
 
 const reasonOfHalt = (halt: QueueHalt): ReadOnlyReason | 'check-session' => {
@@ -482,11 +488,19 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * and listed as not saved, so it can be entered again. Every other waiting tap goes.
    */
   const hold = async (held: string): Promise<void> => {
-    const waiting = (await storage.list(gameId)).filter((entry) => entry.state === 'waiting');
     const madeUnder = (entry: QueuedCommand) =>
       entry.sessionId === undefined || entry.sessionId === held;
-    const lost = waiting.filter((entry) => !madeUnder(entry)).map((entry) => entry.command);
-    if (lost.length > 0) await queue.forget(lost.map((c) => c.commandId));
+    let waiting: QueuedCommand[];
+    let lost: TrackerCommand[];
+    try {
+      waiting = (await storage.list(gameId)).filter((entry) => entry.state === 'waiting');
+      lost = waiting.filter((entry) => !madeUnder(entry)).map((entry) => entry.command);
+      if (lost.length > 0) await queue.forget(lost.map((c) => c.commandId));
+    } catch {
+      // Not known to be dropped, so nothing may be sent: the session is not used, and
+      // its lease runs out unless opening again (into the same session) gets this far.
+      return readOnly('storage-failed');
+    }
     // Not scoring, so every tap of this device's the server lacks is waiting in the
     // queue: the game shown is rebuilt from it, so what will be sent is what is shown
     // (one hidden when the game was lost, say, then kept on opening again into it).
@@ -574,15 +588,29 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     }
   });
 
-  return {
-    async start() {
-      if (stopped) return;
+  /** True once the queue has read what the device holds. */
+  let begun = false;
+
+  /** Reads what the device holds, then opens the game. */
+  const begin = async (): Promise<void> => {
+    try {
       await queue.start();
       // Taps a closed tab left waiting go out if the session they were made under is
       // still this device's (T-114, T-248); otherwise they are listed as not saved.
       made = await waitingTaps();
-      for (const r of queue.status().refused) refusedIds.add(r.command.commandId);
-      await track(open());
+    } catch {
+      // Never left opening for good: read-only with a reason, and `openAgain` tries again.
+      return readOnly('storage-failed');
+    }
+    begun = true;
+    for (const r of queue.status().refused) refusedIds.add(r.command.commandId);
+    return open();
+  };
+
+  return {
+    async start() {
+      if (stopped) return;
+      await track(begin());
     },
 
     tap(input) {
@@ -650,8 +678,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     },
 
     async openAgain() {
-      if (current.mode.kind !== 'read-only') return;
-      await track(open());
+      if (current.mode.kind !== 'read-only' || stopped) return;
+      await track(begun ? open() : begin());
     },
 
     online() {
