@@ -38,6 +38,9 @@ import { basketball } from '@srleagues/sports';
 import type { CommandTransport } from './command-transport.ts';
 import {
   QueueError,
+  keptTap,
+  type GameMoment,
+  type KeptTap,
   type QueueErrorCode,
   type QueueStorage,
   type QueuedCommand,
@@ -106,14 +109,17 @@ export type TrackerControllerStatus = {
   readonly notApplied: readonly RefusedCommand[];
   /**
    * Taps this device made that will not be sent: it no longer held the game (T6 §5).
-   * Kept until `dismissNotSaved`, through a reload and further losses.
+   * Kept until `dismissNotSaved`, through a reload and further losses. Each carries the
+   * period and game clock it was made at (finding I), so the screen can name it even
+   * once the game shown has been rebuilt without it.
    */
-  readonly notSaved: readonly TrackerCommand[];
+  readonly notSaved: readonly KeptTap[];
   /**
-   * The taps not on the server yet, oldest first (finding L1): the plays whose `id` is
-   * one of these command IDs are the ones still to be saved.
+   * The taps not on the server yet, oldest first (finding L1), each with the period and
+   * game clock it was made at (finding I): the plays whose `id` is one of these command
+   * IDs are the ones still to be saved.
    */
-  readonly waiting: readonly TrackerCommand[];
+  readonly waiting: readonly KeptTap[];
   /** Server time (ms) when the server last said it has taps of this device; null until then (L1). */
   readonly lastSavedAt: number | null;
   /**
@@ -249,21 +255,31 @@ const losesTheGame = (reason: ReadOnlyReason, hadGame: boolean): boolean =>
   lostTheGame.has(reason) || (gameGone.has(reason) && hadGame);
 
 /** `more` added to the end of `list`, leaving out any already in it. */
-const withTaps = (
-  list: readonly TrackerCommand[],
-  more: readonly TrackerCommand[],
-): TrackerCommand[] => {
-  const ids = new Set(list.map((c) => c.commandId));
-  const added = more.filter((c) => {
-    if (ids.has(c.commandId)) return false;
-    ids.add(c.commandId);
+const withTaps = (list: readonly KeptTap[], more: readonly KeptTap[]): KeptTap[] => {
+  const ids = new Set(list.map((t) => t.command.commandId));
+  const added = more.filter((t) => {
+    if (ids.has(t.command.commandId)) return false;
+    ids.add(t.command.commandId);
     return true;
   });
   return [...list, ...added];
 };
 
+/** `list` without the taps whose command IDs are in `ids`. */
+const withoutTaps = (list: readonly KeptTap[], ids: ReadonlySet<string>): KeptTap[] =>
+  list.filter((t) => !ids.has(t.command.commandId));
+
+const keptIn = (list: readonly QueuedCommand[], state: QueuedCommand['state']) =>
+  list.filter((entry) => entry.state === state).map(keptTap);
+
 const tapsIn = (list: readonly QueuedCommand[], state: QueuedCommand['state']) =>
-  list.filter((entry) => entry.state === state).map((entry) => entry.command);
+  keptIn(list, state).map((t) => t.command);
+
+/** Where in `game` a tap made at `at` (server time) falls: its period and game clock. */
+const momentIn = (game: basketball.GameState, at: number): GameMoment => ({
+  period: basketball.derive(game).period,
+  clockMs: basketball.clockAt(game, at).remainingMs,
+});
 
 const lowerUuid = (): string => globalThis.crypto.randomUUID().toLowerCase();
 
@@ -516,11 +532,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const held = await storage.list(gameId).catch(() => null);
     if (!stillLost()) return;
     if (held !== null) {
-      const waiting = tapsIn(held, 'waiting');
-      const unsent = new Set(waiting.map((c) => c.commandId));
+      const waiting = keptIn(held, 'waiting');
+      const unsent = new Set(waiting.map((t) => t.command.commandId));
       made = made.filter((c) => !unsent.has(c.commandId));
       update({
-        notSaved: withTaps(withTaps(current.notSaved, tapsIn(held, 'not-saved')), waiting),
+        notSaved: withTaps(withTaps(current.notSaved, keptIn(held, 'not-saved')), waiting),
       });
       // If this fails they are still listed, and never sent under another session.
       if (waiting.length > 0) await queue.setAside([...unsent]).catch(() => undefined);
@@ -532,11 +548,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // A tap the state holds was taken though its answer never came back: it is saved.
     const taken = new Set(loaded.value.state.recent.map((id) => id.toLowerCase()));
     const saved = current.notSaved
-      .map((c) => c.commandId)
+      .map((t) => t.command.commandId)
       .filter((id) => taken.has(id.toLowerCase()));
     if (saved.length > 0) {
-      const dropped = new Set(saved);
-      update({ notSaved: current.notSaved.filter((c) => !dropped.has(c.commandId)) });
+      update({ notSaved: withoutTaps(current.notSaved, new Set(saved)) });
       await queue.forget(saved).catch(() => undefined);
       if (!stillLost()) return;
     }
@@ -630,14 +645,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const madeUnder = (entry: QueuedCommand) =>
       entry.sessionId === undefined || entry.sessionId === held;
     let waiting: QueuedCommand[];
-    let stale: TrackerCommand[];
-    let setAside: TrackerCommand[];
+    let stale: KeptTap[];
+    let setAside: KeptTap[];
     try {
       const list = await storage.list(gameId);
       waiting = list.filter((entry) => entry.state === 'waiting');
-      setAside = tapsIn(list, 'not-saved');
-      stale = waiting.filter((entry) => !madeUnder(entry)).map((entry) => entry.command);
-      if (stale.length > 0) await queue.setAside(stale.map((c) => c.commandId));
+      setAside = keptIn(list, 'not-saved');
+      stale = waiting.filter((entry) => !madeUnder(entry)).map(keptTap);
+      if (stale.length > 0) await queue.setAside(stale.map((t) => t.command.commandId));
     } catch {
       // Not known to be dropped, so nothing may be sent: the session is not used, and
       // its lease runs out unless opening again (into the same session) gets this far.
@@ -652,7 +667,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // setting aside failed, then sent on opening again into the session it was made under).
     const sent = new Set(made.map((c) => c.commandId));
     const listed = withTaps(withTaps(current.notSaved, setAside), stale);
-    update({ notSaved: listed.filter((c) => !sent.has(c.commandId)) });
+    update({ notSaved: withoutTaps(listed, sent) });
     return scoreWith(held);
   };
 
@@ -710,11 +725,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** Drops the taps listed as not saved: the scorekeeper has seen them. */
   const forgetNotSaved = async (): Promise<void> => {
-    const ids = current.notSaved.map((c) => c.commandId);
+    const ids = current.notSaved.map((t) => t.command.commandId);
     if (ids.length > 0) await queue.forget(ids);
     const dropped = new Set(ids);
     made = made.filter((c) => !dropped.has(c.commandId));
-    update({ notSaved: current.notSaved.filter((c) => !dropped.has(c.commandId)) });
+    update({ notSaved: withoutTaps(current.notSaved, dropped) });
   };
 
   /** The queue's sequence when last seen, to tell when the server took a batch. */
@@ -770,7 +785,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       const held = await storage.list(gameId);
       made = tapsIn(held, 'waiting');
       // Listed as not saved before the reload, and not dismissed: still listed.
-      update({ notSaved: withTaps(current.notSaved, tapsIn(held, 'not-saved')) });
+      update({ notSaved: withTaps(current.notSaved, keptIn(held, 'not-saved')) });
     } catch {
       // Never left opening for good: read-only with a reason, and `openAgain` tries again.
       return readOnly('storage-failed');
@@ -803,8 +818,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
           throw thrown;
         }
         const under = sessionId;
+        // Where in the game it was made, kept beside it (finding I).
+        const moment = momentIn(game, command.at);
         try {
-          await queue.enqueue(command);
+          await queue.enqueue(command, moment);
         } catch (thrown) {
           const code = thrown instanceof QueueError ? thrown.code : 'storage-write-failed';
           return { ok: false, reason: 'storage', code };
@@ -815,10 +832,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         // Read afresh: it may have changed while the tap was stored.
         const mode = modeNow();
         const keptLikeTheRest = mode.kind === 'read-only' && !losesTheGame(mode.reason, true);
-        const listed = current.notSaved.some((c) => c.commandId === command.commandId);
+        const listed = current.notSaved.some((t) => t.command.commandId === command.commandId);
         const moved = mode.kind !== 'scoring' || sessionId !== under;
         if (listed || (moved && !keptLikeTheRest)) {
-          if (!listed) update({ notSaved: withTaps(current.notSaved, [command]) });
+          if (!listed) update({ notSaved: withTaps(current.notSaved, [{ command, moment }]) });
           await queue.setAside([command.commandId]).catch(() => undefined);
           return { ok: false, reason: 'not-scoring' };
         }

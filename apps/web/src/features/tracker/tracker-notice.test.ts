@@ -43,7 +43,7 @@ describe('tracker notices (T6 §5, T-113)', () => {
       texts({
         mode: { kind: 'held-by-other', holder: { displayName: 'Sam Scorekeeper', since: 0 } },
         notApplied: [refused, refused],
-        notSaved: [tap(2)],
+        notSaved: [{ command: tap(2), moment: null }],
       }),
     ).toEqual([
       'Sam Scorekeeper is scoring this game on another device.',

@@ -67,8 +67,10 @@ describe('tracker queue: storing taps (T-114)', () => {
     const { queue } = setup({ storage: flaky, sessionId: () => current });
     await queue.start();
     failList = true;
-    await queue.enqueue(tap(1));
+    const q1 = { period: 1, clockMs: 300_000 };
+    await queue.enqueue(tap(1), q1);
     expect(queue.status().waiting).toBe(1);
+    expect(queue.status().waitingTaps).toEqual([{ command: tap(1), moment: q1 }]);
     // The same tap again is already held: the count does not grow.
     await queue.enqueue(tap(1));
     expect(queue.status().waiting).toBe(1);
@@ -477,8 +479,14 @@ describe('tracker queue: the done test, each case left in a known state', () => 
     const { queue, server, clock } = setup();
     server.mode = 'down';
     await queue.start();
-    for (const n of [1, 2]) await queue.enqueue(tap(n));
-    expect(queue.status().waitingTaps).toEqual([tap(1), tap(2)]);
+    const q2 = { period: 2, clockMs: 390_000 };
+    await queue.enqueue(tap(1), q2);
+    await queue.enqueue(tap(2));
+    // With where in the game each was made (finding I); none known for the second.
+    expect(queue.status().waitingTaps).toEqual([
+      { command: tap(1), moment: q2 },
+      { command: tap(2), moment: null },
+    ]);
     expect(queue.status().savedAt).toBeNull();
     await clock.advance(minute);
     server.mode = 'up';

@@ -36,7 +36,10 @@ import {
 import type { CommandTransport, TransportOutcome } from './command-transport.ts';
 import {
   QueueError,
+  keptTap,
   type CommandRefusal,
+  type GameMoment,
+  type KeptTap,
   type QueueErrorCode,
   type QueueStorage,
   type QueuedCommand,
@@ -77,10 +80,11 @@ export type QueueStatus = {
   /** Taps stored and not yet answered for, including any being sent now. */
   readonly waiting: number;
   /**
-   * Those taps, oldest first, so the screens can say which plays are not on the server
-   * yet (finding L1). Read with the count, so the two always agree.
+   * Those taps, oldest first, with where in the game each was made, so the screens can
+   * say which plays are not on the server yet (findings L1, I). Read with the count, so
+   * the two always agree.
    */
-  readonly waitingTaps: readonly TrackerCommand[];
+  readonly waitingTaps: readonly KeptTap[];
   /** Taps the server refused, oldest first, until `forget` drops them. */
   readonly refused: readonly RefusedCommand[];
   /** True while the queue is sending or about to. */
@@ -130,11 +134,12 @@ export type TrackerQueue = {
   /** Reads what the device already holds for the game, and starts sending it. */
   start(): Promise<void>;
   /**
-   * Stores a tap at the end of the queue. Resolves once it is stored: confirm the tap
-   * on screen only then (T-114). Rejects if it could not be stored, or if its command
-   * ID is already held for another game (`command-id-in-other-game`).
+   * Stores a tap at the end of the queue, with where in the game it was made (kept
+   * beside it, never sent). Resolves once it is stored: confirm the tap on screen only
+   * then (T-114). Rejects if it could not be stored, or if its command ID is already
+   * held for another game (`command-id-in-other-game`).
    */
-  enqueue(command: TrackerCommand): Promise<void>;
+  enqueue(command: TrackerCommand, moment?: GameMoment): Promise<void>;
   /** Sends now instead of waiting: the network is back, or a scoring session was taken. */
   wake(): void;
   /**
@@ -235,7 +240,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     if (ticket > readsShown) {
       readsShown = ticket;
       const waitingTaps = list.flatMap((entry) =>
-        entry.state === 'waiting' ? [entry.command] : [],
+        entry.state === 'waiting' ? [keptTap(entry)] : [],
       );
       update({
         waiting: waitingTaps.length,
@@ -438,13 +443,15 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       kick();
     },
 
-    async enqueue(command) {
+    async enqueue(command, moment) {
       if (stopped) throw new QueueError('queue-stopped');
-      // Each tap keeps the session it was made under (T6 §5, record 049).
+      // Each tap keeps the session it was made under (T6 §5, record 049), and where in
+      // the game it was made (finding I).
       const session = sessionId();
       const madeUnder = session === null ? {} : { sessionId: session };
+      const madeAt = moment === undefined ? {} : { moment };
       const added = await stored('storage-write-failed', () =>
-        storage.add(gameId, { protocolVersion, command, ...madeUnder }),
+        storage.add(gameId, { protocolVersion, command, ...madeUnder, ...madeAt }),
       );
       // Stored: whatever happens next, the tap is kept. If the read after it fails, the
       // count goes up by hand, so the screen never shows fewer waiting than are held.
@@ -453,7 +460,10 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
         await refresh();
       } catch {
         if (added === 'added' && readsShown === shown) {
-          update({ waiting: current.waiting + 1, waitingTaps: [...current.waitingTaps, command] });
+          update({
+            waiting: current.waiting + 1,
+            waitingTaps: [...current.waitingTaps, { command, moment: moment ?? null }],
+          });
         }
       }
       kick();

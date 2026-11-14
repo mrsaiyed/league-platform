@@ -17,7 +17,7 @@ import { endpointNetwork, type EndpointNetwork } from './endpoint-network.test-h
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
-import type { QueueStorage } from './queue-storage.ts';
+import type { KeptTap, QueueStorage } from './queue-storage.ts';
 import { createTrackerController, type TapInput } from './tracker-controller.ts';
 import {
   createFakeServer,
@@ -107,6 +107,9 @@ const basket = (side: 'home' | 'away', playerId: string, points: 1 | 2 | 3 = 2):
   playerId,
   points,
 });
+
+/** The tap of a listed play, as the screen made it. */
+const inputOf = (kept: KeptTap) => kept.command.input;
 
 async function tapAll(controller: ReturnType<typeof device>['controller'], inputs: TapInput[]) {
   for (const input of inputs) {
@@ -347,7 +350,7 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     await tablet.controller.idle();
     const status = tablet.controller.status();
     expect(status.mode).toEqual({ kind: 'read-only', reason: 'taken-over' });
-    expect(status.notSaved.map((c) => c.input)).toEqual([
+    expect(status.notSaved.map(inputOf)).toEqual([
       basket('home', hawks[2] ?? ''),
       basket('away', bears[0] ?? ''),
     ]);
@@ -428,7 +431,7 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     await reloaded.controller.idle();
     expect(reloaded.controller.status().mode).toEqual({ kind: 'scoring' });
     // Still listed, so they can be entered again; never sent.
-    expect(reloaded.controller.status().notSaved.map((c) => c.input)).toEqual([
+    expect(reloaded.controller.status().notSaved.map(inputOf)).toEqual([
       basket('home', hawks[2] ?? ''),
     ]);
     expect(reloaded.controller.status().queue.waiting).toBe(0);
@@ -671,7 +674,7 @@ describe('tracker controller: signed out mid-game (finding M4)', () => {
     await tablet.controller.idle();
     const status = tablet.controller.status();
     expect(status.mode).toMatchObject({ kind: 'read-only', reason: 'taken-over' });
-    expect(status.notSaved.map((c) => c.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    expect(status.notSaved.map(inputOf)).toEqual([basket('home', hawks[0] ?? '')]);
     expect((await serverGame(network)).sequence).toBe(2);
   });
 
@@ -752,7 +755,7 @@ describe('tracker controller: an answer that is not the server’s is no answer 
       let status = tablet.controller.status();
       expect(status.mode).toEqual({ kind: 'scoring' });
       expect(status).toMatchObject({ signedOut: false, notSaved: [], notApplied: [] });
-      expect(status.waiting.map((c) => c.input)).toEqual(waiting);
+      expect(status.waiting.map(inputOf)).toEqual(waiting);
       expect(scoreOf(status.game)).toEqual({ home: 5, away: 2 });
       expect(status.queue.unansweredSince).not.toBeNull();
       expect((await tablet.storage.list(gameId)).map((e) => e.state)).toEqual([
@@ -952,19 +955,61 @@ describe('tracker controller: taps not saved are never lost silently (step 2.113
     const storage = createMemoryQueueStorage();
     const { tablet } = await tabletLosesTheGame(network, [a], storage);
     await takeBack(tablet.controller);
-    expect(tablet.controller.status().notSaved.map((c) => c.input)).toEqual([a]);
+    expect(tablet.controller.status().notSaved.map(inputOf)).toEqual([a]);
     await tablet.controller.leave();
 
     const reloaded = device(network, { storage });
     await reloaded.controller.start();
     await reloaded.controller.idle();
     expect(reloaded.controller.status().mode).toEqual({ kind: 'scoring' });
-    expect(reloaded.controller.status().notSaved.map((c) => c.input)).toEqual([a]);
+    expect(reloaded.controller.status().notSaved.map(inputOf)).toEqual([a]);
     expect(reloaded.controller.status().queue.waiting).toBe(0);
     expect((await serverGame(network)).sequence).toBe(2);
     await reloaded.controller.dismissNotSaved();
     expect(reloaded.controller.status().notSaved).toEqual([]);
     expect(await storage.list(gameId)).toEqual([]);
+  });
+
+  it('keeps the period and game clock of each tap not saved, after the game is rebuilt without it (finding I)', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const q2 = { type: 'period', period: 2 } as const;
+    const sixThirty = { type: 'set-clock', ms: 390_000 } as const;
+    const { tablet } = await tabletLosesTheGame(network, [q2, sixThirty, a], storage);
+    const status = tablet.controller.status();
+    // The made-up league plays two halves of twenty minutes.
+    expect(status.notSaved).toEqual([
+      expect.objectContaining({ moment: { period: 1, clockMs: 1_200_000 } }),
+      expect.objectContaining({ moment: { period: 2, clockMs: 1_200_000 } }),
+      { command: expect.objectContaining({ input: a }), moment: { period: 2, clockMs: 390_000 } },
+    ]);
+    // The game shown is the server's: still the first period, and no such basket in it.
+    expect(basketball.derive(status.game ?? basketball.newGame()).period).toBe(1);
+    expect(scoreOf(status.game)).toEqual({ home: 0, away: 0 });
+    // And so is what a reload reads back.
+    await tablet.controller.leave();
+    const reloaded = device(network, { storage });
+    await reloaded.controller.start();
+    await reloaded.controller.idle();
+    expect(reloaded.controller.status().notSaved.map((t) => t.moment)).toEqual([
+      { period: 1, clockMs: 1_200_000 },
+      { period: 2, clockMs: 1_200_000 },
+      { period: 2, clockMs: 390_000 },
+    ]);
+  });
+
+  it('names where in the game each waiting tap was made (finding I)', async () => {
+    const network = endpointNetwork();
+    const { controller } = device(network);
+    await controller.start();
+    await tapAll(controller, tipOff);
+    await controller.idle();
+    network.mode = 'down';
+    await tapAll(controller, [{ type: 'set-clock', ms: 125_000 }, a]);
+    expect(controller.status().waiting).toEqual([
+      expect.objectContaining({ moment: { period: 1, clockMs: 1_200_000 } }),
+      { command: expect.objectContaining({ input: a }), moment: { period: 1, clockMs: 125_000 } },
+    ]);
   });
 
   it('two losses keep both lists, through a reload too', async () => {
@@ -983,14 +1028,14 @@ describe('tracker controller: taps not saved are never lost silently (step 2.113
     tablet.controller.online();
     await tablet.controller.idle();
     expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'taken-over' });
-    expect(tablet.controller.status().notSaved.map((c) => c.input)).toEqual([a, b]);
+    expect(tablet.controller.status().notSaved.map(inputOf)).toEqual([a, b]);
     await tablet.controller.leave();
 
     const reloaded = device(network, { storage });
     await reloaded.controller.start();
     await reloaded.controller.idle();
     expect(reloaded.controller.status().mode).toMatchObject({ kind: 'held-by-other' });
-    expect(reloaded.controller.status().notSaved.map((c) => c.input)).toEqual([a, b]);
+    expect(reloaded.controller.status().notSaved.map(inputOf)).toEqual([a, b]);
     expect((await serverGame(network)).sequence).toBe(2);
   });
 
@@ -1018,7 +1063,7 @@ describe('tracker controller: taps not saved are never lost silently (step 2.113
     await tablet.controller.idle();
     const status = tablet.controller.status();
     expect(status.mode).toEqual({ kind: 'read-only', reason: 'game-not-live' });
-    expect(status.notSaved.map((c) => c.input)).toEqual([a, b]);
+    expect(status.notSaved.map(inputOf)).toEqual([a, b]);
     expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
     expect(await tablet.controller.tap(a)).toEqual({ ok: false, reason: 'not-scoring' });
     expect(
@@ -1056,7 +1101,7 @@ describe('tracker controller: taps not saved are never lost silently (step 2.113
     await tablet.controller.idle();
     const status = tablet.controller.status();
     expect(status.mode).toEqual({ kind: 'read-only', reason: 'game-not-live' });
-    expect(status.notSaved.map((c) => c.input)).toEqual([a]);
+    expect(status.notSaved.map(inputOf)).toEqual([a]);
     // The server's state is shown: the tap is not.
     expect(scoreOf(status.game)).toEqual({ home: 0, away: 0 });
   });
@@ -1097,7 +1142,7 @@ describe('tracker controller: taps not saved are never lost silently (step 2.113
     expect(await tapping).toEqual({ ok: false, reason: 'not-scoring' });
     await tablet.controller.idle();
     const status = tablet.controller.status();
-    expect(status.notSaved.map((c) => c.input)).toEqual([a]);
+    expect(status.notSaved.map(inputOf)).toEqual([a]);
     expect(scoreOf(status.game)).toEqual({ home: 0, away: 0 });
     expect((await inner.list(gameId)).map((entry) => entry.state)).toEqual(['not-saved']);
 
@@ -1105,7 +1150,7 @@ describe('tracker controller: taps not saved are never lost silently (step 2.113
     await takeBack(tablet.controller);
     await tablet.controller.idle();
     expect((await serverGame(network)).sequence).toBe(2);
-    expect(tablet.controller.status().notSaved.map((c) => c.input)).toEqual([a]);
+    expect(tablet.controller.status().notSaved.map(inputOf)).toEqual([a]);
   });
 
   it('a takeover that goes unanswered loads the server’s state again', async () => {
@@ -1179,8 +1224,8 @@ describe('tracker controller: which taps wait, and the last save (finding L1)', 
     const offline = [basket('home', hawks[0] ?? ''), basket('away', bears[1] ?? '', 3)];
     await tapAll(controller, offline);
     let status = controller.status();
-    expect(status.waiting.map((c) => c.input)).toEqual(offline);
-    const unsaved = new Set(status.waiting.map((c) => c.commandId));
+    expect(status.waiting.map(inputOf)).toEqual(offline);
+    const unsaved = new Set(status.waiting.map((t) => t.command.commandId));
     const plays = status.game?.plays ?? [];
     expect(plays.filter((p) => unsaved.has(p.id)).map((p) => p.type)).toEqual(['score', 'score']);
     expect(plays.filter((p) => !unsaved.has(p.id)).map((p) => p.type)).toEqual([
