@@ -280,6 +280,12 @@ describe('the admin Teams screens over the stand-in', () => {
       order: entries.slice(1).join(','),
     });
     expect(stale.answer).toMatchObject({ kind: 'refused', code: 'roster-incomplete' });
+    const reordered = await moveEntry(m.owner, m.ports.deps, {
+      team: teamId,
+      entry: entries[0] ?? '',
+      order: [...entries].reverse().join(','),
+    });
+    expect(reordered.answer).toMatchObject({ kind: 'refused', code: 'roster-incomplete' });
     const moved = await moveEntry(m.owner, m.ports.deps, {
       team: teamId,
       entry: entries[0] ?? '',
