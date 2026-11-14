@@ -104,3 +104,26 @@ describe('live updates', () => {
     );
   });
 });
+
+describe('recent results order', () => {
+  it('puts a finished game with no time last, not first', async () => {
+    const { clock, schedule } = await load(adult);
+    const first = schedule.rounds.flatMap((r) => r.games).find((g) => g.status === 'final');
+    if (first === undefined) throw new Error('no game');
+    const undated = { ...first, id: 'x1', startsAt: null, localDate: null };
+    const changed = { ...schedule, unplacedGames: [...schedule.unplacedGames, undated] };
+    const recent = buildHomeGames(changed, clock, addressee).recent;
+    expect(recent[0]?.id).not.toBe('x1');
+  });
+
+  it('gives a game that finishes live its box score link', async () => {
+    const { clock, schedule } = await load(adult);
+    const game = buildHomeGames(schedule, clock, addressee).upcoming.find(
+      (g) => g.status === 'live',
+    );
+    if (game === undefined) throw new Error('no live game');
+    expect(game.detailsHref).toBeUndefined();
+    const done = applyUpdate(game, { sequence: 9, status: 'final', home: 50, away: 40 });
+    expect(done.detailsHref).toContain('/games/');
+  });
+});

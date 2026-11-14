@@ -28,6 +28,8 @@ export type GameView = {
   readonly whenText: string;
   readonly numberText?: string;
   readonly detailsHref?: string;
+  /** The game's page, kept for a game that finishes while the page is open. */
+  readonly gameHref: string;
   readonly teamSlugs: readonly string[];
 };
 
@@ -95,6 +97,7 @@ export function gameView(
 ): GameView {
   const status = statusOf(game.status);
   const decided = status === 'final' || status === 'forfeit';
+  const gameHref = leagueUrl(league, 'game', { game: game.id, season: seasonSlug });
   return {
     id: game.id,
     home: { name: game.homeTeam.name, score: game.homeScore, color: game.homeTeam.color },
@@ -104,9 +107,8 @@ export function gameView(
     ...(game.number === null
       ? {}
       : { numberText: t('schedule.gameNumber', { number: game.number }) }),
-    ...(decided
-      ? { detailsHref: leagueUrl(league, 'game', { game: game.id, season: seasonSlug }) }
-      : {}),
+    gameHref,
+    ...(decided ? { detailsHref: gameHref } : {}),
     teamSlugs: [game.homeTeam.slug, game.awayTeam.slug],
   };
 }
@@ -211,8 +213,16 @@ export type HomeGames = {
   readonly upcoming: readonly GameView[];
 };
 
-const time = (g: PublicGame): number =>
-  g.startsAt === null ? Number.POSITIVE_INFINITY : Date.parse(g.startsAt);
+/** When a game is, for ordering: its start, else noon of its day, else nothing (undefined). */
+const timeOf = (g: PublicGame): number | undefined =>
+  g.startsAt !== null
+    ? Date.parse(g.startsAt)
+    : g.localDate !== null
+      ? Date.parse(`${g.localDate}T12:00:00Z`)
+      : undefined;
+/** Games with no time sort last among the finished ones, and last among the coming ones. */
+const lastTime = (g: PublicGame): number => timeOf(g) ?? Number.NEGATIVE_INFINITY;
+const nextTime = (g: PublicGame): number => timeOf(g) ?? Number.POSITIVE_INFINITY;
 
 /**
  * The home page's lists: the latest finished games, newest first; and the games still to
@@ -227,13 +237,13 @@ export function buildHomeGames(
   const view = (g: PublicGame) => gameView(g, clock, league, schedule.season.slug);
   const recent = everyGame
     .filter((g) => g.status === 'final' || g.status === 'forfeit')
-    .sort((a, b) => time(b) - time(a))
+    .sort((a, b) => lastTime(b) - lastTime(a))
     .slice(0, homeListSize)
     .map(view);
   const rank = (g: PublicGame) => (g.status === 'live' ? 0 : 1);
   const upcoming = everyGame
     .filter((g) => g.status === 'live' || g.status === 'scheduled' || g.status === 'postponed')
-    .sort((a, b) => rank(a) - rank(b) || time(a) - time(b))
+    .sort((a, b) => rank(a) - rank(b) || nextTime(a) - nextTime(b))
     .slice(0, homeListSize)
     .map(view);
   return { recent, upcoming };

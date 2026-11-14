@@ -11,7 +11,20 @@ export function GameList({
   readonly leagueId: string;
   readonly games: readonly GameView[];
 }) {
-  return <LiveGameList leagueId={leagueId} games={games} labels={displayLabels(t).game} />;
+  return (
+    <LiveGameList
+      leagueId={leagueId}
+      games={games}
+      labels={displayLabels(t).game}
+      announcement={t('schedule.liveAnnouncement', {
+        away: '{away}',
+        awayScore: '{awayScore}',
+        home: '{home}',
+        homeScore: '{homeScore}',
+        status: '{status}',
+      })}
+    />
+  );
 }
 
 /**
