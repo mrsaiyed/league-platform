@@ -76,6 +76,7 @@ export {
   type ApplyTrackerCommandsError,
 } from './commands/apply-tracker-commands.ts';
 export { engineRulesOf } from './engine-rules.ts';
+export { rulesOfGame } from './season-rules-of.ts';
 export {
   leaseMs,
   sessionStanding,

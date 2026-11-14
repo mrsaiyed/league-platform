@@ -45,4 +45,30 @@ export {
   type RecordImportedScoresError,
 } from './record-imported-scores.ts';
 export { startFixtureImport, type StartFixtureImportError } from './start-fixture-import.ts';
+export {
+  planTrackerTransfer,
+  type GameOutcome,
+  type GameProblem,
+  type PlannedGame,
+  type PlannedPerson,
+  type PlanOptions,
+  type TransferPlan,
+} from './plan-tracker-transfer.ts';
+export {
+  runTrackerTransfer,
+  transferDeviceId,
+  type TrackerTransferTx,
+  type TransferReport,
+  type TransferStop,
+} from './run-tracker-transfer.ts';
+export type { LineDifference } from './tracker-lines.ts';
+export type {
+  PlatformGameFact,
+  RosterPersonFact,
+  SeasonGameFact,
+  SeasonTeamFact,
+  TrackerData,
+  TrackerTransferReads,
+} from './tracker-transfer-data.ts';
+export { describeTransferPlan, describeTransferReport } from './tracker-transfer-words.ts';
 export { undoFixtureImport, type UndoFixtureImportError } from './undo-fixture-import.ts';
