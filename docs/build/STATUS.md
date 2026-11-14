@@ -21,11 +21,11 @@ One line per open lane. A run that is cut off leaves this as the map for the nex
 
 Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 / 031 / T-243 belong to 1.14; 0010 / 030 / T-242 to 2.4).
 
-- **2.22 Fixture import** — `.local/lanes/2.22-fixture-import` — none (no migration; record 034 / T-246 if needed) — opened.
-- **2.25 Adjustments and the rule-change preview** — `.local/lanes/2.25-adjustments` — none (no migration; record 035 / T-247 if needed) — opened.
-- **2.28 Scoring sessions and takeover** — `.local/lanes/2.28-scoring-sessions` — none (no migration; record 036 / T-248 if needed) — opened.
-- **2.73 Slots and fairness rules** — `.local/lanes/2.73-slots` — none (no migration; record 037 / T-249 if needed) — opened.
-- **2.43 Standings and statistics pages** — `.local/lanes/2.43-standings-pages` — none (no migration; record 038 / T-250 if needed) — opened (founder priority: real pages in the preview).
+- **2.22 Fixture import** — `.local/lanes/2.22-fixture-import` — 034 / T-246 used — built, reviewed (opus); review fixes being made (scorekeeper bypass via record_imported_scores, upload text left on a failed job, spec registration of T-246, minor). Then: push, GitHub, land.
+- **2.25 Adjustments and the rule-change preview** — `.local/lanes/2.25-adjustments` — none used — built, merged with build, reviewed, fixes made (af4023e, import cycle broken with a leaf events file). Then: GitHub PASS, land. Record when landing: S-1 "game rules apply only to games not yet started" is NOT built (a game gets its format only when decided); 2.47 should call previewSeasonRules then setSeasonRules confirmed:true; 2.56 uses add/remove adjustment commands.
+- **2.28 Scoring sessions and takeover** — `.local/lanes/2.28-scoring-sessions` — 036 / T-248 used (its commit registers it) — built, merged with build, pushed; opus review running. Then: fixes, GitHub PASS, land. Notes: step 2.33 must supply a deviceId; contract gaps in tracker-protocol (no deviceId, no game-closed code, holder displayName); step 2.29 uses sessionStanding.
+- **2.73 Slots and fairness rules** — `.local/lanes/2.73-slots` — none used — built, merged with build, pushed; opus review running. Then: fixes, GitHub PASS, land. Notes: strict vs best-effort split and unplaced result are the builder's technical decision (write up as T-249 / record 037 when landing); two teams alone can meet only once with the matchup rule on.
+- **2.43 Standings and statistics pages** — `.local/lanes/2.43-standings-pages` — none used — built, reviewed clean, pushed (bd9ee4c); waiting for GitHub PASS, then land. Notes: no browser test written; stand-in data only (no database-backed publicStats); minimum games, name policy and audience come from settingsOf; 2.42 will conflict in ports.ts, stand-in-ports.ts, design-style.tsx, site-header.tsx.
 - **2.84 Highlight color** — `.local/lanes/2.84-highlight` — none (no migration; record 038 / T-250 if needed) — opened (founder priority, C-15).
 
 ## Needs the founder
