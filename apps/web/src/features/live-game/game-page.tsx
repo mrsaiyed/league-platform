@@ -59,16 +59,14 @@ export async function GamePage({
   if (!snapshot.ok || !page.ok) return notFound();
   const words = gameWords();
   // Where the game is played and its number are the published schedule's to say (step
-  // 2.39), as on the game's card; a game the schedule does not list shows neither.
-  const schedule = await publicSchedule.scheduleOf(
+  // 2.39), as on the game's card; a game the schedule does not list shows neither. Only
+  // this game's facts are read, not its whole season: this page is read again at every
+  // "Show newer plays" of a game under way.
+  const listed = await publicSchedule.gameFactsOf(
     addressee.id,
     page.value.game.seasonId,
-    clock.today,
+    page.value.game.id,
   );
-  const listed = [
-    ...(schedule?.rounds.flatMap((round) => round.games) ?? []),
-    ...(schedule?.unplacedGames ?? []),
-  ].find((g) => g.id === page.value.game.id);
   const place = listed === undefined ? undefined : placeOf(listed);
   const when = boardWhen(page.value.game.startsAt, clock.timeZone, page.value.game.status);
   return (
@@ -88,9 +86,7 @@ export async function GamePage({
         scheduleAddress: leagueUrl(
           addressee,
           'schedule',
-          schedule === undefined || schedule.season.isCurrent
-            ? {}
-            : { season: schedule.season.slug },
+          listed === undefined || listed.season.isCurrent ? {} : { season: listed.season.slug },
         ),
         ...(listed === undefined || listed.number === null
           ? {}

@@ -485,5 +485,24 @@ export function standInPublicSchedule(
         ? undefined
         : build(found.spec, found.teams, today, zoneOf(leagueId));
     },
+    // One game's facts. The made-up schedules are small and in memory, so this looks the
+    // game up in its season; the database-backed source reads the one row.
+    gameFactsOf: async (leagueId, seasonId, gameId) => {
+      const found = find(leagueId, seasonId);
+      if (found === undefined) return undefined;
+      const zone = zoneOf(leagueId);
+      const schedule = build(found.spec, found.teams, todayIn(now(), zone), zone);
+      const game = [...schedule.rounds.flatMap((r) => r.games), ...schedule.unplacedGames].find(
+        (g) => g.id === gameId,
+      );
+      return game === undefined
+        ? undefined
+        : {
+            number: game.number,
+            venue: game.venue,
+            courtName: game.courtName,
+            season: { slug: found.spec.choice.slug, isCurrent: found.spec.choice.isCurrent },
+          };
+    },
   };
 }

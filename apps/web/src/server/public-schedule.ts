@@ -3,7 +3,7 @@
 // Bound to one league by the caller, so nothing here takes a league from the request (T-28).
 // The seasons themselves come from the standings port (public-stats.ts), so both kinds of
 // page offer the same seasons.
-import type { PublicSchedule } from '@srleagues/core';
+import type { PublicGame, PublicSchedule } from '@srleagues/core';
 
 /** The league's own clock: the day it is there, and the zone its game times are written in. */
 export type LeagueClock = {
@@ -13,8 +13,27 @@ export type LeagueClock = {
   readonly timeZone: string;
 };
 
+/**
+ * What a game's own page shows of the published schedule beside its scores: the game's
+ * number, where it is played, and which season's schedule it is on. One game's facts, so
+ * the page does not read and build a whole season to learn them.
+ */
+export type PublicGameFacts = Pick<PublicGame, 'number' | 'venue' | 'courtName'> & {
+  readonly season: { readonly slug: string; readonly isCurrent: boolean };
+};
+
 export type PublicSchedulePorts = {
   readonly clockOf: (leagueId: string) => Promise<LeagueClock>;
+  /**
+   * One published game's number, place and season; undefined when the season is not one
+   * the public may see or the game is not on its schedule. A database-backed source
+   * answers this with one row.
+   */
+  readonly gameFactsOf: (
+    leagueId: string,
+    seasonId: string,
+    gameId: string,
+  ) => Promise<PublicGameFacts | undefined>;
   /** The season's published games by round; undefined when the season is not one the public may see. */
   readonly scheduleOf: (
     leagueId: string,

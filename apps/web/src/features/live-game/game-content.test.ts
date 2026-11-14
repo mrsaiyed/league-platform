@@ -8,6 +8,7 @@ import {
   readGameSnapshot,
   type GamePage,
 } from '@srleagues/core';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -225,6 +226,40 @@ describe('a game page', () => {
     expect(html).not.toContain('Scheduled for');
     expect(html).not.toContain('ui-page-sub');
     expect(html).toContain('Half 1 20:00');
+  });
+
+  it("reads only its own game's place and number, never a whole season's schedule", async () => {
+    const world = trackerWorld();
+    const { publicSchedule } = world.ports;
+    const { today } = await publicSchedule.clockOf(liveLeagueId);
+    const season = standInSeasonIds.adultFall;
+    const schedule = await publicSchedule.scheduleOf(liveLeagueId, season, today);
+    const listed = schedule?.rounds.flatMap((r) => r.games)[0];
+    if (listed === undefined) throw new Error('no listed game');
+    expect(await publicSchedule.gameFactsOf(liveLeagueId, season, listed.id)).toEqual({
+      number: listed.number,
+      venue: listed.venue,
+      courtName: listed.courtName,
+      season: { slug: 'fall-2026', isCurrent: true },
+    });
+    // An earlier season says so, so the way back leads to that season's schedule.
+    const earlier = standInSeasonIds.adultSpring;
+    const old = (await publicSchedule.scheduleOf(liveLeagueId, earlier, today))?.rounds[0]
+      ?.games[0];
+    expect(
+      (await publicSchedule.gameFactsOf(liveLeagueId, earlier, old?.id ?? ''))?.season,
+    ).toEqual({ slug: 'spring-2026', isCurrent: false });
+    // A game the schedule does not list, or another league's, has none.
+    expect(
+      await publicSchedule.gameFactsOf(liveLeagueId, season, games.hawksBears),
+    ).toBeUndefined();
+    expect(
+      await publicSchedule.gameFactsOf(standInLeagues.other.id, season, listed.id),
+    ).toBeUndefined();
+    // The page asks for that and nothing wider: it is read again at every "Show newer plays".
+    const page = readFileSync(new URL('./game-page.tsx', import.meta.url), 'utf8');
+    expect(page).toContain('publicSchedule.gameFactsOf(');
+    expect(page).not.toContain('scheduleOf(');
   });
 
   it('is drawn again from the server when its game starts, ends or is reopened, and only then', () => {
