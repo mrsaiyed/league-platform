@@ -53,9 +53,21 @@ describe('reading the rosters for the tracker (T-115, T-258)', () => {
         gameId: gameUuid(1),
         homeTeamId,
         awayTeamId,
+        recording: 'live',
         players: roster.slice(0, 3),
       },
     });
+  });
+
+  it('says how the game is recorded, so a game not recorded live is not scored in the tracker', async () => {
+    const { deps, as } = memoryGames({
+      status: 'live',
+      games: [game(1, { captureMode: 'box' })],
+      grants: [scorekeeperGrant],
+      roster,
+    });
+    const result = await readTrackerRosters(as(scorekeeperId), { gameId: gameUuid(1) }, deps);
+    expect(result).toMatchObject({ ok: true, value: { recording: 'box-score' } });
   });
 
   it('accepts a game id in capitals, as the address may have it', async () => {

@@ -614,6 +614,8 @@ export const en = {
     'This device is scoring the game. The scoring screen will appear here in a later version.',
   'tracker.savedOnDevice':
     'Saved on this device: {home} ({homeCount} players) and {away} ({awayCount} players), and the game as it stands.',
+  'tracker.notLive':
+    'This game is not recorded live, so it is not scored here. A league admin enters its result in the games area.',
   // The fixed roles (A-3, P4 §4), by the name the access module gives each.
   'role.owner': 'Owner',
   'role.admin': 'Admin',

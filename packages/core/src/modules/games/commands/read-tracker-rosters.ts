@@ -8,10 +8,12 @@
 // (S-22) is listed in full, so only whoever may score the game may read it
 // (`games.score`, mayScoreGame, read fresh, T-75). Only names and numbers are read,
 // never birth dates or contact details (R-16). Players who have left the team since
-// are listed and marked, as the box score grid lists them (R-17). It changes nothing,
+// are listed and marked, as the box score grid lists them (R-17). It says how the game is
+// recorded, as only a game recorded live is scored in the tracker. It changes nothing,
 // but runs in the same shape as a command (record 014).
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
+import { recordingOf } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GameRosterPlayer, GamesTx } from '../ports.ts';
 import { lowerId } from '../scoring-session.ts';
@@ -21,6 +23,8 @@ export type TrackerRosters = {
   readonly gameId: string;
   readonly homeTeamId: string;
   readonly awayTeamId: string;
+  /** How the game is recorded: only a game recorded live opens in the tracker. */
+  readonly recording: ReturnType<typeof recordingOf>;
   readonly players: readonly GameRosterPlayer[];
 };
 
@@ -39,6 +43,7 @@ export const readTrackerRosters = defineCommand({
       gameId: game.id,
       homeTeamId: game.homeTeamId,
       awayTeamId: game.awayTeamId,
+      recording: recordingOf(game.captureMode),
       players,
     });
   },

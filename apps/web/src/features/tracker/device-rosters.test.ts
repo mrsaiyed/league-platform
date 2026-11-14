@@ -19,6 +19,7 @@ describe('the rosters as the device keeps them', () => {
         gameId: '00000000-0000-4000-8000-0000000000a1',
         homeTeamId: home,
         awayTeamId: away,
+        recording: 'live',
         players: [player(away, 1), player(home, 2), player(home, 3, true)],
       },
       { [home]: 'Made-up Home', [away]: 'Made-up Away' },
@@ -62,7 +63,7 @@ describe('the rosters as the device keeps them', () => {
 
   it('keeps a team with no name known as an empty name, not a missing one', () => {
     const kept = deviceRosters(
-      { gameId: 'g', homeTeamId: home, awayTeamId: away, players: [] },
+      { gameId: 'g', homeTeamId: home, awayTeamId: away, recording: 'live', players: [] },
       {},
     );
     expect(kept.home).toEqual({ teamId: home, name: '', players: [] });

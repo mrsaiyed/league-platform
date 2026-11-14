@@ -9,11 +9,18 @@ describe('the scorekeeper’s admin (P4 §4)', () => {
   });
 
   it('offers the tracker for a game to be played or being played, in a league that may score', () => {
-    expect(opensInTracker({ status: 'scheduled', scorable: true })).toBe(true);
-    expect(opensInTracker({ status: 'live', scorable: true })).toBe(true);
+    const live = { recording: 'live' } as const;
+    expect(opensInTracker({ ...live, status: 'scheduled', scorable: true })).toBe(true);
+    expect(opensInTracker({ ...live, status: 'live', scorable: true })).toBe(true);
     for (const status of ['final', 'forfeit', 'postponed', 'cancelled']) {
-      expect(opensInTracker({ status, scorable: true })).toBe(false);
+      expect(opensInTracker({ ...live, status, scorable: true })).toBe(false);
     }
-    expect(opensInTracker({ status: 'live', scorable: false })).toBe(false);
+    expect(opensInTracker({ ...live, status: 'live', scorable: false })).toBe(false);
+  });
+
+  it('offers the tracker only for a game recorded live', () => {
+    for (const recording of ['final-score', 'box-score', undefined] as const) {
+      expect(opensInTracker({ recording, status: 'scheduled', scorable: true })).toBe(false);
+    }
   });
 });

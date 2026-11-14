@@ -7,7 +7,15 @@ export function scoresOnly(areas: readonly AdminArea[]): boolean {
   return areas.length === 1 && areas[0] === 'games';
 }
 
-/** The tracker opens a game that is to be played or being played, in a league that may score. */
-export function opensInTracker(game: Pick<MyGame, 'status' | 'scorable'>): boolean {
-  return game.scorable && (game.status === 'scheduled' || game.status === 'live');
+/**
+ * The tracker opens a game recorded live that is to be played or being played, in a
+ * league that may score. A game recorded as a final score or a box score is entered in
+ * the games area instead.
+ */
+export function opensInTracker(game: Pick<MyGame, 'status' | 'scorable' | 'recording'>): boolean {
+  return (
+    game.scorable &&
+    game.recording === 'live' &&
+    (game.status === 'scheduled' || game.status === 'live')
+  );
 }
