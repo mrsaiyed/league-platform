@@ -42,6 +42,7 @@ function device(
     game = gameId,
     signedIn = () => as,
     sendTaps = (send) => send,
+    askServer = (ask) => ask,
   }: {
     game?: string;
     as?: Person;
@@ -49,6 +50,8 @@ function device(
     signedIn?: () => Person;
     /** Wraps how taps reach the server, to hold an answer back in a test. */
     sendTaps?: (send: typeof globalThis.fetch) => typeof globalThis.fetch;
+    /** Wraps the session and state requests, likewise. */
+    askServer?: (ask: typeof globalThis.fetch) => typeof globalThis.fetch;
     deviceId?: string;
     storage?: QueueStorage;
     clock?: ReturnType<typeof createManualClock>;
@@ -67,7 +70,11 @@ function device(
       gameId: game,
       fetch: sendTaps(fetch),
     }),
-    server: createFetchTrackerServer({ leagueId: liveLeagueId, gameId: game, fetch }),
+    server: createFetchTrackerServer({
+      leagueId: liveLeagueId,
+      gameId: game,
+      fetch: askServer(fetch),
+    }),
   });
   return { controller, storage, clock };
 }
@@ -258,6 +265,45 @@ describe('tracker controller: a refused tap (T-113)', () => {
     expect(controller.status().notApplied).toEqual([]);
     expect(controller.status().queue.refused).toEqual([]);
     expect((await serverGame(network)).sequence).toBe(3);
+  });
+});
+
+describe('tracker controller: a tap made while the state reloads', () => {
+  it('stays shown, though a refused tap left the game during the reload', async () => {
+    const network = endpointNetwork();
+    let holding = false;
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const { controller } = device(network, {
+      askServer: (ask) => async (input, init) => {
+        const answer = await ask(input, init);
+        if (holding && String(input).endsWith('/state')) await held;
+        return answer;
+      },
+    });
+    await controller.start();
+    await tapAll(controller, [tipOff[1] as TapInput]);
+    await controller.idle();
+    holding = true;
+    const wrong: TapInput = {
+      type: 'lineup',
+      side: 'home',
+      playerIds: [...hawks.slice(0, 4), stranger],
+    };
+    // On the device the stranger is on the floor; on the server nobody is.
+    const wrongAgain = basket('home', stranger);
+    await tapAll(controller, [wrong, wrongAgain]);
+    // Both refused, the second while the state reloads after the first (its answer
+    // held back), so the game shown loses a tap it had when the reload began.
+    await expect.poll(() => controller.status().notApplied.length).toBe(2);
+    expect(controller.status().reloading).toBe(true);
+    await tapAll(controller, [basket('away', bears[2] ?? '')]);
+    release();
+    await controller.idle();
+    const status = controller.status();
+    expect(status.reloading).toBe(false);
+    expect(scoreOf(status.game)).toEqual({ home: 0, away: 2 });
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 2 });
   });
 });
 

@@ -425,12 +425,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * it began (a tap the server took before then is in the state).
    */
   const load = async (): Promise<boolean> => {
+    // The taps made before the load began, by id: `made` may lose some (a refusal) or
+    // gain some (new taps) while the load is under way, so a count would not do.
+    const madeBefore = new Set(made.map((c) => c.commandId));
     // If the storage cannot be read, every tap is kept unless the state has it.
     const waiting = await waitingTaps().then(
       (taps) => new Set(taps.map((c) => c.commandId)),
       () => null,
     );
-    const madeBefore = made.length;
     const loaded = await ask((signal) => server.loadState(signal));
     if (loaded.kind === 'unanswered') return false;
     if (loaded.kind === 'rejected') {
@@ -440,10 +442,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     await serially(() => {
       const taken = new Set(loaded.value.state.recent.map((id) => id.toLowerCase()));
       made = made.filter(
-        (c, i) =>
+        (c) =>
           !taken.has(c.commandId.toLowerCase()) &&
           !refusedIds.has(c.commandId) &&
-          (i >= madeBefore || waiting === null || waiting.has(c.commandId)),
+          (!madeBefore.has(c.commandId) || waiting === null || waiting.has(c.commandId)),
       );
       base = loaded.value;
       showGame();
