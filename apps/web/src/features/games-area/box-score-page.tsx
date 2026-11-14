@@ -21,6 +21,7 @@ import { reopenBoxScoreAction, saveBoxScoreAction } from './actions.ts';
 import { boxScoreField } from './box-score-form.ts';
 import { boxScoreNotice } from './box-score-notice.ts';
 import type { SearchParams } from './games-page.tsx';
+import { ScoreCheck } from './score-check.tsx';
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -240,6 +241,21 @@ export async function BoxScorePage({
             </label>
           ))}
           {editable ? <p>{t('admin.boxScore.scoreHelp')}</p> : null}
+          {editable && sheet.statKeys.includes('points') ? (
+            <ScoreCheck
+              teams={teams.map((team) => ({
+                scoreField: team.field,
+                personIds: sheet.players
+                  .filter((p) => p.teamId === team.teamId)
+                  .map((p) => p.personId),
+                warning: t('admin.boxScore.scoreMismatch', {
+                  team: team.name,
+                  score: '{score}',
+                  points: '{points}',
+                }),
+              }))}
+            />
+          ) : null}
         </fieldset>
         {editable ? <button type="submit">{t('admin.boxScore.save')}</button> : null}
       </form>

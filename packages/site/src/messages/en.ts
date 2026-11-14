@@ -350,7 +350,10 @@ export const en = {
   'admin.boxScore.title': 'Box score: {away} at {home}',
   'admin.boxScore.help':
     'Copy the paper score sheet. Tick each player who played; a player with any number filled in counts as played. Leave a whole column empty if the sheet did not keep that number; it then does not count in that player’s averages. In a column you fill in, an empty box counts as 0.',
-  'admin.boxScore.scoreHelp': 'Leave a team’s score empty to use the total of its players’ points.',
+  'admin.boxScore.scoreHelp':
+    'Leave a team’s score empty to use the total of its players’ points. A score you type is saved as you typed it, even if the players’ points add up to something else.',
+  'admin.boxScore.scoreMismatch':
+    'Check {team}: the score you typed is {score}, but its players’ points add up to {points}. It will be saved as {score} unless you change it.',
   'admin.boxScore.back': 'Back to the games',
   'admin.boxScore.player': 'Player',
   'admin.boxScore.jersey': '#{number}',

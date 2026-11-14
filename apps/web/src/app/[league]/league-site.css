@@ -107,6 +107,12 @@ body {
   inline-size: 1.5rem;
   block-size: 1.5rem;
 }
+/* A typed score that differs from the players' points (S-26): seen, not blocking. */
+.box-score-warning p {
+  border-inline-start: 0.25rem solid currentColor;
+  padding-inline-start: 0.5rem;
+  font-weight: 600;
+}
 /* Public pages are cards; the admin and the scoring screen are not. */
 .site-body > main:not(.score-root) {
   padding: var(--space);

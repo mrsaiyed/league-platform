@@ -5,6 +5,7 @@ import { boxScoreField, readBoxScoreForm } from './box-score-form.ts';
 import { boxScoreNotice } from './box-score-notice.ts';
 import { buildGameRows } from './build-games-view.ts';
 import { runBoxScoreAction } from './run-box-score-action.ts';
+import { scoreMismatch } from './score-mismatch.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
 const owner = '01900000-0000-7000-8000-0000000000a1';
@@ -150,6 +151,32 @@ describe('the box score grid', () => {
     const reopened = await sheetOf(target?.id ?? '');
     expect(reopened.locked).toBeNull();
     expect(reopened.lines.find((l) => l.personId === someone)?.stats).toEqual({ points: 20 });
+  });
+
+  it('warns, but saves the typed score, when it differs from the players’ points', async () => {
+    const { ports, ctx, games, sheetOf } = setup();
+    const target = (await games()).find((g) => g.status === 'scheduled');
+    const sheet = await sheetOf(target?.id ?? '');
+    const home = sheet.players.filter((p) => p.teamId === sheet.game.homeTeamId);
+    const [h1, h2] = home;
+    if (h1 === undefined || h2 === undefined) throw new Error('the stand-in has players');
+    const team = { scoreField: 'homeScore', personIds: home.map((p) => p.personId) } as const;
+    const fields = {
+      gameId: target?.id,
+      version: String(target?.version),
+      [boxScoreField.stat(h1.personId, 'points')]: '10',
+      [boxScoreField.stat(h2.personId, 'points')]: '4',
+      homeScore: '15',
+      awayScore: '9',
+    };
+    expect(scoreMismatch(team, fields)).toEqual({ score: 15, points: 14 });
+    // No warning when they agree, when the score is left to the total, or with no points kept.
+    expect(scoreMismatch(team, { ...fields, homeScore: '14' })).toBeUndefined();
+    expect(scoreMismatch(team, { ...fields, homeScore: '' })).toBeUndefined();
+    expect(scoreMismatch(team, { homeScore: '15' })).toBeUndefined();
+    // Not refused: the admin may know better than the sheet.
+    expect(await runBoxScoreAction('save', fields, ctx, ports.deps)).toEqual({ ok: true });
+    expect((await sheetOf(target?.id ?? '')).game.homeScore).toBe(15);
   });
 
   it('keeps a tracked game out of the grid', async () => {
