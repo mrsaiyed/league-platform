@@ -17,31 +17,41 @@ export const nameKey = (name: string) =>
 
 export type TeamMatch =
   | { readonly kind: 'matched'; readonly teamId: string }
-  | { readonly kind: 'unmatched'; readonly reason: 'not-found' | 'shared' };
+  | { readonly kind: 'unmatched'; readonly reason: 'not-found' | 'shared' | 'several-here' };
+
+/** A name several of the season's teams have: no one team can be picked by it. */
+const several = Symbol('several');
 
 /**
  * Each tracker team's team of the season: the one with its name, or else with its
  * school's name. Two tracker teams that would land on one team are both left unmatched,
- * since a game between them could not be told apart.
+ * since a game between them could not be told apart, and so is one whose name more
+ * than one team here has.
  */
 export function matchTrackerTeams(
   trackerTeams: readonly TrackerTeam[],
   seasonTeams: readonly SeasonTeamFact[],
 ): ReadonlyMap<string, TeamMatch> {
-  const byName = new Map(seasonTeams.map((team) => [nameKey(team.name), team.id]));
-  const found = new Map<string, string | undefined>();
+  const byName = new Map<string, string | typeof several>();
+  for (const team of seasonTeams) {
+    const key = nameKey(team.name);
+    byName.set(key, byName.has(key) ? several : team.id);
+  }
+  const found = new Map<string, string | typeof several | undefined>();
   for (const team of trackerTeams) {
     const school = team.school.trim() === '' ? undefined : byName.get(nameKey(team.school));
     found.set(team.id, byName.get(nameKey(team.name)) ?? school);
   }
   const uses = new Map<string, number>();
   for (const teamId of found.values()) {
-    if (teamId !== undefined) uses.set(teamId, (uses.get(teamId) ?? 0) + 1);
+    if (typeof teamId === 'string') uses.set(teamId, (uses.get(teamId) ?? 0) + 1);
   }
   const matches = new Map<string, TeamMatch>();
   for (const [trackerId, teamId] of found) {
     if (teamId === undefined) matches.set(trackerId, { kind: 'unmatched', reason: 'not-found' });
-    else if ((uses.get(teamId) ?? 0) > 1) {
+    else if (teamId === several) {
+      matches.set(trackerId, { kind: 'unmatched', reason: 'several-here' });
+    } else if ((uses.get(teamId) ?? 0) > 1) {
       matches.set(trackerId, { kind: 'unmatched', reason: 'shared' });
     } else matches.set(trackerId, { kind: 'matched', teamId });
   }

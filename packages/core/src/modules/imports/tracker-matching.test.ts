@@ -37,6 +37,20 @@ describe('matching tracker teams', () => {
     expect(matches.get('t1')).toEqual({ kind: 'unmatched', reason: 'shared' });
     expect(matches.get('t2')).toEqual({ kind: 'unmatched', reason: 'shared' });
   });
+
+  it('leaves a tracker team unmatched when more than one team here has its name', () => {
+    const matches = matchTrackerTeams(
+      [team('t1', 'Owls'), team('t2', 'Foxes', 'Owls'), team('t3', 'Elks', 'Hillcrest')],
+      [
+        { id: 'a', name: 'Owls' },
+        { id: 'b', name: ' owls ' },
+        { id: 'c', name: 'Hillcrest' },
+      ],
+    );
+    expect(matches.get('t1')).toEqual({ kind: 'unmatched', reason: 'several-here' });
+    expect(matches.get('t2')).toEqual({ kind: 'unmatched', reason: 'several-here' });
+    expect(matches.get('t3')).toEqual({ kind: 'matched', teamId: 'c' });
+  });
 });
 
 describe('matching tracker games', () => {

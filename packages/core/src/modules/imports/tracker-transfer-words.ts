@@ -215,7 +215,9 @@ export function describeTransferPlan(words: Words, plan: TransferPlan): string[]
         ? `  Found: ${team.name}`
         : match?.reason === 'shared'
           ? `  Not matched: ${team.name} (another of the tracker’s teams has the same name here)`
-          : `  Not in this season: ${team.name}`,
+          : match?.reason === 'several-here'
+            ? `  Not matched: ${team.name} (more than one team in this season has this name; rename one of them here)`
+            : `  Not in this season: ${team.name}`,
     );
   }
   if (plan.problem === 'tracked-team-not-matched') {
