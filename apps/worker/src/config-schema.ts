@@ -8,7 +8,7 @@ import { z } from 'zod';
 export const workerFields = {
   APP_ENV: { secret: false },
   LOG_LEVEL: { secret: false },
-  DATABASE_URL: { secret: true },
+  PLATFORM_DATABASE_URL: { secret: true },
   PUBLIC_BASE_URL: { secret: false },
   EMAIL_FROM: { secret: false },
   RESEND_API_KEY: { secret: true },
@@ -24,9 +24,11 @@ export const defaultHealthPort = 3001;
 const schema = z.object({
   APP_ENV: z.enum(['local', 'test', 'staging', 'production']),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  // Local work and tests never open an address: they run on a made-up database in
-  // memory (T-201), so DATABASE_URL is needed only in staging and production.
-  DATABASE_URL: z
+  // The platform's database (R8), named apart from the Al-Hadi tracker's DATABASE_URL
+  // so a settings file made for the tracker can never point the worker at it. Local
+  // work and tests never open an address: they run on a made-up database in memory
+  // (T-201), so it is needed only in staging and production.
+  PLATFORM_DATABASE_URL: z
     .string()
     .trim()
     .regex(/^postgres(?:ql)?:\/\//, 'must be a postgres:// address')
@@ -70,7 +72,7 @@ export type WorkerConfig = Readonly<z.infer<typeof schema>>;
 /** Variables that may be left out: absent or blank means "use the default" or "none". */
 const optional: readonly WorkerConfigName[] = [
   'LOG_LEVEL',
-  'DATABASE_URL',
+  'PLATFORM_DATABASE_URL',
   'RESEND_API_KEY',
   'EMAIL_CAPTURE_DIR',
   'WORKER_HEALTH_PORT',
@@ -78,7 +80,7 @@ const optional: readonly WorkerConfigName[] = [
 
 /** Optional elsewhere, but required in these environments. */
 const requiredIn: Readonly<Partial<Record<WorkerConfigName, readonly string[]>>> = {
-  DATABASE_URL: ['staging', 'production'],
+  PLATFORM_DATABASE_URL: ['staging', 'production'],
   RESEND_API_KEY: ['production'],
 };
 

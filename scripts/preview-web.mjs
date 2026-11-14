@@ -70,14 +70,7 @@ const env = {
   APP_ENV: 'test',
   PUBLIC_BASE_URL: `http://${host}:${port}`,
   LOG_LEVEL: 'warn',
-  DATABASE_URL: 'postgres://made-up:made-up-password@127.0.0.1:1/nowhere',
-  SESSION_SECRET: 'made-up-session-secret-0123456789abcdef',
-  SUPABASE_URL: 'http://localhost:54321',
-  SUPABASE_SECRET_KEY: 'made-up-supabase-key',
-  RESEND_API_KEY: 'made-up-resend-key',
   EMAIL_FROM: 'hello@example.test',
-  STRIPE_SECRET_KEY: 'made-up-stripe-key',
-  STRIPE_WEBHOOK_SECRET: 'made-up-webhook-key',
 };
 const nextBin = createRequire(path.join(app, 'package.json')).resolve('next/dist/bin/next');
 const code = git('rev-parse', `${commit}:apps/web`, `${commit}:packages`).replace(/\s+/g, ' ');

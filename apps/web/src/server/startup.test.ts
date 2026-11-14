@@ -7,14 +7,11 @@ import { startWebApp, type StartupDeps } from './startup.ts';
 
 const env = {
   PUBLIC_BASE_URL: 'http://localhost:3000',
-  DATABASE_URL: 'postgres://app:made-up-password@localhost:5432/league_local',
-  SESSION_SECRET: 'made-up-session-secret-0123456789abcdef',
-  SUPABASE_URL: 'http://localhost:54321',
+  PLATFORM_DATABASE_URL: 'postgres://app:made-up-password@localhost:5432/league_local',
+  SUPABASE_URL: 'https://made-up-project.supabase.example.test',
   SUPABASE_SECRET_KEY: 'made-up-supabase-key',
   RESEND_API_KEY: 'made-up-resend-key',
   EMAIL_FROM: 'hello@example.test',
-  STRIPE_SECRET_KEY: 'made-up-stripe-key',
-  STRIPE_WEBHOOK_SECRET: 'made-up-webhook-key',
   // Required in staging and production (config-schema.ts).
   TRUSTED_PROXY: 'one',
 };
@@ -61,7 +58,10 @@ describe('startWebApp', () => {
         'The web app cannot start: the database login role is not fit for the app (T-60): ' +
           'it is a superuser; it bypasses row-level security.',
       );
-      expect(d.createDatabase).toHaveBeenCalledWith({ kind: 'postgres', url: env.DATABASE_URL });
+      expect(d.createDatabase).toHaveBeenCalledWith({
+        kind: 'postgres',
+        url: env.PLATFORM_DATABASE_URL,
+      });
       expect(d.checkLoginRole).toHaveBeenCalledOnce();
       expect(d.close).toHaveBeenCalledOnce();
     }

@@ -5,7 +5,7 @@
 // 1. The settings were read and checked before this is called (config.ts).
 // 2. Local work and tests (APP_ENV local or test) run on a made-up database in
 //    memory and never open an address (T-201); staging and production open
-//    DATABASE_URL.
+//    PLATFORM_DATABASE_URL.
 // 3. The login role is checked (checkLoginRole, T-60): a superuser, a role that
 //    bypasses row-level security, or the tables' owner stops the start.
 // 4. With pg-boss on a hosted database, its schema is checked (checkQueueSchema,
@@ -89,10 +89,12 @@ export async function startWorker(
       closing.push(() => made.close());
       source = made.source;
     } else {
-      if (config.DATABASE_URL === undefined) {
-        throw new WorkerStartError(`DATABASE_URL is needed when APP_ENV is ${config.APP_ENV}.`);
+      if (config.PLATFORM_DATABASE_URL === undefined) {
+        throw new WorkerStartError(
+          `PLATFORM_DATABASE_URL is needed when APP_ENV is ${config.APP_ENV}.`,
+        );
       }
-      source = { kind: 'postgres', url: config.DATABASE_URL };
+      source = { kind: 'postgres', url: config.PLATFORM_DATABASE_URL };
     }
 
     const heartbeat = createHeartbeat({

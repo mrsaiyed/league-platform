@@ -5,7 +5,8 @@
 // 1. Every setting is read and checked (config.ts); a missing one stops it.
 // 2. Local work and tests (APP_ENV local or test) run on the made-up stand-in and
 //    never open a database (T-201).
-// 3. Staging and production open DATABASE_URL and check the login role it uses
+// 3. Staging and production open PLATFORM_DATABASE_URL (never the tracker's
+//    DATABASE_URL, R8) and check the login role it uses
 //    (checkLoginRole, T-60): a superuser, a role that bypasses row-level security,
 //    or the tables' owner stops the start. They then stop anyway, with a plain
 //    reason, until sign-in on the real service is wired (steps 1.14 and 1.15).
@@ -50,8 +51,13 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
     await ports.signUpMadeUpMember();
     return ports;
   }
+  // loadConfig requires it here; checked again so the type says so.
+  const url = config.PLATFORM_DATABASE_URL;
+  if (url === undefined) {
+    throw new StartupError(`PLATFORM_DATABASE_URL is needed when APP_ENV is ${config.APP_ENV}.`);
+  }
   const database = await deps.database();
-  const db = database.createDatabase({ kind: 'postgres', url: config.DATABASE_URL });
+  const db = database.createDatabase({ kind: 'postgres', url });
   try {
     let problems: string[];
     try {

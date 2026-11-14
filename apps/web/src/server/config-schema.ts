@@ -18,7 +18,8 @@ export const fields = {
   PUBLIC_BASE_URL: { secret: false },
   LOG_LEVEL: { secret: false },
   TRUSTED_PROXY: { secret: false },
-  DATABASE_URL: { secret: true },
+  PLATFORM_DATABASE_URL: { secret: true },
+  LOCAL_DATA: { secret: false },
   SESSION_SECRET: { secret: true },
   SUPABASE_URL: { secret: false },
   SUPABASE_SECRET_KEY: { secret: true },
@@ -32,8 +33,10 @@ export type ConfigName = keyof typeof fields;
 
 const webUrl = z.url().regex(/^https?:\/\//i, 'must be an http or https address');
 
+const appEnvs = ['local', 'test', 'staging', 'production'] as const;
+
 const schema = z.object({
-  APP_ENV: z.enum(['local', 'test', 'staging', 'production']),
+  APP_ENV: z.enum(appEnvs),
   PUBLIC_BASE_URL: webUrl,
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   // Whether X-Forwarded-For is believed for the sign-in attempt limits (record 031):
@@ -42,27 +45,65 @@ const schema = z.object({
   // production it must be set (mustBeExplicit), because with 'none' every visitor
   // shares one address and one person's wrong guesses lock out everyone.
   TRUSTED_PROXY: z.enum(['none', 'one']).default('none'),
-  DATABASE_URL: z
+  // The platform's own database (R8): not DATABASE_URL, which the Al-Hadi tracker
+  // reads, so a settings file made for the tracker can never point the web app at the
+  // tracker's database. Local work and tests never open an address (T-201), so it is
+  // needed only in staging and production.
+  PLATFORM_DATABASE_URL: z
     .string()
     .trim()
-    .regex(/^postgres(?:ql)?:\/\//, 'must be a postgres:// address'),
-  SESSION_SECRET: secretText(32),
-  SUPABASE_URL: webUrl,
-  SUPABASE_SECRET_KEY: secretText(16),
-  RESEND_API_KEY: secretText(8),
+    .regex(/^postgres(?:ql)?:\/\//, 'must be a postgres:// address')
+    .optional(),
+  // What local work and tests run on (record 055): 'stand-in', the made-up leagues in
+  // this process's memory (the default), or 'made-up-database', the made-up seed
+  // leagues in a database in memory with every migration. Only local and test read it.
+  LOCAL_DATA: z.enum(['stand-in', 'made-up-database']).default('stand-in'),
+  // Nothing uses these yet (R8): each becomes required, where it is used, with the
+  // step that first uses it. Given now, they are still checked.
+  SESSION_SECRET: secretText(32).optional(),
+  STRIPE_SECRET_KEY: secretText(8).optional(),
+  STRIPE_WEBHOOK_SECRET: secretText(8).optional(),
+  // The sign-in service (record 018): staging and production only; local work and
+  // tests sign in on the stand-in.
+  SUPABASE_URL: webUrl.optional(),
+  SUPABASE_SECRET_KEY: secretText(16).optional(),
+  // Only production sends email (T-140); elsewhere every email is captured.
+  RESEND_API_KEY: secretText(8).optional(),
   EMAIL_FROM: text.regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'must be an email address'),
-  STRIPE_SECRET_KEY: secretText(8),
-  STRIPE_WEBHOOK_SECRET: secretText(8),
 });
 
 export type Config = Readonly<z.infer<typeof schema>>;
 
-/** Optional variables: absent or blank means "use the default", not "missing". */
-const optional: readonly ConfigName[] = ['LOG_LEVEL', 'TRUSTED_PROXY'];
+/** Optional variables: absent or blank means "use the default" or "none", not "missing". */
+const optional: readonly ConfigName[] = [
+  'LOG_LEVEL',
+  'TRUSTED_PROXY',
+  'PLATFORM_DATABASE_URL',
+  'LOCAL_DATA',
+  'SESSION_SECRET',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'SUPABASE_URL',
+  'SUPABASE_SECRET_KEY',
+  'RESEND_API_KEY',
+];
 
 /** Optional in local and test, but required in these, so its choice is a decision. */
 const mustBeExplicit: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   TRUSTED_PROXY: ['staging', 'production'],
+};
+
+/** Optional elsewhere, but required in these environments: where something uses it. */
+const requiredIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
+  PLATFORM_DATABASE_URL: ['staging', 'production'],
+  SUPABASE_URL: ['staging', 'production'],
+  SUPABASE_SECRET_KEY: ['staging', 'production'],
+  RESEND_API_KEY: ['production'],
+};
+
+/** Read only in local work and tests; set anywhere else, it is a mistake. */
+const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
+  LOCAL_DATA: ['local', 'test'],
 };
 
 export class ConfigError extends Error {
@@ -96,10 +137,22 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
   }
   const missing = new Set<string>();
   const invalid = new Map<string, string>();
+  const appEnv = given['APP_ENV'];
   for (const [name, environments] of Object.entries(mustBeExplicit)) {
-    const appEnv = given['APP_ENV'];
     if (given[name] === undefined && appEnv !== undefined && environments.includes(appEnv)) {
       invalid.set(name, `${name}: missing, must be set explicitly when APP_ENV is ${appEnv}`);
+    }
+  }
+  for (const [name, environments] of Object.entries(requiredIn)) {
+    if (given[name] === undefined && appEnv !== undefined && environments.includes(appEnv)) {
+      invalid.set(name, `${name}: missing, must be set when APP_ENV is ${appEnv}`);
+    }
+  }
+  // Only for a known APP_ENV: an unknown one is reported as itself, not as this.
+  const knownEnv = appEnvs.find((known) => known === appEnv);
+  for (const [name, environments] of Object.entries(onlyIn)) {
+    if (given[name] !== undefined && knownEnv !== undefined && !environments.includes(knownEnv)) {
+      invalid.set(name, `${name}: invalid, may be set only when APP_ENV is local or test`);
     }
   }
   const result = schema.safeParse(given);
