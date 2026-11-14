@@ -2,8 +2,8 @@
 // The live part of a game's page (step 2.45; P7 §5.3; T6 §6): the scoreboard with its
 // clock, the team fouls, the latest play and both teams' players. It is drawn first from
 // the snapshot the page arrived with, then kept current by followGame: each live message,
-// a snapshot on a gap, and a snapshot every 5 seconds where the live connection cannot be
-// made. The clock counts down on this device from the reference it was given (T-121).
+// a snapshot on a gap, and a snapshot every 5 seconds (60 for a game not live) where the
+// live connection cannot be made. The clock counts down on this device from the reference it was given (T-121).
 // Subscribing only; this page can never publish (T-120).
 import { GameSnapshot } from '@srleagues/contracts';
 import {

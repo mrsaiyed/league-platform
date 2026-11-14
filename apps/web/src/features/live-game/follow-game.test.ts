@@ -159,6 +159,20 @@ describe('following a game', () => {
     expect(w.fetches).toEqual([5_000, 10_000, 15_000]);
   });
 
+  it('re-fetches only every 60 seconds for a game not live, then 5 once it starts', async () => {
+    const w = world(snapshot(0, 'scheduled'));
+    w.connect('unavailable');
+    await w.advance(59_999);
+    expect(w.fetches).toEqual([]);
+    await w.advance(1);
+    expect(w.fetches).toEqual([60_000]);
+    w.serverIs(snapshot(1, 'live'));
+    await w.advance(60_000);
+    expect(w.last()?.game.status).toBe('live');
+    await w.advance(5_000);
+    expect(w.fetches).toEqual([60_000, 120_000, 125_000]);
+  });
+
   it('catches up when the connection opens again, then stops polling', async () => {
     const w = world();
     w.connect('unavailable');

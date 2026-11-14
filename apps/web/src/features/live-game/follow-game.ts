@@ -7,7 +7,9 @@
 // When a snapshot is fetched (record 051):
 // - at once, on a gap in the numbers (T-118), and each time the live connection opens,
 //   since messages may have been missed while it was connecting or lost;
-// - every 5 seconds while the live connection is not open (T-119);
+// - every 5 seconds while the live connection is not open and the game is live (T-119),
+//   and only every 60 seconds for a game not live (scheduled, postponed, cancelled),
+//   which is enough to see it start;
 // - again after 2 seconds while a snapshot is behind messages already seen (the
 //   snapshot address is cached for 2 seconds, T-119);
 // - at most every 5 seconds while the players shown are older than the score, because
@@ -54,8 +56,10 @@ export type FollowGameOptions = {
   readonly fetchSnapshot: () => Promise<GameSnapshot | null>;
   readonly onChange: (followed: FollowedGame) => void;
   readonly timers?: FollowTimers;
-  /** Re-fetch while the live connection is not open. Default 5 s (T-119). */
+  /** Re-fetch while the live connection is not open and the game is live. Default 5 s (T-119). */
   readonly pollMs?: number;
+  /** Re-fetch while the live connection is not open and the game is not live. Default 60 s. */
+  readonly slowPollMs?: number;
   /** Re-fetch while a snapshot is behind the messages seen. Default 2 s. */
   readonly retryMs?: number;
   /** Re-fetch while the players are older than the score. Default 5 s. */
@@ -78,6 +82,7 @@ const deviceTimers: FollowTimers = {
 export function followGame(options: FollowGameOptions): FollowedGameHandle {
   const timers = options.timers ?? deviceTimers;
   const pollMs = options.pollMs ?? 5_000;
+  const slowPollMs = options.slowPollMs ?? 60_000;
   const retryMs = options.retryMs ?? 2_000;
   const playersMs = options.playersMs ?? 5_000;
   const quietMs = options.quietMs ?? 30_000;
@@ -112,7 +117,7 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
     if (stopped || game === null) return undefined;
     if (state.awaitingSnapshot) return retryMs;
     if (finished()) return undefined;
-    if (connection !== 'open') return pollMs;
+    if (connection !== 'open') return game.status === 'live' ? pollMs : slowPollMs;
     if (game.status === 'live' && !playersAreCurrent(game)) return playersMs;
     if (game.status === 'live') return quietMs;
     return undefined;
