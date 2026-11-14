@@ -322,7 +322,11 @@ export type TeamView = {
 };
 export type Derived = {
   period: number;
-  /** The clock mode now: the format's, or the latest switch still standing. */
+  /**
+   * The game's clock mode: the format's, or the latest switch still standing, the
+   * scorer's own or the mercy rule's. Inside the last-minutes stop clock the mode in
+   * force can differ: read that through `clockModeAt`.
+   */
   clockMode: ClockMode;
   periodStartElapsedMs: number;
   teams: Record<Side, TeamView>;
