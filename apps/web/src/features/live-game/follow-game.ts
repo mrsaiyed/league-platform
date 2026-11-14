@@ -19,7 +19,9 @@
 // - every 5 seconds, as if the connection were not open, once a snapshot fetched while
 //   it is open shows plays no message brought: the connection says it is open but is
 //   not delivering. This lasts until a message arrives again.
-// One fetch at a time; a final game is not followed at all.
+// One fetch at a time. A final game is not listened to, but its snapshot is fetched
+// every 30 seconds for 10 minutes after the page first sees it final, so a game the
+// scorekeeper reopens shows; if it does, the page listens again.
 import type { GameSnapshot, LiveMessage } from '@srleagues/contracts';
 import type { LiveConnection, LiveSubscriber, LiveSubscription } from '../live-updates/index.ts';
 import { largestOffsetMs, serverOffsetMs } from './clock.ts';
@@ -69,6 +71,10 @@ export type FollowGameOptions = {
   readonly playersMs?: number;
   /** Re-fetch while a live game is quiet. Default 30 s. */
   readonly quietMs?: number;
+  /** Re-fetch a final game, in case it is reopened. Default 30 s. */
+  readonly finalPollMs?: number;
+  /** For how long after the page first sees the game final. Default 10 minutes. */
+  readonly finalWatchMs?: number;
 };
 
 export type FollowedGameHandle = {
@@ -89,6 +95,8 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
   const retryMs = options.retryMs ?? 2_000;
   const playersMs = options.playersMs ?? 5_000;
   const quietMs = options.quietMs ?? 30_000;
+  const finalPollMs = options.finalPollMs ?? 30_000;
+  const finalWatchMs = options.finalWatchMs ?? 600_000;
 
   let state: ViewerState = applySnapshot(startViewing(options.gameId), options.initial).state;
   let connection: LiveConnection = 'connecting';
@@ -104,6 +112,9 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
   let timer: unknown;
   let timerSet = false;
   let subscription: LiveSubscription | undefined;
+  let subscribing = false;
+  /** This device's time when the page first saw the game final; undefined while not final. */
+  let finalSince: number | undefined;
 
   const emit = () => {
     if (stopped || state.game === null) return;
@@ -123,7 +134,10 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
     const game = state.game;
     if (stopped || game === null) return undefined;
     if (state.awaitingSnapshot) return retryMs;
-    if (finished()) return undefined;
+    if (finished()) {
+      const watchEnds = (finalSince ?? lastFetchAt) + finalWatchMs;
+      return lastFetchAt + finalPollMs <= watchEnds ? finalPollMs : undefined;
+    }
     if (connection !== 'open' || messagesBehind) {
       return game.status === 'live' ? pollMs : slowPollMs;
     }
@@ -132,12 +146,30 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
     return undefined;
   }
 
-  function plan(): void {
-    clearTimer();
+  /** Listens while the game is not final, and stops once it is. */
+  function listenWhileNotFinal(): void {
     if (finished()) {
-      subscription?.close();
+      finalSince ??= timers.now();
+      const closing = subscription;
       subscription = undefined;
+      closing?.close();
+      return;
     }
+    finalSince = undefined;
+    if (subscription !== undefined || subscribing) return;
+    subscribing = true;
+    connection = 'connecting';
+    subscription = options.subscriber.subscribeGame(options.leagueId, options.gameId, {
+      onMessage,
+      onConnection,
+    });
+    subscribing = false;
+  }
+
+  function plan(): void {
+    if (stopped) return;
+    listenWhileNotFinal();
+    clearTimer();
     const wait = nextWait();
     if (wait === undefined || fetching) return;
     timer = timers.setTimeout(
@@ -225,12 +257,6 @@ export function followGame(options: FollowGameOptions): FollowedGameHandle {
     } else plan();
   }
 
-  if (!finished()) {
-    subscription = options.subscriber.subscribeGame(options.leagueId, options.gameId, {
-      onMessage,
-      onConnection,
-    });
-  }
   plan();
 
   return {

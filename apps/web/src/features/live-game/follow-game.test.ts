@@ -235,22 +235,39 @@ describe('following a game', () => {
     expect(w.last()?.game.sequence).toBe(6);
   });
 
-  it('stops following once the game is final', async () => {
+  it('stops listening once the game is final, and checks on it for 10 minutes', async () => {
     const w = world();
     w.connect('open');
     await settle();
+    w.serverIs(snapshot(1, 'final'));
     w.send(message(1, 'final'));
     expect(w.last()?.game.status).toBe('final');
     expect(w.closed()).toBe(true);
-    await w.advance(120_000);
-    expect(w.fetches).toEqual([0]);
+    await w.advance(30_000);
+    expect(w.fetches).toEqual([0, 30_000]);
+    await w.advance(1_200_000);
+    expect(w.fetches).toHaveLength(21); // every 30 seconds up to 10 minutes, then none
+    expect(w.fetches.at(-1)).toBe(600_000);
   });
 
-  it('does not follow a game that is already final', async () => {
+  it('does not listen to a game that is already final, but checks on it for 10 minutes', async () => {
     const w = world(snapshot(9, 'final'));
     expect(w.subscribed()).toBe(false);
-    await w.advance(120_000);
-    expect(w.fetches).toEqual([]);
+    await w.advance(1_200_000);
+    expect(w.fetches).toHaveLength(20);
+    expect(w.fetches.at(-1)).toBe(600_000);
+  });
+
+  it('listens again when a final game is reopened', async () => {
+    const w = world(snapshot(9, 'final'));
+    w.serverIs(snapshot(10, 'live'));
+    await w.advance(30_000);
+    expect(w.last()?.game.status).toBe('live');
+    expect(w.subscribed()).toBe(true);
+    w.connect('open');
+    await settle();
+    w.send(message(11));
+    expect(w.last()?.game.sequence).toBe(11);
   });
 
   it('sends nothing after it is closed', async () => {

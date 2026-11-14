@@ -192,7 +192,7 @@ describe('a game page', () => {
     }
   });
 
-  it('is drawn again from the server when its game starts or ends, and only then', () => {
+  it('is drawn again from the server when its game starts, ends or is reopened, and only then', () => {
     const at = (status: 'scheduled' | 'live' | 'final', sequence: number) => ({
       status,
       sequence,
@@ -205,7 +205,9 @@ describe('a game page', () => {
     expect(redrawsFor(at('final', 9), at('final', 9))).toBe(false);
     // The page drawn again arrives with the change: nothing newer, so no second drawing.
     expect(redrawsFor(at('live', 3), at('live', 3))).toBe(false);
-    expect(redrawsFor(at('final', 9), at('live', 10))).toBe(false);
+    expect(redrawsFor(at('final', 9), at('final', 10))).toBe(false);
+    // A final game the scorekeeper reopens is drawn again as live.
+    expect(redrawsFor(at('final', 9), at('live', 10))).toBe(true);
   });
 
   it('notes a forfeit under the result', async () => {
