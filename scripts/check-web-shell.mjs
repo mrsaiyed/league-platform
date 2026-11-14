@@ -141,7 +141,8 @@ const cases = [
     'scheduler',
     '/north-valley/admin/schedule',
     200,
-    [adminLink('north-valley', 'schedule'), 'Nothing here yet.'],
+    [adminLink('north-valley', 'schedule'), 'Build the schedule here, round by round.'],
+    ['Nothing here yet.'],
   ],
   ['scheduler', '/north-valley/admin/teams', 403, [noAccess]],
   // Admin → Teams (step 2.51): the season's teams and the form to add one.
@@ -184,7 +185,8 @@ const cases = [
     'programScheduler',
     '/quiet-pines/admin/schedule',
     200,
-    [adminLink('quiet-pines', 'schedule'), 'Nothing here yet.'],
+    [adminLink('quiet-pines', 'schedule'), 'There is no season to schedule yet.'],
+    ['Nothing here yet.'],
   ],
   [
     'registrar',
