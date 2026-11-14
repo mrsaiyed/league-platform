@@ -42,7 +42,9 @@ export const frameVariables = {
     '--tab-tracking': '0',
     '--tab-radius': 'var(--radius-pill)',
     '--tabs-pad': 'var(--step-2)',
-    '--tab-hover-background': 'color-mix(in srgb, var(--color-on-primary) 18%, transparent)',
+    // The bar moved away from its words (derived-colors.ts), so a hovered tab reads at
+    // least as well as a still one, whatever the league's main color.
+    '--tab-hover-background': 'var(--color-primary-hover)',
     '--tab-hover-text': 'var(--color-on-primary)',
     '--tab-current-background': 'var(--color-on-primary)',
     '--tab-current-text': 'var(--color-primary)',

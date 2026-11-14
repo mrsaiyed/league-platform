@@ -65,6 +65,7 @@ export function designToCssVariables(design: DesignDocument): Record<string, str
     '--color-primary-text': derived.primaryText,
     '--color-accent-text': derived.accentText,
     '--color-on-primary': derived.onPrimary,
+    '--color-primary-hover': derived.primaryHover,
     '--color-on-highlight': derived.onHighlight,
     '--color-danger': derived.danger,
     '--color-on-danger': derived.onDanger,

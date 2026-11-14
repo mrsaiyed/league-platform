@@ -1,7 +1,8 @@
 // Colors worked out from the six a league chooses, so its own colors drop into a finished
 // layout (docs/build/DESIGN.md, section 3). Each is a plain #rrggbb value, so the contrast
 // of the text that uses it can be measured on the page.
-import { contrastRatio, nearestReadableColor } from './contrast.ts';
+import { contrastRatio, nearestReadableColor, type ContrastWarning } from './contrast.ts';
+import type { DesignDocument } from './design-document.ts';
 
 const MINIMUM = 4.5;
 
@@ -17,17 +18,32 @@ export function mixColors(a: string, b: string, share: number): string {
   return `#${mixed.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** `color`, moved only as far as it must be to read as text on every one of `surfaces`. */
+/** How `color` reads on the one of `surfaces` it reads worst on. */
+const weakestOn = (color: string, surfaces: readonly string[]): number =>
+  Math.min(...surfaces.map((surface) => contrastRatio(color, surface)));
+
+/** Whether `color` reads as text (4.5 to 1) on every one of `surfaces`. */
+export const readsOn = (color: string, surfaces: readonly string[]): boolean =>
+  weakestOn(color, surfaces) >= MINIMUM;
+
+/**
+ * `color`, moved only as far as it must be to read as text on every one of `surfaces`. It
+ * goes on until it reads. Where nothing can (a light page with a dark panel: no one color
+ * reads on both), it gives the ink that reads best on its worst surface, and `readsOn`
+ * says it still falls short, which `derivedColorWarnings` reports when a design is saved.
+ */
 export function readableOn(color: string, surfaces: readonly string[]): string {
   let shade = color;
-  for (let round = 0; round < 3; round++) {
+  for (let round = 0; round < 8 && !readsOn(shade, surfaces); round++) {
     const hardest = surfaces.reduce((worst, surface) =>
       contrastRatio(shade, surface) < contrastRatio(shade, worst) ? surface : worst,
     );
-    if (contrastRatio(shade, hardest) >= MINIMUM) return shade;
     shade = nearestReadableColor(shade, hardest);
   }
-  return shade;
+  if (readsOn(shade, surfaces)) return shade;
+  return [shade, '#000000', '#ffffff'].reduce((best, ink) =>
+    weakestOn(ink, surfaces) > weakestOn(best, surfaces) ? ink : best,
+  );
 }
 
 /** The text color for words written on a filled `fill`: the design's own where one reads. */
@@ -56,26 +72,96 @@ export type DerivedColors = {
   /** A destructive action or an error, readable on the page and on a panel. */
   readonly danger: string;
   readonly onDanger: string;
+  /**
+   * The main color under the pointer, where words in `onPrimary` are written on it (a tab of
+   * the light header): moved away from those words, so they read at least as well as before.
+   */
+  readonly primaryHover: string;
 };
 
-export function derivedColors(colors: {
+type ChosenColors = {
   readonly background: string;
   readonly panel: string;
   readonly text: string;
   readonly primary: string;
   readonly accent: string;
   readonly highlight: string;
-}): DerivedColors {
-  const surfaces = [colors.background, colors.panel];
+};
+
+/**
+ * How much of the main color is laid over a surface under the pointer (a row of a table, a
+ * button): the stronger of the two frames' tints (frame-look.ts).
+ */
+export const hoverTintShare = 0.09;
+
+/** How far the main color moves under the pointer where words are written on it. */
+const primaryHoverShare = 0.18;
+
+/** A surface with the pointer over it: the main color laid over it at low strength. */
+export const hoveredSurface = (surface: string, primary: string): string =>
+  mixColors(surface, primary, hoverTintShare);
+
+/**
+ * Every surface text is read on: the page and a panel, each as it is and with the pointer
+ * over it. The colors worked out below are fitted to all four, so a hovered row or button
+ * reads as well as a still one.
+ */
+export const textSurfaces = (colors: ChosenColors): readonly string[] => [
+  colors.background,
+  colors.panel,
+  hoveredSurface(colors.background, colors.primary),
+  hoveredSurface(colors.panel, colors.primary),
+];
+
+export function derivedColors(colors: ChosenColors): DerivedColors {
+  const surfaces = textSurfaces(colors);
   const inks = [colors.panel, colors.background, colors.text];
   const danger = readableOn(dangerRed, surfaces);
+  const onPrimary = textOn(colors.primary, inks);
+  // Away from the words on it: darker under light words, lighter under dark ones.
+  const awayFromWords =
+    contrastRatio(onPrimary, '#000000') >= contrastRatio(onPrimary, '#ffffff')
+      ? '#000000'
+      : '#ffffff';
   return {
     muted: readableOn(mixColors(colors.text, colors.background, 0.35), surfaces),
     primaryText: readableOn(colors.primary, surfaces),
     accentText: readableOn(colors.accent, surfaces),
-    onPrimary: textOn(colors.primary, inks),
+    onPrimary,
     onHighlight: textOn(colors.highlight, inks),
     danger,
     onDanger: textOn(danger, inks),
+    primaryHover: mixColors(colors.primary, awayFromWords, primaryHoverShare),
   };
+}
+
+/**
+ * The colors worked out from a design that still cannot be read where they are used: only
+ * when its page and its panel are so far apart (one light, one dark) that no one color
+ * reads on both. Reported with `contrastWarnings` when a design is saved, so nothing falls
+ * short without saying so.
+ */
+export function derivedColorWarnings(design: DesignDocument): ContrastWarning[] {
+  const colors = { ...design.colors, highlight: design.colors.highlight ?? design.colors.accent };
+  const derived = derivedColors(colors);
+  const texts: [string, string][] = [
+    ['quiet text', derived.muted],
+    ['main color as text', derived.primaryText],
+    ['accent as text', derived.accentText],
+    ['error text', derived.danger],
+  ];
+  const surfaces: [string, string][] = [
+    ['background', colors.background],
+    ['panel', colors.panel],
+  ];
+  return texts.flatMap(([name, text]) =>
+    surfaces
+      .map(([where, surface]) => ({
+        pair: `${name} on ${where}`,
+        ratio: contrastRatio(text, surface),
+        minimum: MINIMUM,
+        suggestion: nearestReadableColor(text, surface),
+      }))
+      .filter((warning) => warning.ratio < warning.minimum),
+  );
 }
