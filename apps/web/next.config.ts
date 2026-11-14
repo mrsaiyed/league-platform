@@ -35,8 +35,15 @@ const config: NextConfig = {
   // typecheck). Next.js's own check needs TypeScript's older JavaScript interface,
   // which TypeScript 7 does not have, so it is not run twice here.
   typescript: { ignoreBuildErrors: true },
-  // forbidden(): "you do not have access" is answered with status 403 (U-6).
-  experimental: { authInterrupts: true },
+  experimental: {
+    // forbidden(): "you do not have access" is answered with status 403 (U-6).
+    authInterrupts: true,
+    // The largest form a server action reads. Next.js's own default is 1 MB, which would
+    // refuse a fixtures file between our import limit (maxReportBytes, 800 KB) and 1 MB
+    // with its own error page before our "file too large" notice could be shown. A little
+    // above our limit, so our notice always shows, and still small.
+    serverActions: { bodySizeLimit: '2mb' },
+  },
   poweredByHeader: false,
   headers: async () => [
     { source: '/:path*', headers: everyAnswer },

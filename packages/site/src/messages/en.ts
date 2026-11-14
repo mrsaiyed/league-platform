@@ -230,6 +230,130 @@ export const en = {
   'admin.area.settings': 'League settings',
   'admin.emptyArea': 'Nothing here yet.',
   'admin.viewSite': 'View the site',
+  // The admin's Teams screens (step 2.51, P4 §3, P7 §2).
+  'adminTeams.noSeason': 'This league has no current season yet. Add one in Season settings first.',
+  'adminTeams.seasonLine': 'Teams of {season}',
+  'adminTeams.none': 'No teams yet.',
+  'adminTeams.noDivision': 'No division',
+  'adminTeams.ownColors': "The league's own colors",
+  'adminTeams.openRoster': 'Roster',
+  'adminTeams.allTeams': 'All teams',
+  'adminTeams.create.title': 'Add a team',
+  'adminTeams.create.submit': 'Add team',
+  'adminTeams.field.name': 'Name',
+  'adminTeams.field.shortName': "Short name, used in the team's address",
+  'adminTeams.field.shortNameHint': 'Lower-case letters and numbers, with single hyphens.',
+  'adminTeams.field.color': 'Color',
+  'adminTeams.field.useOwnColors': "Use the league's own colors",
+  'adminTeams.field.division': 'Division',
+  'adminTeams.field.statsVisibility': "Who sees this team's players' numbers",
+  'adminTeams.edit.title': 'Team details',
+  'adminTeams.edit.submit': 'Save team details',
+  'adminTeams.stats.title': "Who sees this team's numbers",
+  'adminTeams.stats.submit': 'Save who sees the numbers',
+  'adminTeams.stats.everyone': 'Everyone',
+  'adminTeams.stats.staff': "Only the team's staff and the league's admins",
+  'adminTeams.remove.title': 'Remove this team',
+  'adminTeams.remove.body':
+    'The team is moved to the bin. Its games and numbers are kept and it can be brought back.',
+  'adminTeams.remove.submit': 'Move the team to the bin',
+  'adminTeams.roster.title': 'Roster',
+  'adminTeams.roster.none': 'Nobody is on this roster yet.',
+  'adminTeams.roster.number': 'Number',
+  'adminTeams.roster.noNumber': 'No number',
+  'adminTeams.roster.name': 'Name',
+  'adminTeams.roster.role': 'Role',
+  'adminTeams.roster.role.player': 'Player',
+  'adminTeams.roster.role.captain': 'Captain',
+  'adminTeams.roster.role.coach': 'Coach',
+  'adminTeams.roster.moveUp': 'Move up',
+  'adminTeams.roster.moveDown': 'Move down',
+  'adminTeams.roster.saveEntry': 'Save number and role',
+  'adminTeams.roster.leftOn': 'Left on',
+  'adminTeams.roster.markLeft': 'Mark as left',
+  'adminTeams.roster.leftTitle': 'Left the team',
+  'adminTeams.roster.leftLine': '{name}, left on {date}',
+  'adminTeams.roster.readFailed':
+    'The roster could not be read just now, so it is not shown. Reload the page to try again.',
+  'adminTeams.add.readFailed':
+    'The roster or the league list could not be read just now. Reload the page to try again.',
+  'adminTeams.people.readFailed':
+    'The league list could not be read just now, so it is not shown. Reload the page to try again.',
+  // A person's name as the Teams screens show it; a language may put the parts the other way.
+  'adminTeams.personName': '{firstName} {lastName}',
+  // After a team's name in the list, with the space before it: " (North)".
+  'adminTeams.inDivision': ' ({division})',
+  'adminTeams.add.title': 'Add a player',
+  'adminTeams.add.person': 'Person',
+  'adminTeams.add.choose': 'Choose a person',
+  'adminTeams.add.noOne': 'Everyone in the league list is already on this roster.',
+  'adminTeams.add.number': 'Jersey number (0 to 99, or 00)',
+  'adminTeams.add.role': 'Role',
+  'adminTeams.add.submit': 'Add to the roster',
+  'adminTeams.newPerson.title': 'Someone not in the list yet',
+  'adminTeams.newPerson.firstName': 'First name',
+  'adminTeams.newPerson.lastName': 'Last name',
+  'adminTeams.newPerson.submit': 'Add the person and put them on the roster',
+  'adminTeams.people.title': 'The league list',
+  'adminTeams.people.body':
+    'Taking someone off the list is refused while they are on a roster: mark them as having left first.',
+  'adminTeams.people.remove': 'Remove from the league list',
+  'adminTeams.confirm': 'Yes, I am sure',
+  'adminTeams.done.created': 'The team was added.',
+  'adminTeams.done.updated': 'The team was saved.',
+  'adminTeams.done.statsSaved': 'Who sees the numbers was saved.',
+  'adminTeams.done.removed': 'The team was moved to the bin.',
+  'adminTeams.done.added': 'The player was added to the roster.',
+  'adminTeams.done.entrySaved': 'The number and role were saved.',
+  'adminTeams.done.moved': 'The roster order was saved.',
+  'adminTeams.done.left': 'The player was marked as having left.',
+  'adminTeams.done.personRemoved': 'The person was taken off the league list.',
+  // Why a teams or people change was refused (T-187): `error.`, the command's name, the code.
+  'error.invalid-input': 'Something you entered is not valid. Check the fields and try again.',
+  'error.not-allowed': 'You are not allowed to do that.',
+  'error.changed-since-read':
+    'Someone else changed this while you were looking. The page now shows the latest; try again.',
+  'error.not-confirmed': 'Tick the box to confirm first. Nothing was changed.',
+  'error.teams.add_new_person.jersey-taken':
+    'Another player on this team already wears that number, so the new person was not kept in the league list.',
+  'error.teams.add_new_person.invalid-input':
+    'The role or number is not valid, so nobody was added.',
+  'error.teams.add_new_person.team-not-found': 'That team is not there, so nobody was added.',
+  'error.teams.add_new_person.already-on-team':
+    'That person is already on this team, so the new person was not kept in the league list.',
+  'error.teams.add_new_person.not-allowed': 'You are not allowed to do that.',
+  'error.teams.add_new_person.not-undone':
+    'The person could not be put on the roster, and could not be taken off the league list again either, so they are still in the league list. Remove them there if they should not be.',
+  'error.teams.list_roster.team-not-found': 'That team is not there.',
+  'error.short-name-needed':
+    'A short name could not be made from this name. Type a short name: lower-case letters and numbers, with single hyphens.',
+  'error.unknown': 'That could not be done.',
+  'error.teams.create_team.season-not-found': 'That season is not there.',
+  'error.teams.create_team.division-not-found': 'That division is not there.',
+  'error.teams.create_team.team-short-name-taken':
+    'Another team of this season already has that short name.',
+  'error.teams.create_team.team-name-taken': 'Another team of this season already has that name.',
+  'error.teams.update_team.team-not-found': 'That team is not there.',
+  'error.teams.update_team.division-not-found': 'That division is not there.',
+  'error.teams.update_team.team-short-name-taken':
+    'Another team of this season already has that short name.',
+  'error.teams.update_team.team-name-taken': 'Another team of this season already has that name.',
+  'error.teams.remove_team.team-not-found': 'That team is not there.',
+  'error.teams.set_stats_visibility.team-not-found': 'That team is not there.',
+  'error.teams.set_stats_visibility.teams-may-not-choose':
+    'This league decides who sees the numbers; teams may not choose.',
+  'error.teams.reorder_roster.team-not-found': 'That team is not there.',
+  'error.teams.reorder_roster.roster-entry-not-found':
+    'Someone on that list is not on this roster.',
+  'error.teams.reorder_roster.roster-incomplete':
+    'The roster changed while you were looking. The page now shows the latest; try again.',
+  'error.teams.change_roster_entry.roster-entry-not-found': 'That roster entry is not there.',
+  'error.teams.mark_left.roster-entry-not-found': 'That roster entry is not there.',
+  'error.people.create_person.sensitive-fields-not-allowed':
+    'You are not allowed to enter those details.',
+  'error.people.remove_person.person-not-found': 'That person is not in the league list.',
+  'error.people.remove_person.person-on-a-roster':
+    'That person is still on a roster. Mark them as having left their team first, then take them off the list.',
   // The games area (step 2.55).
   'admin.games.intro': 'The games of today and the week ahead.',
   'admin.games.listProblem':
@@ -265,6 +389,113 @@ export const en = {
   'admin.games.error.game-not-postponable': 'Only a game that has not started can be postponed.',
   'admin.games.error.game-not-cancellable': 'Only a game that has not started can be cancelled.',
   'admin.games.error.unknown': 'That did not work. Nothing was changed.',
+  // The fixture import screen (Admin → Schedule → Import fixtures, P7 §4 "Also", O-4).
+  'admin.import.title': 'Import fixtures',
+  'admin.import.intro':
+    'Add many games at once from a spreadsheet. The games go into the schedule draft, so nothing reaches the public until you publish the schedule.',
+  'admin.import.help':
+    'Save the spreadsheet as CSV (UTF-8). Give it one row per game with columns for the date, home team and away team, and if you have them the time, venue, court, round, game number and final scores. Team and venue names must match the ones in this season.',
+  'admin.import.season': 'Importing into: {season}',
+  'admin.import.noSeason':
+    'This league has no current season yet, so there is nowhere to import games. Set up a season first.',
+  'admin.import.draft_one': 'The schedule draft has {count} change that is not published yet.',
+  'admin.import.draft_other': 'The schedule draft has {count} changes that are not published yet.',
+  'admin.import.draftEmpty': 'The schedule draft is empty: everything is published.',
+  'admin.import.backToSchedule': 'Back to the schedule',
+  'admin.import.fileLabel': 'Spreadsheet file (CSV)',
+  'admin.import.upload': 'Upload and check',
+  'admin.import.uploadAnother': 'Upload a different file',
+  'admin.import.fileName': 'File: {name}',
+  'admin.import.noFileName': 'File with no name',
+  'admin.import.status.reading':
+    'The file is being read. This usually takes a few seconds: reload the page to see the report.',
+  'admin.import.status.ready':
+    'The file has been checked. Look over the report, then add the games.',
+  'admin.import.status.applied': 'These games were added to the schedule draft.',
+  'admin.import.status.undone': 'This import was undone: its games were taken out of the draft.',
+  'admin.import.status.failed': 'This file could not be used.',
+  'admin.import.reload': 'Reload',
+  'admin.import.discard': 'Stop reading and forget the file',
+  'admin.import.rowsRead_one': '{count} row read.',
+  'admin.import.rowsRead_other': '{count} rows read.',
+  'admin.import.gamesReady_one': '{count} game can be added.',
+  'admin.import.gamesReady_other': '{count} games can be added.',
+  'admin.import.scores_one': '{count} of them has a final score.',
+  'admin.import.scores_other': '{count} of them have final scores.',
+  'admin.import.columns': 'Columns found: {columns}',
+  'admin.import.problemsTitle_one': '{count} row will be left out',
+  'admin.import.problemsTitle_other': '{count} rows will be left out',
+  'admin.import.problemsHelp':
+    'Fix these rows in the spreadsheet and import them again later if you need them. The other rows can be added now.',
+  'admin.import.problemRow': 'Row {row}: {message}',
+  'admin.import.moreProblems_one': 'And {count} more row with a problem.',
+  'admin.import.moreProblems_other': 'And {count} more rows with problems.',
+  'admin.import.warningsTitle': 'Worth a look',
+  'admin.import.gamesTitle': 'Games in the file',
+  'admin.import.moreGames_one': 'And {count} more game not shown here.',
+  'admin.import.moreGames_other': 'And {count} more games not shown here.',
+  'admin.import.col.row': 'Row',
+  'admin.import.col.date': 'Date',
+  'admin.import.col.time': 'Time',
+  'admin.import.col.home': 'Home',
+  'admin.import.col.away': 'Away',
+  'admin.import.col.place': 'Venue and court',
+  'admin.import.col.score': 'Final score',
+  'admin.import.place': '{venue}, {court}',
+  'admin.import.score': '{home}–{away}',
+  'admin.import.none': '–',
+  'admin.import.apply_one': 'Add {count} game to the schedule draft',
+  'admin.import.apply_other': 'Add {count} games to the schedule draft',
+  'admin.import.scoresWaiting_one':
+    '{count} final score will be recorded once its game is published.',
+  'admin.import.scoresWaiting_other':
+    '{count} final scores will be recorded once their games are published.',
+  'admin.import.scoresRecorded_one': '{count} final score has been recorded.',
+  'admin.import.scoresRecorded_other': '{count} final scores have been recorded.',
+  'admin.import.undo': 'Undo this import',
+  'admin.import.undoHelp':
+    'Undo takes exactly these games out of the draft again. It works until someone changes or publishes the draft.',
+  'admin.import.done.upload': 'The file was uploaded.',
+  'admin.import.done.apply': 'The games were added to the schedule draft.',
+  'admin.import.done.undo': 'The import was undone. Its games are no longer in the draft.',
+  'admin.import.done.discard': 'The file was forgotten. Nothing was imported.',
+  'admin.import.clashes_one':
+    '{count} clash needs a look in the schedule: a team, court or date is double-booked.',
+  'admin.import.clashes_other':
+    '{count} clashes need a look in the schedule: a team, court or date is double-booked.',
+  'admin.import.error.not-allowed': 'You are not allowed to import fixtures in this league.',
+  'admin.import.error.invalid-input': 'Something in the form was missing. Try again.',
+  'admin.import.error.no-file': 'Choose a spreadsheet file to upload first.',
+  'admin.import.error.no-season':
+    'This league has no current season yet, so there is nowhere to import games.',
+  'admin.import.error.season-not-found': 'That season is not there any more.',
+  'admin.import.error.file-too-large':
+    'The file is too large to import at once. The limit is about {size}, a little less for a file with many rows. Split it into smaller files.',
+  'admin.import.error.no-account': 'Sign in again to import fixtures.',
+  'admin.import.error.import-not-found': 'That import is not there.',
+  'admin.import.error.changed-since-read':
+    'This import changed while you were looking at it. Here is how it stands now.',
+  'admin.import.error.not-ready': 'This import cannot be added: it is not a checked file waiting.',
+  'admin.import.error.not-applied': 'Only an import that was added can be undone.',
+  'admin.import.error.not-reading': 'This file has already been read.',
+  'admin.import.error.report-unreadable':
+    'The report of this import cannot be read. Upload the file again.',
+  'admin.import.error.record-unreadable':
+    'What this import added cannot be read, so it cannot be undone. Remove its games in the schedule.',
+  'admin.import.error.revision-out-of-date':
+    'The schedule was published after the draft was started. Open the schedule, then try again.',
+  'admin.import.error.draft-unreadable': 'The schedule draft cannot be read. Nothing was changed.',
+  'admin.import.error.draft-too-large':
+    'The schedule draft would be too large with these games. Publish or split the file first.',
+  'admin.import.error.draft-changed':
+    'The schedule draft was changed after this import, so undo could not be sure what to take out. Remove the games in the schedule instead.',
+  'admin.import.error.teams-changed':
+    'A team named in the file was removed after it was checked. Upload the file again.',
+  'admin.import.error.venues-changed':
+    'A venue or court named in the file was removed after it was checked. Upload the file again.',
+  'admin.import.error.change-refused':
+    'One of the games could not be added to the draft. Nothing was changed.',
+  'admin.import.error.unknown': 'That did not work. Nothing was changed.',
   // U-6: an address you are not allowed to open.
   'access.noAccess.title': 'You do not have access',
   'access.noAccess.body':

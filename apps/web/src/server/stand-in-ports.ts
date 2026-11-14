@@ -30,6 +30,8 @@ import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import type { WebPorts } from './ports.ts';
+import { standInAdminTeams } from './stand-in-admin-teams.ts';
+import { standInFixtureImport } from './stand-in-fixture-import.ts';
 import { standInGames } from './stand-in-games.ts';
 import { standInPublicSchedule } from './stand-in-public-schedule.ts';
 import { standInPublicStats } from './stand-in-public-stats.ts';
@@ -262,9 +264,19 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       accessOf: (leagueId) => accessTx(leagueId).access,
       log: options.log,
     }),
+    fixtureImport: standInFixtureImport({
+      leagueId: standInLeagues.live.id,
+      accessOf: (leagueId) => accessTx(leagueId).access,
+      log: options.log,
+    }),
     publicStats: standInPublicStats({
       adultLeagueId: standInLeagues.live.id,
       youthLeagueId: standInLeagues.other.id,
+    }),
+    adminTeams: standInAdminTeams({
+      accessOf: (leagueId) => accessTx(leagueId).access,
+      log: options.log,
+      seededLeagueId: standInLeagues.live.id,
     }),
     publicSchedule: standInPublicSchedule(
       { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
