@@ -53,9 +53,11 @@ export const takeOverScoring = defineCommand({
       return ok(await openFor(tx, gameId, device, now));
     }
     if (current.since !== input.expectedHolderSince) return ok(heldByOther(current, now));
-    await tx.scoringSessions.end(gameId, current.id);
+    // Another request may have ended it a moment ago (a takeover of its own, or the
+    // holder leaving): then this one displaced nobody, and logs nothing.
+    const displaced = await tx.scoringSessions.end(gameId, current.id);
     const reply = await claimGame(tx, gameId, device, now);
-    if (reply.status === 'held-by-you') {
+    if (displaced && reply.status === 'held-by-you') {
       await recordActivity(tx, context, {
         action: 'games.take_over_scoring',
         target: { type: 'game', id: gameId },

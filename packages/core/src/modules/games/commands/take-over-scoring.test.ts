@@ -5,12 +5,18 @@ import {
   finalGame,
   game,
   gameUuid,
+  ownerId,
   schedulerGrant,
   schedulerId,
   scorekeeperGrant,
   scorekeeperId,
 } from '../memory-games.test-helper.ts';
-import { memoryScoring, sessionUuid, startOfTest } from '../memory-scoring.test-helper.ts';
+import {
+  memoryScoring,
+  racingScoring,
+  sessionUuid,
+  startOfTest,
+} from '../memory-scoring.test-helper.ts';
 import { leaseMs } from '../scoring-session.ts';
 import { openScoringSession } from './open-scoring-session.ts';
 import { renewScoringSession } from './renew-scoring-session.ts';
@@ -80,6 +86,54 @@ describe('takeOverScoring (T6 §5, S-5, T-116)', () => {
       value: { status: 'held-by-you', sessionId: sessionUuid(2) },
     });
     expect(db.state.sessions).toEqual([expect.objectContaining({ deviceId: 'phone' })]);
+  });
+
+  it('logs no takeover when the holder left just before it, as nobody was displaced', async () => {
+    const tabletSession = {
+      id: sessionUuid(90),
+      gameId: gameUuid(1),
+      accountId: scorekeeperId,
+      deviceId: 'tablet',
+      since: startOfTest,
+      heldUntil: startOfTest + leaseMs,
+    };
+    const { db, deps, as } = memoryScoring(
+      { games: [game(1)], grants, sessions: [tabletSession] },
+      // The tablet leaves the game between this request reading it and ending it.
+      { beforeEnd: (s) => void (s.sessions = []) },
+    );
+    expect(await takeOverScoring(as(schedulerId), takeOver(), deps)).toMatchObject({
+      value: { status: 'held-by-you', sessionId: sessionUuid(1) },
+    });
+    expect(db.state.activity).toEqual([]);
+  });
+
+  it('two takeovers at the same instant: one takes the game, one is told, one entry is logged', async () => {
+    const tabletSession = {
+      id: sessionUuid(90),
+      gameId: gameUuid(1),
+      accountId: scorekeeperId,
+      deviceId: 'tablet',
+      since: startOfTest,
+      heldUntil: startOfTest + leaseMs,
+    };
+    const race = racingScoring(2, { games: [game(1)], grants, sessions: [tabletSession] });
+    const replies = await Promise.all([
+      takeOverScoring(race.as(schedulerId), takeOver(), race.deps),
+      takeOverScoring(race.as(ownerId), { ...takeOver(), deviceId: 'laptop' }, race.deps),
+    ]);
+    expect(replies.map((r) => (r.ok ? r.value.status : r.error.code)).sort()).toEqual([
+      'held-by-other',
+      'held-by-you',
+    ]);
+    expect(race.db.state.sessions).toEqual([expect.objectContaining({ id: sessionUuid(1) })]);
+    expect(race.db.state.activity).toEqual([
+      expect.objectContaining({
+        action: 'games.take_over_scoring',
+        actorAccountId: race.db.state.sessions[0]?.accountId,
+        details: expect.objectContaining({ takenFromAccountId: scorekeeperId }),
+      }),
+    ]);
   });
 
   it('takes nothing if the game changed hands since the scorekeeper confirmed', async () => {

@@ -12,7 +12,12 @@ import {
   scorekeeperId,
   scoringRule,
 } from '../memory-games.test-helper.ts';
-import { memoryScoring, sessionUuid, startOfTest } from '../memory-scoring.test-helper.ts';
+import {
+  memoryScoring,
+  racingScoring,
+  sessionUuid,
+  startOfTest,
+} from '../memory-scoring.test-helper.ts';
 import { leaseMs } from '../scoring-session.ts';
 import { openScoringSession } from './open-scoring-session.ts';
 
@@ -113,6 +118,54 @@ describe('openScoringSession (T6 §5, T-116)', () => {
       value: { status: 'held-by-you', sessionId: sessionUuid(1) },
     });
     expect(db.state.sessions).toHaveLength(1);
+  });
+
+  it('two devices opening at the same instant: both see a free game, only one gets it', async () => {
+    // Each request waits after reading the game's session until the other has read it
+    // too, so both find it free before either writes; neither can finish alone.
+    const race = racingScoring(2, { games: [game(1)], grants });
+    const replies = await Promise.all([
+      openScoringSession(race.as(scorekeeperId), tablet, race.deps),
+      openScoringSession(race.as(schedulerId), phone, race.deps),
+    ]);
+    const winner = race.db.state.sessions;
+    expect(winner).toHaveLength(1);
+    expect(replies.map((r) => (r.ok ? r.value.status : r.error.code)).sort()).toEqual([
+      'held-by-other',
+      'held-by-you',
+    ]);
+    const lost = replies.find((r) => r.ok && r.value.status === 'held-by-other');
+    expect(lost).toEqual({
+      ok: true,
+      value: {
+        status: 'held-by-other',
+        holder: { accountId: winner[0]?.accountId, since: startOfTest },
+        sentAt: startOfTest,
+      },
+    });
+  });
+
+  it('two devices taking a lapsed game at the same instant: only one gets it', async () => {
+    const lapsed = {
+      id: sessionUuid(90),
+      gameId: gameUuid(1),
+      accountId: ownerId,
+      deviceId: 'laptop',
+      since: startOfTest - 600_000,
+      heldUntil: startOfTest - 1,
+    };
+    const race = racingScoring(2, { games: [game(1)], grants, sessions: [lapsed] });
+    const replies = await Promise.all([
+      openScoringSession(race.as(scorekeeperId), tablet, race.deps),
+      openScoringSession(race.as(schedulerId), phone, race.deps),
+    ]);
+    expect(replies.map((r) => (r.ok ? r.value.status : r.error.code)).sort()).toEqual([
+      'held-by-other',
+      'held-by-you',
+    ]);
+    expect(race.db.state.sessions).toEqual([
+      expect.objectContaining({ id: sessionUuid(1), since: startOfTest }),
+    ]);
   });
 
   it('when two devices race, the one that started second is told who won', async () => {
