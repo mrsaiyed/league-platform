@@ -11,6 +11,7 @@ export {
 } from './live-subscriber.ts';
 export {
   serverSentEventsSubscriber,
+  webLiveAddress,
   type EventSourceLike,
   type ServerSentEventsSubscriberOptions,
 } from './server-sent-events-subscriber.ts';

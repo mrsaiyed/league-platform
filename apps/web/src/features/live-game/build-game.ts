@@ -41,6 +41,17 @@ export function gameWords(): GameWords {
       lineup: t('game.play.lineup'),
       period: t('game.play.period'),
       other: t('game.play.other'),
+      noTeam: {
+        score: t('game.play.noTeam.score'),
+        foul: t('game.play.noTeam.foul'),
+        unfoul: t('game.play.noTeam.unfoul'),
+        turnover: t('game.play.noTeam.turnover'),
+        unturnover: t('game.play.noTeam.unturnover'),
+        timeout: t('game.play.noTeam.timeout'),
+        untimeout: t('game.play.noTeam.untimeout'),
+        sub: t('game.play.noTeam.sub'),
+        lineup: t('game.play.noTeam.lineup'),
+      },
     },
   };
 }

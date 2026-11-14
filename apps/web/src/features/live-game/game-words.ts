@@ -30,6 +30,18 @@ export type GameWords = {
     readonly lineup: string;
     readonly period: string;
     readonly other: string;
+    /** A team's play whose team is not known, said without one. */
+    readonly noTeam: {
+      readonly score: string;
+      readonly foul: string;
+      readonly unfoul: string;
+      readonly turnover: string;
+      readonly unturnover: string;
+      readonly timeout: string;
+      readonly untimeout: string;
+      readonly sub: string;
+      readonly lineup: string;
+    };
   };
 };
 
@@ -93,9 +105,42 @@ export type PlayFacts = {
   readonly period?: string | null;
 };
 
+/** A team's play with no team known, said without one; null for any other play. */
+function withoutTeam(words: GameWords, play: PlayFacts): string | null {
+  const n = words.play.noTeam;
+  switch (play.type) {
+    case 'score':
+      return fill(n.score, { points: play.points ?? '' });
+    case 'foul':
+      return n.foul;
+    case 'unfoul':
+      return n.unfoul;
+    case 'turnover':
+    case 'team-turnover':
+      return n.turnover;
+    case 'unturnover':
+    case 'team-unturnover':
+      return n.unturnover;
+    case 'timeout':
+      return n.timeout;
+    case 'untimeout':
+      return n.untimeout;
+    case 'sub':
+      return n.sub;
+    case 'lineup':
+      return n.lineup;
+    default:
+      return null;
+  }
+}
+
 /** One play in a sentence. */
 export function playSentence(words: GameWords, play: PlayFacts): string {
   const w = words.play;
+  if (play.team === null) {
+    const said = withoutTeam(words, play);
+    if (said !== null) return said;
+  }
   const team = play.team ?? '';
   const points = play.points ?? '';
   switch (play.type) {

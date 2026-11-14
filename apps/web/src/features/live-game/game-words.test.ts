@@ -34,6 +34,19 @@ describe('the words of a game', () => {
     expect(play({ type: 'other' })).toBe('The clock or the game changed');
   });
 
+  it('words a team play with no team known without a dangling team', () => {
+    const play = (p: Partial<Parameters<typeof playSentence>[1]>) =>
+      playSentence(words, { type: 'score', team: null, player: null, points: 2, ...p });
+    expect(play({})).toBe('2 points scored');
+    expect(play({ type: 'timeout' })).toBe('Timeout');
+    expect(play({ type: 'foul', player: '#7' })).toBe('Foul');
+    expect(play({ type: 'team-turnover' })).toBe('Turnover');
+    expect(play({ type: 'untimeout' })).toBe('Timeout taken back');
+    expect(play({ type: 'sub' })).toBe('Substitution');
+    expect(play({ type: 'lineup' })).toBe('Starting players');
+    expect(play({ type: 'period', period: 'Q2' })).toBe('Start of Q2');
+  });
+
   it('leaves a name with no value as it is', () => {
     expect(fill('{a} and {b}', { a: 1 })).toBe('1 and {b}');
   });

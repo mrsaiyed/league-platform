@@ -5,10 +5,8 @@ import { BoxScoreTable } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { t } from '../../server/messages.ts';
 import { gameWords, liveGameLabels, statusNote, type BoxScoresView } from './build-game.ts';
+import { webLiveAddress } from '../live-updates/index.ts';
 import { LiveGameView } from './live-game-view.tsx';
-
-/** The web app's own live address (T-14). */
-const liveAddress = '/api/v1/live';
 
 export type GameView = {
   readonly leagueId: string;
@@ -41,7 +39,7 @@ export function GameContent({ view }: { readonly view: GameView }) {
         leagueId={view.leagueId}
         gameId={view.snapshot.gameId}
         snapshotAddress={view.snapshotAddress}
-        liveAddress={liveAddress}
+        liveAddress={webLiveAddress}
         initial={view.snapshot}
         showPlayers={!arrivedFinal}
         words={gameWords()}
