@@ -67,6 +67,11 @@ export type TransferReport = {
   readonly transferred: readonly { readonly trackerGameId: string; readonly sent: number }[];
   /** Tracker games already here, whose lines were compared again. */
   readonly checked: readonly string[];
+  /**
+   * The tracked team's players not brought over, as the plan lists them (`notBroughtOver`):
+   * the run went through without them, but they are still to be put on the roster.
+   */
+  readonly notBroughtOver: readonly string[];
   /** Where the run stopped and why, or null when it went through. */
   readonly stopped: { readonly trackerGameId: string | null; readonly stop: TransferStop } | null;
 };
@@ -254,6 +259,7 @@ export async function runTrackerTransfer<Tx extends TrackerTransferTx>(
     added,
     transferred,
     checked,
+    notBroughtOver: plan.notBroughtOver,
     stopped,
   });
   if (!plan.ready) return report({ trackerGameId: null, stop: { kind: 'not-ready' } });

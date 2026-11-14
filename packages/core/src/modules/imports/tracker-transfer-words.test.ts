@@ -52,7 +52,10 @@ const person = (p: TrackerPlayer, match: PlannedPerson['match']): [string, Plann
 
 const unmatched = { kind: 'unmatched', reason: 'not-found' } as const;
 
-function planWith(games: readonly PlannedGame[]): TransferPlan {
+function planWith(
+  games: readonly PlannedGame[],
+  notBroughtOver: readonly string[] = [],
+): TransferPlan {
   return {
     problem: null,
     trackedTeamId: 'team-owls',
@@ -81,6 +84,7 @@ function planWith(games: readonly PlannedGame[]): TransferPlan {
       person(nameless, { kind: 'problem', reason: 'no-name' }),
     ]),
     games,
+    notBroughtOver,
     ready: games.every((g) => g.outcome.kind !== 'blocked'),
   };
 }
@@ -106,7 +110,7 @@ describe('the plan, in words', () => {
     );
     expect(text).toContain('Not in this season: Pine Valley Elks');
     expect(text).toContain(
-      'Sam Example (#4): in the league’s list as Sam Example but on no team: to be put on the roster, number 4',
+      'Sam Example (#4): in the league’s list as Sam Example but on no team: taken to be them (the same full name) and put on the roster, number 4',
     );
     expect(text).toContain(
       'Kai Sample (#5): cannot be added: this season asks for unique jersey numbers',
@@ -123,6 +127,15 @@ describe('the plan, in words', () => {
     expect(text).toContain(
       '0 games to transfer, 0 already here, 1 not transferred, 1 game with a problem.',
     );
+    expect(text).not.toContain('Warning');
+  });
+
+  it('warns when some of the tracked team’s players will not be brought over', () => {
+    const lines = describeTransferPlan(words, planWith([], [kai.id]));
+    expect(lines.slice(-2)).toEqual([
+      'Warning: one of the tracked team’s players is not brought over (the Players list says why), so the transfer is not complete. Put them on the roster here by hand, then run it again:',
+      '  Kai Sample (#5)',
+    ]);
   });
 
   it('suggests --with-opponents only for players it would bring in', () => {
@@ -154,6 +167,7 @@ describe('the report, in words', () => {
     added: [],
     transferred: [],
     checked: [],
+    notBroughtOver: [],
     stopped: null,
     ...over,
   });
@@ -172,6 +186,21 @@ describe('the report, in words', () => {
     expect(describeTransferReport(words, report({ checked: ['101', '102'] })).at(-1)).toBe(
       'Nothing to change: every one of 2 games was already here, and every box score line matches.',
     );
+  });
+
+  it('warns after a run that went through without some of the tracked team’s players', () => {
+    const lines = describeTransferReport(
+      words,
+      report({
+        transferred: [{ trackerGameId: '101', sent: 12 }],
+        notBroughtOver: [kai.id, sam.id],
+      }),
+    );
+    expect(lines.slice(-3)).toEqual([
+      'Warning: 2 of the tracked team’s players are not brought over (the Players list says why), so the transfer is not complete. Put them on the roster here by hand, then run it again:',
+      '  Kai Sample (#5)',
+      '  Sam Example (#4)',
+    ]);
   });
 
   it('says where it stopped and why', () => {

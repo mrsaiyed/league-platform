@@ -387,10 +387,11 @@ describe('the tracker transfer (step 2.58)', () => {
     expect(dry.planText).toContain('10 games to transfer, 0 already here, 1 not transferred');
     expect(dry.planText).toContain('Jo Testing (#6): on the roster already');
     expect(dry.planText).toContain(
-      'Sam Example (#4): in the league’s list as Sam Example but on no team: to be put on the roster, number 4',
+      'Sam Example (#4): in the league’s list as Sam Example but on no team: taken to be them (the same full name) and put on the roster, number 4',
     );
     expect(dry.planText).toContain('Kai Sample (#5): to be added as Kai Sample, number 5');
     expect(dry.report).toBeNull();
+    expect(dry.plan.notBroughtOver).toEqual([]);
     expect(await fingerprint(pglite, league.leagueId)).toEqual(start);
 
     // The real run.
@@ -570,6 +571,25 @@ describe('the tracker transfer (step 2.58)', () => {
 
     // Nothing in the other league changed.
     expect(await fingerprint(pglite, bystander.leagueId)).toEqual(untouched);
+  });
+
+  it('refuses another league’s admin before showing any plan, and changes nothing', async () => {
+    const theirs = await makeLeague(pglite, 'made-up-their-league');
+    const ours = await makeLeague(pglite, 'made-up-not-yours');
+    const before = await fingerprint(pglite, ours.leagueId);
+    const theirsBefore = await fingerprint(pglite, theirs.leagueId);
+    for (const dryRun of [true, false]) {
+      // Their admin names our league: refused, dry run or not, with no plan to show.
+      const outcome = await transferTrackerGames(
+        optionsFor(theirs, 'made-up-not-yours', { dryRun }),
+      );
+      expect(outcome).toEqual({ ok: false, problem: { kind: 'not-allowed' } });
+    }
+    expect(await fingerprint(pglite, ours.leagueId)).toEqual(before);
+    expect(await fingerprint(pglite, theirs.leagueId)).toEqual(theirsBefore);
+    // Our own admin may run it.
+    const ok = await transferTrackerGames(optionsFor(ours, 'made-up-not-yours', { dryRun: true }));
+    expect(ok.ok).toBe(true);
   });
 
   it('says so when the league, the season or the account is not there', async () => {

@@ -12,6 +12,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import {
   eventHandlers,
+  mayTransferTrackerGames,
   planTrackerTransfer,
   rulesOfGame,
   runTrackerTransfer,
@@ -76,7 +77,12 @@ export type TransferSetupProblem =
   | { readonly kind: 'league-not-found' }
   | { readonly kind: 'season-not-found' }
   | { readonly kind: 'several-seasons' }
-  | { readonly kind: 'account-not-found' };
+  | { readonly kind: 'account-not-found' }
+  /**
+   * The account may not run the transfer in this league: it is not its owner or an admin
+   * for the whole league (another league's admin included), or the league is read-only.
+   */
+  | { readonly kind: 'not-allowed' };
 
 export type TransferOutcome =
   | { readonly ok: false; readonly problem: TransferSetupProblem }
@@ -194,7 +200,10 @@ async function readsOf(
   };
 }
 
-/** Finds the league, season and account, plans the transfer and, unless a dry run, runs it. */
+/**
+ * Finds the league, season and account, checks the account may run the transfer there,
+ * plans it and, unless a dry run, runs it.
+ */
 export async function transferTrackerGames(
   options: TransferTrackerGamesOptions,
 ): Promise<TransferOutcome> {
@@ -223,7 +232,6 @@ export async function transferTrackerGames(
   ).rows[0];
   if (account === undefined) return { ok: false, problem: { kind: 'account-not-found' } };
 
-  const backup = await readTrackerBackup(options.backupFolder, { workDir: options.workDir });
   const clock = options.clock ?? systemClock;
   const db = createDatabase({ kind: 'pglite', pglite });
   try {
@@ -232,6 +240,16 @@ export async function transferTrackerGames(
       accountId: account.id,
       requestId: 'tracker-transfer',
     };
+    // Checked before the backup is read or a plan worked out: an account that may not
+    // run it is shown nothing of the league or the backup, dry run or not.
+    const allowed = await withTransaction(
+      db,
+      { leagueId: league.id, accountId: account.id },
+      (scope) =>
+        mayTransferTrackerGames(context, { jobs: jobsStore(scope), access: accessStore(scope) }),
+    );
+    if (!allowed) return { ok: false, problem: { kind: 'not-allowed' } };
+    const backup = await readTrackerBackup(options.backupFolder, { workDir: options.workDir });
     const reads = await readsOf(db, context, season.id, league.time_zone);
     const planOptions = { withOpponents: options.withOpponents, now: clock.now() };
     const plan = await planTrackerTransfer(backup, reads, planOptions);

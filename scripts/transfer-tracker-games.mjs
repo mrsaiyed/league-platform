@@ -84,4 +84,8 @@ if (outcome.report === null) {
   for (const line of describeTransferReport(said, outcome.report)) console.log(line);
 }
 console.log(words.databaseLine(path.resolve(databaseFolder)));
-process.exit(outcome.report?.stopped == null && outcome.plan.ready ? 0 : 1);
+// Not done unless nothing was blocked, the run went through, and every one of the tracked
+// team's players was brought over (the plan and the report warn about any left out).
+const complete =
+  outcome.report?.stopped == null && outcome.plan.ready && outcome.plan.notBroughtOver.length === 0;
+process.exit(complete ? 0 : 1);

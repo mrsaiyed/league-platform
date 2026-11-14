@@ -180,6 +180,29 @@ describe('the transfer plan', () => {
     });
   });
 
+  it('lists the tracked team’s players it cannot bring over, even when no game names them', async () => {
+    // One the tracker knows only by number, and one with a single name: neither plays.
+    const numberOnly = player(randomUUID(), 'owls', '', '12');
+    const oneName = player(randomUUID(), 'owls', 'Prince', '13');
+    const backup = {
+      ...data([trackerGame(1, played())]),
+      players: [sam, kai, fox, numberOnly, oneName],
+    };
+    const plan = await planTrackerTransfer(backup, readsOf(), options);
+    // The games go through, but the plan says who is not brought over.
+    expect(plan.ready).toBe(true);
+    expect(plan.games.map((g) => g.outcome.kind)).toEqual(['transfer']);
+    expect([...plan.notBroughtOver].sort()).toEqual(
+      [numberOnly.id.toLowerCase(), oneName.id.toLowerCase()].sort(),
+    );
+    const nothingLeft = await planTrackerTransfer(
+      data([trackerGame(1, played())]),
+      readsOf(),
+      options,
+    );
+    expect(nothingLeft.notBroughtOver).toEqual([]);
+  });
+
   it('blocks the run on a final game it cannot find here, but skips one not ended', async () => {
     const lost = trackerGame(3, played(), { sourceRef: null });
     const live = trackerGame(4, played().slice(0, 4), { sourceRef: null });

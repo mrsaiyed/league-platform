@@ -46,6 +46,10 @@ export {
 } from './record-imported-scores.ts';
 export { startFixtureImport, type StartFixtureImportError } from './start-fixture-import.ts';
 export {
+  mayTransferTrackerGames,
+  trackerTransferPermissions,
+} from './may-transfer-tracker-games.ts';
+export {
   planTrackerTransfer,
   type GameOutcome,
   type GameProblem,

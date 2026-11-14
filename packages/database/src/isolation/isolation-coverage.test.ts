@@ -124,7 +124,7 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.TrackerBackupError, 'the reader error class; runs nothing'],
   [
     databasePackage.transferTrackerGames,
-    'development tool (step 2.58): takes a PGlite, not a scope; finds one league, season and account by name, then reads and writes only through scoped stores and commands (own cases) of that league',
+    'development tool (step 2.58): takes a PGlite, not a scope; finds one league, season and account by name, then reaches that one league only through stores fenced to it (each transaction sets its league) and its commands (own cases)',
   ],
   [
     databasePackage.transferTrackerGamesInFolder,

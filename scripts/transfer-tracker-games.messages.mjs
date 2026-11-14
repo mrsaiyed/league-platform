@@ -29,6 +29,8 @@ export const setupProblems = {
   'season-not-found': 'The league has no season with that short name or name.',
   'several-seasons': 'More than one season has that name. Give its short name instead.',
   'account-not-found': 'There is no account with that email in this database.',
+  'not-allowed':
+    'That account may not run the transfer in this league: it must be the league’s owner or an admin for the whole league, and the league must not be archived or suspended. Nothing was read or changed.',
 };
 
 export const backupProblems = {

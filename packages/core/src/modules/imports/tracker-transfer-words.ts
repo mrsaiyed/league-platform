@@ -13,6 +13,12 @@ import type { TrackerData, TrackerGame } from './tracker-transfer-data.ts';
 export const transferReopenReason =
   'Reopened in the old tracker after it ended; brought over with the transfer.';
 
+/**
+ * Why the door would refuse an action naming a player on the other side, as the plan
+ * reports it before anything is sent.
+ */
+export const wrongSideRefusal = 'That player is not on this team.';
+
 type Words = {
   readonly data: TrackerData;
   readonly timeZone: string;
@@ -195,7 +201,7 @@ function personWords(match: PlayerMatch): string {
       const number = match.jerseyNumber === null ? ', no number' : `, number ${match.jerseyNumber}`;
       return match.personId === null
         ? `to be added as ${match.firstName} ${match.lastName}${number}`
-        : `in the league’s list as ${match.firstName} ${match.lastName} but on no team: to be put on the roster${number}`;
+        : `in the league’s list as ${match.firstName} ${match.lastName} but on no team: taken to be them (the same full name) and put on the roster${number}`;
     }
     case 'problem':
       switch (match.reason) {
@@ -257,7 +263,17 @@ export function describeTransferPlan(words: Words, plan: TransferPlan): string[]
   lines.push(
     `${plural(count('transfer'), 'game', 'games')} to transfer, ${count('already')} already here, ${count('skip')} not transferred, ${plural(count('blocked'), 'game', 'games')} with a problem.`,
   );
+  lines.push(...notBroughtOverLines(words, plan.notBroughtOver));
   return lines;
+}
+
+/** The tracked team's players not brought over, as a warning, or nothing. */
+function notBroughtOverLines(words: Words, ids: readonly string[]): string[] {
+  if (ids.length === 0) return [];
+  return [
+    `Warning: ${ids.length === 1 ? 'one of the tracked team’s players is' : `${ids.length} of the tracked team’s players are`} not brought over (the Players list says why), so the transfer is not complete. Put them on the roster here by hand, then run it again:`,
+    ...ids.map((id) => `  ${playerName(words, id)}`),
+  ];
 }
 
 function stopLines(words: Words, stop: TransferStop): string[] {
@@ -322,5 +338,6 @@ export function describeTransferReport(words: Words, report: TransferReport): st
       ? `Nothing to change: every one of ${plural(games, 'game', 'games')} was already here, and every box score line matches.`
       : `Done: every box score line of ${plural(games, 'game', 'games')} matches the tracker’s.`,
   );
+  lines.push(...notBroughtOverLines(words, report.notBroughtOver));
   return lines;
 }

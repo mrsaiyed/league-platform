@@ -17,9 +17,15 @@
 // The run starts only when no game is blocked, so a problem known beforehand never
 // leaves the season half-transferred.
 //
-// The other team's players are not brought in unless asked for (`withOpponents`): the
-// step brings in the tracked team's players. A game whose actions name an opponent's
-// player who is not already on that team's roster here is blocked until they are.
+// The other team's players are not brought in unless asked for (`withOpponents`, F-12):
+// the step brings in the tracked team's players, whether or not the tracker still lists
+// them as active, and none is given a leaving date (F-15). A game whose actions name an
+// opponent's player who is not already on that team's roster here is blocked until they
+// are. So is a game that names a player who cannot be added (no name, or one word: a
+// person needs a first and a last name), until they are put on the roster by hand
+// (F-13); and a game here that already has a result entered by hand or imported, until
+// it is reopened here (F-14). The tracked team's players who cannot be added are listed
+// (`notBroughtOver`) even when no game names them.
 //
 // The roster is read as the door for the tracker reads it, so nothing the plan lets
 // through is refused part-way through a game: only player and captain entries count, an
@@ -56,6 +62,7 @@ import type {
   TrackerPlayer,
   TrackerTransferReads,
 } from './tracker-transfer-data.ts';
+import { wrongSideRefusal } from './tracker-transfer-words.ts';
 
 export type GameFormat = Replay['format'];
 
@@ -125,6 +132,13 @@ export type TransferPlan = {
   /** The players found here or to be added, by tracker player id in lower case. */
   readonly people: ReadonlyMap<string, PlannedPerson>;
   readonly games: readonly PlannedGame[];
+  /**
+   * The tracked team's players (tracker ids in lower case) who will not be brought over:
+   * found on no roster here and they cannot be added as they are (`people` says why).
+   * A game that names one is blocked; one no game names does not stop the run, but the
+   * transfer is not complete until they are put on the roster by hand.
+   */
+  readonly notBroughtOver: readonly string[];
   /** True when the run may start: nothing is blocked. */
   readonly ready: boolean;
 };
@@ -292,7 +306,7 @@ function sideProblem(
     const teamId = sides[input.side];
     const wrong = playersOf(input).some((id) => people.get(lower(id))?.teamId !== teamId);
     if (wrong) {
-      return { kind: 'refused', seq: step.seq, message: 'That player is not on this team.' };
+      return { kind: 'refused', seq: step.seq, message: wrongSideRefusal };
     }
   }
   return undefined;
@@ -303,6 +317,8 @@ function sideProblem(
  * the one an earlier run added just before it was cut off, so a rerun puts them on the
  * team rather than adding them twice. Only the whole first and last name is theirs, and
  * each listed person goes to one player only, in the plan's order; anyone over is added.
+ * Someone the league added by hand with the same full name and put on no team is taken
+ * to be the player too (F-16, decided for the founder): the dry run says so for each.
  */
 async function findListedPeople(
   people: Map<string, PlannedPerson>,
@@ -385,6 +401,7 @@ export async function planTrackerTransfer(
     teams,
     people: new Map(),
     games: [],
+    notBroughtOver: [],
     ready: false,
   });
   if (trackedTeam === undefined) return nothing('no-tracked-team');
@@ -491,12 +508,16 @@ export async function planTrackerTransfer(
     return { game, match, outcome };
   });
 
+  const notBroughtOver = [...people]
+    .filter(([, person]) => person.tracked && person.match.kind === 'problem')
+    .map(([id]) => id);
   return {
     problem: null,
     trackedTeamId: trackedMatch.teamId,
     teams,
     people,
     games,
+    notBroughtOver,
     ready: games.every((planned) => planned.outcome.kind !== 'blocked'),
   };
 }
