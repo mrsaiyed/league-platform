@@ -45,7 +45,6 @@ function RosterTable({
               <td>{row.number}</td>
               <th scope="row" dir="auto">
                 {row.name}
-                {row.leftText === null ? null : <> ({row.leftText})</>}
               </th>
               <td>{row.role}</td>
             </tr>
@@ -155,10 +154,7 @@ export async function TeamPage({
     <main>
       <h1 dir="auto">{head.team.name}</h1>
       <p>
-        {head.seedText}. {t('team.recordLine', { record: head.recordText })}
-        {head.team.divisionName === null
-          ? null
-          : `. ${t('team.divisionLine', { name: head.team.divisionName })}`}
+        {head.headline}
       </p>
       <p>{season.name}</p>
       <nav>
@@ -172,6 +168,7 @@ export async function TeamPage({
           <form action={clearMyTeamAction}>
             <input type="hidden" name="league" value={addressee.slug} />
             <input type="hidden" name="team" value={head.team.slug} />
+            {season.isCurrent ? null : <input type="hidden" name="season" value={season.slug} />}
             <p>{t('team.isMine')}</p>
             <button type="submit">{t('team.clearMine')}</button>
           </form>
@@ -179,6 +176,7 @@ export async function TeamPage({
           <form action={chooseMyTeamAction}>
             <input type="hidden" name="league" value={addressee.slug} />
             <input type="hidden" name="team" value={head.team.slug} />
+            {season.isCurrent ? null : <input type="hidden" name="season" value={season.slug} />}
             <button type="submit">{t('team.makeMine')}</button>
             <p>{t('team.mineNote')}</p>
           </form>

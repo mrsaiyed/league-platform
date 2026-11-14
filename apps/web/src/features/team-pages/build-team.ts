@@ -72,7 +72,6 @@ export type RosterRowView = {
   readonly name: string;
   readonly role: string;
   readonly former: boolean;
-  readonly leftText: string | null;
 };
 
 const roles = ['player', 'captain', 'coach'] as const;
@@ -86,15 +85,19 @@ function dayText(day: string): string {
   }).format(new Date(`${day}T12:00:00Z`));
 }
 
+function nameText(line: PublicRosterLine): string {
+  const name = line.name.shown ? line.name.text : t('team.nameNotShown');
+  return line.leftOn === null ? name : t('team.nameLeft', { name, date: dayText(line.leftOn) });
+}
+
 export function rosterRow(line: PublicRosterLine): RosterRowView {
   const known = roles.find((r) => r === line.role);
   return {
     key: line.entryId,
     number: line.jerseyNumber ?? '',
-    name: line.name.shown ? line.name.text : t('team.nameNotShown'),
+    name: nameText(line),
     role: known === undefined ? t('team.role.player') : t(`team.role.${known}`),
     former: line.former,
-    leftText: line.leftOn === null ? null : t('team.leftOn', { date: dayText(line.leftOn) }),
   };
 }
 
@@ -188,8 +191,9 @@ export async function loadTeamStats(
   const players = playerLinesShown
     ? table.value.players.filter((p) => p.teamIds.includes(input.teamId))
     : [];
-  const playerRows: StatRow[] = players.map((player) => ({
-    id: player.personId,
+  // An opaque row key: a person's id does not go into the page.
+  const playerRows: StatRow[] = players.map((player, index) => ({
+    id: `player-${index}`,
     cells: {
       player: player.name.text ?? t('stats.unnamedPlayer'),
       games: player.gamesPlayed,
@@ -240,6 +244,8 @@ export type TeamPageData = {
   readonly teamId: string;
   readonly seedText: string;
   readonly recordText: string;
+  /** The line under the team's name, whole: seed, record and, if it has one, division. */
+  readonly headline: string;
   readonly statsShown: 'player_lines' | 'team_totals';
 };
 
@@ -273,6 +279,8 @@ export async function loadTeamHead(
     },
     publicViewer(leagueId),
   );
+  const seedText =
+    record.seed === null ? t('team.noSeed') : t('team.seedLine', { seed: record.seed });
   return {
     team: {
       slug: row.slug,
@@ -281,8 +289,16 @@ export async function loadTeamHead(
       divisionName: division?.name ?? null,
     },
     teamId: row.id,
-    seedText: record.seed === null ? t('team.noSeed') : t('team.seedLine', { seed: record.seed }),
+    seedText,
     recordText: recordText(record),
+    headline:
+      division === undefined
+        ? t('team.headline', { seed: seedText, record: recordText(record) })
+        : t('team.headlineDivision', {
+            seed: seedText,
+            record: recordText(record),
+            name: division.name,
+          }),
     statsShown: shown.statsShown,
   };
 }

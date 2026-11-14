@@ -70,7 +70,7 @@ describe('a team page', () => {
     expect(roster.current.map((r) => r.name)).toContain('Name not shown');
     expect(roster.current.some((r) => r.name.includes('Fontaine'))).toBe(false);
     expect(roster.former.map((r) => r.name.startsWith('Pat'))).toEqual([true]);
-    expect(roster.former[0]?.leftText).toContain('left');
+    expect(roster.former[0]?.name).toContain('(left ');
   });
 
   it('is not there for a team of another season', async () => {
