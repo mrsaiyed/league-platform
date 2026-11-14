@@ -14,7 +14,9 @@
 // - When another device takes over (the renewal says so, or the server refuses taps
 //   because this session no longer holds the game), the device turns read-only, says
 //   why, and lists the taps it had not sent as not saved (T6 §5). They are never sent
-//   under another session: taking the game back drops them, as they were shown.
+//   under another session: each tap is stored with the session it was made under, and
+//   one made under another session is dropped whenever this device is given a session
+//   (taking the game back, or opening after a reload), and listed as not saved.
 // - Offline nothing changes for the scorekeeper: taps are applied and stored, and the
 //   queue sends them when the network is back (`online`).
 import {
@@ -199,8 +201,6 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   } = options;
 
   let sessionId: string | null = null;
-  /** The session this device held last, so opening again can tell whether it carries on. */
-  let lastSessionId: string | null = null;
   /** Server time less device time, from the latest session reply (T-121, record 036). */
   let offsetMs = 0;
   let base: ServerState | null = null;
@@ -419,30 +419,46 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   /** Holding the session: load the game and score. */
   const scoreWith = async (held: string): Promise<void> => {
     sessionId = held;
-    lastSessionId = held;
     resumedAfterNotHeld = 0;
     scheduleRenew();
     const loading = async (): Promise<void> => {
       if (!(await load())) return later(loading);
       failures = 0;
       if (sessionId === null) return;
-      update({ mode: { kind: 'scoring' }, notSaved: [] });
+      update({ mode: { kind: 'scoring' } });
       queue.resume();
     };
     await loading();
   };
 
-  /** Opens the game; `keep` says which session's waiting taps may still be sent. */
-  const open = async (keep: (sessionId: string) => boolean): Promise<void> => {
+  /**
+   * The server gave this device the session `held`. A waiting tap made under another
+   * session was made when that one lost the game (or a closed tab's session did since):
+   * it is never sent under this one (T6 §5, record 049). It is dropped from the queue
+   * and listed as not saved, so it can be entered again. Every other waiting tap goes.
+   */
+  const hold = async (held: string): Promise<void> => {
+    const waiting = (await storage.list(gameId)).filter((entry) => entry.state === 'waiting');
+    const lost = waiting
+      .filter((entry) => entry.sessionId !== undefined && entry.sessionId !== held)
+      .map((entry) => entry.command);
+    if (lost.length > 0) await queue.forget(lost.map((c) => c.commandId));
+    const dropped = new Set(lost.map((c) => c.commandId));
+    made = made.filter((c) => !dropped.has(c.commandId));
+    update({ notSaved: lost });
+    return scoreWith(held);
+  };
+
+  /** Opens the game: asks for the session, and scores if it is given. */
+  const open = async (): Promise<void> => {
     update({ mode: { kind: 'opening' } });
     const opened = await session({ type: 'open', deviceId });
-    if (opened.kind === 'unanswered') return later(() => open(keep));
+    if (opened.kind === 'unanswered') return later(open);
     failures = 0;
     if (opened.kind === 'rejected') return readOnly(reasonOfStatus(opened.httpStatus));
     const reply = opened.value;
     if (reply.status !== 'held-by-you') return notHeld(reply);
-    if (!keep(reply.sessionId)) await forgetNotSaved();
-    return scoreWith(reply.sessionId);
+    return hold(reply.sessionId);
   };
 
   const renew = async (): Promise<void> => {
@@ -477,13 +493,13 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     queue.resume();
   };
 
-  /** Drops the taps that were listed as not saved: they are never sent under another session. */
+  /** Drops the taps listed as not saved: the scorekeeper has seen them. */
   const forgetNotSaved = async (): Promise<void> => {
-    const ids = (await waitingTaps()).map((c) => c.commandId);
+    const ids = current.notSaved.map((c) => c.commandId);
     if (ids.length > 0) await queue.forget(ids);
     const dropped = new Set(ids);
     made = made.filter((c) => !dropped.has(c.commandId));
-    update({ notSaved: [] });
+    update({ notSaved: current.notSaved.filter((c) => !dropped.has(c.commandId)) });
   };
 
   queue.subscribe((status) => {
@@ -516,10 +532,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     async start() {
       if (stopped) return;
       await queue.start();
-      // Taps a closed tab left waiting go out under this device's session (T-114).
+      // Taps a closed tab left waiting go out if the session they were made under is
+      // still this device's (T-114, T-248); otherwise they are listed as not saved.
       made = await waitingTaps();
       for (const r of queue.status().refused) refusedIds.add(r.command.commandId);
-      await track(open(() => true));
+      await track(open());
     },
 
     tap(input) {
@@ -576,16 +593,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         await track(notHeld(reply));
         return { ok: true };
       }
-      // Made under a session that lost the game, and listed as not saved: never sent.
-      await track(forgetNotSaved());
-      await track(scoreWith(reply.sessionId));
+      // What was made under the session that lost the game is never sent under this one.
+      await track(hold(reply.sessionId));
       return { ok: true };
     },
 
     async openAgain() {
       if (current.mode.kind !== 'read-only') return;
-      const before = lastSessionId;
-      await track(open((held) => held === before));
+      await track(open());
     },
 
     online() {
@@ -606,7 +621,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     },
 
     async dismissNotSaved() {
-      if (current.mode.kind === 'scoring') return;
+      // Safe while scoring too: a tap listed as not saved is never one still to send.
       await track(forgetNotSaved());
     },
 

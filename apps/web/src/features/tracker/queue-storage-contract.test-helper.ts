@@ -79,6 +79,20 @@ export function queueStorageContract(name: string, make: () => Promise<QueueStor
       expect(ids(await storage.list(other))).toEqual([commandId(2_000)]);
     });
 
+    it('keeps the session a tap was made under, refused or not', async () => {
+      const storage = await make();
+      const session = '00000000-0000-4000-8000-0000000000c1';
+      await storage.add(game, { protocolVersion: 1, command: tap(1), sessionId: session });
+      await storage.add(game, { protocolVersion: 1, command: tap(2), sessionId: session });
+      await storage.add(game, { protocolVersion: 1, command: tap(3) });
+      const refusal = { code: 'rule', message: 'Player is not on the court.' } as const;
+      await storage.settle(game, { refuse: [{ commandId: commandId(2), refusal }] });
+      const list = await storage.list(game);
+      expect(list.map((e) => e.sessionId)).toEqual([session, session, undefined]);
+      expect(list[1]).toMatchObject({ state: 'refused', refusal });
+      expect('sessionId' in (list[2] ?? {})).toBe(false);
+    });
+
     it('settles only the game it is told', async () => {
       const storage = await make();
       await storage.add(other, { protocolVersion: 1, command: tap(5) });

@@ -17,13 +17,16 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
   let held: QueuedCommand[] = [];
 
   return {
-    async add(gameId, { protocolVersion, command }) {
+    async add(gameId, { protocolVersion, command, sessionId }) {
       const known = held.find((entry) => entry.command.commandId === command.commandId);
       if (known !== undefined) {
         if (known.gameId !== gameId) throw new QueueError('command-id-in-other-game');
         return 'held';
       }
-      held.push(structuredClone({ gameId, protocolVersion, command, state: 'waiting' }));
+      const madeUnder = sessionId === undefined ? {} : { sessionId };
+      held.push(
+        structuredClone({ gameId, protocolVersion, command, ...madeUnder, state: 'waiting' }),
+      );
       return 'added';
     },
     async list(gameId) {
@@ -37,8 +40,8 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
         if (dropped.has(entry.command.commandId)) return [];
         const refusal = refusals.get(entry.command.commandId);
         if (refusal === undefined) return [entry];
-        const { protocolVersion, command } = entry;
-        return [structuredClone({ gameId, protocolVersion, command, state: 'refused', refusal })];
+        const { state: _state, ...kept } = entry;
+        return [structuredClone({ ...kept, state: 'refused', refusal })];
       });
     },
     all: () => structuredClone(held),

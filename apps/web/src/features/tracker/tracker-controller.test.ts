@@ -333,6 +333,82 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
   });
 
+  it('never sends the taps it listed as not saved, even after the page is reloaded', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const tablet = device(network, { storage });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, [...tipOff, basket('home', hawks[1] ?? '')]);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet.controller, [basket('home', hawks[2] ?? '')]);
+    network.mode = 'up';
+
+    // The laptop takes over, scores, and leaves: the game is free again.
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    await tapAll(laptop.controller, [basket('home', hawks[2] ?? '')]);
+    await laptop.controller.idle();
+    await laptop.controller.leave();
+
+    tablet.controller.online();
+    await tablet.controller.idle();
+    // Its session ended when the laptop took over ("released" now that nobody holds it).
+    expect(tablet.controller.status().mode).toMatchObject({ kind: 'read-only' });
+    expect(tablet.controller.status().notSaved).toHaveLength(1);
+    await tablet.controller.leave();
+
+    // The page is reloaded before the taps were dismissed: it opens into a new session.
+    const reloaded = device(network, { storage });
+    await reloaded.controller.start();
+    await reloaded.controller.idle();
+    expect(reloaded.controller.status().mode).toEqual({ kind: 'scoring' });
+    // Still listed, so they can be entered again; never sent.
+    expect(reloaded.controller.status().notSaved.map((c) => c.input)).toEqual([
+      basket('home', hawks[2] ?? ''),
+    ]);
+    expect(reloaded.controller.status().queue.waiting).toBe(0);
+    expect(scoreOf(reloaded.controller.status().game)).toEqual({ home: 4, away: 0 });
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 4, away: 0 });
+    await reloaded.controller.dismissNotSaved();
+    expect(reloaded.controller.status().notSaved).toEqual([]);
+    expect(await storage.list(gameId)).toEqual([]);
+  });
+
+  it('never sends taps a closed tab left waiting once another device has had the game', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const tablet = device(network, { storage });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet.controller, [basket('away', bears[0] ?? '', 3)]);
+    await tablet.controller.leave();
+    network.mode = 'up';
+
+    // While the tab is closed, the laptop takes the game, enters the basket, and leaves.
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    await tapAll(laptop.controller, [basket('away', bears[0] ?? '', 3)]);
+    await laptop.controller.idle();
+    await laptop.controller.leave();
+
+    const reopened = device(network, { storage });
+    await reopened.controller.start();
+    await reopened.controller.idle();
+    expect(reopened.controller.status().mode).toEqual({ kind: 'scoring' });
+    expect(reopened.controller.status().notSaved).toHaveLength(1);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 3 });
+    expect(scoreOf(reopened.controller.status().game)).toEqual({ home: 0, away: 3 });
+  });
+
   it('releases the game on leaving when nothing is waiting', async () => {
     const network = endpointNetwork();
     const tablet = device(network);
