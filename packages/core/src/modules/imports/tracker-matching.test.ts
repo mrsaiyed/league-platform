@@ -159,6 +159,8 @@ describe('matching tracker players', () => {
     lastName,
     publicName,
     jerseyNumber,
+    role: 'player',
+    joinedOn: null,
     leftOn: null,
   });
 

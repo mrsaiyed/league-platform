@@ -20,20 +20,28 @@
 // The other team's players are not brought in unless asked for (`withOpponents`): the
 // step brings in the tracked team's players. A game whose actions name an opponent's
 // player who is not already on that team's roster here is blocked until they are.
+//
+// The roster is read as the door for the tracker reads it, so nothing the plan lets
+// through is refused part-way through a game: only player and captain entries count, an
+// action's players must be on the roster of its side's team, and a player's number is
+// the one on the entry they had on the game's day.
 import type { SeasonRules } from '@srleagues/contracts';
 import { engineRulesOf } from '../games/index.ts';
 import { compareLines, type ComparableLine, type LineDifference } from './tracker-lines.ts';
 import {
+  localDateOf,
   matchTrackerGame,
   matchTrackerPlayers,
   matchTrackerTeams,
   nameKey,
+  playingRoles,
   type GameMatch,
   type PlayerMatch,
   type TeamMatch,
 } from './tracker-matching.ts';
 import {
   playersNamed,
+  playersOf,
   readReplay,
   replaySteps,
   simulateReplay,
@@ -231,9 +239,57 @@ export const isToAdd = (person: PlannedPerson, options: Pick<PlanOptions, 'withO
 const willBeHere = (person: PlannedPerson, options: Pick<PlanOptions, 'withOpponents'>) =>
   person.match.kind === 'on-roster' || isToAdd(person, options);
 
-/** The person a planned player is or will be: their roster number here. */
-const jerseyOfMatch = (match: PlayerMatch | undefined) =>
-  match?.kind === 'on-roster' || match?.kind === 'add' ? match.jerseyNumber : null;
+/** Whether a roster entry is on the team on a day (YYYY-MM-DD), as list-game-players reads it. */
+const isOnTeamOn = (entry: RosterPersonFact, day: string) =>
+  (entry.joinedOn === null || entry.joinedOn <= day) &&
+  (entry.leftOn === null || day < entry.leftOn);
+
+/**
+ * A planned player's number in a game played on `day`, as the door for the tracker gives
+ * it: of the person's player or captain entries on the team, the one on the team that
+ * day, else the one with no leaving date, else the first to leave, which is the order
+ * games.apply_tracker_commands reads a roster in (list-game-players, rosterOf). One to
+ * be added has the number they are added with.
+ */
+function numberOnDay(
+  person: PlannedPerson | undefined,
+  roster: readonly RosterPersonFact[],
+  day: string,
+): string | null {
+  const match = person?.match;
+  if (match?.kind === 'add') return match.jerseyNumber;
+  if (match?.kind !== 'on-roster') return null;
+  const entries = roster.filter(
+    (entry) => lower(entry.personId) === lower(match.personId) && playingRoles.has(entry.role),
+  );
+  const rank = (entry: RosterPersonFact) => (isOnTeamOn(entry, day) ? 0 : 1);
+  const leaving = (entry: RosterPersonFact) => entry.leftOn ?? '';
+  const [first] = [...entries].sort(
+    (a, b) => rank(a) - rank(b) || leaving(a).localeCompare(leaving(b)),
+  );
+  return first?.jerseyNumber ?? null;
+}
+
+/**
+ * The first action the door would refuse because it names a player on the other side:
+ * it takes a player only on the roster of the team the action's side is (playerProblem).
+ */
+function sideProblem(
+  replay: Replay,
+  people: ReadonlyMap<string, PlannedPerson>,
+  sides: { readonly home: string; readonly away: string },
+): GameProblem | undefined {
+  for (const step of replaySteps(replay)) {
+    const input = step.input;
+    if (!('side' in input)) continue;
+    const teamId = sides[input.side];
+    const wrong = playersOf(input).some((id) => people.get(lower(id))?.teamId !== teamId);
+    if (wrong) {
+      return { kind: 'refused', seq: step.seq, message: 'That player is not on this team.' };
+    }
+  }
+  return undefined;
+}
 
 /**
  * Each player to be added who is already a person in the league's list, on no roster:
@@ -380,6 +436,14 @@ export async function planTrackerTransfer(
     });
     const missing = [...playersNamed(replay)].filter((id) => !usable(id));
     if (missing.length > 0) return blocked({ kind: 'players-not-here', playerIds: missing });
+    const homeTeam = teams.get(game.homeTeamId);
+    const awayTeam = teams.get(game.awayTeamId);
+    const sides = {
+      home: homeTeam?.kind === 'matched' ? homeTeam.teamId : '',
+      away: awayTeam?.kind === 'matched' ? awayTeam.teamId : '',
+    };
+    const wrongSide = sideProblem(replay, people, sides);
+    if (wrongSide !== undefined) return blocked(wrongSide);
     const simulation = simulateReplay(
       replay,
       engineRulesOf(fact.rules),
@@ -395,18 +459,20 @@ export async function planTrackerTransfer(
         here: simulation.score,
       });
     }
-    const homeTeam = teams.get(game.homeTeamId);
-    const awayTeam = teams.get(game.awayTeamId);
     const teamOf = (trackerTeamId: string) => {
       const found = teams.get(trackerTeamId);
       return found?.kind === 'matched' ? found.teamId : undefined;
     };
-    const lines = simulatedLines(
-      simulation,
-      homeTeam?.kind === 'matched' ? homeTeam.teamId : '',
-      awayTeam?.kind === 'matched' ? awayTeam.teamId : '',
-      (id) => jerseyOfMatch(people.get(id)?.match),
-    );
+    // The game's day here, as the door judges the roster by it: a game with no time yet
+    // is judged by the league's today.
+    const day =
+      reads.games.find((g) => g.id === match.gameId)?.localDate ??
+      localDateOf(new Date(options.now).toISOString(), reads.timeZone) ??
+      '';
+    const lines = simulatedLines(simulation, sides.home, sides.away, (id) => {
+      const person = people.get(id);
+      return numberOnDay(person, rosters.get(person?.teamId ?? '') ?? [], day);
+    });
     const differences = compareLines(game.lines, lines, [], teamOf);
     if (differences.length > 0) return blocked({ kind: 'lines-differ', differences });
     const outcome: GameOutcome = look.already

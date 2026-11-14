@@ -166,6 +166,8 @@ async function readsOf(
           lastName: entry.lastName,
           publicName: entry.publicName,
           jerseyNumber: entry.jerseyNumber,
+          role: entry.role,
+          joinedOn: entry.joinedOn,
           leftOn: entry.leftOn,
         })),
       ),

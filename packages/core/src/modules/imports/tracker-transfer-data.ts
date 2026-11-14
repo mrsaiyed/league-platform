@@ -95,6 +95,10 @@ export type RosterPersonFact = {
   readonly lastName: string;
   readonly publicName: string | null;
   readonly jerseyNumber: string | null;
+  /** player, captain or coach: only a player or a captain is in a game's box score. */
+  readonly role: string;
+  /** The day they joined the team (YYYY-MM-DD), or null when not known. */
+  readonly joinedOn: string | null;
   /** The day they left the team (YYYY-MM-DD), or null while they are on it. */
   readonly leftOn: string | null;
 };
@@ -127,7 +131,7 @@ export type TrackerTransferReads = {
   readonly timeZone: string;
   readonly teams: readonly SeasonTeamFact[];
   readonly games: readonly SeasonGameFact[];
-  /** The roster of a team of the season, those who have left included. */
+  /** The roster of a team of the season, one fact per entry, those who have left included. */
   readonly roster: (teamId: string) => Promise<readonly RosterPersonFact[]>;
   /** A game's standing, with which of these command ids it has taken. */
   readonly game: (

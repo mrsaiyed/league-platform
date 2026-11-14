@@ -166,6 +166,8 @@ export type PlayerMatch =
         | 'one-name'
         | 'several-on-roster'
         | 'same-person'
+        /** On the team here, but only as a coach: a game takes players and captains. */
+        | 'not-a-player'
         /** Someone on the team here wears the number, and the season wants unique ones. */
         | 'number-taken'
         /** Not a number a roster holds: 0 to 99, or 00. */
@@ -173,6 +175,13 @@ export type PlayerMatch =
     };
 
 const jerseyOf = (player: TrackerPlayer) => (player.jersey === '' ? null : player.jersey);
+
+/** The roles a game's box score takes, as the door for the tracker reads a roster. */
+export const playingRoles: ReadonlySet<string> = new Set(['player', 'captain']);
+
+/** Whether the person has an entry on the roster a game takes: as a player or a captain. */
+const isPlayerHere = (roster: readonly RosterPersonFact[], personId: string) =>
+  roster.some((entry) => entry.personId === personId && playingRoles.has(entry.role));
 
 /** A number a roster entry may hold (0008): 0 to 99, or 00. */
 export const isRosterNumber = (jersey: string) => /^(0|00|[1-9][0-9]?)$/u.test(jersey);
@@ -209,6 +218,8 @@ export function matchTrackerPlayers(
     const only = candidates[0];
     if (candidates.length > 1) {
       matches.set(player.id, { kind: 'problem', reason: 'several-on-roster' });
+    } else if (only !== undefined && !isPlayerHere(roster, only.personId)) {
+      matches.set(player.id, { kind: 'problem', reason: 'not-a-player' });
     } else if (only !== undefined) {
       matches.set(player.id, {
         kind: 'on-roster',

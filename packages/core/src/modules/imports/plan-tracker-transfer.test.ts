@@ -149,7 +149,17 @@ const rosterEntry = (
   over: Partial<RosterPersonFact> = {},
 ): RosterPersonFact => {
   const [firstName = '', lastName = ''] = name.split(' ');
-  return { personId, firstName, lastName, publicName: null, jerseyNumber, leftOn: null, ...over };
+  return {
+    personId,
+    firstName,
+    lastName,
+    publicName: null,
+    jerseyNumber,
+    role: 'player',
+    joinedOn: null,
+    leftOn: null,
+    ...over,
+  };
 };
 
 const options: PlanOptions = { withOpponents: true, now: start + 100 * 86_400_000 };
@@ -275,6 +285,63 @@ describe('the transfer plan', () => {
       'number-not-allowed',
       'add',
     ]);
+    expect(plan.ready).toBe(false);
+  });
+
+  it('takes the roster as the door does: players only, with the number worn on the game’s day', async () => {
+    const samHere = gameUuid(700);
+    // Sam wore 4 until 10 January, then 14: the game on the 5th has them as 4.
+    const rosters = {
+      [homeId]: [
+        rosterEntry(samHere, 'Sam Example', '14', { joinedOn: '2026-01-10' }),
+        rosterEntry(samHere, 'Sam Example', '4', { leftOn: '2026-01-10' }),
+      ],
+    };
+    const plan = await planTrackerTransfer(
+      data([trackerGame(1, played())]),
+      readsOf({ rosters }),
+      options,
+    );
+    expect(plan.games[0]?.outcome.kind).toBe('transfer');
+    // The same game a week later is played with 14 on, so the tracker's 4 would differ.
+    const later = await planTrackerTransfer(
+      data([trackerGame(1, played())]),
+      readsOf({ rosters, games: [seasonGame(1, { localDate: '2026-01-12' })] }),
+      options,
+    );
+    expect(later.games[0]?.outcome).toMatchObject({
+      kind: 'blocked',
+      problem: { kind: 'lines-differ' },
+    });
+    // On the roster only as a coach, Sam is not a player the door takes.
+    const coach = await planTrackerTransfer(
+      data([trackerGame(1, played())]),
+      readsOf({
+        rosters: { [homeId]: [rosterEntry(samHere, 'Sam Example', null, { role: 'coach' })] },
+      }),
+      options,
+    );
+    expect(coach.people.get(sam.id.toLowerCase())?.match).toEqual({
+      kind: 'problem',
+      reason: 'not-a-player',
+    });
+    expect(coach.games[0]?.outcome).toMatchObject({
+      kind: 'blocked',
+      problem: { kind: 'players-not-here' },
+    });
+  });
+
+  it('blocks a game whose action puts a player on the other side, as the door would refuse it', async () => {
+    const inputs: Input[] = [
+      { type: 'lineup', side: 'home', playerIds: [sam.id] },
+      { type: 'lineup', side: 'away', playerIds: [fox.id, kai.id] },
+      ...played().slice(2),
+    ];
+    const plan = await planTrackerTransfer(data([trackerGame(1, inputs)]), readsOf(), options);
+    expect(plan.games[0]?.outcome).toMatchObject({
+      kind: 'blocked',
+      problem: { kind: 'refused', seq: 2 },
+    });
     expect(plan.ready).toBe(false);
   });
 });

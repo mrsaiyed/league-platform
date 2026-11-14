@@ -203,6 +203,8 @@ function personWords(match: PlayerMatch): string {
           return 'more than one person on the roster here could be them';
         case 'same-person':
           return 'another of the team’s players in the tracker has the same name or person here';
+        case 'not-a-player':
+          return 'on the team here only as a coach; a game takes players and captains, so put them on the roster as a player first';
         case 'number-taken':
           return 'cannot be added: this season asks for unique jersey numbers, and someone on the team here (or another player to be added) has the same number; change one of the numbers first';
         case 'number-not-allowed':

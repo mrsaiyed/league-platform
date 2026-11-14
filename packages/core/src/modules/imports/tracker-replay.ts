@@ -144,7 +144,7 @@ export function readReplay(
 export const replaySteps = (replay: Replay): readonly ReplayStep[] => replay.segments.flat();
 
 /** The ids of the players an action names. */
-function playersOf(input: ReplayInput): readonly string[] {
+export function playersOf(input: ReplayInput): readonly string[] {
   switch (input.type) {
     case 'lineup':
       return input.playerIds;
