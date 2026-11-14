@@ -241,6 +241,7 @@ export const en = {
   'game.playsAsOpened': 'These are the plays up to when you opened this page.',
   'game.newerPlays': 'Show newer plays',
   'game.playLine': '{clock}: {play} ({away} {awayScore}, {home} {homeScore})',
+  'game.playLineNoClock': '{play} ({away} {awayScore}, {home} {homeScore})',
   'stat.points': 'Points',
   'stat.points.short': 'PTS',
   'stat.rebounds': 'Rebounds',

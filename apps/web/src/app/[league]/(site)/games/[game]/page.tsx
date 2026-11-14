@@ -1,6 +1,10 @@
-import { LeagueSitePage, type LeagueRouteProps } from '../../../../../features/shell/index.ts';
+import { GamePage } from '../../../../../features/live-game/index.ts';
 
-export default async function Page({ params }: LeagueRouteProps) {
-  const { league } = await params;
-  return <LeagueSitePage league={league} title="page.game" />;
+export default async function Page({
+  params,
+}: {
+  readonly params: Promise<{ readonly league: string; readonly game: string }>;
+}) {
+  const { league, game } = await params;
+  return <GamePage league={league} game={game} />;
 }
