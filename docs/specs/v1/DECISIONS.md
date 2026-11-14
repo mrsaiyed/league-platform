@@ -45,6 +45,9 @@ Answered by me as lead on November 13, 2026, because you said not to stop for qu
 | U-9  | Short names refused as offensive                       | Our own word list, kept with the product                                                                                                                                                                                                       | The list is data: edit it any time                                    |
 | A-5  | Who may restore something from the bin                 | Whoever may remove a kind of thing may restore it. Admins and the owner restore anything                                                                                                                                                       | A small change (the bin is step 2.76, not built yet)                  |
 | R-15 | Players asking to appear as initials                   | Off until the league switches it on. A person of unknown age counts as a child in youth and mixed leagues                                                                                                                                      | The starting value of a setting                                       |
+| S-25 | Which stats the "full" box score grid asks for         | The standard set (points, 3-pointers, free throws, fouls, minutes) plus rebounds, assists, steals, blocks and turnovers: the stats the stats pages already have words for                                                                      | One list in one file: a small change                                  |
+| S-26 | A team score that differs from its players' points     | Not refused, as the admin may know better than the sheet. The grid warns as they type, before saving, and the score typed is the one saved                                                                                                     | Refusing instead is a small change                                    |
+| S-27 | A box score game saved again as a final score only     | Its old player lines are cleared in the same save, so they no longer count in totals or stat leaders                                                                                                                                           | Keeping them is a small change; lines already cleared are not kept    |
 
 ## Needs your answer
 
@@ -430,6 +433,9 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | S-22 | Who can see players' statistics is a setting, and each team can choose for itself                                                                                           | Agreed          |         |
 | S-23 | A new league starts with players' statistics visible to everyone; a team can make its own more private (the founder, November 13: "yes everyone")                           | Agreed          |         |
 | S-24 | A league starts with teams allowed to choose their own statistics level; the league can switch that off                                                                     | Decided for you |         |
+| S-25 | The "full" statistics level's box score adds rebounds, assists, steals, blocks and turnovers to the standard set                                                            | Decided for you |         |
+| S-26 | A box score whose typed team score differs from its players' points is saved as typed, with a warning before saving                                                         | Decided for you |         |
+| S-27 | A box score game saved again as a final score only loses its old player lines, so they no longer count                                                                      | Decided for you |         |
 
 ### [P8 — Notifications](product/P8-notifications.md)
 
