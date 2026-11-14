@@ -51,8 +51,8 @@ function RosterTable({
             {rows.map((row) => (
               <tr key={row.key}>
                 <td className="ui-num">{row.number}</td>
-                <th scope="row" className="ui-team-cell" dir="auto">
-                  {row.name}
+                <th scope="row" className="ui-team-cell">
+                  <span dir="auto">{row.name}</span>
                 </th>
                 <td className="ui-fit">{row.role}</td>
               </tr>
@@ -207,12 +207,9 @@ export async function TeamPage({
           )
         ) : null}
       </PageHead>
+      {/* The games come first in the page and sit first on the screen, at every width, so
+          the keyboard goes through the page in the order it is read. */}
       <div className="team-layout">
-        <div className="team-roster">
-          <Section title={t('team.roster')}>
-            <RosterSections roster={roster} />
-          </Section>
-        </div>
         <div className="team-games">
           <Section title={t('team.schedule')}>
             {games.upcoming.length === 0 ? (
@@ -233,6 +230,11 @@ export async function TeamPage({
             ) : (
               <GameList leagueId={addressee.id} games={games.results} />
             )}
+          </Section>
+        </div>
+        <div className="team-roster">
+          <Section title={t('team.roster')}>
+            <RosterSections roster={roster} />
           </Section>
         </div>
       </div>

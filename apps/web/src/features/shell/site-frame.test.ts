@@ -130,11 +130,61 @@ describe('header, menu and footer', () => {
     ).replace(/\/\*[\s\S]*?\*\//g, '');
     const phone = css.slice(0, css.indexOf('@media (min-width: 48rem)'));
     expect(phone).toMatch(/\.site-header \.site-name \{[^}]*font-size: var\(--text-16\);/);
-    expect(phone).toMatch(/\.site-header \.site-name \{[^}]*-webkit-line-clamp: 2;/);
+    // The name's words are in an element of their own inside the link, so the link can be
+    // as tall as a thumb needs while its words are still held to two lines.
+    expect(phone).toMatch(/\.site-header \.site-name > span \{[^}]*-webkit-line-clamp: 2;/);
     expect(phone).toMatch(/\.site-header \.site-sign-in \{\s*display: none;/);
     // No size of its own: the tap height and the scales come from the design's variables.
     for (const raw of ['2.75rem', '0.375rem', '0.3125rem', '1.25rem', 'font-size: 1rem']) {
       expect(css).not.toContain(raw);
+    }
+  });
+
+  it('takes every gap of the frame from the spacing scale, and keeps what a thumb taps 44 high', () => {
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    // The same rule as the shared pieces' stylesheet (packages/ui, page-pieces.test.ts):
+    // every gap, padding, margin and inset is a step of the scale, the page's gutter (itself
+    // a step), a hairline or a share.
+    const step = String.raw`var\(--(?:step-\d|space(?:-tight|-section)?|gutter|tabs-pad)\)`;
+    const plain = String.raw`(?:${step}|0|auto|-?1px|\d+%)`;
+    const sum = String.raw`calc\((?:${step}|-?1px|\d+%|-?\d+|[-+*/ ()])+\)`;
+    const onScale = new RegExp(`^(?:${plain}|${sum})(?: (?:${plain}|${sum}))*$`);
+    const spaces = [
+      ...css.matchAll(
+        /(?:^|[\s;{])((?:row-|column-)?gap|(?:padding|margin|inset)(?:-block|-inline)?(?:-start|-end)?):\s*([^;]+);/g,
+      ),
+    ].map((m) => `${m[1]}: ${(m[2] ?? '').trim().replace(/\s+/g, ' ')}`);
+    expect(spaces.length).toBeGreaterThan(40);
+    expect(spaces.filter((space) => !onScale.test(space.slice(space.indexOf(': ') + 2)))).toEqual(
+      [],
+    );
+    expect(css).toMatch(/--gutter: var\(--step-4\);/);
+    // Everything in the frame that is tapped: the name, sign in and the menu button, the
+    // menu's links on a phone (48) and as tabs, the footer's links, and the skip link.
+    const tall = /min-block-size: var\(--(?:tap|step-7)\);/;
+    for (const selector of [
+      '.league-site .site-skip',
+      '.site-header .site-name',
+      '.site-header .site-sign-in,\n.site-menu > summary',
+      '.site-header .site-menu-panel li a',
+      '.site-header .site-menu-sign-in',
+      '.site-header .site-tabs a',
+      '.site-footer nav a',
+    ]) {
+      // A selector may be written more than once (with others, then alone): one of its
+      // rules must set the height.
+      const rules = css
+        .split(`\n${selector} {`)
+        .slice(1)
+        .map((rest) => rest.slice(0, rest.indexOf('}')));
+      expect(rules.length, selector).toBeGreaterThan(0);
+      expect(
+        rules.some((rule) => tall.test(rule)),
+        selector,
+      ).toBe(true);
     }
   });
 
@@ -159,19 +209,24 @@ describe('header, menu and footer', () => {
     expect(weight(ring ?? '')).toBeGreaterThan(weight('.ui-root :focus-visible'));
   });
 
-  it('keeps the name its room on a phone: the picker with its button takes a row of its own', () => {
+  it('keeps the name its room on a phone: it has the first row, the picker the one under it', () => {
     const css = readFileSync(
       new URL('../../app/[league]/league-site.css', import.meta.url),
       'utf8',
     ).replace(/\/\*[\s\S]*?\*\//g, '');
-    // Scripts off, or a browser that cannot say: two rows, the name first.
+    // Scripts off, or a browser that cannot say: a header with the season picker gives the
+    // name the whole first row.
     expect(css).toMatch(
-      /@media \(max-width: 47\.99rem\) \{\s*\.site-header-top \{\s*flex-wrap: wrap;\s*\}\s*\.site-season \{[^}]*flex: 1 0 100%;/,
+      /@media \(max-width: 47\.99rem\) \{\s*\.site-header-top:has\(\.site-season\) \{\s*flex-wrap: wrap;[^}]*\}\s*\.site-header-top:has\(\.site-season\) \.site-name \{\s*flex-basis: 100%;/,
     );
-    // Scripts on: the button is put away by the shared styles, so one row is enough.
+    // Scripts on: the button is put away by the shared styles, so one row is enough, but
+    // for the narrowest phones (under 360), where the name needs the whole first row.
     expect(css).toMatch(
-      /@media \(max-width: 47\.99rem\) and \(scripting: enabled\) \{\s*\.site-header-top \{\s*flex-wrap: nowrap;/,
+      /@media \(min-width: 22\.5rem\) and \(max-width: 47\.99rem\) and \(scripting: enabled\) \{\s*\.site-header-top:has\(\.site-season\) \{\s*flex-wrap: nowrap;/,
     );
+    // Nothing in the frame is moved out of the page's own order, so the keyboard goes
+    // through the header as the eye does.
+    expect(css).not.toMatch(/(^|[\s;{])order:/m);
     // Hovered, the header's picker and button stay in the header's own text color.
     expect(css).toMatch(
       /\.site-header \.site-season button:hover \{[^}]*color: var\(--header-text\);/,

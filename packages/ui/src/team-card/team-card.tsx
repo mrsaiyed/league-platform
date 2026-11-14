@@ -19,11 +19,12 @@ export function TeamCard({ name, href, color, figure, facts }: TeamCardProps) {
     <article className="ui-team-card">
       <Emblem name={name} color={color} />
       <div className="ui-team-card-text">
-        <h3 className="ui-team-card-name">
+        {/* Level two: a teams page has its title and then its teams, with no level between. */}
+        <h2 className="ui-team-card-name">
           <a href={href} dir="auto">
             {name}
           </a>
-        </h3>
+        </h2>
         <Facts facts={facts} />
       </div>
       <p className="ui-team-card-figure">

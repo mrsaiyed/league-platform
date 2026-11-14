@@ -2,6 +2,7 @@
 // stand-in leagues: records and seeds, rosters through the one name function, statistics
 // following each team's setting, and who lands where.
 import { publicViewer, type AccessHolder } from '@srleagues/core';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -80,6 +81,27 @@ describe('the team cards', () => {
     expect(text.match(/<dt>Division<\/dt>/g)).toHaveLength(2);
     expect(text).toContain('East');
     expect(text).toContain('No division');
+  });
+
+  it('are headed at level two: the page has its title, then its teams, with no level skipped', () => {
+    const text = html([card('owls', 'East'), card('strays', null)]);
+    expect(text.match(/<h2 class="ui-team-card-name">/g)).toHaveLength(2);
+    expect(text).not.toMatch(/<h[3-6]/);
+  });
+
+  it("a team's page puts its games before its roster, in the page and on the screen", () => {
+    const page = readFileSync(new URL('./team-page.tsx', import.meta.url), 'utf8');
+    expect(page.indexOf('className="team-games"')).toBeGreaterThan(-1);
+    expect(page.indexOf('className="team-games"')).toBeLessThan(
+      page.indexOf('className="team-roster"'),
+    );
+    // The stylesheet places nothing against that order: the keyboard goes as the eye does.
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).not.toMatch(/\.team-(games|roster)\b[^{]*\{[^}]*(grid-(row|column)|order):/);
+    expect(css).not.toMatch(/(^|[\s;{])order:\s*-/m);
   });
 
   it('the stand-in league without divisions has none on its cards', async () => {

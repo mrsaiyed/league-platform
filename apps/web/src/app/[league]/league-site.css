@@ -36,6 +36,9 @@ html {
   inset-block-start: var(--step-2);
   inset-inline-start: var(--step-2);
   z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap);
   padding-block: var(--step-2);
   padding-inline: var(--step-4);
   border-radius: var(--radius-small);
@@ -74,13 +77,12 @@ html {
 /* The name never makes the header taller: on a phone it is small, and a long one takes two
    tight lines beside the buttons and is cut short after that. */
 .site-header .site-name {
-  display: -webkit-box;
+  display: flex;
   flex: 1 1 auto;
+  align-items: center;
   min-inline-size: 0;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  /* The name is the way home: as tall as anything a thumb taps, its words in the middle. */
+  min-block-size: var(--tap);
   color: var(--header-name);
   font-family: var(--font-heading);
   font-size: var(--text-16);
@@ -89,6 +91,14 @@ html {
   line-height: 1.15;
   text-decoration: none;
   text-transform: var(--heading-case);
+}
+.site-header .site-name > span {
+  display: -webkit-box;
+  min-inline-size: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .site-header .site-sign-in,
 .site-menu > summary {
@@ -153,28 +163,34 @@ html {
   border-color: var(--header-text);
   color: var(--header-text);
 }
-/* The league's name leads (U-8). On a phone the season picker with its "Show" button, which
-   is there wherever scripts are off or the browser cannot say, takes a row of its own under
-   the name, so the name keeps its room. Where scripts run the button is put away and the
-   picker sits beside the name; a button brought back by the keyboard hangs under it. */
+/* The league's name leads (U-8). On a phone, a header that holds the season picker gives
+   the name the whole first row wherever scripts are off or the browser cannot say (the
+   picker then has its "Show" button beside it), and always on the narrowest phones (under
+   360): the picker and the menu button share the row under it, in the order they are in
+   the page, so the keyboard goes as the eye does. Where scripts run the button is put away
+   and everything sits in one row; a button brought back by the keyboard hangs under it. */
 @media (max-width: 47.99rem) {
-  .site-header-top {
+  .site-header-top:has(.site-season) {
     flex-wrap: wrap;
-  }
-  .site-season {
-    order: 1;
-    flex: 1 0 100%;
     padding-block-end: var(--step-2);
   }
-}
-@media (max-width: 47.99rem) and (scripting: enabled) {
-  .site-header-top {
-    flex-wrap: nowrap;
+  .site-header-top:has(.site-season) .site-name {
+    flex-basis: 100%;
   }
-  .site-season {
-    order: 0;
+  .site-header-top:has(.site-season) .site-season {
+    flex: 1 1 0;
+  }
+}
+@media (min-width: 22.5rem) and (max-width: 47.99rem) and (scripting: enabled) {
+  .site-header-top:has(.site-season) {
+    flex-wrap: nowrap;
+    padding-block-end: var(--step-1);
+  }
+  .site-header-top:has(.site-season) .site-name {
+    flex-basis: auto;
+  }
+  .site-header-top:has(.site-season) .site-season {
     flex: none;
-    padding-block-end: 0;
   }
   .site-header .site-season .ui-picker:has(:focus-visible) button {
     position: absolute;
@@ -305,10 +321,11 @@ html {
     min-block-size: calc(var(--tap) + var(--step-3));
   }
   .site-header .site-name {
-    display: block;
     font-size: var(--text-22);
     line-height: 1.2;
-    overflow: hidden;
+  }
+  .site-header .site-name > span {
+    display: block;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -420,17 +437,11 @@ html {
   min-inline-size: 0;
 }
 @media (min-width: 64rem) {
+  /* Placed by the page's own order (games, then roster): what is seen first is reached
+     first by the keyboard. */
   .team-layout {
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     align-items: start;
-  }
-  .team-layout > .team-games {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .team-layout > .team-roster {
-    grid-column: 2;
-    grid-row: 1;
   }
 }
 /* "Make this my team": a quiet choice beside the team's name. */

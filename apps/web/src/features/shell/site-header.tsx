@@ -66,7 +66,7 @@ export function SiteHeader({
     <header className="site-header">
       <div className="site-column site-header-top">
         <a className="site-name" href={leagueHomeStayUrl(league)} dir="auto">
-          {name}
+          <span>{name}</span>
         </a>
         {season === null ? null : (
           <div className="site-season">
