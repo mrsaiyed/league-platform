@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   memoryTeams,
   ownerId,
+  programAdminGrant,
+  programAdminId,
   schedulerGrant,
   schedulerId,
   team,
@@ -58,6 +60,48 @@ describe('setTeamStatsVisibility', () => {
     });
     expect(await setTeamStatsVisibility(as(schedulerId), base, deps)).toMatchObject({
       error: { code: 'not-allowed' },
+    });
+  });
+
+  describe('when the league has switched choosing off', () => {
+    const off = {
+      'teams.mayChooseStatsLevel': [
+        { level: 'league' as const, document: { version: 1, value: false } },
+      ],
+    };
+    const input = { teamId: id, version: 1, statsVisibility: 'staff' };
+
+    it('still lets the owner change a team', async () => {
+      const { db, deps, as } = memoryTeams({ teams: [team(1)], settings: off });
+      expect(await setTeamStatsVisibility(as(ownerId), input, deps)).toMatchObject({ ok: true });
+      expect(db.state.teams[0]?.statsVisibility).toBe('staff');
+    });
+
+    it('still lets an admin of the whole league change a team', async () => {
+      const grant = { ...programAdminGrant, scope: { type: 'league' as const } };
+      const { deps, as } = memoryTeams({ teams: [team(1)], grants: [grant], settings: off });
+      expect(await setTeamStatsVisibility(as(programAdminId), input, deps)).toMatchObject({
+        ok: true,
+      });
+    });
+
+    it('refuses an admin limited to one program, and changes nothing', async () => {
+      const { db, deps, as } = memoryTeams({
+        teams: [team(1)],
+        grants: [programAdminGrant],
+        settings: off,
+      });
+      expect(await setTeamStatsVisibility(as(programAdminId), input, deps)).toMatchObject({
+        error: { code: 'teams-may-not-choose' },
+      });
+      expect(db.state.teams[0]?.statsVisibility).toBe('everyone');
+    });
+
+    it('lets that admin change it again once choosing is back on', async () => {
+      const { deps, as } = memoryTeams({ teams: [team(1)], grants: [programAdminGrant] });
+      expect(await setTeamStatsVisibility(as(programAdminId), input, deps)).toMatchObject({
+        ok: true,
+      });
     });
   });
 });

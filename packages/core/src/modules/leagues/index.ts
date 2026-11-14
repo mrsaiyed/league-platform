@@ -36,6 +36,9 @@ export {
   startPageChoices,
   whoMayScore,
   whoMayScoreChoices,
+  startingStatsLevel,
+  statsLevelChoices,
+  teamsMayChooseStatsLevel,
 } from './settings/declarations.ts';
 export {
   defineSetting,
