@@ -47,6 +47,8 @@ This starts Next.js in development mode, with the address in `PUBLIC_BASE_URL` (
 
 With `APP_ENV=local`, the web app holds made-up leagues and made-up people in memory, in the process. It opens **no database and no sign-in service**: the sign-in screens and the made-up people are described in record 031 and in the header of `apps/web/src/server/stand-in-ports.ts`. Restarting the app puts the made-up data back to its starting state.
 
+To run it on the made-up database instead, put `LOCAL_DATA=made-up-database` in `.env` (local and test only). The app then builds a database in memory when it starts, with every migration and the two seed leagues (below), and reads leagues, signed-in people and what they hold from it. Sign-in still uses the stand-in's screens; the stand-in's made-up people do not exist there. The areas not yet moved onto the database (step 2.93, record 055) show an error page. It too opens no address and is gone when the app stops.
+
 To build and run the production build locally:
 
 ```sh
@@ -70,7 +72,7 @@ To keep the database in another folder, pass the folder after `--`:
 npm run seed -- path/to/folder
 ```
 
-Nothing in the web app reads `.local/seed-db` yet. The web app's local mode uses its own in-memory stand-in (above). The seeded database is used by the database tests and is ready for the stage that connects the web app to it (record 048).
+Nothing in the web app reads `.local/seed-db`: its local mode uses its own in-memory stand-in, or with `LOCAL_DATA=made-up-database` a fresh database in memory loaded the same way (above). The seeded folder is for the database tests and the tracker transfer (record 048).
 
 The seed script opens a folder on this computer, never a network address (T-201).
 

@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DatabaseHandle } from '@srleagues/database';
 import { loadConfig } from './config-schema.ts';
-import { startWebApp, type StartupDeps } from './startup.ts';
+import { startWebApp, type DatabasePackage, type StartupDeps } from './startup.ts';
 
 const env = {
   PUBLIC_BASE_URL: 'http://localhost:3000',
@@ -25,7 +25,10 @@ function deps(problems: string[] | Error) {
     if (problems instanceof Error) throw problems;
     return problems;
   });
-  const database = vi.fn(async () => ({ createDatabase, checkLoginRole }));
+  // Only these two are reached in staging and production today.
+  const database = vi.fn(
+    async () => ({ createDatabase, checkLoginRole }) as unknown as DatabasePackage,
+  );
   const given: StartupDeps = { database, log: () => {} };
   return { given, database, createDatabase, checkLoginRole, close };
 }
@@ -38,6 +41,45 @@ describe('startWebApp', () => {
       expect(await ports.findLeague('north-valley')).toMatchObject({ slug: 'north-valley' });
       expect(d.database).not.toHaveBeenCalled();
     }
+  });
+
+  it('runs on the made-up database with LOCAL_DATA=made-up-database (record 055)', async () => {
+    const config = loadConfig({ ...env, APP_ENV: 'test', LOCAL_DATA: 'made-up-database' });
+    const database = vi.fn(() => import('@srleagues/database'));
+    const ports = await startWebApp(config, { database, log: () => {} });
+    expect(database).toHaveBeenCalledOnce();
+    expect(await ports.findLeague('lakeside')).toMatchObject({ slug: 'lakeside' });
+    expect(await ports.findLeague('north-valley')).toBeUndefined();
+    // The made-up member signs in on the sign-in stand-in, as on the stand-in.
+    const signedIn = await ports.signIn.signIn({
+      email: 'member@example.test',
+      password: 'made-up member password',
+      device: {
+        deviceId: 'made-up-device-0000000001',
+        label: 'made-up',
+        networkAddress: '127.0.0.1',
+      },
+    });
+    if (!signedIn.ok)
+      throw new Error(`the made-up member could not sign in: ${signedIn.error.code}`);
+    // Who they are is one of the database's own accounts, not the stand-in's user id.
+    const who = await ports.identify(signedIn.value.session.accessToken);
+    const service = await ports.signIn.identify({
+      accessToken: signedIn.value.session.accessToken,
+    });
+    expect(who.ok && service.ok && who.value.accountId !== service.value.accountId).toBe(true);
+  }, 120_000);
+
+  it('refuses the made-up database too for a site address that is not local', async () => {
+    const d = deps([]);
+    const config = loadConfig({
+      ...env,
+      APP_ENV: 'local',
+      LOCAL_DATA: 'made-up-database',
+      PUBLIC_BASE_URL: 'https://leagues.example.com',
+    });
+    await expect(startWebApp(config, d.given)).rejects.toThrow(/PUBLIC_BASE_URL/);
+    expect(d.database).not.toHaveBeenCalled();
   });
 
   it('refuses the stand-in for a site address that is not local or a test name', async () => {

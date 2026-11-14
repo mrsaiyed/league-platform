@@ -233,7 +233,15 @@ export type StandInPorts = WebPorts & {
   readonly signUpMadeUpMember: () => Promise<void>;
 };
 
-export function standInPorts(options: StandInOptions): StandInPorts {
+/** The sign-in stand-in and its emails, for the stand-in and for the made-up database. */
+export type StandInSignIn = Pick<StandInPorts, 'signIn' | 'signInMail' | 'signUpMadeUpMember'>;
+
+/**
+ * The sign-in screens' stand-in (record 031), with the same refusals as the stand-in
+ * itself: local work and tests only, on this computer or a test name. The made-up
+ * database (record 055) signs people in with it too.
+ */
+export function standInSignIn(options: StandInOptions): StandInSignIn {
   if (options.appEnv !== 'local' && options.appEnv !== 'test') {
     throw new Error(
       `The web app's made-up stand-in is for local work and tests only, not "${options.appEnv}".`,
@@ -245,7 +253,6 @@ export function standInPorts(options: StandInOptions): StandInPorts {
         'must be on localhost, 127.0.0.1, [::1], or a name ending in .localhost or .test.',
     );
   }
-  const people: readonly MadeUpPerson[] = Object.values(standInPeople);
   const now = () => new Date();
   const outbox = captureEmail({ now });
   const signInMail = createSignInMail({
@@ -266,6 +273,35 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     returnOrigins: [options.publicBaseUrl],
     now,
   });
+  return {
+    signIn,
+    signInMail,
+    signUpMadeUpMember: async () => {
+      const here = '127.0.0.1';
+      const { email, password } = standInMember;
+      const asked = await signIn.startSignUp({ email, networkAddress: here });
+      // The code email is handed over without waiting: let it reach the capture.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const sent = outbox.messages().findLast((m) => m.to === email);
+      const code = /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
+      if (!asked.ok || code === undefined) throw new Error('The made-up member got no code.');
+      const proved = await signIn.verifyCode({ email, code, networkAddress: here });
+      if (!proved.ok) throw new Error('The made-up member could not be proved.');
+      const set = await signIn.setPassword({
+        proof: proved.value.proof,
+        password,
+        device: { deviceId: 'made-up-member-device', label: 'made-up', networkAddress: here },
+      });
+      if (!set.ok) throw new Error('The made-up member could not choose a password.');
+      await signIn.signOut({ accessToken: set.value.session.accessToken });
+    },
+  };
+}
+
+export function standInPorts(options: StandInOptions): StandInPorts {
+  const { signIn, signInMail, signUpMadeUpMember } = standInSignIn(options);
+  const people: readonly MadeUpPerson[] = Object.values(standInPeople);
+  const now = () => new Date();
   const deps: CommandDeps<AccessTx> = {
     transaction: (context, work) => work(accessTx(context.leagueId)),
     events: [],
@@ -376,25 +412,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
       coach.accountId,
     ),
-    signUpMadeUpMember: async () => {
-      const here = '127.0.0.1';
-      const { email, password } = standInMember;
-      const asked = await signIn.startSignUp({ email, networkAddress: here });
-      // The code email is handed over without waiting: let it reach the capture.
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      const sent = outbox.messages().findLast((m) => m.to === email);
-      const code = /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
-      if (!asked.ok || code === undefined) throw new Error('The made-up member got no code.');
-      const proved = await signIn.verifyCode({ email, code, networkAddress: here });
-      if (!proved.ok) throw new Error('The made-up member could not be proved.');
-      const set = await signIn.setPassword({
-        proof: proved.value.proof,
-        password,
-        device: { deviceId: 'made-up-member-device', label: 'made-up', networkAddress: here },
-      });
-      if (!set.ok) throw new Error('The made-up member could not choose a password.');
-      await signIn.signOut({ accessToken: set.value.session.accessToken });
-    },
+    signUpMadeUpMember,
   };
 }
 
