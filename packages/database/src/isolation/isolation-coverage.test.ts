@@ -143,6 +143,19 @@ const reachNoLeagueData = new Map<unknown, string>([
     'opens a PGlite folder on disk (never an address) and runs transferTrackerGames on it',
   ],
   [databasePackage.isDatabaseAddress, 'tells an address from a folder name; runs nothing'],
+  [
+    databasePackage.openLeagueMakingTarget,
+    'staff tool (step 2.125, record 057): opens a PGlite folder or the migration login; reads no rows',
+  ],
+  [databasePackage.placeOfAddress, 'reads the host and database name off an address; runs nothing'],
+  [
+    databasePackage.previewNewLeague,
+    'staff tool (step 2.125): as the migration login, reads whether one short name is held (find_league_by_slug) and whether two emails have accounts; no league rows',
+  ],
+  [
+    databasePackage.makeLeague,
+    'staff tool (step 2.125): as the migration login makes accounts by email and checks one short name, then reaches the one new league only through its commands (createLeague, createSeason, getSeason, setCurrentSeason: own cases), each fenced to that league',
+  ],
 ]);
 
 /**
