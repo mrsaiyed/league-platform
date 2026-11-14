@@ -9,8 +9,41 @@ import { clearIntent } from './form-input.ts';
 
 export type Say = (key: string, params?: Readonly<Record<string, string | number>>) => string;
 
-const optionKey = (row: LeagueSettingRow, choice: string) =>
-  `${row.label.replace(/\.label$/, '')}.option.${choice}`;
+const wordsOf = (row: LeagueSettingRow) => row.label.replace(/\.label$/, '');
+const optionKey = (row: LeagueSettingRow, choice: string) => `${wordsOf(row)}.option.${choice}`;
+
+/** The first part of a setting's key: the group it is shown under. */
+export const areaOf = (key: string): string => key.slice(0, Math.max(0, key.indexOf('.')));
+
+/** The rows in order, in runs of the same area. */
+function byArea(rows: readonly LeagueSettingRow[]) {
+  const groups: { area: string; rows: LeagueSettingRow[] }[] = [];
+  for (const row of rows) {
+    const area = areaOf(row.key);
+    const last = groups.at(-1);
+    if (last?.area === area) last.rows.push(row);
+    else groups.push({ area, rows: [row] });
+  }
+  return groups;
+}
+
+/** The box to tick before a value that asks to be confirmed is saved (R-14). */
+function Confirm({ row, say }: { readonly row: LeagueSettingRow; readonly say: Say }) {
+  if (row.confirm.length === 0) return null;
+  const choices = row.confirm.map((value) => valueText(row, value, say)).join(', ');
+  return (
+    <>
+      <p>
+        <small>{say('adminSettings.confirmNote', { choice: choices })}</small>
+      </p>
+      <p>
+        <label>
+          <input type="checkbox" name="confirmed" value="yes" /> {say(`${wordsOf(row)}.confirm`)}
+        </label>
+      </p>
+    </>
+  );
+}
 
 /** A value in words, as the screen shows a default. */
 export function valueText(row: LeagueSettingRow, value: unknown, say: Say): string {
@@ -136,36 +169,44 @@ export function SettingForms({
 }) {
   return (
     <>
-      {rows.map((row) => (
-        <section key={row.key} data-setting={row.key}>
-          <form action={saveSettingAction}>
-            <input type="hidden" name="league" value={league} />
-            <input type="hidden" name="key" value={row.key} />
-            <input type="hidden" name="version" value={row.version ?? ''} />
-            <Control row={row} say={say} />
-            <p id={`${row.key}-about`}>
-              <small>
-                {say('adminSettings.default', { value: valueText(row, row.default, say) })}{' '}
-                {limitsText(row, say)}{' '}
-                {say(
-                  row.source === 'league' ? 'adminSettings.usingOwn' : 'adminSettings.usingDefault',
+      {byArea(rows).map((group) => (
+        <section key={group.area} data-area={group.area}>
+          <h2>{say(`adminSettings.area.${group.area}`)}</h2>
+          {group.rows.map((row) => (
+            <section key={row.key} data-setting={row.key}>
+              <form action={saveSettingAction}>
+                <input type="hidden" name="league" value={league} />
+                <input type="hidden" name="key" value={row.key} />
+                <input type="hidden" name="version" value={row.version ?? ''} />
+                <Control row={row} say={say} />
+                <Confirm row={row} say={say} />
+                <p id={`${row.key}-about`}>
+                  <small>
+                    {say('adminSettings.default', { value: valueText(row, row.default, say) })}{' '}
+                    {limitsText(row, say)}{' '}
+                    {say(
+                      row.source === 'league'
+                        ? 'adminSettings.usingOwn'
+                        : 'adminSettings.usingDefault',
+                    )}
+                  </small>
+                </p>
+                {row.field.kind === 'other' ? null : (
+                  <p>
+                    <button type="submit">{say('adminSettings.save')}</button>
+                    {row.version === null ? null : (
+                      <>
+                        {' '}
+                        <button type="submit" name="intent" value={clearIntent} formNoValidate>
+                          {say('adminSettings.clear')}
+                        </button>
+                      </>
+                    )}
+                  </p>
                 )}
-              </small>
-            </p>
-            {row.field.kind === 'other' ? null : (
-              <p>
-                <button type="submit">{say('adminSettings.save')}</button>
-                {row.version === null ? null : (
-                  <>
-                    {' '}
-                    <button type="submit" name="intent" value={clearIntent} formNoValidate>
-                      {say('adminSettings.clear')}
-                    </button>
-                  </>
-                )}
-              </p>
-            )}
-          </form>
+              </form>
+            </section>
+          ))}
         </section>
       ))}
     </>

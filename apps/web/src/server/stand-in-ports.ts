@@ -37,6 +37,7 @@ import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import { liveListenAuthorize } from './live-listen.ts';
 import type { WebPorts } from './ports.ts';
+import { namePolicyOf } from './name-policy-of.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
 import { createPlayPublisher } from './publish-plays.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
@@ -283,7 +284,14 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
   };
   const accessOf = accessOfVia(deps);
+  // The League settings screen's settings: the public pages read how names show from them.
+  const adminSettings = standInAdminSettings({
+    accessOf: (leagueId) => accessTx(leagueId).access,
+    log: options.log,
+  });
+  const namesShown = namePolicyOf(adminSettings.deps);
   const games = standInGames({
+    namePolicyOf: namesShown,
     leagueId: standInLeagues.live.id,
     people: {
       [owner.accountId]: 'Olive Owner',
@@ -336,19 +344,16 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       accessOf: (leagueId) => accessTx(leagueId).access,
       log: options.log,
     }),
-    publicStats: standInPublicStats({
-      adultLeagueId: standInLeagues.live.id,
-      youthLeagueId: standInLeagues.other.id,
-    }),
+    publicStats: standInPublicStats(
+      { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
+      namesShown,
+    ),
     adminTeams: standInAdminTeams({
       accessOf: (leagueId) => accessTx(leagueId).access,
       log: options.log,
       seededLeagueId: standInLeagues.live.id,
     }),
-    adminSettings: standInAdminSettings({
-      accessOf: (leagueId) => accessTx(leagueId).access,
-      log: options.log,
-    }),
+    adminSettings,
     publicSchedule: standInPublicSchedule(
       { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
       now,

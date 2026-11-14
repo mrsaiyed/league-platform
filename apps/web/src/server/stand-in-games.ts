@@ -9,7 +9,6 @@
 // endpoints (step 2.32) run on the same games, with made-up rosters (stand-in-tracker.ts).
 import { defaultSeasonRules } from '@srleagues/contracts';
 import {
-  defaultNamePolicy,
   systemClock,
   type AccessReader,
   type ActivityEntry,
@@ -24,6 +23,7 @@ import {
   type TransactionRunner,
 } from '@srleagues/core';
 import type { GameNames, GamesAreaPorts } from './games-area-ports.ts';
+import { startingNamePolicy, type NamePolicyOf } from './name-policy-of.ts';
 import {
   emptyTracker,
   liveGamesOf,
@@ -67,6 +67,8 @@ export type StandInGamesOptions = {
   readonly log: (line: CommandLogLine) => void;
   /** The league's own stored settings to start with, by key (for checks). */
   readonly settings?: Readonly<Record<string, StoredSetting[]>>;
+  /** How the league shows names on live messages: its privacy settings (T-81). */
+  readonly namePolicyOf?: NamePolicyOf;
 };
 
 const teamNames: Readonly<Record<string, string>> = {
@@ -396,7 +398,10 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     tracker: {
       deps: { transaction, events: [], log: options.log, now: () => performance.now() },
       snapshotStoreOf,
-      namesShownOf: async () => ({ audience: 'adult', policy: defaultNamePolicy }),
+      namesShownOf: async (leagueId) => ({
+        audience: 'adult',
+        policy: await (options.namePolicyOf ?? startingNamePolicy)(leagueId),
+      }),
       displayNameOf: async (leagueId, accountId) =>
         leagueId === options.leagueId ? (options.people[accountId] ?? '') : '',
       clock: systemClock,

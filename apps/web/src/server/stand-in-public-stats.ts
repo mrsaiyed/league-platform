@@ -5,12 +5,9 @@
 // divisions, an adjustment, a tie settled by head-to-head and a team whose players'
 // numbers are staff only; the other has one table ranked by points and shows its
 // children by first name and last initial.
-import {
-  defaultNamePolicy,
-  type PersonDisplayRecord,
-  type StandingsReadStore,
-} from '@srleagues/core';
+import type { PersonDisplayRecord, StandingsReadStore } from '@srleagues/core';
 import { defaultSeasonRules, SeasonRules } from '@srleagues/contracts';
+import { startingNamePolicy, type NamePolicyOf } from './name-policy-of.ts';
 import type { PublicSeason, PublicStatsPorts, PublicStatsSettings } from './public-stats.ts';
 
 const id = (kind: number, n: number) =>
@@ -528,23 +525,29 @@ const bySeasonOf = (all: SeasonData[]): PublicSeason[] =>
  * The made-up standings and statistics for two leagues, given their ids: an adult league
  * with divisions and a youth league without. Any other league has no seasons.
  */
-export function standInPublicStats(ids: {
-  readonly adultLeagueId: string;
-  readonly youthLeagueId: string;
-}): PublicStatsPorts {
+export function standInPublicStats(
+  ids: {
+    readonly adultLeagueId: string;
+    readonly youthLeagueId: string;
+  },
+  /** How each league shows names: its own privacy settings (T-81), or our starting values. */
+  namePolicyOf: NamePolicyOf = startingNamePolicy,
+): PublicStatsPorts {
   const data = (leagueId: string): SeasonData[] =>
     leagueId === ids.adultLeagueId
       ? [adultFall, adultSpring]
       : leagueId === ids.youthLeagueId
         ? [youthSeason]
         : [];
-  const settings = (leagueId: string): PublicStatsSettings =>
-    leagueId === ids.youthLeagueId
-      ? { audience: 'youth', namePolicy: defaultNamePolicy, minimumGames: 2 }
-      : { audience: 'adult', namePolicy: defaultNamePolicy, minimumGames: 3 };
+  const settings = async (leagueId: string): Promise<PublicStatsSettings> => {
+    const namePolicy = await namePolicyOf(leagueId);
+    return leagueId === ids.youthLeagueId
+      ? { audience: 'youth', namePolicy, minimumGames: 2 }
+      : { audience: 'adult', namePolicy, minimumGames: 3 };
+  };
   return {
     seasonsOf: async (leagueId) => bySeasonOf(data(leagueId)),
-    settingsOf: async (leagueId) => settings(leagueId),
+    settingsOf: (leagueId) => settings(leagueId),
     readStoreOf: (leagueId) => storeOf(data(leagueId)),
   };
 }

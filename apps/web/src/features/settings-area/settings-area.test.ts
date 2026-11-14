@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { standInAdminSettings } from '../../server/stand-in-admin-settings.ts';
 import { answerQuery, doneKey, problemKey, refused } from './answer.ts';
 import { valueOf, versionOf } from './form-input.ts';
-import { SettingForms, type Say } from './setting-fields.tsx';
+import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
 
 const t = createTranslator('en');
 const words: Readonly<Record<string, string>> = {
@@ -27,6 +27,7 @@ const words: Readonly<Record<string, string>> = {
   'setting.test.theme.label': 'Look of the pages',
   'setting.test.theme.option.plain': 'Plain',
   'setting.test.theme.option.bold': 'Bold',
+  'adminSettings.area.test': 'Made-up settings',
 };
 const say: Say = (key, params) =>
   Object.hasOwn(words, key) ? (words[key] ?? '') : t(key as Parameters<typeof t>[0], params);
@@ -92,6 +93,29 @@ describe('the settings form', () => {
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
     expect(html).toContain('The league home');
     expect(html).toContain('Any game');
+    for (const setting of declaredSettings.all()) {
+      const area = `adminSettings.area.${areaOf(setting.key)}`;
+      expect(Object.hasOwn(en, area), area).toBe(true);
+      if (setting.confirm.length > 0) {
+        const confirm = setting.label.replace(/\.label$/, '.confirm');
+        expect(Object.hasOwn(en, confirm), confirm).toBe(true);
+      }
+    }
+  });
+
+  it('puts the names settings under Privacy, with a box to confirm full names (R-14)', async () => {
+    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
+    const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
+    const privacy = html.slice(html.indexOf('data-area="privacy"'));
+    expect(privacy).toMatch(/^data-area="privacy"><h2>Privacy<\/h2>/);
+    expect(privacy).toContain('First name and last initial (the default)');
+    expect(privacy).toContain('Full names');
+    expect(privacy).toContain('Choosing Full names asks you to confirm first.');
+    expect(privacy).toContain('name="confirmed" value="yes"');
+    expect(privacy).toContain('Players may ask to appear as initials on public pages');
+    // Only the names setting asks to confirm.
+    expect(html.match(/name="confirmed"/g)).toHaveLength(1);
   });
 });
 
