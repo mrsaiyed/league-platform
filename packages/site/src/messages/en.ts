@@ -13,11 +13,15 @@ export const en = {
   'footer.privacy': 'Privacy',
   'common.loading': 'Loading',
   'common.notFound': 'We could not find that page.',
+  'common.notFoundTitle': 'Page not found',
+  'common.goToStart': 'Go to the SR Leagues start page',
   'schedule.games_one': '{count} game on {date}',
   'schedule.games_other': '{count} games on {date}',
   // The web app's shell (step 1.17). Pages not built yet say so plainly.
   'shell.siteName': 'SR Leagues',
   'shell.notBuilt': 'This page is not built yet.',
+  'shell.backToLeague': 'Back to the league home',
+  'shell.skipToContent': 'Skip to the content',
   'shell.draftNotice': 'This league is not published. Only the people who run it can see it.',
   'shell.suspendedNotice':
     'This league has been taken down. Only the people who run it can see it, to export their data.',
@@ -66,6 +70,7 @@ export const en = {
   'display.round': 'Round',
   'display.season': 'Season',
   'display.show': 'Show',
+  'display.filters': 'Choose what to show',
   // The standings and statistics pages (step 2.43).
   'standings.title': 'Standings',
   'standings.allTeams': 'All teams',
@@ -116,6 +121,9 @@ export const en = {
   'stats.by.total': 'Season totals',
   'stats.leaderName': '{rank}. {name}',
   'stats.unnamedPlayer': 'A player (name not shown)',
+  'stats.leaderDetail': '{team} · {games}',
+  'stats.leaderGames_one': '{count} game',
+  'stats.leaderGames_other': '{count} games',
   'stats.col.player': 'Player',
   'stats.col.team': 'Team',
   'stats.col.games': 'GP',
@@ -136,6 +144,14 @@ export const en = {
   'home.standingsEmpty': 'The standings appear here once games have been played.',
   'home.fullStandings': 'See the full standings',
   'home.fullSchedule': 'See the full schedule',
+  // The look of the home page (step 2.85): a live game under its own heading, and the
+  // season in four numbers.
+  'home.liveNow': 'Live now',
+  'home.numbers': 'The season in numbers',
+  'home.number.teams': 'Teams',
+  'home.number.played': 'Games played',
+  'home.number.toPlay': 'Games to play',
+  'home.number.rounds': 'Rounds',
   'schedule.title': 'Schedule',
   'schedule.noSeason': 'There is no season to show yet.',
   'schedule.empty': 'No games have been scheduled for this season yet.',
