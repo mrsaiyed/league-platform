@@ -8,7 +8,7 @@ import {
   gameReopened,
   type GameFinalized,
   type GameReopened,
-} from '../games/index.ts';
+} from '../../events/game-events.ts';
 import type { StandingsTx } from './ports.ts';
 import { rebuildSeason } from './rebuild-season.ts';
 

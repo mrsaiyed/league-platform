@@ -74,6 +74,8 @@ export type LeagueRecords = MadeLeague & {
   gameStateId: string;
   playerGameStatsId: string;
   scoringSessionId: string;
+  /** When that session began (ms): what taking the game over from it names. */
+  scoringSessionSince: number;
   /** A player added at the final game's scorer's table, waiting for the admin's review (S-6). */
   walkUpRosterEntryId: string;
   /** The team's standings row, an adjustment to it, and the player's season totals. */
@@ -100,6 +102,15 @@ export type TwoLeagues = {
 
 const id = async (db: Sql, text: string, params: unknown[]) =>
   (await one<{ id: string }>(db, `${text} returning id`, params)).id;
+
+/** When each league's seeded scoring session began; its lease runs two minutes from then. */
+const seededSessionSince = Date.UTC(2026, 11, 13, 18, 0, 0);
+
+/**
+ * The harness's clock (T-116 leases): fixed half a minute into the seeded sessions'
+ * leases, so whether a lease has run out never depends on when the tests run.
+ */
+export const harnessNow = seededSessionSince + 30_000;
 
 /** An account with its own (self) profile. */
 async function person(db: Sql, email: string, first: string, last: string) {
@@ -404,11 +415,21 @@ async function seededLeague(
      values ($1, $2, $3, $4, '23', true, 1200, '{"points": 2, "fg2": 1}')`,
     [leagueId, gameId, teamId, personId],
   );
+  // Begun and held at set moments, so a takeover can name it and, by the harness's
+  // fixed clock (harnessNow), its lease has not run out, whatever the time of day.
+  const scoringSessionSince = seededSessionSince;
   const scoringSessionId = await id(
     pglite,
-    `insert into scoring_sessions (league_id, game_id, account_id, device_id, held_until)
-     values ($1, $2, $3, $4, now() + interval '2 minutes')`,
-    [leagueId, upcomingGameId, member.accountId, `${m}-tablet`],
+    `insert into scoring_sessions (league_id, game_id, account_id, device_id, created_at, held_until)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [
+      leagueId,
+      upcomingGameId,
+      member.accountId,
+      `${m}-tablet`,
+      new Date(scoringSessionSince).toISOString(),
+      new Date(scoringSessionSince + 120_000).toISOString(),
+    ],
   );
   const walkUpPersonId = await id(
     pglite,
@@ -543,6 +564,7 @@ async function seededLeague(
     gameStateId,
     playerGameStatsId,
     scoringSessionId,
+    scoringSessionSince,
     walkUpRosterEntryId,
     standingsRowId,
     standingsAdjustmentId,

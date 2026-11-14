@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
-import { gameReopened, type GameReopened } from '../events.ts';
+import { gameReopened, type GameReopened } from '../../../events/game-events.ts';
 import { correctionReason, gameVersion, isDecided } from '../game-fields.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';

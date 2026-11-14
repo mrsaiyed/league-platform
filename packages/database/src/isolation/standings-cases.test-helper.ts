@@ -4,14 +4,18 @@
 // them have their cases in games-cases.test-helper.ts. Imported by
 // isolation-cases.test-helper.ts.
 import {
+  addAdjustment,
   gameFinalized,
   gameReopened,
   rebuildOnGameFinalized,
   rebuildOnGameReopened,
   rebuildStandings,
+  removeAdjustment,
 } from '@srleagues/core';
 import type { PlayerSeasonTotals, StandingsRow } from '@srleagues/sports';
 import {
+  binStandingsAdjustment,
+  insertStandingsAdjustment,
   listStandingsAdjustments,
   listTableTeams,
   replaceSeasonPlayerTotals,
@@ -37,6 +41,28 @@ registerIsolationCase({
   subject: listStandingsAdjustments,
   name: "list the target's season's adjustments",
   run: (scope, target) => listStandingsAdjustments(scope, target.seasonId),
+});
+
+registerIsolationCase({
+  subject: insertStandingsAdjustment,
+  name: "add an adjustment for the target's team",
+  run: (scope, target) =>
+    insertStandingsAdjustment(scope, target.seasonId, {
+      teamId: target.teamId,
+      wins: 1,
+      losses: 0,
+      ties: 0,
+      points: 0,
+      reason: 'Won by ruling',
+      accountId: scope.accountId ?? '',
+    }),
+});
+
+registerIsolationCase({
+  subject: binStandingsAdjustment,
+  name: "bin the target's adjustment",
+  run: (scope, target) =>
+    binStandingsAdjustment(scope, target.seasonId, target.standingsAdjustmentId),
 });
 
 /** One standings row for the target's team, in its division, alone in its table. */
@@ -96,6 +122,24 @@ registerIsolationCase({
 registerCommandCase(rebuildStandings, harnessTx, {
   name: "rebuild the target's season's standings and totals",
   input: (target) => ({ seasonId: target.seasonId }),
+});
+
+registerCommandCase(addAdjustment, harnessTx, {
+  name: "add an adjustment for the target's team",
+  input: (target) => ({
+    seasonId: target.seasonId,
+    teamId: target.teamId,
+    wins: 1,
+    reason: 'Won by ruling',
+  }),
+});
+
+registerCommandCase(removeAdjustment, harnessTx, {
+  name: "remove the target's adjustment",
+  input: (target) => ({
+    seasonId: target.seasonId,
+    adjustmentId: target.standingsAdjustmentId,
+  }),
 });
 
 // Event handlers ----------------------------------------------------------------------

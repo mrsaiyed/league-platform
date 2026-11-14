@@ -5,7 +5,7 @@
 // the calling command has done that for the game's season.
 import { fail, type CommandContext, type Result } from '../../command/index.ts';
 import { decideGame, openGame, type DecideGameError } from './decide-game.ts';
-import type { GameFinalized } from './events.ts';
+import type { GameFinalized } from '../../events/game-events.ts';
 import type { GamesTx } from './ports.ts';
 import { effectiveRulesOf } from './season-rules-of.ts';
 

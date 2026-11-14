@@ -8,6 +8,11 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
+import type { StandingsTx } from '../standings/index.ts';
+import {
+  standingsStores,
+  type StandingsData,
+} from '../../command/testing/memory-standings-stores.ts';
 import type { SeasonStatus } from './league-values.ts';
 import type { DivisionRecord, LeagueRecord, LeaguesTx, SettingPlace } from './ports.ts';
 
@@ -46,6 +51,8 @@ export type MemoryLeagues = {
     version: number;
   }[];
   activity: ActivityEntry[];
+  /** The season's teams, results, adjustments and saved standings (the standings module's). */
+  standing: Omit<StandingsData, 'seasons'>;
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -90,16 +97,33 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
     grants: [],
     settings: [],
     activity: [],
+    standing: {
+      teams: [],
+      games: [],
+      lines: [],
+      adjustments: [],
+      rows: {},
+      totals: {},
+      locked: [],
+    },
     ...state,
   });
   let accountId: string | null = null;
-  const transaction = memoryTransaction(db, (s, jobs): LeaguesTx => {
+  const transaction = memoryTransaction(db, (s, jobs): LeaguesTx & StandingsTx => {
     const bump = (version: number) => {
       if (s.league === undefined || s.league.version !== version) return undefined;
       return s.league.version + 1;
     };
+    const standing = standingsStores({
+      ...s.standing,
+      // Read when asked, so a season saved earlier in the same transaction is seen.
+      get seasons() {
+        return s.seasons.map(({ id, programId, rules }) => ({ id, programId, rules }));
+      },
+    });
     return {
       jobs,
+      ...standing,
       access: {
         ownerAccountId: async () => s.league?.ownerAccountId,
         leagueStatus: async () => s.league?.status,

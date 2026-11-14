@@ -1,5 +1,6 @@
 // What the games module announces (T-24). Standings and the like react without this
-// module knowing they exist.
+// module knowing they exist. A leaf file that imports nothing, so the games, leagues
+// and standings modules can all read it while they load, whatever order they load in.
 
 export const gameFinalized = 'games.finalized';
 export const gameReopened = 'games.reopened';
