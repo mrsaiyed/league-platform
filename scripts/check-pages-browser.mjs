@@ -18,6 +18,31 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const site = path.join(root, 'dist/pages');
 const shots = path.join(root, 'artifacts/screenshots');
 fs.mkdirSync(shots, { recursive: true });
+// Every wait below is for a condition (an element, some text, a saved row), checked again
+// and again until it holds; this is only how long a slow machine may take before we give up.
+const WAIT_MS = 120_000;
+const POLL_MS = [50, 100, 250, 500];
+
+/** Checks `read` until `ok(value)` holds; on timeout fails saying what it was waiting for. */
+async function until(what, read, ok = Boolean, timeout = WAIT_MS) {
+  const end = Date.now() + timeout;
+  let last;
+  for (let i = 0; ; i++) {
+    try {
+      last = await read();
+      if (ok(last)) return last;
+    } catch (e) {
+      last = e;
+    }
+    if (Date.now() > end)
+      throw new Error(
+        `Gave up after ${timeout / 1000}s waiting for ${what}. Last seen: ${
+          last instanceof Error ? last.message : JSON.stringify(last)
+        }`,
+      );
+    await new Promise((r) => setTimeout(r, POLL_MS[Math.min(i, POLL_MS.length - 1)]));
+  }
+}
 const shot = (page, name, fullPage = false) =>
   page.screenshot({ path: path.join(shots, `pages-${name}.png`), fullPage });
 
@@ -101,6 +126,7 @@ try {
     page.on('dialog', (d) => d.accept());
   };
   const scorer = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  scorer.setDefaultTimeout(WAIT_MS);
   const page = await scorer.newPage();
   watch(page);
 
@@ -110,9 +136,16 @@ try {
   assert.equal(await page.locator('.game').count(), 10);
   assert.equal(await page.getByRole('link', { name: 'Track live stats' }).count(), 0);
   await page.getByRole('link', { name: 'Scorer sign-in' }).click();
-  await page.locator('#passcode').fill('not it');
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.locator('#error', { hasText: 'not right' }).waitFor();
+  // The page's script may not be listening yet when it first loads: try the wrong passcode
+  // again until the page answers (a wrong passcode is harmless to repeat).
+  await until('the sign-in page to say the passcode is not right', async () => {
+    await page.locator('#passcode').fill('not it');
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    return page
+      .locator('#error', { hasText: 'not right' })
+      .waitFor({ timeout: 3_000 })
+      .then(() => true);
+  });
   await page.locator('#passcode').fill('browser-check-passcode');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL(base);
@@ -155,7 +188,7 @@ try {
         !localStorage.getItem(`live-stats:outbox:${id}`) &&
         document.getElementById('lt-sync').textContent.startsWith('Saved'),
       gameId,
-      { timeout: 20_000 },
+      { timeout: WAIT_MS, polling: 100 },
     );
   const saved = () =>
     supabase.db
@@ -190,6 +223,7 @@ try {
 
   // A fan's phone, not signed in, follows along.
   const fan = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+  fan.setDefaultTimeout(WAIT_MS);
   watch(fan);
   await fan.goto(`${base}game.html?id=${gameId}`);
   await fan.locator('.sb-score').first().waitFor();
@@ -206,7 +240,7 @@ try {
   await menu('p2').click();
   await page
     .locator('#lt-sync', { hasText: 'Not connected — 2 actions kept on this device' })
-    .waitFor({ timeout: 30_000 });
+    .waitFor({ timeout: WAIT_MS });
   assert.deepEqual(
     [
       await page.locator('#lt-score-home').textContent(),
@@ -226,8 +260,9 @@ try {
   await fan.waitForFunction(
     () => [...document.querySelectorAll('.sb-score')].map((s) => s.textContent).join() === '5,5',
     null,
-    { timeout: 15_000 },
+    { timeout: WAIT_MS, polling: 100 },
   );
+  await fan.locator('#pbp li', { hasText: '#12 +2' }).first().waitFor();
   assert.match(await fan.locator('#pbp li').first().textContent(), /#12 \+2/);
   await shot(fan, 'game-phone', true);
 
@@ -237,9 +272,8 @@ try {
   await shot(page, 'tracker');
   await page.locator('#lt-end').click();
   await page.locator('#lt-final:not([hidden])').waitFor();
-  await page.waitForFunction(
-    () => !document.getElementById('lt-sync').textContent.startsWith('Saving'),
-  );
+  await settled();
+  await until('the game to be saved as final', saved, (g) => g?.status === 'final');
   assert.equal((await saved()).status, 'final');
 
   // Schedule, game log and a player's game log, as anyone sees them.
