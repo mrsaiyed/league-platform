@@ -26,6 +26,7 @@ Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.
 - **2.28 Scoring sessions and takeover** — `.local/lanes/2.28-scoring-sessions` — 036 / T-248 used (its commit registers it) — built, merged with build, pushed; opus review running. Then: fixes, GitHub PASS, land. Notes: step 2.33 must supply a deviceId; contract gaps in tracker-protocol (no deviceId, no game-closed code, holder displayName); step 2.29 uses sessionStanding.
 - **2.73 Slots and fairness rules** — `.local/lanes/2.73-slots` — none used — built, merged with build, pushed; opus review running. Then: fixes, GitHub PASS, land. Notes: strict vs best-effort split and unplaced result are the builder's technical decision (write up as T-249 / record 037 when landing); two teams alone can meet only once with the matchup rule on.
 - **2.84 Highlight color** — `.local/lanes/2.84-highlight` — none (no migration; record 038 / T-250 if needed) — opened (founder priority, C-15).
+- **2.42 Home and schedule pages** — `.local/lanes/2.42-home-schedule` — none (no migration; record 038 / T-250 if needed) — opened (founder priority).
 
 ## Needs the founder
 
