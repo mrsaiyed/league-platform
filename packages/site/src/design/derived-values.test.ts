@@ -98,6 +98,12 @@ describe('the scales every screen is built from', () => {
     ]);
   });
 
+  it('one height for anything a thumb taps: 44, in every design', () => {
+    for (const key of startingDesignKeys) {
+      expect(rem(designToCssVariables(startingDesign(key))['--tap'])).toBe(44);
+    }
+  });
+
   it("a design's spacing choice picks steps of that scale, never a size between", () => {
     const scale = [4, 8, 12, 16, 24, 32, 48, 64];
     const base = startingDesign('clean-court');

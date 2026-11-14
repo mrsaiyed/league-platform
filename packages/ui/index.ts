@@ -17,6 +17,7 @@ export * from './src/empty-panel/empty-panel.tsx';
 export * from './src/message-page/message-page.tsx';
 export * from './src/stat-strip/stat-strip.tsx';
 export * from './src/emblem/emblem.tsx';
+export * from './src/facts/facts.tsx';
 export * from './src/team-card/team-card.tsx';
 export * from './src/leader-card/leader-card.tsx';
 export * from './src/group/group.tsx';

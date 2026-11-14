@@ -104,9 +104,13 @@ export const tableCss = String.raw`
   background-color: var(--color-panel);
   white-space: nowrap;
 }
-.ui-team-cell .ui-team-chip {
+/* A team's color beside its name, wherever a table names a team; the two never part. */
+.ui-table .ui-team-chip {
   display: inline-block;
   margin-inline-end: var(--step-2);
+}
+.ui-table td:has(> .ui-team-chip) {
+  white-space: nowrap;
 }
 /* A note's number sits beside the name without making its row taller than the others. */
 .ui-note-mark {
@@ -154,8 +158,8 @@ export const tableCss = String.raw`
   gap: 0.35em;
   padding-block: 0;
   padding-inline: 0;
-  min-block-size: 2.75rem;
-  min-inline-size: 2.75rem;
+  min-block-size: var(--tap);
+  min-inline-size: var(--tap);
   border: 0;
   border-radius: var(--radius-small);
   background: none;

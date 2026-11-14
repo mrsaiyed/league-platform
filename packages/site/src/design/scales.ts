@@ -26,6 +26,12 @@ export const textVariables = {
 } as const;
 
 /**
+ * The height of anything a thumb taps: 44, on every screen (docs/build/DESIGN.md, section 3).
+ * Written once here, so no stylesheet carries the number itself.
+ */
+export const tapVariables = { '--tap': '2.75rem' } as const;
+
+/**
  * What a design's spacing choice sets: the padding of a card and the gap between cards
  * (`--space`), the gap inside a card (`--space-tight`) and the gap between the sections of a
  * page (`--space-section`).

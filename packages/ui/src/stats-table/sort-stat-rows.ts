@@ -6,6 +6,11 @@ export type StatValue = string | number | null;
 export type StatRow = {
   readonly id: string;
   readonly cells: Readonly<Record<string, StatValue>>;
+  /**
+   * The columns of this row that name a team, by the column's key, each with the team's own
+   * color (#rrggbb): that cell shows a chip before the name, plain when the color is null.
+   */
+  readonly chips?: Readonly<Record<string, string | null>>;
 };
 
 export type SortDirection = 'ascending' | 'descending';

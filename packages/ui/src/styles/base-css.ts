@@ -125,7 +125,7 @@ body {
     select,
     textarea
   ) {
-  min-block-size: 2.75rem;
+  min-block-size: var(--tap);
   max-inline-size: 100%;
   padding-block: var(--step-2);
   padding-inline: var(--step-3);
@@ -136,18 +136,18 @@ body {
   font-weight: 400;
 }
 .ui-root :where(textarea) {
-  min-block-size: 6rem;
+  min-block-size: calc(2 * var(--step-7));
 }
 .ui-root :where(input[type='checkbox'], input[type='radio']) {
-  inline-size: 1.25rem;
-  block-size: 1.25rem;
+  inline-size: var(--step-5);
+  block-size: var(--step-5);
   margin: 0;
   vertical-align: middle;
   accent-color: var(--color-primary);
 }
 .ui-root :where(input[type='color']) {
-  inline-size: 2.75rem;
-  block-size: 2.75rem;
+  inline-size: var(--tap);
+  block-size: var(--tap);
   padding: var(--step-1);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-small);
@@ -170,7 +170,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: var(--step-2);
-  min-block-size: 2.75rem;
+  min-block-size: var(--tap);
   padding-block: var(--step-2);
   padding-inline: var(--step-4);
   border: 1px solid var(--color-line-strong);

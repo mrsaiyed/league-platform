@@ -7,7 +7,7 @@ import type { DesignDocument } from './design-document.ts';
 import { derivedColors } from './derived-colors.ts';
 import { fontStacks } from './fonts.ts';
 import { frameVariables } from './frame-look.ts';
-import { spacingVariables, stepVariables, textVariables } from './scales.ts';
+import { spacingVariables, stepVariables, tapVariables, textVariables } from './scales.ts';
 
 /** The corners of a card, of a button or field, and of a pill. */
 const corners = {
@@ -75,6 +75,7 @@ export function designToCssVariables(design: DesignDocument): Record<string, str
     ...known(spacingVariables, design.spacing, 'spacing'),
     ...stepVariables,
     ...textVariables,
+    ...tapVariables,
     ...frameVariables[base],
     'color-scheme': base,
   };

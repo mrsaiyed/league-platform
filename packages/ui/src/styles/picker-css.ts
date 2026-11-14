@@ -1,7 +1,8 @@
 // The filter toolbar and its pickers (docs/build/DESIGN.md, section 4, line 15): season,
 // round, team and "per game or totals" in one compact row. With scripts on, choosing a
 // value applies it and the "Show" buttons are put away; with scripts off they stay, quiet.
-// The chosen value is written in the highlight (C-15).
+// The chosen value is in the text color, a little heavier: the highlight is kept for a live
+// game and a winner's score (C-15).
 export const pickerCss = String.raw`
 .ui-toolbar {
   display: flex;
@@ -32,7 +33,7 @@ export const pickerCss = String.raw`
 }
 .ui-picker select,
 .ui-picker button {
-  min-block-size: 2.75rem;
+  min-block-size: var(--tap);
   padding-block: var(--step-2);
   padding-inline: var(--step-3);
   border: 1px solid var(--color-line-strong);
@@ -43,8 +44,8 @@ export const pickerCss = String.raw`
   font-size: var(--text-14);
 }
 .ui-picker select {
-  color: var(--color-highlight);
-  font-weight: 700;
+  max-inline-size: 100%;
+  font-weight: 600;
   cursor: pointer;
 }
 .ui-picker option {
@@ -53,7 +54,6 @@ export const pickerCss = String.raw`
   font-weight: 400;
 }
 .ui-picker option:checked {
-  color: var(--color-highlight);
   font-weight: 700;
 }
 .ui-picker button {

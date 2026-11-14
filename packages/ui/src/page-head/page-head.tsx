@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Facts, type Fact } from '../facts/facts.tsx';
 
 export type PageHeadProps = {
   /** The page's one title. */
@@ -7,6 +8,8 @@ export type PageHeadProps = {
   readonly eyebrow?: string | undefined;
   /** One quiet line under the title. */
   readonly sub?: string | undefined;
+  /** A few short facts under the title, each a label and its value: a team's seed and record. */
+  readonly facts?: readonly Fact[] | undefined;
   /** A home page opens larger, with the eyebrow as a badge. */
   readonly size?: 'page' | 'hero';
   /** Drawn before the title: a team's emblem, say. */
@@ -16,7 +19,15 @@ export type PageHeadProps = {
 };
 
 /** The head of a page: one title, what it belongs to, and the page's own actions. */
-export function PageHead({ title, eyebrow, sub, size = 'page', lead, children }: PageHeadProps) {
+export function PageHead({
+  title,
+  eyebrow,
+  sub,
+  facts,
+  size = 'page',
+  lead,
+  children,
+}: PageHeadProps) {
   if (size === 'hero') {
     return (
       <header className="ui-page-head" data-size="hero">
@@ -35,6 +46,7 @@ export function PageHead({ title, eyebrow, sub, size = 'page', lead, children }:
           {eyebrow ? <p className="ui-eyebrow">{eyebrow}</p> : null}
           <h1 dir="auto">{title}</h1>
           {sub ? <p className="ui-page-sub">{sub}</p> : null}
+          {facts && facts.length > 0 ? <Facts facts={facts} /> : null}
         </div>
         {children}
       </div>

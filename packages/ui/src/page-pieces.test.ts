@@ -44,6 +44,22 @@ describe('page head', () => {
     expect(html).toContain('ui-badge');
     expect(html).toContain(`<h1 dir="auto">${arabicName}</h1>`);
   });
+  it('lists a few facts under the title, each a label and its value', () => {
+    const html = render(
+      createElement(PageHead, {
+        title: 'Owls',
+        facts: [
+          { key: 'seed', label: 'Seed', value: '1' },
+          { key: 'record', label: 'Record', value: '5-1' },
+        ],
+      }),
+    );
+    expect(html).toContain('<dl class="ui-facts">');
+    expect(html).toContain('<dt>Seed</dt><dd dir="auto">1</dd>');
+    expect(html).toContain('<dt>Record</dt><dd dir="auto">5-1</dd>');
+    expect(html.indexOf('Owls')).toBeLessThan(html.indexOf('ui-facts'));
+    expect(render(createElement(PageHead, { title: 'Owls', facts: [] }))).not.toContain('ui-facts');
+  });
 });
 
 describe('section', () => {
@@ -228,6 +244,26 @@ describe('a game card is one link, whole', () => {
     expect(html).not.toContain('ui-game-versus');
     expect(html.match(/<a /g)).toHaveLength(1);
   });
+  it('puts the place on a line of its own, and draws none for a game with no place', () => {
+    expect(html).not.toContain('ui-game-place');
+    const placed = render(
+      createElement(GameCard, {
+        home: { name: 'Hawks', score: null },
+        away: { name: 'Owls', score: null },
+        status: 'scheduled',
+        whenText: 'Sat 9:00',
+        placeText: 'Central Gym, Court 1',
+        labels,
+      }),
+    );
+    expect(placed).toContain('<span class="ui-game-when">Sat 9:00</span>');
+    expect(placed).toContain('<span class="ui-game-place" dir="auto">Central Gym, Court 1</span>');
+    // The place spans the card under the first line, and the teams sit at the foot, so the
+    // cards of a row line up whether or not each has a place.
+    expect(displayCss).toMatch(/\.ui-game-place \{[^}]*grid-column: 1 \/ -1;/);
+    expect(displayCss).toMatch(/\.ui-game-card \{[^}]*grid-template-rows: auto 1fr;/);
+    expect(displayCss).toMatch(/\.ui-game-teams \{[^}]*align-self: end;/);
+  });
   it('covers the card with its link and keeps the link words for screen readers only', () => {
     expect(displayCss).toMatch(/\.ui-game-link \{[^}]*position: absolute;[^}]*inset: 0;/);
     expect(displayCss).toMatch(/\.ui-game-link \{[^}]*text-indent: 200%;/);
@@ -248,6 +284,50 @@ describe('tables', () => {
     );
     expect(html).toContain('--team-color:#663399');
     expect(html).toMatch(/<th scope="row" class="ui-team-cell"><span class="ui-team-chip"/);
+  });
+  it('give a team its color chip in a statistics table too, under the column that names it', () => {
+    const html = render(
+      createElement(SortableStatsTable, {
+        caption: 'All players',
+        columns: [
+          { key: 'player', label: 'Player' },
+          { key: 'team', label: 'Team' },
+          { key: 'pts', label: 'PTS', numeric: true },
+        ],
+        rows: [
+          { id: 'a', cells: { player: 'Dana', team: 'Owls', pts: 12 }, chips: { team: '#663399' } },
+          { id: 'b', cells: { player: 'Sam', team: 'Owls, Hawks', pts: 9 }, chips: { team: null } },
+          { id: 'c', cells: { player: 'Noor', team: 'Hawks', pts: 7 }, chips: { team: 'red;x' } },
+        ],
+        labels: { sortBy: 'Sort by' },
+      }),
+    );
+    expect(html).toContain(
+      '<td><span class="ui-team-chip" aria-hidden="true" style="--team-color:#663399"></span><span dir="auto">Owls</span></td>',
+    );
+    // No color, or one that is not a color: the plain chip, so the names stay in line.
+    expect(html.match(/ui-team-chip/g)).toHaveLength(3);
+    expect(html.match(/--team-color/g)).toHaveLength(1);
+    expect(html).not.toContain('red;x');
+    // A row that names no team in a column has no chip there.
+    const none = render(
+      createElement(SortableStatsTable, {
+        caption: 'Leaders',
+        columns: [{ key: 'player', label: 'Player' }],
+        rows: [{ id: 'a', cells: { player: 'Dana' } }],
+        labels: { sortBy: 'Sort by' },
+      }),
+    );
+    expect(none).not.toContain('ui-team-chip');
+    const teams = render(
+      createElement(SortableStatsTable, {
+        caption: 'Teams',
+        columns: [{ key: 'team', label: 'Team' }],
+        rows: [{ id: 'a', cells: { team: 'Owls' }, chips: { team: '#663399' } }],
+        labels: { sortBy: 'Sort by' },
+      }),
+    );
+    expect(teams).toMatch(/<th scope="row" class="ui-team-cell"><span class="ui-team-chip"/);
   });
   it('can keep a caption for screen readers under a heading that says the same', () => {
     const table = (captionHidden: boolean) =>
@@ -299,7 +379,12 @@ describe('the stylesheet of the page pieces', () => {
   it('keeps everything a thumb taps at least 44 high', () => {
     for (const selector of ['.ui-more', '.ui-crumbs a', '.ui-picker select,\n.ui-picker button']) {
       const block = css.slice(css.indexOf(`${selector} {`));
-      expect(block.slice(0, block.indexOf('}')), selector).toContain('min-block-size: 2.75rem');
+      expect(block.slice(0, block.indexOf('}')), selector).toContain('min-block-size: var(--tap)');
     }
+  });
+  it('names the tap height once, as a variable, and no size off the scales', () => {
+    // 44 is written in the design's values (packages/site, scales.ts), never here.
+    expect(css).not.toContain('2.75rem');
+    for (const raw of ['0.375rem', '0.3125rem', '1.25rem']) expect(css).not.toContain(raw);
   });
 });

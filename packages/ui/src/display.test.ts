@@ -369,7 +369,7 @@ describe('review fixes', () => {
   it('sort arrows are silent and tap targets are big enough', () => {
     expect(displayCss).toContain(String.raw`'\25B2' / ''`);
     expect(displayCss).toContain(String.raw`'\25BC' / ''`);
-    expect(displayCss).toMatch(/\.ui-sort-button \{[^}]*min-block-size: 2\.75rem/);
+    expect(displayCss).toMatch(/\.ui-sort-button \{[^}]*min-block-size: var\(--tap\)/);
     expect(displayCss).toMatch(/\.ui-note-mark a \{[^}]*min-block-size: 1\.5rem/);
   });
 });
@@ -386,7 +386,7 @@ describe('the stylesheet', () => {
       /(^|[\s{;])(margin|padding|border)-(left|right)\b|(^|[\s{;])(left|right)\s*:|text-align:\s*(left|right)|float:/m,
     );
   });
-  it('uses the highlight only for the Live marker, the winner score and the chosen picker item', () => {
+  it('uses the highlight only for the Live marker and the winner score, never for a picker', () => {
     const used = [...css.matchAll(/([^{}]+){([^{}]*)}/g)]
       .filter((m) => (m[2] ?? '').includes('var(--color-highlight)'))
       .map((m) => (m[1] ?? '').trim().replace(/\s+/g, ' '))
@@ -396,9 +396,11 @@ describe('the stylesheet', () => {
         '.ui-live',
         ".ui-game-team[data-winner='true'] .ui-game-team-score",
         ".ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score",
-        '.ui-picker select',
-        '.ui-picker option:checked',
       ].sort(),
+    );
+    // A picker's chosen value is in the text color it is given with its field.
+    expect(css).toMatch(
+      /\.ui-picker select,\s*\.ui-picker button \{[^}]*color: var\(--color-text\);/,
     );
   });
   it('lets readers turn movement off', () => {

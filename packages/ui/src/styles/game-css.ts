@@ -64,7 +64,9 @@ export const gameCss = String.raw`
 .ui-game-card {
   position: relative;
   display: grid;
-  align-content: start;
+  /* The top line takes what it needs and the teams sit at the foot, so in a row of cards the
+     team rows line up whether or not a card has a place to name. */
+  grid-template-rows: auto 1fr;
   gap: var(--step-3);
   inline-size: 100%;
   padding-block: var(--step-4);
@@ -80,15 +82,23 @@ export const gameCss = String.raw`
   border-color: var(--color-primary);
 }
 .ui-game-meta {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--step-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  /* The first line is as tall as a state pill whether or not the game has one. */
+  grid-template-rows: minmax(var(--step-5), auto);
+  align-items: center;
+  align-content: start;
+  gap: var(--step-1) var(--step-3);
   color: var(--color-muted);
   font-size: var(--text-12);
   line-height: 1.5;
 }
 .ui-game-about {
+  min-inline-size: 0;
+}
+/* Where the game is played: always a line of its own, under when. */
+.ui-game-place {
+  grid-column: 1 / -1;
   min-inline-size: 0;
 }
 .ui-game-number {
@@ -100,6 +110,7 @@ export const gameCss = String.raw`
 }
 .ui-game-teams {
   display: grid;
+  align-self: end;
   gap: var(--step-2);
   margin: 0;
   padding: 0;

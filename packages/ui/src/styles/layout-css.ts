@@ -67,7 +67,7 @@ export const layoutCss = String.raw`
 .ui-crumbs a {
   display: inline-flex;
   align-items: center;
-  min-block-size: 2.75rem;
+  min-block-size: var(--tap);
   font-weight: 600;
   text-decoration: none;
 }
@@ -85,7 +85,7 @@ export const layoutCss = String.raw`
   align-items: center;
   justify-content: space-between;
   gap: var(--step-1) var(--step-4);
-  min-block-size: 2.75rem;
+  min-block-size: var(--tap);
   margin-block-end: var(--step-4);
 }
 .ui-section-head h2,
@@ -108,7 +108,7 @@ export const layoutCss = String.raw`
 .ui-more {
   display: inline-flex;
   align-items: center;
-  min-block-size: 2.75rem;
+  min-block-size: var(--tap);
   font-size: var(--text-14);
   font-weight: 600;
   text-decoration: none;

@@ -30,6 +30,8 @@ export type GameCardProps = {
   readonly status: GameStatus;
   /** The date and time, already written for the reader by the page. */
   readonly whenText: string;
+  /** Where it is played, already written by the page; drawn on a line of its own. */
+  readonly placeText?: string;
   /** For example "Game 4", already written by the page. */
   readonly numberText?: string;
   /** Where "view box score" goes. The page builds it with the address helper. */
@@ -82,8 +84,8 @@ function Team({
 }
 
 /**
- * One game as a compact card: a quiet line saying when and where, with its state as a small
- * pill; then each team on its own row, its color and name at the start and its score at the
+ * One game as a compact card: a quiet line saying when, with its state as a small pill, and
+ * where on the line under it; then each team on its own row, its color and name at the start and its score at the
  * end. A card with somewhere to go is one link, whole: the link's words are kept for screen
  * readers and not drawn.
  */
@@ -92,6 +94,7 @@ export function GameCard({
   away,
   status,
   whenText,
+  placeText,
   numberText,
   detailsHref,
   labels,
@@ -109,6 +112,11 @@ export function GameCard({
           <span className="ui-game-when">{whenText}</span>
         </span>
         {state}
+        {placeText ? (
+          <span className="ui-game-place" dir="auto">
+            {placeText}
+          </span>
+        ) : null}
       </header>
       <ul className="ui-game-teams">
         <Team team={away} isWinner={winner === 'away'} labels={labels} />

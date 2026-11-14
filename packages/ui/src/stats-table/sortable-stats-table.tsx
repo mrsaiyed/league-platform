@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
+import { safeColor } from '../team-color.ts';
 import { nextSort, sortStatRows, type Sort, type StatRow } from './sort-stat-rows.ts';
 
 export type StatsColumn = {
@@ -30,6 +31,22 @@ export type SortableStatsTableProps = {
   readonly locale?: string;
   readonly labels: StatsTableLabels;
 };
+
+/**
+ * A team's chip, when the row says this column names a team: in the team's own color, or the
+ * plain chip for a team with no color, so the names of a column stay in line.
+ */
+function chipOf(row: StatRow, key: string): ReactNode {
+  if (row.chips === undefined || !Object.hasOwn(row.chips, key)) return null;
+  const color = safeColor(row.chips[key]);
+  return (
+    <span
+      className="ui-team-chip"
+      aria-hidden="true"
+      style={color ? ({ '--team-color': color } as CSSProperties) : undefined}
+    />
+  );
+}
 
 /** A table of statistics the reader can sort by any column. Shows the initial sort without scripts. */
 export function SortableStatsTable({
@@ -85,6 +102,7 @@ export function SortableStatsTable({
               {columns.map((c, i) =>
                 i === 0 ? (
                   <th key={c.key} scope="row" className="ui-team-cell">
+                    {chipOf(row, c.key)}
                     <span dir="auto">{row.cells[c.key] ?? ''}</span>
                   </th>
                 ) : (
@@ -92,7 +110,10 @@ export function SortableStatsTable({
                     {c.numeric ? (
                       (row.cells[c.key] ?? '')
                     ) : (
-                      <span dir="auto">{row.cells[c.key] ?? ''}</span>
+                      <>
+                        {chipOf(row, c.key)}
+                        <span dir="auto">{row.cells[c.key] ?? ''}</span>
+                      </>
                     )}
                   </td>
                 ),

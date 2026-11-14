@@ -1,11 +1,7 @@
 import { Emblem } from '../emblem/emblem.tsx';
+import { Facts, type Fact } from '../facts/facts.tsx';
 
-export type TeamCardFact = {
-  readonly key: string;
-  /** "Seed", "Division". */
-  readonly label: string;
-  readonly value: string;
-};
+export type TeamCardFact = Fact;
 
 export type TeamCardProps = {
   readonly name: string;
@@ -28,14 +24,7 @@ export function TeamCard({ name, href, color, figure, facts }: TeamCardProps) {
             {name}
           </a>
         </h3>
-        <dl className="ui-facts">
-          {facts.map((fact) => (
-            <div key={fact.key}>
-              <dt>{fact.label}</dt>
-              <dd dir="auto">{fact.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <Facts facts={facts} />
       </div>
       <p className="ui-team-card-figure">
         <span className="ui-visually-hidden">{figure.label}</span> {figure.value}

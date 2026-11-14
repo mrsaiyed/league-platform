@@ -92,7 +92,7 @@ A screen is finished when every line below is true for it, at 390 and at 1280, f
 
 **Color**
 
-16. Most of a screen is the background, the panel and the text color. The main color is for identity: the name, the current tab, section rules, the main button. The accent is for small labels and second-rank marks. The highlight is only for Live, the winner's score and the chosen item (C-15).
+16. Most of a screen is the background, the panel and the text color. The main color is for identity: the name, the current tab, section rules, the main button. The accent is for small labels and second-rank marks. The highlight is only for Live and the winner's score (C-15). A picker's chosen value is in the text color, a little heavier, never the highlight.
 17. Borders are the text or main color at 12 to 25 percent strength (`color-mix`). A full-strength accent line around every box is not allowed.
 
 **Empty, loading and refused**

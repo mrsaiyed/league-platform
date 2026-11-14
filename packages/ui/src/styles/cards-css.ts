@@ -195,20 +195,26 @@ export const cardsCss = String.raw`
 .ui-group > summary::-webkit-details-marker {
   display: none;
 }
+/* The mark that says a group opens: a small corner that points on when shut, down when open. */
 .ui-group > summary::before {
   content: '';
   flex: none;
-  border-inline: 0.3125rem solid transparent;
-  border-block-start: 0.375rem solid var(--color-muted);
+  inline-size: var(--step-2);
+  block-size: var(--step-2);
+  margin-inline: var(--step-1);
+  border-block-end: 2px solid var(--color-muted);
+  border-inline-end: 2px solid var(--color-muted);
   transition: transform 0.15s;
-  transform: rotate(-90deg);
+  transform: rotate(-45deg);
 }
 [dir='rtl'] .ui-group > summary::before {
-  transform: rotate(90deg);
+  transform: rotate(45deg);
 }
-.ui-group[open] > summary::before,
+.ui-group[open] > summary::before {
+  transform: rotate(45deg);
+}
 [dir='rtl'] .ui-group[open] > summary::before {
-  transform: none;
+  transform: rotate(-45deg);
 }
 .ui-group > summary h2,
 .ui-group > summary h3 {
