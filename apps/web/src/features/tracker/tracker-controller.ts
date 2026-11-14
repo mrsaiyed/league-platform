@@ -27,7 +27,12 @@ import {
 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import type { CommandTransport } from './command-transport.ts';
-import { QueueError, type QueueErrorCode, type QueueStorage } from './queue-storage.ts';
+import {
+  QueueError,
+  type QueueErrorCode,
+  type QueueStorage,
+  type QueuedCommand,
+} from './queue-storage.ts';
 import { defaultRetryTiming, retryDelayMs, type RetryTiming } from './retry-delay.ts';
 import type { ServerOutcome, ServerState, TrackerServer } from './tracker-server.ts';
 import {
@@ -345,18 +350,25 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     });
   };
 
-  /** No longer scoring: nothing more is sent, and what was waiting is listed as not saved. */
+  /**
+   * No longer scoring: nothing more is sent. Only when the game was lost is what was
+   * waiting listed as not saved and the server's state shown. For any other reason
+   * (signed out, say) the waiting taps stay shown and are sent on opening again into
+   * the same session, so they are not listed: listing them would invite entering them
+   * twice.
+   */
   const readOnly = async (reason: ReadOnlyReason): Promise<void> => {
     sessionId = null;
     cancelRenew?.();
     cancelRenew = null;
     clearTimer();
+    update({ mode: { kind: 'read-only', reason } });
+    if (!lostTheGame.has(reason)) return;
     const waiting = await waitingTaps().catch(() => current.notSaved);
     const unsent = new Set(waiting.map((c) => c.commandId));
     made = made.filter((c) => !unsent.has(c.commandId));
-    update({ mode: { kind: 'read-only', reason }, notSaved: waiting });
+    update({ notSaved: waiting });
     showGame();
-    if (!lostTheGame.has(reason)) return;
     // Another device may be scoring it: show what the server holds now, if it answers.
     const loaded = await ask((signal) => server.loadState(signal));
     if (loaded.kind === 'answer' && current.mode.kind === 'read-only') {
@@ -439,12 +451,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    */
   const hold = async (held: string): Promise<void> => {
     const waiting = (await storage.list(gameId)).filter((entry) => entry.state === 'waiting');
-    const lost = waiting
-      .filter((entry) => entry.sessionId !== undefined && entry.sessionId !== held)
-      .map((entry) => entry.command);
+    const madeUnder = (entry: QueuedCommand) =>
+      entry.sessionId === undefined || entry.sessionId === held;
+    const lost = waiting.filter((entry) => !madeUnder(entry)).map((entry) => entry.command);
     if (lost.length > 0) await queue.forget(lost.map((c) => c.commandId));
-    const dropped = new Set(lost.map((c) => c.commandId));
-    made = made.filter((c) => !dropped.has(c.commandId));
+    // Not scoring, so every tap of this device's the server lacks is waiting in the
+    // queue: the game shown is rebuilt from it, so what will be sent is what is shown
+    // (one hidden when the game was lost, say, then kept on opening again into it).
+    made = waiting.filter(madeUnder).map((entry) => entry.command);
     update({ notSaved: lost });
     return scoreWith(held);
   };

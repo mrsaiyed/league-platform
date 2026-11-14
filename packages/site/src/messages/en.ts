@@ -970,7 +970,7 @@ export const en = {
   'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
   'tracker.readOnly.unknown-game': 'This game could not be found.',
   'tracker.readOnly.signed-out':
-    'You are signed out. Sign in again to keep scoring: what you tapped on this device is kept.',
+    'You are signed out. Sign in again to keep scoring. What you entered on this device is kept and sent once you are back, so do not enter it again.',
   'tracker.readOnly.update-needed':
     'This tracker needs an update. Reload the page to keep scoring.',
   'tracker.heldByOther': '{name} is scoring this game on another device.',

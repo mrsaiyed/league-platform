@@ -40,15 +40,18 @@ function device(
     storage = createMemoryQueueStorage(),
     clock = createManualClock(),
     game = gameId,
+    signedIn = () => as,
   }: {
     game?: string;
     as?: Person;
+    /** Who the device is signed in as at each request, when that changes in a test. */
+    signedIn?: () => Person;
     deviceId?: string;
     storage?: QueueStorage;
     clock?: ReturnType<typeof createManualClock>;
   } = {},
 ) {
-  const fetch = network.fetchAs(as);
+  const fetch: typeof globalThis.fetch = (input, init) => network.fetchAs(signedIn())(input, init);
   const controller = createTrackerController({
     gameId: game,
     deviceId,
@@ -420,6 +423,42 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     await laptop.controller.start();
     await laptop.controller.idle();
     expect(laptop.controller.status().mode).toEqual({ kind: 'scoring' });
+  });
+});
+
+describe('tracker controller: signed out mid-game', () => {
+  it('keeps showing the waiting taps, lists none as not saved, and sends them on signing in', async () => {
+    const network = endpointNetwork();
+    let who: Person = 'scorekeeper';
+    const tablet = device(network, { signedIn: () => who });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet.controller, [basket('home', hawks[0] ?? '')]);
+    await tablet.controller.idle();
+
+    // Back online, but signed out: the next request is turned away.
+    who = 'visitor';
+    network.mode = 'up';
+    tablet.controller.online();
+    await tablet.controller.idle();
+    let status = tablet.controller.status();
+    expect(status.mode).toEqual({ kind: 'read-only', reason: 'signed-out' });
+    // Not a loss of the game: the tap is still shown and is not listed as not saved.
+    expect(status.notSaved).toEqual([]);
+    expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
+    expect(status.queue.waiting).toBe(1);
+
+    who = 'scorekeeper';
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    status = tablet.controller.status();
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(status.notSaved).toEqual([]);
+    expect(status.queue.waiting).toBe(0);
+    expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
   });
 });
 
