@@ -17,13 +17,13 @@
 // - accepted.
 //
 // Starting a game turns its rules into the engine's: its own if it was given some,
-// otherwise its season's, which the game then keeps (S-1), so a later change to the
-// season's rules leaves it alone. The tracker's protocol version is read before
+// otherwise its season's. Until the game goes live (line-ups only) it follows them as
+// they stand; from then on it keeps them (S-1), so a later change to the season's
+// rules leaves it alone. The tracker's protocol version is read before
 // anything else: the current one and the one before it are taken (T-127).
 import {
   buildVersionRefusal,
   CommandBatch,
-  defaultSeasonRules,
   isAcceptedProtocolVersion,
   type CommandReply,
   type CommandResult,
@@ -41,6 +41,7 @@ import {
   readState,
   rosterOf,
   scoreOf,
+  withCurrentRules,
   withLowerIds,
   type TrackerInput,
 } from '../live-game.ts';
@@ -142,11 +143,16 @@ export const applyTrackerCommands = defineCommand({
 
     const now = tx.clock.now();
     const before = saved === undefined ? undefined : readState(saved.state);
-    // S-1: a game starting now is played under its own rules, or a copy of its season's.
-    const rules = before === undefined ? await effectiveRulesOf(tx, game) : undefined;
+    // S-1: until it starts, a game follows the rules it has now: its own, or its
+    // season's as they stand. A state holding only line-ups takes them again
+    // (withCurrentRules), so a season change before tip-off still reaches it.
+    const rules = await effectiveRulesOf(tx, game);
     // Made at time 0, as the Al-Hadi tracker makes its games, so taps queued offline
     // before this batch arrived still run the clock from when they happened.
-    let state = before ?? basketball.newGame(engineRulesOf(rules ?? defaultSeasonRules()), 0);
+    let state =
+      before === undefined
+        ? basketball.newGame(engineRulesOf(rules), 0)
+        : withCurrentRules(before, engineRulesOf(rules));
     const roster = rosterOf(await tx.liveGames.players(gameId));
     const events: NewGameEvent[] = [];
     const results = batch.commands.map((command, i): CommandResult => {
@@ -189,7 +195,10 @@ export const applyTrackerCommands = defineCommand({
       await tx.liveGames.saveLines(gameId, changed.lines, changed.removed);
     }
     const result = resultOf(state);
-    const fixRules = game.format === null && rules !== undefined;
+    // The game keeps its rules from the moment it goes live (S-1): the database fixes
+    // them then (games_format_fixed_once_started). While only line-ups are in, the
+    // game has none of its own, so a season change before tip-off still applies.
+    const fixRules = game.format === null && result.status === 'live';
     if (
       fixRules ||
       result.status !== game.status ||

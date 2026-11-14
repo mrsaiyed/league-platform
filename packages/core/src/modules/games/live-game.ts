@@ -61,6 +61,30 @@ export function withLowerIds(input: TrackerInput): TrackerInput {
   }
 }
 
+/**
+ * The game's rules put into a state that has not started (S-1): one that is still
+ * scheduled and whose clock has never run holds only line-ups, so it takes the rules
+ * the game has now, as if it were made today. The clock moves to the new first
+ * period unless the scorer set it by hand. A state that has started keeps its rules.
+ */
+export function withCurrentRules(
+  state: basketball.GameState,
+  rules: basketball.Rules,
+): basketball.GameState {
+  if (state.status !== 'scheduled' || state.clock.running || state.clock.elapsedMs > 0) {
+    return state;
+  }
+  const untouched = state.clock.remainingMs === basketball.periodMs(state.rules, 1);
+  return {
+    ...state,
+    rules: { ...rules },
+    clock: {
+      ...state.clock,
+      remainingMs: untouched ? basketball.periodMs(rules, 1) : state.clock.remainingMs,
+    },
+  };
+}
+
 /** The players a command names. A team's own play (a timeout, a team turnover) names none. */
 function playersNamed(input: TrackerInput): readonly string[] {
   switch (input.type) {

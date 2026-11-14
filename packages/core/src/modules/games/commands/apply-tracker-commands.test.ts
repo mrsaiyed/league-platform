@@ -481,14 +481,40 @@ describe('the rules a game is played under (S-1)', () => {
     expect(basketball.clockModeOf(state.rules)).toBe('running');
   });
 
-  it('lineups before tip-off fix the rules, though the game is not live yet', async () => {
+  it('line-ups alone do not fix the rules: a season change before tip-off still applies', async () => {
     const t = setUp();
     await applyTrackerCommands(t.as(scorekeeperId), batchOf(taps(tipOff.slice(0, 2))), t.deps);
     expect(t.db.state.games[0]).toMatchObject({
       status: 'scheduled',
       homeScore: null,
-      format: seasonRulesPreset('high-school'),
+      format: null,
     });
+    // The admin moves the season to halves before tip-off.
+    const season = t.db.state.seasons[0];
+    if (season !== undefined) season.rules = seasonRulesPreset('rec-league');
+    await applyTrackerCommands(t.as(scorekeeperId), batchOf(taps([{ type: 'start' }], 10)), t.deps);
+    const state = t.db.state.states[0]?.state as basketball.GameState;
+    expect(state.rules).toEqual(engineRulesOf(seasonRulesPreset('rec-league')));
+    expect(state.clock.remainingMs).toBe(20 * 60 * 1000);
+    expect(t.db.state.games[0]).toMatchObject({
+      status: 'live',
+      format: seasonRulesPreset('rec-league'),
+    });
+  });
+
+  it('a clock the scorer set by hand before tip-off is kept when the rules change', async () => {
+    const t = setUp();
+    await applyTrackerCommands(
+      t.as(scorekeeperId),
+      batchOf(taps([{ type: 'set-clock', ms: 300_000 }])),
+      t.deps,
+    );
+    const season = t.db.state.seasons[0];
+    if (season !== undefined) season.rules = seasonRulesPreset('rec-league');
+    await applyTrackerCommands(t.as(scorekeeperId), batchOf(taps([{ type: 'start' }], 10)), t.deps);
+    const state = t.db.state.states[0]?.state as basketball.GameState;
+    expect(state.rules.periods).toBe(2);
+    expect(state.clock.remainingMs).toBe(300_000);
   });
 });
 
