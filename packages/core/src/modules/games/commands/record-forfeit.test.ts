@@ -54,6 +54,50 @@ describe('recordForfeit', () => {
     expect(db.state.games[0]).toMatchObject({ homeScore: 1, awayScore: 11 });
   });
 
+  it('clears the old lines of a box score game recorded now as a forfeit', async () => {
+    const lineOf = (n: number) => ({
+      gameId: gameUuid(n),
+      teamId: game(n).homeTeamId,
+      personId: `01900000-0000-7000-8000-0000000d000${n}`,
+      played: true,
+      secondsPlayed: null,
+      stats: { points: 20 },
+    });
+    const state = {
+      games: [game(1, { captureMode: 'box' }), game(2, { captureMode: 'box' })],
+      lines: [lineOf(1), lineOf(2)],
+    };
+    // A refused forfeit changes nothing.
+    const refused = memoryGames(state);
+    const wrongTeam = { ...input, forfeitingTeamId: gameUuid(5) };
+    expect(await recordForfeit(refused.as(ownerId), wrongTeam, refused.deps)).toMatchObject({
+      ok: false,
+    });
+    expect(refused.db.state.lines).toHaveLength(2);
+    const { db, deps, as } = memoryGames(state);
+    expect(await recordForfeit(as(ownerId), input, deps)).toMatchObject({ ok: true });
+    expect(db.state.games[0]).toMatchObject({ status: 'forfeit', captureMode: 'final' });
+    expect(db.state.lines).toEqual([lineOf(2)]);
+  });
+
+  it('leaves the lines of a game that was not a box score alone', async () => {
+    const kept = {
+      gameId: gameUuid(1),
+      teamId: game(1).homeTeamId,
+      personId: '01900000-0000-7000-8000-0000000d0001',
+      played: true,
+      secondsPlayed: null,
+      stats: { points: 20 },
+    };
+    const { db, deps, as } = memoryGames({
+      games: [game(1, { captureMode: 'live' })],
+      lines: [kept],
+    });
+    expect(await recordForfeit(as(ownerId), input, deps)).toMatchObject({ ok: true });
+    expect(db.state.games[0]?.captureMode).toBe('live');
+    expect(db.state.lines).toEqual([kept]);
+  });
+
   it('refuses a team that is not in the game, and a game that cannot be decided', async () => {
     const { deps, as } = memoryGames({ games: [game(1), game(2, { status: 'cancelled' })] });
     const code = async (extra: object) => {

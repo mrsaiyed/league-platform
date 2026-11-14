@@ -143,7 +143,10 @@ Use sub-agents for the building and the reviewing. Keep the lead's own context f
 | Fixing a reviewer's findings                                                                       | the model that built it                  | medium  |
 | Writing a stage plan (section 8)                                                                   | opus                                     | high    |
 | The whole-stage review at the end of a stage                                                       | opus                                     | xhigh   |
+| The look of a screen: a design step, or the design review of any step that adds a screen           | fable                                    | high    |
 | Finding where something is in the code                                                             | the Explore agent                        | its own |
+
+**Screens are looked at.** The founder opened the product on 2026-11-14 and found the UI awful: the look had been left to one late step, and no builder or reviewer had ever seen a screen. [DESIGN.md](DESIGN.md) is the rule now. Design steps are built by the design lead, a builder on `fable` at high effort. Any step that adds or changes a screen gets a design review as well as its code review: when its builder reports done, run `node scripts/shots.mjs --dev --only=<its screens>` in the lane, and a fresh `fable` sub-agent reads the pictures against DESIGN.md's section 4 and lists what breaks it; the builder fixes that before the lane lands. If the Agent tool refuses `fable`, use `opus` at xhigh and say so in the log. Before you write that a design step is done, open the home page pictures of both made-up leagues at both widths yourself.
 
 Rules for delegating:
 

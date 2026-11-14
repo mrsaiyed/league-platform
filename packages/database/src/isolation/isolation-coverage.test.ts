@@ -21,6 +21,7 @@ import { currentLeague } from '../queries/find-current-league.ts';
 import { leagueStatusOf } from '../queries/league-status-of.ts';
 import { divisionSummary } from '../queries/division-summary.ts';
 import { gameSummary } from '../queries/game-summary.ts';
+import { statCounts } from '../queries/list-decided-game-lines.ts';
 import { personSummary, personSummaryWithSensitive } from '../queries/person-summary.ts';
 import { rosterEntrySummary } from '../queries/roster-entry-summary.ts';
 import { scoringSessionSummary } from '../queries/scoring-session-summary.ts';
@@ -48,6 +49,7 @@ const coreScanned = ['../core/index.ts', '../core/src'];
 const reachNoLeagueData = new Map<unknown, string>([
   [programSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [gameSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [statCounts, 'turns a stats document already read into counts; runs no SQL'],
   [personSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [personSummaryWithSensitive, 'turns a row already read into the returned shape; runs no SQL'],
   [divisionSummary, 'turns a row already read into the returned shape; runs no SQL'],

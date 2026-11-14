@@ -22,6 +22,7 @@ export async function updateGameResult(
       home_score: change.homeScore,
       away_score: change.awayScore,
       finalized_at: change.decided ? sql<Date>`now()` : null,
+      ...(change.captureMode === undefined ? {} : { capture_mode: change.captureMode }),
       ...(change.format === undefined
         ? {}
         : { format: sql<null>`coalesce(format, ${JSON.stringify(change.format)}::jsonb)` }),

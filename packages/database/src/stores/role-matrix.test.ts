@@ -72,6 +72,8 @@ import {
   listPostponedGames,
   postponeGame,
   recordFinalScore,
+  setBoxScore,
+  getBoxScoreSheet,
   recordForfeit,
   reopenGame,
   listVenues,
@@ -819,6 +821,26 @@ const gameCommandRows: readonly Row[] = [
       return { gameId: game.gameId, version: 1, forfeitingTeamId: home.rows[0]?.home_team_id };
     },
     (c, i) => recordForfeit(c, i, gamesDeps),
+  ),
+  ...gameRows(
+    'games.set_box_score',
+    'enter a box score afterwards',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      version: 1,
+      homeScore: 52,
+      awayScore: 48,
+      lines: [],
+    }),
+    (c, i) => setBoxScore(c, i, gamesDeps),
+  ),
+  ...gameRows(
+    'games.get_box_score_sheet',
+    'read a box score sheet',
+    'games.score',
+    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId }),
+    (c, i) => getBoxScoreSheet(c, i, gamesDeps),
   ),
   ...gameRows(
     'games.postpone_game',

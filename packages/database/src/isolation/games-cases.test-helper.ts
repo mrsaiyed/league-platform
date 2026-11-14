@@ -5,6 +5,7 @@ import {
   assignScorekeeper,
   cancelGame,
   endTrackedGame,
+  getBoxScoreSheet,
   listMyGames,
   listPostponedGames as listPostponedGamesCommand,
   openScoringSession,
@@ -14,6 +15,7 @@ import {
   releaseScoringSession,
   renewScoringSession,
   reopenGame,
+  setBoxScore,
   takeOverScoring,
   unassignScorekeeper,
 } from '@srleagues/core';
@@ -33,13 +35,17 @@ import {
   saveGameLines,
   saveGameState,
   findGame,
+  gameHasPlays,
   insertGameAssignment,
   insertGameCorrection,
   isGameAssigned,
   listDecidedGameLines,
   listDecidedGames,
+  listGameLines,
+  listGameRoster,
   listGamesInWindow,
   listPostponedGames,
+  replaceGameLines,
   updateGameResult,
 } from '../queries/index.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -146,6 +152,73 @@ registerCommandCase(cancelGame, harnessTx, {
 registerCommandCase(reopenGame, harnessTx, {
   name: "reopen the target's final game",
   input: (target) => ({ gameId: target.gameId, version: 1, reason: 'Harness reopening' }),
+});
+
+// Box scores entered afterwards (step 2.64) -------------------------------------------
+
+registerIsolationCase({
+  subject: listGameLines,
+  name: "list the lines of the target's final game",
+  run: (scope, target) => listGameLines(scope, target.gameId),
+});
+
+registerIsolationCase({
+  subject: listGameRoster,
+  name: "list the players of the target's upcoming game",
+  run: (scope, target) => listGameRoster(scope, target.upcomingGameId),
+});
+
+registerIsolationCase({
+  subject: gameHasPlays,
+  name: "whether the target's final game has plays",
+  run: (scope, target) => gameHasPlays(scope, target.gameId),
+});
+
+registerIsolationCase({
+  subject: replaceGameLines,
+  name: "clear the lines of the target's final game",
+  run: (scope, target) => replaceGameLines(scope, target.gameId, []),
+});
+
+registerIsolationCase({
+  subject: replaceGameLines,
+  name: "replace the lines of the target's upcoming game with its player's",
+  run: (scope, target) =>
+    replaceGameLines(scope, target.upcomingGameId, [
+      {
+        gameId: target.upcomingGameId,
+        teamId: target.teamId,
+        personId: target.personId,
+        jerseyNumber: null,
+        played: true,
+        secondsPlayed: null,
+        stats: { points: 7 },
+      },
+    ]),
+});
+
+registerCommandCase(setBoxScore, harnessTx, {
+  name: "enter the box score of the target's upcoming game",
+  input: (target) => ({
+    gameId: target.upcomingGameId,
+    version: 1,
+    homeScore: 30,
+    awayScore: 20,
+    lines: [
+      {
+        teamId: target.teamId,
+        personId: target.personId,
+        played: true,
+        secondsPlayed: null,
+        stats: { points: 12 },
+      },
+    ],
+  }),
+});
+
+registerCommandCase(getBoxScoreSheet, harnessTx, {
+  name: "read the box score sheet of the target's upcoming game",
+  input: (target) => ({ gameId: target.upcomingGameId }),
 });
 
 // Scorekeepers (step 2.27) ---------------------------------------------------------

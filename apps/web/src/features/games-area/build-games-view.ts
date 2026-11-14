@@ -17,6 +17,11 @@ export type GameRowView = {
   readonly scorekeepers: readonly string[];
   /** The tracker is worth opening: the game is being played, or is scored live. */
   readonly trackerLink: boolean;
+  /**
+   * The box score grid is worth opening: to enter a sheet for a game not being
+   * tracked, or to see and correct one entered as a box score (step 2.64).
+   */
+  readonly boxScoreLink: boolean;
   /** A final score may be entered. */
   readonly canScore: boolean;
   /** Forfeit may be recorded. */
@@ -61,6 +66,10 @@ export function buildGameRows(
       scorekeepers: names.scorekeepers[game.id] ?? [],
       trackerLink: status === 'live' || (status === 'scheduled' && game.recording === 'live'),
       canScore: game.scorable && open,
+      boxScoreLink:
+        game.scorable &&
+        (status === 'scheduled' ||
+          ((status === 'final' || status === 'forfeit') && game.recording === 'box-score')),
       canForfeit: game.scorable && mayChange && open,
       canCallOff: game.scorable && mayChange && status === 'scheduled',
     };
