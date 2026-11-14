@@ -42,7 +42,13 @@ import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import { standInFixtureImport } from './stand-in-fixture-import.ts';
 import { standInGames } from './stand-in-games.ts';
 import { standInPublicSchedule } from './stand-in-public-schedule.ts';
-import { standInPublicStats } from './stand-in-public-stats.ts';
+import {
+  adultTeams,
+  standInPublicStats,
+  standInSeasonIds,
+  youthTeams,
+} from './stand-in-public-stats.ts';
+import { standInSchedule } from './stand-in-schedule.ts';
 import { standInPublicTeams } from './stand-in-public-teams.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
@@ -342,6 +348,25 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
       now,
     ),
+    scheduleAdmin: standInSchedule({
+      leagues: [
+        {
+          leagueId: standInLeagues.live.id,
+          seasonId: standInSeasonIds.adultFall,
+          teams: adultTeams.map((t) => ({ id: t.id, name: t.name })),
+          rounds: 6,
+        },
+        {
+          leagueId: standInLeagues.other.id,
+          seasonId: standInSeasonIds.youthWinter,
+          teams: youthTeams.map((t) => ({ id: t.id, name: t.name })),
+          rounds: 4,
+        },
+      ],
+      accessFor: (leagueId) => accessTx(leagueId).access,
+      log: options.log,
+      today: () => new Date().toISOString().slice(0, 10),
+    }),
     publicTeams: standInPublicTeams(
       { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
       coach.accountId,
