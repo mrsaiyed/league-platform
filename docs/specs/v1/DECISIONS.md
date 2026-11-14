@@ -25,7 +25,7 @@ Three rounds are done. You answered the "start here" list and most of the produc
 
 ## Decided for you, waiting for your yes
 
-Answered by me as lead on November 13 and 14, 2026, because you said not to stop for questions. Every answer is the one I had recommended (S-28 to S-32 are the choices the tracker's builder made, which I accepted). The build goes ahead on them; say the ID to change one.
+Answered by me as lead on November 13 and 14, 2026, because you said not to stop for questions. Every answer is the one I had recommended (S-28 to S-32 are the choices the tracker's builder made, which I accepted; F-12 to F-16 are how the Al-Hadi transfer, step 2.58, treats what it cannot bring over as it is). The build goes ahead on them; say the ID to change one.
 
 | ID   | What was open                                                            | My answer                                                                                                                                                                                                                                                         | If you want it different later                                        |
 | ---- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
@@ -53,6 +53,11 @@ Answered by me as lead on November 13 and 14, 2026, because you said not to stop
 | S-30 | The mercy rule inside the last minutes                                   | Inside the last-minutes stop clock the stop clock wins over the mercy rule's switch; the scorer can still switch to a running clock by hand                                                                                                                       | A small change in the engine                                          |
 | S-31 | When the mercy rule switches again                                       | Only after the lead has dropped below the number and reaches it again. The scorer switches back to a stop clock by hand                                                                                                                                           | A small change in the engine                                          |
 | S-32 | What the personal foul limit does                                        | A player at the limit is only marked out in the box score; the tracker does not take them off the floor or keep them off, which stays the scorekeeper's call (S-21)                                                                                               | A small change: the mark is already there to build on                 |
+| F-12 | Whose players the Al-Hadi transfer brings in                             | The tracked team's players only; another team's only when whoever runs it asks (`--with-opponents`). Until then a game naming one not on their roster here waits. Why: other schools' students are the school's to show (F-6), so we do not add them unasked      | Asking is one word when it is run; the default is a small change      |
+| F-13 | Tracker players with no full name (a number only, or one name)           | Not given a made-up name. A game naming one waits until someone puts them on the roster here by hand. The plan and the report list any tracked player not brought over. Why: a person needs a first and last name, and a guess would sit on a real child's record | Adding them under a stand-in name is a small change                   |
+| F-14 | A game that already has a result here, entered by hand or imported       | Never overwritten: the game is listed as a problem ("reopen it here first") and nothing is transferred until it is put right; once an admin reopens it, the next run brings the tracker's record. Why: a result entered here is the league's, its admin decides   | A small change                                                        |
+| F-15 | Tracked-team players the tracker marks as no longer active               | Added to the roster like the rest, with their numbers and no leaving date, so the games they played keep their lines. Why: the tracker does not record when they left; the admin can set a leaving date on the roster afterwards                                  | The admin sets the date; setting it in the transfer is a small change |
+| F-16 | A player to add with the full name of someone listed here on no team     | Taken to be that person and put on the roster, not added twice; the dry run says so for each ("taken to be them"), and each listed person goes to one player only. Why: it is how a run cut off part-way picks up without adding anyone twice                     | The admin can move the person; a stricter match is a contained change |
 
 ## Needs your answer
 
@@ -294,6 +299,7 @@ All dated November 12, 2026.
 | T-250                 | New                                                                          | A tracked game ends by the tracker's tap or a command; did-not-play lines; a reopened one goes back to its tracker (rec. 038)                   | Step 2.30: T6 §7, §8 did not say which door ends a game or where a reopened one goes               |
 | T-251                 | New                                                                          | Tracker endpoints: one session address naming the device; errors as HTTP; a live message per batch from a visitor snapshot (rec. 039)           | Step 2.32: T6 §3, §5, §6 gave no session bodies, statuses or messages per batch                    |
 | T-253                 | New                                                                          | The device loads the engine's state from a staff read; the tracker's controller on the device (rec. 049)                                        | Step 2.34: T-113 says reload the server's state, but no door gave it                               |
+| T-254                 | New                                                                          | Al-Hadi transfer: account checked first, whole plan before writing, the product's commands only, rerun-safe, every line compared (rec. 050)     | Step 2.58: F-7 and T-137 did not say how recorded games come in or what is checked                 |
 
 ## The full list
 
@@ -486,6 +492,11 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | F-9  | "any size" at launch means "any size we have tested"                                                       | Agreed          |         |
 | F-10 | Until TCSAAL agrees, the demo league does not present itself as TCSAAL                                     | Decided for you |         |
 | F-11 | A "Faraj test" league runs a whole test season before the real league moves                                | Agreed          |         |
+| F-12 | The Al-Hadi transfer brings in only the tracked team's players unless asked for the other teams'           | Decided for you |         |
+| F-13 | A tracker player with no full name gets no made-up name; their games wait until they are on a roster       | Decided for you |         |
+| F-14 | The Al-Hadi transfer never overwrites a result entered here; that game waits until it is reopened          | Decided for you |         |
+| F-15 | The tracked team's players the tracker marks inactive are added with no leaving date                       | Decided for you |         |
+| F-16 | A player to add with the full name of someone listed here on no team is taken to be that person            | Decided for you |         |
 
 ### [T1 — Stack and architecture](technical/T1-stack-and-architecture.md)
 
@@ -715,6 +726,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-250 | A tracked game is ended by the tracker's End game tap or a command, with did-not-play lines; reopening hands it back to its tracker (record 038)                                                                                                                        | Agreed (delegated) |         |
 | T-251 | Tracker endpoints: commands, one session address (open, renew, take over, release; names the device) and the snapshot; errors as HTTP; after a batch, one live message cut from the visitor's snapshot; hub at /api/v1/live (rec. 039)                                  | Agreed (delegated) |         |
 | T-253 | The tracker loads and reloads the engine's state through `GET …/games/{game}/state` (whoever may score the game, never cached); its controller applies each tap at once, rebuilds on the server's state after a refusal, and turns read-only on a takeover (record 049) | Agreed (delegated) |         |
+| T-254 | The Al-Hadi transfer checks its account first, works out its whole plan before writing (nothing while a game has a problem), runs only the product's own commands, keeps the tracker's action ids so a rerun changes nothing, and compares every line (record 050)      | Agreed (delegated) |         |
 
 ### [T7 — Notifications and jobs](technical/T7-notifications-and-jobs.md)
 
