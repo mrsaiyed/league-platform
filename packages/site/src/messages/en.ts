@@ -157,6 +157,8 @@ export const en = {
   'admin.viewSite': 'View the site',
   // The games area (step 2.55).
   'admin.games.intro': 'The games of today and the week ahead.',
+  'admin.games.listProblem':
+    'The games could not be shown. You may not have access to score or change games here.',
   'admin.games.empty': 'There are no games this week.',
   'admin.games.scorekeeper': 'Scorekeeper: {names}',
   'admin.games.noScorekeeper': 'No scorekeeper yet',

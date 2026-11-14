@@ -151,7 +151,7 @@ export async function GamesPage({
   const ports = await webPorts();
   const context = commandContextOf(view.context);
   // Which games are listed is the command's own rule: a scorekeeper in a league that
-  // scores assigned games only gets only theirs (P4 �4).
+  // scores assigned games only gets only theirs (P4 §4).
   const listed = await listMyGames(context, {}, ports.games.deps);
   const games = listed.ok ? listed.value.games : [];
   const holder = await ports.accessOf(context);
@@ -166,7 +166,9 @@ export async function GamesPage({
         <p role={notice.problem ? 'alert' : 'status'}>{t(notice.key)}</p>
       )}
       {games.some((g) => !g.scorable) ? <p>{t('admin.games.notScorable')}</p> : null}
-      {rows.length === 0 ? (
+      {!listed.ok ? (
+        <p role="alert">{t('admin.games.listProblem')}</p>
+      ) : rows.length === 0 ? (
         <p>{t('admin.games.empty')}</p>
       ) : (
         <ul className="admin-game-list">

@@ -19,6 +19,8 @@ import { mayScoreUnder, scoringRuleOf } from '../scoring-access.ts';
 export type MyGame = {
   readonly id: string;
   readonly seasonId: string;
+  /** The program of the game's season, where changing its result is checked. */
+  readonly programId: string;
   readonly divisionId: string | null;
   readonly homeTeamId: string;
   readonly awayTeamId: string;
@@ -45,9 +47,14 @@ export type MyGames = {
   readonly games: readonly MyGame[];
 };
 
-const view = ({ game, day, assigned }: GameInWindow, today: string, scorable: boolean): MyGame => ({
+const view = (
+  { game, day, assigned, programId }: GameInWindow,
+  today: string,
+  scorable: boolean,
+): MyGame => ({
   id: game.id,
   seasonId: game.seasonId,
+  programId,
   divisionId: game.divisionId,
   homeTeamId: game.homeTeamId,
   awayTeamId: game.awayTeamId,

@@ -182,4 +182,30 @@ describe('the games area actions', () => {
     expect(listed.ok && listed.value.games).toEqual([]);
     expect(as(owner).leagueId).toBe(leagueId);
   });
+
+  it('offers forfeit and call-off only at programs where the person may change results', async () => {
+    const { ports, games } = setup();
+    const list = await games(owner);
+    const names = await ports.namesOf(leagueId);
+    const limited = {
+      accountId: other,
+      isOwner: false,
+      grants: [
+        {
+          id: '01900000-0000-7000-8000-0000000000d9',
+          accountId: other,
+          role: 'admin' as const,
+          scope: { type: 'program' as const, id: 'some-other-program' },
+          grantedByAccountId: owner,
+          revokedAt: null,
+        },
+      ],
+    };
+    expect(buildGameRows(list, names, limited).some((r) => r.canForfeit || r.canCallOff)).toBe(
+      false,
+    );
+    const postponed = list.map((g) => ({ ...g, status: 'postponed' }));
+    const rows = buildGameRows(postponed, names, { accountId: owner, isOwner: true, grants: [] });
+    expect(rows.some((r) => r.canScore || r.canForfeit)).toBe(false);
+  });
 });

@@ -1,6 +1,6 @@
 // What the games area draws for each game, worked out from what the commands and
 // stores gave (no reading, no wording): who can do what to it, and what it shows.
-import { roleHasPermission, type AccessHolder, type MyGame } from '@srleagues/core';
+import { allows, type AccessHolder, type MyGame } from '@srleagues/core';
 import type { GameNames } from '../../server/games-area-ports.ts';
 
 export type GameRowView = {
@@ -29,15 +29,10 @@ const knownStatuses = ['scheduled', 'live', 'final', 'forfeit', 'postponed', 'ca
 const statusOf = (status: string): GameRowView['status'] =>
   knownStatuses.find((s) => s === status) ?? 'scheduled';
 
-/** Whether the holder may change results (forfeit, postpone, cancel) at all; the command checks each game. */
-export function holdsResults(holder: AccessHolder | undefined): boolean {
-  if (holder === undefined) return false;
-  if (holder.isOwner) return true;
-  return holder.grants.some(
-    (g) =>
-      g.accountId === holder.accountId &&
-      g.revokedAt === null &&
-      roleHasPermission(g.role, 'games.results'),
+/** Whether the holder may change results at this game's program; the command checks again. */
+export function mayChangeResult(holder: AccessHolder | undefined, programId: string): boolean {
+  return (
+    holder !== undefined && allows(holder, 'games.results', { type: 'program', id: programId })
   );
 }
 
@@ -46,10 +41,12 @@ export function buildGameRows(
   names: GameNames,
   holder: AccessHolder | undefined,
 ): readonly GameRowView[] {
-  const mayChange = holdsResults(holder);
   return games.map((game) => {
     const status = statusOf(game.status);
-    const open = status === 'scheduled' || status === 'live' || status === 'postponed';
+    // A postponed game waits for a new date (P7 §5.6): it is scored or forfeited only once
+    // the schedule has given it one and it is scheduled again.
+    const open = status === 'scheduled' || status === 'live';
+    const mayChange = mayChangeResult(holder, game.programId);
     return {
       id: game.id,
       version: game.version,

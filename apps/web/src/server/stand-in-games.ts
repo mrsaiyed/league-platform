@@ -214,7 +214,10 @@ export function standInGames(options: StandInGamesOptions): GamesAreaPorts {
     transaction: async (context, work) => {
       const draft = structuredClone(stateOf(context.leagueId));
       const result = await work(txOf(context.leagueId, draft));
-      if (context.leagueId === options.leagueId) state = draft;
+      // Kept only when the command succeeded: a refusal leaves nothing behind.
+      const refused =
+        typeof result === 'object' && result !== null && 'ok' in result && result.ok === false;
+      if (!refused && context.leagueId === options.leagueId) state = draft;
       return result;
     },
     events: noticeOnly,

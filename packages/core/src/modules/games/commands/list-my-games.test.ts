@@ -59,6 +59,7 @@ describe('listMyGames', () => {
     expect(result.ok && result.value.games[1]).toEqual({
       id: gameUuid(1),
       seasonId: games[0]?.seasonId,
+      programId: expect.any(String),
       divisionId: null,
       homeTeamId: games[0]?.homeTeamId,
       awayTeamId: games[0]?.awayTeamId,
