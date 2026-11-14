@@ -22,6 +22,8 @@ export const parseBy = (value: string | undefined): StatsBy =>
 
 const known = {
   points: ['stat.points', 'stat.points.short'],
+  fg3: ['stat.fg3', 'stat.fg3.short'],
+  fg1: ['stat.fg1', 'stat.fg1.short'],
   rebounds: ['stat.rebounds', 'stat.rebounds.short'],
   assists: ['stat.assists', 'stat.assists.short'],
   steals: ['stat.steals', 'stat.steals.short'],

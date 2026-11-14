@@ -35,3 +35,36 @@ describe('clock mode (T-128)', () => {
     expect(PlatformEnvelope.safeParse(envelope).success).toBe(true);
   });
 });
+
+describe('last-minutes stop clock, mercy lead and foul limit (step 2.67)', () => {
+  const extras = {
+    stopClockLastSeconds: 120,
+    stopClockScope: 'game',
+    mercyLead: 20,
+    playerFoulLimit: 5,
+  };
+
+  it('the platform shape takes each rule, null for off, and refuses one out of range', () => {
+    const takes = (more: object) =>
+      PlatformCommand.safeParse({ type: 'rules', rules: { ...rules, ...more } }).success;
+    expect(takes(extras)).toBe(true);
+    expect(takes({ stopClockLastSeconds: null, mercyLead: null, playerFoulLimit: null })).toBe(
+      true,
+    );
+    expect(takes({ stopClockLastSeconds: 0 })).toBe(false);
+    expect(takes({ stopClockLastSeconds: 601 })).toBe(false);
+    expect(takes({ stopClockScope: 'quarter' })).toBe(false);
+    expect(takes({ stopClockScope: null })).toBe(false);
+    expect(takes({ mercyLead: 101 })).toBe(false);
+    expect(takes({ playerFoulLimit: 21 })).toBe(false);
+    expect(takes({ playerFoulLimit: 4.5 })).toBe(false);
+  });
+
+  it('the shape the current tracker uses refuses all three', () => {
+    for (const [key, value] of Object.entries(extras)) {
+      const input = { type: 'rules', rules: { ...rules, [key]: value } };
+      expect(Command.safeParse(input).success).toBe(false);
+      expect(PlatformCommand.safeParse(input).success).toBe(true);
+    }
+  });
+});

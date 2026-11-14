@@ -418,6 +418,52 @@ export const en = {
   'admin.games.error.game-not-postponable': 'Only a game that has not started can be postponed.',
   'admin.games.error.game-not-cancellable': 'Only a game that has not started can be cancelled.',
   'admin.games.error.unknown': 'That did not work. Nothing was changed.',
+  // The box score grid (step 2.64).
+  'admin.games.boxScore': 'Box score',
+  'admin.boxScore.title': 'Box score: {away} at {home}',
+  'admin.boxScore.help':
+    'Copy the paper score sheet. Tick each player who played; a player with any number filled in counts as played. Leave a whole column empty if the sheet did not keep that number; it then does not count in that player’s averages. In a column you fill in, an empty box counts as 0.',
+  'admin.boxScore.scoreHelp':
+    'Leave a team’s score empty to use the total of its players’ points. A score you type is saved as you typed it, even if the players’ points add up to something else.',
+  'admin.boxScore.scoreMismatch':
+    'Check {team}: the score you typed is {score}, but its players’ points add up to {points}. It will be saved as {score} unless you change it.',
+  'admin.boxScore.back': 'Back to the games',
+  'admin.boxScore.player': 'Player',
+  'admin.boxScore.jersey': '#{number}',
+  'admin.boxScore.left': '(left the team)',
+  'admin.boxScore.played': 'Played',
+  'admin.boxScore.playedBy': '{name} played',
+  'admin.boxScore.cellLabel': '{stat} for {name}',
+  'admin.boxScore.minutes': 'Minutes',
+  'admin.boxScore.minutes.short': 'MIN',
+  'admin.boxScore.noPlayers': 'This team has no players on its roster yet. Add them in Teams.',
+  'admin.boxScore.save': 'Save box score and make it final',
+  'admin.boxScore.locked.decided':
+    'This game is final. To correct it, reopen it with a reason; then fix the grid and save again.',
+  'admin.boxScore.locked.cancelled': 'This game was cancelled, so it has no box score.',
+  'admin.boxScore.locked.tracked':
+    'This game was scored with the live tracker. Correct it in the tracker, so its list of plays still explains the numbers.',
+  'admin.boxScore.reopenReason': 'Why it needs correcting (kept in the log, never shown publicly)',
+  'admin.boxScore.reopen': 'Reopen to correct',
+  'admin.boxScore.notFound': 'That game is not there, or you may not score it.',
+  'admin.boxScore.done.save': 'The box score is saved and the game is final.',
+  'admin.boxScore.done.reopen': 'The game is reopened. Fix the grid and save it again.',
+  'admin.boxScore.error.invalid-input':
+    'Enter every number as a whole number from 0 to 999 (minutes up to 1440).',
+  'admin.boxScore.error.reopen-reason':
+    'Say why the game needs correcting (up to 1000 characters) to reopen it.',
+  'admin.boxScore.error.game-is-tracked':
+    'This game was scored with the live tracker, so it is corrected there.',
+  'admin.boxScore.error.player-not-on-team':
+    'A player in the grid is no longer on that team’s roster. The page now shows the latest.',
+  'admin.boxScore.error.player-listed-twice': 'A player is listed twice.',
+  'admin.boxScore.error.did-not-play-has-stats':
+    'A player marked as not playing has numbers. Tick “Played” or clear the numbers.',
+  'admin.boxScore.error.game-not-decided': 'That game is not final, so there is nothing to reopen.',
+  'stat.fg3': '3-pointers made',
+  'stat.fg3.short': '3PM',
+  'stat.fg1': 'Free throws made',
+  'stat.fg1.short': 'FTM',
   // The fixture import screen (Admin → Schedule → Import fixtures, P7 §4 "Also", O-4).
   'admin.import.title': 'Import fixtures',
   'admin.import.intro':
@@ -779,6 +825,7 @@ export const en = {
   'activity.leagues.restore_division': 'Restored a division from the bin',
   'activity.games.record_final_score': 'Recorded a final score',
   'activity.games.record_forfeit': 'Recorded a forfeit',
+  'activity.games.set_box_score': 'Recorded a box score',
   'activity.games.postpone_game': 'Postponed a game',
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',

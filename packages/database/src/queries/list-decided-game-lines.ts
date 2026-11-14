@@ -5,7 +5,7 @@ import type { GameLine } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
 /** The counts as stored: whole numbers keyed by stat (is_stat_counts, migration 0010). */
-function statCounts(stats: unknown): Record<string, number> {
+export function statCounts(stats: unknown): Record<string, number> {
   const counts: Record<string, number> = {};
   if (typeof stats !== 'object' || stats === null || Array.isArray(stats)) return counts;
   for (const [key, value] of Object.entries(stats)) {

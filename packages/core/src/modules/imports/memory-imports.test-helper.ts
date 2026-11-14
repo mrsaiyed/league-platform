@@ -232,6 +232,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
             awayScore: change.awayScore,
             finalizedAt: change.decided ? '2026-12-06T20:00:00.000Z' : null,
             format: found.format ?? change.format ?? null,
+            captureMode: change.captureMode ?? found.captureMode,
             version: found.version + 1,
           };
           return found.version + 1;
@@ -240,6 +241,10 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
         listPostponed: async () => [],
         listDecided: async () => [],
         listDecidedLines: async () => [],
+        listLines: async () => [],
+        replaceLines: async () => undefined,
+        listRoster: async () => [],
+        hasPlays: async () => false,
         findSeason: async (id) => {
           const season = s.seasons.find((x) => x.id === id);
           return season === undefined ? undefined : { programId: season.programId, rules: null };

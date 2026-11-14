@@ -3,7 +3,7 @@
 // the ids the commands use. The league comes from each call's context, never from the
 // request body. Today only the made-up stand-in fills it; the database-backed one comes
 // with the web app's start on a database (steps 1.14 and 1.15).
-import type { CommandDeps, GamesTx } from '@srleagues/core';
+import type { CommandDeps, TrackerTx } from '@srleagues/core';
 
 /** The words shown beside a league's games: teams by id, and who scores each game. */
 export type GameNames = {
@@ -13,7 +13,10 @@ export type GameNames = {
 };
 
 export type GamesAreaPorts = {
-  /** What the games commands run on; the context in each call names the league. */
-  readonly deps: CommandDeps<GamesTx>;
+  /**
+   * What the games commands run on; the context in each call names the league. The
+   * tracker's stores too, as reopening a game hands a tracked one back (step 2.30).
+   */
+  readonly deps: CommandDeps<TrackerTx>;
   readonly namesOf: (leagueId: string) => Promise<GameNames>;
 };
