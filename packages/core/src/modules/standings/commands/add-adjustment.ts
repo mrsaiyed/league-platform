@@ -12,7 +12,7 @@ import type { StandingsTx } from '../ports.ts';
 import { rebuildSeason } from '../rebuild-season.ts';
 
 export type AddAdjustmentError =
-  | { readonly code: 'season-not-found' | 'team-not-found' }
+  | { readonly code: 'season-not-found' | 'team-not-found' | 'not-allowed' }
   | { readonly code: 'adjustment-not-counted'; readonly reason: string };
 
 const count = z.number().int().min(-1000).max(1000).default(0);
@@ -42,7 +42,7 @@ export const addAdjustment = defineCommand({
     if ((await tx.games.findSeason(input.seasonId)) === undefined) {
       return fail({ code: 'season-not-found' });
     }
-    if (context.accountId === null) return fail({ code: 'season-not-found' });
+    if (context.accountId === null) return fail({ code: 'not-allowed' });
     const teams = await tx.standings.listTeams(input.seasonId);
     if (!teams.some((team) => team.teamId === input.teamId)) {
       return fail({ code: 'team-not-found' });

@@ -10,8 +10,12 @@
 // that alters a point difference) is refused with the teams it would move until the
 // admin saves again with `confirmed: true`; nothing is saved without it (S-1). A saved
 // change works the season's standings out again, in the same transaction. Game rules
-// (clock, fouls, periods) change nothing in the standings, so they save at once: a
-// game keeps the rules it started under (its own `format`, S-1).
+// (clock, fouls, periods) change nothing in the standings, so they save at once.
+//
+// NOT DONE YET: S-1 says game rules apply only to games not yet started, but nothing
+// enforces that today. A game's own `format` is stamped only when the game is decided
+// (decide-game.ts), so a game still to play, or live, follows the season's rules as
+// they are now, and a game decided earlier keeps the rules it was decided under.
 import { SeasonRules } from '@srleagues/contracts';
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
@@ -60,6 +64,9 @@ export const setSeasonRules = defineCommand({
     const before = readSeasonRules(season.rules);
     const changed = changedParts(before.rules, input.rules);
     if (before.saved && changed.length === 0) return ok({ version: season.version });
+    // Hold the season's standings first, so the preview is worked out one after the
+    // other with any result being saved at the same time, and not from a stale table.
+    await tx.standings.lockSeason(season.id);
     // What the change would move, once a game has been decided.
     const preview = await previewRulesChange(tx, season.id, input.rules);
     const moves = preview?.gamesDecided === true ? preview.moves : [];
