@@ -45,18 +45,14 @@ export type ContrastWarning = {
 };
 
 export function contrastWarnings(design: DesignDocument): ContrastWarning[] {
-  const { background, panel, text, highlight } = design.colors;
-  // The highlight is written as words (the Live marker, a score), so it must read like text.
-  // Left out, it is the accent, which is only ever a border, so there is nothing to check.
+  const { background, panel, text, highlight, accent } = design.colors;
+  // The highlight is written as words (the Live marker, a score, the picker), so it must read
+  // like text. Left out, the accent stands in for it and is used the same way, so check that.
   const pairs: [string, string, string][] = [
     ['text on background', text, background],
     ['text on panel', text, panel],
-    ...(highlight
-      ? ([
-          ['highlight on background', highlight, background],
-          ['highlight on panel', highlight, panel],
-        ] as [string, string, string][])
-      : []),
+    ['highlight on background', highlight ?? accent, background],
+    ['highlight on panel', highlight ?? accent, panel],
   ];
   return pairs
     .map(([pair, fg, bg]) => ({

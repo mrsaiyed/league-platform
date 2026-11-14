@@ -66,13 +66,17 @@ describe('contrast', () => {
       ...base,
       colors: {
         ...base.colors,
-        highlight: undefined,
+        highlight: '#14202b',
         text: '#14202b',
         background: '#ffffff',
         panel: '#1b2a38',
       },
     };
-    expect(contrastWarnings(panelOnly).map((w) => w.pair)).toEqual(['text on panel']);
+    // The highlight is the same dark colour here, so it fails on the panel too.
+    expect(contrastWarnings(panelOnly).map((w) => w.pair)).toEqual([
+      'text on panel',
+      'highlight on panel',
+    ]);
   });
 
   it('suggests the nearest readable shade', () => {
@@ -108,11 +112,11 @@ describe('highlight color (C-15)', () => {
     expect(parseDesignDocument({ ...base, colors: { ...base.colors, highlight: 'red' } }).ok).toBe(
       false,
     );
-    const hostile: any = structuredClone(base);
+    const hostile = structuredClone(base) as unknown as { colors: { highlight: string } };
     hostile.colors.highlight = 'red;} body{display:none';
-    expect(() => designToCssText(hostile)).toThrow();
+    expect(() => designToCssText(hostile as unknown as typeof base)).toThrow();
   });
-  it('warns when the highlight cannot be read, and not when it is left out', () => {
+  it('warns when the highlight (or the accent standing in for it) cannot be read', () => {
     const faint = { ...base, colors: { ...base.colors, highlight: '#f0f0f0' } };
     expect(contrastWarnings(faint).map((w) => w.pair)).toEqual([
       'highlight on background',
@@ -122,7 +126,14 @@ describe('highlight color (C-15)', () => {
     expect(
       contrastRatio(warning?.suggestion ?? '#ffffff', base.colors.background),
     ).toBeGreaterThanOrEqual(4.5);
-    expect(contrastWarnings({ ...base, colors: noHighlight })).toEqual([]);
+    // Left out, the accent stands in, so a readable accent is fine and a pale one warns.
+    const darkAccent = { ...base, colors: { ...noHighlight, accent: '#14202b' } };
+    expect(contrastWarnings(darkAccent)).toEqual([]);
+    const paleAccent = { ...base, colors: { ...noHighlight, accent: '#f0f0f0' } };
+    expect(contrastWarnings(paleAccent).map((w) => w.pair)).toEqual([
+      'highlight on background',
+      'highlight on panel',
+    ]);
   });
 });
 
