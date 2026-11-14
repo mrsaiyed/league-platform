@@ -214,6 +214,26 @@ describe("a decided game's result changes only with a correction (S-7)", () => {
     ).rejects.toMatchObject(needsCorrection);
   });
 
+  it('not with an older correction dated the same instant as this transaction', async () => {
+    // Two transactions can start in the same instant (PGlite's clock ticks in
+    // milliseconds), so an older correction can carry this transaction's now(). Here
+    // the tables' owner dates one so on purpose; it still does not count.
+    const g = await game();
+    await correct(db, g);
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.exec('alter table game_corrections disable trigger game_corrections_is_history');
+        await tx.query('update game_corrections set at = now() where game_id = $1', [g.gameId]);
+        await tx.exec('alter table game_corrections enable trigger game_corrections_is_history');
+        await reopen(tx, g);
+      }),
+    ).rejects.toMatchObject(needsCorrection);
+    const row = await one<{ status: string }>(db, 'select status from games where id = $1', [
+      g.gameId,
+    ]);
+    expect(row.status).toBe('final');
+  });
+
   it('covers a changed score, a change of status, a forfeit and putting it in the bin', async () => {
     const changes: [Record<string, unknown>, string][] = [
       [{}, 'update games set home_score = 49 where id = $1'],
