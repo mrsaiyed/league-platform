@@ -93,6 +93,7 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
               secondName: null,
               seasonId: null,
               binnedAt: t.binnedAt ?? '',
+              kept: t.referenced === true,
             })),
         seasonProgramId: async () => 'p1',
         findTeam: async (id) => {

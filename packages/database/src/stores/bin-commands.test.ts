@@ -176,7 +176,10 @@ describe('the bin: restoring', () => {
       );
     const planned = await game('scheduled', '');
     const played = await game('final', 'x');
-    expect(value(await listBin(l.as, {}, deps)).items.map((i) => i.id)).toEqual([planned.id]);
+    // The purge never removes a game, so the bin gives it no date to go.
+    expect(
+      value(await listBin(l.as, {}, deps)).items.map((i) => [i.id, i.removedForGoodAt]),
+    ).toEqual([[planned.id, null]]);
     value(await restoreGame(l.as, { gameId: planned.id }, deps));
     expect(await restoreGame(l.as, { gameId: played.id }, deps)).toMatchObject({
       error: { code: 'game-not-restorable' },
@@ -290,6 +293,12 @@ describe('the bin: the nightly emptying', () => {
     value(await removePerson(l.as, { personId: loose }, deps));
     await age('people', personId, 90);
     await age('people', loose, 90);
+    // The bin says beforehand which of them the purge leaves.
+    const listed = value(await listBin(l.as, {}, deps)).items;
+    expect(listed.find((i) => i.id === personId)?.removedForGoodAt).toBeNull();
+    expect(listed.find((i) => i.id === loose)?.removedForGoodAt).toBe(
+      new Date(Date.parse(daysAgo(90)) + 30 * day).toISOString(),
+    );
 
     expect(await nightly(l, now)).toMatchObject({ people: 1 });
     expect(await exists('people', personId)).toBe(true);

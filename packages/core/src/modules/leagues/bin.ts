@@ -25,10 +25,18 @@ export type BinnedItem = {
   readonly seasonId: string | null;
   /** When it went to the bin (ISO 8601). */
   readonly binnedAt: string;
+  /**
+   * Whether the purge leaves it, because something outside the bin or history points
+   * at it (a team with games, a person with a roster history). Games are always kept.
+   */
+  readonly kept: boolean;
 };
 
-/** A binned item and the moment it goes for good. */
-export type BinListing = BinnedItem & { readonly removedForGoodAt: string };
+/**
+ * A binned item and the moment it goes for good: null for what the purge leaves (a game,
+ * or anything history points at), which stays in the bin until it is restored.
+ */
+export type BinListing = BinnedItem & { readonly removedForGoodAt: string | null };
 
 /** How many things of each kind one purge removed for good. */
 export type BinCounts = {

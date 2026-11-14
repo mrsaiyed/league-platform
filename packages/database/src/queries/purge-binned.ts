@@ -6,6 +6,7 @@
 // division a game names. Games are not removed here: the app has no DELETE on games
 // (0009), so a binned game stays until the league itself is purged (record 025).
 // Every statement names the league, so it cannot reach another's rows (T-28).
+// list-binned.ts says beforehand what this leaves (`kept`): change its tests with these.
 import type { BinCounts } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';

@@ -18,6 +18,24 @@ describe('listBin', () => {
     expect(result.value.items[0]?.removedForGoodAt).toBe('2026-01-31T00:00:00.000Z');
   });
 
+  it('gives no such moment for what the purge leaves: games and what history points at', async () => {
+    const binnedAt = '2026-01-01T00:00:00.000Z';
+    const { deps, as } = memoryBin({
+      things: [
+        { id: teamId(1), kind: 'game', name: 'A v B', binnedAt },
+        { id: teamId(2), kind: 'team', name: 'Played', binnedAt, referenced: true },
+        { id: teamId(3), kind: 'team', name: 'Unplayed', binnedAt },
+      ],
+    });
+    const result = await listBin(as(ownerId), {}, deps);
+    if (!result.ok) throw new Error('refused');
+    expect(result.value.items.map((i) => [i.name, i.removedForGoodAt])).toEqual([
+      ['A v B', null],
+      ['Played', null],
+      ['Unplayed', '2026-01-31T00:00:00.000Z'],
+    ]);
+  });
+
   it('is for admins and the owner only', async () => {
     const { deps, as } = memoryBin();
     expect(await listBin(as('someone'), {}, deps)).toMatchObject({
