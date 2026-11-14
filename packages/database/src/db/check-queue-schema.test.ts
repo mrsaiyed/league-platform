@@ -14,7 +14,8 @@ beforeAll(async () => {
   await pglite.exec(`
     create role made_up_worker_login login;
     create role made_up_web_login login;
-    grant app_user to made_up_worker_login, made_up_web_login;
+    create role made_up_create_only_login login;
+    grant app_user to made_up_worker_login, made_up_web_login, made_up_create_only_login;
   `);
   db = createDatabase({ kind: 'pglite', pglite });
 });
@@ -40,9 +41,17 @@ describe('checkQueueSchema', () => {
     `);
     expect(await checkQueueSchema(db, 'made_up_worker_login')).toEqual([]);
     expect(await checkQueueSchema(db, 'made_up_web_login')).toEqual([
+      'the login role may not use the pgboss schema (grant it queue_owner)',
       'the login role may not make tables in the pgboss schema (grant it queue_owner)',
     ]);
-    expect(await checkQueueSchema(db, 'app_user')).toHaveLength(1);
+    expect(await checkQueueSchema(db, 'app_user')).toHaveLength(2);
+  });
+
+  it('reports a login that may make tables there but not use them', async () => {
+    await pglite.exec(`grant create on schema pgboss to made_up_create_only_login;`);
+    expect(await checkQueueSchema(db, 'made_up_create_only_login')).toEqual([
+      'the login role may not use the pgboss schema (grant it queue_owner)',
+    ]);
   });
 
   it('checks the login the handle uses when no role is named', async () => {
