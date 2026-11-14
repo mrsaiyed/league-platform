@@ -1,6 +1,7 @@
 // The `bin.empty` job (T7 §2, step 2.76): removes for good what has been in one league's
-// bin for 30 days (T-51). The nightly timer queues one job per league, so each runs inside
-// its own league's fence (T-63); the job holds no ids, the league is the job's own. The
+// bin for 30 days (T-51). No nightly timer queues it yet: step 2.91 builds the fan-out
+// that queues one job per league each night. Each job runs inside its own league's
+// fence (T-63); it holds no ids, the league is the job's own. The
 // clock is given, so a test says what time it is. Run twice it does no harm (T-137): the
 // second run finds nothing left. A failure is thrown and kept by the queue as a fixed
 // code only (errorCodeOf), never a message.
