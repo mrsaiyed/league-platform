@@ -363,19 +363,43 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     cancelRenew = null;
     clearTimer();
     update({ mode: { kind: 'read-only', reason } });
-    if (!lostTheGame.has(reason)) return;
+    if (lostTheGame.has(reason)) await lost();
+  };
+
+  /** Still not scoring: neither opening again nor taking over has begun since. */
+  const stillLost = (): boolean =>
+    current.mode.kind === 'read-only' || current.mode.kind === 'held-by-other';
+
+  /**
+   * The game was lost (T6 §5): what this device had not sent is listed as not saved,
+   * and the server's state is shown, since another device may be scoring it.
+   */
+  const lost = async (): Promise<void> => {
+    // A batch already on its way may still be taken: wait for its answer, so a tap the
+    // server took is not listed. Nothing more is sent, as the session is let go.
+    await queue.idle();
     const waiting = await waitingTaps().catch(() => current.notSaved);
+    if (!stillLost()) return;
     const unsent = new Set(waiting.map((c) => c.commandId));
     made = made.filter((c) => !unsent.has(c.commandId));
     update({ notSaved: waiting });
     showGame();
-    // Another device may be scoring it: show what the server holds now, if it answers.
     const loaded = await ask((signal) => server.loadState(signal));
-    if (loaded.kind === 'answer' && current.mode.kind === 'read-only') {
-      base = loaded.value;
-      made = [];
-      showGame();
+    if (loaded.kind !== 'answer' || !stillLost()) return;
+    // A tap the state holds was taken though its answer never came back: it is saved.
+    const taken = new Set(loaded.value.state.recent.map((id) => id.toLowerCase()));
+    const saved = current.notSaved
+      .map((c) => c.commandId)
+      .filter((id) => taken.has(id.toLowerCase()));
+    if (saved.length > 0) {
+      const dropped = new Set(saved);
+      update({ notSaved: current.notSaved.filter((c) => !dropped.has(c.commandId)) });
+      await queue.forget(saved).catch(() => undefined);
+      if (!stillLost()) return;
     }
+    base = loaded.value;
+    made = [];
+    showGame();
   };
 
   /** What a session reply that is not "held by you" means for this device. */
@@ -385,9 +409,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         sessionId = null;
         cancelRenew?.();
         cancelRenew = null;
-        const waiting = await waitingTaps().catch(() => current.notSaved);
-        update({ mode: { kind: 'held-by-other', holder: reply.holder }, notSaved: waiting });
-        return;
+        update({ mode: { kind: 'held-by-other', holder: reply.holder } });
+        return lost();
       }
       case 'ended':
         return readOnly(reply.reason);
@@ -588,6 +611,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     async takeOver() {
       const mode = current.mode;
       if (mode.kind !== 'held-by-other') return { ok: false, reason: 'not-offered' };
+      // Opening: what was shown about the lost game is no longer to be changed.
+      update({ mode: { kind: 'opening' } });
       const taken = await track(
         session({
           type: 'take-over',
@@ -596,7 +621,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
           expectedHolderSince: mode.holder.since,
         }),
       );
-      if (taken.kind === 'unanswered') return { ok: false, reason: 'unanswered' };
+      if (taken.kind === 'unanswered') {
+        update({ mode });
+        return { ok: false, reason: 'unanswered' };
+      }
       if (taken.kind === 'rejected') {
         await track(readOnly(reasonOfStatus(taken.httpStatus)));
         return { ok: true };

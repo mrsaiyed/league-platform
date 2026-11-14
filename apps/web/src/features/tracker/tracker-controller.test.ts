@@ -41,11 +41,14 @@ function device(
     clock = createManualClock(),
     game = gameId,
     signedIn = () => as,
+    sendTaps = (send) => send,
   }: {
     game?: string;
     as?: Person;
     /** Who the device is signed in as at each request, when that changes in a test. */
     signedIn?: () => Person;
+    /** Wraps how taps reach the server, to hold an answer back in a test. */
+    sendTaps?: (send: typeof globalThis.fetch) => typeof globalThis.fetch;
     deviceId?: string;
     storage?: QueueStorage;
     clock?: ReturnType<typeof createManualClock>;
@@ -59,7 +62,11 @@ function device(
     clock,
     newCommandId,
     random: () => 1,
-    transport: createFetchCommandTransport({ leagueId: liveLeagueId, gameId: game, fetch }),
+    transport: createFetchCommandTransport({
+      leagueId: liveLeagueId,
+      gameId: game,
+      fetch: sendTaps(fetch),
+    }),
     server: createFetchTrackerServer({ leagueId: liveLeagueId, gameId: game, fetch }),
   });
   return { controller, storage, clock };
@@ -410,6 +417,44 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     expect(reopened.controller.status().notSaved).toHaveLength(1);
     expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 3 });
     expect(scoreOf(reopened.controller.status().game)).toEqual({ home: 0, away: 3 });
+  });
+
+  it('does not list as not saved a tap the server took while the takeover was learned', async () => {
+    const network = endpointNetwork();
+    // The server takes the tablet's next batch, but its answer is held back.
+    let holding = false;
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const tablet = device(network, {
+      sendTaps: (send) => async (input, init) => {
+        const answer = await send(input, init);
+        if (holding) await held;
+        return answer;
+      },
+    });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    holding = true;
+    await tapAll(tablet.controller, [basket('home', hawks[0] ?? '')]);
+    // In the server, not yet answered on the tablet.
+    await expect.poll(async () => scoreOf((await serverGame(network)).state).home).toBe(2);
+
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+
+    // The tablet's renewal learns of the takeover while the batch is still in flight.
+    tablet.controller.online();
+    await expect.poll(() => tablet.controller.status().mode.kind).toBe('read-only');
+    release();
+    await tablet.controller.idle();
+    const status = tablet.controller.status();
+    expect(status.notSaved).toEqual([]);
+    expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
+    expect(await tablet.storage.list(gameId)).toEqual([]);
   });
 
   it('releases the game on leaving when nothing is waiting', async () => {
