@@ -282,6 +282,12 @@ export type Line = {
   turnovers: number;
   ms: number;
   appeared: boolean;
+  /**
+   * The player has the format's personal foul limit or more fouls standing. Only set
+   * then, so a game without a limit reads as before. It marks the player; it does not
+   * take them off the floor or stop them coming back, which stays the scorer's call.
+   */
+  fouledOut?: true;
 };
 export type TeamView = {
   score: number;
@@ -492,6 +498,10 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
       const from = since[id];
       if (from !== undefined) line(id, side).ms += Math.max(0, elapsedNowMs - from);
     }
+
+  const limit = state.rules.playerFoulLimit;
+  if (limit != null)
+    for (const l of Object.values(players)) if (l.fouls >= limit) l.fouledOut = true;
 
   // Team fouls reset each period; overtime continues the last regulation period's count.
   const bucket = (p: number) => Math.min(p, state.rules.periods);
@@ -822,6 +832,8 @@ function checkRules(rules: Rules): Rules {
     fail('The last-minutes stop clock is at the end of each period, each half or the game.');
   if (given(r.mercyLead) && !whole(r.mercyLead, 1, 100))
     fail('The mercy rule starts at a lead of 1 to 100 points.');
+  if (given(r.playerFoulLimit) && !whole(r.playerFoulLimit, 1, 20))
+    fail('A player fouls out after 1 to 20 fouls, or never.');
   return {
     periods: r.periods,
     periodSeconds: r.periodSeconds,
@@ -835,6 +847,7 @@ function checkRules(rules: Rules): Rules {
     ...(given(r.stopClockLastSeconds) ? { stopClockLastSeconds: r.stopClockLastSeconds } : {}),
     ...(r.stopClockScope !== undefined ? { stopClockScope: r.stopClockScope } : {}),
     ...(given(r.mercyLead) ? { mercyLead: r.mercyLead } : {}),
+    ...(given(r.playerFoulLimit) ? { playerFoulLimit: r.playerFoulLimit } : {}),
   };
 }
 
