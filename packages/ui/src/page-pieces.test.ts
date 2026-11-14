@@ -1,6 +1,7 @@
 // The pieces a page is laid out with (step 2.85): what each shows, that names in any script
 // keep their own direction (T-188), and that the stylesheet covers the things the look
 // depends on (docs/build/DESIGN.md, section 4).
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -224,20 +225,44 @@ describe('filter toolbar', () => {
     // A choice confirmed with Enter in an open list arrives while Enter is down.
     expect(appliesAtOnce('keyboard', true)).toBe(true);
   });
-  it('puts the Show button away where scripts run, still reachable by the keyboard', () => {
+  // Changed by the second code look (H1): the button used to be hidden by the stylesheet
+  // alone wherever scripts can run, so before the page's script had started, or if it never
+  // loaded, a choice made by tap could not be applied. It is now put away only by the mark
+  // the script sets, and until then it is a button that works.
+  it('puts the Show button away only once the script says it applies choices itself', () => {
     const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '');
     const scripted = css.slice(css.indexOf('@media (scripting: enabled)'));
+    // It hangs under its picker, taking no room, so nothing moves when it comes or goes.
     expect(scripted).toMatch(
-      /\.ui-toolbar \.ui-picker button \{[^}]*position: absolute;[^}]*opacity: 0;[^}]*pointer-events: none;/,
+      /\.ui-toolbar \.ui-picker button \{[^}]*position: absolute;[^}]*inset-block-start: 100%;/,
     );
-    // Back in its place whenever the keyboard is in its picker.
+    // Before the mark it appears after a moment by itself: no rule keeps it hidden for good.
     expect(scripted).toMatch(
-      /\.ui-toolbar \.ui-picker:has\(:focus-visible\) button \{[^}]*position: static;[^}]*opacity: 1;/,
+      /\.ui-toolbar \.ui-picker button \{[^}]*visibility: hidden;\s*animation: ui-picker-wait 0s linear 1\.5s forwards;/,
     );
-    // Never `display: none`, which would take it from the keyboard too; and nothing waits
-    // for the page's script to say so, so nothing appears and then hides on a load.
+    expect(css).toMatch(/@keyframes ui-picker-wait \{\s*to \{\s*visibility: visible;/);
+    // Put away only by the mark.
+    expect(scripted).toMatch(
+      /\.ui-toolbar\[data-applies='true'\] \.ui-picker button \{\s*visibility: hidden;\s*animation: none;/,
+    );
+    // There whenever the keyboard is in its picker, mark or no mark (it comes later, so it wins).
+    expect(scripted).toMatch(
+      /\.ui-toolbar \.ui-picker:has\(:focus-visible\) button \{\s*visibility: visible;/,
+    );
+    expect(scripted.indexOf(".ui-toolbar[data-applies='true'] .ui-picker button")).toBeLessThan(
+      scripted.indexOf('.ui-toolbar .ui-picker:has(:focus-visible) button'),
+    );
+    // Never `display: none`, and never hidden by anything the script has not said.
     expect(css).not.toMatch(/\.ui-picker button \{[^}]*display: none/);
-    expect(css).not.toContain('data-applies');
+    expect(css).not.toMatch(/\.ui-picker button \{[^}]*(opacity: 0|pointer-events: none)/);
+  });
+  it('sets that mark only when it is running in the browser, never in the page as sent', () => {
+    const source = readFileSync(
+      new URL('./filter-toolbar/filter-toolbar.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).toMatch(/useEffect\(\(\) => setApplies\(true\), \[\]\)/);
+    expect(source).toContain("data-applies={applies ? 'true' : undefined}");
   });
 });
 

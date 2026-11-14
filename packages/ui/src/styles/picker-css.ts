@@ -65,26 +65,50 @@ export const pickerCss = String.raw`
 .ui-picker button:hover {
   color: var(--color-text);
 }
-/* Where scripts run, a choice made by tap or click is applied at once, so the "Show"
-   button is put away: out of sight and taking no room, but still the next stop of the
-   keyboard, and back in its place whenever the keyboard is in its picker. The stylesheet
-   knows this before the page's script starts, so nothing appears and then hides. A
-   browser with scripts off, or one that cannot say, keeps the quiet button. */
+/* Where scripts can run, the "Show" button hangs under its picker instead of standing
+   beside it: it takes no room, so nothing on the page moves when it comes or goes. It is
+   put away only once the page's script has said it is running and applying choices
+   itself (data-applies, set by the toolbar when its handler is attached). Until then it
+   is the way to apply a choice: it waits a moment, so a page whose script starts quickly
+   never shows it, and then appears, so a slow phone, or a script that failed to load,
+   leaves a button that works. Whenever the keyboard is in its picker it is there, as the
+   keyboard's next stop. A browser with scripts off, or one that cannot say, keeps the
+   quiet button beside its picker. */
 @media (scripting: enabled) {
   .ui-toolbar .ui-picker {
     position: relative;
   }
   .ui-toolbar .ui-picker button {
     position: absolute;
-    inset-block-start: 0;
+    z-index: 5;
+    inset-block-start: 100%;
     inset-inline-end: 0;
-    opacity: 0;
-    pointer-events: none;
+    margin-block-start: var(--step-1);
+    background: var(--color-panel);
+    color: var(--color-text);
+    box-shadow: var(--overlay-shadow);
+    visibility: hidden;
+    animation: ui-picker-wait 0s linear 1.5s forwards;
+  }
+  .ui-toolbar[data-applies='true'] .ui-picker button {
+    visibility: hidden;
+    animation: none;
   }
   .ui-toolbar .ui-picker:has(:focus-visible) button {
-    position: static;
-    opacity: 1;
-    pointer-events: auto;
+    visibility: visible;
+    animation: none;
+  }
+}
+@keyframes ui-picker-wait {
+  to {
+    visibility: visible;
+  }
+}
+/* A reader who asked for no movement gets no waiting either: the button is there at once
+   until the script takes over. */
+@media (scripting: enabled) and (prefers-reduced-motion: reduce) {
+  .ui-toolbar:not([data-applies='true']) .ui-picker button {
+    visibility: visible;
   }
 }
 `;

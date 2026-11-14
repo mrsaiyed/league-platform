@@ -192,11 +192,11 @@ html {
   .site-header-top:has(.site-season) .site-season {
     flex: none;
   }
-  .site-header .site-season .ui-picker:has(:focus-visible) button {
-    position: absolute;
-    inset-block-start: 100%;
-    inset-inline-end: 0;
-    margin-block-start: var(--step-1);
+}
+/* Where scripts can run the "Show" button hangs under its picker (the shared pieces place
+   it): in the header it is filled with the header's own color, so it reads over the page. */
+@media (scripting: enabled) {
+  .site-header .site-season .ui-picker button {
     background-color: var(--header-background);
   }
 }

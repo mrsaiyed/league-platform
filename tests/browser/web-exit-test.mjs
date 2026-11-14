@@ -452,9 +452,11 @@ if (browser) {
       await open(page, '/north-valley/schedule');
       const quiet = () => new Promise((resolve) => setTimeout(resolve, 800));
       const showOf = (name) => page.locator(`form:has(select[name=${name}]) button[type=submit]`);
+      // The toolbar says when its script is running; only then is the button put away.
+      await page.locator('.site-header .ui-toolbar[data-applies="true"]').waitFor();
       note(
-        'a Show button is put away where scripts run',
-        (await showOf('season').evaluate((el) => getComputedStyle(el).opacity)) === '0',
+        'a Show button is put away once the script says it applies choices itself',
+        (await showOf('season').evaluate((el) => getComputedStyle(el).visibility)) === 'hidden',
       );
       // The season picker in the header: arrow, then Enter.
       const season = page.locator('.site-header select[name=season]');
@@ -469,7 +471,7 @@ if (browser) {
       );
       note(
         'the Show button is back while the keyboard is in its picker',
-        (await showOf('season').evaluate((el) => getComputedStyle(el).opacity)) === '1',
+        (await showOf('season').evaluate((el) => getComputedStyle(el).visibility)) === 'visible',
       );
       await page.keyboard.press('Enter');
       await page.waitForURL(/season=spring-2026/);
@@ -501,6 +503,46 @@ if (browser) {
       note('a choice made without the keyboard is applied at once', true);
     } finally {
       await context.close();
+    }
+    // The page's script blocked from loading (a slow phone, a failed download): a choice is
+    // not applied by itself, so the Show button must be there and work, for a page's
+    // picker and for the header's.
+    const blocked = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    try {
+      await blocked.route('**/_next/static/**/*.js', (route) => route.abort());
+      const page = await blocked.newPage();
+      const showOf = (name) => page.locator(`form:has(select[name=${name}]) button[type=submit]`);
+      for (const [name, value, where] of [
+        ['round', '2', 'main'],
+        ['season', 'spring-2026', '.site-header'],
+      ]) {
+        await open(page, '/north-valley/schedule');
+        note(
+          `with the script blocked the ${name} picker's toolbar never says it applies choices`,
+          (await page.locator(`${where} .ui-toolbar[data-applies]`).count()) === 0,
+        );
+        const header = await page.locator('.site-header').boundingBox();
+        await page.locator(`${where} select[name=${name}]`).selectOption(value);
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        note(
+          `with the script blocked a choice of ${name} is not applied by itself`,
+          !page.url().includes(`${name}=`),
+          page.url(),
+        );
+        // It appears by itself after a moment, hanging under its picker and moving nothing.
+        await showOf(name).waitFor({ state: 'visible', timeout: 5_000 });
+        const after = await page.locator('.site-header').boundingBox();
+        note(
+          `the ${name} picker's Show button appears without moving the header`,
+          header?.height === after?.height,
+          `${header?.height} then ${after?.height}`,
+        );
+        await showOf(name).click();
+        await page.waitForURL(new RegExp(`${name}=${value}`));
+        note(`with the script blocked the Show button applies the ${name} chosen`, true);
+      }
+    } finally {
+      await blocked.close();
     }
   });
 

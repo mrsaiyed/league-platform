@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export type FilterToolbarProps = {
   /** Names the group of pickers for screen readers: "Filters". */
@@ -26,22 +26,28 @@ export function appliesAtOnce(last: PickerInput, enterIsDown: boolean): boolean 
 
 /**
  * The pickers of a page in one compact row. Each picker is a plain form with its own
- * "Show" button, so it works with scripts off. With scripts on, a choice made by tap or
- * click is applied at once and the button is put away (the stylesheet does that, so
- * nothing moves when the page's script starts); a value moved with the keyboard waits for
- * Enter or for the button, which comes back whenever the keyboard is in its picker.
+ * "Show" button, so it works with scripts off, and before this script is running. Once it
+ * is (the handlers below are attached), the toolbar says so with `data-applies`, and only
+ * then is the button put away: a choice made by tap or click is applied at once from then
+ * on. A page whose script is slow, or never loads, keeps a button that works. A value
+ * moved with the keyboard waits for Enter or for the button, which is there whenever the
+ * keyboard is in its picker.
  */
 export function FilterToolbar({ label, children }: FilterToolbarProps) {
   const last = useRef<PickerInput>('pointer');
   const enterIsDown = useRef(false);
   /** Pickers whose value was moved by key and not applied yet. */
   const waiting = useRef(new WeakSet<HTMLSelectElement>());
+  // False on the server and until this component is running in the browser.
+  const [applies, setApplies] = useState(false);
+  useEffect(() => setApplies(true), []);
 
   return (
     <div
       className="ui-toolbar"
       role="group"
       aria-label={label}
+      data-applies={applies ? 'true' : undefined}
       onPointerDown={() => {
         last.current = 'pointer';
       }}
