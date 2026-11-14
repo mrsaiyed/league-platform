@@ -29,10 +29,17 @@ export const Rules = z.strictObject({
 
 /**
  * The rules the platform's tracker sends (T-128): the Al-Hadi tracker's, plus the clock
- * mode, which is absent for a stop clock as every game before the mode existed.
+ * mode, which is absent for a stop clock as every game before the mode existed, and the
+ * last-minutes stop clock, the mercy lead and the personal foul limit, each off when
+ * absent or null. Their limits match the season rules document (./season-rules.ts); a
+ * test keeps the two in step. The engine also keeps the stop clock within a period.
  */
 export const PlatformRules = Rules.extend({
   clockMode: z.enum(['stop', 'running']).optional(),
+  stopClockLastSeconds: z.number().int().min(1).max(600).nullable().optional(),
+  stopClockScope: z.enum(['period', 'half', 'game']).optional(),
+  mercyLead: z.number().int().min(1).max(100).nullable().optional(),
+  playerFoulLimit: z.number().int().min(1).max(20).nullable().optional(),
 });
 
 /** The commands both trackers send. */
@@ -81,7 +88,8 @@ export const Command = z.discriminatedUnion('type', [
 /**
  * Mirrors `Command` in packages/sports/src/basketball/live.ts, which applies the rules:
  * what the platform's server takes (step 2.68). Adds the clock mode and its mid-game
- * switch (S-21, T-128), undone like any play.
+ * switch (S-21, T-128), undone like any play, and the three rules of step 2.67. The
+ * mercy rule needs no command of its own: the scorer switches back with `clock-mode`.
  */
 export const PlatformCommand = z.discriminatedUnion('type', [
   ...sharedCommands,
