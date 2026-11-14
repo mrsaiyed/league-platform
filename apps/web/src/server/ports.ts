@@ -8,6 +8,7 @@ import type { SignInMail } from './sign-in/sign-in-mail.ts';
 import type { ContextDeps } from './context.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
+import type { ScheduleAdminPorts } from './schedule-admin.ts';
 
 export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   /** "Who is this?" for a session cookie's access token (T-6). */
@@ -28,4 +29,6 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly publicStats: PublicStatsPorts;
   /** What the public home and schedule pages read (step 2.42). */
   readonly publicSchedule: PublicSchedulePorts;
+  /** What Admin → Schedule runs its commands on (step 2.52). */
+  readonly scheduleAdmin: ScheduleAdminPorts;
 };

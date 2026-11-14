@@ -31,7 +31,13 @@ import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import type { WebPorts } from './ports.ts';
 import { standInPublicSchedule } from './stand-in-public-schedule.ts';
-import { standInPublicStats } from './stand-in-public-stats.ts';
+import {
+  adultTeams,
+  standInPublicStats,
+  standInSeasonIds,
+  youthTeams,
+} from './stand-in-public-stats.ts';
+import { standInSchedule } from './stand-in-schedule.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
 
@@ -255,6 +261,25 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
       now,
     ),
+    scheduleAdmin: standInSchedule({
+      leagues: [
+        {
+          leagueId: standInLeagues.live.id,
+          seasonId: standInSeasonIds.adultFall,
+          teams: adultTeams.map((t) => ({ id: t.id, name: t.name })),
+          rounds: 6,
+        },
+        {
+          leagueId: standInLeagues.other.id,
+          seasonId: standInSeasonIds.youthWinter,
+          teams: youthTeams.map((t) => ({ id: t.id, name: t.name })),
+          rounds: 4,
+        },
+      ],
+      accessFor: (leagueId) => accessTx(leagueId).access,
+      log: options.log,
+      today: () => new Date().toISOString().slice(0, 10),
+    }),
     signUpMadeUpMember: async () => {
       const here = '127.0.0.1';
       const { email, password } = standInMember;
