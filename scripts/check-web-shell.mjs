@@ -121,6 +121,16 @@ const cases = [
   ['scheduler', '/north-valley/admin', 200, ['Admin areas', 'Schedule', 'Games'], ['People']],
   ['scheduler', '/north-valley/admin/schedule', 200, ['Schedule', 'Nothing here yet.']],
   ['scheduler', '/north-valley/admin/teams', 403, [noAccess]],
+  // Admin → Teams (step 2.51): the season's teams and the form to add one.
+  [
+    'owner',
+    '/north-valley/admin/teams',
+    200,
+    ['Teams of Winter 2026', 'Lions', 'Owls', 'Add a team', 'Short name'],
+    ['Nothing here yet.'],
+  ],
+  ['owner', '/harbor-city/admin/teams', 200, ['No teams yet.', 'Add a team'], ['Lions']],
+  ['owner', '/north-valley/admin/teams/not-a-team', 404, [notFound]],
   ['scheduler', '/harbor-city/admin', 403, [noAccess]],
   ['owner', '/north-valley/admin/settings', 200, ['League settings', 'People', 'Teams']],
   ['scheduler', '/north-valley/score/game-1', 200, ['Score a game']],
@@ -216,6 +226,7 @@ try {
     );
   }
   failures.push(...(await checkSignIn(origin)));
+  failures.push(...(await checkTeams(origin)));
 } finally {
   server.child.kill();
 }
@@ -250,7 +261,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Web shell check passed: ${cases.length + spoofs.length + 3} checks against the built server.`,
+  `Web shell check passed: ${cases.length + spoofs.length + 4} checks against the built server.`,
 );
 
 function start(args, env) {
@@ -298,6 +309,147 @@ function freePort() {
       probe.close(() => resolve(port));
     });
   });
+}
+
+/**
+ * The admin Teams forms over HTTP (step 2.51), as a browser with no script posts them:
+ * the owner adds a team, puts a player on its roster with a number and marks them as
+ * having left; someone who may not open the Teams area changes nothing. The commands'
+ * own rules are tested beside the code (apps/web/src/server/stand-in-admin-teams.test.ts).
+ */
+async function checkTeams(origin) {
+  const problems = [];
+  const as = (who) => ({ cookie: `srl_session=${tokens[who]}` });
+  const pageOf = async (who, page) => (await fetch(origin + page, { headers: as(who) })).text();
+  /** Posts the `index`th form of `page` with the fields given. */
+  async function post(who, page, index, fields, formPage = page) {
+    const html = await pageOf('owner', formPage);
+    const id = [...html.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
+    if (id === undefined) {
+      problems.push(`${page}: no form ${index}`);
+      return undefined;
+    }
+    const body = new FormData();
+    body.set(id, '');
+    for (const [name, value] of Object.entries(fields)) body.set(name, value);
+    return fetch(origin + page, {
+      method: 'POST',
+      body,
+      headers: { origin, ...as(who) },
+      redirect: 'manual',
+    });
+  }
+  const to = (response) => {
+    const location = new URL(response.headers.get('location') ?? '/nowhere', origin);
+    return location.pathname + location.search;
+  };
+  const list = '/harbor-city/admin/teams';
+  const added = await post('owner', list, 0, {
+    league: 'harbor-city',
+    name: 'Blue Jays',
+    useOwnColors: 'on',
+  });
+  if (added === undefined) return problems;
+  const team = /^\/harbor-city\/admin\/teams\/([0-9a-f-]{36})\?done=created$/.exec(to(added))?.[1];
+  if (added.status !== 303 || team === undefined) {
+    problems.push(`adding a team answers ${added.status} to ${to(added)}`);
+    return problems;
+  }
+  const page = `${list}/${team}`;
+  const player = await post('owner', page, 2, {
+    league: 'harbor-city',
+    team,
+    firstName: 'Casey',
+    lastName: 'Walker',
+    jerseyNumber: '7',
+    role: 'captain',
+  });
+  if (player === undefined || to(player) !== `${page}?done=added`) {
+    problems.push(`adding a player answers ${player?.status} to ${player && to(player)}`);
+    return problems;
+  }
+  const withPlayer = await pageOf('owner', page);
+  if (!withPlayer.includes('Casey Walker') || !withPlayer.includes('value="7"')) {
+    problems.push('the roster does not show the player added with a number');
+  }
+  const entry = /name="entry" value="([^"]+)"/.exec(withPlayer)?.[1];
+  const version = /name="version" value="([^"]+)"[^>]*\/><p><label>Number/.exec(withPlayer)?.[1];
+  const forms = [...withPlayer.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].length;
+  // Forms in order: details, who sees, [number and role, mark as left] for the player, ...
+  const gone = await post('owner', page, 3, {
+    league: 'harbor-city',
+    team,
+    entry,
+    version: version ?? '1',
+    leftOn: '2026-11-13',
+  });
+  if (gone === undefined || to(gone) !== `${page}?done=left`) {
+    problems.push(
+      `marking a player as left answers ${gone?.status} to ${gone && to(gone)} of ${forms} forms`,
+    );
+    return problems;
+  }
+  if (!(await pageOf('owner', page)).includes('Casey Walker, left on 2026-11-13')) {
+    problems.push('the roster does not show the player who left');
+  }
+  // Forged posts change nothing: a league field that is not the page's league is "not
+  // found", and another league's team id is not a team of this league (T-23).
+  const forgedLeague = await post('owner', list, 0, { league: 'north-valley', name: 'Forged' });
+  if (
+    forgedLeague !== undefined &&
+    forgedLeague.status === 303 &&
+    !to(forgedLeague).includes('problem=')
+  ) {
+    problems.push(
+      `a post naming another league was taken (${forgedLeague.status} to ${to(forgedLeague)})`,
+    );
+  }
+  const lions = /\/north-valley\/admin\/teams\/([0-9a-f-]{36})/.exec(
+    await pageOf('owner', '/north-valley/admin/teams'),
+  )?.[1];
+  if (lions === undefined) {
+    problems.push('the north valley list does not link its teams');
+  } else {
+    const hijack = await post('owner', page, 0, {
+      league: 'harbor-city',
+      team: lions,
+      version: '1',
+      name: 'Hijacked',
+    });
+    if (hijack !== undefined && !to(hijack).includes('problem=teams.update_team.team-not-found')) {
+      problems.push(`another league's team id was not refused (${hijack.status} to ${to(hijack)})`);
+    }
+  }
+  for (const where of ['/north-valley/admin/teams', list]) {
+    const html = await pageOf('owner', where);
+    if (html.includes('Forged') || html.includes('Hijacked')) {
+      problems.push(`a forged post changed ${where}`);
+    }
+  }
+  if (!(await pageOf('owner', '/north-valley/admin/teams')).includes('Lions')) {
+    problems.push('the north valley teams lost Lions');
+  }
+  // Someone who may not manage teams changes nothing, and the team page is refused.
+  const refused = await post(
+    'scheduler',
+    '/north-valley/admin/teams',
+    0,
+    {
+      league: 'north-valley',
+      name: 'Sneaky',
+    },
+    '/north-valley/admin/teams',
+  );
+  if (refused !== undefined && refused.status === 303) {
+    problems.push(`a scheduler's team was taken (${refused.status})`);
+  }
+  if (
+    !(await pageOf('owner', '/north-valley/admin/teams')).includes('Lions') ||
+    (await pageOf('owner', '/north-valley/admin/teams')).includes('Sneaky')
+  ) {
+    problems.push('the scheduler changed the north valley teams');
+  }
+  return problems;
 }
 
 /**
