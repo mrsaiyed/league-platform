@@ -1,7 +1,8 @@
 // The players of a game's two teams in the scope's league (T3 §7): everyone with a
 // player's or captain's roster entry on either team, with the number on it. One who
-// left and joined again is listed with the entry they are on now first. Names are
-// not read: a box score line never copies one (T-220).
+// left and joined again is listed with the entry they are on now first, and an entry
+// is current while it has no leaving date. Names are not read: a box score line never
+// copies one (T-220).
 import type { GamePlayer } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
@@ -18,7 +19,12 @@ export async function listGamePlayers(scope: LeagueScope, gameId: string): Promi
           ]),
         ),
     )
-    .select(['roster_entries.person_id', 'roster_entries.team_id', 'roster_entries.jersey_number'])
+    .select([
+      'roster_entries.person_id',
+      'roster_entries.team_id',
+      'roster_entries.jersey_number',
+      'roster_entries.left_on',
+    ])
     .where('roster_entries.league_id', '=', scope.leagueId)
     .where('games.id', '=', gameId)
     .where('roster_entries.role', 'in', ['player', 'captain'])
@@ -30,5 +36,6 @@ export async function listGamePlayers(scope: LeagueScope, gameId: string): Promi
     personId: row.person_id,
     teamId: row.team_id,
     jerseyNumber: row.jersey_number,
+    current: row.left_on === null,
   }));
 }

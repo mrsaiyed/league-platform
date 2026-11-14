@@ -12,6 +12,7 @@ import {
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import { engineRulesOf } from '../engine-rules.ts';
+import { tieProblem } from '../live-game.ts';
 import {
   awayTeamId,
   editorGrant,
@@ -19,6 +20,7 @@ import {
   game,
   gameUuid,
   homeTeamId,
+  leagueId,
   rules,
   scorekeeperGrant,
   scorekeeperId,
@@ -48,8 +50,18 @@ const strangerId = '01900000-0000-7000-8000-000000030001';
 const commandUuid = (n: number) => `01900000-0000-7000-8000-0000c0${String(n).padStart(6, '0')}`;
 
 const roster: GamePlayer[] = [
-  ...homeIds.map((personId, i) => ({ personId, teamId: homeTeamId, jerseyNumber: String(i + 10) })),
-  ...awayIds.map((personId, i) => ({ personId, teamId: awayTeamId, jerseyNumber: String(i + 20) })),
+  ...homeIds.map((personId, i) => ({
+    personId,
+    teamId: homeTeamId,
+    jerseyNumber: String(i + 10),
+    current: true,
+  })),
+  ...awayIds.map((personId, i) => ({
+    personId,
+    teamId: awayTeamId,
+    jerseyNumber: String(i + 20),
+    current: true,
+  })),
 ];
 
 const holdingSession = (fields: Partial<ScoringSession> = {}): ScoringSession => ({
@@ -262,7 +274,7 @@ describe('applying the tracker’s commands (T-111, T6 §1)', () => {
     expect(t.db.state.games[0]).toMatchObject({ status: 'scheduled', format: null, version: 1 });
   });
 
-  it('the rules, ending and reopening are not taken through the tracker’s door', async () => {
+  it('the rules and reopening are not taken through the tracker’s door', async () => {
     const t = setUp();
     const result = await applyTrackerCommands(
       t.as(scorekeeperId),
@@ -270,7 +282,6 @@ describe('applying the tracker’s commands (T-111, T6 §1)', () => {
         taps([
           // The Al-Hadi tracker's halves, as its format picker sends them.
           { type: 'rules', rules: { ...basketball.HALVES } },
-          { type: 'end' },
           { type: 'reopen' },
         ]),
       ),
@@ -280,8 +291,7 @@ describe('applying the tracker’s commands (T-111, T6 §1)', () => {
       result.ok && result.value.results.map((r) => r.status === 'refused' && r.reason),
     ).toEqual([
       { code: 'rule', message: 'The game’s rules come from the league’s settings.' },
-      { code: 'rule', message: 'Ending a game is not taken here yet.' },
-      { code: 'rule', message: 'Reopening a game is not taken here yet.' },
+      { code: 'rule', message: 'A final game is reopened by an admin, with a reason.' },
     ]);
   });
 
@@ -563,6 +573,153 @@ describe('protocol versions (T-127)', () => {
     const t = setUp();
     const result = await applyTrackerCommands(t.as(scorekeeperId), batchOf(taps(tipOff)), t.deps);
     expect(result).toMatchObject({ value: { protocolVersion: 1 } });
+  });
+});
+
+describe('the End game tap (step 2.30, T6 §7)', () => {
+  /** Someone who was on the home team and has left it. */
+  const leftId = '01900000-0000-7000-8000-000000019999';
+  const withLeaver = [
+    ...roster,
+    { personId: leftId, teamId: homeTeamId, jerseyNumber: '99', current: false },
+  ];
+
+  it('ends the game in the batch’s transaction: final, lines settled, logged and announced', async () => {
+    const t = setUp({ players: withLeaver });
+    const commands = taps([
+      ...tipOff,
+      { type: 'score', side: 'home', playerId: homeIds[0] ?? '', points: 3 },
+      { type: 'foul', side: 'away', playerId: awayIds[1] ?? '' },
+      { type: 'end' },
+      { type: 'score', side: 'home', playerId: homeIds[1] ?? '', points: 2 },
+    ]);
+    const result = await applyTrackerCommands(t.as(scorekeeperId), batchOf(commands), t.deps);
+    expect(result.ok && result.value.results.map((r) => r.status)).toEqual([
+      'accepted',
+      'accepted',
+      'accepted',
+      'accepted',
+      'accepted',
+      'accepted',
+      'refused',
+    ]);
+    expect(result.ok && result.value.results[6]).toMatchObject({
+      reason: { code: 'rule', message: 'This game is final. Reopen it to make changes.' },
+    });
+    const s = t.db.state;
+    expect(s.events.map((e) => e.type)).toEqual([
+      'lineup',
+      'lineup',
+      'start',
+      'score',
+      'foul',
+      'end',
+    ]);
+    expect(s.states[0]).toMatchObject({ seq: 6, state: { status: 'final' } });
+    expect(s.games[0]).toMatchObject({
+      status: 'final',
+      homeScore: 3,
+      awayScore: 0,
+      format: seasonRulesPreset('high-school'),
+      version: 2,
+    });
+    expect(s.games[0]?.finalizedAt).not.toBeNull();
+    // Ten who played, and the two on the benches as did-not-play; not the one who left.
+    expect(s.liveLines.filter((l) => l.played)).toHaveLength(10);
+    expect(s.liveLines.filter((l) => !l.played)).toEqual([
+      {
+        gameId,
+        teamId: homeTeamId,
+        personId: homeIds[5],
+        jerseyNumber: '15',
+        played: false,
+        secondsPlayed: 0,
+        stats: {},
+      },
+      {
+        gameId,
+        teamId: awayTeamId,
+        personId: awayIds[5],
+        jerseyNumber: '25',
+        played: false,
+        secondsPlayed: 0,
+        stats: {},
+      },
+    ]);
+    expect(s.activity.map((a) => a.action)).toEqual(['games.end_tracked_game']);
+    expect(t.events).toEqual([{ type: 'games.finalized', leagueId, gameId, seasonId }]);
+  });
+
+  it('a level score is refused at the end unless the season allows ties', async () => {
+    const level: Input[] = [
+      ...tipOff,
+      { type: 'score', side: 'home', playerId: homeIds[0] ?? '', points: 2 },
+      { type: 'score', side: 'away', playerId: awayIds[0] ?? '', points: 2 },
+    ];
+    const t = setUp();
+    await applyTrackerCommands(t.as(scorekeeperId), batchOf(taps(level)), t.deps);
+    const refused = await applyTrackerCommands(
+      t.as(scorekeeperId),
+      batchOf(taps([{ type: 'end' }], 10)),
+      t.deps,
+    );
+    expect(refused.ok && refused.value.results[0]).toMatchObject({
+      status: 'refused',
+      reason: { code: 'rule', message: tieProblem },
+    });
+    expect(t.db.state.games[0]).toMatchObject({ status: 'live', homeScore: 2, awayScore: 2 });
+    expect(t.events).toEqual([]);
+
+    const ties = setUp({
+      seasons: [
+        {
+          id: seasonId,
+          programId: 'p1',
+          rules: { ...seasonRulesPreset('high-school'), allowTies: true },
+        },
+      ],
+    });
+    const ended = await applyTrackerCommands(
+      ties.as(scorekeeperId),
+      batchOf(taps([...level, { type: 'end' }])),
+      ties.deps,
+    );
+    expect(ended.ok && ended.value.results.every((r) => r.status === 'accepted')).toBe(true);
+    expect(ties.db.state.games[0]).toMatchObject({ status: 'final', homeScore: 2, awayScore: 2 });
+  });
+
+  it('when the standings cannot be worked out, nothing of the batch is saved', async () => {
+    const failing = {
+      type: 'games.finalized',
+      handle: async () => {
+        throw new Error('standings could not be saved');
+      },
+    };
+    const t = memoryTracker(
+      {
+        seasons: [{ id: seasonId, programId: 'p1', rules: seasonRulesPreset('high-school') }],
+        games: [game(1, { captureMode: 'live' })],
+        grants: [scorekeeperGrant],
+        sessions: [holdingSession()],
+        players: roster,
+      },
+      [failing],
+    );
+    const before = structuredClone(t.db.state);
+    await expect(
+      applyTrackerCommands(
+        t.as(scorekeeperId),
+        batchOf(
+          taps([
+            ...tipOff,
+            { type: 'score', side: 'home', playerId: homeIds[0] ?? '', points: 2 },
+            { type: 'end' },
+          ]),
+        ),
+        t.deps,
+      ),
+    ).rejects.toThrow('standings could not be saved');
+    expect(t.db.state).toEqual(before);
   });
 });
 
