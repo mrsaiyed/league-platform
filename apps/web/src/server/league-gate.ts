@@ -4,9 +4,10 @@
 // "not found", "forward" and "forbidden".
 //
 // - A league that does not exist, is in the bin, or is hidden from this person (a
-//   draft or a suspended league, to anyone but its owner and admins) is "not found",
-//   the same answer for all three, so a hidden league is never given away (U-9). A
-//   former short name forwards only for those who may see the league.
+//   draft league, to anyone without an admin area in it; a suspended league, to
+//   anyone but its owner and admins: mayOpenLeague) is "not found", the same answer
+//   for all three, so a hidden league is never given away (U-9, step 2.87). A former
+//   short name forwards only for those who may see the league.
 // - An admin address or the tracker, in a league this person may see, without the
 //   access it needs, is "no access", whoever they are (U-6). The address shows
 //   where you ask to go; it never proves you may.

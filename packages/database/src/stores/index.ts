@@ -6,6 +6,7 @@ export { gamesStore } from './games-store.ts';
 export { importsStore } from './imports-store.ts';
 export { jobsStore } from './jobs-store.ts';
 export { leaguesStore } from './leagues-store.ts';
+export { liveGamesStore } from './live-games-store.ts';
 export { peopleStore } from './people-store.ts';
 export { schedulingStore } from './scheduling-store.ts';
 export { scoringSessionsStore } from './scoring-sessions-store.ts';

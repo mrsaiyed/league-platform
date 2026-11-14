@@ -9,7 +9,7 @@
 //
 // Being someone: the sign-in screens (step 1.14) run on the sign-in stand-in of
 // packages/providers, in this process's memory, its emails caught by the email
-// capture instead of sent (T-140). Beside it, the four made-up people below are
+// capture instead of sent (T-140). Beside it, the made-up people below are
 // "signed in" when the browser's session cookie holds their made-up token, so the
 // shell's checks can be someone who holds roles in the made-up leagues; nothing
 // about that works outside this file.
@@ -24,6 +24,7 @@ import {
   type Grant,
   type LeagueStatus,
   type Role,
+  type Scope,
 } from '@srleagues/core';
 import { captureEmail, createLocalSignInStandIn, type SessionIdentity } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
@@ -65,11 +66,24 @@ export const standInPeople = {
   coach: { accountId: id(0xa3), token: 'local-coach-token' },
   stranger: { accountId: id(0xa4), token: 'local-stranger-token' },
   scorekeeper: { accountId: id(0xa5), token: 'local-scorekeeper-token' },
+  // The other staff roles, in the draft league only (step 2.87).
+  admin: { accountId: id(0xa6), token: 'local-admin-token' },
+  registrar: { accountId: id(0xa7), token: 'local-registrar-token' },
+  editor: { accountId: id(0xa8), token: 'local-editor-token' },
+  clubAdmin: { accountId: id(0xa9), token: 'local-club-admin-token' },
+  /** A scheduler for one program of the draft league only. */
+  programScheduler: { accountId: id(0xaa), token: 'local-program-scheduler-token' },
+  /** The admin of another league, a draft too, and nothing in the others. */
+  otherAdmin: { accountId: id(0xab), token: 'local-other-admin-token' },
 } as const satisfies Record<string, MadeUpPerson>;
 
 const { owner, scheduler, coach, scorekeeper } = standInPeople;
 
-/** The made-up leagues, one in each state, all run by the made-up owner. */
+/**
+ * The made-up leagues, one in each state, all owned by the made-up owner, and a
+ * second draft league with an admin of its own who holds nothing elsewhere, to show
+ * that one draft's staff do not see another's.
+ */
 export const standInLeagues = {
   live: league(1, 'north-valley', 'live', ['north-vale']),
   other: league(2, 'harbor-city', 'live'),
@@ -77,6 +91,7 @@ export const standInLeagues = {
   archived: league(4, 'old-meadow', 'archived'),
   suspended: league(5, 'closed-gate', 'suspended'),
   inBin: { ...league(6, 'binned-league', 'live'), inBin: true },
+  otherDraft: league(7, 'still-waters', 'draft'),
 } as const satisfies Record<string, MadeUpLeague>;
 
 function league(
@@ -88,13 +103,19 @@ function league(
   return { id: id(n), slug, status, inBin: false, ownerAccountId: owner.accountId, formerSlugs };
 }
 
-const grantOf = (n: number, accountId: string, role: Role, leagueId: string) => ({
+const grantOf = (
+  n: number,
+  accountId: string,
+  role: Role,
+  leagueId: string,
+  scope: Scope = { type: 'league' },
+) => ({
   leagueId,
   grant: {
     id: id(0xd0 + n),
     accountId,
     role,
-    scope: { type: 'league' },
+    scope,
     grantedByAccountId: owner.accountId,
     revokedAt: null,
   } satisfies Grant,
@@ -107,6 +128,16 @@ const grants = [
   grantOf(3, coach.accountId, 'coach', standInLeagues.live.id),
   grantOf(4, coach.accountId, 'coach', standInLeagues.draft.id),
   grantOf(5, scorekeeper.accountId, 'scorekeeper', standInLeagues.live.id),
+  grantOf(6, scorekeeper.accountId, 'scorekeeper', standInLeagues.draft.id),
+  grantOf(7, standInPeople.admin.accountId, 'admin', standInLeagues.draft.id),
+  grantOf(8, standInPeople.registrar.accountId, 'registrar', standInLeagues.draft.id),
+  grantOf(9, standInPeople.editor.accountId, 'editor', standInLeagues.draft.id),
+  grantOf(10, standInPeople.clubAdmin.accountId, 'club_admin', standInLeagues.draft.id),
+  grantOf(11, standInPeople.programScheduler.accountId, 'scheduler', standInLeagues.draft.id, {
+    type: 'program',
+    id: id(0xc1),
+  }),
+  grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.otherDraft.id),
 ];
 
 const leagues: readonly MadeUpLeague[] = Object.values(standInLeagues);

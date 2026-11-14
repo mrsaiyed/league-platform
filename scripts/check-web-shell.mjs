@@ -3,7 +3,8 @@
 // this computer with made-up settings on the made-up stand-in (APP_ENV=test), asks
 // for addresses as different made-up people, and checks the status and the words of
 // each answer, the league's own design, name and the "Powered by" mark (step 1.18): "you do not have access" for admin addresses without access (U-6),
-// unpublished leagues only for their owner and admins (U-9), forwarding (U-7), and
+// a draft league only for those with an admin area in it and a suspended one only
+// for its owner and admins (U-9, step 2.87), forwarding (U-7), and
 // the security headers on every answer.
 // Then it starts the app as staging with a database address that answers nobody,
 // and checks that it refuses to start (T-60). Nothing leaves this computer.
@@ -35,6 +36,13 @@ const tokens = {
   scheduler: 'local-scheduler-token',
   coach: 'local-coach-token',
   stranger: 'local-stranger-token',
+  admin: 'local-admin-token',
+  registrar: 'local-registrar-token',
+  editor: 'local-editor-token',
+  scorekeeper: 'local-scorekeeper-token',
+  clubAdmin: 'local-club-admin-token',
+  programScheduler: 'local-program-scheduler-token',
+  otherAdmin: 'local-other-admin-token',
 };
 
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
@@ -42,6 +50,10 @@ const tokens = {
 // the refusal is read from the page's data, beside its status.
 const noAccess = 'NEXT_HTTP_ERROR_FALLBACK;403';
 const notFound = 'NEXT_HTTP_ERROR_FALLBACK;404';
+
+// A link in the admin's own navigation (features/shell/admin-nav.tsx). The area's
+// name alone is no proof: the site's menu has "Schedule" and "Teams" too.
+const adminLink = (league, area) => `href="/${league}/admin/${area}"`;
 
 /** [who, path, status, words that must be there, words that must not, forward to] */
 const cases = [
@@ -118,8 +130,19 @@ const cases = [
   ['visitor', '/north-valley/admin', 403, [noAccess], ['Admin areas']],
   ['stranger', '/north-valley/admin', 403, [noAccess]],
   ['coach', '/north-valley/admin/teams', 403, [noAccess]],
-  ['scheduler', '/north-valley/admin', 200, ['Admin areas', 'Schedule', 'Games'], ['People']],
-  ['scheduler', '/north-valley/admin/schedule', 200, ['Schedule', 'Nothing here yet.']],
+  [
+    'scheduler',
+    '/north-valley/admin',
+    200,
+    ['Admin areas', adminLink('north-valley', 'schedule'), adminLink('north-valley', 'games')],
+    [adminLink('north-valley', 'people')],
+  ],
+  [
+    'scheduler',
+    '/north-valley/admin/schedule',
+    200,
+    [adminLink('north-valley', 'schedule'), 'Nothing here yet.'],
+  ],
   ['scheduler', '/north-valley/admin/teams', 403, [noAccess]],
   // Admin → Teams (step 2.51): the season's teams and the form to add one.
   [
@@ -132,15 +155,64 @@ const cases = [
   ['owner', '/harbor-city/admin/teams', 200, ['No teams yet.', 'Add a team'], ['Lions']],
   ['owner', '/north-valley/admin/teams/not-a-team', 404, [notFound]],
   ['scheduler', '/harbor-city/admin', 403, [noAccess]],
-  ['owner', '/north-valley/admin/settings', 200, ['League settings', 'People', 'Teams']],
+  [
+    'owner',
+    '/north-valley/admin/settings',
+    200,
+    ['League settings', adminLink('north-valley', 'people'), adminLink('north-valley', 'teams')],
+  ],
   ['scheduler', '/north-valley/score/game-1', 200, ['Score a game']],
   ['coach', '/north-valley/score/game-1', 403, [noAccess]],
   ['visitor', '/quiet-pines', 404, [notFound]],
   ['coach', '/quiet-pines', 404, [notFound]],
   ['stranger', '/quiet-pines/admin', 404, [notFound], [noAccess]],
+  ['otherAdmin', '/quiet-pines', 404, [notFound], ['This league is not published.']],
+  ['otherAdmin', '/quiet-pines/admin', 404, [notFound], [noAccess, 'Admin areas']],
   ['owner', '/quiet-pines', 200, ['This league is not published.']],
-  ['scheduler', '/quiet-pines/admin', 404, [notFound], ['Admin areas']],
   ['owner', '/quiet-pines/admin', 200, ['Admin areas']],
+  // Everyone with an admin area in a draft league may open it (step 2.87).
+  ['admin', '/quiet-pines/admin', 200, [adminLink('quiet-pines', 'settings')]],
+  ['scheduler', '/quiet-pines', 200, ['This league is not published.']],
+  [
+    'scheduler',
+    '/quiet-pines/admin',
+    200,
+    [adminLink('quiet-pines', 'schedule'), adminLink('quiet-pines', 'games')],
+    [adminLink('quiet-pines', 'people')],
+  ],
+  [
+    'programScheduler',
+    '/quiet-pines/admin/schedule',
+    200,
+    [adminLink('quiet-pines', 'schedule'), 'Nothing here yet.'],
+  ],
+  [
+    'registrar',
+    '/quiet-pines/admin',
+    200,
+    [adminLink('quiet-pines', 'registration'), adminLink('quiet-pines', 'people')],
+    [adminLink('quiet-pines', 'games'), adminLink('quiet-pines', 'settings')],
+  ],
+  ['registrar', '/quiet-pines/admin/schedule', 403, [noAccess]],
+  ['editor', '/quiet-pines', 200, ['This league is not published.']],
+  [
+    'editor',
+    '/quiet-pines/admin',
+    200,
+    [adminLink('quiet-pines', 'site')],
+    [adminLink('quiet-pines', 'schedule')],
+  ],
+  ['scorekeeper', '/quiet-pines/score/game-1', 200, ['Score a game']],
+  [
+    'clubAdmin',
+    '/quiet-pines/admin/teams',
+    200,
+    [adminLink('quiet-pines', 'teams'), adminLink('quiet-pines', 'registration'), 'No teams yet.'],
+    [adminLink('quiet-pines', 'people')],
+  ],
+  ['otherAdmin', '/still-waters/admin', 200, [adminLink('still-waters', 'settings')]],
+  ['scheduler', '/still-waters', 404, [notFound]],
+  ['registrar', '/closed-gate', 404, [notFound]],
   ['visitor', '/closed-gate', 404, [notFound]],
   ['owner', '/closed-gate/admin', 200, ['This league has been taken down.']],
   ['scheduler', '/closed-gate', 404, [notFound]],
@@ -151,7 +223,8 @@ const cases = [
   ['visitor', '/North-Valley', 308, [], [], '/north-valley'],
   ['visitor', '/Account', 308, [], [], '/account'],
   ['visitor', '/quiet-pine/admin', 404, [notFound]],
-  ['scheduler', '/quiet-pine/admin', 404, [notFound]],
+  ['otherAdmin', '/quiet-pine/admin', 404, [notFound]],
+  ['scheduler', '/quiet-pine/admin', 308, [], [], '/quiet-pines/admin'],
   ['owner', '/quiet-pine/admin', 308, [], [], '/quiet-pines/admin'],
 ];
 
@@ -225,6 +298,7 @@ try {
       `an invitation address sends referrer-policy "${invitation.headers.get('referrer-policy')}"`,
     );
   }
+  failures.push(...(await sameAsNoLeague(origin)));
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
 } finally {
@@ -309,6 +383,74 @@ function freePort() {
       probe.close(() => resolve(port));
     });
   });
+}
+
+/**
+ * A page as the browser ends up with it, whatever the timing of the stream. Next.js
+ * sends the page's data in `self.__next_f.push` pieces as each part is ready, so how
+ * the data is cut into pieces, and the order its numbered rows arrive in, depend on
+ * how busy the server was. The markup outside those pieces is kept as sent; the data
+ * is joined back together and its rows put in order. Every byte is still compared.
+ */
+function settle(body) {
+  const pieces = [];
+  const markup = body.replace(
+    /<script>self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)<\/script>/g,
+    (_, piece) => {
+      pieces.push(JSON.parse(piece));
+      return '';
+    },
+  );
+  const rows = pieces.join('').split('\n').filter(Boolean).sort().join('\n');
+  return { markup, rows };
+}
+
+/** Where two texts first part, for the report. */
+function firstDifference(a, b) {
+  let at = 0;
+  while (at < a.length && a[at] === b[at]) at += 1;
+  return `at ${at}: "${a.slice(at, at + 80)}" / "${b.slice(at, at + 80)}"`;
+}
+
+/**
+ * A draft league is "not found" for someone who may not see it, exactly the answer
+ * for a name nobody has (U-9, step 2.87): the same status, headers, markup and page
+ * data, once each name is put in the same place. Only the date, the length and how
+ * the stream happened to be cut (settle above) may differ.
+ */
+async function sameAsNoLeague(origin) {
+  const ask = async (name) => {
+    const response = await fetch(`${origin}/${name}/admin`, {
+      headers: { cookie: `srl_session=${tokens.otherAdmin}` },
+      redirect: 'manual',
+    });
+    const headers = [...response.headers]
+      .filter(([header]) => !['date', 'content-length'].includes(header))
+      .map(([header, value]) => `${header}: ${value.replaceAll(name, '{name}')}`)
+      .join('\n');
+    const body = (await response.text()).replaceAll(name, '{name}');
+    return { status: response.status, headers, body };
+  };
+  const draft = await ask('quiet-pines');
+  const nobody = await ask('nobody-has-this');
+  const found = [];
+  if (draft.status !== 404 || nobody.status !== 404) {
+    found.push(`draft and no league answer ${draft.status} and ${nobody.status}, not 404`);
+  }
+  if (draft.headers !== nobody.headers) {
+    found.push(
+      `a draft's headers differ from no league's:\n${draft.headers}\n---\n${nobody.headers}`,
+    );
+  }
+  const [a, b] = [settle(draft.body), settle(nobody.body)];
+  if (a.rows === '' || b.rows === '') found.push('a not-found page carries no page data');
+  if (a.markup !== b.markup) {
+    found.push(`a draft's markup differs from no league's ${firstDifference(a.markup, b.markup)}`);
+  }
+  if (a.rows !== b.rows) {
+    found.push(`a draft's page data differs from no league's ${firstDifference(a.rows, b.rows)}`);
+  }
+  return found;
 }
 
 /**

@@ -39,6 +39,7 @@ import {
   type ScoringTx,
   type StandingsTx,
   type TeamsTx,
+  type TrackerTx,
   type TransactionRunner,
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
@@ -52,6 +53,7 @@ import {
   importsStore,
   jobsStore,
   leaguesStore,
+  liveGamesStore,
   peopleStore,
   schedulingStore,
   scoringSessionsStore,
@@ -67,6 +69,7 @@ export type HarnessTx = ImportScoresTx &
   SchedulingTx &
   GamesTx &
   ScoringTx &
+  TrackerTx &
   PeopleTx &
   TeamsTx &
   AccessTx &
@@ -84,6 +87,7 @@ export function harnessTx(scope: LeagueScope, jobs: JobQueue): HarnessTx {
     scheduling: schedulingStore(scope),
     games: gamesStore(scope),
     scoringSessions: scoringSessionsStore(scope),
+    liveGames: liveGamesStore(scope),
     // Fixed, so the seeded sessions' leases read the same at any time of day.
     clock: { now: () => harnessNow },
     imports: importsStore(scope),
