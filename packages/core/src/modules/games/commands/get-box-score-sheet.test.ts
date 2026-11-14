@@ -10,6 +10,8 @@ import {
   memoryGames,
   ownerId,
   rules,
+  scorekeeperGrant,
+  scorekeeperId,
   seasonId,
 } from '../memory-games.test-helper.ts';
 import { getBoxScoreSheet } from './get-box-score-sheet.ts';
@@ -77,7 +79,33 @@ describe('getBoxScoreSheet', () => {
     const sheet = await getBoxScoreSheet(as(ownerId), { gameId: gameUuid(1) }, deps);
     expect(sheet).toMatchObject({
       ok: true,
-      value: { statKeys: ['points', 'rebounds'], minutes: true, locked: 'decided' },
+      value: {
+        statKeys: ['points', 'rebounds'],
+        minutes: true,
+        locked: 'decided',
+        mayReopen: true,
+      },
+    });
+  });
+
+  it('offers reopening only to whom games.reopen_game would accept, never for a tracked game', async () => {
+    const mayReopen = async (state: Parameters<typeof memoryGames>[0], who = ownerId) => {
+      const { deps, as } = memoryGames(state);
+      const sheet = await getBoxScoreSheet(as(who), { gameId: gameUuid(1) }, deps);
+      return sheet.ok ? sheet.value.mayReopen : undefined;
+    };
+    // A game not yet decided has nothing to reopen.
+    expect(await mayReopen({ games: [game(1)] })).toBe(false);
+    // A scorekeeper may score but not correct.
+    expect(
+      await mayReopen({ games: [finalGame(1)], grants: [scorekeeperGrant] }, scorekeeperId),
+    ).toBe(false);
+    // A final game scored with the live tracker is corrected in the tracker.
+    const tracked = { games: [finalGame(1)], tracked: [gameUuid(1)] };
+    expect(await mayReopen(tracked)).toBe(false);
+    const { deps, as } = memoryGames(tracked);
+    expect(await getBoxScoreSheet(as(ownerId), { gameId: gameUuid(1) }, deps)).toMatchObject({
+      value: { locked: 'tracked' },
     });
   });
 

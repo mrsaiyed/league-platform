@@ -4,7 +4,6 @@
 // reopen it with a reason (S-7) and correct it. On a phone the grid scrolls sideways
 // inside its own box, never the page (A-2). Words come from the message files (T-187).
 import {
-  allows,
   getBoxScoreSheet,
   leagueUrl,
   type BoxScoreSheet,
@@ -175,11 +174,6 @@ export async function BoxScorePage({
   const homeName = names[game.homeTeamId] ?? '';
   const awayName = names[game.awayTeamId] ?? '';
   const editable = sheet.locked === null;
-  const holder = await ports.accessOf(context);
-  const mayReopen =
-    sheet.locked === 'decided' &&
-    holder !== undefined &&
-    allows(holder, 'games.correct', { type: 'program', id: sheet.programId });
   const notice = boxScoreNotice(search);
   const teams = [
     { teamId: game.awayTeamId, name: awayName, score: game.awayScore, field: 'awayScore' },
@@ -199,7 +193,7 @@ export async function BoxScorePage({
       ) : (
         <p>{t(`admin.boxScore.locked.${sheet.locked}`)}</p>
       )}
-      {mayReopen ? (
+      {sheet.mayReopen ? (
         <form action={reopenBoxScoreAction}>
           <input type="hidden" name="league" value={league} />
           <input type="hidden" name="gameId" value={game.id} />
