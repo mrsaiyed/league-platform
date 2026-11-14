@@ -7,6 +7,7 @@
 // One more account holds a role in both leagues, with its own profile and a
 // child's. Its texts carry neither marker: it is not either league's to hide. The
 // child is a person in both leagues, and each league's record of them is its own.
+import { basketball } from '@srleagues/sports';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { createDatabase } from '../db/create-database.ts';
@@ -389,29 +390,35 @@ async function seededLeague(
     'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
     [leagueId, upcomingGameId, member.accountId],
   );
-  // The live game: the final game's events, state and the player's line; a session
-  // scoring the upcoming game; a walk-up player added at the final game's table.
+  // The live game: the final game's events (a basket, then the end), the engine's
+  // state they give and the player's line; a session scoring the upcoming game; a
+  // walk-up player added at the final game's table.
   const gameEventIds: string[] = [];
   const gameCommandIds: string[] = [];
-  for (const [seq, type, payload] of [
-    [1, 'start', {}],
-    [2, 'score', { side: 'home', playerId: personId, points: 2 }],
-  ] as const) {
+  let trackedState = basketball.newGame();
+  const taps: readonly basketball.Command[] = [
+    { type: 'score', side: 'home', playerId: personId, points: 2 },
+    { type: 'end' },
+  ];
+  for (const [i, command] of taps.entries()) {
     const commandId = randomUUID();
     gameCommandIds.push(commandId);
+    const at = Date.UTC(2026, 11, 6, 18, 5, 0);
+    trackedState = basketball.apply(trackedState, command, { id: commandId, now: at });
+    const { type, ...payload } = command;
     gameEventIds.push(
       await id(
         pglite,
         `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at, account_id)
          values ($1, $2, $3, $4, $5, $6, '2026-12-06T18:05:00Z', $7)`,
-        [leagueId, gameId, seq, commandId, type, JSON.stringify(payload), member.accountId],
+        [leagueId, gameId, i + 1, commandId, type, JSON.stringify(payload), member.accountId],
       ),
     );
   }
   const gameStateId = await id(
     pglite,
     'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 2, $3)',
-    [leagueId, gameId, JSON.stringify({ version: 1, status: 'final', plays: [] })],
+    [leagueId, gameId, JSON.stringify(trackedState)],
   );
   const playerGameStatsId = await id(
     pglite,

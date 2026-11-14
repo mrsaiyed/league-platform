@@ -208,6 +208,11 @@ export type GamePlayer = {
   readonly teamId: string;
   /** The number they wear, from their roster entry; null if they have none. */
   readonly jerseyNumber: string | null;
+  /**
+   * True if the entry was on the team on the game's day: joined on or before it (or no
+   * joining date) and not left by it (no leaving date, or one after it).
+   */
+  readonly onGameDay: boolean;
 };
 
 /** A box score line as the live game writes it: a line with the number worn in this game. */
@@ -227,8 +232,13 @@ export type LiveGamesStore = {
   readonly addEvents: (events: readonly NewGameEvent[]) => Promise<void>;
   /** Writes the game's state as of event `seq`: the first time, or over the last one. */
   readonly saveState: (gameId: string, seq: number, state: unknown) => Promise<void>;
-  /** The players of the game's two teams, as their rosters have them. */
+  /**
+   * The players of the game's two teams, as their rosters have them, each person's
+   * entry on the game's day listed first.
+   */
   readonly players: (gameId: string) => Promise<readonly GamePlayer[]>;
+  /** The game's box score lines as they are saved now. */
+  readonly lines: (gameId: string) => Promise<readonly LiveGameLine[]>;
   /** Writes these lines, each added or replaced, and removes the lines of `removed` (person ids). */
   readonly saveLines: (
     gameId: string,
