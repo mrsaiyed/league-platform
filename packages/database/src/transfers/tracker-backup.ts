@@ -98,18 +98,29 @@ export type TrackerBackup = {
  * Why a backup could not be read. The runner words these for people from its own
  * message file; `message` is only for logs.
  *  - missing: there is no such folder.
- *  - not-a-database: the folder holds no database.
- *  - not-a-tracker-backup: the database has no live tracker tables.
+ *  - unreadable: the folder could not be copied (a file in it cannot be read).
+ *  - not-a-database: the folder holds no database, or one that will not open.
+ *  - not-a-tracker-backup: the database is missing the live tracker's tables or columns,
+ *    or reading them failed.
  *  - in-use: a running stats server has the folder open; stop it first.
+ *  - work-dir-unusable: the working folder cannot be made, or is inside the backup
+ *    (`folder` is then the working folder).
+ * `cause` holds the underlying error, when there is one, for logs.
  */
-export type TrackerBackupProblem = 'missing' | 'not-a-database' | 'not-a-tracker-backup' | 'in-use';
+export type TrackerBackupProblem =
+  | 'missing'
+  | 'unreadable'
+  | 'not-a-database'
+  | 'not-a-tracker-backup'
+  | 'in-use'
+  | 'work-dir-unusable';
 
 export class TrackerBackupError extends Error {
   readonly problem: TrackerBackupProblem;
   readonly folder: string;
 
-  constructor(problem: TrackerBackupProblem, folder: string) {
-    super(`Tracker backup ${folder}: ${problem}`);
+  constructor(problem: TrackerBackupProblem, folder: string, cause?: unknown) {
+    super(`Tracker backup ${folder}: ${problem}`, cause === undefined ? undefined : { cause });
     this.name = 'TrackerBackupError';
     this.problem = problem;
     this.folder = folder;
