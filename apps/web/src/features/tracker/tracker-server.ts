@@ -17,10 +17,13 @@ export type ServerOutcome<T> =
   /**
    * The server turned the request away and asking again will not help until something
    * changes: signed out (401), may not score (403), no such game (404), or a request
-   * it could not read (400).
+   * it could not read (400). Only the server's own refusal (`TrackerRefusal`) is this.
    */
   | { readonly kind: 'rejected'; readonly httpStatus: number }
-  /** No usable answer: no network, a timeout, a server error. Ask again later. */
+  /**
+   * No usable answer: no network, a timeout, a server error, or a page that is not the
+   * server's, whatever its status. Ask again later.
+   */
   | { readonly kind: 'unanswered' };
 
 export interface TrackerServer {

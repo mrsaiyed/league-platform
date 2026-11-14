@@ -56,7 +56,7 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 - **T-113:** a refused command (for example a foul on a player the server knows was substituted out by a command the device never saw) makes the tracker reload the server's state and tell the scorekeeper what was not applied. The server's record is always the truth.
 - **T-253 (record 049):** the tracker loads the server's state, and reloads it after a refusal, from `GET /api/v1/leagues/{leagueId}/games/{game}/state`: the engine's state as the server holds it and the sequence number of its last tap, for whoever may score the game only, never cached.
 - Commands are small and are sent a few at a time; a full offline game replays in seconds.
-- **T-251 (record 039):** the server answers a batch it took with 200 and the reply; a batch that is not one, or an old protocol version, with 400; no session with 401; someone who may not score the game with 403; a game that is not in the league the address names with 404. The game is always the address's, never the body's.
+- **T-251 (record 039):** the server answers a batch it took with 200 and the reply; a batch that is not one, or an old protocol version, with 400; no session with 401; someone who may not score the game with 403; a game that is not in the league the address names with 404. The game is always the address's, never the body's. Each refusal carries the server's own body (`TrackerRefusal` in `packages/contracts`), and the tracker takes a refusal as the server's word only with that body at its own status: anything else, such as a gym Wi-Fi sign-in page, a filter or a host's error page answering 404 or 403, is no answer and is tried again, so it never stops scoring or sets taps aside.
 
 ## 4. Offline
 

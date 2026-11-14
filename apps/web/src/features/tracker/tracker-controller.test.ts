@@ -715,6 +715,105 @@ describe('tracker controller: signed out mid-game (finding M4)', () => {
   });
 });
 
+/** A page from something between the device and the server: a filter, a host's error page. */
+const pageInBetween = (status: number) => () =>
+  Promise.resolve(
+    new Response('<html><body>Blocked by the network</body></html>', {
+      status,
+      headers: { 'content-type': 'text/html' },
+    }),
+  );
+
+describe('tracker controller: an answer that is not the server’s is no answer (finding G)', () => {
+  for (const httpStatus of [404, 403, 401, 400]) {
+    it(`a ${httpStatus} page in between while taps wait: nothing is lost, refused or set aside`, async () => {
+      const network = endpointNetwork();
+      let between = false;
+      const tablet = device(network, {
+        sendTaps: (send) => (input, init) =>
+          between ? pageInBetween(httpStatus)() : send(input, init),
+        askServer: (ask) => (input, init) =>
+          between ? pageInBetween(httpStatus)() : ask(input, init),
+      });
+      await tablet.controller.start();
+      await tapAll(tablet.controller, tipOff);
+      await tablet.controller.idle();
+      between = true;
+      const waiting = [
+        basket('home', hawks[0] ?? ''),
+        basket('home', hawks[1] ?? '', 3),
+        basket('away', bears[0] ?? ''),
+      ];
+      await tapAll(tablet.controller, waiting);
+      await tablet.controller.idle();
+      // The renewal meets the page too.
+      await tablet.clock.advance(31_000);
+      await tablet.controller.idle();
+      let status = tablet.controller.status();
+      expect(status.mode).toEqual({ kind: 'scoring' });
+      expect(status).toMatchObject({ signedOut: false, notSaved: [], notApplied: [] });
+      expect(status.waiting.map((c) => c.input)).toEqual(waiting);
+      expect(scoreOf(status.game)).toEqual({ home: 5, away: 2 });
+      expect(status.queue.unansweredSince).not.toBeNull();
+      expect((await tablet.storage.list(gameId)).map((e) => e.state)).toEqual([
+        'waiting',
+        'waiting',
+        'waiting',
+      ]);
+
+      // The network is honest again: every tap goes, once.
+      between = false;
+      tablet.controller.online();
+      await tablet.controller.idle();
+      status = tablet.controller.status();
+      expect(status.mode).toEqual({ kind: 'scoring' });
+      expect(status.waiting).toEqual([]);
+      const server = await serverGame(network);
+      expect(server.sequence).toBe(5);
+      expect(scoreOf(server.state)).toEqual({ home: 5, away: 2 });
+    });
+  }
+
+  it('a 404 page in between while opening: it keeps trying, and opens once the server answers', async () => {
+    const network = endpointNetwork();
+    let between = true;
+    const { controller, clock } = device(network, {
+      askServer: (ask) => (input, init) => (between ? pageInBetween(404)() : ask(input, init)),
+    });
+    await controller.start();
+    await clock.advance(minute);
+    expect(controller.status().mode).toEqual({ kind: 'opening' });
+    between = false;
+    controller.online();
+    await controller.idle();
+    expect(controller.status().mode).toEqual({ kind: 'scoring' });
+  });
+
+  it("the server's own refusal is still its word: a game it no longer has is lost", async () => {
+    const network = endpointNetwork();
+    let gone = false;
+    const tablet = device(network, {
+      sendTaps: (send) => (input, init) =>
+        gone
+          ? Promise.resolve(
+              new Response(JSON.stringify({ error: 'not-found' }), {
+                status: 404,
+                headers: { 'content-type': 'application/json' },
+              }),
+            )
+          : send(input, init),
+    });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    gone = true;
+    await tapAll(tablet.controller, [basket('home', hawks[0] ?? '')]);
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'unknown-game' });
+    expect(tablet.controller.status().notSaved).toHaveLength(1);
+  });
+});
+
 /** A storage that fails to read while `broken` is true. */
 function flakyStorage() {
   const inner = createMemoryQueueStorage();

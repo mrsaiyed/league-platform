@@ -104,6 +104,49 @@ export const VersionRefusal = z.strictObject({
 });
 export type VersionRefusal = z.infer<typeof VersionRefusal>;
 
+// ---------------------------------------------------------------- the server's own refusals (T-251)
+
+/**
+ * How our server turns a tracker request away whole (record 039): the commands, session
+ * and state endpoints answer 400, 401, 403 and 404 with one of these bodies, each at its
+ * own status (`trackerRefusalStatus`). The tracker takes a refusal as the server's word
+ * only when it carries this body at that status (`ownTrackerRefusal`). Anything else (a
+ * gym Wi-Fi sign-in page, a filter, a host's error page during a release) is no answer,
+ * and is asked again: such a page must never stop scoring or set taps aside. The session
+ * endpoint's own refusals that carry a `SessionReply` (403, 404, 409) are read by that body.
+ *
+ * These bodies are the ones the endpoints gave before this shape was written down, so a
+ * tracker opened before then reads them as it always did (T-127).
+ */
+export const TrackerRefusal = z.discriminatedUnion('error', [
+  /** No session cookie, or one that ended (401). */
+  z.strictObject({ error: z.literal('signed-out') }),
+  /** The person may not score this game (403). */
+  z.strictObject({ error: z.literal('not-allowed') }),
+  /** No such league or game, one of another league asked for through this one's address included (404). */
+  z.strictObject({ error: z.literal('not-found') }),
+  /** The body is not a request the endpoint takes (400). */
+  z.strictObject({ error: z.literal('invalid-input'), issues: z.array(z.unknown()) }),
+]);
+export type TrackerRefusal = z.infer<typeof TrackerRefusal>;
+
+/** The status each of the server's own refusals is answered with. */
+export const trackerRefusalStatus: Readonly<Record<TrackerRefusal['error'], number>> = {
+  'signed-out': 401,
+  'not-allowed': 403,
+  'not-found': 404,
+  'invalid-input': 400,
+};
+
+/**
+ * The refusal `body` is when it is our server's own, answered at its own `status`;
+ * null for anything else, which the tracker treats as no answer.
+ */
+export const ownTrackerRefusal = (status: number, body: unknown): TrackerRefusal | null => {
+  const read = TrackerRefusal.safeParse(body);
+  return read.success && trackerRefusalStatus[read.data.error] === status ? read.data : null;
+};
+
 // ---------------------------------------------------------------- scoring session (T-116)
 
 /** The lease runs out this long after the last renewal: "about two minutes". */

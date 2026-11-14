@@ -11,6 +11,7 @@
 // - A session cookie that no longer works is "signed out" (401): the proxy renews a
 //   session before any endpoint sees it, so one still failing here has ended. A public
 //   read (the snapshot) treats it as a visitor instead, as pages do.
+import type { TrackerRefusal } from '@srleagues/contracts';
 import { leagueApiUrl, type AccessHolder } from '@srleagues/core';
 import {
   requestContext,
@@ -28,9 +29,13 @@ export type ApiAnswer = {
 
 export type ApiRefusal = { readonly status: 401 | 404; readonly error: 'signed-out' | 'not-found' };
 
+/**
+ * The refusal as the endpoint answers it: the same body the tracker's endpoints give,
+ * the contract's `TrackerRefusal` (a tracker takes nothing else as the server's word).
+ */
 export const refusalAnswer = (refusal: ApiRefusal): ApiAnswer => ({
   status: refusal.status,
-  body: { error: refusal.error },
+  body: { error: refusal.error } satisfies TrackerRefusal,
 });
 
 const notFound: ApiRefusal = { status: 404, error: 'not-found' };

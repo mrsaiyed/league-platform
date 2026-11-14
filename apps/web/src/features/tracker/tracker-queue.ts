@@ -14,13 +14,14 @@
 //   game is not live, the person may not score it, no such game): the tap stays
 //   waiting and the queue halts, because every later tap would be refused too. After
 //   `resume` the waiting taps go out in order, none skipped; `forget` drops them.
-// - the server could not take the batch as sent (400, 413, 422): the queue sends the
+// - the server could not take the batch as sent (its own 400): the queue sends the
 //   batch's taps one at a time; the one still turned away is kept as refused (`rule`),
 //   and the rest go on.
 // - the server does not speak the batch's protocol version, or turns the request away
 //   whole (signed out, not allowed, no such game): the queue halts with nothing changed.
-// - no answer (no network, a timeout, a server error): nothing changes, and the queue
-//   tries again after a wait that doubles up to half a minute (retry-delay.ts).
+// - no answer (no network, a timeout, a server error, a page that is not the server's
+//   own answer whatever its status): nothing changes, and the queue tries again after a
+//   wait that doubles up to half a minute (retry-delay.ts).
 // - the device's storage fails: nothing is lost that was stored; `storageFailure` says
 //   so (never `unansweredSince`: it is not the network), and the queue tries again.
 //
