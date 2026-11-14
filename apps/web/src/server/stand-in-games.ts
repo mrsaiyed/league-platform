@@ -4,7 +4,10 @@
 // and used with no database. It runs the real games commands over an in-memory games
 // store, so what they refuse and record is what the database-backed store is held to.
 // Like the database, a transaction works on a copy and keeps it only if the work returns.
-// Only one made-up league has games; every other league has none.
+// Only one made-up league has games; every other league has none. It also holds what
+// the tracker's commands write (sessions, plays, saved states), so a reopened game is
+// handed back the way the database hands it back; no made-up game starts with a saved
+// state, so every reopen here goes back to scheduled.
 import { defaultSeasonRules } from '@srleagues/contracts';
 import type {
   AccessReader,
@@ -12,12 +15,15 @@ import type {
   CommandDeps,
   CommandLogLine,
   EventHandler,
-  GameLine,
   GameRecord,
   GameRosterPlayer,
-  GamesTx,
+  LiveGameLine,
   NewGameCorrection,
+  NewGameEvent,
+  SavedGameState,
+  ScoringSession,
   StoredSetting,
+  TrackerTx,
 } from '@srleagues/core';
 import type { GameNames, GamesAreaPorts } from './games-area-ports.ts';
 
@@ -27,10 +33,14 @@ const id = (kind: number, n: number) =>
 type State = {
   seasons: { id: string; programId: string; rules: unknown }[];
   games: GameRecord[];
-  lines: GameLine[];
+  /** Box score lines, with the number worn, as the database keeps them (one table). */
+  lines: LiveGameLine[];
   roster: GameRosterPlayer[];
   /** Games the tracker has recorded plays for. */
   tracked: string[];
+  sessions: ScoringSession[];
+  events: NewGameEvent[];
+  states: (SavedGameState & { gameId: string })[];
   corrections: NewGameCorrection[];
   assignments: { gameId: string; accountId: string }[];
   settings: Record<string, StoredSetting[]>;
@@ -92,6 +102,9 @@ function emptyState(): State {
     lines: [],
     roster: [],
     tracked: [],
+    sessions: [],
+    events: [],
+    states: [],
     corrections: [],
     assignments: [],
     settings: {},
@@ -158,7 +171,69 @@ export function standInGames(options: StandInGamesOptions): GamesAreaPorts {
   let state = seed(options);
   const stateOf = (leagueId: string) => (leagueId === options.leagueId ? state : emptyState());
 
-  const txOf = (leagueId: string, s: State): GamesTx => ({
+  const txOf = (leagueId: string, s: State): TrackerTx => ({
+    clock: { now: () => Date.now() },
+    // One transaction at a time here, so holding a game's lock is only checking it exists.
+    scoringSessions: {
+      lockGame: async (gameId) => s.games.some((g) => g.id === gameId),
+      findForGame: async (gameId) => s.sessions.find((x) => x.gameId === gameId),
+      start: async (session) => {
+        if (s.sessions.some((x) => x.gameId === session.gameId)) return undefined;
+        const started = { ...session, id: crypto.randomUUID() };
+        s.sessions.push(started);
+        return started;
+      },
+      extend: async (gameId, sessionId, heldUntil) => {
+        const index = s.sessions.findIndex((x) => x.gameId === gameId && x.id === sessionId);
+        const found = s.sessions[index];
+        if (found === undefined) return false;
+        s.sessions[index] = { ...found, heldUntil };
+        return true;
+      },
+      end: async (gameId, sessionId, lapsedBy) => {
+        const found = s.sessions.find((x) => x.gameId === gameId && x.id === sessionId);
+        if (found === undefined || (lapsedBy !== undefined && found.heldUntil > lapsedBy)) {
+          return false;
+        }
+        s.sessions = s.sessions.filter((x) => x !== found);
+        return true;
+      },
+    },
+    liveGames: {
+      findState: async (gameId) => {
+        const found = s.states.find((x) => x.gameId === gameId);
+        return found === undefined ? undefined : { seq: found.seq, state: found.state };
+      },
+      takenCommands: async (gameId, commandIds) =>
+        s.events
+          .filter((e) => e.gameId === gameId && commandIds.includes(e.commandId))
+          .map((e) => e.commandId),
+      addEvents: async (events) => void s.events.push(...events),
+      saveState: async (gameId, seq, state) => {
+        s.states = [...s.states.filter((x) => x.gameId !== gameId), { gameId, seq, state }];
+        if (!s.tracked.includes(gameId)) s.tracked.push(gameId);
+      },
+      players: async (gameId) => {
+        const game = s.games.find((g) => g.id === gameId);
+        if (game === undefined) return [];
+        return s.roster
+          .filter((p) => p.teamId === game.homeTeamId || p.teamId === game.awayTeamId)
+          .map((p) => ({
+            personId: p.personId,
+            teamId: p.teamId,
+            jerseyNumber: p.jerseyNumber,
+            onGameDay: !p.left,
+          }));
+      },
+      lines: async (gameId) => s.lines.filter((l) => l.gameId === gameId),
+      saveLines: async (gameId, lines, removed) => {
+        const replaced = new Set([...removed, ...lines.map((l) => l.personId)]);
+        s.lines = [
+          ...s.lines.filter((l) => !(l.gameId === gameId && replaced.has(l.personId))),
+          ...lines,
+        ];
+      },
+    },
     jobs: { enqueue: async () => {} },
     access: options.accessOf(leagueId),
     activity: { record: async (entry) => void s.activity.push(entry), list: async () => [] },
@@ -196,12 +271,12 @@ export function standInGames(options: StandInGamesOptions): GamesAreaPorts {
             (g.status === 'final' || g.status === 'forfeit'),
         ),
       listDecidedLines: async () => [],
-      listLines: async (gameId) => s.lines.filter((l) => l.gameId === gameId),
+      listLines: async (gameId) =>
+        s.lines
+          .filter((l) => l.gameId === gameId)
+          .map(({ jerseyNumber: _jersey, ...line }) => line),
       replaceLines: async (gameId, lines) => {
-        s.lines = [
-          ...s.lines.filter((l) => l.gameId !== gameId),
-          ...lines.map(({ jerseyNumber: _jersey, ...line }) => line),
-        ];
+        s.lines = [...s.lines.filter((l) => l.gameId !== gameId), ...lines];
       },
       listRoster: async (gameId) => {
         const game = s.games.find((g) => g.id === gameId);
@@ -250,11 +325,13 @@ export function standInGames(options: StandInGamesOptions): GamesAreaPorts {
     },
   });
 
-  const noticeOnly: EventHandler<GamesTx>[] = ['games.finalized', 'games.reopened'].map((type) => ({
-    type,
-    handle: async () => {},
-  }));
-  const deps: CommandDeps<GamesTx> = {
+  const noticeOnly: EventHandler<TrackerTx>[] = ['games.finalized', 'games.reopened'].map(
+    (type) => ({
+      type,
+      handle: async () => {},
+    }),
+  );
+  const deps: CommandDeps<TrackerTx> = {
     transaction: async (context, work) => {
       const draft = structuredClone(stateOf(context.leagueId));
       const result = await work(txOf(context.leagueId, draft));

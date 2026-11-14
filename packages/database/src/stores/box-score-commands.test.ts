@@ -10,9 +10,9 @@ import {
   reopenGame,
   setBoxScore,
   type CommandDeps,
-  type GamesTx,
   type Job,
   type StandingsTx,
+  type TrackerTx,
 } from '@srleagues/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
@@ -33,11 +33,13 @@ import {
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { gamesStore } from './games-store.ts';
+import { liveGamesStore } from './live-games-store.ts';
+import { scoringSessionsStore } from './scoring-sessions-store.ts';
 import { standingsStore } from './standings-store.ts';
 
 let pglite: PGlite;
 let db: DatabaseHandle;
-let deps: CommandDeps<GamesTx & StandingsTx>;
+let deps: CommandDeps<TrackerTx & StandingsTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
@@ -45,6 +47,9 @@ beforeAll(async () => {
     transaction: commandTransaction(db, (scope) => ({
       jobs: { enqueue: async (_job: Job) => {} },
       games: gamesStore(scope),
+      scoringSessions: scoringSessionsStore(scope),
+      liveGames: liveGamesStore(scope),
+      clock: { now: () => Date.UTC(2026, 11, 6, 20, 0, 0) },
       standings: standingsStore(scope),
       access: accessStore(scope),
       activity: activityLogStore(scope),

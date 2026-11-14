@@ -8,7 +8,7 @@ import {
   setBoxScore,
   type CommandContext,
   type CommandDeps,
-  type GamesTx,
+  type TrackerTx,
 } from '@srleagues/core';
 import { readBoxScoreForm, type BoxScoreFields } from './box-score-form.ts';
 import type { GameActionResult } from './run-game-action.ts';
@@ -27,7 +27,7 @@ export async function runBoxScoreAction(
   action: BoxScoreAction,
   fields: BoxScoreFields,
   context: CommandContext,
-  deps: CommandDeps<GamesTx>,
+  deps: CommandDeps<TrackerTx>,
 ): Promise<GameActionResult> {
   const gameId = fields['gameId'];
   const version = versionOf(fields['version']);
