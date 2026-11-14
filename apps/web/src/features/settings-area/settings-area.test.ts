@@ -110,23 +110,35 @@ describe('the settings form', () => {
     const privacy = html.slice(html.indexOf('data-area="privacy"'));
     expect(privacy).toMatch(/^data-area="privacy"><h2>Privacy<\/h2>/);
     // Three choices, from the most shown to the least (R-24).
-    const full = privacy.indexOf('Full names');
-    const initial = privacy.indexOf('First name and last initial (the default)');
-    const hidden = privacy.indexOf('Hidden: shown by jersey number only');
+    // Three choices, from the most shown to the least (R-24), each with a made-up example.
+    const quote = (text: string) => `&quot;${text}&quot;`;
+    const full = privacy.indexOf(`Full names, like ${quote('Jordan Ellis')}`);
+    const initial = privacy.indexOf(
+      `First name and last initial, like ${quote('Jordan E.')} (the default)`,
+    );
+    const hidden = privacy.indexOf('Hidden: no names. A player appears by jersey number');
     expect(full).toBeGreaterThan(0);
     expect(initial).toBeGreaterThan(full);
     expect(hidden).toBeGreaterThan(initial);
+    expect(privacy).toContain(`as ${quote('A player (name not shown)')} in the statistics`);
+    expect(privacy).toContain('People who know the team can still tell who a number is.');
     expect(privacy.match(/value="(fullName|firstNameLastInitial|hidden)"/g)).toEqual([
       'value="fullName"',
       'value="firstNameLastInitial"',
       'value="hidden"',
     ]);
-    expect(privacy).toContain('Choosing Full names asks you to confirm first.');
+    // The box to tick says when to tick it, and what is confirmed (R-14).
+    expect(privacy).toContain('Tick this only if you are choosing Full names');
     expect(privacy).toContain('name="confirmed" value="yes"');
+    expect(privacy).toContain(
+      'I confirm that the parents or guardians of the children in this league have agreed to their full names being shown publicly',
+    );
     // The words say who each setting changes, and that a parent's request always wins.
     expect(privacy).toContain('This decides how children are shown');
+    expect(privacy).toContain('coaches too, until you mark them as adults');
     expect(privacy).toContain('Adults are shown by their full name unless they ask for less.');
     expect(privacy).toContain('that always wins over this setting');
+    expect(privacy).toContain('arrives with the next part of this work.');
     expect(privacy).toContain('Adults may ask to appear as initials on public pages.');
     expect(privacy).toContain('Children always can, whatever this says');
     // R-27: switching it off takes no one's initials away.
