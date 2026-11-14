@@ -1,0 +1,237 @@
+// Step 2.33: the tracker's address and the scorekeeper's games in a real browser, against
+// the web app on its made-up stand-in (APP_ENV=test). Nothing leaves this computer; every
+// team, game and person is made up. Builds the app first unless given --no-build (npm run
+// test:web:browser builds it once in web-exit-test.mjs, then runs this with --no-build).
+//
+// - The made-up scorekeeper opens the admin and sees only their games, each with a button
+//   to the tracker; opening one takes the scoring session, asks to confirm the game format,
+//   and stores the rosters and the state on the device (IndexedDB, T-115). Once confirmed,
+//   the same device opens straight to scoring; leaving goes back to the games.
+// - The made-up owner, who runs the league, opens a game the scorekeeper is holding: told
+//   who holds it, takes over, and confirms the format.
+// - Another league's admin, a coach and a visitor are refused: "you do not have access" (U-6).
+// Accessibility checks on each screen (T-186), and no sideways scrolling at phone width (A-2).
+import {
+  accessibilityProblems,
+  buildNext,
+  freePort,
+  launch,
+  startNext,
+  waitFor,
+} from './web-browser-kit.mjs';
+
+const failures = [];
+const checked = [];
+const note = (label, ok, detail = '') => {
+  checked.push(label);
+  if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ''}`);
+};
+const step = async (name, run) => {
+  try {
+    await run();
+  } catch (error) {
+    failures.push(`${name}: ${String(error?.message ?? error).split('\n')[0]}`);
+  }
+};
+
+// The made-up games of the first league (apps/web/src/server/stand-in-games.ts).
+const liveGame = '01900000-0000-7000-8000-006a00000002'; // Hawks v Bears, live
+const otherGame = '01900000-0000-7000-8000-006a00000003'; // Hawks v Lions, assigned to nobody
+const tracker = (game) => `/north-valley/score/${game}`;
+const noAccess = /you do not have access/i;
+
+let built = true;
+if (!process.argv.includes('--no-build')) {
+  await step('building the web app', async () => {
+    built = await buildNext();
+    if (!built) throw new Error('next build failed or took over 10 minutes');
+  });
+}
+
+let server;
+let browser;
+const origin = `http://localhost:${await freePort()}`;
+
+if (built) {
+  server = startNext(['start', '--port', new URL(origin).port], {
+    APP_ENV: 'test',
+    PUBLIC_BASE_URL: origin,
+  });
+  await step('starting the server and the browser', async () => {
+    await waitFor(`${origin}/`, server);
+    browser = await launch();
+  });
+}
+
+async function signedInAs(token) {
+  const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+  await context.addCookies([{ name: 'srl_session', value: token, url: origin }]);
+  const page = await context.newPage();
+  page.setDefaultTimeout(30_000);
+  return { context, page };
+}
+async function accessible(page, label) {
+  await page
+    .waitForFunction(() => document.title.trim() !== '', null, { timeout: 5000 })
+    .catch(() => {});
+  const problems = await accessibilityProblems(page);
+  note(`accessibility: ${label}`, problems.length === 0, problems.join('; '));
+}
+async function noSidewaysScroll(page, label) {
+  const [width, inner] = await page.evaluate(() => [
+    document.documentElement.scrollWidth,
+    window.innerWidth,
+  ]);
+  note(`no sideways scrolling at phone width: ${label}`, width <= inner, `${width} > ${inner}`);
+}
+/** What the device keeps of a game in its browser database (indexeddb-opened-game-storage.ts). */
+const keptOnDevice = (page, game) =>
+  page.evaluate(
+    (id) =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open('srleagues-tracker-games');
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains('games')) {
+            db.close();
+            resolve(null);
+            return;
+          }
+          const read = db.transaction('games').objectStore('games').get(id);
+          read.onsuccess = () => {
+            db.close();
+            resolve(read.result ?? null);
+          };
+          read.onerror = () => reject(read.error);
+        };
+      }),
+    game,
+  );
+const formatHeading = (page) =>
+  page.getByRole('heading', { level: 2, name: 'Check the game format' });
+
+if (browser) {
+  await step('the scorekeeper opens their games and a game in the tracker', async () => {
+    const { context, page } = await signedInAs('local-scorekeeper-token');
+    try {
+      await page.goto(`${origin}/north-valley/admin`);
+      await page.getByRole('heading', { level: 1, name: 'Your games' }).waitFor();
+      const buttons = page.getByRole('link', { name: 'Score this game' });
+      note('each game to be played has a button to the tracker', (await buttons.count()) >= 2);
+      note(
+        'the admin shows nothing but the games',
+        (await page.getByText('Nothing here yet.').count()) === 0,
+      );
+      await accessible(page, "the scorekeeper's games");
+      await noSidewaysScroll(page, "the scorekeeper's games");
+
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === tracker(liveGame)),
+        page
+          .locator(`li[data-game="${liveGame}"]`)
+          .getByRole('link', { name: 'Score this game' })
+          .click(),
+      ]);
+      await page.getByRole('heading', { level: 1, name: 'Score a game' }).waitFor();
+      note('the tracker names the game', (await page.getByText('Bears at Hawks').count()) > 0);
+      await formatHeading(page).waitFor();
+      note('the format is shown', (await page.getByText('Overtime periods of').count()) === 1);
+      await accessible(page, 'confirming the format');
+      await noSidewaysScroll(page, 'confirming the format');
+
+      const kept = await keptOnDevice(page, liveGame);
+      note('the rosters are stored on the device', kept?.rosters?.home?.name === 'Hawks');
+      note(
+        'the players are stored with their names',
+        kept?.rosters?.away?.players?.some((p) => p.firstName === 'Sol') === true,
+      );
+      note('the state is stored on the device', typeof kept?.state?.sequence === 'number');
+
+      await page.getByRole('button', { name: 'Confirm and start scoring' }).click();
+      await page.getByText('This device is scoring the game.').waitFor();
+      note('the banner says all is saved', (await page.getByText('All saved').count()) === 1);
+      note(
+        'the confirmed format is stored on the device',
+        (await keptOnDevice(page, liveGame))?.confirmedFormat !== null,
+      );
+      await accessible(page, 'scoring placeholder');
+
+      // The same device opens straight to scoring: the format was confirmed here.
+      await page.reload();
+      await page.getByText('This device is scoring the game.').waitFor();
+      note(
+        'the format is not asked again on this device',
+        (await formatHeading(page).count()) === 0,
+      );
+
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === '/north-valley/admin'),
+        page.getByRole('button', { name: 'Leave the game' }).click(),
+      ]);
+      note('leaving goes back to the games', true);
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('the owner takes over a game the scorekeeper is holding', async () => {
+    const keeper = await signedInAs('local-scorekeeper-token');
+    const owner = await signedInAs('local-owner-token');
+    try {
+      await keeper.page.goto(origin + tracker(otherGame));
+      await formatHeading(keeper.page).waitFor();
+      const response = await owner.page.goto(origin + tracker(otherGame));
+      note(
+        'the owner may open the tracker',
+        response?.status() === 200,
+        String(response?.status()),
+      );
+      await owner.page
+        .getByText('Sam Scorekeeper is scoring this game on another device.')
+        .waitFor();
+      await accessible(owner.page, 'held by another device');
+      await owner.page.getByRole('button', { name: 'Take over scoring' }).click();
+      await formatHeading(owner.page).waitFor();
+      note('after taking over the owner confirms the format', true);
+    } finally {
+      await keeper.context.close();
+      await owner.context.close();
+    }
+  });
+
+  for (const [who, token] of [
+    ["another league's admin", 'local-other-admin-token'],
+    ['a coach', 'local-coach-token'],
+    ['a visitor', null],
+  ]) {
+    await step(`${who} is refused`, async () => {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      try {
+        if (token !== null) {
+          await context.addCookies([{ name: 'srl_session', value: token, url: origin }]);
+        }
+        const page = await context.newPage();
+        const response = await page.goto(origin + tracker(liveGame));
+        note(`${who}: 403`, response?.status() === 403, String(response?.status()));
+        await page.getByRole('heading', { level: 1 }).filter({ hasText: noAccess }).waitFor();
+        note(
+          `${who}: nothing of the game shown`,
+          (await page.getByText('Bears at Hawks').count()) === 0,
+        );
+        await accessible(page, `${who} refused`);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+}
+
+await browser?.close();
+server?.child.kill();
+
+if (failures.length > 0) {
+  console.error(`Tracker route browser test failed:\n- ${failures.join('\n- ')}`);
+  process.exit(1);
+}
+console.log(`Tracker route browser test passed (${checked.length} checks).`);

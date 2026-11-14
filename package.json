@@ -26,7 +26,7 @@
     "test:varsity:browser": "node scripts/check-varsity-browser.mjs",
     "test:stats:browser": "node scripts/check-live-stats-browser.mjs",
     "test:pages:browser": "node --disable-warning=ExperimentalWarning scripts/check-pages-browser.mjs",
-    "test:web:browser": "node tests/browser/web-exit-test.mjs && node tests/browser/fixture-import-test.mjs --no-build && node tests/browser/schedule-grid-test.mjs --no-build",
+    "test:web:browser": "node tests/browser/web-exit-test.mjs && node tests/browser/fixture-import-test.mjs --no-build && node tests/browser/schedule-grid-test.mjs --no-build && node tests/browser/tracker-route-test.mjs --no-build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "verify": "npm run check && npm run typecheck && npm test && npm run test:units && npm run test:web && npm run format:check && npm run build:demo",
