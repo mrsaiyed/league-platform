@@ -503,6 +503,37 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     expect(await tablet.storage.list(gameId)).toEqual([]);
   });
 
+  it('a passing "not held" that the renewal contradicts is let go again after each good send', async () => {
+    const network = endpointNetwork();
+    // The next batch is answered "not held" without reaching the server.
+    let notHeldOnce = false;
+    const tablet = device(network, {
+      sendTaps: (send) => async (input, init) => {
+        if (!notHeldOnce) return send(input, init);
+        notHeldOnce = false;
+        const batch = JSON.parse(String(init?.body)) as { commands: { commandId: string }[] };
+        const results = batch.commands.map(({ commandId }) => ({
+          commandId,
+          status: 'refused',
+          reason: { code: 'session-not-held', message: '' },
+        }));
+        return new Response(JSON.stringify({ protocolVersion: 1, sequence: 0, results }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      },
+    });
+    await tablet.controller.start();
+    await tablet.controller.idle();
+    for (const input of tipOff) {
+      notHeldOnce = true;
+      await tapAll(tablet.controller, [input]);
+      await tablet.controller.idle();
+      expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
+    }
+    expect((await serverGame(network)).sequence).toBe(2);
+  });
+
   it('releases a session granted after it left while opening', async () => {
     const network = endpointNetwork();
     let release = (): void => undefined;

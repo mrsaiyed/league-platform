@@ -567,8 +567,16 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     update({ notSaved: current.notSaved.filter((c) => !dropped.has(c.commandId)) });
   };
 
+  /** The queue's sequence when last seen, to tell when the server took a batch. */
+  let seenSequence: number | null = null;
+
   queue.subscribe((status) => {
     update({ queue: status, notApplied: status.refused });
+    if (status.sequence !== null && status.sequence !== seenSequence) {
+      seenSequence = status.sequence;
+      // The server took taps from this session: a later "not held" is checked afresh.
+      if (status.halted === null) resumedAfterNotHeld = 0;
+    }
     const fresh = status.refused.filter((r) => !refusedIds.has(r.command.commandId));
     for (const r of fresh) refusedIds.add(r.command.commandId);
     if (fresh.length > 0 && base !== null && current.mode.kind === 'scoring') {
