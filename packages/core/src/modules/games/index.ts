@@ -1,7 +1,10 @@
 // The games module (T2 §3). Other modules and packages use only what is here.
-// The events come first: the standings handlers read them while this module is still
-// loading (games -> leagues -> standings -> games), so they must already be defined.
-export { gameFinalized, gameReopened, type GameFinalized, type GameReopened } from './events.ts';
+export {
+  gameFinalized,
+  gameReopened,
+  type GameFinalized,
+  type GameReopened,
+} from '../../events/game-events.ts';
 export { assignScorekeeper, type AssignScorekeeperError } from './commands/assign-scorekeeper.ts';
 export { cancelGame, type CancelGameError } from './commands/cancel-game.ts';
 export { listMyGames, type MyGame, type MyGames } from './commands/list-my-games.ts';
