@@ -29,7 +29,7 @@ All leagues share one database (T-4), so separation is the most important proper
 
 **Fence 3 — the database itself.** PostgreSQL row-level security is switched on for every league table.
 
-- **T-60:** the web app and worker connect as a restricted database user that cannot change the schema and cannot bypass row-level security.
+- **T-60:** the web app and worker connect as a restricted database user that cannot change the schema and cannot bypass row-level security. The one thing the worker's login may change is the job library's own schema, which holds job ids only and which the app's role cannot use (T-257, [record 053](../../../architecture/decisions/053-the-worker-starts-and-who-makes-pg-boss-tables.md)).
 - **T-61:** at the start of each transaction the app tells the database which league and account it is acting for, for that transaction only. Every table's policy allows only rows whose `league_id` matches (for `leagues` itself, its `id`), for reading and writing alike. A query that forgot its `WHERE league_id = ...` returns nothing from other leagues, because the database filters it anyway; a transaction that set no league sees and writes nothing.
 - **T-62:** tables that belong to a person and not a league (`accounts`, `profiles`, `notifications`) have policies keyed to the account instead.
 - **T-63:** jobs that must look across leagues (finding today's games for reminders) run as a list of per-league steps, each inside its own league's fence. A separate, more powerful database user exists only for migrations.

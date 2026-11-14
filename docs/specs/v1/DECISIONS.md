@@ -294,6 +294,7 @@ All dated November 12, 2026.
 | T-250                 | New                                                                          | A tracked game ends by the tracker's tap or a command; did-not-play lines; a reopened one goes back to its tracker (rec. 038)                   | Step 2.30: T6 §7, §8 did not say which door ends a game or where a reopened one goes               |
 | T-251                 | New                                                                          | Tracker endpoints: one session address naming the device; errors as HTTP; a live message per batch from a visitor snapshot (rec. 039)           | Step 2.32: T6 §3, §5, §6 gave no session bodies, statuses or messages per batch                    |
 | T-253                 | New                                                                          | The device loads the engine's state from a staff read; the tracker's controller on the device (rec. 049)                                        | Step 2.34: T-113 says reload the server's state, but no door gave it                               |
+| T-257                 | New                                                                          | The release makes pg-boss's schema, owned by queue_owner; pg-boss makes its own tables; the worker starts on checked settings (rec. 053)        | Step 2.94: the worker never started (R2); record 012 left open who makes pg-boss's tables (T-60)   |
 
 ## The full list
 
@@ -741,6 +742,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-148 | Chat safety is enforced by the server, not by the screen                                                                                                                   | Agreed (delegated)  |         |
 | T-224 | Jobs are recorded in our own fenced `jobs` table, ids only; pg-boss runs them in production, the table itself locally (record 012)                                         | Agreed (delegated)  | yes     |
 | T-235 | Templates are plain TypeScript until React is in; the invitation link stays in the path, never sent on, cached or logged; its email is built before it commits (rec. 023)  | Agreed (delegated)  | yes     |
+| T-257 | pg-boss's schema is made by the release for a no-login queue_owner, granted to the worker's login only; pg-boss makes its tables there; the worker checks first (rec. 053) | Agreed (delegated)  |         |
 
 ### [T8 — Scale, reliability and operations](technical/T8-scale-reliability-operations.md)
 
