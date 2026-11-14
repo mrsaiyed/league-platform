@@ -1,6 +1,10 @@
-import { AdminArea, type LeagueRouteProps } from '../../../../features/shell/index.ts';
+import { GamesPage, type SearchParams } from '../../../../features/games-area/index.ts';
+import type { LeagueRouteProps } from '../../../../features/shell/index.ts';
 
-export default async function Page({ params }: LeagueRouteProps) {
+export default async function Page({
+  params,
+  searchParams,
+}: LeagueRouteProps & { readonly searchParams: Promise<SearchParams> }) {
   const { league } = await params;
-  return <AdminArea league={league} area="games" />;
+  return <GamesPage league={league} search={await searchParams} />;
 }

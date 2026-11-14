@@ -285,6 +285,41 @@ export const en = {
   'error.people.remove_person.person-not-found': 'That person is not in the league list.',
   'error.people.remove_person.person-on-a-roster':
     'That person is still on a roster. Mark them as having left their team first, then take them off the list.',
+  // The games area (step 2.55).
+  'admin.games.intro': 'The games of today and the week ahead.',
+  'admin.games.listProblem':
+    'The games could not be shown. You may not have access to score or change games here.',
+  'admin.games.empty': 'There are no games this week.',
+  'admin.games.scorekeeper': 'Scorekeeper: {names}',
+  'admin.games.noScorekeeper': 'No scorekeeper yet',
+  'admin.games.scoreOf': 'Score for {team}',
+  'admin.games.saveScore': 'Save final score',
+  'admin.games.forfeitBy': 'Team that forfeits',
+  'admin.games.recordForfeit': 'Record forfeit',
+  'admin.games.postpone': 'Postpone',
+  'admin.games.cancel': 'Cancel the game',
+  'admin.games.otherActions': 'Forfeit, postpone or cancel',
+  'admin.games.openTracker': 'Open the tracker',
+  'admin.games.when': '{day}, {time}',
+  'admin.games.noTime': 'No time set',
+  'admin.games.notScorable': 'This league is archived or suspended, so games cannot be changed.',
+  'admin.games.done.final': 'The final score is saved.',
+  'admin.games.done.forfeit': 'The forfeit is recorded.',
+  'admin.games.done.postpone': 'The game is postponed.',
+  'admin.games.done.cancel': 'The game is cancelled.',
+  'admin.games.error.not-allowed': 'You are not allowed to do that to this game.',
+  'admin.games.error.invalid-input': 'Enter the score as two whole numbers from 0 to 999.',
+  'admin.games.error.game-not-found': 'That game is not there.',
+  'admin.games.error.changed-since-read':
+    'Someone changed this game since you opened the page. It is shown again as it is now.',
+  'admin.games.error.game-already-decided':
+    'That game already has a final result. It can only be changed by reopening it.',
+  'admin.games.error.game-cancelled': 'That game was cancelled, so it cannot be scored.',
+  'admin.games.error.tie-not-allowed': 'This season does not allow ties. Enter a winner.',
+  'admin.games.error.team-not-in-game': 'That team is not in this game.',
+  'admin.games.error.game-not-postponable': 'Only a game that has not started can be postponed.',
+  'admin.games.error.game-not-cancellable': 'Only a game that has not started can be cancelled.',
+  'admin.games.error.unknown': 'That did not work. Nothing was changed.',
   // U-6: an address you are not allowed to open.
   'access.noAccess.title': 'You do not have access',
   'access.noAccess.body':
