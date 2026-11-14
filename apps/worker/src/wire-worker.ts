@@ -15,6 +15,7 @@
 // (checkLoginRole), or start the queue.
 import {
   errorCodeOf,
+  type BinTx,
   type EmailSender,
   type ImportsTx,
   type JobHandlers,
@@ -23,6 +24,7 @@ import {
 import {
   accessStore,
   activityLogStore,
+  binStore,
   commandTransaction,
   createDatabase,
   createPgBoss,
@@ -104,7 +106,14 @@ export function wireWorker(settings: WorkerSettings): WiredWorker {
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));
+  const binTransaction = commandTransaction<BinTx>(db, (scope) => ({
+    jobs: jobsStore(scope),
+    bin: binStore(scope),
+    access: accessStore(scope),
+    activity: activityLogStore(scope),
+  }));
   const handlers = jobHandlers({
+    bin: { transaction: binTransaction, now: () => new Date() },
     importsTransaction,
     transaction,
     email: email.sender,

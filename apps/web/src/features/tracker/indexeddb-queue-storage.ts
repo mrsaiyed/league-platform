@@ -10,7 +10,9 @@
 // The connection is let go when another tab opens a newer version (versionchange) or
 // the browser closes it (close), and opened again on the next use (record 024).
 //
-// The stored shape is QueuedCommand. If a later release changes it, add a step to
+// The stored shape is QueuedCommand. Its `sessionId` came later and is optional, so
+// rows stored before it are read as they are, with no step. If a later release changes
+// the shape in a way older rows do not fit, add a step to
 // `upgradeSteps`, converting the old rows through the upgrade's transaction: a queue
 // left on a device before the release must still be read (T-127). A device may skip
 // releases, so every step from the stored version on runs in turn. An older build
@@ -110,13 +112,14 @@ export async function openIndexedDbQueueStorage(
   await connection();
 
   return {
-    add(gameId, { protocolVersion, command }) {
+    add(gameId, { protocolVersion, command, sessionId }) {
       return write<'added' | 'held'>('added', (commands, outcome, tx) => {
         const known = commands.index(byCommand).get(command.commandId);
         known.onsuccess = () => {
           const row = known.result as Row | undefined;
           if (row === undefined) {
-            const fresh: Row = { gameId, protocolVersion, command, state: 'waiting' };
+            const madeUnder = sessionId === undefined ? {} : { sessionId };
+            const fresh: Row = { gameId, protocolVersion, command, ...madeUnder, state: 'waiting' };
             commands.add(fresh);
           } else if (row.gameId === gameId) {
             outcome.value = 'held';

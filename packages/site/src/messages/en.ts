@@ -327,6 +327,36 @@ export const en = {
   'error.short-name-needed':
     'A short name could not be made from this name. Type a short name: lower-case letters and numbers, with single hyphens.',
   'error.unknown': 'That could not be done.',
+  // The admin's League settings screen (step 2.48). The words for each setting itself are
+  // `setting.<key>.label` and `setting.<key>.option.<choice>`, declared with the setting.
+  'adminSettings.intro':
+    'These settings apply to the whole league. Each shows what it is set to now, its default and what it accepts.',
+  'adminSettings.none': 'This league has no settings to change yet.',
+  'adminSettings.default': 'Default: {value}',
+  'adminSettings.defaultMark': '{choice} (the default)',
+  'adminSettings.yes': 'Yes',
+  'adminSettings.no': 'No',
+  'adminSettings.usingDefault': 'Now: the default.',
+  'adminSettings.usingOwn': 'Now: set for this league.',
+  'adminSettings.limits.whole': 'Accepts a whole number from {min} to {max}.',
+  'adminSettings.limits.number': 'Accepts a number from {min} to {max}.',
+  'adminSettings.limits.text': 'Accepts up to {max} characters.',
+  'adminSettings.limits.choice': 'Accepts one of the choices shown.',
+  'adminSettings.limits.toggle': 'Accepts yes or no.',
+  'adminSettings.limits.other': 'This setting cannot be changed on this screen.',
+  'adminSettings.field.value': 'Value',
+  'adminSettings.save': 'Save',
+  'adminSettings.clear': 'Go back to the default',
+  'adminSettings.done.saved': 'The setting was saved.',
+  'adminSettings.done.cleared': 'The setting is back to its default.',
+  'error.leagues.set_setting.invalid-value':
+    'That value is not allowed for this setting. Check what it accepts and try again.',
+  'error.leagues.set_setting.changed-since-read':
+    'Someone else changed this setting while you were looking, so yours was not saved. The page now shows the latest value; change it again if you still want to.',
+  'error.leagues.clear_setting.changed-since-read':
+    'Someone else changed this setting while you were looking, so it was not put back to the default. The page now shows the latest value.',
+  'error.leagues.set_setting.unknown-setting': 'That setting does not exist.',
+  'error.leagues.clear_setting.unknown-setting': 'That setting does not exist.',
   'error.teams.create_team.season-not-found': 'That season is not there.',
   'error.teams.create_team.division-not-found': 'That division is not there.',
   'error.teams.create_team.team-short-name-taken':
@@ -338,6 +368,25 @@ export const en = {
     'Another team of this season already has that short name.',
   'error.teams.update_team.team-name-taken': 'Another team of this season already has that name.',
   'error.teams.remove_team.team-not-found': 'That team is not there.',
+  'error.leagues.restore_team.team-not-found': 'That team is not there.',
+  'error.leagues.restore_team.team-division-in-bin':
+    'The division of this team is in the bin. Bring the division back first.',
+  'error.leagues.restore_team.team-short-name-taken':
+    'Another team now has this short name. Rename one of them, then try again.',
+  'error.leagues.restore_team.team-name-taken':
+    'Another team now has this name. Rename one of them, then try again.',
+  'error.leagues.restore_team.team-lineage-taken':
+    'This season already has a team that carries on this team from other seasons. Move that team to the bin first, then try again.',
+  'error.leagues.restore_person.person-not-found': 'That person is not there.',
+  'error.leagues.restore_person.person-profile-taken':
+    'The account of this person is now linked to someone else in this league.',
+  'error.leagues.restore_game.game-not-found': 'That game is not there.',
+  'error.leagues.restore_game.game-not-restorable':
+    'A game that was played cannot be restored. Correct it instead.',
+  'error.leagues.restore_game.game-part-in-bin':
+    'A team, division, venue or court of this game is in the bin. Bring it back first.',
+  'error.leagues.restore_game.game-number-taken': 'Another game now has this game number.',
+  'error.leagues.restore_game.game-reference-taken': 'Another game now has this outside reference.',
   'error.teams.set_stats_visibility.team-not-found': 'That team is not there.',
   'error.teams.set_stats_visibility.teams-may-not-choose':
     'This league decides who sees the numbers; teams may not choose.',
@@ -793,6 +842,10 @@ export const en = {
   'activity.leagues.reorder_divisions': 'Changed the order of the divisions',
   'activity.leagues.remove_division': 'Moved a division to the bin',
   'activity.leagues.restore_division': 'Restored a division from the bin',
+  'activity.leagues.restore_team': 'Restored a team from the bin',
+  'activity.leagues.restore_person': 'Restored a person from the bin',
+  'activity.leagues.restore_game': 'Restored a game from the bin',
+  'activity.leagues.empty_bin': 'Removed old things from the bin for good',
   'activity.games.record_final_score': 'Recorded a final score',
   'activity.games.record_forfeit': 'Recorded a forfeit',
   'activity.games.set_box_score': 'Recorded a box score',
@@ -956,6 +1009,35 @@ export const en = {
   'tracker.queue.notSaved_other': '{count} actions not saved',
   'tracker.queue.storageFailed': 'This device could not save to its storage',
   'tracker.queue.separator': ' · ',
+  // What the tracker says about holding the game and refused taps (T6 §5, T-113),
+  // chosen from the controller's status by apps/web/src/features/tracker/tracker-notice.ts.
+  'tracker.readOnly.taken-over':
+    'Another device has taken over scoring this game. This one is now read-only.',
+  'tracker.readOnly.expired':
+    'This device was away too long and another device has had the game since. This one is now read-only.',
+  'tracker.readOnly.released':
+    'This device has left the game. It is read-only until you open it again.',
+  'tracker.readOnly.not-held': 'This device no longer holds the game, so it is read-only.',
+  'tracker.readOnly.game-not-live':
+    'This game cannot be scored now: it is over, cancelled or postponed.',
+  'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
+  'tracker.readOnly.unknown-game': 'This game could not be found.',
+  'tracker.readOnly.request-refused':
+    'The server could not take what this device asked for. Open the game again to try once more.',
+  'tracker.readOnly.storage-failed':
+    'This device could not read what it has saved, so it is read-only. Open the game again to try once more.',
+  'tracker.readOnly.signed-out':
+    'You are signed out. Sign in again to keep scoring. What you entered on this device is kept and sent once you are back, so do not enter it again.',
+  'tracker.readOnly.update-needed':
+    'This tracker needs an update. Reload the page to keep scoring.',
+  'tracker.heldByOther': '{name} is scoring this game on another device.',
+  'tracker.notApplied_one': '{count} action was not applied. The game now shows what was saved.',
+  'tracker.notApplied_other':
+    '{count} actions were not applied. The game now shows what was saved.',
+  'tracker.notSaved_one':
+    '{count} action on this device was not saved. Enter it again if it is needed.',
+  'tracker.notSaved_other':
+    '{count} actions on this device were not saved. Enter them again if they are needed.',
   // Admin → Schedule: the grid of rounds and games (step 2.52).
   'schedule.admin.title': 'Schedule',
   'schedule.admin.intro':

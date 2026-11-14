@@ -27,6 +27,7 @@ export const limits = {
  * @param facts.now ISO time.
  * @param facts.firstStage The earliest stage with an unfinished step.
  * @param facts.firstStageLeft Ids of that stage's unfinished steps that do not wait on the founder.
+ * @param facts.duplicates Step numbers that are in a plan more than once.
  * @param facts.ready Steps that could start now and are in no lane: [{ id }].
  * @param facts.lanes Open lanes: [{ id, openedAt? }] (openedAt: ISO time the lane folder was made).
  * @param facts.lockTime ISO time in the build lock, or '' when there is none.
@@ -37,6 +38,16 @@ export const limits = {
 export function stallSigns(facts) {
   const { now, firstStage, ready = [], lanes = [] } = facts;
   const signs = [];
+
+  for (const id of facts.duplicates ?? []) {
+    signs.push({
+      key: `duplicate-${id}`,
+      text:
+        `STEP ${id} IS IN THE PLAN TWICE. Only one of the two can be followed, so the other is ` +
+        'hidden and will never be offered. Give the newer one the next free number and correct ' +
+        'every place that names it. Before adding a step, look for the highest number in the plan.',
+    });
+  }
 
   const starved = ready.filter((step) => stageOf(step.id) === firstStage).map((step) => step.id);
   const laterLanes = lanes.filter((lane) => stageOf(lane.id) > firstStage);
