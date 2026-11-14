@@ -50,6 +50,7 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 - **T-111:** the server takes a lock on that one game, applies the commands in order with the engine, saves, and replies with the new sequence number and, for each command, **accepted**, **duplicate** (already had it) or **refused** with a reason.
 - **T-112:** the lock is per game. Forty games being scored at once do not wait for each other.
 - **T-113:** a refused command (for example a foul on a player the server knows was substituted out by a command the device never saw) makes the tracker reload the server's state and tell the scorekeeper what was not applied. The server's record is always the truth.
+- **T-253 (record 041):** the tracker loads the server's state, and reloads it after a refusal, from `GET /api/v1/leagues/{leagueId}/games/{game}/state`: the engine's state as the server holds it and the sequence number of its last tap, for whoever may score the game only, never cached.
 - Commands are small and are sent a few at a time; a full offline game replays in seconds.
 - **T-251 (record 039):** the server answers a batch it took with 200 and the reply; a batch that is not one, or an old protocol version, with 400; no session with 401; someone who may not score the game with 403; a game that is not in the league the address names with 404. The game is always the address's, never the body's.
 

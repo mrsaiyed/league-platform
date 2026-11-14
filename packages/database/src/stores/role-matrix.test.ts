@@ -97,6 +97,7 @@ import {
   renewScoringSession,
   takeOverScoring,
   applyTrackerCommands,
+  readTrackerState,
   endTrackedGame,
   engineRulesOf,
   renameShortName,
@@ -955,6 +956,15 @@ const gameCommandRows: readonly Row[] = [
       commands: [{ commandId: randomUUID(), at: matrixNow, input: { type: 'start' } }],
     }),
     (c, i) => applyTrackerCommands(c, i, trackerDeps),
+  ),
+  // The engine's state for the scorekeeper's device (T-113, T-253): whoever may score
+  // the game. A game with no taps yet is read as a new one; nothing changes.
+  ...gameRows(
+    'games.read_tracker_state',
+    'load the tracker’s game state',
+    'games.score',
+    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId }),
+    (c, i) => readTrackerState(c, i, trackerDeps),
   ),
   // Ending a tracked game (T6 §7): whoever may score it. The game is live with one
   // basket recorded by its tracker, so it can be ended.

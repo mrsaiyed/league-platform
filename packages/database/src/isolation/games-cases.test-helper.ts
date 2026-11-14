@@ -9,6 +9,7 @@ import {
   listPostponedGames as listPostponedGamesCommand,
   openScoringSession,
   postponeGame,
+  readTrackerState,
   recordFinalScore,
   recordForfeit,
   releaseScoringSession,
@@ -436,6 +437,27 @@ registerIsolationCase({
   subject: applyTrackerCommands,
   name: "score the target's upcoming game after taking it over",
   run: scoreTargetUpcomingGame,
+});
+
+// The engine's state for the scorekeeper's device (record 041, T-253): the target's
+// final game has a saved state; the target's upcoming game is read once it is scored
+// (in the run's own rolled-back transaction), so both a saved state and its sequence
+// number are there to leak. Anywhere else the read is refused or finds no game.
+registerCommandCase(readTrackerState, harnessTx, {
+  name: "load the tracker's state of the target's final game",
+  input: (target) => ({ gameId: target.gameId }),
+});
+
+registerIsolationCase({
+  subject: readTrackerState,
+  name: "load the tracker's state of the target's upcoming game once it is scored",
+  run: async (scope, target) => {
+    await scoreTargetUpcomingGame(scope, target).catch((thrown: unknown) => {
+      if (thrown instanceof CommandRefused) return undefined;
+      throw thrown;
+    });
+    return runAsApp(readTrackerState, harnessTx, scope, { gameId: target.upcomingGameId });
+  },
 });
 
 // Ending a tracked game (step 2.30): the upcoming game scored as above, then ended at

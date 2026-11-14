@@ -8,6 +8,7 @@ import {
   ProtocolProbe,
   SessionReply,
   SessionRequest,
+  TrackerGameState,
   VersionRefusal,
   buildVersionRefusal,
   isAcceptedProtocolVersion,
@@ -249,5 +250,30 @@ describe('live message and snapshot', () => {
     expect(GameSnapshot.safeParse({ ...snap, players: [...many, many[0]] }).success).toBe(false);
     expect(GameSnapshot.safeParse({ ...snap, correctedOn: 'yesterday' }).success).toBe(false);
     expect(GameSnapshot.safeParse({ ...snap, periods: 3 }).success).toBe(false);
+  });
+});
+
+describe('the engine’s state for the tracker (T-253)', () => {
+  const state = {
+    version: 1,
+    status: 'live',
+    rules: { periods: 4, periodSeconds: 480 },
+    clock: { remainingMs: 480_000, running: false, anchorAt: 0, elapsedMs: 0 },
+    plays: [],
+    redo: [],
+    colorsSwapped: false,
+    recent: [],
+    lastAt: 0,
+  };
+
+  it('carries the sequence number and the engine’s document as it is', () => {
+    expect(TrackerGameState.parse({ sequence: 3, state })).toEqual({ sequence: 3, state });
+  });
+
+  it('refuses a document that is not the engine’s version 1', () => {
+    for (const bad of [{ ...state, version: 2 }, { ...state, plays: undefined }, null]) {
+      expect(TrackerGameState.safeParse({ sequence: 0, state: bad }).success).toBe(false);
+    }
+    expect(TrackerGameState.safeParse({ sequence: -1, state }).success).toBe(false);
   });
 });
