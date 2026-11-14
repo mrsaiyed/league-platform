@@ -98,7 +98,7 @@ export function LiveGameList({
       <p className="ui-visually-hidden" role="status" aria-live="polite">
         {spoken}
       </p>
-      <ul>
+      <ul className="ui-card-grid">
         {games.map((raw) => {
           const g = applyUpdate(raw, updates[raw.id]);
           return (

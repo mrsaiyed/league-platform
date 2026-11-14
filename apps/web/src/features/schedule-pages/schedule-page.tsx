@@ -1,5 +1,5 @@
 import { leagueUrl } from '@srleagues/core';
-import { OptionPicker, RoundPicker } from '@srleagues/ui';
+import { EmptyPanel, FilterToolbar, OptionPicker, PageHead, RoundPicker } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -34,8 +34,8 @@ export async function SchedulePage({
   if (season === undefined || schedule === undefined) {
     return (
       <main>
-        <h1>{t('schedule.title')}</h1>
-        <p>{t('schedule.noSeason')}</p>
+        <PageHead title={t('schedule.title')} />
+        <EmptyPanel text={t('schedule.noSeason')} />
       </main>
     );
   }
@@ -54,41 +54,42 @@ export async function SchedulePage({
   const keepSeason = asked === undefined || asked === '' ? {} : { season: asked };
   return (
     <main>
-      <h1>{t('schedule.title')}</h1>
-      <SeasonChoice
-        seasons={seasons}
-        chosen={season}
-        action={action}
-        keep={{ ...(team === '' ? {} : { team }), ...(round === '' ? {} : { round }) }}
-      />
-      <p>{season.name}</p>
+      <PageHead title={t('schedule.title')} eyebrow={season.name} />
+      <FilterToolbar label={labels.filters}>
+        <SeasonChoice
+          seasons={seasons}
+          chosen={season}
+          action={action}
+          keep={{ ...(team === '' ? {} : { team }), ...(round === '' ? {} : { round }) }}
+        />
+        {built.seasonIsEmpty ? null : (
+          <>
+            <RoundPicker
+              label={labels.round}
+              submitLabel={labels.show}
+              action={action}
+              value={round}
+              options={built.roundOptions}
+              keep={{ ...keepSeason, ...(team === '' ? {} : { team }) }}
+            />
+            <OptionPicker
+              name="team"
+              label={t('schedule.team')}
+              submitLabel={labels.show}
+              action={action}
+              value={team}
+              options={built.teamOptions}
+              keep={{ ...keepSeason, ...(round === '' ? {} : { round }) }}
+            />
+          </>
+        )}
+      </FilterToolbar>
       {built.seasonIsEmpty ? (
-        <p>{t('schedule.empty')}</p>
+        <EmptyPanel text={t('schedule.empty')} />
+      ) : built.rounds.length === 0 ? (
+        <EmptyPanel text={t('schedule.noMatch')} />
       ) : (
-        <>
-          <RoundPicker
-            label={labels.round}
-            submitLabel={labels.show}
-            action={action}
-            value={round}
-            options={built.roundOptions}
-            keep={{ ...keepSeason, ...(team === '' ? {} : { team }) }}
-          />
-          <OptionPicker
-            name="team"
-            label={t('schedule.team')}
-            submitLabel={labels.show}
-            action={action}
-            value={team}
-            options={built.teamOptions}
-            keep={{ ...keepSeason, ...(round === '' ? {} : { round }) }}
-          />
-          {built.rounds.length === 0 ? (
-            <p>{t('schedule.noMatch')}</p>
-          ) : (
-            <RoundSections leagueId={addressee.id} rounds={built.rounds} />
-          )}
-        </>
+        <RoundSections leagueId={addressee.id} rounds={built.rounds} />
       )}
     </main>
   );
