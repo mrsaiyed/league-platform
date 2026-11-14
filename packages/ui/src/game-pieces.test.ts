@@ -97,6 +97,33 @@ describe('the scoreboard of a game page', () => {
     expect(html).toContain('<span class="ui-scoreboard-period">Half 2 15:48</span>');
     expect(html).toMatch(/ui-scoreboard-foot"><p>Team fouls this period: Owls 1, Hawks 0<\/p>/);
   });
+  it('on a phone gives the state a line of its own above the teams, and each team half the board', () => {
+    const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    const wide = css.indexOf('@media (min-width: 40rem) {\n  .ui-scoreboard-teams');
+    expect(wide).toBeGreaterThan(-1);
+    const phone = css.slice(0, wide);
+    // Two equal columns for the teams; what stood between them spans both, on the first line.
+    expect(phone).toMatch(
+      /\.ui-scoreboard-teams \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);/,
+    );
+    expect(phone).toMatch(/\.ui-scoreboard-middle \{[^}]*grid-column: 1 \/ -1;[^}]*grid-row: 1;/);
+    expect(phone).toMatch(/\.ui-scoreboard-side \{[^}]*grid-row: 2 \/ span 3;/);
+    // From a tablet up it stands between them again.
+    const tablet = css.slice(wide);
+    expect(tablet).toMatch(
+      /\.ui-scoreboard-teams \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\);/,
+    );
+    expect(tablet).toMatch(/\.ui-scoreboard-middle \{[^}]*grid-column: 2;/);
+    // A long name wraps beside its chip instead of pushing the other team off the board.
+    expect(css).toMatch(/\.ui-scoreboard-name > \[dir\] \{[^}]*overflow-wrap: break-word;/);
+  });
+  it('marks the winner of a decided game by weight as well as color', () => {
+    const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');
+    expect(css).toMatch(/\.ui-scoreboard-name \{[^}]*font-weight: 700;/);
+    expect(css).toContain(
+      ".ui-scoreboard[data-state='final'] .ui-scoreboard-side:not([data-winner='true']) .ui-scoreboard-name { font-weight: 400; }",
+    );
+  });
   it('sets scores in lining, even-width figures, the largest thing on the board', () => {
     const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '');
     expect(css).toMatch(

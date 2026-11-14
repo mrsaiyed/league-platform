@@ -172,24 +172,61 @@ export const gameCss = String.raw`
   box-shadow: var(--card-shadow);
   text-align: center;
 }
+/* On a phone the state of the game (its pill and clock, or when it will be played) has a
+   quiet line of its own above the two teams, so nothing stands between their names and
+   each has half the board; from a tablet up it stands between them. Each team's label,
+   name and score sit on the same three lines as the other's, even when a long name wraps. */
 .ui-scoreboard-teams {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--step-3);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto;
+  gap: var(--step-2) var(--step-4);
   max-inline-size: 40rem;
   margin-inline: auto;
 }
-@media (min-width: 40rem) {
-  .ui-scoreboard-teams {
-    gap: var(--step-5);
-  }
-}
 .ui-scoreboard-side {
   display: grid;
+  grid-row: 2 / span 3;
+  grid-template-rows: subgrid;
   justify-items: center;
   gap: var(--step-2);
   min-inline-size: 0;
+}
+.ui-scoreboard-middle {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  align-items: center;
+  justify-content: center;
+  gap: var(--step-1) var(--step-3);
+  margin-block-end: var(--step-2);
+}
+.ui-scoreboard-middle:empty {
+  display: none;
+}
+@media (min-width: 40rem) {
+  .ui-scoreboard-teams {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    column-gap: var(--step-5);
+  }
+  .ui-scoreboard-side {
+    grid-row: 1 / span 3;
+  }
+  .ui-scoreboard-side:last-child {
+    grid-column: 3;
+  }
+  .ui-scoreboard-middle {
+    display: grid;
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: center;
+    justify-items: center;
+    gap: var(--step-2);
+    max-inline-size: 12rem;
+    margin-block-end: 0;
+    text-wrap: balance;
+  }
 }
 .ui-scoreboard-role {
   color: var(--color-muted);
@@ -211,8 +248,15 @@ export const gameCss = String.raw`
   line-height: 1.2;
   text-transform: var(--heading-case);
 }
+/* A long name wraps under itself beside its chip, whole words first. */
 .ui-scoreboard-name > [dir] {
   min-inline-size: 0;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+/* The winner of a decided game is the name in bold, as on a game's card; the other is not. */
+.ui-scoreboard[data-state='final'] .ui-scoreboard-side:not([data-winner='true']) .ui-scoreboard-name {
+  font-weight: 400;
 }
 @media (min-width: 48rem) {
   .ui-scoreboard-name {
@@ -232,31 +276,27 @@ export const gameCss = String.raw`
 .ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score {
   color: var(--color-highlight);
 }
-/* What stands between the teams never crowds their names: on a phone its words wrap. */
-.ui-scoreboard-middle {
-  display: grid;
-  justify-items: center;
-  gap: var(--step-2);
-  max-inline-size: 7rem;
-  text-wrap: balance;
-}
-@media (min-width: 40rem) {
-  .ui-scoreboard-middle {
-    max-inline-size: 12rem;
-  }
-}
 .ui-scoreboard-period {
   color: var(--color-muted);
   font-size: var(--text-14);
   font-variant-numeric: lining-nums tabular-nums;
   white-space: nowrap;
 }
-/* A game still to play: its day, and its time the larger of the two. */
+/* A game still to play: its day, and its time the larger of the two; side by side on a
+   phone's one line, one over the other between the teams. */
 .ui-scoreboard-when {
-  display: grid;
-  justify-items: center;
-  gap: var(--step-1);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--step-1) var(--step-2);
   font-variant-numeric: lining-nums tabular-nums;
+}
+@media (min-width: 40rem) {
+  .ui-scoreboard-when {
+    display: grid;
+    justify-items: center;
+  }
 }
 .ui-scoreboard-day {
   color: var(--color-muted);
