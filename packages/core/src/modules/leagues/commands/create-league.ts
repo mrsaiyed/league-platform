@@ -2,7 +2,8 @@
 // U-12), in one transaction. For our own staff through an internal tool only: no
 // page offers it yet. The context's league id is the NEW league's id, picked by the
 // caller before the call (record 008: row-level security needs it set first). The
-// first season is not created here; an organizer adds it (createSeason).
+// first season is not created here; an organizer adds it (createSeason). The contact
+// email and city (P3 §1 step 2, "Where") may be left out and given later.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -36,6 +37,10 @@ export const createLeague = defineCommand({
     /** U-10: when left out, adult leagues are listed and the others are not. */
     listed: z.boolean().optional(),
     ownerAccountId: z.uuid(),
+    /** How people reach the league (T3 §4); the same limits as the leagues table (0003). */
+    contactEmail: z.email().max(320).optional(),
+    /** Where the league plays (P3 §1 step 2); the same limits as the leagues table (0014). */
+    city: z.string().trim().min(1).max(100).optional(),
     sportKey: z.string().regex(/^[a-z][a-z0-9_]{0,39}$/),
   }),
   allowed: (context, _input, tx: LeaguesTx) => mayActAsPlatform(context, tx),
@@ -48,6 +53,8 @@ export const createLeague = defineCommand({
       audience: input.audience,
       listed: input.listed ?? listedByDefault[input.audience],
       ownerAccountId: input.ownerAccountId,
+      contactEmail: input.contactEmail ?? null,
+      city: input.city ?? null,
       defaultProgram: { slug: defaultProgramSlug, name: input.name, sportKey: input.sportKey },
     });
     if (typeof created === 'string') return fail({ code: created });

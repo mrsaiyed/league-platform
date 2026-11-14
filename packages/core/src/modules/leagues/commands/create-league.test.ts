@@ -65,11 +65,30 @@ describe('createLeague', () => {
       { timeZone: 'Mars/Base' },
       { audience: 'everyone' },
       { ownerAccountId: 'not-an-id' },
+      { contactEmail: 'not-an-email' },
+      { city: '   ' },
+      { city: 'x'.repeat(101) },
     ];
     for (const change of bad) {
       expect(await createLeague(as(staffId), { ...input, ...change }, deps)).toMatchObject({
         error: { code: 'invalid-input' },
       });
     }
+  });
+
+  it('passes the contact email and city on, trimmed, and empty when left out', async () => {
+    const given = memoryLeagues(none);
+    await createLeague(
+      given.as(staffId),
+      { ...input, contactEmail: 'hello@example.test', city: '  Springfield ' },
+      given.deps,
+    );
+    expect(given.db.state.made).toMatchObject({
+      contactEmail: 'hello@example.test',
+      city: 'Springfield',
+    });
+    const left = memoryLeagues(none);
+    await createLeague(left.as(staffId), input, left.deps);
+    expect(left.db.state.made).toMatchObject({ contactEmail: null, city: null });
   });
 });

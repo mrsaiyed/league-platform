@@ -253,6 +253,8 @@ registerIsolationCase({
       const created = await insertLeague(fresh, {
         ...newLeagueInput(scope.accountId),
         listed: true,
+        contactEmail: 'harness@example.test',
+        city: 'Harness City',
         defaultProgram: { slug: 'main', name: 'Main', sportKey: 'basketball' },
       });
       // A refusal leaves the transaction unusable, as the commands treat it: roll back.
