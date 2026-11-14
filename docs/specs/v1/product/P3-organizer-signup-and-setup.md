@@ -43,7 +43,7 @@ Then: **Create my league.**
 
 ## 2. Landing in the admin
 
-They arrive at `oursite.com/{league}/admin`. The league exists **unpublished** (its status is called "draft", which has nothing to do with a player draft): its real address works, but only admins can see it. At the top is a checklist built from their step 4 answer. For "players sign up, then we hold a player draft" it reads:
+They arrive at `oursite.com/{league}/admin`. The league exists **unpublished** (its status is called "draft", which has nothing to do with a player draft): its real address works, but only the league's own staff can see it: the owner, admins and everyone else with an admin area, such as a scheduler or registrar they invite to prepare (U-9). To anyone else it is "not found", as if it did not exist. At the top is a checklist built from their step 4 answer. For "players sign up, then we hold a player draft" it reads:
 
 1. **Set your league's rules** — game format, clock, fouls, standings and tiebreakers. A preset gets this done in a minute. It comes first because brackets, standings and the live tracker all follow from it ([P7](P7-teams-schedule-gameday.md) section 1).
 2. **Set up registration** — choose what to ask, then open it.
