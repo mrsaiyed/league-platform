@@ -19,7 +19,7 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane. A run that is cut off leaves this as the map for the next run. Check the lane branches for commits: builders were still working when the usage limit hit.
 
-Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 / 031 / T-243 belong to 1.14; 0010 / 030 / T-242 to 2.4).
+Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 was reserved for 1.14, which landed without a migration; the runner refuses gaps, so 0011 went to the game-corrections fix of 2026-11-14; 0010 / 030 / T-242 to 2.4).
 
 - **2.44 Team pages and the start page** — `.local/lanes/2.44-team-pages` — none reserved — builder started; check the lane, merge build, push, review, GitHub, land.
 - **2.52 The schedule grid** — `.local/lanes/2.52-schedule-grid` — none reserved — builder started; check the lane, merge build, push, review, GitHub, land.
@@ -46,6 +46,7 @@ Nothing here stops the build. Since 2026-11-13 the lead answers open product que
 
 ## Log
 
+- 2026-11-14 — Fixed the flaky GitHub failure "with no test names" (cca1387; also e65f9fc, 37f6dd1 and several lanes). The log, read signed in, named it: `game-corrections.test.ts` > "not with an older correction" failed because a correction from an earlier transaction counted. The S-7 check (0009) found "this transaction's correction" by `at = now()`, and two transactions can start in the same instant (PGlite's clock ticks in milliseconds; fast on GitHub's machines). Real flaw, not only a test one: migration 0011 records each correction's transaction (`game_corrections.written_in`, `pg_current_xact_id()`) and the check asks for that. New test dates an older correction the same instant on purpose and is refused (fails on the old check). Also seen here: vitest's 'Timeout calling onTaskUpdate' under load, which vitest.reporter.ts already forgives when every file passes.
 - 2026-11-14 — Step 2.54 done (fixture import screen at Admin → Schedule → import; stand-in only; passed GitHub on 3bfbb99 and review; review fixes: 2 MB body limit so the friendly too-large notice shows, season check on apply/undo/discard, size text from the limit). Not done: no link from Admin → Schedule to the import screen (2.52 owns that page: whoever lands second adds it; record as part of 2.52 when it lands), no list of past imports, no database adapter. Decided (technical, T-226): the stand-in reads the file inside the web app so the screen works with no worker; core row-problem text is still English (T-187 gap).
 
 - 2026-11-14 — Step 2.51 done (built on the stand-in; passed GitHub on d4768a6 and an independent review, all findings fixed except two now in step 2.90). Review fixes: failed add undoes the new person and says so if it cannot; short-name message for non-Latin names; move needs one direction; failed reads show an alert. Gaps: no browser test, no database adapter for the Teams ports, no paging past 200 people. New step 2.90.
