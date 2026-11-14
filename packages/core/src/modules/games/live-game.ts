@@ -29,11 +29,15 @@ export function readState(stored: unknown): basketball.GameState {
  * Commands the platform takes through other doors, refused here with the reason:
  * the rules come from the league (S-1), and ending or reopening a game is a step of
  * its own that also settles the box score and the standings (step 2.30, T6 §7, §8).
+ * Resetting is refused too: it wipes the plays and the lines and puts a live game back
+ * to scheduled, which must leave a trace in the activity log, so a game is reset
+ * through a later step's own command, not through the tracker's taps.
  */
 export function platformProblem(input: TrackerInput): string | undefined {
   if (input.type === 'rules') return 'The game’s rules come from the league’s settings.';
   if (input.type === 'end') return 'Ending a game is not taken here yet.';
   if (input.type === 'reopen') return 'Reopening a game is not taken here yet.';
+  if (input.type === 'reset') return 'Resetting a game is not taken here yet.';
   return undefined;
 }
 

@@ -285,6 +285,26 @@ describe('applying the tracker’s commands (T-111, T6 §1)', () => {
     ]);
   });
 
+  it('a reset is not taken through the tracker’s door: the plays and lines stay', async () => {
+    const t = setUp();
+    const id = homeIds[0] ?? '';
+    await applyTrackerCommands(
+      t.as(scorekeeperId),
+      batchOf(taps([{ type: 'score', side: 'home', playerId: id, points: 2 }])),
+      t.deps,
+    );
+    const before = structuredClone(t.db.state);
+    const result = await applyTrackerCommands(
+      t.as(scorekeeperId),
+      batchOf(taps([{ type: 'reset' }], 2)),
+      t.deps,
+    );
+    expect(
+      result.ok && result.value.results.map((r) => r.status === 'refused' && r.reason),
+    ).toEqual([{ code: 'rule', message: 'Resetting a game is not taken here yet.' }]);
+    expect(t.db.state).toEqual(before);
+  });
+
   it('a player sent in capitals is the same player: one line, nothing wiped', async () => {
     const t = setUp();
     const id = homeIds[0] ?? '';
