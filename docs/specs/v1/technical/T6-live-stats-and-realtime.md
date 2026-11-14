@@ -61,7 +61,7 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 ## 4. Offline
 
 - **T-114:** a tap is written to the device's storage before the screen confirms it. Closing the tab or the battery dying loses nothing that was tapped, as long as the device itself survives.
-- **T-115:** the tracker is an installable web app. Its code is stored on the device the first time it opens, so reopening it in a gym with no signal works. The game's rosters and state are stored when the scorekeeper opens the game.
+- **T-115:** the tracker is an installable web app. Its code is stored on the device the first time it opens, so reopening it in a gym with no signal works. The game's rosters and state are stored when the scorekeeper opens the game. They stay on the device, players' names included, for as long as the game is open on it: a sign-in that runs out mid-game does not clear them, because scoring carries on (below). They are cleared when the game is closed on the device, or when the scorekeeper signs out on purpose from the tracker.
 - **T-127: a tracker that is already open keeps working across a release.** The server accepts commands from the previous version of the tracker as well as the current one, and the tracker replaces its stored code only when no game is open on the device. With T-158, this means a release never interrupts a game that is being scored.
 - A banner always shows the truth: "All saved", or "12 actions waiting to send", with "3 actions not saved" beside it when the server refused some. If the device's own storage fails, the banner says that, never that the device is offline (record 024).
 - Minutes and clock use the time each action was tapped, so a late upload gives the same result as a live one.
