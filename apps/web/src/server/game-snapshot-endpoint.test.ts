@@ -138,6 +138,18 @@ describe('GET …/games/{game}/snapshot', () => {
     expect((await read(world, { game: 'not-a-game' })).status).toBe(404);
   });
 
+  it('is "not found" for a game of a season still being set up, for everyone', async () => {
+    const world = trackerWorld();
+    for (const as of ['visitor', 'owner'] as const) {
+      const answer = await read(world, { as, game: games.draftSeason });
+      expect(answer).toEqual({
+        status: 404,
+        body: { error: 'not-found' },
+        headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+  });
+
   it('gives a game with no saved plays its score from the game itself', async () => {
     const world = trackerWorld();
     const answer = await read(world, { game: games.decided });

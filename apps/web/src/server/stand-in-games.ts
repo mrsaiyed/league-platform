@@ -40,7 +40,12 @@ const id = (kind: number, n: number) =>
   `01900000-0000-7000-8000-${kind.toString(16).padStart(4, '0')}${n.toString(16).padStart(8, '0')}`;
 
 type State = {
-  seasons: { id: string; programId: string; rules: unknown }[];
+  seasons: {
+    id: string;
+    programId: string;
+    rules: unknown;
+    status: 'draft' | 'active' | 'completed';
+  }[];
   games: GameRecord[];
   lines: GameLine[];
   corrections: NewGameCorrection[];
@@ -131,6 +136,8 @@ function emptyState(): State {
 
 function seed(options: StandInGamesOptions): State {
   const seasonId = id(0x5e, 1);
+  /** A season still being set up, with one game and no date yet (hidden from the public). */
+  const draftSeasonId = id(0x5e, 2);
   const game = (n: number, fields: Partial<GameRecord>): GameRecord => ({
     id: id(0x6a, n),
     seasonId,
@@ -153,7 +160,15 @@ function seed(options: StandInGamesOptions): State {
     ...emptyState(),
     tracker: seedTracker(madeUpTeams, standInPlayerId),
     settings: { ...options.settings },
-    seasons: [{ id: seasonId, programId: id(0x9a, 1), rules: defaultSeasonRules() }],
+    seasons: [
+      { id: seasonId, programId: id(0x9a, 1), rules: defaultSeasonRules(), status: 'active' },
+      {
+        id: draftSeasonId,
+        programId: id(0x9a, 1),
+        rules: defaultSeasonRules(),
+        status: 'draft',
+      },
+    ],
     games: [
       game(1, {}),
       game(2, { homeTeamId: hawks, awayTeamId: bears, status: 'live', captureMode: 'live' }),
@@ -170,6 +185,7 @@ function seed(options: StandInGamesOptions): State {
         finalizedAt: at(0, 10),
         version: 2,
       }),
+      game(6, { seasonId: draftSeasonId, startsAt: null }),
     ],
     assignments: [
       { gameId: id(0x6a, 1), accountId: first },
@@ -178,6 +194,10 @@ function seed(options: StandInGamesOptions): State {
     ],
   };
 }
+
+/** The seasons whose games the public may read, as the database store reads them
+ * (games-read-store.ts, publicSeasonStatuses). */
+const publicSeasonStatuses: readonly string[] = ['active', 'completed'];
 
 const isAssigned = (s: State, gameId: string, accountId: string) =>
   s.assignments.some((a) => a.gameId === gameId && a.accountId === accountId);
@@ -301,7 +321,15 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
   const snapshotStoreOf = (leagueId: string): GameSnapshotStore => {
     const s = () => stateOf(leagueId);
     return {
-      findGame: async (gameId) => s().games.find((g) => g.id === gameId),
+      // A game of a season still being set up (or retired) is not there at all, as in
+      // the database store (games-read-store.ts).
+      findGame: async (gameId) => {
+        const game = s().games.find((g) => g.id === gameId);
+        const season = s().seasons.find((x) => x.id === game?.seasonId);
+        return season === undefined || !publicSeasonStatuses.includes(season.status)
+          ? undefined
+          : game;
+      },
       teams: async (teamIds) => s().tracker.teams.filter((t) => teamIds.includes(t.id)),
       state: async (gameId) => s().tracker.states.find((x) => x.gameId === gameId)?.state,
       savedState: async (gameId) => {

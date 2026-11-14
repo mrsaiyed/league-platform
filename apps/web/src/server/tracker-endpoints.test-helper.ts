@@ -23,6 +23,8 @@ export const games = {
   hawksBears: gameId(2),
   /** Bears v Lions, final. */
   decided: gameId(5),
+  /** Lions v Tigers in a season still being set up: not there for the public. */
+  draftSeason: gameId(6),
 } as const;
 
 /** Hawks are team 3 and Bears team 4 of the made-up rosters. */
