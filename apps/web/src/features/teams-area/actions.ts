@@ -7,7 +7,6 @@ import {
   addToRoster,
   changeRosterEntry,
   createTeam,
-  listRoster,
   markLeft,
   removePerson,
   removeTeam,
@@ -22,6 +21,7 @@ import {
   changeTeamInput,
   markLeftInput,
   newTeamInput,
+  shortNameNeeded,
   teamStatsInput,
 } from './form-input.ts';
 import { addNewPerson, moveEntry } from './roster-changes.ts';
@@ -45,7 +45,11 @@ export async function createTeamAction(form: FormData): Promise<never> {
     if (seasonId === undefined) {
       return { answer: refused(createTeam.commandName, 'season-not-found') };
     }
-    const result = await createTeam(context, newTeamInput(fields, seasonId), ports.deps);
+    const input = newTeamInput(fields, seasonId);
+    if (shortNameNeeded(input)) {
+      return { answer: refused(createTeam.commandName, 'short-name-needed') };
+    }
+    const result = await createTeam(context, input, ports.deps);
     return result.ok
       ? { answer: done('created'), teamId: result.value.teamId }
       : settle(createTeam, result, 'created');
@@ -55,6 +59,9 @@ export async function createTeamAction(form: FormData): Promise<never> {
 export async function saveTeamAction(form: FormData): Promise<never> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     const input = changeTeamInput(fields);
+    if (shortNameNeeded(input)) {
+      return { answer: refused(updateTeam.commandName, 'short-name-needed'), teamId: input.teamId };
+    }
     return settle(
       updateTeam,
       await updateTeam(context, input, ports.deps),

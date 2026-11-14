@@ -1,5 +1,6 @@
 // A Teams form's text fields turned into a command's input (step 2.51). Nothing here
-// decides whether the input is right: the command checks it and refuses what is not.
+// decides whether the input is right: the command checks it and refuses what is not
+// (shortNameNeeded only picks clearer words for one case the command would refuse).
 // A field left empty becomes "not given" (or "none", where the command takes null).
 export type Fields = Readonly<Record<string, string>>;
 
@@ -22,6 +23,15 @@ export function shortNameFrom(name: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 60)
     .replace(/-+$/g, '');
+}
+
+/**
+ * True when a name was typed but no short name could be made from it (a name in
+ * Arabic letters, say) and none was typed: the admin is asked for one, rather than
+ * told only that something is not valid.
+ */
+export function shortNameNeeded(input: { readonly name: string; readonly shortName: string }) {
+  return input.name !== '' && input.shortName === '';
 }
 
 export function newTeamInput(fields: Fields, seasonId: string) {

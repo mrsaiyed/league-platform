@@ -10,6 +10,7 @@ import {
   movedOrder,
   newTeamInput,
   shortNameFrom,
+  shortNameNeeded,
 } from './form-input.ts';
 
 const t = createTranslator('en');
@@ -20,6 +21,15 @@ describe('form input', () => {
     expect(shortNameFrom('  Zoë & Friends ')).toBe('zoe-friends');
     expect(newTeamInput({ name: 'Blue Jays', shortName: '' }, 's').shortName).toBe('blue-jays');
     expect(newTeamInput({ name: 'Blue Jays', shortName: 'jays' }, 's').shortName).toBe('jays');
+  });
+
+  it('asks for a short name when none can be made from the name', () => {
+    expect(shortNameFrom('فرج')).toBe('');
+    expect(shortNameNeeded(newTeamInput({ name: 'فرج' }, 's'))).toBe(true);
+    expect(shortNameNeeded(newTeamInput({ name: 'فرج', shortName: 'faraj' }, 's'))).toBe(false);
+    expect(shortNameNeeded(newTeamInput({ name: 'Blue Jays' }, 's'))).toBe(false);
+    // No name at all is the command's to refuse, not a short-name question.
+    expect(shortNameNeeded(changeTeamInput({ name: '' }))).toBe(false);
   });
 
   it('leaves out what was not given, and takes the color only when not using the own colors', () => {
@@ -107,6 +117,8 @@ describe('answers in the address', () => {
       ['teams.add_new_person', 'not-undone'],
       ['teams.list_roster', 'team-not-found'],
       ['teams.reorder_roster', 'invalid-input'],
+      ['teams.create_team', 'short-name-needed'],
+      ['teams.update_team', 'short-name-needed'],
     ];
     for (const [command, code] of codes) {
       const key = problemKey({ problem: `${command}.${code}` });
