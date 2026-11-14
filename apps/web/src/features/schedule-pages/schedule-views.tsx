@@ -2,7 +2,30 @@ import { Group } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { t } from '../../server/messages.ts';
 import type { GameView, RoundView } from './build-schedule.ts';
+import type { GameLinkWords } from './game-link-text.ts';
 import { LiveGameList } from './live-game-list.tsx';
+
+/** The words of a game card's link, braces and all, for the page to fill (game-link-text.ts). */
+export function gameLinkWords(): GameLinkWords {
+  const teams = { away: '{away}', home: '{home}' };
+  return {
+    score: t('schedule.link.score', {
+      ...teams,
+      state: '{state}',
+      awayScore: '{awayScore}',
+      homeScore: '{homeScore}',
+    }),
+    state: t('schedule.link.state', { ...teams, state: '{state}' }),
+    when: t('schedule.link.when', { ...teams, when: '{when}' }),
+    states: {
+      live: t('schedule.link.live'),
+      final: t('schedule.link.final'),
+      forfeit: t('schedule.link.forfeit'),
+      postponed: t('schedule.link.postponed'),
+      cancelled: t('schedule.link.cancelled'),
+    },
+  };
+}
 
 /** A list of games as cards, kept up to date from the league's live channel. */
 export function GameList({
@@ -17,6 +40,7 @@ export function GameList({
       leagueId={leagueId}
       games={games}
       labels={displayLabels(t).game}
+      linkWords={gameLinkWords()}
       announcement={t('schedule.liveAnnouncement', {
         away: '{away}',
         awayScore: '{awayScore}',

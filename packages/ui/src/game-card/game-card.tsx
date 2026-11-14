@@ -34,8 +34,14 @@ export type GameCardProps = {
   readonly placeText?: string;
   /** For example "Game 4", already written by the page. */
   readonly numberText?: string;
-  /** Where "view box score" goes. The page builds it with the address helper. */
+  /** The game's own page, which the whole card leads to. The page builds it with the address helper. */
   readonly detailsHref?: string;
+  /**
+   * What the card's link says to a screen reader, whole and already written by the page:
+   * "Herons against Falcons, live, 38 to 41". Left out, it says "view box score" and both
+   * teams' names.
+   */
+  readonly linkText?: string | undefined;
   readonly labels: GameCardLabels;
 };
 
@@ -97,6 +103,7 @@ export function GameCard({
   placeText,
   numberText,
   detailsHref,
+  linkText,
   labels,
 }: GameCardProps) {
   const winner = winnerOf(status, home, away);
@@ -124,10 +131,16 @@ export function GameCard({
       </ul>
       {detailsHref ? (
         <a className="ui-game-link" href={detailsHref}>
-          {labels.viewBoxScore}{' '}
-          <span className="ui-visually-hidden" dir="auto">
-            {away.name} {labels.versus} {home.name}
-          </span>
+          {linkText ? (
+            <span dir="auto">{linkText}</span>
+          ) : (
+            <>
+              {labels.viewBoxScore}{' '}
+              <span className="ui-visually-hidden" dir="auto">
+                {away.name} {labels.versus} {home.name}
+              </span>
+            </>
+          )}
         </a>
       ) : null}
     </article>

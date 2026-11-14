@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { GameCard, type GameCardLabels, type GameStatus } from '@srleagues/ui';
 import type { GameView } from './build-schedule.ts';
+import { gameLinkText, type GameLinkWords } from './game-link-text.ts';
 import { pageLeagueScores } from './shared-league-scores.ts';
 
 export type Update = {
@@ -24,13 +25,14 @@ const known: readonly GameStatus[] = [
   'cancelled',
 ];
 
-/** The game as the newest live message says it is; the game itself when there is none. */
+/**
+ * The game as the newest live message says it is; the game itself when there is none. Its
+ * card leads to its page whatever its state, so that does not change.
+ */
 export function applyUpdate(game: GameView, update: Update | undefined): GameView {
   if (update === undefined) return game;
-  const decided = update.status === 'final' || update.status === 'forfeit';
   return {
     ...game,
-    ...(decided ? { detailsHref: game.gameHref } : {}),
     status: update.status,
     home: { ...game.home, score: update.home },
     away: { ...game.away, score: update.away },
@@ -41,11 +43,14 @@ export function LiveGameList({
   leagueId,
   games,
   labels,
+  linkWords,
   announcement,
 }: {
   readonly leagueId: string;
   readonly games: readonly GameView[];
   readonly labels: GameCardLabels;
+  /** What each card's link says to a screen reader, to be filled for each game as it stands. */
+  readonly linkWords: GameLinkWords;
   /** The sentence read out when a score changes, with {away} {awayScore} {home} {homeScore} {status}. */
   readonly announcement: string;
 }) {
@@ -102,7 +107,8 @@ export function LiveGameList({
                 whenText={g.whenText}
                 {...(g.placeText === undefined ? {} : { placeText: g.placeText })}
                 {...(g.numberText === undefined ? {} : { numberText: g.numberText })}
-                {...(g.detailsHref === undefined ? {} : { detailsHref: g.detailsHref })}
+                detailsHref={g.detailsHref}
+                linkText={gameLinkText(g, linkWords)}
                 labels={labels}
               />
             </li>

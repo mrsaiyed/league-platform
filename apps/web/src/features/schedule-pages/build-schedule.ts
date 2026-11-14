@@ -29,9 +29,11 @@ export type GameView = {
   /** Where the game is played; left out for a game with no place yet. */
   readonly placeText?: string;
   readonly numberText?: string;
-  readonly detailsHref?: string;
-  /** The game's page, kept for a game that finishes while the page is open. */
-  readonly gameHref: string;
+  /**
+   * The game's own page, which its card leads to in every state (live, still to play,
+   * postponed, cancelled, decided): docs/build/DESIGN.md, section 4, line 11.
+   */
+  readonly detailsHref: string;
   readonly teamSlugs: readonly string[];
 };
 
@@ -127,8 +129,6 @@ export function gameView(
   seasonSlug: string,
 ): GameView {
   const status = statusOf(game.status);
-  const decided = status === 'final' || status === 'forfeit';
-  const gameHref = leagueUrl(league, 'game', { game: game.id, season: seasonSlug });
   const place = placeOf(game);
   return {
     id: game.id,
@@ -140,8 +140,8 @@ export function gameView(
     ...(game.number === null
       ? {}
       : { numberText: t('schedule.gameNumber', { number: game.number }) }),
-    gameHref,
-    ...(decided ? { detailsHref: gameHref } : {}),
+    // Every game has a page, whatever its state, and its card leads there.
+    detailsHref: leagueUrl(league, 'game', { game: game.id, season: seasonSlug }),
     teamSlugs: [game.homeTeam.slug, game.awayTeam.slug],
   };
 }

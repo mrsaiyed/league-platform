@@ -173,6 +173,18 @@ export const en = {
   'schedule.gameNumber': 'Game {number}',
   'schedule.dateToBeSet': 'Date to be announced',
   'schedule.dateAndTimeToBeSet': '{date}, time to be announced',
+  // What a game card's link says to a screen reader: every card leads to its game's page.
+  'schedule.link.score': '{away} against {home}, {state}, {awayScore} to {homeScore}',
+  'schedule.link.state': '{away} against {home}, {state}',
+  'schedule.link.when': '{away} against {home}, {when}',
+  'schedule.link.live': 'live',
+  'schedule.link.final': 'final',
+  'schedule.link.forfeit': 'forfeit',
+  'schedule.link.postponed': 'postponed',
+  'schedule.link.cancelled': 'cancelled',
+  // A finished round that still holds a game waiting for a new day says so beside its mark.
+  'schedule.postponedCount_one': '{count} game postponed',
+  'schedule.postponedCount_other': '{count} games postponed',
   // A postponed game has no day to come: its old day is never written bare.
   'schedule.postponedFrom': 'Postponed from {date}',
   'schedule.postponedNoDate': 'New date to be announced',

@@ -7,8 +7,9 @@ import { describe, expect, it } from 'vitest';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
 import { buildHomeGames, buildScheduleView, parseRound } from './build-schedule.ts';
+import { gameLinkText } from './game-link-text.ts';
 import { applyUpdate } from './live-game-list.tsx';
-import { RoundSections } from './schedule-views.tsx';
+import { RoundSections, gameLinkWords } from './schedule-views.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
@@ -64,11 +65,19 @@ describe('schedule', () => {
     expect(parseRound('x')).toBeUndefined();
   });
 
-  it('a finished game links to its page; a live one is marked live', async () => {
+  // The rule changed with the game page (step 2.45): before it, only a decided game had a
+  // page to go to, and this test said a live game had no link. Every game has a page now,
+  // finished for every state, so every card is one link to it (DESIGN.md, section 4, line 11).
+  it('every game links to its own page, in every state; a live one is marked live', async () => {
     const { clock, schedule } = await load(adult);
     const games = buildScheduleView(schedule, clock, addressee, {}).rounds.flatMap((r) => r.games);
-    expect(games.find((g) => g.status === 'final')?.detailsHref).toContain('/games/');
-    expect(games.find((g) => g.status === 'live')?.detailsHref).toBeUndefined();
+    // The made-up season has a game in each of these states.
+    for (const status of ['final', 'forfeit', 'live', 'scheduled', 'postponed'] as const) {
+      const game = games.find((g) => g.status === status);
+      expect(game, status).toBeDefined();
+      expect(game?.detailsHref, status).toMatch(new RegExp(`/games/${game?.id}\\b`));
+    }
+    expect(games.every((g) => g.detailsHref.includes(`/games/${g.id}`))).toBe(true);
     const html = renderToStaticMarkup(
       createElement(RoundSections, {
         leagueId: adult,
@@ -76,6 +85,47 @@ describe('schedule', () => {
       }),
     );
     expect(html).toContain('Live');
+    // One link a card, and as many cards as games.
+    expect(html.match(/<a class="ui-game-link"/g)).toHaveLength(games.length);
+    expect(html.match(/<article class="ui-game-card"/g)).toHaveLength(games.length);
+  });
+
+  it('says in the link, for a screen reader, what the game is and how it stands', async () => {
+    const { clock, schedule } = await load(adult);
+    const views = buildScheduleView(schedule, clock, addressee, {}).rounds.flatMap((r) => r.games);
+    const words = gameLinkWords();
+    const said = (status: string) => {
+      const game = views.find((g) => g.status === status);
+      if (game === undefined) throw new Error(`no ${status} game`);
+      return gameLinkText(game, words);
+    };
+    expect(said('live')).toBe('Herons against Falcons, live, 38 to 41');
+    expect(said('final')).toBe('Herons against Falcons, final, 47 to 52');
+    expect(said('forfeit')).toBe('Otters against Badgers, forfeit, 0 to 20');
+    expect(said('postponed')).toBe('Herons against Otters, postponed');
+    expect(said('scheduled')).toMatch(/^Owls against Badgers, [A-Z][a-z]{2}, [A-Z][a-z]{2} \d/);
+    // A game with no day yet, a cancelled one, and a live one whose score is not kept.
+    const live = views.find((g) => g.status === 'live');
+    if (live === undefined) throw new Error('no live game');
+    expect(gameLinkText({ ...live, status: 'cancelled' }, words)).toBe(
+      'Herons against Falcons, cancelled',
+    );
+    expect(gameLinkText({ ...live, home: { ...live.home, score: null } }, words)).toBe(
+      'Herons against Falcons, live',
+    );
+    expect(
+      gameLinkText({ ...live, status: 'scheduled', whenText: 'Date to be announced' }, words),
+    ).toBe('Herons against Falcons, Date to be announced');
+    // The words are on the card's link, and move with the score on the device.
+    const html = renderToStaticMarkup(
+      createElement(RoundSections, {
+        leagueId: adult,
+        rounds: buildScheduleView(schedule, clock, addressee, {}).rounds,
+      }),
+    );
+    expect(html).toContain('<span dir="auto">Herons against Falcons, live, 38 to 41</span></a>');
+    const moved = applyUpdate(live, { sequence: 5, status: 'live', home: 45, away: 40 });
+    expect(gameLinkText(moved, words)).toBe('Herons against Falcons, live, 40 to 45');
   });
 
   it('says when on one line and where on the next, and no place for a game without one', async () => {
@@ -223,14 +273,21 @@ describe('recent results order', () => {
     expect(recent[0]?.id).not.toBe('x1');
   });
 
-  it('gives a game that finishes live its box score link', async () => {
+  // Changed with the rule above: a live game's card already leads to its page (it used to
+  // get its link only when it finished), and it still does once the game is decided.
+  it('a live game leads to its page, and still does when it finishes while the page is open', async () => {
     const { clock, schedule } = await load(adult);
     const game = buildHomeGames(schedule, clock, addressee).upcoming.find(
       (g) => g.status === 'live',
     );
     if (game === undefined) throw new Error('no live game');
-    expect(game.detailsHref).toBeUndefined();
+    expect(game.detailsHref).toContain(`/games/${game.id}`);
     const done = applyUpdate(game, { sequence: 9, status: 'final', home: 50, away: 40 });
-    expect(done.detailsHref).toContain('/games/');
+    expect(done.detailsHref).toBe(game.detailsHref);
+    // Every game the home page lists is a link, the ones still to play and the postponed too.
+    const home = buildHomeGames(schedule, clock, addressee);
+    for (const listed of [...home.recent, ...home.upcoming]) {
+      expect(listed.detailsHref, listed.status).toContain(`/games/${listed.id}`);
+    }
   });
 });

@@ -3,7 +3,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { BoxScoreTable, PlayTable, Scoreboard, displayCss } from '../index.ts';
+import { BoxScoreTable, GameCard, PlayTable, Scoreboard, displayCss } from '../index.ts';
 
 const arabicName = 'نسور الصحراء';
 const render = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el);
@@ -151,6 +151,39 @@ describe('the play-by-play table', () => {
     expect(css).toMatch(
       /\.ui-play \{[^}]*grid-template-columns: var\(--step-3\) minmax\(0, 1fr\);/,
     );
+  });
+});
+
+describe('a game card in any state', () => {
+  const cardLabels = {
+    live: 'Live',
+    final: 'Final',
+    forfeit: 'Forfeit',
+    postponed: 'Postponed',
+    cancelled: 'Cancelled',
+    versus: 'vs',
+    winner: 'Winner',
+    viewBoxScore: 'View box score',
+  };
+  it('is one link whose words, written by the page, say what the game is', () => {
+    for (const status of ['live', 'scheduled', 'postponed', 'cancelled', 'final'] as const) {
+      const html = render(
+        createElement(GameCard, {
+          home: { name: 'Falcons', score: status === 'live' ? 41 : null },
+          away: { name: arabicName, score: status === 'live' ? 38 : null },
+          status,
+          whenText: 'Sat 9:00',
+          detailsHref: '/x/games/1',
+          linkText: `${arabicName} against Falcons, ${status}`,
+          labels: cardLabels,
+        }),
+      );
+      expect(html.match(/<a /g), status).toHaveLength(1);
+      expect(html, status).toContain(
+        `<a class="ui-game-link" href="/x/games/1"><span dir="auto">${arabicName} against Falcons, ${status}</span></a>`,
+      );
+      expect(html, status).not.toContain('View box score');
+    }
   });
 });
 
