@@ -67,7 +67,9 @@ export function GameContent({ view }: { readonly view: GameView }) {
           )}
         </section>
       )}
-      {view.snapshot.status === 'scheduled' && view.plays.length === 0 ? null : (
+      {/* No plays and none to come: a game not started, or decided with only its final
+          score or box score kept, has no play-by-play section at all. */}
+      {view.snapshot.status !== 'live' && view.plays.length === 0 ? null : (
         <section aria-labelledby="game-plays">
           <h2 id="game-plays">{t('game.plays')}</h2>
           {view.snapshot.status === 'live' ? (

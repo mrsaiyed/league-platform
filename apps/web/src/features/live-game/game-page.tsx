@@ -1,8 +1,9 @@
 // A game's page, `/{league}/games/{game}` (step 2.45; P7 §5.3; T6 §6). The game arrives
 // drawn with how it stands, read as a visitor so the page is the same for everyone (T-87,
 // S-22), and its live part then keeps itself current on the device (live-game-view.tsx).
-// A finished game shows both box scores; every game shows its play-by-play as it stood
-// when the page was read; a corrected game shows "corrected" with the date, not the
+// A finished game shows both box scores; a live game, or one with plays, shows its
+// play-by-play as it stood when the page was read, and the page is drawn again when the
+// game starts or ends (record 051); a corrected game shows "corrected" with the date, not the
 // reason (S-7).
 import {
   leagueApiUrl,

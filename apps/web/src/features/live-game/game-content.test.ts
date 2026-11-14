@@ -33,6 +33,7 @@ import {
   startText,
 } from './build-game.ts';
 import { GameContent, type GameView } from './game-content.tsx';
+import { redrawsFor } from './live-game-view.tsx';
 
 const viewing = {
   leagueId: liveLeagueId,
@@ -181,6 +182,32 @@ describe('a game page', () => {
     expect(startText(when, 'UTC', 'scheduled')).toContain('Starts ');
   });
 
+  it('says a game under way started, and a decided one was played, never that it starts', () => {
+    const when = '2026-11-20T18:00:00Z';
+    expect(startText(when, 'UTC', 'live')).toMatch(/^Started /);
+    expect(startText(when, 'UTC', 'final')).toMatch(/^Played /);
+    expect(startText(when, 'UTC', 'forfeit')).toMatch(/^Played /);
+    for (const status of ['live', 'final', 'forfeit']) {
+      expect(startText(null, 'UTC', status)).toBeNull();
+    }
+  });
+
+  it('is drawn again from the server when its game starts or ends, and only then', () => {
+    const at = (status: 'scheduled' | 'live' | 'final', sequence: number) => ({
+      status,
+      sequence,
+    });
+    expect(redrawsFor(at('scheduled', 0), at('live', 3))).toBe(true);
+    expect(redrawsFor(at('scheduled', 0), at('final', 9))).toBe(true);
+    expect(redrawsFor(at('live', 4), at('final', 9))).toBe(true);
+    expect(redrawsFor(at('live', 4), at('live', 9))).toBe(false);
+    expect(redrawsFor(at('scheduled', 0), at('scheduled', 0))).toBe(false);
+    expect(redrawsFor(at('final', 9), at('final', 9))).toBe(false);
+    // The page drawn again arrives with the change: nothing newer, so no second drawing.
+    expect(redrawsFor(at('live', 3), at('live', 3))).toBe(false);
+    expect(redrawsFor(at('final', 9), at('live', 10))).toBe(false);
+  });
+
   it('notes a forfeit under the result', async () => {
     const world = trackerWorld();
     const { view } = await viewOf(world, games.decided);
@@ -197,6 +224,8 @@ describe('a game page', () => {
     expect(html).toContain('Box scores');
     expect(html).toContain('Only the final score was recorded for this game.');
     expect(html).toContain('data-live-status="final"');
+    // Only the final score was kept: no empty play-by-play section.
+    expect(html).not.toContain('Play by play');
   });
 
   it('shows "corrected" with the date only (S-7)', async () => {

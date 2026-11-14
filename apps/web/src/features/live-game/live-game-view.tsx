@@ -4,7 +4,9 @@
 // the snapshot the page arrived with, then kept current by followGame: each live message,
 // a snapshot on a gap, and a snapshot every 5 seconds (60 for a game not live) where the
 // live connection cannot be made. The clock counts down on this device from the reference it was given (T-121).
-// Subscribing only; this page can never publish (T-120).
+// When the game starts or ends, the page is drawn again from the server, so a page opened
+// before tip-off gets its play-by-play and one kept open to the end its box scores
+// (record 051). Subscribing only; this page can never publish (T-120).
 import { GameSnapshot } from '@srleagues/contracts';
 import {
   BoxScoreTable,
@@ -69,6 +71,20 @@ async function fetchSnapshot(address: string): Promise<GameSnapshot | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Whether the page must be drawn again from the server: the game has started, or ended,
+ * since the snapshot the page arrived with, by a newer message or snapshot. The page's
+ * server-drawn parts (the play-by-play, the box scores) stand on how it arrived.
+ */
+export function redrawsFor(
+  arrived: Pick<GameSnapshot, 'status' | 'sequence'>,
+  now: Pick<ViewerGame, 'status' | 'sequence'>,
+): boolean {
+  if (now.sequence <= arrived.sequence) return false;
+  if (arrived.status === 'scheduled') return now.status !== 'scheduled';
+  return arrived.status === 'live' && now.status === 'final';
 }
 
 function latestPlayText(game: ViewerGame, words: GameWords, labels: LiveGameLabels): string {
@@ -156,6 +172,12 @@ export function LiveGameView({
   }, [leagueId, gameId, snapshotAddress, liveAddress, initial]);
 
   const game = followed.game;
+  const redraw = redrawsFor(initial, game);
+  useEffect(() => {
+    // The server reads the same store the change came from, so the page drawn again
+    // arrives at least this new and does not draw itself again.
+    if (redraw) window.location.reload();
+  }, [redraw]);
   const serverNow = deviceNow === null ? initial.sentAt : deviceNow + followed.offsetMs;
   const running = game.status === 'live' && clockIsRunning(game.clock, serverNow);
   useEffect(() => {

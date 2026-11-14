@@ -19,6 +19,7 @@ T-118 says a page that notices a gap fetches a snapshot, and T-119 that a page t
 - **A final game is not followed**: a page that arrives on one opens no live connection, and a page whose game becomes final closes its connection.
 - **The clock** (T-121) is lined up by the page's own snapshot, each message and each fetched snapshot. Each measurement of `sentAt` minus the time it arrived is at most the true offset (anything sent takes time to arrive, and a cached snapshot was sent earlier still), so the page keeps the largest seen and a slow or stale one never lowers it. Until the page runs on the device, the server and the device's first drawing show the clock as it stood when the snapshot was read.
 - **The play-by-play** (S-33) is the one the page arrived with, newest first, with a link to load newer plays while the game is live: messages carry only the latest play, and that play repeats or goes back after clock taps and undos, so it cannot be appended safely. The latest play is shown live above it.
+- **When the game starts or ends** (scheduled to live or final, live to final, by a message or snapshot newer than the page), the page is drawn again from the server, once: its play-by-play, its "Show newer plays" link and its box scores stand on how the game was when the page was read. That is two page reads per viewer per game, not one per play.
 - **Corrected games** show "Corrected on" and the date (S-7), from the snapshot's `correctedOn`, never the reason.
 - The page listens on the local hub (`/api/v1/live`) as the schedule pages do; where that address is absent the connection is refused and the page polls.
 
@@ -27,7 +28,7 @@ T-118 says a page that notices a gap fetches a snapshot, and T-119 that a page t
 - **Only T-118 and T-119.** Simplest, but a page drawn a moment before a play, or one that lost the last message of a quiet spell, would show a wrong score until the next play, possibly for minutes.
 - **Re-fetch the players after every message.** Players would be current within a second, but every viewer would fetch once per play, several times the polling load T-119 budgets for; at most one per 5 seconds keeps it to the same rate as a blocked page.
 - **Building the play-by-play from messages.** Cheap, but wrong after undos and clock taps, and incomplete after a gap.
-- **Redrawing the server part of the page after each play** (`router.refresh`). Always complete, but every viewer would cost a full page read per play, with nothing cached.
+- **Redrawing the server part of the page after each play** (`router.refresh`). Always complete, but every viewer would cost a full page read per play, with nothing cached. Drawing it again only when the game starts or ends keeps the cost to two reads per viewer per game. It reloads the page rather than using `router.refresh`, because the live part is also drawn outside Next.js's router in tests.
 
 ## Revisit if
 
