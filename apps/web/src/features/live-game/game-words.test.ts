@@ -38,6 +38,8 @@ describe('the words of a game', () => {
     const play = (p: Partial<Parameters<typeof playSentence>[1]>) =>
       playSentence(words, { type: 'score', team: null, player: null, points: 2, ...p });
     expect(play({})).toBe('2 points scored');
+    expect(play({ points: 1 })).toBe('1 point scored');
+    expect(play({ points: 3 })).toBe('3 points scored');
     expect(play({ type: 'timeout' })).toBe('Timeout');
     expect(play({ type: 'foul', player: '#7' })).toBe('Foul');
     expect(play({ type: 'team-turnover' })).toBe('Turnover');

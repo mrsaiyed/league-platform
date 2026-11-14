@@ -202,7 +202,7 @@ export const en = {
   // A game's page (step 2.45, P7 §5.3). Words with {braces} are filled on the device too.
   'game.title': '{away} at {home}',
   'game.startsAt': 'Starts {when}',
-  'game.startedAt': 'Started {when}',
+  'game.scheduledFor': 'Scheduled for {when}',
   'game.playedOn': 'Played {when}',
   'game.noDate': 'Date to be announced',
   'game.corrected': 'Corrected on {date}',
@@ -240,6 +240,7 @@ export const en = {
   'game.play.other': 'The clock or the game changed',
   // A team's play whose team is not known: said without one.
   'game.play.noTeam.score': '{points} points scored',
+  'game.play.noTeam.scoreOne': '1 point scored',
   'game.play.noTeam.foul': 'Foul',
   'game.play.noTeam.unfoul': 'Foul taken back',
   'game.play.noTeam.turnover': 'Turnover',

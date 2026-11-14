@@ -189,9 +189,10 @@ describe('a game page', () => {
     expect(startText(when, 'UTC', 'scheduled')).toContain('Starts ');
   });
 
-  it('says a game under way started, and a decided one was played, never that it starts', () => {
+  it('says when a game under way was scheduled for, and a decided one was played, never that it starts', () => {
     const when = '2026-11-20T18:00:00Z';
-    expect(startText(when, 'UTC', 'live')).toMatch(/^Started /);
+    // The time it was set for, not a real start the page does not have.
+    expect(startText(when, 'UTC', 'live')).toMatch(/^Scheduled for /);
     expect(startText(when, 'UTC', 'final')).toMatch(/^Played /);
     expect(startText(when, 'UTC', 'forfeit')).toMatch(/^Played /);
     for (const status of ['live', 'final', 'forfeit']) {

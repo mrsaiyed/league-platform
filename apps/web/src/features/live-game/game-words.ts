@@ -33,6 +33,8 @@ export type GameWords = {
     /** A team's play whose team is not known, said without one. */
     readonly noTeam: {
       readonly score: string;
+      /** The same, for one point. */
+      readonly scoreOne: string;
       readonly foul: string;
       readonly unfoul: string;
       readonly turnover: string;
@@ -110,7 +112,7 @@ function withoutTeam(words: GameWords, play: PlayFacts): string | null {
   const n = words.play.noTeam;
   switch (play.type) {
     case 'score':
-      return fill(n.score, { points: play.points ?? '' });
+      return play.points === 1 ? n.scoreOne : fill(n.score, { points: play.points ?? '' });
     case 'foul':
       return n.foul;
     case 'unfoul':

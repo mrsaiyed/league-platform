@@ -43,6 +43,7 @@ export function gameWords(): GameWords {
       other: t('game.play.other'),
       noTeam: {
         score: t('game.play.noTeam.score'),
+        scoreOne: t('game.play.noTeam.scoreOne'),
         foul: t('game.play.noTeam.foul'),
         unfoul: t('game.play.noTeam.unfoul'),
         turnover: t('game.play.noTeam.turnover'),
@@ -100,8 +101,9 @@ export const gameTitle = (page: GamePage): string =>
   t('game.title', { away: page.scoreboard.away.name, home: page.scoreboard.home.name });
 
 /**
- * When the game starts, in the league's own zone: "Starts" before it does, "Started"
- * while it is live, "Played" once decided. A postponed or cancelled game says when it
+ * When the game starts, in the league's own zone: "Starts" before it does, "Scheduled
+ * for" while it is live (the time it was set for, not when it really started, which the
+ * page does not have), "Played" once decided. A postponed or cancelled game says when it
  * was set for, or nothing when it had no date.
  */
 export function startText(
@@ -122,7 +124,7 @@ export function startText(
   }).format(new Date(startsAt));
   if (notPlayed) return t('game.wasSetFor', { when });
   if (decided) return t('game.playedOn', { when });
-  return t(status === 'live' ? 'game.startedAt' : 'game.startsAt', { when });
+  return t(status === 'live' ? 'game.scheduledFor' : 'game.startsAt', { when });
 }
 
 /** "Corrected on 14 Nov 2026": the date only, never the reason (S-7); null if never corrected. */
