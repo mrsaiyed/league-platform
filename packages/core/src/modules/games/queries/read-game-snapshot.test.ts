@@ -1,4 +1,4 @@
-import { GameSnapshot, LiveMessage } from '@srleagues/contracts';
+import { GameSnapshot, LiveMessage, seasonRulesPreset } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import {
@@ -47,7 +47,7 @@ const person = (id: string) => ({
 });
 
 function store(
-  over: { status?: string; awayVisibility?: string; state?: unknown } = {},
+  over: { status?: string; awayVisibility?: string; state?: unknown; rules?: unknown } = {},
 ): GameSnapshotStore {
   const state = 'state' in over ? over.state : playedState();
   return {
@@ -65,6 +65,7 @@ function store(
             awayScore: 0,
             finalizedAt: null,
             binned: false,
+            rules: over.rules ?? null,
           }
         : undefined,
     teams: async () => [
@@ -212,6 +213,17 @@ describe('readGameSnapshot', () => {
       latestPlay: null,
       players: [],
     });
+  });
+
+  it("takes halves or quarters from the game's rules until the tracker has saved a state", async () => {
+    const halves = seasonRulesPreset('rec-league');
+    const quarters = seasonRulesPreset('high-school');
+    expect((await snapshot(store({ state: undefined, rules: halves }))).periods).toBe(2);
+    expect((await snapshot(store({ state: undefined, rules: quarters }))).periods).toBe(4);
+    // No rules stored: the season follows the starting set, which is halves.
+    expect((await snapshot(store({ state: undefined }))).periods).toBe(2);
+    // Once the tracker has the game, its saved state says (here quarters, over halves rules).
+    expect((await snapshot(store({ rules: halves }))).periods).toBe(4);
   });
 
   it('reads a state the engine cannot as no state', async () => {

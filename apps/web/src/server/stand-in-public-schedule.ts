@@ -5,16 +5,24 @@
 // are counted from the league's own "today", so past, current and upcoming rounds are
 // always there however late it is run. One league has two games a round, a game that
 // went live, a forfeit and a postponement; the other has one game a round, named
-// rounds, and a make-up game with no round and no time yet.
+// rounds, and a make-up game with no round and no time yet. A game's page reads the same
+// games (standInListedGames), so every card opens the game it shows.
 import {
   placeRounds,
+  type GamePageTeam,
+  type GameRecord,
   type PublicGame,
   type PublicGameTeam,
   type PublicSchedule,
   type PublicSeasonChoice,
 } from '@srleagues/core';
 import type { LeagueClock, PublicSchedulePorts } from './public-schedule.ts';
-import { adultTeams, standInSeasonIds, youthTeams } from './stand-in-public-stats.ts';
+import {
+  adultTeams,
+  standInSeasonIds,
+  standInSeasonRulesOf,
+  youthTeams,
+} from './stand-in-public-stats.ts';
 
 type Where = { venue: string; address: string; court: string };
 
@@ -315,7 +323,7 @@ function instantAt(day: string, hour: number, timeZone: string): Date {
 type League = {
   seasonId: string;
   spec: SeasonSpec;
-  teams: Record<string, PublicGameTeam & { id: string }>;
+  teams: Record<string, PublicGameTeam & { readonly visibility: string }>;
 };
 
 function build(
@@ -376,32 +384,96 @@ const todayIn = (now: Date, timeZone: string): string =>
     day: '2-digit',
   }).format(now);
 
+type StandInIds = { readonly adultLeagueId: string; readonly youthLeagueId: string };
+
+const zonesOf = (ids: StandInIds) => {
+  const zones = {
+    [ids.adultLeagueId]: 'America/Chicago',
+    [ids.youthLeagueId]: 'America/Los_Angeles',
+  };
+  return (leagueId: string) => zones[leagueId] ?? 'UTC';
+};
+
+const seasonsOf = (ids: StandInIds, leagueId: string): League[] =>
+  leagueId === ids.adultLeagueId
+    ? [
+        { seasonId: standInSeasonIds.adultFall, spec: adultFallSpec, teams: adult },
+        { seasonId: standInSeasonIds.adultSpring, spec: adultSpringSpec, teams: adult },
+      ]
+    : leagueId === ids.youthLeagueId
+      ? [{ seasonId: standInSeasonIds.youthWinter, spec: youthWinterSpec, teams: youth }]
+      : [];
+
+/**
+ * A game of these schedules as a game's page reads it (stand-in-games.ts), so every card
+ * on the home and schedule pages opens the same game: one set of made-up games for both.
+ */
+export type StandInListedGame = {
+  readonly game: GameRecord;
+  /** Its season's rules, as stored. */
+  readonly seasonRules: unknown;
+  /** Its two teams. */
+  readonly teams: readonly GamePageTeam[];
+};
+
+/**
+ * The games of the made-up schedules of a league, as game records. Only the final score
+ * was kept for them, but for the game under way, which no tracker is scoring.
+ */
+export function standInListedGames(
+  ids: StandInIds,
+  now: () => Date = () => new Date(),
+): (leagueId: string) => readonly StandInListedGame[] {
+  const zoneOf = zonesOf(ids);
+  return (leagueId) => {
+    const zone = zoneOf(leagueId);
+    const today = todayIn(now(), zone);
+    return seasonsOf(ids, leagueId).flatMap(({ seasonId, spec, teams }) => {
+      const schedule = build(spec, teams, today, zone);
+      const games = [...schedule.rounds.flatMap((r) => r.games), ...schedule.unplacedGames];
+      const teamOf = (team: PublicGameTeam): GamePageTeam => ({
+        id: team.id,
+        name: team.name,
+        slug: team.slug,
+        color: team.color,
+        statsVisibility: teams[team.slug]?.visibility ?? 'everyone',
+      });
+      return games.map((g) => ({
+        game: {
+          id: g.id,
+          seasonId,
+          divisionId: null,
+          homeTeamId: g.homeTeam.id,
+          awayTeamId: g.awayTeam.id,
+          startsAt: g.startsAt,
+          status: g.status,
+          captureMode: g.status === 'live' ? 'live' : 'final',
+          homeScore: g.homeScore,
+          awayScore: g.awayScore,
+          format: null,
+          finalizedAt: g.status === 'final' || g.status === 'forfeit' ? g.startsAt : null,
+          binned: false,
+          version: 1,
+        },
+        seasonRules: standInSeasonRulesOf(seasonId),
+        teams: [teamOf(g.homeTeam), teamOf(g.awayTeam)],
+      }));
+    });
+  };
+}
+
 /**
  * The made-up schedules for two leagues, given their ids: an adult league with six
  * rounds and a youth league with four. Any other league has no seasons. `now` is the
  * clock the leagues' "today" is read from.
  */
 export function standInPublicSchedule(
-  ids: { readonly adultLeagueId: string; readonly youthLeagueId: string },
+  ids: StandInIds,
   now: () => Date = () => new Date(),
 ): PublicSchedulePorts {
-  const zones = {
-    [ids.adultLeagueId]: 'America/Chicago',
-    [ids.youthLeagueId]: 'America/Los_Angeles',
-  };
-  const zoneOf = (leagueId: string) => zones[leagueId] ?? 'UTC';
-  const find = (leagueId: string, seasonId: string): League | undefined => {
-    const all: League[] =
-      leagueId === ids.adultLeagueId
-        ? [
-            { seasonId: standInSeasonIds.adultFall, spec: adultFallSpec, teams: adult },
-            { seasonId: standInSeasonIds.adultSpring, spec: adultSpringSpec, teams: adult },
-          ]
-        : leagueId === ids.youthLeagueId
-          ? [{ seasonId: standInSeasonIds.youthWinter, spec: youthWinterSpec, teams: youth }]
-          : [];
-    return all.find((l) => l.seasonId === seasonId);
-  };
+  const zoneOf = zonesOf(ids);
+  const find = (leagueId: string, seasonId: string): League | undefined =>
+    seasonsOf(ids, leagueId).find((l) => l.seasonId === seasonId);
   return {
     clockOf: async (leagueId): Promise<LeagueClock> => ({
       today: todayIn(now(), zoneOf(leagueId)),

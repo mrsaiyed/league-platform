@@ -42,6 +42,7 @@ describe('resolveLeagueApi', () => {
     const session = ok({
       accountId: '01900000-0000-7000-8000-0000000000A1',
       email: 'someone@example.test',
+      emailConfirmed: true,
       sessionId: 's',
       hasPassword: true,
       passwordEnteredAt: null,
@@ -112,6 +113,25 @@ describe('resolveLeagueApi', () => {
     }
   });
 
+  it('is "account problem" for a live session none of our accounts hold, a visitor for a public read', async () => {
+    const session = {
+      ok: false,
+      error: { code: 'account-problem', problem: 'sign-in-link-conflict' },
+    } as const;
+    expect(
+      await resolveLeagueApi(facts(leagueApiUrl({ id: leagueA }, parts), session), parts, deps),
+    ).toEqual({ ok: false, refusal: { status: 403, error: 'account-problem' } });
+    const snapshot = ['games', game, 'snapshot'];
+    expect(
+      await resolveLeagueApi(
+        facts(leagueApiUrl({ id: leagueA }, snapshot), session),
+        snapshot,
+        deps,
+        'visitor',
+      ),
+    ).toMatchObject({ ok: true, context: { account: null, league: { id: leagueA } } });
+  });
+
   it('is still "not found" for a public read of an address that is not the route\'s', async () => {
     const resolved = await resolveLeagueApi(
       facts(leagueApiUrl({ id: leagueA }, parts), { ok: false, error: { code: 'session-ended' } }),
@@ -133,6 +153,14 @@ describe('resolveLeagueApi', () => {
         parts,
         deps,
       ),
+      await resolveLeagueApi(
+        facts(leagueApiUrl({ id: leagueA }, parts), {
+          ok: false,
+          error: { code: 'account-problem', problem: 'sign-in-link-conflict' },
+        }),
+        parts,
+        deps,
+      ),
     ];
     const answers = refusals.map((resolved) => {
       if (resolved.ok) throw new Error('expected a refusal');
@@ -141,6 +169,7 @@ describe('resolveLeagueApi', () => {
     expect(answers).toEqual([
       { status: 404, body: { error: 'not-found' } },
       { status: 401, body: { error: 'signed-out' } },
+      { status: 403, body: { error: 'account-problem' } },
     ]);
     // A tracker takes each as the server's word, not as a page in between.
     for (const answer of answers) {

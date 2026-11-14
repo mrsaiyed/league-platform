@@ -8,7 +8,7 @@
 // the security headers on every answer.
 // Then it starts the app as staging with a database address that answers nobody,
 // and checks that it refuses to start (T-60). Nothing leaves this computer.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
@@ -18,16 +18,35 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = path.join(root, 'apps/web');
 const nextBin = createRequire(path.join(app, 'package.json')).resolve('next/dist/bin/next');
 
+/**
+ * The environment the servers start from (T-201): only what Node.js and Next.js need
+ * to run on this computer, never this shell's own settings, so no real address, key
+ * or secret this shell holds (DATABASE_URL, RESEND_API_KEY, STRIPE_*, SESSION_SECRET,
+ * PG*, anything else) can ride along. Every setting the app reads is made up below.
+ */
+const runOnly = [
+  'PATH',
+  'PATHEXT',
+  'SYSTEMROOT',
+  'WINDIR',
+  'COMSPEC',
+  'TEMP',
+  'TMP',
+  'TMPDIR',
+  'HOME',
+  'USERPROFILE',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'PROGRAMDATA',
+  'NUMBER_OF_PROCESSORS',
+  'PROCESSOR_ARCHITECTURE',
+  'OS',
+  'LANG',
+];
+
 const madeUp = {
   LOG_LEVEL: 'warn',
-  DATABASE_URL: 'postgres://made-up:made-up-password@127.0.0.1:1/nowhere',
-  SESSION_SECRET: 'made-up-session-secret-0123456789abcdef',
-  SUPABASE_URL: 'http://localhost:54321',
-  SUPABASE_SECRET_KEY: 'made-up-supabase-key',
-  RESEND_API_KEY: 'made-up-resend-key',
   EMAIL_FROM: 'hello@example.test',
-  STRIPE_SECRET_KEY: 'made-up-stripe-key',
-  STRIPE_WEBHOOK_SECRET: 'made-up-webhook-key',
 };
 
 // The made-up people's session cookies (apps/web/src/server/stand-in-ports.ts).
@@ -48,6 +67,10 @@ const tokens = {
 // The made-up leagues' ids (stand-in-ports.ts), which name the cookie of a device's "my team".
 const northValley = '01900000-0000-7000-8000-000000000001';
 const harborCity = '01900000-0000-7000-8000-000000000002';
+
+/** A made-up game of North Valley (apps/web/src/server/stand-in-games.ts): 1 scheduled,
+ * 2 live (Hawks v Bears), 5 final (Bears v Lions), 6 in a season still being set up. */
+const game = (n) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0')}`;
 
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
 // browser's script fills with the not-found or forbidden screen (record 020), so
@@ -278,6 +301,30 @@ const cases = [
   ],
   ['scheduler', '/north-valley/admin/settings', 403, [noAccess]],
   ['coach', '/north-valley/admin/settings', 403, [noAccess]],
+  // A game's page (step 2.45): drawn with how the game stands, its live part ready to
+  // follow it; a finished game's result; a game not started; a game that is not this
+  // league's, not public yet, or not an id is not found. The Bears show their players'
+  // numbers to their staff only, so none of their names is on the page (S-22).
+  [
+    'visitor',
+    `/north-valley/games/${game(2)}`,
+    200,
+    ['Bears at Hawks', 'The game, live', 'data-live-status="live"', 'Live', 'Play by play'],
+    ['This page is not built yet.', 'Bearsley'],
+  ],
+  [
+    'visitor',
+    `/north-valley/games/${game(5)}`,
+    200,
+    ['Lions at Bears', 'Final', 'Box scores', 'Only the final score was recorded for this game.'],
+    ['Corrected on'],
+  ],
+  ['visitor', `/north-valley/games/${game(1)}`, 200, ['This game has not started yet.']],
+  ['visitor', `/north-valley/games/${game(6)}`, 404, [notFound]],
+  ['visitor', `/north-valley/games/${game(99)}`, 404, [notFound]],
+  ['visitor', '/north-valley/games/not-a-game', 404, [notFound]],
+  ['visitor', `/harbor-city/games/${game(2)}`, 404, [notFound]],
+  ['visitor', `/quiet-pines/games/${game(2)}`, 404, [notFound]],
   ['scheduler', '/north-valley/score/game-1', 200, ['Score a game']],
   ['coach', '/north-valley/score/game-1', 403, [noAccess]],
   ['visitor', '/quiet-pines', 404, [notFound]],
@@ -364,6 +411,31 @@ const spoofs = [
 
 const failures = [];
 
+// The shell's own settings never reach the servers (T-201): made-up stand-ins for real
+// ones are put in this script's own environment, and none of them may arrive.
+const shellOnly = {
+  DATABASE_URL: 'postgres://shell-made-up:shell-made-up@localhost:1/nowhere',
+  RESEND_API_KEY: 're_shell_made_up',
+  STRIPE_SECRET_KEY: 'sk_shell_made_up',
+  STRIPE_WEBHOOK_SECRET: 'whsec_shell_made_up',
+  SESSION_SECRET: 'shell-made-up-session-secret-0123456789',
+  PGHOST: 'shell-made-up.example.test',
+};
+Object.assign(process.env, shellOnly);
+const arrived = spawnSync(
+  process.execPath,
+  ['-e', 'process.stdout.write(JSON.stringify(Object.keys(process.env)))'],
+  { env: serverEnvironment({}), encoding: 'utf8' },
+);
+const arrivedNames = arrived.status === 0 ? JSON.parse(arrived.stdout) : null;
+if (arrivedNames === null) {
+  failures.push('could not read the environment the servers start with');
+} else {
+  for (const name of Object.keys(shellOnly)) {
+    if (arrivedNames.includes(name)) failures.push(`the shell's ${name} reaches the servers`);
+  }
+}
+
 if (!process.argv.includes('--no-build')) await run(['build'], { APP_ENV: 'test' });
 
 const port = await freePort();
@@ -431,8 +503,13 @@ try {
 const staging = start(['start', '--port', String(await freePort())], {
   APP_ENV: 'staging',
   PUBLIC_BASE_URL: 'https://staging.example.test',
-  // Required outside local and test (config-schema.ts), so the database is reached.
+  // Required in staging (config-schema.ts), so the settings check passes and the
+  // database is reached. All made up: the address answers nobody on this computer. A
+  // host name, as staging refuses an IP address as the host (record 055).
   TRUSTED_PROXY: 'one',
+  PLATFORM_DATABASE_URL: 'postgres://made-up:made-up-password@localhost:1/nowhere',
+  SUPABASE_URL: 'http://localhost:54321',
+  SUPABASE_SECRET_KEY: 'made-up-supabase-secret-key',
 });
 const code = await new Promise((resolve) => {
   const timer = setTimeout(() => {
@@ -450,6 +527,8 @@ if (code === 0 || code === 'still running') {
   failures.push(`staging refused to start without saying why:\n${staging.output()}`);
 } else if (staging.output().includes('made-up-password')) {
   failures.push('the refusal printed the database address');
+} else if (staging.output().includes('made-up-supabase-secret-key')) {
+  failures.push('the refusal printed SUPABASE_SECRET_KEY');
 }
 
 if (failures.length > 0) {
@@ -460,12 +539,20 @@ console.log(
   `Web shell check passed: ${cases.length + spoofs.length + 4} checks against the built server.`,
 );
 
+function serverEnvironment(env) {
+  const clean = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value !== undefined && runOnly.includes(name.toUpperCase())) clean[name] = value;
+  }
+  return { ...clean, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env };
+}
+
 function start(args, env) {
   let output = '';
   // Next.js itself, not scripts/web.mjs, so stopping it stops the server.
   const child = spawn(process.execPath, [nextBin, ...args], {
     cwd: app,
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env },
+    env: serverEnvironment(env),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (chunk) => (output += chunk));

@@ -123,6 +123,11 @@ export const TrackerRefusal = z.discriminatedUnion('error', [
   z.strictObject({ error: z.literal('signed-out') }),
   /** The person may not score this game (403). */
   z.strictObject({ error: z.literal('not-allowed') }),
+  /**
+   * The session is live but is none of our accounts' (403, record 055): signing in
+   * again would not help. A tracker takes it as it takes "not allowed".
+   */
+  z.strictObject({ error: z.literal('account-problem') }),
   /** No such league or game, one of another league asked for through this one's address included (404). */
   z.strictObject({ error: z.literal('not-found') }),
   /** The body is not a request the endpoint takes (400). */
@@ -134,6 +139,7 @@ export type TrackerRefusal = z.infer<typeof TrackerRefusal>;
 export const trackerRefusalStatus: Readonly<Record<TrackerRefusal['error'], number>> = {
   'signed-out': 401,
   'not-allowed': 403,
+  'account-problem': 403,
   'not-found': 404,
   'invalid-input': 400,
 };

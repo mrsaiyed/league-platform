@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { clockIsRunning, clockRemainingMs, formatClock, serverOffsetMs } from './clock.ts';
+import {
+  clockIsRunning,
+  clockRemainingMs,
+  formatClock,
+  largestOffsetMs,
+  serverOffsetMs,
+} from './clock.ts';
 
 const running = { state: 'running', remainingMs: 462_000, asOf: 1_000_000 } as const;
 
@@ -17,6 +23,11 @@ describe('clock reference', () => {
     expect(clockRemainingMs(running, 2_000_000)).toBe(0);
     expect(clockIsRunning(running, 2_000_000)).toBe(false);
     expect(clockIsRunning(running, 1_100_000)).toBe(true);
+  });
+  it('keeps the largest offset measured: a slow arrival never lowers it', () => {
+    const first = serverOffsetMs(1_000_000, 500); // arrived after 500 ms in transit
+    expect(largestOffsetMs(first, 2_000_000, 1_000_100)).toBe(999_900); // a quicker one raises it
+    expect(largestOffsetMs(999_900, 3_000_000, 2_003_000)).toBe(999_900); // a slow one does not
   });
   it('does not run backwards when the device is slightly behind', () => {
     expect(clockRemainingMs(running, 999_000)).toBe(462_000);

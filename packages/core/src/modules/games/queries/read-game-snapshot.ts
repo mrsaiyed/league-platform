@@ -9,12 +9,14 @@
 // The web app reads it as a visitor (publicViewer), so it is the same for everyone
 // and may be cached for two seconds (T-119, record 039); a richer view belongs to the
 // signed-in game page (readGamePage).
-import type {
-  ClockReference,
-  GameSnapshot,
-  GameStatus,
-  LatestPlay,
-  LiveMessage,
+import {
+  defaultSeasonRules,
+  upgradeSeasonRules,
+  type ClockReference,
+  type GameSnapshot,
+  type GameStatus,
+  type LatestPlay,
+  type LiveMessage,
 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { fail, ok, type Result } from '../../../command/index.ts';
@@ -58,6 +60,19 @@ function derived(state: basketball.GameState | undefined): basketball.Derived | 
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Halves or quarters: the saved state's once the tracker has the game, else the rules the
+ * game is played under (its own or its season's, the starting set when none are stored),
+ * so a halves game never shows a quarter before its first play is saved.
+ */
+function periodsOf(state: basketball.GameState | undefined, rules: unknown): 2 | 4 {
+  if (state !== undefined) return state.rules.periods === 2 ? 2 : 4;
+  const read = rules === null || rules === undefined ? undefined : upgradeSeasonRules(rules);
+  const periods =
+    read?.ok === true ? read.rules.gameFormat.periods : defaultSeasonRules().gameFormat.periods;
+  return periods === 2 ? 2 : 4;
 }
 
 /** The three statuses a viewer knows: a decided game is final, anything not begun is scheduled. */
@@ -230,7 +245,7 @@ export async function readGameSnapshot(
       away: whole(view?.teams.away.periodFouls),
     },
     latestPlay,
-    periods: state?.rules.periods === 2 ? 2 : 4,
+    periods: periodsOf(state, game.rules),
     teams: {
       home: { name: short(home.name), statsVisible: shown.home },
       away: { name: short(away.name), statsVisible: shown.away },
