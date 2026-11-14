@@ -11,9 +11,10 @@ export const stayAtHome = 'league';
 
 /** The address of the league home that never forwards to a team (the "league home" links). */
 export function leagueHomeStayUrl(league: LeagueAddressee, season?: string): string {
-  return `${leagueUrl(league, 'home', season === undefined ? {} : { season })}${
-    season === undefined ? '?' : '&'
-  }${new URLSearchParams({ start: stayAtHome })}`;
+  return leagueUrl(league, 'home', {
+    ...(season === undefined ? {} : { season }),
+    query: { start: stayAtHome },
+  });
 }
 
 /** The teams an account is a coach or captain of: roles on a team, still in force. */
