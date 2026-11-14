@@ -1,8 +1,10 @@
 // Erases the signed-in account at its own request (T-52, T-220, record 052), through
 // the narrow function public.erase_account (0012): only the account the transaction
 // was opened for. Its row is emptied in place so history keeps valid links; its
-// profiles that no other account reaches, its grants in every league and its rows in
-// the sign-in store go. Refused, changing nothing, while it owns a league or one of
+// profiles that no other account reaches, its grants, game assignments and scoring
+// sessions in every league, and its rows in the sign-in store (by sign-in user and by
+// address) go; the invitations it accepted keep its placeholder address instead of
+// the one they were sent to. Refused, changing nothing, while it owns a league or one of
 // its profiles is still linked to a league's person. Ending the person's user at the
 // sign-in service, and checking the password again first (T-70), are the caller's.
 import { sql } from 'kysely';

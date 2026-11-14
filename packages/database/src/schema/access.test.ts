@@ -2,6 +2,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  asApp,
   freshSchema,
   newAccount,
   newLeague,
@@ -240,6 +241,38 @@ describe('invitations', () => {
       await expect(db.query(sql, [...params])).rejects.toMatchObject(refused.restrict);
     }
     await db.query('update invitations set cancelled_at = now() where id = $1', [id]);
+  });
+
+  it("lose their email only to an erased accepter's placeholder, by the tables' owner (record 052)", async () => {
+    const { leagueId } = await newLeague(db);
+    const accepter = await newAccount(db);
+    const placeholder = `${accepter}@erased.invalid`;
+    const accepted = (await invite(leagueId)).id;
+    await db.query(
+      'update invitations set accepted_at = now(), accepted_by_account_id = $2 where id = $1',
+      [accepted, accepter],
+    );
+    const pending = (await invite(leagueId)).id;
+    const setEmail = (id: string, email: string) =>
+      db.query('update invitations set email = $2 where id = $1', [id, email]);
+
+    // Not while the accepter's account still has its address.
+    await expect(setEmail(accepted, placeholder)).rejects.toMatchObject(refused.restrict);
+    await db.query('update accounts set email = $2 where id = $1', [accepter, placeholder]);
+    // Not by the app, not to any other address, and not for an invitation not accepted.
+    await expect(
+      asApp(db, { league: leagueId, account: accepter }, (tx) =>
+        tx.query('update invitations set email = $2 where id = $1', [accepted, placeholder]),
+      ),
+    ).rejects.toMatchObject(refused.restrict);
+    await expect(setEmail(accepted, 'someone-else@example.test')).rejects.toMatchObject(
+      refused.restrict,
+    );
+    await expect(setEmail(pending, placeholder)).rejects.toMatchObject(refused.restrict);
+    await setEmail(accepted, placeholder);
+    expect(await one(db, 'select email from invitations where id = $1', [accepted])).toEqual({
+      email: placeholder,
+    });
   });
 });
 

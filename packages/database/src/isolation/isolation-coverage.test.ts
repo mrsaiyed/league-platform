@@ -139,8 +139,11 @@ const narrowLookups = new Map<unknown, string>([
     databasePackage.findLeagueByShortName,
     'the league one short name in an address names (find_league_by_slug): id, short name, state',
   ],
-  // Record 052: the account functions of record 008. None reads or writes a league's
-  // data for another league; each answers for one sign-in or one account only.
+  // Record 052: the account functions of record 008. Each answers for one sign-in or
+  // one account only. The first three read or write no league's data; eraseAccount
+  // does write across leagues, by design: in every league it ends that one account's
+  // grants, removes its game assignments and scoring sessions, and empties the email
+  // on the invitations it accepted, and nothing of anyone else's.
   [
     databasePackage.findAccountOfSignIn,
     'the account one sign-in id is (account_of_sign_in): the account id only, no email taken',
@@ -155,7 +158,7 @@ const narrowLookups = new Map<unknown, string>([
   ],
   [
     databasePackage.eraseAccount,
-    'erases the account set (erase_account): its personal rows, its sign-in rows, and its own grants in every league ended, by design (T-52); tested in erase-account.test.ts',
+    "erases the account set (erase_account): its personal rows and sign-in rows, and writes across leagues by design (T-52): that account's grants ended, its game assignments and scoring sessions removed, its accepted invitations' email emptied; tested in erase-account.test.ts",
   ],
 ]);
 

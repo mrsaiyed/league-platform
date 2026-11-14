@@ -402,11 +402,56 @@ $$;
 comment on function public.create_own_profile(text, text, date) is
   'Makes the own profile of the account set for this transaction, once (record 052).';
 
+-- An invitation's email is fixed once the row exists (0004), with one exception for
+-- erasure: the email of an invitation an account accepted may become that account's
+-- placeholder address, once the account has been erased, and only by the tables'
+-- owner (erase_account below). So the address an erased person was invited at does
+-- not outlive their account (T-220, record 052). The 0004 trigger keeps fixing the
+-- role and the scope; this one fixes the email.
+create or replace function public.check_invitation_email_fixed() returns trigger
+language plpgsql
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if new.email is not distinct from old.email then
+    return new;
+  end if;
+  if old.accepted_by_account_id is not null
+     and new.email = old.accepted_by_account_id::text || '@erased.invalid'
+     and pg_has_role(
+       current_user,
+       (select c.relowner from pg_class c where c.oid = tg_relid),
+       'MEMBER'
+     )
+     and exists (
+       select 1 from public.accounts a
+       where a.id = old.accepted_by_account_id and a.email = new.email
+     ) then
+    return new;
+  end if;
+  raise exception '%.email cannot be changed', tg_table_name
+    using errcode = 'restrict_violation',
+          hint = 'This column is fixed once the row exists. Make a new row instead.';
+end
+$$;
+
+comment on function public.check_invitation_email_fixed() is
+  'BEFORE UPDATE on invitations: the email is fixed, except that the tables'' owner may set an accepted invitation''s email to its erased accepter''s placeholder (record 052).';
+
+drop trigger invitations_on_update on public.invitations;
+create trigger invitations_on_update before update on public.invitations
+  for each row execute function public.on_row_update('role', 'scope_type', 'scope_id');
+create trigger invitations_email_fixed before update on public.invitations
+  for each row execute function public.check_invitation_email_fixed();
+
 -- Erasing an account (T-52, T-220, record 007): only the account set for this
 -- transaction, as its own request. Its row stays, emptied in place, so history keeps
 -- valid links. Its profiles go: its own and those it acts for as a guardian that no
 -- other account reaches; one another account still reaches stays with that account.
--- Its grants in every league end now. Its rows in the sign-in store go. It refuses,
+-- Its grants in every league end now; its game assignments and the scoring sessions
+-- it holds go; the invitations it accepted keep its placeholder address instead of
+-- the one they were sent to. Its rows in the sign-in store go, the address's code
+-- requests, guesses and locks with them. It refuses,
 -- changing nothing, while the account owns a league (the league would have no one
 -- to run it) or while one of its profiles is still linked to a league's person:
 -- each league treats its person first, inside its own fence (T-52, T-63). Ending the
@@ -453,9 +498,13 @@ begin
   delete from public.profile_access pa where pa.account_id = me;
   delete from public.profiles pr where pr.id = any (going);
 
+  -- A grant made by a transaction that began after this one is dated later than
+  -- now(); it still ends no earlier than it began (role_grants_revoked_after_granted).
   update public.role_grants g
-  set revoked_at = now(), revoked_by_account_id = me
+  set revoked_at = greatest(now(), g.created_at), revoked_by_account_id = me
   where g.account_id = me and g.revoked_at is null;
+  delete from public.game_assignments ga where ga.account_id = me;
+  delete from public.scoring_sessions ss where ss.account_id = me;
 
   if link is not null then
     delete from sign_in.sessions s where s.user_id = link;
@@ -465,6 +514,9 @@ begin
   end if;
   delete from sign_in.codes c where lower(c.email) = lower(address);
   delete from sign_in.proofs p where lower(p.email) = lower(address);
+  delete from sign_in.code_requests r where r.scope = 'email' and lower(r.subject) = lower(address);
+  delete from sign_in.guesses g where g.scope = 'email' and lower(g.subject) = lower(address);
+  delete from sign_in.guess_locks l where l.scope = 'email' and lower(l.subject) = lower(address);
 
   update public.accounts a
   set email = me::text || '@erased.invalid',
@@ -473,12 +525,16 @@ begin
       last_seen_at = null,
       sign_in_id = null
   where a.id = me;
+  -- After the account row, which check_invitation_email_fixed reads.
+  update public.invitations i
+  set email = me::text || '@erased.invalid'
+  where i.accepted_by_account_id = me;
   return 'erased';
 end
 $$;
 
 comment on function public.erase_account() is
-  'Erases the account set for this transaction, at its own request: the row emptied in place, its profiles, grants and sign-in rows gone (record 052, T-52, T-220).';
+  'Erases the account set for this transaction, at its own request: the row emptied in place, its profiles, grants, game assignments, scoring sessions and sign-in rows gone, its accepted invitations'' email emptied (record 052, T-52, T-220).';
 
 -- The names on the access list (P4 §6) of the league set for this transaction: the
 -- display name of each account holding a grant in force there, and of its owner, and
