@@ -93,10 +93,18 @@ export function redrawsFor(
   return arrived.status === 'live' && now.status === 'final';
 }
 
-function latestPlayText(game: ViewerGame, words: GameWords, labels: LiveGameLabels): string {
+/**
+ * "Latest play: …", or nothing. A clock tap, an undo or a lineup leaves an "other" play:
+ * that says nothing a viewer can use, so no line is shown for it.
+ */
+export function latestPlayText(
+  game: ViewerGame,
+  words: GameWords,
+  labels: Pick<LiveGameLabels, 'latestPlay'>,
+): string {
   const play = game.latestPlay;
   const teams = game.teams;
-  if (play === null || teams === undefined) return '';
+  if (play === null || play.type === 'other' || teams === undefined) return '';
   const sentence = playSentence(words, {
     type: play.type,
     team: play.side === undefined ? null : teams[play.side].name,

@@ -33,7 +33,8 @@ import {
   startText,
 } from './build-game.ts';
 import { GameContent, type GameView } from './game-content.tsx';
-import { redrawsFor } from './live-game-view.tsx';
+import { latestPlayText, redrawsFor } from './live-game-view.tsx';
+import type { ViewerGame } from './viewer-state.ts';
 
 const viewing = {
   leagueId: liveLeagueId,
@@ -214,6 +215,31 @@ describe('a game page', () => {
     expect(redrawsFor(at('final', 9), at('final', 10))).toBe(false);
     // A final game the scorekeeper reopens is drawn again as live.
     expect(redrawsFor(at('final', 9), at('live', 10))).toBe(true);
+  });
+
+  it('shows no latest play after a clock tap, an undo or a lineup', () => {
+    const game = (latestPlay: ViewerGame['latestPlay']): ViewerGame => ({
+      gameId: games.hawksBears,
+      sequence: 3,
+      sentAt: 0,
+      status: 'live',
+      score: { home: 3, away: 0 },
+      period: 1,
+      clock: { state: 'stopped', remainingMs: 480_000 },
+      teamFouls: { home: 0, away: 0 },
+      latestPlay,
+      teams: {
+        home: { name: 'Hawks', statsVisible: true },
+        away: { name: 'Bears', statsVisible: true },
+      },
+    });
+    const labels = { latestPlay: 'Latest play: {play}' };
+    const play = { side: 'home', playerName: null, jersey: null } as const;
+    expect(latestPlayText(game({ ...play, type: 'other' }), gameWords(), labels)).toBe('');
+    expect(latestPlayText(game(null), gameWords(), labels)).toBe('');
+    expect(latestPlayText(game({ ...play, type: 'timeout' }), gameWords(), labels)).toBe(
+      'Latest play: Timeout, Hawks',
+    );
   });
 
   it('notes a forfeit under the result', async () => {
