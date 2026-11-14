@@ -57,7 +57,24 @@ const cases = [
   ['visitor', '/signup/code', 200, ['Enter your code', 'If that address can sign in']],
   ['visitor', '/signup/password', 200, ['Choose your password']],
   ['visitor', '/account/confirm', 200, ['Enter your password again']],
-  ['visitor', '/north-valley', 200, ['Home', 'This page is not built yet.']],
+  // The home and schedule pages (step 2.42): real content, not the placeholder; the two
+  // leagues have different rounds.
+  [
+    'visitor',
+    '/north-valley',
+    200,
+    ['Home', 'Recent results', 'Upcoming games', 'Standings'],
+    ['This page is not built yet.'],
+  ],
+  [
+    'visitor',
+    '/north-valley/schedule',
+    200,
+    ['Schedule', 'This round', 'Round 1', 'Team'],
+    ['This page is not built yet.'],
+  ],
+  ['visitor', '/harbor-city/schedule', 200, ['Opening day', 'Other games']],
+  ['visitor', '/north-valley/schedule?season=nope', 404, [notFound]],
   ['visitor', '/north-valley/teams/lions', 200, ['Team']],
   // The design as variables once per page, the header and the mark (step 1.18, T-90, U-8):
   // two leagues, two looks.

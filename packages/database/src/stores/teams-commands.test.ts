@@ -19,7 +19,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
-import { freshSchema, newLeague, newSeason, one } from '../schema/schema.test-helper.ts';
+import {
+  freshSchema,
+  newAccount,
+  newLeague,
+  newSeason,
+  one,
+} from '../schema/schema.test-helper.ts';
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { divisionsStore } from './divisions-store.ts';
@@ -174,5 +180,52 @@ describe('teams', () => {
     });
     value(await removeTeam(l.as, { teamId }, deps));
     value(await removeDivision(l.as, { divisionId }, leaguesDeps));
+  });
+});
+
+describe("the league's statistics-level settings on the database (S-22, S-23, S-24)", () => {
+  const setLeagueValue = (leagueId: string, key: string, value: unknown) =>
+    pglite.query(
+      `insert into setting_values (league_id, level, key, value) values ($1, 'league', $2, $3)`,
+      [leagueId, key, JSON.stringify({ version: 1, value })],
+    );
+
+  it("starts a new team at its own league's level, not another league's", async () => {
+    const a = await league();
+    const b = await league();
+    await setLeagueValue(a.leagueId, 'teams.startingStatsLevel', 'staff');
+    const inA = value(
+      await createTeam(a.as, { name: 'Hawks', shortName: 'hawks', seasonId: a.seasonId }, deps),
+    );
+    const inB = value(
+      await createTeam(b.as, { name: 'Hawks', shortName: 'hawks', seasonId: b.seasonId }, deps),
+    );
+    expect((await teamRow(inA.teamId)).stats_visibility).toBe('staff');
+    expect((await teamRow(inB.teamId)).stats_visibility).toBe('everyone');
+  });
+
+  it("refuses a program's admin when choosing is off in that league only, never the owner", async () => {
+    const a = await league();
+    const b = await league();
+    await setLeagueValue(a.leagueId, 'teams.mayChooseStatsLevel', false);
+    const teamA = value(await createTeam(a.as, { ...hawks, seasonId: a.seasonId }, deps));
+    const teamB = value(await createTeam(b.as, { ...hawks, seasonId: b.seasonId }, deps));
+    const adminId = await newAccount(pglite);
+    await pglite.query(
+      `insert into role_grants (league_id, account_id, role, scope_type, scope_id, granted_by_account_id)
+       values ($1, $2, 'admin', 'program', $3, $4)`,
+      [a.leagueId, adminId, a.defaultProgramId, a.ownerId],
+    );
+    const programAdmin = { ...a.as, accountId: adminId };
+    const change = (teamId: string) => ({ teamId, version: 1, statsVisibility: 'staff' as const });
+    expect(await setTeamStatsVisibility(programAdmin, change(teamA.teamId), deps)).toMatchObject({
+      error: { code: 'teams-may-not-choose' },
+    });
+    expect(await setTeamStatsVisibility(a.as, change(teamA.teamId), deps)).toMatchObject({
+      ok: true,
+    });
+    expect(await setTeamStatsVisibility(b.as, change(teamB.teamId), deps)).toMatchObject({
+      ok: true,
+    });
   });
 });

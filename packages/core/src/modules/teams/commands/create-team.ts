@@ -1,7 +1,7 @@
 // Adds a team to a season (P7 §2, T3 §7): a name, a short name its address is built
 // from (T-34), a color, a division of the same season, and who sees its players'
-// numbers (S-22). The caller states that last: it has no default here, because the
-// league setting that would give one waits for the founder's answer. The team gets a
+// numbers (S-22). The caller may state that last; when it does not, the team starts
+// at the league's starting level (everyone unless the league set another). The team gets a
 // lineage of its own, so later seasons can be tied to it. The short name and the name
 // must each differ from every other team's in the season, not in the bin.
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { mayChangeTeams, seasonScope } from '../policy.ts';
 import type { TeamsTx } from '../ports.ts';
+import { leagueStartingStatsLevel } from '../stats-level-settings.ts';
 import { teamColor, teamName, teamSlug, teamStatsVisibility } from '../team-fields.ts';
 
 export type CreateTeamError = {
@@ -28,7 +29,7 @@ export const createTeam = defineCommand({
     shortName: teamSlug,
     color: teamColor.optional(),
     divisionId: z.uuid().optional(),
-    statsVisibility: teamStatsVisibility,
+    statsVisibility: teamStatsVisibility.optional(),
   }),
   allowed: async (context, input, tx: TeamsTx) =>
     mayChangeTeams(context, tx, await seasonScope(tx, input.seasonId)),
@@ -49,7 +50,7 @@ export const createTeam = defineCommand({
       slug: input.shortName,
       name: input.name,
       color: input.color ?? null,
-      statsVisibility: input.statsVisibility,
+      statsVisibility: input.statsVisibility ?? (await leagueStartingStatsLevel(tx)),
     });
     if (created === 'slug-taken') return fail({ code: 'team-short-name-taken' });
     if (created === 'name-taken') return fail({ code: 'team-name-taken' });

@@ -166,7 +166,7 @@ const byPoints = SeasonRules.parse({
   standings: { ...win.standings, rankBy: 'points', columns: [...win.standings.columns, 'points'] },
 });
 
-const adultTeams: Team[] = [
+export const adultTeams: Team[] = [
   {
     id: team(1),
     name: 'Falcons',
@@ -404,7 +404,7 @@ const adultSpring: SeasonData = {
   ],
 };
 
-const youthTeams: Team[] = [
+export const youthTeams: Team[] = [
   {
     id: team(11),
     name: 'Comets',
@@ -513,6 +513,13 @@ const youthSeason: SeasonData = {
     },
   ],
 };
+
+/** The ids of the made-up seasons, so the stand-in schedule describes the same ones. */
+export const standInSeasonIds = {
+  adultFall: season(1),
+  adultSpring: season(2),
+  youthWinter: season(3),
+} as const;
 
 const bySeasonOf = (all: SeasonData[]): PublicSeason[] =>
   all.map((s) => ({ id: s.id, name: s.name, slug: s.slug, isCurrent: s.isCurrent }));

@@ -10,6 +10,7 @@ import {
   insertRosterEntry,
   insertTeam,
   listRoster,
+  listSettingValues,
   updateRosterEntry,
   setTeamBinned,
   updateTeam,
@@ -17,6 +18,8 @@ import {
 
 export function teamsStore(scope: LeagueScope): TeamsStore {
   return {
+    // The league level only: no program or season is named, so only the league's row comes back.
+    leagueSettingRows: (key) => listSettingValues(scope, key, {}),
     find: (teamId) => findTeam(scope, teamId),
     create: (team) => insertTeam(scope, team),
     update: (teamId, change, version) => updateTeam(scope, teamId, change, version),

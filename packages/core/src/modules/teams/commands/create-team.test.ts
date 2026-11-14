@@ -14,6 +14,10 @@ import {
 } from '../memory-teams.test-helper.ts';
 import { createTeam } from './create-team.ts';
 
+const levelRule = (value: unknown) => ({
+  'teams.startingStatsLevel': [{ level: 'league' as const, document: { version: 1, value } }],
+});
+
 const input = { seasonId, name: ' Hawks ', shortName: 'Hawks-1', statsVisibility: 'everyone' };
 
 describe('createTeam', () => {
@@ -81,7 +85,7 @@ describe('createTeam', () => {
     ).toMatchObject({ error: { code: 'division-not-found' } });
   });
 
-  it('refuses a short name that cannot be an address, and a missing numbers choice', async () => {
+  it('refuses a short name that cannot be an address, and a numbers choice not offered', async () => {
     const { deps, as } = memoryTeams();
     for (const bad of [
       { ...input, shortName: 'Has Space' },
@@ -89,7 +93,6 @@ describe('createTeam', () => {
       { ...input, shortName: '' },
       { ...input, shortName: 'a'.repeat(61) },
       { ...input, statsVisibility: 'members' },
-      { ...input, statsVisibility: undefined },
     ]) {
       expect(await createTeam(as(ownerId), bad, deps)).toMatchObject({
         error: { code: 'invalid-input' },
@@ -120,6 +123,33 @@ describe('createTeam', () => {
       await createTeam(as(ownerId), { ...input, shortName: 'd', name: 'D' }, deps),
     ).toMatchObject({
       error: { code: 'not-allowed' },
+    });
+  });
+
+  describe('without a statistics level', () => {
+    const { statsVisibility: _stated, ...unstated } = input;
+
+    it('starts at everyone when the league set none', async () => {
+      const { db, deps, as } = memoryTeams();
+      expect(await createTeam(as(ownerId), unstated, deps)).toMatchObject({ ok: true });
+      expect(db.state.teams[0]?.statsVisibility).toBe('everyone');
+    });
+
+    it('starts at the level the league set, and the caller can still state its own', async () => {
+      const { db, deps, as } = memoryTeams({ settings: levelRule('staff') });
+      await createTeam(as(ownerId), unstated, deps);
+      await createTeam(
+        as(ownerId),
+        { ...unstated, name: 'Owls', shortName: 'owls', statsVisibility: 'everyone' },
+        deps,
+      );
+      expect(db.state.teams.map((t) => t.statsVisibility)).toEqual(['staff', 'everyone']);
+    });
+
+    it('falls back to everyone when the stored value cannot be used', async () => {
+      const { db, deps, as } = memoryTeams({ settings: levelRule('nobody') });
+      await createTeam(as(ownerId), unstated, deps);
+      expect(db.state.teams[0]?.statsVisibility).toBe('everyone');
     });
   });
 });
