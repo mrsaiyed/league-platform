@@ -153,9 +153,7 @@ export async function TeamPage({
   return (
     <main>
       <h1 dir="auto">{head.team.name}</h1>
-      <p>
-        {head.headline}
-      </p>
+      <p>{head.headline}</p>
       <p>{season.name}</p>
       <nav>
         <a href={leagueHomeStayUrl(addressee, season.isCurrent ? undefined : season.slug)}>
