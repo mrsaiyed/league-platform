@@ -30,6 +30,7 @@ import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import type { WebPorts } from './ports.ts';
+import { standInGames } from './stand-in-games.ts';
 import { standInPublicSchedule } from './stand-in-public-schedule.ts';
 import { standInPublicStats } from './stand-in-public-stats.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
@@ -55,9 +56,10 @@ export const standInPeople = {
   scheduler: { accountId: id(0xa2), token: 'local-scheduler-token' },
   coach: { accountId: id(0xa3), token: 'local-coach-token' },
   stranger: { accountId: id(0xa4), token: 'local-stranger-token' },
+  scorekeeper: { accountId: id(0xa5), token: 'local-scorekeeper-token' },
 } as const satisfies Record<string, MadeUpPerson>;
 
-const { owner, scheduler, coach } = standInPeople;
+const { owner, scheduler, coach, scorekeeper } = standInPeople;
 
 /** The made-up leagues, one in each state, all run by the made-up owner. */
 export const standInLeagues = {
@@ -96,6 +98,7 @@ const grants = [
   grantOf(2, scheduler.accountId, 'scheduler', standInLeagues.draft.id),
   grantOf(3, coach.accountId, 'coach', standInLeagues.live.id),
   grantOf(4, coach.accountId, 'coach', standInLeagues.draft.id),
+  grantOf(5, scorekeeper.accountId, 'scorekeeper', standInLeagues.live.id),
 ];
 
 const leagues: readonly MadeUpLeague[] = Object.values(standInLeagues);
@@ -247,6 +250,17 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf: accessOfVia(deps),
+    games: standInGames({
+      leagueId: standInLeagues.live.id,
+      people: {
+        [owner.accountId]: 'Olive Owner',
+        [scheduler.accountId]: 'Sky Scheduler',
+        [scorekeeper.accountId]: 'Sam Scorekeeper',
+      },
+      assignees: [scorekeeper.accountId, owner.accountId],
+      accessOf: (leagueId) => accessTx(leagueId).access,
+      log: options.log,
+    }),
     publicStats: standInPublicStats({
       adultLeagueId: standInLeagues.live.id,
       youthLeagueId: standInLeagues.other.id,
