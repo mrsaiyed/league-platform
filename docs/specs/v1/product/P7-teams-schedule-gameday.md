@@ -102,7 +102,7 @@ How the grid works (built in step 2.64):
 
 - **Columns follow the season's "Statistics kept" (section 1).** Points only: points. Points and fouls: points, fouls. The standard set: points, 3-pointers, free throws, fouls, and minutes. The full set (**S-25**, decided for you): the standard set plus rebounds, assists, steals, blocks and turnovers.
 - **Each team's roster is listed**, players who have left the team since included (R-17), as they may have played that game.
-- **Empty boxes.** A player who is ticked as played, or has any number filled in, played. A column with at least one number for a team was kept for that team, so its empty boxes are 0. A column left wholly empty was not kept, and does not count in that player's averages. A team score left empty is the total of its players' points.
+- **Empty boxes.** A player who is ticked as played, or has any number filled in, played. A column with at least one number for a team was kept for that team, so its empty boxes are 0. A column left wholly empty was not kept, and does not count in that player's averages. A team score left empty is the total of its players' points, 0 when none has any.
 - **A typed score that differs from the players' points is not refused** (**S-26**, decided for you): the admin may know better than the sheet. The page shows a warning as they type, before saving, and the score saved is the one typed.
 - **A game scored with the live tracker is refused here.** It is corrected in the tracker, so its list of plays still explains its numbers.
 - **A final game is corrected by reopening it** with a reason (S-7), then saving the grid again.

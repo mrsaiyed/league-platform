@@ -96,7 +96,7 @@ describe('the box score grid', () => {
     expect(input?.lines).toHaveLength(6);
   });
 
-  it('refuses a box that is not a count, and a missing score with no points to add up', async () => {
+  it('refuses a box that is not a count; an empty score with no points to add up is 0', async () => {
     const { games, sheetOf } = setup();
     const target = (await games()).find((g) => g.status === 'scheduled');
     const sheet = await sheetOf(target?.id ?? '');
@@ -110,7 +110,11 @@ describe('the box score grid', () => {
         }),
       ).toBeUndefined();
     }
-    expect(readBoxScoreForm(sheet, { homeScore: '10' })).toBeUndefined();
+    // P7 §5.2: an empty team score is the total of its players' points, here none.
+    expect(readBoxScoreForm(sheet, { homeScore: '10' })).toMatchObject({
+      homeScore: 10,
+      awayScore: 0,
+    });
   });
 
   it('saves the sheet so the game is final, then reopens it to correct it', async () => {

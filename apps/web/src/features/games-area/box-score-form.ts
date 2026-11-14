@@ -7,7 +7,8 @@
 //   is left out of the lines (so it does not count in averages, T6 §9);
 // - minutes are whole minutes; a player who did not play gets a line saying so if
 //   they are still on the roster, and nothing if they have left the team;
-// - an empty team score is the total of the team's points, when its sheet kept points.
+// - an empty team score is the total of the team's players' points (P7 §5.2): 0 when no
+//   player has points.
 import type { BoxScoreLineInput, BoxScoreSheet } from '@srleagues/core';
 
 /** What a form held: text only, by field name. */
@@ -74,7 +75,7 @@ export function readBoxScoreForm(
   }
 
   const lines: BoxScoreLineInput[] = [];
-  const pointsOf = new Map<string, number | undefined>();
+  const pointsOf = new Map<string, number>();
   for (const teamId of [sheet.game.homeTeamId, sheet.game.awayTeamId]) {
     const team = rows.filter((row) => row.teamId === teamId);
     const played = team.filter((row) => row.played);
@@ -103,28 +104,19 @@ export function readBoxScoreForm(
         stats,
       });
     }
-    // Points kept for the team: every player who played has them (an empty box is 0).
+    // The total of the team's players' points (an empty box is 0, and so is no points).
     pointsOf.set(
       teamId,
-      kept.includes('points')
-        ? played.reduce((sum, row) => sum + (row.stats['points'] ?? 0), 0)
-        : undefined,
+      played.reduce((sum, row) => sum + (row.stats['points'] ?? 0), 0),
     );
   }
 
-  const score = (name: 'homeScore' | 'awayScore', teamId: string): number | undefined | 'bad' => {
+  const score = (name: 'homeScore' | 'awayScore', teamId: string): number | 'bad' => {
     const typed = cell(fields[name], 999);
-    return typed === undefined ? pointsOf.get(teamId) : typed;
+    return typed === undefined ? (pointsOf.get(teamId) ?? 0) : typed;
   };
   const homeScore = score('homeScore', sheet.game.homeTeamId);
   const awayScore = score('awayScore', sheet.game.awayTeamId);
-  if (
-    homeScore === undefined ||
-    awayScore === undefined ||
-    homeScore === 'bad' ||
-    awayScore === 'bad'
-  ) {
-    return undefined;
-  }
+  if (homeScore === 'bad' || awayScore === 'bad') return undefined;
   return { homeScore, awayScore, lines };
 }
