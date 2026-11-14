@@ -138,10 +138,12 @@ function gameLine(words: Words, planned: PlannedGame): string[] {
         left.rules > 0
           ? `${plural(left.rules, 'format setting', 'format settings')} (the season’s format is used)`
           : '',
-        left.colorsWhileEnded > 0 ? `${left.colorsWhileEnded} color swaps after it ended` : '',
+        left.colorsWhileEnded > 0
+          ? `${plural(left.colorsWhileEnded, 'color swap', 'color swaps')} after it ended`
+          : '',
       ].filter((note) => note !== '');
       return [
-        `  Transfer: ${label}${found}: ${plural(steps, 'action', 'actions')}${outcome.resume ? ', carrying on from an earlier run' : ''}${outcome.replay.segments.length > 1 ? `, reopened ${outcome.replay.segments.length - 1} time(s) as in the tracker` : ''}; every box score line will match.`,
+        `  Transfer: ${label}${found}: ${plural(steps, 'action', 'actions')}${outcome.resume ? ', carrying on from an earlier run' : ''}${outcome.replay.segments.length > 1 ? `, reopened ${outcome.replay.segments.length === 2 ? 'once' : `${outcome.replay.segments.length - 1} times`} as in the tracker` : ''}; every box score line will match.`,
         ...(notes.length > 0 ? [`    Left out: ${notes.join('; ')}.`] : []),
       ];
     }

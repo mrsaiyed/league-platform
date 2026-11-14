@@ -221,13 +221,12 @@ export async function runTrackerTransfer<Tx extends TrackerTransferTx>(
       const sent = await sendGame(args, outcome.gameId, outcome.replay, personOf);
       if ('kind' in sent) return report({ trackerGameId: game.id, stop: sent });
       transferred.push({ trackerGameId: game.id, sent: sent.sent });
-    } else {
-      checked.push(game.id);
     }
     const differences = await compareGame(reads, plan, outcome.gameId, game, playerOfPerson);
     if (differences.length > 0) {
       return report({ trackerGameId: game.id, stop: { kind: 'lines-differ', differences } });
     }
+    if (outcome.kind === 'already') checked.push(game.id);
   }
   return report(null);
 }
