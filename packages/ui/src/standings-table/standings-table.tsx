@@ -85,6 +85,7 @@ export function StandingsTable({
               >
                 {hasSeeds ? <td className="ui-num">{row.seed ?? ''}</td> : null}
                 <th scope="row" className="ui-team-cell">
+                  <span className="ui-team-chip" aria-hidden="true" />
                   <span dir="auto">{row.team}</span>
                   {marks.map((m) => (
                     <sup key={m.id} className="ui-note-mark">

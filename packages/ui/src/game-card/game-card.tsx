@@ -71,6 +71,7 @@ function Team({
       data-winner={isWinner ? 'true' : undefined}
       style={color ? ({ '--team-color': color } as CSSProperties) : undefined}
     >
+      <span className="ui-team-chip" aria-hidden="true" />
       <span className="ui-game-team-name" dir="auto">
         {team.name}
       </span>
@@ -80,7 +81,12 @@ function Team({
   );
 }
 
-/** One game: both teams, the score once there is one, when it is, and its state. */
+/**
+ * One game as a compact card: a quiet line saying when and where, with its state as a small
+ * pill; then each team on its own row, its color and name at the start and its score at the
+ * end. A card with somewhere to go is one link, whole: the link's words are kept for screen
+ * readers and not drawn.
+ */
 export function GameCard({
   home,
   away,
@@ -98,15 +104,14 @@ export function GameCard({
   return (
     <article className="ui-game-card" data-status={status}>
       <header className="ui-game-meta">
-        {numberText ? <span className="ui-game-number">{numberText}</span> : null}
-        <span className="ui-game-when">{whenText}</span>
+        <span className="ui-game-about">
+          {numberText ? <span className="ui-game-number">{numberText}</span> : null}
+          <span className="ui-game-when">{whenText}</span>
+        </span>
         {state}
       </header>
       <ul className="ui-game-teams">
         <Team team={away} isWinner={winner === 'away'} labels={labels} />
-        <li className="ui-game-versus" aria-hidden="true">
-          {labels.versus}
-        </li>
         <Team team={home} isWinner={winner === 'home'} labels={labels} />
       </ul>
       {detailsHref ? (

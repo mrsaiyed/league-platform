@@ -18,6 +18,8 @@ export type StatsTableLabels = {
 
 export type SortableStatsTableProps = {
   readonly caption: string;
+  /** For a table under a heading that already says the same words: the caption is kept for screen readers and not drawn. */
+  readonly captionHidden?: boolean;
   /** Names the scrollable region for screen readers; the caption is used when left out. */
   readonly regionLabel?: string;
   /** The first column is the row heading (the player or team name). */
@@ -32,6 +34,7 @@ export type SortableStatsTableProps = {
 /** A table of statistics the reader can sort by any column. Shows the initial sort without scripts. */
 export function SortableStatsTable({
   caption,
+  captionHidden = false,
   regionLabel,
   columns,
   rows,
@@ -44,7 +47,9 @@ export function SortableStatsTable({
   return (
     <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? caption}>
       <table className="ui-table ui-stats">
-        <caption dir="auto">{caption}</caption>
+        <caption dir="auto" className={captionHidden ? 'ui-visually-hidden' : undefined}>
+          {caption}
+        </caption>
         <thead>
           <tr>
             {columns.map((c) => {
