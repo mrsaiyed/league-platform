@@ -31,6 +31,7 @@ import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import type { WebPorts } from './ports.ts';
+import { standInGames } from './stand-in-games.ts';
 import { standInPublicSchedule } from './stand-in-public-schedule.ts';
 import { standInPublicStats } from './stand-in-public-stats.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
@@ -56,11 +57,11 @@ export const standInPeople = {
   scheduler: { accountId: id(0xa2), token: 'local-scheduler-token' },
   coach: { accountId: id(0xa3), token: 'local-coach-token' },
   stranger: { accountId: id(0xa4), token: 'local-stranger-token' },
+  scorekeeper: { accountId: id(0xa5), token: 'local-scorekeeper-token' },
   // The other staff roles, in the draft league only (step 2.87).
-  admin: { accountId: id(0xa5), token: 'local-admin-token' },
-  registrar: { accountId: id(0xa6), token: 'local-registrar-token' },
-  editor: { accountId: id(0xa7), token: 'local-editor-token' },
-  scorekeeper: { accountId: id(0xa8), token: 'local-scorekeeper-token' },
+  admin: { accountId: id(0xa6), token: 'local-admin-token' },
+  registrar: { accountId: id(0xa7), token: 'local-registrar-token' },
+  editor: { accountId: id(0xa8), token: 'local-editor-token' },
   clubAdmin: { accountId: id(0xa9), token: 'local-club-admin-token' },
   /** A scheduler for one program of the draft league only. */
   programScheduler: { accountId: id(0xaa), token: 'local-program-scheduler-token' },
@@ -68,7 +69,7 @@ export const standInPeople = {
   otherAdmin: { accountId: id(0xab), token: 'local-other-admin-token' },
 } as const satisfies Record<string, MadeUpPerson>;
 
-const { owner, scheduler, coach } = standInPeople;
+const { owner, scheduler, coach, scorekeeper } = standInPeople;
 
 /**
  * The made-up leagues, one in each state, all owned by the made-up owner, and a
@@ -118,16 +119,17 @@ const grants = [
   grantOf(2, scheduler.accountId, 'scheduler', standInLeagues.draft.id),
   grantOf(3, coach.accountId, 'coach', standInLeagues.live.id),
   grantOf(4, coach.accountId, 'coach', standInLeagues.draft.id),
-  grantOf(5, standInPeople.admin.accountId, 'admin', standInLeagues.draft.id),
-  grantOf(6, standInPeople.registrar.accountId, 'registrar', standInLeagues.draft.id),
-  grantOf(7, standInPeople.editor.accountId, 'editor', standInLeagues.draft.id),
-  grantOf(8, standInPeople.scorekeeper.accountId, 'scorekeeper', standInLeagues.draft.id),
-  grantOf(9, standInPeople.clubAdmin.accountId, 'club_admin', standInLeagues.draft.id),
-  grantOf(10, standInPeople.programScheduler.accountId, 'scheduler', standInLeagues.draft.id, {
+  grantOf(5, scorekeeper.accountId, 'scorekeeper', standInLeagues.live.id),
+  grantOf(6, scorekeeper.accountId, 'scorekeeper', standInLeagues.draft.id),
+  grantOf(7, standInPeople.admin.accountId, 'admin', standInLeagues.draft.id),
+  grantOf(8, standInPeople.registrar.accountId, 'registrar', standInLeagues.draft.id),
+  grantOf(9, standInPeople.editor.accountId, 'editor', standInLeagues.draft.id),
+  grantOf(10, standInPeople.clubAdmin.accountId, 'club_admin', standInLeagues.draft.id),
+  grantOf(11, standInPeople.programScheduler.accountId, 'scheduler', standInLeagues.draft.id, {
     type: 'program',
     id: id(0xc1),
   }),
-  grantOf(11, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.otherDraft.id),
+  grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.otherDraft.id),
 ];
 
 const leagues: readonly MadeUpLeague[] = Object.values(standInLeagues);
@@ -279,6 +281,17 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf: accessOfVia(deps),
+    games: standInGames({
+      leagueId: standInLeagues.live.id,
+      people: {
+        [owner.accountId]: 'Olive Owner',
+        [scheduler.accountId]: 'Sky Scheduler',
+        [scorekeeper.accountId]: 'Sam Scorekeeper',
+      },
+      assignees: [scorekeeper.accountId, owner.accountId],
+      accessOf: (leagueId) => accessTx(leagueId).access,
+      log: options.log,
+    }),
     publicStats: standInPublicStats({
       adultLeagueId: standInLeagues.live.id,
       youthLeagueId: standInLeagues.other.id,
