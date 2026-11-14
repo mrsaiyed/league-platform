@@ -94,4 +94,30 @@ describe('resolveLeagueApi', () => {
       expect(resolved).toEqual({ ok: false, refusal: { status: 401, error: 'signed-out' } });
     }
   });
+
+  it('sees a session cookie that no longer works as a visitor for a public read', async () => {
+    const snapshot = ['games', game, 'snapshot'];
+    for (const code of ['access-expired', 'session-ended'] as const) {
+      const resolved = await resolveLeagueApi(
+        facts(leagueApiUrl({ id: leagueA }, snapshot), { ok: false, error: { code } }),
+        snapshot,
+        deps,
+        'visitor',
+      );
+      expect(resolved).toMatchObject({
+        ok: true,
+        context: { kind: 'league', account: null, league: { id: leagueA } },
+      });
+    }
+  });
+
+  it('is still "not found" for a public read of an address that is not the route\'s', async () => {
+    const resolved = await resolveLeagueApi(
+      facts(leagueApiUrl({ id: leagueA }, parts), { ok: false, error: { code: 'session-ended' } }),
+      ['games', game, 'snapshot'],
+      deps,
+      'visitor',
+    );
+    expect(resolved).toEqual({ ok: false, refusal: { status: 404, error: 'not-found' } });
+  });
 });

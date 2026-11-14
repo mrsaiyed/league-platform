@@ -15,7 +15,7 @@ type Params = { readonly params: Promise<{ readonly leagueId: string; readonly g
 
 export async function GET(_request: Request, { params }: Params): Promise<Response> {
   const { game } = await params;
-  const endpoint = await leagueEndpoint(['games', game, 'snapshot']);
+  const endpoint = await leagueEndpoint(['games', game, 'snapshot'], 'visitor');
   if (!endpoint.ok) return respond(refusalAnswer(endpoint.refusal));
   const { context, ports } = endpoint;
   const holder =

@@ -9,7 +9,8 @@
 //   pages (league-gate.ts, addressMatchesRoute).
 // - A league that is not there, or is in the bin, is "not found".
 // - A session cookie that no longer works is "signed out" (401): the proxy renews a
-//   session before any endpoint sees it, so one still failing here has ended.
+//   session before any endpoint sees it, so one still failing here has ended. A public
+//   read (the snapshot) treats it as a visitor instead, as pages do.
 import { leagueApiUrl, type AccessHolder } from '@srleagues/core';
 import {
   requestContext,
@@ -45,6 +46,11 @@ export async function resolveLeagueApi(
   facts: RequestFacts,
   parts: readonly string[],
   deps: ContextDeps,
+  /**
+   * What a session cookie that no longer works means: "signed out" for commands and
+   * session requests, or, for a public read, a visitor, as for pages (league-gate.ts).
+   */
+  signedOut: 'refuse' | 'visitor' = 'refuse',
 ): Promise<
   | { readonly ok: true; readonly context: LeagueRequestContext }
   | { readonly ok: false; readonly refusal: ApiRefusal }
@@ -52,9 +58,13 @@ export async function resolveLeagueApi(
   const built = await requestContext(facts, deps);
   if (!built.ok) {
     const code = built.error.code;
-    return code === 'renew-session' || code === 'session-ended'
-      ? { ok: false, refusal: { status: 401, error: 'signed-out' } }
-      : { ok: false, refusal: notFound };
+    if (code !== 'renew-session' && code !== 'session-ended') {
+      return { ok: false, refusal: notFound };
+    }
+    if (signedOut === 'visitor' && facts.session !== null) {
+      return resolveLeagueApi({ ...facts, session: null }, parts, deps, signedOut);
+    }
+    return { ok: false, refusal: { status: 401, error: 'signed-out' } };
   }
   const context = built.value;
   if (context.kind !== 'league') return { ok: false, refusal: notFound };

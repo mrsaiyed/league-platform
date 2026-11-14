@@ -17,16 +17,23 @@ const maxBodyBytes = 64 * 1024;
 /** The request behind `/api/v1/leagues/{leagueId}/{...parts}`, or why there is none. */
 export async function leagueEndpoint(
   parts: readonly string[],
+  /** A public read sees a session that no longer works as a visitor (league-api.ts). */
+  signedOut: 'refuse' | 'visitor' = 'refuse',
 ): Promise<
   | { readonly ok: true; readonly context: LeagueRequestContext; readonly ports: WebPorts }
   | { readonly ok: false; readonly refusal: ApiRefusal }
 > {
   const ports = await webPorts();
   const facts = await requestFacts(ports);
-  const resolved = await resolveLeagueApi(facts, parts, {
-    ...ports,
-    siteOrigin: getConfig().PUBLIC_BASE_URL,
-  });
+  const resolved = await resolveLeagueApi(
+    facts,
+    parts,
+    {
+      ...ports,
+      siteOrigin: getConfig().PUBLIC_BASE_URL,
+    },
+    signedOut,
+  );
   return resolved.ok ? { ok: true, context: resolved.context, ports } : resolved;
 }
 
