@@ -26,8 +26,12 @@
 //   kept, `signedOut` says so, and they are sent under the same session once the
 //   scorekeeper is signed in again (the next renewal, `online` or `openAgain` finds it).
 // - `now()` is the server's time (T-121, finding M1), measured over each session
-//   request from the midpoint of its round trip; a slow reply is not trusted over a
-//   closer one. Taps are timed by it, and the screens paint the clock from it.
+//   request from the midpoint of its round trip, against the steady clock (finding M3:
+//   changing the device's clock moves nothing). The closest measurement is kept, and it
+//   counts as less sure as it ages, so a fresh one still replaces it in time; one that
+//   disagrees with it beyond both their errors replaces it at once (finding L4). `now()`
+//   never goes backwards, so the painted clock never ticks back. Taps are timed by it,
+//   and the screens paint the clock from it.
 import {
   sessionRenewSeconds,
   type SessionReply,
@@ -136,8 +140,9 @@ export type TrackerControllerStatus = {
    */
   readonly now: () => number;
   /**
-   * How far `now()` may be from the server's time: half the round trip it was measured
-   * over. Null until a session reply has been timed, when `now()` is the device's time.
+   * How far `now()` may be from the server's time when it was last measured: half the
+   * round trip it was measured over. Null until a session reply has been timed, when
+   * `now()` is the device's time.
    */
   readonly clockErrorMs: number | null;
 };
@@ -165,6 +170,7 @@ export type TrackerControllerOptions = {
   readonly storage: QueueStorage;
   readonly transport: CommandTransport;
   readonly server: TrackerServer;
+  /** The steady clock the server's time is measured against (finding M3), and the timers. */
   readonly clock?: QueueClock;
   /** A new command ID, a UUID in lower case. */
   readonly newCommandId?: () => string;
@@ -175,11 +181,6 @@ export type TrackerControllerOptions = {
   readonly requestTimeoutMs?: number;
   /** How often the session is renewed while this device holds it. */
   readonly renewEveryMs?: number;
-  /**
-   * A session reply whose round trip took longer than this is not used to set the
-   * server's time when one measured more closely is already known.
-   */
-  readonly slowReplyMs?: number;
   /** Passed on to the queue. */
   readonly queue?: Pick<TrackerQueueOptions, 'batchSize' | 'retry' | 'sendTimeoutMs'>;
 };
@@ -283,6 +284,13 @@ const momentIn = (game: basketball.GameState, at: number): GameMoment => ({
 
 const lowerUuid = (): string => globalThis.crypto.randomUUID().toLowerCase();
 
+/**
+ * How much less sure a measurement of the server's time is taken to grow per
+ * millisecond it ages (finding L4): a second a quarter of an hour. Far more than a
+ * device's clock drifts, so a fresh reply replaces an old close one within minutes.
+ */
+const clockAgingPerMs = 1 / 900;
+
 export function createTrackerController(options: TrackerControllerOptions): TrackerController {
   const {
     gameId,
@@ -296,13 +304,22 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     retry = defaultRetryTiming,
     requestTimeoutMs = 15_000,
     renewEveryMs = sessionRenewSeconds * 1000,
-    slowReplyMs = 2_000,
   } = options;
 
   let sessionId: string | null = null;
-  /** Server time less device time, from the closest recent session reply (T-121, record 036). */
+  /**
+   * Server time less steady-clock time, from the closest recent session reply (T-121,
+   * record 036, findings M3 and L4), and how sure that is: its error, and when it was
+   * measured (steady clock). Null until a reply has been timed.
+   */
   let offsetMs = 0;
-  const serverNow = (): number => Math.max(0, Math.round(clock.now() + offsetMs));
+  let measured: { readonly errorMs: number; readonly at: number } | null = null;
+  /** The latest `now()` given: it never goes back (L4). */
+  let latestNow = 0;
+  const serverNow = (): number => {
+    latestNow = Math.max(latestNow, Math.round(clock.now() + offsetMs));
+    return latestNow;
+  };
   let base: ServerState | null = null;
   /** This device's taps since `base`, in order: the ones the server took and the waiting. */
   let made: TrackerCommand[] = [];
@@ -388,16 +405,27 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   };
 
   /**
-   * The server stamped `serverAt` somewhere between `sent` and `received` (device time):
-   * taken as the midpoint, it is off by at most half the round trip (T-121, finding M1).
+   * The server stamped `serverAt` somewhere between `sent` and `received` (steady
+   * clock): taken as the midpoint, it is off by at most half the round trip (T-121,
+   * finding M1). It replaces what is known only when it is closer than that has become
+   * with age, or the two disagree beyond both their errors (the device slept and its
+   * steady clock stood still, say), so the closer one is kept (finding L4).
    */
   const timeServer = (sent: number, received: number, serverAt: number): void => {
     const errorMs = Math.max(received - sent, 0) / 2;
-    const known = current.clockErrorMs;
-    // A slow reply is used only when nothing closer is known.
-    if (known !== null && errorMs * 2 > slowReplyMs && errorMs > known) return;
-    offsetMs = Math.round(serverAt - (sent + errorMs));
-    if (known !== errorMs) update({ clockErrorMs: errorMs });
+    const offset = Math.round(serverAt - (sent + errorMs));
+    if (measured === null) {
+      // The first measurement: `now()` was the device's own time until now, and is
+      // set right even if that is back (nothing has been timed by it yet).
+      latestNow = 0;
+    } else {
+      const agedMs = measured.errorMs + Math.max(received - measured.at, 0) * clockAgingPerMs;
+      const agree = Math.abs(offset - offsetMs) <= agedMs + errorMs;
+      if (agree && errorMs > agedMs) return;
+    }
+    offsetMs = offset;
+    measured = { errorMs, at: received };
+    if (current.clockErrorMs !== errorMs) update({ clockErrorMs: errorMs });
   };
 
   const session = (request: SessionRequest) => {

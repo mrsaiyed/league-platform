@@ -48,14 +48,18 @@ import { defaultRetryTiming, retryDelayMs, type RetryTiming } from './retry-dela
 
 /** Time as the queue sees it, so tests can move it on by hand. */
 export type QueueClock = {
-  /** Milliseconds, as Date.now(). */
+  /**
+   * Milliseconds on a steady clock (finding M3): near Date.now() when the page opened,
+   * then counting on by itself, never moved when the device's clock is changed. The
+   * server's time is measured against it, and replies are timed by it.
+   */
   readonly now: () => number;
   /** Runs `run` once after `ms`; the function returned cancels it. */
   readonly after: (ms: number, run: () => void) => () => void;
 };
 
 export const browserClock: QueueClock = {
-  now: () => Date.now(),
+  now: () => performance.timeOrigin + performance.now(),
   after: (ms, run) => {
     const timer = setTimeout(run, ms);
     return () => clearTimeout(timer);

@@ -1,10 +1,10 @@
 import type { CommandReply } from '@srleagues/contracts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
 import { commandId, tap } from './queue-storage-contract.test-helper.ts';
 import type { QueueStorage } from './queue-storage.ts';
 import { createFakeServer, createManualClock } from './tracker-queue.test-helper.ts';
-import { createTrackerQueue, type TrackerQueueOptions } from './tracker-queue.ts';
+import { browserClock, createTrackerQueue, type TrackerQueueOptions } from './tracker-queue.ts';
 
 const game = '00000000-0000-4000-8000-0000000000a1';
 const session = '00000000-0000-4000-8000-0000000000c1';
@@ -33,6 +33,21 @@ function setup(
 
 const held = async (storage: QueueStorage) =>
   (await storage.list(game)).map((entry) => [entry.command.commandId, entry.state]);
+
+describe('the browser clock (finding M3)', () => {
+  it('is steady: changing the device clock does not move it', () => {
+    const before = browserClock.now();
+    // The device's clock is put back an hour (by hand, or a time-zone or network fix).
+    const changed = vi.spyOn(Date, 'now').mockReturnValue(Date.now() - 3_600_000);
+    try {
+      const after = browserClock.now();
+      expect(after).toBeGreaterThanOrEqual(before);
+      expect(after - before).toBeLessThan(1_000);
+    } finally {
+      changed.mockRestore();
+    }
+  });
+});
 
 describe('tracker queue: storing taps (T-114)', () => {
   it('has stored a tap by the time enqueue resolves, with no network at all', async () => {

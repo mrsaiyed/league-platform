@@ -1342,4 +1342,55 @@ describe('tracker controller: the server’s time (finding M1)', () => {
     expect(status.now()).toBe(serverTime());
     await until(clock, controller.leave());
   });
+
+  it('keeps the closer measurement over a quick but less close one, until it has aged, and never steps back (finding L4)', async () => {
+    const clock = createManualClock();
+    const ahead = 30_000;
+    const { legs, server } = timedServer(clock, ahead);
+    const controller = createTrackerController({
+      gameId,
+      deviceId: 'tablet-1',
+      storage: createMemoryQueueStorage(),
+      transport: createFakeServer(clock).transport,
+      server,
+      clock,
+      newCommandId,
+      random: () => 1,
+    });
+    const serverTime = () => clock.now() + ahead;
+    legs.up = 20;
+    legs.down = 20;
+    await until(clock, controller.start());
+    await until(clock, controller.idle());
+    expect(controller.status().clockErrorMs).toBe(20);
+    expect(controller.status().now()).toBe(serverTime());
+
+    // Quick (well under two seconds) but lopsided: its midpoint is 150 ms behind. The
+    // closer measurement is kept, so the clock does not jump back.
+    legs.up = 50;
+    legs.down = 350;
+    controller.online();
+    await until(clock, controller.idle());
+    expect(controller.status().clockErrorMs).toBe(20);
+    expect(controller.status().now()).toBe(serverTime());
+
+    // Five minutes with no answer to the renewals: the measurement ages.
+    legs.up = 20_000;
+    await clock.advance(5 * minute);
+    await until(clock, controller.idle());
+    // A fresh one is now closer than the aged one: it is taken, though it is behind.
+    legs.up = 50;
+    legs.down = 350;
+    controller.online();
+    await clock.advance(390);
+    // The clock as painted just before the reply comes back.
+    const painted = controller.status().now();
+    await until(clock, controller.idle());
+    expect(controller.status().clockErrorMs).toBe(200);
+    // It never goes back: it waits for the server's time to catch up instead.
+    expect(controller.status().now()).toBeGreaterThanOrEqual(painted);
+    await clock.advance(1_000);
+    expect(serverTime() - controller.status().now()).toBe(150);
+    await until(clock, controller.leave());
+  });
 });
