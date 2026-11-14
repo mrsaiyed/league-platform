@@ -8,7 +8,11 @@ import { createStoringTrackerServer } from './storing-tracker-server.ts';
 import type { ServerOutcome, ServerState, TrackerServer } from './tracker-server.ts';
 
 const game = '00000000-0000-4000-8000-0000000000a1';
-const league = '00000000-0000-4000-8000-0000000000c1';
+const owner = {
+  gameId: game,
+  leagueId: '00000000-0000-4000-8000-0000000000c1',
+  accountId: '00000000-0000-4000-8000-0000000000f1',
+};
 const state: ServerState = { sequence: 2, state: basketball.newGame(basketball.QUARTERS, 0) };
 
 function serverAnswering(outcome: ServerOutcome<ServerState>): TrackerServer & { asked: number } {
@@ -28,7 +32,7 @@ const signal = new AbortController().signal;
 describe('the state stored on the device as the server gives it (T-115)', () => {
   it('stores each state loaded and hands it on unchanged', async () => {
     const storage = createMemoryOpenedGameStorage();
-    await storage.saveRosters(game, league, madeUpRosters, 1);
+    await storage.saveRosters(owner, madeUpRosters, 1);
     const server = serverAnswering({ kind: 'answer', value: state });
     const storing = createStoringTrackerServer({ gameId: game, server, storage });
     expect(await storing.loadState(signal)).toEqual({ kind: 'answer', value: state });
@@ -38,7 +42,7 @@ describe('the state stored on the device as the server gives it (T-115)', () => 
 
   it('stores nothing when the server gave no state', async () => {
     const storage = createMemoryOpenedGameStorage();
-    await storage.saveRosters(game, league, madeUpRosters, 1);
+    await storage.saveRosters(owner, madeUpRosters, 1);
     for (const outcome of [
       { kind: 'unanswered' } as const,
       { kind: 'rejected', httpStatus: 403 } as const,

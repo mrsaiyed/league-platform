@@ -3,6 +3,7 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, expect, it } from 'vitest';
 import {
+  forgetOpenedGamesOnDevice,
   openIndexedDbOpenedGameStorage,
   openedGamesDatabaseName,
 } from './indexeddb-opened-game-storage.ts';
@@ -13,7 +14,11 @@ import {
 } from './opened-game-storage-contract.test-helper.ts';
 
 const game = '00000000-0000-4000-8000-0000000000a1';
-const league = '00000000-0000-4000-8000-0000000000c1';
+const owner = {
+  gameId: game,
+  leagueId: '00000000-0000-4000-8000-0000000000c1',
+  accountId: '00000000-0000-4000-8000-0000000000f1',
+};
 
 openedGameStorageContract('IndexedDB storage', () =>
   openIndexedDbOpenedGameStorage(new IDBFactory()),
@@ -34,7 +39,7 @@ describe('IndexedDB opened games: the connection', () => {
   it('keeps what it holds for the next tab on the same device', async () => {
     const factory = new IDBFactory();
     const first = await openIndexedDbOpenedGameStorage(factory);
-    await first.saveRosters(game, league, madeUpRosters, 10);
+    await first.saveRosters(owner, madeUpRosters, 10);
     const id = await first.deviceId(() => 'device-a');
     const second = await openIndexedDbOpenedGameStorage(factory);
     expect((await second.find(game))?.rosters).toEqual(madeUpRosters);
@@ -44,7 +49,7 @@ describe('IndexedDB opened games: the connection', () => {
   it('lets go when another tab needs the database, and opens it again on the next use', async () => {
     const factory = new IDBFactory();
     const storage = await openIndexedDbOpenedGameStorage(factory);
-    await storage.saveRosters(game, league, madeUpRosters, 10);
+    await storage.saveRosters(owner, madeUpRosters, 10);
     await new Promise<void>((resolve, reject) => {
       const request = factory.deleteDatabase(openedGamesDatabaseName);
       request.onsuccess = () => resolve();
@@ -52,7 +57,7 @@ describe('IndexedDB opened games: the connection', () => {
       request.onblocked = () => reject(new Error('blocked'));
     });
     expect(await storage.find(game)).toBeUndefined();
-    await storage.saveRosters(game, league, madeUpRosters, 20);
+    await storage.saveRosters(owner, madeUpRosters, 20);
     expect((await storage.find(game))?.rostersSavedAt).toBe(20);
   });
 
@@ -63,5 +68,28 @@ describe('IndexedDB opened games: the connection', () => {
     newer.close();
     await expect(storage.find(game)).rejects.toThrow('storage-newer-version');
     await expect(openIndexedDbOpenedGameStorage(factory)).rejects.toThrow('storage-newer-version');
+  });
+});
+
+describe('IndexedDB opened games: signing out on the device', () => {
+  it('clears the games another tab stored, and keeps the device id', async () => {
+    const factory = new IDBFactory();
+    const tracker = await openIndexedDbOpenedGameStorage(factory);
+    await tracker.saveRosters(owner, madeUpRosters, 10);
+    const id = await tracker.deviceId(() => 'device-a');
+    await forgetOpenedGamesOnDevice(factory);
+    expect(await tracker.find(game)).toBeUndefined();
+    const next = await openIndexedDbOpenedGameStorage(factory);
+    expect(await next.find(game)).toBeUndefined();
+    expect(await next.deviceId(() => 'device-b')).toBe(id);
+  });
+
+  it('never stops signing out, even with no database storage', async () => {
+    class NoStorage extends IDBFactory {
+      override open(): never {
+        throw new Error('no database storage');
+      }
+    }
+    await expect(forgetOpenedGamesOnDevice(new NoStorage())).resolves.toBeUndefined();
   });
 });

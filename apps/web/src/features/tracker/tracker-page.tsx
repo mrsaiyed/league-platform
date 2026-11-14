@@ -9,7 +9,8 @@
 //   scorekeeper limited to assigned games is refused one not theirs the same way. A
 //   game that is not this league's is "not found".
 //
-// The rosters go to the device with the page and are stored there (T-115); the device
+// The rosters go to the device with the page and are stored there under the signed-in
+// account, so the device can let go of another account's games (T-115); the device
 // then takes the scoring session and loads the state itself (tracker-opening.tsx).
 import { catalogs, en } from '@srleagues/site';
 import { leagueUrl, readTrackerRosters } from '@srleagues/core';
@@ -37,12 +38,11 @@ export async function TrackerPage({
   const here = view.context.league;
   if (!isGameIdFormat(game)) return notFound();
   const ports = await webPorts();
-  const read = await readTrackerRosters(
-    commandContextOf(view.context),
-    { gameId: game },
-    ports.games.deps,
-  );
+  const context = commandContextOf(view.context);
+  const read = await readTrackerRosters(context, { gameId: game }, ports.games.deps);
   if (!read.ok) return read.error.code === 'not-allowed' ? forbidden() : notFound();
+  // Only a signed-in account may score, so the read above already refused a visitor.
+  if (context.accountId === null) return forbidden();
   const names = await ports.games.namesOf(here.id);
   const backHref = scoresOnly(view.areas)
     ? leagueUrl(here, 'admin')
@@ -50,6 +50,7 @@ export async function TrackerPage({
   return (
     <TrackerOpening
       leagueId={here.id}
+      accountId={context.accountId}
       gameId={read.value.gameId}
       rosters={deviceRosters(read.value, names.teams)}
       backHref={backHref}

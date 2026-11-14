@@ -6,6 +6,10 @@
 // (memory-opened-game-storage.ts). Both behave the same. It also keeps this device's
 // own id for the scoring session (T-116), made once.
 //
+// Players' names are personal, so the device does not keep them for good: each game is
+// kept under the account that opened it, opening a game lets go of the rest
+// (`stillKept`), and signing out on the device clears them all.
+//
 // Failures throw a QueueError with one of its fixed codes (queue-storage.ts), never a
 // sentence (T-187): the tracker picks the words.
 import { basketball } from '@srleagues/sports';
@@ -38,10 +42,22 @@ export type GameFormat = {
   readonly clockMode: basketball.ClockMode;
 };
 
-/** One opened game, as the device keeps it. */
-export type OpenedGame = {
+/** Whose a kept game is: the game, its league and the signed-in account that opened it. */
+export type OpenedGameOwner = {
   readonly gameId: string;
   readonly leagueId: string;
+  readonly accountId: string;
+};
+
+/**
+ * How long the device keeps a game it opened, from when its rosters were last stored:
+ * long enough for a game opened ahead of the day, short enough that players' names do
+ * not stay on a borrowed or shared device (T-115).
+ */
+export const openedGameKeepMs = 14 * 24 * 60 * 60 * 1000;
+
+/** One opened game, as the device keeps it. */
+export type OpenedGame = OpenedGameOwner & {
   readonly rosters: DeviceRosters;
   /** When the rosters were stored (device time, ms). */
   readonly rostersSavedAt: number;
@@ -58,18 +74,33 @@ export interface OpenedGameStorage {
    * Stores the game's rosters (opening the game), keeping its state and confirmed
    * format if the device has them already.
    */
-  saveRosters(
-    gameId: string,
-    leagueId: string,
-    rosters: DeviceRosters,
-    savedAt: number,
-  ): Promise<void>;
+  saveRosters(owner: OpenedGameOwner, rosters: DeviceRosters, savedAt: number): Promise<void>;
+  /**
+   * Deletes every game `stillKept` says to let go of: another account's or another
+   * league's, a final one, or one stored before `olderThan` (device time, ms). The
+   * owner's own game is let go of only if it is another account's or league's.
+   */
+  forgetOthers(owner: OpenedGameOwner, olderThan: number): Promise<void>;
+  /** Deletes every game kept on the device (signing out). The device id stays. */
+  forgetAll(): Promise<void>;
   /** Stores the state the server gave; ignored for a game whose rosters are not stored. */
   saveState(gameId: string, state: ServerState): Promise<void>;
   /** Stores the format confirmed; ignored for a game whose rosters are not stored. */
   confirmFormat(gameId: string, format: GameFormat): Promise<void>;
   /** This device's own id, made with `make` the first time and kept from then on. */
   deviceId(make: () => string): Promise<string>;
+}
+
+/**
+ * Whether the device keeps `game` while `owner` opens their game: only the signed-in
+ * account's games in this league, and of those only the ones not final and stored
+ * since `olderThan`, so players' names do not stay on the device for good (T-115).
+ * Rows stored before the account was kept have no `accountId`, and are let go of.
+ */
+export function stillKept(game: OpenedGame, owner: OpenedGameOwner, olderThan: number): boolean {
+  if (game.accountId !== owner.accountId || game.leagueId !== owner.leagueId) return false;
+  if (game.gameId === owner.gameId) return true;
+  return game.state?.state.status !== 'final' && game.rostersSavedAt >= olderThan;
 }
 
 /** The format of a game's rules, as it is shown and confirmed. */

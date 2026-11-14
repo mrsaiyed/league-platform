@@ -1,7 +1,7 @@
 // The opened games kept in memory, for tests. It copies what goes in and what comes
 // out, as the browser's storage does, so a test cannot pass by changing an object the
 // storage still holds.
-import type { OpenedGame, OpenedGameStorage } from './opened-game-storage.ts';
+import { stillKept, type OpenedGame, type OpenedGameStorage } from './opened-game-storage.ts';
 
 export function createMemoryOpenedGameStorage(): OpenedGameStorage {
   const games = new Map<string, OpenedGame>();
@@ -17,19 +17,29 @@ export function createMemoryOpenedGameStorage(): OpenedGameStorage {
       const found = games.get(gameId);
       return found === undefined ? undefined : structuredClone(found);
     },
-    async saveRosters(gameId, leagueId, rosters, savedAt) {
+    async saveRosters(owner, rosters, savedAt) {
+      const { gameId, leagueId, accountId } = owner;
       const found = games.get(gameId);
       games.set(
         gameId,
         structuredClone({
           gameId,
           leagueId,
+          accountId,
           rosters,
           rostersSavedAt: savedAt,
           state: found?.state ?? null,
           confirmedFormat: found?.confirmedFormat ?? null,
         }),
       );
+    },
+    async forgetOthers(owner, olderThan) {
+      for (const [gameId, game] of games) {
+        if (!stillKept(game, owner, olderThan)) games.delete(gameId);
+      }
+    },
+    async forgetAll() {
+      games.clear();
     },
     async saveState(gameId, state) {
       change(gameId, (game) => ({ ...game, state }));

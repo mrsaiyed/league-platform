@@ -18,6 +18,8 @@ import { trackerNoticeText, trackerNotices } from './tracker-notice.ts';
 
 export type TrackerOpeningProps = {
   readonly leagueId: string;
+  /** The signed-in account, from the server's session: the device keeps the game under it. */
+  readonly accountId: string;
   readonly gameId: string;
   readonly rosters: DeviceRosters;
   /** Where "back to your games" and leaving the game go. */
@@ -39,6 +41,7 @@ type Phase =
 
 export function TrackerOpening({
   leagueId,
+  accountId,
   gameId,
   rosters,
   backHref,
@@ -59,6 +62,7 @@ export function TrackerOpening({
       const result = await openTrackerGame({
         gameId,
         leagueId,
+        accountId,
         rosters,
         openStorage: async () => ({
           queue: await openIndexedDbQueueStorage(),
@@ -93,7 +97,7 @@ export function TrackerOpening({
       void opened.current?.controller.leave();
       opened.current = null;
     };
-  }, [gameId, leagueId, rosters]);
+  }, [gameId, leagueId, accountId, rosters]);
 
   const act = (work: (game: OpenedTrackerGame) => Promise<unknown>) => async () => {
     const game = opened.current;

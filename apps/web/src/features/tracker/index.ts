@@ -20,4 +20,5 @@ export * from './format-text.ts';
 export * from './my-games.ts';
 export * from './tracker-catalog.ts';
 export { MyGamesPage } from './my-games-page.tsx';
+export { SignOutForm } from './sign-out-form.tsx';
 export { TrackerPage } from './tracker-page.tsx';

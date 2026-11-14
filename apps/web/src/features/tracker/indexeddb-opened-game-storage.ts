@@ -8,12 +8,16 @@
 // done), so storing the state never loses rosters stored a moment before, nor the
 // reverse.
 //
+// The rows hold players' names, so they do not stay for good: opening a game deletes
+// the rows `stillKept` lets go of (opened-game-storage.ts), and signing out on the
+// device clears the store (`forgetOpenedGamesOnDevice`).
+//
 // The stored shape is OpenedGame. If a later release changes it in a way older rows do
 // not fit, add a step to `upgradeSteps`, converting the old rows: a device may skip
 // releases, so every step from the stored version on runs in turn. An older build
 // opening a database a newer one has upgraded gets `storage-newer-version`.
 import { QueueError, type QueueErrorCode } from './queue-storage.ts';
-import type { OpenedGame, OpenedGameStorage } from './opened-game-storage.ts';
+import { stillKept, type OpenedGame, type OpenedGameStorage } from './opened-game-storage.ts';
 
 export const openedGamesDatabaseName = 'srleagues-tracker-games';
 const gamesStore = 'games';
@@ -116,7 +120,8 @@ export async function openIndexedDbOpenedGameStorage(
         read.onsuccess = () => set(read.result as OpenedGame | undefined);
       });
     },
-    saveRosters(gameId, leagueId, rosters, savedAt) {
+    saveRosters(owner, rosters, savedAt) {
+      const { gameId, leagueId, accountId } = owner;
       return run(gamesStore, 'readwrite', undefined, (store) => {
         const read = store.get(gameId);
         read.onsuccess = () => {
@@ -124,6 +129,7 @@ export async function openIndexedDbOpenedGameStorage(
           const game: OpenedGame = {
             gameId,
             leagueId,
+            accountId,
             rosters,
             rostersSavedAt: savedAt,
             state: found?.state ?? null,
@@ -131,6 +137,22 @@ export async function openIndexedDbOpenedGameStorage(
           };
           store.put(game);
         };
+      });
+    },
+    forgetOthers(owner, olderThan) {
+      return run(gamesStore, 'readwrite', undefined, (store) => {
+        const walk = store.openCursor();
+        walk.onsuccess = () => {
+          const cursor = walk.result;
+          if (cursor === null) return;
+          if (!stillKept(cursor.value as OpenedGame, owner, olderThan)) cursor.delete();
+          cursor.continue();
+        };
+      });
+    },
+    forgetAll() {
+      return run(gamesStore, 'readwrite', undefined, (store) => {
+        store.clear();
       });
     },
     saveState(gameId, state) {
@@ -155,6 +177,22 @@ export async function openIndexedDbOpenedGameStorage(
       });
     },
   };
+}
+
+/**
+ * Signing out on this device: clears every opened game kept here, so the next person
+ * to use the device finds no players' names. Never throws: with no database storage
+ * there is nothing kept to clear, and signing out goes ahead either way.
+ */
+export async function forgetOpenedGamesOnDevice(
+  factory: IDBFactory = indexedDB,
+  name: string = openedGamesDatabaseName,
+): Promise<void> {
+  try {
+    await (await openIndexedDbOpenedGameStorage(factory, name)).forgetAll();
+  } catch {
+    // Nothing more to do here; the next opening lets go of another account's games.
+  }
 }
 
 function opened(factory: IDBFactory, name: string): Promise<IDBDatabase> {

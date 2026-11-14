@@ -11,7 +11,7 @@ import { createMemoryOpenedGameStorage } from './memory-opened-game-storage.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
 import { openTrackerGame, screenOf } from './open-tracker-game.ts';
 import { madeUpRosters } from './opened-game-storage-contract.test-helper.ts';
-import { formatOf, type OpenedGameStorage } from './opened-game-storage.ts';
+import { formatOf, openedGameKeepMs, type OpenedGameStorage } from './opened-game-storage.ts';
 import { QueueError, type QueueStorage } from './queue-storage.ts';
 
 const gameId = games.hawksBears;
@@ -22,12 +22,16 @@ const newDevice = (): Device => ({
   games: createMemoryOpenedGameStorage(),
 });
 
+/** A made-up account id for each person: the device keeps their games under it. */
+const accountOf = (as: Person) => `account-${as}`;
+
 let deviceNumber = 0;
 async function open(network: EndpointNetwork, as: Person, device: Device = newDevice()) {
   const fetch = network.fetchAs(as);
   const opened = await openTrackerGame({
     gameId,
     leagueId: liveLeagueId,
+    accountId: accountOf(as),
     rosters: madeUpRosters,
     openStorage: async () => device,
     transport: createFetchCommandTransport({ leagueId: liveLeagueId, gameId, fetch }),
@@ -81,6 +85,44 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     await again.controller.leave();
   });
 
+  it('lets go of the games the device should not keep, and keeps the one opened', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const scorekeeper = { leagueId: liveLeagueId, accountId: accountOf('scorekeeper') };
+    const earlier = '00000000-0000-4000-8000-0000000001a1';
+    const recent = '00000000-0000-4000-8000-0000000001a2';
+    await device.games.saveRosters({ ...scorekeeper, gameId: earlier }, madeUpRosters, 0);
+    await device.games.saveRosters({ ...scorekeeper, gameId: recent }, madeUpRosters, 900);
+    // Another account's game (someone who used the device before, still signed in).
+    await device.games.saveRosters(
+      { gameId, leagueId: liveLeagueId, accountId: accountOf('owner') },
+      madeUpRosters,
+      900,
+    );
+    // `open` opens at 1_000 ms: the game stored at 0 is not older than two weeks yet.
+    const game = await open(network, 'scorekeeper', device);
+    expect((await device.games.find(gameId))?.accountId).toBe(accountOf('scorekeeper'));
+    expect(await device.games.find(earlier)).toBeDefined();
+    expect(await device.games.find(recent)).toBeDefined();
+    await game.controller.leave();
+
+    const later = await openTrackerGame({
+      gameId: recent,
+      ...scorekeeper,
+      rosters: madeUpRosters,
+      openStorage: async () => device,
+      transport: createFetchCommandTransport({ leagueId: liveLeagueId, gameId: recent }),
+      server: createFetchTrackerServer({ leagueId: liveLeagueId, gameId: recent }),
+      newDeviceId: () => 'device',
+      // Two weeks and a moment later: both earlier games are now too old to keep.
+      now: () => 1_001 + openedGameKeepMs,
+    });
+    if (!later.ok) throw new Error(later.code);
+    expect(await device.games.find(earlier)).toBeUndefined();
+    expect(await device.games.find(gameId)).toBeUndefined();
+    expect(await device.games.find(recent)).toBeDefined();
+  });
+
   it('asks again when the format has changed since it was confirmed', () => {
     const scoring = {
       mode: { kind: 'scoring' } as const,
@@ -120,6 +162,7 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     const opened = await openTrackerGame({
       gameId,
       leagueId: liveLeagueId,
+      accountId: accountOf('scorekeeper'),
       rosters: madeUpRosters,
       openStorage: async () => {
         throw new QueueError('storage-unavailable');

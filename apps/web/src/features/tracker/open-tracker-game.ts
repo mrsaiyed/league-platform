@@ -3,8 +3,10 @@
 //
 // 1. The device's storage is opened: the queue (T-114) and the opened games (T-115). A
 //    device with no database storage cannot keep taps, so the game is not opened.
-// 2. The rosters the page brought are stored on the device, and the device's own id is
-//    read, or made the first time.
+// 2. The games the device lets go of are deleted (another account's or league's, final,
+//    or older than `openedGameKeepMs`: `stillKept`), the rosters the page brought are
+//    stored under the signed-in account, and the device's own id is read, or made the
+//    first time.
 // 3. The controller takes the scoring session and loads the engine's state through the
 //    one state read (record 049), which is stored on the device as it comes in
 //    (storing-tracker-server.ts).
@@ -16,6 +18,7 @@ import { QueueError, type QueueStorage } from './queue-storage.ts';
 import type { CommandTransport } from './command-transport.ts';
 import {
   formatOf,
+  openedGameKeepMs,
   sameFormat,
   type DeviceRosters,
   type GameFormat,
@@ -68,6 +71,8 @@ export function screenOf(
 export type OpenTrackerGameOptions = {
   readonly gameId: string;
   readonly leagueId: string;
+  /** The signed-in account opening the game, from the server's session. */
+  readonly accountId: string;
   readonly rosters: DeviceRosters;
   /** Opens the device's storage: in the browser, IndexedDB. */
   readonly openStorage: () => Promise<{
@@ -112,13 +117,16 @@ const codeOf = (error: unknown): QueueErrorCode =>
 export async function openTrackerGame(
   options: OpenTrackerGameOptions,
 ): Promise<OpenTrackerGameResult> {
-  const { gameId, leagueId, rosters, now = Date.now } = options;
+  const { gameId, leagueId, accountId, rosters, now = Date.now } = options;
+  const owner = { gameId, leagueId, accountId };
   let storage: Awaited<ReturnType<OpenTrackerGameOptions['openStorage']>>;
   let deviceId: string;
   let confirmed: GameFormat | null;
   try {
     storage = await options.openStorage();
-    await storage.games.saveRosters(gameId, leagueId, rosters, now());
+    const openedAt = now();
+    await storage.games.forgetOthers(owner, openedAt - openedGameKeepMs);
+    await storage.games.saveRosters(owner, rosters, openedAt);
     deviceId = await storage.games.deviceId(options.newDeviceId);
     confirmed = (await storage.games.find(gameId))?.confirmedFormat ?? null;
   } catch (error) {

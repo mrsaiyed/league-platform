@@ -2,6 +2,7 @@ import { platformUrl } from '@srleagues/core';
 import type { SessionSummary } from '@srleagues/providers';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { SignOutForm } from '../../../features/tracker/index.ts';
 import { webPorts } from '../../../server/container.ts';
 import { t } from '../../../server/messages.ts';
 import { signOutAction, signOutEverywhereAction } from '../../../server/sign-in/actions.ts';
@@ -11,6 +12,7 @@ import { timeInWords } from '../../../server/sign-in/sign-in-mail.ts';
 
 // The account page (P6 §5): the devices signed in, by device and time, with "sign
 // out" and "sign out everywhere" (T-71). Signed out, it sends the person to sign in.
+// Either one also clears the games the tracker kept on this device (T-115).
 export default async function Page() {
   // The cookies first: this makes the page drawn per request, never at build time.
   const accessToken = (await cookies()).get(cookieNames.session)?.value ?? '';
@@ -37,13 +39,13 @@ export default async function Page() {
           </li>
         ))}
       </ul>
-      <form action={signOutAction}>
+      <SignOutForm action={signOutAction}>
         <button type="submit">{t('account.signOut')}</button>
-      </form>
-      <form action={signOutEverywhereAction}>
+      </SignOutForm>
+      <SignOutForm action={signOutEverywhereAction}>
         <p>{t('account.signOutEverywhereHelp')}</p>
         <button type="submit">{t('account.signOutEverywhere')}</button>
-      </form>
+      </SignOutForm>
     </main>
   );
 }
