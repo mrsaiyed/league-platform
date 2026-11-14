@@ -303,6 +303,21 @@ describe('everything else', () => {
     expect(outcome).toEqual({ kind: 'no-access', signedIn: false });
   });
 
+  it('sends a live session that is none of our accounts’ to the account page (record 055)', async () => {
+    const session = {
+      ok: false,
+      error: { code: 'account-problem', problem: 'sign-in-link-conflict' },
+    } as const;
+    for (const want of [site, adminHome, score]) {
+      const outcome = await leagueOutcome(
+        { host: 'localhost:3000', path: '/north-valley', session },
+        want,
+        deps,
+      );
+      expect(outcome).toEqual({ kind: 'account-problem' });
+    }
+  });
+
   it('refuses to make the stand-in for staging or production', () => {
     for (const appEnv of ['staging', 'production']) {
       expect(() =>

@@ -11,6 +11,8 @@
 // - An admin address or the tracker, in a league this person may see, without the
 //   access it needs, is "no access", whoever they are (U-6). The address shows
 //   where you ask to go; it never proves you may.
+// - A session that is live but none of our accounts' (an AccountRefusal, record 055)
+//   is sent to the account page, which says what is wrong and offers to sign out.
 //
 // A request is worked out once (resolveLeagueRequest: one request id, one read of
 // the person's access), and each layout and page of it then gets its own answer
@@ -54,7 +56,9 @@ export type LeagueOutcome =
   /** Forward permanently to the one proper address. */
   | { readonly kind: 'forward'; readonly to: string }
   /** U-6: "you do not have access". */
-  | { readonly kind: 'no-access'; readonly signedIn: boolean };
+  | { readonly kind: 'no-access'; readonly signedIn: boolean }
+  /** The session is none of our accounts' (record 055): the account page explains. */
+  | { readonly kind: 'account-problem' };
 
 export type GateDeps = ContextDeps & Pick<WebPorts, 'accessOf'>;
 
@@ -92,6 +96,8 @@ async function resolveWith(facts: RequestFacts, deps: GateDeps): Promise<Resolve
         return settled({ kind: 'not-found' });
       case 'forward':
         return settled({ kind: 'forward', to: refusal.to });
+      case 'account-problem':
+        return settled({ kind: 'account-problem' });
       // The proxy renews a session whose cookie ran out before any page sees it
       // (renew-session.ts). A token that still fails here (it ran out in between, or
       // the session ended) is drawn as for a visitor; the next request renews or

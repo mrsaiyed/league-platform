@@ -1,5 +1,6 @@
 // T-30: the worker's settings are checked once at start-up; a problem names the
 // setting and never its value. All values here are made up.
+import { trackerProjectOf } from '@srleagues/providers';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
@@ -7,6 +8,7 @@ import {
   loadWorkerConfig,
   WorkerConfigError,
   workerFields,
+  type WorkerConfigGuard,
 } from './config-schema.ts';
 
 const local = {
@@ -18,13 +20,16 @@ const production = {
   ...local,
   APP_ENV: 'production',
   PUBLIC_BASE_URL: 'https://leagues.example.test',
-  DATABASE_URL: 'postgres://worker:hunter2-made-up@db.example.test:5432/league',
+  PLATFORM_DATABASE_URL: 'postgres://worker:hunter2-made-up@db.example.test:5432/league',
   RESEND_API_KEY: 're_made_up_key',
 };
 
-function failure(env: Record<string, string | undefined>): WorkerConfigError {
+function failure(
+  env: Record<string, string | undefined>,
+  guard?: WorkerConfigGuard,
+): WorkerConfigError {
   try {
-    loadWorkerConfig(env);
+    loadWorkerConfig(env, guard);
   } catch (error) {
     if (error instanceof WorkerConfigError) return error;
     throw error;
@@ -44,16 +49,90 @@ describe('loadWorkerConfig', () => {
   it('accepts production with its address and key', () => {
     const config = loadWorkerConfig({ ...production, WORKER_HEALTH_PORT: '10000' });
     expect(config.WORKER_HEALTH_PORT).toBe(10000);
-    expect(config.DATABASE_URL).toBe(production.DATABASE_URL);
+    expect(config.PLATFORM_DATABASE_URL).toBe(production.PLATFORM_DATABASE_URL);
   });
 
   it('needs the database address in staging and production, and the key in production', () => {
     expect(failure({ ...local, APP_ENV: 'staging' }).invalid).toEqual([
-      'DATABASE_URL: missing, must be set when APP_ENV is staging',
+      'PLATFORM_DATABASE_URL: missing, must be set when APP_ENV is staging',
     ]);
     expect(failure({ ...production, RESEND_API_KEY: ' ' }).invalid).toEqual([
       'RESEND_API_KEY: missing, must be set when APP_ENV is production',
     ]);
+  });
+
+  it('takes its database only from PLATFORM_DATABASE_URL, never the tracker setting (R8)', () => {
+    const tracker = 'postgres://postgres:tracker-made-up@tracker.example.test:5432/postgres';
+    const error = failure({
+      ...production,
+      PLATFORM_DATABASE_URL: undefined,
+      DATABASE_URL: tracker,
+    });
+    expect(error.invalid).toEqual([
+      'PLATFORM_DATABASE_URL: missing, must be set when APP_ENV is production',
+    ]);
+    expect(error.message).not.toContain('tracker-made-up');
+    expect(Object.values(loadWorkerConfig({ ...local, DATABASE_URL: tracker }))).not.toContain(
+      tracker,
+    );
+  });
+
+  it('refuses the tracker’s database before anything connects, as the web app does (record 055)', () => {
+    const tracker = 'postgres://postgres:tracker-made-up@tracker.example.test:5432/postgres';
+    for (const url of [
+      tracker,
+      'postgres://postgres:other-made-up@TRACKER.example.test/postgres',
+    ]) {
+      for (const appEnv of ['local', 'staging', 'production']) {
+        const error = failure({
+          ...production,
+          APP_ENV: appEnv,
+          PLATFORM_DATABASE_URL: url,
+          DATABASE_URL: tracker,
+        });
+        expect(error.invalid).toEqual([
+          "PLATFORM_DATABASE_URL: invalid, must not be the tracker's database (DATABASE_URL)",
+        ]);
+        expect(error.message).not.toContain('made-up');
+      }
+    }
+  });
+
+  it('refuses the tracker’s Supabase project however the address spells it (record 055)', () => {
+    const site = readFileSync(new URL('../../../supabase/site.json', import.meta.url), 'utf8');
+    const ref = trackerProjectOf(site) ?? 'none';
+    const guard = { trackerProject: ref };
+    const encoded = `%${ref.charCodeAt(0).toString(16)}${ref.slice(1)}`;
+    for (const url of [
+      `postgres://postgres:made-up-pw@db.${ref}.supabase.co:5432/postgres`,
+      `postgres://postgres.${encoded}:made-up-pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres`,
+      `postgres://made-up:made-up-pw@pooler.example.test:6543/postgres?user=postgres.${ref}`,
+    ]) {
+      const error = failure({ ...production, PLATFORM_DATABASE_URL: url }, guard);
+      expect(error.invalid).toEqual([
+        "PLATFORM_DATABASE_URL: invalid, must not name the tracker's Supabase project (supabase/site.json)",
+      ]);
+      expect(error.message).not.toContain('made-up-pw');
+      expect(error.message).not.toContain(ref);
+    }
+    expect(
+      failure({ ...production, PLATFORM_DATABASE_URL: 'postgres://a:made-up-pw@10.0.0.1/x' }, guard)
+        .invalid,
+    ).toEqual([
+      'PLATFORM_DATABASE_URL: invalid, must name its server by a host name, not an IP address, when APP_ENV is production',
+    ]);
+    expect(loadWorkerConfig(production, guard).APP_ENV).toBe('production');
+  });
+
+  it('refuses staging and production when supabase/site.json could not be read', () => {
+    for (const appEnv of ['staging', 'production']) {
+      expect(failure({ ...production, APP_ENV: appEnv }, { trackerProject: null }).invalid).toEqual(
+        [
+          "supabase/site.json: could not be read, so PLATFORM_DATABASE_URL cannot be checked against the tracker's project",
+        ],
+      );
+    }
+    expect(loadWorkerConfig(local, { trackerProject: null }).APP_ENV).toBe('local');
   });
 
   it('takes health port 0 (any free port) only in tests', () => {
@@ -87,14 +166,14 @@ describe('loadWorkerConfig', () => {
   it('names every missing or invalid setting, and never a value', () => {
     const error = failure({
       APP_ENV: 'everywhere',
-      DATABASE_URL: 'mysql://worker:hunter2-made-up@db.example.test/league',
+      PLATFORM_DATABASE_URL: 'mysql://worker:hunter2-made-up@db.example.test/league',
       RESEND_API_KEY: 'tiny',
       WORKER_HEALTH_PORT: '99999',
     });
     expect(error.missing).toEqual(['PUBLIC_BASE_URL', 'EMAIL_FROM']);
     expect(error.invalid).toEqual([
       'APP_ENV: invalid, not one of the allowed values',
-      'DATABASE_URL: invalid, must be a postgres:// address',
+      'PLATFORM_DATABASE_URL: invalid, must be a postgres:// address',
       'RESEND_API_KEY: invalid, must be at least 8 characters',
       'WORKER_HEALTH_PORT: invalid, must be a port from 0 to 65535',
     ]);

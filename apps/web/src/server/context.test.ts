@@ -17,6 +17,7 @@ const accountId = '01900000-0000-7000-8000-0000000000bb';
 const identity: SessionIdentity = {
   accountId: accountId.toUpperCase(),
   email: 'made-up@example.test',
+  emailConfirmed: true,
   sessionId: 'session-1',
   hasPassword: true,
   passwordEnteredAt: new Date('2026-11-01T10:00:00Z'),
@@ -381,6 +382,18 @@ describe('requestContext: who is asking', () => {
         session: { ok: false, error: { code: 'session-ended' } },
       }),
     ).toEqual({ ok: false, error: { code: 'session-ended' } });
+    expect(findLeague).not.toHaveBeenCalled();
+  });
+
+  it('passes on a live session that is none of our accounts’, on every page (record 055)', async () => {
+    const { build, findLeague } = setup();
+    const problem = { code: 'account-problem', problem: 'sign-in-link-conflict' } as const;
+    for (const path of ['/north-league', '/account', '/api/v1/leagues/x']) {
+      expect(await build({ path, session: { ok: false, error: problem } })).toEqual({
+        ok: false,
+        error: problem,
+      });
+    }
     expect(findLeague).not.toHaveBeenCalled();
   });
 });

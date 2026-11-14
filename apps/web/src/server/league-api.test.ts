@@ -41,6 +41,7 @@ describe('resolveLeagueApi', () => {
     const session = ok({
       accountId: '01900000-0000-7000-8000-0000000000A1',
       email: 'someone@example.test',
+      emailConfirmed: true,
       sessionId: 's',
       hasPassword: true,
       passwordEnteredAt: null,
@@ -109,6 +110,25 @@ describe('resolveLeagueApi', () => {
         context: { kind: 'league', account: null, league: { id: leagueA } },
       });
     }
+  });
+
+  it('is "account problem" for a live session none of our accounts hold, a visitor for a public read', async () => {
+    const session = {
+      ok: false,
+      error: { code: 'account-problem', problem: 'sign-in-link-conflict' },
+    } as const;
+    expect(
+      await resolveLeagueApi(facts(leagueApiUrl({ id: leagueA }, parts), session), parts, deps),
+    ).toEqual({ ok: false, refusal: { status: 403, error: 'account-problem' } });
+    const snapshot = ['games', game, 'snapshot'];
+    expect(
+      await resolveLeagueApi(
+        facts(leagueApiUrl({ id: leagueA }, snapshot), session),
+        snapshot,
+        deps,
+        'visitor',
+      ),
+    ).toMatchObject({ ok: true, context: { account: null, league: { id: leagueA } } });
   });
 
   it('is still "not found" for a public read of an address that is not the route\'s', async () => {
