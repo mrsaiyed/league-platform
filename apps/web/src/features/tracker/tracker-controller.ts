@@ -89,6 +89,14 @@ export type ReadOnlyReason =
    * scoring, the device keeps scoring instead (`signedOut`).
    */
   | 'signed-out'
+  /**
+   * Signed out while scoring, then signed in again, and the session is no longer this
+   * device's (finding L5): someone else signed in on it (the game was being scored under
+   * another account), or another device took the game over meanwhile. The server
+   * answers both the same way, so the words cover both. The taps not sent are listed as
+   * not saved: they are never sent under another person's name.
+   */
+  | 'signed-in-as-other'
   /** The server no longer speaks this tracker's version (T-127): reload the page. */
   | 'update-needed';
 
@@ -244,6 +252,7 @@ const lostTheGame: ReadonlySet<ReadOnlyReason> = new Set([
   'expired',
   'released',
   'not-held',
+  'signed-in-as-other',
 ]);
 
 /**
@@ -620,7 +629,12 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         return lost();
       }
       case 'ended':
-        return readOnly(reply.reason, gameWasLost);
+        // Signed out until this answer: the account signed in now is not the one the
+        // session was taken under, or another device took over meanwhile (L5).
+        return readOnly(
+          current.signedOut && reply.reason === 'taken-over' ? 'signed-in-as-other' : reply.reason,
+          gameWasLost,
+        );
       case 'refused':
         return readOnly(reply.code, gameWasLost);
     }

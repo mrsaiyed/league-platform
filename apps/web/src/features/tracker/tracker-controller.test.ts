@@ -674,9 +674,45 @@ describe('tracker controller: signed out mid-game (finding M4)', () => {
     await tablet.controller.openAgain();
     await tablet.controller.idle();
     const status = tablet.controller.status();
-    expect(status.mode).toMatchObject({ kind: 'read-only', reason: 'taken-over' });
+    // Not "another device took over" (finding L5): its own reason, and its own words.
+    expect(status.mode).toMatchObject({ kind: 'read-only', reason: 'signed-in-as-other' });
     expect(status.notSaved.map(inputOf)).toEqual([basket('home', hawks[0] ?? '')]);
     expect((await serverGame(network)).sequence).toBe(2);
+  });
+
+  it('a real takeover while signed in is still a takeover', async () => {
+    const { tablet } = await tabletLosesTheGame(endpointNetwork(), [
+      basket('home', hawks[0] ?? ''),
+    ]);
+    expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'taken-over' });
+  });
+
+  it("no longer allowed to score mid-game (the server's own 403): the taps stay on the device, and go once allowed again", async () => {
+    const network = endpointNetwork();
+    let who: Person = 'scorekeeper';
+    const tablet = device(network, { signedIn: () => who });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    // The person may no longer score the game: the next send is refused as not allowed.
+    who = 'coach';
+    await tapAll(tablet.controller, [basket('home', hawks[0] ?? '')]);
+    await tablet.controller.idle();
+    let status = tablet.controller.status();
+    expect(status.mode).toEqual({ kind: 'read-only', reason: 'not-allowed' });
+    expect(status.notSaved).toEqual([]);
+    expect(status.waiting.map(inputOf)).toEqual([basket('home', hawks[0] ?? '')]);
+    expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
+    // Allowed again, the game is opened again here: the tap goes, once.
+    who = 'scorekeeper';
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    status = tablet.controller.status();
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(status.waiting).toEqual([]);
+    const server = await serverGame(network);
+    expect(server.sequence).toBe(3);
+    expect(scoreOf(server.state)).toEqual({ home: 2, away: 0 });
   });
 
   it('a reload that is turned away while signed out is tried again once signed in', async () => {
