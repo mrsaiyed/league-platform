@@ -127,6 +127,8 @@ Inside a league, a program or custom page cannot use a name the site already use
 
 **U-9 (agreed): a league is not visible until its organizer publishes it.** States are: **draft** (only the league's own staff can see it: the owner, admins and everyone with an admin area, so they can prepare before launch), **live**, **archived** (read-only, still viewable), and **suspended** (taken down by us for abuse or non-payment, with notice; data is kept and exportable). We never delete a league's history because a payment failed.
 
+**U-14 (decided for you, November 14): the owner and any admin publish, archive and un-archive the league**, and change its name, its short name and whether it is listed (U-10) under League settings → Profile. Admins have the owner's access except for three things (O-7), and none of these is one of them. Only we suspend, as U-9 says.
+
 **U-10 (agreed): being listed in `/find` is the league's choice**, on by default for adult leagues and off by default for youth leagues. Any league can also ask search engines not to index it.
 
 ## 7. One person, many leagues

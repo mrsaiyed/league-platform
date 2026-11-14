@@ -1,6 +1,6 @@
 # T7 — Notifications and background jobs
 
-[Spec home](../README.md) · Decisions T-130 to T-148, T-224
+[Spec home](../README.md) · Decisions T-130 to T-148, T-224, T-257
 
 How reminders, recaps and every other piece of delayed or scheduled work ([P8](../product/P8-notifications.md)) actually happens.
 
@@ -13,6 +13,7 @@ The **worker** is the second of our two programs (T1 section 2). It does nothing
 - A job has a name, the league it belongs to, the earliest time it may run, a count of attempts, and optionally a key that prevents a duplicate of itself being queued.
 - Several workers can run at once. A job is leased to one worker at a time; if that worker dies, the lease expires and another takes it.
 - **T-224: the `jobs` table is behind the league fence** like every other league table, so a request records and sees only its own league's jobs. The worker takes due jobs from every league through one narrow owner-run function that returns ids only. In staging and production it hands each one to pg-boss under the job's own id (a repeated handover is ignored) and pg-boss runs it; for local work and tests the jobs run straight from the table. Detail: [decision record 012](../../../architecture/decisions/012-the-jobs-table-and-pg-boss.md).
+- **T-257: pg-boss's tables are pg-boss's own, in a schema the release makes.** The release makes the `pgboss` schema, owned by a role with no login, `queue_owner`; the worker's login is granted it, the web app's never is. pg-boss makes and upgrades its own tables there when it starts, and the worker never creates a schema. Before it takes a job the worker checks its settings, its login role (T-60) and that schema, and stops with a plain reason if anything is wrong. Detail: [decision record 053](../../../architecture/decisions/053-the-worker-starts-and-who-makes-pg-boss-tables.md).
 
 ## 2. Every job
 
@@ -94,6 +95,7 @@ Email is the main cost that grows with use, which is why allowances are tied to 
 
 - One worker at launch; more are added by changing a number.
 - On shutdown it finishes the jobs it holds or releases them.
+- It has a health check of its own: answered "up" only while its last look at the queue worked and is recent (the heartbeat that T8 section 7's uptime checks ask).
 - We watch three numbers: how many jobs are waiting, how old the oldest waiting job is, and how many have failed. **T-142:** an alert fires if a job has waited more than 10 minutes or any job lands in the failed list.
 
 ## 10. Group chats

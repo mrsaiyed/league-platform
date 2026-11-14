@@ -154,7 +154,12 @@ export function pgBossQueue(
       types = new Set(Object.keys(handlers));
       await boss.start();
       for (const type of types) await work(type, handlers);
-      stopRelay = pollEvery(options.pollMs ?? 1000, (stopping) => relayDue(stopping), onError);
+      stopRelay = pollEvery(
+        options.pollMs ?? 1000,
+        (stopping) => relayDue(stopping),
+        onError,
+        options.onPolled,
+      );
     },
     stop: async () => {
       if (stopRelay === undefined) return; // never started

@@ -8,11 +8,11 @@
 //   production      the pg-boss queue, and Resend
 //
 // It also makes the job handlers (jobs/job-handlers.ts), each job's transaction
-// bound to the database's stores; the caller passes them to `queue.start`.
+// bound to the database's stores; the caller passes them to `queue.start`. Queue
+// faults and what became of each job go to the logger (worker-log.ts).
 //
-// What it does not do yet: read the environment (the worker's config file,
-// apps/worker/src/config.ts, does not exist yet), check the login role
-// (checkLoginRole), or start the queue.
+// Opening is all it does: nothing connects yet. Reading the settings, checking the
+// login role and starting the queue are start-worker.ts's.
 import {
   errorCodeOf,
   type BinTx,
@@ -38,12 +38,14 @@ import {
   type DatabaseSource,
   type QueueOptions,
 } from '@srleagues/database';
+import type { Logger } from '@srleagues/observability';
 import { emailSenderFor } from '@srleagues/providers';
 import {
   checkedInvitationEmailSettings,
   type InvitationEmailTx,
 } from './jobs/invitation-email-job.ts';
 import { jobHandlers } from './jobs/job-handlers.ts';
+import { jobLogger, queueErrorLogger } from './worker-log.ts';
 
 export type WorkerSettings = {
   readonly appEnv: 'local' | 'test' | 'staging' | 'production';
@@ -69,25 +71,17 @@ export type WiredWorker = {
   readonly close: () => Promise<void>;
 };
 
-/**
- * Until the logging library exists (step 1.20), a queue fault (the database or
- * pg-boss unreachable) is written to stderr as one JSON line with the error's kind
- * and a fixed code only, never its message (T-86).
- */
-export function reportQueueError(error: unknown): void {
-  const kind = error instanceof Error ? error.name : typeof error;
-  process.stderr.write(
-    `${JSON.stringify({ event: 'worker.queue_error', kind, code: errorCodeOf(error) })}\n`,
-  );
-}
-
-export function wireWorker(settings: WorkerSettings): WiredWorker {
+export function wireWorker(settings: WorkerSettings, logger: Logger): WiredWorker {
   // First, so a missing production key or a setting the emails cannot use throws
   // before anything is opened or any job runs (record 023).
   const email = emailSenderFor(settings);
   checkedInvitationEmailSettings(settings);
   const db = createDatabase(settings.database);
-  const options: QueueOptions = { onError: reportQueueError, ...settings.queue };
+  const options: QueueOptions = {
+    onError: queueErrorLogger(logger),
+    log: jobLogger(logger),
+    ...settings.queue,
+  };
   const queue =
     settings.appEnv === 'local' || settings.appEnv === 'test'
       ? tableQueue(db, options)

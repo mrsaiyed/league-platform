@@ -24,9 +24,11 @@ Set in **Admin → Season settings**. This is the first thing an organizer settl
 
 **S-1 (agreed, changed November 12): the admin can change the rules at any time, and is shown what a change will do before it applies.** The league is the admin's to run. Before the first game, changes simply save. After it, a change that would move anything (a tiebreaker that reorders the standings, a forfeit score that alters point difference) shows what will move, asks for confirmation, and is logged. Game rules (clock, fouls, period length) apply to games that have not started; a game already played keeps the rules it was played under.
 
+**S-41 (decided for you, November 14): what the roster rules do.** A team's roster cannot grow past the season's largest size. After the lock date only the owner and admins change rosters. A roster under the smallest size is a warning, never a refusal. A player added at the scorer's table (S-6) is refused by neither rule, so a game is never stopped by them, and is marked for the admin to review.
+
 ## 2. Teams
 
-Teams come from three places: created by hand, registered by captains ([P6](P6-registration-and-accounts.md) section 3), or carried over from last season. Each has a name, color, optional logo, a division, and a captain or coach. A team's roster is built by dragging registered people onto it, or by the draft. Jersey numbers are set on the roster and can be changed at the scorer's table. A player who leaves or is replaced mid-season stays in the team's history with every game they played (R-17).
+Teams come from three places: created by hand, registered by captains ([P6](P6-registration-and-accounts.md) section 3), or carried over from last season. Each has a name, color, optional logo, a division, and a captain or coach. A team's roster is built by dragging registered people onto it, or by the draft. Jersey numbers are set on the roster and can be changed at the scorer's table by whoever is scoring that game (**S-37**, decided for you); where the season wants unique numbers, a number already worn on the team is refused with a sentence naming who wears it. A player who leaves or is replaced mid-season stays in the team's history with every game they played (R-17).
 
 ## 3. Turning sign-ups into teams
 
@@ -90,7 +92,8 @@ When the regular season ends, the admin creates a **bracket**: choose how many t
 
 - The league's reminders go out ([P8](P8-notifications.md)).
 - A scorekeeper is assigned to the game, or any scorekeeper opens it from their list. The league chooses which.
-- The scorekeeper opens `/{league}/score/{game}` on a phone or tablet and confirms the game format.
+- The scorekeeper opens `/{league}/score/{game}` on a phone or tablet and confirms the game format. Only games recorded live have a "Score this game" button (**S-38**, decided for you); an admin can switch a game to live in the schedule.
+- The confirmation lists every rule of the game, the clock mode (stop or running) included (**S-39**, decided for you). If the officials are playing a different format, the scorekeeper changes it for this game before the first play, where the league allows it: a league setting, "Scorekeepers may change a game's format before it starts", on to begin with (**S-35**, decided for you). With it off, the scorekeeper asks an admin, who can give any game its own format.
 
 ### 5.2 Three ways to record a game
 
@@ -115,7 +118,8 @@ How the grid works (built in step 2.64):
 - Clock with start and stop; tap it to correct it. Period selector, team fouls, bonus indicator, horn.
 - **Running clock switch.** The clock follows the league's rule (section 1). Under a stop clock it stops by itself when a foul is recorded. Under a running clock it keeps going. A switch on the tracker turns the running clock on or off at any moment of the game, whatever the rule says. If the league has a mercy rule, the tracker switches to a running clock when the lead reaches the chosen number and says so; the scorekeeper can switch it back.
 - **Undo and redo** through the list of plays.
-- Add a player on the spot (name and number) for either team.
+- Add a player on the spot for either team: a number, a name, or both (**S-34**, decided for you). A player added by number only is shown as "#12" everywhere.
+- **Mark not started**, for a game started by mistake (**S-40**, decided for you): whoever is scoring may do it while nothing but lineups and clock taps are recorded; once a basket, foul or turnover is recorded it needs the permission to correct games and a reason. The game is scheduled again and the event log keeps what was cleared.
 - **Every tap is saved as it happens.** If the gym's connection drops, the tracker keeps working, shows how many actions are waiting, and sends them when the connection returns.
 - **End game** locks the result.
 
@@ -130,7 +134,7 @@ How the grid works (built in step 2.64):
 **S-21 (new, the founder's direction, November 12): every game rule that differs between leagues is a setting, and the scorekeeper can override anything automatic at the table.** Leagues play by different rules. A high school league stops the clock on every foul. A rec league lets it run. Some switch to a running clock once a team leads by a set number of points. So nothing about the rules is built in.
 
 - Each rule is a season setting, with presets to start from: a high-school-style stop clock, a rec-league-style running clock, or custom.
-- A single game can be given different rules before it starts.
+- A single game can be given different rules before it starts: by an admin, or at the table by the scorekeeper where the league allows it (S-35).
 - During a game the clock mode can be switched at any moment, and the clock, period, fouls and score can always be corrected by hand.
 - Built first: the clock mode and its switch, stopping on fouls, the mercy rule, a stop clock in the last minutes, and the personal foul limit. Timeouts and technical fouls follow when a league asks for them.
 - How those rules meet (decided for you, S-28 to S-32): every overtime period ends in the last-minutes stop clock; the scorekeeper's switch to a running clock inside those last minutes lasts until they end; inside them the stop clock wins over the mercy rule; the mercy rule switches again only after the lead drops below the number, and the scorekeeper switches back by hand; a player at the foul limit is marked out, but the tracker does not take them off the floor or keep them off.
@@ -149,7 +153,7 @@ How the grid works (built in step 2.64):
 
 ### 5.5 Corrections
 
-- An admin (or the scorekeeper, within a time the league sets) can **reopen** a final game with a reason, fix it, and finalize again. Everything recalculates.
+- An admin (or the scorekeeper, within a time the league sets) can **reopen** a final game with a reason, fix it, and finalize again. Everything recalculates. The scorekeeper's time is a league setting, 30 minutes after the end to begin with (**S-36**, decided for you); after it, only an admin reopens the game.
 - **S-7:** every correction is logged with who, when and why. The public page shows "corrected" with the date, not the reason.
 - **S-8:** if a correction changes the winner or the score, people who got the recap get a short correction notice. Other fixes (a foul moved to the right player) send nothing.
 

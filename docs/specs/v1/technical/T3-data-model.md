@@ -44,11 +44,13 @@ The split between these tables is what makes "one account, many leagues", "admin
 
 | Table            | What a row is                                              | Key columns                                                                                                                                                                  |
 | ---------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `accounts`       | A sign-in. One per email. Not tied to any league.          | `email`, `display_name`, `phone`, `last_seen_at`                                                                                                                             |
+| `accounts`       | A sign-in. One per email. Not tied to any league.          | `email`, `display_name`, `phone`, `last_seen_at`, `sign_in_id` (the sign-in service's own id for the person, T-256)                                                          |
 | `profiles`       | A human being an account can act for: yourself, or a child | `first_name`, `last_name`, `birth_date`                                                                                                                                      |
 | `profile_access` | Which account may act for which profile                    | `account_id`, `profile_id`, `relation` (self or guardian)                                                                                                                    |
 | `people`         | A person **as one league knows them**                      | `league_id`, `profile_id` (empty until linked), `first_name`, `last_name`, `public_name`, `contact_email`, `birth_date`, `is_minor`, `visibility`, `photo`, `merged_into_id` |
 | `follows`        | An account following a team                                | `account_id`, `league_id`, `team_id`                                                                                                                                         |
+
+Our account ids are our own (T-41); the sign-in service's id is only a link beside them, written by owner-run functions, and an account made before its owner first signs in is linked by its address then ([record 052](../../../architecture/decisions/052-accounts-on-the-real-database.md), T-256). What the sign-in adapter keeps for itself (devices, sessions, counts) is in a schema of its own, `sign_in`, outside these tables.
 
 A person added by hand is a `people` row with an empty `profile_id`. Claiming or registering fills it in. Statistics and rosters point at `people`, so nothing moves when the link is made.
 
@@ -85,7 +87,7 @@ A division's parent is in the same season, and a division is never its own ances
 | `activity_log`       | Who changed what (A-6)                       | `league_id`, `actor_account_id`, `action`, `target_type`, `target_id`, `summary`, `details` (JSON), `at`                         |
 | `support_access_log` | Our staff opening a league (section 8 of P2) | `league_id`, `staff_account_id`, `reason`, `started_at`, `ended_at`                                                              |
 
-A grant's account, role and scope, and an invitation's email, role and scope, never change once the row exists: a different role is a new grant. A program or team scope points at a program or team of the same league; club scopes are refused until the `clubs` table exists. An activity entry's `action` is the command's name and its `summary` a message key (T-226); `details` holds ids and fixed words only. A support visit starts when its row is written and lasts at most an hour (T-77); while it runs it can be ended early, and once over it never changes.
+A grant's account, role and scope, and an invitation's email, role and scope, never change once the row exists: a different role is a new grant. The one exception is erasure: an accepted invitation's email becomes its erased accepter's placeholder, so the address does not outlive the account ([record 052](../../../architecture/decisions/052-accounts-on-the-real-database.md)). A program or team scope points at a program or team of the same league; club scopes are refused until the `clubs` table exists. An activity entry's `action` is the command's name and its `summary` a message key (T-226); `details` holds ids and fixed words only. A support visit starts when its row is written and lasts at most an hour (T-77); while it runs it can be ended early, and once over it never changes.
 
 ## 6. Registration
 

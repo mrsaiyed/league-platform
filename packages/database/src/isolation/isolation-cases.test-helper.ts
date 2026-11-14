@@ -38,6 +38,7 @@ import {
   listActivityEntries,
   listOpenInvitations,
   listRoleGrants,
+  listAccessNames,
   markInvitationAccepted,
   markInvitationCancelled,
   renewInvitationLink,
@@ -422,6 +423,12 @@ registerIsolationCase({
   subject: listRoleGrants,
   name: "list the scope's grants",
   run: (scope) => listRoleGrants(scope),
+});
+
+registerIsolationCase({
+  subject: listAccessNames,
+  name: "list the names on the scope's access list (record 052)",
+  run: (scope) => listAccessNames(scope),
 });
 
 registerIsolationCase({

@@ -117,4 +117,35 @@ describe('tableQueue', () => {
     expect(done).toHaveLength(2);
     expect((await s.row(after)).state).toBe('waiting');
   });
+
+  it('once started, says after each look that worked, and not after one that failed', async () => {
+    let polled = 0;
+    const errors: unknown[] = [];
+    const running = tableQueue(s.db, {
+      pollMs: 20,
+      onPolled: () => {
+        polled++;
+        throw new Error('a broken heartbeat must not stop the queue');
+      },
+      onError: (error) => void errors.push(error),
+    });
+    await running.start({});
+    await eventually(() => polled >= 2);
+    await running.stop();
+    expect(errors).toEqual([]);
+
+    // A look that fails (the database is gone) is reported, and is not a beat.
+    const gone = await queueSetUp();
+    await gone.close();
+    let failedPolls = 0;
+    const failing = tableQueue(gone.db, {
+      pollMs: 20,
+      onPolled: () => void failedPolls++,
+      onError: (error) => void errors.push(error),
+    });
+    await failing.start({});
+    await eventually(() => errors.length >= 2);
+    await failing.stop();
+    expect(failedPolls).toBe(0);
+  });
 });

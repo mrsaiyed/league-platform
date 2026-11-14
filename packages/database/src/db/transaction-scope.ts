@@ -30,12 +30,13 @@ export type LeagueScope = AppScope & {
 const open = new WeakMap<AppScope, Transaction<Database>>();
 
 /**
- * Set while withTransaction's work runs. The guarded driver (guarded-dialect.ts)
- * refuses to hand out a second connection inside it: a nested withTransaction or a
- * query on the bare handle would run outside this transaction's fence, and on
- * PGlite, which has one connection, would wait forever.
+ * Set while withTransaction's (or withSignInTransaction's) work runs, to its scope.
+ * The guarded driver (guarded-dialect.ts) refuses to hand out a second connection
+ * inside it: a nested transaction or a query on the bare handle would run outside
+ * this transaction's fence, and on PGlite, which has one connection, would wait
+ * forever.
  */
-export const workInProgress = new AsyncLocalStorage<AppScope>();
+export const workInProgress = new AsyncLocalStorage<object>();
 
 /** Makes the scope for an open transaction. Only withTransaction calls this. */
 export function openScope(

@@ -2,8 +2,9 @@
 // beat each time its loop runs (and each time it finishes a job); an outside check
 // asks this endpoint, which answers 200 while the last beat is recent and 503 when
 // it is older than `maxAgeMs` or has never happened. The answer holds fixed words
-// and numbers only (T-86). The jobs waiting and the age of the oldest (T-142) need
-// the database and come with the worker's own start-up file.
+// and numbers only (T-86). start-worker.ts beats after each look at the jobs table
+// that worked. The jobs waiting and the age of the oldest (T-142) are not here yet:
+// counting them across leagues needs an owner-run function, a migration (record 053).
 import { createServer, type Server } from 'node:http';
 
 export type WorkerHealth = {

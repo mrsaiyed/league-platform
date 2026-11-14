@@ -40,16 +40,24 @@ export type QueueOptions = {
   readonly log?: (line: JobRunLine) => void;
   /** Told when looking for jobs failed (the database was unreachable). Must not throw. */
   readonly onError?: (error: unknown) => void;
+  /**
+   * Told after each look at the jobs table that worked, once the queue is started:
+   * the worker's heartbeat (T8 §7). A look that failed goes to onError instead, so
+   * a worker cut off from its database stops beating. Must not throw.
+   */
+  readonly onPolled?: () => void;
 };
 
 /**
  * Calls `tick` every `pollMs` until stopped; `stop` waits for the tick under way.
- * A failing tick is reported and the loop goes on.
+ * A failing tick is reported and the loop goes on; one that worked is told to
+ * `onPolled`.
  */
 export function pollEvery(
   pollMs: number,
   tick: (stopping: () => boolean) => Promise<unknown>,
   onError: (error: unknown) => void,
+  onPolled: () => void = () => {},
 ) {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -57,7 +65,13 @@ export function pollEvery(
   const loop = () => {
     running = tick(() => stopped)
       .then(
-        () => undefined,
+        () => {
+          try {
+            onPolled();
+          } catch {
+            // A broken heartbeat must not stop the worker.
+          }
+        },
         (error: unknown) => {
           try {
             onError(error);

@@ -76,36 +76,58 @@ function typeOf(column: Column): string {
 const pascal = (name: string) =>
   name.replace(/(^|_)([a-z0-9])/g, (_, __: string, letter: string) => letter.toUpperCase());
 
-/** The text of schema-types.ts for the `public` tables of `db`, before formatting. */
+/**
+ * The schemas typed, each as its own Kysely database: `public` (the app's tables,
+ * reached as app_user) and `sign_in` (the sign-in store's, reached only as
+ * sign_in_store, record 052). A sign_in table is named with its schema
+ * (`'sign_in.sessions'`) and its type with a prefix (`SignInSessionsTable`).
+ */
+const schemas = [
+  { schema: 'public', database: 'Database', prefix: '', qualified: false },
+  { schema: 'sign_in', database: 'SignInDatabase', prefix: 'SignIn', qualified: true },
+] as const;
+
+/** The text of schema-types.ts for the tables of `db` in `schemas`, before formatting. */
 export async function generateSchemaTypes(db: SqlSession): Promise<string> {
-  const { rows } = await db.query<Column>(
-    `select c.table_name, c.column_name, c.udt_name, c.is_nullable, c.column_default,
-            c.is_generated, c.identity_generation
-     from information_schema.columns c
-     join information_schema.tables t
-       on t.table_schema = c.table_schema and t.table_name = c.table_name
-     where c.table_schema = 'public' and t.table_type = 'BASE TABLE'
-     order by c.table_name, c.ordinal_position`,
-  );
-  const tables = new Map<string, Column[]>();
-  for (const row of rows) tables.set(row.table_name, [...(tables.get(row.table_name) ?? []), row]);
-
-  const names = new Map<string, string>();
-  for (const table of tables.keys()) {
-    const taken = names.get(pascal(table));
-    if (taken !== undefined) {
-      throw new Error(`Tables ${taken} and ${table} would both be typed ${pascal(table)}Table.`);
-    }
-    names.set(pascal(table), table);
-  }
-
   const parts = [header];
-  for (const [table, columns] of tables) {
-    const fields = columns.map((column) => `  ${column.column_name}: ${typeOf(column)};`);
-    parts.push(`export interface ${pascal(table)}Table {\n${fields.join('\n')}\n}\n`);
+  const names = new Map<string, string>();
+  for (const { schema, database, prefix, qualified } of schemas) {
+    const { rows } = await db.query<Column>(
+      `select c.table_name, c.column_name, c.udt_name, c.is_nullable, c.column_default,
+              c.is_generated, c.identity_generation
+       from information_schema.columns c
+       join information_schema.tables t
+         on t.table_schema = c.table_schema and t.table_name = c.table_name
+       where c.table_schema = $1 and t.table_type = 'BASE TABLE'
+       order by c.table_name, c.ordinal_position`,
+      [schema],
+    );
+    const tables = new Map<string, Column[]>();
+    for (const row of rows) {
+      tables.set(row.table_name, [...(tables.get(row.table_name) ?? []), row]);
+    }
+    // Only public is required to exist: a database without the sign-in store
+    // (a test's own schema) gets no SignInDatabase.
+    if (schema !== 'public' && tables.size === 0) continue;
+
+    const typeName = (table: string) => `${prefix}${pascal(table)}Table`;
+    for (const table of tables.keys()) {
+      const taken = names.get(typeName(table));
+      if (taken !== undefined) {
+        throw new Error(`Tables ${taken} and ${table} would both be typed ${typeName(table)}.`);
+      }
+      names.set(typeName(table), table);
+    }
+
+    for (const [table, columns] of tables) {
+      const fields = columns.map((column) => `  ${column.column_name}: ${typeOf(column)};`);
+      parts.push(`export interface ${typeName(table)} {\n${fields.join('\n')}\n}\n`);
+    }
+    const entries = [...tables.keys()].map(
+      (table) => `  ${qualified ? `'${schema}.${table}'` : table}: ${typeName(table)};`,
+    );
+    parts.push(`/** Every table in the ${schema} schema, for Kysely. */
+export interface ${database} {\n${entries.join('\n')}\n}\n`);
   }
-  const entries = [...tables.keys()].map((table) => `  ${table}: ${pascal(table)}Table;`);
-  parts.push(`/** Every table in the public schema, for Kysely. */
-export interface Database {\n${entries.join('\n')}\n}\n`);
   return parts.join('\n');
 }

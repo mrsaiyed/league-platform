@@ -105,11 +105,14 @@ My advice on this direction:
 | Leagues that come back for a second season                 | Over 80%                             |
 | Support requests per league per season                     | Under 3                              |
 
+**B-15 (decided for you, November 14):** the product starts counting these in stage 5, when the first outside league can join, from what it already records and with no tracking of visitors (T4 section 7's cookieless page counts). Until then they are read by hand from Faraj and the demo league.
+
 ## 10. Things that need a professional, not an engineer
 
 The founder agreed on November 12 to engage a lawyer and an accountant, after our own tests with Faraj and the demo league and before any stranger signs up. Everything to tell them and ask them is written out in the [brief for the lawyer and accountant](../LEGAL-BRIEF.md).
 
 - **B-9 (agreed):** terms of service and privacy policy, written by a lawyer, before any stranger signs up.
+- **B-14 (decided for you, November 14):** until the lawyer's versions exist, the Terms and Privacy pages hold a short plain note worded by the lead: what we keep, why, who can see it, who to write to, and that the lawyer's terms and policy come before any stranger signs up. It makes no legal promise and replaces nothing the lawyer writes; the founder can change any word.
 - **B-10 (agreed):** children's data. TCSAAL and Al-Hadi involve students. The lawyer confirms our duties (in the United States: COPPA, and school-records rules where a school is the customer) before any youth league other than our own demo uses the product. Two things in the brief should not wait that long, because they exist during our tests: the school's written permission to show Al-Hadi's players publicly, and how the demo league uses TCSAAL's name (F-10).
 - **B-11 (agreed):** payment terms and the tax treatment of what we charge, confirmed by an accountant before any money is taken.
 

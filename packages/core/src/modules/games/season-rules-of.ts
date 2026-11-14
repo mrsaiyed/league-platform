@@ -7,13 +7,32 @@
 import { defaultSeasonRules, upgradeSeasonRules, type SeasonRules } from '@srleagues/contracts';
 import type { GameRecord, GamesStore, GamesTx } from './ports.ts';
 
+/** A season's rules as stored, read in the current format; the starting set if unreadable or none. */
+const readSeasonRules = (stored: unknown): SeasonRules => {
+  const upgraded = stored === undefined ? undefined : upgradeSeasonRules(stored);
+  return upgraded?.ok === true ? upgraded.rules : defaultSeasonRules();
+};
+
+/**
+ * The rules a game is played under, from what is stored: the game's own `format` if it
+ * has one that reads, else its season's stored rules (undefined when the season has
+ * none or is not found). The same answer as effectiveRulesOf, for a caller that has
+ * already read both (the Al-Hadi transfer, step 2.58).
+ */
+export function rulesOfGame(format: unknown, seasonRules: unknown): SeasonRules {
+  if (format !== null && format !== undefined) {
+    const own = upgradeSeasonRules(format);
+    if (own.ok) return own.rules;
+  }
+  return readSeasonRules(seasonRules);
+}
+
 export async function seasonRulesOf(
   tx: { readonly games: Pick<GamesStore, 'findSeason'> },
   seasonId: string,
 ): Promise<SeasonRules> {
   const season = await tx.games.findSeason(seasonId);
-  const upgraded = season === undefined ? undefined : upgradeSeasonRules(season.rules);
-  return upgraded?.ok === true ? upgraded.rules : defaultSeasonRules();
+  return readSeasonRules(season?.rules);
 }
 
 /** The rules this game is played under: its own if it has them, else its season's. */
