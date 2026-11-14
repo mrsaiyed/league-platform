@@ -38,6 +38,8 @@ export type GameResultChange = {
   readonly decided: boolean;
   /** Set only if the game has none; a game that has rules keeps them. */
   readonly format?: SeasonRules;
+  /** How the game is now recorded (final, box or live), when that changes with the result. */
+  readonly captureMode?: 'final' | 'box' | 'live';
 };
 
 /** A result as a correction keeps it: a versioned document of words and numbers only (T-220). */
@@ -58,6 +60,20 @@ export type GameLine = {
   readonly secondsPlayed: number | null;
   /** Counts keyed by stat; a missing key means the stat was not recorded. */
   readonly stats: Readonly<Record<string, number>>;
+};
+
+/** A line as the box score grid saves it: with the jersey the player wore (from the roster). */
+export type NewGameLine = GameLine & { readonly jerseyNumber: string | null };
+
+/** A player on the roster of one of a game's two teams, as the box score grid lists them (P7 §5.2). */
+export type GameRosterPlayer = {
+  readonly teamId: string;
+  readonly personId: string;
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly jerseyNumber: string | null;
+  /** The player has left the team since (R-17); still listed, as they may have played this game. */
+  readonly left: boolean;
 };
 
 /** One reopening, with numbers only, never names (T-220). */
@@ -108,6 +124,17 @@ export type GamesStore = {
   readonly listDecided: (seasonId: string) => Promise<readonly GameRecord[]>;
   /** The box score lines of a season's decided games not in the bin, by game and person. */
   readonly listDecidedLines: (seasonId: string) => Promise<readonly GameLine[]>;
+  /** Every line of the game, whatever its status, by team and person. */
+  readonly listLines: (gameId: string) => Promise<readonly GameLine[]>;
+  /** Replaces all of the game's lines with these (none to clear them). */
+  readonly replaceLines: (gameId: string, lines: readonly NewGameLine[]) => Promise<void>;
+  /**
+   * The players (not coaches) on either team's roster, those who have left included,
+   * by team, roster order and name.
+   */
+  readonly listRoster: (gameId: string) => Promise<readonly GameRosterPlayer[]>;
+  /** Whether the tracker has recorded any play of the game (T3 §8 `game_events`). */
+  readonly hasPlays: (gameId: string) => Promise<boolean>;
   /** The program a season belongs to and its rules as stored, or undefined if it is not here. */
   readonly findSeason: (
     seasonId: string,

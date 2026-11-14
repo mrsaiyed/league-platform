@@ -9,9 +9,16 @@ import {
   memoryTransaction,
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
+import { boxScoreStores } from '../../command/testing/memory-box-scores.ts';
 import type { EventHandler } from '../../command/index.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
-import type { GameLine, GameRecord, GamesTx, NewGameCorrection } from '../games/index.ts';
+import type {
+  GameLine,
+  GameRecord,
+  GameRosterPlayer,
+  GamesTx,
+  NewGameCorrection,
+} from '../games/index.ts';
 import {
   standingsStores,
   type MemoryOptions,
@@ -25,6 +32,10 @@ export type MemoryStandings = {
   teams: (TableTeam & { seasonId: string })[];
   games: GameRecord[];
   lines: GameLine[];
+  /** Players on teams' rosters, by team. */
+  roster: GameRosterPlayer[];
+  /** Games the tracker has recorded plays for. */
+  tracked: string[];
   adjustments: (SeasonAdjustment & { seasonId: string; binned?: boolean })[];
   corrections: NewGameCorrection[];
   grants: Grant[];
@@ -127,6 +138,8 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     teams: fourTeams,
     games: [],
     lines: [],
+    roster: [],
+    tracked: [],
     adjustments: [],
     corrections: [],
     grants: [],
@@ -162,12 +175,14 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
           awayScore: change.awayScore,
           finalizedAt: change.decided ? '2026-12-20T20:00:00.000Z' : null,
           format: found.format ?? change.format ?? null,
+          captureMode: change.captureMode ?? found.captureMode,
           version: found.version + 1,
         };
         return found.version + 1;
       },
       addCorrection: async (correction) => void s.corrections.push(correction),
       listPostponed: async () => [],
+      ...boxScoreStores(s),
       ...standingsStores(s, options).games,
       // Scorekeeper assignments play no part in standings: the league keeps the
       // starting choice (any scorekeeper may score) and has none.

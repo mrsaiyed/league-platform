@@ -41,6 +41,8 @@ export async function decideGame(args: {
   readonly status: 'final' | 'forfeit';
   readonly homeScore: number;
   readonly awayScore: number;
+  /** How the game is now recorded, when deciding it changes that (a box score: `box`). */
+  readonly captureMode?: 'final' | 'box' | 'live';
 }): Promise<Result<{ version: number }, DecideGameError>> {
   const { context, tx, game } = args;
   const rules = await seasonRulesOf(tx, game.seasonId);
@@ -52,6 +54,7 @@ export async function decideGame(args: {
       awayScore: args.awayScore,
       decided: true,
       ...(game.format === null ? { format: rules } : {}),
+      ...(args.captureMode === undefined ? {} : { captureMode: args.captureMode }),
     },
     args.version,
   );

@@ -14,6 +14,7 @@ import type {
   EventHandler,
   GameLine,
   GameRecord,
+  GameRosterPlayer,
   GamesTx,
   NewGameCorrection,
   StoredSetting,
@@ -27,6 +28,9 @@ type State = {
   seasons: { id: string; programId: string; rules: unknown }[];
   games: GameRecord[];
   lines: GameLine[];
+  roster: GameRosterPlayer[];
+  /** Games the tracker has recorded plays for. */
+  tracked: string[];
   corrections: NewGameCorrection[];
   assignments: { gameId: string; accountId: string }[];
   settings: Record<string, StoredSetting[]>;
@@ -55,6 +59,24 @@ const teamNames: Readonly<Record<string, string>> = {
 };
 const [lions, tigers, hawks, bears] = Object.keys(teamNames) as [string, string, string, string];
 
+/** Three made-up players a team, for the box score grid. */
+const playerNames = [
+  ['Avery', 'Stone'],
+  ['Blake', 'Rivers'],
+  ['Casey', 'Hill'],
+] as const;
+const standInRoster: readonly GameRosterPlayer[] = [lions, tigers, hawks, bears].flatMap(
+  (teamId, t) =>
+    playerNames.map(([firstName, lastName], p) => ({
+      teamId,
+      personId: id(0x9e, t * 10 + p + 1),
+      firstName,
+      lastName,
+      jerseyNumber: String(p * 10 + t + 1),
+      left: false,
+    })),
+);
+
 /** An ISO time `days` days from now at this hour (UTC), so the games are always this week's. */
 function at(days: number, hour: number): string {
   const day = new Date();
@@ -68,6 +90,8 @@ function emptyState(): State {
     seasons: [],
     games: [],
     lines: [],
+    roster: [],
+    tracked: [],
     corrections: [],
     assignments: [],
     settings: {},
@@ -99,6 +123,9 @@ function seed(options: StandInGamesOptions): State {
     ...emptyState(),
     settings: { ...options.settings },
     seasons: [{ id: seasonId, programId: id(0x9a, 1), rules: defaultSeasonRules() }],
+    roster: [...standInRoster],
+    // The live game has plays from the tracker.
+    tracked: [id(0x6a, 2)],
     games: [
       game(1, {}),
       game(2, { homeTeamId: hawks, awayTeamId: bears, status: 'live', captureMode: 'live' }),
@@ -148,6 +175,7 @@ export function standInGames(options: StandInGamesOptions): GamesAreaPorts {
           awayScore: change.awayScore,
           finalizedAt: change.decided ? new Date().toISOString() : null,
           format: found.format ?? change.format ?? null,
+          captureMode: change.captureMode ?? found.captureMode,
           version: found.version + 1,
         };
         return found.version + 1;
@@ -168,6 +196,22 @@ export function standInGames(options: StandInGamesOptions): GamesAreaPorts {
             (g.status === 'final' || g.status === 'forfeit'),
         ),
       listDecidedLines: async () => [],
+      listLines: async (gameId) => s.lines.filter((l) => l.gameId === gameId),
+      replaceLines: async (gameId, lines) => {
+        s.lines = [
+          ...s.lines.filter((l) => l.gameId !== gameId),
+          ...lines.map(({ jerseyNumber: _jersey, ...line }) => line),
+        ];
+      },
+      listRoster: async (gameId) => {
+        const game = s.games.find((g) => g.id === gameId);
+        if (game === undefined) return [];
+        return [
+          ...s.roster.filter((p) => p.teamId === game.homeTeamId),
+          ...s.roster.filter((p) => p.teamId === game.awayTeamId),
+        ];
+      },
+      hasPlays: async (gameId) => s.tracked.includes(gameId),
       findSeason: async (seasonId) => s.seasons.find((x) => x.id === seasonId),
       leagueSettingRows: async (key) => s.settings[key] ?? [],
       isAssigned: async (gameId, accountId) => isAssigned(s, gameId, accountId),
