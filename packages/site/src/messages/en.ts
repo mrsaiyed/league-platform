@@ -345,6 +345,8 @@ export const en = {
     'Another team now has this short name. Rename one of them, then try again.',
   'error.leagues.restore_team.team-name-taken':
     'Another team now has this name. Rename one of them, then try again.',
+  'error.leagues.restore_team.team-lineage-taken':
+    'This season already has a team that carries on this team from other seasons. Move that team to the bin first, then try again.',
   'error.leagues.restore_person.person-not-found': 'That person is not there.',
   'error.leagues.restore_person.person-profile-taken':
     'The account of this person is now linked to someone else in this league.',

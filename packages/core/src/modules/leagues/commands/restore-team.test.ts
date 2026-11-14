@@ -17,13 +17,18 @@ describe('restoreTeam', () => {
   });
 
   it('says plainly when its short name or name was taken, and leaves it in the bin', async () => {
-    for (const clash of ['short-name-taken', 'name-taken'] as const) {
+    const codes = {
+      'short-name-taken': 'team-short-name-taken',
+      'name-taken': 'team-name-taken',
+      'lineage-taken': 'team-lineage-taken',
+    } as const;
+    for (const clash of ['short-name-taken', 'name-taken', 'lineage-taken'] as const) {
       const { db, deps, as } = memoryBin({
         things: [{ id: teamId(1), kind: 'team', name: 'Hawks', binnedAt, clash }],
       });
       expect(await restoreTeam(as(ownerId), { teamId: teamId(1) }, deps)).toEqual({
         ok: false,
-        error: { code: clash === 'name-taken' ? 'team-name-taken' : 'team-short-name-taken' },
+        error: { code: codes[clash] },
       });
       expect(db.state.things[0]?.binnedAt).toBe(binnedAt);
     }

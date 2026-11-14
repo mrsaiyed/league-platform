@@ -121,6 +121,28 @@ describe('the bin: restoring', () => {
     expect(value(await listBin(l.as, {}, deps)).items).toHaveLength(1);
   });
 
+  it('says plainly when another team of the season now carries on the same team', async () => {
+    const l = await league();
+    const { teamId } = value(await createTeam(l.as, { ...hawks, seasonId: l.seasonId }, deps));
+    value(await removeTeam(l.as, { teamId }, deps));
+    const other = value(
+      await createTeam(
+        l.as,
+        { ...hawks, name: 'Other', shortName: 'other', seasonId: l.seasonId },
+        deps,
+      ),
+    ).teamId;
+    await pglite.query(
+      'update teams set lineage_id = (select lineage_id from teams where id = $1) where id = $2',
+      [teamId, other],
+    );
+    expect(await restoreTeam(l.as, { teamId }, deps)).toEqual({
+      ok: false,
+      error: { code: 'team-lineage-taken' },
+    });
+    expect(value(await listBin(l.as, {}, deps)).items.map((i) => i.id)).toEqual([teamId]);
+  });
+
   it('brings back a person, and a game nobody played, but never a played one', async () => {
     const l = await league();
     const { personId } = value(

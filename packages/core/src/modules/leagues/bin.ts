@@ -67,9 +67,12 @@ export type BinStore = {
   readonly findGame: (gameId: string) => Promise<GameInBin | undefined>;
   /**
    * Brings a team back, with its roster (nothing of it was touched): false if it is
-   * not in this league, or which of its short name and name another team took.
+   * not in this league, which of its short name and name another team took, or
+   * 'lineage-taken': another team of its season now carries on the same team.
    */
-  readonly restoreTeam: (teamId: string) => Promise<boolean | 'short-name-taken' | 'name-taken'>;
+  readonly restoreTeam: (
+    teamId: string,
+  ) => Promise<boolean | 'short-name-taken' | 'name-taken' | 'lineage-taken'>;
   /** Brings a person back: false if not in this league, or 'profile-taken' (the account is linked to another person). */
   readonly restorePerson: (personId: string) => Promise<boolean | 'profile-taken'>;
   /**

@@ -26,7 +26,12 @@ type Thing = {
   status?: string;
   partInBin?: boolean;
   /** What restoring it meets: another thing holds its name. */
-  clash?: 'short-name-taken' | 'name-taken' | 'profile-taken' | 'game-number-taken';
+  clash?:
+    | 'short-name-taken'
+    | 'name-taken'
+    | 'lineage-taken'
+    | 'profile-taken'
+    | 'game-number-taken';
 };
 
 export type MemoryBin = {
@@ -111,7 +116,8 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
                 partInBin: t.partInBin === true,
               };
         },
-        restoreTeam: async (id) => restore(id, ['short-name-taken', 'name-taken'] as const),
+        restoreTeam: async (id) =>
+          restore(id, ['short-name-taken', 'name-taken', 'lineage-taken'] as const),
         restorePerson: async (id) => restore(id, ['profile-taken'] as const),
         restoreGame: async (id) => restore(id, ['game-number-taken'] as const),
         purge: async (cutoff) => {

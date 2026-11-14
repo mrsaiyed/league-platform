@@ -15,7 +15,9 @@ export type RestoreTeamError = {
     | 'team-not-found'
     | 'team-division-in-bin'
     | 'team-short-name-taken'
-    | 'team-name-taken';
+    | 'team-name-taken'
+    /** Another team of the season now carries on the same team from other seasons. */
+    | 'team-lineage-taken';
 };
 
 export const restoreTeam = defineCommand({
@@ -39,6 +41,7 @@ export const restoreTeam = defineCommand({
     const restored = await tx.bin.restoreTeam(input.teamId);
     if (restored === 'short-name-taken') return fail({ code: 'team-short-name-taken' });
     if (restored === 'name-taken') return fail({ code: 'team-name-taken' });
+    if (restored === 'lineage-taken') return fail({ code: 'team-lineage-taken' });
     if (restored === false) return fail({ code: 'team-not-found' });
     await recordActivity(tx, context, {
       action: 'leagues.restore_team',
