@@ -91,7 +91,7 @@ A league's life after setup repeats:
 4. **Schedule is built and published.**
 5. **Games are played and scored**; standings, statistics, reminders and recaps run by themselves.
 6. **Playoffs**, champion, awards.
-7. **Season is archived.** It stays on the site under the season picker, read-only.
+7. **Season is archived.** It stays on the site under the season picker, read-only. **O-12 (decided for you, November 14):** read-only means nothing in it changes except a correction with a reason, by someone allowed to correct games (S-7), so a wrong old score can still be put right and shows as corrected.
 
 **O-5 (agreed): the admin home always shows "what needs you now"** for the current point in this cycle, not a wall of charts ([P4](P4-admin-dashboard.md) section 2).
 
