@@ -405,6 +405,7 @@ export const en = {
   'admin.games.openTracker': 'Open the tracker',
   'admin.games.when': '{day}, {time}',
   'admin.games.noTime': 'No time set',
+  'admin.games.today': 'Today, {time}',
   'admin.games.notScorable': 'This league is archived or suspended, so games cannot be changed.',
   'admin.games.done.final': 'The final score is saved.',
   'admin.games.done.forfeit': 'The forfeit is recorded.',
@@ -590,7 +591,13 @@ export const en = {
   'tracker.storeFailed':
     'This device could not save the latest state of the game. Scoring still works; what you enter is kept apart.',
   'tracker.takeOver': 'Take over scoring',
+  'tracker.takeOverQuestion':
+    'Take over scoring from {name}? Their device stops scoring at once and shows the game read-only.',
+  'tracker.takeOverYes': 'Yes, take over',
+  'tracker.takeOverNo': 'Not now',
   'tracker.openAgain': 'Open the game again',
+  'tracker.sharedDevice.text': 'On a shared phone or tablet, sign out when you finish.',
+  'tracker.sharedDevice.link': 'Sign out on your account page',
   'tracker.leave': 'Leave the game',
   'tracker.back': 'Back to your games',
   'tracker.format.title': 'Check the game format',

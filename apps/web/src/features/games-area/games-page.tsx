@@ -3,8 +3,9 @@ import { displayLabels } from '@srleagues/site';
 import { GameCard } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
+import { gameWhenText, type LeagueTimes } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { t, type TextKey } from '../../server/messages.ts';
+import { locale, t, type TextKey } from '../../server/messages.ts';
 import {
   cancelGameAction,
   enterFinalScoreAction,
@@ -39,24 +40,6 @@ export function noticeKey(search: SearchParams): { key: TextKey; problem: boolea
     'admin.games.error.game-not-cancellable',
   ];
   return { key: known.find((k) => k === key) ?? 'admin.games.error.unknown', problem: true };
-}
-
-const dayFormat = new Intl.DateTimeFormat('en', {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-  timeZone: 'UTC',
-});
-const timeFormat = new Intl.DateTimeFormat('en', {
-  hour: 'numeric',
-  minute: '2-digit',
-  timeZone: 'UTC',
-});
-
-function whenText(startsAt: string | null): string {
-  if (startsAt === null) return t('admin.games.noTime');
-  const when = new Date(startsAt);
-  return t('admin.games.when', { day: dayFormat.format(when), time: timeFormat.format(when) });
 }
 
 function Fields({ league, game }: { readonly league: string; readonly game: GameRowView }) {
@@ -159,6 +142,8 @@ export async function GamesPage({
   const games = listed.ok ? listed.value.games : [];
   const holder = await ports.accessOf(context);
   const rows = buildGameRows(games, await ports.games.namesOf(addressee.id), holder);
+  const { timeZone } = await ports.publicSchedule.clockOf(addressee.id);
+  const times: LeagueTimes = { locale, timeZone };
   const labels = displayLabels(t).game;
   const notice = noticeKey(search);
   return (
@@ -181,7 +166,7 @@ export async function GamesPage({
                 home={{ name: game.homeName, score: game.homeScore }}
                 away={{ name: game.awayName, score: game.awayScore }}
                 status={game.status}
-                whenText={whenText(game.startsAt)}
+                whenText={gameWhenText(game.startsAt, times)}
                 {...(game.status === 'final' || game.status === 'forfeit'
                   ? { detailsHref: leagueUrl(addressee, 'game', { game: game.id }) }
                   : {})}
