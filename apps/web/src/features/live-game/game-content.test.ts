@@ -22,6 +22,8 @@ import {
   tap,
   trackerWorld,
 } from '../../server/tracker-endpoints.test-helper.ts';
+import { standInLeagues } from '../../server/stand-in-ports.ts';
+import { standInSeasonIds } from '../../server/stand-in-public-stats.ts';
 import {
   buildBoxScores,
   buildPlays,
@@ -116,6 +118,40 @@ describe('a game page', () => {
     expect(html).toContain('Only this team&#x27;s total is shown.');
     expect(html).toContain('These are the plays up to when you opened this page.');
     for (const name of bearsNames) expect(html).not.toContain(name);
+  });
+
+  it('opens every game the home and schedule pages show: one set of made-up games', async () => {
+    const world = trackerWorld();
+    const seasons = [
+      [liveLeagueId, standInSeasonIds.adultFall],
+      [liveLeagueId, standInSeasonIds.adultSpring],
+      [standInLeagues.other.id, standInSeasonIds.youthWinter],
+    ] as const;
+    let opened = 0;
+    for (const [leagueId, seasonId] of seasons) {
+      const { today } = await world.ports.publicSchedule.clockOf(leagueId);
+      const schedule = await world.ports.publicSchedule.scheduleOf(leagueId, seasonId, today);
+      const listed = [
+        ...(schedule?.rounds.flatMap((r) => r.games) ?? []),
+        ...(schedule?.unplacedGames ?? []),
+      ];
+      expect(listed.length).toBeGreaterThan(0);
+      const store = world.tracker.snapshotStoreOf(leagueId);
+      const as = { ...viewing, leagueId, viewer: publicViewer(leagueId) };
+      for (const game of listed) {
+        const shot = await readGameSnapshot(store, { gameId: game.id }, as, Date.now());
+        const page = await readGamePage(store, { gameId: game.id }, as);
+        if (!shot.ok || !page.ok) throw new Error(`no page for ${game.id}`);
+        expect(page.value.scoreboard.home.name).toBe(game.homeTeam.name);
+        expect(page.value.scoreboard.away.name).toBe(game.awayTeam.name);
+        expect(page.value.game.status).toBe(game.status);
+        expect(shot.value.score.home).toBe(game.homeScore ?? 0);
+        // Their seasons play halves: no quarter is shown before a tracker has the game.
+        expect(shot.value.periods).toBe(2);
+        opened += 1;
+      }
+    }
+    expect(opened).toBe(20);
   });
 
   it('says a game has not started yet', async () => {
