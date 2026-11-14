@@ -1,6 +1,7 @@
 // The two-league harness's cases for games (step 2.23, T-65): every query in ../queries
 // for them and every command of the same step. Imported by isolation-cases.test-helper.ts.
 import {
+  applyTrackerCommands,
   assignScorekeeper,
   cancelGame,
   listMyGames,
@@ -23,6 +24,13 @@ import {
   extendScoringSession,
   findScoringSession,
   insertScoringSession,
+  findSavedGameState,
+  insertGameEvents,
+  listGamePlayers,
+  listTakenCommands,
+  lockLiveGame,
+  saveGameLines,
+  saveGameState,
   findGame,
   insertGameAssignment,
   insertGameCorrection,
@@ -34,7 +42,12 @@ import {
   updateGameResult,
 } from '../queries/index.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
-import { harnessTx, registerCommandCase, runAsApp } from './command-cases.test-helper.ts';
+import {
+  CommandRefused,
+  harnessTx,
+  registerCommandCase,
+  runAsApp,
+} from './command-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import { harnessNow, type LeagueRecords } from './two-leagues.test-helper.ts';
 
@@ -294,4 +307,130 @@ registerCommandCase(takeOverScoring, harnessTx, {
 registerCommandCase(releaseScoringSession, harnessTx, {
   name: "release the session scoring the target's upcoming game",
   input: (target) => ({ gameId: target.upcomingGameId, sessionId: target.scoringSessionId }),
+});
+
+// Applying the tracker's commands (step 2.29) ----------------------------------------
+
+// Set ids, so every run sends the same batch and its answers compare equal.
+const harnessCommandIds = [
+  '01900000-0000-7000-8000-00000000c291',
+  '01900000-0000-7000-8000-00000000c292',
+];
+
+registerIsolationCase({
+  subject: lockLiveGame,
+  name: "lock the target's upcoming game",
+  run: (scope, target) => lockLiveGame(scope, target.upcomingGameId),
+});
+
+registerIsolationCase({
+  subject: findSavedGameState,
+  name: "read the saved state of the target's final game",
+  run: (scope, target) => findSavedGameState(scope, target.gameId),
+});
+
+registerIsolationCase({
+  subject: listTakenCommands,
+  name: "ask which of the target's final game's commands it has taken",
+  run: (scope, target) => listTakenCommands(scope, target.gameId, target.gameCommandIds),
+});
+
+registerIsolationCase({
+  subject: insertGameEvents,
+  name: "add a third event to the target's final game",
+  run: (scope, target) =>
+    insertGameEvents(scope, [
+      {
+        gameId: target.gameId,
+        seq: 3,
+        commandId: harnessCommandIds[0] ?? '',
+        type: 'pause',
+        payload: {},
+        tappedAt: harnessNow,
+        accountId: scope.accountId ?? randomUUID(),
+      },
+    ]),
+});
+
+registerIsolationCase({
+  subject: saveGameState,
+  name: "write over the saved state of the target's final game",
+  run: (scope, target) =>
+    saveGameState(scope, target.gameId, 3, { version: 1, status: 'final', plays: [] }),
+});
+
+registerIsolationCase({
+  subject: listGamePlayers,
+  name: "list the players of the target's upcoming game",
+  run: (scope, target) => listGamePlayers(scope, target.upcomingGameId),
+});
+
+registerIsolationCase({
+  subject: saveGameLines,
+  name: "write over the player's line in the target's final game",
+  run: (scope, target) =>
+    saveGameLines(
+      scope,
+      target.gameId,
+      [
+        {
+          gameId: target.gameId,
+          teamId: target.teamId,
+          personId: target.personId,
+          jerseyNumber: '23',
+          played: true,
+          secondsPlayed: 600,
+          stats: { points: 4, fg2: 2 },
+        },
+      ],
+      [],
+    ),
+});
+
+registerIsolationCase({
+  subject: saveGameLines,
+  name: "take the player's line out of the target's final game",
+  run: (scope, target) => saveGameLines(scope, target.gameId, [], [target.personId]),
+});
+
+// The scope's account takes the target's upcoming game over from its member first, so
+// that in the target's own league the batch is taken: a line-up and a basket for the
+// target's player (the away side). Anywhere else the takeover is refused, and the
+// batch is sent with the member's session, which must reach nothing.
+registerIsolationCase({
+  subject: applyTrackerCommands,
+  name: "score the target's upcoming game after taking it over",
+  run: async (scope, target) => {
+    const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      deviceId: 'harness-device',
+      confirmed: true,
+      expectedHolderSince: target.scoringSessionSince,
+    }).catch((thrown: unknown) => {
+      if (thrown instanceof CommandRefused) return undefined;
+      throw thrown;
+    });
+    const reply = taken?.value as { status?: string; sessionId?: string } | undefined;
+    const sessionId =
+      reply?.status === 'held-by-you' && reply.sessionId !== undefined
+        ? reply.sessionId
+        : target.scoringSessionId;
+    return runAsApp(applyTrackerCommands, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      protocolVersion: 1,
+      sessionId,
+      commands: [
+        {
+          commandId: harnessCommandIds[0],
+          at: harnessNow - 2000,
+          input: { type: 'lineup', side: 'away', playerIds: [target.personId] },
+        },
+        {
+          commandId: harnessCommandIds[1],
+          at: harnessNow - 1000,
+          input: { type: 'score', side: 'away', playerId: target.personId, points: 2 },
+        },
+      ],
+    });
+  },
 });

@@ -55,7 +55,9 @@ export type ScoringSessionReply =
 /** One account on one device. */
 export type ScoringDevice = { readonly accountId: string; readonly deviceId: string };
 
-export type ScorableGameError = { readonly code: 'game-not-found' | 'game-closed' };
+export type ScorableGameError = {
+  readonly code: 'game-not-found' | 'game-closed' | 'game-postponed';
+};
 
 /** The signed-in account; the commands' policy has already refused anyone else. */
 export function scorerOf(context: CommandContext): string {
@@ -63,7 +65,12 @@ export function scorerOf(context: CommandContext): string {
   return context.accountId;
 }
 
-/** A game that can be opened to score: there, not in the bin, not decided or cancelled. */
+/**
+ * A game that can be opened to score: there, not in the bin, not decided or cancelled,
+ * and not postponed. A postponed game has no date to be played on; the tracker's
+ * commands refuse it too (game-not-live), so it cannot be opened only to have every
+ * tap refused. Once it is given a new slot it is scheduled again and opens.
+ */
 export async function scorableGame(
   tx: ScoringTx,
   gameId: string,
@@ -71,6 +78,7 @@ export async function scorableGame(
   const game = await tx.games.find(gameId);
   if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
   if (isClosed(game.status)) return fail({ code: 'game-closed' });
+  if (game.status === 'postponed') return fail({ code: 'game-postponed' });
   return ok(game.id);
 }
 

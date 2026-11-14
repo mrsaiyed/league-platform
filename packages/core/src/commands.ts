@@ -47,6 +47,7 @@ import {
   renewScoringSession,
   reopenGame,
   takeOverScoring,
+  applyTrackerCommands,
   unassignScorekeeper,
 } from './modules/games/index.ts';
 import { createPerson, listPeople, removePerson, updatePerson } from './modules/people/index.ts';
@@ -144,6 +145,7 @@ export const commands = commandRegistry([
   renewScoringSession,
   takeOverScoring,
   releaseScoringSession,
+  applyTrackerCommands,
   rebuildStandings,
   addAdjustment,
   removeAdjustment,

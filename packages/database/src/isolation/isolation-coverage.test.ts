@@ -69,6 +69,7 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.scoringSessionsStore,
     'binds the scoring session queries (own cases) to a scope',
   ],
+  [databasePackage.liveGamesStore, 'binds the live game queries (own cases) to a scope'],
   [scoringSessionSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [databasePackage.standingsStore, 'binds the standings queries (own cases) to a scope'],
   [

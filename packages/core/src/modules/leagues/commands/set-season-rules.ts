@@ -12,10 +12,12 @@
 // change works the season's standings out again, in the same transaction. Game rules
 // (clock, fouls, periods) change nothing in the standings, so they save at once.
 //
-// NOT DONE YET: S-1 says game rules apply only to games not yet started, but nothing
-// enforces that today. A game's own `format` is stamped only when the game is decided
-// (decide-game.ts), so a game still to play, or live, follows the season's rules as
-// they are now, and a game decided earlier keeps the rules it was decided under.
+// S-1: game rules reach only games not yet started. A game's own `format` is written
+// when it goes live on the tracker (step 2.29, apply-tracker-commands.ts) or is decided
+// (decide-game.ts), and the database refuses to change it from then on
+// (games_format_fixed_once_started). So a game still to play, including one with only
+// its line-ups in, follows the season's rules as they are now; a live or decided game
+// keeps the rules it started under.
 import { SeasonRules } from '@srleagues/contracts';
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';

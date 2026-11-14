@@ -116,6 +116,7 @@ export {
   hiddenLeagueStatuses,
   isLeagueHidden,
   mayOpenLeague,
-  maySeeHiddenLeague,
+  maySeeDraftLeague,
+  maySeeSuspendedLeague,
 } from './rules/league-visibility.ts';
 export { isBlockedShortName, isShortNameFormat, isSystemShortName } from './short-names.ts';
