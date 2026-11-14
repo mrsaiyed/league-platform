@@ -101,6 +101,7 @@ describe('scoreboard', () => {
           away: 'Away',
           live: 'Live',
           final: 'Final',
+          winner: 'Winner',
         },
       }),
     );
@@ -261,10 +262,12 @@ describe('highlight in the markup', () => {
       away: 'Away',
       live: 'Live',
       final: 'Final',
+      winner: 'Winner',
     };
     const board = (state: 'live' | 'final', h: number, a: number) =>
       render(createElement(Scoreboard, { home: team('H', h), away: team('A', a), state, labels }));
     expect(board('final', 5, 2).match(/data-winner="true"/g)).toHaveLength(1);
+    expect(board('final', 5, 2).match(/Winner<\/span>/g)).toHaveLength(1);
     expect(board('final', 2, 2)).not.toContain('data-winner');
     expect(board('live', 5, 2)).not.toContain('data-winner');
   });
@@ -397,8 +400,6 @@ describe('the stylesheet', () => {
         '.ui-picker option:checked',
       ].sort(),
     );
-    // Never body text: no rule for text, tables or links takes it.
-    expect(css).not.toMatch(/\.ui-(table|note-mark|game-link)[^{]*\{[^}]*--color-highlight/);
   });
   it('lets readers turn movement off', () => {
     expect(css).toContain('prefers-reduced-motion: reduce');

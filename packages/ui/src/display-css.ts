@@ -269,6 +269,7 @@ th[aria-sort='descending'] .ui-sort-button::after {
   font-weight: 700;
 }
 .ui-picker option {
+  background: var(--color-panel);
   color: var(--color-text);
   font-weight: 400;
 }
