@@ -56,6 +56,13 @@ export {
   type SettingRegistry,
 } from './settings/define-setting.ts';
 export { getSetting } from './settings/get-setting.ts';
+export {
+  describeSetting,
+  kindOf,
+  type SettingField,
+  type SettingKind,
+} from './settings/describe-setting.ts';
+export { listLeagueSettings, type LeagueSettingRow } from './settings/list-league-settings.ts';
 export { lookupSetting, type SettingValue, type StoredSetting } from './settings/lookup-setting.ts';
 export {
   leagueCreated,
