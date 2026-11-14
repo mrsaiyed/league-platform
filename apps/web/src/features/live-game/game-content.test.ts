@@ -85,7 +85,8 @@ async function viewOf(world: ReturnType<typeof trackerWorld>, gameId: string) {
   const view: GameView = {
     leagueId: liveLeagueId,
     title: gameTitle(page.value),
-    start: startText(page.value.game.startsAt, 'UTC'),
+    status: page.value.game.status,
+    start: startText(page.value.game.startsAt, 'UTC', page.value.game.status),
     corrected: correctedText(snapshot.value.correctedOn),
     snapshot: snapshot.value,
     snapshotAddress: '/snapshot',
@@ -123,6 +124,32 @@ describe('a game page', () => {
     const html = draw(view);
     expect(html).toContain('This game has not started yet.');
     expect(html).not.toContain('Play by play');
+  });
+
+  it('says a postponed or cancelled game is not going ahead, not that it starts', async () => {
+    const world = trackerWorld();
+    const { view } = await viewOf(world, games.lionsTigers);
+    const when = '2026-11-20T18:00:00Z';
+    for (const [status, says] of [
+      ['postponed', 'This game has been postponed.'],
+      ['cancelled', 'This game has been cancelled.'],
+    ] as const) {
+      const html = draw({ ...view, status, start: startText(when, 'UTC', status) });
+      expect(html).toContain(says);
+      expect(html).toContain('It was set for');
+      expect(html).not.toContain('This game has not started yet.');
+      expect(html).not.toContain('Starts ');
+      expect(startText(null, 'UTC', status)).toBeNull();
+    }
+    expect(startText(null, 'UTC', 'scheduled')).toBe('Date to be announced');
+    expect(startText(when, 'UTC', 'scheduled')).toContain('Starts ');
+  });
+
+  it('notes a forfeit under the result', async () => {
+    const world = trackerWorld();
+    const { view } = await viewOf(world, games.decided);
+    expect(draw({ ...view, status: 'forfeit' })).toContain('This game was decided by forfeit.');
+    expect(draw({ ...view, status: 'final' })).not.toContain('forfeit');
   });
 
   it('draws a finished game with its result and how it was recorded', async () => {

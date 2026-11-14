@@ -58,7 +58,8 @@ export async function GamePage({
       view={{
         leagueId: addressee.id,
         title: gameTitle(page.value),
-        start: startText(page.value.game.startsAt, clock.timeZone),
+        status: page.value.game.status,
+        start: startText(page.value.game.startsAt, clock.timeZone, page.value.game.status),
         corrected: correctedText(snapshot.value.correctedOn ?? page.value.game.correctedOn),
         snapshot: snapshot.value,
         snapshotAddress: leagueApiUrl(addressee, ['games', snapshot.value.gameId, 'snapshot']),

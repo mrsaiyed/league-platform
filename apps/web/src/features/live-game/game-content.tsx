@@ -4,7 +4,7 @@ import type { GameSnapshot } from '@srleagues/contracts';
 import { BoxScoreTable } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { t } from '../../server/messages.ts';
-import { gameWords, liveGameLabels, type BoxScoresView } from './build-game.ts';
+import { gameWords, liveGameLabels, statusNote, type BoxScoresView } from './build-game.ts';
 import { LiveGameView } from './live-game-view.tsx';
 
 /** The web app's own live address (T-14). */
@@ -13,7 +13,10 @@ const liveAddress = '/api/v1/live';
 export type GameView = {
   readonly leagueId: string;
   readonly title: string;
-  readonly start: string;
+  /** The game's own status: the snapshot calls a postponed or cancelled game "scheduled". */
+  readonly status: string;
+  /** Null: a postponed or cancelled game with no date. */
+  readonly start: string | null;
   readonly corrected: string | null;
   readonly snapshot: GameSnapshot;
   readonly snapshotAddress: string;
@@ -27,10 +30,12 @@ export type GameView = {
 export function GameContent({ view }: { readonly view: GameView }) {
   const labels = displayLabels(t);
   const arrivedFinal = view.snapshot.status === 'final';
+  const note = statusNote(view.status);
   return (
     <main>
       <h1 dir="auto">{view.title}</h1>
-      <p>{view.start}</p>
+      {view.start === null ? null : <p>{view.start}</p>}
+      {note === null ? null : <p className="game-status-note">{note}</p>}
       {view.corrected === null ? null : <p className="game-corrected">{view.corrected}</p>}
       <LiveGameView
         leagueId={view.leagueId}
@@ -40,7 +45,7 @@ export function GameContent({ view }: { readonly view: GameView }) {
         initial={view.snapshot}
         showPlayers={!arrivedFinal}
         words={gameWords()}
-        labels={liveGameLabels()}
+        labels={liveGameLabels(view.status)}
       />
       {view.boxScores === null ? null : (
         <section aria-labelledby="game-box-scores">

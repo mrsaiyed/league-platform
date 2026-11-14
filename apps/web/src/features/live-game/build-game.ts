@@ -51,12 +51,27 @@ const column = (key: string): BoxScoreColumn => ({
   fullName: statLabel(key).full,
 });
 
-/** The live part's words. */
-export function liveGameLabels(): LiveGameLabels {
+/**
+ * What a game not played says instead of "not started yet". The snapshot calls a
+ * postponed or cancelled game "scheduled", so the page reads the game's own status.
+ */
+function notStartedText(status: string): string {
+  if (status === 'postponed') return t('game.postponed');
+  if (status === 'cancelled') return t('game.cancelled');
+  return t('game.notStarted');
+}
+
+/** A note under the result: a forfeit says so; null for every other game. */
+export function statusNote(status: string): string | null {
+  return status === 'forfeit' ? t('game.forfeit') : null;
+}
+
+/** The live part's words, for a game whose own status is `status`. */
+export function liveGameLabels(status: string): LiveGameLabels {
   const labels = displayLabels(t);
   return {
     region: t('game.live'),
-    notStarted: t('game.notStarted'),
+    notStarted: notStartedText(status),
     teamFouls: t('game.teamFouls'),
     latestPlay: t('game.latestPlay'),
     playersHidden: t('game.playersHidden'),
@@ -71,9 +86,17 @@ export function liveGameLabels(): LiveGameLabels {
 export const gameTitle = (page: GamePage): string =>
   t('game.title', { away: page.scoreboard.away.name, home: page.scoreboard.home.name });
 
-/** When the game starts, in the league's own zone. */
-export function startText(startsAt: string | null, timeZone: string): string {
-  if (startsAt === null) return t('game.noDate');
+/**
+ * When the game starts, in the league's own zone. A postponed or cancelled game says
+ * when it was set for, or nothing when it had no date.
+ */
+export function startText(
+  startsAt: string | null,
+  timeZone: string,
+  status: string,
+): string | null {
+  const notPlayed = status === 'postponed' || status === 'cancelled';
+  if (startsAt === null) return notPlayed ? null : t('game.noDate');
   const when = new Intl.DateTimeFormat(locale, {
     weekday: 'long',
     month: 'long',
@@ -82,7 +105,7 @@ export function startText(startsAt: string | null, timeZone: string): string {
     minute: '2-digit',
     timeZone,
   }).format(new Date(startsAt));
-  return t('game.startsAt', { when });
+  return t(notPlayed ? 'game.wasSetFor' : 'game.startsAt', { when });
 }
 
 /** "Corrected on 14 Nov 2026": the date only, never the reason (S-7); null if never corrected. */
