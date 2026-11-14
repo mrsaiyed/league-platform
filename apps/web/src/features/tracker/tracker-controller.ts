@@ -509,13 +509,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * was waiting listed as not saved and the server's state shown. For any other reason
    * (the storage failed, say) the waiting taps stay shown and are sent on opening again
    * into the same session, so they are not listed: listing them would invite entering
-   * them twice.
+   * them twice. `gameWasLost`: another device had the game already (a takeover was
+   * turned away), so the loss is finished whatever the reason (finding L2).
    */
-  const readOnly = async (reason: ReadOnlyReason): Promise<void> => {
+  const readOnly = async (reason: ReadOnlyReason, gameWasLost = false): Promise<void> => {
     const hadGame = base !== null || made.length > 0;
     stopScoring();
     update({ mode: { kind: 'read-only', reason }, signedOut: false });
-    if (losesTheGame(reason, hadGame)) await lost();
+    if (gameWasLost || losesTheGame(reason, hadGame)) await lost();
   };
 
   /** Signed out while scoring (finding M4): keep scoring, hold the taps, keep the session. */
@@ -548,6 +549,32 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     current.mode.kind === 'read-only' || current.mode.kind === 'held-by-other';
 
   /**
+   * Taps the scorekeeper has dismissed from the not-saved list: never listed again, even
+   * by a read of the storage made before they were dropped from it (finding L3).
+   */
+  const dismissed = new Set<string>();
+
+  /** Shows `list` as the taps not saved, less any the scorekeeper has dismissed. */
+  const listNotSaved = (list: readonly KeptTap[]): void => {
+    update({ notSaved: withoutTaps(list, dismissed) });
+  };
+
+  /**
+   * A tap listed as not saved that the server's state holds was taken though its answer
+   * never came back: it is saved. It leaves the list and the storage, so it is never
+   * entered twice (finding M1).
+   */
+  const dropTaken = async (state: ServerState): Promise<void> => {
+    const taken = new Set(state.state.recent.map((id) => id.toLowerCase()));
+    const saved = current.notSaved
+      .map((t) => t.command.commandId)
+      .filter((id) => taken.has(id.toLowerCase()));
+    if (saved.length === 0) return;
+    update({ notSaved: withoutTaps(current.notSaved, new Set(saved)) });
+    await queue.forget(saved).catch(() => undefined);
+  };
+
+  /**
    * The game was lost (T6 §5): what this device had not sent is listed as not saved,
    * added to what was listed before, and set aside in the storage so it is never sent
    * and a reload keeps the list. The server's state is shown, since another device may
@@ -563,9 +590,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       const waiting = keptIn(held, 'waiting');
       const unsent = new Set(waiting.map((t) => t.command.commandId));
       made = made.filter((c) => !unsent.has(c.commandId));
-      update({
-        notSaved: withTaps(withTaps(current.notSaved, keptIn(held, 'not-saved')), waiting),
-      });
+      listNotSaved(withTaps(withTaps(current.notSaved, keptIn(held, 'not-saved')), waiting));
       // If this fails they are still listed, and never sent under another session.
       if (waiting.length > 0) await queue.setAside([...unsent]).catch(() => undefined);
       if (!stillLost()) return;
@@ -573,23 +598,21 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     showGame();
     const loaded = await ask((signal) => server.loadState(signal));
     if (loaded.kind !== 'answer' || !stillLost()) return;
-    // A tap the state holds was taken though its answer never came back: it is saved.
-    const taken = new Set(loaded.value.state.recent.map((id) => id.toLowerCase()));
-    const saved = current.notSaved
-      .map((t) => t.command.commandId)
-      .filter((id) => taken.has(id.toLowerCase()));
-    if (saved.length > 0) {
-      update({ notSaved: withoutTaps(current.notSaved, new Set(saved)) });
-      await queue.forget(saved).catch(() => undefined);
-      if (!stillLost()) return;
-    }
+    await dropTaken(loaded.value);
+    if (!stillLost()) return;
     base = loaded.value;
     made = [];
     showGame();
   };
 
-  /** What a session reply that is not "held by you" means for this device. */
-  const notHeld = async (reply: Exclude<SessionReply, { status: 'held-by-you' }>) => {
+  /**
+   * What a session reply that is not "held by you" means for this device.
+   * `gameWasLost`: as for `readOnly` (the reply turned a takeover away).
+   */
+  const notHeld = async (
+    reply: Exclude<SessionReply, { status: 'held-by-you' }>,
+    gameWasLost = false,
+  ) => {
     switch (reply.status) {
       case 'held-by-other': {
         stopScoring();
@@ -597,9 +620,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         return lost();
       }
       case 'ended':
-        return readOnly(reply.reason);
+        return readOnly(reply.reason, gameWasLost);
       case 'refused':
-        return readOnly(reply.code);
+        return readOnly(reply.code, gameWasLost);
     }
   };
 
@@ -639,6 +662,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       base = loaded.value;
       showGame();
     });
+    // A tap listed as not saved that the state has is saved after all (finding M1).
+    await dropTaken(loaded.value);
     return true;
   };
 
@@ -672,6 +697,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   const hold = async (held: string): Promise<void> => {
     const madeUnder = (entry: QueuedCommand) =>
       entry.sessionId === undefined || entry.sessionId === held;
+    // A batch the old session sent may still be on its way, and be taken: wait for its
+    // answer first, so a tap the server took is never listed (finding M1), as `lost` does.
+    await queue.idle();
     let waiting: QueuedCommand[];
     let stale: KeptTap[];
     let setAside: KeptTap[];
@@ -695,7 +723,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // setting aside failed, then sent on opening again into the session it was made under).
     const sent = new Set(made.map((c) => c.commandId));
     const listed = withTaps(withTaps(current.notSaved, setAside), stale);
-    update({ notSaved: withoutTaps(listed, sent) });
+    listNotSaved(withoutTaps(listed, sent));
+    // Loading the state then drops any of them the server has after all (M1).
     return scoreWith(held);
   };
 
@@ -754,7 +783,16 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   /** Drops the taps listed as not saved: the scorekeeper has seen them. */
   const forgetNotSaved = async (): Promise<void> => {
     const ids = current.notSaved.map((t) => t.command.commandId);
-    if (ids.length > 0) await queue.forget(ids);
+    // Known as dismissed before the storage is written, so a read of it already under
+    // way (a loss being listed, say) cannot bring them back (finding L3).
+    for (const id of ids) dismissed.add(id);
+    try {
+      if (ids.length > 0) await queue.forget(ids);
+    } catch (thrown) {
+      // Still stored, so still listed: the scorekeeper can dismiss them again.
+      for (const id of ids) dismissed.delete(id);
+      throw thrown;
+    }
     const dropped = new Set(ids);
     made = made.filter((c) => !dropped.has(c.commandId));
     update({ notSaved: withoutTaps(current.notSaved, dropped) });
@@ -813,7 +851,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       const held = await storage.list(gameId);
       made = tapsIn(held, 'waiting');
       // Listed as not saved before the reload, and not dismissed: still listed.
-      update({ notSaved: withTaps(current.notSaved, keptIn(held, 'not-saved')) });
+      listNotSaved(withTaps(current.notSaved, keptIn(held, 'not-saved')));
     } catch {
       // Never left opening for good: read-only with a reason, and `openAgain` tries again.
       return readOnly('storage-failed');
@@ -860,10 +898,25 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         // Read afresh: it may have changed while the tap was stored.
         const mode = modeNow();
         const keptLikeTheRest = mode.kind === 'read-only' && !losesTheGame(mode.reason, true);
-        const listed = current.notSaved.some((t) => t.command.commandId === command.commandId);
+        const isListed = () =>
+          current.notSaved.some((t) => t.command.commandId === command.commandId);
         const moved = mode.kind !== 'scoring' || sessionId !== under;
-        if (listed || (moved && !keptLikeTheRest)) {
-          if (!listed) update({ notSaved: withTaps(current.notSaved, [{ command, moment }]) });
+        if (isListed() || (moved && !keptLikeTheRest)) {
+          if (!isListed()) {
+            // It may have gone out, and been taken, before the game was lost: wait for
+            // that answer, and list it only if the storage still holds it waiting
+            // (finding L1). If the storage cannot be read, it is listed: never lost silently.
+            await queue.idle();
+            const still = await storage.list(gameId).then(
+              (list) => list.find((e) => e.command.commandId === command.commandId)?.state,
+              () => 'waiting' as const,
+            );
+            // Taken by the server: saved, and the game shown is the server's.
+            if (still === undefined) return { ok: true, commandId: command.commandId };
+            if (still === 'waiting' && !isListed()) {
+              listNotSaved(withTaps(current.notSaved, [{ command, moment }]));
+            }
+          }
           await queue.setAside([command.commandId]).catch(() => undefined);
           return { ok: false, reason: 'not-scoring' };
         }
@@ -894,14 +947,17 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         void track(lost());
         return { ok: false, reason: 'unanswered' };
       }
+      // Turned away (signed out, may not score, say): read-only, and what was being done
+      // about the lost game when the takeover began is finished, as when it goes
+      // unanswered (finding L2): another device has had the game whatever the reason.
       if (taken.kind === 'rejected') {
-        await track(readOnly(reasonOfStatus(taken.httpStatus)));
+        await track(readOnly(reasonOfStatus(taken.httpStatus), true));
         return { ok: true };
       }
       const reply = taken.value;
       if (reply.status !== 'held-by-you') {
         // Changed hands since it was shown: the new holder is shown to confirm again.
-        await track(notHeld(reply));
+        await track(notHeld(reply, true));
         return { ok: true };
       }
       // What was made under the session that lost the game is never sent under this one.
