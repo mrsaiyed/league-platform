@@ -100,7 +100,9 @@ export const publicNames = defineSetting({
 
 /**
  * R-15: whether an adult may ask to appear as initials. Off until the league switches it
- * on. A request for a child always takes effect, whatever this says (R-25).
+ * on. A request for a child always takes effect, whatever this says (R-25). It decides
+ * only whether a new adult request may be recorded: switching it off takes no one's
+ * recorded initials away (R-27).
  */
 export const playersMayAskForInitials = defineSetting({
   key: 'privacy.playersMayAskForInitials',

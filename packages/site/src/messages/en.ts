@@ -996,7 +996,7 @@ export const en = {
   'setting.privacy.publicNames.confirm':
     'I confirm this league has the permission it needs to show children by their full names, for example from their parents on the registration form.',
   'setting.privacy.playersMayAskForInitials.label':
-    'Adults may ask to appear as initials on public pages. Children always can, whatever this says: a request from a parent is always followed. Anyone can ask to have their name taken off.',
+    'Adults may ask to appear as initials on public pages. Children always can, whatever this says: a request from a parent is always followed. Anyone can ask to have their name taken off. Switching this off only stops new requests: anyone already shown as initials stays that way until their own record is changed.',
   // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
   // league's name, {role} a role's name from above, {days} how long a link works.
   'email.invitation.subject': 'You are invited to help run {league}',

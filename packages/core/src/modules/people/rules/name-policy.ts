@@ -49,14 +49,18 @@ export function shownAsChild(isMinor: boolean | null, audience: Audience): boole
 }
 
 /**
- * R-25: whether a person's request takes effect. "Removed" and "as the league shows
- * everyone" always do (R-17). "Initials" always does for a child (shown under the
+ * R-25: whether a NEW request may be recorded. "Removed" and "as the league shows
+ * everyone" always may (R-17). "Initials" always may for a child (shown under the
  * children's rule): a guardian asking for less of their child to be public is never
- * overruled by a league setting. For an adult it does only while the league lets
- * players ask for initials (R-15). The command refuses a request that would not take
- * effect, so none is saved to do nothing.
+ * overruled by a league setting. For an adult only while the league lets players ask
+ * for initials (R-15); otherwise the command refuses it, so none is saved to do nothing.
+ *
+ * R-27: this decides recording only. A request once recorded keeps taking effect
+ * (`showName` honours it) until that person's own "Show as" is changed, whatever
+ * happens later to the switch or to the person's age: a name never comes back onto a
+ * public page as a side effect of another change.
  */
-export function nameRequestTakesEffect(
+export function mayRecordNameRequest(
   request: NameRequest,
   person: { readonly isMinor: boolean | null },
   audience: Audience,

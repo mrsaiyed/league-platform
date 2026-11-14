@@ -1,14 +1,9 @@
 // The one function every public page and live message gets a person's name from
 // (T-81). It applies the league's display policy (R-14, R-15, R-24), the person's own
-// request (R-15, R-17, R-25) and, where the name stands beside a team's numbers, who may see
+// request (R-15, R-17, R-25, R-27) and, where the name stands beside a team's numbers, who may see
 // that team's player statistics (S-22, T-87).
 import type { Audience } from '../../leagues/index.ts';
-import {
-  nameRequestTakesEffect,
-  shownAsChild,
-  type NamePolicy,
-  type NameRequest,
-} from './name-policy.ts';
+import { shownAsChild, type NamePolicy, type NameRequest } from './name-policy.ts';
 import { statsShown, type TeamStatsSetting } from './stats-shown.ts';
 import type { Viewer } from './viewer.ts';
 
@@ -78,11 +73,10 @@ export function showName(person: PersonForDisplay, where: WhereShown): ShownName
   const last = tidy(person.lastName);
   if (first === '' && last === '') return { shown: false, why: 'no_name' };
 
-  // R-25: whether a request for initials takes effect is the one policy function's to
-  // say, which the command that records a request asks too.
-  const asked =
-    person.nameRequest === 'initials' &&
-    nameRequestTakesEffect('initials', person, where.audience, where.policy);
+  // R-27: a request once recorded keeps taking effect, whatever the league's initials
+  // switch or the person's age now say; only whether a new one may be recorded depends
+  // on them (mayRecordNameRequest, asked by the command).
+  const asked = person.nameRequest === 'initials';
   let form: Form;
   if (shownAsChild(person.isMinor, where.audience)) {
     // R-24: the league's choice; R-25: a request for initials always takes effect for a
@@ -90,7 +84,7 @@ export function showName(person: PersonForDisplay, where: WhereShown): ShownName
     const league = formOf(where.policy.children);
     form = asked ? lesser(league, 'initials') : league;
   } else {
-    // R-15: an adult by full name, as initials only where the league allows asking.
+    // R-15: an adult by full name, or as the initials they asked for.
     form = asked ? 'initials' : 'full';
   }
   switch (form) {

@@ -13,6 +13,9 @@
 // request is refused (`initials-not-offered`), never kept to do nothing. Removed always
 // works. R-26: in an archived or suspended league a change that shows less of the person
 // (to initials, or to removed) still works; one that shows more is refused (U-9).
+// R-27: the check is for a new request only. Saving the value a person already has is
+// not one: it is allowed and changes nothing, and a request once recorded keeps taking
+// effect whatever later happens to the switch or to the person's age.
 import { z } from 'zod';
 import { hasPermission, readOnlyLeagueStatuses, recordActivity } from '../../access/index.ts';
 import {
@@ -25,7 +28,7 @@ import {
 import type { PeopleTx } from '../ports.ts';
 import { readNamePolicy } from '../queries/read-name-policy.ts';
 import {
-  nameRequestTakesEffect,
+  mayRecordNameRequest,
   nameRequests,
   requestShowsLess,
   type NameRequest,
@@ -87,7 +90,7 @@ export const setNameRequest = defineCommand({
         readNamePolicy({ settingRows: (key) => tx.people.leagueSettingRows(key) }),
       ]);
       const isMinor = person.sensitive?.isMinor ?? null;
-      if (!nameRequestTakesEffect('initials', { isMinor }, audience, policy)) {
+      if (!mayRecordNameRequest('initials', { isMinor }, audience, policy)) {
         return fail({ code: 'initials-not-offered' });
       }
     }

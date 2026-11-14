@@ -64,15 +64,19 @@ describe('showName: the league display policy (R-14, R-15)', () => {
     expect(showName(person({ isMinor: true }), where('adult'))).toEqual(named('Amina Y.'));
   });
 
-  it("shows an adult's initials only when they asked and the league allows asking", () => {
+  it("keeps honouring an adult's recorded initials, whatever the switch now says (R-27)", () => {
     const asked = person({ nameRequest: 'initials' });
-    expect(showName(asked, where('adult'))).toEqual(named('Amina Yusuf'));
     expect(showName(asked, where('adult', { playersMayAskForInitials: true }))).toEqual(
       named('A. Y.'),
     );
-    expect(showName(asked, where('youth', { playersMayAskForInitials: true }))).toEqual(
+    // The league switched asking off after the request was recorded: it still holds.
+    expect(showName(asked, where('adult'))).toEqual(named('A. Y.'));
+    // A child who asked and has since been recorded as an adult: it still holds.
+    expect(showName(person({ isMinor: false, nameRequest: 'initials' }), where('youth'))).toEqual(
       named('A. Y.'),
     );
+    // Someone who did not ask is shown by full name.
+    expect(showName(person(), where('adult'))).toEqual(named('Amina Yusuf'));
   });
 
   it("always honours a child's request for initials, whatever the league's settings (R-25)", () => {
@@ -197,7 +201,8 @@ describe('showName: every combination of policy, setting and viewer', () => {
       if (policy.children === 'first_name_last_initial') return named('Amina Y.');
       return named('Amina Yusuf');
     }
-    if (request === 'initials' && policy.playersMayAskForInitials) return named('A. Y.');
+    // A recorded request holds whatever the switch now says (R-27).
+    if (request === 'initials') return named('A. Y.');
     return named('Amina Yusuf');
   }
 

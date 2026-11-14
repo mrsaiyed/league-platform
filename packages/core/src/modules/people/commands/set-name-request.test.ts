@@ -9,6 +9,9 @@ import {
   scorekeeperGrant,
   scorekeeperId,
 } from '../memory-people.test-helper.ts';
+import type { NameRequest } from '../rules/name-policy.ts';
+import { showName } from '../rules/show-name.ts';
+import { publicViewer } from '../rules/viewer.ts';
 import { setNameRequest } from './set-name-request.ts';
 import { updatePerson } from './update-person.ts';
 
@@ -193,6 +196,69 @@ describe('setNameRequest: initials for children always, for adults where offered
       expect(codeOf(await setNameRequest(as(ownerId), ask(who, 'removed'), deps))).toBe('ok');
       expect(db.state.people[i]?.visibility).toBe('removed');
     }
+  });
+});
+
+describe('a recorded request keeps taking effect (R-27)', () => {
+  /** How the person shows on a public page now, from what is stored. */
+  const shownNow = (
+    stored: { firstName: string; lastName: string; visibility: string },
+    isMinor: boolean | null,
+    audience: 'adult' | 'youth',
+    playersMayAskForInitials: boolean,
+  ) =>
+    showName(
+      {
+        firstName: stored.firstName,
+        lastName: stored.lastName,
+        isMinor,
+        nameRequest: stored.visibility as NameRequest,
+      },
+      {
+        audience,
+        policy: { children: 'first_name_last_initial', playersMayAskForInitials },
+        viewer: publicViewer('L1'),
+        statsOf: null,
+      },
+    );
+
+  it("keeps an adult's initials after the league switches asking off", async () => {
+    const m = league({ audience: 'adult', settings: { 'privacy.playersMayAskForInitials': true } });
+    expect(codeOf(await setNameRequest(m.as(ownerId), ask(adult, 'initials'), m.deps))).toBe('ok');
+    m.db.state.settings = { 'privacy.playersMayAskForInitials': false };
+    const stored = m.db.state.people[1];
+    if (stored === undefined) throw new Error('expected the person');
+    expect(shownNow(stored, false, 'adult', false)).toEqual({ shown: true, text: 'F. L.' });
+    // Saving what they already have is not a new request: allowed, nothing changes.
+    expect(await setNameRequest(m.as(ownerId), ask(adult, 'initials', 2), m.deps)).toEqual({
+      ok: true,
+      value: { version: 2 },
+    });
+    expect(m.db.state.activity).toHaveLength(1);
+    // A new request for an adult is still refused while asking is off.
+    expect(await setNameRequest(m.as(ownerId), ask(unknownAge, 'initials'), m.deps)).toEqual({
+      ok: false,
+      error: { code: 'initials-not-offered' },
+    });
+  });
+
+  it("keeps a child's initials after their age makes them an adult", async () => {
+    const m = league({ audience: 'adult' });
+    expect(codeOf(await setNameRequest(m.as(ownerId), ask(child, 'initials'), m.deps))).toBe('ok');
+    const grownUp = await updatePerson(
+      m.as(ownerId),
+      { personId: child, version: 2, isMinor: false, birthDate: '2000-01-01' },
+      m.deps,
+    );
+    expect(grownUp).toEqual({ ok: true, value: { version: 3 } });
+    const stored = m.db.state.people[0];
+    if (stored === undefined) throw new Error('expected the person');
+    expect(stored.visibility).toBe('initials');
+    expect(shownNow(stored, false, 'adult', false)).toEqual({ shown: true, text: 'F. L.' });
+    expect(await setNameRequest(m.as(ownerId), ask(child, 'initials', 3), m.deps)).toEqual({
+      ok: true,
+      value: { version: 3 },
+    });
   });
 });
 

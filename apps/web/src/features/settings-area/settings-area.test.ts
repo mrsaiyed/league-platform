@@ -129,6 +129,9 @@ describe('the settings form', () => {
     expect(privacy).toContain('that always wins over this setting');
     expect(privacy).toContain('Adults may ask to appear as initials on public pages.');
     expect(privacy).toContain('Children always can, whatever this says');
+    // R-27: switching it off takes no one's initials away.
+    expect(privacy).toContain('Switching this off only stops new requests');
+    expect(privacy).toContain('stays that way until their own record is changed');
     // Only the names setting asks to confirm.
     expect(html.match(/name="confirmed"/g)).toHaveLength(1);
   });

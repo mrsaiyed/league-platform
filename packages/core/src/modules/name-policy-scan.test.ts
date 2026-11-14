@@ -47,17 +47,22 @@ type MadeUp = {
   readonly side: 'home' | 'away';
 };
 
-/** Children, people of unknown age and adults, each with a request of their own. */
+/**
+ * Children, people of unknown age and adults, each with a request of their own. Under
+ * "adults may not ask", Lena stands for an adult whose initials were recorded before the
+ * league switched asking off, and Ravi for a child whose initials were recorded before
+ * his age made him an adult: both requests keep taking effect (R-27).
+ */
 const people: readonly MadeUp[] = [
   ['Mariam', 'Okafor', null, 'none'],
   ['Yusuf', 'Haddad', true, 'initials'],
   ['Lena', 'Fischer', false, 'initials'],
+  ['Ravi', 'Patel', false, 'initials'],
   ['Omar', 'Rahimi', true, 'removed'],
   ['Dana', 'Whitfield', false, 'none'],
   ['Theo', 'Lindqvist', false, 'removed'],
   ['Priya', 'Raman', null, 'initials'],
   ['Kofi', 'Mensah', true, 'none'],
-  ['Wen', 'Zhao', false, 'none'],
   ['Gita', 'Shah', null, 'removed'],
 ].map(([firstName, lastName, isMinor, nameRequest], i) => ({
   id: personId(i + 1),
@@ -76,7 +81,8 @@ function expectedName(p: MadeUp, audience: Audience, policy: NamePolicy): ShownN
   const initials = `${p.firstName[0]}. ${p.lastName[0]}.`;
   const child = p.isMinor === true || (p.isMinor === null && audience !== 'adult');
   if (!child) {
-    return p.nameRequest === 'initials' && policy.playersMayAskForInitials
+    // A recorded request holds whatever the switch now says (R-27).
+    return p.nameRequest === 'initials'
       ? { shown: true, text: initials }
       : { shown: true, text: `${p.firstName} ${p.lastName}` };
   }
@@ -242,6 +248,9 @@ describe('every public surface under each name setting (T-81, R-24, R-25)', () =
       ]);
       const textOf = (name: ShownName | undefined) => (name?.shown === true ? name.text : null);
       const wanted = expected.map(textOf);
+      // R-27 in plain view: the recorded initials of Lena (an adult) and Ravi (a child
+      // then, an adult now) hold even where adults may no longer ask.
+      expect(wanted.slice(2, 4)).toEqual(['L. F.', 'R. P.']);
 
       // A team's roster: one line each, the removed and the hidden kept with their number.
       const roster = people.map((p) =>
