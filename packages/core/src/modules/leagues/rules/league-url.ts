@@ -113,6 +113,11 @@ type Common = {
    * site (an email, a calendar feed). Without it the address starts at `/`.
    */
   readonly origin?: string | undefined;
+  /**
+   * Extra `?name=value` pairs after the page's own (such as the season), in the order
+   * given. A name the address already uses itself (`season`) cannot be given here.
+   */
+  readonly query?: Readonly<Record<string, string>> | undefined;
 };
 type SeasonOption = {
   /** A past season's short name; without it the page shows the current season. */
@@ -212,8 +217,21 @@ export function leagueUrl<P extends LeaguePage>(
   }
 
   const season = spec.level === 'private' ? undefined : given('season');
-  const query =
-    season === undefined ? '' : `?${new URLSearchParams({ season: checked('season', season) })}`;
+  const pairs = new URLSearchParams();
+  if (season !== undefined) pairs.set('season', checked('season', season));
+  const extra = values['query'];
+  if (extra !== undefined) {
+    if (typeof extra !== 'object' || extra === null || Array.isArray(extra)) {
+      throw new TypeError('leagueUrl: "query" must be a set of names and text.');
+    }
+    for (const [name, value] of Object.entries(extra as Readonly<Record<string, unknown>>)) {
+      if (name === '' || name === 'season' || typeof value !== 'string') {
+        throw new TypeError(`leagueUrl: "query" cannot hold "${name}" like that.`);
+      }
+      pairs.set(name, value);
+    }
+  }
+  const query = pairs.size === 0 ? '' : `?${pairs}`;
   const below = segments.length === 0 ? '' : `/${segments.join('/')}`;
   return leagueRoot(league, given('origin')) + below + query;
 }

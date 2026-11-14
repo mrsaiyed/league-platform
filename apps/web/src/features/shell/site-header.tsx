@@ -1,5 +1,6 @@
 import { leagueUrl, platformUrl, type LeagueAddressee } from '@srleagues/core';
 import { t } from '../../server/messages.ts';
+import { leagueHomeStayUrl } from '../team-pages/index.ts';
 
 const menu = [
   ['home', 'nav.home'],
@@ -21,14 +22,16 @@ export function SiteHeader({
 }) {
   return (
     <header className="site-header">
-      <a className="site-name" href={leagueUrl(league, 'home')} dir="auto">
+      <a className="site-name" href={leagueHomeStayUrl(league)} dir="auto">
         {name}
       </a>
       <nav aria-label={t('nav.menu')}>
         <ul>
           {menu.map(([page, label]) => (
             <li key={page}>
-              <a href={leagueUrl(league, page)}>{t(label)}</a>
+              <a href={page === 'home' ? leagueHomeStayUrl(league) : leagueUrl(league, page)}>
+                {t(label)}
+              </a>
             </li>
           ))}
           {signedIn ? null : (

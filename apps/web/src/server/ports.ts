@@ -10,6 +10,7 @@ import type { FixtureImportPorts } from './fixture-import-ports.ts';
 import type { GamesAreaPorts } from './games-area-ports.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
+import type { PublicTeamsPorts } from './public-teams.ts';
 import type { AdminTeamsPorts } from './admin-teams.ts';
 import type { PublishPlays } from './tracker-commands-endpoint.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
@@ -37,6 +38,8 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly fixtureImport: FixtureImportPorts;
   /** What the public home and schedule pages read (step 2.42). */
   readonly publicSchedule: PublicSchedulePorts;
+  /** What the public teams pages and the members' start page read (step 2.44). */
+  readonly publicTeams: PublicTeamsPorts;
   /** What the admin's Teams screens read and run (step 2.51). */
   readonly adminTeams: AdminTeamsPorts;
   /** What the tracker's endpoints run on (step 2.32). */
