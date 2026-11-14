@@ -15,7 +15,7 @@ So three things change (decided by the lead, 2026-11-14): one owner for the look
 
 ## 1. Who owns the look
 
-- **The design lead** is a builder on the strongest model there is (runbook, section 4: `fable`, high effort). It builds the design steps (2.85, 2.101, 2.102 and any later step whose job is the look). It owns `packages/ui`, `packages/site/src/design` and the web app's stylesheets. It works like a product designer who also writes the front end: it decides layout, spacing, type and color use, and it is expected to change a page's markup where the look needs it.
+- **The design lead** is a builder on the strongest model there is (runbook, section 4: `fable`, high effort). It builds the design steps (2.85, 2.102, 2.103 and any later step whose job is the look). It owns `packages/ui`, `packages/site/src/design` and the web app's stylesheets. It works like a product designer who also writes the front end: it decides layout, spacing, type and color use, and it is expected to change a page's markup where the look needs it.
 - **Every other builder** that adds or changes a screen uses the shared display pieces and the shared classes. It adds no color, no font size, no spacing value and no one-off style of its own. If a piece it needs does not exist, it builds the screen with the nearest piece and says so in its report; the design lead adds the piece.
 - **The design reviewer** is a fresh sub-agent on the same strongest model that did not write the change. It looks at the pictures first and the code second (section 6).
 - **The lead** looks at the home page of both made-up leagues, at both widths, before it tells the founder a design step is done.

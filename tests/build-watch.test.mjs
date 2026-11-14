@@ -66,6 +66,13 @@ test('the earliest stage has steps left that nothing builds and nothing lists', 
   assert.deepEqual(keys({ ...facts, firstStageLeft: [] }), []);
 });
 
+test('a step number given out twice is a sign', () => {
+  const [sign] = stallSigns({ ...moving, duplicates: ['2.101'] });
+  assert.equal(sign.key, 'duplicate-2.101');
+  assert.match(sign.text, /STEP 2\.101 IS IN THE PLAN TWICE/);
+  assert.deepEqual(keys({ ...moving, duplicates: [] }), []);
+});
+
 test('a working run that lands nothing for two hours is stuck; an idle build is not', () => {
   const quiet = { ...moving, lastLanding: ago(limits.landingMinutes) };
   assert.deepEqual(keys(quiet), ['nothing-landing']);
