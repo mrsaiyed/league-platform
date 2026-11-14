@@ -293,6 +293,7 @@ All dated November 12, 2026.
 | T-249                 | New                                                                          | Placing a schedule: strict rules never broken, the rest best effort, unplaced games returned (rec. 037)                                         | Step 2.73: P7 §4 did not say what happens when the fairness rules cannot all be met                |
 | T-250                 | New                                                                          | A tracked game ends by the tracker's tap or a command; did-not-play lines; a reopened one goes back to its tracker (rec. 038)                   | Step 2.30: T6 §7, §8 did not say which door ends a game or where a reopened one goes               |
 | T-251                 | New                                                                          | Tracker endpoints: one session address naming the device; errors as HTTP; a live message per batch from a visitor snapshot (rec. 039)           | Step 2.32: T6 §3, §5, §6 gave no session bodies, statuses or messages per batch                    |
+| T-255                 | New                                                                          | Game page: a snapshot when the connection opens, for old players, after 30 s quiet; final games not followed (rec. 051)                         | Step 2.45: T-118, T-119 missed a lost last message, players, and plays before connecting           |
 
 ## The full list
 
@@ -713,6 +714,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-249 | Schedules never break strict rules (twice a day, same matchup two weeks running, division, requests); the rest is best effort; unplaced games are returned (rec. 037)                                                                                     | Agreed (delegated) |         |
 | T-250 | A tracked game is ended by the tracker's End game tap or a command, with did-not-play lines; reopening hands it back to its tracker (record 038)                                                                                                          | Agreed (delegated) |         |
 | T-251 | Tracker endpoints: commands, one session address (open, renew, take over, release; names the device) and the snapshot; errors as HTTP; after a batch, one live message cut from the visitor's snapshot; hub at /api/v1/live (rec. 039)                    | Agreed (delegated) |         |
+| T-255 | A game page also fetches a snapshot when its live connection opens, at most every 5 s while its players are older than the score, and every 30 s while a live game is quiet; final games are not followed (rec. 051)                                      | Agreed (delegated) |         |
 
 ### [T7 — Notifications and jobs](technical/T7-notifications-and-jobs.md)
 
