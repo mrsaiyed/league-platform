@@ -113,7 +113,7 @@ export function TrackerOpening({
 
   const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
   return (
-    <main className="score-root tracker-opening">
+    <main className="score-root">
       <h1>{t('tracker.title')}</h1>
       <p>{matchup}</p>
       {phase.kind === 'preparing' ? <p role="status">{t('tracker.opening')}</p> : null}

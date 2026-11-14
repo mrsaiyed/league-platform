@@ -70,10 +70,7 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
               />
               {opensInTracker(game) ? (
                 <p>
-                  <a
-                    className="admin-my-games-score"
-                    href={leagueUrl(here, 'score', { game: game.id })}
-                  >
+                  <a href={leagueUrl(here, 'score', { game: game.id })}>
                     {t('admin.myGames.score')}
                   </a>
                 </p>

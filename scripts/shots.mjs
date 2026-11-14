@@ -39,6 +39,8 @@ const madeUp = {
 // (apps/web/src/server/stand-in-ports.ts).
 const leagues = ['north-valley', 'harbor-city'];
 const owner = { name: 'srl_session', value: 'local-owner-token' };
+// The made-up scorekeeper, who scores games in the first league only.
+const scorekeeper = { name: 'srl_session', value: 'local-scorekeeper-token' };
 const widths = [
   { name: '390', viewport: { width: 390, height: 844 } },
   { name: '1280', viewport: { width: 1280, height: 800 } },
@@ -65,6 +67,11 @@ const adminPages = [
   { name: 'admin-settings', at: '/admin/settings' },
   { name: 'admin-people', at: '/admin/people' },
   { name: 'admin-standings', at: '/admin/standings' },
+];
+// What the scorekeeper sees (step 2.33): their games, and the tracker opened from them.
+const scorekeeperPages = [
+  { name: 'scorekeeper-games', at: '/admin' },
+  { name: 'scorekeeper-tracker', at: '/admin', first: '/score/' },
 ];
 // SR Leagues' own pages, which belong to no league.
 const platformPages = [
@@ -148,6 +155,8 @@ try {
     const visitor = await browser.newContext({ viewport: width.viewport });
     const staff = await browser.newContext({ viewport: width.viewport });
     await staff.addCookies([{ ...owner, url: origin }]);
+    const keeper = await browser.newContext({ viewport: width.viewport });
+    await keeper.addCookies([{ ...scorekeeper, url: origin }]);
     const jobs = [
       ...platformPages.map((page) => ({ ...page, context: visitor, base: '' })),
       ...leagues.flatMap((league) => [
@@ -164,6 +173,12 @@ try {
           base: `/${league}`,
         })),
       ]),
+      ...scorekeeperPages.map((page) => ({
+        ...page,
+        name: `${leagues[0]}-${page.name}`,
+        context: keeper,
+        base: `/${leagues[0]}`,
+      })),
     ].filter((job) => wanted(job.name));
     for (const job of jobs) {
       const label = `${width.name}/${job.name}`;
@@ -196,6 +211,7 @@ try {
     }
     await visitor.close();
     await staff.close();
+    await keeper.close();
   }
 } finally {
   await browser?.close();
