@@ -43,8 +43,9 @@ const roleText = (role: string): string =>
     ? t(`adminTeams.roster.role.${role}` as TextKey)
     : role;
 
+/** A person's name; the order of its parts is the message file's (T-187). */
 const nameOf = (line: { readonly firstName: string; readonly lastName: string }): string =>
-  `${line.firstName} ${line.lastName}`.trim();
+  t('adminTeams.personName', { firstName: line.firstName, lastName: line.lastName }).trim();
 
 export async function TeamPage({
   league,
@@ -77,6 +78,8 @@ export async function TeamPage({
   const left = lines.filter((line) => line.leftOn !== null);
   const people = await listPeople(context, { limit: 200 }, ports.deps);
   const everyone: readonly PersonRecord[] = people.ok ? people.value : [];
+  // A read that fails is shown as such, never as an empty roster or list.
+  const readFailed = !roster.ok || !people.ok;
   const onRoster = new Set(open.map((line) => line.personId));
   const available = everyone.filter((person) => !onRoster.has(person.id));
   const listUrl = leagueUrl(here, 'admin-area', { area: 'teams' });
@@ -135,7 +138,9 @@ export async function TeamPage({
       </Section>
 
       <Section title={t('adminTeams.roster.title')}>
-        {open.length === 0 ? (
+        {!roster.ok ? (
+          <p role="alert">{t('adminTeams.roster.readFailed')}</p>
+        ) : open.length === 0 ? (
           <p>{t('adminTeams.roster.none')}</p>
         ) : (
           <ol>
@@ -208,7 +213,9 @@ export async function TeamPage({
       </Section>
 
       <Section title={t('adminTeams.add.title')}>
-        {available.length === 0 ? (
+        {readFailed ? (
+          <p role="alert">{t('adminTeams.add.readFailed')}</p>
+        ) : available.length === 0 ? (
           <p>{t('adminTeams.add.noOne')}</p>
         ) : (
           <form action={addToRosterAction}>
@@ -262,6 +269,7 @@ export async function TeamPage({
 
       <Section title={t('adminTeams.people.title')}>
         <p>{t('adminTeams.people.body')}</p>
+        {people.ok ? null : <p role="alert">{t('adminTeams.people.readFailed')}</p>}
         <ul>
           {everyone.map((person) => (
             <li key={person.id}>

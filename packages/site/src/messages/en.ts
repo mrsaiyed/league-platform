@@ -229,6 +229,16 @@ export const en = {
   'adminTeams.roster.markLeft': 'Mark as left',
   'adminTeams.roster.leftTitle': 'Left the team',
   'adminTeams.roster.leftLine': '{name}, left on {date}',
+  'adminTeams.roster.readFailed':
+    'The roster could not be read just now, so it is not shown. Reload the page to try again.',
+  'adminTeams.add.readFailed':
+    'The roster or the league list could not be read just now. Reload the page to try again.',
+  'adminTeams.people.readFailed':
+    'The league list could not be read just now, so it is not shown. Reload the page to try again.',
+  // A person's name as the Teams screens show it; a language may put the parts the other way.
+  'adminTeams.personName': '{firstName} {lastName}',
+  // After a team's name in the list, with the space before it: " (North)".
+  'adminTeams.inDivision': ' ({division})',
   'adminTeams.add.title': 'Add a player',
   'adminTeams.add.person': 'Person',
   'adminTeams.add.choose': 'Choose a person',

@@ -26,7 +26,7 @@ describe('form input', () => {
   it('asks for a short name when none can be made from the name', () => {
     expect(shortNameFrom('فرج')).toBe('');
     expect(shortNameNeeded(newTeamInput({ name: 'فرج' }, 's'))).toBe(true);
-    expect(shortNameNeeded(newTeamInput({ name: 'فرج', shortName: 'faraj' }, 's'))).toBe(false);
+    expect(shortNameNeeded(newTeamInput({ name: 'فرج', shortName: 'stars' }, 's'))).toBe(false);
     expect(shortNameNeeded(newTeamInput({ name: 'Blue Jays' }, 's'))).toBe(false);
     // No name at all is the command's to refuse, not a short-name question.
     expect(shortNameNeeded(changeTeamInput({ name: '' }))).toBe(false);
@@ -74,6 +74,13 @@ describe('form input', () => {
     expect(movedOrder(ids, 'a', 'up')).toEqual(ids);
     expect(movedOrder(ids, 'c', 'down')).toEqual(ids);
     expect(movedOrder(ids, 'x', 'down')).toEqual(ids);
+  });
+});
+
+describe('words the screens build from parts', () => {
+  it('takes the name order and the division brackets from the message file', () => {
+    expect(t('adminTeams.personName', { firstName: 'Ali', lastName: 'Test' })).toBe('Ali Test');
+    expect(t('adminTeams.inDivision', { division: 'North' })).toBe(' (North)');
   });
 });
 

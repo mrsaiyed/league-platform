@@ -69,7 +69,7 @@ async function Body({
                 </a>
                 {divisionName(team.divisionId) === undefined
                   ? null
-                  : ` (${divisionName(team.divisionId)})`}
+                  : t('adminTeams.inDivision', { division: divisionName(team.divisionId) ?? '' })}
               </li>
             ))}
           </ul>
