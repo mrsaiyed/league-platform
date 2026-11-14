@@ -45,6 +45,10 @@ const tokens = {
   otherAdmin: 'local-other-admin-token',
 };
 
+// The made-up leagues' ids (stand-in-ports.ts), which name the cookie of a device's "my team".
+const northValley = '01900000-0000-7000-8000-000000000001';
+const harborCity = '01900000-0000-7000-8000-000000000002';
+
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
 // browser's script fills with the not-found or forbidden screen (record 020), so
 // the refusal is read from the page's data, beside its status.
@@ -55,7 +59,7 @@ const notFound = 'NEXT_HTTP_ERROR_FALLBACK;404';
 // name alone is no proof: the site's menu has "Schedule" and "Teams" too.
 const adminLink = (league, area) => `href="/${league}/admin/${area}"`;
 
-/** [who, path, status, words that must be there, words that must not, forward to] */
+/** [who, path, status, words that must be there, words that must not, forward to, extra cookies] */
 const cases = [
   ['visitor', '/', 200, ['Find your league, or start one']],
   // The sign-in screens (step 1.14).
@@ -87,7 +91,107 @@ const cases = [
   ],
   ['visitor', '/harbor-city/schedule', 200, ['Opening day', 'Other games']],
   ['visitor', '/north-valley/schedule?season=nope', 404, [notFound]],
-  ['visitor', '/north-valley/teams/lions', 200, ['Team']],
+  // The teams list and a team's page (step 2.44): record and seed, the roster by the one name
+  // function, statistics as each team's setting allows; a team that is not there is not found.
+  [
+    'visitor',
+    '/north-valley/teams',
+    200,
+    ['Owls', 'Falcons', '5-1', 'East', 'Seed', 'Record'],
+    ['This page is not built yet.'],
+  ],
+  ['visitor', '/harbor-city/teams', 200, ['Comets', 'Rockets', 'Meteors']],
+  [
+    'visitor',
+    '/north-valley/teams/falcons',
+    200,
+    [
+      'Falcons',
+      'Roster',
+      'Dana Whitfield',
+      'Name not shown',
+      'Left the team',
+      'Schedule',
+      'Results',
+      'Statistics',
+      'League home',
+    ],
+    ['This page is not built yet.', 'Fontaine', 'Make this my team'],
+  ],
+  [
+    'visitor',
+    '/north-valley/teams/owls',
+    200,
+    ['Owls', 'Team totals', 'Roster', 'Jordan Castellanos'],
+    ['Players', '>150<'],
+  ],
+  ['visitor', '/north-valley/teams/lions', 404, [notFound]],
+  ['visitor', '/north-valley/teams/falcons?season=nope', 404, [notFound]],
+  // The start page for members (step 2.44, U-5, R-10). North Valley keeps the league home;
+  // Harbor City starts members on their team: a member with a roster place, or the team a
+  // device remembers. The league home is always one tap away (start=league).
+  ['visitor', '/north-valley', 200, ['Recent results', 'start=league']],
+  ['coach', '/north-valley', 200, ['Recent results']],
+  ['visitor', '/harbor-city', 200, ['Recent results']],
+  ['stranger', '/harbor-city', 200, ['Recent results']],
+  ['coach', '/harbor-city', 307, [], [], '/harbor-city/teams/rockets'],
+  ['coach', '/harbor-city?start=league', 200, ['Recent results']],
+  ['coach', '/harbor-city?season=winter', 200, ['Recent results']],
+  [
+    'visitor',
+    '/harbor-city',
+    307,
+    [],
+    [],
+    '/harbor-city/teams/comets',
+    `srl_my_team_${harborCity}=comets`,
+  ],
+  [
+    'visitor',
+    '/harbor-city?start=league',
+    200,
+    ['Recent results'],
+    [],
+    undefined,
+    `srl_my_team_${harborCity}=comets`,
+  ],
+  [
+    'visitor',
+    '/harbor-city',
+    200,
+    ['Recent results'],
+    [],
+    undefined,
+    `srl_my_team_${harborCity}=nobody`,
+  ],
+  [
+    'visitor',
+    '/harbor-city',
+    200,
+    ['Recent results'],
+    [],
+    undefined,
+    `srl_my_team_${harborCity}=..%2Fx`,
+  ],
+  [
+    'visitor',
+    '/north-valley',
+    200,
+    ['Recent results'],
+    [],
+    undefined,
+    `srl_my_team_${northValley}=owls`,
+  ],
+  ['visitor', '/harbor-city/teams/rockets', 200, ['Make this my team', 'League home']],
+  [
+    'visitor',
+    '/harbor-city/teams/rockets',
+    200,
+    ['This is your team on this device.', 'Stop using this as my team'],
+    ['Make this my team'],
+    undefined,
+    `srl_my_team_${harborCity}=rockets`,
+  ],
   // The design as variables once per page, the header and the mark (step 1.18, T-90, U-8):
   // two leagues, two looks.
   [
@@ -256,8 +360,11 @@ const server = start(['start', '--port', String(port)], {
 });
 try {
   await waitFor(`${origin}/`, server);
-  for (const [who, address, status, must = [], mustNot = [], to] of cases) {
-    const headers = who === 'visitor' ? {} : { cookie: `srl_session=${tokens[who]}` };
+  for (const [who, address, status, must = [], mustNot = [], to, extraCookie] of cases) {
+    const sent = [who === 'visitor' ? '' : `srl_session=${tokens[who]}`, extraCookie ?? ''];
+    const headers = sent.some((c) => c !== '')
+      ? { cookie: sent.filter((c) => c !== '').join('; ') }
+      : {};
     const response = await fetch(origin + address, { headers, redirect: 'manual' });
     const text = await response.text();
     const label = `${who} ${address}`;

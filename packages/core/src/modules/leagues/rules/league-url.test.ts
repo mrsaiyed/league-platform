@@ -130,6 +130,18 @@ describe('leagueUrl (T-34)', () => {
     );
   });
 
+  it('adds extra query pairs after the season, encoded', () => {
+    expect(leagueUrl(north, 'home', { query: { start: 'league' } })).toBe(
+      '/north-league?start=league',
+    );
+    expect(leagueUrl(north, 'home', { season: 'fall-2025', query: { start: 'a&b' } })).toBe(
+      '/north-league?season=fall-2025&start=a%26b',
+    );
+    expect(leagueUrl(north, 'home', { query: {} })).toBe('/north-league');
+    expect(() => leagueUrl(north, 'home', { query: { season: 'x' } })).toThrow(TypeError);
+    expect(() => leagueUrl(north, 'home', { query: { '': 'x' } })).toThrow(TypeError);
+  });
+
   it('refuses values that cannot be part of an address', () => {
     for (const team of ['', '.', '..']) {
       expect(() => leagueUrl(north, 'team', { team })).toThrow(TypeError);
