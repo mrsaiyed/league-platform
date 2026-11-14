@@ -37,6 +37,8 @@ export type ScheduleActionOutcome =
       readonly code: string;
       /** For a change the schedule rules refused: which rule. */
       readonly reason?: string;
+      /** The move was saved to the draft but the recording change after it was refused. */
+      readonly partial?: true;
     };
 
 type Basis = {
@@ -118,15 +120,18 @@ export async function runScheduleAction(
         '~',
       );
       let current = basis;
+      let movedSlot = false;
       if (wasSlot !== nowSlot) {
         const moved = await moveDraftGame(context, { ...current, gameId, ...slot }, deps);
         if (!moved.ok) return refusal(moved);
         current = next(current, moved.value);
+        movedSlot = true;
       }
       const recording = text(form, 'recording');
       if (recording !== '' && recording !== text(form, 'wasRecording')) {
         const set = await setDraftRecording(context, { ...current, gameId, recording }, deps);
-        if (!set.ok) return refusal(set);
+        // The move above is already in the draft: say so rather than a plain "not saved".
+        if (!set.ok) return movedSlot ? { ...refusal(set), partial: true } : refusal(set);
       }
       return { kind: 'saved' };
     }

@@ -28,6 +28,7 @@ export async function performScheduleAction(
   if (outcome.kind === 'refused') {
     query.set('problem', outcome.code);
     if (outcome.reason !== undefined) query.set('reason', outcome.reason);
+    if (outcome.partial === true) query.set('partial', '1');
   } else {
     query.set('done', outcome.kind);
   }

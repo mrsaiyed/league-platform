@@ -80,5 +80,7 @@ export function noticeOf(search: Search): Notice | undefined {
   if (problem === undefined) return undefined;
   const reason = pick(reasons, first(search['reason']));
   const why = reason === undefined ? problem() : `${problem()} ${reason()}`;
-  return { kind: 'problem', text: t('schedule.admin.problem', { reason: why }) };
+  const key =
+    first(search['partial']) === '1' ? 'schedule.admin.problemPartial' : 'schedule.admin.problem';
+  return { kind: 'problem', text: t(key, { reason: why }) };
 }

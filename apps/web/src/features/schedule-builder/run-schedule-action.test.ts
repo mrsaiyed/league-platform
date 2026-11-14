@@ -159,6 +159,36 @@ describe('schedule grid', () => {
     expect(view.published.rounds[0]?.label).toBe('Week 5, Rivalry Week');
   });
 
+  it('says the move was saved when the recording change after it is refused', async () => {
+    const { read, press } = setup();
+    const first = await read();
+    const round = first.result.rounds[0];
+    if (round === undefined || round.date === null) throw new Error('no round');
+    const added = await press('add-game', {
+      gameId: gameId(1),
+      homeTeamId: team(1),
+      awayTeamId: team(2),
+      roundId: round.id,
+      date: round.date,
+      time: '10:00',
+      place: '',
+    });
+    expect(added).toEqual({ kind: 'saved' });
+    const saved = await press('save-game', {
+      gameId: gameId(1),
+      roundId: round.id,
+      date: round.date,
+      time: '11:00',
+      place: '',
+      wasSlot: [round.id, round.date, '10:00', ''].join('~'),
+      recording: 'not-a-mode',
+      wasRecording: '',
+    });
+    expect(saved).toEqual({ kind: 'refused', code: 'invalid-input', partial: true });
+    const view = await read();
+    expect(view.result.games.find((g) => g.id === gameId(1))?.time).toBe('11:00');
+  });
+
   it('refuses an edit based on an old reading of the draft', async () => {
     const { press } = setup();
     const done = await press('rename-round', {

@@ -885,6 +885,8 @@ export const en = {
   'schedule.admin.published': 'The schedule is published. Visitors can see it now.',
   'schedule.admin.discarded': 'The draft was discarded.',
   'schedule.admin.problem': 'That was not saved: {reason}',
+  'schedule.admin.problemPartial':
+    'The new time and place were saved to the draft, but the recording change was not: {reason}',
   'schedule.admin.noRounds': 'This season has no rounds yet.',
   'schedule.admin.clashes': 'Clashes to fix',
   'schedule.admin.clashesNone': 'No clashes.',
