@@ -19,6 +19,7 @@
 // in core (modules/access/policy.test.ts), and they join this matrix with the
 // clubs and teams step.
 import { defaultSeasonRules } from '@srleagues/contracts';
+import { basketball } from '@srleagues/sports';
 import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import {
@@ -96,6 +97,8 @@ import {
   renewScoringSession,
   takeOverScoring,
   applyTrackerCommands,
+  endTrackedGame,
+  engineRulesOf,
   renameShortName,
   resendInvitation,
   revokeGrant,
@@ -838,7 +841,7 @@ const gameCommandRows: readonly Row[] = [
       version: 1,
       reason: 'The score was wrong',
     }),
-    (c, i) => reopenGame(c, i, gamesDeps),
+    (c, i) => reopenGame(c, i, trackerDeps),
   ),
   // Assigning scorekeepers is part of running Games (P4 §3, P7 §5.1): schedulers too.
   ...gameRows(
@@ -952,6 +955,47 @@ const gameCommandRows: readonly Row[] = [
       commands: [{ commandId: randomUUID(), at: matrixNow, input: { type: 'start' } }],
     }),
     (c, i) => applyTrackerCommands(c, i, trackerDeps),
+  ),
+  // Ending a tracked game (T6 §7): whoever may score it. The game is live with one
+  // basket recorded by its tracker, so it can be ended.
+  ...gameRows(
+    'games.end_tracked_game',
+    'end a tracked game',
+    'games.score',
+    async (league, program) => {
+      const { gameId } = await gameIn(league, program, { capture_mode: 'live' });
+      const personId = await newPerson(pglite, league.leagueId);
+      const rules = defaultSeasonRules();
+      const basket = { type: 'score', side: 'home', playerId: personId, points: 2 } as const;
+      const state = basketball.apply(basketball.newGame(engineRulesOf(rules), 0), basket, {
+        id: randomUUID(),
+        now: matrixNow,
+      });
+      const { side, playerId, points } = basket;
+      await pglite.query(
+        `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at, account_id)
+         values ($1, $2, 1, $3, 'score', $4, $5, $6)`,
+        [
+          league.leagueId,
+          gameId,
+          randomUUID(),
+          JSON.stringify({ side, playerId, points }),
+          new Date(matrixNow).toISOString(),
+          league.ownerId,
+        ],
+      );
+      await pglite.query(
+        'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 1, $3)',
+        [league.leagueId, gameId, JSON.stringify(state)],
+      );
+      const live = await pglite.query<{ version: number }>(
+        `update games set status = 'live', home_score = 2, away_score = 0, format = $2
+         where id = $1 returning version`,
+        [gameId, JSON.stringify(rules)],
+      );
+      return { gameId, version: live.rows[0]?.version };
+    },
+    (c, i) => endTrackedGame(c, i, trackerDeps),
   ),
 ];
 

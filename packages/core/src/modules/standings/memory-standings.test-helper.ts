@@ -11,7 +11,15 @@ import {
 } from '../../command/testing/memory-transaction.ts';
 import type { EventHandler } from '../../command/index.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
-import type { GameLine, GameRecord, GamesTx, NewGameCorrection } from '../games/index.ts';
+import type {
+  GameLine,
+  GameRecord,
+  GamesTx,
+  LiveGamesStore,
+  NewGameCorrection,
+  ScoringSessionsStore,
+  TrackerTx,
+} from '../games/index.ts';
 import {
   standingsStores,
   type MemoryOptions,
@@ -137,8 +145,34 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     ...state,
   });
 
-  const transaction = memoryTransaction(db, (s, jobs): GamesTx & StandingsTx => ({
+  // No game here is tracked: the lock finds the game, and there is no saved state.
+  const noSessions = (s: MemoryStandings): ScoringSessionsStore => ({
+    lockGame: async (id) => s.games.some((g) => g.id === id),
+    findForGame: async () => undefined,
+    start: async () => undefined,
+    extend: async () => false,
+    end: async () => false,
+  });
+  const noLiveGames: LiveGamesStore = {
+    findState: async () => undefined,
+    takenCommands: async () => [],
+    addEvents: async () => {
+      throw new Error('No game is tracked in the standings tests.');
+    },
+    saveState: async () => {
+      throw new Error('No game is tracked in the standings tests.');
+    },
+    players: async () => [],
+    lines: async () => [],
+    saveLines: async () => {
+      throw new Error('No game is tracked in the standings tests.');
+    },
+  };
+  const transaction = memoryTransaction(db, (s, jobs): TrackerTx & StandingsTx => ({
     jobs,
+    scoringSessions: noSessions(s),
+    liveGames: noLiveGames,
+    clock: { now: () => Date.UTC(2026, 11, 20, 20, 0, 0) },
     access: {
       ownerAccountId: async () => ownerId,
       leagueStatus: async () => s.status,
