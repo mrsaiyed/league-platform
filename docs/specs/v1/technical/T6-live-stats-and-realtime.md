@@ -65,6 +65,7 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 - **T-127: a tracker that is already open keeps working across a release.** The server accepts commands from the previous version of the tracker as well as the current one, and the tracker replaces its stored code only when no game is open on the device. With T-158, this means a release never interrupts a game that is being scored.
 - A banner always shows the truth: "All saved", or "12 actions waiting to send", with "3 actions not saved" beside it when the server refused some. If the device's own storage fails, the banner says that, never that the device is offline (record 024).
 - Minutes and clock use the time each action was tapped, so a late upload gives the same result as a live one.
+- If the sign-in runs out mid-game, the tracker keeps taking taps and keeps them on the device, says it is signed out, and sends them once the scorekeeper is signed in again (A-5). The banner can name each play still waiting and the time of the last save.
 - **T-129 (new, follows S-5): a game can be saved to a file and uploaded from any device.** "Save a copy" writes the game's commands, with their IDs, to a file on the device. Opening that file on another phone or computer sends the same commands through the same door the tracker uses. Because every command carries its ID, anything the server already has is recognised and skipped, so a file and a late-uploading tablet can never count a basket twice. Uploading a file needs the same permission as scoring the game.
 - **Known limit, stated to users:** if a device is offline for the whole game and is then lost or wiped before reconnecting, and no copy was saved, that game's taps are gone. After several minutes offline the tracker says so plainly and suggests saving a copy.
 
@@ -72,7 +73,7 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 
 - **T-116:** opening a game to score takes a **scoring session**: a short lease renewed automatically while the tracker is open.
 - A second scorekeeper opening the same game sees who holds it and can **take over** after confirming. The first device immediately becomes read-only and says why.
-- Commands from a session that no longer holds the game are refused. Anything that device had not yet sent is shown to its user as "not saved", so the new scorekeeper can re-enter it.
+- Commands from a session that no longer holds the game are refused. Anything that device had not yet sent is shown to its user as "not saved", so the new scorekeeper can re-enter it. The same happens when the game is decided or removed while that device holds it. The list is kept on the device until the scorekeeper dismisses it, through a reload, and a second loss adds to it rather than replacing it.
 - If a device simply disappears, its lease runs out after about two minutes and the game is free.
 - **T-251 (record 039):** the tracker opens, renews, takes over and releases its session at `POST /api/v1/leagues/{leagueId}/games/{game}/session`; opening and taking over name the device, and another scorekeeper is shown the holder's name, never their account.
 - **T-253 (record 049):** a device that lost the game never sends what it listed as not saved, even if it takes the game back or the page is reloaded: each tap is kept on the device with the session it was made under, and is never sent under another; leaving releases the game only when nothing is waiting to send, so a device that leaves with taps waiting still has them taken when it opens the game again.
@@ -91,7 +92,7 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 
 ### The clock
 
-**T-121:** the clock is not broadcast every second. A message says "running, 7:42 left as of this instant" or "stopped at 7:42". Each viewer's device counts down by itself from that. Starting, stopping and correcting the clock are the only clock messages.
+**T-121:** the clock is not broadcast every second. A message says "running, 7:42 left as of this instant" or "stopped at 7:42". Each viewer's device counts down by itself from that. Starting, stopping and correcting the clock are the only clock messages. The tracker counts from the server's time too, never the device's: it measures the difference from each scoring-session reply, taking the server's time as the middle of the request's round trip (so it is off by at most half of it) and not trusting a slow reply over a closer one; every tap is timed by it and the scoring screen paints the clock from it.
 
 ## 7. Ending a game
 

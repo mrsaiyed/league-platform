@@ -19,7 +19,12 @@ import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
 import type { QueueStorage } from './queue-storage.ts';
 import { createTrackerController, type TapInput } from './tracker-controller.ts';
-import { createManualClock } from './tracker-queue.test-helper.ts';
+import {
+  createFakeServer,
+  createManualClock,
+  type ManualClock,
+} from './tracker-queue.test-helper.ts';
+import type { TrackerServer } from './tracker-server.ts';
 
 const gameId = games.hawksBears;
 const minute = 60_000;
@@ -573,42 +578,104 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
   });
 });
 
-describe('tracker controller: signed out mid-game', () => {
-  it('keeps showing the waiting taps, lists none as not saved, and sends them on signing in', async () => {
+describe('tracker controller: signed out mid-game (finding M4)', () => {
+  it('keeps taking taps, holds them, and sends each once after signing in again', async () => {
     const network = endpointNetwork();
     let who: Person = 'scorekeeper';
     const tablet = device(network, { signedIn: () => who });
     await tablet.controller.start();
     await tapAll(tablet.controller, tipOff);
     await tablet.controller.idle();
-    network.mode = 'down';
+
+    // The sign-in runs out: the next send is turned away.
+    who = 'visitor';
     await tapAll(tablet.controller, [basket('home', hawks[0] ?? '')]);
     await tablet.controller.idle();
-
-    // Back online, but signed out: the next request is turned away.
-    who = 'visitor';
-    network.mode = 'up';
-    tablet.controller.online();
-    await tablet.controller.idle();
     let status = tablet.controller.status();
-    expect(status.mode).toEqual({ kind: 'read-only', reason: 'signed-out' });
-    // Not a loss of the game: the tap is still shown and is not listed as not saved.
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(status.signedOut).toBe(true);
+
+    // Still scoring: two more taps are taken and shown, and kept.
+    await tapAll(tablet.controller, [
+      basket('away', bears[0] ?? '', 3),
+      basket('home', hawks[1] ?? ''),
+    ]);
+    // The renewal is turned away too; scoring goes on.
+    await tablet.clock.advance(31_000);
+    await tablet.controller.idle();
+    status = tablet.controller.status();
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(status.signedOut).toBe(true);
     expect(status.notSaved).toEqual([]);
-    expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
-    expect(status.queue.waiting).toBe(1);
+    expect(status.queue.waiting).toBe(3);
+    expect(scoreOf(status.game)).toEqual({ home: 4, away: 3 });
+    expect((await serverGame(network)).sequence).toBe(2);
+
+    // Signed in again: the next renewal finds it, and the three go, once each.
+    who = 'scorekeeper';
+    await tablet.clock.advance(31_000);
+    await tablet.controller.idle();
+    status = tablet.controller.status();
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(status.signedOut).toBe(false);
+    expect(status.notSaved).toEqual([]);
+    expect(status.queue.waiting).toBe(0);
+    const server = await serverGame(network);
+    expect(server.sequence).toBe(5);
+    expect(scoreOf(server.state)).toEqual({ home: 4, away: 3 });
+    expect(server.state.plays).toEqual(status.game?.plays);
+  });
+
+  it('sends at once when the scorekeeper comes back signed in (openAgain)', async () => {
+    const network = endpointNetwork();
+    let who: Person = 'scorekeeper';
+    const tablet = device(network, { signedIn: () => who });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    who = 'visitor';
+    await tapAll(tablet.controller, [basket('home', hawks[0] ?? '')]);
+    await tablet.controller.idle();
+    expect(tablet.controller.status().signedOut).toBe(true);
+    // Still signed out: nothing changes.
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    expect(tablet.controller.status()).toMatchObject({
+      signedOut: true,
+      mode: { kind: 'scoring' },
+    });
 
     who = 'scorekeeper';
     await tablet.controller.openAgain();
     await tablet.controller.idle();
-    status = tablet.controller.status();
-    expect(status.mode).toEqual({ kind: 'scoring' });
-    expect(status.notSaved).toEqual([]);
-    expect(status.queue.waiting).toBe(0);
-    expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
-    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
+    expect(tablet.controller.status()).toMatchObject({
+      signedOut: false,
+      mode: { kind: 'scoring' },
+    });
+    expect(tablet.controller.status().queue.waiting).toBe(0);
+    expect((await serverGame(network)).sequence).toBe(3);
   });
 
-  it('is no longer reloading once read-only, though the reload was still to be tried again', async () => {
+  it('signed in as someone else: the taps are not sent under their name, and are listed', async () => {
+    const network = endpointNetwork();
+    let who: Person = 'scorekeeper';
+    const tablet = device(network, { signedIn: () => who });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    who = 'visitor';
+    await tapAll(tablet.controller, [basket('home', hawks[0] ?? '')]);
+    await tablet.controller.idle();
+    who = 'owner';
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    const status = tablet.controller.status();
+    expect(status.mode).toMatchObject({ kind: 'read-only', reason: 'taken-over' });
+    expect(status.notSaved.map((c) => c.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    expect((await serverGame(network)).sequence).toBe(2);
+  });
+
+  it('a reload that is turned away while signed out is tried again once signed in', async () => {
     const network = endpointNetwork();
     let who: Person = 'scorekeeper';
     let stateDown = false;
@@ -629,10 +696,22 @@ describe('tracker controller: signed out mid-game', () => {
     // Refused; the reload gets no answer and waits to try again.
     expect(tablet.controller.status().reloading).toBe(true);
     who = 'visitor';
+    stateDown = false;
     await tablet.clock.advance(31_000);
     await tablet.controller.idle();
-    expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'signed-out' });
-    expect(tablet.controller.status().reloading).toBe(false);
+    expect(tablet.controller.status()).toMatchObject({
+      mode: { kind: 'scoring' },
+      signedOut: true,
+      reloading: true,
+    });
+    who = 'scorekeeper';
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    expect(tablet.controller.status()).toMatchObject({
+      mode: { kind: 'scoring' },
+      signedOut: false,
+      reloading: false,
+    });
   });
 });
 
@@ -721,5 +800,402 @@ describe('tracker controller: a game it may not score', () => {
     expect(network.reached.filter((r) => r.endsWith('commands') || r.endsWith('state'))).toEqual(
       [],
     );
+  });
+});
+
+/** A door held shut until `open` is called. */
+function gate() {
+  let open = (): void => undefined;
+  const shut = new Promise<void>((resolve) => (open = resolve));
+  return { shut, open };
+}
+
+/** The tablet scores the tip-off, taps `unsent` with no network, and the laptop takes over. */
+async function tabletLosesTheGame(
+  network: EndpointNetwork,
+  unsent: TapInput[],
+  storage?: QueueStorage,
+) {
+  const tablet = device(network, storage === undefined ? {} : { storage });
+  await tablet.controller.start();
+  await tapAll(tablet.controller, tipOff);
+  await tablet.controller.idle();
+  network.mode = 'down';
+  await tapAll(tablet.controller, unsent);
+  network.mode = 'up';
+  const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+  await laptop.controller.start();
+  await laptop.controller.idle();
+  await laptop.controller.takeOver();
+  await laptop.controller.idle();
+  tablet.controller.online();
+  await tablet.controller.idle();
+  expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'taken-over' });
+  return { tablet, laptop };
+}
+
+/** Takes the game back on `side` (it was shown read-only), after confirming. */
+async function takeBack(side: ReturnType<typeof device>['controller']) {
+  await side.openAgain();
+  await side.idle();
+  expect(side.status().mode).toMatchObject({ kind: 'held-by-other' });
+  expect(await side.takeOver()).toEqual({ ok: true });
+  await side.idle();
+  expect(side.status().mode).toEqual({ kind: 'scoring' });
+}
+
+describe('tracker controller: taps not saved are never lost silently (step 2.113)', () => {
+  const a = basket('home', hawks[2] ?? '');
+  const b = basket('away', bears[3] ?? '', 3);
+
+  it('a reload after taking the game back keeps the not-saved list, and sends none of it', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const { tablet } = await tabletLosesTheGame(network, [a], storage);
+    await takeBack(tablet.controller);
+    expect(tablet.controller.status().notSaved.map((c) => c.input)).toEqual([a]);
+    await tablet.controller.leave();
+
+    const reloaded = device(network, { storage });
+    await reloaded.controller.start();
+    await reloaded.controller.idle();
+    expect(reloaded.controller.status().mode).toEqual({ kind: 'scoring' });
+    expect(reloaded.controller.status().notSaved.map((c) => c.input)).toEqual([a]);
+    expect(reloaded.controller.status().queue.waiting).toBe(0);
+    expect((await serverGame(network)).sequence).toBe(2);
+    await reloaded.controller.dismissNotSaved();
+    expect(reloaded.controller.status().notSaved).toEqual([]);
+    expect(await storage.list(gameId)).toEqual([]);
+  });
+
+  it('two losses keep both lists, through a reload too', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const { tablet, laptop } = await tabletLosesTheGame(network, [a], storage);
+    await takeBack(tablet.controller);
+    network.mode = 'down';
+    await tapAll(tablet.controller, [b]);
+    network.mode = 'up';
+    // The laptop learns it lost the game, and takes it back in its turn.
+    laptop.controller.online();
+    await laptop.controller.idle();
+    await takeBack(laptop.controller);
+
+    tablet.controller.online();
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'taken-over' });
+    expect(tablet.controller.status().notSaved.map((c) => c.input)).toEqual([a, b]);
+    await tablet.controller.leave();
+
+    const reloaded = device(network, { storage });
+    await reloaded.controller.start();
+    await reloaded.controller.idle();
+    expect(reloaded.controller.status().mode).toMatchObject({ kind: 'held-by-other' });
+    expect(reloaded.controller.status().notSaved.map((c) => c.input)).toEqual([a, b]);
+    expect((await serverGame(network)).sequence).toBe(2);
+  });
+
+  it('a game ended while the tablet was offline lists its taps as not saved', async () => {
+    const network = endpointNetwork();
+    const tablet = device(network);
+    await tablet.controller.start();
+    await tapAll(tablet.controller, [...tipOff, basket('home', hawks[0] ?? '')]);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet.controller, [a, b]);
+    network.mode = 'up';
+
+    // Meanwhile the game is ended on another device.
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    await tapAll(laptop.controller, [{ type: 'end' }]);
+    await laptop.controller.idle();
+    expect((await serverGame(network)).state.status).toBe('final');
+
+    tablet.controller.online();
+    await tablet.controller.idle();
+    const status = tablet.controller.status();
+    expect(status.mode).toEqual({ kind: 'read-only', reason: 'game-not-live' });
+    expect(status.notSaved.map((c) => c.input)).toEqual([a, b]);
+    expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
+    expect(await tablet.controller.tap(a)).toEqual({ ok: false, reason: 'not-scoring' });
+    expect(
+      (await tablet.storage.list(gameId)).map((entry) => [entry.command.input, entry.state]),
+    ).toEqual([
+      [a, 'not-saved'],
+      [b, 'not-saved'],
+    ]);
+  });
+
+  it('the queue halted because the game is no longer live: the game is lost, its taps listed', async () => {
+    const network = endpointNetwork();
+    // The next batch is answered "game not live" without reaching the server.
+    let notLive = false;
+    const tablet = device(network, {
+      sendTaps: (send) => async (input, init) => {
+        if (!notLive) return send(input, init);
+        const batch = JSON.parse(String(init?.body)) as { commands: { commandId: string }[] };
+        const results = batch.commands.map(({ commandId }) => ({
+          commandId,
+          status: 'refused',
+          reason: { code: 'game-not-live', message: '' },
+        }));
+        return new Response(JSON.stringify({ protocolVersion: 1, sequence: 2, results }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      },
+    });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    notLive = true;
+    await tapAll(tablet.controller, [a]);
+    await tablet.controller.idle();
+    const status = tablet.controller.status();
+    expect(status.mode).toEqual({ kind: 'read-only', reason: 'game-not-live' });
+    expect(status.notSaved.map((c) => c.input)).toEqual([a]);
+    // The server's state is shown: the tap is not.
+    expect(scoreOf(status.game)).toEqual({ home: 0, away: 0 });
+  });
+
+  it('a tap stored while the game was being lost is listed as not saved, not shown', async () => {
+    const network = endpointNetwork();
+    const inner = createMemoryQueueStorage();
+    let adding: ReturnType<typeof gate> | null = null;
+    const storage: QueueStorage = {
+      add: async (g, e) => {
+        if (adding !== null) await adding.shut;
+        return inner.add(g, e);
+      },
+      list: (g) => inner.list(g),
+      settle: (g, s) => inner.settle(g, s),
+    };
+    const tablet = device(network, { storage });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+
+    // The tap is being stored when the tablet learns of the takeover.
+    adding = gate();
+    const statesBefore = network.reached.filter((r) => r === 'GET state').length;
+    const tapping = tablet.controller.tap(a);
+    tablet.controller.online();
+    await expect.poll(() => tablet.controller.status().mode.kind).toBe('read-only');
+    // The server's state is asked for again as the game is lost.
+    await expect
+      .poll(() => network.reached.filter((r) => r === 'GET state').length)
+      .toBe(statesBefore + 1);
+    adding.open();
+    expect(await tapping).toEqual({ ok: false, reason: 'not-scoring' });
+    await tablet.controller.idle();
+    const status = tablet.controller.status();
+    expect(status.notSaved.map((c) => c.input)).toEqual([a]);
+    expect(scoreOf(status.game)).toEqual({ home: 0, away: 0 });
+    expect((await inner.list(gameId)).map((entry) => entry.state)).toEqual(['not-saved']);
+
+    // Taking the game back never sends it.
+    await takeBack(tablet.controller);
+    await tablet.controller.idle();
+    expect((await serverGame(network)).sequence).toBe(2);
+    expect(tablet.controller.status().notSaved.map((c) => c.input)).toEqual([a]);
+  });
+
+  it('a takeover that goes unanswered loads the server’s state again', async () => {
+    const network = endpointNetwork();
+    let stateGate: ReturnType<typeof gate> | null = null;
+    let statesAsked = 0;
+    let takeOverGate: ReturnType<typeof gate> | null = null;
+    const tablet = device(network, {
+      askServer: (ask) => async (input, init) => {
+        if (String(input).endsWith('/state')) {
+          statesAsked += 1;
+          const held = stateGate;
+          const answer = await ask(input, init);
+          if (held !== null) await held.shut;
+          return answer;
+        }
+        if (takeOverGate !== null && String(init?.body).includes('"take-over"')) {
+          await takeOverGate.shut;
+          throw new TypeError('Failed to fetch');
+        }
+        return ask(input, init);
+      },
+    });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    tablet.controller.online();
+    await tablet.controller.idle();
+    // The laptop scores after the tablet last saw the server's state.
+    await tapAll(laptop.controller, [basket('home', hawks[0] ?? '')]);
+    await laptop.controller.idle();
+
+    // Shown the holder, the tablet's state reload is held up; the takeover begins.
+    stateGate = gate();
+    const asked = statesAsked;
+    const opening = tablet.controller.openAgain();
+    await expect.poll(() => statesAsked).toBe(asked + 1);
+    expect(tablet.controller.status().mode).toMatchObject({ kind: 'held-by-other' });
+    takeOverGate = gate();
+    const taking = tablet.controller.takeOver();
+    const held = stateGate;
+    stateGate = null;
+    held.open();
+    await opening;
+    expect(scoreOf(tablet.controller.status().game)).toEqual({ home: 0, away: 0 });
+    takeOverGate.open();
+    expect(await taking).toEqual({ ok: false, reason: 'unanswered' });
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toMatchObject({ kind: 'held-by-other' });
+    expect(scoreOf(tablet.controller.status().game)).toEqual({ home: 2, away: 0 });
+  });
+});
+
+describe('tracker controller: which taps wait, and the last save (finding L1)', () => {
+  it('names each waiting tap, the plays still to save, and when the last one was saved', async () => {
+    const network = endpointNetwork();
+    const { controller, clock } = device(network);
+    await controller.start();
+    await tapAll(controller, tipOff);
+    await controller.idle();
+    const firstSave = controller.status().lastSavedAt ?? 0;
+    // On the server's clock (the stand-in's is the real one): within a second of now.
+    expect(Math.abs(firstSave - controller.status().now())).toBeLessThan(1_000);
+
+    network.mode = 'down';
+    const offline = [basket('home', hawks[0] ?? ''), basket('away', bears[1] ?? '', 3)];
+    await tapAll(controller, offline);
+    let status = controller.status();
+    expect(status.waiting.map((c) => c.input)).toEqual(offline);
+    const unsaved = new Set(status.waiting.map((c) => c.commandId));
+    const plays = status.game?.plays ?? [];
+    expect(plays.filter((p) => unsaved.has(p.id)).map((p) => p.type)).toEqual(['score', 'score']);
+    expect(plays.filter((p) => !unsaved.has(p.id)).map((p) => p.type)).toEqual([
+      'lineup',
+      'lineup',
+    ]);
+    await clock.advance(5 * minute);
+    expect(controller.status().lastSavedAt).toBe(firstSave);
+
+    network.mode = 'up';
+    controller.online();
+    await controller.idle();
+    status = controller.status();
+    expect(status.waiting).toEqual([]);
+    const lastSave = status.lastSavedAt ?? 0;
+    expect(Math.abs(lastSave - status.now())).toBeLessThan(1_000);
+    // The device's five minutes offline are not the server's: only its own clock counts.
+    expect(lastSave).toBeGreaterThanOrEqual(firstSave);
+  });
+});
+
+/**
+ * A server whose clock is `aheadMs` ahead of the device's, answering a session request
+ * `up` ms after it is sent (when it stamps its time) and `down` ms after that.
+ */
+function timedServer(clock: ManualClock, aheadMs: number) {
+  const legs = { up: 100, down: 100 };
+  const sessionId = '01900000-0000-7000-8000-0000000000c1';
+  const server: TrackerServer = {
+    session: () =>
+      new Promise((resolve) => {
+        const up = legs.up;
+        const down = legs.down;
+        clock.after(up, () => {
+          const sentAt = clock.now() + aheadMs;
+          const value = {
+            status: 'held-by-you' as const,
+            sessionId,
+            expiresAt: sentAt + 120_000,
+            sentAt,
+          };
+          clock.after(down, () => resolve({ kind: 'answer', value } as const));
+        });
+      }),
+    loadState: async () => ({
+      kind: 'answer',
+      value: { sequence: 0, state: basketball.newGame() },
+    }),
+  };
+  return { legs, server };
+}
+
+/** Moves the clock on a little at a time until `work` is done (its timers set late). */
+async function until(clock: ManualClock, work: Promise<unknown>) {
+  let done = false;
+  void work.finally(() => (done = true)).catch(() => undefined);
+  for (let step = 0; step < 500 && !done; step += 1) await clock.advance(100);
+  await work;
+}
+
+describe('tracker controller: the server’s time (finding M1)', () => {
+  it('with the device 30 seconds slow, now() gives the server’s time within the measured error', async () => {
+    const clock = createManualClock();
+    const ahead = 30_000;
+    const { legs, server } = timedServer(clock, ahead);
+    const queueServer = createFakeServer(clock);
+    const controller = createTrackerController({
+      gameId,
+      deviceId: 'tablet-1',
+      storage: createMemoryQueueStorage(),
+      transport: queueServer.transport,
+      server,
+      clock,
+      newCommandId,
+      random: () => 1,
+    });
+    const serverTime = () => clock.now() + ahead;
+    expect(controller.status().clockErrorMs).toBeNull();
+
+    // Up quickly, back slowly: the midpoint is off, by less than half the round trip.
+    legs.up = 50;
+    legs.down = 350;
+    await until(clock, controller.start());
+    await until(clock, controller.idle());
+    let status = controller.status();
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(status.clockErrorMs).toBe(200);
+    expect(Math.abs(status.now() - serverTime())).toBeLessThanOrEqual(200);
+    expect(Math.abs(status.now() - serverTime())).toBeGreaterThan(0);
+
+    // A tap is timed by the server's clock, not the device's.
+    await tapAll(controller, tipOff);
+    expect(
+      Math.abs((queueServer.received[0]?.commands[0]?.at ?? 0) - serverTime()),
+    ).toBeLessThanOrEqual(200);
+
+    // A slow, lopsided reply is not trusted over the closer one.
+    const before = status.now() - clock.now();
+    legs.up = 100;
+    legs.down = 9_000;
+    controller.online();
+    await until(clock, controller.idle());
+    status = controller.status();
+    expect(status.now() - clock.now()).toBe(before);
+    expect(status.clockErrorMs).toBe(200);
+
+    // An even, quick one is: the error shrinks with it.
+    legs.up = 20;
+    legs.down = 20;
+    controller.online();
+    await until(clock, controller.idle());
+    status = controller.status();
+    expect(status.clockErrorMs).toBe(20);
+    expect(status.now()).toBe(serverTime());
+    await until(clock, controller.leave());
   });
 });
