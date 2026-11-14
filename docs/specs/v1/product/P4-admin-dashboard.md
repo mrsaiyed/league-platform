@@ -62,7 +62,7 @@ A **search box** at the top of the dashboard finds any person, team or game by n
 
 A person can hold several roles. A role can be limited to **one program** ("volleyball scheduler") in leagues that have several.
 
-What each role sees is trimmed to what they can use. A scorekeeper who opens the admin sees a list of their games and nothing else. Coaches and captains do not use the admin at all; their tools are on the team page under `/{league}/my`.
+What each role sees is trimmed to what they can use. A scorekeeper who opens the admin sees a list of their games and nothing else; games recorded live carry a "Score this game" button (S-38, decided for you). Coaches and captains do not use the admin at all; their tools are on the team page under `/{league}/my`.
 
 **Inviting someone:** enter an email, pick a role, send. They get a link, sign in (or create their account), and they are in. Pending invitations can be re-sent or cancelled. Access can be removed at any time and takes effect immediately.
 
@@ -88,7 +88,7 @@ What each role sees is trimmed to what they can use. A scorekeeper who opens the
 
 - **Profile**: league name, address (short name), logo, contact email, city and time zone, adult or youth.
 - **Admins**: the people with roles, pending invitations, the activity log.
-- **Features**: switches for the optional parts: registration fees, draft, awards and trophies, sponsors, media, news, player pages, live stats. Switching a feature off hides it from the site and the admin but keeps its data.
+- **Features**: switches for the optional parts: registration fees, draft, awards and trophies, sponsors, media, news, player pages, live stats. Switching a feature off hides it from the site and the admin but keeps its data. Player pages start switched on (**A-15**, decided for you, November 14).
 - **Wording**: the league's own words for division, round, team leader and club (U-4).
 - **Start page for members**: the league home, or each member's own team page (U-5).
 - **Privacy**: what is public about players (full name, first name and initial, or hidden), whether photos are shown, whether the league is listed in search ([P6](P6-registration-and-accounts.md) section 7).

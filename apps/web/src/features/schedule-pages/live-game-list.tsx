@@ -5,11 +5,8 @@
 // simply shows what it was given.
 import { useEffect, useState } from 'react';
 import { GameCard, type GameCardLabels, type GameStatus } from '@srleagues/ui';
-import { serverSentEventsSubscriber } from '../live-updates/index.ts';
+import { serverSentEventsSubscriber, webLiveAddress } from '../live-updates/index.ts';
 import type { GameView } from './build-schedule.ts';
-
-/** The web app's own live address (T-14). */
-const liveAddress = '/api/v1/live';
 
 export type Update = {
   readonly sequence: number;
@@ -60,37 +57,36 @@ export function LiveGameList({
   useEffect(() => {
     if (!watched) return undefined;
     const ids = new Set(games.map((g) => g.id));
-    const subscription = serverSentEventsSubscriber({ address: liveAddress }).subscribeLeagueScores(
-      leagueId,
-      {
-        onMessage: (m) => {
-          if (!ids.has(m.gameId)) return;
-          const status = known.find((s) => s === m.status);
-          if (status === undefined) return;
-          setUpdates((prev) => {
-            const before = prev[m.gameId];
-            if (before !== undefined && before.sequence >= m.sequence) return prev;
-            const game = games.find((g) => g.id === m.gameId);
-            if (game !== undefined) {
-              const word =
-                status === 'live' ? labels.live : status === 'scheduled' ? '' : labels[status];
-              setSpoken(
-                announcement
-                  .replace('{away}', game.away.name)
-                  .replace('{awayScore}', String(m.score.away))
-                  .replace('{home}', game.home.name)
-                  .replace('{homeScore}', String(m.score.home))
-                  .replace('{status}', word),
-              );
-            }
-            return {
-              ...prev,
-              [m.gameId]: { sequence: m.sequence, status, home: m.score.home, away: m.score.away },
-            };
-          });
-        },
+    const subscription = serverSentEventsSubscriber({
+      address: webLiveAddress,
+    }).subscribeLeagueScores(leagueId, {
+      onMessage: (m) => {
+        if (!ids.has(m.gameId)) return;
+        const status = known.find((s) => s === m.status);
+        if (status === undefined) return;
+        setUpdates((prev) => {
+          const before = prev[m.gameId];
+          if (before !== undefined && before.sequence >= m.sequence) return prev;
+          const game = games.find((g) => g.id === m.gameId);
+          if (game !== undefined) {
+            const word =
+              status === 'live' ? labels.live : status === 'scheduled' ? '' : labels[status];
+            setSpoken(
+              announcement
+                .replace('{away}', game.away.name)
+                .replace('{awayScore}', String(m.score.away))
+                .replace('{home}', game.home.name)
+                .replace('{homeScore}', String(m.score.home))
+                .replace('{status}', word),
+            );
+          }
+          return {
+            ...prev,
+            [m.gameId]: { sequence: m.sequence, status, home: m.score.home, away: m.score.away },
+          };
+        });
       },
-    );
+    });
     return () => subscription.close();
   }, [leagueId, games, watched, labels, announcement]);
   return (

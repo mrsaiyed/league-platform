@@ -25,6 +25,7 @@ const store = (over: Partial<GamesReadStore> = {}): GamesReadStore => ({
           awayScore: 48,
           finalizedAt: '2026-12-06T19:30:00.000Z',
           binned: false,
+          rules: null,
         }
       : undefined,
   teams: async () => [

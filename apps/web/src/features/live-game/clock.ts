@@ -13,6 +13,19 @@ export function serverOffsetMs(serverSentAt: number, deviceReceivedAt: number): 
   return serverSentAt - deviceReceivedAt;
 }
 
+/**
+ * The offset to keep after one more measurement. Anything sent took some time to arrive
+ * (and a cached snapshot was sent earlier still), so each measurement is at most the true
+ * offset: the largest seen is the closest, and a slow or stale one never lowers it.
+ */
+export function largestOffsetMs(
+  currentMs: number,
+  serverSentAt: number,
+  deviceReceivedAt: number,
+): number {
+  return Math.max(currentMs, serverOffsetMs(serverSentAt, deviceReceivedAt));
+}
+
 /** Milliseconds left on the clock at `serverNowMs`. Never below zero, never above the reference. */
 export function clockRemainingMs(clock: ClockReference, serverNowMs: number): number {
   if (clock.state === 'stopped') return clock.remainingMs;

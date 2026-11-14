@@ -521,6 +521,10 @@ export const standInSeasonIds = {
   youthWinter: season(3),
 } as const;
 
+/** A made-up season's rules, as stored, so a game's page plays it by them; undefined if none. */
+export const standInSeasonRulesOf = (seasonId: string): unknown =>
+  [adultFall, adultSpring, youthSeason].find((s) => s.id === seasonId)?.rules;
+
 const bySeasonOf = (all: SeasonData[]): PublicSeason[] =>
   all.map((s) => ({ id: s.id, name: s.name, slug: s.slug, isCurrent: s.isCurrent }));
 

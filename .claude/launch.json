@@ -9,6 +9,13 @@
       "url": "http://127.0.0.1:4180"
     },
     {
+      "name": "build-progress",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/progress-server.mjs"],
+      "port": 3230,
+      "url": "http://127.0.0.1:3230"
+    },
+    {
       "name": "product-preview",
       "runtimeExecutable": "node",
       "runtimeArgs": ["scripts/preview-web.mjs"],
