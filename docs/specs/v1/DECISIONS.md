@@ -320,6 +320,7 @@ All dated November 12, 2026.
 | T-254                 | New                                                                          | Al-Hadi transfer: account checked first, whole plan before writing, the product's commands only, rerun-safe, every line compared (rec. 050)     | Step 2.58: F-7 and T-137 did not say how recorded games come in or what is checked                 |
 | T-257                 | New                                                                          | The release makes pg-boss's schema, owned by queue_owner; pg-boss makes its own tables; the worker starts on checked settings (rec. 053)        | Step 2.94: the worker never started (R2); record 012 left open who makes pg-boss's tables (T-60)   |
 | T-256                 | New                                                                          | Account ids stay ours, linked to the sign-in user; the sign-in store in its own schema and role (rec. 052)                                      | Step 2.92: Supabase ids are not v7; the store and record 008's functions were missing              |
+| T-259                 | New                                                                          | Name settings read by one `readNamePolicy`; a setting value can need confirming; a person's request is a command, fixed-word reason (rec. 056)  | Step 2.126: nothing set the name policy or `people.visibility` (2.105 audit, H2)                   |
 
 ## The full list
 
@@ -716,6 +717,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-223 | The command shape: Zod input, one transaction, permission inside it, events inside it, jobs through the transaction object, one log line; core defines ports, database implements them (record 010)                                              | Agreed (delegated)  | yes     |
 | T-225 | Sign-in numbers: codes last 10 minutes, 5 tries, 5 an hour per address and 30 per network; passwords 8 characters to 72 bytes, NFKC; wrong guesses slowed, then locked, per address and network (record 013)                                     | Agreed (delegated)  | yes     |
 | T-256 | Our account ids stay ours, linked to the sign-in user; the sign-in store has its own schema and role; app_user changes only name, phone, last seen (record 052)                                                                                  | Agreed (delegated)  | yes     |
+| T-259 | Name settings `privacy.publicNames` and `privacy.playersMayAskForInitials`, read by one `readNamePolicy`; saving full names needs confirming; `people.set_name_request` sets a person's request, reason from a fixed list (rec. 056)             | Agreed (delegated)  | yes     |
 
 ### [T5 — Customization engine](technical/T5-customization-engine.md)
 
