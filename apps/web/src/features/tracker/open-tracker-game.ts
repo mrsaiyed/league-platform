@@ -14,6 +14,9 @@
 //    says when, and `confirmFormat` stores it on the device, so the same format is not
 //    asked again on this device. A format changed since is asked again. A game that
 //    already has plays is not asked about: whoever takes it over continues (P7 §5.2).
+// 5. Once the server says the account is signed out (401), the names the device keeps
+//    are deleted (`forgetAll`), as signing out on the device deletes them: whoever
+//    picks the device up next does not find the players' names on it (T-115).
 import type { QueueErrorCode } from './queue-storage.ts';
 import { QueueError, type QueueStorage } from './queue-storage.ts';
 import type { CommandTransport } from './command-transport.ts';
@@ -148,6 +151,12 @@ export async function openTrackerGame(
       storage: games,
       ...(options.onStoreFailed === undefined ? {} : { onStoreFailed: options.onStoreFailed }),
     }),
+  });
+  let forgotten = false;
+  controller.subscribe(({ mode }) => {
+    if (forgotten || mode.kind !== 'read-only' || mode.reason !== 'signed-out') return;
+    forgotten = true;
+    games.forgetAll().catch((error: unknown) => options.onStoreFailed?.(codeOf(error)));
   });
   return {
     ok: true,

@@ -171,6 +171,31 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     expect((await game.device.games.find(gameId))?.state).toBeNull();
   });
 
+  it('deletes the names kept on the device once the server says the account is signed out', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const other = '00000000-0000-4000-8000-0000000001a3';
+    await device.games.saveRosters(
+      { gameId: other, leagueId: liveLeagueId, accountId: accountOf('visitor') },
+      madeUpRosters,
+      900,
+    );
+    // Signed out since the page was drawn: the server turns the device away with 401.
+    const game = await open(network, 'visitor', device);
+    expect(screen(game)).toEqual({ kind: 'read-only', reason: 'signed-out' });
+    await new Promise((settle) => setTimeout(settle, 0));
+    expect(await device.games.find(gameId)).toBeUndefined();
+    expect(await device.games.find(other)).toBeUndefined();
+  });
+
+  it('keeps the names on the device when refused for another reason', async () => {
+    const network = endpointNetwork();
+    const game = await open(network, 'coach');
+    expect(screen(game)).toEqual({ kind: 'read-only', reason: 'not-allowed' });
+    await new Promise((settle) => setTimeout(settle, 0));
+    expect((await game.device.games.find(gameId))?.rosters).toEqual(madeUpRosters);
+  });
+
   it('opens nothing on a device with no storage', async () => {
     const network = endpointNetwork();
     const fetch = network.fetchAs('scorekeeper');
