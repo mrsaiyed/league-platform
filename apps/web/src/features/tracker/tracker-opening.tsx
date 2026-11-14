@@ -60,6 +60,13 @@ export function TrackerOpening({
   const working = useRef(false);
   const opened = useRef<OpenedTrackerGame | null>(null);
   const leaving = useRef(false);
+  // The rosters the page last brought. The page drawn again (a refresh) brings the same
+  // rosters as a new object: the game is opened once per game, league and account, not
+  // let go of and taken again each time, so the opening reads them from here.
+  const rostersNow = useRef(rosters);
+  useEffect(() => {
+    rostersNow.current = rosters;
+  }, [rosters]);
 
   useEffect(() => {
     let gone = false;
@@ -80,7 +87,7 @@ export function TrackerOpening({
         gameId,
         leagueId,
         accountId,
-        rosters,
+        rosters: rostersNow.current,
         openStorage: async () => ({
           queue: await openIndexedDbQueueStorage(),
           games: await openIndexedDbOpenedGameStorage(),
@@ -116,7 +123,7 @@ export function TrackerOpening({
       void opened.current?.controller.leave();
       opened.current = null;
     };
-  }, [gameId, leagueId, accountId, rosters]);
+  }, [gameId, leagueId, accountId]);
 
   const act = (work: (game: OpenedTrackerGame) => Promise<unknown>) => async () => {
     const game = opened.current;
