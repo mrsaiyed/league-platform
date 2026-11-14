@@ -8,7 +8,7 @@
 // the security headers on every answer.
 // Then it starts the app as staging with a database address that answers nobody,
 // and checks that it refuses to start (T-60). Nothing leaves this computer.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
@@ -17,6 +17,32 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = path.join(root, 'apps/web');
 const nextBin = createRequire(path.join(app, 'package.json')).resolve('next/dist/bin/next');
+
+/**
+ * The environment the servers start from (T-201): only what Node.js and Next.js need
+ * to run on this computer, never this shell's own settings, so no real address, key
+ * or secret this shell holds (DATABASE_URL, RESEND_API_KEY, STRIPE_*, SESSION_SECRET,
+ * PG*, anything else) can ride along. Every setting the app reads is made up below.
+ */
+const runOnly = [
+  'PATH',
+  'PATHEXT',
+  'SYSTEMROOT',
+  'WINDIR',
+  'COMSPEC',
+  'TEMP',
+  'TMP',
+  'TMPDIR',
+  'HOME',
+  'USERPROFILE',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'PROGRAMDATA',
+  'NUMBER_OF_PROCESSORS',
+  'PROCESSOR_ARCHITECTURE',
+  'OS',
+  'LANG',
+];
 
 const madeUp = {
   LOG_LEVEL: 'warn',
@@ -385,6 +411,31 @@ const spoofs = [
 
 const failures = [];
 
+// The shell's own settings never reach the servers (T-201): made-up stand-ins for real
+// ones are put in this script's own environment, and none of them may arrive.
+const shellOnly = {
+  DATABASE_URL: 'postgres://shell-made-up:shell-made-up@localhost:1/nowhere',
+  RESEND_API_KEY: 're_shell_made_up',
+  STRIPE_SECRET_KEY: 'sk_shell_made_up',
+  STRIPE_WEBHOOK_SECRET: 'whsec_shell_made_up',
+  SESSION_SECRET: 'shell-made-up-session-secret-0123456789',
+  PGHOST: 'shell-made-up.example.test',
+};
+Object.assign(process.env, shellOnly);
+const arrived = spawnSync(
+  process.execPath,
+  ['-e', 'process.stdout.write(JSON.stringify(Object.keys(process.env)))'],
+  { env: serverEnvironment({}), encoding: 'utf8' },
+);
+const arrivedNames = arrived.status === 0 ? JSON.parse(arrived.stdout) : null;
+if (arrivedNames === null) {
+  failures.push('could not read the environment the servers start with');
+} else {
+  for (const name of Object.keys(shellOnly)) {
+    if (arrivedNames.includes(name)) failures.push(`the shell's ${name} reaches the servers`);
+  }
+}
+
 if (!process.argv.includes('--no-build')) await run(['build'], { APP_ENV: 'test' });
 
 const port = await freePort();
@@ -476,6 +527,8 @@ if (code === 0 || code === 'still running') {
   failures.push(`staging refused to start without saying why:\n${staging.output()}`);
 } else if (staging.output().includes('made-up-password')) {
   failures.push('the refusal printed the database address');
+} else if (staging.output().includes('made-up-supabase-secret-key')) {
+  failures.push('the refusal printed SUPABASE_SECRET_KEY');
 }
 
 if (failures.length > 0) {
@@ -486,12 +539,20 @@ console.log(
   `Web shell check passed: ${cases.length + spoofs.length + 4} checks against the built server.`,
 );
 
+function serverEnvironment(env) {
+  const clean = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value !== undefined && runOnly.includes(name.toUpperCase())) clean[name] = value;
+  }
+  return { ...clean, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env };
+}
+
 function start(args, env) {
   let output = '';
   // Next.js itself, not scripts/web.mjs, so stopping it stops the server.
   const child = spawn(process.execPath, [nextBin, ...args], {
     cwd: app,
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env },
+    env: serverEnvironment(env),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (chunk) => (output += chunk));
