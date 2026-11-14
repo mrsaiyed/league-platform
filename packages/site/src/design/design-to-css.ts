@@ -39,6 +39,7 @@ export function designToCssVariables(design: DesignDocument): Record<string, str
     '--color-text': color(design.colors.text, 'text'),
     '--color-primary': color(design.colors.primary, 'primary'),
     '--color-accent': color(design.colors.accent, 'accent'),
+    '--color-highlight': color(design.colors.highlight ?? design.colors.accent, 'highlight'),
     '--font-heading': known(fontStacks, design.fonts.heading, 'font'),
     '--font-body': known(fontStacks, design.fonts.body, 'font'),
     '--radius': known(radius, design.corners, 'corners'),
