@@ -19,13 +19,14 @@ States: `building` (keep the lanes full) · `waiting-for-founder` (no step in an
 
 One line per open lane. A run that is cut off leaves this as the map for the next run. Check the lane branches for commits: builders were still working when the usage limit hit.
 
-Next free: migration 0012, record 040, T-252 (038/T-250 to 2.30, 039/T-251 to 2.32; 034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 was reserved for 1.14, which landed without a migration; the runner refuses gaps, so 0011 went to the game-corrections fix of 2026-11-14; 0010 / 030 / T-242 to 2.4).
+Next free: migration 0012, record 041, T-253 (040/T-252 to 2.67; 038/T-250 to 2.30, 039/T-251 to 2.32; 034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 was reserved for 1.14, which landed without a migration; the runner refuses gaps, so 0011 went to the game-corrections fix of 2026-11-14; 0010 / 030 / T-242 to 2.4).
 
 - **2.52 The schedule grid** — `.local/lanes/2.52-schedule-grid` — none reserved — merged with build, import link added, reviewed; findings fixed and pushed (14f62e5 FAILED on GitHub with no test names; re-checked as lane/2.52-schedule-grid-again, delete that branch afterwards). No drag: form-based edits only for now (P7 §4.3 says drag; a later step). Then push, GitHub PASS, land.
 - **2.64 Box score entry** — `.local/lanes/2.64-box-score` — none reserved — merged with build, reviewed; findings fixed (forfeit/import clear lines, binned people, reopen form, messages, empty score = player points), merged with build, pushed f0b7383, waiting for GitHub. Lead owns S-25 to S-27 ('Decided for you'). Then land.
-- **2.57 Tracker backup reader** — `.local/lanes/2.57-hadi-reader` — none reserved — reviewed clean; GitHub verify FAILED with no names (its tests took 208 s); tests now 52 s not 258 s; merged with build, pushed 2cc5987, waiting for GitHub, then land. Notes for 2.58: pass its own workDir; validate state/command before replay through 2.29; never store the tracker's names on platform lines (T-220).
-- **2.30 Ending and reopening a tracked game** — `.local/lanes/2.30-end-reopen` — record 038, T-250 — builder (opus) started 2026-11-14; check the lane, push, review, GitHub, land.
 - **2.32 Tracker endpoints and publishing plays** — `.local/lanes/2.32-tracker-endpoints` — record 039, T-251 — builder (opus) started 2026-11-14; check the lane, push, review, GitHub, land.
+- **2.67 Engine last-minutes stop clock, mercy rule, foul limit** — `.local/lanes/2.67-engine-rules` — record 040, T-252 — builder (opus) started 2026-11-14; check the lane, push, review, GitHub, land.
+- **2.48 League settings screen** — `.local/lanes/2.48-league-settings` — none reserved — builder (sonnet) started 2026-11-14; check the lane, push, review, GitHub, land.
+- **2.76 The bin** — `.local/lanes/2.76-bin` — none reserved (no migration) — builder (sonnet) started 2026-11-14; check the lane, push, review, GitHub, land.
 
 ## Needs the founder
 
@@ -51,6 +52,9 @@ Nothing here stops the build. Since 2026-11-13 the lead answers open product que
 - 2026-11-14 — Step 2.51 done (built on the stand-in; passed GitHub on d4768a6 and an independent review, all findings fixed except two now in step 2.90). Review fixes: failed add undoes the new person and says so if it cannot; short-name message for non-Latin names; move needs one direction; failed reads show an alert. Gaps: no browser test, no database adapter for the Teams ports, no paging past 200 people. New step 2.90.
 
 Newest first. One line per step or event.
+
+- 2026-11-14 — Step 2.30 done (record 038 / T-250, no migration): games.end_tracked_game and the tracker's End tap end a tracked game in one transaction (lines settled, did-not-play lines for the roster on the game's day, standings through 2.24); reopening a tracked game hands it back to the tracker live; refused while another account holds an unexpired scoring session. Reviewed, findings fixed, GitHub PASSED. Not done: one did-not-play line per team for a person on both rosters (database allows one line per person per game: needs a schema change, record 030); brackets and recaps; record_final_score/forfeit still accept a game with live plays. Decided by the lead: a scorekeeper may not reopen a final game (P7 §5.5 'within a time the league sets' has no setting yet; reopening needs games.correct, admins only); add the time-limited setting later if wanted.
+- 2026-11-14 — Step 2.57 done: the tracker backup reader (packages/database/src/transfers; reads a copy of a backup folder, read-only, never any network). Failed GitHub because the isolation scan wanted a reviewed reason for the new exports (found by running verify here); tests now 52 s not 258 s. For 2.58: pass its own workDir (default is the temp folder, holds real names while reading); validate state/command before replay through 2.29; never store the tracker's names on platform lines (T-220); vitest.config.ts glob touched.
 
 - 2026-11-14 — Step 2.44 done: /{league}/teams, team pages and the members' start page on stand-in data (GitHub PASSED, reviewed, findings fixed: season kept in the my-team redirect, leagueUrl takes a query option, whole-message headlines, opaque row keys). Not done: no database-backed public-teams port, no browser test (2.62), my-team button only when the league's start page is 'my team'.
 

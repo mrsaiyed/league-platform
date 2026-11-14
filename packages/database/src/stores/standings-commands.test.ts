@@ -10,10 +10,10 @@ import {
   recordForfeit,
   reopenGame,
   type CommandDeps,
-  type GamesTx,
   type Job,
   type StandingsStore,
   type StandingsTx,
+  type TrackerTx,
 } from '@srleagues/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
@@ -35,6 +35,8 @@ import {
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { gamesStore } from './games-store.ts';
+import { liveGamesStore } from './live-games-store.ts';
+import { scoringSessionsStore } from './scoring-sessions-store.ts';
 import { standingsStore } from './standings-store.ts';
 
 let pglite: PGlite;
@@ -51,11 +53,14 @@ afterAll(async () => {
 /** The apps' deps: every store the games commands and the standings handlers need. */
 function depsWith(
   standings: (scope: LeagueScope) => StandingsStore = standingsStore,
-): CommandDeps<GamesTx & StandingsTx> {
+): CommandDeps<TrackerTx & StandingsTx> {
   return {
     transaction: commandTransaction(db, (scope) => ({
       jobs: { enqueue: async (_job: Job) => {} },
       games: gamesStore(scope),
+      scoringSessions: scoringSessionsStore(scope),
+      liveGames: liveGamesStore(scope),
+      clock: { now: () => Date.UTC(2026, 11, 6, 20, 0, 0) },
       standings: standings(scope),
       access: accessStore(scope),
       activity: activityLogStore(scope),

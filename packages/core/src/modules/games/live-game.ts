@@ -27,19 +27,23 @@ export function readState(stored: unknown): basketball.GameState {
 
 /**
  * Commands the platform takes through other doors, refused here with the reason:
- * the rules come from the league (S-1), and ending or reopening a game is a step of
- * its own that also settles the box score and the standings (step 2.30, T6 §7, §8).
- * Resetting is refused too: it wipes the plays and the lines and puts a live game back
- * to scheduled, which must leave a trace in the activity log, so a game is reset
- * through a later step's own command, not through the tracker's taps.
+ * the rules come from the league (S-1), and reopening a final game needs the
+ * permission to correct games and a reason, which a tap carries neither of, so it is
+ * done through games.reopen_game (T6 §8, S-7). Ending a game is taken here: it ends
+ * the game in the batch's transaction (step 2.30, T6 §7). Resetting is refused too:
+ * it wipes the plays and the lines and puts a live game back to scheduled, which must
+ * leave a trace in the activity log, so a game is reset through a later step's own
+ * command, not through the tracker's taps.
  */
 export function platformProblem(input: TrackerInput): string | undefined {
   if (input.type === 'rules') return 'The game’s rules come from the league’s settings.';
-  if (input.type === 'end') return 'Ending a game is not taken here yet.';
-  if (input.type === 'reopen') return 'Reopening a game is not taken here yet.';
+  if (input.type === 'reopen') return 'A final game is reopened by an admin, with a reason.';
   if (input.type === 'reset') return 'Resetting a game is not taken here yet.';
   return undefined;
 }
+
+/** Why ending a game level on points is refused, when its rules allow no ties (P7 §5.6). */
+export const tieProblem = 'The score is level and this season allows no ties. Play overtime.';
 
 const lower = (id: string) => id.toLowerCase();
 
@@ -119,7 +123,7 @@ export function rosterOf(players: readonly GamePlayer[]): ReadonlyMap<string, Ga
   const byKey = new Map<string, GamePlayer>();
   for (const player of players) {
     const key = keyOf(player.teamId, player.personId.toLowerCase());
-    // Listed with the current entry first (one who left and rejoined): keep that one.
+    // Listed with the game day's entry first (one who left and rejoined): keep that one.
     if (!byKey.has(key)) byKey.set(key, player);
   }
   return byKey;
@@ -172,7 +176,62 @@ export function linesOf(
   return lines;
 }
 
-const sameLine = (a: LiveGameLine, b: LiveGameLine) => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * The box score lines of a game that has ended (T6 §7): the lines its state gives, and
+ * a "did not play" line for everyone on either team's roster on the game's day who
+ * never entered, so the game's page lists them (P7 §5.6). The game's day, not today:
+ * an old game transferred later (step 2.58) lists the roster it was played with. A
+ * did-not-play line has no time and no counts, and never counts as a game played.
+ */
+export function settledLines(
+  game: GameRecord,
+  players: readonly GamePlayer[],
+  state: basketball.GameState,
+): ReadonlyMap<string, LiveGameLine> {
+  const roster = rosterOf(players);
+  const lines = new Map(linesOf(game, roster, state));
+  for (const player of roster.values()) {
+    const personId = player.personId.toLowerCase();
+    if (!player.onGameDay || lines.has(personId)) continue;
+    lines.set(personId, {
+      gameId: game.id,
+      teamId: player.teamId,
+      personId,
+      jerseyNumber: player.jerseyNumber,
+      played: false,
+      secondsPlayed: 0,
+      stats: {},
+    });
+  }
+  return lines;
+}
+
+/** Lines by person, as a saved game's lines are read back. */
+export const linesByPerson = (lines: readonly LiveGameLine[]): ReadonlyMap<string, LiveGameLine> =>
+  new Map(lines.map((line) => [line.personId.toLowerCase(), line]));
+
+/** The same counts: the same stats with the same numbers, in whatever order they come. */
+function sameStats(a: LiveGameLine['stats'], b: LiveGameLine['stats']): boolean {
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => Object.hasOwn(b, key) && a[key] === b[key])
+  );
+}
+
+/**
+ * The same line, field by field. A line read back from the database has its fields
+ * and its stats in another order than one the state gives, so comparing them as text
+ * would find every line changed and write them all again.
+ */
+const sameLine = (a: LiveGameLine, b: LiveGameLine) =>
+  a.gameId === b.gameId &&
+  a.teamId === b.teamId &&
+  a.personId === b.personId &&
+  a.jerseyNumber === b.jerseyNumber &&
+  a.played === b.played &&
+  a.secondsPlayed === b.secondsPlayed &&
+  sameStats(a.stats, b.stats);
 
 /** The lines to write (new or changed) and the people whose lines are gone (undone). */
 export function changedLines(

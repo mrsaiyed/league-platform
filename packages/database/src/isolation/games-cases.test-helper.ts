@@ -4,6 +4,7 @@ import {
   applyTrackerCommands,
   assignScorekeeper,
   cancelGame,
+  endTrackedGame,
   getBoxScoreSheet,
   listMyGames,
   listPostponedGames as listPostponedGamesCommand,
@@ -470,40 +471,64 @@ registerIsolationCase({
 // that in the target's own league the batch is taken: a line-up and a basket for the
 // target's player (the away side). Anywhere else the takeover is refused, and the
 // batch is sent with the member's session, which must reach nothing.
+async function scoreTargetUpcomingGame(scope: LeagueScope, target: LeagueRecords) {
+  const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
+    gameId: target.upcomingGameId,
+    deviceId: 'harness-device',
+    confirmed: true,
+    expectedHolderSince: target.scoringSessionSince,
+  }).catch((thrown: unknown) => {
+    if (thrown instanceof CommandRefused) return undefined;
+    throw thrown;
+  });
+  const reply = taken?.value as { status?: string; sessionId?: string } | undefined;
+  const sessionId =
+    reply?.status === 'held-by-you' && reply.sessionId !== undefined
+      ? reply.sessionId
+      : target.scoringSessionId;
+  return runAsApp(applyTrackerCommands, harnessTx, scope, {
+    gameId: target.upcomingGameId,
+    protocolVersion: 1,
+    sessionId,
+    commands: [
+      {
+        commandId: harnessCommandIds[0],
+        at: harnessNow - 2000,
+        input: { type: 'lineup', side: 'away', playerIds: [target.personId] },
+      },
+      {
+        commandId: harnessCommandIds[1],
+        at: harnessNow - 1000,
+        input: { type: 'score', side: 'away', playerId: target.personId, points: 2 },
+      },
+    ],
+  });
+}
+
 registerIsolationCase({
   subject: applyTrackerCommands,
   name: "score the target's upcoming game after taking it over",
+  run: scoreTargetUpcomingGame,
+});
+
+// Ending a tracked game (step 2.30): the upcoming game scored as above, then ended at
+// the version it has now, read in the scope's own league (none elsewhere). In the
+// target's league that settles its lines, makes it final and rebuilds its season's
+// standings; anywhere else the end is refused.
+registerIsolationCase({
+  subject: endTrackedGame,
+  name: "end the target's upcoming game once it is scored",
   run: async (scope, target) => {
-    const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
+    await scoreTargetUpcomingGame(scope, target);
+    const row = await transactionOf(scope)
+      .selectFrom('games')
+      .select('version')
+      .where('league_id', '=', scope.leagueId)
+      .where('id', '=', target.upcomingGameId)
+      .executeTakeFirst();
+    return runAsApp(endTrackedGame, harnessTx, scope, {
       gameId: target.upcomingGameId,
-      deviceId: 'harness-device',
-      confirmed: true,
-      expectedHolderSince: target.scoringSessionSince,
-    }).catch((thrown: unknown) => {
-      if (thrown instanceof CommandRefused) return undefined;
-      throw thrown;
-    });
-    const reply = taken?.value as { status?: string; sessionId?: string } | undefined;
-    const sessionId =
-      reply?.status === 'held-by-you' && reply.sessionId !== undefined
-        ? reply.sessionId
-        : target.scoringSessionId;
-    return runAsApp(applyTrackerCommands, harnessTx, scope, {
-      gameId: target.upcomingGameId,
-      protocolVersion: 1,
-      sessionId,
-      commands: [
-        {
-          commandId: harnessCommandIds[0],
-          at: harnessNow - 2000,
-          input: { type: 'lineup', side: 'away', playerIds: [target.personId] },
-        },
-        {
-          commandId: harnessCommandIds[1],
-          at: harnessNow - 1000,
-          input: { type: 'score', side: 'away', playerId: target.personId, points: 2 },
-        },
-      ],
+      version: row?.version ?? 1,
     });
   },
 });

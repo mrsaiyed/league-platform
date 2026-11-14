@@ -7,7 +7,12 @@
 // `lockingTracker` runs transactions over one shared state with a real lock per game,
 // to show batches for different games never wait for each other (T-112): PGlite has
 // one connection and runs transactions one after another, so it cannot show that.
-import type { JobQueue, TransactionRunner } from '../../command/index.ts';
+import type {
+  DomainEvent,
+  EventHandler,
+  JobQueue,
+  TransactionRunner,
+} from '../../command/index.ts';
 import {
   memoryDatabase,
   memoryTransaction,
@@ -77,6 +82,7 @@ export function liveGamesOf(s: MemoryTracker): LiveGamesStore {
       const teams = teamsOf(s, gameId);
       return s.players.filter((p) => teams.includes(p.teamId));
     },
+    lines: async (gameId) => structuredClone(s.liveLines.filter((l) => l.gameId === gameId)),
     saveLines: async (gameId, lines, removed) => {
       const replaced = new Set([...removed, ...lines.map((l) => l.personId)]);
       s.liveLines = [
@@ -100,14 +106,26 @@ const trackerTxOf = (
   liveGames: liveGamesOf(s),
 });
 
-/** Each transaction works on a copy, kept only if it returns (nothing kept on a refusal). */
-export function memoryTracker(state: Partial<MemoryTracker> = {}) {
+/**
+ * Each transaction works on a copy, kept only if it returns (nothing kept on a
+ * refusal). The games module's announcements are kept in `events`, after `handlers`
+ * (none unless given) have run in the command's transaction.
+ */
+export function memoryTracker(
+  state: Partial<MemoryTracker> = {},
+  handlers: readonly EventHandler<TrackerTx>[] = [],
+) {
   const db = memoryDatabase<MemoryTracker>(initialTracker(state));
   const clock = testClock();
   const transaction = memoryTransaction(db, (s, jobs) => trackerTxOf(s, jobs, clock));
-  const deps = testDeps(transaction);
+  const events: DomainEvent[] = [];
+  const keep: EventHandler<TrackerTx>[] = ['games.finalized', 'games.reopened'].map((type) => ({
+    type,
+    handle: async (event) => void events.push(event),
+  }));
+  const deps = testDeps(transaction, [...handlers, ...keep]);
   const as = (accountId: string | null) => ({ leagueId, accountId, requestId: 'request-1' });
-  return { db, deps, as, clock };
+  return { db, deps, as, clock, events };
 }
 
 /**

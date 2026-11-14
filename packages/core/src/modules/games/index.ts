@@ -30,6 +30,7 @@ export {
 } from './commands/get-box-score-sheet.ts';
 export { boxScoreColumns } from './box-score-columns.ts';
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
+export { endTrackedGame, type EndTrackedGameError } from './commands/end-tracked-game.ts';
 export { recordFinalScoreWithin } from './record-score-within.ts';
 export type { DecideGameError } from './decide-game.ts';
 export { recordingOf } from './game-fields.ts';

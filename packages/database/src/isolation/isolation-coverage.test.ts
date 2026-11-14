@@ -116,6 +116,11 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.normalizeMigrationText, 'normalises migration text'],
   [databasePackage.pgliteDriver, "the migration runner's PGlite connection"],
   [databasePackage.connectPostgresDriver, "the migration runner's PostgreSQL connection"],
+  [
+    databasePackage.readTrackerBackup,
+    'reads a copy of a tracker backup folder on disk with its own embedded database; no league, no platform tables (step 2.57)',
+  ],
+  [databasePackage.TrackerBackupError, 'the reader error class; runs nothing'],
 ]);
 
 /**
