@@ -180,9 +180,16 @@ describe('a game page', () => {
           side: 'home',
           name: 'Hawks',
           playerLinesShown: true,
-          totals: { points: 5 },
+          totals: { points: 5, mystery_stat: 1 },
           players: [
-            { personId: 'p', name: null, jersey: '4', played: true, seconds: null, stats: {} },
+            {
+              personId: 'p',
+              name: null,
+              jersey: '4',
+              played: true,
+              seconds: null,
+              stats: { mystery_stat: 1 },
+            },
           ],
         },
         {
@@ -200,5 +207,16 @@ describe('a game page', () => {
     expect(built.tables[0]?.players).toBeNull();
     expect(built.tables[1]?.players?.[0]?.name).toBe('Name not shown');
     expect(built.tables[0]?.columns.map((c) => c.label)).toEqual(['PTS']);
+  });
+
+  it('leaves out a statistic with no words, and has no stats if that was all', () => {
+    const page = {
+      game: { recording: 'box-score' },
+      boxScores: [
+        { side: 'home', name: 'Hawks', playerLinesShown: true, totals: { odd: 1 }, players: [] },
+        { side: 'away', name: 'Bears', playerLinesShown: true, totals: {}, players: [] },
+      ],
+    } as unknown as GamePage;
+    expect(buildBoxScores(page)).toEqual({ kind: 'no-stats' });
   });
 });

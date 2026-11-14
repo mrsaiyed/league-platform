@@ -5,7 +5,7 @@ import type { GamePage, PlayLine } from '@srleagues/core';
 import type { BoxScoreColumn, BoxScorePlayer } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { locale, t } from '../../server/messages.ts';
-import { statLabel } from '../stats-pages/index.ts';
+import { hasStatLabel, statLabel } from '../stats-pages/index.ts';
 import {
   periodClockText,
   periodName,
@@ -135,12 +135,17 @@ export type BoxScoresView =
   | { readonly kind: 'no-stats' }
   | { readonly kind: 'tables'; readonly tables: readonly BoxScoreView[] };
 
-/** A finished game's box scores, away team first as on the scoreboard. */
+/**
+ * A finished game's box scores, away team first as on the scoreboard. A statistic the
+ * message file has no words for is left out, so no raw key is ever a heading (T-187).
+ */
 export function buildBoxScores(page: GamePage): BoxScoresView {
   if (page.game.recording === 'final-score') return { kind: 'final-score-only' };
   const keys: string[] = [];
   const add = (stats: Readonly<Record<string, number>>) => {
-    for (const key of Object.keys(stats)) if (!keys.includes(key)) keys.push(key);
+    for (const key of Object.keys(stats)) {
+      if (hasStatLabel(key) && !keys.includes(key)) keys.push(key);
+    }
   };
   for (const box of page.boxScores) {
     add(box.totals);
