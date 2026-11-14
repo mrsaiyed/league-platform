@@ -22,6 +22,11 @@ export const tableCss = String.raw`
   max-inline-size: 100%;
   overflow-x: auto;
   scroll-timeline: --ui-table-scroll inline;
+  /* The box is the measure of what is in it: the name column is held to a share of it. */
+  container-type: inline-size;
+  /* Whatever the keyboard reaches is scrolled clear of the name column, which stays put
+     over the start of the box and would otherwise cover it. */
+  scroll-padding-inline-start: 50%;
   /* When columns are scrolled out of sight, a soft shadow at that edge says so. The two
      panel-colored covers move with the table and hide the shadow at an edge with nothing
      beyond it. The same on both sides, so it is right in either reading direction. */
@@ -184,6 +189,30 @@ export const tableCss = String.raw`
   background-color: var(--color-panel);
   white-space: nowrap;
 }
+/* The column that stays put never takes more than about 45% of its box, or on a phone a
+   long name would leave no room to bring the numbers into view. A name longer than that
+   wraps under itself, whole, beside its color chip; only a single word wider than the
+   limit is broken. */
+.ui-team-cell > [dir] {
+  display: inline-block;
+  /* As wide as its words up to the limit, and never squeezed below that: a name that fits
+     stays on one line, and the table scrolls rather than folding its names. */
+  inline-size: max-content;
+  max-inline-size: calc(45vw - var(--step-6));
+  max-inline-size: calc(45cqi - var(--step-6));
+  overflow-wrap: break-word;
+  vertical-align: middle;
+  white-space: normal;
+}
+.ui-team-cell > .ui-team-chip {
+  vertical-align: middle;
+}
+/* The word "Total" stays put with the names above it. */
+.ui-table tfoot th {
+  position: sticky;
+  inset-inline-start: 0;
+  background-color: var(--color-panel);
+}
 /* A team's color beside its name, wherever a table names a team; the two never part. */
 .ui-table .ui-team-chip {
   display: inline-block;
@@ -238,7 +267,7 @@ export const tableCss = String.raw`
   align-items: center;
   /* A short heading starts where its column's words start, not in the middle of the button. */
   justify-content: flex-start;
-  gap: 0.35em;
+  gap: var(--step-1);
   padding-block: 0;
   padding-inline: 0;
   min-block-size: var(--tap);
@@ -254,6 +283,11 @@ export const tableCss = String.raw`
 }
 .ui-sort-button:hover {
   color: var(--color-text);
+}
+/* The ring of a heading's button is drawn inside it: the box the table scrolls in cuts off
+   anything drawn outside its first row. */
+.ui-table .ui-sort-button:focus-visible {
+  outline-offset: -3px;
 }
 .ui-num .ui-sort-button {
   justify-content: flex-end;

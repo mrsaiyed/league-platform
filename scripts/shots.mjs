@@ -18,6 +18,10 @@
 // games of the made-up schedules. Only the first made-up league has tracked games, so
 // `game-live-light` and `game-final-light` are those two pages drawn with the second
 // league's design values, which is all that differs between two leagues' looks (T-90).
+//
+// `--only=long-name` takes the pages with tables at 320 and 390 wide with a made-up name of
+// 36 letters in the column that stays put, as they open and with the tables scrolled to
+// their far end (.local/shots/320 and /390, `…-long-name.jpg` and `…-long-name-scrolled.jpg`).
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -109,6 +113,20 @@ const platformPages = [
   { name: 'platform-find', at: '/find' },
   { name: 'platform-start', at: '/start' },
   { name: 'platform-help', at: '/help' },
+];
+
+// A long name where a table's first column stays put, at the two narrowest phones.
+const longName = 'The Northside Community Thunderbolts';
+const longNameWidths = [
+  { name: '320', viewport: { width: 320, height: 700 } },
+  { name: '390', viewport: { width: 390, height: 844 } },
+];
+const longNamePages = [
+  { name: 'north-valley-home-long-name', at: '/north-valley' },
+  { name: 'north-valley-standings-long-name', at: '/north-valley/standings' },
+  { name: 'north-valley-stats-long-name', at: '/north-valley/stats' },
+  { name: 'north-valley-team-long-name', at: '/north-valley/teams/owls' },
+  { name: 'north-valley-game-final-long-name', at: `/north-valley/games/${finalGame}` },
 ];
 
 const flag = (name) => process.argv.includes(name);
@@ -272,7 +290,10 @@ try {
   browser = await launch();
   const looks = {};
   const tracked = gamePages['north-valley'].filter((page) => /game-(live|final)/.test(page.name));
-  if (tracked.some((page) => wanted(`north-valley-${page.name}`))) {
+  if (
+    tracked.some((page) => wanted(`north-valley-${page.name}`)) ||
+    wanted('north-valley-game-final-long-name')
+  ) {
     try {
       await scoreTrackedGames(origin);
     } catch (error) {
@@ -345,6 +366,52 @@ try {
     }
     await visitor.close();
     await staff.close();
+  }
+  // A long name in the column of a table that stays put (`--only=long-name`): the first
+  // name of every table on the page is rewritten, in the picture only, to a made-up one of
+  // 36 letters, at the two narrowest phones. Each page is taken as it opens and again with
+  // its tables scrolled to their far end, which shows the numbers can still be reached.
+  for (const width of longNameWidths) {
+    const jobs = longNamePages.filter((job) => wanted(job.name));
+    if (jobs.length === 0) continue;
+    fs.mkdirSync(path.join(out, width.name), { recursive: true });
+    const visitor = await browser.newContext({ viewport: width.viewport });
+    for (const job of jobs) {
+      const page = await visitor.newPage();
+      page.setDefaultTimeout(90_000);
+      try {
+        await page.goto(`${origin}${job.at}`, { waitUntil: 'networkidle' });
+        await page.evaluate((name) => {
+          for (const table of document.querySelectorAll('table.ui-table')) {
+            const first = table.querySelector('tbody .ui-team-cell > [dir]');
+            if (first) first.textContent = name;
+          }
+        }, longName);
+        for (const scrolled of [false, true]) {
+          if (scrolled) {
+            await page.evaluate(() => {
+              for (const box of document.querySelectorAll('.ui-table-wrap')) {
+                box.scrollLeft = box.scrollWidth;
+              }
+            });
+            await page.waitForTimeout(300);
+          }
+          const name = `${job.name}${scrolled ? '-scrolled' : ''}`;
+          await page.screenshot({
+            path: path.join(out, width.name, `${name}.jpg`),
+            fullPage: true,
+            type: 'jpeg',
+            quality: 80,
+          });
+          taken.push(`${width.name}/${name}.jpg`);
+        }
+      } catch (error) {
+        missed.push(`${width.name}/${job.name}: ${String(error.message ?? error).split('\n')[0]}`);
+      } finally {
+        await page.close();
+      }
+    }
+    await visitor.close();
   }
 } finally {
   await browser?.close();

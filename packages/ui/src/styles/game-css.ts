@@ -6,8 +6,10 @@ export const gameCss = String.raw`
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 0.4em;
-  padding-block: 0.125rem;
+  gap: var(--step-1);
+  /* A pill is one step of the scale high (24), with its words centered in it. */
+  min-block-size: var(--step-5);
+  padding-block: 0;
   padding-inline: var(--step-2);
   border-radius: var(--radius-pill);
   background: var(--color-highlight);
@@ -37,8 +39,11 @@ export const gameCss = String.raw`
   }
 }
 .ui-game-state {
+  display: inline-flex;
   flex: none;
-  padding-block: 0.125rem;
+  align-items: center;
+  min-block-size: var(--step-5);
+  padding-block: 0;
   padding-inline: var(--step-2);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-pill);

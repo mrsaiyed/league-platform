@@ -226,7 +226,10 @@ export const cardsCss = String.raw`
   color: var(--color-primary-text);
 }
 .ui-group-mark {
-  padding-block: 0.125rem;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--step-5);
+  padding-block: 0;
   padding-inline: var(--step-2);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-pill);

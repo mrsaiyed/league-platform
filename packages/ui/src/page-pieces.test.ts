@@ -374,6 +374,56 @@ describe('tables', () => {
     );
     expect(displayCss).toMatch(/\.ui-table \.ui-num \{[^}]*inline-size: 1%;[^}]*text-align: end;/);
   });
+  it('hold the column that stays put to a share of the box, so a long name never hides the numbers', () => {
+    // The box is the measure, and the name is held to about 45% of it and wraps, whole.
+    expect(displayCss).toMatch(/\.ui-table-wrap \{[^}]*container-type: inline-size;/);
+    expect(displayCss).toMatch(
+      /\.ui-team-cell > \[dir\] \{[^}]*max-inline-size: calc\(45cqi - var\(--step-6\)\);[^}]*white-space: normal;/,
+    );
+    // The name is an element of its own in that cell in every table, so the limit reaches it.
+    const long = 'The Northside Community Thunderbolts';
+    const tables = [
+      render(
+        createElement(StandingsTable, {
+          caption: 'East',
+          idPrefix: 'east',
+          columns: [{ key: 'w', label: 'W' }],
+          rows: [{ id: 'a', team: long, color: '#663399', cells: { w: 5 } }],
+          labels: { seed: 'Seed', team: 'Team', note: 'Note', notes: 'Notes' },
+        }),
+      ),
+      render(
+        createElement(SortableStatsTable, {
+          caption: 'Teams',
+          columns: [{ key: 'team', label: 'Team' }],
+          rows: [{ id: 'a', cells: { team: long }, chips: { team: '#663399' } }],
+          labels: { sortBy: 'Sort by' },
+        }),
+      ),
+      render(
+        createElement(BoxScoreTable, {
+          teamName: 'Owls',
+          columns: [{ key: 'pts', label: 'PTS' }],
+          players: [{ id: 'p', jersey: '7', name: long, cells: { pts: 1 } }],
+          totals: { pts: 1 },
+          labels: { jersey: 'No.', player: 'Player', total: 'Total' },
+        }),
+      ),
+    ];
+    for (const html of tables) {
+      expect(html).toMatch(
+        new RegExp(
+          `<th scope="row" class="ui-team-cell">(<span class="ui-team-chip"[^>]*></span>)?<span dir="auto">${long}</span>`,
+        ),
+      );
+    }
+  });
+  it('keep the ring of a heading button whole, and what the keyboard reaches clear of the name column', () => {
+    expect(displayCss).toMatch(
+      /\.ui-table \.ui-sort-button:focus-visible \{\s*outline-offset: -3px;/,
+    );
+    expect(displayCss).toMatch(/\.ui-table-wrap \{[^}]*scroll-padding-inline-start: 50%;/);
+  });
   it('show at the far edge of their box that they go on, only while they do', () => {
     // The box stays still and the table scrolls inside it, so the box can carry the sign.
     const standings = render(
@@ -438,15 +488,28 @@ describe('the stylesheet of the page pieces', () => {
     const sizes = [...css.matchAll(/font-size:\s*([^;]+);/g)].map((m) => (m[1] ?? '').trim());
     expect(sizes.length).toBeGreaterThan(20);
     for (const size of sizes) expect(size).toMatch(/^(var\(--text-\d+\)|inherit|0\.7em)$/);
-    // Gaps, padding and margins come only from the spacing variables; a hairline or a
-    // pill's two pixels of padding are the only bare lengths.
+    // Every gap, padding, margin and inset, on either axis and either side, is a step of
+    // the spacing scale (DESIGN.md, section 4, line 2). The only bare lengths are a
+    // hairline, the one pixel that hides words kept for screen readers, and a share (%).
+    const step = String.raw`var\(--(?:step-\d|space(?:-tight|-section)?)\)`;
+    const plain = String.raw`(?:${step}|0|auto|-?1px|\d+%)`;
+    const sum = String.raw`calc\((?:${step}|-?1px|\d+%|-?\d+|[-+*/ ()])+\)`;
+    const onScale = new RegExp(`^(?:${plain}|${sum})(?: (?:${plain}|${sum}))*$`);
     const spaces = [
-      ...css.matchAll(/(?:^|[\s;{])(?:gap|padding(?:-block|-inline)?|margin-block):\s*([^;]+);/g),
-    ].flatMap((m) => (m[1] ?? '').trim().split(/\s+/));
-    for (const part of spaces) {
-      expect(part).toMatch(
-        /^(var\(--(step-\d|space(-tight|-section)?)\)|0|1px|0\.125rem|0\.\d+em)$/,
-      );
+      ...css.matchAll(
+        /(?:^|[\s;{])((?:row-|column-)?gap|(?:padding|margin|inset)(?:-block|-inline)?(?:-start|-end)?):\s*([^;]+);/g,
+      ),
+    ].map((m) => `${m[1]}: ${(m[2] ?? '').trim().replace(/\s+/g, ' ')}`);
+    expect(spaces.length).toBeGreaterThan(150);
+    expect(spaces.filter((space) => !onScale.test(space.slice(space.indexOf(': ') + 2)))).toEqual(
+      [],
+    );
+    // The check does see the sides it names: these are in the stylesheet, and pass.
+    for (const seen of ['margin-inline: auto', 'inset-inline-start: 0', 'inset: 0']) {
+      expect(spaces).toContain(seen);
+    }
+    for (const off of ['0.125rem', '0.35em', '0.4em', '2px 4px']) {
+      expect(onScale.test(off)).toBe(false);
     }
   });
   it('never shows a browser button or field as the browser draws it', () => {
@@ -456,10 +519,32 @@ describe('the stylesheet of the page pieces', () => {
     );
   });
   it('keeps everything a thumb taps at least 44 high', () => {
-    for (const selector of ['.ui-more', '.ui-crumbs a', '.ui-picker select,\n.ui-picker button']) {
-      const block = css.slice(css.indexOf(`${selector} {`));
-      expect(block.slice(0, block.indexOf('}')), selector).toContain('min-block-size: var(--tap)');
+    // Every piece that is tapped, by its own rule: a link that stands alone, a picker and
+    // its button, a heading that sorts, a group that opens (48). The browser test measures
+    // the same on the pages themselves (tests/browser/web-exit-test.mjs).
+    const tall = /min-block-size: var\(--(?:tap|step-7)\);/;
+    for (const selector of [
+      '.ui-more',
+      '.ui-crumbs a',
+      '.ui-picker select,\n.ui-picker button',
+      '.ui-sort-button',
+      '.ui-group > summary',
+    ]) {
+      const at = css.indexOf(`\n${selector} {`);
+      expect(at, selector).toBeGreaterThan(-1);
+      const block = css.slice(at);
+      expect(block.slice(0, block.indexOf('}')), selector).toMatch(tall);
     }
+    // Every button and every field, whatever page it is on.
+    expect(css).toMatch(
+      /\.ui-root :where\(button, input\[type='submit'\][^{]*\{[^}]*min-block-size: var\(--tap\);/,
+    );
+    expect(css).toMatch(/select,\s*textarea\s*\)\s*\{[^}]*min-block-size: var\(--tap\);/);
+    // A card that is a link is covered whole by it, and a card is taller than 44.
+    expect(css).toMatch(/\.ui-game-link \{[^}]*inset: 0;/);
+    expect(css).toMatch(/\.ui-team-card-name a::after \{[^}]*inset: 0;/);
+    expect(css).toMatch(/\.ui-game-team \{[^}]*min-block-size: var\(--step-6\);/);
+    expect(css).toMatch(/\.ui-emblem \{[^}]*block-size: var\(--step-7\);/);
   });
   it('names the tap height once, as a variable, and no size off the scales', () => {
     // 44 is written in the design's values (packages/site, scales.ts), never here.
