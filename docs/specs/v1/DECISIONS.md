@@ -315,6 +315,7 @@ All dated November 12, 2026.
 | T-246                 | New                                                                          | A fixtures file's text is held in its import's row only until the worker has read it, then replaced; an unread upload is discarded (rec. 034)   | Step 2.22: T-80 and T-131 left no place for the file between the upload and the worker             |
 | T-248                 | New                                                                          | A lapsed scoring session frees the game for others but carries on on its own device if nobody took it; times from the server's clock (rec. 036) | Step 2.28: T6 §5 did not say what a device back from offline finds, nor whose clock counts         |
 | T-249                 | New                                                                          | Placing a schedule: strict rules never broken, the rest best effort, unplaced games returned (rec. 037)                                         | Step 2.73: P7 §4 did not say what happens when the fairness rules cannot all be met                |
+| C-16                  | New (November 14)                                                            | The first starting design is built from the first Al-Hadi demo (maroon, white, gold); every color is the admin's; "simple, not boring"          | Founder, after seeing step 2.85's pictures: "better but still boring" (step 2.147, DESIGN.md)      |
 | T-250                 | New                                                                          | A tracked game ends by the tracker's tap or a command; did-not-play lines; a reopened one goes back to its tracker (rec. 038)                   | Step 2.30: T6 §7, §8 did not say which door ends a game or where a reopened one goes               |
 | T-251                 | New                                                                          | Tracker endpoints: one session address naming the device; errors as HTTP; a live message per batch from a visitor snapshot (rec. 039)           | Step 2.32: T6 §3, §5, §6 gave no session bodies, statuses or messages per batch                    |
 | T-253                 | New                                                                          | The device loads the engine's state from a staff read; the tracker's controller on the device (rec. 049)                                        | Step 2.34: T-113 says reload the server's state, but no door gave it                               |
@@ -405,23 +406,24 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 
 ### [P5 — Site customization](product/P5-site-customization.md)
 
-| ID   | Decision                                                                                                                                                                  | Status  | Stage 1 |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ------- |
-| C-1  | An admin can change anything about how their site looks and what it shows by choosing, arranging and configuring parts we built                                           | Agreed  |         |
-| C-2  | Faraj's current look becomes one of the starting designs, under a neutral name, for any league to pick                                                                    | Agreed  |         |
-| C-3  | Site edits are always draft-then-publish, and restoring an old version never touches league data                                                                          | Agreed  |         |
-| C-4  | Content that changes weekly is edited in the dashboard, not by redesigning pages                                                                                          | Agreed  |         |
-| C-5  | The trophy is a "Trophy display" section; Faraj's trophy is built first, and a league bringing its own trophy comes later                                                 | Changed |         |
-| C-6  | Other Faraj-specific parts follow the same rule and are listed one by one in P9                                                                                           | Agreed  |         |
-| C-7  | "Exactly as it is" means Faraj's visitors lose nothing that matters; checked by the feature list and the founder's side-by-side review                                    | Changed |         |
-| C-8  | Each page gets a real address. Today Faraj is one page with tabs (`#schedule`). On the platform it is `/farajleague/schedule`. Moving between pages stays instant, links… | Agreed  |         |
-| C-9  | Approved embeds at launch are YouTube, Vimeo, Instagram, Google Maps and Google Calendar                                                                                  | Agreed  |         |
-| C-10 | Uploaded images are resized and compressed automatically                                                                                                                  | Agreed  |         |
-| C-11 | News posts are written in a simple editor                                                                                                                                 | Agreed  |         |
-| C-12 | Every page has a title and description for search engines and link previews, filled in sensibly by default and editable                                                   | Agreed  |         |
-| C-13 | Design is set once for the whole league                                                                                                                                   | Agreed  |         |
-| C-14 | A club page (a member school) uses a fixed layout showing that school's teams across programs, with the school's logo and colors                                          | Later   |         |
-| C-15 | New, your direction (November 13): a league has a third color, a highlight used sparingly to make a few things stand out; the admin can change it like the others         | Agreed  |         |
+| ID   | Decision                                                                                                                                                                      | Status  | Stage 1 |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ------- |
+| C-1  | An admin can change anything about how their site looks and what it shows by choosing, arranging and configuring parts we built                                               | Agreed  |         |
+| C-2  | Faraj's current look becomes one of the starting designs, under a neutral name, for any league to pick                                                                        | Agreed  |         |
+| C-3  | Site edits are always draft-then-publish, and restoring an old version never touches league data                                                                              | Agreed  |         |
+| C-4  | Content that changes weekly is edited in the dashboard, not by redesigning pages                                                                                              | Agreed  |         |
+| C-5  | The trophy is a "Trophy display" section; Faraj's trophy is built first, and a league bringing its own trophy comes later                                                     | Changed |         |
+| C-6  | Other Faraj-specific parts follow the same rule and are listed one by one in P9                                                                                               | Agreed  |         |
+| C-7  | "Exactly as it is" means Faraj's visitors lose nothing that matters; checked by the feature list and the founder's side-by-side review                                        | Changed |         |
+| C-8  | Each page gets a real address. Today Faraj is one page with tabs (`#schedule`). On the platform it is `/farajleague/schedule`. Moving between pages stays instant, links…     | Agreed  |         |
+| C-9  | Approved embeds at launch are YouTube, Vimeo, Instagram, Google Maps and Google Calendar                                                                                      | Agreed  |         |
+| C-10 | Uploaded images are resized and compressed automatically                                                                                                                      | Agreed  |         |
+| C-11 | News posts are written in a simple editor                                                                                                                                     | Agreed  |         |
+| C-12 | Every page has a title and description for search engines and link previews, filled in sensibly by default and editable                                                       | Agreed  |         |
+| C-13 | Design is set once for the whole league                                                                                                                                       | Agreed  |         |
+| C-14 | A club page (a member school) uses a fixed layout showing that school's teams across programs, with the school's logo and colors                                              | Later   |         |
+| C-15 | New, your direction (November 13): a league has a third color, a highlight used sparingly to make a few things stand out; the admin can change it like the others             | Agreed  |         |
+| C-16 | New, your direction (November 14): the first starting design is built from the first Al-Hadi demo (maroon, white, gold); every color is the admin's to change (P5 quotes you) | Agreed  |         |
 
 ### [P6 — Registration and accounts](product/P6-registration-and-accounts.md)
 
