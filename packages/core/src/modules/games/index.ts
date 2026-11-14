@@ -1,4 +1,10 @@
 // The games module (T2 §3). Other modules and packages use only what is here.
+export {
+  gameFinalized,
+  gameReopened,
+  type GameFinalized,
+  type GameReopened,
+} from '../../events/game-events.ts';
 export { assignScorekeeper, type AssignScorekeeperError } from './commands/assign-scorekeeper.ts';
 export { cancelGame, type CancelGameError } from './commands/cancel-game.ts';
 export { listMyGames, type MyGame, type MyGames } from './commands/list-my-games.ts';
@@ -15,7 +21,6 @@ export { recordForfeit, type RecordForfeitError } from './commands/record-forfei
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
 export { recordFinalScoreWithin } from './record-score-within.ts';
 export type { DecideGameError } from './decide-game.ts';
-export { gameFinalized, gameReopened, type GameFinalized, type GameReopened } from './events.ts';
 export { recordingOf } from './game-fields.ts';
 export {
   readGamePage,

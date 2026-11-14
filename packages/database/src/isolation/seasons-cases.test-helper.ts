@@ -5,6 +5,7 @@ import { defaultSeasonRules } from '@srleagues/contracts';
 import {
   getSeason,
   setSeasonRosterSettings,
+  previewSeasonRules,
   setSeasonRules,
   updateSeason as updateSeasonCommand,
 } from '@srleagues/core';
@@ -47,6 +48,11 @@ registerCommandCase(setSeasonRules, harnessTx, {
     version: 1,
     rules: defaultSeasonRules(),
   }),
+});
+
+registerCommandCase(previewSeasonRules, harnessTx, {
+  name: "preview new rules for the target's season",
+  input: (target) => ({ seasonId: target.seasonId, rules: defaultSeasonRules() }),
 });
 
 registerCommandCase(setSeasonRosterSettings, harnessTx, {

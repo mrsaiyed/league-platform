@@ -9,6 +9,10 @@ export { updateDivision, type UpdateDivisionError } from './commands/update-divi
 export { createSeason, type CreateSeasonError } from './commands/create-season.ts';
 export { getSeason, type GetSeasonError } from './commands/get-season.ts';
 export { updateSeason, type UpdateSeasonError } from './commands/update-season.ts';
+export {
+  previewSeasonRules,
+  type PreviewSeasonRulesError,
+} from './commands/preview-season-rules.ts';
 export { setSeasonRules, type SetSeasonRulesError } from './commands/set-season-rules.ts';
 export {
   setSeasonRosterSettings,

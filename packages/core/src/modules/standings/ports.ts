@@ -19,6 +19,18 @@ export type SeasonAdjustment = {
   readonly reason: string;
 };
 
+/** An adjustment to add (S-10); at least one of the four changes is not zero. */
+export type NewAdjustment = {
+  readonly teamId: string;
+  readonly wins: number;
+  readonly losses: number;
+  readonly ties: number;
+  readonly points: number;
+  readonly reason: string;
+  /** Who entered it: an id only (history keeps no copies of personal details). */
+  readonly accountId: string;
+};
+
 export type StandingsStore = {
   /**
    * Holds the season's standings for the rest of the transaction, so two results
@@ -29,6 +41,10 @@ export type StandingsStore = {
   readonly listTeams: (seasonId: string) => Promise<readonly TableTeam[]>;
   /** The season's adjustments not in the bin, in id order. */
   readonly listAdjustments: (seasonId: string) => Promise<readonly SeasonAdjustment[]>;
+  /** Adds an adjustment to the season's: its id. The team must be one of the season's. */
+  readonly addAdjustment: (seasonId: string, adjustment: NewAdjustment) => Promise<string>;
+  /** Moves the season's adjustment to the bin (T-45): false if it is not there or already in it. */
+  readonly binAdjustment: (seasonId: string, adjustmentId: string) => Promise<boolean>;
   /** Makes the season's standings rows exactly these: one per team, others removed. */
   readonly replaceRows: (seasonId: string, rows: readonly StandingsRow[]) => Promise<void>;
   /** Makes the season's player totals exactly these: one per person, others removed. */

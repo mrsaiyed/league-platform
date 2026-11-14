@@ -31,6 +31,7 @@ import {
   getSeason,
   updateSeason,
   setSeasonRules,
+  previewSeasonRules,
   setSeasonRosterSettings,
 } from './modules/leagues/index.ts';
 import {
@@ -53,7 +54,7 @@ import {
   startFixtureImport,
   undoFixtureImport,
 } from './modules/imports/index.ts';
-import { rebuildStandings } from './modules/standings/index.ts';
+import { addAdjustment, rebuildStandings, removeAdjustment } from './modules/standings/index.ts';
 import {
   addDraftGame,
   changeDraftRoundDate,
@@ -98,6 +99,7 @@ export const commands = commandRegistry([
   getSeason,
   updateSeason,
   setSeasonRules,
+  previewSeasonRules,
   setSeasonRosterSettings,
   createDivision,
   updateDivision,
@@ -135,6 +137,8 @@ export const commands = commandRegistry([
   unassignScorekeeper,
   listMyGames,
   rebuildStandings,
+  addAdjustment,
+  removeAdjustment,
   startFixtureImport,
   applyFixtureImport,
   undoFixtureImport,

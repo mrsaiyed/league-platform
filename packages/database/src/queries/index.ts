@@ -121,6 +121,8 @@ export { isGameAssigned } from './is-game-assigned.ts';
 export { listGamesInWindow } from './list-games-in-window.ts';
 export { listTableTeams } from './list-table-teams.ts';
 export { listStandingsAdjustments } from './list-standings-adjustments.ts';
+export { insertStandingsAdjustment } from './insert-standings-adjustment.ts';
+export { binStandingsAdjustment } from './bin-standings-adjustment.ts';
 export { lockSeasonStandings } from './lock-season-standings.ts';
 export { replaceStandingsRows } from './replace-standings-rows.ts';
 export { replaceSeasonPlayerTotals } from './replace-season-player-totals.ts';

@@ -4,7 +4,7 @@
 // stamps `finalized_at` and refuses a score a decided game may not have (T3 §12).
 import { recordActivity } from '../access/index.ts';
 import { fail, ok, type CommandContext, type Result } from '../../command/index.ts';
-import { gameFinalized, type GameFinalized } from './events.ts';
+import { gameFinalized, type GameFinalized } from '../../events/game-events.ts';
 import { isDecided } from './game-fields.ts';
 import type { GameRecord, GamesTx } from './ports.ts';
 import { seasonRulesOf } from './season-rules-of.ts';
