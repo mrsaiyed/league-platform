@@ -5,16 +5,24 @@ import {
   cancelGame,
   listMyGames,
   listPostponedGames as listPostponedGamesCommand,
+  openScoringSession,
   postponeGame,
   recordFinalScore,
   recordForfeit,
+  releaseScoringSession,
+  renewScoringSession,
   reopenGame,
+  takeOverScoring,
   unassignScorekeeper,
 } from '@srleagues/core';
 import { sql } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import {
   deleteGameAssignment,
+  deleteScoringSession,
+  extendScoringSession,
+  findScoringSession,
+  insertScoringSession,
   findGame,
   insertGameAssignment,
   insertGameCorrection,
@@ -205,4 +213,83 @@ registerIsolationCase({
     await postponeTargetGame(scope, target);
     return runAsApp(listPostponedGamesCommand, harnessTx, scope, {});
   },
+});
+
+// Scoring sessions (step 2.28) -------------------------------------------------------
+
+// The target's member holds its upcoming game on a tablet, for two minutes from when
+// the seed ran; the harness's clock is the real one, so the lease has not run out.
+
+registerIsolationCase({
+  subject: findScoringSession,
+  name: "find the session scoring the target's upcoming game",
+  run: (scope, target) => findScoringSession(scope, target.upcomingGameId),
+});
+
+registerIsolationCase({
+  subject: insertScoringSession,
+  // The scope's own game is held already, so its session is ended first (in the run's
+  // own rolled-back transaction) to have a game to start one on.
+  name: "start a session on a game of the scope's league",
+  run: async (scope) => {
+    const gameId = await ownUpcomingGameId(scope);
+    await transactionOf(scope)
+      .deleteFrom('scoring_sessions')
+      .where('league_id', '=', scope.leagueId)
+      .where('game_id', '=', gameId)
+      .execute();
+    // Set times, so every run returns the same answer apart from the new session's id.
+    const since = Date.UTC(2026, 11, 13, 19, 0, 0);
+    return insertScoringSession(scope, {
+      gameId,
+      accountId: scope.accountId ?? randomUUID(),
+      deviceId: 'harness-device',
+      since,
+      heldUntil: since + 120_000,
+    });
+  },
+});
+
+registerIsolationCase({
+  subject: extendScoringSession,
+  name: "renew the session scoring the target's upcoming game",
+  run: (scope, target) =>
+    extendScoringSession(
+      scope,
+      target.upcomingGameId,
+      target.scoringSessionId,
+      Date.now() + 120_000,
+    ),
+});
+
+registerIsolationCase({
+  subject: deleteScoringSession,
+  name: "end the session scoring the target's upcoming game",
+  run: (scope, target) =>
+    deleteScoringSession(scope, target.upcomingGameId, target.scoringSessionId),
+});
+
+registerCommandCase(openScoringSession, harnessTx, {
+  name: "open the target's upcoming game to score",
+  input: (target) => ({ gameId: target.upcomingGameId, deviceId: 'harness-device' }),
+});
+
+registerCommandCase(renewScoringSession, harnessTx, {
+  name: "renew the session scoring the target's upcoming game",
+  input: (target) => ({ gameId: target.upcomingGameId, sessionId: target.scoringSessionId }),
+});
+
+registerCommandCase(takeOverScoring, harnessTx, {
+  name: "take over scoring the target's upcoming game from its member",
+  input: (target) => ({
+    gameId: target.upcomingGameId,
+    deviceId: 'harness-device',
+    confirmed: true,
+    expectedHolderSince: target.scoringSessionSince,
+  }),
+});
+
+registerCommandCase(releaseScoringSession, harnessTx, {
+  name: "release the session scoring the target's upcoming game",
+  input: (target) => ({ gameId: target.upcomingGameId, sessionId: target.scoringSessionId }),
 });

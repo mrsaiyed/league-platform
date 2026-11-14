@@ -84,6 +84,11 @@ import {
   listAccess,
   listActivity,
   myAccess,
+  openScoringSession,
+  releaseScoringSession,
+  renewScoringSession,
+  systemClock,
+  takeOverScoring,
   renameShortName,
   resendInvitation,
   revokeGrant,
@@ -104,6 +109,7 @@ import {
   type Permission,
   type PeopleTx,
   type SchedulingTx,
+  type ScoringTx,
   type SettingRegistry,
   type StandingsTx,
   type TeamsTx,
@@ -140,6 +146,7 @@ import { divisionsStore } from './divisions-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 import { peopleStore } from './people-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
+import { scoringSessionsStore } from './scoring-sessions-store.ts';
 import { standingsStore } from './standings-store.ts';
 import { teamsStore } from './teams-store.ts';
 
@@ -183,6 +190,7 @@ let accessDeps: CommandDeps<AccessTx>;
 let leaguesDeps: CommandDeps<LeaguesTx>;
 let schedulingDeps: CommandDeps<SchedulingTx>;
 let gamesDeps: CommandDeps<GamesTx>;
+let scoringDeps: CommandDeps<ScoringTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
 let teamsDeps: CommandDeps<TeamsTx>;
 let standingsDeps: CommandDeps<StandingsTx>;
@@ -196,6 +204,8 @@ beforeAll(async () => {
     divisions: divisionsStore(scope),
     scheduling: schedulingStore(scope),
     games: gamesStore(scope),
+    scoringSessions: scoringSessionsStore(scope),
+    clock: systemClock,
     people: peopleStore(scope),
     teams: teamsStore(scope),
     standings: standingsStore(scope),
@@ -208,6 +218,7 @@ beforeAll(async () => {
   leaguesDeps = { transaction, events: [], ...rest };
   schedulingDeps = { transaction, events: [], ...rest };
   gamesDeps = { transaction, events: [], ...rest };
+  scoringDeps = { transaction, events: [], ...rest };
   peopleDeps = { transaction, events: [], ...rest };
   teamsDeps = { transaction, events: [], ...rest };
 });
@@ -851,6 +862,59 @@ const gameCommandRows: readonly Row[] = [
     prepare: async () => ({ input: {} }),
     run: (c, i) => listPostponedGames(c, i, gamesDeps),
   },
+  // Holding a game to score (T6 §5, T-116): whoever may score it.
+  ...gameRows(
+    'games.open_scoring_session',
+    'open a game to score',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      deviceId: 'matrix-tablet',
+    }),
+    (c, i) => openScoringSession(c, i, scoringDeps),
+  ),
+  // A session no longer held is answered "ended": allowed, and nothing changes.
+  ...gameRows(
+    'games.renew_scoring_session',
+    'renew a scoring session',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      sessionId: randomUUID(),
+    }),
+    (c, i) => renewScoringSession(c, i, scoringDeps),
+  ),
+  ...gameRows(
+    'games.release_scoring_session',
+    'leave a game being scored',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      sessionId: randomUUID(),
+    }),
+    (c, i) => releaseScoringSession(c, i, scoringDeps),
+  ),
+  ...gameRows(
+    'games.take_over_scoring',
+    'take over scoring a game from another device',
+    'games.score',
+    async (league, program) => {
+      const { gameId } = await gameIn(league, program);
+      const since = Date.UTC(2026, 11, 6, 18, 0, 0);
+      await pglite.query(
+        `insert into scoring_sessions (league_id, game_id, account_id, device_id, created_at, held_until)
+         values ($1, $2, $3, 'matrix-phone', $4, now() + interval '2 minutes')`,
+        [
+          league.leagueId,
+          gameId,
+          await grant(league.leagueId, 'scorekeeper'),
+          new Date(since).toISOString(),
+        ],
+      );
+      return { gameId, deviceId: 'matrix-tablet', confirmed: true, expectedHolderSince: since };
+    },
+    (c, i) => takeOverScoring(c, i, scoringDeps),
+  ),
 ];
 
 const divisionAndVenueRows: readonly Row[] = [

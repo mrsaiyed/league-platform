@@ -23,6 +23,7 @@ import { divisionSummary } from '../queries/division-summary.ts';
 import { gameSummary } from '../queries/game-summary.ts';
 import { personSummary, personSummaryWithSensitive } from '../queries/person-summary.ts';
 import { rosterEntrySummary } from '../queries/roster-entry-summary.ts';
+import { scoringSessionSummary } from '../queries/scoring-session-summary.ts';
 import { teamSummary } from '../queries/team-summary.ts';
 import { programSummary } from '../queries/program-summary.ts';
 import { courtSummary, venueSummary } from '../queries/venue-summary.ts';
@@ -64,6 +65,11 @@ const reachNoLeagueData = new Map<unknown, string>([
     'binds the division queries, each with its own cases, to a scope',
   ],
   [databasePackage.gamesStore, 'binds the game queries (own cases) to a scope'],
+  [
+    databasePackage.scoringSessionsStore,
+    'binds the scoring session queries (own cases) to a scope',
+  ],
+  [scoringSessionSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [databasePackage.standingsStore, 'binds the standings queries (own cases) to a scope'],
   [
     databasePackage.lockSeasonStandings,

@@ -22,6 +22,7 @@
 // command aimed at the target is refused there before any handler runs.
 import {
   eventHandlers,
+  systemClock,
   type AccessTx,
   type Command,
   type CommandDeps,
@@ -35,6 +36,7 @@ import {
   type LeaguesTx,
   type PeopleTx,
   type SchedulingTx,
+  type ScoringTx,
   type StandingsTx,
   type TeamsTx,
   type TransactionRunner,
@@ -51,6 +53,7 @@ import {
   leaguesStore,
   peopleStore,
   schedulingStore,
+  scoringSessionsStore,
   standingsStore,
   teamsStore,
 } from '../stores/index.ts';
@@ -61,6 +64,7 @@ import type { LeagueRecords } from './two-leagues.test-helper.ts';
 export type HarnessTx = LeaguesTx &
   SchedulingTx &
   GamesTx &
+  ScoringTx &
   PeopleTx &
   TeamsTx &
   AccessTx &
@@ -77,6 +81,8 @@ export function harnessTx(scope: LeagueScope, jobs: JobQueue): HarnessTx {
     divisions: divisionsStore(scope),
     scheduling: schedulingStore(scope),
     games: gamesStore(scope),
+    scoringSessions: scoringSessionsStore(scope),
+    clock: systemClock,
     people: peopleStore(scope),
     teams: teamsStore(scope),
     standings: standingsStore(scope),

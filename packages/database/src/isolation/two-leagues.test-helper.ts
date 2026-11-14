@@ -74,6 +74,8 @@ export type LeagueRecords = MadeLeague & {
   gameStateId: string;
   playerGameStatsId: string;
   scoringSessionId: string;
+  /** When that session began (ms): what taking the game over from it names. */
+  scoringSessionSince: number;
   /** A player added at the final game's scorer's table, waiting for the admin's review (S-6). */
   walkUpRosterEntryId: string;
   /** The team's standings row, an adjustment to it, and the player's season totals. */
@@ -400,11 +402,19 @@ async function seededLeague(
      values ($1, $2, $3, $4, '23', true, 1200, '{"points": 2, "fg2": 1}')`,
     [leagueId, gameId, teamId, personId],
   );
+  // Begun at a set moment, so a takeover can name it; held for two minutes from now.
+  const scoringSessionSince = Date.UTC(2026, 11, 13, 18, 0, 0);
   const scoringSessionId = await id(
     pglite,
-    `insert into scoring_sessions (league_id, game_id, account_id, device_id, held_until)
-     values ($1, $2, $3, $4, now() + interval '2 minutes')`,
-    [leagueId, upcomingGameId, member.accountId, `${m}-tablet`],
+    `insert into scoring_sessions (league_id, game_id, account_id, device_id, created_at, held_until)
+     values ($1, $2, $3, $4, $5, now() + interval '2 minutes')`,
+    [
+      leagueId,
+      upcomingGameId,
+      member.accountId,
+      `${m}-tablet`,
+      new Date(scoringSessionSince).toISOString(),
+    ],
   );
   const walkUpPersonId = await id(
     pglite,
@@ -505,6 +515,7 @@ async function seededLeague(
     gameStateId,
     playerGameStatsId,
     scoringSessionId,
+    scoringSessionSince,
     walkUpRosterEntryId,
     standingsRowId,
     standingsAdjustmentId,

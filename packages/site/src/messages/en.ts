@@ -129,6 +129,15 @@ export const en = {
     'That person is already assigned to this game.',
   'error.games.unassign_scorekeeper.game-not-found': 'That game is not there.',
   'error.games.unassign_scorekeeper.not-assigned': 'That person is not assigned to this game.',
+  // Why opening a game to score was refused (T6 §5, T-187).
+  'error.games.open_scoring_session.game-not-found': 'That game is not there.',
+  'error.games.open_scoring_session.game-closed':
+    'That game is already decided or cancelled. Reopen it first to correct it.',
+  'error.games.take_over_scoring.game-not-found': 'That game is not there.',
+  'error.games.take_over_scoring.game-closed':
+    'That game is already decided or cancelled. Reopen it first to correct it.',
+  'error.games.renew_scoring_session.game-not-found': 'That game is not there.',
+  'error.games.release_scoring_session.game-not-found': 'That game is not there.',
   // Why a schedule draft edit was refused (T-187).
   'error.scheduling.add_draft_game.changed-since-read':
     'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
@@ -283,6 +292,7 @@ export const en = {
   'activity.games.reopen_game': 'Reopened a final game to correct it',
   'activity.games.assign_scorekeeper': 'Assigned a scorekeeper to a game',
   'activity.games.unassign_scorekeeper': 'Took a scorekeeper off a game',
+  'activity.games.take_over_scoring': 'Took over scoring a game from another device',
   'activity.standings.rebuild_season': "Worked out a season's standings and totals again",
   'activity.people.create_person': 'Added a person',
   'activity.people.update_person': 'Changed a person',
