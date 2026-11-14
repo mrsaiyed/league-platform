@@ -1,5 +1,7 @@
 // Records a forfeit (P7 §5.6): the team that forfeits loses, the other wins, at the
-// league's forfeit score from the season's rules. No player statistics. Announces
+// league's forfeit score from the season's rules. No player statistics: a reopened box
+// score game recorded now as a forfeit loses its old lines in the same transaction, as a
+// final score only does (S-27), so they no longer count in totals. Announces
 // `games.finalized` (T-24). Needs `games.results`, as postponing and cancelling do.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
@@ -36,6 +38,9 @@ export const recordForfeit = defineCommand({
       return fail({ code: 'team-not-in-game' });
     }
     const { forfeit } = await effectiveRulesOf(tx, game);
+    // A forfeit has no player statistics (P7 §5.6): a box score's old lines go (S-27).
+    const wasBox = game.captureMode === 'box';
+    if (wasBox) await tx.games.replaceLines(game.id, []);
     return decideGame({
       context,
       tx,
@@ -46,6 +51,7 @@ export const recordForfeit = defineCommand({
       status: 'forfeit',
       homeScore: homeForfeits ? forfeit.loserScore : forfeit.winnerScore,
       awayScore: homeForfeits ? forfeit.winnerScore : forfeit.loserScore,
+      ...(wasBox ? { captureMode: 'final' as const } : {}),
     });
   },
 });

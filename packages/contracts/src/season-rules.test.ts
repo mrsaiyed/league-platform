@@ -26,7 +26,7 @@ const HALVES = {
   overtimeTimeouts: 1,
   timeoutsCarry: false,
 } as const;
-import { Rules as TrackerRules } from './live-stats.ts';
+import { PlatformRules, Rules as TrackerRules } from './live-stats.ts';
 import {
   SEASON_RULES_PRESETS,
   SeasonRules,
@@ -134,6 +134,61 @@ describe('season rules presets', () => {
     edge('overtimeSeconds', 60, true);
     edge('bonusFouls', 31, false);
     edge('doubleBonusFouls', 41, false);
+  });
+
+  it('keeps the platform tracker limits of the three clock and foul rules in step (step 2.67)', () => {
+    const base = {
+      periods: 2,
+      periodSeconds: 1200,
+      overtimeSeconds: 300,
+      bonusFouls: 7,
+      doubleBonusFouls: 10,
+    };
+    const edge = (key: string, value: number | null, expected: boolean) => {
+      const doc = structuredClone(defaultSeasonRules());
+      // The document keeps the stop clock to a running clock and the mercy rule to a stop one.
+      if (key === 'stopClockLastSeconds') doc.clock.stopClockLastSeconds = value;
+      if (key === 'mercyLead') doc.clock = { ...doc.clock, mode: 'stop', mercyLead: value };
+      if (key === 'playerFoulLimit') doc.fouls.playerFoulLimit = value;
+      expect(SeasonRules.safeParse(doc).success).toBe(expected);
+      expect(PlatformRules.safeParse({ ...base, [key]: value }).success).toBe(expected);
+    };
+    for (const key of ['stopClockLastSeconds', 'mercyLead', 'playerFoulLimit']) {
+      edge(key, null, true);
+      edge(key, 0, false);
+      edge(key, 1, true);
+      edge(key, 2.5, false);
+    }
+    edge('stopClockLastSeconds', 600, true);
+    edge('stopClockLastSeconds', 601, false);
+    edge('mercyLead', 100, true);
+    edge('mercyLead', 101, false);
+    edge('playerFoulLimit', 20, true);
+    edge('playerFoulLimit', 21, false);
+    for (const scope of ['period', 'half', 'game'] as const) {
+      const doc = structuredClone(defaultSeasonRules());
+      doc.clock.stopClockScope = scope;
+      expect(SeasonRules.safeParse(doc).success).toBe(true);
+      expect(PlatformRules.safeParse({ ...base, stopClockScope: scope }).success).toBe(true);
+    }
+    expect(PlatformRules.safeParse({ ...base, stopClockScope: 'quarter' }).success).toBe(false);
+  });
+
+  it('keeps the platform last-minutes stop clock within a period, as the engine does', () => {
+    const base = {
+      periods: 4,
+      periodSeconds: 300,
+      overtimeSeconds: 180,
+      bonusFouls: 5,
+      doubleBonusFouls: null,
+    };
+    expect(PlatformRules.safeParse({ ...base, stopClockLastSeconds: 300 }).success).toBe(true);
+    expect(PlatformRules.safeParse({ ...base, stopClockLastSeconds: 301 }).success).toBe(false);
+    expect(PlatformRules.safeParse({ ...base, stopClockLastSeconds: null }).success).toBe(true);
+    const doc = structuredClone(defaultSeasonRules());
+    doc.gameFormat.periodSeconds = 300;
+    doc.clock = { ...doc.clock, mode: 'running', stopClockLastSeconds: 301 };
+    expect(SeasonRules.safeParse(doc).success).toBe(false);
   });
 });
 

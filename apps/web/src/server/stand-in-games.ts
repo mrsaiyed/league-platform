@@ -16,10 +16,8 @@ import {
   type CommandDeps,
   type CommandLogLine,
   type EventHandler,
-  type GameLine,
   type GameRecord,
   type GameSnapshotStore,
-  type GamesTx,
   type NewGameCorrection,
   type StoredSetting,
   type TrackerTx,
@@ -47,7 +45,9 @@ type State = {
     status: 'draft' | 'active' | 'completed';
   }[];
   games: GameRecord[];
-  lines: GameLine[];
+  /** Games whose plays the tracker recorded before this process started (no plays kept
+   * here); a game the tracker writes to here counts too (`tracker.events`). */
+  tracked: string[];
   corrections: NewGameCorrection[];
   assignments: { gameId: string; accountId: string }[];
   settings: Record<string, StoredSetting[]>;
@@ -125,7 +125,7 @@ function emptyState(): State {
   return {
     seasons: [],
     games: [],
-    lines: [],
+    tracked: [],
     corrections: [],
     assignments: [],
     settings: {},
@@ -160,6 +160,8 @@ function seed(options: StandInGamesOptions): State {
     ...emptyState(),
     tracker: seedTracker(madeUpTeams, standInPlayerId),
     settings: { ...options.settings },
+    // The live game has plays from the tracker.
+    tracked: [id(0x6a, 2)],
     seasons: [
       { id: seasonId, programId: id(0x9a, 1), rules: defaultSeasonRules(), status: 'active' },
       {
@@ -232,6 +234,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
           awayScore: change.awayScore,
           finalizedAt: change.decided ? new Date().toISOString() : null,
           format: found.format ?? change.format ?? null,
+          captureMode: change.captureMode ?? found.captureMode,
           version: found.version + 1,
         };
         return found.version + 1;
@@ -252,6 +255,33 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
             (g.status === 'final' || g.status === 'forfeit'),
         ),
       listDecidedLines: async () => [],
+      // Box score lines, with the number worn, are the tracker's lines (one table, as in
+      // the database), so the grid and the tracker read and write the same ones.
+      listLines: async (gameId) =>
+        s.tracker.lines
+          .filter((l) => l.gameId === gameId)
+          .map(({ jerseyNumber: _jersey, ...line }) => line),
+      replaceLines: async (gameId, lines) => {
+        s.tracker.lines = [...s.tracker.lines.filter((l) => l.gameId !== gameId), ...lines];
+      },
+      listRoster: async (gameId) =>
+        teamsOf(s, gameId).flatMap((teamId) =>
+          s.tracker.players
+            .filter((p) => p.teamId === teamId)
+            .map((p) => {
+              const person = s.tracker.people.find((x) => x.id === p.personId);
+              return {
+                teamId,
+                personId: p.personId,
+                firstName: person?.firstName ?? '',
+                lastName: person?.lastName ?? '',
+                jerseyNumber: p.jerseyNumber,
+                left: !p.onGameDay,
+              };
+            }),
+        ),
+      hasPlays: async (gameId) =>
+        s.tracked.includes(gameId) || s.tracker.events.some((e) => e.gameId === gameId),
       findSeason: async (seasonId) => s.seasons.find((x) => x.id === seasonId),
       leagueSettingRows: async (key) => s.settings[key] ?? [],
       isAssigned: async (gameId, accountId) => isAssigned(s, gameId, accountId),
@@ -293,10 +323,12 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     liveGames: liveGamesOf(s.tracker, (gameId) => teamsOf(s, gameId)),
   });
 
-  const noticeOnly: EventHandler<GamesTx>[] = ['games.finalized', 'games.reopened'].map((type) => ({
-    type,
-    handle: async () => {},
-  }));
+  const noticeOnly: EventHandler<TrackerTx>[] = ['games.finalized', 'games.reopened'].map(
+    (type) => ({
+      type,
+      handle: async () => {},
+    }),
+  );
   // One transaction at a time, as the database's lock on a game would hold the others.
   let queue: Promise<unknown> = Promise.resolve();
   const transaction: TransactionRunner<TrackerTx> = (context, work) => {
@@ -312,7 +344,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     queue = run.catch(() => undefined);
     return run;
   };
-  const deps: CommandDeps<GamesTx> = {
+  const deps: CommandDeps<TrackerTx> = {
     transaction,
     events: noticeOnly,
     log: options.log,
