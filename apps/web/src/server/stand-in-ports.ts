@@ -37,6 +37,7 @@ import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import { liveListenAuthorize } from './live-listen.ts';
 import type { WebPorts } from './ports.ts';
+import { standInAdminSettings } from './stand-in-admin-settings.ts';
 import { createPlayPublisher } from './publish-plays.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import { standInFixtureImport } from './stand-in-fixture-import.ts';
@@ -343,6 +344,10 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       accessOf: (leagueId) => accessTx(leagueId).access,
       log: options.log,
       seededLeagueId: standInLeagues.live.id,
+    }),
+    adminSettings: standInAdminSettings({
+      accessOf: (leagueId) => accessTx(leagueId).access,
+      log: options.log,
     }),
     publicSchedule: standInPublicSchedule(
       { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },

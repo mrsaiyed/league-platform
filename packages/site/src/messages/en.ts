@@ -327,6 +327,36 @@ export const en = {
   'error.short-name-needed':
     'A short name could not be made from this name. Type a short name: lower-case letters and numbers, with single hyphens.',
   'error.unknown': 'That could not be done.',
+  // The admin's League settings screen (step 2.48). The words for each setting itself are
+  // `setting.<key>.label` and `setting.<key>.option.<choice>`, declared with the setting.
+  'adminSettings.intro':
+    'These settings apply to the whole league. Each shows what it is set to now, its default and what it accepts.',
+  'adminSettings.none': 'This league has no settings to change yet.',
+  'adminSettings.default': 'Default: {value}',
+  'adminSettings.defaultMark': '{choice} (the default)',
+  'adminSettings.yes': 'Yes',
+  'adminSettings.no': 'No',
+  'adminSettings.usingDefault': 'Now: the default.',
+  'adminSettings.usingOwn': 'Now: set for this league.',
+  'adminSettings.limits.whole': 'Accepts a whole number from {min} to {max}.',
+  'adminSettings.limits.number': 'Accepts a number from {min} to {max}.',
+  'adminSettings.limits.text': 'Accepts up to {max} characters.',
+  'adminSettings.limits.choice': 'Accepts one of the choices shown.',
+  'adminSettings.limits.toggle': 'Accepts yes or no.',
+  'adminSettings.limits.other': 'This setting cannot be changed on this screen.',
+  'adminSettings.field.value': 'Value',
+  'adminSettings.save': 'Save',
+  'adminSettings.clear': 'Go back to the default',
+  'adminSettings.done.saved': 'The setting was saved.',
+  'adminSettings.done.cleared': 'The setting is back to its default.',
+  'error.leagues.set_setting.invalid-value':
+    'That value is not allowed for this setting. Check what it accepts and try again.',
+  'error.leagues.set_setting.changed-since-read':
+    'Someone else changed this setting while you were looking, so yours was not saved. The page now shows the latest value; change it again if you still want to.',
+  'error.leagues.clear_setting.changed-since-read':
+    'Someone else changed this setting while you were looking, so it was not put back to the default. The page now shows the latest value.',
+  'error.leagues.set_setting.unknown-setting': 'That setting does not exist.',
+  'error.leagues.clear_setting.unknown-setting': 'That setting does not exist.',
   'error.teams.create_team.season-not-found': 'That season is not there.',
   'error.teams.create_team.division-not-found': 'That division is not there.',
   'error.teams.create_team.team-short-name-taken':
