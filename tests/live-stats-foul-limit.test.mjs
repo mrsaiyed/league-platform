@@ -3,7 +3,10 @@
 // format leaves it out, so a game reads as before.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { LiveStats } from '../apps/live-stats/service.ts';
+import { MemoryRepository } from '../packages/database/src/live-stats/memory.ts';
 import {
   apply,
   derive,
@@ -120,4 +123,37 @@ test('the same commands give the same game on the device and on the server', asy
   assert.deepEqual(device.derive(onServer), d);
   assert.equal(d.players.h1.fouledOut, true);
   assert.equal('fouledOut' in d.players.h2, false);
+});
+
+test('the mark is not saved in a player line, so the stored format stays as it was', async () => {
+  // The Al-Hadi tracker never sends the limit; a game whose rules carry one stands in here.
+  class WithLimit extends MemoryRepository {
+    record(gameId, commandId, decide) {
+      return super.record(gameId, commandId, (game) =>
+        decide({
+          ...game,
+          state: { ...game.state, rules: { ...game.state.rules, playerFoulLimit: 1 } },
+        }),
+      );
+    }
+  }
+  const seed = JSON.parse(
+    await readFile(
+      new URL('../apps/live-stats/data/tcsaal-alhadi-varsity-boys-2026-27.json', import.meta.url),
+    ),
+  );
+  const repo = new WithLimit();
+  await repo.initialize();
+  const stats = new LiveStats(repo, () => Date.parse('2026-11-02T19:05:00-06:00'));
+  await stats.seed(seed);
+  const g = (await stats.schedule()).games[0];
+  const player = await stats.addPlayer(g.home.id, { name: 'Player 1', jersey: '1' });
+  const send = (input) => stats.command(g.id, { commandId: randomUUID(), input });
+  await send({ type: 'lineup', side: 'home', playerIds: [player.id] });
+  await send({ type: 'foul', side: 'home', playerId: player.id });
+  const state = (await repo.game(g.id)).state;
+  assert.equal(derive(state).players[player.id].fouledOut, true, 'the engine marks the player');
+  const [line] = await repo.gameLines(g.id);
+  assert.equal(line.fouls, 1);
+  assert.equal('fouledOut' in line, false);
 });
