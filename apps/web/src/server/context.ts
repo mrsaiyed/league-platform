@@ -34,10 +34,12 @@ import type { SessionError, SessionIdentity } from '@srleagues/providers';
 /**
  * Why a session the sign-in service accepts still belongs to none of our accounts
  * (record 055). `sign-in-link-conflict`: the account for its address is linked to
- * another sign-in user, which is put right by hand (record 052). The person stays
- * signed in, is told so plainly on the account page and may sign out there.
+ * another sign-in user, which is put right by hand (record 052).
+ * `address-not-confirmed`: a user seen for the first time whose address the service
+ * does not hold as proved, so no account is linked or made for it. Either way the
+ * person stays signed in, is told so plainly on the account page and may sign out there.
  */
-export type AccountProblem = 'sign-in-link-conflict';
+export type AccountProblem = 'sign-in-link-conflict' | 'address-not-confirmed';
 
 export type AccountRefusal = { readonly code: 'account-problem'; readonly problem: AccountProblem };
 

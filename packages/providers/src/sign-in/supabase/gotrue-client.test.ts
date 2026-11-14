@@ -34,7 +34,7 @@ describe('the Supabase Auth client', () => {
         refreshToken: 'r-1',
         accessExpiresAt: new Date(1_700_000_000_000),
         sessionId: 's-1',
-        user: { id: 'u-1', email: 'ana@example.test' },
+        user: { id: 'u-1', email: 'ana@example.test', emailConfirmedAt: null },
       },
     });
     expect(seen[0]?.url).toBe(
@@ -45,6 +45,25 @@ describe('the Supabase Auth client', () => {
       'x-supabase-api-version': '2024-01-01',
       'content-type': 'application/json',
     });
+  });
+
+  it('keeps when the address was confirmed, and anything else as never (record 055)', async () => {
+    const at = '2026-11-01T10:00:00.000Z';
+    const answers: [unknown, Date | null][] = [
+      [at, new Date(at)],
+      [null, null],
+      [undefined, null],
+      ['', null],
+      ['not a time', null],
+      [1_700_000_000, null],
+    ];
+    for (const [given, expected] of answers) {
+      const { client } = clientAnswering(() =>
+        Response.json({ id: 'u-1', email: 'ana@example.test', email_confirmed_at: given }),
+      );
+      const answer = await client.user(accessToken);
+      expect(answer.ok ? answer.value.emailConfirmedAt : 'refused').toEqual(expected);
+    }
   });
 
   it('reads the error code, the weak-password reasons and the wait', async () => {

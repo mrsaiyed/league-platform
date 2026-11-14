@@ -980,6 +980,8 @@ export const en = {
   'account.signOutEverywhere': 'Sign out everywhere',
   'account.signOutEverywhereHelp': 'Signs out every device that uses your account, this one too.',
   'account.problem.title': 'We cannot open your account',
+  'account.problem.notConfirmed':
+    'You are signed in, but your email address has not been confirmed yet, so we cannot open your account. Sign out, then sign in again. If this keeps happening, please contact us.',
   'account.problem.linkConflict':
     'You are signed in, but your email address belongs to an account that is joined to a different sign-in. Nothing has been lost: this needs putting right on our side, and we have noted it. Please contact us. Until then, you can sign out here.',
   'device.label': '{browser} on {system}',

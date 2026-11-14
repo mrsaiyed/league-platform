@@ -56,6 +56,7 @@ export default async function Page() {
 
 const problemText = {
   'sign-in-link-conflict': 'account.problem.linkConflict',
+  'address-not-confirmed': 'account.problem.notConfirmed',
 } as const satisfies Record<AccountProblem, TextKey>;
 
 /** What is wrong with the account, in plain words, and signing out (record 055). */

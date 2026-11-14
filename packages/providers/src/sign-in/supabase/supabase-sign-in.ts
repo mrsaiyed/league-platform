@@ -476,7 +476,8 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       const seen = await store.accounts.rememberDevice(held.accountId, where.deviceId);
       const session: GoTrueSession = {
         ...held.supabase,
-        user: { id: held.accountId, email: held.email },
+        // Only the id is recorded; identify asks Supabase whether the address is confirmed.
+        user: { id: held.accountId, email: held.email, emailConfirmedAt: null },
       };
       await recordSession(session, where.label, now());
       return ok({
@@ -550,6 +551,7 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       return ok({
         accountId: session.accountId,
         email: user.email,
+        emailConfirmed: user.emailConfirmedAt !== null,
         sessionId: session.sessionId,
         hasPassword: await store.accounts.hasPassword(session.accountId),
         passwordEnteredAt: session.passwordEnteredAt,

@@ -445,6 +445,8 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       const identity: SessionIdentity = {
         accountId: session.account.id,
         email: session.account.email,
+        // Every account here was made after its address was proved (a code, or Google).
+        emailConfirmed: true,
         sessionId: session.id,
         hasPassword: session.account.hash !== undefined,
         passwordEnteredAt: session.passwordEnteredAt,

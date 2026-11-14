@@ -19,11 +19,12 @@ const sessions = new Map<string, SessionIdentity>();
 /** The lines warn was given. */
 const warnings: { message: string; fields: { signInUserId: string } }[] = [];
 
-const signedIn = (email: string, signInId: string = randomUUID()) => {
+const signedIn = (email: string, signInId: string = randomUUID(), emailConfirmed = true) => {
   const token = `token-${randomUUID()}`;
   sessions.set(token, {
     accountId: signInId,
     email,
+    emailConfirmed,
     sessionId: `session-${token}`,
     hasPassword: true,
     passwordEnteredAt: null,
@@ -38,11 +39,12 @@ const accountOf = async (token: string) => {
   return who.value.accountId;
 };
 
-const lakeside = () => {
-  const found = made.leagues.find((l) => l.slug === 'lakeside');
-  if (found === undefined) throw new Error('the seed has no lakeside league');
+const seedLeague = (slug: string) => {
+  const found = made.leagues.find((l) => l.slug === slug);
+  if (found === undefined) throw new Error(`the seed has no ${slug} league`);
   return found;
 };
+const lakeside = () => seedLeague('lakeside');
 
 beforeAll(async () => {
   made = await database.madeUpDatabase();
@@ -124,6 +126,25 @@ describe('databasePorts (record 055)', () => {
     }
     // The first user keeps their account.
     expect(await accountOf(signedIn(email, firstSignIn))).toBe(first);
+  });
+
+  it('links or makes no account for an address the service has not confirmed (record 055)', async () => {
+    const { ownerAccountId } = seedLeague('maple-street');
+    const owner = 'owner@maple.example.test';
+    const signInId = randomUUID();
+    const refused = fail({ code: 'account-problem', problem: 'address-not-confirmed' });
+    // An account made for the address before its owner signed in is not handed over.
+    expect(await ports.identify(signedIn(owner, signInId, false))).toEqual(refused);
+    const fresh = `unconfirmed-${randomUUID()}@example.test`;
+    const freshId = randomUUID();
+    expect(await ports.identify(signedIn(fresh, freshId, false))).toEqual(refused);
+    // Nothing was linked or made: once confirmed, the owner's account is linked, and the
+    // new address gets an account of its own.
+    expect(await accountOf(signedIn(owner, signInId))).toBe(ownerAccountId);
+    const made = await accountOf(signedIn(fresh, freshId));
+    expect(made).not.toBe(ownerAccountId);
+    // A user already linked keeps their account whatever the service says later.
+    expect(await accountOf(signedIn(owner, signInId, false))).toBe(ownerAccountId);
   });
 
   it('reads what the account holds in the league through the access module', async () => {

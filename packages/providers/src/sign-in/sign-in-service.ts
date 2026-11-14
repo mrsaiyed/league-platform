@@ -96,6 +96,11 @@ export type ExternalSignInStarted = {
 export type SessionIdentity = {
   readonly accountId: string;
   readonly email: string;
+  /**
+   * Whether the service holds the address as proved (a right code, or Google). The
+   * app links an account to the session by its address only when it is (record 055).
+   */
+  readonly emailConfirmed: boolean;
   readonly sessionId: string;
   /** False for an account made with Google that has never set a password. */
   readonly hasPassword: boolean;

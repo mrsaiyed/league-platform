@@ -115,6 +115,7 @@ describe('sign-up with an emailed code', () => {
     expect(who).toMatchObject({
       accountId: done.accountId,
       email: 'ana@example.test',
+      emailConfirmed: true,
       sessionId: done.session.sessionId,
       hasPassword: true,
     });

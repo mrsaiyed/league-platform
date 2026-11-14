@@ -158,6 +158,7 @@ function identityOf(person: MadeUpPerson): SessionIdentity {
   return {
     accountId: person.accountId,
     email: `${person.token}@example.test`,
+    emailConfirmed: true,
     sessionId: `session-${person.token}`,
     hasPassword: true,
     passwordEnteredAt: signedInAt,

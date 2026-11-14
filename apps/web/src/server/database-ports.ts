@@ -94,8 +94,9 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
   // Which of our accounts the service's user is (record 052, T-256). The service has
   // already proved this session, and a session is only ever made after it proved the
   // mailbox (a right code, Google, or a right password), so the first time a user is
-  // seen, accountForSignIn may link or make their account. This is its only call: the
-  // email is the one the service holds for the session, never one from the request.
+  // seen, accountForSignIn may link or make their account, provided the service also
+  // says the address is confirmed (record 055). This is its only call: the email is
+  // the one the service holds for the session, never one from the request.
   // When that address's account is linked to another sign-in user (put right by hand,
   // record 052), the answer is a refusal, never another person's account: each request
   // logs the sign-in user's id for whoever puts it right, and the person is told so
@@ -103,11 +104,15 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
   const accountOfSignIn = async (
     signInId: string,
     email: string,
+    emailConfirmed: boolean,
   ): Promise<Result<string, AccountRefusal>> => {
     const linked = await database.withTransaction(db, {}, (scope) =>
       database.findAccountOfSignIn(scope, signInId),
     );
     if (linked !== undefined) return ok(linked);
+    // Linking hands the address's account over, so only for an address the service
+    // holds as proved; nor is an account made for one it does not.
+    if (!emailConfirmed) return fail({ code: 'account-problem', problem: 'address-not-confirmed' });
     try {
       return ok(
         await database.withTransaction(db, {}, (scope) =>
@@ -127,7 +132,8 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
   const identify: WebPorts['identify'] = async (accessToken) => {
     const who = await signIn.identify({ accessToken });
     if (!who.ok) return who;
-    const account = await accountOfSignIn(who.value.accountId, who.value.email);
+    const { accountId, email, emailConfirmed } = who.value;
+    const account = await accountOfSignIn(accountId, email, emailConfirmed);
     if (!account.ok) return account;
     return ok({ ...who.value, accountId: account.value });
   };

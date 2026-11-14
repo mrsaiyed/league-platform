@@ -17,6 +17,7 @@ const accountId = '01900000-0000-7000-8000-0000000000bb';
 const identity: SessionIdentity = {
   accountId: accountId.toUpperCase(),
   email: 'made-up@example.test',
+  emailConfirmed: true,
   sessionId: 'session-1',
   hasPassword: true,
   passwordEnteredAt: new Date('2026-11-01T10:00:00Z'),
