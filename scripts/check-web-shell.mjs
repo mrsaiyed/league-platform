@@ -49,6 +49,10 @@ const tokens = {
 const northValley = '01900000-0000-7000-8000-000000000001';
 const harborCity = '01900000-0000-7000-8000-000000000002';
 
+/** A made-up game of North Valley (apps/web/src/server/stand-in-games.ts): 1 scheduled,
+ * 2 live (Hawks v Bears), 5 final (Bears v Lions), 6 in a season still being set up. */
+const game = (n) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0')}`;
+
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
 // browser's script fills with the not-found or forbidden screen (record 020), so
 // the refusal is read from the page's data, beside its status.
@@ -266,6 +270,30 @@ const cases = [
     200,
     ['League settings', adminLink('north-valley', 'people'), adminLink('north-valley', 'teams')],
   ],
+  // A game's page (step 2.45): drawn with how the game stands, its live part ready to
+  // follow it; a finished game's result; a game not started; a game that is not this
+  // league's, not public yet, or not an id is not found. The Bears show their players'
+  // numbers to their staff only, so none of their names is on the page (S-22).
+  [
+    'visitor',
+    `/north-valley/games/${game(2)}`,
+    200,
+    ['Bears at Hawks', 'The game, live', 'data-live-status="live"', 'Live', 'Play by play'],
+    ['This page is not built yet.', 'Bearsley'],
+  ],
+  [
+    'visitor',
+    `/north-valley/games/${game(5)}`,
+    200,
+    ['Lions at Bears', 'Final', 'Box scores', 'Only the final score was recorded for this game.'],
+    ['Corrected on'],
+  ],
+  ['visitor', `/north-valley/games/${game(1)}`, 200, ['This game has not started yet.']],
+  ['visitor', `/north-valley/games/${game(6)}`, 404, [notFound]],
+  ['visitor', `/north-valley/games/${game(99)}`, 404, [notFound]],
+  ['visitor', '/north-valley/games/not-a-game', 404, [notFound]],
+  ['visitor', `/harbor-city/games/${game(2)}`, 404, [notFound]],
+  ['visitor', `/quiet-pines/games/${game(2)}`, 404, [notFound]],
   ['scheduler', '/north-valley/score/game-1', 200, ['Score a game']],
   ['coach', '/north-valley/score/game-1', 403, [noAccess]],
   ['visitor', '/quiet-pines', 404, [notFound]],
