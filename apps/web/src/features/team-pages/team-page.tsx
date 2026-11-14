@@ -1,5 +1,5 @@
 import { leagueUrl, publicViewer } from '@srleagues/core';
-import { SortableStatsTable } from '@srleagues/ui';
+import { Emblem, EmptyPanel, PageHead, Section, SortableStatsTable } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -34,19 +34,23 @@ function RosterTable({
         <caption className="ui-visually-hidden">{caption}</caption>
         <thead>
           <tr>
-            <th scope="col">{t('team.jersey')}</th>
+            <th scope="col" className="ui-num">
+              {t('team.jersey')}
+            </th>
             <th scope="col">{t('team.player')}</th>
-            <th scope="col">{t('team.role')}</th>
+            <th scope="col" className="ui-fit">
+              {t('team.role')}
+            </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.key}>
-              <td>{row.number}</td>
-              <th scope="row" dir="auto">
+              <td className="ui-num">{row.number}</td>
+              <th scope="row" className="ui-team-cell" dir="auto">
                 {row.name}
               </th>
-              <td>{row.role}</td>
+              <td className="ui-fit">{row.role}</td>
             </tr>
           ))}
         </tbody>
@@ -58,31 +62,33 @@ function RosterTable({
 /** The roster: those on the team now, then those who left. Nothing here reads anything. */
 export function RosterSections({ roster }: { readonly roster: RosterView }) {
   if (roster.current.length === 0 && roster.former.length === 0) {
-    return <p>{t('team.rosterEmpty')}</p>;
+    return <EmptyPanel text={t('team.rosterEmpty')} />;
   }
   return (
-    <>
+    <div className="ui-stack">
       {roster.current.length === 0 ? (
-        <p>{t('team.rosterEmpty')}</p>
+        <EmptyPanel text={t('team.rosterEmpty')} />
       ) : (
         <RosterTable rows={roster.current} caption={t('team.roster')} />
       )}
       {roster.former.length === 0 ? null : (
-        <>
+        <div>
           <h3>{t('team.rosterFormer')}</h3>
           <RosterTable rows={roster.former} caption={t('team.rosterFormer')} />
-        </>
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
 /** The team's statistics as its setting allows: totals always, player lines when shown. */
 export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
   const labels = displayLabels(t);
-  if (!stats.hasNumbers && stats.playerLinesShown) return <p>{t('team.statsNone')}</p>;
+  if (!stats.hasNumbers && stats.playerLinesShown) {
+    return <EmptyPanel text={t('team.statsNone')} />;
+  }
   return (
-    <>
+    <div className="ui-stack">
       {stats.totalsRows.length > 0 ? (
         <SortableStatsTable
           caption={t('team.statsTotals')}
@@ -103,9 +109,9 @@ export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
           />
         ) : null
       ) : (
-        <p>{t('team.statsTotalsOnly')}</p>
+        <p className="ui-section-note">{t('team.statsTotalsOnly')}</p>
       )}
-    </>
+    </div>
   );
 }
 
@@ -152,58 +158,68 @@ export async function TeamPage({
   const seasonOption = season.isCurrent ? {} : { season: season.slug };
   return (
     <main>
-      <h1 dir="auto">{head.team.name}</h1>
-      <p>{head.headline}</p>
-      <p>{season.name}</p>
-      <nav>
+      <nav className="ui-crumbs">
         <a href={leagueHomeStayUrl(addressee, season.isCurrent ? undefined : season.slug)}>
           {t('team.leagueHome')}
         </a>{' '}
         <a href={leagueUrl(addressee, 'teams', seasonOption)}>{t('team.allTeams')}</a>
       </nav>
-      {offersMyTeam ? (
-        isMine ? (
-          <form action={clearMyTeamAction}>
-            <input type="hidden" name="league" value={addressee.slug} />
-            <input type="hidden" name="team" value={head.team.slug} />
-            {season.isCurrent ? null : <input type="hidden" name="season" value={season.slug} />}
-            <p>{t('team.isMine')}</p>
-            <button type="submit">{t('team.clearMine')}</button>
-          </form>
+      <PageHead
+        title={head.team.name}
+        eyebrow={season.name}
+        sub={head.headline}
+        lead={<Emblem name={head.team.name} color={head.team.color} size="large" />}
+      >
+        {offersMyTeam ? (
+          isMine ? (
+            <form className="team-mine" action={clearMyTeamAction}>
+              <input type="hidden" name="league" value={addressee.slug} />
+              <input type="hidden" name="team" value={head.team.slug} />
+              {season.isCurrent ? null : <input type="hidden" name="season" value={season.slug} />}
+              <p>{t('team.isMine')}</p>
+              <button type="submit">{t('team.clearMine')}</button>
+            </form>
+          ) : (
+            <form className="team-mine" action={chooseMyTeamAction}>
+              <input type="hidden" name="league" value={addressee.slug} />
+              <input type="hidden" name="team" value={head.team.slug} />
+              {season.isCurrent ? null : <input type="hidden" name="season" value={season.slug} />}
+              <button type="submit">{t('team.makeMine')}</button>
+              <p>{t('team.mineNote')}</p>
+            </form>
+          )
+        ) : null}
+      </PageHead>
+      <div className="team-layout">
+        <div className="team-roster">
+          <Section title={t('team.roster')}>
+            <RosterSections roster={roster} />
+          </Section>
+        </div>
+        <div className="team-games">
+          <Section title={t('team.schedule')}>
+            {games.upcoming.length === 0 ? (
+              <EmptyPanel text={t('team.noSchedule')} />
+            ) : (
+              <GameList leagueId={addressee.id} games={games.upcoming} />
+            )}
+          </Section>
+          <Section title={t('team.results')}>
+            {games.results.length === 0 ? (
+              <EmptyPanel text={t('team.noResults')} />
+            ) : (
+              <GameList leagueId={addressee.id} games={games.results} />
+            )}
+          </Section>
+        </div>
+      </div>
+      <Section title={t('team.stats')}>
+        {stats === undefined ? (
+          <EmptyPanel text={t('team.statsNone')} />
         ) : (
-          <form action={chooseMyTeamAction}>
-            <input type="hidden" name="league" value={addressee.slug} />
-            <input type="hidden" name="team" value={head.team.slug} />
-            {season.isCurrent ? null : <input type="hidden" name="season" value={season.slug} />}
-            <button type="submit">{t('team.makeMine')}</button>
-            <p>{t('team.mineNote')}</p>
-          </form>
-        )
-      ) : null}
-      <section>
-        <h2>{t('team.roster')}</h2>
-        <RosterSections roster={roster} />
-      </section>
-      <section>
-        <h2>{t('team.schedule')}</h2>
-        {games.upcoming.length === 0 ? (
-          <p>{t('team.noSchedule')}</p>
-        ) : (
-          <GameList leagueId={addressee.id} games={games.upcoming} />
+          <TeamStatsSection stats={stats} />
         )}
-      </section>
-      <section>
-        <h2>{t('team.results')}</h2>
-        {games.results.length === 0 ? (
-          <p>{t('team.noResults')}</p>
-        ) : (
-          <GameList leagueId={addressee.id} games={games.results} />
-        )}
-      </section>
-      <section>
-        <h2>{t('team.stats')}</h2>
-        {stats === undefined ? <p>{t('team.statsNone')}</p> : <TeamStatsSection stats={stats} />}
-      </section>
+      </Section>
     </main>
   );
 }

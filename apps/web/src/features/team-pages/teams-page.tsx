@@ -1,4 +1,6 @@
 import { leagueUrl } from '@srleagues/core';
+import { EmptyPanel, FilterToolbar, PageHead, TeamCard as TeamCardPiece } from '@srleagues/ui';
+import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -6,34 +8,32 @@ import { t } from '../../server/messages.ts';
 import { chooseSeason, firstValue, SeasonChoice, type SearchParams } from '../stats-pages/index.ts';
 import { loadTeamCards, type TeamCard } from './build-team.ts';
 
-/** The table of teams, each linked to its page. Nothing here reads anything. */
-export function TeamsTable({ cards }: { readonly cards: readonly TeamCard[] }) {
+/**
+ * The season's teams as cards, each one link to its team's page: the emblem and name, the
+ * record as the card's one figure, then seed and division. Nothing here reads anything.
+ */
+export function TeamCards({ cards }: { readonly cards: readonly TeamCard[] }) {
   return (
-    <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={t('teams.title')}>
-      <table className="ui-table">
-        <caption className="ui-visually-hidden">{t('teams.title')}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{t('teams.col.seed')}</th>
-            <th scope="col">{t('teams.col.team')}</th>
-            <th scope="col">{t('teams.col.record')}</th>
-            <th scope="col">{t('teams.col.division')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cards.map((card) => (
-            <tr key={card.slug}>
-              <td>{card.seedText}</td>
-              <th scope="row" dir="auto">
-                <a href={card.href}>{card.name}</a>
-              </th>
-              <td>{card.recordText}</td>
-              <td dir="auto">{card.divisionName ?? t('teams.noDivision')}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul className="ui-card-grid" aria-label={t('teams.title')}>
+      {cards.map((card) => (
+        <li key={card.slug}>
+          <TeamCardPiece
+            name={card.name}
+            href={card.href}
+            color={card.color}
+            figure={{ label: t('teams.col.record'), value: card.recordText }}
+            facts={[
+              { key: 'seed', label: t('teams.col.seed'), value: card.seedText },
+              {
+                key: 'division',
+                label: t('teams.col.division'),
+                value: card.divisionName ?? t('teams.noDivision'),
+              },
+            ]}
+          />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -65,14 +65,25 @@ export async function TeamsPage({
   if (season !== undefined && cards === undefined) return notFound();
   return (
     <main>
-      <h1>{t('teams.title')}</h1>
+      <PageHead title={t('teams.title')} eyebrow={season?.name} />
       {season === undefined || cards === undefined ? (
-        <p>{t('teams.noSeason')}</p>
+        <EmptyPanel text={t('teams.noSeason')} />
       ) : (
         <>
-          <SeasonChoice seasons={seasons} chosen={season} action={leagueUrl(addressee, 'teams')} />
-          <p>{season.name}</p>
-          {cards.length === 0 ? <p>{t('teams.empty')}</p> : <TeamsTable cards={cards} />}
+          {seasons.length > 1 ? (
+            <FilterToolbar label={displayLabels(t).filters}>
+              <SeasonChoice
+                seasons={seasons}
+                chosen={season}
+                action={leagueUrl(addressee, 'teams')}
+              />
+            </FilterToolbar>
+          ) : null}
+          {cards.length === 0 ? (
+            <EmptyPanel text={t('teams.empty')} />
+          ) : (
+            <TeamCards cards={cards} />
+          )}
         </>
       )}
     </main>
