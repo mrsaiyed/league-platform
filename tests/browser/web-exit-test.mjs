@@ -524,9 +524,18 @@ if (browser) {
         );
         note(
           `at ${width} with scripts off the name is shown whole`,
-          await page
-            .locator('.site-header .site-name')
-            .evaluate((el) => el.scrollHeight <= el.clientHeight + 1),
+          // Its words take no more than the two lines the header shows, and none runs
+          // past the name's own box: nothing is cut off.
+          await page.locator('.site-header .site-name').evaluate((el) => {
+            const words = document.createRange();
+            words.selectNodeContents(el);
+            const lines = [...words.getClientRects()];
+            const box = el.getBoundingClientRect();
+            return (
+              new Set(lines.map((line) => Math.round(line.top))).size <= 2 &&
+              lines.every((line) => line.right <= box.right + 1 && line.left >= box.left - 1)
+            );
+          }),
         );
         note(
           `at ${width} with scripts off the season picker and its Show button are there, under the name`,
