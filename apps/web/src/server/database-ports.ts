@@ -11,7 +11,14 @@
 //
 // packages/database is handed in, not imported: Node.js loads it when the app starts
 // (container.ts), so Next.js never bundles it.
-import { fail, ok, type AccessTx, type CommandDeps, type Result } from '@srleagues/core';
+import {
+  fail,
+  isLeagueIdFormat,
+  ok,
+  type AccessTx,
+  type CommandDeps,
+  type Result,
+} from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
 import type { SignInService } from '@srleagues/providers';
@@ -142,6 +149,8 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     findLeague: (shortName) =>
       database.withTransaction(db, {}, (scope) => database.findLeagueByShortName(scope, shortName)),
     findLeagueById: async (leagueId) => {
+      // Not a UUID is no league, asked of no database (where it could not be cast).
+      if (!isLeagueIdFormat(leagueId.toLowerCase())) return undefined;
       const found = await database.withTransaction(db, { leagueId }, (scope) =>
         database.findCurrentLeague(scope),
       );

@@ -85,6 +85,13 @@ describe('databasePorts (record 055)', () => {
     const { leagueId } = lakeside();
     expect(await ports.findLeagueById(leagueId)).toMatchObject({ id: leagueId, slug: 'lakeside' });
     expect(await ports.findLeagueById(randomUUID())).toBeUndefined();
+    expect(await ports.findLeagueById(leagueId.toUpperCase())).toMatchObject({ id: leagueId });
+  });
+
+  it('finds nothing, and does not fail, for an id that is not a UUID', async () => {
+    for (const id of ['', 'lakeside', 'not-a-uuid', `${lakeside().leagueId}x`, "1' or '1'='1"]) {
+      expect(await ports.findLeagueById(id)).toBeUndefined();
+    }
   });
 
   it('links the sign-in user to the account already made for its address (record 052)', async () => {
