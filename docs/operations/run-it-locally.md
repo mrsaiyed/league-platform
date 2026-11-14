@@ -86,6 +86,16 @@ It is safe to run again: a game already brought over is only compared, and a run
 
 It opens a database folder on this computer and refuses anything that reads as a network address (T-201). Use it on made-up backups: a backup of the live tracker holds real people's names, and bringing one over waits for the founder.
 
+## Make a league
+
+```sh
+npm run league:make -- --name "Made-up Hoops" --short-name made-up-hoops --who-plays adults --city Springfield --contact-email hello@example.test --owner-email owner@example.test --as you@example.test
+```
+
+This makes a league in draft, with its first season as the current one, through the product's own commands (step 2.125, [record 057](../architecture/decisions/057-making-a-league-from-this-computer.md)). It is how we put a league on the platform until self-serve sign-up exists (P3 §8). Anything not given is asked for: the sport (basketball), the time zone (this computer's) and the first season's name (from today, such as "Fall 2026") have suggestions. `--as` is your own email, as our staff. The owner needs no account: one is made for their email, and it becomes theirs when they sign up with it.
+
+It shows everything it will make, and where, and makes nothing unless you type `yes`. Where: `--db <folder>` if given; otherwise the database of the migration login, `MIGRATION_DATABASE_URL` (see `.env.example`); otherwise the local test database in `.local/seed-db`. A short name another league holds, or a database without the migrations, makes nothing. Use a hosted database only for the test copy, in a session the founder started (T-201).
+
 ## Checks
 
 These are the commands to run before a change is committed.
