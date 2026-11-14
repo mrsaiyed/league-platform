@@ -9,6 +9,8 @@ export type ScoreboardLabels = {
   readonly away: string;
   readonly live: string;
   readonly final: string;
+  /** Spoken next to the winning team, so the winner is not shown by colour alone. */
+  readonly winner: string;
 };
 
 export type ScoreboardProps = {
@@ -24,10 +26,12 @@ function Side({
   team,
   role,
   isWinner,
+  winnerLabel,
 }: {
   readonly team: ScoreboardTeam;
   readonly role: string;
   readonly isWinner: boolean;
+  readonly winnerLabel: string;
 }) {
   return (
     <div className="ui-scoreboard-side" data-winner={isWinner ? 'true' : undefined}>
@@ -36,6 +40,7 @@ function Side({
         {team.name}
       </span>
       <span className="ui-scoreboard-score">{team.score}</span>
+      {isWinner ? <span className="ui-visually-hidden">{winnerLabel}</span> : null}
     </div>
   );
 }
@@ -47,13 +52,13 @@ export function Scoreboard({ home, away, state, periodText, labels }: Scoreboard
   const awayWins = state === 'final' && away.score > home.score;
   return (
     <section className="ui-scoreboard" aria-label={labels.scoreboard} data-state={state}>
-      <Side team={away} role={labels.away} isWinner={awayWins} />
+      <Side team={away} role={labels.away} isWinner={awayWins} winnerLabel={labels.winner} />
       <div className="ui-scoreboard-middle">
         {state === 'live' ? <LiveMarker label={labels.live} /> : null}
         {state === 'final' ? <span className="ui-game-state">{labels.final}</span> : null}
         {periodText ? <span className="ui-scoreboard-period">{periodText}</span> : null}
       </div>
-      <Side team={home} role={labels.home} isWinner={homeWins} />
+      <Side team={home} role={labels.home} isWinner={homeWins} winnerLabel={labels.winner} />
     </section>
   );
 }
