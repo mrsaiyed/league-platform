@@ -670,6 +670,19 @@ describe('the End game tap (step 2.30, T6 §7)', () => {
     expect(t.db.state.games[0]).toMatchObject({ status: 'live', homeScore: 2, awayScore: 2 });
     expect(t.events).toEqual([]);
 
+    // Nothing recorded yet (line-ups only, 0–0): the engine's own refusal wins.
+    const empty = setUp();
+    const early = await applyTrackerCommands(
+      empty.as(scorekeeperId),
+      batchOf(taps([...tipOff.slice(0, 2), { type: 'end' }])),
+      empty.deps,
+    );
+    expect(early.ok && early.value.results[2]).toMatchObject({
+      status: 'refused',
+      reason: { code: 'rule', message: 'Nothing is recorded for this game yet.' },
+    });
+    expect(empty.db.state.events.map((e) => e.type)).toEqual(['lineup', 'lineup']);
+
     const ties = setUp({
       seasons: [
         {

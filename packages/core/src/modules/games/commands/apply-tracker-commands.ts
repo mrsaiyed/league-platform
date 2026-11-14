@@ -173,18 +173,22 @@ export const applyTrackerCommands = defineCommand({
       if (problem !== undefined) return refused(problem);
       // platformProblem refuses every rules command; this tells the type checker so.
       if (input.type === 'rules') return refused('The game’s rules come from the league.');
-      if (input.type === 'end') {
-        const score = scoreOf(state);
-        if (score.home === score.away && !rules.allowTies) return refused(tieProblem);
-      }
       // A tap that waited out a dropped connection lands where it happened, never later than now.
       const at = Math.min(now, command.at);
+      let next: basketball.GameState;
       try {
-        state = basketball.apply(state, input, { id: commandId, now: at });
+        next = basketball.apply(state, input, { id: commandId, now: at });
       } catch (thrown) {
         if (thrown instanceof basketball.TrackerError) return refused(thrown.message);
         throw thrown;
       }
+      // The engine's own refusal (nothing recorded, already final) comes first, as in
+      // games.end_tracked_game; then a level score the rules do not allow.
+      if (input.type === 'end') {
+        const score = scoreOf(next);
+        if (score.home === score.away && !rules.allowTies) return refused(tieProblem);
+      }
+      state = next;
       const { type, ...payload } = input;
       seq += 1;
       events.push({ gameId, seq, commandId, type, payload, tappedAt: at, accountId });
