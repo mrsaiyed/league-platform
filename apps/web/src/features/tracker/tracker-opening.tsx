@@ -4,7 +4,7 @@
 // then holds the place where the scoring screens of steps 2.35 to 2.37 will draw. Plain
 // forms and messages only. The words come from the page, from the message files (T-187).
 import { createTranslator, type Catalog } from '@srleagues/site';
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
@@ -22,10 +22,12 @@ export type TrackerOpeningProps = {
   readonly accountId: string;
   readonly gameId: string;
   readonly rosters: DeviceRosters;
-  /** Where "back to your games" and leaving the game go. */
+  /** Where "back to your games" goes, leaving the game. */
   readonly backHref: string;
   /** The account page, where a shared device is signed out (and its kept games cleared). */
   readonly accountHref: string;
+  /** The sign-in screen, coming back to this game: offered once the device is signed out. */
+  readonly signInHref: string;
   readonly locale: string;
   /** The tracker's own messages (tracker-catalog.ts). */
   readonly catalog: Catalog;
@@ -48,6 +50,7 @@ export function TrackerOpening({
   rosters,
   backHref,
   accountHref,
+  signInHref,
   locale,
   catalog,
 }: TrackerOpeningProps) {
@@ -143,7 +146,8 @@ export function TrackerOpening({
     }
   };
 
-  // Leaving the game, by its button, by "back to your games" or by the link to sign out:
+  // Leaving the game, by "back to your games" (the one way out: step 2.33 dropped a
+  // "Leave the game" button that did the same), the link to sign out or to sign in:
   // the session is released first (T6 §5), as a page that is simply left would hold the
   // game until it runs out. It runs once however often it is tapped, and goes on to `to`
   // even if the release fails.
@@ -167,12 +171,29 @@ export function TrackerOpening({
     void leaveGame(to);
   };
 
+  // Still opening after a while: most likely no connection, so the screen says so while
+  // the controller keeps trying by itself (step 2.33).
+  const stillOpening =
+    phase.kind === 'preparing' ||
+    (phase.kind === 'open' && screenOf(phase.status, phase.confirmed).kind === 'opening');
+  const slow = useSlowAfter(stillOpening, slowOpeningMs);
+  const openingText = (
+    <p role="status" data-opening="">
+      {t('tracker.opening')}
+      {slow ? ` ${t('tracker.openingSlow')}` : null}
+    </p>
+  );
+  const signedOut =
+    phase.kind === 'open' &&
+    phase.status.mode.kind === 'read-only' &&
+    phase.status.mode.reason === 'signed-out';
+
   const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
   return (
     <main className="score-root">
       <h1>{t('tracker.title')}</h1>
       <p>{matchup}</p>
-      {phase.kind === 'preparing' ? <p role="status">{t('tracker.opening')}</p> : null}
+      {phase.kind === 'preparing' ? openingText : null}
       {phase.kind === 'no-storage' ? <p role="alert">{t('tracker.noStorage')}</p> : null}
       {phase.kind === 'open' ? (
         <OpenGame
@@ -181,11 +202,18 @@ export function TrackerOpening({
           locale={locale}
           rosters={rosters}
           busy={busy}
+          openingText={openingText}
           onTakeOver={act((game) => game.controller.takeOver())}
           onOpenAgain={act((game) => game.controller.openAgain())}
           onConfirm={(format) => act((game) => game.confirmFormat(format))()}
-          onLeave={() => void leaveGame(backHref)}
         />
+      ) : null}
+      {signedOut ? (
+        <p>
+          <a className="tap-button" href={signInHref} onClick={leaveBy(signInHref)}>
+            {t('tracker.signIn')}
+          </a>
+        </p>
       ) : null}
       {storeFailed ? <p role="alert">{t('tracker.storeFailed')}</p> : null}
       <p>
@@ -203,6 +231,26 @@ export function TrackerOpening({
   );
 }
 
+/** How long "Opening the game…" stands alone before it mentions the connection. */
+const slowOpeningMs = 10_000;
+
+/**
+ * Whether `active` has stayed true for `afterMs`: false again as soon as it is not. The
+ * timer runs once per stretch of `active`, whatever is drawn in between.
+ */
+function useSlowAfter(active: boolean, afterMs: number): boolean {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setTimeout(() => setSlow(true), afterMs);
+    return () => {
+      window.clearTimeout(timer);
+      setSlow(false);
+    };
+  }, [active, afterMs]);
+  return active && slow;
+}
+
 /**
  * Whether opening the game again can help: not for someone signed out, refused or
  * sent to a game that is not there, who would only be turned away again.
@@ -216,25 +264,27 @@ function OpenGame({
   locale,
   rosters,
   busy,
+  openingText,
   onTakeOver,
   onOpenAgain,
   onConfirm,
-  onLeave,
 }: {
   readonly phase: Extract<Phase, { kind: 'open' }>;
   readonly t: ReturnType<typeof createTranslator>;
   readonly locale: string;
   readonly rosters: DeviceRosters;
   readonly busy: boolean;
+  /** "Opening the game…", and after a while a word about the connection. */
+  readonly openingText: ReactNode;
   readonly onTakeOver: () => void;
   readonly onOpenAgain: () => void;
   readonly onConfirm: (format: GameFormat) => void;
-  readonly onLeave: () => void;
 }) {
   const { status, confirmed } = phase;
   const screen = screenOf(status, confirmed);
   const notices = trackerNotices(status);
-  // Taking over asks first (T6 §5, P7 §5.2): the other device stops scoring at once.
+  // Taking over asks first (T6 §5, P7 §5.2): the other device stops scoring, and plays
+  // it has not sent yet are lost.
   const [askingTakeOver, setAskingTakeOver] = useState(false);
   // Asked again if the game is let go of and then held by another device once more.
   useEffect(() => {
@@ -258,7 +308,7 @@ function OpenGame({
           ))}
         </ul>
       )}
-      {screen.kind === 'opening' ? <p>{t('tracker.opening')}</p> : null}
+      {screen.kind === 'opening' ? openingText : null}
       {screen.kind === 'held-by-other' && !askingTakeOver ? (
         <button
           type="button"
@@ -292,7 +342,8 @@ function OpenGame({
       ) : null}
       {screen.kind === 'read-only' && mayOpenAgain(screen.reason) ? (
         <button type="button" onClick={onOpenAgain} disabled={busy}>
-          {t('tracker.openAgain')}
+          {/* Taken over: opening again shows who has the game, and offers it back. */}
+          {t(screen.reason === 'taken-over' ? 'tracker.seeWhoIsScoring' : 'tracker.openAgain')}
         </button>
       ) : null}
       {screen.kind === 'confirm-format' ? (
@@ -327,9 +378,6 @@ function OpenGame({
               awayCount: rosters.away.players.length,
             })}
           </p>
-          <button type="button" onClick={onLeave} disabled={busy}>
-            {t('tracker.leave')}
-          </button>
         </section>
       ) : null}
     </>

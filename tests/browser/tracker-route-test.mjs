@@ -9,9 +9,18 @@
 //   the same device opens straight to scoring; leaving goes back to the games.
 // - The made-up owner, who runs the league, opens a game the scorekeeper is holding: told
 //   who holds it, takes over after confirming, and confirms the format.
-// - Another league's admin, a coach and a visitor are refused: "you do not have access" (U-6).
-// - In the draft league, which scores assigned games only, the scorekeeper is refused a
-//   game assigned to its admin, and does not see it on their games (P7 §5.1).
+// - Another league's admin and a coach are refused: "you do not have access" (U-6).
+// - Someone not signed in is sent to sign in, told why, and brought back to the game (the
+//   made-up member, who scores nowhere, is then refused there); "Your games" does the same.
+// - The games are in game-night order (live, today, days ahead, finished), the first
+//   "Score this game" on a phone's first screen; a final-score game says so and links to
+//   where its score is entered, as its tracker page does.
+// - In the draft league, which scores assigned games only, the scorekeeper is told a game
+//   assigned to its admin is not theirs, with the way back, and does not see it on their
+//   games (P7 §5.1). An unknown game is refused with the way back too.
+// - With no answer from the server the tracker mentions the connection after about ten
+//   seconds and opens by itself once it answers; signed out while open, it offers to sign
+//   in and come back.
 // - Signing out on the account page clears the games the device kept (T-115).
 // Accessibility checks on each screen (T-186), and no sideways scrolling at phone width (A-2).
 import {
@@ -41,6 +50,11 @@ const step = async (name, run) => {
 const liveGame = '01900000-0000-7000-8000-006a00000002'; // Hawks v Bears, live
 const otherGame = '01900000-0000-7000-8000-006a00000003'; // Hawks v Lions, assigned to nobody
 const finalScoreGame = '01900000-0000-7000-8000-006a00000001'; // Lions v Tigers, final score only
+const laterGame = '01900000-0000-7000-8000-006a00000004'; // Tigers v Bears, in two days
+const finishedGame = '01900000-0000-7000-8000-006a00000005'; // Bears v Lions, final, this morning
+const unknownGame = '01900000-0000-7000-8000-006a000000ff';
+// The made-up member who signs in with a password (stand-in-ports.ts): scores nowhere.
+const member = { email: 'member@example.test', password: 'made-up member password' };
 const tracker = (game) => `/north-valley/score/${game}`;
 // The draft league has the same games, scores assigned games only, and gives the live
 // game to its admin (apps/web/src/server/stand-in-ports.ts, moreLeagues).
@@ -228,9 +242,14 @@ if (browser) {
         (await formatHeading(page).count()) === 0,
       );
 
+      note(
+        'one way out of the game: "Back to your games", no "Leave the game" beside it',
+        (await page.getByRole('button', { name: 'Leave the game' }).count()) === 0 &&
+          (await page.getByRole('link', { name: 'Back to your games' }).count()) === 1,
+      );
       await Promise.all([
         page.waitForURL((url) => url.pathname === '/north-valley/admin'),
-        page.getByRole('button', { name: 'Leave the game' }).click(),
+        page.getByRole('link', { name: 'Back to your games' }).click(),
       ]);
       note('leaving goes back to the games', true);
     } finally {
@@ -259,7 +278,9 @@ if (browser) {
       await takeOver.click();
       // One tap only asks: the game is not taken until the owner says yes (T6 §5).
       await owner.page
-        .getByText('Take over scoring from Sam Scorekeeper? Their device stops scoring at once')
+        .getByText(
+          'Take over scoring from Sam Scorekeeper? Their device stops scoring. Plays it has not sent yet will not be saved',
+        )
         .waitFor();
       note(
         'the first tap asks before taking over',
@@ -283,14 +304,11 @@ if (browser) {
   for (const [who, token] of [
     ["another league's admin", 'local-other-admin-token'],
     ['a coach', 'local-coach-token'],
-    ['a visitor', null],
   ]) {
     await step(`${who} is refused`, async () => {
       const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
       try {
-        if (token !== null) {
-          await context.addCookies([{ name: 'srl_session', value: token, url: origin }]);
-        }
+        await context.addCookies([{ name: 'srl_session', value: token, url: origin }]);
         const page = await context.newPage();
         const response = await page.goto(origin + tracker(liveGame));
         note(`${who}: 403`, response?.status() === 403, String(response?.status()));
@@ -308,25 +326,136 @@ if (browser) {
 }
 
 if (browser) {
+  // Signed out at the tracker: sent to sign in, told why, and brought back to the game.
+  // Only the made-up member signs in with a password, and scores nowhere, so back on the
+  // game they get the league's own "no access" (U-6): the way back is what is checked.
+  await step('a visitor is sent to sign in and brought back to the game', async () => {
+    const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(30_000);
+      await page.goto(origin + tracker(liveGame));
+      const at = new URL(page.url());
+      note(
+        'signed out: the tracker sends to sign in, coming back to this game',
+        at.pathname === '/signin' && at.searchParams.get('next') === tracker(liveGame),
+        page.url(),
+      );
+      await page.getByText('Sign in to score this game.').waitFor();
+      note('the sign-in screen says why', true);
+      note(
+        'signed out: nothing of the game shown',
+        (await page.getByText('Bears at Hawks').count()) === 0,
+      );
+      await accessible(page, 'sent to sign in from the tracker');
+      await page.getByLabel('Email').fill(member.email);
+      await page.getByLabel('Password').fill(member.password);
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === tracker(liveGame)),
+        page.getByRole('button', { name: 'Sign in', exact: true }).click(),
+      ]);
+      note('after signing in the browser is back on the game', true);
+      await page.getByRole('heading', { level: 1 }).filter({ hasText: noAccess }).waitFor();
+      note('someone signed in who scores nowhere here is refused there (U-6)', true);
+
+      // "Your games", reached signed out, does the same.
+      await context.clearCookies();
+      await page.goto(`${origin}/north-valley/admin`);
+      const games = new URL(page.url());
+      note(
+        'signed out: "Your games" sends to sign in, coming back to it',
+        games.pathname === '/signin' && games.searchParams.get('next') === '/north-valley/admin',
+        page.url(),
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
   await step('a game not recorded live is not opened in the tracker', async () => {
     const { context, page } = await signedInAs('local-scorekeeper-token');
     try {
       await page.goto(`${origin}/north-valley/admin`);
       await page.getByRole('heading', { level: 1, name: 'Your games' }).waitFor();
+      const card = page.locator(`li[data-game="${finalScoreGame}"]`);
       note(
         'a game recorded as a final score has no button to the tracker',
-        (await page
-          .locator(`li[data-game="${finalScoreGame}"]`)
-          .getByRole('link', { name: 'Score this game' })
-          .count()) === 0,
+        (await card.getByRole('link', { name: 'Score this game' }).count()) === 0,
+      );
+      note(
+        'its card says how it is recorded, with a link to enter the score',
+        (await card.getByText('Final score only').count()) === 1 &&
+          (await card.getByRole('link', { name: 'Enter the score' }).getAttribute('href')) ===
+            '/north-valley/admin/games',
       );
       await page.goto(origin + tracker(finalScoreGame));
-      await page.getByText('This game is not recorded live').waitFor();
+      await page
+        .getByText('This game is set to final score only, so there is no live scoring.')
+        .waitFor();
       note(
-        'its tracker page says so and keeps nothing on the device',
+        'its tracker page says where its score is entered',
+        (await page.getByRole('link', { name: 'Enter the score' }).getAttribute('href')) ===
+          '/north-valley/admin/games' &&
+          (await page.getByRole('link', { name: 'Back to your games' }).count()) === 1,
+      );
+      note(
+        'its tracker page keeps nothing on the device',
         (await keptOnDevice(page, finalScoreGame)) === null,
       );
       await accessible(page, 'a game not recorded live');
+      await noSidewaysScroll(page, 'a game not recorded live');
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step("the scorekeeper's games are in game-night order", async () => {
+    const { context, page } = await signedInAs('local-scorekeeper-token');
+    try {
+      await page.goto(`${origin}/north-valley/admin`);
+      await page.getByRole('heading', { level: 1, name: 'Your games' }).waitFor();
+      const order = await page
+        .locator('[data-my-games] > li')
+        .evaluateAll((items) => items.map((li) => li.getAttribute('data-game')));
+      // Live now, today still to play, the days ahead (by day), and the finished game.
+      note(
+        'live first, then today, then the days ahead, finished last',
+        JSON.stringify(order) ===
+          JSON.stringify([liveGame, finalScoreGame, otherGame, laterGame, finishedGame]),
+        JSON.stringify(order),
+      );
+      const first = page.getByRole('link', { name: 'Score this game' }).first();
+      const box = await first.boundingBox();
+      note(
+        'on a phone the first "Score this game" is on the first screen',
+        box !== null && box.y + box.height <= 812,
+        JSON.stringify(box),
+      );
+      note(
+        'the first "Score this game" is the game being played now',
+        (await page
+          .locator(`li[data-game="${liveGame}"]`)
+          .getByRole('link', { name: 'Score this game' })
+          .count()) === 1 && order[0] === liveGame,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('an unknown game is refused with the way back', async () => {
+    const { context, page } = await signedInAs('local-scorekeeper-token');
+    try {
+      for (const game of [unknownGame, 'tonight']) {
+        await page.goto(`${origin}/north-valley/score/${game}`);
+        await page.getByText('We could not find that game.').waitFor();
+        note(
+          `an unknown game (${game}): "Back to your games" goes to the games`,
+          (await page.getByRole('link', { name: 'Back to your games' }).getAttribute('href')) ===
+            '/north-valley/admin',
+        );
+      }
+      await accessible(page, 'an unknown game');
     } finally {
       await context.close();
     }
@@ -341,13 +470,21 @@ if (browser) {
         "a game assigned to someone else is not on the scorekeeper's games",
         (await page.locator(`li[data-game="${liveGame}"]`).count()) === 0,
       );
-      const response = await page.goto(origin + assignedOnlyTracker(liveGame));
+      await page.goto(origin + assignedOnlyTracker(liveGame));
+      // The tracker's own refusal, not the league's "no access": they do score here.
+      await page
+        .getByText(
+          'You are not assigned to score this game. Ask a league admin to assign it to you.',
+        )
+        .waitFor();
       note(
-        'assigned games only: 403 for a game assigned to someone else',
-        response?.status() === 403,
-        String(response?.status()),
+        'assigned games only: told the game is not theirs, with the way back to their games',
+        (await page.getByRole('link', { name: 'Back to your games' }).getAttribute('href')) ===
+          '/quiet-pines/admin' &&
+          (await page.getByRole('link', { name: 'Sign in' }).count()) === 0 &&
+          (await page.getByRole('heading', { level: 1 }).filter({ hasText: noAccess }).count()) ===
+            0,
       );
-      await page.getByRole('heading', { level: 1 }).filter({ hasText: noAccess }).waitFor();
       note(
         'assigned games only: nothing of the game shown',
         (await page.getByText('Bears at Hawks').count()) === 0,
@@ -362,12 +499,70 @@ if (browser) {
     }
   });
 
+  await step('with no answer from the server, the tracker says so and keeps trying', async () => {
+    const { context, page } = await signedInAs('local-scorekeeper-token');
+    try {
+      await context.route('**/api/**', (route) => route.abort());
+      const started = Date.now();
+      await page.goto(origin + tracker(liveGame));
+      await page.getByText('Opening the game…').waitFor();
+      await page
+        .getByText('No answer yet. Check the connection; this keeps trying.')
+        .waitFor({ timeout: 30_000 });
+      const waited = Date.now() - started;
+      note('after about ten seconds the connection is mentioned', waited >= 9_000, `${waited} ms`);
+      await accessible(page, 'no answer from the server');
+      await context.unroute('**/api/**');
+      await page
+        .getByText('This device is scoring the game.')
+        .or(formatHeading(page))
+        .waitFor({ timeout: 60_000 });
+      note(
+        'once the server answers the game opens by itself, and the words go',
+        (await page.getByText('No answer yet.').count()) === 0,
+      );
+      // Leave by the one way out, so the next device finds the game free.
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === '/north-valley/admin'),
+        page.getByRole('link', { name: 'Back to your games' }).click(),
+      ]);
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('signed out while the game is open, the tracker offers to sign in', async () => {
+    const { context, page } = await signedInAs('local-scorekeeper-token');
+    try {
+      await page.goto(origin + tracker(liveGame));
+      await page.getByText('This device is scoring the game.').or(formatHeading(page)).waitFor();
+      // The session cookie goes; the device finds out at its next renewal (30 s).
+      await context.clearCookies();
+      await page.getByText('You are signed out.').waitFor({ timeout: 60_000 });
+      const href = await page.getByRole('link', { name: 'Sign in' }).getAttribute('href');
+      const to = new URL(href ?? '/nowhere', origin);
+      note(
+        'signed out while open: a "Sign in" link coming back to this game',
+        to.pathname === '/signin' && to.searchParams.get('next') === tracker(liveGame),
+        String(href),
+      );
+      await accessible(page, 'signed out while the game is open');
+    } finally {
+      await context.close();
+    }
+  });
+
   // Last, as it ends the made-up scorekeeper's session.
   await step('signing out clears the games kept on the device', async () => {
     const { context, page } = await signedInAs('local-scorekeeper-token');
     try {
       await page.goto(origin + tracker(liveGame));
-      await page.getByText('This device is scoring the game.').or(formatHeading(page)).waitFor();
+      // The device signed out above may still hold the game: then this one is told so.
+      await page
+        .getByText('This device is scoring the game.')
+        .or(formatHeading(page))
+        .or(page.getByText('is scoring this game on another device.'))
+        .waitFor();
       note('a game is kept on the device before signing out', (await gamesKeptOnDevice(page)) > 0);
       await Promise.all([
         page.waitForURL((url) => url.pathname === '/account'),

@@ -234,7 +234,17 @@ const cases = [
   ['visitor', '/harbor-city/stats', 200, ['Sam R.', 'Noor H.'], ['Rivera', 'Haddad']],
   ['visitor', '/harbor-city/standings', 200, ['Level with another team', 'PTS']],
   ['scheduler', '/north-valley/admin', 200, ['Powered by SR Leagues', '--color-primary: #c8a84b']],
-  ['visitor', '/north-valley/admin', 403, [noAccess], ['Admin areas']],
+  // Someone not signed in at the admin's home (a scorekeeper's games) is sent to sign in
+  // and brought back (step 2.33); at an admin area they are still refused (U-6).
+  [
+    'visitor',
+    '/north-valley/admin',
+    307,
+    [],
+    ['Admin areas'],
+    '/signin?next=%2Fnorth-valley%2Fadmin',
+  ],
+  ['visitor', '/north-valley/admin/teams', 403, [noAccess], ['Admin areas']],
   ['stranger', '/north-valley/admin', 403, [noAccess]],
   ['coach', '/north-valley/admin/teams', 403, [noAccess]],
   [
@@ -289,11 +299,33 @@ const cases = [
   ['scorekeeper', `/north-valley/score/${unassignedGame}`, 200, ['Lions at Hawks']],
   ['owner', `/north-valley/score/${liveGame}`, 200, ['Bears at Hawks']],
   ['coach', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
-  ['visitor', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
+  // Someone not signed in is sent to sign in, told why, and brought back to the game.
+  [
+    'visitor',
+    `/north-valley/score/${liveGame}`,
+    307,
+    [],
+    ['Bears at Hawks'],
+    `/signin?problem=signInToScore&next=%2Fnorth-valley%2Fscore%2F${liveGame}`,
+  ],
+  ['visitor', '/signin?problem=signInToScore', 200, ['Sign in to score this game.']],
   ['otherAdmin', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
-  ['owner', '/north-valley/score/game-1', 404, [notFound]],
+  // No such game: the tracker's own refusal, with the way back (step 2.33).
+  [
+    'owner',
+    '/north-valley/score/game-1',
+    200,
+    ['We could not find that game.', 'Back to your games'],
+    [notFound],
+  ],
   // Another league's game asked for through this league's address is not there.
-  ['owner', `/harbor-city/score/${liveGame}`, 404, [notFound], ['Bears at Hawks']],
+  [
+    'owner',
+    `/harbor-city/score/${liveGame}`,
+    200,
+    ['We could not find that game.'],
+    ['Bears at Hawks'],
+  ],
   // A scorekeeper's admin: their games, each with a button to the tracker (P4 §4).
   [
     'scorekeeper',

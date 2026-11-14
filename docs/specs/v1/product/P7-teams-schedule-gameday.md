@@ -92,7 +92,9 @@ When the regular season ends, the admin creates a **bracket**: choose how many t
 
 - The league's reminders go out ([P8](P8-notifications.md)).
 - A scorekeeper is assigned to the game, or any scorekeeper opens it from their list. The league chooses which.
-- The scorekeeper opens `/{league}/score/{game}` on a phone or tablet and confirms the game format. Only games recorded live have a "Score this game" button (**S-38**, decided for you); an admin can switch a game to live in the schedule.
+- The scorekeeper opens `/{league}/score/{game}` on a phone or tablet and confirms the game format. Only games recorded live have a "Score this game" button (**S-38**, decided for you); an admin can switch a game to live in the schedule. A game recorded as a final score or a box score says so on the scorekeeper's list and on its tracker address, with a link to enter its score in Games, which a scorekeeper may do.
+- The scorekeeper's list puts tonight first: games being played now, then today's games still to play, then the days ahead, and finished games last.
+- Someone not signed in who opens the tracker's address, or the scorekeeper's list, is sent to sign in and brought back to it; a device signed out while a game is open offers the same. A scorekeeper who may not score a game (one assigned to someone else, in a league that scores assigned games only) is told so, with the way back to their games.
 - The confirmation lists every rule of the game, the clock mode (stop or running) included (**S-39**, decided for you). If the officials are playing a different format, the scorekeeper changes it for this game before the first play, where the league allows it: a league setting, "Scorekeepers may change a game's format before it starts", on to begin with (**S-35**, decided for you). With it off, the scorekeeper asks an admin, who can give any game its own format.
 
 ### 5.2 Three ways to record a game

@@ -25,6 +25,8 @@ export type TrackerRosters = {
   readonly awayTeamId: string;
   /** How the game is recorded: only a game recorded live opens in the tracker. */
   readonly recording: ReturnType<typeof recordingOf>;
+  /** Where the game stands (scheduled, live, final...): a game over is not entered again. */
+  readonly status: string;
   readonly players: readonly GameRosterPlayer[];
 };
 
@@ -44,6 +46,7 @@ export const readTrackerRosters = defineCommand({
       homeTeamId: game.homeTeamId,
       awayTeamId: game.awayTeamId,
       recording: recordingOf(game.captureMode),
+      status: game.status,
       players,
     });
   },

@@ -16,9 +16,11 @@
 // address the proxy wrote down, the proxy did not run for this request, and the
 // answer is "not found" (league-gate.ts, addressMatchesRoute).
 import type { AdminArea } from '@srleagues/core';
-import { forbidden, notFound, permanentRedirect } from 'next/navigation';
+import { forbidden, notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { getConfig } from './config.ts';
+import { signInFirstUrl } from './sign-in-first.ts';
+import type { Problem } from './sign-in/problems.ts';
 import { webPorts } from './container.ts';
 import {
   addressMatchesRoute,
@@ -55,11 +57,21 @@ async function outcomeFor(
   return leaguePageOutcome(resolved, want);
 }
 
+/**
+ * For a page someone not signed in can only be meant to sign in for (the tracker, the
+ * scorekeeper's games): instead of "you do not have access", they are sent to sign in
+ * and brought back to this address, with `problem` shown on the sign-in screen if
+ * given. Someone signed in without the access is still refused (U-6), and a league
+ * hidden from them is still "not found".
+ */
+export type VisitorSignsIn = { readonly problem?: Problem };
+
 /** For a page: the view, or Next.js's refusal. `routeLeague` is the route's `[league]`. */
 export async function loadLeaguePage(
   routeLeague: string,
   page: LeagueWant['page'],
   area: AdminArea | null = null,
+  visitorSignsIn?: VisitorSignsIn,
 ): Promise<LeagueView> {
   const outcome = await outcomeFor(routeLeague, page, area);
   switch (outcome.kind) {
@@ -68,6 +80,10 @@ export async function loadLeaguePage(
     case 'forward':
       return permanentRedirect(outcome.to);
     case 'no-access':
+      if (visitorSignsIn !== undefined && !outcome.signedIn) {
+        const { path } = await resolvedRequest();
+        return redirect(signInFirstUrl(path, visitorSignsIn));
+      }
       return forbidden();
     case 'not-found':
       return notFound();

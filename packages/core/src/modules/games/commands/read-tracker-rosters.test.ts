@@ -54,6 +54,7 @@ describe('reading the rosters for the tracker (T-115, T-258)', () => {
         homeTeamId,
         awayTeamId,
         recording: 'live',
+        status: 'scheduled',
         players: roster.slice(0, 3),
       },
     });
@@ -68,6 +69,20 @@ describe('reading the rosters for the tracker (T-115, T-258)', () => {
     });
     const result = await readTrackerRosters(as(scorekeeperId), { gameId: gameUuid(1) }, deps);
     expect(result).toMatchObject({ ok: true, value: { recording: 'box-score' } });
+  });
+
+  it('says where the game stands, so a game over is not offered for its score again', async () => {
+    const { deps, as } = memoryGames({
+      status: 'live',
+      games: [game(1, { captureMode: 'final', status: 'final' })],
+      grants: [scorekeeperGrant],
+      roster,
+    });
+    const result = await readTrackerRosters(as(scorekeeperId), { gameId: gameUuid(1) }, deps);
+    expect(result).toMatchObject({
+      ok: true,
+      value: { recording: 'final-score', status: 'final' },
+    });
   });
 
   it('accepts a game id in capitals, as the address may have it', async () => {

@@ -35,7 +35,9 @@ describe('tracker notices (T6 §5, T-113)', () => {
     }
     expect(
       texts({ mode: { kind: 'read-only', reason: 'taken-over' }, notApplied: [], notSaved: [] }),
-    ).toEqual(['Another device has taken over scoring this game. This one is now read-only.']);
+    ).toEqual([
+      'Someone else is now scoring this game on another device. This device can no longer score it.',
+    ]);
   });
 
   it('names who holds the game, and counts the taps not saved and not applied', () => {
