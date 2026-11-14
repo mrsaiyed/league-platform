@@ -14,6 +14,8 @@ export const designDocumentSchema = z.object({
     text: hexColor,
     primary: hexColor,
     accent: hexColor,
+    // Used sparingly to make a few things stand out; a design without one uses its accent (C-15).
+    highlight: hexColor.optional(),
   }),
   fonts: z.object({ heading: z.enum(fontKeys), body: z.enum(fontKeys) }),
   corners: z.enum(['sharp', 'soft', 'round']),

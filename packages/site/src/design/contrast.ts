@@ -45,17 +45,21 @@ export type ContrastWarning = {
 };
 
 export function contrastWarnings(design: DesignDocument): ContrastWarning[] {
-  const { background, panel, text } = design.colors;
-  const pairs: [string, string][] = [
-    ['text on background', background],
-    ['text on panel', panel],
+  const { background, panel, text, highlight, accent } = design.colors;
+  // The highlight is written as words (the Live marker, a score, the picker), so it must read
+  // like text. Left out, the accent stands in for it and is used the same way, so check that.
+  const pairs: [string, string, string][] = [
+    ['text on background', text, background],
+    ['text on panel', text, panel],
+    ['highlight on background', highlight ?? accent, background],
+    ['highlight on panel', highlight ?? accent, panel],
   ];
   return pairs
-    .map(([pair, bg]) => ({
+    .map(([pair, fg, bg]) => ({
       pair,
-      ratio: contrastRatio(text, bg),
+      ratio: contrastRatio(fg, bg),
       minimum: MINIMUM,
-      suggestion: nearestReadableColor(text, bg),
+      suggestion: nearestReadableColor(fg, bg),
     }))
     .filter((w) => w.ratio < w.minimum);
 }
