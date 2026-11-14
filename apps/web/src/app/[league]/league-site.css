@@ -113,6 +113,38 @@ body {
   padding-inline-start: 0.5rem;
   font-weight: 600;
 }
+/* The main tap of a screen ("Score this game", "Confirm and start scoring", "Take over
+   scoring"): a button at least 44px high, easy to hit courtside (A-2). Text on its
+   swapped background always meets AA (checked on save), as for the menu's hover. */
+.league-site .tap-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  padding-block: 0.5rem;
+  padding-inline: 1.25rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--color-text);
+  color: var(--color-background);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.league-site .tap-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* A list of game cards: the cards stand on their own, with no bullets beside them. */
+.admin-game-list {
+  display: grid;
+  gap: var(--space);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 /* Public pages are cards; the admin and the scoring screen are not. */
 .site-body > main:not(.score-root) {
   padding: var(--space);

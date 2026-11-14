@@ -12,7 +12,8 @@
 //    (storing-tracker-server.ts).
 // 4. The scorekeeper confirms the game format before scoring (P7 §5.1): `screenOf`
 //    says when, and `confirmFormat` stores it on the device, so the same format is not
-//    asked again on this device. A format changed since is asked again.
+//    asked again on this device. A format changed since is asked again. A game that
+//    already has plays is not asked about: whoever takes it over continues (P7 §5.2).
 import type { QueueErrorCode } from './queue-storage.ts';
 import { QueueError, type QueueStorage } from './queue-storage.ts';
 import type { CommandTransport } from './command-transport.ts';
@@ -61,7 +62,9 @@ export function screenOf(
     case 'scoring': {
       if (game === null) return { kind: 'opening' };
       const format = formatOf(game.rules);
-      return sameFormat(confirmed, format)
+      // A game already under way is played under the format it started with: a device
+      // taking it over mid-game carries on scoring, it is not asked to check it (P7 §5.2).
+      return game.plays.length > 0 || sameFormat(confirmed, format)
         ? { kind: 'scoring', format }
         : { kind: 'confirm-format', format };
     }

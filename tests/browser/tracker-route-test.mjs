@@ -8,8 +8,9 @@
 //   and stores the rosters and the state on the device (IndexedDB, T-115). Once confirmed,
 //   the same device opens straight to scoring; leaving goes back to the games.
 // - The made-up owner, who runs the league, opens a game the scorekeeper is holding: told
-//   who holds it, takes over, and confirms the format.
+//   who holds it, takes over after confirming, and confirms the format.
 // - Another league's admin, a coach and a visitor are refused: "you do not have access" (U-6).
+// - Signing out on the account page clears the games the device kept (T-115).
 // Accessibility checks on each screen (T-186), and no sideways scrolling at phone width (A-2).
 import {
   accessibilityProblems,
@@ -108,8 +109,35 @@ const keptOnDevice = (page, game) =>
       }),
     game,
   );
+/** How many games the device keeps in its browser database, all accounts together. */
+const gamesKeptOnDevice = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open('srleagues-tracker-games');
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains('games')) {
+            db.close();
+            resolve(0);
+            return;
+          }
+          const count = db.transaction('games').objectStore('games').count();
+          count.onsuccess = () => {
+            db.close();
+            resolve(count.result);
+          };
+          count.onerror = () => reject(count.error);
+        };
+      }),
+  );
 const formatHeading = (page) =>
   page.getByRole('heading', { level: 2, name: 'Check the game format' });
+const signOutHint = 'On a shared phone or tablet, sign out when you finish.';
+const signOutLink = (page) => page.getByRole('link', { name: 'Sign out on your account page' });
+/** The height of the main tap, in CSS pixels: at least 44 (A-2). */
+const tapHeight = async (locator) => (await locator.boundingBox())?.height ?? 0;
 
 if (browser) {
   await step('the scorekeeper opens their games and a game in the tracker', async () => {
@@ -122,6 +150,22 @@ if (browser) {
       note(
         'the admin shows nothing but the games',
         (await page.getByText('Nothing here yet.').count()) === 0,
+      );
+      note(
+        'the games list tells a shared device to sign out, with a link to the account page',
+        (await page.getByText(signOutHint).count()) === 1 &&
+          (await signOutLink(page).getAttribute('href')) === '/account',
+      );
+      note(
+        '"Score this game" is a tap at least 44px high',
+        (await tapHeight(buttons.first())) >= 44,
+        String(await tapHeight(buttons.first())),
+      );
+      note(
+        'the games are cards with no bullets beside them',
+        (await page
+          .locator('[data-my-games]')
+          .evaluate((list) => getComputedStyle(list).listStyleType)) === 'none',
       );
       await accessible(page, "the scorekeeper's games");
       await noSidewaysScroll(page, "the scorekeeper's games");
@@ -137,6 +181,19 @@ if (browser) {
       note('the tracker names the game', (await page.getByText('Bears at Hawks').count()) > 0);
       await formatHeading(page).waitFor();
       note('the format is shown', (await page.getByText('Overtime periods of').count()) === 1);
+      note(
+        '"All saved" is not said before anything is entered',
+        (await page.getByText('All saved').count()) === 0,
+      );
+      note(
+        'the tracker tells a shared device to sign out',
+        (await page.getByText(signOutHint).count()) === 1 &&
+          (await signOutLink(page).count()) === 1,
+      );
+      note(
+        '"Confirm and start scoring" is a tap at least 44px high',
+        (await tapHeight(page.getByRole('button', { name: 'Confirm and start scoring' }))) >= 44,
+      );
       await accessible(page, 'confirming the format');
       await noSidewaysScroll(page, 'confirming the format');
 
@@ -191,9 +248,26 @@ if (browser) {
         .getByText('Sam Scorekeeper is scoring this game on another device.')
         .waitFor();
       await accessible(owner.page, 'held by another device');
+      const takeOver = owner.page.getByRole('button', { name: 'Take over scoring' });
+      note('"Take over scoring" is a tap at least 44px high', (await tapHeight(takeOver)) >= 44);
+      await takeOver.click();
+      // One tap only asks: the game is not taken until the owner says yes (T6 §5).
+      await owner.page
+        .getByText('Take over scoring from Sam Scorekeeper? Their device stops scoring at once')
+        .waitFor();
+      note(
+        'the first tap asks before taking over',
+        (await formatHeading(owner.page).count()) === 0 &&
+          (await owner.page
+            .getByText('Sam Scorekeeper is scoring this game on another device.')
+            .count()) === 1,
+      );
+      await accessible(owner.page, 'asked to confirm the takeover');
+      await owner.page.getByRole('button', { name: 'Not now' }).click();
       await owner.page.getByRole('button', { name: 'Take over scoring' }).click();
+      await owner.page.getByRole('button', { name: 'Yes, take over' }).click();
       await formatHeading(owner.page).waitFor();
-      note('after taking over the owner confirms the format', true);
+      note('after confirming the takeover the owner confirms the format', true);
     } finally {
       await keeper.context.close();
       await owner.context.close();
@@ -225,6 +299,33 @@ if (browser) {
       }
     });
   }
+}
+
+if (browser) {
+  // Last, as it ends the made-up scorekeeper's session.
+  await step('signing out clears the games kept on the device', async () => {
+    const { context, page } = await signedInAs('local-scorekeeper-token');
+    try {
+      await page.goto(origin + tracker(liveGame));
+      await page.getByText('This device is scoring the game.').or(formatHeading(page)).waitFor();
+      note('a game is kept on the device before signing out', (await gamesKeptOnDevice(page)) > 0);
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === '/account'),
+        signOutLink(page).click(),
+      ]);
+      await Promise.all([
+        page.waitForURL((url) => url.pathname !== '/account'),
+        page.getByRole('button', { name: 'Sign out', exact: true }).click(),
+      ]);
+      note(
+        'signing out leaves no game kept on the device',
+        (await gamesKeptOnDevice(page)) === 0,
+        String(await gamesKeptOnDevice(page)),
+      );
+    } finally {
+      await context.close();
+    }
+  });
 }
 
 await browser?.close();

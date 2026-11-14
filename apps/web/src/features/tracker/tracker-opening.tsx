@@ -13,7 +13,7 @@ import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
 import { savedBanner, savedBannerText } from './queue-banner.ts';
-import type { TrackerControllerStatus } from './tracker-controller.ts';
+import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controller.ts';
 import { trackerNoticeText, trackerNotices } from './tracker-notice.ts';
 
 export type TrackerOpeningProps = {
@@ -24,6 +24,8 @@ export type TrackerOpeningProps = {
   readonly rosters: DeviceRosters;
   /** Where "back to your games" and leaving the game go. */
   readonly backHref: string;
+  /** The account page, where a shared device is signed out (and its kept games cleared). */
+  readonly accountHref: string;
   readonly locale: string;
   /** The tracker's own messages (tracker-catalog.ts). */
   readonly catalog: Catalog;
@@ -45,6 +47,7 @@ export function TrackerOpening({
   gameId,
   rosters,
   backHref,
+  accountHref,
   locale,
   catalog,
 }: TrackerOpeningProps) {
@@ -170,9 +173,19 @@ export function TrackerOpening({
           {t('tracker.back')}
         </a>
       </p>
+      <p data-shared-device="">
+        {t('tracker.sharedDevice.text')} <a href={accountHref}>{t('tracker.sharedDevice.link')}</a>
+      </p>
     </main>
   );
 }
+
+/**
+ * Whether opening the game again can help: not for someone signed out, refused or
+ * sent to a game that is not there, who would only be turned away again.
+ */
+const mayOpenAgain = (reason: ReadOnlyReason): boolean =>
+  reason !== 'signed-out' && reason !== 'not-allowed' && reason !== 'unknown-game';
 
 function OpenGame({
   phase,
@@ -198,11 +211,23 @@ function OpenGame({
   const { status, confirmed } = phase;
   const screen = screenOf(status, confirmed);
   const notices = trackerNotices(status);
+  // Taking over asks first (T6 §5, P7 §5.2): the other device stops scoring at once.
+  const [askingTakeOver, setAskingTakeOver] = useState(false);
+  // Asked again if the game is let go of and then held by another device once more.
+  useEffect(() => {
+    if (screen.kind !== 'held-by-other') setAskingTakeOver(false);
+  }, [screen.kind]);
+  const banner = savedBanner(status.queue);
+  // "All saved" is said once there is something to have saved: on the scoring screen,
+  // or whenever taps are waiting, refused or cannot be stored.
+  const showBanner = screen.kind === 'scoring' || banner[0].key !== 'tracker.queue.allSaved';
   return (
     <>
-      <p role="status" aria-live="polite" data-saved-banner="">
-        {savedBannerText(savedBanner(status.queue), t)}
-      </p>
+      {showBanner ? (
+        <p role="status" aria-live="polite" data-saved-banner="">
+          {savedBannerText(banner, t)}
+        </p>
+      ) : null}
       {notices.length === 0 ? null : (
         <ul role="alert" data-tracker-notices="">
           {notices.map((notice) => (
@@ -211,12 +236,38 @@ function OpenGame({
         </ul>
       )}
       {screen.kind === 'opening' ? <p>{t('tracker.opening')}</p> : null}
-      {screen.kind === 'held-by-other' ? (
-        <button type="button" onClick={onTakeOver} disabled={busy}>
+      {screen.kind === 'held-by-other' && !askingTakeOver ? (
+        <button
+          type="button"
+          className="tap-button"
+          onClick={() => setAskingTakeOver(true)}
+          disabled={busy}
+        >
           {t('tracker.takeOver')}
         </button>
       ) : null}
-      {screen.kind === 'read-only' ? (
+      {screen.kind === 'held-by-other' && askingTakeOver ? (
+        <section aria-labelledby="tracker-take-over" data-take-over="">
+          <p id="tracker-take-over">{t('tracker.takeOverQuestion', { name: screen.name })}</p>
+          <p>
+            <button
+              type="button"
+              className="tap-button"
+              onClick={() => {
+                setAskingTakeOver(false);
+                onTakeOver();
+              }}
+              disabled={busy}
+            >
+              {t('tracker.takeOverYes')}
+            </button>{' '}
+            <button type="button" onClick={() => setAskingTakeOver(false)} disabled={busy}>
+              {t('tracker.takeOverNo')}
+            </button>
+          </p>
+        </section>
+      ) : null}
+      {screen.kind === 'read-only' && mayOpenAgain(screen.reason) ? (
         <button type="button" onClick={onOpenAgain} disabled={busy}>
           {t('tracker.openAgain')}
         </button>
@@ -231,7 +282,12 @@ function OpenGame({
             ))}
           </ul>
           <p>{t('tracker.format.wrong')}</p>
-          <button type="button" onClick={() => onConfirm(screen.format)} disabled={busy}>
+          <button
+            type="button"
+            className="tap-button"
+            onClick={() => onConfirm(screen.format)}
+            disabled={busy}
+          >
             {t('tracker.format.confirm')}
           </button>
         </section>

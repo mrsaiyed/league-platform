@@ -13,7 +13,7 @@
 // account, so the device can let go of another account's games (T-115); the device
 // then takes the scoring session and loads the state itself (tracker-opening.tsx).
 import { catalogs, en } from '@srleagues/site';
-import { leagueUrl, readTrackerRosters } from '@srleagues/core';
+import { leagueUrl, platformUrl, readTrackerRosters } from '@srleagues/core';
 import { forbidden, notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
@@ -54,6 +54,7 @@ export async function TrackerPage({
       gameId={read.value.gameId}
       rosters={deviceRosters(read.value, names.teams)}
       backHref={backHref}
+      accountHref={platformUrl('account')}
       locale={locale}
       catalog={trackerCatalog(catalogs[locale] ?? en)}
     />

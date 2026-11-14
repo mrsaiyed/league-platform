@@ -136,6 +136,21 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     expect(screenOf({ mode: { kind: 'scoring' }, game: null }, null).kind).toBe('opening');
   });
 
+  it('does not ask about the format of a game already under way: it carries on scoring', () => {
+    const started = basketball.apply(
+      basketball.newGame(basketball.HALVES),
+      { type: 'team-turnover', side: 'home' },
+      { id: 'play-1', now: 0 },
+    );
+    expect(started.plays.length).toBeGreaterThan(0);
+    const scoring = { mode: { kind: 'scoring' } as const, game: started };
+    expect(screenOf(scoring, null)).toEqual({
+      kind: 'scoring',
+      format: formatOf(basketball.HALVES),
+    });
+    expect(screenOf(scoring, formatOf(basketball.QUARTERS)).kind).toBe('scoring');
+  });
+
   it('shows another device who holds the game, and lets it take over', async () => {
     const network = endpointNetwork();
     const first = await open(network, 'scorekeeper');
