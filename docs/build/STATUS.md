@@ -22,6 +22,8 @@ One line per open lane. A run that is cut off leaves this as the map for the nex
 Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.25, 036/T-248 to 2.28, 037/T-249 to 2.73) (0011 / 031 / T-243 belong to 1.14; 0010 / 030 / T-242 to 2.4).
 
 - **2.55 The games area** — `.local/lanes/2.55-games-area` — none used — builder started; check the lane for commits, then merge build, push, review, GitHub, land.
+- **2.87 A draft league for all its staff** — `.local/lanes/2.87-draft-staff` — none reserved — opus builder started; check the lane, merge build, push, review, GitHub, land.
+- **2.51 Teams and rosters screens** — `.local/lanes/2.51-teams-screens` — none reserved — builder started; check the lane, merge build, push, review, GitHub, land.
 - **1.22 Browser tests for the exit test** — `.local/lanes/1.22-browser-tests` — none used — builder started; check the lane, merge build, push, review, GitHub, land.
 - **2.29 Applying tracker commands** — `.local/lanes/2.29-apply-tracker` — none reserved — opus builder started; check the lane, merge build, push, review, GitHub, land.
 - **1.27 Sturdy timing tests (rest)** — `.local/lanes/1.27-sturdy-again` — none used — builder started: make scripts/check-pages-browser.mjs wait for what it tests; then the five-green-runs proof (lane/1.27-again1..5, lead pushes).
