@@ -1,9 +1,16 @@
 // Creates a league, in the state draft (U-9), with its hidden default program (U-3,
-// U-12), in one transaction. For our own staff through an internal tool only: no
-// page offers it yet. The context's league id is the NEW league's id, picked by the
-// caller before the call (record 008: row-level security needs it set first). The
-// first season is not created here; an organizer adds it (createSeason). The contact
-// email and city (P3 §1 step 2, "Where") may be left out and given later.
+// U-12) and, when one is given, its first season as the current one, all in one
+// transaction: either everything is made or nothing is (T-260). For our own staff
+// through an internal tool only: no page offers it yet. The context's league id is
+// the NEW league's id, picked by the caller before the call (record 008: row-level
+// security needs it set first).
+//
+// The first season is made here, by our staff, rather than by the owner with
+// createSeason afterwards: the owner may never have signed in, so no command may act
+// as them (a context comes from a session, never made up), and a league left with no
+// season because a second step refused could be neither finished nor removed. The
+// activity log names our staff for both, set up for the owner (`forOwnerAccountId`).
+// The contact email and city (P3 §1 step 2, "Where") may be left out and given later.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -12,19 +19,45 @@ import { audiences, defaultProgramSlug, listedByDefault } from '../league-values
 import { mayActAsPlatform } from '../policy.ts';
 import type { LeagueRecord, LeaguesTx } from '../ports.ts';
 import { isBlockedShortName, shortNameSchema } from '../short-names.ts';
+import { namedTimeZone } from '../time-zone.ts';
 
 export type CreateLeagueError = {
   readonly code: 'short-name-blocked' | 'short-name-taken' | 'league-exists' | 'owner-not-found';
 };
 
-const validTimeZone = (value: string) => {
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: value });
-    return true;
-  } catch {
-    return false;
-  }
-};
+/** The league, and its first season's id when one was made with it. */
+export type CreatedLeague = LeagueRecord & { readonly firstSeasonId: string | null };
+
+const day = z.iso.date();
+
+/** P3 §1 step 4: a name, its short name, and rough dates, which are optional. */
+const firstSeason = z
+  .object({
+    // The same limits as the seasons table (0003) and createSeason.
+    slug: z
+      .string()
+      .max(60)
+      .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
+    name: z.string().trim().min(1).max(120),
+    startsOn: day.optional(),
+    endsOn: day.optional(),
+  })
+  .refine((s) => s.startsOn === undefined || s.endsOn === undefined || s.endsOn >= s.startsOn, {
+    path: ['endsOn'],
+  });
+
+/** A named zone only, kept by its canonical name (time-zone.ts). */
+const timeZone = z
+  .string()
+  .max(64)
+  .transform((value, context) => {
+    const name = namedTimeZone(value);
+    if (name === undefined) {
+      context.addIssue({ code: 'custom', message: 'not a named time zone' });
+      return z.NEVER;
+    }
+    return name;
+  });
 
 export const createLeague = defineCommand({
   name: 'leagues.create',
@@ -32,7 +65,7 @@ export const createLeague = defineCommand({
   input: z.object({
     slug: shortNameSchema,
     name: z.string().trim().min(1).max(120),
-    timeZone: z.string().min(1).max(64).refine(validTimeZone),
+    timeZone,
     audience: z.enum(audiences),
     /** U-10: when left out, adult leagues are listed and the others are not. */
     listed: z.boolean().optional(),
@@ -42,9 +75,11 @@ export const createLeague = defineCommand({
     /** Where the league plays (P3 §1 step 2); the same limits as the leagues table (0014). */
     city: z.string().trim().min(1).max(100).optional(),
     sportKey: z.string().regex(/^[a-z][a-z0-9_]{0,39}$/),
+    /** Made in the default program, in draft, as the current season. */
+    firstSeason: firstSeason.optional(),
   }),
   allowed: (context, _input, tx: LeaguesTx) => mayActAsPlatform(context, tx),
-  run: async ({ context, input, tx, emit }): Promise<Result<LeagueRecord, CreateLeagueError>> => {
+  run: async ({ context, input, tx, emit }): Promise<Result<CreatedLeague, CreateLeagueError>> => {
     if (isBlockedShortName(input.slug)) return fail({ code: 'short-name-blocked' });
     const created = await tx.leagues.createLeague({
       slug: input.slug,
@@ -58,11 +93,49 @@ export const createLeague = defineCommand({
       defaultProgram: { slug: defaultProgramSlug, name: input.name, sportKey: input.sportKey },
     });
     if (typeof created === 'string') return fail({ code: created });
+    const setUp = { forOwnerAccountId: input.ownerAccountId };
     await recordActivity(tx, context, {
       action: 'leagues.create',
       target: { type: 'league', id: context.leagueId },
+      details: setUp,
     });
+    const firstSeasonId =
+      input.firstSeason === undefined ? null : await makeFirstSeason(tx, input.firstSeason);
+    if (firstSeasonId !== null) {
+      await recordActivity(tx, context, {
+        action: 'leagues.create_season',
+        target: { type: 'season', id: firstSeasonId },
+        details: { ...setUp, current: true },
+      });
+    }
     emit({ type: leagueCreated, leagueId: context.leagueId });
-    return ok(created);
+    return ok({ ...created, firstSeasonId });
   },
 });
+
+/**
+ * The first season, in the default program just made, as its current one. A new
+ * league has no other season, so neither a taken short name nor a missing program can
+ * happen: either would be a fault, thrown so the whole league is rolled back.
+ */
+async function makeFirstSeason(
+  tx: LeaguesTx,
+  season: z.output<typeof firstSeason>,
+): Promise<string> {
+  const program = await tx.leagues.findProgram(undefined);
+  if (program === undefined) throw new Error('leagues.create: the default program is missing.');
+  const seasonId = await tx.leagues.createSeason({
+    programId: program.id,
+    slug: season.slug,
+    name: season.name,
+    startsOn: season.startsOn ?? null,
+    endsOn: season.endsOn ?? null,
+  });
+  if (seasonId === 'slug-taken') {
+    throw new Error('leagues.create: a new league already had a season with that short name.');
+  }
+  if (!(await tx.leagues.setCurrentSeason(seasonId))) {
+    throw new Error('leagues.create: the first season could not be made the current one.');
+  }
+  return seasonId;
+}

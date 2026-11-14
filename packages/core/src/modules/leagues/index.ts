@@ -1,5 +1,10 @@
 // The leagues module (T2 §3). Other modules and packages use only what is here.
-export { createLeague, type CreateLeagueError } from './commands/create-league.ts';
+export {
+  createLeague,
+  type CreatedLeague,
+  type CreateLeagueError,
+} from './commands/create-league.ts';
+export { namedTimeZone } from './time-zone.ts';
 export { createDivision, type CreateDivisionError } from './commands/create-division.ts';
 export { listDivisions } from './commands/list-divisions.ts';
 export { removeDivision, type RemoveDivisionError } from './commands/remove-division.ts';

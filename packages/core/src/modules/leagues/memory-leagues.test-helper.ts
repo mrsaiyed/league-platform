@@ -226,7 +226,15 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
             return 'slug-taken';
           }
           const id = `season-${s.seasons.length + 1}`;
-          s.seasons.push({ id, programId: season.programId, slug: season.slug, isCurrent: false });
+          s.seasons.push({
+            id,
+            programId: season.programId,
+            slug: season.slug,
+            isCurrent: false,
+            name: season.name,
+            startsOn: season.startsOn,
+            endsOn: season.endsOn,
+          });
           return id;
         },
         findSeason: async (seasonId) => {
