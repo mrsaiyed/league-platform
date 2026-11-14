@@ -13,6 +13,9 @@ P7 §4 lets an admin switch fairness rules on (no team twice in one day, early a
 - **Locked games are the admin's.** They stay exactly where they are, even when they break a rule, and the rest is placed around them. They are the one way a strict rule can be broken, and it is the admin's own doing.
 - **Repeatable.** The same inputs give the same schedule. Variety comes only from the `arrangement` number the caller passes, never from a clock or a random source.
 - **Checked with generated inputs (T-182).** Tests build many seasons from a seeded generator and check that no schedule breaks a strict rule, that nothing clashes, that every game is either placed or listed as unplaced, and that locked games stay put.
+- **Regenerating replaces every game that is not locked.** That includes games that already have a result, are live or were forfeited. Step 2.74 must therefore lock every game that is not still plain "scheduled", or refuse to regenerate while any game has a result. Locked games that are cancelled or postponed still stand for one game of the pairings (the placer does not place that pair again) and are not put on a new date, because the admin locked them.
+- **Known gap: the clean-up pass does not retry.** After placing, the fairness report and clash check take out any placed game that still breaks a strict rule, and it goes to `unplaced`. It is not tried again in another slot or week. This only happens when locked games break a rule, since the placing itself avoids them, so the admin sees it in the unplaced list and can add the game by hand. A retry can be added later without changing the result's shape.
+- **Inputs are checked.** The `arrangement` number must be a whole number, 0 or more (`invalid-arrangement`). A round kept from the old schedule that holds no locked game takes the date of its first new game.
 
 ## Considered
 

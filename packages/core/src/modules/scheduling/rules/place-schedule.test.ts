@@ -206,6 +206,23 @@ describe('placeSchedule, worked examples (P7 §4.1, §4.2)', () => {
     expect(new Set(again.games.map((g) => g.id)).size).toBe(again.games.length);
   });
 
+  it('gives a reused round the date of its new first game, not its old date', () => {
+    const first = placed(sundays());
+    const stale = first.rounds.map((r) => {
+      const date = r.date ?? '';
+      return {
+        ...r,
+        date: `${date.slice(0, 8)}${String(Number(date.slice(8)) + 1).padStart(2, '0')}`,
+      };
+    });
+    const again = placed(sundays({ current: { rounds: stale, games: first.games } }));
+    expect(again.rounds.map((r) => r.id)).toEqual(stale.map((r) => r.id));
+    for (const round of again.rounds) {
+      const dates = again.games.filter((g) => g.roundId === round.id).map((g) => g.date);
+      expect(round.date).toBe([...dates].sort()[0]);
+    }
+  });
+
   it('gives the same schedule for the same inputs and another for another arrangement', () => {
     const input = sundays({ teams: teamsOf('abcdefg'), timesEachPair: 2, lastDate: '2027-01-31' });
     expect(placeSchedule(input)).toEqual(placeSchedule(input));
@@ -251,6 +268,8 @@ describe('placeSchedule, worked examples (P7 §4.1, §4.2)', () => {
     expect(error({ skipDates: ['soon'] })).toEqual({ code: 'invalid-date', value: 'soon' });
     expect(error({ playingDays: [] })).toEqual({ code: 'no-playing-days' });
     expect(error({ playingDays: [7] })).toEqual({ code: 'invalid-playing-day', value: 7 });
+    expect(error({ arrangement: -1 })).toEqual({ code: 'invalid-arrangement', value: -1 });
+    expect(error({ arrangement: 1.5 })).toEqual({ code: 'invalid-arrangement', value: 1.5 });
     expect(error({ times: [] })).toEqual({ code: 'no-times' });
     expect(error({ times: ['6pm'] })).toEqual({ code: 'invalid-time', value: '6pm' });
     expect(error({ courts: [] })).toEqual({ code: 'no-courts' });

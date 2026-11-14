@@ -58,6 +58,7 @@ export type PlacementError =
   | { code: 'season-too-long'; days: number }
   | { code: 'invalid-playing-day'; value: number }
   | { code: 'no-playing-days' }
+  | { code: 'invalid-arrangement'; value: number }
   | { code: 'invalid-time'; value: string }
   | { code: 'no-times' }
   | { code: 'no-courts' }

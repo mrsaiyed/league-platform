@@ -164,7 +164,15 @@ export function placeSchedule(input: PlacementInput): PlacementResult {
       );
       const kept = lockedRound ?? datedRound;
       if (kept) {
-        keptRounds.set(kept.id, kept);
+        // A round of the old schedule that holds no locked game takes the date of its new games.
+        const firstNew = alive
+          .filter((p) => p.week === week)
+          .map((p) => p.date)
+          .sort()[0];
+        keptRounds.set(
+          kept.id,
+          kept === lockedRound || firstNew === undefined ? kept : { ...kept, date: firstNew },
+        );
         roundOfWeek.set(week, kept.id);
         continue;
       }
@@ -729,6 +737,12 @@ function checkInput(input: PlacementInput): Checked {
     if (!Number.isInteger(day) || day < 0 || day > 6) {
       return fail({ code: 'invalid-playing-day', value: day });
     }
+  }
+  if (
+    input.arrangement !== undefined &&
+    (!Number.isInteger(input.arrangement) || input.arrangement < 0)
+  ) {
+    return fail({ code: 'invalid-arrangement', value: input.arrangement });
   }
   if (input.times.length === 0) return fail({ code: 'no-times' });
   for (const time of input.times) {
