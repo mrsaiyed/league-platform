@@ -173,7 +173,7 @@ export async function TeamPage({
                   <p>
                     <label>
                       {t('adminTeams.roster.leftOn')}
-                      <input name="leftOn" type="date" />
+                      <input name="leftOn" type="date" required />
                     </label>{' '}
                     <button type="submit">{t('adminTeams.roster.markLeft')}</button>
                   </p>
@@ -184,6 +184,7 @@ export async function TeamPage({
                   entryId={line.id}
                   place={place}
                   last={open.length - 1}
+                  order={open.map((l) => l.id).join(',')}
                 />
               </li>
             ))}
@@ -269,6 +270,7 @@ export async function TeamPage({
                 <LeagueField league={here.slug} />
                 <input type="hidden" name="team" value={team.id} />
                 <input type="hidden" name="personId" value={person.id} />
+                <ConfirmBox />
                 <button type="submit">{t('adminTeams.people.remove')}</button>
               </form>
             </li>
@@ -281,10 +283,22 @@ export async function TeamPage({
         <form action={removeTeamAction}>
           <LeagueField league={here.slug} />
           <input type="hidden" name="team" value={team.id} />
+          <ConfirmBox />
           <button type="submit">{t('adminTeams.remove.submit')}</button>
         </form>
       </Section>
     </main>
+  );
+}
+
+/** A plain tick the action requires before something goes to the bin (works with no script). */
+function ConfirmBox() {
+  return (
+    <p>
+      <label>
+        <input type="checkbox" name="confirm" required /> {t('adminTeams.confirm')}
+      </label>
+    </p>
   );
 }
 
@@ -329,12 +343,15 @@ function MoveForm({
   entryId,
   place,
   last,
+  order,
 }: {
   readonly league: string;
   readonly teamId: string;
   readonly entryId: string;
   readonly place: number;
   readonly last: number;
+  /** The open entries in the order the admin sees them, so a stale page is noticed. */
+  readonly order: string;
 }) {
   if (last === 0) return null;
   return (
@@ -342,6 +359,7 @@ function MoveForm({
       <LeagueField league={league} />
       <input type="hidden" name="team" value={teamId} />
       <input type="hidden" name="entry" value={entryId} />
+      <input type="hidden" name="order" value={order} />
       <p>
         {place === 0 ? null : (
           <button type="submit" name="moveUp">

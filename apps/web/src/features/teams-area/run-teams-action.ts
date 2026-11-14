@@ -19,12 +19,10 @@ export type TeamsAction = {
   /** The league's current season, or undefined when it has none. */
   readonly seasonId: string | undefined;
   readonly fields: Fields;
-  /** Today as yyyy-mm-dd, for a leaving date left empty. */
-  readonly today: string;
 };
 
 /** What to tell the person, and which team's page to go back to (the list when none). */
-export type TeamsActionResult = { readonly answer: Answer; readonly teamId?: string };
+export type TeamsActionResult = { readonly answer: Answer; readonly teamId?: string | undefined };
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -51,7 +49,6 @@ export async function runTeamsAction(
     ports,
     seasonId: season?.id,
     fields,
-    today: new Date().toISOString().slice(0, 10),
   });
   const teamId =
     result.teamId !== undefined && uuidShape.test(result.teamId) ? result.teamId : undefined;

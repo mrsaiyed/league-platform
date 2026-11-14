@@ -6,13 +6,11 @@
 import {
   addToRoster,
   changeRosterEntry,
-  createPerson,
   createTeam,
   listRoster,
   markLeft,
   removePerson,
   removeTeam,
-  reorderRoster,
   setTeamStatsVisibility,
   updateTeam,
   type Result,
@@ -23,11 +21,10 @@ import {
   changeEntryInput,
   changeTeamInput,
   markLeftInput,
-  movedOrder,
-  newPersonInput,
   newTeamInput,
   teamStatsInput,
 } from './form-input.ts';
+import { addNewPerson, moveEntry } from './roster-changes.ts';
 import { runTeamsAction, type TeamsActionResult } from './run-teams-action.ts';
 
 type Named = { readonly commandName: string };
@@ -82,6 +79,9 @@ export async function saveTeamStatsAction(form: FormData): Promise<never> {
 export async function removeTeamAction(form: FormData): Promise<never> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     const teamId = fields['team'] ?? '';
+    if (fields['confirm'] === undefined) {
+      return { answer: refused(removeTeam.commandName, 'not-confirmed'), teamId };
+    }
     const result = await removeTeam(context, { teamId }, ports.deps);
     // Gone, so back to the list; a refusal stays on the team's own page.
     return result.ok ? { answer: done('removed') } : settle(removeTeam, result, 'removed', teamId);
@@ -100,15 +100,10 @@ export async function addToRosterAction(form: FormData): Promise<never> {
   });
 }
 
-/** Adds someone not in the league list yet and puts them on the roster: two commands. */
 export async function addNewPersonAction(form: FormData): Promise<never> {
-  return runTeamsAction(form, async ({ context, ports, fields }) => {
-    const teamId = fields['team'] ?? '';
-    const made = await createPerson(context, newPersonInput(fields), ports.deps);
-    if (!made.ok) return settle(createPerson, made, 'added', teamId);
-    const input = addToRosterInput(fields, made.value.personId);
-    return settle(addToRoster, await addToRoster(context, input, ports.deps), 'added', teamId);
-  });
+  return runTeamsAction(form, ({ context, ports, fields }) =>
+    addNewPerson(context, ports.deps, fields),
+  );
 }
 
 export async function changeEntryAction(form: FormData): Promise<never> {
@@ -119,29 +114,24 @@ export async function changeEntryAction(form: FormData): Promise<never> {
 }
 
 export async function markLeftAction(form: FormData): Promise<never> {
-  return runTeamsAction(form, async ({ context, ports, fields, today }) => {
-    const result = await markLeft(context, markLeftInput(fields, today), ports.deps);
+  return runTeamsAction(form, async ({ context, ports, fields }) => {
+    const result = await markLeft(context, markLeftInput(fields), ports.deps);
     return settle(markLeft, result, 'left', fields['team']);
   });
 }
 
-/** Moves one player a place up or down: the roster's new order is worked out from the stored one. */
 export async function moveEntryAction(form: FormData): Promise<never> {
-  return runTeamsAction(form, async ({ context, ports, fields }) => {
-    const teamId = fields['team'] ?? '';
-    const direction = fields['moveUp'] !== undefined ? 'up' : 'down';
-    const roster = await listRoster(context, { teamId }, ports.deps);
-    if (!roster.ok) return settle(listRoster, roster, 'moved', teamId);
-    const open = roster.value.filter((line) => line.leftOn === null).map((line) => line.id);
-    const order = movedOrder(open, fields['entry'] ?? '', direction);
-    const result = await reorderRoster(context, { teamId, rosterEntryIds: order }, ports.deps);
-    return settle(reorderRoster, result, 'moved', teamId);
-  });
+  return runTeamsAction(form, ({ context, ports, fields }) =>
+    moveEntry(context, ports.deps, fields),
+  );
 }
 
 /** Takes a person off the league list: refused while they are on a roster (R-17). */
 export async function removePersonAction(form: FormData): Promise<never> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
+    if (fields['confirm'] === undefined) {
+      return { answer: refused(removePerson.commandName, 'not-confirmed'), teamId: fields['team'] };
+    }
     const result = await removePerson(context, { personId: fields['personId'] ?? '' }, ports.deps);
     return settle(removePerson, result, 'personRemoved', fields['team']);
   });

@@ -84,11 +84,16 @@ export function changeEntryInput(fields: Fields) {
   };
 }
 
-export function markLeftInput(fields: Fields, today: string) {
+/**
+ * The leaving date is always typed by the admin (the field is required): the server
+ * does not guess "today", because its clock is UTC and the league has no time zone
+ * here yet, so a guess could be a day off.
+ */
+export function markLeftInput(fields: Fields) {
   return {
     rosterEntryId: text(fields, 'entry'),
     version: versionOf(fields),
-    leftOn: given(fields, 'leftOn') ?? today,
+    leftOn: text(fields, 'leftOn'),
   };
 }
 

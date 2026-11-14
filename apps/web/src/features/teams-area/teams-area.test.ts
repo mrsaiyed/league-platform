@@ -45,7 +45,7 @@ describe('form input', () => {
     });
   });
 
-  it('takes a number away when it is emptied, and leaves today for an empty date', () => {
+  it('takes a number away when it is emptied, and never guesses a leaving date', () => {
     expect(
       changeEntryInput({ entry: 'e', version: '2', jerseyNumber: ' ', role: 'coach' }),
     ).toEqual({
@@ -54,9 +54,7 @@ describe('form input', () => {
       jerseyNumber: null,
       role: 'coach',
     });
-    expect(markLeftInput({ entry: 'e', version: '2', leftOn: '' }, '2026-11-13').leftOn).toBe(
-      '2026-11-13',
-    );
+    expect(markLeftInput({ entry: 'e', version: '2', leftOn: '' }).leftOn).toBe('');
   });
 
   it('moves one place and stops at the ends', () => {

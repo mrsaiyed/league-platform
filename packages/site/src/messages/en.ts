@@ -244,6 +244,7 @@ export const en = {
   'adminTeams.people.body':
     'Taking someone off the list is refused while they are on a roster: mark them as having left first.',
   'adminTeams.people.remove': 'Remove from the league list',
+  'adminTeams.confirm': 'Yes, I am sure',
   'adminTeams.done.created': 'The team was added.',
   'adminTeams.done.updated': 'The team was saved.',
   'adminTeams.done.statsSaved': 'Who sees the numbers was saved.',
@@ -258,6 +259,15 @@ export const en = {
   'error.not-allowed': 'You are not allowed to do that.',
   'error.changed-since-read':
     'Someone else changed this while you were looking. The page now shows the latest; try again.',
+  'error.not-confirmed': 'Tick the box to confirm first. Nothing was changed.',
+  'error.teams.add_new_person.jersey-taken':
+    'Another player on this team already wears that number, so the new person was not kept in the league list.',
+  'error.teams.add_new_person.invalid-input':
+    'The role or number is not valid, so nobody was added.',
+  'error.teams.add_new_person.team-not-found': 'That team is not there, so nobody was added.',
+  'error.teams.add_new_person.already-on-team':
+    'That person is already on this team, so the new person was not kept in the league list.',
+  'error.teams.add_new_person.not-allowed': 'You are not allowed to do that.',
   'error.unknown': 'That could not be done.',
   'error.teams.create_team.season-not-found': 'That season is not there.',
   'error.teams.create_team.division-not-found': 'That division is not there.',

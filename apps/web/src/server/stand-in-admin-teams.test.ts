@@ -4,6 +4,7 @@ import {
   addToRoster,
   createPerson,
   createTeam,
+  listPeople,
   listRoster,
   markLeft,
   removePerson,
@@ -21,6 +22,7 @@ import {
   newPersonInput,
   newTeamInput,
 } from '../features/teams-area/form-input.ts';
+import { addNewPerson, moveEntry } from '../features/teams-area/roster-changes.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -33,8 +35,12 @@ const access: AccessReader = {
   activeGrantsOf: async () => [],
 };
 
-function made() {
-  const ports = standInAdminTeams({ accessOf: () => access, log: () => undefined });
+function made(uniqueJerseys = false) {
+  const ports = standInAdminTeams({
+    accessOf: () => access,
+    log: () => undefined,
+    uniqueJerseys,
+  });
   const as = (accountId: string | null): CommandContext => ({
     leagueId,
     accountId,
@@ -106,7 +112,11 @@ describe('the admin Teams screens over the stand-in', () => {
     const entry = before.ok ? before.value.find((line) => line.id === entries[3]) : undefined;
     const gone = await markLeft(
       m.owner,
-      markLeftInput({ entry: entries[3] ?? '', version: String(entry?.version) }, '2026-11-13'),
+      markLeftInput({
+        entry: entries[3] ?? '',
+        version: String(entry?.version),
+        leftOn: '2026-11-13',
+      }),
       m.ports.deps,
     );
     expect(gone.ok).toBe(true);
@@ -128,7 +138,11 @@ describe('the admin Teams screens over the stand-in', () => {
     const entry = roster.ok ? roster.value.find((line) => line.id === entries[0]) : undefined;
     await markLeft(
       m.owner,
-      markLeftInput({ entry: entries[0] ?? '', version: String(entry?.version) }, '2026-11-13'),
+      markLeftInput({
+        entry: entries[0] ?? '',
+        version: String(entry?.version),
+        leftOn: '2026-11-13',
+      }),
       m.ports.deps,
     );
     const removed = await removePerson(m.owner, { personId: people[0] }, m.ports.deps);
@@ -204,4 +218,78 @@ describe('the admin Teams screens over the stand-in', () => {
     expect(season).toBeDefined();
     expect(await m.ports.teams(otherLeague, season?.id ?? '')).toEqual([]);
   });
+
+  it('adds a new person to the roster, and leaves no orphan when the number is worn', async () => {
+    const m = made(true);
+    const { teamId } = await teamOfTen(m);
+    const before = await listPeopleCount(m);
+    const worn = await addNewPerson(m.owner, m.ports.deps, {
+      team: teamId,
+      firstName: 'Orphan',
+      lastName: 'Test',
+      jerseyNumber: '3',
+      role: 'player',
+    });
+    expect(worn.answer).toEqual({
+      kind: 'refused',
+      command: 'teams.add_new_person',
+      code: 'jersey-taken',
+    });
+    expect(await listPeopleCount(m)).toBe(before);
+
+    const fine = await addNewPerson(m.owner, m.ports.deps, {
+      team: teamId,
+      firstName: 'Kept',
+      lastName: 'Test',
+      jerseyNumber: '33',
+      role: 'player',
+    });
+    expect(fine.answer).toEqual({ kind: 'done', done: 'added' });
+    expect(await listPeopleCount(m)).toBe(before + 1);
+  });
+
+  it('checks the role and number before it makes anyone', async () => {
+    const m = made();
+    const { teamId } = await teamOfTen(m);
+    const before = await listPeopleCount(m);
+    for (const bad of [{ jerseyNumber: '123' }, { role: 'wizard' }]) {
+      const answer = await addNewPerson(m.owner, m.ports.deps, {
+        team: teamId,
+        firstName: 'Nobody',
+        lastName: 'Test',
+        ...bad,
+      });
+      expect(answer.answer).toMatchObject({ kind: 'refused', code: 'invalid-input' });
+    }
+    expect(await listPeopleCount(m)).toBe(before);
+  });
+
+  it('refuses to move someone who is not on the open roster, or from a stale page', async () => {
+    const m = made();
+    const { teamId, entries } = await teamOfTen(m);
+    const open = entries.join(',');
+    const stranger = await moveEntry(m.owner, m.ports.deps, {
+      team: teamId,
+      entry: 'not-an-entry',
+      order: open,
+    });
+    expect(stranger.answer).toMatchObject({ kind: 'refused', code: 'roster-entry-not-found' });
+    const stale = await moveEntry(m.owner, m.ports.deps, {
+      team: teamId,
+      entry: entries[0] ?? '',
+      order: entries.slice(1).join(','),
+    });
+    expect(stale.answer).toMatchObject({ kind: 'refused', code: 'roster-incomplete' });
+    const moved = await moveEntry(m.owner, m.ports.deps, {
+      team: teamId,
+      entry: entries[0] ?? '',
+      order: open,
+    });
+    expect(moved.answer).toEqual({ kind: 'done', done: 'moved' });
+  });
 });
+
+async function listPeopleCount(m: ReturnType<typeof made>): Promise<number> {
+  const people = await listPeople(m.owner, { limit: 200 }, m.ports.deps);
+  return people.ok ? people.value.length : -1;
+}

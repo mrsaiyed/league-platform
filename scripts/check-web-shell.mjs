@@ -392,6 +392,43 @@ async function checkTeams(origin) {
   if (!(await pageOf('owner', page)).includes('Casey Walker, left on 2026-11-13')) {
     problems.push('the roster does not show the player who left');
   }
+  // Forged posts change nothing: a league field that is not the page's league is "not
+  // found", and another league's team id is not a team of this league (T-23).
+  const forgedLeague = await post('owner', list, 0, { league: 'north-valley', name: 'Forged' });
+  if (
+    forgedLeague !== undefined &&
+    forgedLeague.status === 303 &&
+    !to(forgedLeague).includes('problem=')
+  ) {
+    problems.push(
+      `a post naming another league was taken (${forgedLeague.status} to ${to(forgedLeague)})`,
+    );
+  }
+  const lions = /\/north-valley\/admin\/teams\/([0-9a-f-]{36})/.exec(
+    await pageOf('owner', '/north-valley/admin/teams'),
+  )?.[1];
+  if (lions === undefined) {
+    problems.push('the north valley list does not link its teams');
+  } else {
+    const hijack = await post('owner', page, 0, {
+      league: 'harbor-city',
+      team: lions,
+      version: '1',
+      name: 'Hijacked',
+    });
+    if (hijack !== undefined && !to(hijack).includes('problem=teams.update_team.team-not-found')) {
+      problems.push(`another league's team id was not refused (${hijack.status} to ${to(hijack)})`);
+    }
+  }
+  for (const where of ['/north-valley/admin/teams', list]) {
+    const html = await pageOf('owner', where);
+    if (html.includes('Forged') || html.includes('Hijacked')) {
+      problems.push(`a forged post changed ${where}`);
+    }
+  }
+  if (!(await pageOf('owner', '/north-valley/admin/teams')).includes('Lions')) {
+    problems.push('the north valley teams lost Lions');
+  }
   // Someone who may not manage teams changes nothing, and the team page is refused.
   const refused = await post(
     'scheduler',

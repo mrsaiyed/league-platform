@@ -44,6 +44,8 @@ export type StandInAdminTeamsOptions = {
   readonly log: CommandDeps<AdminTeamsTx>['log'];
   /** A league that starts with a few made-up teams and people, so the screens are not empty. */
   readonly seededLeagueId?: string;
+  /** The season asks for a different number for each player (default: it does not). */
+  readonly uniqueJerseys?: boolean;
 };
 
 const uuid = () => randomUUID();
@@ -118,6 +120,7 @@ export function standInAdminTeams(options: StandInAdminTeamsOptions): AdminTeams
     let found = states.get(leagueId);
     if (found === undefined) {
       found = leagueId === options.seededLeagueId ? seededState() : emptyState();
+      found.uniqueJerseys = options.uniqueJerseys ?? false;
       states.set(leagueId, found);
     }
     return found;
