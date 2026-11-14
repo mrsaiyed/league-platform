@@ -2,6 +2,7 @@
 // one transaction for one league, so none of these take a league id (T-28).
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
+import type { StoredSetting } from '../leagues/index.ts';
 
 /** A team of a season, in or out of the bin (T3 §7). */
 export type TeamRecord = {
@@ -86,6 +87,8 @@ export type RosterEntryChange = {
 export type RosterTaken = 'already-on-team' | 'jersey-taken';
 
 export type TeamsStore = {
+  /** The league's own stored rows for one setting key (no program or season), as setting_values keeps them. */
+  readonly leagueSettingRows: (key: string) => Promise<readonly StoredSetting[]>;
   /** The team with this id, in the bin or not, or undefined if it is not in this league. */
   readonly find: (teamId: string) => Promise<TeamRecord | undefined>;
   /**

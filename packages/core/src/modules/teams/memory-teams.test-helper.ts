@@ -7,6 +7,7 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
+import type { StoredSetting } from '../leagues/index.ts';
 import type { RosterEntryRecord, TeamRecord, TeamsTx } from './ports.ts';
 
 export type MemoryTeams = {
@@ -21,6 +22,8 @@ export type MemoryTeams = {
   /** The season asks for unique jersey numbers in a team (0008). */
   uniqueJerseys: boolean;
   grants: Grant[];
+  /** The league's stored setting rows by key, as setting_values keeps them. */
+  settings: Record<string, StoredSetting[]>;
   activity: ActivityEntry[];
 };
 
@@ -113,6 +116,7 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
     roster: [],
     uniqueJerseys: false,
     grants: [],
+    settings: {},
     activity: [],
     ...state,
   });
@@ -140,6 +144,7 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
         list: async () => [],
       },
       teams: {
+        leagueSettingRows: async (key) => s.settings[key] ?? [],
         find: async (id) => s.teams.find((t) => t.id === id),
         create: async (t) => {
           const taken = clash({ seasonId: t.seasonId, slug: t.slug, name: t.name });

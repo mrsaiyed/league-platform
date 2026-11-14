@@ -1,5 +1,6 @@
 // The limits on a team's fields, the same as the teams table (0008).
 import { z } from 'zod';
+import { statsLevelChoices } from '../leagues/index.ts';
 
 export const teamName = z.string().trim().min(1).max(120);
 
@@ -21,10 +22,10 @@ export const teamColor = z
   .transform((color) => color.toLowerCase());
 
 /**
- * Who sees a team's players' numbers (S-22) that an admin can set today: everyone, or
- * the team's staff and the league's admins. The two levels between (the league's signed-in
- * members, the team's own players and parents) arrive with accounts in stage 4.
+ * Who sees a team's players' numbers (S-22) that can be set today: the same choices as
+ * the league's starting level (everyone, or the team's staff and the league's admins).
+ * The two levels between arrive with accounts in stage 4.
  */
-export const statsVisibilityChoices = ['everyone', 'staff'] as const;
+export const statsVisibilityChoices = statsLevelChoices;
 export const teamStatsVisibility = z.enum(statsVisibilityChoices);
 export type TeamStatsVisibility = z.infer<typeof teamStatsVisibility>;

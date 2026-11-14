@@ -19,6 +19,11 @@ const es = {
 };
 
 describe('messages (T-187)', () => {
+  it('holds no U+FFFD replacement character (a damaged apostrophe)', () => {
+    const damaged = Object.entries(en).filter(([, text]) => String(text).includes('�'));
+    expect(damaged).toEqual([]);
+  });
+
   it('looks up English text and fills in values', () => {
     const t = createTranslator('en');
     expect(t('site.poweredBy')).toBe('Powered by SR Leagues');

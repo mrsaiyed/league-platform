@@ -161,4 +161,16 @@ describe('the settings stage 2 declares', () => {
     expect(setting?.type.safeParse('assignedOnly').success).toBe(true);
     expect(setting?.type.safeParse('nobody').success).toBe(false);
   });
+
+  it('start a new team at everyone and let teams choose (S-22, S-23, S-24)', () => {
+    const level = declaredSettings.get('teams.startingStatsLevel');
+    expect(level?.default).toBe('everyone');
+    expect(level?.levels).toEqual(['league']);
+    expect(level?.type.safeParse('staff').success).toBe(true);
+    expect(level?.type.safeParse('nobody').success).toBe(false);
+    const may = declaredSettings.get('teams.mayChooseStatsLevel');
+    expect(may?.default).toBe(true);
+    expect(may?.type.safeParse(false).success).toBe(true);
+    expect(may?.type.safeParse('no').success).toBe(false);
+  });
 });
