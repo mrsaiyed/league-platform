@@ -19,6 +19,8 @@ export { postponeGame, type PostponeGameError } from './commands/postpone-game.t
 export { recordFinalScore, type RecordFinalScoreError } from './commands/record-final-score.ts';
 export { recordForfeit, type RecordForfeitError } from './commands/record-forfeit.ts';
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
+export { recordFinalScoreWithin } from './record-score-within.ts';
+export type { DecideGameError } from './decide-game.ts';
 export { recordingOf } from './game-fields.ts';
 export {
   readGamePage,

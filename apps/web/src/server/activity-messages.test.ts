@@ -19,6 +19,7 @@ const reads = new Set([
   'leagues.preview_season_rules',
   'scheduling.list_venues',
   'scheduling.get_schedule_draft',
+  'imports.get_fixture_import',
   'scheduling.preview_schedule_publish',
   'teams.list_roster',
 ]);

@@ -46,6 +46,14 @@ import {
   unassignScorekeeper,
 } from './modules/games/index.ts';
 import { createPerson, listPeople, removePerson, updatePerson } from './modules/people/index.ts';
+import {
+  applyFixtureImport,
+  discardFixtureImport,
+  getFixtureImport,
+  recordImportedScores,
+  startFixtureImport,
+  undoFixtureImport,
+} from './modules/imports/index.ts';
 import { addAdjustment, rebuildStandings, removeAdjustment } from './modules/standings/index.ts';
 import {
   addDraftGame,
@@ -131,6 +139,12 @@ export const commands = commandRegistry([
   rebuildStandings,
   addAdjustment,
   removeAdjustment,
+  startFixtureImport,
+  applyFixtureImport,
+  undoFixtureImport,
+  discardFixtureImport,
+  recordImportedScores,
+  getFixtureImport,
   createPerson,
   updatePerson,
   removePerson,
