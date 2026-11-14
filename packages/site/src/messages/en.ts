@@ -294,6 +294,50 @@ export const en = {
   'error.scheduling.get_schedule_draft.season-not-found': 'That season is not there.',
   'error.scheduling.get_schedule_draft.draft-unreadable':
     'The saved schedule draft cannot be read. Discard it and start again.',
+  // Why a fixtures import was refused (T-187).
+  'error.imports.apply_fixture_import.season-not-found': 'That season is not there.',
+  'error.imports.apply_fixture_import.revision-out-of-date':
+    'The schedule was published since the import was previewed. Discard the draft or start the import again from the published schedule.',
+  'error.imports.apply_fixture_import.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.imports.apply_fixture_import.draft-too-large':
+    'These games do not fit in the schedule draft. Publish or discard the draft first, or split the file into smaller files.',
+  'error.imports.apply_fixture_import.draft-changed':
+    'The schedule draft changed while the games were being added. Try again.',
+  'error.imports.apply_fixture_import.teams-changed':
+    'A team named in the file has since been removed from this season. Upload the file again.',
+  'error.imports.apply_fixture_import.venues-changed':
+    'A venue or court named in the file has since been removed. Upload the file again.',
+  'error.imports.apply_fixture_import.change-refused':
+    'One of the games in the file cannot be added to the schedule as it stands.',
+  'error.imports.apply_fixture_import.import-not-found': 'That import is not there.',
+  'error.imports.apply_fixture_import.changed-since-read':
+    'Someone else changed this import since you opened it. Reload it to see where it stands.',
+  'error.imports.apply_fixture_import.not-ready':
+    'This import is not ready to apply. It is either still being read, was refused, or has already been applied.',
+  'error.imports.apply_fixture_import.report-unreadable':
+    'The saved report of this import cannot be read. Upload the file again.',
+  'error.imports.start_fixture_import.season-not-found': 'That season is not there.',
+  'error.imports.start_fixture_import.file-too-large':
+    'The file is too large to import in one go. Split it into smaller files.',
+  'error.imports.start_fixture_import.no-account': 'You need to be signed in to import a file.',
+  'error.imports.undo_fixture_import.import-not-found': 'That import is not there.',
+  'error.imports.undo_fixture_import.changed-since-read':
+    'Someone else changed this import since you opened it. Reload it to see where it stands.',
+  'error.imports.undo_fixture_import.not-applied':
+    'This import has not been applied, or has already been undone.',
+  'error.imports.undo_fixture_import.record-unreadable':
+    'The record of what this import added cannot be read, so it cannot be undone automatically.',
+  'error.imports.undo_fixture_import.draft-changed':
+    'The schedule draft was edited, published or discarded after this import, so it cannot be undone automatically. Remove its games by hand.',
+  'error.imports.record_imported_scores.import-not-found': 'That import is not there.',
+  'error.imports.record_imported_scores.not-applied':
+    'Scores can be recorded only for an import that has been applied.',
+  'error.imports.record_imported_scores.record-unreadable':
+    'The record of what this import added cannot be read.',
+  'error.imports.record_imported_scores.changed-since-read':
+    'Someone else changed this import since you opened it. Reload it to see where it stands.',
+  'error.imports.get_fixture_import.import-not-found': 'That import is not there.',
   // Why publishing the schedule, or previewing it, was refused (P7 §4.4, T-187).
   'error.scheduling.publish_schedule.season-not-found': 'That season is not there.',
   'error.scheduling.publish_schedule.draft-not-found': 'There is no schedule draft to publish.',
@@ -328,6 +372,9 @@ export const en = {
     'There is no schedule draft to publish.',
   'error.scheduling.preview_schedule_publish.draft-unreadable':
     'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.imports.discard_fixture_import.import-not-found': 'That import is not there.',
+  'error.imports.discard_fixture_import.not-reading':
+    'This import is not waiting to be read, so there is nothing to discard.',
   // Activity log lines (A-6, T-226): the key is `activity.` and the command's name;
   // the values come from the entry's details. {role} is a role's name from above.
   'activity.access.invite': 'Invited someone as {role}',
@@ -376,6 +423,12 @@ export const en = {
   'activity.scheduling.change_draft_round_date': "Changed a round's date in the schedule draft",
   'activity.scheduling.set_draft_recording': 'Changed how a game is recorded in the schedule draft',
   'activity.scheduling.discard_schedule_draft': 'Discarded the schedule draft',
+  'activity.imports.start_fixture_import': 'Uploaded a fixtures file to import',
+  'activity.imports.apply_fixture_import':
+    'Added the games of a fixtures file to the schedule draft',
+  'activity.imports.discard_fixture_import': 'Gave up on a fixtures file that was not read',
+  'activity.imports.undo_fixture_import': 'Undid a fixtures import',
+  'activity.imports.record_imported_scores': 'Recorded final scores from a fixtures import',
   'activity.scheduling.publish_schedule': 'Published the schedule',
   'activity.scheduling.create_venue': 'Added a venue',
   'activity.scheduling.update_venue': 'Changed a venue',

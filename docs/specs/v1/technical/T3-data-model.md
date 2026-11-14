@@ -180,7 +180,7 @@ The public site is always drawn from the latest `site_releases` row, never from 
 | `jobs`               | A job a change left (T-224)     | `league_id`, `type`, `ids` (JSON, ids only, T-131), `dedupe_key`, `state`, `run_after`       |
 | pg-boss's tables     | Jobs handed over to run         | In their own `pgboss` schema, which the app's role cannot use (record 012)                   |
 
-An import's `kind` is fixtures, people or teams and its `status` is reading, ready, applied, undone or failed; it records who started it, the file's name (never the file, T-80), and when it was applied and undone. Detail: record 030.
+An import's `kind` is fixtures, people or teams and its `status` is reading, ready, applied, undone or failed; it records who started it, the file's name (never the file, T-80), and when it was applied and undone. The file's text is held in the import's `report` only until the worker has read it, and the report replaces it; if the read never succeeds (the job fails for good, or is lost) the text is replaced all the same, by a failed report, when the job's last attempt fails or when an admin discards the import (T-246). Detail: records 030 and 034.
 
 `dedupe_key` is what guarantees "nothing is ever sent twice" (N-8): a recap for game G to account A has one possible key, and the database refuses a second.
 

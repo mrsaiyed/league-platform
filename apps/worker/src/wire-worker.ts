@@ -13,16 +13,24 @@
 // What it does not do yet: read the environment (the worker's config file,
 // apps/worker/src/config.ts, does not exist yet), check the login role
 // (checkLoginRole), or start the queue.
-import { errorCodeOf, type EmailSender, type JobHandlers, type WorkQueue } from '@srleagues/core';
+import {
+  errorCodeOf,
+  type EmailSender,
+  type ImportsTx,
+  type JobHandlers,
+  type WorkQueue,
+} from '@srleagues/core';
 import {
   accessStore,
   activityLogStore,
   commandTransaction,
   createDatabase,
   createPgBoss,
+  importsStore,
   jobsStore,
   leaguesStore,
   pgBossQueue,
+  schedulingStore,
   tableQueue,
   type DatabaseHandle,
   type DatabaseSource,
@@ -89,7 +97,15 @@ export function wireWorker(settings: WorkerSettings): WiredWorker {
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));
+  const importsTransaction = commandTransaction<ImportsTx>(db, (scope) => ({
+    jobs: jobsStore(scope),
+    imports: importsStore(scope),
+    scheduling: schedulingStore(scope),
+    access: accessStore(scope),
+    activity: activityLogStore(scope),
+  }));
   const handlers = jobHandlers({
+    importsTransaction,
     transaction,
     email: email.sender,
     siteOrigin: settings.siteOrigin,

@@ -95,7 +95,7 @@ describe('openTwoLeagues', () => {
         ])),
         ...(await texts('select file_name as t from imports where league_id = $1', [leagueId])),
       ];
-      expect(found.length).toBe(22);
+      expect(found.length).toBe(24);
       for (const text of found) expect(text.toLowerCase()).toContain(marker);
     }
     const shared = await texts(
@@ -170,7 +170,9 @@ describe('openTwoLeagues', () => {
       expect(own?.get('standings_rows')).toEqual([league.standingsRowId]);
       expect(own?.get('standings_adjustments')).toEqual([league.standingsAdjustmentId]);
       expect(own?.get('season_player_totals')).toEqual([league.seasonPlayerTotalsId]);
-      expect(own?.get('imports')).toEqual([league.importId]);
+      expect(own?.get('imports')?.sort()).toEqual(
+        [league.importId, league.readyImportId, league.readingImportId].sort(),
+      );
     }
   });
 });

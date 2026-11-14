@@ -30,6 +30,7 @@ import {
   type DomainEvent,
   type EventHandler,
   type GamesTx,
+  type ImportScoresTx,
   type Job,
   type JobQueue,
   type LeaguesTx,
@@ -47,6 +48,7 @@ import {
   activityLogStore,
   divisionsStore,
   gamesStore,
+  importsStore,
   jobsStore,
   leaguesStore,
   peopleStore,
@@ -58,7 +60,8 @@ import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
 /** Every module's store, as the apps' transaction offers them. Grows with each module. */
-export type HarnessTx = LeaguesTx &
+export type HarnessTx = ImportScoresTx &
+  LeaguesTx &
   SchedulingTx &
   GamesTx &
   PeopleTx &
@@ -77,6 +80,7 @@ export function harnessTx(scope: LeagueScope, jobs: JobQueue): HarnessTx {
     divisions: divisionsStore(scope),
     scheduling: schedulingStore(scope),
     games: gamesStore(scope),
+    imports: importsStore(scope),
     people: peopleStore(scope),
     teams: teamsStore(scope),
     standings: standingsStore(scope),
