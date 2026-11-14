@@ -44,6 +44,27 @@ describe('generateSchemaTypes', () => {
     expect(text).not.toContain('sample_view');
   });
 
+  it('types the sign-in store’s schema as a database of its own, named with its schema', async () => {
+    const text = await typesFor(`
+      create table public.plain_rows (id uuid primary key);
+      create schema sign_in;
+      create table sign_in.sessions (session_id text primary key, ended boolean not null);
+    `);
+    expect(text).toContain(`export interface SignInSessionsTable {
+  session_id: string;
+  ended: boolean;
+}`);
+    expect(text).toContain(`export interface SignInDatabase {
+  'sign_in.sessions': SignInSessionsTable;
+}`);
+    expect(text).toContain('  plain_rows: PlainRowsTable;');
+    // Without the schema there is no SignInDatabase at all.
+    await db?.close();
+    expect(await typesFor('create table public.only_rows (id uuid primary key);')).not.toContain(
+      'SignInDatabase',
+    );
+  });
+
   it('refuses an array whose elements the drivers would not parse as promised', async () => {
     await expect(typesFor('create table public.days (d date[]);')).rejects.toThrow(
       'days.d: arrays of date are not supported',
