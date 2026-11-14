@@ -25,7 +25,6 @@ Next free: migration 0012, record 038, T-250 (034/T-246 to 2.22, 035/T-247 to 2.
 - **2.52 The schedule grid** — `.local/lanes/2.52-schedule-grid` — none reserved — builder started; check the lane, merge build, push, review, GitHub, land.
 - **2.29 Applying tracker commands** — `.local/lanes/2.29-apply-tracker` — none used — built (opus), reviewed by opus: one medium (takeover/release must take the game lock first), four low; a fixer was fixing them. GitHub FAILED on 8956400 (no names; check test:web and tests after merging build). Then: push, GitHub PASS, land. Record when landing: decided by the lead: the tracker's `rules` command is refused; a game in final-score/box-score mode may still be tracked live, mode unchanged; end and reopen refused until 2.30; 2.32 maps error codes to HTTP; 2.68 carries new rules and clock-mode through batchReaders; engine ignores fouls.teamFoulsReset (gap for 2.68).
 - **2.87 A draft league for all its staff** — `.local/lanes/2.87-draft-staff` — none used — built, opus-reviewed (no security faults), GitHub PASSED 111fe58; a fixer was making review fixes (stale comments, a sturdier shell check, club admin in DECISIONS.md U-9, notes in record 020). Check the lane for new commits, merge build, push, GitHub PASS, land. Decided by the lead: club admins count as staff; the tiny timing difference for a signed-in non-staff asker is accepted.
-- **2.54 (step 2.54, see STAGE-2.md)** — `.local/lanes/2.54-*` (builder creating it) — none reserved — builder started 2026-11-14; check the lane, push, review, GitHub, land.
 - **2.64 (step 2.64, see STAGE-2.md)** — `.local/lanes/2.64-*` (builder creating it) — none reserved — builder started 2026-11-14; check the lane, push, review, GitHub, land.
 
 ## Needs the founder
@@ -45,6 +44,8 @@ Nothing here stops the build. Since 2026-11-13 the lead answers open product que
 - [x] The test copy's sign-in settings: checked on 2026-11-13 after the founder changed them. Codes have 6 digits and last 10 minutes; a password needs at least 8 characters.
 
 ## Log
+
+- 2026-11-14 — Step 2.54 done (fixture import screen at Admin → Schedule → import; stand-in only; passed GitHub on 3bfbb99 and review; review fixes: 2 MB body limit so the friendly too-large notice shows, season check on apply/undo/discard, size text from the limit). Not done: no link from Admin → Schedule to the import screen (2.52 owns that page: whoever lands second adds it; record as part of 2.52 when it lands), no list of past imports, no database adapter. Decided (technical, T-226): the stand-in reads the file inside the web app so the screen works with no worker; core row-problem text is still English (T-187 gap).
 
 - 2026-11-14 — Step 2.51 done (built on the stand-in; passed GitHub on d4768a6 and an independent review, all findings fixed except two now in step 2.90). Review fixes: failed add undoes the new person and says so if it cannot; short-name message for non-Latin names; move needs one direction; failed reads show an alert. Gaps: no browser test, no database adapter for the Teams ports, no paging past 200 people. New step 2.90.
 
