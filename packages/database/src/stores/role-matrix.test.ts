@@ -91,6 +91,10 @@ import {
   listAccess,
   listActivity,
   myAccess,
+  openScoringSession,
+  releaseScoringSession,
+  renewScoringSession,
+  takeOverScoring,
   renameShortName,
   resendInvitation,
   revokeGrant,
@@ -98,6 +102,7 @@ import {
   getSeason,
   updateSeason,
   setSeasonRules,
+  previewSeasonRules,
   setSeasonRosterSettings,
   setLeagueName,
   setLeagueStatus,
@@ -111,10 +116,13 @@ import {
   type Permission,
   type PeopleTx,
   type SchedulingTx,
+  type ScoringTx,
   type SettingRegistry,
   type StandingsTx,
   type TeamsTx,
+  addAdjustment,
   rebuildStandings,
+  removeAdjustment,
 } from '@srleagues/core';
 import { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -148,6 +156,7 @@ import { leaguesStore } from './leagues-store.ts';
 import { peopleStore } from './people-store.ts';
 import { importsStore } from './imports-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
+import { scoringSessionsStore } from './scoring-sessions-store.ts';
 import { standingsStore } from './standings-store.ts';
 import { teamsStore } from './teams-store.ts';
 
@@ -184,13 +193,17 @@ type Row = {
   readonly run: (context: CommandContext, input: unknown) => Promise<Outcome>;
 };
 
+/** The scoring session commands' clock (T-116): fixed, so leases never depend on the time of day. */
+const matrixNow = Date.UTC(2026, 11, 6, 18, 0, 30);
+
 let pglite: PGlite;
 let db: DatabaseHandle;
 let staffId: string;
 let accessDeps: CommandDeps<AccessTx>;
-let leaguesDeps: CommandDeps<LeaguesTx>;
+let leaguesDeps: CommandDeps<LeaguesTx & StandingsTx>;
 let schedulingDeps: CommandDeps<SchedulingTx>;
 let gamesDeps: CommandDeps<GamesTx>;
+let scoringDeps: CommandDeps<ScoringTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
 let teamsDeps: CommandDeps<TeamsTx>;
 let standingsDeps: CommandDeps<StandingsTx>;
@@ -206,6 +219,8 @@ beforeAll(async () => {
     scheduling: schedulingStore(scope),
     imports: importsStore(scope),
     games: gamesStore(scope),
+    scoringSessions: scoringSessionsStore(scope),
+    clock: { now: () => matrixNow },
     people: peopleStore(scope),
     teams: teamsStore(scope),
     standings: standingsStore(scope),
@@ -218,6 +233,7 @@ beforeAll(async () => {
   leaguesDeps = { transaction, events: [], ...rest };
   schedulingDeps = { transaction, events: [], ...rest };
   gamesDeps = { transaction, events: [], ...rest };
+  scoringDeps = { transaction, events: [], ...rest };
   peopleDeps = { transaction, events: [], ...rest };
   teamsDeps = { transaction, events: [], ...rest };
   importsDeps = { transaction, events: [], ...rest };
@@ -862,6 +878,61 @@ const gameCommandRows: readonly Row[] = [
     prepare: async () => ({ input: {} }),
     run: (c, i) => listPostponedGames(c, i, gamesDeps),
   },
+  // Holding a game to score (T6 §5, T-116): whoever may score it.
+  ...gameRows(
+    'games.open_scoring_session',
+    'open a game to score',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      deviceId: 'matrix-tablet',
+    }),
+    (c, i) => openScoringSession(c, i, scoringDeps),
+  ),
+  // A session no longer held is answered "ended": allowed, and nothing changes.
+  ...gameRows(
+    'games.renew_scoring_session',
+    'renew a scoring session',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      sessionId: randomUUID(),
+    }),
+    (c, i) => renewScoringSession(c, i, scoringDeps),
+  ),
+  ...gameRows(
+    'games.release_scoring_session',
+    'leave a game being scored',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      sessionId: randomUUID(),
+    }),
+    (c, i) => releaseScoringSession(c, i, scoringDeps),
+  ),
+  ...gameRows(
+    'games.take_over_scoring',
+    'take over scoring a game from another device',
+    'games.score',
+    async (league, program) => {
+      const { gameId } = await gameIn(league, program);
+      // Begun half a minute before the matrix's fixed clock, so its lease still holds.
+      const since = matrixNow - 30_000;
+      await pglite.query(
+        `insert into scoring_sessions (league_id, game_id, account_id, device_id, created_at, held_until)
+         values ($1, $2, $3, 'matrix-phone', $4, $5)`,
+        [
+          league.leagueId,
+          gameId,
+          await grant(league.leagueId, 'scorekeeper'),
+          new Date(since).toISOString(),
+          new Date(since + 120_000).toISOString(),
+        ],
+      );
+      return { gameId, deviceId: 'matrix-tablet', confirmed: true, expectedHolderSince: since };
+    },
+    (c, i) => takeOverScoring(c, i, scoringDeps),
+  ),
 ];
 
 const divisionAndVenueRows: readonly Row[] = [
@@ -1137,6 +1208,37 @@ const standingsRows: readonly Row[] = gameRows(
   (c, i) => rebuildStandings(c, i, standingsDeps),
 );
 
+// Adjustments are checked at their season's program too (S-10): the owner and admins.
+const adjustmentRows: readonly Row[] = [
+  ...gameRows(
+    'standings.add_adjustment',
+    'add an adjustment',
+    'standings.adjust',
+    async (league, program) => {
+      const seasonId = await seasonIn(league, program);
+      const teamId = await newTeam(pglite, league.leagueId, seasonId);
+      return { seasonId, teamId, wins: 1, reason: 'Won by ruling' };
+    },
+    (c, i) => addAdjustment(c, i, standingsDeps),
+  ),
+  ...gameRows(
+    'standings.remove_adjustment',
+    'remove an adjustment',
+    'standings.adjust',
+    async (league, program) => {
+      const seasonId = await seasonIn(league, program);
+      const teamId = await newTeam(pglite, league.leagueId, seasonId);
+      const added = await pglite.query<{ id: string }>(
+        `insert into standings_adjustments (league_id, season_id, team_id, wins, reason, account_id)
+         values ($1, $2, $3, 1, 'Won by ruling', $4) returning id`,
+        [league.leagueId, seasonId, teamId, league.ownerId],
+      );
+      return { seasonId, adjustmentId: added.rows[0]?.id };
+    },
+    (c, i) => removeAdjustment(c, i, standingsDeps),
+  ),
+];
+
 /** An import of a season, ready to apply or applied (with the empty draft it names). */
 async function importIn(
   league: League,
@@ -1248,6 +1350,7 @@ const rows: readonly Row[] = [
   ...peopleRows,
   ...gameCommandRows,
   ...standingsRows,
+  ...adjustmentRows,
   ...teamCommandRows,
   ...rosterCommandRows,
   ...scheduleDraftRows,
@@ -1390,6 +1493,17 @@ const rows: readonly Row[] = [
     },
     run: (c, i) => setSeasonRules(c, i, leaguesDeps),
   },
+  ...[false, true].map((program) => ({
+    command: 'leagues.preview_season_rules',
+    name: `see what new rules would move in a season of ${program ? 'one program' : 'the default program'}`,
+    needs: 'season.settings' as const,
+    ...(program ? { scope: 'program' as const } : {}),
+    prepare: async (league: League) => {
+      const seasonId = await seasonIn(league, program);
+      return { input: { seasonId, rules: defaultSeasonRules() } };
+    },
+    run: (c: CommandContext, i: unknown) => previewSeasonRules(c, i, leaguesDeps),
+  })),
   {
     command: 'leagues.set_season_roster_settings',
     name: 'set the roster settings of a season of the default program',

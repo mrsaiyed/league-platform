@@ -21,6 +21,7 @@ export function displayLabels(t: Translate) {
       away: t('display.away'),
       live: t('display.live'),
       final: t('display.final'),
+      winner: t('display.winner'),
     },
     standings: {
       seed: t('display.seed'),

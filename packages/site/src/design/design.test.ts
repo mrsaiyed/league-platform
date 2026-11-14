@@ -64,9 +64,19 @@ describe('contrast', () => {
     // Only the panel is too close to the text.
     const panelOnly = {
       ...base,
-      colors: { ...base.colors, text: '#14202b', background: '#ffffff', panel: '#1b2a38' },
+      colors: {
+        ...base.colors,
+        highlight: '#14202b',
+        text: '#14202b',
+        background: '#ffffff',
+        panel: '#1b2a38',
+      },
     };
-    expect(contrastWarnings(panelOnly).map((w) => w.pair)).toEqual(['text on panel']);
+    // The highlight is the same dark colour here, so it fails on the panel too.
+    expect(contrastWarnings(panelOnly).map((w) => w.pair)).toEqual([
+      'text on panel',
+      'highlight on panel',
+    ]);
   });
 
   it('suggests the nearest readable shade', () => {
@@ -79,6 +89,51 @@ describe('contrast', () => {
     expect(
       contrastRatio(nearestReadableColor('#445566', '#0b2233'), '#0b2233'),
     ).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('highlight color (C-15)', () => {
+  const base = startingDesign('clean-court');
+  const { highlight: _dropped, ...noHighlight } = base.colors;
+  it('both starting designs supply one', () => {
+    for (const key of startingDesignKeys) {
+      expect(startingDesign(key).colors.highlight).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+  it('accepts a design with and without one, and both produce the variable', () => {
+    const without = { ...base, colors: noHighlight };
+    expect(parseDesignDocument(base).ok).toBe(true);
+    expect(parseDesignDocument(without).ok).toBe(true);
+    expect(designToCssVariables(base)['--color-highlight']).toBe(base.colors.highlight);
+    expect(designToCssVariables(without)['--color-highlight']).toBe(base.colors.accent);
+    expect(designToCssText(without)).toContain('--color-highlight: #e8590c;');
+  });
+  it('rejects a bad highlight, and refuses a hostile one at the CSS step', () => {
+    expect(parseDesignDocument({ ...base, colors: { ...base.colors, highlight: 'red' } }).ok).toBe(
+      false,
+    );
+    const hostile = structuredClone(base) as unknown as { colors: { highlight: string } };
+    hostile.colors.highlight = 'red;} body{display:none';
+    expect(() => designToCssText(hostile as unknown as typeof base)).toThrow();
+  });
+  it('warns when the highlight (or the accent standing in for it) cannot be read', () => {
+    const faint = { ...base, colors: { ...base.colors, highlight: '#f0f0f0' } };
+    expect(contrastWarnings(faint).map((w) => w.pair)).toEqual([
+      'highlight on background',
+      'highlight on panel',
+    ]);
+    const [warning] = contrastWarnings(faint);
+    expect(
+      contrastRatio(warning?.suggestion ?? '#ffffff', base.colors.background),
+    ).toBeGreaterThanOrEqual(4.5);
+    // Left out, the accent stands in, so a readable accent is fine and a pale one warns.
+    const darkAccent = { ...base, colors: { ...noHighlight, accent: '#14202b' } };
+    expect(contrastWarnings(darkAccent)).toEqual([]);
+    const paleAccent = { ...base, colors: { ...noHighlight, accent: '#f0f0f0' } };
+    expect(contrastWarnings(paleAccent).map((w) => w.pair)).toEqual([
+      'highlight on background',
+      'highlight on panel',
+    ]);
   });
 });
 
