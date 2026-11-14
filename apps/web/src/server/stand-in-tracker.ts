@@ -63,7 +63,12 @@ export function seedTracker(
     team.players.forEach((player, n) => {
       const id = personId(t + 1, n + 1);
       state.people.push({ id, ...player, isMinor: false, visibility: 'none' });
-      state.players.push({ personId: id, teamId: team.id, jerseyNumber: String(n * 2 + 3) });
+      state.players.push({
+        personId: id,
+        teamId: team.id,
+        jerseyNumber: String(n * 2 + 3),
+        onGameDay: true,
+      });
     });
   });
   return state;
@@ -134,6 +139,7 @@ export function liveGamesOf(
       const teams = teamsOf(gameId);
       return s.players.filter((p) => teams.includes(p.teamId));
     },
+    lines: async (gameId) => s.lines.filter((l) => l.gameId === gameId),
     saveLines: async (gameId, lines, removed) => {
       const replaced = new Set([...removed, ...lines.map((l) => l.personId)]);
       s.lines = [
