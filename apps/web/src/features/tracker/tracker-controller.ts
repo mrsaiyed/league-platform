@@ -496,11 +496,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const madeUnder = (entry: QueuedCommand) =>
       entry.sessionId === undefined || entry.sessionId === held;
     let waiting: QueuedCommand[];
-    let lost: TrackerCommand[];
+    let stale: TrackerCommand[];
     try {
       waiting = (await storage.list(gameId)).filter((entry) => entry.state === 'waiting');
-      lost = waiting.filter((entry) => !madeUnder(entry)).map((entry) => entry.command);
-      if (lost.length > 0) await queue.forget(lost.map((c) => c.commandId));
+      stale = waiting.filter((entry) => !madeUnder(entry)).map((entry) => entry.command);
+      if (stale.length > 0) await queue.forget(stale.map((c) => c.commandId));
     } catch {
       // Not known to be dropped, so nothing may be sent: the session is not used, and
       // its lease runs out unless opening again (into the same session) gets this far.
@@ -510,7 +510,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // queue: the game shown is rebuilt from it, so what will be sent is what is shown
     // (one hidden when the game was lost, say, then kept on opening again into it).
     made = waiting.filter(madeUnder).map((entry) => entry.command);
-    update({ notSaved: lost });
+    // Listed as not saved: the stale taps, and any listed before that are not to be sent
+    // after all (opening again into the session they were made under sends them).
+    const sent = new Set(made.map((c) => c.commandId));
+    const listed = new Set(stale.map((c) => c.commandId));
+    const before = current.notSaved.filter(
+      (c) => !sent.has(c.commandId) && !listed.has(c.commandId),
+    );
+    update({ notSaved: [...before, ...stale] });
     return scoreWith(held);
   };
 
