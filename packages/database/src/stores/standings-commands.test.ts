@@ -97,10 +97,12 @@ async function season() {
       stageId,
       homeTeamId: teams[home],
       awayTeamId: teams[away],
-      columns: { starts_at: `2026-12-0${n + 1}T18:00:00Z`, capture_mode: 'box' },
+      columns: { starts_at: `2026-12-0${n + 1}T18:00:00Z`, capture_mode: 'live' },
     });
     games.push(gameId);
-    // Each team's player's line: points and minutes.
+    // Each team's player's line: points and minutes. The games are tracked live, so
+    // their lines stay when the result is saved with two numbers; a box score game
+    // saved that way loses its lines (S-27), which box-score-commands.test.ts covers.
     for (const side of [home, away]) {
       await pglite.query(
         `insert into player_game_stats (league_id, game_id, team_id, person_id, played,
