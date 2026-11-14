@@ -9,6 +9,7 @@ import type { ContextDeps } from './context.ts';
 import type { GamesAreaPorts } from './games-area-ports.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
+import type { AdminTeamsPorts } from './admin-teams.ts';
 
 export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   /** "Who is this?" for a session cookie's access token (T-6). */
@@ -31,4 +32,6 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly games: GamesAreaPorts;
   /** What the public home and schedule pages read (step 2.42). */
   readonly publicSchedule: PublicSchedulePorts;
+  /** What the admin's Teams screens read and run (step 2.51). */
+  readonly adminTeams: AdminTeamsPorts;
 };
