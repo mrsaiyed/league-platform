@@ -67,6 +67,22 @@ type Args<Tx extends TrackerTransferTx> = {
   readonly options: Pick<PlanOptions, 'withOpponents'>;
 };
 
+/**
+ * The deps with the transaction's clock showing `at` (never later than the real time):
+ * the reopen the tracker made is made here at the time it made it, as the dry run
+ * plays it (simulateReplay). Only the engine's time moves; nothing else reads it.
+ */
+function clockAt<Tx extends TrackerTransferTx>(deps: CommandDeps<Tx>, at: number): CommandDeps<Tx> {
+  return {
+    ...deps,
+    transaction: (context, work) =>
+      deps.transaction(context, (tx) => {
+        const now = tx.clock.now();
+        return work({ ...tx, clock: { now: () => Math.min(now, at) } });
+      }),
+  };
+}
+
 /** Sends one game's actions; how many were sent, or why it stopped. */
 async function sendGame<Tx extends TrackerTransferTx>(
   args: Args<Tx>,
@@ -76,7 +92,7 @@ async function sendGame<Tx extends TrackerTransferTx>(
 ): Promise<{ readonly sent: number } | TransferStop> {
   const { context, deps, reads } = args;
   let sent = 0;
-  for (const segment of replay.segments) {
+  for (const [index, segment] of replay.segments.entries()) {
     const fact = await reads.game(
       gameId,
       segment.map((step) => step.commandId),
@@ -84,12 +100,14 @@ async function sendGame<Tx extends TrackerTransferTx>(
     if (fact === undefined) return { kind: 'not-sent', code: 'game-not-found' };
     const untaken = segment.filter((step) => !fact.taken.has(step.commandId));
     if (untaken.length === 0) continue;
-    // The tracker reopened the game here; the platform reopens it with a reason.
+    // The tracker reopened the game here; the platform reopens it with a reason, at the
+    // time the tracker did, so the actions after it keep their own times.
     if (isDecided(fact.status)) {
+      const at = replay.reopenedAt[index - 1];
       const reopened = await reopenGame(
         context,
         { gameId, version: fact.version, reason: transferReopenReason },
-        deps,
+        at === undefined ? deps : clockAt(deps, at),
       );
       if (!reopened.ok) return { kind: 'reopen-refused', code: reopened.error.code };
     }

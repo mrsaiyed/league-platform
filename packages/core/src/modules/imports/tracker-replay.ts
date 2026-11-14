@@ -10,7 +10,10 @@
 //   the last one are played again;
 // - "reopen" is not a tap on the platform (it needs a reason, T6 §8), so the actions
 //   are cut into parts at each reopen, and the runner reopens the game between them
-//   with games.reopen_game, which applies the engine's own reopen;
+//   with games.reopen_game, which applies the engine's own reopen. It is made at the
+//   time the tracker reopened (`reopenedAt`): the engine never moves time backwards,
+//   so a reopen at the moment of the run would put every action after it at that
+//   moment, and a clock run after it (overtime) would count no time;
 // - swapping colors on an ended game changes nothing that is kept, and the door turns
 //   away anything sent to an ended game, so those are left out.
 // Every stored action is checked against the tracker's own command shape before any of
@@ -40,6 +43,8 @@ export type ReplayStep = StoredStep & { readonly input: ReplayInput };
 export type Replay = {
   /** The actions in order, cut at each reopen. */
   readonly segments: readonly (readonly ReplayStep[])[];
+  /** When the tracker reopened the game before each part after the first, as tapped. */
+  readonly reopenedAt: readonly number[];
   readonly leftOut: {
     readonly beforeReset: number;
     readonly rules: number;
@@ -100,6 +105,7 @@ export function readReplay(
   const lastReset = steps.findLastIndex((step) => step.input.type === 'reset');
   const kept = steps.slice(lastReset + 1);
   const segments: ReplayStep[][] = [[]];
+  const reopenedAt: number[] = [];
   let ended = false;
   let rules = 0;
   let colorsWhileEnded = 0;
@@ -114,6 +120,7 @@ export function readReplay(
       case 'reopen':
         ended = false;
         segments.push([]);
+        reopenedAt.push(stored.at);
         continue;
       case 'colors':
         if (ended) {
@@ -134,6 +141,7 @@ export function readReplay(
     ok: true,
     replay: {
       segments,
+      reopenedAt,
       leftOut: { beforeReset: lastReset + 1, rules, colorsWhileEnded },
       format: { periods, periodSeconds, overtimeSeconds },
     },
@@ -223,7 +231,8 @@ export type Simulation =
  * The replay played through the engine as the door plays it: a new game in the
  * platform's rules made at time 0, each action at its tap time (never later than
  * `now`), a level score refused at the end unless ties are allowed, and between parts
- * the engine's reopen at `now`, as games.reopen_game makes it.
+ * the engine's reopen at the time the tracker reopened (never later than `now`), as the
+ * runner has games.reopen_game make it.
  */
 export function simulateReplay(
   replay: Replay,
@@ -234,7 +243,8 @@ export function simulateReplay(
   let state = basketball.newGame(rules, 0);
   for (const [index, segment] of replay.segments.entries()) {
     if (index > 0 && state.status === 'final') {
-      state = basketball.apply(state, { type: 'reopen' }, { id: 'reopen', now });
+      const at = Math.min(now, replay.reopenedAt[index - 1] ?? now);
+      state = basketball.apply(state, { type: 'reopen' }, { id: 'reopen', now: at });
     }
     for (const step of segment) {
       let next: basketball.GameState;

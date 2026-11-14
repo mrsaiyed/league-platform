@@ -120,6 +120,40 @@ describe('playing the replay through the engine', () => {
     });
   });
 
+  it('keeps the time of every action after a reopen, overtime included', () => {
+    const inputs: Input[] = [
+      ...played.slice(0, 4),
+      { type: 'score', side: 'away', playerId: away[0]!, points: 2 },
+      { type: 'pause' },
+      { type: 'period', period: 4 },
+      { type: 'start' },
+      { type: 'score', side: 'home', playerId: home[0]!, points: 1 },
+      { type: 'pause' },
+      { type: 'end' },
+      // A point taken back makes it level: the game is reopened and goes to overtime.
+      { type: 'reopen' },
+      { type: 'undo' },
+      { type: 'period', period: 5 },
+      { type: 'start' },
+      { type: 'score', side: 'away', playerId: away[0]!, points: 3 },
+      { type: 'pause' },
+      { type: 'end' },
+    ];
+    const game = stored(inputs);
+    const read = readReplay(game);
+    if (!read.ok) throw new Error('not read');
+    expect(read.replay.reopenedAt).toEqual([start + 11 * 20_000]);
+    // Run long after the game, as a transfer is.
+    const simulation = simulateReplay(read.replay, basketball.QUARTERS, false, start + 86_400_000);
+    if (!simulation.ok) throw new Error(JSON.stringify(simulation.problem));
+    const tracker = basketball.derive(game.state as basketball.GameState);
+    expect(simulation.score).toEqual({ home: 2, away: 5 });
+    for (const id of [home[0]!, away[0]!]) {
+      expect(tracker.players[id]!.ms).toBeGreaterThan(60_000);
+      expect(simulation.lines.get(id.toLowerCase())?.ms).toBe(tracker.players[id]!.ms);
+    }
+  });
+
   it('refuses a level end when ties are not allowed, and says which action the engine refused', () => {
     const level: Input[] = [
       ...played.slice(0, 4),

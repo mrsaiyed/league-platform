@@ -128,11 +128,15 @@ function actionsOf(g: number, home: string[], away: string[]): Input[] {
     { type: 'pause' },
     { type: 'end' },
   );
-  // Game 3 is reopened in the tracker to fix a basket, and ended again.
+  // Game 3 is reopened in the tracker, plays an overtime period with the clock running
+  // (time on court after the reopen counts), and is ended again.
   if (g === 3) {
     list.push(
       { type: 'reopen' },
+      { type: 'period', period: 5 },
+      { type: 'start' },
       { type: 'score', side: 'home', playerId: h1, points: 3 },
+      { type: 'pause' },
       { type: 'end' },
     );
   }
