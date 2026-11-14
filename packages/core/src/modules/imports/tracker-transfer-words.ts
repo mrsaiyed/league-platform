@@ -4,7 +4,7 @@
 // saved anywhere (T-220).
 import type { GameProblem, PlannedGame, TransferPlan } from './plan-tracker-transfer.ts';
 import type { LineDifference } from './tracker-lines.ts';
-import type { PlayerMatch } from './tracker-matching.ts';
+import type { GameMatch, PlayerMatch } from './tracker-matching.ts';
 import { localDateOf } from './tracker-matching.ts';
 import type { TransferReport, TransferStop } from './run-tracker-transfer.ts';
 import type { TrackerData, TrackerGame } from './tracker-transfer-data.ts';
@@ -82,6 +82,10 @@ function problemLines(words: Words, problem: GameProblem): string[] {
       return ['The game’s saved state in the backup cannot be read.'];
     case 'game-not-found':
       return ['The matching game is no longer here.'];
+    case 'not-matched':
+      return [
+        `It was ended in the tracker, but ${matchWords(problem.reason)}. Add or fix the game in this season’s schedule here first.`,
+      ];
     case 'not-playable':
       return [`The game here is ${problem.status}, so it cannot be scored.`];
     case 'result-entered':
@@ -153,9 +157,7 @@ function gameLine(words: Words, planned: PlannedGame): string[] {
       const why =
         outcome.reason === 'not-played'
           ? 'nothing is recorded for it yet'
-          : outcome.reason === 'still-live'
-            ? 'it has not been ended in the tracker'
-            : matchWords(planned);
+          : 'it has not been ended in the tracker';
       return [`  Not transferred: ${label}: ${why}.`];
     }
     case 'blocked':
@@ -166,9 +168,8 @@ function gameLine(words: Words, planned: PlannedGame): string[] {
   }
 }
 
-function matchWords(planned: PlannedGame): string {
-  if (planned.match.kind === 'matched') return 'found';
-  switch (planned.match.reason) {
+function matchWords(reason: Extract<GameMatch, { kind: 'unmatched' }>['reason']): string {
+  switch (reason) {
     case 'team-not-matched':
       return 'one of its teams is not in this season';
     case 'not-found':

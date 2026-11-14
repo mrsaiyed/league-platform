@@ -11,8 +11,9 @@
 // - transfer: matched, ended in the tracker, and every line will match;
 // - already: transferred before (every action is here and the game is ended), so a
 //   second run leaves it alone and only compares its lines again (T-137);
-// - skip: not played yet, still being scored in the tracker, or not found here;
-// - blocked: found, but it cannot be transferred as it is; the plan says why.
+// - skip: not played yet, or still being scored in the tracker;
+// - blocked: ended in the tracker but not found here, or found but it cannot be
+//   transferred as it is; the plan says why.
 // The run starts only when no game is blocked, so a problem known beforehand never
 // leaves the season half-transferred.
 //
@@ -52,6 +53,11 @@ export type GameProblem =
   | { readonly kind: 'unreadable-action'; readonly seq: number }
   | { readonly kind: 'unreadable-state' }
   | { readonly kind: 'game-not-found' }
+  /** Ended in the tracker, but no game of the season is it. */
+  | {
+      readonly kind: 'not-matched';
+      readonly reason: Extract<GameMatch, { kind: 'unmatched' }>['reason'];
+    }
   | { readonly kind: 'not-playable'; readonly status: string }
   | { readonly kind: 'result-entered' }
   | { readonly kind: 'scored-here' }
@@ -77,7 +83,7 @@ export type GameOutcome =
       readonly resume: boolean;
     }
   | { readonly kind: 'already'; readonly gameId: string; readonly replay: Replay }
-  | { readonly kind: 'skip'; readonly reason: 'not-played' | 'still-live' | 'not-matched' }
+  | { readonly kind: 'skip'; readonly reason: 'not-played' | 'still-live' }
   | { readonly kind: 'blocked'; readonly gameId: string | null; readonly problem: GameProblem };
 
 export type PlannedGame = {
@@ -155,7 +161,15 @@ async function firstLook(
     return settled({ kind: 'skip', reason: 'not-played' });
   }
   if (game.status !== 'final') return settled({ kind: 'skip', reason: 'still-live' });
-  if (match.kind !== 'matched') return settled({ kind: 'skip', reason: 'not-matched' });
+  // A game the tracker ended is one the season played: not finding it here is a problem
+  // to put right, never a game quietly left behind.
+  if (match.kind !== 'matched') {
+    return settled({
+      kind: 'blocked',
+      gameId: null,
+      problem: { kind: 'not-matched', reason: match.reason },
+    });
+  }
   const blocked = (problem: GameProblem) =>
     settled({ kind: 'blocked', gameId: match.gameId, problem });
   const read = readReplay(game);
