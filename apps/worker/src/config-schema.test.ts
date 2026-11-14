@@ -56,6 +56,34 @@ describe('loadWorkerConfig', () => {
     ]);
   });
 
+  it('takes health port 0 (any free port) only in tests', () => {
+    expect(loadWorkerConfig({ ...local, APP_ENV: 'test', WORKER_HEALTH_PORT: '0' })).toMatchObject({
+      WORKER_HEALTH_PORT: 0,
+    });
+    for (const env of [local, production]) {
+      expect(failure({ ...env, WORKER_HEALTH_PORT: '0' }).invalid).toEqual([
+        'WORKER_HEALTH_PORT: invalid, may be 0 only when APP_ENV is test',
+      ]);
+    }
+  });
+
+  it('takes only a scheme and host as the site address, as the web app does', () => {
+    expect(
+      loadWorkerConfig({ ...production, PUBLIC_BASE_URL: 'https://leagues.example.test/' }),
+    ).toBeTruthy();
+    for (const bad of [
+      'https://leagues.example.test/base',
+      'https://leagues.example.test/?x=1',
+      'https://someone:made-up@leagues.example.test',
+    ]) {
+      const error = failure({ ...production, PUBLIC_BASE_URL: bad });
+      expect(error.invalid).toEqual([
+        'PUBLIC_BASE_URL: invalid, must be only a scheme and host, like https://site',
+      ]);
+      expect(error.message).not.toContain('made-up');
+    }
+  });
+
   it('names every missing or invalid setting, and never a value', () => {
     const error = failure({
       APP_ENV: 'everywhere',

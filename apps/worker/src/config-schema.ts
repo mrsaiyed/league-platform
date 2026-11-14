@@ -31,7 +31,13 @@ const schema = z.object({
     .trim()
     .regex(/^postgres(?:ql)?:\/\//, 'must be a postgres:// address')
     .optional(),
-  PUBLIC_BASE_URL: z.url().regex(/^https?:\/\//i, 'must be an http or https address'),
+  // The web app has no base path (its addresses are built from the origin alone, T-34,
+  // and it refuses a PUBLIC_BASE_URL with a path when it builds them), so the worker
+  // takes only a scheme and host too, rather than quietly dropping a path from links.
+  PUBLIC_BASE_URL: z
+    .url()
+    .regex(/^https?:\/\//i, 'must be an http or https address')
+    .refine(isBareOrigin, 'must be only a scheme and host, like https://site'),
   EMAIL_FROM: z
     .string()
     .trim()
@@ -46,6 +52,18 @@ const schema = z.object({
     .max(65535, 'must be a port from 0 to 65535')
     .default(defaultHealthPort),
 });
+
+function isBareOrigin(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false; // z.url() has reported it already
+  }
+  return (
+    url.pathname === '/' && url.search === '' && url.hash === '' && !url.username && !url.password
+  );
+}
 
 export type WorkerConfig = Readonly<z.infer<typeof schema>>;
 
@@ -63,6 +81,9 @@ const requiredIn: Readonly<Partial<Record<WorkerConfigName, readonly string[]>>>
   DATABASE_URL: ['staging', 'production'],
   RESEND_API_KEY: ['production'],
 };
+
+/** WORKER_HEALTH_PORT 0 (any free port) is for tests only: a host must know the port. */
+const anyPortOnlyIn: readonly string[] = ['test'];
 
 export class WorkerConfigError extends Error {
   readonly missing: readonly string[];
@@ -102,6 +123,16 @@ export function loadWorkerConfig(env: Readonly<Record<string, string | undefined
     }
   }
   const result = schema.safeParse(given);
+  if (
+    result.success &&
+    result.data.WORKER_HEALTH_PORT === 0 &&
+    !anyPortOnlyIn.includes(result.data.APP_ENV)
+  ) {
+    invalid.set(
+      'WORKER_HEALTH_PORT',
+      'WORKER_HEALTH_PORT: invalid, may be 0 only when APP_ENV is test',
+    );
+  }
   if (result.success && invalid.size === 0) return Object.freeze(result.data);
 
   for (const issue of result.success ? [] : result.error.issues) {
