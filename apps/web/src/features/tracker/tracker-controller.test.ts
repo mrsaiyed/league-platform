@@ -551,6 +551,33 @@ describe('tracker controller: signed out mid-game', () => {
     expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
     expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
   });
+
+  it('is no longer reloading once read-only, though the reload was still to be tried again', async () => {
+    const network = endpointNetwork();
+    let who: Person = 'scorekeeper';
+    let stateDown = false;
+    const tablet = device(network, {
+      signedIn: () => who,
+      askServer: (ask) => async (input, init) => {
+        if (stateDown && String(input).endsWith('/state')) throw new TypeError('Failed to fetch');
+        return ask(input, init);
+      },
+    });
+    await tablet.controller.start();
+    await tablet.controller.idle();
+    stateDown = true;
+    await tapAll(tablet.controller, [
+      { type: 'lineup', side: 'home', playerIds: [...hawks.slice(0, 4), stranger] },
+    ]);
+    await tablet.controller.idle();
+    // Refused; the reload gets no answer and waits to try again.
+    expect(tablet.controller.status().reloading).toBe(true);
+    who = 'visitor';
+    await tablet.clock.advance(31_000);
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'signed-out' });
+    expect(tablet.controller.status().reloading).toBe(false);
+  });
 });
 
 describe('tracker controller: a game it may not score', () => {

@@ -351,6 +351,18 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   };
 
   /**
+   * Lets the session go: nothing more is sent or renewed, and nothing waits to be
+   * asked again (a reload after a refusal included, so it is no longer shown).
+   */
+  const stopScoring = (): void => {
+    sessionId = null;
+    cancelRenew?.();
+    cancelRenew = null;
+    clearTimer();
+    if (current.reloading) update({ reloading: false });
+  };
+
+  /**
    * No longer scoring: nothing more is sent. Only when the game was lost is what was
    * waiting listed as not saved and the server's state shown. For any other reason
    * (signed out, say) the waiting taps stay shown and are sent on opening again into
@@ -358,10 +370,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * twice.
    */
   const readOnly = async (reason: ReadOnlyReason): Promise<void> => {
-    sessionId = null;
-    cancelRenew?.();
-    cancelRenew = null;
-    clearTimer();
+    stopScoring();
     update({ mode: { kind: 'read-only', reason } });
     if (lostTheGame.has(reason)) await lost();
   };
@@ -406,9 +415,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   const notHeld = async (reply: Exclude<SessionReply, { status: 'held-by-you' }>) => {
     switch (reply.status) {
       case 'held-by-other': {
-        sessionId = null;
-        cancelRenew?.();
-        cancelRenew = null;
+        stopScoring();
         update({ mode: { kind: 'held-by-other', holder: reply.holder } });
         return lost();
       }
