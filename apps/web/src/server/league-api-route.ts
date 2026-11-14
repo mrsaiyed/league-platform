@@ -11,8 +11,7 @@ import type { WebPorts } from './ports.ts';
 import { requestFacts } from './request-facts.ts';
 import { cookieNames } from './sign-in/cookies.ts';
 
-/** The most a request body may hold. A full batch of 50 taps is a few kilobytes. */
-const maxBodyBytes = 64 * 1024;
+export { jsonBody } from './json-body.ts';
 
 /** The request behind `/api/v1/leagues/{leagueId}/{...parts}`, or why there is none. */
 export async function leagueEndpoint(
@@ -44,24 +43,6 @@ export async function leagueEndpoint(
 export async function carriesSignInCookies(): Promise<boolean> {
   const jar = await cookies();
   return [cookieNames.session, cookieNames.renew].some((name) => jar.has(name));
-}
-
-/** The body as JSON, or undefined when it is not JSON or is too large. */
-export async function jsonBody(request: Request): Promise<unknown> {
-  const declared = Number(request.headers.get('content-length') ?? '0');
-  if (Number.isFinite(declared) && declared > maxBodyBytes) return undefined;
-  let text: string;
-  try {
-    text = await request.text();
-  } catch {
-    return undefined;
-  }
-  if (text.length > maxBodyBytes) return undefined;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
-  }
 }
 
 /** An answer as Next.js sends it; never cached unless the answer says so. */
