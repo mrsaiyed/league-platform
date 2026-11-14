@@ -17,7 +17,8 @@ A league's design is a small JSON document, checked against a schema.
     "panel": "#0f2c40",
     "text": "#f3ead2",
     "primary": "#c8a84b",
-    "accent": "#2fa89a"
+    "accent": "#2fa89a",
+    "highlight": "#e2725b"
   },
   "fonts": { "heading": "cinzel", "body": "jost" },
   "corners": "soft",
@@ -29,6 +30,7 @@ A league's design is a small JSON document, checked against a schema.
 ```
 
 - **T-90:** the league layout turns this into CSS variables (`--color-primary` and so on) once per page. Every component is styled in terms of those variables. There is no per-league stylesheet and no generated CSS file.
+- `highlight` is the third color of C-15: `--color-highlight`, used sparingly by the display pieces and never for body text. A document saved without one uses its accent, so a design stored before the highlight existed stays valid.
 - Fonts come from a fixed list we host ourselves. The document stores a font's key, never a web address.
 - A **starting design** is simply a stored copy of such a document plus default page layouts.
 - On save we compute contrast between text and background colors and return warnings (C-1, section 8 of P5).
