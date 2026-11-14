@@ -302,7 +302,7 @@ export const en = {
     'This league has no current season yet, so there is nowhere to import games.',
   'admin.import.error.season-not-found': 'That season is not there any more.',
   'admin.import.error.file-too-large':
-    'The file is too large to import at once (the limit is about 800 KB). Split it into smaller files.',
+    'The file is too large to import at once. The limit is about {size}, a little less for a file with many rows. Split it into smaller files.',
   'admin.import.error.no-account': 'Sign in again to import fixtures.',
   'admin.import.error.import-not-found': 'That import is not there.',
   'admin.import.error.changed-since-read':

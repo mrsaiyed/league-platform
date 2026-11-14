@@ -3,7 +3,7 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import type { ImportNames } from '../../server/fixture-import-ports.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { t } from '../../server/messages.ts';
+import { locale, t } from '../../server/messages.ts';
 import {
   applyImportAction,
   discardImportAction,
@@ -11,8 +11,18 @@ import {
   uploadFixturesAction,
 } from './actions.ts';
 import { first, importNotice, type SearchParams } from './import-notice.ts';
+import { maxUploadBytes } from './run-import-action.ts';
 
-const dayFormat = new Intl.DateTimeFormat('en', {
+/** The import's size limit in the page's words, from the limit itself so it cannot drift. */
+const sizeLimitText = new Intl.NumberFormat(locale, {
+  style: 'unit',
+  unit: 'kilobyte',
+  maximumFractionDigits: 0,
+}).format(maxUploadBytes / 1000);
+
+const columnList = new Intl.ListFormat(locale, { style: 'short', type: 'unit' });
+
+const dayFormat = new Intl.DateTimeFormat(locale, {
   weekday: 'short',
   day: 'numeric',
   month: 'short',
@@ -183,7 +193,7 @@ function ImportReport({
             {view.scoreCount > 0 ? <> {t.plural('admin.import.scores', view.scoreCount)}</> : null}
           </p>
           {view.columnsFound.length > 0 ? (
-            <p>{t('admin.import.columns', { columns: view.columnsFound.join(', ') })}</p>
+            <p>{t('admin.import.columns', { columns: columnList.format(view.columnsFound) })}</p>
           ) : null}
         </>
       )}
@@ -258,7 +268,7 @@ export async function ImportPage({
       <p>{t('admin.import.intro')}</p>
       {notice === undefined ? null : (
         <div role={notice.problem ? 'alert' : 'status'}>
-          <p>{t(notice.key)}</p>
+          <p>{t(notice.key, { size: sizeLimitText })}</p>
           {notice.clashes === undefined ? null : (
             <p>{t.plural('admin.import.clashes', notice.clashes)}</p>
           )}
