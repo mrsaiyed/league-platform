@@ -74,6 +74,19 @@ export async function loadLeaguePage(
   }
 }
 
+/**
+ * For the league's own "not found" screen (`[league]/not-found.tsx`), which Next.js gives no
+ * route values: the league of the address the proxy wrote down, when its public pages may be
+ * shown to this person, else null. It is the same worked-out request the league layout
+ * used, so the screen agrees with the frame around it. Never used to decide access: the
+ * page has already refused.
+ */
+export async function leagueViewOfAddress(): Promise<LeagueView | null> {
+  const { resolved } = await resolvedRequest();
+  const outcome = leaguePageOutcome(resolved, { page: 'site' });
+  return outcome.kind === 'show' ? outcome.view : null;
+}
+
 /** For a layout: the view when the page may be shown, else null (the page refuses). */
 export async function leagueView(
   routeLeague: string,
