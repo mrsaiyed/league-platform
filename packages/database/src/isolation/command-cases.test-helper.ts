@@ -31,6 +31,7 @@ import {
   type EventHandler,
   type GamesTx,
   type ImportScoresTx,
+  type BinTx,
   type Job,
   type JobQueue,
   type LeaguesTx,
@@ -48,6 +49,7 @@ import { openScope, transactionOf, type LeagueScope } from '../db/transaction-sc
 import {
   accessStore,
   activityLogStore,
+  binStore,
   divisionsStore,
   gamesStore,
   importsStore,
@@ -64,7 +66,8 @@ import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import { harnessNow, type LeagueRecords } from './two-leagues.test-helper.ts';
 
 /** Every module's store, as the apps' transaction offers them. Grows with each module. */
-export type HarnessTx = ImportScoresTx &
+export type HarnessTx = BinTx &
+  ImportScoresTx &
   LeaguesTx &
   SchedulingTx &
   GamesTx &
@@ -93,6 +96,7 @@ export function harnessTx(scope: LeagueScope, jobs: JobQueue): HarnessTx {
     imports: importsStore(scope),
     people: peopleStore(scope),
     teams: teamsStore(scope),
+    bin: binStore(scope),
     standings: standingsStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),

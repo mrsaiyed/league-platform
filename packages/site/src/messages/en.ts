@@ -368,6 +368,25 @@ export const en = {
     'Another team of this season already has that short name.',
   'error.teams.update_team.team-name-taken': 'Another team of this season already has that name.',
   'error.teams.remove_team.team-not-found': 'That team is not there.',
+  'error.leagues.restore_team.team-not-found': 'That team is not there.',
+  'error.leagues.restore_team.team-division-in-bin':
+    'The division of this team is in the bin. Bring the division back first.',
+  'error.leagues.restore_team.team-short-name-taken':
+    'Another team now has this short name. Rename one of them, then try again.',
+  'error.leagues.restore_team.team-name-taken':
+    'Another team now has this name. Rename one of them, then try again.',
+  'error.leagues.restore_team.team-lineage-taken':
+    'This season already has a team that carries on this team from other seasons. Move that team to the bin first, then try again.',
+  'error.leagues.restore_person.person-not-found': 'That person is not there.',
+  'error.leagues.restore_person.person-profile-taken':
+    'The account of this person is now linked to someone else in this league.',
+  'error.leagues.restore_game.game-not-found': 'That game is not there.',
+  'error.leagues.restore_game.game-not-restorable':
+    'A game that was played cannot be restored. Correct it instead.',
+  'error.leagues.restore_game.game-part-in-bin':
+    'A team, division, venue or court of this game is in the bin. Bring it back first.',
+  'error.leagues.restore_game.game-number-taken': 'Another game now has this game number.',
+  'error.leagues.restore_game.game-reference-taken': 'Another game now has this outside reference.',
   'error.teams.set_stats_visibility.team-not-found': 'That team is not there.',
   'error.teams.set_stats_visibility.teams-may-not-choose':
     'This league decides who sees the numbers; teams may not choose.',
@@ -862,6 +881,10 @@ export const en = {
   'activity.leagues.reorder_divisions': 'Changed the order of the divisions',
   'activity.leagues.remove_division': 'Moved a division to the bin',
   'activity.leagues.restore_division': 'Restored a division from the bin',
+  'activity.leagues.restore_team': 'Restored a team from the bin',
+  'activity.leagues.restore_person': 'Restored a person from the bin',
+  'activity.leagues.restore_game': 'Restored a game from the bin',
+  'activity.leagues.empty_bin': 'Removed old things from the bin for good',
   'activity.games.record_final_score': 'Recorded a final score',
   'activity.games.record_forfeit': 'Recorded a forfeit',
   'activity.games.set_box_score': 'Recorded a box score',

@@ -70,6 +70,7 @@ export function tableQueue(db: DatabaseHandle, options: QueueOptions = {}): Tabl
         options.pollMs ?? 1000,
         (stopping) => runDue(handlers, stopping),
         options.onError ?? (() => {}),
+        options.onPolled,
       );
     },
     stop: async () => {
