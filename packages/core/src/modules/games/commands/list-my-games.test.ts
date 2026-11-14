@@ -66,6 +66,8 @@ describe('listMyGames', () => {
       day: '2026-12-06',
       isToday: true,
       status: 'scheduled',
+      homeScore: null,
+      awayScore: null,
       recording: 'final-score',
       assignedToMe: true,
       scorable: true,

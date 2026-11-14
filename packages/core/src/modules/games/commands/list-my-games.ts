@@ -27,6 +27,9 @@ export type MyGame = {
   readonly day: string;
   readonly isToday: boolean;
   readonly status: string;
+  /** The score so far, or null while there is none. */
+  readonly homeScore: number | null;
+  readonly awayScore: number | null;
   readonly recording: ReturnType<typeof recordingOf>;
   /** Whether the person is assigned to score it. */
   readonly assignedToMe: boolean;
@@ -52,6 +55,8 @@ const view = ({ game, day, assigned }: GameInWindow, today: string, scorable: bo
   day,
   isToday: day === today,
   status: game.status,
+  homeScore: game.homeScore,
+  awayScore: game.awayScore,
   recording: recordingOf(game.captureMode),
   assignedToMe: assigned,
   scorable,

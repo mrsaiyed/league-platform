@@ -6,6 +6,7 @@ import type { SessionError, SessionIdentity, SignInService } from '@srleagues/pr
 import type { Renew } from './sign-in/renew-session.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
 import type { ContextDeps } from './context.ts';
+import type { GamesAreaPorts } from './games-area-ports.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 
 export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
@@ -25,4 +26,6 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly accessOf: (context: CommandContext) => Promise<AccessHolder | undefined>;
   /** What the public standings and statistics pages read (step 2.43). */
   readonly publicStats: PublicStatsPorts;
+  /** What the admin's games area runs on (step 2.55). */
+  readonly games: GamesAreaPorts;
 };
