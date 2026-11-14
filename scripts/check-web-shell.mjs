@@ -379,9 +379,37 @@ function freePort() {
 }
 
 /**
- * A draft league is "not found" for someone who may not see it, byte for byte the
- * answer for a name nobody has (U-9, step 2.87): the same status, headers and body,
- * once each name is put in the same place.
+ * A page as the browser ends up with it, whatever the timing of the stream. Next.js
+ * sends the page's data in `self.__next_f.push` pieces as each part is ready, so how
+ * the data is cut into pieces, and the order its numbered rows arrive in, depend on
+ * how busy the server was. The markup outside those pieces is kept as sent; the data
+ * is joined back together and its rows put in order. Every byte is still compared.
+ */
+function settle(body) {
+  const pieces = [];
+  const markup = body.replace(
+    /<script>self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)<\/script>/g,
+    (_, piece) => {
+      pieces.push(JSON.parse(piece));
+      return '';
+    },
+  );
+  const rows = pieces.join('').split('\n').filter(Boolean).sort().join('\n');
+  return { markup, rows };
+}
+
+/** Where two texts first part, for the report. */
+function firstDifference(a, b) {
+  let at = 0;
+  while (at < a.length && a[at] === b[at]) at += 1;
+  return `at ${at}: "${a.slice(at, at + 80)}" / "${b.slice(at, at + 80)}"`;
+}
+
+/**
+ * A draft league is "not found" for someone who may not see it, exactly the answer
+ * for a name nobody has (U-9, step 2.87): the same status, headers, markup and page
+ * data, once each name is put in the same place. Only the date, the length and how
+ * the stream happened to be cut (settle above) may differ.
  */
 async function sameAsNoLeague(origin) {
   const ask = async (name) => {
@@ -407,13 +435,13 @@ async function sameAsNoLeague(origin) {
       `a draft's headers differ from no league's:\n${draft.headers}\n---\n${nobody.headers}`,
     );
   }
-  if (draft.body !== nobody.body) {
-    let at = 0;
-    while (draft.body[at] === nobody.body[at]) at += 1;
-    found.push(
-      `a draft's page differs from no league's at ${at}: ` +
-        `"${draft.body.slice(at, at + 80)}" / "${nobody.body.slice(at, at + 80)}"`,
-    );
+  const [a, b] = [settle(draft.body), settle(nobody.body)];
+  if (a.rows === '' || b.rows === '') found.push('a not-found page carries no page data');
+  if (a.markup !== b.markup) {
+    found.push(`a draft's markup differs from no league's ${firstDifference(a.markup, b.markup)}`);
+  }
+  if (a.rows !== b.rows) {
+    found.push(`a draft's page data differs from no league's ${firstDifference(a.rows, b.rows)}`);
   }
   return found;
 }
