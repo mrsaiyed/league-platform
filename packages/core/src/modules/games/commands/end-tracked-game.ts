@@ -6,6 +6,10 @@
 // announces it, so standings and season totals follow (finish-tracked-game.ts). All of
 // it is saved or none of it. A tie is refused unless the game's rules allow ties
 // (P7 §5.6). A game with no tracked plays is decided with record_final_score instead.
+// While another account's tablet holds the game's scoring session, unexpired, the end
+// is refused (session-held), as taking over is confirmed first (T-116): the holder may
+// still be scoring, and ending would turn their tablet read-only mid-play. The holder's
+// own account may end it here; once the lease runs out anyone who may score may.
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -14,7 +18,7 @@ import { gameVersion, isDecided } from '../game-fields.ts';
 import { readState, scoreOf } from '../live-game.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
-import { lowerId, scorerOf } from '../scoring-session.ts';
+import { hasLapsed, lowerId, scorerOf } from '../scoring-session.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
 
 export type EndTrackedGameError = {
@@ -24,6 +28,7 @@ export type EndTrackedGameError = {
     | 'game-already-decided'
     | 'game-cancelled'
     | 'game-not-live'
+    | 'session-held'
     | 'not-tracked'
     | 'nothing-recorded'
     | 'tie-not-allowed';
@@ -52,10 +57,15 @@ export const endTrackedGame = defineCommand({
     if (game.status !== 'live' && game.status !== 'scheduled') {
       return fail({ code: 'game-not-live' });
     }
+    const now = tx.clock.now();
+    // Read as take_over_scoring reads it: a lapsed session holds nothing.
+    const session = await tx.scoringSessions.findForGame(game.id);
+    if (session !== undefined && !hasLapsed(session, now) && session.accountId !== accountId) {
+      return fail({ code: 'session-held' });
+    }
     const saved = await tx.liveGames.findState(game.id);
     if (saved === undefined) return fail({ code: 'not-tracked' });
     const before = readState(saved.state);
-    const now = tx.clock.now();
     const commandId = crypto.randomUUID();
     let state: basketball.GameState;
     try {

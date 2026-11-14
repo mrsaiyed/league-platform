@@ -118,6 +118,9 @@ async function underWay(t: Tracker) {
   );
 }
 
+/** The tablet's lease runs out: the game's session holds nothing any more. */
+const lapse = (t: Tracker) => t.clock.advance(leaseMs / 1000);
+
 const versionOf = (t: Tracker) => t.db.state.games[0]?.version ?? 0;
 const lineOf = (t: Tracker, personId: string | undefined) =>
   t.db.state.liveLines.find((l) => l.personId === personId);
@@ -161,6 +164,7 @@ describe('ending a tracked game (T6 §7)', () => {
     };
     const t = setUp({}, [failing]);
     await underWay(t);
+    lapse(t);
     const before = structuredClone(t.db.state);
     await expect(
       endTrackedGame(t.as(ownerId), { gameId, version: versionOf(t) }, t.deps),
@@ -180,6 +184,7 @@ describe('ending a tracked game (T6 §7)', () => {
       ],
     });
     await tap(t, tipOff, 1);
+    lapse(t);
     const before = structuredClone(t.db.state);
     const code = async (n: number, version = 1) => {
       const result = await endTrackedGame(t.as(ownerId), { gameId: gameUuid(n), version }, t.deps);
@@ -204,6 +209,7 @@ describe('ending a tracked game (T6 §7)', () => {
     ];
     const t = setUp();
     await tap(t, level, 1);
+    lapse(t);
     expect(
       await endTrackedGame(t.as(ownerId), { gameId, version: versionOf(t) }, t.deps),
     ).toMatchObject({ error: { code: 'tie-not-allowed' } });
@@ -219,10 +225,35 @@ describe('ending a tracked game (T6 §7)', () => {
       ],
     });
     await tap(ties, level, 1);
+    lapse(ties);
     expect(
       await endTrackedGame(ties.as(ownerId), { gameId, version: versionOf(ties) }, ties.deps),
     ).toMatchObject({ ok: true });
     expect(ties.db.state.games[0]).toMatchObject({ status: 'final', homeScore: 2, awayScore: 2 });
+  });
+
+  it('refuses while another account holds the scoring session; the holder may end it', async () => {
+    const t = setUp();
+    await underWay(t);
+    const before = structuredClone(t.db.state);
+    // The scorekeeper's tablet holds the game and its lease has not run out.
+    expect(await endTrackedGame(t.as(ownerId), { gameId, version: versionOf(t) }, t.deps)).toEqual({
+      ok: false,
+      error: { code: 'session-held' },
+    });
+    expect(t.db.state).toEqual(before);
+    // The holder's own account may end it from elsewhere.
+    expect(
+      await endTrackedGame(t.as(scorekeeperId), { gameId, version: versionOf(t) }, t.deps),
+    ).toMatchObject({ ok: true });
+
+    // Once the lease has run out, anyone who may score the game may end it.
+    const lapsed = setUp();
+    await underWay(lapsed);
+    lapse(lapsed);
+    expect(
+      await endTrackedGame(lapsed.as(ownerId), { gameId, version: versionOf(lapsed) }, lapsed.deps),
+    ).toMatchObject({ ok: true });
   });
 
   it('needs games.score: the scorekeeper may, an editor may not', async () => {
@@ -241,6 +272,7 @@ describe('reopening a tracked game hands it back to the tracker (T6 §8)', () =>
   it('end, reopen with a reason, fix with the tracker, end again: one correct result', async () => {
     const t = setUp();
     await underWay(t);
+    lapse(t);
     await endTrackedGame(t.as(ownerId), { gameId, version: versionOf(t) }, t.deps);
 
     const reopened = await reopenGame(
@@ -282,6 +314,7 @@ describe('reopening a tracked game hands it back to the tracker (T6 §8)', () =>
       20,
     );
     expect(t.db.state.games[0]).toMatchObject({ status: 'live', homeScore: 5, awayScore: 2 });
+    lapse(t);
     await endTrackedGame(t.as(ownerId), { gameId, version: versionOf(t) }, t.deps);
 
     s = t.db.state;

@@ -158,6 +158,9 @@ async function trackedGame() {
 type Game = Awaited<ReturnType<typeof trackedGame>>;
 type Input = Parameters<typeof basketball.apply>[1];
 
+/** The tablet's lease runs out, so another account may end the game. */
+const lapse = () => void (clock.at += 120_000);
+
 /** Sends taps through the tracker's door; their statuses. */
 async function tap(g: Game, inputs: readonly Input[], deps = depsWith()) {
   const commands = inputs.map((input) => {
@@ -322,6 +325,15 @@ describe('ending a tracked game on the database (T6 §7)', () => {
       ...firstHalf(g),
       { type: 'score', side: 'away', playerId: g.away[1] ?? '', points: 3 },
     ]);
+    // While the scorekeeper's tablet holds the game, the owner may not end it.
+    expect(
+      await endTrackedGame(
+        g.as(g.ownerId),
+        { gameId: g.gameId, version: await versionOf(g) },
+        depsWith(),
+      ),
+    ).toMatchObject({ error: { code: 'session-held' } });
+    lapse();
     expect(
       await endTrackedGame(
         g.as(g.ownerId),
@@ -349,6 +361,7 @@ describe('ending a tracked game on the database (T6 §7)', () => {
   it('is all or nothing: when the totals cannot be saved, nothing of the end is', async () => {
     const g = await trackedGame();
     await tap(g, firstHalf(g));
+    lapse();
     const before = await rowsOf(g);
     const failing = (scope: LeagueScope): StandingsStore => ({
       ...standingsStore(scope),
