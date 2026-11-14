@@ -250,9 +250,9 @@ export function buildPlays(page: GamePage, words: GameWords): readonly PlayPerio
 export type GameBoard = {
   readonly colors: { readonly home: string | null; readonly away: string | null };
   /** A game still to play: its day and, when it has one, its time, in the league's own zone. */
-  readonly when?: { readonly day: string; readonly time?: string };
+  readonly when?: { readonly day: string; readonly time?: string } | undefined;
   /** Where it is played: the venue, and the court when it has one. */
-  readonly placeText?: string;
+  readonly placeText?: string | undefined;
 };
 
 /** The two teams' own colors, as the game's page read them. */

@@ -58,7 +58,10 @@ html {
   color: var(--header-text);
   border-block-end: 1px solid var(--header-line);
 }
-.site-header :focus-visible {
+/* The focus ring in the header is in the header's own text color, so it shows on the bar
+   whatever a design's main color is. The league's frame is named too, so this wins over
+   the shared pieces' ring (`.ui-root :focus-visible`) wherever the two stylesheets land. */
+.league-site .site-header :focus-visible {
   outline-color: var(--header-text);
 }
 .site-header-top {
@@ -143,9 +146,43 @@ html {
   max-inline-size: calc(3 * var(--step-7));
   text-overflow: ellipsis;
 }
+/* Hovered, both stay in the header's text color: the shared picker's own hover color is the
+   page's, which on a bar of the main color would not read. */
 .site-header .site-season select:hover,
 .site-header .site-season button:hover {
   border-color: var(--header-text);
+  color: var(--header-text);
+}
+/* The league's name leads (U-8). On a phone the season picker with its "Show" button, which
+   is there wherever scripts are off or the browser cannot say, takes a row of its own under
+   the name, so the name keeps its room. Where scripts run the button is put away and the
+   picker sits beside the name; a button brought back by the keyboard hangs under it. */
+@media (max-width: 47.99rem) {
+  .site-header-top {
+    flex-wrap: wrap;
+  }
+  .site-season {
+    order: 1;
+    flex: 1 0 100%;
+    padding-block-end: var(--step-2);
+  }
+}
+@media (max-width: 47.99rem) and (scripting: enabled) {
+  .site-header-top {
+    flex-wrap: nowrap;
+  }
+  .site-season {
+    order: 0;
+    flex: none;
+    padding-block-end: 0;
+  }
+  .site-header .site-season .ui-picker:has(:focus-visible) button {
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-end: 0;
+    margin-block-start: var(--step-1);
+    background-color: var(--header-background);
+  }
 }
 
 /* The menu on a phone: one button that opens a panel. A plain disclosure, so it works

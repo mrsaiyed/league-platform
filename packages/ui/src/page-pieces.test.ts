@@ -20,6 +20,7 @@ import {
   StandingsTable,
   StatStrip,
   TeamCard,
+  appliesAtOnce,
   displayCss,
   initialOf,
 } from '../index.ts';
@@ -215,6 +216,28 @@ describe('filter toolbar', () => {
     expect(html).toContain('aria-label="Choose what to show"');
     expect(html).toContain('type="submit"');
     expect(html).not.toContain('data-applies');
+  });
+  it('applies a choice made by tap or click at once, and one moved by key only when confirmed', () => {
+    // A closed picker changes at every arrow key: that must not read the page again.
+    expect(appliesAtOnce('pointer', false)).toBe(true);
+    expect(appliesAtOnce('keyboard', false)).toBe(false);
+    // A choice confirmed with Enter in an open list arrives while Enter is down.
+    expect(appliesAtOnce('keyboard', true)).toBe(true);
+  });
+  it('puts the Show button away where scripts run, still reachable by the keyboard', () => {
+    const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    const scripted = css.slice(css.indexOf('@media (scripting: enabled)'));
+    expect(scripted).toMatch(
+      /\.ui-toolbar \.ui-picker button \{[^}]*position: absolute;[^}]*opacity: 0;[^}]*pointer-events: none;/,
+    );
+    // Back in its place whenever the keyboard is in its picker.
+    expect(scripted).toMatch(
+      /\.ui-toolbar \.ui-picker:has\(:focus-visible\) button \{[^}]*position: static;[^}]*opacity: 1;/,
+    );
+    // Never `display: none`, which would take it from the keyboard too; and nothing waits
+    // for the page's script to say so, so nothing appears and then hides on a load.
+    expect(css).not.toMatch(/\.ui-picker button \{[^}]*display: none/);
+    expect(css).not.toContain('data-applies');
   });
 });
 

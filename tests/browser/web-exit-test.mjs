@@ -14,7 +14,12 @@
 // league page has (step 2.85): the season picker in the header moves the page to another
 // season and keeps the page's other choices, the header is one row high on a phone, and a
 // page that is not there keeps the league's header and leads back to the league home, while
-// a league that may not be seen gets the plain screen.
+// a league that may not be seen gets the plain screen. And the header for the keyboard and
+// with scripts off (2.85 review): the focus ring is measured against the header's bar on
+// the league's name, a tab, the season picker, Sign in and the phone menu button, in both
+// looks; an arrow key in a picker never reads the page again, and Enter or the Show
+// button applies the choice; with scripts off at 320, 360 and 390 wide the league's name
+// keeps its room and the season picker sits under it.
 // A part that throws (a wait that times out, a build that fails) is recorded by name and
 // the other parts still run and print.
 // Not covered: (1) the invitation email being captured and its link followed: the
@@ -346,6 +351,199 @@ if (browser) {
       }
     } finally {
       await context.close();
+    }
+  });
+
+  await step('the header for the keyboard: a focus ring that shows, in both looks', async () => {
+    /** The ring `target` shows to the keyboard, and how it reads against the header's bar. */
+    const ringOf = async (target) => {
+      await target.focus();
+      return target.evaluate((el) => {
+        const parse = (value) => {
+          const [r, g, b, a = 1] = (/rgba?\(([^)]+)\)/.exec(value)?.[1] ?? '0 0 0 0')
+            .split(/[ ,/]+/)
+            .filter(Boolean)
+            .map(Number);
+          return { r, g, b, a };
+        };
+        const light = ({ r, g, b }) => {
+          const f = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+          return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+        };
+        const style = getComputedStyle(el);
+        const ring = parse(style.outlineColor);
+        const bar = parse(getComputedStyle(el.closest('.site-header')).backgroundColor);
+        const [hi, lo] = [light(ring), light(bar)].sort((a, b) => b - a);
+        return {
+          shown:
+            el.matches(':focus-visible') &&
+            style.outlineStyle === 'solid' &&
+            parseFloat(style.outlineWidth) >= 2 &&
+            ring.a === 1 &&
+            bar.a === 1,
+          ratio: (hi + 0.05) / (lo + 0.05),
+        };
+      });
+    };
+    const checkRing = async (label, target) => {
+      const ring = await ringOf(target);
+      note(
+        `the focus ring shows on ${label}`,
+        ring.shown && ring.ratio >= 3,
+        `shown ${ring.shown}, ${ring.ratio.toFixed(2)}:1 against the header`,
+      );
+    };
+    const laptop = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    try {
+      const page = await laptop.newPage();
+      const small = await phone.newPage();
+      for (const league of ['north-valley', 'harbor-city']) {
+        await open(page, `/${league}/schedule`);
+        // The keyboard is in use from here on, so what is focused shows its ring.
+        await page.keyboard.press('Tab');
+        const header = page.locator('.site-header');
+        await checkRing(`the league's name (${league})`, header.locator('.site-name'));
+        await checkRing(`a tab (${league})`, header.locator('.site-tabs a').nth(2));
+        await checkRing(
+          `the current tab (${league})`,
+          header.locator('.site-tabs a[aria-current=page]'),
+        );
+        await checkRing(`Sign in (${league})`, header.locator('.site-sign-in'));
+        await open(small, `/${league}/schedule`);
+        await small.keyboard.press('Tab');
+        await checkRing(
+          `the phone menu button (${league})`,
+          small.locator('.site-header .site-menu > summary'),
+        );
+      }
+      // The season picker: only the first league has two seasons, so it is measured there
+      // in its own look and then under the second league's design values, which is all
+      // that differs between two leagues' looks (T-90).
+      await open(page, '/north-valley/schedule');
+      await page.keyboard.press('Tab');
+      const picker = page.locator('.site-header select[name=season]');
+      await checkRing('the season picker (north-valley)', picker);
+      await page.evaluate(async () => {
+        const values = /:root \{[^}]*\}/.exec(await (await fetch('/harbor-city')).text())?.[0];
+        if (!values) throw new Error('no design values on /harbor-city');
+        for (const style of document.querySelectorAll('style')) {
+          if (/:root \{[^}]*--color-background/.test(style.textContent ?? ''))
+            style.textContent = style.textContent.replace(/:root \{[^}]*\}/, values);
+        }
+      });
+      note(
+        "the page took the second league's design values",
+        (await page.evaluate(() =>
+          getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim(),
+        )) === '#1f5fbf',
+      );
+      await checkRing("the season picker (under harbor-city's look)", picker);
+    } finally {
+      await laptop.close();
+      await phone.close();
+    }
+  });
+
+  await step('a picker and the keyboard: an arrow key never reads the page again', async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    try {
+      const page = await context.newPage();
+      await open(page, '/north-valley/schedule');
+      const quiet = () => new Promise((resolve) => setTimeout(resolve, 800));
+      const showOf = (name) => page.locator(`form:has(select[name=${name}]) button[type=submit]`);
+      note(
+        'a Show button is put away where scripts run',
+        (await showOf('season').evaluate((el) => getComputedStyle(el).opacity)) === '0',
+      );
+      // The season picker in the header: arrow, then Enter.
+      const season = page.locator('.site-header select[name=season]');
+      await page.keyboard.press('Tab');
+      await season.focus();
+      await page.keyboard.press('ArrowDown');
+      await quiet();
+      note(
+        'an arrow key moves the season without reading the page again',
+        (await season.inputValue()) === 'spring-2026' && !page.url().includes('season='),
+        `${await season.inputValue()} at ${page.url()}`,
+      );
+      note(
+        'the Show button is back while the keyboard is in its picker',
+        (await showOf('season').evaluate((el) => getComputedStyle(el).opacity)) === '1',
+      );
+      await page.keyboard.press('Enter');
+      await page.waitForURL(/season=spring-2026/);
+      note('Enter applies the season the keyboard chose', true);
+      // A picker of the page: arrow, then the Show button, which the keyboard reaches next.
+      await open(page, '/north-valley/schedule');
+      const round = page.locator('main select[name=round]');
+      await page.keyboard.press('Tab');
+      await round.focus();
+      await page.keyboard.press('ArrowDown');
+      await quiet();
+      note(
+        'an arrow key moves the round without reading the page again',
+        (await round.inputValue()) === '1' && !page.url().includes('round='),
+        `${await round.inputValue()} at ${page.url()}`,
+      );
+      await page.keyboard.press('Tab');
+      note(
+        'the next stop of the keyboard is the Show button of that picker',
+        await showOf('round').evaluate((el) => el === document.activeElement),
+      );
+      await page.keyboard.press('Enter');
+      await page.waitForURL(/round=1/);
+      note('the Show button applies the round the keyboard chose', true);
+      // A choice made by pointer is still applied at once.
+      await open(page, '/north-valley/schedule');
+      await page.locator('main select[name=round]').selectOption('2');
+      await page.waitForURL(/round=2/);
+      note('a choice made without the keyboard is applied at once', true);
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step("with scripts off on a small phone the league's name keeps its room", async () => {
+    for (const width of [320, 360, 390]) {
+      const context = await browser.newContext({
+        viewport: { width, height: 740 },
+        javaScriptEnabled: false,
+      });
+      try {
+        const page = await context.newPage();
+        await open(page, '/north-valley/schedule');
+        const box = (selector) => page.locator(`.site-header ${selector}`).boundingBox();
+        const name = await box('.site-name');
+        const picker = await box('select[name=season]');
+        const show = await box('.site-season button[type=submit]');
+        note(
+          `at ${width} with scripts off the league's name has most of the header's width`,
+          (name?.width ?? 0) >= width * 0.6,
+          `${name?.width} of ${width}`,
+        );
+        note(
+          `at ${width} with scripts off the name is shown whole`,
+          await page
+            .locator('.site-header .site-name')
+            .evaluate((el) => el.scrollHeight <= el.clientHeight + 1),
+        );
+        note(
+          `at ${width} with scripts off the season picker and its Show button are there, under the name`,
+          picker !== null &&
+            show !== null &&
+            picker.y >= (name?.y ?? 0) + (name?.height ?? 0) - 1 &&
+            show.x + show.width <= width &&
+            show.height >= 44,
+          JSON.stringify({ name, picker, show }),
+        );
+        note(
+          `at ${width} with scripts off the page does not scroll sideways`,
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        );
+      } finally {
+        await context.close();
+      }
     }
   });
 

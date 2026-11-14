@@ -65,7 +65,26 @@ export const pickerCss = String.raw`
 .ui-picker button:hover {
   color: var(--color-text);
 }
-.ui-toolbar[data-applies='true'] .ui-picker button {
-  display: none;
+/* Where scripts run, a choice made by tap or click is applied at once, so the "Show"
+   button is put away: out of sight and taking no room, but still the next stop of the
+   keyboard, and back in its place whenever the keyboard is in its picker. The stylesheet
+   knows this before the page's script starts, so nothing appears and then hides. A
+   browser with scripts off, or one that cannot say, keeps the quiet button. */
+@media (scripting: enabled) {
+  .ui-toolbar .ui-picker {
+    position: relative;
+  }
+  .ui-toolbar .ui-picker button {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .ui-toolbar .ui-picker:has(:focus-visible) button {
+    position: static;
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 `;

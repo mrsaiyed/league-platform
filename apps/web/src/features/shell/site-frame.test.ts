@@ -2,6 +2,7 @@
 // on every page (U-8), words from the message file (T-187) and right-to-left (T-188).
 import { designToCssText, startingDesign } from '@srleagues/site';
 import { htmlAttributes, en } from '@srleagues/site';
+import { displayCss } from '@srleagues/ui';
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -135,6 +136,46 @@ describe('header, menu and footer', () => {
     for (const raw of ['2.75rem', '0.375rem', '0.3125rem', '1.25rem', 'font-size: 1rem']) {
       expect(css).not.toContain(raw);
     }
+  });
+
+  it('draws the focus ring in the header in the header text color, whichever stylesheet lands last', () => {
+    const strip = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '');
+    const css = strip(
+      readFileSync(new URL('../../app/[league]/league-site.css', import.meta.url), 'utf8'),
+    );
+    const shared = strip(displayCss);
+    const ring = /([^{}]+)\{\s*outline-color: var\(--header-text\);\s*\}/.exec(css)?.[1]?.trim();
+    expect(ring).toBe('.league-site .site-header :focus-visible');
+    // The shared pieces draw one ring for everything (and the team card's own, which is
+    // never in the header). The header's rule names more than the shared one, so it wins
+    // even though the shared styles come later in the page.
+    const colored = [...shared.matchAll(/([^{}]+)\{[^{}]*outline: [^;]*var\(--color[^{}]*\}/g)]
+      .map((m) => (m[1] ?? '').trim())
+      .sort();
+    expect(colored).toEqual(
+      ['.ui-root :focus-visible', '.ui-team-card-name a:focus-visible::after'].sort(),
+    );
+    const weight = (selector: string) => (selector.match(/[.:][a-z-]+/g) ?? []).length;
+    expect(weight(ring ?? '')).toBeGreaterThan(weight('.ui-root :focus-visible'));
+  });
+
+  it('keeps the name its room on a phone: the picker with its button takes a row of its own', () => {
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    // Scripts off, or a browser that cannot say: two rows, the name first.
+    expect(css).toMatch(
+      /@media \(max-width: 47\.99rem\) \{\s*\.site-header-top \{\s*flex-wrap: wrap;\s*\}\s*\.site-season \{[^}]*flex: 1 0 100%;/,
+    );
+    // Scripts on: the button is put away by the shared styles, so one row is enough.
+    expect(css).toMatch(
+      /@media \(max-width: 47\.99rem\) and \(scripting: enabled\) \{\s*\.site-header-top \{\s*flex-wrap: nowrap;/,
+    );
+    // Hovered, the header's picker and button stay in the header's own text color.
+    expect(css).toMatch(
+      /\.site-header \.site-season button:hover \{[^}]*color: var\(--header-text\);/,
+    );
   });
 
   it('carries the Powered by SR Leagues mark and the footer links (U-8)', () => {
