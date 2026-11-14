@@ -76,6 +76,7 @@ const reachNoLeagueData = new Map<unknown, string>([
     "takes a lock keyed by the scope's own league and a season id; reads and writes no rows",
   ],
   [databasePackage.peopleStore, 'binds the people queries (own cases) to a scope'],
+  [databasePackage.importsStore, 'binds the import queries (own cases) to a scope'],
   [databasePackage.schedulingStore, 'binds the venue and court queries (own cases) to a scope'],
   [currentLeague, 'turns a row already read into the returned shape; runs no SQL'],
   [leagueStatusOf, "checks a state already read against core's list; runs no SQL"],

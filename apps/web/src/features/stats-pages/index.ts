@@ -1,0 +1,8 @@
+// The public standings and statistics pages (step 2.43). Used only through this file.
+export {
+  StandingsPage,
+  StandingsTables,
+  SeasonChoice,
+  type SearchParams,
+} from './standings-page.tsx';
+export { StatsPage, StatsTables } from './stats-page.tsx';

@@ -75,6 +75,28 @@ const cases = [
     ['Harbor City League', 'Powered by SR Leagues', '--color-primary: #1f5fbf'],
     ['#c8a84b'],
   ],
+  // The standings and statistics pages (step 2.43): real tables, not the placeholder; a
+  // team set to staff only shows its totals and none of its players to a visitor (S-22).
+  [
+    'visitor',
+    '/north-valley/standings',
+    200,
+    ['East', 'West', 'Owls', 'Played an ineligible player in round 3.', 'games they played'],
+    ['This page is not built yet.'],
+  ],
+  ['visitor', '/north-valley/standings?season=spring-2026', 200, ['Spring 2026', 'All teams']],
+  ['visitor', '/north-valley/standings?season=nope', 404, [notFound]],
+  [
+    'visitor',
+    '/north-valley/stats',
+    200,
+    ['Leaders', 'Dana Whitfield', 'Owls', 'Only team totals are shown for Owls.', 'ui-stats'],
+    ['This page is not built yet.', 'Jordan', 'Castellanos', 'Imani', 'Brooks'],
+  ],
+  ['coach', '/north-valley/stats', 200, ['Dana Whitfield'], ['Jordan', 'Castellanos', 'Brooks']],
+  ['visitor', '/north-valley/stats?by=total', 200, ['Season totals']],
+  ['visitor', '/harbor-city/stats', 200, ['Sam R.', 'Noor H.'], ['Rivera', 'Haddad']],
+  ['visitor', '/harbor-city/standings', 200, ['Level with another team', 'PTS']],
   ['scheduler', '/north-valley/admin', 200, ['Powered by SR Leagues', '--color-primary: #c8a84b']],
   ['visitor', '/north-valley/admin', 403, [noAccess], ['Admin areas']],
   ['stranger', '/north-valley/admin', 403, [noAccess]],

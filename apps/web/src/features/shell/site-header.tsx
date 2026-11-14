@@ -5,6 +5,7 @@ const menu = [
   ['home', 'nav.home'],
   ['schedule', 'nav.schedule'],
   ['standings', 'nav.standings'],
+  ['stats', 'nav.stats'],
   ['teams', 'nav.teams'],
 ] as const;
 

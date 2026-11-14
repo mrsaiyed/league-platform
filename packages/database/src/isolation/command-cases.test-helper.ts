@@ -30,6 +30,7 @@ import {
   type DomainEvent,
   type EventHandler,
   type GamesTx,
+  type ImportScoresTx,
   type Job,
   type JobQueue,
   type LeaguesTx,
@@ -48,6 +49,7 @@ import {
   activityLogStore,
   divisionsStore,
   gamesStore,
+  importsStore,
   jobsStore,
   leaguesStore,
   peopleStore,
@@ -60,7 +62,8 @@ import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import { harnessNow, type LeagueRecords } from './two-leagues.test-helper.ts';
 
 /** Every module's store, as the apps' transaction offers them. Grows with each module. */
-export type HarnessTx = LeaguesTx &
+export type HarnessTx = ImportScoresTx &
+  LeaguesTx &
   SchedulingTx &
   GamesTx &
   ScoringTx &
@@ -83,6 +86,7 @@ export function harnessTx(scope: LeagueScope, jobs: JobQueue): HarnessTx {
     scoringSessions: scoringSessionsStore(scope),
     // Fixed, so the seeded sessions' leases read the same at any time of day.
     clock: { now: () => harnessNow },
+    imports: importsStore(scope),
     people: peopleStore(scope),
     teams: teamsStore(scope),
     standings: standingsStore(scope),

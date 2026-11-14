@@ -18,6 +18,7 @@ const reads = new Set([
   'leagues.get_season',
   'scheduling.list_venues',
   'scheduling.get_schedule_draft',
+  'imports.get_fixture_import',
   'scheduling.preview_schedule_publish',
   'teams.list_roster',
   // Holding a game to score (T-116): the tracker opens, renews every half minute and
