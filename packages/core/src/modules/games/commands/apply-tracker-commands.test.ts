@@ -285,6 +285,24 @@ describe('applying the tracker’s commands (T-111, T6 §1)', () => {
     ]);
   });
 
+  it('a player sent in capitals is the same player: one line, nothing wiped', async () => {
+    const t = setUp();
+    const id = homeIds[0] ?? '';
+    await applyTrackerCommands(
+      t.as(scorekeeperId),
+      batchOf(
+        taps([
+          { type: 'score', side: 'home', playerId: id.toUpperCase(), points: 2 },
+          { type: 'score', side: 'home', playerId: id, points: 3 },
+        ]),
+      ),
+      t.deps,
+    );
+    expect(t.db.state.liveLines).toHaveLength(1);
+    expect(t.db.state.liveLines[0]).toMatchObject({ personId: id, stats: { points: 5 } });
+    expect(t.db.state.events[0]?.payload).toMatchObject({ playerId: id });
+  });
+
   it('undoing a player’s only play removes their line', async () => {
     const t = setUp();
     await applyTrackerCommands(

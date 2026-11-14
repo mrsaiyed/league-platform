@@ -41,6 +41,7 @@ import {
   readState,
   rosterOf,
   scoreOf,
+  withLowerIds,
   type TrackerInput,
 } from '../live-game.ts';
 import { mayScoreGame } from '../policy.ts';
@@ -156,7 +157,7 @@ export const applyTrackerCommands = defineCommand({
         status: 'refused',
         reason: { code: 'rule', message: message.slice(0, 300) },
       });
-      const input: TrackerInput = command.input;
+      const input: TrackerInput = withLowerIds(command.input);
       const problem = platformProblem(input) ?? playerProblem(game, roster, input);
       if (problem !== undefined) return refused(problem);
       // platformProblem refuses every rules command; this tells the type checker so.

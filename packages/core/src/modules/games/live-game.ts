@@ -37,6 +37,30 @@ export function platformProblem(input: TrackerInput): string | undefined {
   return undefined;
 }
 
+const lower = (id: string) => id.toLowerCase();
+
+/**
+ * The command with its player ids in lower case, as the database spells them. The
+ * engine compares ids as text, so one player sent as `AB…` and as `ab…` would
+ * otherwise count as two, and the second's line would replace the first's.
+ */
+export function withLowerIds(input: TrackerInput): TrackerInput {
+  switch (input.type) {
+    case 'lineup':
+      return { ...input, playerIds: input.playerIds.map(lower) };
+    case 'sub':
+      return { ...input, inId: lower(input.inId), outId: lower(input.outId) };
+    case 'score':
+    case 'foul':
+    case 'unfoul':
+    case 'turnover':
+    case 'unturnover':
+      return { ...input, playerId: lower(input.playerId) };
+    default:
+      return input;
+  }
+}
+
 /** The players a command names. A team's own play (a timeout, a team turnover) names none. */
 function playersNamed(input: TrackerInput): readonly string[] {
   switch (input.type) {
