@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { TrackerBackup } from './index.ts';
 import { TrackerBackupError, readTrackerBackup } from './index.ts';
 
 // The tracker's own schema, as its stats server creates it.
@@ -25,12 +26,14 @@ const ids = {
   c3: '00000000-0000-4000-8000-000000000033',
 };
 
-/** A made-up backup: two teams, three players, three games, one of them tracked to the end. */
-async function makeBackup(dir: string, { oldLines = false, change = '' } = {}) {
+/**
+ * A made-up backup: two teams, three players, three games, one of them tracked to the end.
+ * Starting a fresh embedded database is the slow part, so this is done once; the variants
+ * the tests need are copies of it with `change` applied (see `variant`).
+ */
+async function makeBackup(dir: string) {
   const db = new PGlite(dir);
   await db.exec(await readFile(schemaFile, 'utf8'));
-  // A backup from before turnovers were kept.
-  if (oldLines) await db.exec('ALTER TABLE live_stats.player_game_lines DROP COLUMN turnovers');
   await db.query(
     `INSERT INTO live_stats.teams(id, slug, name, school, tracked, source_url) VALUES
        ($1, 'riverside-owls', 'Riverside Owls', 'Riverside Academy', true, 'https://example.test/owls'),
@@ -70,18 +73,21 @@ async function makeBackup(dir: string, { oldLines = false, change = '' } = {}) {
       JSON.stringify({ type: 'end' }),
     ],
   );
-  const columns = oldLines
-    ? 'game_id, player_id, team_id, name, jersey, appeared, points, fg1, fg2, fg3, fouls, ms'
-    : 'game_id, player_id, team_id, name, jersey, appeared, points, fg1, fg2, fg3, fouls, ms, turnovers';
-  const extra = oldLines ? '' : ', 2';
   await db.query(
-    `INSERT INTO live_stats.player_game_lines(${columns}) VALUES
-       ($1, $2, $4, 'Sam Example', '4', true, 5, 0, 1, 1, 2, 1500000${extra}),
-       ($1, $3, $5, '', '12', true, 2, 2, 0, 0, 0, 900000${oldLines ? '' : ', 0'})`,
+    `INSERT INTO live_stats.player_game_lines(game_id, player_id, team_id, name, jersey, appeared,
+       points, fg1, fg2, fg3, fouls, ms, turnovers) VALUES
+       ($1, $2, $4, 'Sam Example', '4', true, 5, 0, 1, 1, 2, 1500000, 2),
+       ($1, $3, $5, '', '12', true, 2, 2, 0, 0, 0, 900000, 0)`,
     [ids.final, ids.p1, ids.p3, ids.home, ids.away],
   );
-  // Damage done to a test backup after it is filled.
-  if (change) await db.exec(change);
+  await db.close();
+}
+
+/** A copy of the finished backup with `change` (damage, or an older shape) applied to it. */
+async function variant(dir: string, change: string) {
+  await cp(backup, dir, { recursive: true });
+  const db = new PGlite(dir);
+  await db.exec(change);
   await db.close();
 }
 
@@ -98,17 +104,91 @@ async function fingerprint(dir: string) {
   return out;
 }
 
+/** What a reader call came to: the data, or the problem a TrackerBackupError named. */
+async function outcome(run: () => Promise<TrackerBackup>) {
+  return run().then(
+    (read) => ({ read, problem: 'read' }),
+    (error: unknown) => ({
+      read: undefined,
+      problem: error instanceof TrackerBackupError ? error.problem : 'other',
+    }),
+  );
+}
+
+// Copying a backup folder (about a thousand files) is what makes these tests slow, so every
+// folder is built once, and the reads that do not depend on each other run side by side.
 let root: string;
 let backup: string;
-let oldBackup: string;
+let work: string;
+let results: {
+  whole: Awaited<ReturnType<typeof outcome>>;
+  before: Record<string, string>;
+  after: Record<string, string>;
+  workLeft: string[];
+  deepWorkLeft: string[];
+  old: Awaited<ReturnType<typeof outcome>>;
+  other: Awaited<ReturnType<typeof outcome>>;
+  noVenue: Awaited<ReturnType<typeof outcome>>;
+  failing: Awaited<ReturnType<typeof outcome>>;
+  beside: Awaited<ReturnType<typeof outcome>>;
+};
 
 beforeAll(async () => {
   root = await mkdtemp(path.join(tmpdir(), 'tracker-backup-test-'));
   backup = path.join(root, 'backup');
-  oldBackup = path.join(root, 'old-backup');
+  work = path.join(root, 'work');
   await makeBackup(backup);
-  await makeBackup(oldBackup, { oldLines: true });
-});
+  const deepWork = `${backup}-work/deeper`;
+  const folders = {
+    old: path.join(root, 'old-backup'),
+    other: path.join(root, 'other-database'),
+    noVenue: path.join(root, 'no-venue'),
+    failing: path.join(root, 'failing'),
+  };
+  await mkdir(work);
+  await Promise.all([
+    // A backup from before turnovers were kept.
+    variant(folders.old, 'ALTER TABLE live_stats.player_game_lines DROP COLUMN turnovers'),
+    // A database that is not the tracker's at all.
+    variant(folders.other, 'DROP SCHEMA live_stats CASCADE; CREATE TABLE notes (id int)'),
+    // The tracker's tables, but one lacks a column the reader needs.
+    variant(folders.noVenue, 'ALTER TABLE live_stats.games DROP COLUMN venue'),
+    // Every column is there, but reading one fails.
+    variant(
+      folders.failing,
+      `ALTER TABLE live_stats.teams RENAME TO teams_kept;
+        CREATE VIEW live_stats.teams AS
+          SELECT id, slug, name, school, tracked, (1 / 0)::text AS source_url
+          FROM live_stats.teams_kept`,
+    ),
+  ]);
+  const before = await fingerprint(backup);
+  // A lock left by a process that has stopped does not count.
+  await writeFile(`${folders.old}.lock`, '999999999');
+  const [whole, old, other, noVenue, failing, beside] = await Promise.all([
+    outcome(() => readTrackerBackup(backup, { workDir: work })),
+    outcome(() => readTrackerBackup(folders.old)),
+    outcome(() => readTrackerBackup(folders.other)),
+    outcome(() => readTrackerBackup(folders.noVenue)),
+    outcome(() => readTrackerBackup(folders.failing)),
+    // A folder beside the backup whose name only starts the same is a fine working folder,
+    // and one that does not exist yet is made.
+    outcome(() => readTrackerBackup(backup, { workDir: deepWork })),
+  ]);
+  await rm(`${folders.old}.lock`);
+  results = {
+    whole,
+    before,
+    after: await fingerprint(backup),
+    workLeft: await readdir(work),
+    deepWorkLeft: await readdir(deepWork),
+    old,
+    other,
+    noVenue,
+    failing,
+    beside,
+  };
+}, 150_000);
 
 afterAll(async () => {
   await rm(root, { recursive: true, force: true });
@@ -116,7 +196,8 @@ afterAll(async () => {
 
 describe('readTrackerBackup', () => {
   it('reads a whole backup into plain data', async () => {
-    const read = await readTrackerBackup(backup);
+    const read = results.whole.read;
+    if (!read) throw new Error(`the backup was not read: ${results.whole.problem}`);
 
     expect(read.teams).toEqual([
       {
@@ -219,19 +300,17 @@ describe('readTrackerBackup', () => {
     expect(undated).toMatchObject({ startsAt: null, sourceRef: null, gameType: 'scrimmage' });
   });
 
-  it('leaves the backup byte-for-byte unchanged and adds nothing beside it', async () => {
-    const before = await fingerprint(backup);
-    const work = path.join(root, 'work');
-    await mkdir(work);
-    await readTrackerBackup(backup, { workDir: work });
-    expect(await fingerprint(backup)).toEqual(before);
+  it('leaves the backup byte-for-byte unchanged and adds nothing beside it', () => {
+    expect(results.whole.problem).toBe('read');
+    expect(results.after).toEqual(results.before);
     expect(existsSync(`${backup}.lock`)).toBe(false);
     // The working copy is gone.
-    expect(await readdir(work)).toEqual([]);
+    expect(results.workLeft).toEqual([]);
   });
 
-  it('reads a backup from before turnovers were kept, with none', async () => {
-    const read = await readTrackerBackup(oldBackup);
+  it('reads a backup from before turnovers were kept, with none', () => {
+    const read = results.old.read;
+    if (!read) throw new Error(`the backup was not read: ${results.old.problem}`);
     expect(read.games[0]?.lines.map((l) => l.turnovers)).toEqual([0, 0]);
     expect(read.games[0]?.lines[0]?.points).toBe(5);
   });
@@ -249,11 +328,7 @@ describe('readTrackerBackup', () => {
     await mkdir(empty);
     expect(await problem(empty)).toBe('not-a-database');
 
-    const other = path.join(root, 'other-database');
-    const db = new PGlite(other);
-    await db.exec('CREATE TABLE notes (id int)');
-    await db.close();
-    expect(await problem(other)).toBe('not-a-tracker-backup');
+    expect(results.other.problem).toBe('not-a-tracker-backup');
 
     // A folder that looks like a database but will not open.
     const corrupt = path.join(root, 'corrupt');
@@ -262,20 +337,8 @@ describe('readTrackerBackup', () => {
     await writeFile(path.join(corrupt, 'base', 'junk'), 'not a database page');
     expect(await problem(corrupt)).toBe('not-a-database');
 
-    // The tracker's tables, but one lacks a column the reader needs.
-    const noVenue = path.join(root, 'no-venue');
-    await makeBackup(noVenue, { change: 'ALTER TABLE live_stats.games DROP COLUMN venue' });
-    expect(await problem(noVenue)).toBe('not-a-tracker-backup');
-
-    // Every column is there, but reading one fails.
-    const failing = path.join(root, 'failing');
-    await makeBackup(failing, {
-      change: `ALTER TABLE live_stats.teams RENAME TO teams_kept;
-        CREATE VIEW live_stats.teams AS
-          SELECT id, slug, name, school, tracked, (1 / 0)::text AS source_url
-          FROM live_stats.teams_kept`,
-    });
-    expect(await problem(failing)).toBe('not-a-tracker-backup');
+    expect(results.noVenue.problem).toBe('not-a-tracker-backup');
+    expect(results.failing.problem).toBe('not-a-tracker-backup');
 
     // A folder a running stats server holds (this test's own process stands in for it).
     await writeFile(`${backup}.lock`, String(process.pid));
@@ -285,12 +348,7 @@ describe('readTrackerBackup', () => {
       await rm(`${backup}.lock`);
     }
     // A lock left by a process that has stopped does not count.
-    await writeFile(`${backup}.lock`, '999999999');
-    try {
-      expect(await problem(backup)).toBe('read');
-    } finally {
-      await rm(`${backup}.lock`);
-    }
+    expect(results.old.problem).toBe('read');
   });
 
   it('keeps what caused the error, for logs', async () => {
@@ -302,10 +360,8 @@ describe('readTrackerBackup', () => {
     expect((error as TrackerBackupError).cause).toBeDefined();
   });
 
-  it('makes a working folder that does not exist yet', async () => {
-    const work = path.join(root, 'new-work', 'deeper');
-    await readTrackerBackup(backup, { workDir: work });
-    expect(await readdir(work)).toEqual([]);
+  it('makes a working folder that does not exist yet', () => {
+    expect(results.deepWorkLeft).toEqual([]);
   });
 
   it('refuses a working folder it cannot use', async () => {
@@ -328,6 +384,6 @@ describe('readTrackerBackup', () => {
     expect(await problem(file)).toBe('work-dir-unusable');
 
     // A folder beside the backup whose name only starts the same is fine.
-    expect(await problem(`${backup}-work`)).toBe('read');
+    expect(results.beside.problem).toBe('read');
   });
 });

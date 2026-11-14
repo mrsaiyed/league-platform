@@ -32,6 +32,10 @@ export type ReadTrackerBackupOptions = {
  * is missing or cannot be copied, holds no database or one that will not open, lacks the
  * tracker's tables or columns, is open in a running stats server, or the working folder
  * cannot be used.
+ *
+ * The working folder defaults to the system's temporary folder, which is fine for a test
+ * but not for real use: the caller (the import, step 2.58) should pass its own `workDir`,
+ * a folder it owns on a disk with room for a copy of the backup.
  */
 export async function readTrackerBackup(
   folder: string,
