@@ -66,6 +66,15 @@ describe('the Supabase Auth client', () => {
     }
   });
 
+  it('lower-cases only A to Z in the address, never folding another character into ASCII', async () => {
+    // U+212A, the Kelvin sign: toLowerCase() would make it a plain k (record 055).
+    const { client } = clientAnswering(() =>
+      Response.json({ id: 'u-1', email: 'Kim.ANA@Example.test' }),
+    );
+    const answer = await client.user(accessToken);
+    expect(answer.ok ? answer.value.email : 'refused').toBe('Kim.ana@example.test');
+  });
+
   it('reads the error code, the weak-password reasons and the wait', async () => {
     const { client } = clientAnswering(() =>
       Response.json(

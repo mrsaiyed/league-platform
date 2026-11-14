@@ -33,3 +33,17 @@ export function isSignInLinkConflict(error: unknown): boolean {
   const found = constraintOf(error);
   return found?.code === '23505' && found.constraint === 'accounts_sign_in_id_key';
 }
+
+/**
+ * Whether `error` is the database refusing what accountForSignIn was given or would
+ * make: a rule of the data broken (SQLSTATE class 23: an address on .invalid, one the
+ * accounts' email format refuses, a link conflict) or a value it cannot take (class
+ * 22: too long, a null). Such an address will be refused every time, so the caller
+ * answers it plainly (record 055). Anything else, such as the database not being
+ * reached, a lost connection or a missing grant, is a fault, not a refusal.
+ */
+export function isSignInRefusal(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const { code } = error as { code?: unknown };
+  return typeof code === 'string' && /^2[23][0-9A-Z]{3}$/.test(code);
+}

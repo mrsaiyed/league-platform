@@ -7,7 +7,7 @@ import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import { withTransaction } from '../db/with-transaction.ts';
 import { freshSchema, newAccount, one, unique } from '../schema/schema.test-helper.ts';
-import { accountForSignIn, isSignInLinkConflict } from './account-for-sign-in.ts';
+import { accountForSignIn, isSignInLinkConflict, isSignInRefusal } from './account-for-sign-in.ts';
 import { findAccountOfSignIn } from './find-account-of-sign-in.ts';
 
 let pglite: PGlite;
@@ -70,6 +70,34 @@ describe('accountForSignIn (record 052)', () => {
     // Only that refusal: any other error is not a link conflict.
     expect(isSignInLinkConflict(erased)).toBe(false);
     expect(isSignInLinkConflict(new Error('accounts_sign_in_id_key'))).toBe(false);
+  });
+
+  it('tells the database’s refusals of an address from faults (record 055)', async () => {
+    const refusedBy = (email: string) =>
+      forSignIn(crypto.randomUUID(), email).catch((error: unknown) => error);
+    const erased = await refusedBy(`${crypto.randomUUID()}@erased.invalid`);
+    const badFormat = await refusedBy('no at sign');
+    const tooLong = await refusedBy(`${'a'.repeat(330)}@example.test`);
+    for (const refused of [erased, badFormat, tooLong]) {
+      expect(refused).toBeInstanceOf(Error);
+      expect(isSignInRefusal(refused)).toBe(true);
+    }
+    const email = `${unique('conflict')}@example.test`;
+    await forSignIn(crypto.randomUUID(), email);
+    expect(isSignInRefusal(await refusedBy(email))).toBe(true);
+    // Not reaching the database, a lost connection or a missing grant is a fault.
+    const unreachable = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
+    for (const fault of [
+      unreachable,
+      Object.assign(new Error('terminating connection'), { code: '57P01' }),
+      Object.assign(new Error('permission denied'), { code: '42501' }),
+      Object.assign(new Error('could not serialize'), { code: '40001' }),
+      new Error('no code'),
+      'not an error',
+      null,
+    ]) {
+      expect(isSignInRefusal(fault)).toBe(false);
+    }
   });
 
   it('keeps a linked sign-in user’s account whatever address the service now gives', async () => {

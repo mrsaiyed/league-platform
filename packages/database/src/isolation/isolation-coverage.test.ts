@@ -89,6 +89,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.isSignInLinkConflict,
     "tells accountForSignIn's link refusal from an error already thrown; runs no SQL",
   ],
+  [
+    databasePackage.isSignInRefusal,
+    "tells accountForSignIn's refusals from faults, by an error already thrown; runs no SQL",
+  ],
   [databasePackage.withTransaction, 'opens the fenced transaction every case runs in'],
   // It opens its own transaction, which no case can do inside a harness run; its
   // mapping of a context to the fences is tested beside it.

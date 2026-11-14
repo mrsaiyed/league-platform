@@ -132,7 +132,9 @@ function userOf(value: unknown, what: string): GoTrueUser {
   const confirmedAt = confirmed === undefined ? null : new Date(confirmed);
   return {
     id,
-    email: email.toLowerCase(),
+    // A to Z only: toLowerCase() folds some other characters into ASCII (the Kelvin
+    // sign into k), which would turn one mailbox's address into another's (record 055).
+    email: email.replace(/[A-Z]/g, (letter) => String.fromCharCode(letter.charCodeAt(0) + 32)),
     emailConfirmedAt:
       confirmedAt === null || Number.isNaN(confirmedAt.getTime()) ? null : confirmedAt,
   };

@@ -36,10 +36,14 @@ import type { SessionError, SessionIdentity } from '@srleagues/providers';
  * (record 055). `sign-in-link-conflict`: the account for its address is linked to
  * another sign-in user, which is put right by hand (record 052).
  * `address-not-confirmed`: a user seen for the first time whose address the service
- * does not hold as proved, so no account is linked or made for it. Either way the
- * person stays signed in, is told so plainly on the account page and may sign out there.
+ * does not hold as proved, so no account is linked or made for it.
+ * `address-refused`: an address no account may be linked or made for: one the database
+ * refuses (on .invalid, or not in the accounts' email format), or one with characters
+ * other than plain ASCII, which could be folded into another person's address.
+ * Whichever, the person stays signed in, is told so plainly on the account page and
+ * may sign out there.
  */
-export type AccountProblem = 'sign-in-link-conflict' | 'address-not-confirmed';
+export type AccountProblem = 'sign-in-link-conflict' | 'address-not-confirmed' | 'address-refused';
 
 export type AccountRefusal = { readonly code: 'account-problem'; readonly problem: AccountProblem };
 
