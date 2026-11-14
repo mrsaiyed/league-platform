@@ -48,7 +48,7 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
   });
   const transaction = memoryTransaction(db, (s, jobs): BinTx => {
     const find = (id: string) => s.things.find((t) => t.id === id);
-    const restore = <T extends string>(id: string, clashes: readonly T[]) => {
+    const restore = <T extends string>(id: string, clashes: readonly T[]): boolean | T => {
       const t = find(id);
       if (t === undefined) return false;
       if (t.clash !== undefined && (clashes as readonly string[]).includes(t.clash)) {
@@ -100,9 +100,9 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
                 partInBin: t.partInBin === true,
               };
         },
-        restoreTeam: async (id) => restore(id, ['short-name-taken', 'name-taken']),
-        restorePerson: async (id) => restore(id, ['profile-taken']),
-        restoreGame: async (id) => restore(id, ['game-number-taken']),
+        restoreTeam: async (id) => restore(id, ['short-name-taken', 'name-taken'] as const),
+        restorePerson: async (id) => restore(id, ['profile-taken'] as const),
+        restoreGame: async (id) => restore(id, ['game-number-taken'] as const),
         purge: async (cutoff) => {
           const counts = { courts: 0, venues: 0, teams: 0, divisions: 0, people: 0 };
           const key = {

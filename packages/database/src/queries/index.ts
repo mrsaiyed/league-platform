@@ -141,3 +141,8 @@ export { findImport } from './find-import.ts';
 export { insertImport } from './insert-import.ts';
 export { listSeasonNames } from './list-season-names.ts';
 export { updateImport } from './update-import.ts';
+export { hasBinnedGamePart } from './has-binned-game-part.ts';
+export { listBinned } from './list-binned.ts';
+export { purgeBinned } from './purge-binned.ts';
+export { restoreBinnedGame } from './restore-binned-game.ts';
+export { restoreBinnedPerson } from './restore-binned-person.ts';
