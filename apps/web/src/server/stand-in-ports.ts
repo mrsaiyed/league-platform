@@ -36,6 +36,7 @@ import { standInFixtureImport } from './stand-in-fixture-import.ts';
 import { standInGames } from './stand-in-games.ts';
 import { standInPublicSchedule } from './stand-in-public-schedule.ts';
 import { standInPublicStats } from './stand-in-public-stats.ts';
+import { standInPublicTeams } from './stand-in-public-teams.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
 
@@ -311,6 +312,10 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     publicSchedule: standInPublicSchedule(
       { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
       now,
+    ),
+    publicTeams: standInPublicTeams(
+      { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
+      coach.accountId,
     ),
     signUpMadeUpMember: async () => {
       const here = '127.0.0.1';
