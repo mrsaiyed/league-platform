@@ -130,6 +130,8 @@ A large step can also be split among builders inside its lane, when their files 
 
 Working side by side finishes sooner by the clock. It does not make the usage allowance go further: five builders use it about five times as fast.
 
+**Watching the allowance** (the chat lead, for the founder, 2026-11-14, after two cut-offs in one day killed helpers mid-work). The lead reads the plan's usage every 30 minutes with the app's usage tool (`mcp__ccd_session_mgmt__get_usage`) and writes the weekly figure and the time into the log, so the cost of a day's building is known. If the weekly figure for all models passes 85%: start no new helper, tell the running ones to commit what works and report, land what has passed, write it under "Needs the founder" in `STATUS.md`, and end the run, so that the founder can still talk to the chat lead. A helper cut off by a limit is not replaced: once requests are accepted again it is sent back to its lane with a message and carries on from where it stopped. One helper writes in a lane at a time, and a reviewer and a fixer for the same lane run one after the other.
+
 ## 4. Sub-agents: who does what
 
 Use sub-agents for the building and the reviewing. Keep the lead's own context for planning, checking and landing: a lead that does the building itself fills its context and has to end the run early. Choose the model and effort by the kind of work:
