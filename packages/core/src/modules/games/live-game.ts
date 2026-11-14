@@ -210,7 +210,28 @@ export function settledLines(
 export const linesByPerson = (lines: readonly LiveGameLine[]): ReadonlyMap<string, LiveGameLine> =>
   new Map(lines.map((line) => [line.personId.toLowerCase(), line]));
 
-const sameLine = (a: LiveGameLine, b: LiveGameLine) => JSON.stringify(a) === JSON.stringify(b);
+/** The same counts: the same stats with the same numbers, in whatever order they come. */
+function sameStats(a: LiveGameLine['stats'], b: LiveGameLine['stats']): boolean {
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => Object.hasOwn(b, key) && a[key] === b[key])
+  );
+}
+
+/**
+ * The same line, field by field. A line read back from the database has its fields
+ * and its stats in another order than one the state gives, so comparing them as text
+ * would find every line changed and write them all again.
+ */
+const sameLine = (a: LiveGameLine, b: LiveGameLine) =>
+  a.gameId === b.gameId &&
+  a.teamId === b.teamId &&
+  a.personId === b.personId &&
+  a.jerseyNumber === b.jerseyNumber &&
+  a.played === b.played &&
+  a.secondsPlayed === b.secondsPlayed &&
+  sameStats(a.stats, b.stats);
 
 /** The lines to write (new or changed) and the people whose lines are gone (undone). */
 export function changedLines(
