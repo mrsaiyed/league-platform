@@ -45,7 +45,7 @@ describe('the box score grid', () => {
     const [h1, h2, h3] = sheet.players.filter((p) => p.teamId === sheet.game.homeTeamId);
     const [a1] = sheet.players.filter((p) => p.teamId === sheet.game.awayTeamId);
     if (h1 === undefined || h2 === undefined || h3 === undefined || a1 === undefined) {
-      throw new Error('the stand-in has three players a team');
+      throw new Error('the stand-in has players on both teams');
     }
     const input = readBoxScoreForm(sheet, {
       [boxScoreField.stat(h1.personId, 'points')]: '12',
@@ -93,7 +93,9 @@ describe('the box score grid', () => {
         },
       ]),
     });
-    expect(input?.lines).toHaveLength(6);
+    // One line for every rostered player of both teams (six a team in the stand-in).
+    expect(sheet.players).toHaveLength(12);
+    expect(input?.lines).toHaveLength(12);
   });
 
   it('refuses a box that is not a count; an empty score with no points to add up is 0', async () => {

@@ -44,10 +44,16 @@ export {
   type PlayerRef,
   type ReadGamePageError,
 } from './queries/read-game-page.ts';
+export {
+  liveMessageOf,
+  readGameSnapshot,
+  type ReadGameSnapshotError,
+} from './queries/read-game-snapshot.ts';
 export type {
   GamePageTeam,
   GamePersonRecord,
   GamePlayerLine,
+  GameSnapshotStore,
   GamesReadStore,
 } from './read-ports.ts';
 export { seasonResults, type SeasonResults } from './season-results.ts';

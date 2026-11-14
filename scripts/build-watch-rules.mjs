@@ -26,6 +26,7 @@ export const limits = {
 /**
  * @param facts.now ISO time.
  * @param facts.firstStage The earliest stage with an unfinished step.
+ * @param facts.firstStageLeft Ids of that stage's unfinished steps that do not wait on the founder.
  * @param facts.ready Steps that could start now and are in no lane: [{ id }].
  * @param facts.lanes Open lanes: [{ id, openedAt? }] (openedAt: ISO time the lane folder was made).
  * @param facts.lockTime ISO time in the build lock, or '' when there is none.
@@ -48,6 +49,24 @@ export function stallSigns(facts) {
         `${many ? 'them' : 'it'}, while ${laterLanes.length} of the open lanes hold later-stage steps. ` +
         `The next lane that frees goes to ${many ? 'them' : 'it'}. A step that cannot be built as ` +
         'written is rewritten or split, with the reason in the log; it is never skipped.',
+    });
+  }
+
+  // The earliest stage has steps left, none of them in a lane and none listed as able to
+  // start. Nothing will ever open them: the plan's "Needs" lines hold each other up. (Stage 1
+  // was written up as complete with two steps left, because one of them was never listed.)
+  const left = facts.firstStageLeft ?? [];
+  const building = lanes.some((lane) => stageOf(lane.id) === firstStage);
+  if (left.length && !starved.length && !building) {
+    const many = left.length > 1;
+    signs.push({
+      key: `stage-${firstStage}-knot`,
+      text:
+        `STAGE ${firstStage} IS NOT DONE AND NOTHING IS BUILDING IT: ${left.join(', ')} ` +
+        `${many ? 'are' : 'is'} unticked in its plan, in no lane, and not listed as able to start. ` +
+        `Read what ${many ? 'they need' : 'it needs'} in the plan against what has landed, correct ` +
+        'the plan, and open the first in the next lane that frees. A stage is complete only when ' +
+        'every step in its plan is ticked.',
     });
   }
 
