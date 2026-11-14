@@ -22,7 +22,7 @@ import type { StatRow, StatsColumn } from '@srleagues/ui';
 import type { LeagueClock } from '../../server/public-schedule.ts';
 import type { PublicStatsSettings } from '../../server/public-stats.ts';
 import { locale, t } from '../../server/messages.ts';
-import { gameView, type GameView } from '../schedule-pages/index.ts';
+import { comingOrder, gameView, type GameView } from '../schedule-pages/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
 
 export type TeamCard = {
@@ -113,7 +113,7 @@ const timeOf = (g: PublicGame): number | undefined =>
       ? Date.parse(`${g.localDate}T12:00:00Z`)
       : undefined;
 
-/** One team's games: the ones still to play by time (no time last), the finished ones newest first. */
+/** One team's games: the ones still to play, the next one first; the finished ones newest first. */
 export function buildTeamGames(
   schedule: PublicSchedule | undefined,
   teamSlug: string,
@@ -132,11 +132,11 @@ export function buildTeamGames(
       (a, b) => (timeOf(b) ?? Number.NEGATIVE_INFINITY) - (timeOf(a) ?? Number.NEGATIVE_INFINITY),
     )
     .map(view);
+  // The next game the team can go to comes first; a postponed game, which has no day to
+  // come, comes last (comingOrder), never first on the strength of its old date.
   const upcoming = mine
     .filter((g) => !decided(g) && g.status !== 'cancelled')
-    .sort(
-      (a, b) => (timeOf(a) ?? Number.POSITIVE_INFINITY) - (timeOf(b) ?? Number.POSITIVE_INFINITY),
-    )
+    .sort(comingOrder(clock))
     .map(view);
   return { upcoming, results };
 }

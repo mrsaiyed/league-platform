@@ -112,6 +112,89 @@ describe('home', () => {
   });
 });
 
+describe('upcoming games', () => {
+  const upcomingOf = async () => {
+    const { clock, schedule } = await load(adult);
+    const everyGame = schedule.rounds.flatMap((r) => r.games);
+    return { clock, schedule, everyGame, home: buildHomeGames(schedule, clock, addressee) };
+  };
+
+  it('never puts a postponed game, dated in the past, first as if it were the next game', async () => {
+    const { clock, everyGame, home } = await upcomingOf();
+    // The made-up league has one: postponed two rounds ago, with no new date.
+    const postponed = everyGame.find((g) => g.status === 'postponed');
+    expect(postponed?.localDate !== null && (postponed?.localDate ?? '') < clock.today).toBe(true);
+    const statuses = home.upcoming.map((g) => g.status);
+    expect(statuses).toContain('postponed');
+    // Every postponed game comes after every game still to play.
+    expect(statuses.lastIndexOf('scheduled')).toBeLessThan(statuses.indexOf('postponed'));
+    expect(statuses.indexOf('live')).toBe(0);
+    // The games still to play are in the order they are played, from today on.
+    const coming = home.upcoming.filter((g) => g.status === 'scheduled').map((g) => g.id);
+    const byStart = everyGame
+      .filter((g) => g.status === 'scheduled' && (g.localDate ?? '') >= clock.today)
+      .sort((a, b) => Date.parse(a.startsAt ?? '') - Date.parse(b.startsAt ?? ''))
+      .map((g) => g.id);
+    expect(coming).toEqual(byStart.slice(0, coming.length));
+  });
+
+  it('says a postponed game was postponed from its old day, never the bare day', async () => {
+    const { home } = await upcomingOf();
+    const card = home.upcoming.find((g) => g.status === 'postponed');
+    expect(card?.whenText).toMatch(/^Postponed from [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}$/);
+    // The same card on the schedule page, in the round it was to be played in.
+    const { clock, schedule } = await load(adult);
+    const listed = buildScheduleView(schedule, clock, addressee, {})
+      .rounds.flatMap((r) => r.games)
+      .find((g) => g.status === 'postponed');
+    expect(listed?.whenText).toBe(card?.whenText);
+    // One with no day at all says a new one is to come.
+    const undated = schedule.rounds
+      .flatMap((r) => r.games)
+      .filter((g) => g.status === 'postponed')
+      .map((g) => ({ ...g, startsAt: null, localDate: null }));
+    const changed = { ...schedule, rounds: [], unplacedGames: undated };
+    expect(buildHomeGames(changed, clock, addressee).upcoming[0]?.whenText).toBe(
+      'New date to be announced',
+    );
+  });
+
+  it('puts a game with no day, and one whose day has passed with no result, after the dated ones', async () => {
+    const { clock, schedule, everyGame } = await upcomingOf();
+    const next = everyGame.find(
+      (g) => g.status === 'scheduled' && (g.localDate ?? '') > clock.today,
+    );
+    if (next === undefined) throw new Error('no coming game');
+    const undated = { ...next, id: 'no-day', startsAt: null, localDate: null };
+    const overdue = { ...next, id: 'overdue', startsAt: null, localDate: '2026-01-01' };
+    const postponed = { ...next, id: 'off', status: 'postponed' };
+    const changed = {
+      ...schedule,
+      rounds: [],
+      unplacedGames: [postponed, overdue, undated, next],
+    };
+    const ids = buildHomeGames(changed, clock, addressee).upcoming.map((g) => g.id);
+    expect(ids).toEqual([next.id, 'no-day', 'overdue', 'off']);
+  });
+
+  it('keeps postponed games from taking a coming game its place in the list', async () => {
+    const { clock, schedule, everyGame } = await upcomingOf();
+    const next = everyGame.find((g) => g.status === 'scheduled');
+    if (next === undefined) throw new Error('no coming game');
+    const many = Array.from({ length: 8 }, (_, i) => ({ ...next, id: `g${i}` }));
+    const off = Array.from({ length: 8 }, (_, i) => ({
+      ...next,
+      id: `p${i}`,
+      status: 'postponed',
+    }));
+    const changed = { ...schedule, rounds: [], unplacedGames: [...off, ...many] };
+    const statuses = buildHomeGames(changed, clock, addressee).upcoming.map((g) => g.status);
+    expect(statuses.filter((s) => s === 'scheduled')).toHaveLength(5);
+    expect(statuses.filter((s) => s === 'postponed')).toHaveLength(5);
+    expect(statuses.indexOf('postponed')).toBe(5);
+  });
+});
+
 describe('live updates', () => {
   it('moves a game to the newest score without a refresh', async () => {
     const { clock, schedule } = await load(adult);

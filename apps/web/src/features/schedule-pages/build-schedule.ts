@@ -67,7 +67,27 @@ function dayText(day: string): string {
   }).format(new Date(`${day}T12:00:00Z`));
 }
 
+/** The league's own day a game is on (yyyy-mm-dd); null for a game with no day yet. */
+function dayOf(game: PublicGame, clock: LeagueClock): string | null {
+  if (game.localDate !== null) return game.localDate;
+  if (game.startsAt === null) return null;
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: clock.timeZone,
+  }).format(new Date(game.startsAt));
+}
+
 function whenOf(game: PublicGame, clock: LeagueClock): string {
+  // A postponed game has no day to come: its old day is said as the day it was postponed
+  // from, never bare, as if the game were still on it.
+  if (game.status === 'postponed') {
+    const day = dayOf(game, clock);
+    return day === null
+      ? t('schedule.postponedNoDate')
+      : t('schedule.postponedFrom', { date: dayText(day) });
+  }
   if (game.startsAt !== null) {
     return new Intl.DateTimeFormat(locale, {
       weekday: 'short',
@@ -229,8 +249,26 @@ const lastTime = (g: PublicGame): number => timeOf(g) ?? Number.NEGATIVE_INFINIT
 const nextTime = (g: PublicGame): number => timeOf(g) ?? Number.POSITIVE_INFINITY;
 
 /**
+ * The order of games still to play, so that the first one listed is the next one a
+ * visitor can go to: a game under way; then games on a day from today on, by start; then
+ * games with no day yet; then games whose day has passed with no result; and last the
+ * postponed ones, which have no day to come until they are given a new one.
+ */
+export function comingOrder(clock: LeagueClock): (a: PublicGame, b: PublicGame) => number {
+  const rank = (g: PublicGame): number => {
+    if (g.status === 'live') return 0;
+    if (g.status === 'postponed') return 4;
+    const day = dayOf(g, clock);
+    if (day === null) return 2;
+    return day >= clock.today ? 1 : 3;
+  };
+  return (a, b) => rank(a) - rank(b) || nextTime(a) - nextTime(b);
+}
+
+/**
  * The home page's lists: the latest finished games, newest first; and the games still to
- * play, a live one first, then by start time, games with no time last.
+ * play in the order a visitor needs them (comingOrder), followed by the postponed ones
+ * still waiting for a new day, which never take a coming game's place in the list.
  */
 export function buildHomeGames(
   schedule: PublicSchedule,
@@ -244,11 +282,14 @@ export function buildHomeGames(
     .sort((a, b) => lastTime(b) - lastTime(a))
     .slice(0, homeListSize)
     .map(view);
-  const rank = (g: PublicGame) => (g.status === 'live' ? 0 : 1);
-  const upcoming = everyGame
-    .filter((g) => g.status === 'live' || g.status === 'scheduled' || g.status === 'postponed')
-    .sort((a, b) => rank(a) - rank(b) || nextTime(a) - nextTime(b))
-    .slice(0, homeListSize)
-    .map(view);
-  return { recent, upcoming };
+  const order = comingOrder(clock);
+  const coming = everyGame
+    .filter((g) => g.status === 'live' || g.status === 'scheduled')
+    .sort(order)
+    .slice(0, homeListSize);
+  const postponed = everyGame
+    .filter((g) => g.status === 'postponed')
+    .sort(order)
+    .slice(0, homeListSize);
+  return { recent, upcoming: [...coming, ...postponed].map(view) };
 }

@@ -173,6 +173,9 @@ export const en = {
   'schedule.gameNumber': 'Game {number}',
   'schedule.dateToBeSet': 'Date to be announced',
   'schedule.dateAndTimeToBeSet': '{date}, time to be announced',
+  // A postponed game has no day to come: its old day is never written bare.
+  'schedule.postponedFrom': 'Postponed from {date}',
+  'schedule.postponedNoDate': 'New date to be announced',
   'schedule.venueCourt': '{venue}, {court}',
   // The teams list and a team's page (step 2.44).
   'teams.title': 'Teams',

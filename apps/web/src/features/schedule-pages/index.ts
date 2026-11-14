@@ -2,4 +2,4 @@
 export { HomePage } from './home-page.tsx';
 export { SchedulePage } from './schedule-page.tsx';
 export { GameList } from './schedule-views.tsx';
-export { gameView, placeOf, type GameView } from './build-schedule.ts';
+export { comingOrder, gameView, placeOf, type GameView } from './build-schedule.ts';

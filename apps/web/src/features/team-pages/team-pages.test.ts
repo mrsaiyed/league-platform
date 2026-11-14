@@ -170,6 +170,19 @@ describe('a team page', () => {
       results: [],
     });
   });
+
+  it('lists a team its postponed game last, never first on the strength of its old date', async () => {
+    const s = await season(adult);
+    const clock = await schedules.clockOf(adult);
+    const schedule = await schedules.scheduleOf(adult, s.id, clock.today);
+    // The Herons have a game postponed two rounds ago and games still to play.
+    const statuses = buildTeamGames(schedule, 'herons', clock, addressee).upcoming.map(
+      (g) => g.status,
+    );
+    expect(statuses).toContain('scheduled');
+    expect(statuses.at(-1)).toBe('postponed');
+    expect(statuses.indexOf('postponed')).toBe(statuses.length - 1);
+  });
 });
 
 describe('the start page', () => {
