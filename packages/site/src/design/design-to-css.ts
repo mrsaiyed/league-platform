@@ -1,17 +1,29 @@
 // Turns a design into CSS variables, once per page (T-90). No per-league stylesheet.
 // Every value is a hex color, a known font stack or a fixed keyword, so nothing a league
-// types can reach the stylesheet text.
+// types can reach the stylesheet text. Beside the values a league chooses it writes the ones
+// worked out from them (derived-colors.ts, frame-look.ts) and the two scales every screen
+// is built from (scales.ts), so the stylesheets hold no color, size or gap of their own.
 import type { DesignDocument } from './design-document.ts';
+import { derivedColors } from './derived-colors.ts';
 import { fontStacks } from './fonts.ts';
+import { frameVariables } from './frame-look.ts';
+import { spacingVariables, stepVariables, textVariables } from './scales.ts';
 
-const radius = { sharp: '0px', soft: '8px', round: '16px' } as const;
-const cardBorder = { flat: '0', outlined: '1px', raised: '0' } as const;
-const cardShadow = {
-  flat: 'none',
-  outlined: 'none',
-  raised: '0 4px 14px rgba(0, 0, 0, 0.25)',
+/** The corners of a card, of a button or field, and of a pill. */
+const corners = {
+  sharp: { '--radius': '0px', '--radius-small': '0px', '--radius-pill': '0px' },
+  soft: { '--radius': '8px', '--radius-small': '6px', '--radius-pill': '999px' },
+  round: { '--radius': '12px', '--radius-small': '8px', '--radius-pill': '999px' },
 } as const;
-const space = { compact: '0.75rem', comfortable: '1rem', roomy: '1.5rem' } as const;
+/** A card is told from the page by nothing, by a hairline, or by a hairline and a soft shadow. */
+const cards = {
+  flat: { '--card-border-width': '0', '--card-shadow': 'none' },
+  outlined: { '--card-border-width': '1px', '--card-shadow': 'none' },
+  raised: {
+    '--card-border-width': '1px',
+    '--card-shadow': '0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.07)',
+  },
+} as const;
 
 const hex = /^#[0-9a-fA-F]{6}$/;
 
@@ -33,19 +45,37 @@ function color(value: unknown, what: string): string {
 export function designToCssVariables(design: DesignDocument): Record<string, string> {
   const base = design.base as unknown;
   if (base !== 'light' && base !== 'dark') throw new Error('Unknown color scheme');
+  const chosen = {
+    background: color(design.colors.background, 'background'),
+    panel: color(design.colors.panel, 'panel'),
+    text: color(design.colors.text, 'text'),
+    primary: color(design.colors.primary, 'primary'),
+    accent: color(design.colors.accent, 'accent'),
+    highlight: color(design.colors.highlight ?? design.colors.accent, 'highlight'),
+  };
+  const derived = derivedColors(chosen);
   return {
-    '--color-background': color(design.colors.background, 'background'),
-    '--color-panel': color(design.colors.panel, 'panel'),
-    '--color-text': color(design.colors.text, 'text'),
-    '--color-primary': color(design.colors.primary, 'primary'),
-    '--color-accent': color(design.colors.accent, 'accent'),
-    '--color-highlight': color(design.colors.highlight ?? design.colors.accent, 'highlight'),
+    '--color-background': chosen.background,
+    '--color-panel': chosen.panel,
+    '--color-text': chosen.text,
+    '--color-primary': chosen.primary,
+    '--color-accent': chosen.accent,
+    '--color-highlight': chosen.highlight,
+    '--color-muted': derived.muted,
+    '--color-primary-text': derived.primaryText,
+    '--color-accent-text': derived.accentText,
+    '--color-on-primary': derived.onPrimary,
+    '--color-on-highlight': derived.onHighlight,
+    '--color-danger': derived.danger,
+    '--color-on-danger': derived.onDanger,
     '--font-heading': known(fontStacks, design.fonts.heading, 'font'),
     '--font-body': known(fontStacks, design.fonts.body, 'font'),
-    '--radius': known(radius, design.corners, 'corners'),
-    '--card-border-width': known(cardBorder, design.cards, 'cards'),
-    '--card-shadow': known(cardShadow, design.cards, 'cards'),
-    '--space': known(space, design.spacing, 'spacing'),
+    ...known(corners, design.corners, 'corners'),
+    ...known(cards, design.cards, 'cards'),
+    ...known(spacingVariables, design.spacing, 'spacing'),
+    ...stepVariables,
+    ...textVariables,
+    ...frameVariables[base],
     'color-scheme': base,
   };
 }
