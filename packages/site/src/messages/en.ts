@@ -795,6 +795,7 @@ export const en = {
   'activity.leagues.restore_division': 'Restored a division from the bin',
   'activity.games.record_final_score': 'Recorded a final score',
   'activity.games.record_forfeit': 'Recorded a forfeit',
+  'activity.games.set_box_score': 'Recorded a box score',
   'activity.games.postpone_game': 'Postponed a game',
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
