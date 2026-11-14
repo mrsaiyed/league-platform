@@ -29,7 +29,7 @@ export default defineConfig({
       'packages/contracts/**/*.test.ts',
       'packages/sports/src/{stats,standings}/**/*.test.ts',
       'packages/sports/src/*.test.ts',
-      'packages/database/src/{migrations,schema,db,queries,stores,isolation,queue,seed}/**/*.test.ts',
+      'packages/database/src/{migrations,schema,db,queries,stores,isolation,queue,seed,transfers}/**/*.test.ts',
     ],
     exclude: ['**/node_modules/**'],
     setupFiles: ['./vitest.setup.ts'],
