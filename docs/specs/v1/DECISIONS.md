@@ -282,6 +282,7 @@ All dated November 12, 2026.
 | T-245                 | New                                                                          | Standings and totals rebuilt by event handlers in the result's transaction, one season at a time (rec. 033)                                     | Step 2.24: T3 did not say how handlers get their stores, how two results at once agree, or S-22    |
 | T-246                 | New                                                                          | A fixtures file's text is held in its import's row only until the worker has read it, then replaced; an unread upload is discarded (rec. 034)   | Step 2.22: T-80 and T-131 left no place for the file between the upload and the worker             |
 | T-248                 | New                                                                          | A lapsed scoring session frees the game for others but carries on on its own device if nobody took it; times from the server's clock (rec. 036) | Step 2.28: T6 §5 did not say what a device back from offline finds, nor whose clock counts         |
+| T-249                 | New                                                                          | Placing a schedule: strict rules never broken, the rest best effort, unplaced games returned (rec. 037)                                         | Step 2.73: P7 §4 did not say what happens when the fairness rules cannot all be met                |
 
 ## The full list
 
@@ -691,6 +692,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-129 | A game can be saved to a file and uploaded from any device, without anything being counted twice                                                                                                                                                          | Agreed (delegated) |         |
 | T-233 | Live updates: publishing is in `packages/providers`, subscribing in `apps/web/src/features/live-updates`, names and shapes in `packages/contracts`; the Realtime policies receive only on visible leagues and refuse every browser broadcast (record 021) | Agreed (delegated) |         |
 | T-248 | A scoring session whose lease ran out frees the game for anyone else, but its own device carries on with it if nobody took it; leases are timed by the server's clock (record 036)                                                                        | Agreed (delegated) |         |
+| T-249 | Schedules never break strict rules (twice a day, same matchup two weeks running, division, requests); the rest is best effort; unplaced games are returned (rec. 037)                                                                                     | Agreed (delegated) |         |
 
 ### [T7 — Notifications and jobs](technical/T7-notifications-and-jobs.md)
 
