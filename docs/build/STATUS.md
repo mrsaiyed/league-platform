@@ -26,6 +26,7 @@ Next free: migration 0014, record 057, T-260 (0013 to 2.113; 055 to 2.93 (used);
 - **2.93 The website on the real database, part 1** — `.local/lanes/2.93-web-real-database` — none (migration none) — opus builder started 2026-11-14; built in parts.
 - **2.113 Tracker controller review fixes** — `.local/lanes/2.113-tracker-fixes` — migration 0013 — builder (opus, high) started 2026-11-14 16:xx UTC.
 - **2.126 Who sees players' names** — `.local/lanes/2.126-name-visibility` — record 056, T-259 — builder (opus, high) started; screen part gets fable design review and area 5 lead review.
+- **2.125 part 1 Making a league (command on this computer)** — `.local/lanes/2.125p1-make-league` — migration 0014 if needed, record 057, T-260 — builder (opus, high) started 2026-11-14.
 
 ## Needs the founder
 
