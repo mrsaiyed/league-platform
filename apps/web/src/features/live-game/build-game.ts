@@ -81,7 +81,9 @@ export function statusNote(status: string): string | null {
 export function liveGameLabels(status: string): LiveGameLabels {
   const labels = displayLabels(t);
   return {
-    region: t('game.live'),
+    region: t('game.region'),
+    regionLive: t('game.live'),
+    spokenScore: t('game.spokenScore'),
     notStarted: notStartedText(status),
     teamFouls: t('game.teamFouls'),
     latestPlay: t('game.latestPlay'),

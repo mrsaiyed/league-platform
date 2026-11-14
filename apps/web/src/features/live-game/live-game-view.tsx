@@ -33,8 +33,12 @@ import type { ViewerGame } from './viewer-state.ts';
 
 /** The words this part shows, from the message file (T-187). */
 export type LiveGameLabels = {
-  /** Names the live region. */
+  /** Names the region while the game is not live. */
   readonly region: string;
+  /** Names the region while the game is live. */
+  readonly regionLive: string;
+  /** The score as said to a screen reader, with {away} {awayScore} {home} {homeScore}. */
+  readonly spokenScore: string;
   readonly notStarted: string;
   /** With {away} {awayFouls} {home} {homeFouls}. */
   readonly teamFouls: string;
@@ -200,7 +204,7 @@ export function LiveGameView({
   return (
     <section
       className="game-live"
-      aria-label={labels.region}
+      aria-label={game.status === 'live' ? labels.regionLive : labels.region}
       data-live-connection={followed.connection}
       data-live-sequence={game.sequence}
       data-live-status={game.status}
@@ -236,6 +240,16 @@ export function LiveGameView({
         </p>
       ) : null}
       <p role="status" aria-live="polite" className="game-latest-play">
+        {game.status === 'scheduled' ? null : (
+          <span className="ui-visually-hidden">
+            {fill(labels.spokenScore, {
+              away: teams.away.name,
+              awayScore: game.score.away,
+              home: teams.home.name,
+              homeScore: game.score.home,
+            })}{' '}
+          </span>
+        )}
         {latest}
       </p>
       {showPlayers && game.status !== 'scheduled' ? (

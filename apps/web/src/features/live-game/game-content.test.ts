@@ -114,6 +114,11 @@ describe('a game page', () => {
     expect(html).toContain('Half 1 20:00');
     expect(html).toContain('Team fouls this period: Bears 1, Hawks 0');
     expect(html).toContain('Latest play: Foul on Bears');
+    expect(html).toContain('aria-label="The game, live"');
+    // The spoken update carries the score, not only the play.
+    expect(html).toMatch(
+      /role="status"[^>]*><span class="ui-visually-hidden">Bears 2, Hawks 3\. <\/span>/,
+    );
     expect(html).toContain('Max Hawkins');
     expect(html).toContain('scored 3 for Hawks');
     expect(html).toContain('Only this team&#x27;s total is shown.');
@@ -160,6 +165,7 @@ describe('a game page', () => {
     const { view } = await viewOf(world, games.lionsTigers);
     const html = draw(view);
     expect(html).toContain('This game has not started yet.');
+    expect(html).toContain('aria-label="The game"');
     expect(html).not.toContain('Play by play');
   });
 
@@ -226,6 +232,8 @@ describe('a game page', () => {
     expect(html).toContain('Box scores');
     expect(html).toContain('Only the final score was recorded for this game.');
     expect(html).toContain('data-live-status="final"');
+    expect(html).toContain('aria-label="The game"');
+    expect(html).not.toContain('The game, live');
     // Only the final score was kept: no empty play-by-play section.
     expect(html).not.toContain('Play by play');
   });
