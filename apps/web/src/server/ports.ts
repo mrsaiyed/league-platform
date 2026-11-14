@@ -11,6 +11,7 @@ import type { GamesAreaPorts } from './games-area-ports.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 import type { ScheduleAdminPorts } from './schedule-admin.ts';
+import type { PublicTeamsPorts } from './public-teams.ts';
 import type { AdminTeamsPorts } from './admin-teams.ts';
 
 export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
@@ -38,6 +39,8 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly publicSchedule: PublicSchedulePorts;
   /** What Admin → Schedule runs its commands on (step 2.52). */
   readonly scheduleAdmin: ScheduleAdminPorts;
+  /** What the public teams pages and the members' start page read (step 2.44). */
+  readonly publicTeams: PublicTeamsPorts;
   /** What the admin's Teams screens read and run (step 2.51). */
   readonly adminTeams: AdminTeamsPorts;
 };

@@ -21,6 +21,12 @@
 // they stand; from then on it keeps them (S-1), so a later change to the season's
 // rules leaves it alone. The tracker's protocol version is read before
 // anything else: the current one and the one before it are taken (T-127).
+//
+// The End game tap ends the game in this same transaction (step 2.30, T6 §7): the
+// lines are settled, the game is final with its scores, and standings follow
+// (finish-tracked-game.ts). A tie is refused unless the game's rules allow ties. Taps
+// after it in the batch meet the engine's own "this game is final". Reopening is not
+// a tap: it needs a reason and the permission to correct games (games.reopen_game).
 import {
   buildVersionRefusal,
   CommandBatch,
@@ -41,10 +47,12 @@ import {
   readState,
   rosterOf,
   scoreOf,
+  tieProblem,
   withCurrentRules,
   withLowerIds,
   type TrackerInput,
 } from '../live-game.ts';
+import { finishTrackedGame, liveResultOf } from '../finish-tracked-game.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GameRecord, NewGameEvent, TrackerTx } from '../ports.ts';
 import { lowerId, scorerOf, sessionStanding } from '../scoring-session.ts';
@@ -75,14 +83,6 @@ const messages: Readonly<Record<Exclude<RefusalCode, 'rule' | 'not-allowed'>, st
   'unknown-game': 'There is no such game.',
 };
 
-/** Where a game's status and score stand once a state is saved. */
-function resultOf(state: basketball.GameState) {
-  if (state.status === 'scheduled')
-    return { status: 'scheduled', homeScore: null, awayScore: null };
-  const score = scoreOf(state);
-  return { status: 'live', homeScore: score.home, awayScore: score.away };
-}
-
 export const applyTrackerCommands = defineCommand({
   name: 'games.apply_tracker_commands',
   permission: 'games.score',
@@ -90,7 +90,12 @@ export const applyTrackerCommands = defineCommand({
   // the current shapes at all (ProtocolProbe).
   input: z.looseObject({ gameId: lowerId, protocolVersion: z.number().int().min(1) }),
   allowed: (context, input, tx: TrackerTx) => mayScoreGame(context, tx, input.gameId),
-  run: async ({ context, input, tx }): Promise<Result<CommandReply, ApplyTrackerCommandsError>> => {
+  run: async ({
+    context,
+    input,
+    tx,
+    emit,
+  }): Promise<Result<CommandReply, ApplyTrackerCommandsError>> => {
     const version = input.protocolVersion;
     const reader = batchReaders[version];
     if (!isAcceptedProtocolVersion(version) || reader === undefined) {
@@ -170,12 +175,20 @@ export const applyTrackerCommands = defineCommand({
       if (input.type === 'rules') return refused('The game’s rules come from the league.');
       // A tap that waited out a dropped connection lands where it happened, never later than now.
       const at = Math.min(now, command.at);
+      let next: basketball.GameState;
       try {
-        state = basketball.apply(state, input, { id: commandId, now: at });
+        next = basketball.apply(state, input, { id: commandId, now: at });
       } catch (thrown) {
         if (thrown instanceof basketball.TrackerError) return refused(thrown.message);
         throw thrown;
       }
+      // The engine's own refusal (nothing recorded, already final) comes first, as in
+      // games.end_tracked_game; then a level score the rules do not allow.
+      if (input.type === 'end') {
+        const score = scoreOf(next);
+        if (score.home === score.away && !rules.allowTies) return refused(tieProblem);
+      }
+      state = next;
       const { type, ...payload } = input;
       seq += 1;
       events.push({ gameId, seq, commandId, type, payload, tappedAt: at, accountId });
@@ -187,6 +200,10 @@ export const applyTrackerCommands = defineCommand({
     // T6 §1: the events, the state, every changed line and the score, all together.
     await tx.liveGames.addEvents(events);
     await tx.liveGames.saveState(gameId, seq, state);
+    if (state.status === 'final') {
+      await finishTrackedGame({ context, tx, emit, game, state, rules });
+      return ok(reply(seq, results));
+    }
     const changed = changedLines(
       before === undefined ? new Map() : linesOf(game, roster, before),
       linesOf(game, roster, state),
@@ -194,7 +211,7 @@ export const applyTrackerCommands = defineCommand({
     if (changed.lines.length > 0 || changed.removed.length > 0) {
       await tx.liveGames.saveLines(gameId, changed.lines, changed.removed);
     }
-    const result = resultOf(state);
+    const result = liveResultOf(state);
     // The game keeps its rules from the moment it goes live (S-1): the database fixes
     // them then (games_format_fixed_once_started). While only line-ups are in, the
     // game has none of its own, so a season change before tip-off still applies.

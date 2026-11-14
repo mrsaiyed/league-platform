@@ -15,8 +15,8 @@ import {
   reopenGame,
   type CommandDeps,
   type DomainEvent,
-  type GamesTx,
   type Job,
+  type TrackerTx,
 } from '@srleagues/core';
 import { defaultSeasonRules } from '@srleagues/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -38,10 +38,12 @@ import {
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { gamesStore } from './games-store.ts';
+import { liveGamesStore } from './live-games-store.ts';
+import { scoringSessionsStore } from './scoring-sessions-store.ts';
 
 let pglite: PGlite;
 let db: DatabaseHandle;
-let deps: CommandDeps<GamesTx>;
+let deps: CommandDeps<TrackerTx>;
 const events: DomainEvent[] = [];
 beforeAll(async () => {
   pglite = await freshSchema();
@@ -49,6 +51,10 @@ beforeAll(async () => {
   const transaction = commandTransaction(db, (scope) => ({
     jobs: { enqueue: async (_job: Job) => {} },
     games: gamesStore(scope),
+    // Reopening a game takes its lock and hands a tracked game back (step 2.30).
+    scoringSessions: scoringSessionsStore(scope),
+    liveGames: liveGamesStore(scope),
+    clock: { now: () => Date.UTC(2026, 11, 6, 20, 0, 0) },
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));

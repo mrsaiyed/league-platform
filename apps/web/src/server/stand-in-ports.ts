@@ -42,6 +42,7 @@ import {
   youthTeams,
 } from './stand-in-public-stats.ts';
 import { standInSchedule } from './stand-in-schedule.ts';
+import { standInPublicTeams } from './stand-in-public-teams.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
 
@@ -337,6 +338,10 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       log: options.log,
       today: () => new Date().toISOString().slice(0, 10),
     }),
+    publicTeams: standInPublicTeams(
+      { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
+      coach.accountId,
+    ),
     signUpMadeUpMember: async () => {
       const here = '127.0.0.1';
       const { email, password } = standInMember;

@@ -96,11 +96,14 @@ The tracker sends commands to `POST /api/v1/leagues/{leagueId}/games/{game}/comm
 
 Either all of that happens or none of it does.
 
+**T-250 (record 038):** the tracker's own End game tap ends the game in the batch that carries it, and `games.end_tracked_game` ends it from anywhere else; both do the same steps. A level score is refused unless the season allows ties. Settling the lines gives everyone on either team's current roster who never entered a "did not play" line, which never counts as a game played.
+
 ## 8. Corrections
 
 - Reopening requires the `games.correct` permission and a reason, and writes a `game_corrections` row.
 - Fixes are made with the tracker's own tools (undo, or adding and removing plays) or through an "edit box score" grid. **T-122:** the grid also produces commands, so the event log always explains the final numbers.
 - Finalizing again recalculates everything. Whether a notice is sent follows S-8.
+- **T-250 (record 038):** reopening a tracked game hands it back to its tracker: it is live again with the score its plays give, the engine's reopen is kept in the event log, and it counts for nothing until it is ended again. The tracker's own reopen tap is refused, since a tap carries no reason.
 
 ## 9. The simpler ways of recording
 
