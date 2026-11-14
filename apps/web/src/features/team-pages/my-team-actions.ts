@@ -20,13 +20,24 @@ async function leagueAndTeam(form: FormData) {
   const ports = await webPorts();
   const found = await ports.findLeague(leagueName);
   if (found === undefined || found.inBin || found.forwarded) return undefined;
-  return { league: found, team: teamName, ports };
+  const season = form.get('season');
+  return {
+    league: found,
+    team: teamName,
+    season: typeof season === 'string' && season !== '' ? season : undefined,
+    ports,
+  };
+}
+
+/** Back to the team's page, in the season the button was pressed on (a past season too). */
+function teamPageUrl(slug: string, team: string, season: string | undefined): string {
+  return leagueUrl({ slug }, 'team', season === undefined ? { team } : { team, season });
 }
 
 export async function chooseMyTeamAction(form: FormData): Promise<never> {
   const given = await leagueAndTeam(form);
   if (given === undefined) return redirect('/');
-  const { league, team, ports } = given;
+  const { league, team, season, ports } = given;
   const seasons = await ports.publicStats.seasonsOf(league.leagueId);
   const known = (
     await Promise.all(
@@ -41,13 +52,13 @@ export async function chooseMyTeamAction(form: FormData): Promise<never> {
       cookieOptions(secure, longestCookieSeconds),
     );
   }
-  return redirect(leagueUrl({ slug: league.slug }, 'team', { team }));
+  return redirect(teamPageUrl(league.slug, team, season));
 }
 
 export async function clearMyTeamAction(form: FormData): Promise<never> {
   const given = await leagueAndTeam(form);
   if (given === undefined) return redirect('/');
-  const { league, team } = given;
+  const { league, team, season } = given;
   (await cookies()).delete(myTeamCookieName(league.leagueId));
-  return redirect(leagueUrl({ slug: league.slug }, 'team', { team }));
+  return redirect(teamPageUrl(league.slug, team, season));
 }
