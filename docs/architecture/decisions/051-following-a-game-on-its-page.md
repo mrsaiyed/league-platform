@@ -12,13 +12,13 @@ T-118 says a page that notices a gap fetches a snapshot, and T-119 that a page t
 - **When a snapshot is fetched:**
   - at once, on a gap in the numbers (T-118);
   - at once, each time the live connection opens, because messages may have been missed while it was connecting or lost;
-  - every 5 seconds while the live connection is not open (T-119), silently;
+  - every 5 seconds while the live connection is not open and the game is live (T-119), silently, and every 60 seconds for a game not live (scheduled, postponed or cancelled), enough to see it start;
   - again 2 seconds after a snapshot that is behind messages already seen (the snapshot address is cached for 2 seconds);
   - at most every 5 seconds while the players shown are older than the score;
   - every 30 seconds while a live game is open and quiet, so a lost last message is found.
 - **A final game is not followed**: a page that arrives on one opens no live connection, and a page whose game becomes final closes its connection.
-- **The clock** (T-121) is lined up by the page's own snapshot and by each message, whose `sentAt` is fresh. A fetched snapshot never moves it, since it may be a cached copy up to 2 seconds old. Until the page runs on the device, the server and the device's first drawing show the clock as it stood when the snapshot was read.
-- **The play-by-play** is the one the page arrived with, newest first, with a link to load newer plays while the game is live: messages carry only the latest play, and that play repeats or goes back after clock taps and undos, so it cannot be appended safely. The latest play is shown live above it.
+- **The clock** (T-121) is lined up by the page's own snapshot, each message and each fetched snapshot. Each measurement of `sentAt` minus the time it arrived is at most the true offset (anything sent takes time to arrive, and a cached snapshot was sent earlier still), so the page keeps the largest seen and a slow or stale one never lowers it. Until the page runs on the device, the server and the device's first drawing show the clock as it stood when the snapshot was read.
+- **The play-by-play** (S-33) is the one the page arrived with, newest first, with a link to load newer plays while the game is live: messages carry only the latest play, and that play repeats or goes back after clock taps and undos, so it cannot be appended safely. The latest play is shown live above it.
 - **Corrected games** show "Corrected on" and the date (S-7), from the snapshot's `correctedOn`, never the reason.
 - The page listens on the local hub (`/api/v1/live`) as the schedule pages do; where that address is absent the connection is refused and the page polls.
 
@@ -31,6 +31,6 @@ T-118 says a page that notices a gap fetches a snapshot, and T-119 that a page t
 
 ## Revisit if
 
-- The play-by-play must update live (P7 §5.3): give the snapshot or a cached read of its own the recent plays, as the visitor sees them.
+- Step 2.101 makes the play-by-play update live (P7 §5.3, S-33): the snapshot and the live message carry the recent plays, as the visitor sees them, so the page can append and correct them.
 - The polling load is measured in staging (F-5) and the 5-second or 30-second rates prove too costly or too slow.
 - Pages listen to Supabase Realtime: the page then needs that subscriber and the project's address, as the schedule pages will.

@@ -53,6 +53,7 @@ Answered by me as lead on November 13 and 14, 2026, because you said not to stop
 | S-30 | The mercy rule inside the last minutes                                   | Inside the last-minutes stop clock the stop clock wins over the mercy rule's switch; the scorer can still switch to a running clock by hand                                                                                                                       | A small change in the engine                                          |
 | S-31 | When the mercy rule switches again                                       | Only after the lead has dropped below the number and reaches it again. The scorer switches back to a stop clock by hand                                                                                                                                           | A small change in the engine                                          |
 | S-32 | What the personal foul limit does                                        | A player at the limit is only marked out in the box score; the tracker does not take them off the floor or keep them off, which stays the scorekeeper's call (S-21)                                                                                               | A small change: the mark is already there to build on                 |
+| S-33 | The play-by-play on a live game's page                                   | Until step 2.101, the list as it stood when the page was opened, newest first, with a "Show newer plays" link. The latest play, the score, the team fouls and the clock update live                                                                               | Step 2.101 makes the list itself update live                          |
 
 ## Needs your answer
 
@@ -449,6 +450,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | S-30 | Inside the last-minutes stop clock, the mercy rule's switch gives way to the stop clock                                                                                     | Decided for you |         |
 | S-31 | The mercy rule switches again only after the lead drops below the number; the scorer switches back by hand                                                                  | Decided for you |         |
 | S-32 | A player at the personal foul limit is only marked, not taken off or kept off the floor (S-21: the scorekeeper decides)                                                     | Decided for you |         |
+| S-33 | Until step 2.101, a live game's play-by-play is the list as of opening with a "Show newer plays" link; the latest play, score, fouls and clock update live                  | Decided for you |         |
 
 ### [P8 — Notifications](product/P8-notifications.md)
 
