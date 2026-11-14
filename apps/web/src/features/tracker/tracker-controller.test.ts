@@ -503,6 +503,31 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     expect(await tablet.storage.list(gameId)).toEqual([]);
   });
 
+  it('releases a session granted after it left while opening', async () => {
+    const network = endpointNetwork();
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const tablet = device(network, {
+      askServer: (ask) => async (input, init) => {
+        const answer = await ask(input, init);
+        if (String(init?.body).includes('"open"')) await held;
+        return answer;
+      },
+    });
+    const starting = tablet.controller.start();
+    await expect.poll(() => network.reached).toContain('POST session:open');
+    await tablet.controller.leave();
+    release();
+    await starting;
+    await tablet.controller.idle();
+    expect(network.reached).toContain('POST session:release');
+    expect(tablet.controller.status().mode.kind).not.toBe('scoring');
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    expect(laptop.controller.status().mode).toEqual({ kind: 'scoring' });
+  });
+
   it('releases the game on leaving when nothing is waiting', async () => {
     const network = endpointNetwork();
     const tablet = device(network);

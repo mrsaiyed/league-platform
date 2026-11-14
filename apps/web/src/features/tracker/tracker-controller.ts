@@ -468,6 +468,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** Holding the session: load the game and score. */
   const scoreWith = async (held: string): Promise<void> => {
+    if (stopped) {
+      // Left while the session was being asked for: let it go as leaving does.
+      if (queue.status().waiting === 0) await session({ type: 'release', sessionId: held });
+      return;
+    }
     sessionId = held;
     resumedAfterNotHeld = 0;
     scheduleRenew();
