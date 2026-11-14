@@ -17,6 +17,9 @@ T-80 says an import spreadsheet is read once by the worker and never kept for do
 - **Undo is exact or refused.** Undo removes the import's changes only while the draft is still the one it was left as (same id, same version). If the draft was edited, published or discarded since, nothing is touched and the admin is told to remove the games by hand.
 - **Scores wait for publication.** A draft game is not a game, so a final score cannot be recorded until the schedule is published. `record_imported_scores` records the waiting scores of those games that exist by then, as `record_final_score` would (ties judged by the game's rules, the `games.finalized` event announced), and marks each so it is never recorded twice. Publishing (step 2.21) must keep the draft's game ids for this to find them.
 
+- **An upload that is never read does not stay.** When the job's last attempt fails (or it fails with an error that is not retried), the worker replaces the text with a failed report that holds none. If the job was lost altogether, an admin can discard the import (`discard_fixture_import`), which does the same for an import still `reading`. Only an import still `reading` is touched.
+- **Seeing an import** needs `schedule.import` but works in an archived or suspended league, as reading the draft does. Recording an import's scores needs `schedule.import` as well as `games.score`, so a scorekeeper limited to assigned games cannot record a whole file's scores.
+
 ## Considered
 
 - **A private storage bucket with a deleted-after-read object.** A real service to run and pay for, a second place to secure, and a path that must be made atomic with the job. The row is already league-fenced and in the transaction.
