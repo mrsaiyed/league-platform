@@ -36,6 +36,51 @@ describe('recordFinalScore', () => {
     ]);
   });
 
+  it('clears the old lines of a box score game saved now as a final score only', async () => {
+    const lineOf = (n: number) => ({
+      gameId: gameUuid(n),
+      teamId: game(n).homeTeamId,
+      personId: `01900000-0000-7000-8000-0000000d000${n}`,
+      played: true,
+      secondsPlayed: null,
+      stats: { points: 20 },
+    });
+    const state = {
+      games: [game(1, { captureMode: 'box' }), game(2, { captureMode: 'box' })],
+      lines: [lineOf(1), lineOf(2)],
+    };
+    // A refused save changes nothing.
+    const refused = memoryGames(state);
+    const tie = { ...input, homeScore: 40, awayScore: 40 };
+    expect(await recordFinalScore(refused.as(ownerId), tie, refused.deps)).toMatchObject({
+      ok: false,
+    });
+    expect(refused.db.state.lines).toHaveLength(2);
+    const { db, deps, as } = memoryGames(state);
+    expect(await recordFinalScore(as(ownerId), input, deps)).toMatchObject({ ok: true });
+    expect(db.state.games[0]).toMatchObject({ status: 'final', captureMode: 'final' });
+    // Only that game's lines go, so they no longer count in totals.
+    expect(db.state.lines).toEqual([lineOf(2)]);
+  });
+
+  it('leaves the lines of a game that was not a box score alone', async () => {
+    const kept = {
+      gameId: gameUuid(1),
+      teamId: game(1).homeTeamId,
+      personId: '01900000-0000-7000-8000-0000000d0001',
+      played: true,
+      secondsPlayed: null,
+      stats: { points: 20 },
+    };
+    const { db, deps, as } = memoryGames({
+      games: [game(1, { captureMode: 'live' })],
+      lines: [kept],
+    });
+    expect(await recordFinalScore(as(ownerId), input, deps)).toMatchObject({ ok: true });
+    expect(db.state.games[0]?.captureMode).toBe('live');
+    expect(db.state.lines).toEqual([kept]);
+  });
+
   it('keeps the rules a game already has', async () => {
     const own = rules((r) => (r.allowTies = true));
     const { db, deps, as } = memoryGames({ games: [game(1, { format: own })] });

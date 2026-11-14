@@ -5,14 +5,18 @@ import {
   deleteGameAssignment,
   findGame,
   findSeason,
+  gameHasPlays,
   insertGameAssignment,
   insertGameCorrection,
   isGameAssigned,
   listDecidedGameLines,
   listDecidedGames,
+  listGameLines,
+  listGameRoster,
   listGamesInWindow,
   listPostponedGames,
   listSettingValues,
+  replaceGameLines,
   updateGameResult,
 } from '../queries/index.ts';
 
@@ -24,6 +28,10 @@ export function gamesStore(scope: LeagueScope): GamesStore {
     listPostponed: (seasonId) => listPostponedGames(scope, seasonId),
     listDecided: (seasonId) => listDecidedGames(scope, seasonId),
     listDecidedLines: (seasonId) => listDecidedGameLines(scope, seasonId),
+    listLines: (gameId) => listGameLines(scope, gameId),
+    replaceLines: (gameId, lines) => replaceGameLines(scope, gameId, lines),
+    listRoster: (gameId) => listGameRoster(scope, gameId),
+    hasPlays: (gameId) => gameHasPlays(scope, gameId),
     findSeason: async (seasonId) => {
       const season = await findSeason(scope, seasonId);
       return season === undefined
