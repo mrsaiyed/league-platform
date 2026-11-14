@@ -979,6 +979,9 @@ export const en = {
   'account.signOut': 'Sign out',
   'account.signOutEverywhere': 'Sign out everywhere',
   'account.signOutEverywhereHelp': 'Signs out every device that uses your account, this one too.',
+  'account.problem.title': 'We cannot open your account',
+  'account.problem.linkConflict':
+    'You are signed in, but your email address belongs to an account that is joined to a different sign-in. Nothing has been lost: this needs putting right on our side, and we have noted it. Please contact us. Until then, you can sign out here.',
   'device.label': '{browser} on {system}',
   'device.unknown': 'A web browser',
   'problem.invalidEmail': 'That does not look like an email address.',

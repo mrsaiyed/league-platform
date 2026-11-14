@@ -7,7 +7,7 @@ import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import { withTransaction } from '../db/with-transaction.ts';
 import { freshSchema, newAccount, one, unique } from '../schema/schema.test-helper.ts';
-import { accountForSignIn } from './account-for-sign-in.ts';
+import { accountForSignIn, isSignInLinkConflict } from './account-for-sign-in.ts';
 import { findAccountOfSignIn } from './find-account-of-sign-in.ts';
 
 let pglite: PGlite;
@@ -57,13 +57,19 @@ describe('accountForSignIn (record 052)', () => {
   it('refuses an address whose account is another sign-in user’s, and an erased address', async () => {
     const email = `${unique('taken')}@example.test`;
     await forSignIn(crypto.randomUUID(), email);
-    await expect(forSignIn(crypto.randomUUID(), email)).rejects.toMatchObject({
-      code: '23505',
-      constraint: 'accounts_sign_in_id_key',
-    });
-    await expect(
-      forSignIn(crypto.randomUUID(), `${crypto.randomUUID()}@erased.invalid`),
-    ).rejects.toMatchObject({ code: '23514' });
+    const conflict: unknown = await forSignIn(crypto.randomUUID(), email).catch(
+      (error: unknown) => error,
+    );
+    expect(conflict).toMatchObject({ code: '23505', constraint: 'accounts_sign_in_id_key' });
+    expect(isSignInLinkConflict(conflict)).toBe(true);
+    const erased: unknown = await forSignIn(
+      crypto.randomUUID(),
+      `${crypto.randomUUID()}@erased.invalid`,
+    ).catch((error: unknown) => error);
+    expect(erased).toMatchObject({ code: '23514' });
+    // Only that refusal: any other error is not a link conflict.
+    expect(isSignInLinkConflict(erased)).toBe(false);
+    expect(isSignInLinkConflict(new Error('accounts_sign_in_id_key'))).toBe(false);
   });
 
   it('keeps a linked sign-in user’s account whatever address the service now gives', async () => {

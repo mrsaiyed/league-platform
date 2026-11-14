@@ -16,6 +16,8 @@ let db: database.DatabaseHandle;
 let ports: WebPorts;
 /** Who each made-up access token is, as the sign-in service would say. */
 const sessions = new Map<string, SessionIdentity>();
+/** The lines warn was given. */
+const warnings: { message: string; fields: { signInUserId: string } }[] = [];
 
 const signedIn = (email: string, signInId: string = randomUUID()) => {
   const token = `token-${randomUUID()}`;
@@ -57,6 +59,7 @@ beforeAll(async () => {
     signIn,
     signInMail: {} as SignInMail,
     log: () => {},
+    warn: (message, fields) => warnings.push({ message, fields }),
   });
 }, 120_000);
 
@@ -98,11 +101,29 @@ describe('databasePorts (record 055)', () => {
     expect(account).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7/);
   });
 
-  it('passes the service’s refusal on, and refuses an address linked to another user', async () => {
+  it('passes the service’s refusal on', async () => {
     expect(await ports.identify('no-such-token')).toEqual(fail({ code: 'session-ended' }));
+  });
+
+  it('refuses, without throwing, an address linked to another sign-in user, and logs its id', async () => {
     const email = `twice-${randomUUID()}@example.test`;
-    await accountOf(signedIn(email));
-    await expect(ports.identify(signedIn(email))).rejects.toThrow();
+    const firstSignIn = randomUUID();
+    const first = await accountOf(signedIn(email, firstSignIn));
+    const again = randomUUID();
+    const token = signedIn(email, again);
+    warnings.length = 0;
+    const refused = fail({ code: 'account-problem', problem: 'sign-in-link-conflict' });
+    // Every request answers the same, and never with the other user's account.
+    expect(await ports.identify(token)).toEqual(refused);
+    expect(await ports.identify(token)).toEqual(refused);
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]?.fields).toEqual({ signInUserId: again });
+    for (const { message } of warnings) {
+      expect(message).not.toContain(email);
+      expect(message).not.toContain(token);
+    }
+    // The first user keeps their account.
+    expect(await accountOf(signedIn(email, firstSignIn))).toBe(first);
   });
 
   it('reads what the account holds in the league through the access module', async () => {

@@ -11,6 +11,9 @@
 // - A session cookie that no longer works is "signed out" (401): the proxy renews a
 //   session before any endpoint sees it, so one still failing here has ended. A public
 //   read (the snapshot) treats it as a visitor instead, as pages do.
+// - A live session that is none of our accounts' (an AccountRefusal, record 055) is
+//   "account problem" (403), or a visitor for a public read; signing in again would
+//   not help, and the account page says why.
 import { leagueApiUrl, type AccessHolder } from '@srleagues/core';
 import {
   requestContext,
@@ -26,7 +29,10 @@ export type ApiAnswer = {
   readonly headers?: Readonly<Record<string, string>>;
 };
 
-export type ApiRefusal = { readonly status: 401 | 404; readonly error: 'signed-out' | 'not-found' };
+export type ApiRefusal =
+  | { readonly status: 401; readonly error: 'signed-out' }
+  | { readonly status: 403; readonly error: 'account-problem' }
+  | { readonly status: 404; readonly error: 'not-found' };
 
 export const refusalAnswer = (refusal: ApiRefusal): ApiAnswer => ({
   status: refusal.status,
@@ -58,12 +64,14 @@ export async function resolveLeagueApi(
   const built = await requestContext(facts, deps);
   if (!built.ok) {
     const code = built.error.code;
-    if (code !== 'renew-session' && code !== 'session-ended') {
+    const accountProblem = code === 'account-problem';
+    if (code !== 'renew-session' && code !== 'session-ended' && !accountProblem) {
       return { ok: false, refusal: notFound };
     }
     if (signedOut === 'visitor' && facts.session !== null) {
       return resolveLeagueApi({ ...facts, session: null }, parts, deps, signedOut);
     }
+    if (accountProblem) return { ok: false, refusal: { status: 403, error: 'account-problem' } };
     return { ok: false, refusal: { status: 401, error: 'signed-out' } };
   }
   const context = built.value;

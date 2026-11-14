@@ -31,6 +31,19 @@ import {
 } from '@srleagues/core';
 import type { SessionError, SessionIdentity } from '@srleagues/providers';
 
+/**
+ * Why a session the sign-in service accepts still belongs to none of our accounts
+ * (record 055). `sign-in-link-conflict`: the account for its address is linked to
+ * another sign-in user, which is put right by hand (record 052). The person stays
+ * signed in, is told so plainly on the account page and may sign out there.
+ */
+export type AccountProblem = 'sign-in-link-conflict';
+
+export type AccountRefusal = { readonly code: 'account-problem'; readonly problem: AccountProblem };
+
+/** The web app's "who is this?" refusals: the service's own, or ours (AccountRefusal). */
+export type IdentifyError = SessionError | AccountRefusal;
+
 /** What the request itself says, before anything is believed. */
 export type RequestFacts = {
   /** The Host the request was sent to, as received. */
@@ -38,7 +51,7 @@ export type RequestFacts = {
   /** The path and query as received, still percent-encoded: `/north-league/teams?season=x`. */
   readonly path: string;
   /** The sign-in service's identify answer for the session cookie, or null with no cookie. */
-  readonly session: Result<SessionIdentity, SessionError> | null;
+  readonly session: Result<SessionIdentity, IdentifyError> | null;
 };
 
 /** The league a short name names, as the narrow lookup answers it (T-221). */
@@ -129,11 +142,14 @@ export type RequestContext = PlatformRequestContext | LeagueRequestContext;
  *   such a league exists.
  * - `forward`: one of our own pages spelled another way (`/Account`, `/%61ccount`);
  *   forward permanently to `to`, its one proper address.
+ * - `account-problem`: the session is live but is none of our accounts' (AccountRefusal);
+ *   send the person to the account page, which explains it and offers to sign out.
  */
 export type ContextRefusal =
   | { readonly code: 'unknown-host' }
   | { readonly code: 'renew-session' }
   | { readonly code: 'session-ended' }
+  | AccountRefusal
   | { readonly code: 'league-not-found' }
   | {
       readonly code: 'league-moved';
@@ -152,9 +168,9 @@ export async function requestContext(
   let account: SignedInAccount | null = null;
   if (facts.session !== null) {
     if (!facts.session.ok) {
-      return fail({
-        code: facts.session.error.code === 'access-expired' ? 'renew-session' : 'session-ended',
-      });
+      const error = facts.session.error;
+      if (error.code === 'account-problem') return fail(error);
+      return fail({ code: error.code === 'access-expired' ? 'renew-session' : 'session-ended' });
     }
     account = signedInAccount(facts.session.value);
   }

@@ -44,8 +44,12 @@ export type StartupDeps = {
   readonly database: () => Promise<DatabasePackage>;
   /** Where the access module's T-196 lines go. */
   readonly log: (line: CommandLogLine) => void;
-  /** Where a sign-in email that could not be sent is reported: its kind only (T-86). */
-  readonly warn?: (message: string, fields: { readonly kind: string }) => void;
+  /**
+   * Where problems that are not one request's are reported: a sign-in email that could
+   * not be sent (its kind only), a sign-in to put right by hand (the sign-in user's id
+   * only). Never an address, a token or a secret (T-86).
+   */
+  readonly warn?: (message: string, fields: Readonly<Record<string, string>>) => void;
 };
 
 export async function startWebApp(config: Config, deps: StartupDeps): Promise<WebPorts> {
@@ -117,5 +121,6 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
     signIn: signIn.signIn,
     signInMail: signIn.signInMail,
     log: options.log,
+    warn: (message, fields) => deps.warn?.(message, fields),
   });
 }

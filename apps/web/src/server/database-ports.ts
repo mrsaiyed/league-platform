@@ -11,12 +11,13 @@
 //
 // packages/database is handed in, not imported: Node.js loads it when the app starts
 // (container.ts), so Next.js never bundles it.
-import { ok, type AccessTx, type CommandDeps } from '@srleagues/core';
+import { fail, ok, type AccessTx, type CommandDeps, type Result } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
 import type { SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
+import type { AccountRefusal } from './context.ts';
 import type { WebPorts } from './ports.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
@@ -30,6 +31,7 @@ export type DatabaseQueries = Pick<
   | 'findCurrentLeague'
   | 'findAccountOfSignIn'
   | 'accountForSignIn'
+  | 'isSignInLinkConflict'
   | 'accessStore'
   | 'activityLogStore'
   | 'jobsStore'
@@ -43,6 +45,11 @@ export type DatabasePortsOptions = {
   readonly signInMail: SignInMail;
   /** Where the access module's T-196 lines go. */
   readonly log: CommandDeps<AccessTx>['log'];
+  /**
+   * Where a sign-in that needs putting right by hand is reported: a fixed message and
+   * the sign-in user's id, never an address or a token (T-86).
+   */
+  readonly warn: (message: string, fields: { readonly signInUserId: string }) => void;
   readonly now?: () => Date;
 };
 
@@ -89,25 +96,40 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
   // mailbox (a right code, Google, or a right password), so the first time a user is
   // seen, accountForSignIn may link or make their account. This is its only call: the
   // email is the one the service holds for the session, never one from the request.
-  // It throws if that address's account is linked to another sign-in user (put right
-  // by hand, record 052), so the request fails rather than acting as anyone.
-  const accountOfSignIn = async (signInId: string, email: string): Promise<string> => {
+  // When that address's account is linked to another sign-in user (put right by hand,
+  // record 052), the answer is a refusal, never another person's account: each request
+  // logs the sign-in user's id for whoever puts it right, and the person is told so
+  // plainly on the account page, where they can still sign out (record 055).
+  const accountOfSignIn = async (
+    signInId: string,
+    email: string,
+  ): Promise<Result<string, AccountRefusal>> => {
     const linked = await database.withTransaction(db, {}, (scope) =>
       database.findAccountOfSignIn(scope, signInId),
     );
-    if (linked !== undefined) return linked;
-    return database.withTransaction(db, {}, (scope) =>
-      database.accountForSignIn(scope, signInId, email),
-    );
+    if (linked !== undefined) return ok(linked);
+    try {
+      return ok(
+        await database.withTransaction(db, {}, (scope) =>
+          database.accountForSignIn(scope, signInId, email),
+        ),
+      );
+    } catch (error) {
+      if (!database.isSignInLinkConflict(error)) throw error;
+      options.warn(
+        'A sign-in user cannot be linked: the account for its address belongs to another sign-in user. Put it right by hand (records 052 and 055).',
+        { signInUserId: signInId },
+      );
+      return fail({ code: 'account-problem', problem: 'sign-in-link-conflict' });
+    }
   };
 
   const identify: WebPorts['identify'] = async (accessToken) => {
     const who = await signIn.identify({ accessToken });
     if (!who.ok) return who;
-    return ok({
-      ...who.value,
-      accountId: await accountOfSignIn(who.value.accountId, who.value.email),
-    });
+    const account = await accountOfSignIn(who.value.accountId, who.value.email);
+    if (!account.ok) return account;
+    return ok({ ...who.value, accountId: account.value });
   };
 
   return {

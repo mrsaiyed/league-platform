@@ -2,10 +2,10 @@
 // adapters to core). container.ts chooses which adapters fill it: the made-up
 // stand-ins for local work and tests, or the database for staging and production.
 import type { AccessHolder, CommandContext, Result } from '@srleagues/core';
-import type { SessionError, SessionIdentity, SignInService } from '@srleagues/providers';
+import type { SessionIdentity, SignInService } from '@srleagues/providers';
 import type { Renew } from './sign-in/renew-session.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
-import type { ContextDeps } from './context.ts';
+import type { ContextDeps, IdentifyError } from './context.ts';
 import type { FixtureImportPorts } from './fixture-import-ports.ts';
 import type { GamesAreaPorts } from './games-area-ports.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
@@ -18,8 +18,12 @@ import type { PublishPlays } from './tracker-commands-endpoint.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
 export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
-  /** "Who is this?" for a session cookie's access token (T-6). */
-  readonly identify: (accessToken: string) => Promise<Result<SessionIdentity, SessionError>>;
+  /**
+   * "Who is this?" for a session cookie's access token (T-6), as one of our accounts:
+   * the service's refusal, or an AccountRefusal for a live session that is none of
+   * our accounts' (record 055).
+   */
+  readonly identify: (accessToken: string) => Promise<Result<SessionIdentity, IdentifyError>>;
   /** The sign-in service (T-6): the local stand-in, or Supabase (record 018). */
   readonly signIn: SignInService;
   /** The sign-in emails, through our own email service (T4 §3). */
