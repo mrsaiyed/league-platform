@@ -12,11 +12,12 @@ import {
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
+import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
 import { loadStatsPage, parseBy, type LeaderBoard, type StatsPageData } from './build-stats.ts';
 import { chooseSeason, firstValue } from './choose-season.ts';
-import { SeasonChoice, type SearchParams } from './standings-page.tsx';
+import type { SearchParams } from './standings-page.tsx';
 
 /** One leader board as the card draws it: each leader's place and name, team and games, and number. */
 function leaderEntries(board: LeaderBoard): readonly LeaderEntry[] {
@@ -35,7 +36,14 @@ function leaderEntries(board: LeaderBoard): readonly LeaderEntry[] {
 }
 
 /** The leaders, the full table of players and the teams' totals. Nothing here reads anything. */
-export function StatsTables({ data }: { readonly data: StatsPageData }) {
+export function StatsTables({
+  data,
+  scheduleHref,
+}: {
+  readonly data: StatsPageData;
+  /** Where "See the full schedule" goes while no numbers have been recorded. */
+  readonly scheduleHref?: string;
+}) {
   const labels = displayLabels(t);
   const boards = data.leaders.filter((board) => board.rows.length > 0);
   const hasNumbers =
@@ -43,7 +51,18 @@ export function StatsTables({ data }: { readonly data: StatsPageData }) {
     data.teamRows.some((row) =>
       Object.entries(row.cells).some(([key, value]) => key !== 'team' && value !== null),
     );
-  if (!hasNumbers) return <EmptyPanel text={t('stats.empty')} />;
+  if (!hasNumbers) {
+    return (
+      <EmptyPanel
+        text={t('stats.empty')}
+        action={
+          scheduleHref === undefined
+            ? undefined
+            : { href: scheduleHref, label: t('home.fullSchedule') }
+        }
+      />
+    );
+  }
   return (
     <>
       <Section
@@ -107,7 +126,7 @@ export async function StatsPage({
   const view = await loadLeaguePage(league, 'site');
   const addressee = view.context.league;
   const { publicStats } = await webPorts();
-  const seasons = await publicStats.seasonsOf(addressee.id);
+  const seasons = await seasonsOfLeague(addressee.id);
   const asked = firstValue(search['season']);
   const season = chooseSeason(seasons, asked);
   if (season === undefined && asked !== undefined && asked !== '') return notFound();
@@ -131,7 +150,6 @@ export async function StatsPage({
       ) : (
         <>
           <FilterToolbar label={labels.filters}>
-            <SeasonChoice seasons={seasons} chosen={season} action={action} keep={{ by }} />
             <OptionPicker
               name="by"
               label={t('stats.showBy')}
@@ -145,7 +163,12 @@ export async function StatsPage({
               keep={asked === undefined || asked === '' ? {} : { season: asked }}
             />
           </FilterToolbar>
-          <StatsTables data={data} />
+          <StatsTables
+            data={data}
+            scheduleHref={leagueUrl(addressee, 'schedule', {
+              season: asked === undefined || asked === '' ? undefined : asked,
+            })}
+          />
         </>
       )}
     </main>

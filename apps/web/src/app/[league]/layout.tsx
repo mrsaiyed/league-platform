@@ -3,11 +3,13 @@ import type { ReactNode } from 'react';
 import {
   currentMenuPage,
   DesignStyle,
+  headerSeason,
   LeagueNotice,
   SiteFooter,
   SiteHeader,
   type LeagueRouteProps,
 } from '../../features/shell/index.ts';
+import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { siteOfLeague } from '../../server/league-site.ts';
 import { leagueView } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
@@ -19,7 +21,9 @@ import './league-site.css';
  * it (U-9); this draws nothing of the league's own unless the page may be shown.
  * The league's design becomes CSS variables once here (T-90), and the header, menu
  * and footer with our small mark (U-8) frame every page. The menu marks the page the
- * visitor is on, read from the address as it arrived (the proxy's header).
+ * visitor is on, read from the address as it arrived (the proxy's header). On the menu's
+ * pages the header also holds the season picker, so the seasons are read here; the page
+ * under it reads the same ones without asking again (league-seasons.ts).
  */
 export default async function LeagueLayout({
   children,
@@ -29,6 +33,10 @@ export default async function LeagueLayout({
   if (view === null) return children;
   const site = siteOfLeague(view.context.league);
   const path = (await headers()).get(pathHeader) ?? '';
+  const league = view.context.league;
+  const current = currentMenuPage(league, path);
+  const season =
+    current === null ? null : headerSeason(league, path, await seasonsOfLeague(league.id));
   return (
     <div className="league-site ui-root">
       <DesignStyle design={site.design} />
@@ -36,10 +44,11 @@ export default async function LeagueLayout({
         {t('shell.skipToContent')}
       </a>
       <SiteHeader
-        league={view.context.league}
+        league={league}
         name={site.name}
         signedIn={view.context.account !== null}
-        current={currentMenuPage(view.context.league, path)}
+        current={current}
+        season={season}
       />
       <LeagueNotice status={view.context.league.status} />
       <div className="site-body site-column" id="content">

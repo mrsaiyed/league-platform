@@ -206,7 +206,7 @@ export async function loadTeamStats(
     },
   }));
   const totalsColumns: StatsColumn[] = [
-    { key: 'team', label: t('team.totalsRow') },
+    { key: 'team', label: t('stats.col.team') },
     ...statColumns,
   ];
   const totalsRows: StatRow[] =
@@ -224,6 +224,7 @@ export async function loadTeamStats(
                 }),
               ),
             },
+            chips: { team: team.color },
           },
         ];
   const hasNumbers =
@@ -243,9 +244,9 @@ export type TeamPageData = {
   };
   readonly teamId: string;
   readonly seedText: string;
+  /** The seed alone ("1"), or the words for a team with no place yet. */
+  readonly seedValue: string;
   readonly recordText: string;
-  /** The line under the team's name, whole: seed, record and, if it has one, division. */
-  readonly headline: string;
   readonly statsShown: 'player_lines' | 'team_totals';
 };
 
@@ -290,15 +291,8 @@ export async function loadTeamHead(
     },
     teamId: row.id,
     seedText,
+    seedValue: record.seed === null ? t('teams.noSeed') : String(record.seed),
     recordText: recordText(record),
-    headline:
-      division === undefined
-        ? t('team.headline', { seed: seedText, record: recordText(record) })
-        : t('team.headlineDivision', {
-            seed: seedText,
-            record: recordText(record),
-            name: division.name,
-          }),
     statsShown: shown.statsShown,
   };
 }

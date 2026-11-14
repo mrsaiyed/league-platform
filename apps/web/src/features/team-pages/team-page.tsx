@@ -4,6 +4,7 @@ import { displayLabels } from '@srleagues/site';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
+import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
 import { myTeamCookieName } from '../../server/my-team-cookie.ts';
@@ -130,7 +131,7 @@ export async function TeamPage({
   const view = await loadLeaguePage(league, 'site');
   const addressee = view.context.league;
   const { publicStats, publicSchedule, publicTeams } = await webPorts();
-  const seasons = await publicStats.seasonsOf(addressee.id);
+  const seasons = await seasonsOfLeague(addressee.id);
   const asked = firstValue(search['season']);
   const season = chooseSeason(seasons, asked);
   if (season === undefined) return notFound();
@@ -167,7 +168,19 @@ export async function TeamPage({
       <PageHead
         title={head.team.name}
         eyebrow={season.name}
-        sub={head.headline}
+        facts={[
+          { key: 'seed', label: t('teams.col.seed'), value: head.seedValue },
+          { key: 'record', label: t('teams.col.record'), value: head.recordText },
+          ...(head.team.divisionName === null
+            ? []
+            : [
+                {
+                  key: 'division',
+                  label: t('teams.col.division'),
+                  value: head.team.divisionName,
+                },
+              ]),
+        ]}
         lead={<Emblem name={head.team.name} color={head.team.color} size="large" />}
       >
         {offersMyTeam ? (
@@ -199,7 +212,13 @@ export async function TeamPage({
         <div className="team-games">
           <Section title={t('team.schedule')}>
             {games.upcoming.length === 0 ? (
-              <EmptyPanel text={t('team.noSchedule')} />
+              <EmptyPanel
+                text={t('team.noSchedule')}
+                action={{
+                  href: leagueUrl(addressee, 'schedule', seasonOption),
+                  label: t('home.fullSchedule'),
+                }}
+              />
             ) : (
               <GameList leagueId={addressee.id} games={games.upcoming} />
             )}

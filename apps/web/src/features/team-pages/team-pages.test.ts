@@ -2,6 +2,8 @@
 // stand-in leagues: records and seeds, rosters through the one name function, statistics
 // following each team's setting, and who lands where.
 import { publicViewer, type AccessHolder } from '@srleagues/core';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
@@ -15,6 +17,7 @@ import {
   loadTeamStats,
 } from './build-team.ts';
 import { chooseMyTeam, leagueHomeStayUrl, teamIdsFromGrants } from './start-page.ts';
+import { TeamCards } from './teams-page.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
@@ -52,12 +55,55 @@ describe('the teams list', () => {
   });
 });
 
+describe('the team cards', () => {
+  const card = (slug: string, divisionName: string | null) => ({
+    slug,
+    name: slug,
+    color: null,
+    href: `/x/teams/${slug}`,
+    seedText: '1',
+    recordText: '1-0',
+    divisionName,
+  });
+  const html = (cards: Parameters<typeof TeamCards>[0]['cards']) =>
+    renderToStaticMarkup(createElement(TeamCards, { cards }));
+
+  it('say nothing about divisions in a league that has none', () => {
+    const text = html([card('comets', null), card('rockets', null)]);
+    expect(text).not.toContain('Division');
+    expect(text).not.toContain('No division');
+    expect(text).toContain('Seed');
+  });
+
+  it('say which team has no division in a league that has them', () => {
+    const text = html([card('owls', 'East'), card('strays', null)]);
+    expect(text.match(/<dt>Division<\/dt>/g)).toHaveLength(2);
+    expect(text).toContain('East');
+    expect(text).toContain('No division');
+  });
+
+  it('the stand-in league without divisions has none on its cards', async () => {
+    const s = await season(youth);
+    const cards = await loadTeamCards(
+      stats.readStoreOf(youth),
+      { id: youth, slug: 'harbor-city', customDomain: null } as never,
+      s,
+      s.isCurrent,
+    );
+    expect(cards?.length).toBeGreaterThan(0);
+    expect(html(cards ?? [])).not.toContain('Division');
+  });
+});
+
 describe('a team page', () => {
   it('has the team, its record and its roster with those who left apart', async () => {
     const s = await season(adult);
     const head = await loadTeamHead(stats.readStoreOf(adult), adult, s.id, 'falcons');
     expect(head?.team.name).toBe('Falcons');
     expect(head?.seedText).toBe('Seed 2');
+    // The seed alone, for the row of facts under the team's name.
+    expect(head?.seedValue).toBe('2');
+    expect(head?.team.divisionName).toBe('East');
     expect(head?.recordText).toBe('5-1');
     const roster = buildRoster(
       await teams.rosterOf(adult, head?.teamId ?? '', {
@@ -92,6 +138,11 @@ describe('a team page', () => {
     expect(hidden?.playerLinesShown).toBe(false);
     expect(hidden?.playerRows).toEqual([]);
     expect(hidden?.totalsRows).toHaveLength(1);
+    // The totals row names the team under a plain "Team" heading, with the team's own color.
+    expect(hidden?.totalsColumns[0]?.label).toBe('Team');
+    expect(hidden?.totalsRows[0]?.cells['team']).toBe('Owls');
+    expect(hidden?.totalsRows[0]?.chips?.['team']).toBe(owls?.team.color);
+    expect(owls?.team.color).toMatch(/^#[0-9a-f]{6}$/i);
     expect(JSON.stringify(hidden)).not.toContain('Castellanos');
     const falcons = await loadTeamHead(store, adult, s.id, 'falcons');
     const shown = await loadTeamStats(store, settings, {

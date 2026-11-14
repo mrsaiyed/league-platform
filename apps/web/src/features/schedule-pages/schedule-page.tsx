@@ -3,13 +3,17 @@ import { EmptyPanel, FilterToolbar, OptionPicker, PageHead, RoundPicker } from '
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
+import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
-import { chooseSeason, firstValue, SeasonChoice, type SearchParams } from '../stats-pages/index.ts';
+import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { buildScheduleView, parseRound } from './build-schedule.ts';
 import { RoundSections } from './schedule-views.tsx';
 
-/** `/{league}/schedule`: past rounds closed, the current one open, then the coming ones. */
+/**
+ * `/{league}/schedule`: past rounds closed, the current one open, then the coming ones. The
+ * season is picked in the header; the round and the team in the page's own toolbar.
+ */
 export async function SchedulePage({
   league,
   search,
@@ -20,8 +24,8 @@ export async function SchedulePage({
 }) {
   const view = await loadLeaguePage(league, 'site');
   const addressee = view.context.league;
-  const { publicStats, publicSchedule } = await webPorts();
-  const seasons = await publicStats.seasonsOf(addressee.id);
+  const { publicSchedule } = await webPorts();
+  const seasons = await seasonsOfLeague(addressee.id);
   const asked = firstValue(search['season']);
   const season = chooseSeason(seasons, asked);
   if (season === undefined && asked !== undefined && asked !== '') return notFound();
@@ -55,39 +59,43 @@ export async function SchedulePage({
   return (
     <main>
       <PageHead title={t('schedule.title')} eyebrow={season.name} />
-      <FilterToolbar label={labels.filters}>
-        <SeasonChoice
-          seasons={seasons}
-          chosen={season}
-          action={action}
-          keep={{ ...(team === '' ? {} : { team }), ...(round === '' ? {} : { round }) }}
-        />
-        {built.seasonIsEmpty ? null : (
-          <>
-            <RoundPicker
-              label={labels.round}
-              submitLabel={labels.show}
-              action={action}
-              value={round}
-              options={built.roundOptions}
-              keep={{ ...keepSeason, ...(team === '' ? {} : { team }) }}
-            />
-            <OptionPicker
-              name="team"
-              label={t('schedule.team')}
-              submitLabel={labels.show}
-              action={action}
-              value={team}
-              options={built.teamOptions}
-              keep={{ ...keepSeason, ...(round === '' ? {} : { round }) }}
-            />
-          </>
-        )}
-      </FilterToolbar>
+      {built.seasonIsEmpty ? null : (
+        <FilterToolbar label={labels.filters}>
+          <RoundPicker
+            label={labels.round}
+            submitLabel={labels.show}
+            action={action}
+            value={round}
+            options={built.roundOptions}
+            keep={{ ...keepSeason, ...(team === '' ? {} : { team }) }}
+          />
+          <OptionPicker
+            name="team"
+            label={t('schedule.team')}
+            submitLabel={labels.show}
+            action={action}
+            value={team}
+            options={built.teamOptions}
+            keep={{ ...keepSeason, ...(round === '' ? {} : { round }) }}
+          />
+        </FilterToolbar>
+      )}
       {built.seasonIsEmpty ? (
-        <EmptyPanel text={t('schedule.empty')} />
+        <EmptyPanel
+          text={t('schedule.empty')}
+          action={{
+            href: leagueUrl(addressee, 'teams', { ...keepSeason }),
+            label: t('home.seeTeams'),
+          }}
+        />
       ) : built.rounds.length === 0 ? (
-        <EmptyPanel text={t('schedule.noMatch')} />
+        <EmptyPanel
+          text={t('schedule.noMatch')}
+          action={{
+            href: leagueUrl(addressee, 'schedule', { ...keepSeason }),
+            label: t('schedule.showAll'),
+          }}
+        />
       ) : (
         <RoundSections leagueId={addressee.id} rounds={built.rounds} />
       )}

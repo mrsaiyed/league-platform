@@ -144,6 +144,7 @@ export const en = {
   'home.standingsEmpty': 'The standings appear here once games have been played.',
   'home.fullStandings': 'See the full standings',
   'home.fullSchedule': 'See the full schedule',
+  'home.seeTeams': 'See the teams',
   // The look of the home page (step 2.85): a live game under its own heading, and the
   // season in four numbers.
   'home.liveNow': 'Live now',
@@ -156,6 +157,7 @@ export const en = {
   'schedule.noSeason': 'There is no season to show yet.',
   'schedule.empty': 'No games have been scheduled for this season yet.',
   'schedule.noMatch': 'No games match that choice.',
+  'schedule.showAll': 'Show every game',
   'schedule.allRounds': 'All rounds',
   'schedule.team': 'Team',
   'schedule.allTeams': 'All teams',
@@ -170,7 +172,6 @@ export const en = {
   'schedule.gameNumber': 'Game {number}',
   'schedule.dateToBeSet': 'Date to be announced',
   'schedule.dateAndTimeToBeSet': '{date}, time to be announced',
-  'schedule.whenWhere': '{when} at {where}',
   'schedule.venueCourt': '{venue}, {court}',
   // The teams list and a team's page (step 2.44).
   'teams.title': 'Teams',
@@ -186,8 +187,6 @@ export const en = {
   'teams.recordTies': '{wins}-{losses}-{ties}',
   'team.seedLine': 'Seed {seed}',
   'team.noSeed': 'Not seeded yet',
-  'team.headline': '{seed}. Record: {record}',
-  'team.headlineDivision': '{seed}. Record: {record}. Division: {name}',
   'team.allTeams': 'All teams',
   'team.leagueHome': 'League home',
   'team.roster': 'Roster',
@@ -210,7 +209,6 @@ export const en = {
   'team.statsTotalsOnly': "Only this team's totals are shown. Its players' numbers are not public.",
   'team.statsPlayers': 'Players',
   'team.statsTotals': 'Team totals',
-  'team.totalsRow': 'Team total',
   'team.makeMine': 'Make this my team',
   'team.isMine': 'This is your team on this device.',
   'team.clearMine': 'Stop using this as my team',

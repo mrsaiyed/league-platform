@@ -26,6 +26,8 @@ export type GameView = {
   };
   readonly status: GameStatus;
   readonly whenText: string;
+  /** Where the game is played; left out for a game with no place yet. */
+  readonly placeText?: string;
   readonly numberText?: string;
   readonly detailsHref?: string;
   /** The game's page, kept for a game that finishes while the page is open. */
@@ -66,9 +68,8 @@ function dayText(day: string): string {
 }
 
 function whenOf(game: PublicGame, clock: LeagueClock): string {
-  let when: string;
   if (game.startsAt !== null) {
-    when = new Intl.DateTimeFormat(locale, {
+    return new Intl.DateTimeFormat(locale, {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
@@ -76,17 +77,18 @@ function whenOf(game: PublicGame, clock: LeagueClock): string {
       minute: '2-digit',
       timeZone: clock.timeZone,
     }).format(new Date(game.startsAt));
-  } else if (game.localDate !== null) {
-    when = t('schedule.dateAndTimeToBeSet', { date: dayText(game.localDate) });
-  } else {
-    when = t('schedule.dateToBeSet');
   }
-  if (game.venue === null) return when;
-  const where =
-    game.courtName === null
-      ? game.venue.name
-      : t('schedule.venueCourt', { venue: game.venue.name, court: game.courtName });
-  return t('schedule.whenWhere', { when, where });
+  return game.localDate !== null
+    ? t('schedule.dateAndTimeToBeSet', { date: dayText(game.localDate) })
+    : t('schedule.dateToBeSet');
+}
+
+/** The venue, and the court when the game has one; undefined for a game with no place yet. */
+function placeOf(game: PublicGame): string | undefined {
+  if (game.venue === null) return undefined;
+  return game.courtName === null
+    ? game.venue.name
+    : t('schedule.venueCourt', { venue: game.venue.name, court: game.courtName });
 }
 
 export function gameView(
@@ -98,12 +100,14 @@ export function gameView(
   const status = statusOf(game.status);
   const decided = status === 'final' || status === 'forfeit';
   const gameHref = leagueUrl(league, 'game', { game: game.id, season: seasonSlug });
+  const place = placeOf(game);
   return {
     id: game.id,
     home: { name: game.homeTeam.name, score: game.homeScore, color: game.homeTeam.color },
     away: { name: game.awayTeam.name, score: game.awayScore, color: game.awayTeam.color },
     status,
     whenText: whenOf(game, clock),
+    ...(place === undefined ? {} : { placeText: place }),
     ...(game.number === null
       ? {}
       : { numberText: t('schedule.gameNumber', { number: game.number }) }),

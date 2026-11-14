@@ -74,6 +74,69 @@ describe('header, menu and footer', () => {
     expect(signedIn).not.toContain(en['nav.signIn']);
   });
 
+  it('holds the season picker, between the name and sign in, when the page has one', () => {
+    const html = renderToStaticMarkup(
+      createElement(SiteHeader, {
+        league,
+        name: 'North Valley League',
+        signedIn: false,
+        current: 'schedule',
+        season: {
+          action: '/north-valley/schedule',
+          value: 'spring-2026',
+          options: [
+            { value: 'fall-2026', label: 'Fall 2026' },
+            { value: 'spring-2026', label: 'Spring 2026' },
+          ],
+          keep: { team: 'owls' },
+        },
+      }),
+    );
+    const top = html.slice(0, html.indexOf('class="site-tabs"'));
+    expect(top).toContain('<form class="ui-picker" action="/north-valley/schedule" method="get">');
+    expect(top).toContain('<input type="hidden" name="team" value="owls"/>');
+    expect(top).toMatch(
+      /<label for="site-season">Season<\/label><select id="site-season" name="season"/,
+    );
+    expect(top).toContain('<option value="spring-2026" selected="">Spring 2026</option>');
+    // Works with scripts off: the picker keeps its quiet button until the page script runs.
+    expect(top).toContain('<button type="submit">Show</button>');
+    expect(top.indexOf('class="site-name"')).toBeLessThan(top.indexOf('class="site-season"'));
+    expect(top.indexOf('class="site-season"')).toBeLessThan(top.indexOf('class="site-sign-in"'));
+    expect(html.match(/name="season"/g)).toHaveLength(1);
+    const without = renderToStaticMarkup(
+      createElement(SiteHeader, { league, name: 'x', signedIn: false }),
+    );
+    expect(without).not.toContain('site-season');
+    expect(without).not.toContain('<select');
+  });
+
+  it('offers sign in inside the phone menu too, and the menu button has a name', () => {
+    const html = renderToStaticMarkup(
+      createElement(SiteHeader, { league, name: 'x', signedIn: false }),
+    );
+    const panel = html.slice(html.indexOf('class="site-menu-panel"'), html.indexOf('</details>'));
+    expect(panel).toContain(`class="site-menu-sign-in" href="/signin">${en['nav.signIn']}</a>`);
+    expect(html).toMatch(
+      new RegExp(`<summary>.*<span class="ui-visually-hidden">${en['nav.menu']}</span></summary>`),
+    );
+  });
+
+  it('keeps the header one row high on a phone: a small name, sign in put away', () => {
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    const phone = css.slice(0, css.indexOf('@media (min-width: 48rem)'));
+    expect(phone).toMatch(/\.site-header \.site-name \{[^}]*font-size: var\(--text-16\);/);
+    expect(phone).toMatch(/\.site-header \.site-name \{[^}]*-webkit-line-clamp: 2;/);
+    expect(phone).toMatch(/\.site-header \.site-sign-in \{\s*display: none;/);
+    // No size of its own: the tap height and the scales come from the design's variables.
+    for (const raw of ['2.75rem', '0.375rem', '0.3125rem', '1.25rem', 'font-size: 1rem']) {
+      expect(css).not.toContain(raw);
+    }
+  });
+
   it('carries the Powered by SR Leagues mark and the footer links (U-8)', () => {
     const html = renderToStaticMarkup(createElement(SiteFooter));
     expect(html).toContain('Powered by SR Leagues');

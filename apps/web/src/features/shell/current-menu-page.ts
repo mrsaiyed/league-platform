@@ -10,12 +10,24 @@ export type MenuPage = (typeof menuPages)[number];
 const plain = (address: string): string =>
   (address.split(/[?#]/)[0] ?? '').replace(/\/+$/, '').toLowerCase();
 
-/** The menu page `path` (the address as it arrived, with or without a query) is on; null for none. */
-export function currentMenuPage(league: LeagueAddressee, path: string): MenuPage | null {
+/**
+ * The menu page `path` (the address as it arrived, with or without a query) is on or under;
+ * `exact` says it is that page itself. Null for a page the menu does not hold.
+ */
+export function menuPageAt(
+  league: LeagueAddressee,
+  path: string,
+): { readonly page: MenuPage; readonly exact: boolean } | null {
   const at = plain(path);
   for (const page of menuPages) {
     const base = plain(leagueUrl(league, page));
-    if (at === base || (page !== 'home' && at.startsWith(`${base}/`))) return page;
+    if (at === base) return { page, exact: true };
+    if (page !== 'home' && at.startsWith(`${base}/`)) return { page, exact: false };
   }
   return null;
+}
+
+/** The menu page `path` is on, so the menu can mark it; null for none. */
+export function currentMenuPage(league: LeagueAddressee, path: string): MenuPage | null {
+  return menuPageAt(league, path)?.page ?? null;
 }

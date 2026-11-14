@@ -108,6 +108,7 @@ export function LiveGameList({
                 away={g.away}
                 status={g.status}
                 whenText={g.whenText}
+                {...(g.placeText === undefined ? {} : { placeText: g.placeText })}
                 {...(g.numberText === undefined ? {} : { numberText: g.numberText })}
                 {...(g.detailsHref === undefined ? {} : { detailsHref: g.detailsHref })}
                 labels={labels}

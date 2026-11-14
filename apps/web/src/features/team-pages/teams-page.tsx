@@ -1,18 +1,22 @@
-import { leagueUrl } from '@srleagues/core';
-import { EmptyPanel, FilterToolbar, PageHead, TeamCard as TeamCardPiece } from '@srleagues/ui';
-import { displayLabels } from '@srleagues/site';
+import { EmptyPanel, PageHead, TeamCard as TeamCardPiece } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
+import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
-import { chooseSeason, firstValue, SeasonChoice, type SearchParams } from '../stats-pages/index.ts';
+import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { loadTeamCards, type TeamCard } from './build-team.ts';
+import { leagueHomeStayUrl } from './start-page.ts';
 
 /**
  * The season's teams as cards, each one link to its team's page: the emblem and name, the
- * record as the card's one figure, then seed and division. Nothing here reads anything.
+ * record as the card's one figure, then seed and, where the league has divisions, division.
+ * Nothing here reads anything.
  */
 export function TeamCards({ cards }: { readonly cards: readonly TeamCard[] }) {
+  // A league with no divisions says nothing about divisions; one that has them says which
+  // team has none.
+  const hasDivisions = cards.some((card) => card.divisionName !== null);
   return (
     <ul className="ui-card-grid" aria-label={t('teams.title')}>
       {cards.map((card) => (
@@ -24,11 +28,15 @@ export function TeamCards({ cards }: { readonly cards: readonly TeamCard[] }) {
             figure={{ label: t('teams.col.record'), value: card.recordText }}
             facts={[
               { key: 'seed', label: t('teams.col.seed'), value: card.seedText },
-              {
-                key: 'division',
-                label: t('teams.col.division'),
-                value: card.divisionName ?? t('teams.noDivision'),
-              },
+              ...(hasDivisions
+                ? [
+                    {
+                      key: 'division',
+                      label: t('teams.col.division'),
+                      value: card.divisionName ?? t('teams.noDivision'),
+                    },
+                  ]
+                : []),
             ]}
           />
         </li>
@@ -49,7 +57,7 @@ export async function TeamsPage({
   const view = await loadLeaguePage(league, 'site');
   const addressee = view.context.league;
   const { publicStats } = await webPorts();
-  const seasons = await publicStats.seasonsOf(addressee.id);
+  const seasons = await seasonsOfLeague(addressee.id);
   const asked = firstValue(search['season']);
   const season = chooseSeason(seasons, asked);
   if (season === undefined && asked !== undefined && asked !== '') return notFound();
@@ -70,17 +78,14 @@ export async function TeamsPage({
         <EmptyPanel text={t('teams.noSeason')} />
       ) : (
         <>
-          {seasons.length > 1 ? (
-            <FilterToolbar label={displayLabels(t).filters}>
-              <SeasonChoice
-                seasons={seasons}
-                chosen={season}
-                action={leagueUrl(addressee, 'teams')}
-              />
-            </FilterToolbar>
-          ) : null}
           {cards.length === 0 ? (
-            <EmptyPanel text={t('teams.empty')} />
+            <EmptyPanel
+              text={t('teams.empty')}
+              action={{
+                href: leagueHomeStayUrl(addressee, season.isCurrent ? undefined : season.slug),
+                label: t('shell.backToLeague'),
+              }}
+            />
           ) : (
             <TeamCards cards={cards} />
           )}

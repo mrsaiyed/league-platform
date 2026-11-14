@@ -1,10 +1,12 @@
 // The shell's screens (steps 1.17 and 1.18): placeholders for pages not built yet, the
 // admin's navigation, the notice on a league that is not public, and the league's
-// design, header and footer; and the frame of a page that belongs to no league (step 2.85).
+// design, header (with its season picker) and footer; and the frame of a page that belongs
+// to no league (step 2.85).
 export { AdminArea } from './admin-area.tsx';
 export { AdminNav } from './admin-nav.tsx';
 export { currentMenuPage, type MenuPage } from './current-menu-page.ts';
 export { DesignStyle } from './design-style.tsx';
+export { headerSeason, type HeaderSeason } from './header-season.ts';
 export { LeagueNotice } from './league-notice.tsx';
 export { LeagueSitePage } from './league-site-page.tsx';
 export { NotBuilt } from './not-built.tsx';

@@ -77,6 +77,29 @@ describe('schedule', () => {
     );
     expect(html).toContain('Live');
   });
+
+  it('says when on one line and where on the next, and no place for a game without one', async () => {
+    const { clock, schedule } = await load(adult);
+    const games = buildScheduleView(schedule, clock, addressee, {}).rounds.flatMap((r) => r.games);
+    const placed = games.find((g) => g.placeText !== undefined);
+    expect(placed?.placeText).toMatch(/^Central Gym, Court \d$/);
+    // When is only when: the place is never run into it.
+    for (const game of games) expect(game.whenText).not.toContain('Central Gym');
+    const first = schedule.rounds.flatMap((r) => r.games)[0];
+    if (first === undefined) throw new Error('no game');
+    const nowhere = { ...first, id: 'x2', venue: null, courtName: null };
+    const changed = { ...schedule, unplacedGames: [nowhere] };
+    const views = buildScheduleView(changed, clock, addressee, {}).rounds.flatMap((r) => r.games);
+    expect(views.find((g) => g.id === 'x2')).toBeDefined();
+    expect(views.find((g) => g.id === 'x2')?.placeText).toBeUndefined();
+    const html = renderToStaticMarkup(
+      createElement(RoundSections, {
+        leagueId: adult,
+        rounds: buildScheduleView(schedule, clock, addressee, {}).rounds,
+      }),
+    );
+    expect(html).toMatch(/<span class="ui-game-place" dir="auto">Central Gym, Court \d<\/span>/);
+  });
 });
 
 describe('home', () => {

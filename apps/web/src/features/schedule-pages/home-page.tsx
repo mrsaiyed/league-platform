@@ -1,15 +1,9 @@
 import { leagueUrl, readStandings } from '@srleagues/core';
-import {
-  EmptyPanel,
-  FilterToolbar,
-  PageHead,
-  Section,
-  StandingsTable,
-  StatStrip,
-} from '@srleagues/ui';
+import { EmptyPanel, PageHead, Section, StandingsTable, StatStrip } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
+import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { siteOfLeague } from '../../server/league-site.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
@@ -17,7 +11,6 @@ import {
   buildStandingsViews,
   chooseSeason,
   firstValue,
-  SeasonChoice,
   type SearchParams,
   type StandingsTableView,
 } from '../stats-pages/index.ts';
@@ -35,7 +28,8 @@ export function compactStandings(table: StandingsTableView): StandingsTableView 
 }
 
 /**
- * `/{league}`: the league's name and season, the season in four numbers, a live game under
+ * `/{league}`: the league's name and season (the season is picked in the header), the season
+ * in four numbers, a live game under
  * its own heading, then recent results and upcoming games with the compact standings beside
  * them on a laptop and beneath them on a phone.
  */
@@ -51,7 +45,7 @@ export async function HomePage({
   const addressee = view.context.league;
   const name = siteOfLeague(addressee).name;
   const { publicStats, publicSchedule } = await webPorts();
-  const seasons = await publicStats.seasonsOf(addressee.id);
+  const seasons = await seasonsOfLeague(addressee.id);
   const asked = firstValue(search['season']);
   const season = chooseSeason(seasons, asked);
   if (season === undefined && asked !== undefined && asked !== '') return notFound();
@@ -81,19 +75,19 @@ export async function HomePage({
   const teamCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
   return (
     <main>
-      <PageHead size="hero" title={name} eyebrow={season.name}>
-        {seasons.length > 1 ? (
-          <FilterToolbar label={labels.filters}>
-            <SeasonChoice seasons={seasons} chosen={season} action={leagueUrl(addressee, 'home')} />
-          </FilterToolbar>
-        ) : null}
-      </PageHead>
+      <PageHead size="hero" title={name} eyebrow={season.name} />
       <div className="home-numbers">
         <StatStrip label={t('home.numbers')} items={buildHomeNumbers(schedule, teamCount)} />
       </div>
       {empty ? (
         <Section title={t('home.recentResults')}>
-          <EmptyPanel text={t('home.noGames')} />
+          <EmptyPanel
+            text={t('home.noGames')}
+            action={{
+              href: leagueUrl(addressee, 'teams', { season: askedSeason }),
+              label: t('home.seeTeams'),
+            }}
+          />
         </Section>
       ) : null}
       {live.length > 0 ? (
@@ -106,7 +100,13 @@ export async function HomePage({
           {empty ? null : (
             <Section title={t('home.recentResults')}>
               {games.recent.length === 0 ? (
-                <EmptyPanel text={t('home.noResults')} />
+                <EmptyPanel
+                  text={t('home.noResults')}
+                  action={{
+                    href: leagueUrl(addressee, 'schedule', { season: askedSeason }),
+                    label: t('home.fullSchedule'),
+                  }}
+                />
               ) : (
                 <GameList leagueId={addressee.id} games={games.recent} />
               )}
@@ -151,7 +151,13 @@ export async function HomePage({
               })}
             </div>
           ) : (
-            <EmptyPanel text={t('home.standingsEmpty')} />
+            <EmptyPanel
+              text={t('home.standingsEmpty')}
+              action={{
+                href: leagueUrl(addressee, 'schedule', { season: askedSeason }),
+                label: t('home.fullSchedule'),
+              }}
+            />
           )}
         </Section>
       </div>
