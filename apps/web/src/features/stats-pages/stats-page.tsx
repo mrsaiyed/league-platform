@@ -1,73 +1,96 @@
 import { leagueUrl } from '@srleagues/core';
-import { OptionPicker, SortableStatsTable } from '@srleagues/ui';
+import {
+  EmptyPanel,
+  FilterToolbar,
+  LeaderCard,
+  OptionPicker,
+  PageHead,
+  Section,
+  SortableStatsTable,
+  type LeaderEntry,
+} from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
-import { loadStatsPage, parseBy, type StatsPageData } from './build-stats.ts';
+import { loadStatsPage, parseBy, type LeaderBoard, type StatsPageData } from './build-stats.ts';
 import { chooseSeason, firstValue } from './choose-season.ts';
 import { SeasonChoice, type SearchParams } from './standings-page.tsx';
+
+/** One leader board as the card draws it: each leader's place and name, team and games, and number. */
+function leaderEntries(board: LeaderBoard): readonly LeaderEntry[] {
+  return board.rows.map((row) => {
+    const games = row.cells['games'];
+    return {
+      id: row.id,
+      name: String(row.cells['player'] ?? ''),
+      detail: t('stats.leaderDetail', {
+        team: String(row.cells['team'] ?? ''),
+        games: t.plural('stats.leaderGames', typeof games === 'number' ? games : 0),
+      }),
+      value: String(row.cells['value'] ?? ''),
+    };
+  });
+}
 
 /** The leaders, the full table of players and the teams' totals. Nothing here reads anything. */
 export function StatsTables({ data }: { readonly data: StatsPageData }) {
   const labels = displayLabels(t);
-  const hasLeaders = data.leaders.some((board) => board.rows.length > 0);
+  const boards = data.leaders.filter((board) => board.rows.length > 0);
   const hasNumbers =
     data.playerRows.length > 0 ||
     data.teamRows.some((row) =>
       Object.entries(row.cells).some(([key, value]) => key !== 'team' && value !== null),
     );
-  if (!hasNumbers) return <p>{t('stats.empty')}</p>;
+  if (!hasNumbers) return <EmptyPanel text={t('stats.empty')} />;
   return (
     <>
-      <section>
-        <h2>{t('stats.leaders')}</h2>
-        {data.minimumGames > 0 ? <p>{t.plural('stats.minimumGames', data.minimumGames)}</p> : null}
-        {hasLeaders ? (
-          data.leaders
-            .filter((board) => board.rows.length > 0)
-            .map((board) => (
-              <SortableStatsTable
-                key={board.key}
-                caption={board.title}
-                columns={board.columns}
-                rows={board.rows}
-                locale={locale}
-                labels={labels.stats}
-              />
-            ))
+      <Section
+        title={t('stats.leaders')}
+        note={data.minimumGames > 0 ? t.plural('stats.minimumGames', data.minimumGames) : undefined}
+      >
+        {boards.length > 0 ? (
+          <ul className="ui-card-grid">
+            {boards.map((board) => (
+              <li key={board.key}>
+                <LeaderCard title={board.title} entries={leaderEntries(board)} />
+              </li>
+            ))}
+          </ul>
         ) : (
-          <p>{t('stats.leadersNone')}</p>
+          <EmptyPanel text={t('stats.leadersNone')} />
         )}
-      </section>
-      <section>
-        <h2>{t('stats.allPlayers')}</h2>
+      </Section>
+      <Section title={t('stats.allPlayers')}>
         <SortableStatsTable
           caption={t('stats.allPlayers')}
+          captionHidden
           columns={data.playerColumns}
           rows={data.playerRows}
           locale={locale}
           labels={labels.stats}
         />
-      </section>
-      <section>
-        <h2>{t('stats.teams')}</h2>
+      </Section>
+      <Section
+        title={t('stats.teams')}
+        note={
+          data.totalsOnlyTeams.length > 0
+            ? t('stats.teamsTotalsOnly', {
+                teams: data.totalsOnlyTeams.join(t('stats.teamsJoin')),
+              })
+            : undefined
+        }
+      >
         <SortableStatsTable
           caption={t('stats.teams')}
+          captionHidden
           columns={data.teamColumns}
           rows={data.teamRows}
           locale={locale}
           labels={labels.stats}
         />
-        {data.totalsOnlyTeams.length > 0 ? (
-          <p>
-            {t('stats.teamsTotalsOnly', {
-              teams: data.totalsOnlyTeams.join(t('stats.teamsJoin')),
-            })}
-          </p>
-        ) : null}
-      </section>
+      </Section>
     </>
   );
 }
@@ -102,25 +125,26 @@ export async function StatsPage({
   const action = leagueUrl(addressee, 'stats');
   return (
     <main>
-      <h1>{t('stats.title')}</h1>
+      <PageHead title={t('stats.title')} eyebrow={season?.name} />
       {season === undefined || data === undefined ? (
-        <p>{t('stats.noSeason')}</p>
+        <EmptyPanel text={t('stats.noSeason')} />
       ) : (
         <>
-          <SeasonChoice seasons={seasons} chosen={season} action={action} keep={{ by }} />
-          <OptionPicker
-            name="by"
-            label={t('stats.showBy')}
-            submitLabel={labels.show}
-            action={action}
-            value={by}
-            options={[
-              { value: 'average', label: t('stats.by.average') },
-              { value: 'total', label: t('stats.by.total') },
-            ]}
-            keep={asked === undefined || asked === '' ? {} : { season: asked }}
-          />
-          <p>{season.name}</p>
+          <FilterToolbar label={labels.filters}>
+            <SeasonChoice seasons={seasons} chosen={season} action={action} keep={{ by }} />
+            <OptionPicker
+              name="by"
+              label={t('stats.showBy')}
+              submitLabel={labels.show}
+              action={action}
+              value={by}
+              options={[
+                { value: 'average', label: t('stats.by.average') },
+                { value: 'total', label: t('stats.by.total') },
+              ]}
+              keep={asked === undefined || asked === '' ? {} : { season: asked }}
+            />
+          </FilterToolbar>
           <StatsTables data={data} />
         </>
       )}

@@ -1,5 +1,5 @@
 import { leagueUrl, readStandings } from '@srleagues/core';
-import { SeasonPicker, StandingsTable } from '@srleagues/ui';
+import { EmptyPanel, FilterToolbar, PageHead, SeasonPicker, StandingsTable } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -42,9 +42,9 @@ export function SeasonChoice({
 export function StandingsTables({ tables }: { readonly tables: readonly StandingsTableView[] }) {
   const labels = displayLabels(t).standings;
   return tables.length === 0 ? (
-    <p>{t('standings.empty')}</p>
+    <EmptyPanel text={t('standings.empty')} />
   ) : (
-    <>
+    <div className="ui-stack">
       {tables.map((table) => (
         <section key={table.key}>
           <StandingsTable
@@ -57,7 +57,7 @@ export function StandingsTables({ tables }: { readonly tables: readonly Standing
           />
         </section>
       ))}
-    </>
+    </div>
   );
 }
 
@@ -84,17 +84,20 @@ export async function StandingsPage({
   if (result !== undefined && !result.ok) return notFound();
   return (
     <main>
-      <h1>{t('standings.title')}</h1>
+      <PageHead title={t('standings.title')} eyebrow={season?.name} />
       {season === undefined || result === undefined || !result.ok ? (
-        <p>{t('standings.noSeason')}</p>
+        <EmptyPanel text={t('standings.noSeason')} />
       ) : (
         <>
-          <SeasonChoice
-            seasons={seasons}
-            chosen={season}
-            action={leagueUrl(addressee, 'standings')}
-          />
-          <p>{season.name}</p>
+          {seasons.length > 1 ? (
+            <FilterToolbar label={displayLabels(t).filters}>
+              <SeasonChoice
+                seasons={seasons}
+                chosen={season}
+                action={leagueUrl(addressee, 'standings')}
+              />
+            </FilterToolbar>
+          ) : null}
           <StandingsTables tables={buildStandingsViews(result.value)} />
         </>
       )}
