@@ -32,3 +32,6 @@ export type {
   StatTotal,
   TeamSeasonTotals,
 } from './src/stats/index.ts';
+// The live basketball engine (T6 §1), for the platform's server (step 2.29). Re-exported
+// as it is: the Al-Hadi tracker still reads it by path, and nothing about it changes.
+export * as basketball from './src/basketball/live.ts';

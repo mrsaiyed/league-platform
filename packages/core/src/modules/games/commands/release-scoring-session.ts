@@ -25,6 +25,9 @@ export const releaseScoringSession = defineCommand({
     input,
     tx,
   }): Promise<Result<ScoringSessionReply, ReleaseScoringSessionError>> => {
+    // The game first, then its session, as every command that writes either does
+    // (ScoringSessionsStore.lockGame): a batch of taps in flight finishes first.
+    await tx.scoringSessions.lockGame(input.gameId);
     const game = await tx.games.find(input.gameId);
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
     const now = tx.clock.now();

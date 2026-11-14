@@ -2,6 +2,7 @@
 // "you do not have access" (U-6); unpublished leagues are seen only by the people
 // who run them (U-9). Runs on the made-up stand-in, through the real request
 // context and the access module's own query.
+import { adminAreas } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import {
   addressMatchesRoute,
@@ -98,35 +99,101 @@ describe('a live league', () => {
   });
 });
 
-describe('a draft league (U-9)', () => {
-  it('is not there for visitors, strangers, or a coach who does not run it', async () => {
-    for (const who of ['visitor', 'stranger', 'coach'] as const) {
-      expect(kind(await ask(who, '/quiet-pines', site))).toBe('not-found');
-      expect(kind(await ask(who, '/quiet-pines/admin', adminHome))).toBe('not-found');
+describe('a draft league (U-9, step 2.87)', () => {
+  // Everyone with an admin area in it, and the areas each one's roles open there.
+  const everyArea = adminAreas;
+  const staff = {
+    owner: everyArea,
+    admin: everyArea,
+    registrar: ['registration', 'people'],
+    scheduler: ['schedule', 'games'],
+    programScheduler: ['schedule', 'games'],
+    editor: ['site'],
+    scorekeeper: ['games'],
+    clubAdmin: ['registration', 'teams'],
+  } as const satisfies Partial<Record<Who, readonly string[]>>;
+  const staffNames = Object.keys(staff) as (keyof typeof staff)[];
+  // A signed-out visitor, a plain member, a coach (no admin area), and the admin of
+  // another league.
+  const refused = ['visitor', 'stranger', 'coach', 'otherAdmin'] as const;
+
+  it('is there for each staff role, its public site and its admin', async () => {
+    for (const who of staffNames) {
+      expect(kind(await ask(who, '/quiet-pines', site)), who).toBe('show');
+      const home = await ask(who, '/quiet-pines/admin', adminHome);
+      expect(home.kind === 'show' && home.view.runsTheLeague, who).toBe(true);
+      expect(home.kind === 'show' && home.view.areas, who).toEqual(staff[who]);
     }
   });
 
-  it('is there for its owner and admins only, not for other staff (U-9 read literally)', async () => {
-    expect(kind(await ask('owner', '/quiet-pines', site))).toBe('show');
-    expect(kind(await ask('owner', '/quiet-pines/admin', adminHome))).toBe('show');
-    expect(kind(await ask('scheduler', '/quiet-pines/admin', adminHome))).toBe('not-found');
-    expect(kind(await ask('scheduler', '/quiet-pines', site))).toBe('not-found');
+  it('still opens to each staff role only the areas their roles use (U-6)', async () => {
+    expect(kind(await ask('editor', '/quiet-pines/admin/teams', area('teams')))).toBe('no-access');
+    expect(kind(await ask('registrar', '/quiet-pines/admin/schedule', area('schedule')))).toBe(
+      'no-access',
+    );
+    expect(kind(await ask('scheduler', '/quiet-pines/admin/schedule', area('schedule')))).toBe(
+      'show',
+    );
+    expect(kind(await ask('clubAdmin', '/quiet-pines/admin/teams', area('teams')))).toBe('show');
+    expect(kind(await ask('scorekeeper', '/quiet-pines/score/game-1', score))).toBe('show');
+    expect(kind(await ask('editor', '/quiet-pines/score/game-1', score))).toBe('no-access');
+  });
+
+  it('is not there for anyone else, whatever page they ask for', async () => {
+    for (const who of refused) {
+      expect(kind(await ask(who, '/quiet-pines', site)), who).toBe('not-found');
+      expect(kind(await ask(who, '/quiet-pines/admin', adminHome)), who).toBe('not-found');
+      expect(kind(await ask(who, '/quiet-pines/admin/settings', area('settings'))), who).toBe(
+        'not-found',
+      );
+      expect(kind(await ask(who, '/quiet-pines/score/game-1', score)), who).toBe('not-found');
+    }
+  });
+
+  it('gives them the same answer as a short name nobody has', async () => {
+    for (const who of refused) {
+      for (const want of [site, adminHome, score]) {
+        expect(await ask(who, '/quiet-pines', want), who).toEqual(
+          await ask(who, '/nobody-has-this', want),
+        );
+        expect(await ask(who, '/quiet-pine', want), who).toEqual(
+          await ask(who, '/nobody-has-this', want),
+        );
+      }
+    }
   });
 
   it('forwards a former short name only for those who may see it', async () => {
-    expect(await ask('visitor', '/quiet-pine/admin', adminHome)).toEqual({ kind: 'not-found' });
-    expect(await ask('coach', '/quiet-pine', site)).toEqual({ kind: 'not-found' });
-    expect(await ask('scheduler', '/quiet-pine/admin', adminHome)).toEqual({ kind: 'not-found' });
-    expect(await ask('owner', '/quiet-pine/admin', adminHome)).toEqual({
+    for (const who of refused) {
+      expect(await ask(who, '/quiet-pine/admin', adminHome), who).toEqual({ kind: 'not-found' });
+    }
+    for (const who of staffNames) {
+      expect(await ask(who, '/quiet-pine/admin', adminHome), who).toEqual({
+        kind: 'forward',
+        to: '/quiet-pines/admin',
+      });
+    }
+    expect(await ask('scheduler', '/Quiet-Pines', site)).toEqual({
       kind: 'forward',
-      to: '/quiet-pines/admin',
+      to: '/quiet-pines',
     });
+    expect(await ask('visitor', '/Quiet-Pines', site)).toEqual({ kind: 'not-found' });
   });
 
-  it('gives the same answer as a short name nobody has', async () => {
-    expect(await ask('visitor', '/quiet-pines', site)).toEqual(
-      await ask('visitor', '/nobody-has-this', site),
-    );
+  it("does not let one league's staff see another league's draft", async () => {
+    expect(kind(await ask('otherAdmin', '/still-waters/admin', adminHome))).toBe('show');
+    for (const who of staffNames.filter((name) => name !== 'owner')) {
+      expect(kind(await ask(who, '/still-waters', site)), who).toBe('not-found');
+      expect(kind(await ask(who, '/still-waters/admin', adminHome)), who).toBe('not-found');
+    }
+    // Their access in the live league opens nothing there either.
+    expect(kind(await ask('otherAdmin', '/north-valley/admin', adminHome))).toBe('no-access');
+  });
+
+  it('does not open a suspended league to staff other than its admins', async () => {
+    for (const who of ['registrar', 'editor', 'scorekeeper', 'clubAdmin', 'scheduler'] as const) {
+      expect(kind(await ask(who, '/closed-gate', site)), who).toBe('not-found');
+    }
   });
 });
 
