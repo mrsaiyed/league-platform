@@ -77,6 +77,12 @@ describe('fetch tracker server: the state', () => {
     }
     const notState = serverAnswering(() => json(200, { sequence: 1, state: { version: 2 } }));
     expect(await notState.server.loadState(signal)).toEqual({ kind: 'unanswered' });
+    // It has the contract's marks, but the engine cannot read its plays.
+    for (const plays of [[null], [{ type: 'score' }]]) {
+      const malformed = { ...basketball.newGame(), plays };
+      const answer = serverAnswering(() => json(200, { sequence: 1, state: malformed }));
+      expect(await answer.server.loadState(signal)).toEqual({ kind: 'unanswered' });
+    }
     const down = serverAnswering(() => Promise.reject(new TypeError('offline')));
     expect(await down.server.loadState(signal)).toEqual({ kind: 'unanswered' });
   });
