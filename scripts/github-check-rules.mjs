@@ -35,6 +35,26 @@ export function newestChecks(runs) {
   return checks;
 }
 
+// The lines to show under "Failed step" from GitHub's annotations of a failed job: each
+// failure note's title, then every line of its message (the gate's own notes, written by
+// scripts/verify-failure-notes.mjs, carry several), at most `most` lines in all.
+export function failureNoteLines(notes, most = 40) {
+  const failures = (Array.isArray(notes) ? notes : []).filter(
+    (note) => note.annotation_level === 'failure' && !/^Process completed/.test(note.message ?? ''),
+  );
+  const lines = [];
+  for (const note of failures) {
+    const where =
+      note.path && note.path !== '.github' ? `${note.path}:${note.start_line ?? ''} ` : '';
+    const message = (note.message ?? '').split(/\r?\n/).filter((line) => line.trim() !== '');
+    const [first = '', ...rest] = note.title ? [`${note.title}:`, ...message] : message;
+    lines.push(`  - ${where}${first}`.slice(0, 500));
+    for (const line of rest) lines.push(`      ${line}`.slice(0, 500));
+  }
+  if (lines.length <= most) return lines;
+  return [...lines.slice(0, most - 1), `  (${lines.length - most + 1} more lines on GitHub)`];
+}
+
 // One plain line about a branch. `local` is this computer's newest commit on it, or ''.
 export function describe(branch, check, local) {
   const short = (commit) => commit.slice(0, 7);

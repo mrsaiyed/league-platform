@@ -94,10 +94,32 @@ async function squad(leagueId: string, teamId: string, first: number) {
 }
 
 /**
+ * Waits until the database's clock has moved on to the next millisecond. Ids are
+ * version 7 UUIDs that start with the time (public.uuid_v7()); PGlite's clock moves in
+ * whole milliseconds, so of two ids made in the same one, either may sort first. An id
+ * made after this sorts after every id made before it.
+ */
+async function nextMillisecond() {
+  const now = async () =>
+    (
+      await one<{ ms: string }>(
+        pglite,
+        `select floor(extract(epoch from clock_timestamp()) * 1000)::text as ms`,
+      )
+    ).ms;
+  const start = await now();
+  while ((await now()) === start) {
+    // The next reading is a new query: the clock is read again.
+  }
+}
+
+/**
  * A season under the high-school rules with one live-tracked game between two teams
  * of six, held by a scorekeeper's tablet, and a seventh home player who has left.
+ * `awayTeamFirst` makes the away team first, a millisecond apart, so its id sorts
+ * before the home team's; otherwise the home team's sorts first.
  */
-async function trackedGame() {
+async function trackedGame({ awayTeamFirst = false } = {}) {
   clock.at = startOfTest;
   const l = await newLeague(pglite);
   const programId = await newProgram(pglite, l.leagueId);
@@ -107,8 +129,15 @@ async function trackedGame() {
     JSON.stringify(seasonRulesPreset('high-school')),
   ]);
   const stageId = await newStage(pglite, l.leagueId, seasonId);
-  const homeTeamId = await newTeam(pglite, l.leagueId, seasonId);
-  const awayTeamId = await newTeam(pglite, l.leagueId, seasonId);
+  const team = async () => {
+    const id = await newTeam(pglite, l.leagueId, seasonId);
+    await nextMillisecond();
+    return id;
+  };
+  const first = await team();
+  const second = await team();
+  const homeTeamId = awayTeamFirst ? second : first;
+  const awayTeamId = awayTeamFirst ? first : second;
   const home = await squad(l.leagueId, homeTeamId, 10);
   const away = await squad(l.leagueId, awayTeamId, 20);
   const leftId = await newPerson(pglite, l.leagueId);
@@ -388,7 +417,22 @@ describe('ending a tracked game on the database (T6 §7)', () => {
 describe('reopening a tracked game on the database (T6 §8)', () => {
   it('end, reopen with a reason, fix with the tracker, end again: one correct result', async () => {
     const g = await trackedGame();
+    // The activity log's entries in the order they were made, each picked up as it is.
+    // The log keeps each entry's transaction start time, and PGlite's clock moves in
+    // whole milliseconds: two entries can share a time, and then the log's own order
+    // (time, then id) does not say which came first.
+    const made: string[] = [];
+    const pickUpNew = async () => {
+      const all = await actions(g);
+      for (const action of made) {
+        expect(all).toContain(action);
+        all.splice(all.indexOf(action), 1);
+      }
+      expect(all).toHaveLength(1);
+      made.push(...all);
+    };
     await tap(g, [...firstHalf(g), { type: 'end' }]);
+    await pickUpNew();
 
     const reopened = await reopenGame(
       g.as(g.ownerId),
@@ -396,6 +440,7 @@ describe('reopening a tracked game on the database (T6 §8)', () => {
       depsWith(),
     );
     expect(reopened).toMatchObject({ ok: true });
+    await pickUpNew();
     let rows = await rowsOf(g);
     expect(rows.game).toMatchObject({
       status: 'live',
@@ -430,6 +475,7 @@ describe('reopening a tracked game on the database (T6 §8)', () => {
         { type: 'end' },
       ]),
     ).toEqual(['accepted', 'accepted', 'accepted']);
+    await pickUpNew();
     rows = await rowsOf(g);
     expect(rows.game).toMatchObject({
       status: 'final',
@@ -443,8 +489,11 @@ describe('reopening a tracked game on the database (T6 §8)', () => {
       rows.lines.find((l) => l.person_id === personId)?.stats.points;
     expect([points(g.away[0]), points(g.away[1])]).toEqual([0, 2]);
 
-    // The same as a game tracked right the first time.
-    const right = await trackedGame();
+    // The same as a game tracked right the first time, in a season whose away team was
+    // made first: the result must not depend on which team's id sorts first.
+    const right = await trackedGame({ awayTeamFirst: true });
+    expect(g.homeTeamId < g.awayTeamId).toBe(true);
+    expect(right.awayTeamId < right.homeTeamId).toBe(true);
     await tap(right, [
       ...firstHalf(right).slice(0, 5),
       { type: 'score', side: 'away', playerId: right.away[1] ?? '', points: 2 },
@@ -458,8 +507,12 @@ describe('reopening a tracked game on the database (T6 §8)', () => {
         ...x.home.map((id, i): [string, string] => [id, `home-${i}`]),
         ...x.away.map((id, i): [string, string] => [id, `away-${i}`]),
       ]);
+      // Both in name order: the rows come in id order, and which team's id sorts first
+      // differs between the two seasons.
       return {
-        table: table.map((r) => ({ ...r, team_id: rename.get(r.team_id) })),
+        table: table
+          .map((r) => ({ ...r, team_id: rename.get(r.team_id) }))
+          .sort((a, b) => String(a.team_id).localeCompare(String(b.team_id))),
         totals: totals
           .map((t) => ({
             person: rename.get(t.person_id),
@@ -470,10 +523,7 @@ describe('reopening a tracked game on the database (T6 §8)', () => {
       };
     };
     expect(await shape(g)).toEqual(await shape(right));
-    expect(await actions(g)).toEqual([
-      'games.end_tracked_game',
-      'games.reopen_game',
-      'games.end_tracked_game',
-    ]);
+    expect(made).toEqual(['games.end_tracked_game', 'games.reopen_game', 'games.end_tracked_game']);
+    expect((await actions(g)).sort()).toEqual([...made].sort());
   });
 });

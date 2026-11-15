@@ -189,3 +189,34 @@ export const workerOnlySteps = [
     why: 'it makes a working invitation link with no permission check',
   },
 ];
+
+/**
+ * NODE-TS: the files Node runs itself, not through a bundler, and so with only its
+ * own type stripping (no parameter properties, enums, namespaces with code,
+ * `import =` or `export =`). Everything they load is checked with them. A file
+ * listed here that is gone fails a test (tests/structure-checks.test.mjs).
+ */
+export const nodeEntries = [
+  // Next.js loads its config with Node.
+  'apps/web/next.config.ts',
+  // apps/web/src/server/container.ts has Node load the database package at run time
+  // (`turbopackIgnore`), with everything its index reaches.
+  'packages/database/index.ts',
+  // npm run start:worker, npm run seed, npm run db:types.
+  'apps/worker/src/main.ts',
+  'packages/database/scripts/seed-leagues.ts',
+  'packages/database/scripts/generate-schema-types.ts',
+  // The tracker's own entries (npm run dev:stats, stats:db-check, stats:copy) and the
+  // varsity preview (npm run dev:varsity): read only, outside the scanned folders.
+  'apps/live-stats/server.ts',
+  'apps/live-stats/db-check.ts',
+  'apps/live-stats/copy.ts',
+  'apps/varsity-preview/server.ts',
+];
+
+/**
+ * NODE-TS: folders whose every code file Node runs directly (npm run league:make,
+ * transfer:tracker, build:supabase and the rest), with everything those files load:
+ * scripts/make-league.mjs, for one, loads the core, database and providers packages.
+ */
+export const nodeEntryFolders = ['scripts'];
