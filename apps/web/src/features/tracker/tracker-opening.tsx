@@ -1,0 +1,431 @@
+'use client';
+// The tracker's page on the device (P7 §5.1; T6 §4, §5; T-115, T-116): opens the game
+// (open-tracker-game.ts), shows who holds it, asks for the format to be confirmed, and
+// then holds the place where the scoring screens of steps 2.35 to 2.37 will draw. Plain
+// forms and messages only. The words come from the page, from the message files (T-187).
+import { createTranslator, type Catalog } from '@srleagues/site';
+import { PageHead } from '@srleagues/ui';
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { createFetchCommandTransport } from './fetch-command-transport.ts';
+import { createFetchTrackerServer } from './fetch-tracker-server.ts';
+import { formatLines } from './format-text.ts';
+import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.ts';
+import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
+import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
+import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
+import { savedBanner, savedBannerText } from './queue-banner.ts';
+import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controller.ts';
+import { trackerNoticeText, trackerNotices } from './tracker-notice.ts';
+
+export type TrackerOpeningProps = {
+  readonly leagueId: string;
+  /** The signed-in account, from the server's session: the device keeps the game under it. */
+  readonly accountId: string;
+  readonly gameId: string;
+  readonly rosters: DeviceRosters;
+  /** Where "back to your games" goes, leaving the game. */
+  readonly backHref: string;
+  /** The account page, where a shared device is signed out (and its kept games cleared). */
+  readonly accountHref: string;
+  /** The sign-in screen, coming back to this game: offered once the device is signed out. */
+  readonly signInHref: string;
+  readonly locale: string;
+  /** The tracker's own messages (tracker-catalog.ts). */
+  readonly catalog: Catalog;
+};
+
+type Phase =
+  | { readonly kind: 'preparing' }
+  | { readonly kind: 'no-storage' }
+  | {
+      readonly kind: 'open';
+      readonly game: OpenedTrackerGame;
+      readonly status: TrackerControllerStatus;
+      readonly confirmed: GameFormat | null;
+    };
+
+export function TrackerOpening({
+  leagueId,
+  accountId,
+  gameId,
+  rosters,
+  backHref,
+  accountHref,
+  signInHref,
+  locale,
+  catalog,
+}: TrackerOpeningProps) {
+  const t = useMemo(() => createTranslator(locale, { [locale]: catalog }), [locale, catalog]);
+  const [phase, setPhase] = useState<Phase>({ kind: 'preparing' });
+  const [storeFailed, setStoreFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // What `busy` will be once drawn: read here, so a double tap before the next drawing
+  // cannot run the same step twice.
+  const working = useRef(false);
+  const opened = useRef<OpenedTrackerGame | null>(null);
+  const leaving = useRef(false);
+  // The rosters the page last brought. The page drawn again (a refresh) brings the same
+  // rosters as a new object: the game is opened once per game, league and account, not
+  // let go of and taken again each time, so the opening reads them from here.
+  const rostersNow = useRef(rosters);
+  useEffect(() => {
+    rostersNow.current = rosters;
+  }, [rosters]);
+
+  useEffect(() => {
+    let gone = false;
+    let unsubscribe = () => {};
+    const online = () => opened.current?.controller.online();
+    // The page going away (the tab closed, another address typed) releases the session,
+    // as leaving by a button does (T6 §5): the release is sent with keepalive
+    // (fetch-tracker-server.ts). A page brought back from the browser's back-forward
+    // cache has let go of the game, so it is opened afresh.
+    const hidden = () => void opened.current?.controller.leave();
+    const shown = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    // The page shown again (the phone woke, the tab came back): the device may have
+    // slept, so the controller measures the server's time again, renews and sends.
+    const visible = () => {
+      if (document.visibilityState === 'visible') opened.current?.controller.awake();
+    };
+    window.addEventListener('pagehide', hidden);
+    window.addEventListener('pageshow', shown);
+    document.addEventListener('visibilitychange', visible);
+    void (async () => {
+      const result = await openTrackerGame({
+        gameId,
+        leagueId,
+        accountId,
+        rosters: rostersNow.current,
+        openStorage: async () => ({
+          queue: await openIndexedDbQueueStorage(),
+          games: await openIndexedDbOpenedGameStorage(),
+        }),
+        transport: createFetchCommandTransport({ leagueId, gameId }),
+        server: createFetchTrackerServer({ leagueId, gameId }),
+        newDeviceId: () => globalThis.crypto.randomUUID(),
+        onStoreFailed: () => setStoreFailed(true),
+      });
+      if (gone) {
+        if (result.ok) void result.game.controller.leave();
+        return;
+      }
+      if (!result.ok) {
+        setPhase({ kind: 'no-storage' });
+        return;
+      }
+      const { game } = result;
+      opened.current = game;
+      const show = (status: TrackerControllerStatus) =>
+        setPhase({ kind: 'open', game, status, confirmed: game.confirmedFormat() });
+      unsubscribe = game.controller.subscribe(show);
+      show(game.controller.status());
+      window.addEventListener('online', online);
+      await game.controller.start();
+    })();
+    return () => {
+      gone = true;
+      unsubscribe();
+      window.removeEventListener('online', online);
+      window.removeEventListener('pagehide', hidden);
+      window.removeEventListener('pageshow', shown);
+      document.removeEventListener('visibilitychange', visible);
+      void opened.current?.controller.leave();
+      opened.current = null;
+    };
+  }, [gameId, leagueId, accountId]);
+
+  const act = (work: (game: OpenedTrackerGame) => Promise<unknown>) => async () => {
+    const game = opened.current;
+    if (game === null || working.current || leaving.current) return;
+    working.current = true;
+    setBusy(true);
+    try {
+      await work(game);
+    } finally {
+      working.current = false;
+      setBusy(false);
+      setPhase((now) =>
+        now.kind === 'open'
+          ? { ...now, status: game.controller.status(), confirmed: game.confirmedFormat() }
+          : now,
+      );
+    }
+  };
+
+  // Leaving the game, by "back to your games" (the one way out: step 2.33 dropped a
+  // "Leave the game" button that did the same), the link to sign out or to sign in:
+  // the session is released first (T6 §5), as a page that is simply left would hold the
+  // game until it runs out. It runs once however often it is tapped, and goes on to `to`
+  // even if the release fails.
+  const leaveGame = async (to: string) => {
+    const game = opened.current;
+    if (leaving.current) return;
+    leaving.current = true;
+    working.current = true;
+    setBusy(true);
+    try {
+      await game?.controller.leave();
+    } finally {
+      window.location.assign(to);
+    }
+  };
+  const leaveBy = (to: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    // A link opened in a new tab or window leaves this page as it is.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return;
+    event.preventDefault();
+    void leaveGame(to);
+  };
+
+  // Still opening after a while: most likely no connection, so the screen says so while
+  // the controller keeps trying by itself (step 2.33).
+  const stillOpening =
+    phase.kind === 'preparing' ||
+    (phase.kind === 'open' && screenOf(phase.status, phase.confirmed).kind === 'opening');
+  const slow = useSlowAfter(stillOpening, slowOpeningMs);
+  const openingText = (
+    <p role="status" data-opening="">
+      {t('tracker.opening')}
+      {slow ? ` ${t('tracker.openingSlow')}` : null}
+    </p>
+  );
+  // Signed out, before the game was open (read-only) or while scoring (record 054): the
+  // way to sign in, coming back to this game.
+  // Right under the notice that says so. Before the game was open it is the one thing to
+  // do (the main button); while still scoring it sits beside the scoring, outlined.
+  const readOnlySignedOut =
+    phase.kind === 'open' &&
+    phase.status.mode.kind === 'read-only' &&
+    phase.status.mode.reason === 'signed-out';
+  const signIn =
+    phase.kind === 'open' && (phase.status.signedOut || readOnlySignedOut) ? (
+      <p>
+        <a
+          className="ui-button"
+          {...(readOnlySignedOut ? { 'data-kind': 'main' } : {})}
+          href={signInHref}
+          onClick={leaveBy(signInHref)}
+        >
+          {t('tracker.signIn')}
+        </a>
+      </p>
+    ) : null;
+
+  const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
+  return (
+    <main className="ui-stack" data-tracker="">
+      <PageHead title={t('tracker.title')} sub={matchup} />
+      <section className="ui-panel ui-stack" aria-label={matchup}>
+        {phase.kind === 'preparing' ? openingText : null}
+        {phase.kind === 'no-storage' ? (
+          <p className="ui-notice" data-kind="error" role="alert">
+            {t('tracker.noStorage')}
+          </p>
+        ) : null}
+        {phase.kind === 'open' ? (
+          <OpenGame
+            phase={phase}
+            t={t}
+            locale={locale}
+            rosters={rosters}
+            busy={busy}
+            openingText={openingText}
+            signIn={signIn}
+            onTakeOver={act((game) => game.controller.takeOver())}
+            onOpenAgain={act((game) => game.controller.openAgain())}
+            onConfirm={(format) => act((game) => game.confirmFormat(format))()}
+          />
+        ) : null}
+        {storeFailed ? (
+          <p className="ui-notice" data-kind="error" role="alert">
+            {t('tracker.storeFailed')}
+          </p>
+        ) : null}
+      </section>
+      <p>
+        <a className="ui-button" href={backHref} onClick={leaveBy(backHref)}>
+          {t('tracker.back')}
+        </a>
+      </p>
+      <p data-shared-device="">
+        {t('tracker.sharedDevice.text')}{' '}
+        <a href={accountHref} onClick={leaveBy(accountHref)}>
+          {t('tracker.sharedDevice.link')}
+        </a>
+      </p>
+    </main>
+  );
+}
+
+/** How long "Opening the game…" stands alone before it mentions the connection. */
+const slowOpeningMs = 10_000;
+
+/**
+ * Whether `active` has stayed true for `afterMs`: false again as soon as it is not. The
+ * timer runs once per stretch of `active`, whatever is drawn in between.
+ */
+function useSlowAfter(active: boolean, afterMs: number): boolean {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setTimeout(() => setSlow(true), afterMs);
+    return () => {
+      window.clearTimeout(timer);
+      setSlow(false);
+    };
+  }, [active, afterMs]);
+  return active && slow;
+}
+
+/**
+ * Whether opening the game again can help: not for someone signed out, refused or
+ * sent to a game that is not there, who would only be turned away again.
+ */
+const mayOpenAgain = (reason: ReadOnlyReason): boolean =>
+  reason !== 'signed-out' && reason !== 'not-allowed' && reason !== 'unknown-game';
+
+function OpenGame({
+  phase,
+  t,
+  locale,
+  rosters,
+  busy,
+  openingText,
+  signIn,
+  onTakeOver,
+  onOpenAgain,
+  onConfirm,
+}: {
+  readonly phase: Extract<Phase, { kind: 'open' }>;
+  readonly t: ReturnType<typeof createTranslator>;
+  readonly locale: string;
+  readonly rosters: DeviceRosters;
+  readonly busy: boolean;
+  /** "Opening the game…", and after a while a word about the connection. */
+  readonly openingText: ReactNode;
+  /** The way to sign in, shown under the notices when the device is signed out. */
+  readonly signIn: ReactNode;
+  readonly onTakeOver: () => void;
+  readonly onOpenAgain: () => void;
+  readonly onConfirm: (format: GameFormat) => void;
+}) {
+  const { status, confirmed } = phase;
+  const screen = screenOf(status, confirmed);
+  const notices = trackerNotices(status);
+  // Taking over asks first (T6 §5, P7 §5.2): the other device stops scoring, and plays
+  // it has not sent yet are lost.
+  const [askingTakeOver, setAskingTakeOver] = useState(false);
+  // Asked again if the game is let go of and then held by another device once more.
+  useEffect(() => {
+    if (screen.kind !== 'held-by-other') setAskingTakeOver(false);
+  }, [screen.kind]);
+  const banner = savedBanner(status.queue);
+  // "All saved" is said once there is something to have saved: on the scoring screen,
+  // or whenever taps are waiting, refused or cannot be stored.
+  const showBanner = screen.kind === 'scoring' || banner[0].key !== 'tracker.queue.allSaved';
+  return (
+    <>
+      {showBanner ? (
+        <p role="status" aria-live="polite" data-saved-banner="">
+          {savedBannerText(banner, t)}
+        </p>
+      ) : null}
+      {notices.length === 0 ? null : (
+        <div role="alert" className="ui-stack" data-tracker-notices="">
+          {notices.map((notice) => (
+            <p key={notice.key} className="ui-notice">
+              {trackerNoticeText(notice, t)}
+            </p>
+          ))}
+        </div>
+      )}
+      {signIn}
+      {screen.kind === 'opening' ? openingText : null}
+      {screen.kind === 'held-by-other' && !askingTakeOver ? (
+        <p>
+          <button
+            type="button"
+            className="ui-button"
+            data-kind="main"
+            onClick={() => setAskingTakeOver(true)}
+            disabled={busy}
+          >
+            {t('tracker.takeOver')}
+          </button>
+        </p>
+      ) : null}
+      {screen.kind === 'held-by-other' && askingTakeOver ? (
+        <section aria-labelledby="tracker-take-over" data-take-over="">
+          <p id="tracker-take-over">{t('tracker.takeOverQuestion', { name: screen.name })}</p>
+          <p>
+            <button
+              type="button"
+              className="ui-button"
+              data-kind="main"
+              onClick={() => {
+                setAskingTakeOver(false);
+                onTakeOver();
+              }}
+              disabled={busy}
+            >
+              {t('tracker.takeOverYes')}
+            </button>{' '}
+            <button
+              type="button"
+              className="ui-button"
+              onClick={() => setAskingTakeOver(false)}
+              disabled={busy}
+            >
+              {t('tracker.takeOverNo')}
+            </button>
+          </p>
+        </section>
+      ) : null}
+      {screen.kind === 'read-only' && mayOpenAgain(screen.reason) ? (
+        <p>
+          <button type="button" className="ui-button" onClick={onOpenAgain} disabled={busy}>
+            {/* Taken over: opening again shows who has the game, and offers it back. */}
+            {t(screen.reason === 'taken-over' ? 'tracker.seeWhoIsScoring' : 'tracker.openAgain')}
+          </button>
+        </p>
+      ) : null}
+      {screen.kind === 'confirm-format' ? (
+        <section aria-labelledby="tracker-format-title" data-format="">
+          <h2 id="tracker-format-title">{t('tracker.format.title')}</h2>
+          <p>{t('tracker.format.intro')}</p>
+          <ul>
+            {formatLines(screen.format, t, locale).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p>{t('tracker.format.wrong')}</p>
+          <button
+            type="button"
+            className="ui-button"
+            data-kind="main"
+            onClick={() => onConfirm(screen.format)}
+            disabled={busy}
+          >
+            {t('tracker.format.confirm')}
+          </button>
+        </section>
+      ) : null}
+      {screen.kind === 'scoring' ? (
+        // Where the scoring screens of steps 2.35 to 2.37 will draw.
+        <section data-scoring="">
+          <p>{t('tracker.ready')}</p>
+          <p>
+            {t('tracker.savedOnDevice', {
+              home: rosters.home.name,
+              homeCount: rosters.home.players.length,
+              away: rosters.away.name,
+              awayCount: rosters.away.players.length,
+            })}
+          </p>
+        </section>
+      ) : null}
+    </>
+  );
+}

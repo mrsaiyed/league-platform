@@ -39,7 +39,7 @@ describe('tracker notices (T6 §5, T-113)', () => {
       expect(text).not.toContain('tracker.');
     }
     expect(texts({ ...calm, mode: { kind: 'read-only', reason: 'taken-over' } })).toEqual([
-      'Another device has taken over scoring this game. This one is now read-only.',
+      'Someone else is now scoring this game on another device. This device can no longer score it.',
     ]);
   });
 
