@@ -236,25 +236,28 @@ describe('filter toolbar', () => {
     expect(scripted).toMatch(
       /\.ui-toolbar \.ui-picker button \{[^}]*position: absolute;[^}]*inset-block-start: 100%;/,
     );
-    // Before the mark it appears after a moment by itself: no rule keeps it hidden for good.
+    // Before the mark it appears after a moment by itself: the wait ends with it in sight
+    // and taking taps, so no rule keeps it away for good unless the script has spoken.
     expect(scripted).toMatch(
-      /\.ui-toolbar \.ui-picker button \{[^}]*visibility: hidden;\s*animation: ui-picker-wait 0s linear 1\.5s forwards;/,
+      /\.ui-toolbar \.ui-picker button \{[^}]*opacity: 0;\s*pointer-events: none;\s*animation: ui-picker-wait 0s linear 1\.5s forwards;/,
     );
-    expect(css).toMatch(/@keyframes ui-picker-wait \{\s*to \{\s*visibility: visible;/);
-    // Put away only by the mark.
+    expect(css).toMatch(
+      /@keyframes ui-picker-wait \{\s*to \{\s*opacity: 1;\s*pointer-events: auto;/,
+    );
+    // Kept away only by the mark: that rule, and no other, stops the wait.
     expect(scripted).toMatch(
-      /\.ui-toolbar\[data-applies='true'\] \.ui-picker button \{\s*visibility: hidden;\s*animation: none;/,
+      /\.ui-toolbar\[data-applies='true'\] \.ui-picker button \{\s*opacity: 0;\s*pointer-events: none;\s*animation: none;/,
     );
     // There whenever the keyboard is in its picker, mark or no mark (it comes later, so it wins).
     expect(scripted).toMatch(
-      /\.ui-toolbar \.ui-picker:has\(:focus-visible\) button \{\s*visibility: visible;/,
+      /\.ui-toolbar \.ui-picker:has\(:focus-visible\) button \{\s*opacity: 1;\s*pointer-events: auto;/,
     );
     expect(scripted.indexOf(".ui-toolbar[data-applies='true'] .ui-picker button")).toBeLessThan(
       scripted.indexOf('.ui-toolbar .ui-picker:has(:focus-visible) button'),
     );
-    // Never `display: none`, and never hidden by anything the script has not said.
-    expect(css).not.toMatch(/\.ui-picker button \{[^}]*display: none/);
-    expect(css).not.toMatch(/\.ui-picker button \{[^}]*(opacity: 0|pointer-events: none)/);
+    // Never taken from the keyboard: a button hidden at the moment its field loses the
+    // keyboard cannot take it, and the keyboard would fall off the page.
+    expect(css).not.toMatch(/\.ui-picker[^{]* button \{[^}]*(display: none|visibility: hidden)/);
   });
   it('on a phone gives each picker its own row, labels in one shared column, so they line up', () => {
     const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '');

@@ -95,7 +95,11 @@ export const pickerCss = String.raw`
    never shows it, and then appears, so a slow phone, or a script that failed to load,
    leaves a button that works. Whenever the keyboard is in its picker it is there, as the
    keyboard's next stop. A browser with scripts off, or one that cannot say, keeps the
-   quiet button beside its picker. */
+   quiet button beside its picker.
+   Put away, it is out of sight and takes no tap, but it is never hidden from the
+   keyboard (no 'visibility: hidden', no 'display: none'): the keyboard must be able to
+   land on it straight from the field, and a button hidden at the moment the field loses
+   the keyboard cannot take it. */
 @media (scripting: enabled) {
   .ui-toolbar .ui-picker {
     position: relative;
@@ -109,28 +113,33 @@ export const pickerCss = String.raw`
     background: var(--color-panel);
     color: var(--color-text);
     box-shadow: var(--overlay-shadow);
-    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
     animation: ui-picker-wait 0s linear 1.5s forwards;
   }
   .ui-toolbar[data-applies='true'] .ui-picker button {
-    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
     animation: none;
   }
   .ui-toolbar .ui-picker:has(:focus-visible) button {
-    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
     animation: none;
   }
 }
 @keyframes ui-picker-wait {
   to {
-    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 /* A reader who asked for no movement gets no waiting either: the button is there at once
    until the script takes over. */
 @media (scripting: enabled) and (prefers-reduced-motion: reduce) {
   .ui-toolbar:not([data-applies='true']) .ui-picker button {
-    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 `;

@@ -456,7 +456,7 @@ if (browser) {
       await page.locator('.site-header .ui-toolbar[data-applies="true"]').waitFor();
       note(
         'a Show button is put away once the script says it applies choices itself',
-        (await showOf('season').evaluate((el) => getComputedStyle(el).visibility)) === 'hidden',
+        (await showOf('season').evaluate((el) => getComputedStyle(el).opacity)) === '0',
       );
       // The season picker in the header: arrow, then Enter.
       const season = page.locator('.site-header select[name=season]');
@@ -471,7 +471,7 @@ if (browser) {
       );
       note(
         'the Show button is back while the keyboard is in its picker',
-        (await showOf('season').evaluate((el) => getComputedStyle(el).visibility)) === 'visible',
+        (await showOf('season').evaluate((el) => getComputedStyle(el).opacity)) === '1',
       );
       await page.keyboard.press('Enter');
       await page.waitForURL(/season=spring-2026/);
@@ -529,8 +529,17 @@ if (browser) {
           !page.url().includes(`${name}=`),
           page.url(),
         );
-        // It appears by itself after a moment, hanging under its picker and moving nothing.
-        await showOf(name).waitFor({ state: 'visible', timeout: 5_000 });
+        // It appears by itself after a moment (in sight, and taking a tap), hanging under its
+        // picker and moving nothing.
+        const button = await showOf(name).elementHandle();
+        await page.waitForFunction(
+          (el) => {
+            const style = getComputedStyle(el);
+            return style.opacity === '1' && style.pointerEvents !== 'none';
+          },
+          button,
+          { timeout: 5_000 },
+        );
         const after = await page.locator('.site-header').boundingBox();
         note(
           `the ${name} picker's Show button appears without moving the header`,
@@ -809,10 +818,11 @@ if (browser) {
             JSON.stringify(columns),
           );
         }
-        await page.setViewportSize({ width: 320, height: 700 });
         // The sign that a table goes on (the fade and the arrow at its far edge) is there
         // only while columns are out of sight; and the column that stays put shows its
-        // edge only while the table is scrolled under it.
+        // edge only while the table is scrolled under it. At 390 wide these two pages
+        // hold tables of both kinds: ones that go on, and one that fits.
+        await page.setViewportSize({ width: 390, height: 800 });
         const signs = [];
         for (const address of ['/harbor-city/standings', '/harbor-city/stats']) {
           await open(page, address);
@@ -851,6 +861,7 @@ if (browser) {
             signs.filter((s) => !s.goesOn).every((s) => s.edgeScrolled === '0'),
           JSON.stringify(signs),
         );
+        await page.setViewportSize({ width: 320, height: 700 });
         // A heading's sort button, reached backwards by the keyboard, is scrolled clear of the
         // column that stays put, and its ring is drawn inside it.
         await open(page, '/north-valley/stats');
