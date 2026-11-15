@@ -2,6 +2,10 @@
 // it (S-7), by the door the page offered (reopen-view.ts). The form's words become a games command's input, and the command runs with
 // the context the server worked out from the session (T-23). The sheet is read again
 // first, so the grid is read against the players and columns the game has now.
+//
+// A refusal says which boxes are wrong and the score the sheet came to (step 2.155), so
+// the grid marks them and keeps what was typed. A sheet sent twice (a double tap) is
+// known as the same request before it gets here (server/same-request.ts, record 067).
 import {
   getBoxScoreSheet,
   reopenGame,
@@ -11,8 +15,7 @@ import {
   type CommandDeps,
   type TrackerTx,
 } from '@srleagues/core';
-import { readBoxScoreForm, type BoxScoreFields } from './box-score-form.ts';
-import type { GameActionResult } from './run-game-action.ts';
+import { readBoxScoreForm, wrongBoxScoreFields, type BoxScoreFields } from './box-score-form.ts';
 
 export const boxScoreActions = ['save', 'reopen'] as const;
 export type BoxScoreAction = (typeof boxScoreActions)[number];
@@ -20,6 +23,17 @@ export type BoxScoreAction = (typeof boxScoreActions)[number];
 export function isBoxScoreAction(value: unknown): value is BoxScoreAction {
   return boxScoreActions.some((a) => a === value);
 }
+
+export type BoxScoreActionResult =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly code: string;
+      /** The fields to mark, in screen order. */
+      readonly wrong?: readonly string[];
+      /** The score the sheet came to, when it was read. */
+      readonly scores?: { readonly home: number; readonly away: number };
+    };
 
 const versionOf = (text: string | undefined): number | undefined =>
   /^\d+$/.test((text ?? '').trim()) ? Number(text) : undefined;
@@ -29,7 +43,7 @@ export async function runBoxScoreAction(
   fields: BoxScoreFields,
   context: CommandContext,
   deps: CommandDeps<TrackerTx>,
-): Promise<GameActionResult> {
+): Promise<BoxScoreActionResult> {
   const gameId = fields['gameId'];
   const version = versionOf(fields['version']);
   if (action === 'reopen') {
@@ -72,7 +86,19 @@ export async function runBoxScoreAction(
   const sheet = await getBoxScoreSheet(context, { gameId }, deps);
   if (!sheet.ok) return { ok: false, code: sheet.error.code };
   const input = readBoxScoreForm(sheet.value, fields);
-  if (input === undefined) return { ok: false, code: 'invalid-input' };
+  if (input === undefined) {
+    return { ok: false, code: 'invalid-input', wrong: wrongBoxScoreFields(sheet.value, fields) };
+  }
   const saved = await setBoxScore(context, { gameId, version, ...input }, deps);
-  return saved.ok ? { ok: true } : { ok: false, code: saved.error.code };
+  if (saved.ok) return { ok: true };
+  const code = saved.error.code;
+  // A tie is the two scores: both are marked, and the sentence names the score.
+  return code === 'tie-not-allowed'
+    ? {
+        ok: false,
+        code,
+        wrong: ['awayScore', 'homeScore'],
+        scores: { home: input.homeScore, away: input.awayScore },
+      }
+    : { ok: false, code };
 }

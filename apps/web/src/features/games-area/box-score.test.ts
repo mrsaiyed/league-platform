@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { namesShownOf, startingNamePolicy } from '../../server/name-policy-of.ts';
 import { standInGameId, standInGames } from '../../server/stand-in-games.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
-import { boxScoreField, readBoxScoreForm } from './box-score-form.ts';
-import { boxScoreNotice } from './box-score-notice.ts';
+import { boxScoreField, readBoxScoreForm, wrongBoxScoreFields } from './box-score-form.ts';
+import { boxScoreProblemKey, gamesProblemKey } from './problem-keys.ts';
 import { buildGameRows } from './build-games-view.ts';
 import { runBoxScoreAction } from './run-box-score-action.ts';
 import { sheetReopenViewOf } from './reopen-view.ts';
@@ -122,6 +122,53 @@ describe('the box score grid', () => {
       homeScore: 10,
       awayScore: 0,
     });
+  });
+
+  it('names the boxes a refusal is about, in screen order, and the score of a tie (2.155)', async () => {
+    const { ports, ctx, games, sheetOf } = setup();
+    const target = (await games()).find((g) => g.id === lionsTigers);
+    const sheet = await sheetOf(target?.id ?? '');
+    const away = sheet.players.filter((p) => p.teamId === sheet.game.awayTeamId);
+    const home = sheet.players.filter((p) => p.teamId === sheet.game.homeTeamId);
+    const [a1, a2] = away;
+    const [h1] = home;
+    if (a1 === undefined || a2 === undefined || h1 === undefined) {
+      throw new Error('the stand-in has players on both teams');
+    }
+    const points = (personId: string) => boxScoreField.stat(personId, 'points');
+    const broken = {
+      [points(h1.personId)]: '7.5',
+      [points(a2.personId)]: 'x',
+      [points(a1.personId)]: '4',
+      [boxScoreField.stat(a1.personId, 'fouls')]: '1000',
+      homeScore: '-1',
+      awayScore: '',
+    };
+    // Away team's rows first (as on the screen), each row's boxes in column order, then
+    // the scores.
+    expect(wrongBoxScoreFields(sheet, broken)).toEqual([
+      boxScoreField.stat(a1.personId, 'fouls'),
+      points(a2.personId),
+      points(h1.personId),
+      'homeScore',
+    ]);
+    expect(wrongBoxScoreFields(sheet, { [points(a1.personId)]: '4' })).toEqual([]);
+    const base = { gameId: target?.id, version: String(target?.version) };
+    expect(await runBoxScoreAction('save', { ...base, ...broken }, ctx, ports.deps)).toEqual({
+      ok: false,
+      code: 'invalid-input',
+      wrong: wrongBoxScoreFields(sheet, broken),
+    });
+    // Twelve players' points coming to a tie, in a season without ties: both scores are
+    // marked, with the score the sheet came to.
+    const tie = Object.fromEntries([...away, ...home].map((p) => [points(p.personId), '5']));
+    expect(await runBoxScoreAction('save', { ...base, ...tie }, ctx, ports.deps)).toEqual({
+      ok: false,
+      code: 'tie-not-allowed',
+      wrong: ['awayScore', 'homeScore'],
+      scores: { home: 30, away: 30 },
+    });
+    expect((await sheetOf(target?.id ?? '')).game.status).toBe('scheduled');
   });
 
   it('saves the sheet so the game is final, then reopens it to correct it', async () => {
@@ -300,20 +347,14 @@ describe('the box score grid', () => {
     ).toMatchObject({ ok: false });
   });
 
-  it('words every notice from the message files', () => {
-    expect(boxScoreNotice({ done: 'save' })).toEqual({
-      key: 'admin.boxScore.done.save',
-      problem: false,
-    });
-    expect(boxScoreNotice({ problem: 'game-is-tracked' })?.key).toBe(
-      'admin.boxScore.error.game-is-tracked',
-    );
-    expect(boxScoreNotice({ problem: 'reopen-reason' })?.key).toBe(
-      'admin.boxScore.error.reopen-reason',
-    );
-    expect(boxScoreNotice({ problem: 'tie-not-allowed' })?.key).toBe(
-      'admin.games.error.tie-not-allowed',
-    );
-    expect(boxScoreNotice({ problem: 'something-else' })?.key).toBe('admin.games.error.unknown');
+  it('words every refusal from the message files', () => {
+    expect(boxScoreProblemKey('game-is-tracked')).toBe('admin.boxScore.error.game-is-tracked');
+    expect(boxScoreProblemKey('reopen-reason')).toBe('admin.boxScore.error.reopen-reason');
+    expect(boxScoreProblemKey('invalid-input')).toBe('admin.boxScore.error.invalid-input');
+    expect(boxScoreProblemKey('tie-not-allowed')).toBe('admin.games.error.tie-not-allowed');
+    expect(boxScoreProblemKey('something-else')).toBe('admin.games.error.unknown');
+    expect(gamesProblemKey('invalid-input')).toBe('admin.games.error.invalid-input');
+    expect(gamesProblemKey('changed-since-read')).toBe('admin.games.error.changed-since-read');
+    expect(gamesProblemKey('<b>')).toBe('admin.games.error.unknown');
   });
 });
