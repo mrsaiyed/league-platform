@@ -141,12 +141,16 @@ export async function HomePage({
           >
             {/* On a phone only the first two are drawn, with the way to the full schedule
                 over them, so the standings are reached sooner (the stylesheet). */}
-            <div className="home-next">
+            <div className="home-next" data-live={live.length > 0 ? 'true' : undefined}>
               <GameList leagueId={addressee.id} games={next} layout="board" across="two" />
             </div>
           </Section>
         )}
-        <div className="home-pair" data-tables={manyTables ? 'many' : 'few'}>
+        <div
+          className="home-pair"
+          data-tables={manyTables ? 'many' : 'few'}
+          data-live={live.length > 0 ? 'true' : undefined}
+        >
           {empty ? null : (
             <Section title={t('home.recentResults')} kicker={t('home.results.kicker')}>
               {results.length === 0 ? (

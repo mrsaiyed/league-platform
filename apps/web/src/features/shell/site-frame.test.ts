@@ -373,7 +373,7 @@ describe('header, menu and footer', () => {
       /\.site-body:has\(> \.site-wide\) \{\s*max-inline-size: none;\s*padding-block-start: 0;\s*padding-inline: 0;/,
     );
     const conditional = [...css.matchAll(/([^{}]*:has\([^{}]*)\{/g)].map((m) =>
-      (m[1] ?? '').trim(),
+      (m[1] ?? '').trim().replace(/\s+/g, ' '),
     );
     expect(conditional).toEqual([
       '.site-header-top:has(.site-menu[open])',
@@ -382,7 +382,13 @@ describe('header, menu and footer', () => {
       // Not the column: the phone's home page puts its later matchups away (a browser
       // that does not know `:has()` shows them all).
       ".home-next .ui-card-grid > li:nth-child(n + 3):has(> .ui-game-card[data-status='scheduled'])",
+      // And one fewer while a game is being played (its board already heads the page).
+      ".home-next[data-live='true'] .ui-card-grid > li:nth-child(n + 2):has(> .ui-game-card[data-status='scheduled'])",
     ]);
+    // The same phone, the same moment: the latest games show one board.
+    expect(css).toMatch(
+      /\.home-pair\[data-live='true'\] > \.ui-section:first-child \.ui-card-grid > li:nth-child\(n \+ 2\) \{\s*display: none;/,
+    );
     expect(css).toMatch(
       /@supports not selector\(:has\(\*\)\) \{\s*\.site-wide \.site-column \{\s*padding-inline: 0;/,
     );

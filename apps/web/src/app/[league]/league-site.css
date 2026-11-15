@@ -590,6 +590,16 @@ html {
   .home-next .ui-card-grid > li:nth-child(n + 3):has(> .ui-game-card[data-status='scheduled']) {
     display: none;
   }
+  /* While a game is being played its board already heads the page: the phone then shows
+     one coming game and the latest one, so the standings are still a few boards down. */
+  .home-next[data-live='true']
+    .ui-card-grid
+    > li:nth-child(n + 2):has(> .ui-game-card[data-status='scheduled']) {
+    display: none;
+  }
+  .home-pair[data-live='true'] > .ui-section:first-child .ui-card-grid > li:nth-child(n + 2) {
+    display: none;
+  }
 }
 /* Results and standings share a row on a laptop, each with half of it, so neither column
    is left empty beside the other. A league with three divisions or more has too many
