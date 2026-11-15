@@ -343,7 +343,7 @@ registerIsolationCase({
   name: "list the games needing a result after the target's upcoming game's start has passed",
   run: async (scope, target) => {
     await startTargetGameAnHourAgo(scope, target);
-    return listGamesNeedingResult(scope, target.memberId, 100);
+    return listGamesNeedingResult(scope, target.memberId, { every: 'all', assigned: 'all' }, 100);
   },
 });
 

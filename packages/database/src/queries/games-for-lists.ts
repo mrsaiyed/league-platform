@@ -3,7 +3,7 @@
 // their season, in no bin and of a season in no bin, each with its season's program, the
 // day it is played in the league's time zone and whether the account is assigned to it.
 // Every table read is filtered to the scope's league (T-28).
-import type { GameInWindow } from '@srleagues/core';
+import type { GameInWindow, ScoringReach } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { gameSummary } from './game-summary.ts';
@@ -72,6 +72,28 @@ export function gamesForLists(
     .where('s.league_id', '=', scope.leagueId)
     .where('g.deleted_at', 'is', null)
     .where('s.deleted_at', 'is', null);
+}
+
+/**
+ * The condition that keeps the games in `reach` (core's ScoringReach), for a query over
+ * `games as g` joined to `seasons as s`: every game of the programs in `reach.every`, and
+ * the account's assigned games of the programs in `reach.assigned`. A list applies it
+ * before it cuts, so no game the person scores is pushed out by games they do not. The
+ * assignments read are filtered to the scope's league (T-28).
+ */
+export function inReachOf(scope: LeagueScope, accountId: string, reach: ScoringReach) {
+  if (reach.every === 'all') return sql<boolean>`true`;
+  const assigned = sql`exists (
+    select 1 from game_assignments a
+    where a.league_id = ${scope.leagueId} and a.game_id = g.id and a.account_id = ${accountId}
+  )`;
+  const parts = [];
+  if (reach.every.length > 0) parts.push(sql`s.program_id in (${sql.join(reach.every)})`);
+  if (reach.assigned === 'all') parts.push(assigned);
+  else if (reach.assigned.length > 0) {
+    parts.push(sql`(s.program_id in (${sql.join(reach.assigned)}) and ${assigned})`);
+  }
+  return parts.length === 0 ? sql<boolean>`false` : sql<boolean>`(${sql.join(parts, sql` or `)})`;
 }
 
 type ListRow = Parameters<typeof gameSummary>[0] & {

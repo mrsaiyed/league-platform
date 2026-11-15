@@ -6,9 +6,11 @@
 // in the same shape as a command (record 014).
 import { z } from 'zod';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
+import { accessOfAccount } from '../../access/index.ts';
 import { myGamesOf, type MyGame } from '../my-games-of.ts';
 import { mayReadGames } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
+import { scoringReachOf, scoringRuleOf } from '../scoring-access.ts';
 
 /** The most games the list holds at once: a league that never enters scores still opens quickly. */
 export const needsResultLimit = 100;
@@ -32,14 +34,20 @@ export const listGamesNeedingResult = defineCommand({
     const none = { today: '', games: [], more: false };
     const accountId = context.accountId;
     if (accountId === null) return ok(none);
-    // One more than is shown, to know whether there are more. The cut is made before the
-    // person's own filter, so "more" is said only to someone who sees every game read: it
-    // never speaks of games a scorekeeper does not score.
-    const found = await tx.games.listNeedingResult(accountId, needsResultLimit + 1);
-    const shown = found.games.slice(0, needsResultLimit);
-    const games = await myGamesOf(tx, accountId, shown, found.today);
+    const holder = await accessOfAccount(tx, accountId);
+    if (holder === undefined) return ok(none);
+    // The store keeps only the games this person may score, then cuts: one more than is
+    // shown, to know whether there are more. So no game of theirs is pushed out by games
+    // they do not score, and "more" speaks only of theirs.
+    const reach = scoringReachOf(holder, await scoringRuleOf(tx));
+    const found = await tx.games.listNeedingResult(accountId, reach, needsResultLimit + 1);
+    const games = await myGamesOf(
+      tx,
+      accountId,
+      found.games.slice(0, needsResultLimit),
+      found.today,
+    );
     if (games === undefined) return ok(none);
-    const more = found.games.length > needsResultLimit && games.length === shown.length;
-    return ok({ today: found.today, games, more });
+    return ok({ today: found.today, games, more: found.games.length > needsResultLimit });
   },
 });

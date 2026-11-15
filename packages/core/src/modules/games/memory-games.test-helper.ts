@@ -20,6 +20,7 @@ import {
   type GameWithRound,
 } from './earlier-rounds-of.ts';
 import { needsResult, oldestFirst } from './needs-result.ts';
+import { inScoringReach } from './scoring-access.ts';
 import type {
   GameInWindow,
   GameLine,
@@ -286,13 +287,15 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
           .map(({ g }) => entryOf(s, g, accountId));
         return { today: s.today, games };
       },
-      listNeedingResult: async (accountId, limit) => ({
+      // Each keeps the games in the person's reach first, then cuts, as the database does.
+      listNeedingResult: async (accountId, reach, limit) => ({
         today: s.today,
         games: s.games
           .filter((g) => !g.binned && needsResult(g, Date.parse(s.now)))
           .sort(oldestFirst)
-          .slice(0, limit)
-          .map((g) => entryOf(s, g, accountId)),
+          .map((g) => entryOf(s, g, accountId))
+          .filter((e) => inScoringReach(reach, e))
+          .slice(0, limit),
       }),
       listEarlierRounds: async (accountId, limit) =>
         earlierRoundsOf(

@@ -13,6 +13,7 @@ import {
   earlierRoundsOf,
   hasPlaysPastMarker,
   inEarlierRound,
+  inScoringReach,
   isEarlierGame,
   needsResult,
   oldestFirst,
@@ -248,15 +249,17 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       };
     },
     // As list-games-needing-result.ts: core's own rule, by the server's clock.
-    listNeedingResult: async (accountId, limit) => {
+    // The games in the person's reach first, then the cut.
+    listNeedingResult: async (accountId, reach, limit) => {
       const today = dayIn(now(), s.timeZone);
       return {
         today,
         games: s.games
           .filter((g) => !g.binned && needsResult(g, now().getTime()))
           .sort(oldestFirst)
-          .slice(0, limit)
-          .map((g) => entryOf(g, accountId, today)),
+          .map((g) => entryOf(g, accountId, today))
+          .filter((entry) => inScoringReach(reach, entry))
+          .slice(0, limit),
       };
     },
     // As list-earlier-rounds.ts and list-earlier-round.ts, by core's own counting.

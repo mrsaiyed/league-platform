@@ -3,10 +3,13 @@
 // refused; a role or an assignment taken away is refused at once (T-75). Tried
 // through recording a final score, the scoring command there is today.
 import { describe, expect, it } from 'vitest';
-import type { Grant } from '../access/index.ts';
+import type { AccessHolder, Grant } from '../access/index.ts';
 import { recordFinalScore } from './commands/record-final-score.ts';
 import { unassignScorekeeper } from './commands/unassign-scorekeeper.ts';
+import { inScoringReach, mayScoreUnder, scoringReachOf } from './scoring-access.ts';
 import {
+  editorGrant,
+  editorId,
   game,
   gameUuid,
   memoryGames,
@@ -136,6 +139,42 @@ describe('who may score a game (P4 section 4)', () => {
       const result = await recordFinalScore(as(account), missing, deps);
       expect(result.ok ? 'ok' : result.error.code).toBe(code);
     }
+  });
+
+  // Step 2.156: the lists ask the store for the person's games by this reach before they
+  // cut, so it must say exactly what mayScoreUnder says, game by game.
+  it('gives the lists the same reach as the one rule, for every role, program and assignment', () => {
+    const grants = [
+      scorekeeperGrant,
+      schedulerGrant,
+      programAdminGrant,
+      programScorekeeperGrant,
+      editorGrant,
+    ];
+    const revoked: Grant = { ...scorekeeperGrant, revokedAt: '2026-12-06T17:00:00.000Z' };
+    const holders: AccessHolder[] = [
+      { accountId: ownerId, isOwner: true, grants: [] },
+      ...[scorekeeperId, schedulerId, programAdminId, programScorekeeperId, editorId].map(
+        (accountId) => ({ accountId, isOwner: false, grants }),
+      ),
+      { accountId: scorekeeperId, isOwner: false, grants: [revoked] },
+    ];
+    for (const rule of ['anyScorekeeper', 'assignedOnly'] as const) {
+      for (const holder of holders) {
+        const reach = scoringReachOf(holder, rule);
+        for (const programId of ['p1', 'p2']) {
+          for (const assigned of [false, true]) {
+            const scope = { type: 'program', id: programId } as const;
+            expect(
+              inScoringReach(reach, { programId, assigned }),
+              `${holder.accountId} ${rule} ${programId} ${assigned}`,
+            ).toBe(mayScoreUnder(holder, scope, rule, assigned));
+          }
+        }
+      }
+    }
+    const programOnly = { accountId: programScorekeeperId, isOwner: false, grants };
+    expect(scoringReachOf(programOnly, 'assignedOnly')).toEqual({ every: [], assigned: ['p2'] });
   });
 
   it('reads a stored value it cannot use as the starting value: any scorekeeper', async () => {

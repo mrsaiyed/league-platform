@@ -35,6 +35,8 @@ export {
 } from './commands/unassign-scorekeeper.ts';
 export { mayScoreGame } from './policy.ts';
 export type { ScoringRule } from './scoring-access.ts';
+// What a person may score, as the stores filter the lists before they cut (step 2.156).
+export { inScoringReach } from './scoring-access.ts';
 export { listPostponedGames, type PostponedGame } from './commands/list-postponed-games.ts';
 export { postponeGame, type PostponeGameError } from './commands/postpone-game.ts';
 export { recordFinalScore, type RecordFinalScoreError } from './commands/record-final-score.ts';
@@ -149,6 +151,7 @@ export type {
   EarlierRoundRef,
   GameInWindow,
   GamesWindow,
+  ScoringReach,
   GameLine,
   GameRecord,
   GameRosterPlayer,

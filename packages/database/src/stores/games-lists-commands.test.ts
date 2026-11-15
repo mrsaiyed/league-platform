@@ -9,6 +9,8 @@ import {
   listEarlierGames,
   listGamesNeedingResult,
   listMyGames,
+  needsResultLimit,
+  setSetting,
   type AccessTx,
   type CommandDeps,
   type GamesTx,
@@ -23,6 +25,7 @@ import { withTransaction } from '../db/with-transaction.ts';
 import {
   freshSchema,
   gameRules,
+  newAccount,
   newGame,
   newLeague,
   newProgram,
@@ -128,6 +131,79 @@ describe('the games that still need a result, on the database', () => {
       isToday: false,
       status: 'live',
     });
+  });
+});
+
+/** A role in the league for a new made-up account: its id. */
+async function grant(leagueId: string, role: string, programId: string | null = null) {
+  const accountId = await newAccount(pglite);
+  await pglite.query(
+    `insert into role_grants (league_id, account_id, role, scope_type, scope_id)
+     values ($1, $2, $3, $4, $5)`,
+    [leagueId, accountId, role, programId === null ? 'league' : 'program', programId],
+  );
+  return accountId;
+}
+
+const asAccount = (leagueId: string, accountId: string) => ({
+  leagueId,
+  accountId,
+  requestId: 'r-1',
+});
+
+// The review's H1: the query keeps the person's own games first, then cuts.
+describe('the games that need a result, for a person who scores only some, on the database', () => {
+  it('never pushes their games out with more than a list of games they do not score', async () => {
+    const l = await league();
+    // More old unscored games of the first program than the list holds.
+    await pglite.query(
+      `insert into games (league_id, season_id, stage_id, home_team_id, away_team_id,
+         starts_at, status, capture_mode)
+       select $1, $2, $3, $4, $5, now() - interval '60 days' + k * interval '1 hour',
+         'scheduled', 'final'
+       from generate_series(1, $6::integer) k`,
+      [l.leagueId, l.seasonId, l.stageId, l.home, l.away, needsResultLimit + 1],
+    );
+    // The newest of the first program's, assigned to a scorekeeper of the whole league.
+    const assignedGame = await l.gameAt({ starts_at: l.at(-10 * day) });
+    const scorekeeper = await grant(l.leagueId, 'scorekeeper');
+    await pglite.query(
+      'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
+      [l.leagueId, assignedGame, scorekeeper],
+    );
+    // Yesterday's unscored game of a second program, and its own scorekeeper.
+    const other = await newProgram(pglite, l.leagueId);
+    const otherSeason = await newSeason(pglite, l.leagueId, other);
+    const otherStage = await newStage(pglite, l.leagueId, otherSeason);
+    const theirs = await newGame(pglite, {
+      leagueId: l.leagueId,
+      seasonId: otherSeason,
+      stageId: otherStage,
+      homeTeamId: await newTeam(pglite, l.leagueId, otherSeason),
+      awayTeamId: await newTeam(pglite, l.leagueId, otherSeason),
+      columns: { starts_at: l.at(-day + 18 * 60) },
+    });
+    const programScorekeeper = await grant(l.leagueId, 'scorekeeper', other);
+
+    const needs = (accountId: string) =>
+      listGamesNeedingResult(asAccount(l.leagueId, accountId), {}, deps);
+    const owner = await needs(l.ownerId);
+    expect(owner.ok && owner.value.games).toHaveLength(needsResultLimit);
+    expect(owner.ok && owner.value.more).toBe(true);
+    const program = await needs(programScorekeeper);
+    expect(program.ok && program.value.games.map((g) => g.id)).toEqual([theirs]);
+    expect(program.ok && program.value.more).toBe(false);
+
+    const chosen = await setSetting(
+      l.as(),
+      { level: 'league', key: 'games.whoMayScore', value: 'assignedOnly', version: null },
+      deps,
+    );
+    expect(chosen.ok).toBe(true);
+    const mine = await needs(scorekeeper);
+    expect(mine.ok && mine.value.games.map((g) => g.id)).toEqual([assignedGame]);
+    expect(mine.ok && mine.value.games[0]?.assignedToMe).toBe(true);
+    expect(mine.ok && mine.value.more).toBe(false);
   });
 });
 

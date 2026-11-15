@@ -132,6 +132,18 @@ export type EarlierRoundCount = {
 /** One round of earlier games: a round, or a season's games in no round. */
 export type EarlierRoundRef = { readonly roundId: string } | { readonly seasonId: string };
 
+/**
+ * The games a person may score, as the lists that stop at a limit ask the store for them
+ * (step 2.156): every game of `every`, and the games assigned to them of `assigned`, each
+ * the whole league ('all') or these programs (none when empty). The store keeps only these
+ * before it cuts, so a game of theirs is never pushed out by games they do not score.
+ * Worked out by scoringReachOf (scoring-access.ts), by the one rule of mayScoreUnder.
+ */
+export type ScoringReach = {
+  readonly every: 'all' | readonly string[];
+  readonly assigned: 'all' | readonly string[];
+};
+
 export type GamesStore = {
   /** The game with this id, in the bin or not, or undefined if it is not in this league. */
   readonly find: (gameId: string) => Promise<GameRecord | undefined>;
@@ -196,10 +208,14 @@ export type GamesStore = {
   readonly listWindow: (accountId: string, days: number) => Promise<GamesWindow>;
   /**
    * The games that still need a result (needs-result.ts) by the store's clock: live, or
-   * scheduled with their start passed; in no bin, of a season in no bin; oldest first, at
-   * most `limit`.
+   * scheduled with their start passed; in no bin, of a season in no bin; of those, the ones
+   * in `reach`; oldest first, at most `limit`.
    */
-  readonly listNeedingResult: (accountId: string, limit: number) => Promise<GamesWindow>;
+  readonly listNeedingResult: (
+    accountId: string,
+    reach: ScoringReach,
+    limit: number,
+  ) => Promise<GamesWindow>;
   /** The rounds of earlier games (EarlierRoundCount), the latest played first, at most `limit`. */
   readonly listEarlierRounds: (
     accountId: string,

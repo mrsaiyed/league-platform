@@ -90,6 +90,47 @@ describe('listGamesNeedingResult', () => {
     expect(mine.ok && mine.value).toMatchObject({ more: false, games: [{ id: gameUuid(100) }] });
   });
 
+  // The review's H1: the cut is made after the person's own filter, never before it.
+  describe('a person who scores only some games, past the limit of games they do not score', () => {
+    const hours = (i: number) => new Date(Date.UTC(2026, 10, 1, 8) + i * 3_600_000).toISOString();
+    const old = Array.from({ length: needsResultLimit + 1 }, (_, i) =>
+      game(100 + i, { startsAt: hours(i) }),
+    );
+
+    it("still sees a program scorekeeper's own game, and only it", async () => {
+      const theirs = game(900, { startsAt: '2026-12-05T18:00:00.000Z', seasonId: otherSeasonId });
+      const { deps, as } = memoryGames({ games: [...old, theirs], grants });
+      const mine = await listGamesNeedingResult(as(programScorekeeperId), {}, deps);
+      expect(mine.ok && mine.value).toMatchObject({ more: false, games: [{ id: gameUuid(900) }] });
+      expect(mine.ok && mine.value.games).toHaveLength(1);
+      const owner = await listGamesNeedingResult(as(ownerId), {}, deps);
+      expect(owner.ok && owner.value.more).toBe(true);
+    });
+
+    it('still sees the one assigned game of a scorekeeper who scores assigned games only', async () => {
+      const assignments = [{ gameId: gameUuid(100 + needsResultLimit), accountId: scorekeeperId }];
+      const settings = scoringRule('assignedOnly');
+      const { deps, as } = memoryGames({ games: old, grants, assignments, settings });
+      const mine = await listGamesNeedingResult(as(scorekeeperId), {}, deps);
+      expect(mine.ok && mine.value).toMatchObject({
+        more: false,
+        games: [{ id: gameUuid(100 + needsResultLimit), assignedToMe: true }],
+      });
+      expect(mine.ok && mine.value.games).toHaveLength(1);
+    });
+
+    it('says "more" to them only when games they score were cut', async () => {
+      const theirs = Array.from({ length: needsResultLimit + 1 }, (_, i) =>
+        game(300 + i, { startsAt: hours(200 + i), seasonId: otherSeasonId }),
+      );
+      const { deps, as } = memoryGames({ games: [...old, ...theirs], grants });
+      const mine = await listGamesNeedingResult(as(programScorekeeperId), {}, deps);
+      expect(mine.ok && mine.value.games).toHaveLength(needsResultLimit);
+      expect(mine.ok && mine.value.games[0]?.id).toBe(gameUuid(300));
+      expect(mine.ok && mine.value.more).toBe(true);
+    });
+  });
+
   it('still lists them in an archived league, marked not scorable', async () => {
     const { deps, as } = memoryGames({ games, grants, status: 'archived' });
     const result = await listGamesNeedingResult(as(ownerId), {}, deps);
