@@ -436,10 +436,22 @@ if (browser) {
         await owner.tap({ type: 'end' });
         await page.getByRole('heading', { name: 'Box scores' }).waitFor({ timeout: 10_000 });
         note('once it ends the page shows the box scores', true);
+        // The box score tables themselves, under their own heading, one a team: the
+        // play-by-play is drawn as tables too, so counting every table proved nothing.
+        const boxScores = page.locator(
+          'section[aria-labelledby="game-box-scores"] table.ui-box-score',
+        );
         note(
           'both teams have a box score',
-          (await page.locator('table').count()) >= 2,
-          `${await page.locator('table').count()} tables`,
+          (await boxScores.count()) === 2 &&
+            (await page.locator('table.ui-box-score').count()) === 2,
+          `${await boxScores.count()} box score tables of ${await page.locator('table').count()} tables`,
+        );
+        const named = await boxScores.locator('caption').allTextContents();
+        note(
+          'the two box scores are the two teams of the game, away team first',
+          named.join() === 'Lions,Hawks',
+          named.join(),
         );
         note(
           'a finished game has no link to newer plays',
