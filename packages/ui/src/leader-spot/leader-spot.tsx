@@ -15,6 +15,11 @@ export type LeaderSpotProps = {
   readonly team?: { readonly name: string; readonly color?: string | null } | undefined;
   /** The first of a row carries the league's main color, as a band does. */
   readonly first?: boolean;
+  /**
+   * The level of the name's heading: 3 under a section's own title (the default), 4 where
+   * the cards stand under a small heading of level 3 inside another section.
+   */
+  readonly headingLevel?: 3 | 4;
 };
 
 /**
@@ -30,7 +35,9 @@ export function LeaderSpot({
   detail,
   team,
   first = false,
+  headingLevel = 3,
 }: LeaderSpotProps) {
+  const Name = headingLevel === 4 ? 'h4' : 'h3';
   return (
     <article className="ui-spot" data-first={first ? 'true' : undefined}>
       <p className="ui-spot-label">{label}</p>
@@ -40,9 +47,9 @@ export function LeaderSpot({
         {unit ? <span className="ui-spot-unit">{unit}</span> : null}
       </p>
       <div className="ui-spot-who">
-        <h3 className="ui-spot-name" dir="auto">
+        <Name className="ui-spot-name" dir="auto">
           {name}
-        </h3>
+        </Name>
         {detail ? (
           <p className="ui-spot-detail" dir="auto">
             {detail}

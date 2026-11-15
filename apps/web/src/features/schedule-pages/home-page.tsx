@@ -1,13 +1,5 @@
 import { leagueUrl, readStandings } from '@srleagues/core';
-import {
-  CallBand,
-  EmptyPanel,
-  Hero,
-  LeaderSpot,
-  Section,
-  StandingsTable,
-  StatStrip,
-} from '@srleagues/ui';
+import { CallBand, EmptyPanel, Hero, Section, StandingsTable, StatStrip } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -19,12 +11,13 @@ import {
   buildStandingsViews,
   chooseSeason,
   firstValue,
-  loadHomeLeaders,
+  homeLeadersOf,
   type SearchParams,
   type StandingsTableView,
 } from '../stats-pages/index.ts';
 import { buildHomeNumbers } from './build-home-numbers.ts';
 import { buildHomeGames } from './build-schedule.ts';
+import { HomeLeaders } from './home-leaders.tsx';
 import { homeLeadersPlace, homeNextGames, homeResults } from './home-lists.ts';
 import { GameList } from './schedule-views.tsx';
 
@@ -94,28 +87,14 @@ export async function HomePage({
     .filter((table) => table.rows.length > 0)
     .map((table) => ({ rows: table.rows.length, hasNotes: table.footnotes.length > 0 }));
   // The season's leaders, as the statistics page reads them: names by the league's name
-  // setting, and nobody from a team whose numbers are staff only.
-  const leaders = await loadHomeLeaders(
-    publicStats.readStoreOf(addressee.id),
-    await publicStats.settingsOf(addressee.id),
-    { leagueId: addressee.id, seasonId: season.id },
-  );
+  // setting, and nobody from a team whose numbers are staff only. A read that fails
+  // leaves the leaders out; it never takes the page down.
+  const leaders = await homeLeadersOf(publicStats, {
+    leagueId: addressee.id,
+    seasonId: season.id,
+  });
   const leadersPlace = homeLeadersPlace(empty ? 0 : results.length, tableHeights, leaders.length);
   const statsHref = leagueUrl(addressee, 'stats', { season: askedSeason });
-  const leaderCards = (count: number) =>
-    leaders.slice(0, count).map((leader, index) => (
-      <li key={leader.id}>
-        <LeaderSpot
-          label={leader.label}
-          value={leader.value}
-          unit={leader.unit}
-          name={leader.name}
-          detail={leader.detail}
-          team={leader.team}
-          first={index === 0}
-        />
-      </li>
-    ));
   const teamCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
   const scheduleHref = leagueUrl(addressee, 'schedule', { season: askedSeason });
   const standingsHref = leagueUrl(addressee, 'standings', { season: askedSeason });
@@ -216,33 +195,18 @@ export async function HomePage({
             )}
             {/* A short column of standings is filled out with the season's leaders, each
                 one short row, so the two columns end about level. */}
-            {leadersPlace.beside > 0 ? (
-              <div className="home-leaders-beside">
-                <div className="home-leaders-head">
-                  <h3 className="ui-kicker">{t('home.leaders')}</h3>
-                  <a className="ui-more" href={statsHref}>
-                    {t('home.leaders.all')}
-                  </a>
-                </div>
-                <ul className="ui-spot-row">{leaderCards(leadersPlace.beside)}</ul>
-              </div>
-            ) : null}
+            <HomeLeaders
+              leaders={leaders.slice(0, leadersPlace.beside)}
+              placing="beside"
+              statsHref={statsHref}
+            />
           </Section>
         </div>
-        {leadersPlace.across > 0 ? (
-          <Section
-            title={t('home.leaders')}
-            kicker={t('home.leaders.kicker')}
-            more={{ href: statsHref, label: t('home.leaders.all') }}
-          >
-            <ul
-              className="ui-spot-row"
-              data-across={(['one', 'two', 'three'] as const)[leadersPlace.across - 1]}
-            >
-              {leaderCards(leadersPlace.across)}
-            </ul>
-          </Section>
-        ) : null}
+        <HomeLeaders
+          leaders={leaders.slice(0, leadersPlace.across)}
+          placing="across"
+          statsHref={statsHref}
+        />
         <CallBand
           title={t('home.call.title')}
           text={t('home.call.text')}

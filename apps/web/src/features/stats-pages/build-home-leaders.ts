@@ -6,7 +6,7 @@
 import { publicViewer, readStatLeaders, readStatisticsTable } from '@srleagues/core';
 import type { StandingsReadStore } from '@srleagues/core';
 import { locale, t } from '../../server/messages.ts';
-import type { PublicStatsSettings } from '../../server/public-stats.ts';
+import type { PublicStatsPorts, PublicStatsSettings } from '../../server/public-stats.ts';
 import { statLabel } from './build-stats.ts';
 
 /**
@@ -40,11 +40,64 @@ const perGame = new Intl.NumberFormat(locale, {
 });
 
 /**
+ * The same store, with each of its reads made once however often it is asked for. The two
+ * core reads below both start from the season's player totals: through this they share
+ * one set of reads for one visit, and the store's own shape is untouched.
+ */
+function readOnce(store: StandingsReadStore): StandingsReadStore {
+  const made = new Map<string, unknown>();
+  return new Proxy(store, {
+    get(target, name, receiver) {
+      const read: unknown = Reflect.get(target, name, receiver);
+      if (typeof read !== 'function') return read;
+      return (...args: readonly unknown[]): unknown => {
+        const key = `${String(name)}:${JSON.stringify(args)}`;
+        if (!made.has(key)) made.set(key, Reflect.apply(read, target, args));
+        return made.get(key);
+      };
+    },
+  });
+}
+
+/**
  * The first few leaders of a season, or none: when the season has no statistics yet, when
- * the sport's statistics are all ones nobody is glad to lead, or when the season is not
- * there (the page that asks has already answered that).
+ * the sport's statistics are all ones nobody is glad to lead, when the season is not
+ * there (the page that asks has already answered that), or when the statistics cannot be
+ * read just now. The home page is never taken down by its leaders: without them it leaves
+ * the section out.
  */
 export async function loadHomeLeaders(
+  store: StandingsReadStore,
+  settings: PublicStatsSettings,
+  input: { readonly leagueId: string; readonly seasonId: string },
+): Promise<readonly HomeLeader[]> {
+  try {
+    return await readHomeLeaders(readOnce(store), settings, input);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The same for a page that holds the league's statistics ports: the league's settings are
+ * read here too, so that neither read can take the page down.
+ */
+export async function homeLeadersOf(
+  ports: Pick<PublicStatsPorts, 'readStoreOf' | 'settingsOf'>,
+  input: { readonly leagueId: string; readonly seasonId: string },
+): Promise<readonly HomeLeader[]> {
+  try {
+    return await loadHomeLeaders(
+      ports.readStoreOf(input.leagueId),
+      await ports.settingsOf(input.leagueId),
+      input,
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function readHomeLeaders(
   store: StandingsReadStore,
   settings: PublicStatsSettings,
   input: { readonly leagueId: string; readonly seasonId: string },
@@ -78,12 +131,14 @@ export async function loadHomeLeaders(
       // A leader with nothing to their name yet is no leader.
       .filter((leader) => leader.value > 0)
       .slice(0, homeLeaderLimit)
-      .map((leader, index) => {
+      .map((leader) => {
         const theirs = leader.teamIds.flatMap((id) => teams.get(id) ?? []);
         const only = theirs.length === 1 ? theirs[0] : undefined;
         return {
           id: leader.personId,
-          label: t('home.leaders.label', { place: String(index + 1).padStart(2, '0'), stat }),
+          // The leader's rank, as the statistics page gives it: players who are level
+          // share a place (01, 01, 03), they are not numbered by where they happen to stand.
+          label: t('home.leaders.label', { place: String(leader.rank).padStart(2, '0'), stat }),
           value: perGame.format(leader.value),
           unit: t('home.leaders.perGame'),
           name: leader.name.text ?? t('stats.unnamedPlayer'),
