@@ -3,6 +3,7 @@
 // at that venue; its scores fit its status; its winner follows from the scores; and
 // it keeps the rules it started with (S-1, S-21).
 import type { PGlite } from '@electric-sql/pglite';
+import { tablePlayerEventTypes } from '@srleagues/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   asApp,
@@ -445,6 +446,131 @@ describe('the rules a game is played under (S-1, S-21)', () => {
     expect(await fixedAt(scheduled)).toBeNull();
     const decided = await newGame(db, { ...s.game, columns: final(50, 45) });
     expect(await fixedAt(decided)).not.toBeNull();
+  });
+
+  it('are emptied, with the time they were fixed, only by the update that marks a live game not started (S-40)', async () => {
+    const s = await season();
+    const fixed = { ...refused.restrict, constraint: 'games_format_fixed_once_started' };
+    const row = (game: string) =>
+      one<{ format: unknown; format_fixed_at: Date | null; status: string }>(
+        db,
+        'select format, format_fixed_at, status from games where id = $1',
+        [game],
+      );
+    const live = { status: 'live', home_score: 2, away_score: 0, format: JSON.stringify(rules) };
+    const toScheduled = { status: 'scheduled', home_score: null, away_score: null };
+    /** A live game whose tracker's log holds these events, in order. */
+    const tracked = async (types: readonly string[]) => {
+      const game = await newGame(db, { ...s.game, columns: live });
+      await logged(game, types);
+      return game;
+    };
+    const logged = async (game: string, types: readonly string[]) => {
+      const { count } = await one<{ count: number }>(
+        db,
+        'select count(*)::int as count from game_events where game_id = $1',
+        [game],
+      );
+      for (const [i, type] of types.entries()) {
+        await db.query(
+          `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at)
+           values ($1, $2, $3, $4, $5, '{}', now())`,
+          [s.leagueId, game, count + i + 1, crypto.randomUUID(), type],
+        );
+      }
+    };
+
+    // Live back to scheduled with the format emptied, its log ending at the marker: both go.
+    const game = await tracked(['lineup', 'start', 'score', 'undo', 'reset']);
+    await set(game, { ...toScheduled, format: null });
+    expect(await row(game)).toMatchObject({
+      status: 'scheduled',
+      format: null,
+      format_fixed_at: null,
+    });
+    // It is a game that never started: given rules of its own, or started again, as any.
+    await set(game, { format: JSON.stringify({ ...rules, periods: 4 }) });
+    await set(game, { format: null });
+    await logged(game, ['start']);
+    await set(game, { status: 'live', format: JSON.stringify(rules) });
+    expect((await row(game)).format_fixed_at).not.toBeNull();
+
+    // With no marker at the end of its log, or none at all: refused, whatever moves with it.
+    for (const types of [[], ['start'], ['reset', 'start']]) {
+      const unmarked = await tracked(types);
+      await expect(
+        set(unmarked, { ...toScheduled, format: null }),
+        types.join(),
+      ).rejects.toMatchObject(fixed);
+    }
+
+    // Back to scheduled keeping its format: both stay, and the format cannot be emptied after.
+    const kept = await tracked(['start', 'reset']);
+    await set(kept, toScheduled);
+    expect((await row(kept)).format_fixed_at).not.toBeNull();
+    await expect(set(kept, { format: null })).rejects.toMatchObject(fixed);
+
+    // Emptied while live, or on the way to postponed or cancelled: refused as before.
+    const other = await tracked(['start', 'reset']);
+    await expect(set(other, { format: null })).rejects.toMatchObject(fixed);
+    for (const status of ['postponed', 'cancelled']) {
+      await expect(set(other, { ...toScheduled, status, format: null })).rejects.toMatchObject(
+        fixed,
+      );
+    }
+    // Back to scheduled with other rules in place of empty ones: refused.
+    await expect(
+      set(other, { ...toScheduled, format: JSON.stringify({ ...rules, periods: 4 }) }),
+    ).rejects.toMatchObject(fixed);
+
+    // A game that was ever decided is never cleared: ended by its tracker and reopened,
+    // even with every play undone and a marker after it ...
+    const reopened = await tracked(['start', 'score', 'end', 'reopen', 'undo', 'reset']);
+    await expect(set(reopened, { ...toScheduled, format: null })).rejects.toMatchObject(fixed);
+    // ... or decided by hand, reopened with a correction, then scored live.
+    const corrected = await tracked(['start', 'reset']);
+    await db.query(
+      `insert into game_corrections (league_id, game_id, account_id, reason, before, after)
+       values ($1, $2, $3, 'Harness', '{"version": 1}', '{"version": 1}')`,
+      [s.leagueId, corrected, s.ownerId],
+    );
+    await expect(set(corrected, { ...toScheduled, format: null })).rejects.toMatchObject(fixed);
+
+    // The app's fenced role marks a game not started the same way.
+    const byApp = await tracked(['start', 'reset']);
+    await asApp(db, { league: s.leagueId }, (tx) =>
+      tx.query(
+        `update games set status = 'scheduled', home_score = null, away_score = null,
+           format = null where id = $1`,
+        [byApp],
+      ),
+    );
+    expect(await row(byApp)).toMatchObject({ format: null, format_fixed_at: null });
+
+    // Cleared, with nothing after its marker, the game may go to the bin like one never
+    // scored; with a tap after the marker, or once decided, it may not.
+    await set(byApp, { deleted_at: new Date().toISOString() });
+    // The players the scorer's table changed are not plays (record 058), after a marker
+    // or with none at all.
+    // One game per type, from the contract's own list: if it gains a type the SQL of
+    // migration 0016 does not name, this fails.
+    for (const type of tablePlayerEventTypes) {
+      for (const types of [['start', 'reset', type], [type]]) {
+        const tableOnly = await tracked(types);
+        await set(tableOnly, toScheduled);
+        await set(tableOnly, { deleted_at: new Date().toISOString() });
+      }
+    }
+    const scoredBin = { ...refused.restrict, constraint: 'games_scored_not_binned' };
+    const tappedAgain = await tracked(['start', 'reset', 'lineup']);
+    await set(tappedAgain, { ...toScheduled });
+    await expect(set(tappedAgain, { deleted_at: new Date().toISOString() })).rejects.toMatchObject(
+      scoredBin,
+    );
+    await set(reopened, { ...toScheduled });
+    await expect(set(reopened, { deleted_at: new Date().toISOString() })).rejects.toMatchObject(
+      scoredBin,
+    );
   });
 
   it('cannot change for the app either', async () => {

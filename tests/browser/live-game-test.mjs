@@ -369,7 +369,7 @@ if (browser) {
             (await page.locator('[data-live-status="live"]').count()) === 1 &&
             (await page.locator('.ui-scoreboard-score').count()) === 2,
         );
-        // A game still to play, under "Upcoming games".
+        // A game still to play, under "The next matchups".
         const coming = await tap('scheduled');
         note(
           "a coming game's link says who plays and when",

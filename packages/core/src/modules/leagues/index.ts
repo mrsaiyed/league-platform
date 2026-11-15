@@ -45,6 +45,7 @@ export {
   startPageChoices,
   whoMayScore,
   whoMayScoreChoices,
+  scorekeeperReopenMinutes,
   startingStatsLevel,
   statsLevelChoices,
   teamsMayChooseStatsLevel,

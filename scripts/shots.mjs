@@ -6,6 +6,15 @@
 //   node scripts/shots.mjs --dev                `next dev` instead of a build (quicker to start)
 //   node scripts/shots.mjs --no-build           serves the build that is already here
 //   node scripts/shots.mjs --only=home,admin    only pictures whose name contains one of these
+//   node scripts/shots.mjs --design=pine        the first made-up league under a named design
+//
+// `--design=<name>` proves that every shared piece takes its colors from a league's design
+// (docs/build/DESIGN.md, section 4, line 28). It starts the web app with the first made-up
+// league drawn under that design (the LOCAL_DESIGN setting, which the app refuses outside
+// local work and tests, as it does the stand-in itself) and takes that league's public
+// pages only, named `…-in-<name>.jpg`. The names are the starting designs (crest,
+// crest-light, midnight-gold, clean-court) and the made-up ones kept for pictures (pine:
+// apps/web/src/server/stand-in-designs.ts); any other name stops the app as it starts.
 //
 // Each screen is taken whole, at two widths: 390 (a phone) and 1280 (a laptop). The files go
 // to .local/shots/<width>/<name>.jpg, which git ignores. Open them with the Read tool. A
@@ -76,6 +85,9 @@ const liveGame = trackedGame(2);
 const finalGame = trackedGame(3);
 const gamePages = {
   'north-valley': [
+    // The home page of a season with no game under way: the hero by itself, with its mark
+    // where the live game would stand (`home-no-live`). The first league's other season.
+    { name: 'home-no-live', at: '?season=spring-2026' },
     { name: 'game-live', at: `/games/${liveGame}` },
     { name: 'game-live-light', at: `/games/${liveGame}`, lookOf: 'harbor-city' },
     { name: 'game-final', at: `/games/${finalGame}` },
@@ -123,6 +135,8 @@ const platformPages = [
 // a table that stays put, a scoreboard, a game card, a team card, a team page's heading)
 // and a league's in the header.
 const longName = 'The Northside Community Thunderbolts';
+// One long word, which cannot wrap: a made-up team name of 16 letters.
+const longWord = 'Trailblazerettes';
 const longLeagueName = 'The Greater Northside Community Basketball Association';
 const longNameWidths = [
   { name: '320', viewport: { width: 320, height: 700 } },
@@ -157,6 +171,18 @@ const only = (process.argv.find((arg) => arg.startsWith('--only=')) ?? '')
   .split(',')
   .filter(Boolean);
 const wanted = (name) => !only.length || only.some((part) => name.includes(part));
+// The design the first made-up league is pictured under, when one is named.
+const design = (process.argv.find((arg) => arg.startsWith('--design=')) ?? '').slice(
+  '--design='.length,
+);
+if (design !== '' && !/^[a-z][a-z0-9-]{0,39}$/.test(design)) {
+  console.error('--design takes a design name, such as crest-light or pine.');
+  process.exit(1);
+}
+/** A picture's file name: marked with the design it was taken under, when one is named. */
+const fileName = (name) => (design === '' ? name : `${name}-in-${design}`);
+// Under a named design only the first league's public pages change, so only they are taken.
+const picturedLeagues = design === '' ? leagues : [leagues[0]];
 
 /** On GitHub the Chromium ci.yml installs; here the Edge Windows already has. */
 const launch = () => (process.env.CI ? chromium.launch() : chromium.launch({ channel: 'msedge' }));
@@ -303,6 +329,7 @@ const port = await freePort();
 const origin = `http://localhost:${port}`;
 const server = start(dev ? ['dev', '--port', String(port)] : ['start', '--port', String(port)], {
   PUBLIC_BASE_URL: origin,
+  ...(design === '' ? {} : { LOCAL_DESIGN: design }),
 });
 const taken = [];
 const missed = [];
@@ -331,15 +358,22 @@ try {
     const keeper = await browser.newContext({ viewport: width.viewport });
     await keeper.addCookies([{ ...scorekeeper, url: origin }]);
     const jobs = [
-      ...platformPages.map((page) => ({ ...page, context: visitor, base: '' })),
-      ...leagues.flatMap((league) => [
-        ...[...publicPages, ...(gamePages[league] ?? [])].map((page) => ({
-          ...page,
-          name: `${league}-${page.name}`,
-          context: visitor,
-          base: `/${league}`,
-        })),
-        ...adminPages.map((page) => ({
+      ...(design === '' ? platformPages : []).map((page) => ({
+        ...page,
+        context: visitor,
+        base: '',
+      })),
+      ...picturedLeagues.flatMap((league) => [
+        ...[...publicPages, ...(gamePages[league] ?? [])]
+          // A page drawn with another league's values says nothing about a named design.
+          .filter((page) => design === '' || page.lookOf === undefined)
+          .map((page) => ({
+            ...page,
+            name: `${league}-${page.name}`,
+            context: visitor,
+            base: `/${league}`,
+          })),
+        ...(design === '' ? adminPages : []).map((page) => ({
           ...page,
           name: `${league}-${page.name}`,
           context: staff,
@@ -354,7 +388,7 @@ try {
       })),
     ].filter((job) => wanted(job.name));
     for (const job of jobs) {
-      const label = `${width.name}/${job.name}`;
+      const label = `${width.name}/${fileName(job.name)}`;
       const page = await job.context.newPage();
       page.setDefaultTimeout(90_000);
       try {
@@ -384,7 +418,10 @@ try {
           }, looks[job.lookOf]);
           await page.waitForTimeout(500);
         }
-        const file = path.join(out, width.name, `${job.name}.jpg`);
+        // The faces a page draws are fetched as it is laid out: wait for them, so no
+        // picture shows the stand-in face a reader sees for the first moment.
+        await page.evaluate(() => document.fonts.ready.then(() => undefined));
+        const file = path.join(out, width.name, `${fileName(job.name)}.jpg`);
         await page.screenshot({ path: file, fullPage: true, type: 'jpeg', quality: 80 });
         taken.push(
           `${label}.jpg${(answer?.status() ?? 200) >= 400 ? ` (the page answered ${answer.status()})` : ''}`,
@@ -401,8 +438,10 @@ try {
   }
   // The phone menu, open (`--only=menu`), at 390 in each league's own look.
   {
-    const jobs = leagues
-      .map((league) => ({ name: `${league}-menu-open`, at: `/${league}` }))
+    // On a page of the schedule, so the panel holds everything it can: the menu, sign-in
+    // and the season picker of a league with more than one season.
+    const jobs = picturedLeagues
+      .map((league) => ({ name: `${league}-menu-open`, at: `/${league}/schedule` }))
       .filter((job) => wanted(job.name));
     if (jobs.length > 0) {
       fs.mkdirSync(path.join(out, menuWidth.name), { recursive: true });
@@ -416,12 +455,13 @@ try {
           await page.locator('.site-header .site-menu-panel').waitFor({ state: 'visible' });
           await page.waitForTimeout(300);
           // The screen as a visitor holds it: the open panel over the top of the page.
+          await page.evaluate(() => document.fonts.ready.then(() => undefined));
           await page.screenshot({
-            path: path.join(out, menuWidth.name, `${job.name}.jpg`),
+            path: path.join(out, menuWidth.name, `${fileName(job.name)}.jpg`),
             type: 'jpeg',
             quality: 80,
           });
-          taken.push(`${menuWidth.name}/${job.name}.jpg`);
+          taken.push(`${menuWidth.name}/${fileName(job.name)}.jpg`);
         } catch (error) {
           missed.push(
             `${menuWidth.name}/${job.name}: ${String(error.message ?? error).split('\n')[0]}`,
@@ -440,7 +480,9 @@ try {
   // team card, and a team page's own heading. Each page is taken as it opens and again
   // with its tables scrolled to their far end, which shows the numbers can still be reached.
   for (const width of longNameWidths) {
-    const jobs = longNamePages.filter((job) => wanted(job.name));
+    const jobs = longNamePages.filter(
+      (job) => wanted(job.name) && picturedLeagues.some((league) => job.name.startsWith(league)),
+    );
     if (jobs.length === 0) continue;
     fs.mkdirSync(path.join(out, width.name), { recursive: true });
     const visitor = await browser.newContext({ viewport: width.viewport });
@@ -450,7 +492,7 @@ try {
       try {
         await page.goto(`${origin}${job.at}`, { waitUntil: 'networkidle' });
         await page.evaluate(
-          ({ name, league, heading }) => {
+          ({ name, word, league, heading }) => {
             const put = (el, text) => {
               if (el) el.textContent = text;
             };
@@ -459,11 +501,45 @@ try {
               put(table.querySelector('tbody .ui-team-cell > [dir]'), name);
             }
             put(document.querySelector('.ui-scoreboard-name > [dir]'), name);
-            put(document.querySelector('.ui-game-card .ui-game-team-name'), name);
+            // The first game card gets the long name, and the next card one long word. A
+            // scoreboard is told how many letters its longer name needs room for, exactly
+            // as the card works it out when it is drawn with that name (packages/ui,
+            // nameMeasure: the longer line of the name's best break into two): its teams
+            // then stand one over the other where the card is too narrow for them side by
+            // side. These made-up names are in Latin letters, one letter wide each.
+            const measure = (text) => {
+              const words = text
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .map((w) => [...w].length);
+              const whole = words.reduce((sum, w) => sum + w, 0) + words.length - 1;
+              let best = whole;
+              let first = -1;
+              for (const word of words.slice(0, -1)) {
+                first += word + 1;
+                best = Math.min(best, Math.max(first, whole - first - 1));
+              }
+              return Math.max(0, best);
+            };
+            const cards = [...document.querySelectorAll('.ui-game-card')];
+            for (const [card, text] of [
+              [cards[0], name],
+              [cards[1], word],
+            ]) {
+              if (!card) continue;
+              put(card.querySelector('.ui-game-team-name'), text);
+              card.querySelector('.ui-game-board')?.style.setProperty('--letters', measure(text));
+            }
             put(document.querySelector('.ui-team-card-name a'), name);
             if (heading) put(document.querySelector('.ui-page-head h1'), name);
           },
-          { name: longName, league: longLeagueName, heading: job.heading === true },
+          {
+            name: longName,
+            word: longWord,
+            league: longLeagueName,
+            heading: job.heading === true,
+          },
         );
         const hasTables = (await page.locator('.ui-table-wrap').count()) > 0;
         for (const scrolled of hasTables ? [false, true] : [false]) {
@@ -475,7 +551,8 @@ try {
             });
             await page.waitForTimeout(300);
           }
-          const name = `${job.name}${scrolled ? '-scrolled' : ''}`;
+          const name = fileName(`${job.name}${scrolled ? '-scrolled' : ''}`);
+          await page.evaluate(() => document.fonts.ready.then(() => undefined));
           await page.screenshot({
             path: path.join(out, width.name, `${name}.jpg`),
             fullPage: true,

@@ -608,6 +608,37 @@ describe('the tracker transfer (step 2.58)', () => {
     expect(ok.ok).toBe(true);
   });
 
+  it('transfers a game only tried here and marked not started, never one scored here since', async () => {
+    const league = await makeLeague(pglite, 'made-up-tried-here');
+    const gameId = league.games[0]!;
+    // Tried on this platform's tracker and marked not started (record 061): a start, then
+    // the marker, with the saved state a new game at the marker's number.
+    const event = (seq: number, type: string) =>
+      pglite.query(
+        `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at)
+         values ($1, $2, $3, $4, $5, '{}', now())`,
+        [league.leagueId, gameId, seq, randomUUID(), type],
+      );
+    await event(1, 'start');
+    await event(2, 'reset');
+    await pglite.query(
+      'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 2, $3)',
+      [league.leagueId, gameId, JSON.stringify(basketball.newGame(basketball.QUARTERS, 0))],
+    );
+    const outcomeOf = async () => {
+      const dry = await run(optionsFor(league, 'made-up-tried-here', { dryRun: true }));
+      return dry.plan.games.find((g) => g.match.kind === 'matched' && g.match.gameId === gameId)
+        ?.outcome;
+    };
+    expect(await outcomeOf()).toMatchObject({ kind: 'transfer', resume: false });
+    // A tap after the marker: scored here, so it is not overwritten.
+    await event(3, 'start');
+    expect(await outcomeOf()).toMatchObject({
+      kind: 'blocked',
+      problem: { kind: 'scored-here' },
+    });
+  });
+
   it('says so when the league, the season or the account is not there', async () => {
     const nobody = { email: 'nobody@example.test' };
     const missing = await transferTrackerGames(optionsFor(nobody, 'no-such-league'));

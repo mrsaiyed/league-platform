@@ -14,6 +14,8 @@ export type GameLinkWords = {
   readonly state: string;
   /** A game still to play: {away} {home} {when}. */
   readonly when: string;
+  /** A game whose start has passed with no result yet: {away} {home} {when}. */
+  readonly awaiting?: string;
   /** Each state as it is said inside those sentences: "live", "final", "postponed". */
   readonly states: Readonly<Record<Exclude<GameStatus, 'scheduled'>, string>>;
 };
@@ -24,6 +26,8 @@ type LinkedGame = {
   readonly status: GameStatus;
   /** When it is played, as its card writes it. */
   readonly whenText: string;
+  /** Its start has passed with no result yet (build-schedule.ts). */
+  readonly awaiting?: boolean | undefined;
 };
 
 const fill = (text: string, values: Readonly<Record<string, string | number>>): string =>
@@ -34,7 +38,11 @@ const fill = (text: string, values: Readonly<Record<string, string | number>>): 
 /** The words of one game's link, away team first as on its card. */
 export function gameLinkText(game: LinkedGame, words: GameLinkWords): string {
   const teams = { away: game.away.name, home: game.home.name };
-  if (game.status === 'scheduled') return fill(words.when, { ...teams, when: game.whenText });
+  if (game.status === 'scheduled') {
+    const sentence =
+      game.awaiting === true && words.awaiting !== undefined ? words.awaiting : words.when;
+    return fill(sentence, { ...teams, when: game.whenText });
+  }
   const state = words.states[game.status];
   const played = game.status === 'live' || game.status === 'final' || game.status === 'forfeit';
   return played && game.home.score !== null && game.away.score !== null

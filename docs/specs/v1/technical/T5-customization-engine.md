@@ -29,9 +29,10 @@ A league's design is a small JSON document, checked against a schema.
 }
 ```
 
-- **T-90:** the league layout turns this into CSS variables (`--color-primary` and so on) once per page. Every component is styled in terms of those variables. There is no per-league stylesheet and no generated CSS file.
+- **T-90:** the league layout turns this into CSS variables (`--color-primary` and so on) once per page. Every component is styled in terms of those variables. There is no per-league stylesheet and no generated CSS file. One screen is outside this on purpose (**T-267**, record 064): the scoring screen has one look of its own for every league, with its own variables, because it is read at arm's length in a gym and a league's colors must never make a score hard to read. Sign-in, the account pages and our own pages carry our neutral look in the same way.
 - `highlight` is the third color of C-15: `--color-highlight`, used sparingly by the display pieces and never for body text. A document saved without one uses its accent, so a design stored before the highlight existed stays valid.
 - Fonts come from a fixed list we host ourselves. The document stores a font's key, never a web address.
+- **T-262:** every face in that list is served from our own address. Its files come into the product inside an open-licence package the web app depends on at one exact version (the `@fontsource-variable` packages; every face is under the SIL Open Font License 1.1), and the web app links them once for every page. No page asks another site for a font, when it is read or when the product is built. A page downloads only the faces it draws, for the scripts it uses, and shows its text in a face the device already has until they arrive (`font-display: swap`), so a font never holds up a page. A score is set only in a face whose figures are lining and even-width; a design whose heading face has none uses its body face for scores ([record 059](../../../architecture/decisions/059-the-designs-faces-served-from-our-own-address.md)).
 - A **starting design** is simply a stored copy of such a document plus default page layouts.
 - On save we compute contrast between text and background colors and return warnings (C-1, section 8 of P5).
 - Division and team colors live on their own rows (`divisions.color`, `teams.color`) and reach components the same way.

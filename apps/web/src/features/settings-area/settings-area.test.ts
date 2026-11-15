@@ -103,6 +103,34 @@ describe('the settings form', () => {
     }
   });
 
+  it('shows under Scoring how long a scorekeeper may reopen a game they ended (S-36)', async () => {
+    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
+    const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
+    const scoring = html.slice(html.indexOf('data-area="games"'));
+    expect(scoring).toMatch(/^data-area="games"><h2>Scoring<\/h2>/);
+    const field = scoring.slice(scoring.indexOf('data-setting="games.scorekeeperReopenMinutes"'));
+    expect(field).toContain('the scorekeeper who ended it may reopen it from the tracker');
+    expect(field).toContain('0 means never. After that, only an admin can reopen it.');
+    expect(field).toContain('type="number"');
+    expect(field).toContain('min="0"');
+    expect(field).toContain('max="1440"');
+    expect(field).toContain('value="30"');
+    expect(field).toContain('Default: 30');
+    expect(field).toContain('Accepts a whole number from 0 to 1440.');
+  });
+
+  it('saves the minutes a scorekeeper may reopen a game, 0 included, and refuses more than a day', async () => {
+    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const key = 'games.scorekeeperReopenMinutes';
+    const set = (value: unknown, version: number | null) =>
+      setSetting(as(ownerId), { level: 'league', key, value, version }, deps);
+    expect(await set(1441, null)).toEqual({ ok: false, error: { code: 'invalid-value' } });
+    expect((await set(0, null)).ok).toBe(true);
+    const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
+    expect(rows.find((r) => r.key === key)).toMatchObject({ value: 0, source: 'league' });
+  });
+
   it('puts the names settings under Privacy, with a box to confirm full names (R-14)', async () => {
     const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
