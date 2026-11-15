@@ -24,7 +24,7 @@ export interface NamePolicy {
   readonly names: NameForm;
   /**
    * R-14: whether the admin has confirmed the parents' agreement to children's full
-   * names (the setting `privacy.childrenInFullConfirmed`). A child is shown by full name
+   * names (the declared setting childrenInFullConfirmed). A child is shown by full name
    * only where this is true AND `names` is full names; otherwise by first name and last
    * initial at most.
    */

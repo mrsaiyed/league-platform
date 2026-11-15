@@ -3,7 +3,12 @@
 // is in force now (and since when the parents' confirmation is), and where the
 // confirmation is offered. Everything shown comes from the message files (T-187); this
 // file only chooses which words, from facts read by the page.
-import type { LeagueSettingRow, NamePolicy, PrivacyFacts } from '@srleagues/core';
+import {
+  childrenInFullConfirmed,
+  type LeagueSettingRow,
+  type NamePolicy,
+  type PrivacyFacts,
+} from '@srleagues/core';
 import type { TextKey } from '../../server/messages.ts';
 
 /** One sentence: a message key and what fills it. */
@@ -22,7 +27,7 @@ export type SettingNotes = {
   >;
 };
 
-export const confirmationKey = 'privacy.childrenInFullConfirmed';
+export const confirmationKey = childrenInFullConfirmed.key;
 
 export type PrivacyInput = {
   readonly facts: PrivacyFacts;
