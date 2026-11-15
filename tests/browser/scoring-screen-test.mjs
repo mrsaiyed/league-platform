@@ -1416,6 +1416,84 @@ if (browser) {
     }
   });
 
+  /**
+   * Records every change of a tile's mark from now on, as the page sees it: whose tile,
+   * where it is drawn (floor or bench), what it says and its state (`data-mark-state`).
+   */
+  const watchMarks = (c) =>
+    c.root.evaluate((root) => {
+      window.markLog = [];
+      new MutationObserver((changes) => {
+        for (const change of changes) {
+          const el = change.target;
+          if (!(el instanceof Element) || !el.matches('[data-teams] [data-player]')) continue;
+          window.markLog.push({
+            player: el.dataset.player,
+            floor: el.closest('[data-floor]') !== null,
+            mark: el.getAttribute('data-mark'),
+            state: el.getAttribute('data-mark-state'),
+          });
+        }
+      }).observe(root, { attributes: true, subtree: true, attributeFilter: ['data-mark-state'] });
+    });
+  /**
+   * Waits until `player`'s tile has shown these states in this order (null: the mark taken
+   * off), where asked on the floor or the bench and with that mark. False if it never does.
+   */
+  const marksShown = (page, player, states, where = {}) =>
+    page
+      .waitForFunction(
+        ([id, wanted, floor, mark]) => {
+          const seen = window.markLog
+            .filter((one) => one.player === id)
+            .filter((one) => floor === null || one.floor === floor)
+            .filter((one) => mark === null || one.mark === mark || one.state === null)
+            .map((one) => one.state);
+          let at = 0;
+          for (const state of seen) if (at < wanted.length && state === wanted[at]) at += 1;
+          return at === wanted.length;
+        },
+        [player, states, where.floor ?? null, where.mark ?? null],
+        { timeout: 15_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      );
+  const markLog = (page) => page.evaluate(() => JSON.stringify(window.markLog));
+
+  await step('a substitution’s marks stay with the two players (the code look, L2)', async () => {
+    const { context, page, errors } = await scorekeeperAt(phone);
+    try {
+      await page.goto(`${origin}${trackerPath()}`);
+      const c = await openCourt(page);
+      await c.saved();
+      await watchMarks(c);
+      // A substitution stored: the player who came on carries "On" on their floor tile,
+      // drawn anew there, as stored; the one who went off carries "Off" on the bench.
+      const benchTile = c.root.locator('[data-bench="home"] > [data-player]').first();
+      const benchId = await benchTile.getAttribute('data-player');
+      const goingTile = c.root.locator('[data-floor="home"] > [data-player]').nth(1);
+      const goingId = await goingTile.getAttribute('data-player');
+      await c.recorded(() => c.drag(benchTile, goingTile));
+      note(
+        'after a stored substitution the incoming player’s floor tile carries "On", stored (L2)',
+        (await c.onCourtById(benchId)) &&
+          (await marksShown(page, benchId, ['stored'], { floor: true, mark: 'On' })),
+        await markLog(page),
+      );
+      note(
+        'and the player who went off carries "Off" on their bench tile, stored (L2)',
+        await marksShown(page, goingId, ['stored'], { floor: false, mark: 'Off' }),
+        await markLog(page),
+      );
+      await c.saved();
+      note('nothing broke on the page', errors.length === 0, errors.join('; '));
+    } finally {
+      await letGo(page, context);
+    }
+  });
+
   await step('the five sizes: targets, the two teams’ places, less motion', async () => {
     for (const size of sizes) {
       const { context, page } = await scorekeeperAt(size);

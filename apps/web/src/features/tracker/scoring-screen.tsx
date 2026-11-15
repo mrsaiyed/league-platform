@@ -43,7 +43,7 @@ import {
 } from './scoring-moves.ts';
 import { findTile, scoringView, type PlayerTile } from './scoring-view.ts';
 import { createTileDrag, type TileDrag } from './tile-drag.ts';
-import { createTileMarks, type MarkKind, type TileMark } from './tile-marks.ts';
+import { createTileMarks, type MarkKind, type TileMark, type TileMarks } from './tile-marks.ts';
 import type { TapInput, TrackerControllerStatus } from './tracker-controller.ts';
 
 export type ScoringScreenProps = {
@@ -74,34 +74,19 @@ const saidForMs = 3200;
 const tileElement = (root: HTMLElement | null, playerId: string): HTMLElement | null =>
   root?.querySelector<HTMLElement>(`[data-teams] [data-player="${CSS.escape(playerId)}"]`) ?? null;
 
-/** The marks of every tile on the page (tile-marks.ts), on the browser's own timers. */
-const tileMarks = createTileMarks({
-  after: (ms, run) => {
+/** The browser's own timers, for the tiles' marks. */
+const markTimers = {
+  after: (ms: number, run: () => void) => {
     const timer = window.setTimeout(run, ms);
     return () => window.clearTimeout(timer);
   },
-});
-
-/**
- * Marks a tile with what was tapped, now, as taken: written straight onto the element,
- * so it is painted in this turn whatever else the screen is working on. The mark is told
- * afterwards whether the tap was stored or not taken. Null for a tile not on the screen.
- */
-function markTile(
-  root: HTMLElement | null,
-  playerId: string,
-  text: string,
-  kind: MarkKind,
-): TileMark | null {
-  const tile = tileElement(root, playerId);
-  return tile === null ? null : tileMarks.show(tile, text, kind);
-}
+};
 
 /** Tells a tap's marks how the tap ended. */
-const answerMarks = (marks: readonly (TileMark | null)[], taken: boolean): void => {
+const answerMarks = (marks: readonly TileMark[], taken: boolean): void => {
   for (const mark of marks) {
-    if (taken) mark?.stored();
-    else mark?.refused();
+    if (taken) mark.stored();
+    else mark.refused();
   }
 };
 
@@ -187,6 +172,19 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const [said, setSaid] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
+  // The marks of the tiles (tile-marks.ts): kept by player, so a tile drawn anew (a
+  // substitution moves two players between floor and bench) is given its player's mark.
+  const marks = useRef<TileMarks | null>(null);
+  marks.current ??= createTileMarks(markTimers, (playerId) => tileElement(root.current, playerId));
+  const tileMarks = marks.current;
+  useLayoutEffect(() => tileMarks.redraw());
+  /**
+   * Marks a player's tile with what was tapped, now, as taken: written straight onto the
+   * element, so it is painted in this turn whatever else the screen is working on. The
+   * mark is told afterwards whether the tap was stored or not taken.
+   */
+  const markTile = (playerId: string, text: string, kind: MarkKind): TileMark =>
+    tileMarks.show(playerId, text, kind);
 
   const elapsed = useElapsed(state, status.now);
   const view = useMemo(
@@ -319,7 +317,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
                   : 'tracker.pad.turnover',
             );
       const kind = input.type === 'score' ? 'points' : action === 'foul' ? 'foul' : 'plain';
-      const mark = markTile(root.current, tile.id, text, kind);
+      const mark = markTile(tile.id, text, kind);
       // A foul on a player already at the limit is recorded, and said once for each.
       const alreadyOut = action === 'foul' && tile.fouledOut && !toldOut.current.has(tile.id);
       if (alreadyOut) toldOut.current.add(tile.id);
@@ -404,8 +402,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
 
   function markSub(coming: PlayerTile, going: PlayerTile) {
     return [
-      markTile(root.current, going.id, t('tracker.mark.off'), 'plain'),
-      markTile(root.current, coming.id, t('tracker.mark.on'), 'plain'),
+      markTile(going.id, t('tracker.mark.off'), 'plain'),
+      markTile(coming.id, t('tracker.mark.on'), 'plain'),
     ];
   }
 
