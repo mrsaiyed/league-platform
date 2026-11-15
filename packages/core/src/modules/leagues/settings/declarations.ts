@@ -6,6 +6,7 @@
 //   - whether scorekeepers may score any game or only games assigned to them (P4 §4;
 //     A-13: a new league starts with any game and can tighten it. The founder left
 //     that starting value to the lead on 2026-11-13, who kept the recommendation);
+//   - how long after the end the scorekeeper who ended a game may reopen it (S-36);
 //   - the statistics level a new team starts with (S-22; S-23, the founder: everyone
 //     can see its players' statistics), and whether teams may choose their own (S-24:
 //     yes, the league can switch it off);
@@ -42,6 +43,22 @@ export const whoMayScore = defineSetting({
   levels: ['league'],
   permission: 'league.settings',
   label: 'setting.games.whoMayScore.label',
+});
+
+/**
+ * How long after the end the scorekeeper who ended a tracked game may reopen it, with a
+ * reason (S-36, decided for you: 30 minutes to begin with; P7 §5.5). 0 means never:
+ * then only those who may correct games reopen one, as they may at any time. At most a
+ * day (1440 minutes): past that a reopening is an admin's correction, not an undo of
+ * one wrong tap (record 060, T-263). The games module reads it (reopen-tracked-game.ts).
+ */
+export const scorekeeperReopenMinutes = defineSetting({
+  key: 'games.scorekeeperReopenMinutes',
+  type: z.number().int().min(0).max(1440),
+  default: 30,
+  levels: ['league'],
+  permission: 'league.settings',
+  label: 'setting.games.scorekeeperReopenMinutes.label',
 });
 
 /**
@@ -116,6 +133,7 @@ export const playersMayAskForInitials = defineSetting({
 export const declaredSettings = settingRegistry([
   membersStartPage,
   whoMayScore,
+  scorekeeperReopenMinutes,
   startingStatsLevel,
   teamsMayChooseStatsLevel,
   publicNames,

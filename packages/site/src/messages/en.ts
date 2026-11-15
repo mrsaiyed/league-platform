@@ -1074,6 +1074,8 @@ export const en = {
     'Which games a scorekeeper may score: any game, or only the games they are assigned to',
   'setting.games.whoMayScore.option.anyScorekeeper': 'Any game',
   'setting.games.whoMayScore.option.assignedOnly': 'Only games they are assigned to',
+  'setting.games.scorekeeperReopenMinutes.label':
+    'Minutes after a game ends during which the scorekeeper who ended it may reopen it from the tracker, with a reason, if they tapped End game too soon. 0 means never. After that, only an admin can reopen it.',
   'setting.teams.startingStatsLevel.label':
     "Who sees a new team's players' statistics until the team chooses",
   'setting.teams.startingStatsLevel.option.everyone': 'Everyone',
