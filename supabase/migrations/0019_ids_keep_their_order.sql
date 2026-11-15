@@ -27,7 +27,18 @@
 -- it uses the last time part plus one: a count within the millisecond, as the RFC's
 -- method 1 allows, that carries into the next millisecond after 4,096 ids. The time part
 -- is still the time (the clock's, or a few counts after the last), never earlier than
--- the clock, and ahead of it only while more than 4,096 ids a millisecond are made.
+-- the clock. It runs ahead of the clock in two cases only: while more than 4,096 ids a
+-- millisecond are made, and after the clock steps back, by the size of the step, until
+-- the clock catches up.
+--
+-- The remembered value is checked before it is trusted: anything that is not 1 to 18
+-- digits (so below 2^60: it fits the time part, and plus one cannot overflow), and
+-- anything more than one hour ahead of the clock's own time part, is treated as "none
+-- yet", and the id follows the clock. Only our own SQL logins can set it, but one
+-- mistake (a word, an empty value, a huge number) must not stop every insert on that
+-- connection, or on every client sharing it behind a pooler. Deliberately, this also
+-- means a clock stepped back by more than an hour loses the order once on that
+-- connection: the next id follows the clock, below the ones before it.
 --
 -- Why a session setting: it is the one piece of memory PostgreSQL keeps per
 -- connection that both PGlite (PostgreSQL itself, built for the browser) and the hosted
@@ -43,10 +54,20 @@
 --   id may repeat a time part a rolled-back id had. Harmless: those rows do not exist,
 --   the random bits keep every id unique, and the next id still sorts after every id of
 --   this connection that does exist.
--- - A connection pool that hands one connection to many requests: the memory is the
---   connection's, so ids stay in order across those requests; nothing more is promised.
---   A pool that resets its connections (RESET ALL, DISCARD ALL) clears the memory; ids
---   then follow the clock alone until the next one is made.
+-- - A connection pool in the app (one client connection handed to many requests in
+--   turn): the memory is the connection's, so ids stay in order across those requests.
+-- - A pooler in transaction mode (Supabase's, on port 6543, which the worker's settings
+--   expect): the memory belongs to the SERVER connection, which many clients share, one
+--   transaction at a time. Each command is one transaction on one server connection, so
+--   the ids made within one command keep their order. The app's next transaction may
+--   land on another server connection, so across commands the order follows the clock
+--   only. Harmlessly weaker, and it leaks nothing: the setting holds a time that every
+--   id already shows, and no league, person or permission. It is the one session-wide
+--   setting the product writes; every other is for its transaction only (record 009).
+--   A stale or another client's value can only move a time part forward, within the
+--   hour the check above allows.
+-- - A pooler that resets its connections (RESET ALL, DISCARD ALL) clears the memory;
+--   ids then follow the clock alone until the next one is made.
 -- - Volatile and now PARALLEL UNSAFE (it writes a setting, which a parallel worker may
 --   not): a query that calls it runs without parallel workers. As a column default it
 --   is called once a row, in the order the rows are inserted, so a multi-row insert
@@ -72,10 +93,19 @@ declare
   -- The time part: milliseconds times 4,096, plus the fraction of the millisecond in
   -- 4,096ths. extract() gives an exact numeric, so nothing is lost before the floor.
   stamp bigint := floor(extract(epoch from clock_timestamp()) * 4096000)::bigint;
-  -- The last time part this connection gave; none yet is 0.
-  last bigint := coalesce(nullif(current_setting('srleagues.uuid_v7_last', true), '')::bigint, 0);
+  -- The last time part this connection gave, as text, and as a number only when it is 1
+  -- to 18 digits; anything else (none yet included) is 0. translate() rather than a
+  -- pattern: the same test, at about the cost the function had without it.
+  remembered text := current_setting('srleagues.uuid_v7_last', true);
+  last bigint := case
+    when length(remembered) between 1 and 18 and translate(remembered, '0123456789', '') = ''
+      then remembered::bigint
+    else 0
+  end;
 begin
-  if stamp <= last then
+  -- Used only when the clock has not passed it and it is at most an hour
+  -- (3,600 x 4,096,000) ahead of the clock; otherwise the id follows the clock.
+  if stamp <= last and last <= stamp + 14745600000 then
     stamp := last + 1;
   end if;
   -- false: for the session, not only this transaction.

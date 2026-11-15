@@ -125,6 +125,42 @@ describe('ids on one connection (T-41, record 068)', () => {
     expect(made.every((id) => timePart(id) > ahead)).toBe(true);
   });
 
+  it('ignores a remembered value it cannot trust, and keeps making ids in order', async () => {
+    const hour = 3600n * 4096000n;
+    const values = [
+      () => 'abc',
+      () => '',
+      () => '9223372036854775807',
+      () => String(2n ** 60n),
+      async () => String((await clockPart(db)) + 2n * hour),
+    ];
+    for (const value of values) {
+      const remembered = await value();
+      await db.query(`select set_config('srleagues.uuid_v7_last', $1, false)`, [remembered]);
+      const before = await clockPart(db);
+      await db.exec('truncate made');
+      for (let n = 1; n <= 20; n++) await db.query('insert into made (n) values ($1)', [n]);
+      const after = await clockPart(db);
+      const { made, sorted } = await madeAndSorted(db);
+      expect(sorted, remembered).toEqual(made);
+      const first = made[0] ?? '';
+      const hex = first.replaceAll('-', '');
+      expect(hex[12], remembered).toBe('7');
+      expect(Number.parseInt(hex.charAt(16), 16) >> 2, remembered).toBe(0b10);
+      // At the clock's time: the value was treated as "none yet".
+      expect(timePart(first), remembered).toBeGreaterThanOrEqual(before);
+      expect(timePart(first), remembered).toBeLessThanOrEqual(after);
+    }
+  });
+
+  it('trusts a remembered value up to an hour ahead of the clock', async () => {
+    const ahead = (await clockPart(db)) + 3500n * 4096000n;
+    await db.query(`select set_config('srleagues.uuid_v7_last', $1, false)`, [String(ahead)]);
+    const { id } = await one<{ id: string }>(db, 'select public.uuid_v7()::text as id');
+    expect(timePart(id)).toBe(ahead + 1n);
+    await db.exec('reset all');
+  });
+
   it('after a rollback still sorts after every id of the connection that exists', async () => {
     await db.exec('truncate made');
     await db.query('insert into made (n) values (1)');
