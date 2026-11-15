@@ -1,7 +1,12 @@
 // The teams list, a team's page and the members' start page (step 2.44), on the made-up
 // stand-in leagues: records and seeds, rosters through the one name function, statistics
 // following each team's setting, and who lands where.
-import { publicViewer, type AccessHolder } from '@srleagues/core';
+import {
+  defaultNamePolicy,
+  publicRosterLine,
+  publicViewer,
+  type AccessHolder,
+} from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
@@ -86,6 +91,34 @@ describe('a team page', () => {
     ]);
     expect(roster.former.map((r) => r.name)).toEqual([expect.stringMatching(/^#1 \(left /)]);
     expect(JSON.stringify(roster)).not.toMatch(/Noor|Haddad|Jay|Whitaker|Tess|Moreno/);
+  });
+
+  it('shows a player added at the scorer’s table by number only as "#12" (S-34)', () => {
+    const line = (entryId: string, jerseyNumber: string | null, firstName = '') =>
+      publicRosterLine(
+        {
+          entryId,
+          jerseyNumber,
+          role: 'player',
+          leftOn: null,
+          firstName,
+          lastName: '',
+          isMinor: null,
+          nameRequest: 'none',
+          personBinned: false,
+        },
+        'adult',
+        { viewer: publicViewer(adult), policy: defaultNamePolicy },
+      );
+    const roster = buildRoster({
+      lines: [line('a', '12'), line('b', '7', 'Yusuf'), line('c', null)],
+    });
+    expect(roster.current.map((r) => [r.number, r.name])).toEqual([
+      ['12', '#12'],
+      ['7', 'Yusuf'],
+      // No name and no number cannot be added at the table; were it there, it is nameless.
+      ['', 'Name not shown'],
+    ]);
   });
 
   it('is not there for a team of another season', async () => {

@@ -7,6 +7,7 @@ import { displayLabels } from '@srleagues/site';
 import { locale, t } from '../../server/messages.ts';
 import { hasStatLabel, statLabel } from '../stats-pages/index.ts';
 import {
+  boxScoreName,
   periodClockText,
   periodName,
   playSentence,
@@ -90,6 +91,7 @@ export function liveGameLabels(status: string): LiveGameLabels {
     latestPlay: t('game.latestPlay'),
     playersHidden: t('game.playersHidden'),
     nameNotShown: t('game.nameNotShown'),
+    jerseyOnly: t('game.jerseyOnly'),
     columns: [column('points'), column('fouls')],
     scoreboard: labels.scoreboard,
     boxScore: labels.boxScore,
@@ -185,7 +187,7 @@ export function buildBoxScores(page: GamePage): BoxScoresView {
         ? box.players.map((p) => ({
             id: p.personId,
             jersey: p.jersey,
-            name: p.name ?? t('game.nameNotShown'),
+            name: boxScoreName(t('game.jerseyOnly'), t('game.nameNotShown'), p),
             cells: p.stats,
           }))
         : null,

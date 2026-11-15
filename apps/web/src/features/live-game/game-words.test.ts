@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { gameWords } from './build-game.ts';
-import { fill, periodClockText, periodName, playSentence, playerText } from './game-words.ts';
+import {
+  boxScoreName,
+  fill,
+  periodClockText,
+  periodName,
+  playSentence,
+  playerText,
+} from './game-words.ts';
 
 const words = gameWords();
 
@@ -17,6 +24,17 @@ describe('the words of a game', () => {
     expect(playerText(words, 'Ada Lionel', null)).toBe('Ada Lionel');
     expect(playerText(words, null, '7')).toBe('#7');
     expect(playerText(words, null, null)).toBeNull();
+  });
+
+  it('names a box score line "#12" only for a player with no name recorded (S-34)', () => {
+    const name = (player: { name: string | null; jersey: string | null; unnamed?: boolean }) =>
+      boxScoreName(words.jerseyOnly, 'Name not shown', player);
+    expect(name({ name: 'Ada Lionel', jersey: '7' })).toBe('Ada Lionel');
+    expect(name({ name: null, jersey: '12', unnamed: true })).toBe('#12');
+    // A name withheld (removed, hidden, a team's players for staff only) is said so.
+    expect(name({ name: null, jersey: '12' })).toBe('Name not shown');
+    expect(name({ name: null, jersey: '12', unnamed: false })).toBe('Name not shown');
+    expect(name({ name: null, jersey: null, unnamed: true })).toBe('Name not shown');
   });
 
   it('words each play, naming nobody where no player is shown', () => {

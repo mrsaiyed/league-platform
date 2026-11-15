@@ -21,6 +21,7 @@ import { serverSentEventsSubscriber } from '../live-updates/index.ts';
 import { clockIsRunning, clockRemainingMs, serverOffsetMs } from './clock.ts';
 import { followGame, type FollowedGame } from './follow-game.ts';
 import {
+  boxScoreName,
   fill,
   periodClockText,
   periodName,
@@ -46,6 +47,8 @@ export type LiveGameLabels = {
   readonly latestPlay: string;
   readonly playersHidden: string;
   readonly nameNotShown: string;
+  /** A player known by number only (S-34), with {jersey}: "#12". */
+  readonly jerseyOnly: string;
   readonly columns: readonly BoxScoreColumn[];
   readonly scoreboard: ScoreboardLabels;
   readonly boxScore: BoxScoreLabels;
@@ -131,7 +134,7 @@ function PlayersTable({
     ? own.map((p) => ({
         id: p.playerId,
         jersey: p.jersey,
-        name: p.name ?? labels.nameNotShown,
+        name: boxScoreName(labels.jerseyOnly, labels.nameNotShown, p),
         cells: { points: p.points ?? '', fouls: p.fouls ?? '' },
       }))
     : null;

@@ -86,11 +86,13 @@ function dayText(day: string): string {
 }
 
 function nameText(line: PublicRosterLine): string {
-  // A child the league hides (R-24) is shown by their number, like "#12"; with no
+  // A child the league hides (R-24), and a player added at the scorer's table by number
+  // only, who has no name at all (S-34), are shown by their number, like "#12"; with no
   // number, as a removed person is.
+  const byNumber = !line.name.shown && (line.name.why === 'hidden' || line.name.why === 'no_name');
   const name = line.name.shown
     ? line.name.text
-    : line.name.why === 'hidden' && line.jerseyNumber !== null && line.jerseyNumber !== ''
+    : byNumber && line.jerseyNumber !== null && line.jerseyNumber !== ''
       ? t('team.byNumber', { number: line.jerseyNumber })
       : t('team.nameNotShown');
   return line.leftOn === null ? name : t('team.nameLeft', { name, date: dayText(line.leftOn) });
