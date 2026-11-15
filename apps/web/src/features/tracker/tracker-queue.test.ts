@@ -1,10 +1,10 @@
 import type { CommandReply } from '@srleagues/contracts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
 import { commandId, tap } from './queue-storage-contract.test-helper.ts';
 import type { QueueStorage } from './queue-storage.ts';
 import { createFakeServer, createManualClock } from './tracker-queue.test-helper.ts';
-import { createTrackerQueue, type TrackerQueueOptions } from './tracker-queue.ts';
+import { browserClock, createTrackerQueue, type TrackerQueueOptions } from './tracker-queue.ts';
 
 const game = '00000000-0000-4000-8000-0000000000a1';
 const session = '00000000-0000-4000-8000-0000000000c1';
@@ -33,6 +33,21 @@ function setup(
 
 const held = async (storage: QueueStorage) =>
   (await storage.list(game)).map((entry) => [entry.command.commandId, entry.state]);
+
+describe('the browser clock (finding M3)', () => {
+  it('is steady: changing the device clock does not move it', () => {
+    const before = browserClock.now();
+    // The device's clock is put back an hour (by hand, or a time-zone or network fix).
+    const changed = vi.spyOn(Date, 'now').mockReturnValue(Date.now() - 3_600_000);
+    try {
+      const after = browserClock.now();
+      expect(after).toBeGreaterThanOrEqual(before);
+      expect(after - before).toBeLessThan(1_000);
+    } finally {
+      changed.mockRestore();
+    }
+  });
+});
 
 describe('tracker queue: storing taps (T-114)', () => {
   it('has stored a tap by the time enqueue resolves, with no network at all', async () => {
@@ -67,8 +82,10 @@ describe('tracker queue: storing taps (T-114)', () => {
     const { queue } = setup({ storage: flaky, sessionId: () => current });
     await queue.start();
     failList = true;
-    await queue.enqueue(tap(1));
+    const q1 = { period: 1, clockMs: 300_000 };
+    await queue.enqueue(tap(1), q1);
     expect(queue.status().waiting).toBe(1);
+    expect(queue.status().waitingTaps).toEqual([{ command: tap(1), moment: q1 }]);
     // The same tap again is already held: the count does not grow.
     await queue.enqueue(tap(1));
     expect(queue.status().waiting).toBe(1);
@@ -151,6 +168,22 @@ describe('tracker queue: sending', () => {
     queue.wake();
     await queue.idle();
     expect(server.saved).toEqual([commandId(1)]);
+  });
+
+  it('never sends a tap under a session other than the one it was made under', async () => {
+    let current: string | null = session;
+    const { queue, server, storage } = setup({ sessionId: () => current });
+    server.mode = 'down';
+    await queue.start();
+    await queue.enqueue(tap(1));
+    current = '00000000-0000-4000-8000-0000000000c2';
+    await queue.enqueue(tap(2));
+    server.mode = 'up';
+    queue.wake();
+    await queue.idle();
+    expect(server.saved).toEqual([commandId(2)]);
+    expect(await held(storage)).toEqual([[commandId(1), 'waiting']]);
+    expect(server.received.at(-1)?.sessionId).toBe(current);
   });
 
   it('sends taps stored before a release under the version they were made with (T-127)', async () => {
@@ -428,6 +461,60 @@ describe('tracker queue: the done test, each case left in a known state', () => 
     await queue.enqueue(tap(3));
     await queue.idle();
     expect(server.saved).toEqual([commandId(3)]);
+  });
+
+  it('keeps taps set aside as not saved, never sends them, and a new queue does not either', async () => {
+    const { queue, server, storage, clock, open } = setup();
+    for (const n of [1, 2, 3]) server.refuse.set(commandId(n), 'session-not-held');
+    for (const n of [1, 2, 3]) await queue.enqueue(tap(n));
+    await queue.start();
+    await queue.idle();
+    await queue.setAside([commandId(1), commandId(2)]);
+    expect(queue.status().halted).not.toBeNull();
+    await queue.setAside([commandId(3)]);
+    expect(queue.status()).toMatchObject({ waiting: 0, waitingTaps: [], halted: null });
+    server.refuse.clear();
+    await queue.idle();
+    expect(server.saved).toEqual([]);
+
+    // The page is reloaded: the taps are still held as not saved, and still not sent.
+    queue.stop();
+    const reloaded = open();
+    await reloaded.start();
+    await reloaded.idle();
+    expect(reloaded.status()).toMatchObject({ waiting: 0, refused: [] });
+    expect(await held(storage)).toEqual([1, 2, 3].map((n) => [commandId(n), 'not-saved']));
+    await reloaded.forget([commandId(1)]);
+    expect((await held(storage)).map(([id]) => id)).toEqual([commandId(2), commandId(3)]);
+    await clock.advance(minute);
+    expect(server.saved).toEqual([]);
+  });
+
+  it('says which taps are waiting, and when the server last said it had some (L1)', async () => {
+    const { queue, server, clock } = setup();
+    server.mode = 'down';
+    await queue.start();
+    const q2 = { period: 2, clockMs: 390_000 };
+    await queue.enqueue(tap(1), q2);
+    await queue.enqueue(tap(2));
+    // With where in the game each was made (finding I); none known for the second.
+    expect(queue.status().waitingTaps).toEqual([
+      { command: tap(1), moment: q2 },
+      { command: tap(2), moment: null },
+    ]);
+    expect(queue.status().savedAt).toBeNull();
+    await clock.advance(minute);
+    server.mode = 'up';
+    const when = clock.now();
+    queue.wake();
+    await queue.idle();
+    expect(queue.status()).toMatchObject({ waiting: 0, waitingTaps: [], savedAt: when });
+    // A refusal is an answer, but saves nothing: the time stays.
+    server.refuse.set(commandId(3), 'rule');
+    await clock.advance(minute);
+    await queue.enqueue(tap(3));
+    await queue.idle();
+    expect(queue.status().savedAt).toBe(when);
   });
 
   it('a halt after an outage clears the offline clock: the server did answer', async () => {
