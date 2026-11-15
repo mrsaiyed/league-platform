@@ -3,14 +3,18 @@ import { displayCss } from '@srleagues/ui';
 import { designToCssText, type DesignDocument } from '@srleagues/site';
 
 /**
- * Where the shared display pieces' stylesheet is served (src/app/display.css/route.ts). The
- * mark after the question mark is made from the stylesheet's own text, so a changed
- * stylesheet has a new address and the browser may keep each one for good.
+ * The mark of the shared display pieces' stylesheet: made from its own text, so a changed
+ * stylesheet has a new mark. The page links to the stylesheet with this mark, and the
+ * address that serves it (src/app/display.css/route.ts) says "keep this for good" only to
+ * a request that asks for the very text it is sending.
  */
-export const displayStylesheet = `/display.css?v=${createHash('sha256')
+export const displayStylesheetMark = createHash('sha256')
   .update(displayCss)
   .digest('hex')
-  .slice(0, 12)}`;
+  .slice(0, 12);
+
+/** Where the shared display pieces' stylesheet is served, with the mark of its text. */
+export const displayStylesheet = `/display.css?v=${displayStylesheetMark}`;
 
 /**
  * The league's design as CSS variables, once per page (T-90): one small style block, no

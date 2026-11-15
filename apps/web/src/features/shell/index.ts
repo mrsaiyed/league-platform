@@ -5,7 +5,7 @@
 export { AdminArea } from './admin-area.tsx';
 export { AdminNav } from './admin-nav.tsx';
 export { currentMenuPage, type MenuPage } from './current-menu-page.ts';
-export { DesignStyle } from './design-style.tsx';
+export { DesignStyle, displayStylesheet, displayStylesheetMark } from './design-style.tsx';
 export { headerSeason, type HeaderSeason } from './header-season.ts';
 export { LeagueNotice } from './league-notice.tsx';
 export { LeagueSitePage } from './league-site-page.tsx';

@@ -681,13 +681,26 @@ if (browser) {
           shared > -1 && frame > -1 && frame < shared,
           sheets.join(', '),
         );
-        const answer = await fetch(sheets[shared] ?? `${origin}/display.css`);
+        // The address the page links to carries the mark of the text: only that one is kept
+        // for good. The bare address, or another mark, gets the same styles for a minute.
+        const linked = sheets[shared] ?? '';
+        const answer = linked === '' ? undefined : await fetch(linked);
         note(
-          'the shared stylesheet may be kept by the browser for good',
-          answer.status === 200 &&
-            (answer.headers.get('cache-control') ?? '').includes('immutable'),
-          `${answer.status} ${answer.headers.get('cache-control')}`,
+          'the shared stylesheet, as the page links to it, may be kept by the browser for good',
+          answer?.status === 200 &&
+            answer.headers.get('cache-control') === 'public, max-age=31536000, immutable',
+          `${answer?.status} ${answer?.headers.get('cache-control')}`,
         );
+        for (const address of ['/display.css', '/display.css?v=0123456789ab']) {
+          const other = await fetch(origin + address);
+          note(
+            `${address} answers the styles but is not kept for good`,
+            other.status === 200 &&
+              other.headers.get('cache-control') === 'public, max-age=60' &&
+              (await other.text()) === (await (await fetch(linked)).text()),
+            `${other.status} ${other.headers.get('cache-control')}`,
+          );
+        }
       } finally {
         await context.close();
       }
