@@ -512,7 +512,13 @@ function Pad(props: CourtViewProps) {
           <div className="court-hint" data-hint="">
             <h2 className="court-label">{t('tracker.hint.title')}</h2>
             <p>{t('tracker.hint.players')}</p>
-            <p>{t('tracker.hint.subs')}</p>
+            {/* The hint says only what this size offers: where the bench is folded away
+                (a short phone) there is no bench tile to tap or drag, and the stylesheet
+                shows the second wording in place of the first. */}
+            <p>
+              <span className="court-hint-bench">{t('tracker.hint.subs')}</span>
+              <span className="court-hint-folded">{t('tracker.hint.subsFolded')}</span>
+            </p>
             <p>{t('tracker.hint.turnovers')}</p>
             <p>{t('tracker.hint.saved')}</p>
           </div>

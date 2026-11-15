@@ -1286,6 +1286,15 @@ if (browser) {
             ),
           ),
         );
+        // The hint says only what this size offers (second look, L2): dragging a bench
+        // player where a bench is on the screen to drag from, the bench's button where
+        // it is folded away.
+        const hint = await c.pad.locator('[data-hint]').innerText();
+        note(
+          `${label}: the hint offers ${fold ? 'the bench’s button, and no drag' : 'the drag from the bench'}`,
+          fold ? !/drag/i.test(hint) && /“Bench”/.test(hint) : /dragged/.test(hint),
+          hint,
+        );
         // Where only its three dots show, More is still named for a screen reader.
         note(
           `${label}: the More button is named "More" for a screen reader, word shown or not`,

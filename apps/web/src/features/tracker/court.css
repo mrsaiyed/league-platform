@@ -912,6 +912,11 @@
 .court[data-stage='lineups'] .court-hint {
   display: none;
 }
+/* How to substitute is said in the words that fit what is on the screen: the second
+   wording only where the bench is folded away (a short phone, further down). */
+.court-hint-folded {
+  display: none;
+}
 .court-options {
   flex: 1;
   display: flex;
@@ -1345,6 +1350,13 @@
   }
   .court-bench-open {
     display: inline-flex;
+  }
+  /* No bench on the screen to tap or drag from: the hint says how it is done here. */
+  .court-hint-bench {
+    display: none;
+  }
+  .court-hint-folded {
+    display: inline;
   }
   .court-chip {
     padding-inline: 8px;
