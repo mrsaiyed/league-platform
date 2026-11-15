@@ -146,7 +146,8 @@ const commandsOf = (inputs: readonly Input[]): BatchCommand[] =>
     (input, i) => ({ commandId: randomUUID(), at: startOfTest + i * 1000, input }) as BatchCommand,
   );
 
-const resultsOf = (result: Awaited<ReturnType<ReturnType<typeof leagueWithGame>['send']>>) => {
+type Sent = Awaited<ReturnType<Awaited<ReturnType<typeof leagueWithGame>>['send']>>;
+const resultsOf = (result: Sent): readonly CommandResult[] => {
   if (!result.ok) throw new Error(result.error.code);
   return result.value.results;
 };
