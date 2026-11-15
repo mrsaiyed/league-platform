@@ -225,6 +225,81 @@ export type DivisionsStore = {
 };
 
 /**
+ * Why a league is not exactly what the internal tool makes (step 2.150, record 063),
+ * so it is not that tool's to remove: a published or used league is step 2.133's.
+ */
+export type LeagueRemovalFinding =
+  /** Published, archived or suspended (U-9). */
+  | { readonly kind: 'state'; readonly state: string }
+  | { readonly kind: 'in-bin' }
+  /** Renamed, given a new short name, an agreement or its own wording since it was made. */
+  | { readonly kind: 'league-changed' }
+  /** A second program, or the default program changed or in the bin. */
+  | { readonly kind: 'program-changed' }
+  /** A second season, or the first one published, in the bin or changed. */
+  | { readonly kind: 'season-changed' }
+  /** An activity-log entry by anyone but the maker, or of anything else. */
+  | { readonly kind: 'activity' }
+  /** Rows of the league in another table (a game, a person, a role, ...), by table. */
+  | { readonly kind: 'rows'; readonly table: string; readonly count: number };
+
+/** What removing the transaction's league came to. */
+export type DraftLeagueRemoval =
+  | {
+      readonly removed: true;
+      readonly slug: string;
+      readonly name: string;
+      readonly ownerAccountId: string;
+      /** The platform log's entry about it (it outlives the league). */
+      readonly logEntryId: string;
+    }
+  | {
+      readonly removed: false;
+      readonly why:
+        | 'not-found'
+        | 'short-name-differs'
+        /** Not the league the plan showed: made again since, or changed. */
+        | 'changed-since-plan'
+        /** Its owner has signed in, and their email was not typed, exactly. */
+        | 'owner-email-differs';
+    }
+  | {
+      readonly removed: false;
+      readonly why: 'in-use';
+      readonly found: readonly LeagueRemovalFinding[];
+    };
+
+/**
+ * Removing a league made by mistake (step 2.150). Bound to one transaction for one
+ * league and one staff account, as every store is: it takes no league id.
+ */
+export type LeagueRemovalStore = {
+  /**
+   * Locks the transaction's league, checks it is the league the plan showed and
+   * exactly what the internal tool makes, writes the platform log's entry, and
+   * removes it, all in this transaction; or refuses with nothing changed.
+   */
+  readonly removeDraftLeague: (asked: DraftLeagueRemovalAsked) => Promise<DraftLeagueRemoval>;
+};
+
+/** What the person was shown and typed. */
+export type DraftLeagueRemovalAsked = {
+  /** Must be the league's short name, exactly. */
+  readonly typedSlug: string;
+  /** The league's version and creation time the plan showed: it must still be that row. */
+  readonly shownVersion: number;
+  readonly shownCreatedAt: string;
+  /** The owner's email as typed, needed exactly when the owner has signed in; else null. */
+  readonly typedOwnerEmail: string | null;
+};
+
+/** The removal's transaction: who is our staff, and the removal itself. */
+export type LeagueRemovalTx = CommandTx & {
+  readonly leagues: Pick<LeaguesStore, 'isPlatformStaff'>;
+  readonly leagueRemoval: LeagueRemovalStore;
+};
+
+/**
  * A leagues command's transaction: its own store, the access reader its policy
  * checks permissions with (T-74, T-75), and the activity log it writes (A-6).
  */

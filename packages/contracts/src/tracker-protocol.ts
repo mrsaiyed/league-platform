@@ -1,10 +1,11 @@
 // The tracker's door (T6 §3, §5, §6; T-111, T-113, T-116, T-117, T-118, T-121, T-127):
 // the shapes that cross between the tracker, the server and the people watching.
-// The engine's commands are the ones in live-stats.ts, reused as they are; the
-// players added, changed and taken off at the scorer's table (version 2, record 058,
-// T-261) are this door's own.
+// The engine's commands are the ones in live-stats.ts, reused as they are: the
+// platform's shape (`PlatformEnvelope`), with the clock-mode switch (record 062,
+// T-265); the players added, changed and taken off at the scorer's table (version 2,
+// record 058, T-261) are this door's own.
 import { z } from 'zod';
-import { Envelope, Jersey } from './live-stats.ts';
+import { Envelope, Jersey, PlatformEnvelope } from './live-stats.ts';
 import { RecordingMode } from './season-rules.ts';
 
 const Side = z.enum(['home', 'away']);
@@ -15,7 +16,9 @@ const Ms = z.number().int().nonnegative();
 
 /**
  * The protocol the current tracker speaks. It goes up when the shapes below change.
- * Version 2 (record 058) added the players at the scorer's table to the batch.
+ * Version 2 (record 058) added the players at the scorer's table to the batch. Its taps
+ * took the platform's command shape later (record 062): only more is taken, so every
+ * batch a version 2 tracker sends is read and answered as before, and it stays 2.
  */
 export const trackerProtocolVersion = 2;
 
@@ -52,9 +55,19 @@ export const buildVersionRefusal = (current: number = trackerProtocolVersion): V
 /** The most commands in one batch: "a few at a time". */
 export const maxCommandsPerBatch = 50;
 
-/** One tap as sent: the scorer action with its ID and the moment it was tapped. */
-export const TrackerCommand = Envelope.required({ at: true });
+/**
+ * One tap as sent: the scorer action with its ID and the moment it was tapped, in the
+ * platform's command shape (T-128, record 062): the Al-Hadi tracker's commands and the
+ * clock-mode switch, which the engine records as a play (S-21).
+ */
+export const TrackerCommand = PlatformEnvelope.required({ at: true });
 export type TrackerCommand = z.infer<typeof TrackerCommand>;
+
+/**
+ * A tap of version 1, kept as it was (T-127): the Al-Hadi tracker's command shape,
+ * which has no clock-mode switch.
+ */
+export const TrackerCommandV1 = Envelope.required({ at: true });
 
 // ---------------------------------------------------------------- players at the table (record 058)
 
@@ -156,7 +169,7 @@ const commandList = <T extends z.ZodType<{ readonly commandId: string }>>(comman
 export const CommandBatchV1 = z.strictObject({
   protocolVersion: z.number().int().min(1),
   sessionId: Id,
-  commands: commandList(TrackerCommand),
+  commands: commandList(TrackerCommandV1),
 });
 
 /** What the tracker posts to `POST /api/v1/leagues/{leagueId}/games/{game}/commands` (T-229). */

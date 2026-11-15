@@ -1,5 +1,5 @@
 // One connection per page to a league's live scores, however many lists of games the page
-// holds (the home page has two when a game is under way: "Live now" and "Upcoming games").
+// holds (the home page has two when a game is under way: "Live now" and "The next matchups").
 // Each list asks to listen; the first opens the connection, the others share it, and it is
 // closed when the last one stops. Subscribing only; nothing here can publish (T-120).
 import type { LeagueScoreMessage } from '@srleagues/contracts';

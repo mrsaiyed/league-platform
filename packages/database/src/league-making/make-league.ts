@@ -64,8 +64,13 @@ export type TargetProblem =
   | { readonly kind: 'login'; readonly problems: readonly LoginProblem[] }
   | { readonly kind: 'migrations'; readonly state: Exclude<MigrationState, 'ready'> };
 
-/** The logins first, then the migrations: undefined when both are right. Reads only. */
-async function targetProblem(target: LeagueMakingTarget): Promise<TargetProblem | undefined> {
+/**
+ * The logins first, then the migrations: undefined when both are right. Reads only.
+ * The removal tool asks the same (remove-league.ts), with its own login question.
+ */
+export async function targetProblem(
+  target: LeagueMakingTarget,
+): Promise<TargetProblem | undefined> {
   const problems = await probeLogins(target);
   if (problems.length > 0) return { kind: 'login', problems };
   const state = await migrationState(target.login);

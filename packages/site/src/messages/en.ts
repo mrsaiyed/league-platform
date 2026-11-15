@@ -22,6 +22,9 @@ export const en = {
   'shell.notBuilt': 'This page is not built yet.',
   'shell.backToLeague': 'Back to the league home',
   'shell.skipToContent': 'Skip to the content',
+  // The small line under a league's name in the header, the same for every league until a
+  // league can write its own.
+  'shell.tagline': 'Official league site',
   'shell.draftNotice': 'This league is not published. Only the people who run it can see it.',
   'shell.suspendedNotice':
     'This league has been taken down. Only the people who run it can see it, to export their data.',
@@ -139,9 +142,8 @@ export const en = {
   'home.noGames': 'No games have been scheduled for this season yet.',
   'home.recentResults': 'Recent results',
   'home.noResults': 'No games have been played yet.',
-  'home.upcoming': 'Upcoming games',
-  'home.noUpcoming': 'There are no upcoming games scheduled.',
-  'home.standings': 'Standings',
+  'home.upcoming': 'The next matchups',
+  'home.standings': 'The standings',
   'home.standingsEmpty': 'The standings appear here once games have been played.',
   'home.fullStandings': 'See the full standings',
   'home.fullSchedule': 'See the full schedule',
@@ -154,6 +156,23 @@ export const en = {
   'home.number.played': 'Games played',
   'home.number.toPlay': 'Games to play',
   'home.number.rounds': 'Rounds',
+  // The first starting design's home page (step 2.147, C-16): a hero with one sentence and
+  // two ways on, a tiny label (a kicker) over each section's title, and one call to action
+  // near the foot. Every phrase is written to read well for any league and any sport.
+  'home.hero.text': 'Scores, standings and the schedule for every team, all season long.',
+  'home.hero.schedule': 'See the schedule',
+  'home.hero.standings': 'View the standings',
+  'home.upcoming.kicker': 'On the schedule',
+  // Over "Recent results": the list opens with decided games and may end with one whose
+  // result is still awaited, so its label is true of both.
+  'home.results.kicker': 'Latest games',
+  'home.standings.kicker': 'The race for the top',
+  'home.call.title': 'Every team has a story.',
+  'home.call.text': 'Rosters, records and results for every team in the league.',
+  'home.call.action': 'Meet the teams',
+  // A game whose start has passed with no result yet: not still to come, and not decided.
+  'schedule.awaitingResult': 'Awaiting result',
+  'schedule.link.awaiting': '{away} against {home}, {when}, awaiting the result',
   'schedule.title': 'Schedule',
   'schedule.noSeason': 'There is no season to show yet.',
   'schedule.empty': 'No games have been scheduled for this season yet.',
@@ -1088,6 +1107,7 @@ export const en = {
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
   'activity.games.end_tracked_game': 'Ended a tracked game',
+  'activity.games.mark_not_started': 'Marked a started game not started',
   'activity.games.reopen_tracked_game': 'Reopened a game ended from the tracker',
   'activity.games.apply_tracker_commands': "Changed a team's players at the scorer's table",
   'activity.standings.add_adjustment': 'Added a standings adjustment',
@@ -1285,6 +1305,47 @@ export const en = {
   'tracker.readOnly.game-not-live':
     'This game cannot be scored now: it is over, cancelled or postponed.',
   'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
+  // Marking a game not started (step 2.121, S-40): the Al-Hadi tracker's question
+  // (checklist J5), the reason asked for once a basket, foul or turnover stands, and
+  // each refusal of POST …/not-started by its code (NotStartedReply). Step 2.37 draws them.
+  'tracker.notStarted.button': 'Mark not started',
+  'tracker.notStarted.question': 'Mark this game as not started?',
+  'tracker.notStarted.questionDetail':
+    'Its score and every stat recorded for it are cleared, here and on the live page. It shows as scheduled again.',
+  'tracker.notStarted.reason': 'Why it needs clearing (kept in the log, never shown publicly)',
+  'tracker.notStarted.reasons.startedByMistake': 'Started by mistake',
+  'tracker.notStarted.reasons.onlyTrying': 'Only trying the tracker',
+  'tracker.notStarted.reasons.wrongGame': 'Wrong game',
+  'tracker.notStarted.reasons.wrongFormat': 'Wrong game format',
+  'tracker.notStarted.reasons.other': 'Another reason',
+  'tracker.notStarted.yes': 'Yes, mark not started',
+  'tracker.notStarted.no': 'Keep scoring',
+  'tracker.notStarted.done': 'The game is scheduled again. Nothing recorded in it counts.',
+  'tracker.notStarted.refused.not-allowed':
+    'You do not have access to score this game, so you cannot mark it not started.',
+  'tracker.notStarted.refused.plays-recorded':
+    'A basket, foul or turnover is recorded. Undo them first, then mark the game not started; or a league admin can clear it with a reason.',
+  'tracker.notStarted.refused.unknown-game': 'This game could not be found.',
+  'tracker.notStarted.refused.changed-since-read':
+    'Plays were saved for this game since this screen loaded them. Look again before you clear it.',
+  'tracker.notStarted.refused.game-not-started':
+    'This game has not started, so there is nothing to clear.',
+  'tracker.notStarted.refused.game-final':
+    'This game is final. Reopen it to change it; it cannot be marked not started.',
+  'tracker.notStarted.refused.was-decided':
+    'This game was final once, so it was played and cannot be marked not started. Correct its plays instead.',
+  'tracker.notStarted.refused.entered-by-hand':
+    'This game’s result was entered by hand, not scored live. Reopen it to change it.',
+  'tracker.notStarted.refused.game-postponed':
+    'This game is postponed, so there is nothing to clear.',
+  'tracker.notStarted.refused.game-cancelled':
+    'This game is cancelled, so there is nothing to clear.',
+  'tracker.notStarted.refused.not-tracked':
+    'This game has no plays from the tracker, so there is nothing to clear.',
+  'tracker.notStarted.refused.session-held':
+    'Someone else has been scoring this game on another device, and may still be scoring it without a connection. Take the game over first, then try again.',
+  'tracker.notStarted.refused.reason-needed':
+    'A basket, foul or turnover is recorded in this game. Say why it needs clearing.',
   'tracker.readOnly.unknown-game': 'This game could not be found.',
   'tracker.readOnly.request-refused':
     'Something went wrong opening the game. Tap Open the game again.',

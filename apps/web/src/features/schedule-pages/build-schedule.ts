@@ -35,6 +35,12 @@ export type GameView = {
    */
   readonly detailsHref: string;
   readonly teamSlugs: readonly string[];
+  /**
+   * Still marked to be played, but its start has passed (or, with a day and no time, its
+   * day is over): it is not still to come and it is not decided, and its card says so in
+   * a quiet word of its own instead of standing among the coming games as one of them.
+   */
+  readonly awaiting?: boolean;
 };
 
 export type RoundView = {
@@ -135,6 +141,12 @@ export function gameView(
 ): GameView {
   const status = statusOf(game.status);
   const place = placeOf(game);
+  const day = dayOf(game, clock);
+  const awaiting =
+    status === 'scheduled' &&
+    (game.startsAt !== null
+      ? Date.parse(game.startsAt) <= Date.parse(clock.now)
+      : day !== null && day < clock.today);
   return {
     id: game.id,
     home: { name: game.homeTeam.name, score: game.homeScore, color: game.homeTeam.color },
@@ -148,6 +160,7 @@ export function gameView(
     // Every game has a page, whatever its state, and its card leads there.
     detailsHref: leagueUrl(league, 'game', { game: game.id, season: seasonSlug }),
     teamSlugs: [game.homeTeam.slug, game.awayTeam.slug],
+    ...(awaiting ? { awaiting: true } : {}),
   };
 }
 
@@ -254,7 +267,16 @@ export function buildScheduleView(
 export type HomeGames = {
   readonly recent: readonly GameView[];
   readonly upcoming: readonly GameView[];
+  /**
+   * Games still marked to be played whose start has passed, latest first: the home page
+   * lists them with its results, each saying it is waiting for one, and never among the
+   * games to come.
+   */
+  readonly awaiting: readonly GameView[];
 };
+
+/** How many games waiting for a result the home page lists above its results. */
+export const homeAwaitingSize = 2;
 
 /** When a game is, for ordering: its start, else noon of its day, else nothing (undefined). */
 const timeOf = (g: PublicGame): number | undefined =>
@@ -332,5 +354,11 @@ export function buildHomeGames(
     .filter((g) => g.status === 'postponed')
     .sort(order)
     .slice(0, homeListSize);
-  return { recent, upcoming: [...coming, ...postponed].map(view) };
+  const awaiting = everyGame
+    .filter((g) => g.status === 'scheduled')
+    .sort((a, b) => lastTime(b) - lastTime(a))
+    .map(view)
+    .filter((g) => g.awaiting === true)
+    .slice(0, homeAwaitingSize);
+  return { recent, upcoming: [...coming, ...postponed].map(view), awaiting };
 }

@@ -18,11 +18,56 @@ describe('design document', () => {
   });
 
   it('starting designs look different and have good contrast', () => {
-    const [a, b] = startingDesignKeys.map(startingDesign);
-    expect(a?.base).not.toBe(b?.base);
-    expect(a?.colors.primary).not.toBe(b?.colors.primary);
-    expect(a?.fonts.heading).not.toBe(b?.fonts.heading);
+    // The first one is the design a league opens with (C-16), then its light sibling.
+    expect(startingDesignKeys).toEqual(['crest', 'crest-light', 'midnight-gold', 'clean-court']);
+    const designs = startingDesignKeys.map(startingDesign);
+    // No two share a page: every pair differs in its background, and in its text or main
+    // color. (Two light designs may both have white panels: paper is paper.)
+    for (const [i, a] of designs.entries()) {
+      for (const b of designs.slice(i + 1)) {
+        expect(a.colors.background).not.toBe(b.colors.background);
+        expect([a.colors.text, a.colors.primary]).not.toEqual([b.colors.text, b.colors.primary]);
+        if (a.base === 'dark' || b.base === 'dark') {
+          expect(a.colors.panel).not.toBe(b.colors.panel);
+        }
+      }
+    }
+    // The first design and its light sibling are one look on two pages: the same main
+    // color and faces, a dark base and a light one.
+    const [crest, crestLight] = [startingDesign('crest'), startingDesign('crest-light')];
+    expect(crest.base).toBe('dark');
+    expect(crestLight.base).toBe('light');
+    expect(crestLight.colors.primary).toBe(crest.colors.primary);
+    expect(crestLight.fonts).toEqual(crest.fonts);
+    // The three looks differ from each other in base or main color, and in heading face.
+    const looks = (['crest', 'midnight-gold', 'clean-court'] as const).map(startingDesign);
+    for (const [i, a] of looks.entries()) {
+      for (const b of looks.slice(i + 1)) {
+        expect(a.colors.primary).not.toBe(b.colors.primary);
+        expect(a.fonts.heading).not.toBe(b.fonts.heading);
+      }
+    }
+    expect(looks[1]?.base).not.toBe(looks[2]?.base);
     expect(startingDesignKeys.flatMap((k) => contrastWarnings(startingDesign(k)))).toEqual([]);
+  });
+
+  it('the first starting design carries the colors it was built from (C-16)', () => {
+    expect(startingDesign('crest').colors).toEqual({
+      background: '#170e13',
+      panel: '#24171e',
+      text: '#f6f1e9',
+      primary: '#96062d',
+      accent: '#b77d8c',
+      highlight: '#d3b780',
+    });
+    // Its light sibling is maroon, white and gold: a warm white page, white panels with a
+    // fine line (not a tinted panel, which a maroon nearby turns dusty pink).
+    const light = startingDesign('crest-light');
+    expect([light.colors.background, light.colors.panel]).toEqual(['#fffefa', '#ffffff']);
+    expect([light.colors.primary, light.colors.accent]).toEqual(['#96062d', '#d3b780']);
+    expect(light.cards).toBe('outlined');
+    // A serif for titles, names and numbers; a plain sans for reading.
+    expect(startingDesign('crest').fonts).toEqual({ heading: 'gelasio', body: 'source-sans' });
   });
 
   it('rejects bad colors, unknown fonts and web addresses', () => {
@@ -150,9 +195,12 @@ describe('design to CSS variables (T-90)', () => {
   });
 
   it('gives different output for different designs', () => {
-    const [a, b] = startingDesignKeys.map((k) => designToCssText(startingDesign(k)));
-    expect(a).not.toBe(b);
-    expect(a).toMatch(/^:root \{\n {2}--color-background: #0b2233;/);
+    const texts = startingDesignKeys.map((k) => designToCssText(startingDesign(k)));
+    expect(new Set(texts).size).toBe(startingDesignKeys.length);
+    expect(texts[0]).toMatch(/^:root \{\n {2}--color-background: #170e13;/);
+    expect(designToCssText(startingDesign('midnight-gold'))).toMatch(
+      /^:root \{\n {2}--color-background: #0b2233;/,
+    );
   });
 
   it('accepts only safe selectors', () => {
@@ -181,15 +229,44 @@ describe('design to CSS variables (T-90)', () => {
     expect(hostile((x) => (x.base = 'dark; x'))).toThrow();
   });
 
-  it('keeps links, names and hover swaps readable in both starting designs', () => {
+  it('keeps links, names and hover swaps readable in every starting design', () => {
     for (const key of startingDesignKeys) {
       const { colors } = startingDesign(key);
+      const vars = designToCssVariables(startingDesign(key));
+      // What a variable stands for, followed through the variables it names.
+      const colorOf = (name: string): string => {
+        const value = vars[name] ?? '';
+        const named = /^var\((--[a-z-]+)\)$/.exec(value)?.[1];
+        return named === undefined ? value : colorOf(named);
+      };
       for (const bg of [colors.background, colors.panel]) {
-        expect(contrastRatio(colors.primary, bg)).toBeGreaterThanOrEqual(4.5);
+        // A link, and the color the eye lands on (a number, a score, a way on), are in
+        // colors worked out to read here, whatever the league's main color is.
+        for (const name of ['--color-primary-text', '--color-pop']) {
+          expect(contrastRatio(colorOf(name), bg), `${key} ${name}`).toBeGreaterThanOrEqual(4.5);
+        }
         expect(contrastRatio(colors.text, bg)).toBeGreaterThanOrEqual(4.5);
       }
+      // The league's name, and the current page of the menu, in the header.
+      const bar = colorOf('--header-background');
+      for (const name of ['--header-name', '--header-text', '--tab-text']) {
+        expect(contrastRatio(colorOf(name), bar), `${key} ${name}`).toBeGreaterThanOrEqual(4.5);
+      }
+      // The current page is written on the bar, or on its own filled pill.
+      const pill = colorOf('--tab-current-background');
+      expect(
+        contrastRatio(colorOf('--tab-current-text'), pill === 'transparent' ? bar : pill),
+        `${key} current page`,
+      ).toBeGreaterThanOrEqual(4.5);
       // hover swaps text and background colors
       expect(contrastRatio(colors.background, colors.text)).toBeGreaterThanOrEqual(4.5);
+    }
+    // The two designs whose main color is itself their links' color: it reads as it is.
+    for (const key of ['midnight-gold', 'clean-court'] as const) {
+      const { colors } = startingDesign(key);
+      for (const bg of [colors.background, colors.panel]) {
+        expect(contrastRatio(colors.primary, bg), key).toBeGreaterThanOrEqual(4.5);
+      }
     }
   });
 });

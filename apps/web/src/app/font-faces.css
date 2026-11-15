@@ -1,0 +1,16 @@
+/* Every face a design can name (packages/site/src/design/fonts.ts), served from our own
+   address (T5 §1, T-262, record 059). The files come into the product inside open-licence
+   packages the web app depends on (SIL Open Font License 1.1, each); the build copies them
+   beside the app's other static files, so no page ever asks another site for a font, at
+   run time or at build time. Each rule says `font-display: swap` and a range of letters:
+   a page downloads only the faces it draws, only the scripts it uses, and shows its text
+   in the next face of the list until they arrive. font-faces.test.ts holds this list to
+   the designs' list. */
+@import '@fontsource-variable/gelasio/wght.css';
+@import '@fontsource-variable/cinzel/wght.css';
+@import '@fontsource-variable/jost/wght.css';
+@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource-variable/playfair-display/wght.css';
+@import '@fontsource-variable/source-sans-3/wght.css';
+@import '@fontsource-variable/oswald/wght.css';
+@import '@fontsource-variable/noto-naskh-arabic/wght.css';

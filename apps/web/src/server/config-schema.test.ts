@@ -17,6 +17,7 @@ const valid: Record<ConfigName, string> = {
   TRUSTED_PROXY: 'one',
   PLATFORM_DATABASE_URL: 'postgres://app:hunter2-made-up@localhost:5432/x',
   LOCAL_DATA: 'stand-in',
+  LOCAL_DESIGN: 'crest-light',
   SESSION_SECRET: longValue('SESSION_SECRET'),
   SUPABASE_URL: 'http://localhost:54321',
   SUPABASE_SECRET_KEY: longValue('SUPABASE_SECRET_KEY'),
@@ -26,8 +27,11 @@ const valid: Record<ConfigName, string> = {
   STRIPE_WEBHOOK_SECRET: longValue('STRIPE_WEBHOOK_SECRET'),
 };
 const names = Object.keys(fields) as ConfigName[];
-/** Every setting, for staging and production: LOCAL_DATA is for local work and tests only. */
-const hosted = { ...valid, LOCAL_DATA: undefined };
+/**
+ * Every setting, for staging and production: LOCAL_DATA and LOCAL_DESIGN are for local
+ * work and tests only.
+ */
+const hosted = { ...valid, LOCAL_DATA: undefined, LOCAL_DESIGN: undefined };
 /** Required in every environment. */
 const required: readonly ConfigName[] = ['APP_ENV', 'PUBLIC_BASE_URL', 'EMAIL_FROM'];
 /** Where something uses it (R8): only those environments require it. */
@@ -113,6 +117,7 @@ describe('loadConfig', () => {
       APP_ENV: 'production',
       TRUSTED_PROXY: undefined,
       LOCAL_DATA: undefined,
+      LOCAL_DESIGN: undefined,
       EMAIL_FROM: undefined,
     });
     expect(error.missing).toEqual(['EMAIL_FROM']);
@@ -269,6 +274,24 @@ describe('loadConfig', () => {
     for (const appEnv of ['staging', 'production']) {
       expect(failure({ ...production, APP_ENV: appEnv, LOCAL_DATA: 'stand-in' }).invalid).toEqual([
         'LOCAL_DATA: invalid, may be set only when APP_ENV is local or test',
+      ]);
+    }
+  });
+
+  it('takes LOCAL_DESIGN in local work and tests only, and only a design it knows (step 2.147)', () => {
+    expect(loadConfig(localOnly).LOCAL_DESIGN).toBeUndefined();
+    for (const name of ['crest', 'crest-light', 'midnight-gold', 'clean-court', 'pine']) {
+      expect(loadConfig({ ...localOnly, LOCAL_DESIGN: name }).LOCAL_DESIGN).toBe(name);
+      expect(loadConfig({ ...localOnly, APP_ENV: 'test', LOCAL_DESIGN: name }).LOCAL_DESIGN).toBe(
+        name,
+      );
+    }
+    expect(failure({ ...localOnly, LOCAL_DESIGN: 'no-such-design' }).invalid).toEqual([
+      'LOCAL_DESIGN: invalid, not one of the allowed values',
+    ]);
+    for (const appEnv of ['staging', 'production']) {
+      expect(failure({ ...production, APP_ENV: appEnv, LOCAL_DESIGN: 'crest' }).invalid).toEqual([
+        'LOCAL_DESIGN: invalid, may be set only when APP_ENV is local or test',
       ]);
     }
   });

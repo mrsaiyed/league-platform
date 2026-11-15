@@ -19,7 +19,10 @@
 // the league's name, a tab, the season picker, Sign in and the phone menu button, in both
 // looks; an arrow key in a picker never reads the page again, and Enter or the Show
 // button applies the choice; with scripts off at 320, 360 and 390 wide the league's name
-// keeps its room and the season picker sits under it.
+// keeps its room and the season picker sits under it. Since step 2.147 the picker is in the
+// menu's panel on a phone: it is put away with the menu, shown as the last thing in the
+// open one (reached by the keyboard after the links and sign-in), and with scripts off the
+// menu still opens and the picker's Show button still applies the season chosen.
 // A part that throws (a wait that times out, a build that fails) is recorded by name and
 // the other parts still run and print.
 // Not covered: (1) the invitation email being captured and its link followed: the
@@ -222,6 +225,152 @@ async function accessible(page, label) {
   const problems = await accessibilityProblems(page);
   note(`accessibility: ${label}`, problems.length === 0, problems.join('; '));
 }
+/**
+ * Every game drawn as a board on the page, measured as it is drawn: whether its two teams
+ * stand one over the other or side by side, and whether what is drawn agrees with that.
+ * Side by side, the score or "VS" stands between the teams and no team carries a score of
+ * its own; one over the other, each team's score is at the end of its own row and nothing
+ * stands between the rows.
+ */
+async function measureBoards(page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('.ui-game-board')].map((board) => {
+      const rect = (el) => el.getBoundingClientRect();
+      const drawn = (r) => r.width > 1 && r.height > 1;
+      const box = rect(board);
+      const sides = [...board.querySelectorAll('.ui-game-side')];
+      const [first, second] = sides.map(rect);
+      const middle = rect(board.querySelector('.ui-game-middle > *'));
+      const stacked = second.top >= first.bottom - 1;
+      const own = sides.map((side) => side.querySelector('.ui-game-side-score')).filter(Boolean);
+      const names = [...board.querySelectorAll('.ui-game-team-name')];
+      // The lines a piece of a name's text is drawn on, each as a box.
+      const linesOf = (node, from, to) => {
+        const range = document.createRange();
+        range.setStart(node, from);
+        range.setEnd(node, to);
+        return [...range.getClientRects()].filter((r) => r.width > 0);
+      };
+      // The words of a name that are drawn on more than one line: split inside the word.
+      const split = names.flatMap((name) => {
+        const node = name.firstChild;
+        if (!node || node.nodeType !== Node.TEXT_NODE) return [];
+        return [...node.textContent.matchAll(/\S+/g)]
+          .filter((word) => {
+            const tops = linesOf(node, word.index, word.index + word[0].length).map((r) =>
+              Math.round(r.top),
+            );
+            return new Set(tops).size > 1;
+          })
+          .map((word) => word[0]);
+      });
+      // In two rows both names start at the same place, after their emblems, and every
+      // line of a name that wraps starts there too (these pages are read left to right).
+      const starts = names.map((name) => {
+        const node = name.firstChild;
+        const lines = node ? linesOf(node, 0, node.textContent.length) : [];
+        return { box: rect(name).left, lines: lines.map((r) => r.left) };
+      });
+      return {
+        stacked,
+        split,
+        fromTheStart:
+          !stacked ||
+          (starts.every((s) => s.lines.every((left) => Math.abs(left - s.box) <= 1)) &&
+            Math.abs(starts[0].box - starts[1].box) <= 1 &&
+            sides.every(
+              (side) =>
+                rect(side.querySelector('.ui-emblem')).right <=
+                rect(side.querySelector('.ui-game-team-name')).left,
+            )),
+        // Side by side: the first team ends before what stands between them begins, and
+        // that ends before the second team. One over the other: a team's emblem and name
+        // end before its own score begins.
+        apart: stacked
+          ? sides.every((side) => {
+              const score = side.querySelector('.ui-game-side-score');
+              return (
+                !score ||
+                rect(side.querySelector('.ui-game-side-team')).right <= rect(score).left + 1
+              );
+            })
+          : first.right <= middle.left + 1 && middle.right <= second.left + 1,
+        inside: [first, second].every((r) => r.left >= box.left - 1 && r.right <= box.right + 1),
+        // No name is cut off, and none takes more lines than two.
+        whole: names.every((name) => name.scrollWidth <= name.clientWidth + 1),
+        lines: Math.max(
+          ...names.map((name) =>
+            Math.round(rect(name).height / parseFloat(getComputedStyle(name).lineHeight)),
+          ),
+        ),
+        drawnAsDecided: stacked
+          ? !drawn(middle) && own.every((el) => drawn(rect(el)))
+          : drawn(middle) && own.every((el) => !drawn(rect(el))),
+      };
+    }),
+  );
+}
+/**
+ * Puts long made-up names on the page's first two boards, as a league might have: a name
+ * of 36 letters and one word of 16. A board is told the room its longer name needs, as
+ * the page's own code works it out (packages/ui, nameMeasure): 22 and 16 letters.
+ */
+async function plantLongNames(page) {
+  await page.evaluate(() => {
+    const boards = [...document.querySelectorAll('.ui-game-board')];
+    for (const [board, text, letters] of [
+      [boards[0], 'The Northside Community Thunderbolts', '22'],
+      [boards[1], 'Trailblazerettes', '16'],
+    ]) {
+      if (!board) continue;
+      board.querySelector('.ui-game-team-name').textContent = text;
+      board.style.setProperty('--letters', letters);
+    }
+  });
+}
+/**
+ * The boards of a league's home page at the four widths, as they are and with long names
+ * put in. However a board is drawn, nothing overlaps, no name is split inside a word, and
+ * in two rows both names start after their emblems. A name as the league wrote it is also
+ * whole; a made-up word too long for its row may be cut short with "…", never split.
+ */
+async function checkHomeBoards(page, address, label) {
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const planted of [false, true]) {
+      await page.goto(address);
+      await page.locator('main').first().waitFor();
+      await page.evaluate(() => document.fonts.ready);
+      if (planted) await plantLongNames(page);
+      const boards = await measureBoards(page);
+      const sound = (b) =>
+        b.apart &&
+        b.inside &&
+        b.drawnAsDecided &&
+        b.fromTheStart &&
+        b.split.length === 0 &&
+        (planted || (b.whole && (b.stacked || b.lines <= 2)));
+      note(
+        `at ${width} every board of ${label}${planted ? ' with long names' : ''} is drawn one way or the other, and no name is split inside a word`,
+        boards.length >= 3 && boards.every(sound),
+        JSON.stringify(boards.filter((b) => !sound(b))),
+      );
+      if (planted && width === 320) {
+        note(
+          `at 320 the board of ${label} with a 36-letter name stands its teams in two rows`,
+          boards[0]?.stacked === true,
+        );
+      }
+      if (!planted && width === 1280) {
+        note(
+          `at 1280 the boards of ${label} have their teams side by side`,
+          boards.filter((b) => !b.stacked).length >= 3,
+          `${boards.filter((b) => !b.stacked).length} of ${boards.length}`,
+        );
+      }
+    }
+  }
+}
 const pathOf = (page) => new URL(page.url()).pathname;
 const week = 7 * 24 * 3600;
 
@@ -263,9 +412,74 @@ if (browser) {
       }
       note(
         'the two leagues have different looks',
-        looks['north-valley'] === '#c8a84b' && looks['harbor-city'] === '#1f5fbf',
+        looks['north-valley'] === '#96062d' && looks['harbor-city'] === '#1f5fbf',
         JSON.stringify(looks),
       );
+    } finally {
+      await context.close();
+    }
+  });
+
+  // Step 2.147 (T-262, record 059): the faces of a league's design are served from our own
+  // address and drawn on the page; nothing is asked of any other site.
+  await step('the faces of a design come from our own address', async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    try {
+      const page = await context.newPage();
+      const asked = [];
+      page.on('request', (request) => asked.push(request.url()));
+      for (const [league, faces] of [
+        ['north-valley', ['Gelasio Variable', 'Source Sans 3 Variable']],
+        ['harbor-city', ['Source Sans 3 Variable', 'Inter Variable']],
+      ]) {
+        asked.length = 0;
+        await open(page, `/${league}`);
+        await page.evaluate(() => document.fonts.ready.then(() => undefined));
+        const drawn = await page.evaluate(
+          (names) =>
+            names.map((name) => ({
+              name,
+              // The face the design names first for its titles or its text is the one in use.
+              named: [
+                getComputedStyle(document.querySelector('.ui-root')).fontFamily,
+                getComputedStyle(document.querySelector('main h1')).fontFamily,
+              ].some((list) => list.replace(/["']/g, '').startsWith(name)),
+              loaded: [...document.fonts].some(
+                (face) => face.family.replace(/["']/g, '') === name && face.status === 'loaded',
+              ),
+            })),
+          faces,
+        );
+        note(
+          `${league} draws the faces its design names, from files that arrived`,
+          drawn.every((face) => face.named && face.loaded),
+          JSON.stringify(drawn),
+        );
+        const fonts = asked.filter((url) => /\.(woff2?|ttf|otf)(\?|$)/.test(url));
+        note(
+          `${league} takes every font file from our own address`,
+          fonts.length >= 2 && fonts.every((url) => url.startsWith(`${origin}/_next/static/`)),
+          fonts.join(', '),
+        );
+        note(
+          `${league} asks no other site for anything`,
+          asked.every((url) => url.startsWith(origin) || url.startsWith('data:')),
+          asked.filter((url) => !url.startsWith(origin)).join(', '),
+        );
+        const kept = fonts[0] === undefined ? undefined : await fetch(fonts[0]);
+        note(
+          `${league}'s font files may be kept by the browser for good`,
+          kept?.status === 200 &&
+            /immutable/.test(kept.headers.get('cache-control') ?? '') &&
+            /^font\/woff2/.test(kept.headers.get('content-type') ?? ''),
+          `${kept?.status} ${kept?.headers.get('cache-control')} ${kept?.headers.get('content-type')}`,
+        );
+      }
+      // No rule holds up the page: every face may be swapped in after the text is drawn.
+      const waits = await page.evaluate(() =>
+        [...document.fonts].filter((face) => face.display !== 'swap').map((face) => face.family),
+      );
+      note('no face holds up the page (font-display: swap)', waits.length === 0, waits.join());
     } finally {
       await context.close();
     }
@@ -287,6 +501,49 @@ if (browser) {
       note(
         'no page repeats the season picker',
         (await page.locator('select[name=season]').count()) === 1,
+      );
+      // On a phone the picker is in the menu's panel (step 2.147): put away until the menu
+      // is opened, and then the last thing in it, under the menu's links and sign-in.
+      note('on a phone the season picker is put away with the menu', !(await picker.isVisible()));
+      const menuButton = page.locator('.site-header .site-menu > summary');
+      await menuButton.click();
+      await picker.waitFor({ state: 'visible' });
+      const [nameBox, panelBox, pickerBox] = await Promise.all([
+        page.locator('.site-header .site-name').boundingBox(),
+        page.locator('.site-header .site-menu-panel').boundingBox(),
+        picker.boundingBox(),
+      ]);
+      note(
+        'the open menu holds the season picker under its links, under the name',
+        nameBox !== null &&
+          panelBox !== null &&
+          pickerBox !== null &&
+          panelBox.y >= nameBox.y + nameBox.height - 1 &&
+          pickerBox.y >= panelBox.y + panelBox.height - 1 &&
+          pickerBox.x + pickerBox.width <= 390 &&
+          pickerBox.height >= 44,
+        JSON.stringify({ nameBox, panelBox, pickerBox }),
+      );
+      // The keyboard goes through the open menu as the eye does: the button, the links,
+      // sign-in, then the picker.
+      await menuButton.focus();
+      const stops = [];
+      for (let i = 0; i < 12 && stops.at(-1) !== 'season'; i++) {
+        await page.keyboard.press('Tab');
+        stops.push(
+          await page.evaluate(() => {
+            const el = document.activeElement;
+            if (el?.matches('select[name=season]')) return 'season';
+            if (el?.matches('.site-menu-sign-in')) return 'sign-in';
+            return el?.closest('.site-menu-panel') ? 'link' : 'other';
+          }),
+        );
+      }
+      note(
+        'the keyboard reaches the links, then sign-in, then the season picker',
+        stops.join() === [...Array(stops.length - 2).fill('link'), 'sign-in', 'season'].join() &&
+          stops.length >= 3,
+        stops.join(),
       );
       await picker.selectOption({ label: 'Spring 2026' });
       await page.waitForURL(/season=spring-2026/);
@@ -559,25 +816,64 @@ if (browser) {
         await open(page, '/north-valley/schedule');
         const box = (selector) => page.locator(`.site-header ${selector}`).boundingBox();
         const name = await box('.site-name');
+        // The picker is in the menu's panel on a phone (step 2.147). The menu is a plain
+        // disclosure, so it opens with scripts off: the picker and its Show button are
+        // then measured where a visitor finds them.
+        const shut = await box('select[name=season]');
+        await page.locator('.site-header .site-menu > summary').click();
         const picker = await box('select[name=season]');
         const show = await box('.site-season button[type=submit]');
         note(
+          `at ${width} with scripts off the menu opens, and only then shows the season picker`,
+          shut === null && picker !== null,
+        );
+        // The room the name's words have: the link's width less the room it keeps for the
+        // league's mark, which is not room for the name (the code review of step 2.147,
+        // M2). The words' own element is only as wide as the words, so a short name would
+        // say nothing about the room.
+        const room = await page.locator('.site-header .site-name').evaluate((el) => {
+          const style = getComputedStyle(el);
+          return (
+            el.getBoundingClientRect().width -
+            parseFloat(style.paddingInlineStart) -
+            parseFloat(style.paddingInlineEnd)
+          );
+        });
+        const words = await box('.site-name > span');
+        note(
           `at ${width} with scripts off the league's name has most of the header's width`,
-          (name?.width ?? 0) >= width * 0.6,
-          `${name?.width} of ${width}`,
+          room >= width * 0.6 && (words?.width ?? 0) <= room + 1,
+          `${room} of ${width}`,
+        );
+        // And it keeps clear of the top of its row, however many lines it takes.
+        const row = await box('.site-header-top');
+        note(
+          `at ${width} with scripts off the league's name keeps clear of the top of its row`,
+          words !== null && row !== null && words.y - row.y >= 7.5,
+          `${(words?.y ?? 0) - (row?.y ?? 0)}`,
         );
         note(
           `at ${width} with scripts off the name is shown whole`,
           // Its words take no more than the two lines the header shows, and none runs
-          // past the name's own box: nothing is cut off.
+          // past the name's own box: nothing is cut off. The lines measured are those of
+          // the words themselves (the text inside the name's own element): since step
+          // 2.147 the name shares its row with the league's mark and the menu button, so
+          // on the narrowest phones it does take two lines, and the box of the element
+          // around the words is not a third.
           await page.locator('.site-header .site-name').evaluate((el) => {
+            const text = el.querySelector('span')?.firstChild;
+            if (!text || text.nodeType !== Node.TEXT_NODE) return false;
             const words = document.createRange();
-            words.selectNodeContents(el);
+            words.selectNodeContents(text);
             const lines = [...words.getClientRects()];
             const box = el.getBoundingClientRect();
+            const held = el.querySelector('span');
             return (
+              lines.length > 0 &&
               new Set(lines.map((line) => Math.round(line.top))).size <= 2 &&
-              lines.every((line) => line.right <= box.right + 1 && line.left >= box.left - 1)
+              lines.every((line) => line.right <= box.right + 1 && line.left >= box.left - 1) &&
+              // And the element that holds the words to two lines is not cutting any off.
+              held.scrollHeight <= held.clientHeight + 1
             );
           }),
         );
@@ -587,9 +883,18 @@ if (browser) {
             show !== null &&
             picker.y >= (name?.y ?? 0) + (name?.height ?? 0) - 1 &&
             show.x + show.width <= width &&
-            show.height >= 44,
+            show.height >= 44 &&
+            // Side by side in one row of the open menu, the button after its picker.
+            picker.height >= 44 &&
+            show.x >= picker.x + picker.width - 1 &&
+            Math.abs(show.y - picker.y) <= 1,
           JSON.stringify({ name, picker, show }),
         );
+        // And it works: choosing a season and pressing Show reads that season's page.
+        await page.locator('.site-header select[name=season]').selectOption('spring-2026');
+        await page.locator('.site-header .site-season button[type=submit]').click();
+        await page.waitForURL(/season=spring-2026/);
+        note(`at ${width} with scripts off the Show button applies the season chosen`, true);
         note(
           `at ${width} with scripts off the page does not scroll sideways`,
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -761,7 +1066,15 @@ if (browser) {
           .locator('main article.ui-game-card[data-status="postponed"] a.ui-game-link')
           .first()
           .getAttribute('href');
-        for (const address of ['/north-valley', '/north-valley/teams', postponed ?? '']) {
+        // What each address must hold for the check of the two teams to be a check at all
+        // (the code review of step 2.147, L10: on the home page it used to find nothing and
+        // pass): a game's page holds the big board, the home page holds games as boards,
+        // the teams page holds neither.
+        for (const [address, holds] of [
+          ['/north-valley', 'boards'],
+          ['/north-valley/teams', 'none'],
+          [postponed ?? '', 'scoreboard'],
+        ]) {
           await open(page, address);
           const fits = await page.evaluate(() => {
             const team = 'The Northside Community Thunderbolts';
@@ -773,25 +1086,63 @@ if (browser) {
               'The Greater Northside Community Basketball Association',
             );
             put(document.querySelector('.ui-scoreboard-name > [dir]'), team);
-            put(document.querySelector('.ui-game-card .ui-game-team-name'), team);
+            const planted = document.querySelector('.ui-game-card .ui-game-team-name');
+            put(planted, team);
+            // The page's own code tells a board how many letters its longer name needs
+            // (packages/ui, nameMeasure): for this name, the longer line of its best break
+            // into two ("Community Thunderbolts"), 22.
+            planted?.closest('.ui-game-board')?.style.setProperty('--letters', '22');
             put(document.querySelector('.ui-team-card-name a'), team);
             const names = [...document.querySelectorAll('.ui-scoreboard-name')].map((el) =>
               el.getBoundingClientRect(),
             );
             const board = document.querySelector('.ui-scoreboard')?.getBoundingClientRect();
+            const header = document.querySelector('.site-header-top').getBoundingClientRect();
+            const held = document.querySelector('.site-header .site-name > span');
+            const words = held.getBoundingClientRect();
             return {
               pageScrolls: document.documentElement.scrollWidth > window.innerWidth,
-              // On a board: the first team's name ends before the second's begins, and both
-              // are inside the board.
+              // On a game's big board: the first team's name ends before the second's
+              // begins, and both are inside the board.
+              scoreboards: names.length,
               apart:
                 names.length < 2 ||
                 (names[0].right <= names[1].left + 1 &&
                   names[0].left >= board.left &&
                   names[1].right <= board.right),
+              // A long league name keeps clear of its row's top and foot.
+              nameClear: words.top - header.top >= 7.5 && header.bottom - words.bottom >= 7.5,
+              nameLines: Math.round(words.height / parseFloat(getComputedStyle(held).lineHeight)),
             };
           });
           note(`long names on ${address} do not make the page scroll sideways`, !fits.pageScrolls);
-          note(`long names on ${address} keep each team of a board in its own half`, fits.apart);
+          note(
+            `a long league name on ${address} takes two lines and keeps clear of its row's edges`,
+            fits.nameClear && fits.nameLines === 2,
+            JSON.stringify({ clear: fits.nameClear, lines: fits.nameLines }),
+          );
+          if (holds !== 'boards') {
+            note(
+              `long names on ${address} keep each team of a board in its own half`,
+              fits.apart && (holds === 'none' || fits.scoreboards === 2),
+              `${fits.scoreboards} names found`,
+            );
+            continue;
+          }
+          // The home page's games are boards, and the first of them now has a name of 36
+          // letters: on the narrowest phone that board stands its teams one over the
+          // other, and every board keeps each team in its own part of it.
+          const boards = await measureBoards(page);
+          note(
+            `long names on ${address} keep each team of a board in its own half`,
+            boards.length >= 3 && boards.every((b) => b.apart && b.inside && b.whole),
+            JSON.stringify(boards.filter((b) => !(b.apart && b.inside && b.whole))),
+          );
+          note(
+            'at 320 a board whose names cannot sit side by side stands its teams one over the other',
+            boards[0]?.stacked === true && boards.every((b) => b.drawnAsDecided),
+            JSON.stringify(boards.map((b) => ({ stacked: b.stacked, ok: b.drawnAsDecided }))),
+          );
         }
         // The divisions' tables on one page: each number column starts at the same place in
         // all of them, on a phone (390) as on this narrowest one, so GP sits under GP.
@@ -890,6 +1241,116 @@ if (browser) {
       }
     },
   );
+
+  await step('the home page: its boards at every width, and what leads it', async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    try {
+      const page = await context.newPage();
+      // A board decides between its two drawings by a sum (packages/ui, the board's
+      // styles). Whatever it decides, what is drawn must agree with it and nothing may
+      // overlap, be cut off or be split inside a word (the code review of step 2.147, L10).
+      // The two leagues as they are: the first starting design and the plain light one.
+      for (const league of ['north-valley', 'harbor-city']) {
+        await checkHomeBoards(page, `${origin}/${league}`, `/${league}`);
+      }
+      // And the first league under the other three sets of colors and faces (a face of
+      // capitals is half as wide again as a serif): one more server for each, with the
+      // design named as the picture script names it.
+      for (const design of ['crest-light', 'pine', 'midnight-gold']) {
+        const base = `http://localhost:${await freePort()}`;
+        const other = start(['start', '--port', new URL(base).port], {
+          APP_ENV: 'test',
+          PUBLIC_BASE_URL: base,
+          LOCAL_DESIGN: design,
+        });
+        try {
+          await waitFor(`${base}/`, other);
+          await checkHomeBoards(page, `${base}/north-valley`, `/north-valley in ${design}`);
+        } finally {
+          other.child.kill();
+        }
+      }
+      for (const width of [320, 390, 768, 1280]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const league of ['north-valley', 'harbor-city']) {
+          await open(page, `/${league}`);
+          await page.evaluate(() => document.fonts.ready);
+          // A card's top line never breaks inside the date and time: a line that cannot
+          // hold them and the state's pill gives the pill a line of its own.
+          const broken = await page.evaluate(() =>
+            [...document.querySelectorAll('.ui-game-card[data-layout="board"] .ui-game-when')]
+              .filter(
+                (when) =>
+                  when.getBoundingClientRect().height >
+                  1.5 * parseFloat(getComputedStyle(when).lineHeight),
+              )
+              .map((when) => when.textContent),
+          );
+          note(
+            `at ${width} no board of /${league} breaks its date and time`,
+            broken.length === 0,
+            broken.join('; '),
+          );
+          // The hero's mark is drawn only where the words leave it room: on a phone
+          // nothing of it passes under the words or a button.
+          const art = await page
+            .locator('.ui-hero-art')
+            .first()
+            .evaluate((el) => getComputedStyle(el).display);
+          note(
+            `at ${width} the hero's mark on /${league} is ${width >= 1024 ? 'drawn' : 'put away'}`,
+            width >= 1024 ? art !== 'none' : art === 'none',
+            art,
+          );
+        }
+      }
+      // On a laptop the two rows of the home page share one gap, so their edges meet: the
+      // second column of the lower row starts where the second board of the upper row does.
+      await open(page, '/north-valley');
+      const edges = await page.evaluate(() => {
+        const left = (el) => (el ? Math.round(el.getBoundingClientRect().left) : null);
+        const right = (el) => (el ? Math.round(el.getBoundingClientRect().right) : null);
+        const cards = document.querySelectorAll(
+          '.ui-card-grid[data-layout="board"][data-across="two"] > li',
+        );
+        const pair = document.querySelector('.home-pair[data-tables="few"]');
+        return {
+          cards: [right(cards[0]), left(cards[1])],
+          columns: [right(pair?.children[0]), left(pair?.children[1])],
+        };
+      });
+      note(
+        'on a laptop the edges of the home page’s two rows meet',
+        edges.cards.every((x) => x !== null) &&
+          Math.abs(edges.cards[0] - edges.columns[0]) <= 1 &&
+          Math.abs(edges.cards[1] - edges.columns[1]) <= 1,
+        JSON.stringify(edges),
+      );
+      // A season with nothing coming has no section to say so: the page leads with its
+      // latest games, decided ones first, and the standings.
+      await open(page, '/north-valley?season=spring-2026');
+      const led = await page.evaluate(() => ({
+        titles: [...document.querySelectorAll('main h2')].map((h) => h.textContent),
+        first: document.querySelector('.home-pair .ui-game-card')?.getAttribute('data-status'),
+        empties: document.querySelectorAll('main .ui-empty').length,
+      }));
+      note(
+        'a season with nothing coming leads with its latest games and the standings',
+        !led.titles.includes('The next matchups') &&
+          led.titles[0] === 'Recent results' &&
+          led.titles.includes('The standings') &&
+          led.empties === 0,
+        JSON.stringify(led),
+      );
+      note(
+        'the latest games open with a decided game',
+        led.first === 'final' || led.first === 'forfeit',
+        `${led.first}`,
+      );
+    } finally {
+      await context.close();
+    }
+  });
 
   await step('sign in, close the browser, come back', async () => {
     const first = await launch();

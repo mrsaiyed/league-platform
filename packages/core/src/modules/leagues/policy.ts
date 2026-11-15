@@ -26,7 +26,10 @@ export async function mayChangeLeagueSettings(
  * role (A-3 lists none, and T-77 gives staff no standing access to any league):
  * the app names them from its settings; nobody is staff by default.
  */
-export async function mayActAsPlatform(context: CommandContext, tx: LeaguesTx): Promise<boolean> {
+export async function mayActAsPlatform(
+  context: CommandContext,
+  tx: { readonly leagues: Pick<LeaguesTx['leagues'], 'isPlatformStaff'> },
+): Promise<boolean> {
   return context.accountId !== null && (await tx.leagues.isPlatformStaff());
 }
 
