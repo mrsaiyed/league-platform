@@ -64,7 +64,11 @@ export function GameContent({ view }: { readonly view: GameView }) {
       )}
       <header className="ui-page-head">
         {view.numberText === undefined ? null : <p className="ui-eyebrow">{view.numberText}</p>}
-        <h1 dir="auto">{view.title}</h1>
+        {/* The board under this head says the two names at title size, so the title is
+            kept for screen readers and the browser's tab and not drawn. */}
+        <h1 className="ui-visually-hidden" dir="auto">
+          {view.title}
+        </h1>
         {view.start === null ? null : <p className="ui-page-sub">{view.start}</p>}
         {view.corrected === null ? null : (
           <p className="ui-page-sub game-corrected">{view.corrected}</p>

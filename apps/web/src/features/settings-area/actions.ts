@@ -5,7 +5,7 @@
 // (runSettingsAction): who is acting and in which league come from the session.
 import { clearSetting, declaredSettings, describeSetting, setSetting } from '@srleagues/core';
 import { done, refused } from './answer.ts';
-import { clearIntent, valueOf, versionOf } from './form-input.ts';
+import { clearIntent, tickValue, valueOf, versionOf } from './form-input.ts';
 import { runSettingsAction } from './run-settings-action.ts';
 
 export async function saveSettingAction(form: FormData): Promise<never> {
@@ -22,10 +22,17 @@ export async function saveSettingAction(form: FormData): Promise<never> {
       return result.ok ? done('cleared') : refused(clearSetting.commandName, result.error.code);
     }
     const setting = declaredSettings.get(key);
-    const value =
-      setting === undefined ? undefined : valueOf(describeSetting(setting).field, fields['value']);
     // The box ticked to confirm a value that asks for it (R-14); the command checks it.
     const confirmed = fields['confirmed'] === 'yes';
+    // A yes-or-no setting drawn as one box to tick (the parents' confirmation, record
+    // 065): ticked is yes and confirmed, unticked is no.
+    const field = setting === undefined ? undefined : describeSetting(setting).field;
+    const value =
+      field === undefined
+        ? undefined
+        : field.kind === 'toggle' && fields['value'] === tickValue
+          ? confirmed
+          : valueOf(field, fields['value']);
     const result = await setSetting(
       context,
       { level: 'league', key, value, version, confirmed },

@@ -69,6 +69,7 @@ import './divisions-venues-cases.test-helper.ts';
 import './games-cases.test-helper.ts';
 import './not-started-cases.test-helper.ts';
 import './imports-cases.test-helper.ts';
+import './league-removal-cases.test-helper.ts';
 import './bin-cases.test-helper.ts';
 import './people-cases.test-helper.ts';
 import './public-schedule-cases.test-helper.ts';

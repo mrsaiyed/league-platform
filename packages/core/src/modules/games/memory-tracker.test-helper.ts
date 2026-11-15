@@ -309,6 +309,9 @@ function withPlaysFromEvents(s: MemoryTracker, tx: TrackerTx): TrackerTx {
       ...tx.games,
       hasPlays: async (gameId) =>
         s.tracked.includes(gameId) || hasPlaysPastMarker(s.events, gameId),
+      // The game's one lock, as the database has it: the games store and the session
+      // commands take the same (T-111), so a result typed by hand and a batch race for real.
+      lockGame: (gameId) => tx.scoringSessions.lockGame(gameId),
     },
   };
 }

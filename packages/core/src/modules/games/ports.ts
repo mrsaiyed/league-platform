@@ -112,6 +112,12 @@ export type GamesStore = {
   /** The game with this id, in the bin or not, or undefined if it is not in this league. */
   readonly find: (gameId: string) => Promise<GameRecord | undefined>;
   /**
+   * Holds the game until the transaction ends: the same lock the tracker's commands take
+   * (ScoringSessionsStore.lockGame, T-111), so a batch of plays and a result typed by
+   * hand never pass each other. False if the game is not in this league.
+   */
+  readonly lockGame: (gameId: string) => Promise<boolean>;
+  /**
    * Changes a game not in the bin if it is still at `version` (T-46): the new
    * version, or undefined if it is not there or moved on.
    */

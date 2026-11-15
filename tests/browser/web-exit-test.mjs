@@ -37,6 +37,8 @@ import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withLoopback } from '../../scripts/web-listen.mjs';
+import { sayOnFailure, whatWentWrong } from './web-browser-kit.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const app = path.join(root, 'apps/web');
@@ -53,13 +55,16 @@ const launch = () => (process.env.CI ? chromium.launch() : chromium.launch({ cha
 
 function start(args, env) {
   let output = '';
-  const child = spawn(process.execPath, [nextBin, ...args], {
+  // On the made-up stand-in, on this computer's loopback address only (web-listen.mjs).
+  const environment = { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env };
+  const child = spawn(process.execPath, [nextBin, ...withLoopback(args, environment)], {
     cwd: app,
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env },
+    env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (c) => (output += c));
   child.stderr.on('data', (c) => (output += c));
+  sayOnFailure(`next ${args[0]}`, child, () => output);
   return { child, output: () => output };
 }
 function freePort() {
@@ -97,7 +102,7 @@ const step = async (name, run) => {
   try {
     await run();
   } catch (error) {
-    failures.push(`${name}: ${String(error?.message ?? error).split('\n')[0]}`);
+    failures.push(`${name}: ${whatWentWrong(error)}`);
   }
 };
 
@@ -233,9 +238,15 @@ async function accessible(page, label) {
  * stands between the rows.
  */
 async function measureBoards(page) {
-  return page.evaluate(() =>
-    [...document.querySelectorAll('.ui-game-board')].map((board) => {
-      const rect = (el) => el.getBoundingClientRect();
+  return page.evaluate(() => {
+    const rect = (el) => el.getBoundingClientRect();
+    // The boards that are drawn: on a phone a list may put its later boards away.
+    const drawnBoards = [...document.querySelectorAll('.ui-game-board')].filter(
+      (board) => rect(board).width > 0,
+    );
+    // One shape for every board of a list: the place of each board's list among the lists.
+    const lists = [...new Set(drawnBoards.map((board) => board.closest('ul')))];
+    return drawnBoards.map((board) => {
       const drawn = (r) => r.width > 1 && r.height > 1;
       const box = rect(board);
       const sides = [...board.querySelectorAll('.ui-game-side')];
@@ -273,6 +284,16 @@ async function measureBoards(page) {
       });
       return {
         stacked,
+        list: lists.indexOf(board.closest('ul')),
+        // The card's own width: boards of one list in cards of one width are one shape.
+        card: Math.round(rect(board.closest('.ui-game-card')).width),
+        // Where the card and its first shield begin: the cards of one row begin together,
+        // and their shields stand on one line.
+        cardTop: Math.round(rect(board.closest('.ui-game-card')).top),
+        // Side by side a shield stands at the top of its team; in two rows it stands in
+        // the middle of its row beside the name (which may take several lines), so there
+        // it is the row that is measured.
+        shieldTop: Math.round(stacked ? first.top : rect(board.querySelector('.ui-emblem')).top),
         split,
         fromTheStart:
           !stacked ||
@@ -307,8 +328,8 @@ async function measureBoards(page) {
           ? !drawn(middle) && own.every((el) => drawn(rect(el)))
           : drawn(middle) && own.every((el) => !drawn(rect(el))),
       };
-    }),
-  );
+    });
+  });
 }
 /**
  * Puts long made-up names on the page's first two boards, as a league might have: a name
@@ -319,12 +340,18 @@ async function plantLongNames(page) {
   await page.evaluate(() => {
     const boards = [...document.querySelectorAll('.ui-game-board')];
     for (const [board, text, letters] of [
-      [boards[0], 'The Northside Community Thunderbolts', '22'],
-      [boards[1], 'Trailblazerettes', '16'],
+      [boards[0], 'The Northside Community Thunderbolts', 22],
+      [boards[1], 'Trailblazerettes', 16],
     ]) {
       if (!board) continue;
       board.querySelector('.ui-game-team-name').textContent = text;
-      board.style.setProperty('--letters', letters);
+      // Every board of a list reckons with the room of the list's longest name (the page
+      // tells them so: packages/ui, listRoom), so the whole list is told the new one.
+      const list = board.closest('ul')?.querySelectorAll('.ui-game-board') ?? [board];
+      for (const each of list) {
+        const now = Number(each.style.getPropertyValue('--letters'));
+        each.style.setProperty('--letters', String(Math.max(now, letters)));
+      }
     }
   });
 }
@@ -355,6 +382,52 @@ async function checkHomeBoards(page, address, label) {
         boards.length >= 3 && boards.every(sound),
         JSON.stringify(boards.filter((b) => !sound(b))),
       );
+      // Every board of one list, in cards of one width, is the same shape: all side by
+      // side or all in two rows, never one of each under the other.
+      const shapes = new Map();
+      for (const b of boards) {
+        const key = `${b.list}:${b.card}`;
+        shapes.set(key, (shapes.get(key) ?? new Set()).add(b.stacked));
+      }
+      note(
+        `at ${width} each list of ${label}${planted ? ' with long names' : ''} is one shape`,
+        [...shapes.values()].every((seen) => seen.size === 1),
+        JSON.stringify(boards.map((b) => [b.list, b.card, b.stacked])),
+      );
+      // The cards of one row share their top line's height, so their shields stand on one
+      // line across the row, whether or not a card's pill took a line of its own.
+      const rows = new Map();
+      for (const b of boards) {
+        const key = `${b.list}:${b.cardTop}`;
+        rows.set(key, [...(rows.get(key) ?? []), b.shieldTop]);
+      }
+      note(
+        `at ${width} the shields of each row of ${label}${planted ? ' with long names' : ''} stand on one line`,
+        [...rows.values()].every((tops) => Math.max(...tops) - Math.min(...tops) <= 1),
+        JSON.stringify([...rows.entries()].filter(([, tops]) => new Set(tops).size > 1)),
+      );
+      if (!planted && width === 1280) {
+        // The home page's two columns (the latest games, and the standings with any
+        // leaders under them) end about level, in every design: the reckoning that places
+        // the leaders (home-lists.ts) was measured on one.
+        const ends = await page.evaluate(() => {
+          const pair = document.querySelector('.home-pair[data-tables="few"]');
+          if (!pair || pair.children.length < 2) return null;
+          const end = (column) => {
+            const last = [
+              ...column.querySelectorAll('.ui-game-card, .ui-table-frame, .ui-spot'),
+            ].pop();
+            return last ? Math.round(last.getBoundingClientRect().bottom) : null;
+          };
+          return [end(pair.children[0]), end(pair.children[1])];
+        });
+        note(
+          `at 1280 the two columns of ${label} end within a row of each other`,
+          ends === null ||
+            (ends[0] !== null && ends[1] !== null && Math.abs(ends[0] - ends[1]) <= 64),
+          JSON.stringify(ends),
+        );
+      }
       if (planted && width === 320) {
         note(
           `at 320 the board of ${label} with a 36-letter name stands its teams in two rows`,
@@ -567,7 +640,8 @@ if (browser) {
         (await page.locator('select[name=season]').count()) === 0,
       );
 
-      for (const address of ['/north-valley/teams/lions', '/north-valley/no-such-page/at-all']) {
+      // Comets is a team of another league, never of this one (step 2.152).
+      for (const address of ['/north-valley/teams/comets', '/north-valley/no-such-page/at-all']) {
         const response = await open(page, address);
         note(`${address} is not found`, response?.status() === 404);
         note(

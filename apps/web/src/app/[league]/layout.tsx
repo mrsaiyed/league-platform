@@ -10,6 +10,7 @@ import {
   type LeagueRouteProps,
 } from '../../features/shell/index.ts';
 import { isTrackerAddress } from '../../features/tracker/index.ts';
+import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { leagueSites, siteOfLeague } from '../../server/league-site.ts';
 import { leagueView } from '../../server/load-league-page.ts';
@@ -62,7 +63,7 @@ export default async function LeagueLayout({
       <div className="site-body" id="content">
         {children}
       </div>
-      <SiteFooter name={site.name} />
+      <SiteFooter name={site.name} madeUp={(await webPorts()).madeUpWorld} />
     </div>
   );
 }

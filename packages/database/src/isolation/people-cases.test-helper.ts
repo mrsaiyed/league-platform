@@ -11,6 +11,7 @@ import {
 import {
   findLeagueAudience,
   findPerson,
+  hasRecordedChild,
   insertPerson,
   isPersonOnRoster,
   listPeople,
@@ -64,6 +65,12 @@ registerIsolationCase({
   subject: findLeagueAudience,
   name: "read who plays in the scope's league",
   run: (scope) => findLeagueAudience(scope),
+});
+
+registerIsolationCase({
+  subject: hasRecordedChild,
+  name: "ask whether anyone in the scope's league is recorded as a child",
+  run: (scope) => hasRecordedChild(scope),
 });
 
 registerIsolationCase({

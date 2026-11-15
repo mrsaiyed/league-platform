@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { Emblem } from '../emblem/emblem.tsx';
 import { LiveMarker } from '../live-marker/live-marker.tsx';
 import { safeColor } from '../team-color.ts';
 
@@ -63,7 +64,7 @@ function Side({
     >
       <span className="ui-scoreboard-role">{role}</span>
       <span className="ui-scoreboard-name">
-        <span className="ui-team-chip" aria-hidden="true" />
+        <Emblem name={team.name} color={team.color} size="large" />
         <span dir="auto">{team.name}</span>
       </span>
       {team.score === null ? null : <span className="ui-scoreboard-score">{team.score}</span>}
@@ -73,9 +74,10 @@ function Side({
 }
 
 /**
- * The big board of a game's page: each team with its color and its score, and between them
- * the state of the game (Live with the period and clock, Final, or when it will be
- * played); under them, quietly, where it is played and anything else the page has to say.
+ * The big board of a game's page, its opening moment: each team with its shield, its name
+ * and its score in the color the eye lands on; between them the state of the game (Live
+ * with the period and clock, Final, or when it will be played); under them, quietly, where
+ * it is played and anything else the page has to say.
  */
 export function Scoreboard({
   home,
@@ -95,7 +97,14 @@ export function Scoreboard({
   const awayWins = decided && away.score > home.score;
   const pill = stateText ?? (state === 'final' ? labels.final : undefined);
   return (
-    <section className="ui-scoreboard" aria-label={labels.scoreboard} data-state={state}>
+    <section
+      className="ui-scoreboard"
+      aria-label={labels.scoreboard}
+      data-state={state}
+      // A plain "Final" is quiet, as on a game's card; a state the page names in other
+      // words (forfeit, postponed, cancelled) keeps the soft tint.
+      data-pill={state === 'final' && stateText === undefined ? 'quiet' : undefined}
+    >
       <div className="ui-scoreboard-teams">
         <Side team={away} role={labels.away} isWinner={awayWins} winnerLabel={labels.winner} />
         <div className="ui-scoreboard-middle">

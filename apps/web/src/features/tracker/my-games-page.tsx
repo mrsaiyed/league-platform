@@ -13,6 +13,7 @@ import { commandContextOf } from '../../server/context.ts';
 import { gameWhenText, type LeagueTimes } from '../../server/game-when.ts';
 import type { LeagueView } from '../../server/league-gate.ts';
 import { locale, t } from '../../server/messages.ts';
+import { readReopenViews, ReopenLine } from '../games-area/index.ts';
 import {
   entersScoreInGames,
   gameNightOrder,
@@ -38,6 +39,12 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
   const games = gameNightOrder(listed.ok ? listed.value.games : []);
   const stopped = notScoredBecause(here.status);
   const names = (await ports.games.namesOf(here.id)).teams;
+  // A finished game says how it is put right, or who can (step 2.154).
+  const context = commandContextOf(view.context);
+  const reopens =
+    stopped === null
+      ? await readReopenViews(games, context, await ports.accessOf(context), ports.games.deps)
+      : new Map<string, never>();
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
   const times: LeagueTimes = { locale, timeZone };
   const labels = displayLabels(t).game;
@@ -99,6 +106,11 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
                   </p>
                 ) : null}
                 {entersScoreIn(game)}
+                <ReopenLine
+                  view={reopens.get(game.id)}
+                  href={leagueUrl(here, 'admin-area', { area: 'games', subpath: [game.id] })}
+                  times={times}
+                />
               </div>
             </li>
           ))}

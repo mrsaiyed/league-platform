@@ -16,6 +16,7 @@ const problemKeys: readonly TextKey[] = [
   'admin.boxScore.error.player-listed-twice',
   'admin.boxScore.error.did-not-play-has-stats',
   'admin.boxScore.error.game-not-decided',
+  'admin.boxScore.error.reopen-time-over',
 ];
 const gamesProblemKeys: readonly TextKey[] = [
   'admin.games.error.not-allowed',

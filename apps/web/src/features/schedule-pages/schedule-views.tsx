@@ -43,7 +43,7 @@ export function GameList({
   readonly leagueId: string;
   readonly games: readonly GameView[];
   readonly layout?: 'rows' | 'board';
-  readonly across?: 'one' | 'two';
+  readonly across?: 'one' | 'two' | 'pair';
   readonly featured?: boolean;
 }) {
   return (
@@ -92,7 +92,7 @@ export function RoundSections({
           open={round.open}
           phase={round.phase ?? 'other'}
         >
-          <GameList leagueId={leagueId} games={round.games} />
+          <GameList leagueId={leagueId} games={round.games} layout="board" across="two" />
         </Group>
       ))}
     </>

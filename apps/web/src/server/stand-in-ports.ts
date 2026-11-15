@@ -14,18 +14,18 @@
 // shell's checks can be someone who holds roles in the made-up leagues; nothing
 // about that works outside this file.
 //
-// Reads go through the access module's own query (myAccess) on an in-memory
-// transaction; this stand-in cannot change anything.
+// Who holds what is read through the access module's own query (myAccess) on an
+// in-memory transaction that cannot change it. Everything else a league holds is the
+// one made-up world (stand-in-world.ts, seeded by stand-in-world-seed.ts), which every
+// area reads and writes through the product's own commands; it is made again each time
+// the server starts.
 import {
-  fail,
   ok,
   type AccessTx,
   type CommandDeps,
   type Grant,
-  type LeagueStatus,
   type Role,
   type Scope,
-  whoMayScore,
 } from '@srleagues/core';
 import {
   captureEmail,
@@ -35,6 +35,13 @@ import {
 } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
+import {
+  castId,
+  standInDraftProgramId,
+  standInLeagues,
+  standInPeople,
+  standInSeedCast,
+} from './stand-in-cast.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import { liveListenAuthorize } from './live-listen.ts';
 import type { WebPorts } from './ports.ts';
@@ -44,77 +51,23 @@ import { createPlayPublisher } from './publish-plays.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import { standInFixtureImport } from './stand-in-fixture-import.ts';
 import { standInGames } from './stand-in-games.ts';
-import { standInListedGames, standInPublicSchedule } from './stand-in-public-schedule.ts';
-import {
-  adultTeams,
-  standInAudienceOf,
-  standInPublicStats,
-  standInSeasonIds,
-  youthTeams,
-} from './stand-in-public-stats.ts';
+import { standInPublicSchedule } from './stand-in-public-schedule.ts';
+import { standInPublicStats } from './stand-in-public-stats.ts';
 import { standInSchedule } from './stand-in-schedule.ts';
 import { standInPublicTeams } from './stand-in-public-teams.ts';
+import { madeUpLeagues } from './stand-in-world-seed.ts';
+import { madeUpWorld } from './stand-in-world.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
-type MadeUpLeague = {
-  readonly id: string;
-  readonly slug: string;
-  readonly status: LeagueStatus;
-  readonly inBin: boolean;
-  readonly ownerAccountId: string;
-  /** Former short names, still forwarding (U-7). */
-  readonly formerSlugs: readonly string[];
-};
+export { standInDraftProgramId, standInLeagues, standInPeople } from './stand-in-cast.ts';
 
 type MadeUpPerson = { readonly accountId: string; readonly token: string };
 
-const id = (n: number) => `01900000-0000-7000-8000-${n.toString(16).padStart(12, '0')}`;
-
-/** The made-up people. A token is the session cookie's value for being that person. */
-export const standInPeople = {
-  owner: { accountId: id(0xa1), token: 'local-owner-token' },
-  scheduler: { accountId: id(0xa2), token: 'local-scheduler-token' },
-  coach: { accountId: id(0xa3), token: 'local-coach-token' },
-  stranger: { accountId: id(0xa4), token: 'local-stranger-token' },
-  scorekeeper: { accountId: id(0xa5), token: 'local-scorekeeper-token' },
-  // The other staff roles, in the draft league only (step 2.87).
-  admin: { accountId: id(0xa6), token: 'local-admin-token' },
-  registrar: { accountId: id(0xa7), token: 'local-registrar-token' },
-  editor: { accountId: id(0xa8), token: 'local-editor-token' },
-  clubAdmin: { accountId: id(0xa9), token: 'local-club-admin-token' },
-  /** A scheduler for one program of the draft league only. */
-  programScheduler: { accountId: id(0xaa), token: 'local-program-scheduler-token' },
-  /** The admin of another league, a draft too, and nothing in the others. */
-  otherAdmin: { accountId: id(0xab), token: 'local-other-admin-token' },
-} as const satisfies Record<string, MadeUpPerson>;
+const id = castId;
 
 const { owner, scheduler, coach, scorekeeper } = standInPeople;
-
-/**
- * The made-up leagues, one in each state, all owned by the made-up owner, and a
- * second draft league with an admin of its own who holds nothing elsewhere, to show
- * that one draft's staff do not see another's.
- */
-export const standInLeagues = {
-  live: league(1, 'north-valley', 'live', ['north-vale']),
-  other: league(2, 'harbor-city', 'live'),
-  draft: league(3, 'quiet-pines', 'draft', ['quiet-pine']),
-  archived: league(4, 'old-meadow', 'archived'),
-  suspended: league(5, 'closed-gate', 'suspended'),
-  inBin: { ...league(6, 'binned-league', 'live'), inBin: true },
-  otherDraft: league(7, 'still-waters', 'draft'),
-} as const satisfies Record<string, MadeUpLeague>;
-
-function league(
-  n: number,
-  slug: string,
-  status: LeagueStatus,
-  formerSlugs: readonly string[] = [],
-): MadeUpLeague {
-  return { id: id(n), slug, status, inBin: false, ownerAccountId: owner.accountId, formerSlugs };
-}
 
 const grantOf = (
   n: number,
@@ -148,7 +101,7 @@ const grants = [
   grantOf(10, standInPeople.clubAdmin.accountId, 'club_admin', standInLeagues.draft.id),
   grantOf(11, standInPeople.programScheduler.accountId, 'scheduler', standInLeagues.draft.id, {
     type: 'program',
-    id: id(0xc1),
+    id: standInDraftProgramId,
   }),
   grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.otherDraft.id),
   // A scorekeeper still holding the role in an archived league is told it is archived,
@@ -156,7 +109,8 @@ const grants = [
   grantOf(13, scorekeeper.accountId, 'scorekeeper', standInLeagues.archived.id),
 ];
 
-const leagues: readonly MadeUpLeague[] = Object.values(standInLeagues);
+const leagues: readonly (typeof standInLeagues)[keyof typeof standInLeagues][] =
+  Object.values(standInLeagues);
 
 const signedInAt = new Date('2026-11-01T10:00:00Z');
 
@@ -228,7 +182,9 @@ export type StandInOptions = {
 /**
  * A made-up member who signs in with a password on the sign-in stand-in, made when
  * the app starts (signUpMadeUpMember), so checks can compare an address that has an
- * account with one that has none (T-68).
+ * account with one that has none (T-68). Its password is written here, on the stand-in and
+ * on the made-up database alike, so in local work and tests the server listens on this
+ * computer's loopback address only, whatever LOCAL_DATA says (scripts/web-listen.mjs).
  */
 export const standInMember = {
   email: 'member@example.test',
@@ -326,46 +282,28 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
   };
   const accessOf = accessOfVia(deps);
-  // The League settings screen's settings: the public pages read how names show from them.
-  // There is exactly one: a second copy would keep the admin's saved setting from the pages.
-  const adminSettings = standInAdminSettings({
+  // The one made-up world: every area below reads and writes the same rows (step 2.152).
+  const world = madeUpWorld({
+    leagues: madeUpLeagues(standInSeedCast, now()),
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
   });
+  // The League settings screen's settings: every area reads them from the same world, and
+  // the Privacy settings read who plays there and whether anyone is recorded as a child
+  // from its rows too (record 065), so they never say something the public pages do not.
+  const adminSettings = standInAdminSettings(world);
   const namePolicy = namePolicyOf(adminSettings.deps);
-  const scheduled = {
-    adultLeagueId: standInLeagues.live.id,
-    youthLeagueId: standInLeagues.other.id,
-  };
-  // Who plays in each made-up league, read by every page that shows a name (R-15).
-  const audienceOf = standInAudienceOf(scheduled);
-  const games = standInGames({
-    namesShownOf: namesShownOf(namePolicy, audienceOf),
-    leagueId: standInLeagues.live.id,
+  // Who plays in each made-up league and how it shows names, read by every page that
+  // shows a name (R-15).
+  const namesShown = namesShownOf(namePolicy, world.audienceOf);
+  const games = standInGames(world, {
+    namesShownOf: namesShown,
     people: {
       [owner.accountId]: 'Olive Owner',
       [scheduler.accountId]: 'Sky Scheduler',
       [scorekeeper.accountId]: 'Sam Scorekeeper',
       [standInPeople.admin.accountId]: 'Avery Admin',
     },
-    assignees: [scorekeeper.accountId, owner.accountId],
-    // The draft league has the same games, but scores assigned games only, and its
-    // admin is given the live ones: its scorekeeper is refused those (P7 §5.1).
-    moreLeagues: [
-      {
-        leagueId: standInLeagues.draft.id,
-        assignees: [standInPeople.admin.accountId, scorekeeper.accountId],
-        settings: {
-          [whoMayScore.key]: [
-            { level: 'league', document: { version: whoMayScore.version, value: 'assignedOnly' } },
-          ],
-        },
-      },
-    ],
-    accessOf: (leagueId) => accessTx(leagueId).access,
-    log: options.log,
-    // The home and schedule pages' games, so each card opens its game's page.
-    listedGames: standInListedGames(scheduled, now),
   });
   // One live hub for this process (record 021): the tracker's endpoints publish to it,
   // and GET /api/v1/live lets a page listen, only to a league it may open.
@@ -404,63 +342,75 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       warn: (message, fields) => options.warn?.(message, { kind: fields.reason }),
     }),
     liveFeed: (request) => hub.serve(request),
-    fixtureImport: standInFixtureImport({
-      leagueId: standInLeagues.live.id,
-      accessOf: (leagueId) => accessTx(leagueId).access,
-      log: options.log,
-    }),
-    publicStats: standInPublicStats(scheduled, namePolicy),
-    adminTeams: standInAdminTeams({
-      accessOf: (leagueId) => accessTx(leagueId).access,
-      log: options.log,
-      seededLeagueId: standInLeagues.live.id,
-      audienceOf: (leagueId) => audienceOf(leagueId) ?? 'youth',
-      // A person's name request reads the settings the admin saves (R-25).
-      settingRowsOf: (leagueId, key) =>
-        adminSettings.deps.transaction(
-          { leagueId, accountId: null, requestId: 'name-settings' },
-          (tx) => tx.leagues.settingRows(key, {}),
-        ),
-    }),
+    madeUpWorld: true,
+    // The made-up owner's cookie is in the code and the world takes writes. Other computers
+    // cannot connect at all: the server listens on the loopback address alone
+    // (scripts/web-listen.mjs). This keeps out what can still arrive on this computer
+    // (review 2, M1): a request for another name, or one passed on by another server.
+    answers: answersOnlyHere(options.publicBaseUrl),
+    fixtureImport: standInFixtureImport(world),
+    publicStats: standInPublicStats(world, namePolicy),
+    adminTeams: standInAdminTeams(world),
     adminSettings,
-    publicSchedule: standInPublicSchedule(scheduled, now),
-    scheduleAdmin: standInSchedule({
-      leagues: [
-        {
-          leagueId: standInLeagues.live.id,
-          seasonId: standInSeasonIds.adultFall,
-          teams: adultTeams.map((t) => ({ id: t.id, name: t.name })),
-          rounds: 6,
-        },
-        {
-          leagueId: standInLeagues.other.id,
-          seasonId: standInSeasonIds.youthWinter,
-          teams: youthTeams.map((t) => ({ id: t.id, name: t.name })),
-          rounds: 4,
-        },
-      ],
-      accessFor: (leagueId) => accessTx(leagueId).access,
-      log: options.log,
-      today: () => new Date().toISOString().slice(0, 10),
-    }),
-    publicTeams: standInPublicTeams(scheduled, coach.accountId),
+    publicSchedule: standInPublicSchedule(world),
+    scheduleAdmin: standInSchedule(world),
+    publicTeams: standInPublicTeams(world),
     signUpMadeUpMember,
   };
 }
 
+/** A Host header that is only a name or an address, and a port: nothing a URL reads otherwise. */
+const plainHost =
+  /^(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:]+\]|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/i;
+
+/**
+ * The loopback address as the server's own socket gives it. Next.js writes it into
+ * X-Forwarded-For when a request carries none, so it alone says nothing was passed on.
+ */
+const loopbackAddresses = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+/** A URL's host name in small letters, or '' when it is not a URL. */
+function hostnameOf(address: string): string {
+  try {
+    return new URL(address).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+/** This computer's own names: they reach only the loopback address. */
+function isThisComputer(host: string): boolean {
+  return (
+    host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost')
+  );
+}
+
 /** Whether `address` is on this computer, or on a name kept for tests (`.test`). */
 export function isLocalOrTestHost(address: string): boolean {
-  let host: string;
-  try {
-    host = new URL(address).hostname.toLowerCase();
-  } catch {
-    return false;
-  }
-  return (
-    host === 'localhost' ||
-    host === '127.0.0.1' ||
-    host === '[::1]' ||
-    host.endsWith('.localhost') ||
-    host.endsWith('.test')
-  );
+  const host = hostnameOf(address);
+  return isThisComputer(host) || host.endsWith('.test');
+}
+
+/**
+ * Which requests the made-up stand-in answers (step 2.152, review 2 M1). Only one
+ * addressed by its Host header to this computer's own names, or to the one `.test` name
+ * PUBLIC_BASE_URL gives (review 2 L1), and carrying no sign of having been passed on by
+ * another server: no Forwarded or Via header, no X-Forwarded-Host other than its own Host,
+ * no X-Forwarded-For other than the loopback address Next.js itself writes. A program on
+ * this computer that passes requests on and removes those headers is not told apart: the
+ * loopback address is what keeps other computers out.
+ */
+export function answersOnlyHere(publicBaseUrl: string): (headers: Headers) => boolean {
+  const ownTestName = hostnameOf(publicBaseUrl);
+  return (headers) => {
+    const host = headers.get('host') ?? '';
+    if (!plainHost.test(host)) return false;
+    const name = hostnameOf(`http://${host}`);
+    if (!isThisComputer(name) && !(name.endsWith('.test') && name === ownTestName)) return false;
+    if (headers.has('forwarded') || headers.has('via')) return false;
+    const forwardedHost = headers.get('x-forwarded-host');
+    if (forwardedHost !== null && forwardedHost !== host) return false;
+    const forwardedFor = headers.get('x-forwarded-for');
+    return forwardedFor === null || loopbackAddresses.has(forwardedFor.trim());
+  };
 }

@@ -33,7 +33,7 @@ function adminName(leagueId: string, firstName: string, lastName: string): strin
     { firstName, lastName, isMinor: false, nameRequest: 'none' },
     {
       audience: 'adult',
-      policy: { children: 'full_name', playersMayAskForInitials: false },
+      policy: { names: 'full_name', childrenInFull: true, playersMayAskForInitials: false },
       viewer: { ...publicViewer(leagueId), leagueAdmin: true },
       statsOf: null,
     },

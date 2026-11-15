@@ -1,9 +1,9 @@
 // The people module (T2 §3). Other modules and packages use only what is here.
 export {
-  childNameForms,
   defaultNamePolicy,
+  nameForms,
   nameRequests,
-  type ChildNameForm,
+  type NameForm,
   type NamePolicy,
   type NameRequest,
 } from './rules/name-policy.ts';

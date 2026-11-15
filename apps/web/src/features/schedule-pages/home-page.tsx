@@ -11,12 +11,14 @@ import {
   buildStandingsViews,
   chooseSeason,
   firstValue,
+  homeLeadersOf,
   type SearchParams,
   type StandingsTableView,
 } from '../stats-pages/index.ts';
 import { buildHomeNumbers } from './build-home-numbers.ts';
 import { buildHomeGames } from './build-schedule.ts';
-import { homeNextGames, homeResults } from './home-lists.ts';
+import { HomeLeaders } from './home-leaders.tsx';
+import { homeLeadersPlace, homeNextGames, homeResults } from './home-lists.ts';
 import { GameList } from './schedule-views.tsx';
 
 /** The columns the home page's compact standings keep. */
@@ -81,6 +83,18 @@ export async function HomePage({
     games.awaiting,
     tables.map((table) => ({ rows: table.rows.length, hasNotes: table.footnotes.length > 0 })),
   );
+  const tableHeights = tables
+    .filter((table) => table.rows.length > 0)
+    .map((table) => ({ rows: table.rows.length, hasNotes: table.footnotes.length > 0 }));
+  // The season's leaders, as the statistics page reads them: names by the league's name
+  // setting, and nobody from a team whose numbers are staff only. A read that fails
+  // leaves the leaders out; it never takes the page down.
+  const leaders = await homeLeadersOf(publicStats, {
+    leagueId: addressee.id,
+    seasonId: season.id,
+  });
+  const leadersPlace = homeLeadersPlace(empty ? 0 : results.length, tableHeights, leaders.length);
+  const statsHref = leagueUrl(addressee, 'stats', { season: askedSeason });
   const teamCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
   const scheduleHref = leagueUrl(addressee, 'schedule', { season: askedSeason });
   const standingsHref = leagueUrl(addressee, 'standings', { season: askedSeason });
@@ -125,7 +139,11 @@ export async function HomePage({
             kicker={t('home.upcoming.kicker')}
             more={{ href: scheduleHref, label: t('home.fullSchedule') }}
           >
-            <GameList leagueId={addressee.id} games={next} layout="board" across="two" />
+            {/* On a phone only the first two are drawn, with the way to the full schedule
+                over them, so the standings are reached sooner (the stylesheet). */}
+            <div className="home-next">
+              <GameList leagueId={addressee.id} games={next} layout="board" across="two" />
+            </div>
           </Section>
         )}
         <div className="home-pair" data-tables={manyTables ? 'many' : 'few'}>
@@ -175,8 +193,20 @@ export async function HomePage({
                 action={{ href: scheduleHref, label: t('home.fullSchedule') }}
               />
             )}
+            {/* A short column of standings is filled out with the season's leaders, each
+                one short row, so the two columns end about level. */}
+            <HomeLeaders
+              leaders={leaders.slice(0, leadersPlace.beside)}
+              placing="beside"
+              statsHref={statsHref}
+            />
           </Section>
         </div>
+        <HomeLeaders
+          leaders={leaders.slice(0, leadersPlace.across)}
+          placing="across"
+          statsHref={statsHref}
+        />
         <CallBand
           title={t('home.call.title')}
           text={t('home.call.text')}
