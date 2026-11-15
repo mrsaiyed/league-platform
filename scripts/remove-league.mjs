@@ -22,7 +22,8 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { openLeagueMakingTarget, previewLeagueRemoval, removeLeague } from '@srleagues/database';
 import { trackerProjectFor } from '@srleagues/providers';
-import { answerGoesAhead, sourceFor } from './make-league-source.mjs';
+import { sourceFor } from './make-league-source.mjs';
+import { typedShortName } from './remove-league-answer.mjs';
 import * as words from './remove-league.messages.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -89,9 +90,9 @@ async function askToRemove(slug, hosted, place) {
   // The person checks where it is, then types the short name from the plan: the
   // question does not print the answer.
   if (hosted) for (const line of words.checkBeforeAnswering(place)) console.log(line);
-  const typed = await ask(words.confirm);
-  // The same rule as the twin's hosted question: only the exact short name goes on.
-  return answerGoesAhead(typed, { hosted: true, slug }) ? typed.trim() : null;
+  // The spaces around the typed line are taken off; then only the exact short name,
+  // capitals included, goes on (remove-league-answer.mjs).
+  return typedShortName(await ask(words.confirm), slug);
 }
 
 async function askForMissing() {

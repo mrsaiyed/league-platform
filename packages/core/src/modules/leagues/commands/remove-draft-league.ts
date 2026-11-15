@@ -33,7 +33,11 @@ export const removeDraftLeague = defineCommand({
   name: 'leagues.remove_draft',
   permission: 'platform-staff',
   input: z.object({
-    /** The short name as typed: compared with the league's own exactly, not trimmed. */
+    /**
+     * The short name as typed. The tool takes off only the spaces the terminal leaves
+     * around the line; this command and the database trim nothing more and compare it
+     * with the league's own exactly, capitals included.
+     */
     typedSlug: z.string().min(1).max(100),
   }),
   allowed: (context, _input, tx: LeagueRemovalTx) => mayActAsPlatform(context, tx),
