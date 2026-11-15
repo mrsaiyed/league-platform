@@ -71,6 +71,9 @@ html {
 .league-site .site-header :focus-visible {
   outline-color: var(--header-text);
 }
+/* The first row is 56 high for a name of one line. A long name takes two lines, and then
+   the row grows by what they need: the name never touches the row's edges (8 clear above
+   its words, 6 under the small line). */
 .site-header-top {
   position: relative;
   display: flex;
@@ -78,6 +81,7 @@ html {
   align-items: center;
   column-gap: var(--step-4);
   min-block-size: calc(var(--tap) + var(--step-3));
+  padding-block: calc(var(--step-3) / 2);
 }
 /* The league's mark, its name and the small line under the name. The whole of it is the
    way home: the name's link covers it. The mark stands over the start of the link and the
@@ -93,27 +97,28 @@ html {
   /* Room for the menu button (44) and the gap before it, at the end of the row. */
   margin-inline-end: calc(var(--step-7) + var(--step-2));
 }
+/* The mark stands level with the menu button at the other end of the row (both 6 from the
+   top of a 44-high row), so the two stay level when a long name makes the row taller. */
 .site-header .site-brand .ui-emblem {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: calc(var(--step-3) / 2);
   inset-inline-start: 0;
   block-size: var(--step-6);
-  transform: translateY(-50%);
   pointer-events: none;
 }
-/* The name never makes the header taller than one row: on a phone it is small, and a long
-   one takes two tight lines beside the button and is cut short after that. */
+/* On a phone the name is small. A long one takes two tight lines beside the button and is
+   cut short after that; it is never squeezed against the top of the row. */
 .site-header .site-name {
   display: flex;
   grid-area: 1 / 1;
   align-items: center;
   min-inline-size: 0;
   /* The name is the way home: as tall as anything a thumb taps, its words over the small
-     line. */
+     line, with a little clear above them however many lines they take. */
   min-block-size: var(--tap);
-  padding-block-end: var(--step-4);
-  /* The width of the mark (a shield 32 high) and the gap after it. */
-  padding-inline-start: calc(var(--step-6) + var(--step-2));
+  padding-block: calc(var(--step-1) / 2) var(--step-4);
+  /* The width of the mark (a shield 32 high is 28 wide) and the gap after it. */
+  padding-inline-start: calc(var(--step-6) + var(--step-1));
   color: var(--header-name);
   font-family: var(--font-heading);
   font-size: var(--text-16);
@@ -141,7 +146,7 @@ html {
   grid-area: 1 / 1;
   align-self: end;
   block-size: var(--step-4);
-  padding-inline-start: calc(var(--step-6) + var(--step-2));
+  padding-inline-start: calc(var(--step-6) + var(--step-1));
   overflow: hidden;
   color: var(--header-muted);
   font-size: var(--text-12);
@@ -218,6 +223,8 @@ html {
   overflow-y: auto;
 }
 .site-menu-panel {
+  /* Its line stands under the whole first row, the menu button included. */
+  margin-block-start: calc(var(--step-3) / 2);
   padding-block: var(--step-2) var(--step-4);
   border-block-start: 1px solid var(--header-rule);
 }
@@ -379,16 +386,19 @@ html {
     /* The same 80 the header is moved up by, above. */
     block-size: calc(var(--step-8) + var(--step-4));
     min-block-size: 0;
+    padding-block: 0;
   }
   .site-brand {
     margin-inline-end: 0;
   }
+  /* A shield 48 high, in the middle of a name's link 56 high. */
   .site-header .site-brand .ui-emblem {
+    inset-block-start: var(--step-1);
     block-size: var(--step-7);
   }
   .site-header .site-name {
     min-block-size: calc(var(--tap) + var(--step-3));
-    padding-block-end: var(--step-5);
+    padding-block: 0 var(--step-5);
     /* The mark is a shield 48 high here. */
     padding-inline-start: calc(var(--step-7) + var(--step-4));
     font-size: var(--text-22);
@@ -469,21 +479,32 @@ html {
   text-align: center;
 }
 
-/* The body of a page sits in the centered column. A page that opens with a band the width
-   of the screen (a hero) says so on its main area (`site-wide`): it then has the whole
-   width, and puts everything under its band in the column itself. */
+/* The body of a page sits in the centered column: that is the plain rule, which every
+   browser follows. A page that opens with a band the width of the screen (a hero) says so
+   on its main area (`site-wide`): the body then gives up the column, and the page puts
+   everything under its band in the column itself. */
 .site-body {
   flex: 1;
-  padding-block: var(--step-5) var(--step-8);
-}
-.site-body:not(:has(> .site-wide)) {
   inline-size: 100%;
   max-inline-size: calc(70rem + 2 * var(--gutter));
   margin-inline: auto;
+  padding-block: var(--step-5) var(--step-8);
   padding-inline: var(--gutter);
 }
 .site-body:has(> .site-wide) {
+  max-inline-size: none;
   padding-block-start: 0;
+  padding-inline: 0;
+}
+/* A browser too old to know what a body holds keeps the wide page in the column too: its
+   band is then as wide as the column, and the page's own columns add no second gutter. */
+@supports not selector(:has(*)) {
+  .site-wide .site-column {
+    padding-inline: 0;
+  }
+  .site-wide .ui-hero-inner.site-column {
+    padding-inline: var(--gutter);
+  }
 }
 .site-body:focus {
   outline: none;
@@ -564,10 +585,12 @@ html {
 }
 /* Results and standings share a row on a laptop, each with half of it, so neither column
    is left empty beside the other. A league with three divisions or more has too many
-   tables for half a row: its results and its tables each take the width, two across. */
+   tables for half a row: its results and its tables each take the width, two across.
+   The two columns stand as far apart as two scoreboards in the row above them (the grid of
+   boards in packages/ui), so the edges of the two rows meet. */
 .home-pair {
   display: grid;
-  gap: 0 var(--step-7);
+  gap: 0 var(--step-5);
 }
 .home-pair > * {
   min-inline-size: 0;

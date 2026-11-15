@@ -307,6 +307,40 @@ describe('header, menu and footer', () => {
     expect(css).toMatch(/\.site-header \.site-brand \.ui-emblem \{[^}]*pointer-events: none;/);
   });
 
+  it('never lets a long name touch the top of its row on a phone: the row grows for two lines', () => {
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    const phone = css.slice(0, css.indexOf('@media (min-width: 48rem)'));
+    // The row is at least 56 high and has no height it must keep to; 6 of it is kept clear
+    // above and below whatever stands in it.
+    const row = /\.site-header-top \{([^}]*)\}/.exec(phone)?.[1] ?? '';
+    expect(row).toMatch(/min-block-size: calc\(var\(--tap\) \+ var\(--step-3\)\);/);
+    expect(row).toMatch(/padding-block: calc\(var\(--step-3\) \/ 2\);/);
+    expect(row).not.toMatch(/(?:^|\s)(?:max-)?block-size:/);
+    // The name's link is at least as tall as a thumb needs and grows with its words: 2 more
+    // clear above them (8 in all), and under them the room of the small line.
+    const name = /\.site-header \.site-name \{([^}]*)\}/.exec(phone)?.[1] ?? '';
+    expect(name).toMatch(/min-block-size: var\(--tap\);/);
+    expect(name).toMatch(/padding-block: calc\(var\(--step-1\) \/ 2\) var\(--step-4\);/);
+    expect(name).not.toMatch(/(?:^|\s)(?:max-)?block-size:/);
+    expect(phone).toMatch(/\.site-tagline \{[^}]*align-self: end;\s*block-size: var\(--step-4\);/);
+    // Cut short after two lines.
+    expect(phone).toMatch(/\.site-header \.site-name > span \{[^}]*line-clamp: 2;/);
+    // The mark and the menu button are both hung from the top of the row, at the same
+    // distance, so a taller row leaves them level with each other.
+    expect(phone).toMatch(
+      /\.site-header \.site-brand \.ui-emblem \{\s*position: absolute;\s*inset-block-start: calc\(var\(--step-3\) \/ 2\);/,
+    );
+    expect(phone).toMatch(
+      /\.site-menu > summary \{\s*position: absolute;\s*inset-block-start: calc\(var\(--step-3\) \/ 2\);/,
+    );
+    // From a tablet up the name is one line and the row keeps its own height.
+    const wide = css.slice(phone.length);
+    expect(wide).toMatch(/\.site-header-top \{[^}]*min-block-size: 0;\s*padding-block: 0;/);
+  });
+
   it('keeps the menu on top while the page scrolls, and brings the name back for the keyboard', () => {
     const css = readFileSync(
       new URL('../../app/[league]/league-site.css', import.meta.url),
@@ -329,8 +363,25 @@ describe('header, menu and footer', () => {
       new URL('../../app/[league]/league-site.css', import.meta.url),
       'utf8',
     ).replace(/\/\*[\s\S]*?\*\//g, '');
+    // The column is the body's plain rule, with no condition on it (the code review, L6):
+    // a browser that does not know `:has()` still draws every ordinary page in the column.
     expect(css).toMatch(
-      /\.site-body:not\(:has\(> \.site-wide\)\) \{\s*inline-size: 100%;\s*max-inline-size: calc\(70rem \+ 2 \* var\(--gutter\)\);\s*margin-inline: auto;\s*padding-inline: var\(--gutter\);/,
+      /\n\.site-body \{\s*flex: 1;\s*inline-size: 100%;\s*max-inline-size: calc\(70rem \+ 2 \* var\(--gutter\)\);\s*margin-inline: auto;\s*padding-block: var\(--step-5\) var\(--step-8\);\s*padding-inline: var\(--gutter\);/,
+    );
+    // Only the page with a band asks for more, and only that asking uses `:has()`.
+    expect(css).toMatch(
+      /\.site-body:has\(> \.site-wide\) \{\s*max-inline-size: none;\s*padding-block-start: 0;\s*padding-inline: 0;/,
+    );
+    const conditional = [...css.matchAll(/([^{}]*:has\([^{}]*)\{/g)].map((m) =>
+      (m[1] ?? '').trim(),
+    );
+    expect(conditional).toEqual([
+      '.site-header-top:has(.site-menu[open])',
+      '.site-body:has(> .site-wide)',
+      '@supports not selector(:has(*))',
+    ]);
+    expect(css).toMatch(
+      /@supports not selector\(:has\(\*\)\) \{\s*\.site-wide \.site-column \{\s*padding-inline: 0;/,
     );
     // The same column a wide page puts its own content in.
     expect(css).toMatch(
