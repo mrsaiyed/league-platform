@@ -460,6 +460,30 @@ export const en = {
   'adminSettings.area.games': 'Scoring',
   'adminSettings.area.teams': 'Team statistics',
   'adminSettings.area.privacy': 'Privacy',
+  // What the Privacy part says around its settings (step 2.162, R-29, record 065): one
+  // opening sentence by who plays, what is in force now, and where the parents'
+  // confirmation is offered.
+  'adminSettings.privacy.intro.adult':
+    'Your league is for adults, so it starts with full names. Choose less here at any time.',
+  'adminSettings.privacy.intro.youth':
+    'Your league is for young players. It starts as it always has: adults by full name, young players by first name and last initial. Choose less here at any time.',
+  'adminSettings.privacy.intro.mixed':
+    'Your league has both adults and young players. It starts with adults by full name and young players by first name and last initial. Choose less here at any time.',
+  'adminSettings.privacy.now.full':
+    'Now: adults are shown by full name, and children by first name and last initial.',
+  'adminSettings.privacy.now.fullConfirmed': 'Now: everyone is shown by full name, children too.',
+  'adminSettings.privacy.now.initial': 'Now: everyone is shown by first name and last initial.',
+  'adminSettings.privacy.now.hidden':
+    'Now: nobody is shown by name; players appear by jersey number.',
+  'adminSettings.privacy.keptNoEffect':
+    "The parents' confirmation is kept, but it has no effect while names are not on full names.",
+  'adminSettings.privacy.confirmedOn': 'Confirmed on {date}.',
+  'adminSettings.privacy.confirm.youthOrMixed':
+    "Tick to show the young players' full names too, while names are on full names.",
+  'adminSettings.privacy.confirm.adultWithChildren':
+    'This league has players recorded as children. Tick to show their full names too, while names are on full names.',
+  'adminSettings.privacy.confirm.adultNoChildren':
+    'A player recorded as a child is shown by first name and last initial.',
   // Beside a setting whose value asks to be confirmed (its `setting.<key>.confirm`).
   'adminSettings.confirmNote': 'Tick this only if you are choosing {choice}:',
   'error.leagues.set_setting.confirmation-needed':

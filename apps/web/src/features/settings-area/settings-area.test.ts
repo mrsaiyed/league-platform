@@ -6,6 +6,8 @@ import {
   declaredSettings,
   defineSetting,
   listLeagueSettings,
+  readNamePolicy,
+  readPrivacyFacts,
   setSetting,
   settingRegistry,
   type AccessReader,
@@ -20,6 +22,7 @@ import { z } from 'zod';
 import { standInAdminSettings } from '../../server/stand-in-admin-settings.ts';
 import { answerQuery, doneKey, problemKey, refused } from './answer.ts';
 import { valueOf, versionOf } from './form-input.ts';
+import { privacyNotes } from './privacy-notes.ts';
 import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
 
 const t = createTranslator('en');
@@ -169,8 +172,13 @@ describe('the settings form', () => {
     // The box to tick says what is confirmed (R-14), on the confirmation's own form.
     const confirmation = privacy.slice(
       privacy.indexOf('data-setting="privacy.childrenInFullConfirmed"'),
+      privacy.indexOf('data-setting="privacy.playersMayAskForInitials"'),
     );
-    expect(confirmation).toContain('name="confirmed" value="yes"');
+    // Drawn as one box to tick: ticking it says yes and confirms (record 065).
+    expect(confirmation).toContain('type="checkbox" name="confirmed" value="yes"');
+    expect(confirmation).toContain('name="value" value="tick"');
+    expect(confirmation).not.toContain('type="radio"');
+    expect(privacy).not.toContain('Tick this only if');
     expect(confirmation).toContain(
       'I confirm that the parents or guardians of the children in this league have agreed to their full names being shown publicly',
     );
@@ -186,6 +194,92 @@ describe('the settings form', () => {
     // Only the parents' confirmation asks to confirm; the names setting no longer does.
     expect(html.match(/name="confirmed"/g)).toHaveLength(1);
     expect(confirmation.indexOf('name="confirmed"')).toBeGreaterThan(0);
+  });
+
+  it('opens Privacy with what fits who plays, says what is in force, and offers the tick only where it covers someone (R-29)', async () => {
+    const privacyOf = async (audience: Audience, hasRecordedChild = false) => {
+      const { deps } = settingsStandIn(audience, hasRecordedChild);
+      const { rows, facts, policy } = await deps.transaction(as(ownerId), async (tx) => ({
+        rows: await listLeagueSettings(tx),
+        facts: await readPrivacyFacts(tx),
+        policy: await readNamePolicy(tx.leagues),
+      }));
+      const notes = privacyNotes({ facts, policy, rows, timeZone: 'UTC', locale: 'en' });
+      const html = renderToStaticMarkup(
+        createElement(SettingForms, { rows, league: 'x', say, notes }),
+      );
+      return html.slice(html.indexOf('data-area="privacy"'));
+    };
+    const confirmationOf = (html: string) =>
+      html.slice(html.indexOf('data-setting="privacy.childrenInFullConfirmed"'));
+    const adult = await privacyOf('adult');
+    // The sentence comes first, right under the heading, then what is in force.
+    expect(adult).toMatch(
+      /^data-area="privacy"><h2>Privacy<\/h2><p>Your league is for adults, so it starts with full names\. Choose less here at any time\.<\/p><p>Now: adults are shown by full name, and children by first name and last initial\.<\/p>/,
+    );
+    // No one recorded as a child: one sentence, no tick.
+    expect(confirmationOf(adult)).toContain(
+      'A player recorded as a child is shown by first name and last initial.',
+    );
+    expect(adult).not.toContain('name="confirmed"');
+    const adultWithChild = confirmationOf(await privacyOf('adult', true));
+    expect(adultWithChild).toContain('This league has players recorded as children.');
+    expect(adultWithChild).toContain('type="checkbox" name="confirmed" value="yes"');
+    for (const audience of ['youth', 'mixed'] as const) {
+      const html = await privacyOf(audience);
+      expect(html, audience).toContain('young players by first name and last initial');
+      expect(confirmationOf(html), audience).toContain(
+        'Tick to show the young players&#x27; full names too',
+      );
+      expect(html.match(/name="confirmed"/g), audience).toHaveLength(1);
+    }
+  });
+
+  it('says the confirmation is in force and since when, once it is given (record 065)', async () => {
+    const { deps } = standInAdminSettings({
+      accessOf: () => access,
+      log: () => undefined,
+      audienceOf: () => 'youth',
+      hasRecordedChild: () => false,
+      now: () => new Date('2026-11-15T12:00:00Z'),
+    });
+    const given = await setSetting(
+      as(ownerId),
+      {
+        level: 'league',
+        key: 'privacy.childrenInFullConfirmed',
+        value: true,
+        version: null,
+        confirmed: true,
+      },
+      deps,
+    );
+    expect(given).toMatchObject({ ok: true });
+    const render = async () => {
+      const { rows, facts, policy } = await deps.transaction(as(ownerId), async (tx) => ({
+        rows: await listLeagueSettings(tx),
+        facts: await readPrivacyFacts(tx),
+        policy: await readNamePolicy(tx.leagues),
+      }));
+      const notes = privacyNotes({ facts, policy, rows, timeZone: 'UTC', locale: 'en' });
+      return renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say, notes }));
+    };
+    const html = await render();
+    expect(html).toContain('Now: everyone is shown by full name, children too.');
+    expect(html).toContain('Confirmed on November 15, 2026.');
+    // The tick is drawn ticked.
+    expect(html).toContain('type="checkbox" name="confirmed" checked="" value="yes"');
+    // Names moved off full names: the confirmation is kept and has no effect.
+    await setSetting(
+      as(ownerId),
+      { level: 'league', key: 'privacy.publicNames', value: 'hidden', version: null },
+      deps,
+    );
+    const hidden = await render();
+    expect(hidden).toContain('Now: nobody is shown by name; players appear by jersey number.');
+    expect(hidden).toContain(
+      'The parents&#x27; confirmation is kept, but it has no effect while names are not on full names.',
+    );
   });
 });
 
