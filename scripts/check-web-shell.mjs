@@ -275,7 +275,13 @@ const cases = [
     'visitor',
     '/north-valley/stats',
     200,
-    ['Leaders', 'Dana Whitfield', 'Owls', 'Only team totals are shown for Bears, Owls.', 'ui-stats'],
+    [
+      'Leaders',
+      'Dana Whitfield',
+      'Owls',
+      'Only team totals are shown for Bears, Owls.',
+      'ui-stats',
+    ],
     ['This page is not built yet.', 'Jordan', 'Castellanos', 'Imani', 'Brooks'],
   ],
   ['coach', '/north-valley/stats', 200, ['Dana Whitfield'], ['Jordan', 'Castellanos', 'Brooks']],
@@ -882,7 +888,9 @@ async function checkTeams(origin) {
     return problems;
   }
   const page = `${list}/${team}`;
-  const player = await post('owner', page, 2, {
+  // Forms of a team with no one on it yet: details, who sees, putting one of the league's
+  // people on the roster (the league has people, step 2.152), then someone new.
+  const player = await post('owner', page, 3, {
     league: 'harbor-city',
     team,
     firstName: 'Casey',
