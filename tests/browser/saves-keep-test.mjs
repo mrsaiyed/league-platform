@@ -52,6 +52,24 @@ const finalGame = '01900000-0000-7000-8000-006a00000005'; // Lions at Bears, fin
 const phone = { width: 390, height: 844 };
 const someoneChanged = /Someone changed/;
 
+/**
+ * When the made-up world's clock starts (LOCAL_NOW, step 2.179). The day's final game was
+ * played three hours before the world is made, and the games list starts at the league's
+ * midnight, so in the first hours of the league's day (America/Chicago) that game was last
+ * night's and is not on the list. Then the world starts four hours on, so it always is.
+ */
+const worldNow = (() => {
+  const now = new Date();
+  const hour = Number(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Chicago',
+      hourCycle: 'h23',
+      hour: 'numeric',
+    }).format(now),
+  );
+  return new Date(now.getTime() + (hour < 4 ? 4 * 3_600_000 : 0)).toISOString();
+})();
+
 let built = true;
 if (!process.argv.includes('--no-build')) {
   await step('building the web app', async () => {
@@ -68,6 +86,7 @@ if (built) {
   server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
+    LOCAL_NOW: worldNow,
   });
   await step('starting the server and the browser', async () => {
     await waitFor(`${origin}/`, server);
