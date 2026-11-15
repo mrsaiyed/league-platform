@@ -928,6 +928,7 @@ export const en = {
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
   'activity.games.end_tracked_game': 'Ended a tracked game',
+  'activity.games.apply_tracker_commands': "Changed a team's players at the scorer's table",
   'activity.standings.add_adjustment': 'Added a standings adjustment',
   'activity.standings.remove_adjustment': 'Removed a standings adjustment',
   'activity.games.assign_scorekeeper': 'Assigned a scorekeeper to a game',
