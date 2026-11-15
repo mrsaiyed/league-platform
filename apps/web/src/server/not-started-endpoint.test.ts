@@ -2,8 +2,16 @@
 // stand-in: both sides of S-40's line with their refusals, the live message and the
 // snapshot saying scheduled at once, another device's taps refused afterwards, the
 // tracker's own refusals for a visitor and a bad body, and one league's game never
-// reached through another's address.
-import { CommandReply, GameSnapshot, LiveMessage, NotStartedReply } from '@srleagues/contracts';
+// reached through another's address; and the words for each refusal and reason.
+import {
+  CommandReply,
+  GameSnapshot,
+  LiveMessage,
+  NotStartedReply,
+  notStartedReasons,
+  notStartedRefusals,
+} from '@srleagues/contracts';
+import { en } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
 import { gameSnapshot } from './game-snapshot-endpoint.ts';
 import { markNotStartedRequest } from './not-started-endpoint.ts';
@@ -215,5 +223,21 @@ describe('POST …/games/{game}/not-started', () => {
     const scorekeeper = await mark(world, { sequence: 3 }, { league: 'other' });
     expect(scorekeeper.answer).toMatchObject({ status: 403, body: { code: 'not-allowed' } });
     expect(await snapshotOf(world)).toMatchObject({ status: 'live', sequence: 3 });
+  });
+});
+
+describe('the words for marking a game not started (T-187)', () => {
+  it('has words for every refusal and every reason', () => {
+    const keys = [
+      ...notStartedRefusals.map((code) => `tracker.notStarted.refused.${code}`),
+      ...notStartedReasons.map((reason) => `tracker.notStarted.reasons.${reason}`),
+    ];
+    expect(keys.filter((key) => !Object.hasOwn(en, key))).toEqual([]);
+  });
+
+  it('tells a scorekeeper refused for a play that stands that Undo is the way out', () => {
+    const words = en['tracker.notStarted.refused.not-allowed'];
+    expect(words).toContain('Undo them first');
+    expect(words).toContain('a league admin can clear it with a reason');
   });
 });
