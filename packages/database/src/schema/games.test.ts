@@ -3,6 +3,7 @@
 // at that venue; its scores fit its status; its winner follows from the scores; and
 // it keeps the rules it started with (S-1, S-21).
 import type { PGlite } from '@electric-sql/pglite';
+import { tablePlayerEventTypes } from '@srleagues/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   asApp,
@@ -551,13 +552,14 @@ describe('the rules a game is played under (S-1, S-21)', () => {
     await set(byApp, { deleted_at: new Date().toISOString() });
     // The players the scorer's table changed are not plays (record 058), after a marker
     // or with none at all.
-    for (const types of [
-      ['start', 'reset', 'add-player', 'change-player'],
-      ['add-player', 'add-player-refused', 'remove-player'],
-    ]) {
-      const tableOnly = await tracked(types);
-      await set(tableOnly, toScheduled);
-      await set(tableOnly, { deleted_at: new Date().toISOString() });
+    // One game per type, from the contract's own list: if it gains a type the SQL of
+    // migration 0016 does not name, this fails.
+    for (const type of tablePlayerEventTypes) {
+      for (const types of [['start', 'reset', type], [type]]) {
+        const tableOnly = await tracked(types);
+        await set(tableOnly, toScheduled);
+        await set(tableOnly, { deleted_at: new Date().toISOString() });
+      }
     }
     const scoredBin = { ...refused.restrict, constraint: 'games_scored_not_binned' };
     const tappedAgain = await tracked(['start', 'reset', 'lineup']);
