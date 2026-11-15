@@ -10,7 +10,8 @@
 // - an account that may also correct games at the game's program reopens it at any time;
 // - otherwise only the account that sent the game's latest end, and only while the game
 //   ended no longer ago than the league's games.scorekeeperReopenMinutes (0: never).
-//   How long ago is measured inside the database (`now() - finalized_at`), so the two
+//   How long ago is measured inside the database (`statement_timestamp() -
+//   finalized_at`, so a wait for the game's lock counts too), so the two
 //   ends are one clock; the device's clock never counts. Exactly the setting's minutes
 //   still counts.
 //

@@ -346,7 +346,8 @@ export type LiveGamesStore = {
   ) => Promise<{ readonly accountId: string | null } | undefined>;
   /**
    * How long ago the game was decided, in milliseconds, measured inside the database
-   * (its `now()` less the game's `finalized_at`, both its own clock), or undefined if
+   * (the start of the asking statement less the game's `finalized_at`, both its own
+   * clock, so a wait for the game's lock counts), or undefined if
    * it is not decided. Never below 0.
    */
   readonly endedAgo: (gameId: string) => Promise<number | undefined>;
