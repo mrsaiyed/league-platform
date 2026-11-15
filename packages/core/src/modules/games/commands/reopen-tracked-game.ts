@@ -12,7 +12,7 @@
 //   command id. A retry with the same id, after an answer lost on the way, finds that
 //   event and is answered "reopened" again (with the game's number now), never "this
 //   game is not over". The same id from another account, or on another kind of event,
-//   is refused (changed-since-read).
+//   or arriving once the game has been decided again, is refused (changed-since-read).
 // - `sequence`, when given, is the number of the last tap the device knows of (its End
 //   game): a game that moved on since is refused. It is optional: a reopen takes nothing
 //   away, and a device that never scored the game has no number.
@@ -27,7 +27,7 @@ import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { gameReopened, type GameReopened } from '../../../events/game-events.ts';
-import { correctionReason } from '../game-fields.ts';
+import { correctionReason, isDecided } from '../game-fields.ts';
 import { handBackTrackedGame } from '../finish-tracked-game.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
@@ -69,7 +69,9 @@ export const reopenTrackedGame = defineCommand({
     // A retry of a reopen already made: the same answer, nothing done twice.
     const earlier = await tx.liveGames.findEvent(game.id, input.requestId);
     if (earlier !== undefined) {
-      if (earlier.type !== 'reopen' || earlier.accountId !== accountId) {
+      // Not this account's reopen, or the game has been decided again since: the device's
+      // picture is out of date, whatever its request once did.
+      if (earlier.type !== 'reopen' || earlier.accountId !== accountId || isDecided(game.status)) {
         return fail({ code: 'changed-since-read' });
       }
       return ok({ sequence: saved?.seq ?? earlier.seq });

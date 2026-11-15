@@ -1,174 +1,47 @@
 // The scorekeeper reopens a game they just ended (step 2.120, S-36, A-5): with a reason,
 // for as long after the end as the league allows, measured on the server's clock; the
-// game goes back to its tracker and the device that scored it carries on. The same
+// game goes back to its tracker and the device that scored it carries on. The read the
+// device makes before the tap is tested beside it (read-reopen-offer.test.ts). The same
 // against the real database, with the standings both ways, is in packages/database
 // (stores/scorekeeper-reopen-commands.test.ts).
-import { seasonRulesPreset, type TrackerCommand } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import type { Grant } from '../../access/index.ts';
 import {
-  awayTeamId,
   finalGame,
   game,
   gameUuid,
-  homeTeamId,
   leagueId,
   ownerId,
-  programScorekeeperGrant,
   programScorekeeperId,
-  schedulerGrant,
   schedulerId,
   scorekeeperGrant,
   scorekeeperId,
   scoringRule,
   seasonId,
 } from '../memory-games.test-helper.ts';
-import { sessionUuid, startOfTest } from '../memory-scoring.test-helper.ts';
-import { memoryTracker, type MemoryTracker } from '../memory-tracker.test-helper.ts';
-import type { GamePlayer } from '../ports.ts';
+import {
+  awayIds,
+  endedOnTablet,
+  gameId,
+  homeIds,
+  minutes,
+  minutesSetting,
+  offerTo,
+  otherScorekeeperId,
+  reason,
+  reopenAs,
+  requestUuid,
+  sequenceOf,
+  sessionId,
+  setUp,
+  tap,
+  versionOf,
+} from '../reopen-game.test-helper.ts';
 import { leaseMs } from '../scoring-session.ts';
-import { applyTrackerCommands } from './apply-tracker-commands.ts';
 import { endTrackedGame } from './end-tracked-game.ts';
 import { openScoringSession } from './open-scoring-session.ts';
-import { readReopenOffer } from './read-reopen-offer.ts';
 import { reopenGame } from './reopen-game.ts';
 import { reopenTrackedGame } from './reopen-tracked-game.ts';
-
-const gameId = gameUuid(1);
-const sessionId = sessionUuid(1);
-const homeIds = [1, 2, 3, 4, 5].map(
-  (n) => `01900000-0000-7000-8000-00000001${String(n).padStart(4, '0')}`,
-);
-const awayIds = [1, 2, 3, 4, 5].map(
-  (n) => `01900000-0000-7000-8000-00000002${String(n).padStart(4, '0')}`,
-);
-const commandUuid = (n: number) => `01900000-0000-7000-8000-0000c0${String(n).padStart(6, '0')}`;
-const minutes = (n: number) => n * 60_000;
-const reason = ' Tapped End game instead of Pause ';
-
-/** A second scorekeeper of the whole league, who did not end the game. */
-const otherScorekeeperId = '01900000-0000-7000-8000-0000000000a5';
-const otherScorekeeperGrant: Grant = {
-  ...scorekeeperGrant,
-  id: '01900000-0000-7000-8000-0000000000f6',
-  accountId: otherScorekeeperId,
-};
-
-const roster: GamePlayer[] = [
-  ...homeIds.map((personId, i) => ({
-    personId,
-    teamId: homeTeamId,
-    jerseyNumber: String(i + 10),
-    onGameDay: true,
-  })),
-  ...awayIds.map((personId, i) => ({
-    personId,
-    teamId: awayTeamId,
-    jerseyNumber: String(i + 20),
-    onGameDay: true,
-  })),
-];
-
-/** A live-tracked game held by the scorekeeper's tablet. */
-function setUp(state: Partial<MemoryTracker> = {}) {
-  return memoryTracker({
-    seasons: [{ id: seasonId, programId: 'p1', rules: seasonRulesPreset('high-school') }],
-    games: [game(1, { captureMode: 'live' })],
-    grants: [scorekeeperGrant, otherScorekeeperGrant, schedulerGrant, programScorekeeperGrant],
-    sessions: [
-      {
-        id: sessionId,
-        gameId,
-        accountId: scorekeeperId,
-        deviceId: 'tablet',
-        since: startOfTest,
-        heldUntil: startOfTest + leaseMs,
-      },
-    ],
-    players: roster,
-    ...state,
-  });
-}
-
-type Tracker = ReturnType<typeof setUp>;
-type Input = TrackerCommand['input'];
-
-let numbered = 0;
-/**
- * Sends taps from the tablet; their statuses. `deviceAhead` is how far the tablet's own
- * clock is ahead of the server's (behind when negative): the time each tap carries.
- */
-async function tap(t: Tracker, inputs: readonly Input[], deviceAhead = 0) {
-  const commands = inputs.map((input) => {
-    numbered += 1;
-    return { commandId: commandUuid(numbered), at: t.clock.now() + deviceAhead, input };
-  });
-  const result = await applyTrackerCommands(
-    t.as(scorekeeperId),
-    { gameId, protocolVersion: 1, sessionId, commands },
-    t.deps,
-  );
-  if (!result.ok) throw new Error(`batch refused: ${result.error.code}`);
-  return result.value.results.map((r) => r.status);
-}
-
-/**
- * Home 5, away 2, then End game tapped on the tablet. The game's end is stamped by
- * the database's own clock; the stand-in stamps a fixed time, so it is set here to the
- * moment the server took the end, as the database would.
- */
-async function endedOnTablet(t: Tracker, deviceAhead = 0) {
-  await tap(
-    t,
-    [
-      { type: 'lineup', side: 'home', playerIds: homeIds },
-      { type: 'lineup', side: 'away', playerIds: awayIds },
-      { type: 'start' },
-      { type: 'score', side: 'home', playerId: homeIds[0] ?? '', points: 3 },
-      { type: 'score', side: 'home', playerId: homeIds[1] ?? '', points: 2 },
-      { type: 'score', side: 'away', playerId: awayIds[0] ?? '', points: 2 },
-    ],
-    deviceAhead,
-  );
-  t.clock.advance(1800);
-  expect(await tap(t, [{ type: 'end' }], deviceAhead)).toEqual(['accepted']);
-  const [ended] = t.db.state.games;
-  if (ended === undefined) throw new Error('no game');
-  t.db.state.games[0] = { ...ended, finalizedAt: new Date(t.clock.now()).toISOString() };
-  return t.clock.now();
-}
-
-const versionOf = (t: Tracker) => t.db.state.games[0]?.version ?? 0;
-/** The number of the last tap saved: what the tablet knows of the game. */
-const sequenceOf = (t: Tracker, id = gameId) =>
-  t.db.state.states.find((x) => x.gameId === id)?.seq ?? 0;
-
-let requests = 0;
-/** A fresh id for one reopen, as the device makes it. */
-const requestUuid = () => {
-  requests += 1;
-  return `01900000-0000-7000-8000-0000e0${String(requests).padStart(6, '0')}`;
-};
-
-/** Reopens with a fresh request id and no sequence number, unless `extra` gives them. */
-async function reopenAs(t: Tracker, accountId: string | null, extra: object = {}) {
-  const result = await reopenTrackedGame(
-    t.as(accountId),
-    { gameId, requestId: requestUuid(), reason, ...extra },
-    t.deps,
-  );
-  return result.ok ? 'ok' : result.error.code;
-}
-
-const offerTo = async (t: Tracker, accountId: string) => {
-  const result = await readReopenOffer(t.as(accountId), { gameId }, t.deps);
-  if (!result.ok) throw new Error(`offer refused: ${result.error.code}`);
-  return result.value;
-};
-
-const minutesSetting = (value: number) => ({
-  'games.scorekeeperReopenMinutes': [{ level: 'league' as const, document: { version: 1, value } }],
-});
 
 describe('a scorekeeper reopening a game they ended (S-36)', () => {
   it('reopens at 29 minutes with a reason: live again, the correction says who and why', async () => {
@@ -441,6 +314,23 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
     expect(await reopenAs(t, ownerId, { requestId: tapId })).toBe('changed-since-read');
   });
 
+  it('refuses a late retry once the game has been ended again, and writes nothing', async () => {
+    const t = setUp();
+    const endedAt = await endedOnTablet(t);
+    t.clock.at = endedAt + minutes(5);
+    const requestId = requestUuid();
+    const send = () =>
+      reopenTrackedGame(t.as(scorekeeperId), { gameId, requestId, reason }, t.deps);
+    // Reopened, but the answer was lost on the way.
+    expect(await send()).toEqual({ ok: true, value: { sequence: 8 } });
+    // The game is ended again before the retry arrives.
+    expect(await tap(t, [{ type: 'end' }])).toEqual(['accepted']);
+    const ended = structuredClone(t.db.state);
+    expect(await send()).toEqual({ ok: false, error: { code: 'changed-since-read' } });
+    expect(t.db.state).toEqual(ended);
+    expect(t.db.state.games[0]?.status).toBe('final');
+  });
+
   it('tells who ended the game when it was not this scorekeeper', async () => {
     const t = setUp();
     await endedOnTablet(t);
@@ -480,57 +370,5 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
     expect(await reopenAs(t, scorekeeperId)).toBe('reopen-time-over');
     t.clock.at = endedAt + minutes(29);
     expect(await reopenAs(t, scorekeeperId)).toBe('ok');
-  });
-});
-
-describe('what the device is told before the tap (games.read_reopen_offer)', () => {
-  it('offers it until a server time to the one who ended it, always to a corrector, and says who ended it', async () => {
-    const t = setUp();
-    const endedAt = await endedOnTablet(t);
-    t.clock.at = endedAt + minutes(10);
-    expect(await offerTo(t, scorekeeperId)).toEqual({
-      reopen: { when: 'until', until: endedAt + minutes(30) },
-      endedBy: scorekeeperId,
-    });
-    expect(await offerTo(t, schedulerId)).toEqual({
-      reopen: { when: 'always' },
-      endedBy: scorekeeperId,
-    });
-    expect(await offerTo(t, otherScorekeeperId)).toEqual({
-      reopen: { when: 'no', code: 'not-ended-by-you' },
-      endedBy: scorekeeperId,
-    });
-    t.clock.at = endedAt + minutes(31);
-    expect((await offerTo(t, scorekeeperId)).reopen).toEqual({
-      when: 'no',
-      code: 'reopen-time-over',
-    });
-    // The read changes nothing.
-    expect(t.db.state.corrections).toEqual([]);
-  });
-
-  it('answers "no" with the reason for every game it would refuse, and refuses whoever may not score it', async () => {
-    const t = setUp({
-      games: [game(1, { captureMode: 'live' }), finalGame(2)],
-      settings: minutesSetting(0),
-    });
-    expect((await offerTo(t, scorekeeperId)).reopen).toEqual({
-      when: 'no',
-      code: 'game-not-decided',
-    });
-    const byHand = await readReopenOffer(t.as(scorekeeperId), { gameId: gameUuid(2) }, t.deps);
-    expect(byHand).toMatchObject({
-      ok: true,
-      value: { reopen: { when: 'no', code: 'not-ended-by-tracker' }, endedBy: null },
-    });
-    await endedOnTablet(t);
-    expect((await offerTo(t, scorekeeperId)).reopen).toEqual({
-      when: 'no',
-      code: 'scorekeepers-may-not-reopen',
-    });
-    const stranger = await readReopenOffer(t.as(programScorekeeperId), { gameId }, t.deps);
-    expect(stranger).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
-    const missing = await readReopenOffer(t.as(ownerId), { gameId: gameUuid(9) }, t.deps);
-    expect(missing).toMatchObject({ ok: false, error: { code: 'game-not-found' } });
   });
 });

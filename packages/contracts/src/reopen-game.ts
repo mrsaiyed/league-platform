@@ -59,7 +59,10 @@ export const reopenRefusalCodes = [
   'not-allowed',
   /** No such game in this league (one of another league asked for through its address included). */
   'game-not-found',
-  /** The game moved on since the `sequence` the device sent, or the request id was another's. */
+  /**
+   * The game moved on since the `sequence` the device sent, the request id was another's,
+   * or a retry arrived after the game was decided again: the device reads the game again.
+   */
   'changed-since-read',
   /** No reason, or one longer than `reopenReasonMaxLength`. */
   'reason-needed',
