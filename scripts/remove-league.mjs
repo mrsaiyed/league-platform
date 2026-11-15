@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { openLeagueMakingTarget, previewLeagueRemoval, removeLeague } from '@srleagues/database';
 import { trackerProjectFor } from '@srleagues/providers';
 import { sourceFor } from './make-league-source.mjs';
-import { typedShortName } from './remove-league-answer.mjs';
+import { typedOwnerEmail, typedShortName } from './remove-league-answer.mjs';
 import * as words from './remove-league.messages.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -161,7 +161,7 @@ async function run(stage) {
     console.error(words.staffUnknown(request.staffEmail));
     return 1;
   }
-  for (const line of words.planLines(preview, target.place)) console.log(line);
+  for (const line of words.planLines(preview, target.place, Date.now())) console.log(line);
   const typed = await askToRemove(preview.league.slug, source.kind === 'hosted', target.place);
   if (typed === undefined) {
     console.log(words.notRemoved);
@@ -171,9 +171,29 @@ async function run(stage) {
     console.log(words.typedWrong);
     return 1;
   }
+  // An owner who has signed in will find their league gone: the short name alone is not
+  // enough, the owner's email is typed too, compared the same way.
+  let ownerEmail = null;
+  if (words.ownerHasSignedIn(preview)) {
+    ownerEmail = typedOwnerEmail(await ask(words.confirmOwner), preview.league.ownerEmail);
+    if (ownerEmail === null) {
+      console.log(words.ownerEmailWrong);
+      return 1;
+    }
+  }
 
   stage.removing = true;
-  const outcome = await removeLeague(target, { ...request, typedSlug: typed });
+  // The league the plan showed travels with the answer: any other is refused.
+  const outcome = await removeLeague(target, {
+    ...request,
+    typedSlug: typed,
+    shown: {
+      leagueId: preview.league.leagueId,
+      version: preview.league.version,
+      createdAt: preview.league.createdAt,
+    },
+    typedOwnerEmail: ownerEmail,
+  });
   if (outcome.ok) {
     for (const line of words.removedLines(outcome.removed, request.staffEmail)) console.log(line);
     return 0;

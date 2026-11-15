@@ -2,7 +2,15 @@
 // spaces around the typed line are taken off, then the comparison is exact.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { typedShortName } from '../scripts/remove-league-answer.mjs';
+import { typedOwnerEmail, typedShortName } from '../scripts/remove-league-answer.mjs';
+
+test('the owner’s email, asked once the owner has signed in, is compared the same way', () => {
+  const email = 'Owner.Name@example.test';
+  assert.equal(typedOwnerEmail(`  ${email}\n`, email), email);
+  for (const answer of ['owner.name@example.test', 'Owner.Name@example.tes', 'yes', '']) {
+    assert.equal(typedOwnerEmail(answer, email), null, JSON.stringify(answer));
+  }
+});
 
 test('takes off the spaces around the typed line, then compares exactly, capitals included', () => {
   for (const answer of [

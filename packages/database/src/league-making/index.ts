@@ -31,6 +31,7 @@ export { type MadeLeagueFacts } from './login-queries.ts';
 export {
   previewLeagueRemoval,
   removeLeague,
+  type LeagueRemovalAnswer,
   type LeagueRemovalPreview,
   type LeagueRemovalRequest,
   type RemovalReadBack,

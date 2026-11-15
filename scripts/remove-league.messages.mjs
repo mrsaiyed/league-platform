@@ -113,7 +113,26 @@ const keptReasons = (kept) => kept.map((k) => keptWords[k] ?? k).join('; ');
 
 const indent = '                  ';
 
-export const planLines = (preview, place) => {
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+/** How long ago something was, in plain words: "just now", "40 minutes ago", "3 days ago". */
+export const agoWords = (ms) => {
+  const minutes = Math.floor(Math.max(0, ms) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${plural(minutes, 'minute', 'minutes')} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${plural(hours, 'hour', 'hours')} ago`;
+  return `${plural(Math.floor(hours / 24), 'day', 'days')} ago`;
+};
+
+/** Whether the owner has signed in, so the plan says so and the owner's email is asked too. */
+export const ownerHasSignedIn = (preview) => preview.ownerKept.includes('signed-in');
+
+/** On a line of its own when the owner has signed in (area 5 review, M3). */
+export const ownerSignedInLine =
+  'Its owner has already signed in. They will find their league gone.';
+
+export const planLines = (preview, place, nowMs) => {
   const { league, ownerKept } = preview;
   const seasons = league.seasons.length === 0 ? 'none' : league.seasons.join(', ');
   return [
@@ -121,7 +140,7 @@ export const planLines = (preview, place) => {
     'This will remove, in one step:',
     `  League          ${league.name}`,
     `  Short name      ${league.slug} (free for another league afterwards)`,
-    `  Made            ${league.madeOn}${league.madeByEmail === null ? '' : `, by ${league.madeByEmail}`}`,
+    `  Made            ${league.madeAt} (${agoWords(nowMs - league.madeAtMs)})${league.madeByEmail === null ? '' : `, by ${league.madeByEmail}`}`,
     `  State           ${league.status}`,
     `  City            ${league.city ?? '(none given)'}`,
     `  Season          ${seasons}`,
@@ -133,8 +152,16 @@ export const planLines = (preview, place) => {
     '  Kept            one line in the platform’s own log: who removed it, and when',
     `  Where           ${placeWords(place)}`,
     '',
+    ...(ownerHasSignedIn(preview) ? [ownerSignedInLine, ''] : []),
   ];
 };
+
+/** Asked as well, after the short name, when the owner has signed in. */
+export const confirmOwner = 'To remove it anyway, also type the owner’s email address: ';
+export const ownerEmailWrong =
+  'That is not the owner’s email address, exactly. Nothing was removed.';
+export const changedSincePlan =
+  'The league with that short name is not the one this plan showed: it was removed, made again or changed since. Nothing was removed. Run this again to see a new plan.';
 
 /** Answered by typing the short name, on this computer as on a hosted database. */
 export const confirm = 'To remove it, type the league’s short name: ';
@@ -156,6 +183,8 @@ export const removeProblemLines = (problem, request) => {
   if (problem.kind === 'not-found') return [notFound(request.slug)];
   if (problem.kind === 'staff-unknown') return [staffUnknown(request.staffEmail)];
   if (problem.kind === 'short-name-differs') return [typedWrong];
+  if (problem.kind === 'changed-since-plan') return [changedSincePlan];
+  if (problem.kind === 'owner-email-differs') return [ownerEmailWrong];
   if (problem.kind === 'in-use') {
     return [
       `It is not what npm run league:make leaves, so it is not removed. Found:`,
@@ -219,4 +248,9 @@ export const removedLines = (removed, staffEmail) => [
   `The platform’s own log keeps one line about it (league id ${removed.leagueId}).`,
   ...readBackLines(removed, staffEmail),
   'Nothing was sent to anyone.',
+  ...(!removed.owner.removed && removed.owner.kept.includes('signed-in')
+    ? [
+        `Its owner had already signed in: tell them yourself, at ${removed.ownerEmail}, that the league was removed.`,
+      ]
+    : []),
 ];

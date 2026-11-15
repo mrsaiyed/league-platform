@@ -123,6 +123,7 @@ export type {
   DivisionRecord,
   DivisionsStore,
   DraftLeagueRemoval,
+  DraftLeagueRemovalAsked,
   LeagueRecord,
   LeagueRemovalFinding,
   LeagueRemovalStore,

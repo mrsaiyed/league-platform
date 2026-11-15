@@ -121,6 +121,10 @@ export type RemoveLeagueProblem =
   | { readonly kind: 'not-found' }
   | { readonly kind: 'staff-unknown' }
   | { readonly kind: 'short-name-differs' }
+  /** The short name now names another league, or the league changed, since the plan. */
+  | { readonly kind: 'changed-since-plan' }
+  /** Its owner has signed in, and their email was not typed, exactly. */
+  | { readonly kind: 'owner-email-differs' }
   | { readonly kind: 'in-use'; readonly found: readonly LeagueRemovalFinding[] }
   /**
    * Something unexpected stopped it. `league` says whether the league is still there
@@ -146,10 +150,25 @@ function reasonOf(error: unknown): string | undefined {
   return typeof code === 'string' && /^[A-Z0-9_]{2,24}$/.test(code) ? code : undefined;
 }
 
+/**
+ * What the person saw and typed: the league the plan showed (removing any other is
+ * refused, M1 of the area 5 review), the short name, and the owner's email when the
+ * plan asked for it because the owner has signed in (null otherwise).
+ */
+export type LeagueRemovalAnswer = LeagueRemovalRequest & {
+  readonly shown: {
+    readonly leagueId: string;
+    readonly version: number;
+    readonly createdAt: string;
+  };
+  readonly typedSlug: string;
+  readonly typedOwnerEmail: string | null;
+};
+
 /** Removes the league, then its owner's account if unused. Never throws. */
 export async function removeLeague(
   target: LeagueMakingTarget,
-  request: LeagueRemovalRequest & { readonly typedSlug: string },
+  request: LeagueRemovalAnswer,
   { now = () => Date.now() }: RemoveLeagueOptions = {},
 ): Promise<RemoveLeagueOutcome> {
   let leagueId: string | undefined;
@@ -158,11 +177,17 @@ export async function removeLeague(
     // Asked again here, not only in the preview: things may have changed meanwhile.
     const problem = await removalTargetProblem(target);
     if (problem !== undefined) return { ok: false, problem };
-    leagueId = await leagueHoldingShortName(target.login, request.slug);
-    const league =
-      leagueId === undefined ? undefined : await leagueToRemove(target.login, leagueId);
-    if (leagueId === undefined || league === undefined) {
-      return { ok: false, problem: { kind: 'not-found' } };
+    const holder = await leagueHoldingShortName(target.login, request.slug);
+    if (holder === undefined) return { ok: false, problem: { kind: 'not-found' } };
+    // The short name now names another league than the plan showed: made again since.
+    if (holder !== request.shown.leagueId) {
+      return { ok: false, problem: { kind: 'changed-since-plan' } };
+    }
+    leagueId = holder;
+    const league = await leagueToRemove(target.login, leagueId);
+    if (league === undefined) return { ok: false, problem: { kind: 'not-found' } };
+    if (league.version !== request.shown.version || league.createdAt !== request.shown.createdAt) {
+      return { ok: false, problem: { kind: 'changed-since-plan' } };
     }
     const staff = await accountByEmail(target.login, request.staffEmail);
     if (staff === undefined) return { ok: false, problem: { kind: 'staff-unknown' } };
@@ -176,12 +201,27 @@ export async function removeLeague(
     commandRan = true;
     const result = await removeDraftLeague(
       { leagueId, accountId: staff.accountId, requestId: `remove-league-${league.slug}` },
-      { typedSlug: request.typedSlug },
+      {
+        typedSlug: request.typedSlug,
+        // The plan's league, checked again under the lock (remove_draft_league).
+        shownVersion: request.shown.version,
+        shownCreatedAt: request.shown.createdAt,
+        typedOwnerEmail:
+          request.typedOwnerEmail === null || request.typedOwnerEmail === ''
+            ? null
+            : request.typedOwnerEmail,
+      },
       deps,
     );
     if (!result.ok) {
       const { error } = result;
       if (error.code === 'league-not-found') return { ok: false, problem: { kind: 'not-found' } };
+      if (error.code === 'league-changed-since-plan') {
+        return { ok: false, problem: { kind: 'changed-since-plan' } };
+      }
+      if (error.code === 'owner-email-differs') {
+        return { ok: false, problem: { kind: 'owner-email-differs' } };
+      }
       if (error.code === 'league-in-use') {
         return { ok: false, problem: { kind: 'in-use', found: error.found } };
       }

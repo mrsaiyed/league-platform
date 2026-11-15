@@ -236,7 +236,16 @@ export type DraftLeagueRemoval =
       /** The platform log's entry about it (it outlives the league). */
       readonly logEntryId: string;
     }
-  | { readonly removed: false; readonly why: 'not-found' | 'short-name-differs' }
+  | {
+      readonly removed: false;
+      readonly why:
+        | 'not-found'
+        | 'short-name-differs'
+        /** Not the league the plan showed: made again since, or changed. */
+        | 'changed-since-plan'
+        /** Its owner has signed in, and their email was not typed, exactly. */
+        | 'owner-email-differs';
+    }
   | {
       readonly removed: false;
       readonly why: 'in-use';
@@ -249,11 +258,22 @@ export type DraftLeagueRemoval =
  */
 export type LeagueRemovalStore = {
   /**
-   * Locks the transaction's league, checks it is exactly what the internal tool
-   * makes, writes the platform log's entry, and removes it, all in this transaction;
-   * or refuses with nothing changed. `typedSlug` must be its short name, exactly.
+   * Locks the transaction's league, checks it is the league the plan showed and
+   * exactly what the internal tool makes, writes the platform log's entry, and
+   * removes it, all in this transaction; or refuses with nothing changed.
    */
-  readonly removeDraftLeague: (typedSlug: string) => Promise<DraftLeagueRemoval>;
+  readonly removeDraftLeague: (asked: DraftLeagueRemovalAsked) => Promise<DraftLeagueRemoval>;
+};
+
+/** What the person was shown and typed. */
+export type DraftLeagueRemovalAsked = {
+  /** Must be the league's short name, exactly. */
+  readonly typedSlug: string;
+  /** The league's version and creation time the plan showed: it must still be that row. */
+  readonly shownVersion: number;
+  readonly shownCreatedAt: string;
+  /** The owner's email as typed, needed exactly when the owner has signed in; else null. */
+  readonly typedOwnerEmail: string | null;
 };
 
 /** The removal's transaction: who is our staff, and the removal itself. */

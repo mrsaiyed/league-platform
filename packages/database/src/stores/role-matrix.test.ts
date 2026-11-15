@@ -2012,7 +2012,20 @@ const rows: readonly Row[] = [
         leaguesDeps,
       );
       if (!created.ok) throw new Error(`the league to remove was not made: ${created.error.code}`);
-      return { leagueId, input: { typedSlug: slug } };
+      const shown = await one<{ version: number; created_at: string }>(
+        pglite,
+        'select version, created_at::text as created_at from leagues where id = $1',
+        [leagueId],
+      );
+      return {
+        leagueId,
+        input: {
+          typedSlug: slug,
+          shownVersion: shown.version,
+          shownCreatedAt: shown.created_at,
+          typedOwnerEmail: null,
+        },
+      };
     },
     run: (c, i) => removeDraftLeague(c, i, removalDeps),
   },

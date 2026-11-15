@@ -35,7 +35,13 @@ export type LeagueToRemove = {
   readonly name: string;
   readonly status: string;
   readonly city: string | null;
-  readonly madeOn: string;
+  /** When it was made, as the plan shows it: date and time in UTC, such as 2026-11-15 14:03 UTC. */
+  readonly madeAt: string;
+  /** The same moment in milliseconds, to say how long ago it was. */
+  readonly madeAtMs: number;
+  /** What the removal checks it is still the same league by: its row's version and creation time, exactly. */
+  readonly version: number;
+  readonly createdAt: string;
   readonly seasons: readonly string[];
   readonly ownerAccountId: string;
   readonly ownerEmail: string;
@@ -56,13 +62,19 @@ export async function leagueToRemove(
     name: string;
     status: string;
     city: string | null;
-    made_on: string;
+    made_at: string;
+    made_at_ms: string | number;
+    version: number;
+    created_at: string;
     owner_account_id: string;
     owner_email: string;
     made_by_email: string | null;
     problems: string[];
   }>(
-    `select l.id, l.slug, l.name, l.status, l.city, to_char(l.created_at at time zone 'UTC', 'YYYY-MM-DD') as made_on,
+    `select l.id, l.slug, l.name, l.status, l.city,
+            to_char(l.created_at at time zone 'UTC', 'YYYY-MM-DD HH24:MI') || ' UTC' as made_at,
+            floor(extract(epoch from l.created_at) * 1000)::bigint as made_at_ms,
+            l.version, l.created_at::text as created_at,
             l.owner_account_id, o.email as owner_email,
             (select a.email from public.activity_log g
                join public.accounts a on a.id = g.actor_account_id
@@ -85,7 +97,10 @@ export async function leagueToRemove(
     name: row.name,
     status: row.status,
     city: row.city,
-    madeOn: row.made_on,
+    madeAt: row.made_at,
+    madeAtMs: Number(row.made_at_ms),
+    version: Number(row.version),
+    createdAt: row.created_at,
     seasons: seasons.rows.map((s) => s.name),
     ownerAccountId: row.owner_account_id,
     ownerEmail: row.owner_email,

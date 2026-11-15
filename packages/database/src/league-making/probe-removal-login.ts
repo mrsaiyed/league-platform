@@ -8,7 +8,7 @@ import type { SqlSession } from '../migrations/index.ts';
 export async function migrationLoginMayRemove(session: SqlSession): Promise<boolean> {
   const { rows } = await session.query<{ may: boolean | null }>(
     `select case
-       when to_regprocedure('public.remove_draft_league(uuid,text,uuid)') is null
+       when to_regprocedure('public.remove_draft_league(uuid,text,uuid,integer,timestamptz,text)') is null
          or to_regprocedure('public.league_removal_problems(uuid)') is null
          or to_regprocedure('public.league_rows(uuid)') is null
          or not exists (select 1 from pg_catalog.pg_namespace where nspname = 'platform')
@@ -16,7 +16,8 @@ export async function migrationLoginMayRemove(session: SqlSession): Promise<bool
        when not has_schema_privilege('platform', 'usage') then false
        when to_regclass('platform.activity_log') is null then true
        -- Each on its own: a list of privileges answers true when ANY one is held.
-       else has_function_privilege('public.remove_draft_league(uuid,text,uuid)', 'execute')
+       else has_function_privilege(
+              'public.remove_draft_league(uuid,text,uuid,integer,timestamptz,text)', 'execute')
          and has_function_privilege('public.league_removal_problems(uuid)', 'execute')
          and has_function_privilege('public.league_rows(uuid)', 'execute')
          and has_table_privilege('platform.activity_log', 'select')

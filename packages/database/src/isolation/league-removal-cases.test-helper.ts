@@ -50,6 +50,10 @@ registerIsolationCase({
       const trx = transactionOf(fresh);
       const { rows } = await sql<{ role: string }>`select current_user as role`.execute(trx);
       const role = rows[0]?.role ?? 'app_user';
+      // What the tool's plan shows of the league: its version and creation time.
+      const { rows: shown } = await sql<{ version: number; created_at: string }>`
+        select version, created_at::text as created_at from leagues
+        where id = ${fresh.leagueId}`.execute(trx);
       await sql`reset role`.execute(trx);
       try {
         return await runInScope(
@@ -62,7 +66,12 @@ registerIsolationCase({
             leagueRemoval: leagueRemovalStore(sessionOf(fresh)),
           }),
           fresh,
-          { typedSlug: slug },
+          {
+            typedSlug: slug,
+            shownVersion: shown[0]?.version ?? 0,
+            shownCreatedAt: shown[0]?.created_at ?? '',
+            typedOwnerEmail: null,
+          },
         );
       } finally {
         await sql`set local role ${sql.id(role)}`.execute(trx);

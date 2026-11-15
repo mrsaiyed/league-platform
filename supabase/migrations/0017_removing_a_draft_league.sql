@@ -10,10 +10,13 @@
 -- 1. The platform's own log, `platform.activity_log`: what our staff did to the
 --    platform itself, kept after the league it is about is gone. No link to a
 --    league (the league's id is kept as a plain uuid, with its short name and name,
---    which are not personal); the staff member by account id only (T-220: history
---    keeps ids, never copies of personal details). Rows are only ever added: the same
---    refuse_history_change trigger as every history table, which never lets a row of
---    this table go (it has no league_id for a purge to name). In a schema of its own
+--    which are normally not personal); the staff member by account id only (T-220:
+--    history keeps ids, never copies of personal details). Rows cannot be changed or
+--    removed one by one by any role: the same refuse_history_change trigger as every
+--    history table, which never lets a row of this table go (it has no league_id for
+--    a purge to name). Emptying a whole table by its owner (TRUNCATE) is not guarded
+--    here, for this table or any history table: that is for the audit, step 2.108.
+--    In a schema of its own
 --    that app_user cannot use: nothing in the app reads it yet, so the app's login
 --    gets nothing (record 063).
 -- 2. `league_rows(league)`: how many rows every table with a league_id column holds
@@ -21,8 +24,11 @@
 --    table is not named there, so one added later cannot be forgotten.
 -- 3. `league_removal_problems(league)`: why a league is not exactly what the maker
 --    writes (empty when it is). Read-only: the tool's plan shows it.
--- 4. `remove_draft_league(league, typed short name, staff account)`: for the league
---    this transaction is set to only, it locks the league row, asks
+-- 4. `remove_draft_league(league, typed short name, staff account, the version and
+--    the creation time the plan showed, the owner's email as typed)`: for the league
+--    this transaction is set to only, it locks the league row, refuses a league that
+--    is not the one the plan showed, and one whose owner has signed in unless the
+--    owner's email was typed, asks
 --    league_removal_problems again under that lock, writes the platform log entry,
 --    lets the history delete through for that one league for that one call (its own
 --    transaction-local setting, put back at once, as purge_league_history does),
@@ -72,7 +78,7 @@ comment on table platform.activity_log is
   'Who of our staff changed the platform itself, and when (step 2.150): today only a draft league removed. History: rows are only ever added (T-45). Ids only, no personal details (T-220).';
 
 comment on column platform.activity_log.details is
-  'Ids only, never joined to anything: ownerAccountId names the removed league''s owner, whose account may since have been removed too (it was never used), so the id may name no account at all.';
+  'Ids, a time and a fixed word only, never joined to anything: ownerAccountId (the removed league''s owner, whose account may since have been removed too, as it was never used, so the id may name no account at all), madeByAccountId (who made the league), madeAt (when) and audience (who plays: adult, youth or mixed).';
 
 revoke all on table platform.activity_log from public;
 
@@ -234,10 +240,17 @@ comment on function public.league_removal_problems(uuid) is
 
 -- 4. Removing it -------------------------------------------------------------------------
 
+-- `shown_version` and `shown_created_at` are what the plan showed of the league, so an
+-- old plan cannot remove a league made again under the same short name meanwhile.
+-- `typed_owner_email` is the owner's email as the person typed it (null when they were
+-- not asked): needed when the owner has signed in, compared exactly.
 create or replace function public.remove_draft_league(
   removed_league uuid,
   typed_slug text,
-  staff_account uuid
+  staff_account uuid,
+  shown_version integer,
+  shown_created_at timestamptz,
+  typed_owner_email text
 ) returns table (outcome text, problems text[], entry_id uuid)
 language plpgsql
 volatile
@@ -246,6 +259,9 @@ as $$
 declare
   found_league public.leagues;
   found_problems text[];
+  owner_email text;
+  owner_signed_in boolean;
+  maker uuid;
   entry uuid;
 begin
   perform public.require_view_of_every_league();
@@ -267,6 +283,12 @@ begin
     return query select 'not-found'::text, '{}'::text[], null::uuid;
     return;
   end if;
+  -- The very league the plan showed: the same row, unchanged since.
+  if shown_version is distinct from found_league.version
+     or shown_created_at is distinct from found_league.created_at then
+    return query select 'changed-since-plan'::text, '{}'::text[], null::uuid;
+    return;
+  end if;
   if typed_slug is distinct from found_league.slug then
     return query select 'short-name-differs'::text, '{}'::text[], null::uuid;
     return;
@@ -276,14 +298,34 @@ begin
     return query select 'in-use'::text, found_problems, null::uuid;
     return;
   end if;
+  -- An owner who has signed in (or was erased) will find their league gone: the
+  -- person must also type the owner's email, exactly. Read after the lock, so a
+  -- sign-in that landed since the plan is seen.
+  select a.email, a.sign_in_id is not null or a.email like '%@erased.invalid'
+    into owner_email, owner_signed_in
+  from public.accounts a where a.id = found_league.owner_account_id;
+  if owner_signed_in is distinct from false and typed_owner_email is distinct from owner_email then
+    return query select 'owner-email-differs'::text, '{}'::text[], null::uuid;
+    return;
+  end if;
 
   -- Written before anything goes, in the same transaction: the entry exists exactly
-  -- when the league is gone.
+  -- when the league is gone. Besides the league, it keeps what its own two log rows
+  -- said, which go with it: who made it and when, and who plays (ids, a time and a
+  -- fixed word only, T-220).
+  select g.actor_account_id into maker
+  from public.activity_log g where g.league_id = removed_league and g.action = 'leagues.create';
   insert into platform.activity_log
     (action, removed_league_id, league_slug, league_name, actor_account_id, details)
   values (
     'leagues.remove_draft', found_league.id, found_league.slug, found_league.name,
-    staff_account, jsonb_build_object('ownerAccountId', found_league.owner_account_id)
+    staff_account,
+    jsonb_build_object(
+      'ownerAccountId', found_league.owner_account_id,
+      'madeByAccountId', maker,
+      'madeAt', found_league.created_at,
+      'audience', found_league.audience
+    )
   )
   returning id into entry;
 
@@ -300,9 +342,10 @@ begin
 end
 $$;
 
-revoke all on function public.remove_draft_league(uuid, text, uuid) from public;
+revoke all on function public.remove_draft_league(uuid, text, uuid, integer, timestamptz, text)
+  from public;
 
-comment on function public.remove_draft_league(uuid, text, uuid) is
+comment on function public.remove_draft_league(uuid, text, uuid, integer, timestamptz, text) is
   'Removes a draft league that is exactly what the internal tool makes, for the league and staff account this transaction is set to (step 2.150, record 063). Table owner only.';
 
 -- Supabase's API roles get nothing in the new schema either (T-64), where they exist:

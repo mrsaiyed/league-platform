@@ -65,8 +65,36 @@ async function made(change: Record<string, string> = {}): Promise<Made> {
   return { ...outcome.made, slug: plan.slug };
 }
 
-const remove = (league: { slug: string }, typedSlug = league.slug, as = staffEmail) =>
-  removeLeague(target, { slug: league.slug, staffEmail: as, typedSlug });
+/** What a plan shows of the league with this short name now (a league that is not there: nothing). */
+async function shownNow(slug: string) {
+  const { rows } = await pglite.query<{ id: string; version: number; created_at: string }>(
+    'select id, version, created_at::text as created_at from leagues where slug = $1',
+    [slug],
+  );
+  const row = rows[0];
+  return row === undefined
+    ? {
+        leagueId: '01900000-0000-7000-8000-00000000dead',
+        version: 1,
+        createdAt: '2026-01-01 00:00:00+00',
+      }
+    : { leagueId: row.id, version: row.version, createdAt: row.created_at };
+}
+
+/** The tool's run: the plan shown just now, then the answer typed. */
+const remove = async (
+  league: { slug: string },
+  typedSlug = league.slug,
+  as = staffEmail,
+  typedOwnerEmail: string | null = null,
+) =>
+  removeLeague(target, {
+    slug: league.slug,
+    staffEmail: as,
+    typedSlug,
+    shown: await shownNow(league.slug),
+    typedOwnerEmail,
+  });
 
 /** Every row of every table in public and platform, as JSON text, table by table. */
 async function everything(): Promise<Map<string, string[]>> {
@@ -150,7 +178,18 @@ describe('removeLeague: the done test', () => {
       expect({ table, rows: rows.length }).toEqual({ table, rows: count });
     }
 
-    const outcome = await remove(first);
+    if (!preview.ready || preview.league === undefined) throw new Error('no plan');
+    const outcome = await removeLeague(target, {
+      slug: first.slug,
+      staffEmail,
+      typedSlug: first.slug,
+      shown: {
+        leagueId: preview.league.leagueId,
+        version: preview.league.version,
+        createdAt: preview.league.createdAt,
+      },
+      typedOwnerEmail: null,
+    });
     expect(outcome).toMatchObject({
       ok: true,
       removed: {
@@ -182,6 +221,88 @@ describe('removeLeague: the done test', () => {
     expect(
       await one(pglite, 'select count(*)::int as n from leagues where id = $1', [second.leagueId]),
     ).toEqual({ n: 1 });
+
+    // The entry keeps what the league's own two log rows said, which went with it: who
+    // made it and when, and who plays (ids, a time and a fixed word only).
+    const madeRow = JSON.parse(
+      (before.get('public.leagues') ?? []).find(
+        (text) => (JSON.parse(text) as { id: string }).id === first.leagueId,
+      ) ?? '{}',
+    ) as { created_at: string; audience: string };
+    const staff = await one<{ id: string }>(pglite, 'select id from accounts where email = $1', [
+      staffEmail,
+    ]);
+    if (!outcome.ok) throw new Error('not removed');
+    const entry = await one<{ details: Record<string, unknown>; same_time: boolean }>(
+      pglite,
+      `select details, (details ->> 'madeAt')::timestamptz = $2::timestamptz as same_time
+       from platform.activity_log where id = $1`,
+      [outcome.removed.logEntryId, madeRow.created_at],
+    );
+    expect(entry.details).toEqual({
+      ownerAccountId: first.ownerAccountId,
+      madeByAccountId: staff.id,
+      madeAt: expect.any(String),
+      audience: 'adult',
+    });
+    expect(entry.same_time).toBe(true);
+    expect(madeRow.audience).toBe('adult');
+  });
+
+  it('never removes a league the plan did not show: one removed and made again meanwhile (area 5, M1)', async () => {
+    const slug = unique('school-league');
+    const wrong = await made({ shortName: slug, ownerEmail: `${slug}.owner@example.test` });
+    // Terminal 1: the plan shows the wrong league, and its question waits.
+    const plan = await previewLeagueRemoval(target, { slug, staffEmail });
+    if (!plan.ready || plan.league === undefined) throw new Error('no plan');
+    expect(plan.league.leagueId).toBe(wrong.leagueId);
+    const shown = {
+      leagueId: plan.league.leagueId,
+      version: plan.league.version,
+      createdAt: plan.league.createdAt,
+    };
+    // Terminal 2: it is removed and made again, right this time, under the same name.
+    expect((await remove({ slug })).ok).toBe(true);
+    const right = await made({
+      shortName: slug,
+      ownerEmail: `${slug}.owner@example.test`,
+      whoPlays: 'under-18s',
+    });
+    const before = await everything();
+    // Terminal 1 answers the question it was asked about the wrong league.
+    expect(
+      await removeLeague(target, {
+        slug,
+        staffEmail,
+        typedSlug: slug,
+        shown,
+        typedOwnerEmail: null,
+      }),
+    ).toEqual({ ok: false, problem: { kind: 'changed-since-plan' } });
+    expect(await everything()).toEqual(before);
+    expect(
+      await one(pglite, 'select count(*)::int as n from leagues where id = $1', [right.leagueId]),
+    ).toEqual({ n: 1 });
+  });
+
+  it('refuses when the league changed after the plan, or the plan names another league', async () => {
+    const league = await made();
+    const other = await made();
+    const shown = await shownNow(league.slug);
+    await pglite.query("update leagues set name = 'Renamed meanwhile' where id = $1", [
+      league.leagueId,
+    ]);
+    const before = await everything();
+    const answer = { slug: league.slug, staffEmail, typedSlug: league.slug, typedOwnerEmail: null };
+    expect(await removeLeague(target, { ...answer, shown })).toEqual({
+      ok: false,
+      problem: { kind: 'changed-since-plan' },
+    });
+    expect(await removeLeague(target, { ...answer, shown: await shownNow(other.slug) })).toEqual({
+      ok: false,
+      problem: { kind: 'changed-since-plan' },
+    });
+    expect(await everything()).toEqual(before);
   });
 
   it('says the league is not there on a second run, and changes nothing', async () => {
@@ -414,9 +535,18 @@ describe('removeLeague refuses a league that is used, with nothing removed', () 
     const league = await made();
     const preview = await previewLeagueRemoval(target, { slug: league.slug, staffEmail });
     expect(preview).toMatchObject({ ready: true, league: { problems: [] } });
+    const shown = await shownNow(league.slug);
     await newPerson(pglite, league.leagueId);
     const before = await everything();
-    expect(await remove(league)).toMatchObject({
+    expect(
+      await removeLeague(target, {
+        slug: league.slug,
+        staffEmail,
+        typedSlug: league.slug,
+        shown,
+        typedOwnerEmail: null,
+      }),
+    ).toMatchObject({
       ok: false,
       problem: { kind: 'in-use', found: [{ kind: 'rows', table: 'public.people', count: 1 }] },
     });
@@ -433,13 +563,30 @@ describe('the owner’s account: removed only when the database shows nobody eve
     expect(await previewLeagueRemoval(target, { slug: league.slug, staffEmail })).toMatchObject({
       ownerKept: ['signed-in', 'used'],
     });
-    expect(await remove(league)).toMatchObject({
+    // The short name alone is not enough once the owner has signed in: the owner's
+    // email must be typed too, exactly (area 5, M3).
+    const before = await everything();
+    for (const typed of [null, 'Signed.In.Owner@example.test', 'signed.in.owner@example.tes']) {
+      expect(await remove(league, league.slug, staffEmail, typed)).toEqual({
+        ok: false,
+        problem: { kind: 'owner-email-differs' },
+      });
+    }
+    expect(await everything()).toEqual(before);
+    expect(
+      await remove(league, league.slug, staffEmail, 'signed.in.owner@example.test'),
+    ).toMatchObject({
       ok: true,
       removed: {
         owner: { removed: false, kept: ['signed-in', 'used'] },
         readBack: { ownerAccountThere: true },
       },
     });
+  });
+
+  it('needs no email for an owner who has never signed in', async () => {
+    const league = await made();
+    expect(await remove(league, league.slug, staffEmail, null)).toMatchObject({ ok: true });
   });
 
   it('keeps it when it owns another league', async () => {
@@ -499,7 +646,13 @@ describe('removeLeague when a login may not do its part', () => {
       problem: refusal,
     });
     expect(
-      await removeLeague(own, { slug: league.slug, staffEmail, typedSlug: league.slug }),
+      await removeLeague(own, {
+        slug: league.slug,
+        staffEmail,
+        typedSlug: league.slug,
+        shown: await shownNow(league.slug),
+        typedOwnerEmail: null,
+      }),
     ).toEqual({ ok: false, problem: refusal });
     expect(await everything()).toEqual(before);
   });
@@ -522,7 +675,13 @@ describe('removeLeague when something unexpected stops it', () => {
     };
     const before = await everything();
     expect(
-      await removeLeague(broken, { slug: league.slug, staffEmail, typedSlug: league.slug }),
+      await removeLeague(broken, {
+        slug: league.slug,
+        staffEmail,
+        typedSlug: league.slug,
+        shown: await shownNow(league.slug),
+        typedOwnerEmail: null,
+      }),
     ).toEqual({
       ok: false,
       problem: { kind: 'failed', league: 'not-removed', reason: 'ECONNRESET' },

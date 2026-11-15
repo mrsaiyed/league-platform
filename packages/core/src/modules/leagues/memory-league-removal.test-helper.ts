@@ -10,6 +10,10 @@ export type MemoryRemovalLeague = {
   readonly slug: string;
   readonly name: string;
   readonly ownerAccountId: string;
+  readonly ownerEmail: string;
+  readonly ownerSignedIn: boolean;
+  readonly version: number;
+  readonly createdAt: string;
   /** Why it is not exactly what the maker writes; empty when it may go. */
   readonly found: readonly LeagueRemovalFinding[];
 };
@@ -25,6 +29,15 @@ export type MemoryRemoval = {
 export const removalLeagueId = '01900000-0000-7000-8000-0000000000c1';
 export const removalOwnerId = '01900000-0000-7000-8000-0000000000c2';
 export const removalStaffId = '01900000-0000-7000-8000-0000000000c3';
+export const removalMadeAt = '2026-11-15 14:03:07.123456+00';
+
+/** What the plan showed of the stand-in league, and its short name typed. */
+export const asShown = {
+  typedSlug: 'made-up-hoops',
+  shownVersion: 1,
+  shownCreatedAt: removalMadeAt,
+  typedOwnerEmail: null,
+};
 
 /** One draft league, as the maker leaves it, and one member of our staff. */
 export function memoryRemoval(change: Partial<MemoryRemovalLeague> = {}) {
@@ -35,6 +48,10 @@ export function memoryRemoval(change: Partial<MemoryRemovalLeague> = {}) {
         slug: 'made-up-hoops',
         name: 'Made-up Hoops',
         ownerAccountId: removalOwnerId,
+        ownerEmail: 'owner@example.test',
+        ownerSignedIn: false,
+        version: 1,
+        createdAt: removalMadeAt,
         found: [],
         ...change,
       },
@@ -58,12 +75,18 @@ export function memoryRemoval(change: Partial<MemoryRemovalLeague> = {}) {
             context.accountId !== null && draft.staff.includes(context.accountId),
         },
         leagueRemoval: {
-          removeDraftLeague: async (typedSlug) => {
+          removeDraftLeague: async (asked) => {
             const league = draft.leagues.find((l) => l.id === context.leagueId);
             if (league === undefined) return { removed: false, why: 'not-found' };
-            if (league.slug !== typedSlug) return { removed: false, why: 'short-name-differs' };
+            if (league.version !== asked.shownVersion || league.createdAt !== asked.shownCreatedAt)
+              return { removed: false, why: 'changed-since-plan' };
+            if (league.slug !== asked.typedSlug) {
+              return { removed: false, why: 'short-name-differs' };
+            }
             if (league.found.length > 0)
               return { removed: false, why: 'in-use', found: league.found };
+            if (league.ownerSignedIn && asked.typedOwnerEmail !== league.ownerEmail)
+              return { removed: false, why: 'owner-email-differs' };
             const entry = {
               id: `entry-${draft.platformLog.length + 1}`,
               leagueId: league.id,

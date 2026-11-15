@@ -2,8 +2,10 @@
 // draft that is exactly what the internal tool makes (its default program, at most
 // its first season, and the maker's two activity-log entries) and nothing else. For
 // our own staff, through that tool only, as making a league is (P3 §8). The league
-// is the context's, never one named in the input; the input is only the short name
-// the person typed, which must be the league's own, exactly.
+// is the context's, never one named in the input. The input is what the person was
+// shown and typed: the league's short name, exactly; the version and creation time
+// the plan showed, so an old plan cannot remove a league made again under the same
+// short name meanwhile; and, when the owner has signed in, the owner's email, exactly.
 //
 // The checks are made by the database under a lock on the league, inside this
 // command's transaction (remove_draft_league, 0017), so nothing can be added between
@@ -19,6 +21,8 @@ import type { LeagueRemovalFinding, LeagueRemovalTx } from '../ports.ts';
 export type RemoveDraftLeagueError =
   | { readonly code: 'league-not-found' }
   | { readonly code: 'short-name-differs' }
+  | { readonly code: 'league-changed-since-plan' }
+  | { readonly code: 'owner-email-differs' }
   | { readonly code: 'league-in-use'; readonly found: readonly LeagueRemovalFinding[] };
 
 export type RemovedDraftLeague = {
@@ -28,6 +32,13 @@ export type RemovedDraftLeague = {
   readonly ownerAccountId: string;
   readonly logEntryId: string;
 };
+
+const errorCodes = {
+  'not-found': 'league-not-found',
+  'short-name-differs': 'short-name-differs',
+  'changed-since-plan': 'league-changed-since-plan',
+  'owner-email-differs': 'owner-email-differs',
+} as const;
 
 export const removeDraftLeague = defineCommand({
   name: 'leagues.remove_draft',
@@ -39,6 +50,12 @@ export const removeDraftLeague = defineCommand({
      * with the league's own exactly, capitals included.
      */
     typedSlug: z.string().min(1).max(100),
+    /** The league's version as the plan showed it. */
+    shownVersion: z.number().int().positive(),
+    /** When the league was made, as the plan read it from the database. */
+    shownCreatedAt: z.string().min(1).max(64),
+    /** The owner's email as typed, the same way as the short name; null when not asked. */
+    typedOwnerEmail: z.string().min(1).max(320).nullable(),
   }),
   allowed: (context, _input, tx: LeagueRemovalTx) => mayActAsPlatform(context, tx),
   run: async ({
@@ -46,7 +63,7 @@ export const removeDraftLeague = defineCommand({
     input,
     tx,
   }): Promise<Result<RemovedDraftLeague, RemoveDraftLeagueError>> => {
-    const outcome = await tx.leagueRemoval.removeDraftLeague(input.typedSlug);
+    const outcome = await tx.leagueRemoval.removeDraftLeague(input);
     if (outcome.removed) {
       return ok({
         leagueId: context.leagueId,
@@ -57,6 +74,6 @@ export const removeDraftLeague = defineCommand({
       });
     }
     if (outcome.why === 'in-use') return fail({ code: 'league-in-use', found: outcome.found });
-    return fail({ code: outcome.why === 'not-found' ? 'league-not-found' : 'short-name-differs' });
+    return fail({ code: errorCodes[outcome.why] });
   },
 });

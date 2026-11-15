@@ -44,11 +44,30 @@ async function makerShaped(sql: PGlite = db) {
       [league.leagueId, staff, action, `activity.${action}`],
     );
   }
-  const { rows } = await sql.query<{ slug: string }>('select slug from leagues where id = $1', [
-    league.leagueId,
-  ]);
-  return { ...league, staff, seasonId: season.id, slug: rows[0]?.slug ?? '' };
+  const { rows } = await sql.query<{ slug: string; version: number; created_at: string }>(
+    'select slug, version, created_at::text as created_at from leagues where id = $1',
+    [league.leagueId],
+  );
+  const row = rows[0];
+  return {
+    ...league,
+    staff,
+    seasonId: season.id,
+    slug: row?.slug ?? '',
+    version: row?.version ?? 0,
+    createdAt: row?.created_at ?? '',
+  };
 }
+
+/** The call, with what a plan showed of the league and no owner's email typed. */
+const removeCall = 'public.remove_draft_league($1, $2, $3, $4, $5::timestamptz, null)';
+const removeArgs = (league: Awaited<ReturnType<typeof makerShaped>>) => [
+  league.leagueId,
+  league.slug,
+  league.staff,
+  league.version,
+  league.createdAt,
+];
 
 /** Runs `work` as the tables' owner in a transaction set to `league` and `account`. */
 function setTo<T>(
@@ -149,7 +168,7 @@ describe('league_rows counts every league table (a table added later cannot be f
   it('remove_draft_league locks the league row before it checks', async () => {
     const { definition } = await one<{ definition: string }>(
       db,
-      "select pg_get_functiondef('public.remove_draft_league(uuid,text,uuid)'::regprocedure) as definition",
+      "select pg_get_functiondef('public.remove_draft_league(uuid,text,uuid,integer,timestamptz,text)'::regprocedure) as definition",
     );
     const lock = definition.indexOf('for update');
     const check = definition.indexOf('found_problems := public.league_removal_problems');
@@ -164,8 +183,8 @@ describe('remove_draft_league (0017)', () => {
     const result = await setTo(league.leagueId, league.staff, (tx) =>
       one<{ outcome: string; entry_id: string }>(
         tx,
-        'select outcome, entry_id::text as entry_id from public.remove_draft_league($1, $2, $3)',
-        [league.leagueId, league.slug, league.staff],
+        `select outcome, entry_id::text as entry_id from ${removeCall}`,
+        removeArgs(league),
       ),
     );
     expect(result.outcome).toBe('removed');
@@ -189,6 +208,43 @@ describe('remove_draft_league (0017)', () => {
     });
   });
 
+  it('refuses, under the lock, a league not as the plan showed it, and a signed-in owner’s league without their email', async () => {
+    const league = await makerShaped();
+    const outcomeOf = (args: unknown[], email: string | null = null) =>
+      setTo(
+        league.leagueId,
+        league.staff,
+        async (tx) =>
+          (
+            await one<{ outcome: string }>(
+              tx,
+              'select outcome from public.remove_draft_league($1, $2, $3, $4, $5::timestamptz, $6)',
+              [...args, email],
+            )
+          ).outcome,
+      );
+    const [id, slug, staff, version, createdAt] = removeArgs(league);
+    expect(await outcomeOf([id, slug, staff, Number(version) + 1, createdAt])).toBe(
+      'changed-since-plan',
+    );
+    expect(await outcomeOf([id, slug, staff, version, '2020-01-01 00:00:00+00'])).toBe(
+      'changed-since-plan',
+    );
+    await db.query("update accounts set sign_in_id = 'made-up-sign-in-0017' where id = $1", [
+      league.ownerId,
+    ]);
+    const { email } = await one<{ email: string }>(db, 'select email from accounts where id = $1', [
+      league.ownerId,
+    ]);
+    for (const typed of [null, email.toUpperCase(), `${email} `]) {
+      expect(await outcomeOf(removeArgs(league), typed)).toBe('owner-email-differs');
+    }
+    expect(
+      await one(db, 'select count(*)::int as n from leagues where id = $1', [league.leagueId]),
+    ).toEqual({ n: 1 });
+    expect(await outcomeOf(removeArgs(league), email)).toBe('removed');
+  });
+
   it('acts only on the league and account the transaction is set to (the fence the other way)', async () => {
     const league = await makerShaped();
     const other = await makerShaped();
@@ -200,11 +256,7 @@ describe('remove_draft_league (0017)', () => {
     ] as const) {
       await expect(
         setTo(setLeague, setAccount, (tx) =>
-          tx.query('select * from public.remove_draft_league($1, $2, $3)', [
-            league.leagueId,
-            league.slug,
-            league.staff,
-          ]),
+          tx.query(`select * from ${removeCall}`, removeArgs(league)),
         ),
       ).rejects.toMatchObject(refused.privilege);
     }
@@ -220,11 +272,7 @@ describe('remove_draft_league (0017)', () => {
     const kept = await makerShaped();
     await expect(
       setTo(league.leagueId, league.staff, async (tx) => {
-        await tx.query('select * from public.remove_draft_league($1, $2, $3)', [
-          league.leagueId,
-          league.slug,
-          league.staff,
-        ]);
+        await tx.query(`select * from ${removeCall}`, removeArgs(league));
         const setting = await one<{ value: string }>(
           tx,
           "select coalesce(current_setting('srleagues.history_purge', true), '') as value",
@@ -267,8 +315,8 @@ describe('the platform log (0017)', () => {
     const { entry_id: entry } = await setTo(league.leagueId, league.staff, (tx) =>
       one<{ entry_id: string }>(
         tx,
-        'select entry_id::text as entry_id from public.remove_draft_league($1, $2, $3)',
-        [league.leagueId, league.slug, league.staff],
+        `select entry_id::text as entry_id from ${removeCall}`,
+        removeArgs(league),
       ),
     );
     for (const change of [
@@ -296,7 +344,7 @@ describe('the platform log (0017)', () => {
       'select * from platform.activity_log',
       `select public.league_rows('${league.leagueId}')`,
       `select public.league_removal_problems('${league.leagueId}')`,
-      `select * from public.remove_draft_league('${league.leagueId}', '${league.slug}', '${league.staff}')`,
+      `select * from public.remove_draft_league('${league.leagueId}', '${league.slug}', '${league.staff}', ${league.version}, '${league.createdAt}'::timestamptz, null)`,
       `delete from leagues where id = '${league.leagueId}'`,
     ]) {
       await expect(asApp(db, context, (tx) => tx.query(statement))).rejects.toMatchObject(
