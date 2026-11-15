@@ -28,6 +28,26 @@ import {
 } from './memory-games.test-helper.ts';
 
 const input = { gameId: gameUuid(1), version: 1, homeScore: 52, awayScore: 48 };
+const programScope = (id: string): Grant['scope'] => ({ type: 'program', id });
+/** A made-up account holding these roles, each where it applies. */
+const holderOf = (
+  name: string,
+  ...roles: readonly (readonly [Grant['role'], Grant['scope']])[]
+): AccessHolder => {
+  const accountId = `01900000-0000-7000-8000-0000000000${name}`;
+  return {
+    accountId,
+    isOwner: false,
+    grants: roles.map(([role, scope], i) => ({
+      id: `01900000-0000-7000-8000-00000000${name}0${i}`,
+      accountId,
+      role,
+      scope,
+      grantedByAccountId: ownerId,
+      revokedAt: null,
+    })),
+  };
+};
 const assigned = (accountId: string, n = 1) => ({ gameId: gameUuid(n), accountId });
 const settings = {
   default: {},
@@ -152,17 +172,28 @@ describe('who may score a game (P4 section 4)', () => {
       editorGrant,
     ];
     const revoked: Grant = { ...scorekeeperGrant, revokedAt: '2026-12-06T17:00:00.000Z' };
+    const twoPrograms = holderOf(
+      'b1',
+      ['scorekeeper', programScope('p1')],
+      ['scheduler', programScope('p2')],
+    );
     const holders: AccessHolder[] = [
       { accountId: ownerId, isOwner: true, grants: [] },
       ...[scorekeeperId, schedulerId, programAdminId, programScorekeeperId, editorId].map(
         (accountId) => ({ accountId, isOwner: false, grants }),
       ),
       { accountId: scorekeeperId, isOwner: false, grants: [revoked] },
+      // Two roles at once: scorekeeper in one program and scheduler in another; a league
+      // admin who is also a scorekeeper; a scheduler of one program; a coach of a team.
+      twoPrograms,
+      holderOf('b2', ['admin', { type: 'league' }], ['scorekeeper', { type: 'league' }]),
+      holderOf('b3', ['scheduler', programScope('p1')]),
+      holderOf('b4', ['coach', { type: 'team', id: 't1' }]),
     ];
     for (const rule of ['anyScorekeeper', 'assignedOnly'] as const) {
       for (const holder of holders) {
         const reach = scoringReachOf(holder, rule);
-        for (const programId of ['p1', 'p2']) {
+        for (const programId of ['p1', 'p2', 'p3']) {
           for (const assigned of [false, true]) {
             const scope = { type: 'program', id: programId } as const;
             expect(
@@ -175,6 +206,10 @@ describe('who may score a game (P4 section 4)', () => {
     }
     const programOnly = { accountId: programScorekeeperId, isOwner: false, grants };
     expect(scoringReachOf(programOnly, 'assignedOnly')).toEqual({ every: [], assigned: ['p2'] });
+    expect(scoringReachOf(twoPrograms, 'assignedOnly')).toEqual({
+      every: ['p2'],
+      assigned: ['p1', 'p2'],
+    });
   });
 
   it('reads a stored value it cannot use as the starting value: any scorekeeper', async () => {
