@@ -57,10 +57,13 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   return response;
 }
 
-// Every address but Next.js's own files and the icon, matched exactly: a looser
-// pattern (`favicon.ico` unanchored) also skipped addresses such as `/faviconXico`,
-// whose pages would then see whatever header the browser sent. The pages check too
-// (league-gate.ts, addressMatchesRoute).
+// Every address but Next.js's own files, the icon and the two stylesheets we serve
+// ourselves, matched exactly: a looser pattern (`favicon.ico` unanchored) also skipped
+// addresses such as `/faviconXico`, whose pages would then see whatever header the
+// browser sent. The pages check too (league-gate.ts, addressMatchesRoute).
+// The stylesheets (`/display.css`, `/standalone.css`) are public and kept by browsers and
+// shared caches: nothing of a person's session may ever ride on their answers, so a
+// request for one never comes through here, where a session is renewed and its cookies set.
 export const config = {
-  matcher: ['/((?!_next/static/|_next/image|favicon\\.ico$).*)'],
+  matcher: ['/((?!_next/static/|_next/image|favicon\\.ico$|display\\.css$|standalone\\.css$).*)'],
 };

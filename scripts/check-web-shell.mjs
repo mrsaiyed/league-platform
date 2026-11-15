@@ -470,6 +470,7 @@ try {
     );
   }
   failures.push(...(await sameAsNoLeague(origin)));
+  failures.push(...(await checkStylesheets(origin)));
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
   failures.push(...(await checkSettings(origin)));
@@ -507,7 +508,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Web shell check passed: ${cases.length + spoofs.length + 4} checks against the built server.`,
+  `Web shell check passed: ${cases.length + spoofs.length + 5} checks against the built server.`,
 );
 
 function start(args, env) {
@@ -631,6 +632,45 @@ async function sameAsNoLeague(origin) {
  * having left; someone who may not open the Teams area changes nothing. The commands'
  * own rules are tested beside the code (apps/web/src/server/stand-in-admin-teams.test.ts).
  */
+/**
+ * The two stylesheets we serve ourselves are public and kept by browsers and shared
+ * caches, so nothing of a person's session may ride on their answers: no cookie is ever
+ * set, whatever cookies the request carries. A request with a renewing token and no
+ * session is the one the proxy would act on (it clears an ended one, as checkSignIn
+ * shows on a page), so the stylesheets must not pass through the proxy at all.
+ */
+async function checkStylesheets(origin) {
+  const problems = [];
+  const home = await (await fetch(`${origin}/north-valley`)).text();
+  const linked = /href="(\/display\.css\?v=[0-9a-f]+)"/.exec(home)?.[1];
+  if (linked === undefined)
+    problems.push('a league page does not link to /display.css with its mark');
+  const carried = [
+    ['no cookies', ''],
+    ['an ended renewing token', 'srl_renew=made-up-ended-token'],
+    ['a session and a renewing token', `srl_session=${tokens.owner}; srl_renew=made-up-token`],
+  ];
+  for (const address of [linked ?? '/display.css', '/display.css', '/standalone.css']) {
+    for (const [label, cookie] of carried) {
+      const answer = await fetch(origin + address, {
+        headers: cookie === '' ? {} : { cookie },
+        redirect: 'manual',
+      });
+      const kept = answer.headers.get('cache-control') ?? '';
+      if (answer.status !== 200 || !(answer.headers.get('content-type') ?? '').includes('css')) {
+        problems.push(`${address} with ${label} answers ${answer.status}`);
+      }
+      if (answer.headers.getSetCookie().length > 0) {
+        problems.push(`${address} with ${label} sets a cookie on an answer caches may keep`);
+      }
+      if (!kept.startsWith('public') || kept.includes('private') || kept.includes('no-store')) {
+        problems.push(`${address} with ${label} is sent with cache-control "${kept}"`);
+      }
+    }
+  }
+  return problems;
+}
+
 async function checkTeams(origin) {
   const problems = [];
   const as = (who) => ({ cookie: `srl_session=${tokens[who]}` });
