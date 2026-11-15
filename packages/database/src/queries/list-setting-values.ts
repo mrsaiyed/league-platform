@@ -7,6 +7,8 @@ export type SettingValueRow = {
   level: 'league' | 'program' | 'season';
   document: unknown;
   version: number;
+  /** When the value was last saved, as an ISO time (record 065). */
+  savedAt: string;
 };
 
 export async function listSettingValues(
@@ -16,7 +18,7 @@ export async function listSettingValues(
 ): Promise<SettingValueRow[]> {
   const rows = await transactionOf(scope)
     .selectFrom('setting_values')
-    .select(['level', 'value', 'version'])
+    .select(['level', 'value', 'version', 'updated_at'])
     .where('league_id', '=', scope.leagueId)
     .where('key', '=', key)
     .where((eb) => {
@@ -36,5 +38,6 @@ export async function listSettingValues(
     level: row.level as SettingValueRow['level'],
     document: row.value,
     version: row.version,
+    savedAt: new Date(row.updated_at).toISOString(),
   }));
 }

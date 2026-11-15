@@ -8,9 +8,16 @@ export type StatRow = {
   readonly cells: Readonly<Record<string, StatValue>>;
   /**
    * The columns of this row that name a team, by the column's key, each with the team's own
-   * color (#rrggbb): that cell shows a chip before the name, plain when the color is null.
+   * color (#rrggbb): that cell shows the team's mark before the name (its small shield, or
+   * a chip of its color), plain when the color is null.
    */
   readonly chips?: Readonly<Record<string, string | null>>;
+  /**
+   * The columns whose cell names several teams ("Owls, Falcons"), by the column's key: a
+   * shield drawn there carries no letter, because the first team's letter would say the
+   * player is that team's alone.
+   */
+  readonly severalTeams?: Readonly<Record<string, boolean>>;
 };
 
 export type SortDirection = 'ascending' | 'descending';

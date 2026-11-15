@@ -57,7 +57,53 @@ export type GameCardProps = {
   readonly note?: string | undefined;
   /** A board picked out from the others: the game being played now. Larger figures. */
   readonly featured?: boolean;
+  /**
+   * The room every board of the same list reckons with (`listRoom`), so that all of them
+   * are drawn the same way: side by side, or all as two rows. Left out, a board reckons
+   * with its own two names and its own score.
+   */
+  readonly room?: BoardRoom | undefined;
 };
+
+/** What a board's sum of the width its teams need side by side is made from. */
+export type BoardRoom = {
+  /** The letters the longest name needs (`nameMeasure`). */
+  readonly letters: number;
+  /** The figures of the longest score; none where no game has a score to show. */
+  readonly figures?: number | undefined;
+};
+
+/** A game shows its score once it has one to show: while it is played and after. */
+const hasScore = (game: {
+  readonly status: GameStatus;
+  readonly home: GameCardTeam;
+  readonly away: GameCardTeam;
+}): boolean =>
+  (game.status === 'live' || game.status === 'final' || game.status === 'forfeit') &&
+  game.home.score !== null &&
+  game.away.score !== null;
+
+/**
+ * The room the boards of one list need: the longest of all their names, and the longest
+ * of their scores. Given to every board of the list, it makes them all decide alike
+ * between side by side and two rows, so a list is one shape from top to bottom.
+ */
+export function listRoom(
+  games: readonly {
+    readonly status: GameStatus;
+    readonly home: GameCardTeam;
+    readonly away: GameCardTeam;
+  }[],
+): BoardRoom {
+  const letters = Math.max(
+    0,
+    ...games.map((game) => Math.max(nameMeasure(game.home.name), nameMeasure(game.away.name))),
+  );
+  const figures = games
+    .filter(hasScore)
+    .map((game) => `${game.away.score}${game.home.score}`.length);
+  return figures.length === 0 ? { letters } : { letters, figures: Math.max(...figures) };
+}
 
 const statusKey = {
   final: 'final',
@@ -199,6 +245,7 @@ export function GameCard({
   layout = 'rows',
   note,
   featured = false,
+  room,
 }: GameCardProps) {
   const winner = winnerOf(status, home, away);
   let state: ReactNode = null;
@@ -226,11 +273,15 @@ export function GameCard({
     </a>
   ) : null;
   if (layout === 'board') {
-    // A game shows its score once it has one to show: while it is played and after.
-    const scored =
-      (status === 'live' || status === 'final' || status === 'forfeit') &&
-      home.score !== null &&
-      away.score !== null;
+    const scored = hasScore({ status, home, away });
+    // The sum is made from the list's room where the list gave one, else from this game.
+    const letters = room?.letters ?? Math.max(nameMeasure(home.name), nameMeasure(away.name));
+    const figures =
+      room === undefined
+        ? scored
+          ? `${away.score}${home.score}`.length
+          : undefined
+        : room.figures;
     return (
       <article
         className="ui-game-card"
@@ -248,10 +299,11 @@ export function GameCard({
         <div
           className="ui-game-board"
           data-scored={scored ? 'true' : undefined}
+          data-room={!scored && figures !== undefined ? 'scored' : undefined}
           style={
             {
-              '--letters': Math.max(nameMeasure(home.name), nameMeasure(away.name)),
-              ...(scored ? { '--figures': `${away.score}${home.score}`.length } : {}),
+              '--letters': letters,
+              ...(figures === undefined ? {} : { '--figures': figures }),
             } as CSSProperties
           }
         >

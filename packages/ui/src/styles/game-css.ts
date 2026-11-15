@@ -160,11 +160,28 @@ export const gameCss = String.raw`
   white-space: nowrap;
 }
 
-/* A quiet word where a state's pill would be: "Awaiting result". */
-.ui-game-state[data-kind='quiet'] {
+/* A quiet word where a state's pill would be: "Awaiting result". "Final" is as quiet: a
+   decided game says so by its score, and its pill is never the loudest mark on its card. */
+.ui-game-state[data-kind='quiet'],
+.ui-game-card[data-status='final'] .ui-game-state,
+.ui-scoreboard[data-pill='quiet'] .ui-game-state {
   border-color: var(--color-line);
+  background: transparent;
   color: var(--color-muted);
   font-weight: 600;
+}
+/* A game that was put off, called off or forfeited wears a soft tint of the league's main
+   color (no more of it than every text is fitted to), its words in the accent and its
+   edge a line of the accent at a line's strength (DESIGN.md, section 4, line 17): on a
+   game's card, on the big board of its page, and beside a round's name ("1 game
+   postponed"). */
+.ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit'])
+  .ui-game-state,
+.ui-scoreboard:not([data-pill='quiet']) .ui-game-state,
+.ui-group .ui-group-mark[data-kind='note'] {
+  border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
+  background: var(--color-tint);
+  color: var(--color-accent-text);
 }
 
 /* A game as a scoreboard: an emblem and a name on each side, the score or "VS" large
@@ -224,6 +241,15 @@ export const gameCss = String.raw`
 .ui-game-card[data-layout='board'] :is(.ui-game-number, .ui-game-when) {
   white-space: nowrap;
 }
+/* In a card as narrow as a small phone's the pill always has a line of its own under the
+   date, so it stands in one place on every card of a list, whatever the date's length. A
+   wider card (a phone of 390, three across on a laptop) holds the date and the pill on
+   one line. */
+@container card (max-width: 16.99rem) {
+  .ui-game-card[data-layout='board'] .ui-game-about {
+    flex-basis: 100%;
+  }
+}
 /* The two teams sit side by side with what stands between them, or, when they cannot,
    one over the other. The board works out the width they need side by side: each side
    has room for the longer of the two names (the card counts its letters, a name of
@@ -253,14 +279,25 @@ export const gameCss = String.raw`
   --board-room: calc((100cqi - var(--board-needs)) * 999);
   display: flex;
   flex-wrap: wrap;
+  /* What stands between the sides is level with their middle; the sides themselves begin
+     at the top (below), and in a board taller than its teams (a row of cards shares its
+     tallest board's height) the teams stay at the top, not spread down it. */
   align-items: center;
+  align-content: flex-start;
   justify-content: center;
   /* Between the two rows, and (the same step --board-gap names) between the sides. */
   gap: var(--step-2) var(--step-3);
+  /* In a card with a whole row to itself the two teams are kept within reach of each
+     other, in the middle of the card. */
+  inline-size: 100%;
+  max-inline-size: calc(10 * var(--step-8));
+  margin-inline: auto;
   padding-block: var(--step-5);
   container: board / inline-size;
 }
-.ui-game-board[data-scored='true'] {
+/* The middle holds a score's figures in a board that has a score, and in every board of a
+   list where any has one (the list says so), so the boards of one list are drawn alike. */
+.ui-game-board:is([data-scored='true'], [data-room='scored']) {
   --board-middle: calc(var(--figures, 4) * 0.65 * var(--board-figure) + var(--step-5));
 }
 /* A side takes the whole row when the board is short of room, and shares what the middle
@@ -269,6 +306,9 @@ export const gameCss = String.raw`
 .ui-game-side {
   display: flex;
   flex: 1 1 var(--board-short);
+  /* A side begins at the top of its board, so the shields of a row of cards stand on one
+     line even where one card's name takes two lines and its neighbors' one. */
+  align-self: flex-start;
   align-items: center;
   gap: var(--step-3);
   min-inline-size: 0;
@@ -487,15 +527,56 @@ export const gameCss = String.raw`
     grid-column: 1 / -1;
   }
 }
+/* A list in a column narrower than the page (a team's games beside its roster): two
+   across from a tablet up, and a board left over takes the row. */
+@media (min-width: 48rem) {
+  .ui-card-grid[data-layout='board'][data-across='pair'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--step-5);
+  }
+  .ui-card-grid[data-layout='board'][data-across='pair'] > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+/* On a laptop a board left over is not stretched across the page: an odd number of boards
+   ends with three in a row, each a third of it (three boards are one row of three, five
+   are two and three). Only a board that is the whole list has the row to itself. */
+@media (min-width: 64rem) {
+  .ui-card-grid[data-layout='board'][data-across='two'] {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .ui-card-grid[data-layout='board'][data-across='two'] > li {
+    grid-column: span 3;
+  }
+  .ui-card-grid[data-layout='board'][data-across='two'] > li:nth-last-child(3):nth-child(odd),
+  .ui-card-grid[data-layout='board'][data-across='two'] > li:nth-last-child(3):nth-child(odd) ~ li {
+    grid-column: span 2;
+  }
+  .ui-card-grid[data-layout='board'][data-across='two'] > li:only-child {
+    grid-column: 1 / -1;
+  }
+}
+/* The cards of one row are one height (the list's grid stretches them), each card's top
+   line takes what it needs and its board the rest, and inside a board the teams begin at
+   the top: so across a row the shields and names stand on one line wherever the cards'
+   top lines are one line each, which the rule for the pill above sees to at every width
+   but a small phone's (where cards are one to a row). The cards cannot share their top
+   line's height with each other through the list's grid (subgrid): a card is a measure of
+   its own, by which its parts size themselves, and a browser does not let such a box lend
+   its rows to its neighbors. */
 
 /* The big board of a game's page. The teams and what stands between them are held to a
    width the eye takes in at once, however wide the panel is. */
 .ui-scoreboard {
   padding-block: var(--step-5);
   padding-inline: var(--space);
-  background: var(--color-panel);
+  /* As a game's card: the panel, warmed at one corner in a dark design, with the fine line
+     of the league's color of decoration at its top. */
+  background-color: var(--color-panel);
+  background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   color: var(--color-text);
   border: var(--card-border-width) solid var(--color-line);
+  border-block-start: 2px solid var(--color-ornament-line);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   text-align: center;
@@ -568,9 +649,11 @@ export const gameCss = String.raw`
 }
 .ui-scoreboard-name {
   display: flex;
+  /* The team's shield stands over its name, both in the middle of the team's half. */
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--step-2);
+  justify-content: flex-start;
+  gap: var(--step-3);
   max-inline-size: 100%;
   font-family: var(--font-heading);
   /* One step smaller on a phone, where a team has half the board for its name. */
@@ -602,18 +685,46 @@ export const gameCss = String.raw`
     font-size: var(--text-22);
   }
 }
-/* A score is set in the reading face, whose figures are lining and even-width on every
-   device: two scores side by side are compared digit by digit. */
+/* A score is set in a face whose figures are lining and even-width (--font-score): two
+   scores side by side are compared digit by digit. It is the largest thing on the page and
+   is in the color the eye lands on: both scores while the game is played, and once it is
+   decided only the winner's, with a bar under it in the league's color of decoration.
+   Its weights are the score face's own, plain numbers every score face has (not the
+   heading face's display weight, which may be heavier than a winner's): a score still
+   being played is 600, and once the game is decided the winner's is 700 and the other's
+   400, so the winner is the heavier in every design. */
 .ui-scoreboard-score {
-  font-family: var(--font-body);
-  font-size: var(--text-36);
-  font-weight: 700;
+  justify-self: center;
+  padding-block-end: var(--step-1);
+  border-block-end: 2px solid transparent;
+  font-family: var(--font-score);
+  font-size: var(--text-48);
+  font-weight: 600;
   line-height: 1;
   font-variant-numeric: lining-nums tabular-nums;
+  color: var(--color-pop);
+}
+.ui-scoreboard[data-state='final'] .ui-scoreboard-side:not([data-winner='true']) .ui-scoreboard-score {
   color: var(--color-text);
+  font-weight: 400;
 }
 .ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score {
-  color: var(--color-highlight);
+  border-block-end-color: var(--color-ornament);
+  font-weight: 700;
+}
+.ui-scoreboard .ui-emblem {
+  block-size: var(--step-8);
+}
+@media (min-width: 48rem) {
+  .ui-scoreboard {
+    padding-block: var(--step-6);
+  }
+  .ui-scoreboard-score {
+    font-size: var(--text-64);
+  }
+  .ui-scoreboard .ui-emblem {
+    block-size: calc(var(--step-8) + var(--step-5));
+  }
 }
 .ui-scoreboard-period {
   color: var(--color-muted);

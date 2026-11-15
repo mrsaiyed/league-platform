@@ -548,7 +548,13 @@ try {
             ]) {
               if (!card) continue;
               put(card.querySelector('.ui-game-team-name'), text);
-              card.querySelector('.ui-game-board')?.style.setProperty('--letters', measure(text));
+              // Every board of a list reckons with the list's longest name (packages/ui,
+              // listRoom), so the whole list is told the new one.
+              const boards = card.closest('ul')?.querySelectorAll('.ui-game-board') ?? [];
+              for (const board of boards) {
+                const now = Number(board.style.getPropertyValue('--letters'));
+                board.style.setProperty('--letters', String(Math.max(now, measure(text))));
+              }
             }
             put(document.querySelector('.ui-team-card-name a'), name);
             if (heading) put(document.querySelector('.ui-page-head h1'), name);

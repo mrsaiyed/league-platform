@@ -26,7 +26,10 @@ describe('the scoreboard of a game page', () => {
         labels,
       }),
     );
-    expect(html.match(/ui-team-chip/g)).toHaveLength(2);
+    // Since step 2.147 part 2 a team's mark on the big board is its shield (the emblem
+    // piece), in its own color, where a chip of the color used to be.
+    expect(html.match(/<svg class="ui-emblem" data-size="large"/g)).toHaveLength(2);
+    expect(html).not.toContain('ui-team-chip');
     expect(html).toContain('--team-color:#2f7fb8');
     // Anything that is not a color never reaches the page.
     expect(html).not.toContain('red;x');
@@ -142,7 +145,9 @@ describe('the scoreboard of a game page', () => {
   it('sets scores in lining, even-width figures, the largest thing on the board', () => {
     const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '');
     expect(css).toMatch(
-      /\.ui-scoreboard-score \{[^}]*font-family: var\(--font-body\);[^}]*font-size: var\(--text-36\);[^}]*font-variant-numeric: lining-nums tabular-nums;/,
+      // Since step 2.147 part 2: the face a design keeps for scores, which always has
+      // lining, even-width figures (packages/site, scoreFont), a display size larger.
+      /\.ui-scoreboard-score \{[^}]*font-family: var\(--font-score\);[^}]*font-size: var\(--text-48\);[^}]*font-variant-numeric: lining-nums tabular-nums;/,
     );
     expect(css).toMatch(
       /\.ui-game-team-score \{[^}]*font-variant-numeric: lining-nums tabular-nums;/,
