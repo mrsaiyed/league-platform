@@ -114,8 +114,19 @@ const gamesStates = [
     at: '/admin/games',
     onlyIn: leagues[0],
     tap: async (page) => {
-      const game = page.locator(`li[id="game-${listedGame(13, 20)}"]`);
-      await game.locator('[data-score-boxes] > summary').click();
+      const id = listedGame(13, 20);
+      const game = page.locator(`li[id="game-${id}"]`);
+      if ((await game.count()) === 0) {
+        // Made final at the other width already: reopened first, as a correction is.
+        await page.goto(page.url().replace(/\/admin\/games.*$/, `/admin/games/${id}`));
+        await page.locator('[data-reopen-form] input[name="reason"]').fill('Pictures');
+        await Promise.all([
+          page.waitForURL((url) => url.pathname.endsWith('/admin/games')),
+          page.locator('[data-reopen-form] button[type="submit"]').click(),
+        ]);
+      }
+      const boxes = game.locator('[data-score-boxes]');
+      if ((await boxes.getAttribute('open')) === null) await boxes.locator('> summary').click();
       await game.locator('input[name="awayScore"]').fill('45');
       await game.locator('input[name="homeScore"]').fill('50');
       await game.locator('[data-score-boxes] button[type="submit"]').click();
