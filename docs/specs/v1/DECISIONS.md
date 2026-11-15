@@ -347,6 +347,7 @@ All dated November 12, 2026.
 | T-259                 | New                                                                          | Name settings read by one `readNamePolicy`; a setting value can need confirming; a person's request is a command, fixed-word reason (rec. 056)  | Step 2.126: nothing set the name policy or `people.visibility` (2.105 audit, H2)                   |
 | T-260                 | New                                                                          | Made from this computer by one script: the owner's account ahead by email, then the league and its first season by our staff at once (rec. 057) | Step 2.125: T10 line 31's internal tool did not exist; the leagues table had no city               |
 | T-261                 | New                                                                          | Agreed (delegated): players added, changed and taken off at the table travel in the tracker's queue (protocol 2); a rosters address (rec. 058)  | Step 2.117: no way to put a player into a game at the table (2.107 audit, H1)                      |
+| T-267                 | New                                                                          | Agreed (delegated): the scoring screen is styled by the product, not by the league's design values: one dark courtside look (rec. 064)          | Before step 2.35: nobody had decided how the tracker looks (2.107 audit, M10)                      |
 
 ## The full list
 
@@ -787,6 +788,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-102 | The 3D code is downloaded only on pages that use that style, so no other league's pages get slower because the trophy exists                        | Agreed (delegated)  |         |
 | T-103 | Faraj's acceptance is the feature list plus the founder's side-by-side review; after sign-off, screenshots of the new pages guard against drift     | Changed (delegated) |         |
 | T-104 | Every document (design, page, form, season rules) carries a version                                                                                 | Agreed (delegated)  |         |
+| T-267 | The scoring screen has one look of its own for every league; a league's design values do not reach it (record 064; DESIGN.md section 7)             | Agreed (delegated)  |         |
 
 ### [T6 — Live stats and realtime](technical/T6-live-stats-and-realtime.md)
 
