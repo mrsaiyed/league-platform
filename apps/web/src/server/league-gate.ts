@@ -48,6 +48,8 @@ export type LeagueView = {
   readonly areas: readonly AdminArea[];
   /** Whether this person runs the league (has any area of the admin). */
   readonly runsTheLeague: boolean;
+  /** Whether this person may score games here (the tracker, P2 §4), for the account menu. */
+  readonly mayScore: boolean;
 };
 
 export type LeagueOutcome =
@@ -146,7 +148,10 @@ export function leaguePageOutcome(
     (want.page === 'score' && mayOpenTracker(holder)) ||
     (want.page === 'admin' && (want.area === null ? areas.length > 0 : areas.includes(want.area)));
   if (!allowed) return { kind: 'no-access', signedIn: context.account !== null };
-  return { kind: 'show', view: { context, areas, runsTheLeague: areas.length > 0 } };
+  return {
+    kind: 'show',
+    view: { context, areas, runsTheLeague: areas.length > 0, mayScore: mayOpenTracker(holder) },
+  };
 }
 
 /** Both steps at once, for one page. */

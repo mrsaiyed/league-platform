@@ -60,6 +60,8 @@ export type LeagueRecords = MadeLeague & {
   /** The season's regular-season stage and its first round. */
   stageId: string;
   roundId: string;
+  /** A second round of the season, with no games in it (step 2.160). */
+  emptyRoundId: string;
   /** A second team of the season, the team's opponent. */
   opponentId: string;
   /** The schedule's first published revision, and a draft based on it. */
@@ -328,6 +330,12 @@ async function seededLeague(
      values ($1, $2, 1, $3, '2026-12-06')`,
     [leagueId, seasonId, `Week 1 ${m}`],
   );
+  const emptyRoundId = await id(
+    pglite,
+    `insert into rounds (league_id, season_id, number, label, date)
+     values ($1, $2, 2, $3, '2026-12-13')`,
+    [leagueId, seasonId, `Week 2 ${m}`],
+  );
   const opponentId = await id(
     pglite,
     `insert into teams (league_id, season_id, division_id, slug, name, stats_visibility)
@@ -566,6 +574,7 @@ async function seededLeague(
     rosterEntryId,
     stageId,
     roundId,
+    emptyRoundId,
     opponentId,
     scheduleRevisionId,
     scheduleDraftId,

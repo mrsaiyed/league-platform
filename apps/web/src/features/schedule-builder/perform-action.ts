@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
+import { answerParams } from './grid-answer.ts';
 import { runScheduleAction, type ScheduleActionKind } from './run-schedule-action.ts';
 
 export async function performScheduleAction(
@@ -25,13 +26,8 @@ export async function performScheduleAction(
   const season = form.get('season');
   const query = new URLSearchParams();
   if (typeof season === 'string' && season !== '') query.set('season', season);
-  if (outcome.kind === 'refused') {
-    query.set('problem', outcome.code);
-    if (outcome.reason !== undefined) query.set('reason', outcome.reason);
-    if (outcome.partial === true) query.set('partial', '1');
-  } else {
-    query.set('done', outcome.kind);
-  }
+  const answer = answerParams(outcome);
+  for (const [name, value] of Object.entries(answer.query)) query.set(name, value);
   const base = leagueUrl(view.context.league, 'admin-area', { area: 'schedule' });
-  return redirect(`${base}?${query.toString()}`);
+  return redirect(`${base}?${query.toString()}${answer.hash}`);
 }

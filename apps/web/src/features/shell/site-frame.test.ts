@@ -11,9 +11,19 @@ import { siteOfLeague } from '../../server/league-site.ts';
 import { standInLeagues } from '../../server/stand-in-ports.ts';
 import { DesignStyle } from './design-style.tsx';
 import { SiteFooter } from './site-footer.tsx';
+import type { AccountMenu } from './account-menu.ts';
 import { SiteHeader } from './site-header.tsx';
 
 const league = { slug: 'north-valley' };
+const signInHref = '/signin?next=%2Fnorth-valley';
+const madeUpAccount: AccountMenu = {
+  initial: 'O',
+  email: 'owner@example.test',
+  adminHref: '/north-valley/admin',
+  gamesHref: '/north-valley/admin/games',
+  accountHref: '/account',
+  onScoringPage: false,
+};
 
 describe('league design', () => {
   it('turns the two starting designs into visibly different variables', () => {
@@ -56,7 +66,7 @@ describe('league design', () => {
 describe('header, menu and footer', () => {
   it('shows the league name first, the menu and sign in for a visitor', () => {
     const html = renderToStaticMarkup(
-      createElement(SiteHeader, { league, name: 'North Valley League', signedIn: false }),
+      createElement(SiteHeader, { league, name: 'North Valley League', account: null, signInHref }),
     );
     expect(html.indexOf('North Valley League')).toBeLessThan(html.indexOf(en['nav.schedule']));
     for (const key of [
@@ -64,15 +74,15 @@ describe('header, menu and footer', () => {
       'nav.schedule',
       'nav.standings',
       'nav.teams',
-      'nav.signIn',
+      'account.signInOrCreate',
     ] as const) {
       expect(html).toContain(en[key]);
     }
     expect(html).toContain('href="/north-valley/schedule"');
     const signedIn = renderToStaticMarkup(
-      createElement(SiteHeader, { league, name: 'x', signedIn: true }),
+      createElement(SiteHeader, { league, name: 'x', account: madeUpAccount, signInHref }),
     );
-    expect(signedIn).not.toContain(en['nav.signIn']);
+    expect(signedIn).not.toContain(en['account.signInOrCreate']);
   });
 
   it('holds the season picker, between the name and sign in, when the page has one', () => {
@@ -80,7 +90,8 @@ describe('header, menu and footer', () => {
       createElement(SiteHeader, {
         league,
         name: 'North Valley League',
-        signedIn: false,
+        account: null,
+        signInHref,
         current: 'schedule',
         season: {
           action: '/north-valley/schedule',
@@ -106,7 +117,7 @@ describe('header, menu and footer', () => {
     expect(top.indexOf('class="site-season"')).toBeLessThan(top.indexOf('class="site-sign-in"'));
     expect(html.match(/name="season"/g)).toHaveLength(1);
     const without = renderToStaticMarkup(
-      createElement(SiteHeader, { league, name: 'x', signedIn: false }),
+      createElement(SiteHeader, { league, name: 'x', account: null, signInHref }),
     );
     expect(without).not.toContain('site-season');
     expect(without).not.toContain('<select');
@@ -114,10 +125,12 @@ describe('header, menu and footer', () => {
 
   it('offers sign in inside the phone menu too, and the menu button has a name', () => {
     const html = renderToStaticMarkup(
-      createElement(SiteHeader, { league, name: 'x', signedIn: false }),
+      createElement(SiteHeader, { league, name: 'x', account: null, signInHref }),
     );
     const panel = html.slice(html.indexOf('class="site-menu-panel"'), html.indexOf('</details>'));
-    expect(panel).toContain(`class="site-menu-sign-in" href="/signin">${en['nav.signIn']}</a>`);
+    expect(panel).toContain(
+      `class="site-menu-sign-in" href="/signin?next=%2Fnorth-valley">${en['account.signInOrCreate']}</a>`,
+    );
     expect(html).toMatch(
       new RegExp(`<summary>.*<span class="ui-visually-hidden">${en['nav.menu']}</span></summary>`),
     );
@@ -267,7 +280,8 @@ describe('header, menu and footer', () => {
       createElement(SiteHeader, {
         league,
         name: 'North Valley League',
-        signedIn: false,
+        account: null,
+        signInHref,
         season: { action: '/north-valley', value: 'a', options: [], keep: {} },
       }),
     );
@@ -300,7 +314,12 @@ describe('header, menu and footer', () => {
   // for a later step, and until then none is shown.
   it("shows the league's mark and its name, with no line under it; the name alone is the link's words", () => {
     const html = renderToStaticMarkup(
-      createElement(SiteHeader, { league, name: 'North Valley League', signedIn: true }),
+      createElement(SiteHeader, {
+        league,
+        name: 'North Valley League',
+        account: madeUpAccount,
+        signInHref,
+      }),
     );
     // The mark: the league's first letter in a shield, drawn as part of the page and
     // silent to a screen reader. It stands beside the link, not in it, so the link says
@@ -437,12 +456,17 @@ describe('header, menu and footer', () => {
 describe('right to left (T-188)', () => {
   it('gives an Arabic league name its own direction, and an English one its own', () => {
     const arabic = renderToStaticMarkup(
-      createElement(SiteHeader, { league, name: 'دوري الوادي', signedIn: true }),
+      createElement(SiteHeader, {
+        league,
+        name: 'دوري الوادي',
+        account: madeUpAccount,
+        signInHref,
+      }),
     );
     // dir="auto": the browser reads the name's first strong letter, so any script works
     expect(arabic).toMatch(/class="site-name"[^>]*dir="auto"/);
     const english = renderToStaticMarkup(
-      createElement(SiteHeader, { league, name: 'Valley', signedIn: true }),
+      createElement(SiteHeader, { league, name: 'Valley', account: madeUpAccount, signInHref }),
     );
     expect(english).toMatch(/class="site-name"[^>]*dir="auto"/);
   });

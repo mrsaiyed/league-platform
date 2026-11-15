@@ -1,6 +1,7 @@
 // How the grid says what just happened. The address carries only fixed words
 // (`?done=saved`, `?problem=changed-since-read`); the words themselves are looked up
 // here, so nothing a visitor types into an address can become text on the page.
+import { maxRounds, roundYears } from '@srleagues/core';
 import { t } from '../../server/messages.ts';
 
 type Search = Readonly<Record<string, string | readonly string[] | undefined>>;
@@ -36,6 +37,8 @@ const problems = {
   'game-without-time': () => t('schedule.admin.error.game-without-time'),
   'change-no-longer-fits': () => t('schedule.admin.error.change-no-longer-fits'),
   'nothing-to-publish': () => t('schedule.admin.error.nothing-to-publish'),
+  'round-in-use': () => t('schedule.admin.error.round-in-use'),
+  'round-cannot-be-added': () => t('schedule.admin.error.round-cannot-be-added'),
 } as const;
 
 const reasons = {
@@ -47,6 +50,14 @@ const reasons = {
   'empty-round-label': () => t('schedule.admin.refused.empty-round-label'),
   'invalid-date': () => t('schedule.admin.refused.invalid-date'),
   'invalid-time': () => t('schedule.admin.refused.invalid-time'),
+  'round-exists': () => t('schedule.admin.refused.round-exists'),
+  'round-has-games': () => t('schedule.admin.refused.round-has-games'),
+  'too-many-rounds': () => t('schedule.admin.refused.too-many-rounds', { max: maxRounds }),
+  'date-out-of-range': () =>
+    t('schedule.admin.refused.date-out-of-range', {
+      first: roundYears.first,
+      last: roundYears.last,
+    }),
 } as const;
 
 const blockers = {
@@ -61,6 +72,7 @@ const blockers = {
   'unknown-venue': () => t('schedule.admin.blocker.unknown-venue'),
   'unknown-court': () => t('schedule.admin.blocker.unknown-court'),
   'draft-unreadable': () => t('schedule.admin.blocker.draft-unreadable'),
+  'round-in-use': () => t('schedule.admin.blocker.round-in-use'),
 } as const;
 
 function pick<T extends Record<string, () => string>>(
@@ -83,4 +95,38 @@ export function noticeOf(search: Search): Notice | undefined {
   const key =
     first(search['partial']) === '1' ? 'schedule.admin.problemPartial' : 'schedule.admin.problem';
   return { kind: 'problem', text: t(key, { reason: why }) };
+}
+
+/**
+ * The one sentence that says why a form beside it was refused (step 2.160): the rule's
+ * own words when a rule refused it, else the refusal's; undefined when the address names
+ * no refusal we know. Said beside the form, so "That was not saved" goes without saying.
+ */
+export function whyNotSaved(search: Search): string | undefined {
+  const problem = pick(problems, first(search['problem']));
+  if (problem === undefined) return undefined;
+  const reason = pick(reasons, first(search['reason']));
+  return reason === undefined ? problem() : reason();
+}
+
+/** Which field of "Add a round" a refusal belongs beside, and the sentence to say there. */
+export function addRoundProblemOf(
+  search: Search,
+  typed: { readonly label: string; readonly date: string },
+): { readonly field: 'label' | 'date' | 'form'; readonly text: string } | undefined {
+  const problem = first(search['problem']);
+  const reason = first(search['reason']);
+  if (problem === undefined) return undefined;
+  if (reason === 'empty-round-label' || (problem === 'invalid-input' && typed.label === '')) {
+    return { field: 'label', text: t('schedule.admin.addRoundError.name') };
+  }
+  if (reason === 'invalid-date' || (problem === 'invalid-input' && typed.date === '')) {
+    return { field: 'date', text: t('schedule.admin.addRoundError.date') };
+  }
+  if (reason === 'date-out-of-range') {
+    const why = pick(reasons, reason);
+    return why === undefined ? undefined : { field: 'date', text: why() };
+  }
+  const why = whyNotSaved(search);
+  return why === undefined ? undefined : { field: 'form', text: why };
 }

@@ -91,7 +91,73 @@ const adminLink = (league, area) => `href="/${league}/admin/${area}"`;
 
 /** [who, path, status, words that must be there, words that must not, forward to, extra cookies] */
 const cases = [
-  ['visitor', '/', 200, ['Find your league, or start one']],
+  // Step 2.127: the front page says what SR Leagues is and offers "Sign in" to a visitor
+  // (the words it is found by changed from the placeholder's "Find your league, or start
+  // one"); a signed-in person sees their leagues first, and only those they may see.
+  [
+    'visitor',
+    '/',
+    200,
+    ['SR Leagues runs the websites of sports leagues', 'Sign in'],
+    ['This page is not built yet.', 'Your leagues', 'Signed in as'],
+  ],
+  [
+    'owner',
+    '/',
+    200,
+    ['Your leagues', 'North Valley League', 'Harbor City League', 'Quiet Pines League', 'Owner'],
+    ['Binned League', 'binned-league'],
+  ],
+  [
+    'scheduler',
+    '/',
+    200,
+    ['North Valley League', 'Scheduler', 'Quiet Pines League'],
+    ['Harbor City'],
+  ],
+  ['coach', '/', 200, ['North Valley League', 'Coach'], ['Quiet Pines']],
+  ['stranger', '/', 200, ['The leagues you belong to will be listed here'], ['North Valley']],
+  [
+    'owner',
+    '/account',
+    200,
+    ['Signed in as local-owner-token@example.test', 'Your leagues', 'North Valley League'],
+  ],
+  // The sign-in screen names only a league this person may see (return-league.ts, U-9):
+  // never a draft or a suspended league to a visitor or the coach, nor a league that does
+  // not exist; a live league to anyone.
+  [
+    'visitor',
+    '/signin?next=%2Fnorth-valley',
+    200,
+    ['Sign in to carry on at North Valley League.', 'Back to North Valley League'],
+  ],
+  ...['visitor', 'coach'].flatMap((who) =>
+    ['%2Fquiet-pines', '%2Fquiet-pines%2Fadmin', '%2Fclosed-gate', '%2Fno-such-league'].map(
+      (next) => [
+        who,
+        `/signin?next=${next}`,
+        200,
+        ['Sign in'],
+        ['carry on at', 'Back to', 'Quiet Pines', 'Closed Gate'],
+      ],
+    ),
+  ),
+  // The account button (U-8): a signed-in person's own, never in a visitor's page.
+  [
+    'owner',
+    '/north-valley',
+    200,
+    ['Signed in as local-owner-token@example.test', 'My games to score', 'Your account'],
+    ['Sign in or create an account'],
+  ],
+  [
+    'visitor',
+    '/north-valley',
+    200,
+    ['Sign in or create an account', 'href="/signin?next=%2Fnorth-valley"'],
+    ['Signed in as', 'site-account', 'My games to score', 'local-owner-token'],
+  ],
   // The sign-in screens (step 1.14).
   ['visitor', '/account', 307, [], [], '/signin?next=%2Faccount'],
   ['owner', '/account', 200, ['Your account', 'Signed-in devices', 'Sign out everywhere']],
@@ -868,6 +934,15 @@ async function checkStylesheets(origin) {
   return problems;
 }
 
+/**
+ * The page's own forms: those after the league's header. Since step 2.127 the header holds
+ * the account button's "Sign out" form (twice: the phone menu and the laptop's button),
+ * so forms are counted from the page's own content, as they were before it.
+ */
+function pageForms(html) {
+  return html.slice(Math.max(0, html.indexOf('</header>')));
+}
+
 async function checkTeams(origin) {
   const problems = [];
   const as = (who) => ({ cookie: `srl_session=${tokens[who]}` });
@@ -875,7 +950,7 @@ async function checkTeams(origin) {
   /** Posts the `index`th form of `page` with the fields given. */
   async function post(who, page, index, fields, formPage = page) {
     const html = await pageOf('owner', formPage);
-    const id = [...html.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
+    const id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
     if (id === undefined) {
       problems.push(`${page}: no form ${index}`);
       return undefined;
@@ -927,7 +1002,7 @@ async function checkTeams(origin) {
   }
   const entry = /name="entry" value="([^"]+)"/.exec(withPlayer)?.[1];
   const version = /name="version" value="([^"]+)"[^>]*\/><p><label>Number/.exec(withPlayer)?.[1];
-  const forms = [...withPlayer.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].length;
+  const forms = [...pageForms(withPlayer).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].length;
   // Forms in order: details, who sees, [number and role, mark as left] for the player, ...
   const gone = await post('owner', page, 3, {
     league: 'harbor-city',
@@ -1019,7 +1094,7 @@ async function checkSettings(origin) {
   const pageOf = async (who) => (await fetch(origin + page, { headers: as(who) })).text();
   async function post(who, index, fields) {
     const html = await pageOf('owner');
-    const id = [...html.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
+    const id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
     if (id === undefined) {
       problems.push(`settings: no form ${index}`);
       return undefined;

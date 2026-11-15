@@ -15,6 +15,7 @@ import type { DatabaseSource } from '../db/create-database.ts';
 import { applyMigrations } from '../migrations/apply-migrations.ts';
 import { pgliteDriver } from '../migrations/pglite-driver.ts';
 import { seedLeaguesInto } from './seed-leagues.ts';
+import { putSeedSeasonsUnderWay } from './seed-season-under-way.ts';
 
 /** The login role a made-up database is used as. */
 export const madeUpLoginRole = 'made_up_app_login';
@@ -37,6 +38,12 @@ export type MadeUpDatabase = {
 export type MadeUpOptions = {
   /** Seed leagues, by short name, to put in the bin once loaded: for tests of the bin. */
   readonly inBin?: readonly string[];
+  /**
+   * Each seed league's season opened, with a published schedule and a result
+   * (seed-season-under-way.ts): what the web app runs on locally, so its public pages
+   * have something to show. Off by default: the seeded season is still being set up.
+   */
+  readonly underWay?: boolean;
 };
 
 /** Opens a new made-up database in memory. Close it when done. */
@@ -46,6 +53,7 @@ export async function madeUpDatabase(options: MadeUpOptions = {}): Promise<MadeU
     const run = await applyMigrations(pgliteDriver(pglite));
     if (!run.ok) throw new Error(`The made-up database could not be built: ${run.error.code}.`);
     await seedLeaguesInto(pglite);
+    if (options.underWay === true) await putSeedSeasonsUnderWay(pglite);
     const inBin = options.inBin ?? [];
     if (inBin.length > 0) {
       const binned = await pglite.query(
