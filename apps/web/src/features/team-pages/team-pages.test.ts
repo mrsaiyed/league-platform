@@ -205,6 +205,41 @@ describe('a team page', () => {
     expect(statuses.at(-1)).toBe('postponed');
     expect(statuses.indexOf('postponed')).toBe(statuses.length - 1);
   });
+
+  it("lists a team its game tonight ahead of one earlier today with no result yet, by the league's clock", async () => {
+    const s = await season(adult);
+    const real = await schedules.clockOf(adult);
+    const schedule = await schedules.scheduleOf(adult, s.id, real.today);
+    const base = schedule?.rounds.flatMap((r) => r.games).find((g) => g.homeTeam.slug === 'herons');
+    if (schedule === undefined || base === undefined) throw new Error('no game');
+    // 9:30 in the evening of the 13th in Chicago; already the 14th by UTC.
+    const clock = {
+      today: '2026-11-13',
+      now: '2026-11-14T03:30:00.000Z',
+      timeZone: 'America/Chicago',
+    };
+    const game = (id: string, startsAt: string) => ({
+      ...base,
+      id,
+      status: 'scheduled',
+      startsAt,
+      localDate: '2026-11-13',
+      homeScore: null,
+      awayScore: null,
+    });
+    const changed = {
+      ...schedule,
+      rounds: [],
+      unplacedGames: [
+        game('earlier-today', '2026-11-14T01:00:00.000Z'),
+        game('tonight', '2026-11-14T04:00:00.000Z'),
+      ],
+    };
+    expect(buildTeamGames(changed, 'herons', clock, addressee).upcoming.map((g) => g.id)).toEqual([
+      'tonight',
+      'earlier-today',
+    ]);
+  });
 });
 
 describe('the start page', () => {

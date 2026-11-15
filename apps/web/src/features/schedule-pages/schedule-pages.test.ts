@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
-import { buildHomeGames, buildScheduleView, parseRound } from './build-schedule.ts';
+import { buildHomeGames, buildScheduleView, comingOrder, parseRound } from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
 import { applyUpdate } from './live-game-list.tsx';
 import { RoundSections, gameLinkWords } from './schedule-views.tsx';
@@ -260,7 +260,10 @@ describe('upcoming games', () => {
     );
   });
 
-  it('puts a game with no day, and one whose day has passed with no result, after the dated ones', async () => {
+  // The order between the last three was settled by the second code look (L2): a game whose
+  // start has passed with no result now comes before one with no day (it was the other
+  // way round), since its result is the nearer news.
+  it('puts a game whose day has passed with no result, then one with no day, after the coming ones', async () => {
     const { clock, schedule, everyGame } = await upcomingOf();
     const next = everyGame.find(
       (g) => g.status === 'scheduled' && (g.localDate ?? '') > clock.today,
@@ -275,7 +278,66 @@ describe('upcoming games', () => {
       unplacedGames: [postponed, overdue, undated, next],
     };
     const ids = buildHomeGames(changed, clock, addressee).upcoming.map((g) => g.id);
-    expect(ids).toEqual([next.id, 'no-day', 'overdue', 'off']);
+    expect(ids).toEqual([next.id, 'overdue', 'no-day', 'off']);
+  });
+
+  it("lists tonight's game ahead of one earlier today that has no result yet, by the league's own clock", async () => {
+    const { schedule, everyGame } = await upcomingOf();
+    const base = everyGame.find((g) => g.status === 'scheduled');
+    if (base === undefined) throw new Error('no game');
+    // 9:30 in the evening of November 13 in the league's zone (Chicago); by UTC it is
+    // already 3:30 in the morning of the 14th. "Today" is the league's 13th.
+    const clock = {
+      today: '2026-11-13',
+      now: '2026-11-14T03:30:00.000Z',
+      timeZone: 'America/Chicago',
+    };
+    const game = (id: string, startsAt: string | null, localDate: string | null) => ({
+      ...base,
+      id,
+      startsAt,
+      localDate,
+    });
+    const games = [
+      game('postponed', '2026-11-06T00:00:00.000Z', '2026-11-05'),
+      game('no-day', null, null),
+      // Yesterday in the league's zone, with a day and no time: passed.
+      game('yesterday', null, '2026-11-12'),
+      // 7 pm today in Chicago: started two and a half hours ago, no result yet.
+      game('earlier-today', '2026-11-14T01:00:00.000Z', '2026-11-13'),
+      // Today in the league's zone, time to be announced: by UTC's date it would be "yesterday".
+      game('today-no-time', null, '2026-11-13'),
+      // 10 pm tonight in Chicago: half an hour from now. The real next game.
+      game('tonight', '2026-11-14T04:00:00.000Z', '2026-11-13'),
+      game('tomorrow', '2026-11-15T00:00:00.000Z', '2026-11-14'),
+    ].map((g) => (g.id === 'postponed' ? { ...g, status: 'postponed' } : g));
+    const changed = { ...schedule, rounds: [], unplacedGames: games };
+    // Seven games, and the home page lists five coming ones and then the postponed.
+    const sorted = [...games].sort(comingOrder(clock)).map((g) => g.id);
+    expect(sorted).toEqual([
+      'tonight',
+      'today-no-time',
+      'tomorrow',
+      'earlier-today',
+      'yesterday',
+      'no-day',
+      'postponed',
+    ]);
+    const home = buildHomeGames(changed, clock, addressee).upcoming.map((g) => g.id);
+    expect(home[0]).toBe('tonight');
+    expect(home.indexOf('tonight')).toBeLessThan(home.indexOf('earlier-today'));
+    expect(home.at(-1)).toBe('postponed');
+    // An hour later tonight's game has started with no result: tomorrow's is the next one.
+    const later = { ...clock, now: '2026-11-14T04:30:00.000Z' };
+    expect([...games].sort(comingOrder(later)).map((g) => g.id)).toEqual([
+      'today-no-time',
+      'tomorrow',
+      'tonight',
+      'earlier-today',
+      'yesterday',
+      'no-day',
+      'postponed',
+    ]);
   });
 
   it('keeps postponed games from taking a coming game its place in the list', async () => {

@@ -269,19 +269,41 @@ const nextTime = (g: PublicGame): number => timeOf(g) ?? Number.POSITIVE_INFINIT
 
 /**
  * The order of games still to play, so that the first one listed is the next one a
- * visitor can go to: a game under way; then games on a day from today on, by start; then
- * games with no day yet; then games whose day has passed with no result; and last the
- * postponed ones, which have no day to come until they are given a new one.
+ * visitor can go to:
+ * 1. a game under way;
+ * 2. games still to start, soonest first: a start time later than now, or, for a game
+ *    with a day and no time yet, a day from today on (after that day's timed games);
+ * 3. games whose start has passed with no result, today's included, latest first;
+ * 4. games with no day yet;
+ * 5. postponed games, which have no day to come until they are given a new one.
+ * "Now" and "today" are the league's own (its clock), so a game late on the league's
+ * evening is still tonight's when the date has already changed elsewhere.
  */
 export function comingOrder(clock: LeagueClock): (a: PublicGame, b: PublicGame) => number {
+  const now = Date.parse(clock.now);
+  /** Still to start: its time is ahead, or it has only a day and that day is not over. */
+  const ahead = (g: PublicGame, day: string): boolean =>
+    g.startsAt !== null ? Date.parse(g.startsAt) > now : day >= clock.today;
   const rank = (g: PublicGame): number => {
     if (g.status === 'live') return 0;
     if (g.status === 'postponed') return 4;
     const day = dayOf(g, clock);
-    if (day === null) return 2;
-    return day >= clock.today ? 1 : 3;
+    if (day === null) return 3;
+    return ahead(g, day) ? 1 : 2;
   };
-  return (a, b) => rank(a) - rank(b) || nextTime(a) - nextTime(b);
+  return (a, b) => {
+    const [ra, rb] = [rank(a), rank(b)];
+    if (ra !== rb) return ra - rb;
+    if (ra === 1) {
+      // By day; within a day the games with a time first, by that time.
+      const [da, db] = [dayOf(a, clock) ?? '', dayOf(b, clock) ?? ''];
+      if (da !== db) return da < db ? -1 : 1;
+      if ((a.startsAt === null) !== (b.startsAt === null)) return a.startsAt === null ? 1 : -1;
+      return nextTime(a) - nextTime(b);
+    }
+    // Passed with no result: the latest first. Everything else: earliest first.
+    return ra === 2 ? lastTime(b) - lastTime(a) : nextTime(a) - nextTime(b);
+  };
 }
 
 /**

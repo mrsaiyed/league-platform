@@ -475,10 +475,14 @@ export function standInPublicSchedule(
   const find = (leagueId: string, seasonId: string): League | undefined =>
     seasonsOf(ids, leagueId).find((l) => l.seasonId === seasonId);
   return {
-    clockOf: async (leagueId): Promise<LeagueClock> => ({
-      today: todayIn(now(), zoneOf(leagueId)),
-      timeZone: zoneOf(leagueId),
-    }),
+    clockOf: async (leagueId): Promise<LeagueClock> => {
+      const moment = now();
+      return {
+        today: todayIn(moment, zoneOf(leagueId)),
+        now: moment.toISOString(),
+        timeZone: zoneOf(leagueId),
+      };
+    },
     scheduleOf: async (leagueId, seasonId, today) => {
       const found = find(leagueId, seasonId);
       return found === undefined

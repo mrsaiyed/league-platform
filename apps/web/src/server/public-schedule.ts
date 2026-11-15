@@ -9,6 +9,8 @@ import type { PublicGame, PublicSchedule } from '@srleagues/core';
 export type LeagueClock = {
   /** yyyy-mm-dd. */
   readonly today: string;
+  /** This moment, as an ISO time: what "has it started yet" is measured against. */
+  readonly now: string;
   /** An IANA zone name, such as `Europe/Paris`. */
   readonly timeZone: string;
 };
