@@ -46,9 +46,14 @@ export type EarlierGames = {
     /** More games than `earlierRoundGamesLimit` in it: the first are shown. */
     readonly more: boolean;
   } | null;
+  /**
+   * Whether the person may score every game of the league; false when theirs are only
+   * some (a program, or their assigned games), so an empty list speaks of theirs only.
+   */
+  readonly seesEveryGame: boolean;
 };
 
-const none: EarlierGames = { rounds: [], moreRounds: false, shown: null };
+const none: EarlierGames = { rounds: [], moreRounds: false, shown: null, seesEveryGame: false };
 
 export const listEarlierGames = defineCommand({
   name: 'games.list_earlier_games',
@@ -88,10 +93,13 @@ export const listEarlierGames = defineCommand({
       )
       .filter((round) => round.games > 0);
     const moreRounds = counted.length > earlierRoundsLimit;
+    const seesEveryGame = reach.every === 'all';
     // Only a round on offer is shown: a key for any other names nothing here.
     const asked = parseEarlierRoundKey(input.round);
     const round = asked === undefined ? undefined : rounds.find((r) => r.key === keyOf(asked));
-    if (asked === undefined || round === undefined) return ok({ rounds, moreRounds, shown: null });
+    if (asked === undefined || round === undefined) {
+      return ok({ rounds, moreRounds, shown: null, seesEveryGame });
+    }
     const found = await tx.games.listEarlierRound(
       accountId,
       reach,
@@ -112,6 +120,7 @@ export const listEarlierGames = defineCommand({
         games: games ?? [],
         more: found.games.length > earlierRoundGamesLimit,
       },
+      seesEveryGame,
     });
   },
 });

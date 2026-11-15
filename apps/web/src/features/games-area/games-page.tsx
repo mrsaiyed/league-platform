@@ -38,6 +38,7 @@ import {
 } from './actions.ts';
 import { buildGameRows, type GameRowView } from './build-games-view.ts';
 import { FinalScoreBoxes, type FinalScoreTexts } from './final-score-boxes.tsx';
+import { earlierEmptyText, needsResultEmptyText } from './empty-list-text.ts';
 import { dayHeadingText, earlierRoundText } from './game-day-text.ts';
 import { gamesSections } from './games-sections.ts';
 import { readReopenViews } from './read-reopen-views.ts';
@@ -429,7 +430,7 @@ export async function GamesPage({
           >
             <Part
               rows={rows(sections.needsResult)}
-              empty={t('admin.games.needsResult.empty')}
+              empty={needsResultEmptyText(needs.ok && needs.value.seesEveryGame)}
               scene={scene}
             />
             {needs.ok && needs.value.more ? (
@@ -459,7 +460,7 @@ export async function GamesPage({
             <Section title={t('admin.games.earlier.title')} note={t('admin.games.earlier.note')}>
               {roundOptions.length === 0 ? (
                 <div className="ui-stack">
-                  <EmptyPanel text={t('admin.games.earlier.empty')} />
+                  <EmptyPanel text={earlierEmptyText(earlier.ok && earlier.value.seesEveryGame)} />
                   {/* Never "none" alone while rounds were left out: say only the latest are offered. */}
                   {earlier.ok && earlier.value.moreRounds ? (
                     <p className="ui-section-note">

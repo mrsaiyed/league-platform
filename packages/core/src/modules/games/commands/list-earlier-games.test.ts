@@ -164,6 +164,14 @@ describe('listEarlierGames', () => {
     expect(value.shown?.more).toBe(false);
   });
 
+  it('says whether the person sees every game, so an empty list speaks only of theirs', async () => {
+    const settings = scoringRule('assignedOnly');
+    expect((await earlier(ownerId)).seesEveryGame).toBe(true);
+    expect((await earlier(scorekeeperId)).seesEveryGame).toBe(true);
+    expect((await earlier(scorekeeperId, `r-${r1.id}`, { settings })).seesEveryGame).toBe(false);
+    expect((await earlier(programScorekeeperId)).seesEveryGame).toBe(false);
+  });
+
   it('refuses anyone who scores nowhere, and a visitor', async () => {
     const { deps, as } = memoryGames({ games, grants, rounds });
     expect(await listEarlierGames(as(editorId), {}, deps)).toEqual({

@@ -22,6 +22,11 @@ export type GamesNeedingResult = {
   readonly games: readonly MyGame[];
   /** More games than these need a result: the oldest are shown first. */
   readonly more: boolean;
+  /**
+   * Whether the person may score every game of the league; false when theirs are only
+   * some (a program, or their assigned games), so an empty list speaks of theirs only.
+   */
+  readonly seesEveryGame: boolean;
 };
 
 export const listGamesNeedingResult = defineCommand({
@@ -31,7 +36,7 @@ export const listGamesNeedingResult = defineCommand({
   // Anyone who scores somewhere in the league; which games is decided game by game below.
   allowed: (context, _input, tx: GamesTx) => mayReadGames(context, tx, 'games.score'),
   run: async ({ context, tx }): Promise<Result<GamesNeedingResult, never>> => {
-    const none = { today: '', games: [], more: false };
+    const none = { today: '', games: [], more: false, seesEveryGame: false };
     const accountId = context.accountId;
     if (accountId === null) return ok(none);
     const holder = await accessOfAccount(tx, accountId);
@@ -48,6 +53,11 @@ export const listGamesNeedingResult = defineCommand({
       found.today,
     );
     if (games === undefined) return ok(none);
-    return ok({ today: found.today, games, more: found.games.length > needsResultLimit });
+    return ok({
+      today: found.today,
+      games,
+      more: found.games.length > needsResultLimit,
+      seesEveryGame: reach.every === 'all',
+    });
   },
 });

@@ -306,6 +306,14 @@ if (browser) {
         theirs.length === 1 && theirs[0] === draftUnscored,
         theirs.join(' '),
       );
+      // None of their games is in an earlier round: said of their games, not the league's.
+      const earlierText = await part(page, 'Earlier games').innerText();
+      note(
+        'their empty "Earlier games" speaks only of the games they score',
+        earlierText.includes('There are no earlier games you score yet.') &&
+          !earlierText.includes('There are no earlier games yet.'),
+        earlierText.slice(0, 200),
+      );
       await accessible(page, "a scorekeeper's Games");
     } finally {
       await keeper.context.close();

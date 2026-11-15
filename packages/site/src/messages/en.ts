@@ -604,6 +604,8 @@ export const en = {
   'admin.games.needsResult.note':
     'Games whose start has passed and that have no result yet, oldest first.',
   'admin.games.needsResult.empty': 'Every game that has started has its result.',
+  // For someone who scores only some games (a program, or the games assigned to them).
+  'admin.games.needsResult.emptyYours': 'Every game you score that has started has its result.',
   'admin.games.needsResult.more':
     'Only the oldest {count} are shown. Enter their results and the next ones appear here.',
   'admin.games.todayTitle': 'Today',
@@ -615,6 +617,7 @@ export const en = {
   'admin.games.earlier.note':
     'Finished, forfeited, postponed and cancelled games from before today, one round at a time, to look back or correct a result.',
   'admin.games.earlier.empty': 'There are no earlier games yet.',
+  'admin.games.earlier.emptyYours': 'There are no earlier games you score yet.',
   'admin.games.earlier.filters': 'Earlier games',
   'admin.games.earlier.round': 'Round',
   'admin.games.earlier.choose': 'Choose a round',

@@ -131,6 +131,20 @@ describe('listGamesNeedingResult', () => {
     });
   });
 
+  it('says whether the person sees every game, so an empty list speaks only of theirs', async () => {
+    const sees = async (account: string, state: Partial<MemoryGames> = {}) => {
+      const { deps, as } = memoryGames({ games, grants, ...state });
+      const result = await listGamesNeedingResult(as(account), {}, deps);
+      return result.ok && result.value.seesEveryGame;
+    };
+    const settings = scoringRule('assignedOnly');
+    expect(await sees(ownerId)).toBe(true);
+    expect(await sees(schedulerId, { settings })).toBe(true);
+    expect(await sees(scorekeeperId)).toBe(true);
+    expect(await sees(scorekeeperId, { settings })).toBe(false);
+    expect(await sees(programScorekeeperId)).toBe(false);
+  });
+
   it('still lists them in an archived league, marked not scorable', async () => {
     const { deps, as } = memoryGames({ games, grants, status: 'archived' });
     const result = await listGamesNeedingResult(as(ownerId), {}, deps);
