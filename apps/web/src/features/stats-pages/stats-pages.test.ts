@@ -134,6 +134,14 @@ describe('statistics page', () => {
     expect(html(data)).toContain('at least 3 games');
   });
 
+  it('gives fouls and turnovers no leaders card, and keeps them in the tables (S-48)', async () => {
+    const data = await statsFor(adult);
+    expect(data.playerColumns.map((c) => c.key)).toContain('fouls');
+    expect(data.leaders.map((board) => board.key)).not.toContain('fouls');
+    expect(data.leaders.map((board) => board.key)).not.toContain('turnovers');
+    expect(data.leaders.map((board) => board.key)).toContain('points');
+  });
+
   it('shows children by first name and last initial in a youth league', async () => {
     const text = html(await statsFor(youth));
     expect(text).toContain('Sam R.');
