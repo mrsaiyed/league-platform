@@ -15,7 +15,7 @@
 // with a reason first (S-7), then entering the sheet again.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
-import { decideGame, openGame, type DecideGameError } from '../decide-game.ts';
+import { decideGame, openGameByHand, type DecideGameError } from '../decide-game.ts';
 import { gameScore, gameVersion } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GameRosterPlayer, GamesTx, NewGameLine } from '../ports.ts';
@@ -24,11 +24,7 @@ import { effectiveRulesOf } from '../season-rules-of.ts';
 export type SetBoxScoreError =
   | DecideGameError
   | {
-      readonly code:
-        | 'game-is-tracked'
-        | 'player-not-on-team'
-        | 'player-listed-twice'
-        | 'did-not-play-has-stats';
+      readonly code: 'player-not-on-team' | 'player-listed-twice' | 'did-not-play-has-stats';
     };
 
 /** A stat key as the database takes it (is_stat_counts, migration 0010). */
@@ -67,12 +63,12 @@ export const setBoxScore = defineCommand({
     tx,
     emit,
   }): Promise<Result<{ version: number }, SetBoxScoreError>> => {
-    const open = openGame(await tx.games.find(input.gameId), input.version);
+    // A game with plays is refused by openGameByHand; one under way with none yet is too:
+    // a sheet is copied afterwards.
+    const open = await openGameByHand(tx, await tx.games.find(input.gameId), input.version);
     if (!open.ok) return open;
     const game = open.value;
-    if (game.status === 'live' || (await tx.games.hasPlays(game.id))) {
-      return fail({ code: 'game-is-tracked' });
-    }
+    if (game.status === 'live') return fail({ code: 'game-is-tracked' });
     if (input.homeScore === input.awayScore) {
       const rules = await effectiveRulesOf(tx, game);
       if (!rules.allowTies) return fail({ code: 'tie-not-allowed' });

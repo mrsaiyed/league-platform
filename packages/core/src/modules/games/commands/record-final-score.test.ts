@@ -1,4 +1,7 @@
+import { tablePlayerEventTypes } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
+import { memoryTracker } from '../memory-tracker.test-helper.ts';
+import type { NewGameEvent } from '../ports.ts';
 import {
   finalGame,
   game,
@@ -161,6 +164,76 @@ describe('recordFinalScore', () => {
     const { deps, as } = memoryGames({ games: [game(1)], grants: [programAdminGrant] });
     expect(await recordFinalScore(as(programAdminId), input, deps)).toMatchObject({
       error: { code: 'not-allowed' },
+    });
+  });
+});
+
+describe('recordFinalScore over a game the live tracker scores (S-46)', () => {
+  const live = game(1, { status: 'live', captureMode: 'live', homeScore: 12, awayScore: 9 });
+  const event = (seq: number, type: string): NewGameEvent => ({
+    gameId: gameUuid(1),
+    seq,
+    commandId: `01900000-0000-7000-8000-00000000e00${seq}`,
+    type,
+    payload: {},
+    tappedAt: 0,
+    accountId: scorekeeperId,
+  });
+
+  it('refuses a game with plays, whoever sends it, and the game stays live with its plays', async () => {
+    const grants = [scorekeeperGrant, schedulerGrant];
+    for (const account of [ownerId, schedulerId, scorekeeperId]) {
+      const { db, deps, as, events } = memoryTracker({
+        games: [live],
+        grants,
+        events: [event(1, 'lineup'), event(2, 'score')],
+      });
+      expect(await recordFinalScore(as(account), input, deps), account).toEqual({
+        ok: false,
+        error: { code: 'game-is-tracked' },
+      });
+      expect(db.state.games[0]).toEqual(live);
+      expect(db.state.events).toHaveLength(2);
+      expect(db.state.activity).toEqual([]);
+      expect(events).toEqual([]);
+    }
+  });
+
+  it('refuses a scheduled game the tracker has begun to score', async () => {
+    const { db, deps, as } = memoryGames({
+      games: [game(1, { captureMode: 'live' })],
+      tracked: [gameUuid(1)],
+    });
+    expect(await recordFinalScore(as(ownerId), input, deps)).toMatchObject({
+      error: { code: 'game-is-tracked' },
+    });
+    expect(db.state.games[0]?.status).toBe('scheduled');
+  });
+
+  it('still finishes a game set to live tracking that has no plays yet', async () => {
+    // Only players added at the scorer's table: they are not plays (record 058).
+    const { db, deps, as } = memoryTracker({
+      games: [game(1, { captureMode: 'live' })],
+      events: [event(1, tablePlayerEventTypes[0])],
+    });
+    expect(await recordFinalScore(as(ownerId), input, deps)).toMatchObject({ ok: true });
+    expect(db.state.games[0]).toMatchObject({ status: 'final', homeScore: 52, awayScore: 48 });
+  });
+
+  it('counts only the plays since the game was last marked not started (record 061)', async () => {
+    const marked = memoryTracker({
+      games: [game(1, { captureMode: 'live' })],
+      events: [event(1, 'lineup'), event(2, 'score'), event(3, 'reset')],
+    });
+    expect(await recordFinalScore(marked.as(ownerId), input, marked.deps)).toMatchObject({
+      ok: true,
+    });
+    const again = memoryTracker({
+      games: [game(1, { captureMode: 'live' })],
+      events: [event(1, 'score'), event(2, 'reset'), event(3, 'lineup')],
+    });
+    expect(await recordFinalScore(again.as(ownerId), input, again.deps)).toMatchObject({
+      error: { code: 'game-is-tracked' },
     });
   });
 });

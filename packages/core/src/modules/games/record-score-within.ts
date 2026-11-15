@@ -4,9 +4,10 @@
 // and a game already decided or cancelled is left alone. It does not check permission:
 // the calling command has done that for the game's season. A reopened box score game
 // finalized here with two numbers only loses its old lines, as record_final_score does
-// (S-27), so they no longer count in totals.
+// (S-27), so they no longer count in totals. A game the live tracker has recorded plays
+// of is refused, as record_final_score refuses it (`game-is-tracked`, S-46).
 import { fail, type CommandContext, type Result } from '../../command/index.ts';
-import { decideGame, openGame, type DecideGameError } from './decide-game.ts';
+import { decideGame, openGameByHand, type DecideGameError } from './decide-game.ts';
 import type { GameFinalized } from '../../events/game-events.ts';
 import type { GamesTx } from './ports.ts';
 import { effectiveRulesOf } from './season-rules-of.ts';
@@ -25,7 +26,7 @@ export async function recordFinalScoreWithin(args: {
   const { context, tx, emit } = args;
   const found = await tx.games.find(args.gameId);
   const version = args.version ?? found?.version ?? 0;
-  const open = openGame(found, version);
+  const open = await openGameByHand(tx, found, version);
   if (!open.ok) return open;
   const game = open.value;
   if (args.homeScore === args.awayScore) {

@@ -2,10 +2,12 @@
 // league's forfeit score from the season's rules. No player statistics: a reopened box
 // score game recorded now as a forfeit loses its old lines in the same transaction, as a
 // final score only does (S-27), so they no longer count in totals. Announces
-// `games.finalized` (T-24). Needs `games.results`, as postponing and cancelling do.
+// `games.finalized` (T-24). Needs `games.results`, as postponing and cancelling do. A
+// game the live tracker has recorded plays of is refused (`game-is-tracked`), as a final
+// score typed by hand is (S-46): a forfeit's numbers would contradict the plays.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
-import { decideGame, openGame, type DecideGameError } from '../decide-game.ts';
+import { decideGame, openGameByHand, type DecideGameError } from '../decide-game.ts';
 import { gameVersion } from '../game-fields.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
@@ -30,7 +32,7 @@ export const recordForfeit = defineCommand({
     tx,
     emit,
   }): Promise<Result<{ version: number }, RecordForfeitError>> => {
-    const open = openGame(await tx.games.find(input.gameId), input.version);
+    const open = await openGameByHand(tx, await tx.games.find(input.gameId), input.version);
     if (!open.ok) return open;
     const game = open.value;
     const homeForfeits = input.forfeitingTeamId === game.homeTeamId;
