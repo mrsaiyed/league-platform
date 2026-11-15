@@ -769,6 +769,10 @@ test('a planted violation of any rule fails the gate', (t) => {
     'T-183': { 'supabase/migrations/0001_a.sql': 'drop table teams;\n' },
     'T-226': { 'apps/web/src/a.ts': 'issueInvitationLink(tx, id);\n' },
     'T-187': { 'apps/web/src/a.tsx': 'export const A = () => <p>Save changes</p>;\n' },
+    'NODE-TS': {
+      'packages/database/index.ts': "export { E } from './src/e.ts';\n",
+      'packages/database/src/e.ts': 'export class E {\n  constructor(readonly x: string) {}\n}\n',
+    },
   };
   const quiet = () => {};
   for (const [rule, files] of Object.entries(plants)) {
@@ -786,4 +790,89 @@ test('a planted violation of any rule fails the gate', (t) => {
   assert.match(failed.stderr, /packages\/core\/src\/a\.ts:1 \[T-21\] core may not import database/);
   const passed = spawnSync(process.execPath, [cli, repoRoot], { encoding: 'utf8' });
   assert.equal(passed.status, 0, passed.stderr);
+});
+
+test('NODE-TS catches what Node cannot strip, in any file Node runs itself, at its line', (t) => {
+  assertExactly(
+    found(t, {
+      // The database package: the web server has Node load it at run time.
+      'packages/database/index.ts': [
+        "export { NotPlain } from './src/not-plain.ts';",
+        "import { type Kind } from './src/kind.ts';",
+        "export const later = () => import('./src/later.ts');",
+        "export * from './src/helper.ts';",
+        '',
+      ].join('\n'),
+      // The very form that stopped the web server on GitHub (step 2.149).
+      'packages/database/src/not-plain.ts': [
+        '// constructor(readonly inAComment: string) is not code',
+        'export class NotPlain extends Error {',
+        '  constructor(',
+        '    readonly entry: string,',
+        '  ) {',
+        '    super(entry);',
+        '  }',
+        '}',
+        '',
+      ].join('\n'),
+      // `import { type Kind }` still loads the file.
+      'packages/database/src/kind.ts': 'export enum Kind {\n  A,\n}\n',
+      // So does a dynamic import of a written name.
+      'packages/database/src/later.ts': 'export namespace Later {\n  export const a = 1;\n}\n',
+      // A test helper that code Node runs loads: Node would run it in the app.
+      'packages/database/src/helper.ts': "export * from './made-up.test-helper.ts';\n",
+      'packages/database/src/made-up.test-helper.ts':
+        'export class H {\n  constructor(private h: number) {}\n}\n',
+      // Next.js loads its config with Node.
+      'apps/web/next.config.ts': "import config from './settings.ts';\nexport default config;\n",
+      'apps/web/settings.ts':
+        'class S {\n  constructor(public s = 1) {}\n}\nexport default new S();\n',
+    }),
+    [
+      [
+        'packages/database/src/not-plain.ts:4 [NODE-TS]',
+        'parameter property is not supported in strip-only mode". Node runs it itself (loaded by packages/database/index.ts)',
+      ],
+      ['packages/database/src/kind.ts:1 [NODE-TS]', 'enum is not supported'],
+      ['packages/database/src/later.ts:1 [NODE-TS]', 'namespace'],
+      [
+        'packages/database/src/helper.ts:1 [NODE-TS]',
+        'loads the test file packages/database/src/made-up.test-helper.ts',
+      ],
+      ['packages/database/src/made-up.test-helper.ts:2 [NODE-TS]', 'parameter property'],
+      ['apps/web/settings.ts:2 [NODE-TS]', 'parameter property'],
+    ],
+  );
+});
+
+test('NODE-TS leaves alone what Node never runs itself, and what strips', (t) => {
+  assertExactly(
+    found(t, {
+      'packages/database/index.ts': [
+        "import type { OnlyAType } from './src/only-a-type.ts';",
+        "export type { Also } from './src/also.ts';",
+        "export { fine } from './src/fine.ts';",
+        '',
+      ].join('\n'),
+      // Reached only by type: Node never loads them.
+      'packages/database/src/only-a-type.ts':
+        'export class OnlyAType {\n  constructor(readonly x: string) {}\n}\n',
+      'packages/database/src/also.ts': 'export enum Also {\n  A,\n}\n',
+      // Types Node strips.
+      'packages/database/src/fine.ts':
+        'export const fine = <T,>(value: T): T => value;\nexport interface I { readonly a: string }\ndeclare enum Gone { A }\n',
+      // A test, run by the test runner, which compiles it.
+      'packages/database/src/a.test.ts': 'class T {\n  constructor(readonly t: string) {}\n}\n',
+      // Web app code is compiled by Next.js's bundler, not stripped by Node.
+      'apps/web/src/bundled.ts': 'export class B {\n  constructor(private b: number) {}\n}\n',
+    }),
+    [],
+  );
+});
+
+test('every file NODE-TS starts from is still there', async () => {
+  const { nodeEntries } = await import('../scripts/structure/config.mjs');
+  for (const rel of nodeEntries) {
+    assert.ok(fs.existsSync(path.join(repoRoot, rel)), `${rel} is gone: update nodeEntries`);
+  }
 });

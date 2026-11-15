@@ -28,6 +28,11 @@ const failureLine = [
   /^\s*not ok\b/,
   /^\s*✖/,
   /^\s*(Test Files|Tests)\s.*\bfailed\b/,
+  // The repository's own checks ("Web shell check failed:", "Structure checks failed …").
+  /\bchecks? failed\b/,
+  // Node refusing a TypeScript file it runs itself (step 2.149), and the rule naming it.
+  /not supported in strip-only mode/,
+  /\[NODE-TS\]/,
 ];
 
 /** The annotations, as lines for GitHub to read. */

@@ -70,3 +70,31 @@ test('many failures are cut short, and long lines too', () => {
 test('a line redrawn in place keeps only its last state', () => {
   assert.deepEqual(plainLines('a\r b\r c\nd'), [' c', 'd']);
 });
+
+test("a repository check's own failure and Node's refusal of a file are named", () => {
+  // The words GitHub printed when the web shell check failed (step 2.149).
+  const notes = failureNotes(
+    [
+      '> league-platform@0.1.0 test:web',
+      '> node scripts/check-web-shell.mjs',
+      'Web shell check failed:',
+      '  staging refused to start without saying why:',
+      '✓ Ready in 65ms',
+      'TypeScript parameter property is not supported in strip-only mode',
+      '  The file Node refused:',
+      '    packages/database/src/made-up.ts:10 [NODE-TS] Node refuses this file',
+    ].join('\n'),
+  );
+  assert.equal(
+    notes[0],
+    '::error title=verify stopped during test%3Aweb::> league-platform@0.1.0 test:web',
+  );
+  assert.deepEqual(
+    notes.filter((note) => note.startsWith('::error title=failed::')).map((note) => note.slice(22)),
+    [
+      'Web shell check failed:',
+      'TypeScript parameter property is not supported in strip-only mode',
+      'packages/database/src/made-up.ts:10 [NODE-TS] Node refuses this file',
+    ],
+  );
+});

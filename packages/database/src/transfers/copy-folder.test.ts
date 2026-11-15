@@ -1,5 +1,15 @@
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -57,7 +67,36 @@ describe('copyFolder', () => {
     const error = await copyFolder(from, to).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(NotPlainFolderError);
     expect((error as NotPlainFolderError).entry).toBe(path.join('base', 'link'));
+    expect((error as NotPlainFolderError).kind).toBe('link');
+    expect((error as NotPlainFolderError).message).toMatch(/lstat calls it a symbolic link/);
     expect(existsSync(to)).toBe(false);
+  });
+
+  // Windows keeps no such permissions on its files and folders: there, only the first
+  // part (the empty file and the empty folder) can be checked.
+  it(`keeps empty files and folders${process.platform === 'win32' ? '' : ', and each file and folder’s permissions (0600, 0700)'}`, async () => {
+    const from = path.join(root, 'private');
+    await mkdir(path.join(from, 'pg_notify'), { recursive: true });
+    await mkdir(path.join(from, 'base', '5'), { recursive: true });
+    await writeFile(path.join(from, 'postmaster.opts'), '');
+    await writeFile(path.join(from, 'base', '5', '1259'), 'page');
+    if (process.platform !== 'win32') {
+      await chmod(path.join(from, 'base', '5', '1259'), 0o600);
+      await chmod(path.join(from, 'base'), 0o700);
+      await chmod(from, 0o750);
+    }
+
+    const to = path.join(root, 'private-copy');
+    await copyFolder(from, to);
+
+    expect(await readdir(path.join(to, 'pg_notify'))).toEqual([]);
+    expect((await stat(path.join(to, 'postmaster.opts'))).size).toBe(0);
+    if (process.platform !== 'win32') {
+      const mode = async (inner: string) => (await stat(path.join(to, inner))).mode & 0o777;
+      expect(await mode(path.join('base', '5', '1259'))).toBe(0o600);
+      expect(await mode('base')).toBe(0o700);
+      expect(await mode('')).toBe(0o750);
+    }
   });
 
   it('fails when a file cannot be copied, and stops copying the rest', async () => {
