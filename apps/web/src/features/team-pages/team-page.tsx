@@ -221,14 +221,24 @@ export async function TeamPage({
                 }}
               />
             ) : (
-              <GameList leagueId={addressee.id} games={games.upcoming} />
+              <GameList
+                leagueId={addressee.id}
+                games={games.upcoming}
+                layout="board"
+                across="pair"
+              />
             )}
           </Section>
           <Section title={t('team.results')}>
             {games.results.length === 0 ? (
               <EmptyPanel text={t('team.noResults')} />
             ) : (
-              <GameList leagueId={addressee.id} games={games.results} />
+              <GameList
+                leagueId={addressee.id}
+                games={games.results}
+                layout="board"
+                across="pair"
+              />
             )}
           </Section>
         </div>

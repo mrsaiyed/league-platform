@@ -26,6 +26,49 @@ export function homeNextGames(upcoming: readonly GameView[]): readonly GameView[
 /** What of a standings table decides its height: its rows, and whether it has notes. */
 export type TableHeight = { readonly rows: number; readonly hasNotes: boolean };
 
+// Heights, in rows of a standings table (about 49 on a laptop), measured on the pictures.
+const tableHeadRows = 2;
+const boardRows = 4.75;
+const gapRows = 0.5;
+/** A leader's card with a column to itself (its number beside its name), and the gap after. */
+const leaderRows = 2.6;
+const leaderGapRows = 0.33;
+/** The small heading over leaders that stand under the standings, with the space above it. */
+const leaderHeadRows = 1.4;
+/** How far past level the standings column may run before a leader is one too many. */
+const leaderSlackRows = 0.5;
+
+/**
+ * Where the home page's leaders stand. When the column of standings is shorter than the
+ * column of games beside it, as many leaders as close the hole stand under the standings
+ * (`beside`), each card one short row. Otherwise they stand across the page in a section
+ * of their own (`across`), one, two or three in a row. Never both: a leader is named once.
+ */
+export function homeLeadersPlace(
+  boards: number,
+  tables: readonly TableHeight[],
+  leaders: number,
+): { readonly beside: number; readonly across: number } {
+  // With no standings, or more than two tables (which lie across the page), there is no
+  // short column to fill.
+  if (leaders === 0 || boards === 0 || tables.length === 0 || tables.length > 2) {
+    return { beside: 0, across: leaders };
+  }
+  const tablesTall =
+    tables.reduce((sum, table) => sum + tableHeadRows + table.rows + (table.hasNotes ? 1 : 0), 0) +
+    gapRows * (tables.length - 1);
+  const boardsTall = boards * boardRows + gapRows * (boards - 1);
+  const hole = boardsTall - tablesTall + leaderSlackRows;
+  let beside = 0;
+  while (
+    beside < leaders &&
+    leaderHeadRows + (beside + 1) * leaderRows + beside * leaderGapRows <= hole
+  ) {
+    beside += 1;
+  }
+  return beside > 0 ? { beside, across: 0 } : { beside: 0, across: leaders };
+}
+
 /**
  * The home page's latest games: the latest decided games first, then the games whose
  * start has passed with no result yet (each says "Awaiting result"). They stand in a

@@ -41,6 +41,7 @@ export function StandingsTables({
             rows={table.rows}
             footnotes={table.footnotes}
             labels={labels}
+            emblems
           />
         </section>
       ))}
