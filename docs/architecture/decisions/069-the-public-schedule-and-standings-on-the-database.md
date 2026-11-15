@@ -26,4 +26,5 @@ On the database (`LOCAL_DATA=made-up-database` today, staging and production onc
 
 ## Revisit if
 
-- Part 3 moves the statistics and the team pages: `settingsOf`, the six reads, `rosterOf` and `teamIdsOfAccount` move, the home page's leaders appear on the database, and a "my team" league's home sends a signed-in member to their team page again.- The seed leagues gain venues or rounds: the seeded games could use them.
+- Part 3 moves the statistics and the team pages: `settingsOf`, the six reads, `rosterOf` and `teamIdsOfAccount` move, the home page's leaders appear on the database, and a "my team" league's home sends a signed-in member to their team page again.
+- The seed leagues gain venues or rounds: the seeded games could use them.
