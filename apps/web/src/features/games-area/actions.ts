@@ -82,13 +82,13 @@ function leaveNotice(context: CommandContext, screen: NoticeScreen, thing: strin
 }
 
 /**
- * The screen after a save, with its notice left: drawn again in the answer to the post
- * when the post came from the app's own scripts and the screen is the form's own (`here`);
- * else the browser is sent to `to` (post, redirect, get).
+ * The form's own screen after a save, with its notice left: drawn again in the answer to
+ * the post when the post came from the app's own scripts; else the browser is sent to `to`
+ * on that screen (post, redirect, get). A save that leads to another screen redirects.
  */
-async function showSaved(to: string, here: boolean): Promise<void> {
+async function showSaved(to: string): Promise<void> {
   // Next.js's own header on a post its scripts send; a form sent by the browser has none.
-  if (here && (await headers()).has('next-action')) {
+  if ((await headers()).has('next-action')) {
     refresh();
     return;
   }
@@ -139,7 +139,8 @@ export async function finalScoreAction(
     );
   }
   if (fields['step'] !== 'confirm' || fields['confirmed'] !== 'yes') {
-    return { kind: 'ask', ...scores, version };
+    // The question names the score as a number; "No" gives back exactly what was typed.
+    return { kind: 'ask', ...scores, version, typed };
   }
   const { games } = await webPorts();
   const result = await requests().once(requestKeyOf(context, fields), () =>
@@ -147,7 +148,7 @@ export async function finalScoreAction(
   );
   if (result.ok) {
     leaveNotice(context, 'games', gameId, 'final');
-    await showSaved(`${list}#${gameAnchor(gameId)}`, true);
+    await showSaved(`${list}#${gameAnchor(gameId)}`);
     return untouched;
   }
   return refused(
@@ -169,11 +170,13 @@ async function act(action: GameAction, form: FormData): Promise<FormState> {
   );
   if (result.ok && gameId !== undefined) {
     leaveNotice(context, 'games', gameId, action);
-    await showSaved(`${list}#${gameAnchor(gameId)}`, true);
+    await showSaved(`${list}#${gameAnchor(gameId)}`);
     return untouched;
   }
   if (result.ok) return redirect(list);
-  return refused(result.code, fields, [], t(gamesProblemKey(result.code)));
+  // A team that is not in the game is the forfeit's one field: it is marked.
+  const wrong = result.code === 'team-not-in-game' ? ['forfeitingTeamId'] : [];
+  return refused(result.code, fields, wrong, t(gamesProblemKey(result.code)));
 }
 
 export async function recordForfeitAction(_state: FormState, form: FormData): Promise<FormState> {
@@ -206,7 +209,7 @@ export async function saveBoxScoreAction(
   if (result.ok) {
     if (gameId === undefined) return redirect(list);
     leaveNotice(context, 'box-score', gameId, 'save');
-    await showSaved(`${sheet(gameId)}#${sheetScoresId}`, true);
+    await showSaved(`${sheet(gameId)}#${sheetScoresId}`);
     return untouched;
   }
   return {
@@ -231,7 +234,7 @@ export async function reopenBoxScoreAction(_state: FormState, form: FormData): P
       return redirect(`${list}#${gameAnchor(gameId)}`);
     }
     leaveNotice(context, 'box-score', gameId, 'reopen');
-    await showSaved(sheet(gameId), true);
+    await showSaved(sheet(gameId));
     return untouched;
   }
   return refused(

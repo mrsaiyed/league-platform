@@ -98,15 +98,14 @@ function finalScoreTexts(game: GameRowView, early: string | undefined): FinalSco
   };
 }
 
-function Fields({ league, game }: { readonly league: string; readonly game: GameRowView }) {
-  return (
-    <>
-      <input type="hidden" name="league" value={league} />
-      <input type="hidden" name="gameId" value={game.id} />
-      <input type="hidden" name="version" value={game.version} />
-      <input type="hidden" name="requestToken" value={crypto.randomUUID()} />
-    </>
-  );
+/** A game's form's hidden values: which game as it was read, and the form's one-time token. */
+function hiddenOf(league: string, game: GameRowView): Record<string, string> {
+  return {
+    league,
+    gameId: game.id,
+    version: String(game.version),
+    requestToken: crypto.randomUUID(),
+  };
 }
 
 function Controls({
@@ -129,6 +128,8 @@ function Controls({
   const trackerHref = leagueUrl(here, 'score', { game: game.id });
   const gameHref = leagueUrl(here, 'admin-area', { area: 'games', subpath: [game.id] });
   const permalink = `${leagueUrl(here, 'admin-area', { area: 'games' })}#${gameAnchor(game.id)}`;
+  // A refusal names the game ("Tigers at Lions: …").
+  const refusal = t('admin.games.refusedAbout', { game: gameText(game), problem: '{problem}' });
   const early =
     game.startsAt !== null && Date.parse(game.startsAt) > now
       ? gameWhenText(game.startsAt, times)
@@ -178,27 +179,37 @@ function Controls({
       {game.canForfeit ? (
         <details>
           <summary>{t('admin.games.otherActions')}</summary>
-          <ActionForm action={recordForfeitAction} permalink={permalink}>
-            <Fields league={league} game={game} />
-            <label>
-              <span>{t('admin.games.forfeitBy')}</span>
-              <select name="forfeitingTeamId" required>
-                <option value={game.homeTeamId}>{game.homeName}</option>
-                <option value={game.awayTeamId}>{game.awayName}</option>
-              </select>
-            </label>
-            <button type="submit">{t('admin.games.recordForfeit')}</button>
-          </ActionForm>
+          <ActionForm
+            action={recordForfeitAction}
+            permalink={permalink}
+            hidden={hiddenOf(league, game)}
+            choice={{
+              name: 'forfeitingTeamId',
+              label: t('admin.games.forfeitBy'),
+              options: [
+                { value: game.homeTeamId, label: game.homeName },
+                { value: game.awayTeamId, label: game.awayName },
+              ],
+            }}
+            button={t('admin.games.recordForfeit')}
+            refusal={refusal}
+          />
           {game.canCallOff ? (
             <>
-              <ActionForm action={postponeGameAction} permalink={permalink}>
-                <Fields league={league} game={game} />
-                <button type="submit">{t('admin.games.postpone')}</button>
-              </ActionForm>
-              <ActionForm action={cancelGameAction} permalink={permalink}>
-                <Fields league={league} game={game} />
-                <button type="submit">{t('admin.games.cancel')}</button>
-              </ActionForm>
+              <ActionForm
+                action={postponeGameAction}
+                permalink={permalink}
+                hidden={hiddenOf(league, game)}
+                button={t('admin.games.postpone')}
+                refusal={refusal}
+              />
+              <ActionForm
+                action={cancelGameAction}
+                permalink={permalink}
+                hidden={hiddenOf(league, game)}
+                button={t('admin.games.cancel')}
+                refusal={refusal}
+              />
             </>
           ) : null}
         </details>

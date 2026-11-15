@@ -31,9 +31,12 @@ export type FinalScoreState =
   /** The question: the score typed, and the game's version as the boxes read it. */
   | {
       readonly kind: 'ask';
+      /** The score as numbers, as the question names it and "Yes" sends it. */
       readonly homeScore: string;
       readonly awayScore: string;
       readonly version: string;
+      /** The boxes exactly as typed, which "No, change the score" gives back. */
+      readonly typed: TypedFields;
     };
 
 /** The box score grid: refused with the score the sheet came to, when it came to one. */

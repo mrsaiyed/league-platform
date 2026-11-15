@@ -617,6 +617,7 @@ export const en = {
   'admin.games.saved.cancel': 'Saved: {game} is cancelled.',
   // A refused score said beside the boxes, naming the box or the score (step 2.155; A-4).
   'admin.games.refused.score': 'Enter the score for {team} as a whole number from 0 to 999.',
+  'admin.games.refusedAbout': '{game}: {problem}',
   'admin.games.refused.tie':
     '{result} is a tie, and this season does not allow ties. Change a score so one team wins.',
   // A game the live tracker has recorded plays of is ended there (S-46).

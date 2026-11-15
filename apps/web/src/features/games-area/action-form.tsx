@@ -1,35 +1,79 @@
 'use client';
-// A form of the games area with no typed boxes of its own (a forfeit, postpone, cancel):
-// it goes quiet once sent, and a refusal is said inside it, beside its button, in the
-// response to the post itself (T-271, record 067). A change that works sends the browser
-// to the list again, where "Saved" is said beside the game.
-import { useActionState, useId, type ReactNode } from 'react';
+// A form of the games area with no typed boxes (a forfeit, postpone, cancel): its hidden
+// values, at most one choice, and its button. It goes quiet once sent, and a refusal is
+// said inside it, beside its button, naming the game, in the response to the post itself
+// (T-271, record 067): the choice still holds what was picked (and is marked when it is
+// what was wrong), and the sentence is what the button and the choice are described by.
+// A change that works sends the browser to the list again, where "Saved" is said beside
+// the game. Words come from the server, from the message files (T-187).
+import { useActionState, useId } from 'react';
 import { untouched, type FormState } from './form-state.ts';
 import { useOneSubmit } from './use-one-submit.ts';
+
+export type ActionChoice = {
+  readonly name: string;
+  readonly label: string;
+  readonly options: readonly { readonly value: string; readonly label: string }[];
+};
 
 export function ActionForm({
   action,
   permalink,
-  className,
-  children,
+  hidden,
+  choice,
+  button,
+  refusal,
 }: {
   readonly action: (state: FormState, form: FormData) => Promise<FormState>;
   /** Where the browser lands with scripts off: the thing's place on the screen. */
   readonly permalink: string;
-  readonly className?: string;
-  readonly children: ReactNode;
+  /** The form's hidden values: league, game, version and its one-time token. */
+  readonly hidden: Readonly<Record<string, string>>;
+  readonly choice?: ActionChoice;
+  readonly button: string;
+  /** A refusal's sentence, naming the game, with {problem} for why. */
+  readonly refusal: string;
 }) {
   const [state, dispatch, pending] = useActionState(action, untouched, permalink);
   const onSubmit = useOneSubmit(pending, state);
-  const id = useId();
+  const problemId = `${useId()}-problem`;
+  const refused = state.kind === 'refused' ? state : undefined;
+  const describedBy = refused === undefined ? {} : { 'aria-describedby': problemId };
   return (
-    <form action={dispatch} onSubmit={onSubmit} className={className}>
-      {children}
-      {state.kind === 'refused' ? (
-        <p id={`${id}-problem`} className="ui-field-error" role="alert">
-          {state.said}
+    <form action={dispatch} onSubmit={onSubmit}>
+      {Object.entries(hidden).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
+      {choice === undefined ? null : (
+        <label>
+          <span>{choice.label}</span>
+          <select
+            // React takes a select's defaultValue only as it is first drawn: drawn afresh
+            // with what was picked, it keeps it through the form's reset after the answer.
+            key={refused?.typed[choice.name] ?? ''}
+            name={choice.name}
+            required
+            defaultValue={refused?.typed[choice.name] ?? choice.options[0]?.value}
+            {...(refused?.wrong.includes(choice.name) === true
+              ? { 'aria-invalid': true, ...describedBy }
+              : {})}
+          >
+            {choice.options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <button type="submit" {...describedBy}>
+        {button}
+      </button>
+      {refused === undefined ? null : (
+        <p id={problemId} className="ui-field-error" role="alert">
+          {refusal.replaceAll('{problem}', refused.said)}
         </p>
-      ) : null}
+      )}
     </form>
   );
 }

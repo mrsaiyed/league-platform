@@ -184,6 +184,78 @@ async function checkTiedSheetRefused(page, label, typed, away, home) {
 }
 
 if (browser) {
+  await step('a refused forfeit keeps the team that was picked', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token');
+    try {
+      await openGames(page);
+      const game = gameOn(page, laterGame);
+      await game.getByText('Forfeit, postpone or cancel').click();
+      const forfeit = game.locator('form', { has: page.locator('select') });
+      const team = forfeit.getByLabel('Team that forfeits');
+      // The away team, the second choice: a reset would put back the first (the Tigers).
+      await team.selectOption({ label: 'Bears' });
+      const bears = await team.inputValue();
+      // A form whose game has changed since it was drawn: another version than the game's.
+      await forfeit.locator('input[name="version"]').evaluate((input) => {
+        input.value = '999';
+      });
+      await forfeit.getByRole('button', { name: 'Record forfeit' }).click();
+      const refusal = forfeit.getByRole('alert');
+      await refusal.waitFor();
+      const text = ((await refusal.textContent()) ?? '').trim();
+      note(
+        'a refused forfeit names the game and says why',
+        text.startsWith('Bears at Tigers: Someone changed this game'),
+        text,
+      );
+      note(
+        'a refused forfeit keeps the team that was picked',
+        (await team.inputValue()) === bears,
+        await team.inputValue(),
+      );
+      note(
+        "the forfeit's button is described by the refusal",
+        (await forfeit
+          .getByRole('button', { name: 'Record forfeit' })
+          .getAttribute('aria-describedby')) === (await refusal.getAttribute('id')),
+      );
+      note(
+        'nothing was recorded',
+        (await game.locator('.ui-game-card').getAttribute('data-status')) === 'scheduled',
+      );
+      await accessible(page, 'a refused forfeit');
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('"No, change the score" gives back exactly what was typed', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token');
+    try {
+      await openGames(page);
+      const game = gameOn(page, finalScoreGame);
+      await game.getByText('Enter the final score').click();
+      await game.getByLabel('Score for Tigers').fill('047');
+      await game.getByLabel('Score for Lions').fill('51');
+      await game.getByRole('button', { name: 'Save final score' }).click();
+      await game.locator('[data-question]').waitFor();
+      note(
+        'the question names the score as numbers',
+        /Tigers 47, Lions 51\./.test((await game.locator('[data-question]').textContent()) ?? ''),
+      );
+      await game.getByRole('button', { name: 'No, change the score' }).click();
+      await game.getByLabel('Score for Tigers').waitFor();
+      note(
+        '"No" gives back the boxes exactly as typed',
+        (await game.getByLabel('Score for Tigers').inputValue()) === '047' &&
+          (await game.getByLabel('Score for Lions').inputValue()) === '51',
+        await game.getByLabel('Score for Tigers').inputValue(),
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
   await step(
     'twelve players’ points and a tie in the box score are kept after the refusal',
     async () => {

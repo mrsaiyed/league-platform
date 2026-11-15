@@ -58,10 +58,17 @@ export function FinalScoreBoxes(props: FinalScoreBoxesProps) {
 
   if (state.kind === 'ask') {
     const scores = { home: state.homeScore, away: state.awayScore };
-    const typed = (
+    const asked = (
       <>
         <input type="hidden" name="homeScore" value={state.homeScore} />
         <input type="hidden" name="awayScore" value={state.awayScore} />
+      </>
+    );
+    // "No" sends the boxes back exactly as they were typed ("051" stays "051").
+    const asTyped = (
+      <>
+        <input type="hidden" name="homeScore" value={state.typed['homeScore'] ?? ''} />
+        <input type="hidden" name="awayScore" value={state.typed['awayScore'] ?? ''} />
       </>
     );
     return (
@@ -76,7 +83,7 @@ export function FinalScoreBoxes(props: FinalScoreBoxesProps) {
         </p>
         <form action={dispatch} onSubmit={onSubmit}>
           {common}
-          {typed}
+          {asked}
           <input type="hidden" name="version" value={state.version} />
           <input type="hidden" name="step" value="confirm" />
           <input type="hidden" name="confirmed" value="yes" />
@@ -86,7 +93,7 @@ export function FinalScoreBoxes(props: FinalScoreBoxesProps) {
         </form>
         <form action={dispatch} onSubmit={onSubmit}>
           {common}
-          {typed}
+          {asTyped}
           <input type="hidden" name="step" value="change" />
           <button type="submit" className="ui-button">
             {texts.no}
