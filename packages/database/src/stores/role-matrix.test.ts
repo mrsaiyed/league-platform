@@ -33,6 +33,8 @@ import {
   createDivision,
   cancelGame,
   createLeague,
+  removeDraftLeague,
+  type LeagueRemovalTx,
   createPerson,
   clearSettingFor,
   createSeason,
@@ -144,6 +146,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
+import { removalTransaction } from '../league-making/removal-transaction.ts';
+import { pgliteDriver } from '../migrations/index.ts';
 import {
   freshSchema,
   newAccount,
@@ -227,6 +231,7 @@ let teamsDeps: CommandDeps<TeamsTx>;
 let binDeps: CommandDeps<BinTx>;
 let standingsDeps: CommandDeps<StandingsTx>;
 let importsDeps: CommandDeps<ImportScoresTx>;
+let removalDeps: CommandDeps<LeagueRemovalTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
@@ -260,6 +265,11 @@ beforeAll(async () => {
   teamsDeps = { transaction, events: [], ...rest };
   binDeps = { transaction, events: [], ...rest };
   importsDeps = { transaction, events: [], ...rest };
+  removalDeps = {
+    transaction: removalTransaction(pgliteDriver(pglite), [staffId]),
+    events: [],
+    ...rest,
+  };
 });
 afterAll(async () => {
   await db.close();
@@ -1826,6 +1836,35 @@ const rows: readonly Row[] = [
       },
     }),
     run: (c, i) => createLeague(c, i, leaguesDeps),
+  },
+  // Removing a league made by mistake (step 2.150): our staff only, in a fresh draft
+  // league made by createLeague as the tool makes it. It runs as the tool runs it, in
+  // a transaction of the tables' owner set to that league and account (record 063),
+  // not as app_user, which may not delete a league.
+  {
+    command: 'leagues.remove_draft',
+    name: 'remove a draft league made by mistake (our staff only)',
+    needs: 'platform-staff',
+    prepare: async (league) => {
+      const leagueId = randomUUID();
+      const slug = unique('mistake');
+      const created = await createLeague(
+        { leagueId, accountId: staffId, requestId: 'matrix' },
+        {
+          slug,
+          name: 'Made by mistake',
+          timeZone: 'UTC',
+          audience: 'adult',
+          ownerAccountId: league.ownerId,
+          sportKey: 'basketball',
+          firstSeason: { slug: 'first', name: 'First season' },
+        },
+        leaguesDeps,
+      );
+      if (!created.ok) throw new Error(`the league to remove was not made: ${created.error.code}`);
+      return { leagueId, input: { typedSlug: slug } };
+    },
+    run: (c, i) => removeDraftLeague(c, i, removalDeps),
   },
   // Who has access (P4 §4, §6): the owner and admins; a program's admin for it.
   {

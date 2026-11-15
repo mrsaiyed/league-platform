@@ -31,6 +31,9 @@ const reads = new Set([
   'games.release_scoring_session',
   // The engine's state for the tracker to load (T-253): a read.
   'games.read_tracker_state',
+  // Removing a draft league made by mistake (step 2.150): its entry goes in the
+  // platform's own log, since the league and its log are gone (record 063).
+  'leagues.remove_draft',
   // The rosters stored on the scorekeeper's device when it opens a game (T-258): a read.
   'games.read_tracker_rosters',
 ]);
