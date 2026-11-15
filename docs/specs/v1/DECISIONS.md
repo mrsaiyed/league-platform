@@ -351,6 +351,7 @@ All dated November 12, 2026.
 | T-263                 | New                                                                          | The scorekeeper's reopen: a second door, for who sent the end; timed in the database; offered before the tap; safe twice (rec. 060)             | Step 2.120: S-36 did not say who "the scorekeeper" is, whose clock counts, or a limit              |
 | T-264                 | A started game's rules stay fixed even if it goes back to scheduled (T-237)  | Agreed (delegated): a game marked not started has no rules of its own again; it takes its season's when it next starts (rec. 061)               | Step 2.121: record 025 kept a started game's rules even after it went back to scheduled            |
 | T-267                 | New                                                                          | Agreed (delegated): the scoring screen is styled by the product, not by the league's design values: one dark courtside look (rec. 064)          | Before step 2.35: nobody had decided how the tracker looks (2.107 audit, M10)                      |
+| T-269                 | New                                                                          | The leagues of the signed-in account: one owner-run function, no argument, that account only; U-9 decided in core (rec. 066)                    | Step 2.127: no fenced query can list an account's leagues (2.105 audit, H3)                        |
 
 ## The full list
 
@@ -771,6 +772,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-223 | The command shape: Zod input, one transaction, permission inside it, events inside it, jobs through the transaction object, one log line; core defines ports, database implements them (record 010)                                              | Agreed (delegated)  | yes     |
 | T-225 | Sign-in numbers: codes last 10 minutes, 5 tries, 5 an hour per address and 30 per network; passwords 8 characters to 72 bytes, NFKC; wrong guesses slowed, then locked, per address and network (record 013)                                     | Agreed (delegated)  | yes     |
 | T-256 | Our account ids stay ours, linked to the sign-in user; the sign-in store has its own schema and role; app_user changes only name, phone, last seen (record 052)                                                                                  | Agreed (delegated)  | yes     |
+| T-269 | The leagues a signed-in person belongs to come from one owner-run function with no argument, for the account set only; core decides U-9 before any name shows (record 066)                                                                       | Agreed (delegated)  |         |
 | T-259 | Name settings `privacy.publicNames` (three values) and `privacy.playersMayAskForInitials`, read by one `readNamePolicy`; full names need confirming; `protectiveOrder` (R-26); `people.set_name_request`, fixed-list reason (rec. 056)           | Agreed (delegated)  | yes     |
 
 ### [T5 — Customization engine](technical/T5-customization-engine.md)

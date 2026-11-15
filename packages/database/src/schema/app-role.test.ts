@@ -39,7 +39,8 @@ const historyTables = [
  * id, returns an account id only), account_for_sign_in (after the sign-in service
  * proved the mailbox; returns an id, never says whether it found or made it),
  * create_own_profile and erase_account (only the account set for the transaction),
- * and access_list_names (display names on the set league's access list only).
+ * and access_list_names (display names on the set league's access list only). Step
+ * 2.127 added my_leagues (record 066): the leagues of the account set, no argument.
  */
 const definerFunctions = [
   'access_list_names',
@@ -51,6 +52,7 @@ const definerFunctions = [
   'create_own_profile',
   'erase_account',
   'find_league_by_slug',
+  'my_leagues',
   'take_jobs',
 ];
 /** The sign-in store's tables (record 052): schema sign_in, reached only by sign_in_store. */
@@ -606,6 +608,20 @@ describe('owner-run checks refuse to run where the owner is fenced', () => {
         other.transaction(async (tx) => {
           await tx.query("select set_config('app.account_id', $1, true)", [ownerId]);
           await tx.query('select public.erase_account()');
+        }),
+      ).rejects.toMatchObject(fencedRefusal);
+    });
+  });
+
+  // Record 066: fenced, my_leagues would see no league and tell everyone they belong to
+  // none, a wrong answer that looks right, so it refuses instead.
+  it('the leagues of an account refuse instead of answering "none" (record 066)', async () => {
+    const { ownerId } = await newLeague(other);
+    await ownedByFencedRole('my_leagues()', async () => {
+      await expect(
+        other.transaction(async (tx) => {
+          await tx.query("select set_config('app.account_id', $1, true)", [ownerId]);
+          await tx.query('select * from public.my_leagues()');
         }),
       ).rejects.toMatchObject(fencedRefusal);
     });

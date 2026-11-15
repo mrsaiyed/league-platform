@@ -188,7 +188,7 @@ Adding a section type is adding a folder and one line in the registry. No other 
 ## 6. Rules for all code
 
 - **T-27: no league is ever named in code.** A check fails the build on anything like `if (league.slug === 'farajleague')`. Differences between leagues are data.
-- **T-28: no query without a league.** Every function in `packages/database` that touches league data requires a league ID argument; there is no way to call it without one. The database enforces the same thing again underneath ([T4](T4-tenancy-auth-security.md)).
+- **T-28: no query without a league.** Every function in `packages/database` that touches league data requires a league ID argument; there is no way to call it without one. The database enforces the same thing again underneath ([T4](T4-tenancy-auth-security.md)). The narrow lookups of T-221 are the only exceptions, each one owner-run function; one of them, the leagues of the signed-in account (T-269, record 066), is the product's one read across leagues for an ordinary person, and it is by account, never by a league id from the request.
 - **T-29: what goes to the browser is chosen, not leaked.** Queries return objects built field by field for their screen. A new private column is invisible to every screen until someone deliberately adds it.
 - **T-30: settings and secrets are read in one place** at startup, checked against a schema, and the app refuses to start if one is missing. Secrets never appear in browser code; a build check confirms it.
 - **T-31: naming.** Files are `kebab-case.ts`. One command or query per file, named for what it does (`end-game.ts`). Tests sit beside the code as `end-game.test.ts`. Database tables and columns are `snake_case`.

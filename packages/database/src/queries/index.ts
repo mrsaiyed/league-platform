@@ -61,6 +61,7 @@ export { createOwnProfile, type OwnProfile } from './create-own-profile.ts';
 export { eraseAccount, type EraseAccountAnswer } from './erase-account.ts';
 export { findAccountOfSignIn } from './find-account-of-sign-in.ts';
 export { listAccessNames, type AccessListName } from './list-access-names.ts';
+export { listMyLeagues } from './list-my-leagues.ts';
 export { findProgramBySlug } from './find-program-by-slug.ts';
 export { findProgramId } from './find-program-id.ts';
 export { findRoleGrant } from './find-role-grant.ts';
