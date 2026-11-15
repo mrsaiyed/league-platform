@@ -104,6 +104,30 @@ describe('statistics page', () => {
     );
   });
 
+  it('opens with a number card for who leads each statistic, the first on the main color', async () => {
+    const data = await statsFor(adult);
+    const text = html(data);
+    const boards = data.leaders.filter((board) => board.first !== undefined);
+    expect(boards.length).toBeGreaterThan(0);
+    // One card for each of the first three boards, before the leaders' lists.
+    const cards = Math.min(boards.length, 3);
+    expect(text.match(/<article class="ui-spot"/g)).toHaveLength(cards);
+    expect(text.match(/<article class="ui-spot" data-first="true"/g)).toHaveLength(1);
+    expect(text.indexOf('ui-spot-row')).toBeLessThan(text.indexOf('ui-leader-card'));
+    for (const board of boards.slice(0, 3)) {
+      // The same person, name and number as the first line of that board's list.
+      const top = board.rows[0];
+      expect(board.first?.id).toBe(top?.id);
+      expect(top?.cells['player']).toBe(`1. ${board.first?.name}`);
+      expect(board.first?.value).toBe(top?.cells['value']);
+      expect(text).toContain(`<p class="ui-spot-label">${board.title} leader</p>`);
+      expect(text).toContain(`<h2 class="ui-spot-name" dir="auto">${board.first?.name}</h2>`);
+    }
+    // Never for fouls or turnovers.
+    expect(text).not.toContain('Fouls leader');
+    expect(text).not.toContain('Turnovers leader');
+  });
+
   it("carries each team's color for its chip, and a player's only team's color", async () => {
     const data = await statsFor(adult);
     const hex = /^#[0-9a-f]{6}$/i;

@@ -17,6 +17,7 @@ import {
   SortableStatsTable,
   StandingsTable,
   StatStrip,
+  TeamCard,
   displayCss,
   initialOf,
   lettersWide,
@@ -966,6 +967,39 @@ describe('a leader, picked out', () => {
   });
 });
 
+describe('a team’s card', () => {
+  it('has the team’s large shield, a fine line of its color at the top, and its record as its one figure', () => {
+    const html = render(
+      createElement(TeamCard, {
+        name: arabicName,
+        href: '/x/teams/a',
+        color: '#2f7fb8',
+        figure: { label: 'Record', value: '5-1' },
+        facts: [],
+      }),
+    );
+    expect(html).toContain('<article class="ui-team-card" style="--team-color:#2f7fb8">');
+    expect(html.match(/<svg class="ui-emblem"/g)).toHaveLength(1);
+    // Anything that is not a color never reaches the page; the line is then the accent.
+    const plain = render(
+      createElement(TeamCard, {
+        name: 'Owls',
+        href: '/x/teams/o',
+        color: 'red;x',
+        figure: { label: 'Record', value: '0-0' },
+        facts: [],
+      }),
+    );
+    expect(plain).toContain('<article class="ui-team-card">');
+    expect(plain).not.toContain('red;x');
+    expect(css).toMatch(
+      /\.ui-team-card \{[^}]*border-block-start: 2px solid\s*color-mix\(in srgb, var\(--team-color, var\(--color-accent\)\) 50%, transparent\);/,
+    );
+    expect(css).toMatch(/\.ui-team-card > \.ui-emblem \{\s*block-size: var\(--step-8\);/);
+    expect(css).toMatch(/\.ui-team-card-figure \{[^}]*font-size: var\(--text-28\);/);
+  });
+});
+
 describe('a team’s shield in a table of statistics', () => {
   const table = (rows: Parameters<typeof SortableStatsTable>[0]['rows']) =>
     render(
@@ -1026,6 +1060,8 @@ describe('color where the eye should land (C-16)', () => {
         ".ui-game-card[data-featured='true']",
         ".ui-standings[data-emblems='true'] tbody td.ui-num:first-child",
         '.ui-team-card-figure',
+        // A team's card under the pointer: its edge, as a game's card.
+        '.ui-team-card:hover',
         '.ui-leader:first-child .ui-leader-value',
         // A leader's one big number.
         '.ui-spot-value',

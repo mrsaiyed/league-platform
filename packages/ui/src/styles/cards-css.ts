@@ -74,16 +74,26 @@ export const cardsCss = String.raw`
   align-items: center;
   gap: var(--step-4);
   inline-size: 100%;
-  padding-block: var(--step-4);
-  padding-inline: var(--space);
-  background: var(--color-panel);
+  padding-block: var(--step-5);
+  padding-inline: var(--step-5);
+  /* As a game's card: the panel, warmed at one corner in a dark design. At its top a fine
+     line in the team's own color (the accent for a team with none), strong enough to be
+     told from its neighbors' and no stronger than a picked-out card's edge. */
+  background-color: var(--color-panel);
+  background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   border: var(--card-border-width) solid var(--color-line);
+  border-block-start: 2px solid
+    color-mix(in srgb, var(--team-color, var(--color-accent)) 50%, transparent);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   transition: border-color 0.15s;
 }
 .ui-team-card:hover {
-  border-color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-pop) 55%, transparent);
+}
+/* The team's shield is the largest thing on its card. */
+.ui-team-card > .ui-emblem {
+  block-size: var(--step-8);
 }
 .ui-team-card-text {
   display: grid;
@@ -153,7 +163,7 @@ export const cardsCss = String.raw`
   flex: none;
   color: var(--color-pop);
   font-family: var(--font-score);
-  font-size: var(--text-22);
+  font-size: var(--text-28);
   font-weight: var(--heading-weight);
   font-variant-numeric: lining-nums tabular-nums;
   line-height: 1;

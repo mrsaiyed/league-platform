@@ -179,6 +179,13 @@ export const en = {
   'standings.lead': 'Where every team stands after each game.',
   'stats.heading': 'By the numbers.',
   'stats.lead': 'The season’s leaders, then every player and every team.',
+  // The number cards that open the statistics page: who leads a statistic, and what the
+  // number is when the page shows season totals.
+  'stats.leaderOf': '{stat} leader',
+  'stats.inAll': 'this season',
+  // The band that closes the teams page, with the way to the schedule.
+  'teams.call.title': 'See them play.',
+  'teams.call.text': 'Every game of the season, round by round.',
   'teams.heading': 'The teams.',
   'teams.lead': 'Every team’s record, roster and games.',
   'home.leaders': 'Leading the way',

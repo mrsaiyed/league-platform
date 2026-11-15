@@ -641,6 +641,27 @@ html {
   }
 }
 
+/* The statistics page. It opens with its number cards. With few statistics the players'
+   table and the teams' table sit side by side on a laptop, so a row's numbers stay near
+   the name they belong to; with many, each table takes the page's width. */
+.stats-firsts {
+  margin-block-start: var(--step-5);
+}
+.stats-tables {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 var(--step-5);
+}
+.stats-tables > * {
+  min-inline-size: 0;
+}
+@media (min-width: 64rem) {
+  .stats-tables[data-layout='pair'] {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+  }
+}
+
 /* A team's page: the games take the width, the roster sits beside them. */
 .team-layout {
   display: grid;

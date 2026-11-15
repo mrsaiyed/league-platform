@@ -3,6 +3,7 @@ import {
   EmptyPanel,
   FilterToolbar,
   LeaderCard,
+  LeaderSpot,
   OptionPicker,
   PageHead,
   Section,
@@ -63,8 +64,40 @@ export function StatsTables({
       />
     );
   }
+  // The page opens with its number cards: who leads each of the first three statistics,
+  // one very large number each, the first on the league's main color.
+  const firsts = boards.flatMap((board) =>
+    board.first === undefined ? [] : [{ board, first: board.first }],
+  );
+  // Few statistics: the players' table and the teams' sit side by side on a laptop, so a
+  // row's numbers stay near its name. Many: each takes the page's width.
+  const sideBySide = data.playerColumns.length <= 7;
   return (
     <>
+      {firsts.length > 0 ? (
+        <ul
+          className="ui-spot-row stats-firsts"
+          data-across={(['one', 'two', 'three'] as const)[Math.min(firsts.length, 3) - 1]}
+        >
+          {firsts.slice(0, 3).map(({ board, first }, index) => (
+            <li key={board.key}>
+              <LeaderSpot
+                label={t('stats.leaderOf', { stat: board.title })}
+                value={first.value}
+                unit={t(data.by === 'average' ? 'home.leaders.perGame' : 'stats.inAll')}
+                name={first.name}
+                detail={t('stats.leaderDetail', {
+                  team: first.teams,
+                  games: t.plural('stats.leaderGames', first.games),
+                })}
+                team={first.team}
+                first={index === 0}
+                headingLevel={2}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <Section
         title={t('stats.leaders')}
         note={data.minimumGames > 0 ? t.plural('stats.minimumGames', data.minimumGames) : undefined}
@@ -81,37 +114,39 @@ export function StatsTables({
           <EmptyPanel text={t('stats.leadersNone')} />
         )}
       </Section>
-      <Section title={t('stats.allPlayers')}>
-        <SortableStatsTable
-          caption={t('stats.allPlayers')}
-          captionHidden
-          columns={data.playerColumns}
-          rows={data.playerRows}
-          locale={locale}
-          labels={labels.stats}
-          emblems
-        />
-      </Section>
-      <Section
-        title={t('stats.teams')}
-        note={
-          data.totalsOnlyTeams.length > 0
-            ? t('stats.teamsTotalsOnly', {
-                teams: data.totalsOnlyTeams.join(t('stats.teamsJoin')),
-              })
-            : undefined
-        }
-      >
-        <SortableStatsTable
-          caption={t('stats.teams')}
-          captionHidden
-          columns={data.teamColumns}
-          rows={data.teamRows}
-          locale={locale}
-          labels={labels.stats}
-          emblems
-        />
-      </Section>
+      <div className="stats-tables" data-layout={sideBySide ? 'pair' : 'stack'}>
+        <Section title={t('stats.allPlayers')}>
+          <SortableStatsTable
+            caption={t('stats.allPlayers')}
+            captionHidden
+            columns={data.playerColumns}
+            rows={data.playerRows}
+            locale={locale}
+            labels={labels.stats}
+            emblems
+          />
+        </Section>
+        <Section
+          title={t('stats.teams')}
+          note={
+            data.totalsOnlyTeams.length > 0
+              ? t('stats.teamsTotalsOnly', {
+                  teams: data.totalsOnlyTeams.join(t('stats.teamsJoin')),
+                })
+              : undefined
+          }
+        >
+          <SortableStatsTable
+            caption={t('stats.teams')}
+            captionHidden
+            columns={data.teamColumns}
+            rows={data.teamRows}
+            locale={locale}
+            labels={labels.stats}
+            emblems
+          />
+        </Section>
+      </div>
     </>
   );
 }

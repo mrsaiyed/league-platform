@@ -60,6 +60,21 @@ export type LeaderBoard = {
   readonly title: string;
   readonly columns: readonly StatsColumn[];
   readonly rows: readonly StatRow[];
+  /**
+   * Who leads, for the number card that opens the page: the name as the league's name
+   * setting shows it, the number, the games played, and the player's team when they have
+   * one team only. None while nobody is ranked.
+   */
+  readonly first?:
+    | undefined
+    | {
+        readonly id: string;
+        readonly name: string;
+        readonly value: string;
+        readonly games: number;
+        readonly teams: string;
+        readonly team?: { readonly name: string; readonly color: string | null } | undefined;
+      };
 };
 
 export type StatsPageData = {
@@ -152,9 +167,24 @@ function pageData(
     },
     { key: 'value', label: t('stats.col.value'), numeric: true },
   ];
+  const firstOf = (board: StatLeaders): LeaderBoard['first'] => {
+    const leader = board.leaders[0];
+    if (leader === undefined) return undefined;
+    const only = leader.teamIds.length === 1 ? (leader.teamIds[0] ?? '') : '';
+    const name = teamName.get(only);
+    return {
+      id: leader.personId,
+      name: playerName(leader.name),
+      value: shown(leader.value, board.by),
+      games: leader.gamesPlayed,
+      teams: teamsOf(leader.teamIds),
+      team: name === undefined ? undefined : { name, color: teamColor.get(only) ?? null },
+    };
+  };
   const leaders: LeaderBoard[] = boards.map((board) => ({
     key: board.measure,
     title: statLabel(board.measure).full,
+    first: firstOf(board),
     columns: leaderColumns,
     rows: board.leaders.map(
       (leader: StatLeader): StatRow => ({
