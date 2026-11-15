@@ -29,6 +29,8 @@ import {
   unique,
   type MadeLeague,
 } from '../schema/schema.test-helper.ts';
+import { findLeagueTimeZone } from './find-league-time-zone.ts';
+import { findPublicGameFacts } from './find-public-game-facts.ts';
 import { findPublicSeason } from './find-public-season.ts';
 import { findPublicTeam } from './find-public-team.ts';
 import { listPublicGames } from './list-public-games.ts';
@@ -46,6 +48,10 @@ let draftSeasonId: string;
 let hawks: string;
 let owls: string;
 let draftTeam: string;
+let firstGame: string;
+let binnedGame: string;
+let draftGame: string;
+let oldSeasonId: string;
 let display: PublicDisplay;
 
 const people = {
@@ -73,6 +79,7 @@ beforeAll(async () => {
     [seasonId],
   );
   const old = await newSeason(pglite, L, league.defaultProgramId, { slug: 'fall-2025' });
+  oldSeasonId = old;
   await pglite.query(
     "update seasons set status = 'completed', starts_on = '2025-09-01' where id = $1",
     [old],
@@ -84,6 +91,7 @@ beforeAll(async () => {
   await pglite.query('update teams set deleted_at = now() where id = $1', [binnedTeam]);
   await pglite.query("update teams set stats_visibility = 'staff' where id = $1", [owls]);
   draftTeam = await newTeam(pglite, L, draftSeasonId, { slug: 'draft-team' });
+  const draftTeam2 = await newTeam(pglite, L, draftSeasonId, { slug: 'draft-team-2' });
 
   const stage = await newStage(pglite, L, seasonId);
   const r1 = await newRound(pglite, L, seasonId, 1);
@@ -98,7 +106,7 @@ beforeAll(async () => {
     "insert into venues (league_id, name, address) values ($1, 'North Gym', '1 Court St') returning id",
     [L],
   );
-  await newGame(pglite, {
+  firstGame = await newGame(pglite, {
     leagueId: L,
     seasonId,
     stageId: stage,
@@ -106,6 +114,7 @@ beforeAll(async () => {
     awayTeamId: owls,
     columns: {
       round_id: r1,
+      game_number: 7,
       status: 'final',
       home_score: 40,
       away_score: 31,
@@ -130,7 +139,7 @@ beforeAll(async () => {
     awayTeamId: hawks,
     columns: { starts_at: new Date('2026-12-13T18:00:00Z') },
   });
-  const binnedGame = await newGame(pglite, {
+  binnedGame = await newGame(pglite, {
     leagueId: L,
     seasonId,
     stageId: stage,
@@ -139,6 +148,14 @@ beforeAll(async () => {
     columns: { round_id: r2 },
   });
   await pglite.query('update games set deleted_at = now() where id = $1', [binnedGame]);
+  const draftStage = await newStage(pglite, L, draftSeasonId);
+  draftGame = await newGame(pglite, {
+    leagueId: L,
+    seasonId: draftSeasonId,
+    stageId: draftStage,
+    homeTeamId: draftTeam,
+    awayTeamId: draftTeam2,
+  });
 
   const child = await newPerson(pglite, L, {
     firstName: people.child.first,
@@ -205,6 +222,58 @@ describe('seasons', () => {
       findPublicSeason(scope),
     );
     expect(found).toBeUndefined();
+  });
+
+  it('gives each season offered the id the other public queries take', async () => {
+    const seasons = await inLeague((scope) => listPublicSeasons(scope));
+    const current = await inLeague((scope) => findPublicSeason(scope));
+    expect(seasons[0]?.id).toBe(seasonId);
+    expect(seasons[0]).toEqual(current);
+    expect(seasons.map((s) => s.id)).not.toContain(draftSeasonId);
+  });
+});
+
+describe("a league's clock and one game's facts (step 2.93)", () => {
+  it("reads the league's time zone, and none for a league in the bin", async () => {
+    expect(await inLeague((scope) => findLeagueTimeZone(scope))).toBe('America/Chicago');
+    const binned = await newLeague(pglite, unique('pub'));
+    await pglite.query('update leagues set deleted_at = now() where id = $1', [binned.leagueId]);
+    expect(
+      await withTransaction(db, { leagueId: binned.leagueId }, (scope) =>
+        findLeagueTimeZone(scope),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("gives a published game's number, venue and season from its one row", async () => {
+    const facts = await inLeague((scope) => findPublicGameFacts(scope, seasonId, firstGame));
+    expect(facts).toEqual({
+      number: 7,
+      venue: { name: 'North Gym', address: '1 Court St', mapLink: null },
+      courtName: null,
+      season: { slug: 'fall-2026', isCurrent: true },
+    });
+    expect(findPrivateFields(facts, { privateValues: [] })).toEqual([]);
+  });
+
+  it('gives nothing for a game in the bin, of a season being set up, or of another season', async () => {
+    expect(
+      await inLeague((scope) => findPublicGameFacts(scope, seasonId, binnedGame)),
+    ).toBeUndefined();
+    expect(
+      await inLeague((scope) => findPublicGameFacts(scope, draftSeasonId, draftGame)),
+    ).toBeUndefined();
+    expect(
+      await inLeague((scope) => findPublicGameFacts(scope, oldSeasonId, firstGame)),
+    ).toBeUndefined();
+  });
+
+  it("gives nothing of this league's game in another league", async () => {
+    expect(
+      await withTransaction(db, { leagueId: other.leagueId }, (scope) =>
+        findPublicGameFacts(scope, seasonId, firstGame),
+      ),
+    ).toBeUndefined();
   });
 });
 

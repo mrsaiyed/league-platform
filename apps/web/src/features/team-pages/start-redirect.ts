@@ -1,14 +1,16 @@
 // Where the league home sends someone first (U-5), on the server: reads the league's
-// setting, the signed-in account's teams and the device's remembered team, and gives the
-// team page's address, or nothing when the person stays on the league home.
+// setting, the signed-in account's teams and the device's remembered team
+// (my-team-start.ts), and gives the team page's address, or nothing when the person
+// stays on the league home.
 import { leagueUrl } from '@srleagues/core';
 import { cookies } from 'next/headers';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import type { LeagueView } from '../../server/league-gate.ts';
 import { myTeamCookieName } from '../../server/my-team-cookie.ts';
-import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
-import { chooseMyTeam, stayAtHome, teamIdsFromGrants } from './start-page.ts';
+import { firstValue, type SearchParams } from '../stats-pages/index.ts';
+import { myTeamStart } from './my-team-start.ts';
+import { stayAtHome } from './start-page.ts';
 
 export async function startPageRedirect(
   view: LeagueView,
@@ -20,20 +22,11 @@ export async function startPageRedirect(
   if (asked !== undefined && asked !== '') return undefined;
   const league = view.context.league;
   const ports = await webPorts();
-  if ((await ports.publicTeams.startPageOf(league.id)) !== 'myTeam') return undefined;
-  const season = chooseSeason(await ports.publicStats.seasonsOf(league.id), undefined);
-  if (season === undefined) return undefined;
-  const teams = await ports.publicStats.readStoreOf(league.id).teams(season.id);
   const account = view.context.account;
-  const holder =
-    account === null ? undefined : await ports.accessOf(commandContextOf(view.context));
-  const slug = chooseMyTeam({
-    teams,
-    grantTeamIds: teamIdsFromGrants(holder),
-    rosterTeamIds:
-      account === null
-        ? []
-        : await ports.publicTeams.teamIdsOfAccount(league.id, season.id, account.accountId),
+  const slug = await myTeamStart(ports, {
+    leagueId: league.id,
+    accountId: account === null ? null : account.accountId,
+    holder: () => ports.accessOf(commandContextOf(view.context)),
     rememberedSlug: (await cookies()).get(myTeamCookieName(league.id))?.value,
   });
   return slug === undefined ? undefined : leagueUrl(league, 'team', { team: slug });
