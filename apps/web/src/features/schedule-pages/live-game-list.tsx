@@ -122,7 +122,13 @@ export function LiveGameList({
                 home={g.home}
                 away={g.away}
                 status={g.status}
-                whenText={g.whenText}
+                whenText={
+                  // A board's pill says "Postponed", so its date line need not: the shorter
+                  // line is drawn there (and only while the game is still postponed).
+                  layout === 'board' && g.status === 'postponed' && g.whenBesidePill !== undefined
+                    ? g.whenBesidePill
+                    : g.whenText
+                }
                 {...(g.placeText === undefined ? {} : { placeText: g.placeText })}
                 {...(g.numberText === undefined ? {} : { numberText: g.numberText })}
                 detailsHref={g.detailsHref}

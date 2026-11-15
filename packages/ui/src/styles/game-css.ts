@@ -163,16 +163,23 @@ export const gameCss = String.raw`
 /* A quiet word where a state's pill would be: "Awaiting result". "Final" is as quiet: a
    decided game says so by its score, and its pill is never the loudest mark on its card. */
 .ui-game-state[data-kind='quiet'],
-.ui-game-card[data-status='final'] .ui-game-state {
+.ui-game-card[data-status='final'] .ui-game-state,
+.ui-scoreboard[data-pill='quiet'] .ui-game-state {
   border-color: var(--color-line);
+  background: transparent;
   color: var(--color-muted);
   font-weight: 600;
 }
 /* A game that was put off, called off or forfeited wears a soft tint of the league's main
-   color (no more of it than every text is fitted to), its words and edge in the accent. */
+   color (no more of it than every text is fitted to), its words in the accent and its
+   edge a line of the accent at a line's strength (DESIGN.md, section 4, line 17): on a
+   game's card, on the big board of its page, and beside a round's name ("1 game
+   postponed"). */
 .ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit'])
-  .ui-game-state {
-  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  .ui-game-state,
+.ui-scoreboard:not([data-pill='quiet']) .ui-game-state,
+.ui-group .ui-group-mark[data-kind='note'] {
+  border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
   background: var(--color-tint);
   color: var(--color-accent-text);
 }
@@ -234,9 +241,11 @@ export const gameCss = String.raw`
 .ui-game-card[data-layout='board'] :is(.ui-game-number, .ui-game-when) {
   white-space: nowrap;
 }
-/* In a card as narrow as a phone's the pill always has a line of its own under the date,
-   so it stands in one place on every card of a list, whatever the date's length. */
-@container card (max-width: 21.99rem) {
+/* In a card as narrow as a small phone's the pill always has a line of its own under the
+   date, so it stands in one place on every card of a list, whatever the date's length. A
+   wider card (a phone of 390, three across on a laptop) holds the date and the pill on
+   one line. */
+@container card (max-width: 16.99rem) {
   .ui-game-card[data-layout='board'] .ui-game-about {
     flex-basis: 100%;
   }
@@ -277,7 +286,7 @@ export const gameCss = String.raw`
   /* In a card with a whole row to itself the two teams are kept within reach of each
      other, in the middle of the card. */
   inline-size: 100%;
-  max-inline-size: 40rem;
+  max-inline-size: calc(10 * var(--step-8));
   margin-inline: auto;
   padding-block: var(--step-5);
   container: board / inline-size;
@@ -540,6 +549,31 @@ export const gameCss = String.raw`
     grid-column: 1 / -1;
   }
 }
+/* The cards of one row share the heights of their three parts (the top line, the board,
+   the place): a row that holds a card whose pill took a second line gives every card of
+   that row the same top line, so shields, names and scores stand on one line across the
+   row; a row with no such card stays as short as it was. Each card lends its three rows
+   to the list (a card is three rows of the list's grid), so the space between the rows
+   of cards is the card's own margin, taken back after the last row. */
+@supports (grid-template-rows: subgrid) {
+  @media (min-width: 48rem) {
+    .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair']) {
+      row-gap: 0;
+      margin-block-end: calc(-1 * var(--step-5));
+    }
+    .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair']) > li {
+      grid-row: span 3;
+      grid-template-rows: subgrid;
+      margin-block-end: var(--step-5);
+    }
+    .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair'])
+      > li
+      > .ui-game-card {
+      grid-row: 1 / -1;
+      grid-template-rows: subgrid;
+    }
+  }
+}
 
 /* The big board of a game's page. The teams and what stands between them are held to a
    width the eye takes in at once, however wide the panel is. */
@@ -556,13 +590,6 @@ export const gameCss = String.raw`
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   text-align: center;
-}
-/* The state's pill on the big board is soft: a tint of the main color, the accent for its
-   words and its edge. */
-.ui-scoreboard .ui-game-state {
-  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
-  background: var(--color-tint);
-  color: var(--color-accent-text);
 }
 /* On a phone the state of the game (its pill and clock, or when it will be played) has a
    quiet line of its own above the two teams, so nothing stands between their names and
@@ -671,24 +698,29 @@ export const gameCss = String.raw`
 /* A score is set in a face whose figures are lining and even-width (--font-score): two
    scores side by side are compared digit by digit. It is the largest thing on the page and
    is in the color the eye lands on: both scores while the game is played, and once it is
-   decided only the winner's, with a bar under it in the league's color of decoration. */
+   decided only the winner's, with a bar under it in the league's color of decoration.
+   Its weights are the score face's own, plain numbers every score face has (not the
+   heading face's display weight, which may be heavier than a winner's): a score still
+   being played is 600, and once the game is decided the winner's is 700 and the other's
+   400, so the winner is the heavier in every design. */
 .ui-scoreboard-score {
   justify-self: center;
   padding-block-end: var(--step-1);
   border-block-end: 2px solid transparent;
   font-family: var(--font-score);
   font-size: var(--text-48);
-  font-weight: var(--display-weight);
+  font-weight: 600;
   line-height: 1;
   font-variant-numeric: lining-nums tabular-nums;
   color: var(--color-pop);
 }
 .ui-scoreboard[data-state='final'] .ui-scoreboard-side:not([data-winner='true']) .ui-scoreboard-score {
   color: var(--color-text);
+  font-weight: 400;
 }
 .ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score {
   border-block-end-color: var(--color-ornament);
-  font-weight: 600;
+  font-weight: 700;
 }
 .ui-scoreboard .ui-emblem {
   block-size: var(--step-8);

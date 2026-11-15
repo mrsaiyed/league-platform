@@ -47,7 +47,9 @@ function chipOf(row: StatRow, key: string, emblems: boolean): ReactNode {
   if (row.chips === undefined || !Object.hasOwn(row.chips, key)) return null;
   const color = safeColor(row.chips[key]);
   if (emblems) {
-    return <Emblem name={String(row.cells[key] ?? '')} color={color} size="small" />;
+    // A cell that names several teams gets a plain shield with no letter.
+    const name = row.severalTeams?.[key] === true ? '' : String(row.cells[key] ?? '');
+    return <Emblem name={name} color={color} size="small" />;
   }
   return (
     <span

@@ -75,9 +75,9 @@ function Side({
 
 /**
  * The big board of a game's page, its opening moment: each team with its shield, its name
- * and its score in the color the eye lands on, and between them
- * the state of the game (Live with the period and clock, Final, or when it will be
- * played); under them, quietly, where it is played and anything else the page has to say.
+ * and its score in the color the eye lands on; between them the state of the game (Live
+ * with the period and clock, Final, or when it will be played); under them, quietly, where
+ * it is played and anything else the page has to say.
  */
 export function Scoreboard({
   home,
@@ -97,7 +97,14 @@ export function Scoreboard({
   const awayWins = decided && away.score > home.score;
   const pill = stateText ?? (state === 'final' ? labels.final : undefined);
   return (
-    <section className="ui-scoreboard" aria-label={labels.scoreboard} data-state={state}>
+    <section
+      className="ui-scoreboard"
+      aria-label={labels.scoreboard}
+      data-state={state}
+      // A plain "Final" is quiet, as on a game's card; a state the page names in other
+      // words (forfeit, postponed, cancelled) keeps the soft tint.
+      data-pill={state === 'final' && stateText === undefined ? 'quiet' : undefined}
+    >
       <div className="ui-scoreboard-teams">
         <Side team={away} role={labels.away} isWinner={awayWins} winnerLabel={labels.winner} />
         <div className="ui-scoreboard-middle">

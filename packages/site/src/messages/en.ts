@@ -213,6 +213,9 @@ export const en = {
   'schedule.postponedCount_other': '{count} games postponed',
   // A postponed game has no day to come: its old day is never written bare.
   'schedule.postponedFrom': 'Postponed from {date}',
+  // The same on a scoreboard card, whose pill already says "Postponed": the word is not
+  // said twice, and the day still has "From" before it.
+  'schedule.postponedFromDay': 'From {date}',
   'schedule.postponedNoDate': 'New date to be announced',
   'schedule.venueCourt': '{venue}, {court}',
   // The teams list and a team's page (step 2.44).

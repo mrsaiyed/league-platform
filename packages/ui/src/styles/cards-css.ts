@@ -284,7 +284,7 @@ export const cardsCss = String.raw`
   color: var(--color-muted);
   font-size: var(--text-12);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
 }
 .ui-spot-who {
@@ -322,11 +322,21 @@ export const cardsCss = String.raw`
 .ui-spot[data-first='true'] .ui-spot-value {
   color: var(--color-band-pop);
 }
+/* On the filled card a shield keeps its team's own color: it is filled with that color,
+   a little deepened, not laid thinly over the card's (which turned a green team grey on a
+   maroon card). Its lines and its letter are in the band's words' color, and the letter
+   has a fine dark edge so it reads on a light team color too. */
 .ui-spot[data-first='true'] > .ui-emblem {
-  color: color-mix(in srgb, var(--emblem-color) 60%, var(--color-on-band));
+  color: color-mix(in srgb, var(--emblem-color) 35%, var(--color-on-band));
+}
+.ui-spot[data-first='true'] .ui-emblem-shield {
+  fill: color-mix(in srgb, var(--emblem-color) 82%, var(--color-band-deep));
 }
 .ui-spot[data-first='true'] .ui-emblem-letter {
   color: var(--color-on-band);
+  paint-order: stroke;
+  stroke: color-mix(in srgb, var(--color-band-deep) 70%, transparent);
+  stroke-width: 1.5px;
 }
 /* Wide: the number in a first column of its own, the name beside it, clear of the shield. */
 @container spot (min-width: 28rem) {
@@ -438,13 +448,9 @@ export const cardsCss = String.raw`
   background: var(--color-primary);
   color: var(--color-on-primary);
 }
-/* What the mark does not say, beside it ("1 game postponed"): drawn like a game's own
-   state pill, so it is read as news about the games inside, in any round. */
-.ui-group .ui-group-mark[data-kind='note'] {
-  border-color: var(--color-line-strong);
-  background: transparent;
-  color: var(--color-text);
-}
+/* What the mark does not say, beside it ("1 game postponed"), is drawn like a postponed
+   game's own pill, soft, so it is read as news about the games inside in any round and is
+   never the loudest mark of the page: the rule is with the game's pills (game-css.ts). */
 .ui-group-summary {
   margin-inline-start: auto;
   color: var(--color-muted);
