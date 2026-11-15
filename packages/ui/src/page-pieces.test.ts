@@ -414,6 +414,11 @@ describe('tables', () => {
   it('hold the column that stays put to a share of the box, so a long name never hides the numbers', () => {
     // The box is the measure, and the name is held to about 45% of it and wraps, whole.
     expect(displayCss).toMatch(/\.ui-table-wrap \{[^}]*container-type: inline-size;/);
+    // A box that is a measure takes no width from what it holds, so it has its own: a
+    // parent that shrinks to fit could otherwise collapse the table to nothing.
+    expect(displayCss).toMatch(
+      /\.ui-table-wrap \{[^}]*inline-size: 100%;\s*container-type: inline-size;/,
+    );
     expect(displayCss).toMatch(
       /\.ui-team-cell > \[dir\] \{[^}]*max-inline-size: calc\(45cqi - var\(--step-6\)\);[^}]*white-space: normal;/,
     );

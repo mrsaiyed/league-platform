@@ -33,7 +33,10 @@ export const tableCss = String.raw`
   max-inline-size: 100%;
   overflow-x: auto;
   scroll-timeline: --ui-table-scroll inline;
-  /* The box is the measure of what is in it: the name column is held to a share of it. */
+  /* The box is the measure of what is in it: the name column is held to a share of it.
+     Being that measure, it takes no width from what it holds, so it is given its own: the
+     whole of its place, whatever kind of box it is put in. */
+  inline-size: 100%;
   container-type: inline-size;
   /* Whatever the keyboard reaches is scrolled clear of the name column, which stays put
      over the start of the box and would otherwise cover it. */
