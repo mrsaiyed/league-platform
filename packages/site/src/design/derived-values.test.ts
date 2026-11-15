@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   contrastRatio,
+  contrastWarnings,
   derivedColorWarnings,
   derivedColors,
   designToCssVariables,
@@ -177,12 +178,39 @@ describe('fitting a color to the surfaces it is read on', () => {
     expect(warnings.length).toBeGreaterThan(0);
     for (const warning of warnings) {
       expect(warning.ratio).toBeLessThan(4.5);
-      expect(warning.pair).toMatch(/ on (background|panel)$/);
+      expect(warning.pair).toMatch(/ on (hovered )?(background|panel)$/);
     }
     // A design whose worked-out colors all read has nothing to report.
     for (const key of startingDesignKeys) {
       expect(derivedColorWarnings(startingDesign(key))).toEqual([]);
     }
+  });
+
+  it('checks the hovered surfaces too, the ones the colors are fitted to', () => {
+    // A text color that only just reads on its panel, and a strong main color: on a hovered
+    // row (the main color laid over the panel) the text falls short. The plain check of
+    // text on the panel as it is passes, so only this one can say so.
+    const base = startingDesign('clean-court');
+    const design = {
+      ...base,
+      colors: { ...base.colors, panel: '#ffffff', text: '#767676', primary: '#000000' },
+    };
+    expect(contrastRatio('#767676', '#ffffff')).toBeGreaterThanOrEqual(4.5);
+    const hovered = hoveredSurface('#ffffff', '#000000');
+    expect(contrastRatio('#767676', hovered)).toBeLessThan(4.5);
+    expect(contrastWarnings(design).map((w) => w.pair)).not.toContain('text on panel');
+    const pairs = derivedColorWarnings(design).map((w) => w.pair);
+    expect(pairs).toContain('text on hovered panel');
+    // Every worked-out color is checked on all four surfaces it is fitted to.
+    const apart = {
+      ...base,
+      colors: { ...base.colors, background: '#ffffff', panel: '#0f2c40' },
+    };
+    const where = new Set(
+      derivedColorWarnings(apart).map((w) => w.pair.slice(w.pair.indexOf(' on ') + 4)),
+    );
+    expect([...where].some((surface) => surface.startsWith('hovered '))).toBe(true);
+    expect([...where].some((surface) => !surface.startsWith('hovered '))).toBe(true);
   });
 });
 

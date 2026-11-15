@@ -30,7 +30,8 @@ export const readsOn = (color: string, surfaces: readonly string[]): boolean =>
  * `color`, moved only as far as it must be to read as text on every one of `surfaces`. It
  * goes on until it reads. Where nothing can (a light page with a dark panel: no one color
  * reads on both), it gives the ink that reads best on its worst surface, and `readsOn`
- * says it still falls short, which `derivedColorWarnings` reports when a design is saved.
+ * says it still falls short, which `derivedColorWarnings` lists for the design editor's
+ * save to report once that exists.
  */
 export function readableOn(color: string, surfaces: readonly string[]): string {
   let shade = color;
@@ -136,25 +137,37 @@ export function derivedColors(colors: ChosenColors): DerivedColors {
 }
 
 /**
- * The colors worked out from a design that still cannot be read where they are used: only
- * when its page and its panel are so far apart (one light, one dark) that no one color
- * reads on both. Reported with `contrastWarnings` when a design is saved, so nothing falls
- * short without saying so.
+ * The colors worked out from a design that still cannot be read where they are used, on
+ * each of the four surfaces they are fitted to: the page and a panel, as they are and
+ * with the pointer over them. That happens only when a design's surfaces are so far apart
+ * (a light page with a dark panel) that no one color reads on all of them. The league's
+ * own text color is checked on the two hovered surfaces too: `contrastWarnings` checks it
+ * on the page and the panel as they are.
+ *
+ * Nothing calls this yet: no design is saved anywhere until the design editor exists.
+ * The editor's save is to report these beside `contrastWarnings`, so no color falls short
+ * without saying so.
  */
 export function derivedColorWarnings(design: DesignDocument): ContrastWarning[] {
   const colors = { ...design.colors, highlight: design.colors.highlight ?? design.colors.accent };
   const derived = derivedColors(colors);
-  const texts: [string, string][] = [
-    ['quiet text', derived.muted],
-    ['main color as text', derived.primaryText],
-    ['accent as text', derived.accentText],
-    ['error text', derived.danger],
-  ];
-  const surfaces: [string, string][] = [
+  const still: [string, string][] = [
     ['background', colors.background],
     ['panel', colors.panel],
   ];
-  return texts.flatMap(([name, text]) =>
+  const hovered: [string, string][] = still.map(([where, surface]) => [
+    `hovered ${where}`,
+    hoveredSurface(surface, colors.primary),
+  ]);
+  const everywhere = [...still, ...hovered];
+  const checks: [string, string, [string, string][]][] = [
+    ['quiet text', derived.muted, everywhere],
+    ['main color as text', derived.primaryText, everywhere],
+    ['accent as text', derived.accentText, everywhere],
+    ['error text', derived.danger, everywhere],
+    ['text', colors.text, hovered],
+  ];
+  return checks.flatMap(([name, text, surfaces]) =>
     surfaces
       .map(([where, surface]) => ({
         pair: `${name} on ${where}`,
