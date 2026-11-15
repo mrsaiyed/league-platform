@@ -551,7 +551,7 @@ describe('the platform’s command shape at the door (record 062, T-128)', () =>
     expect(CommandBatchV1.safeParse(batch(1, ...present)).success).toBe(true);
   });
 
-  it('keeps version 1 as it was: the Al-Hadi shape, which has no switch', () => {
+  it('keeps version 1 as it was: the first tracker’s shape, which has no switch', () => {
     expect(CommandBatchV1.safeParse(batch(1, switchTo('running'))).success).toBe(false);
   });
 });

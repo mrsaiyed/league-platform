@@ -209,7 +209,11 @@ describe('a game keeps the rules it started with (S-1)', () => {
     // A state started before step 2.122: its rules have no limit, though its format does.
     const before = basketball.newGame({ ...basketball.QUARTERS, clockMode: 'stop' }, 0);
     let state = before;
-    const earlier = [...tipOff, { type: 'start' } as const];
+    const earlier: basketball.Command[] = [
+      { type: 'lineup', side: 'home', playerIds: homeIds },
+      { type: 'lineup', side: 'away', playerIds: awayIds },
+      { type: 'start' },
+    ];
     for (const [i, input] of earlier.entries()) {
       state = basketball.apply(state, input, { id: commandUuid(900 + i), now: startOfTest });
     }
@@ -326,7 +330,7 @@ describe('the platform’s command shape at the door (T-128, record 062)', () =>
     ]);
   });
 
-  it('a version 1 batch is read as it always was: the Al-Hadi shape, with no switch (T-127)', async () => {
+  it('a version 1 batch is read as it always was: the first tracker’s shape, with no switch (T-127)', async () => {
     const t = setUp(withLimit(4));
     expect(await send(t, [...tipOff, ...fouls(4)], 1)).toEqual(Array(6).fill('accepted'));
     expect(lineOf(savedState(t), fouler)?.fouledOut).toBe(true);
