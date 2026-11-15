@@ -249,14 +249,16 @@ function tablePlayersOf(
 
 /**
  * The live game's storage, over one state; `teamsOf` gives a game's two teams,
- * `decidedAt` when it was decided (its `finalizedAt`), and `uniqueJerseys` whether a
- * team's season asks for unique numbers (none, if not given).
+ * `decidedAt` when it was decided (its `finalizedAt`), `uniqueJerseys` whether a
+ * team's season asks for unique numbers (none, if not given), and `corrected` whether a
+ * game has a correction (kept beside the games).
  */
 export function liveGamesOf(
   s: TrackerState,
   teamsOf: (gameId: string) => readonly string[],
   decidedAt: (gameId: string) => string | null | undefined,
   uniqueJerseys: (teamId: string) => boolean = () => false,
+  corrected: (gameId: string) => boolean = () => false,
 ): LiveGamesStore {
   return {
     findState: async (gameId) => {
@@ -277,6 +279,9 @@ export function liveGamesOf(
         s.events.push(event);
       }
     },
+    wasDecided: async (gameId) =>
+      corrected(gameId) ||
+      s.events.some((e) => e.gameId === gameId && (e.type === 'end' || e.type === 'reopen')),
     saveState: async (gameId, seq, state) => {
       s.states = [...s.states.filter((x) => x.gameId !== gameId), { gameId, seq, state }];
     },

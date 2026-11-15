@@ -10,6 +10,7 @@ import {
   findLastEventSeq,
   findSavedGameState,
   findTablePlayer,
+  gameWasDecided,
   insertGameEvents,
   insertTablePlayer,
   listRefusedAdds,
@@ -36,6 +37,7 @@ export function liveGamesStore(scope: LeagueScope): LiveGamesStore {
     findState: (gameId) => findSavedGameState(scope, gameId),
     takenCommands: (gameId, commandIds) => listTakenCommands(scope, gameId, commandIds),
     addEvents: (events) => insertGameEvents(scope, events),
+    wasDecided: (gameId) => gameWasDecided(scope, gameId),
     saveState: (gameId, seq, state) => saveGameState(scope, gameId, seq, state),
     players: (gameId) => listGamePlayers(scope, gameId),
     lines: async (gameId) =>

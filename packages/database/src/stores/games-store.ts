@@ -17,6 +17,7 @@ import {
   listPostponedGames,
   listSettingValues,
   replaceGameLines,
+  updateGameNotStarted,
   updateGameResult,
 } from '../queries/index.ts';
 
@@ -24,6 +25,7 @@ export function gamesStore(scope: LeagueScope): GamesStore {
   return {
     find: (gameId) => findGame(scope, gameId),
     setResult: (gameId, change, version) => updateGameResult(scope, gameId, change, version),
+    markNotStarted: (gameId, version) => updateGameNotStarted(scope, gameId, version),
     addCorrection: (correction) => insertGameCorrection(scope, correction),
     listPostponed: (seasonId) => listPostponedGames(scope, seasonId),
     listDecided: (seasonId) => listDecidedGames(scope, seasonId),
