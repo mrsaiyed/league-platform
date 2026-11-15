@@ -20,7 +20,24 @@ export const sizes = [
   { name: 'phone-lying', width: 844, height: 390 },
   { name: 'tablet-upright', width: 820, height: 1180 },
   { name: 'tablet-lying', width: 1180, height: 820 },
+  // The phone a scorekeeper really holds: a 390 x 844 phone's browser, with its bars,
+  // shows about this much, and the page never scrolls them away (the fifth size).
+  { name: 'phone-in-browser', width: 390, height: 664 },
 ];
+
+/** Three more a side on top of `morePlayers`: fifteen a side, a bench of ten. */
+export const evenMorePlayers = {
+  home: [
+    ['40', 'Xev Hawkins'],
+    ['41', 'Yul Hawkins'],
+    ['42', ''],
+  ],
+  away: [
+    ['40', 'Dov Bearsley'],
+    ['41', 'Eve Bearsley'],
+    ['44', 'Fin Bearsley'],
+  ],
+};
 
 /** Six more made-up players a side, so each team has twelve, as on a real game night. */
 export const morePlayers = {
@@ -147,6 +164,15 @@ export function court(page) {
     },
     /** Taps an option of the open pad (or any button of it) and waits for the play. */
     choose: (act) => recorded(() => option(act).click()),
+    /** The button beside a team's name that opens its bench in the pad (a short phone). */
+    benchButton: (side) => root.locator(`[data-bench-open="${side}"]`),
+    /** A player in the bench opened in the pad, by jersey number. */
+    benchPlayer: (jersey) =>
+      pad.locator('[data-bench-pick]').filter({
+        has: page.locator('.court-opt-number', { hasText: new RegExp(`^${jersey}$`) }),
+      }),
+    /** The end tile of a line of bench players that does not hold them all ("+5"). */
+    moreTile: (within) => within.locator('.court-more-tile'),
     /** A bench player comes in for a floor player, by "In for". */
     async substitute(side, coming, going) {
       // Tapped already, their options are open: a second tap would close them.

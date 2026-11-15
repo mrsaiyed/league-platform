@@ -1,5 +1,7 @@
-// Pictures of the scoring screen with a game IN PLAY, at the four sizes it is designed for
-// (docs/build/DESIGN.md section 7, line 8; finding L4 of the 2.107 audit). scripts/shots.mjs
+// Pictures of the scoring screen with a game IN PLAY, at the five sizes it is designed for
+// (the four of docs/build/DESIGN.md section 7, line 8, and 390 x 664: what a phone's
+// browser really shows; finding L4 of the 2.107 audit). The last states are played with
+// fifteen a side, so a long bench is seen too. scripts/shots.mjs
 // photographs pages as they open; a scoring screen has to be played to be seen, so this
 // plays a made-up game through the screen's own buttons and takes a picture of each state.
 // The web app runs on its made-up stand-in (APP_ENV=test): nothing leaves this computer.
@@ -20,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import {
   addPlayers,
   court,
+  evenMorePlayers,
   playStretch,
   scorekeeper,
   sizes,
@@ -164,6 +167,53 @@ const states = [
       await page.waitForTimeout(3400);
     },
   },
+  {
+    name: '14-bench',
+    about: 'a team’s whole bench opened in the pad (the way to it on a short phone)',
+    run: async (page) => {
+      const c = court(page);
+      // The button is drawn only where the bench is folded away; it is there at every size.
+      await c.benchButton('away').evaluate((button) => button.click());
+      await c.pad.locator('[data-bench-list="away"]').waitFor();
+    },
+  },
+  {
+    name: '15-fifteen-a-side',
+    about: 'fifteen a side: a bench of ten ends in a tile that says how many more',
+    run: async (page, origin) => {
+      const c = court(page);
+      // The game is let go of, three more a side are added at the table, and it is
+      // opened again.
+      await c.pad.locator('.court-close').click();
+      await c.more.click();
+      await Promise.all([
+        page.waitForURL((url) => !url.pathname.includes('/score/')),
+        c.sheet.getByRole('link', { name: 'Back to your games' }).click(),
+      ]);
+      await addPlayers(origin, evenMorePlayers);
+      await page.goto(`${origin}${trackerPath()}`);
+      await c.open();
+      await c.root.locator('[data-floor="home"] .court-tile').first().waitFor();
+    },
+  },
+  {
+    name: '16-fifteen-sub-in',
+    about: 'fifteen a side: "Sub in" for a floor player, ending in the way to the rest',
+    run: async (page) => {
+      const c = court(page);
+      await c.root.locator('[data-floor="home"] .court-tile').first().click();
+      await c.pad.locator('[data-options]').waitFor();
+    },
+  },
+  {
+    name: '17-fifteen-bench',
+    about: 'fifteen a side: the whole bench, to come in for that player',
+    run: async (page) => {
+      const c = court(page);
+      await c.moreTile(c.pad).click();
+      await c.pad.locator('[data-bench-list="home"]').waitFor();
+    },
+  },
 ];
 
 async function main() {
@@ -192,7 +242,7 @@ async function main() {
     await page.goto(`${origin}${trackerPath()}`);
     fs.mkdirSync(out, { recursive: true });
     for (const state of states) {
-      await state.run(page);
+      await state.run(page, origin);
       if (only !== undefined && !only.some((word) => state.name.includes(word))) continue;
       // What was just tapped has stopped showing on its tile.
       await page.waitForTimeout(800);

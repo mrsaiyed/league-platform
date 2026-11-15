@@ -151,6 +151,8 @@ const noHandlers: CourtHandlers = {
   substitute: () => undefined,
   closePad: () => undefined,
   turnovers: () => undefined,
+  bench: () => undefined,
+  benchPick: () => undefined,
   takeBackTurnover: () => undefined,
   teamTurnover: () => undefined,
   takeBackTeamTurnover: () => undefined,
@@ -423,6 +425,32 @@ describe('substitutions (checklist E1 to E5)', () => {
     expect(tagWith(html, 'data-say=""')).toContain('role="status"');
     expect(padDrawn(html)).toContain('Substitutions have to stay within one team.');
     expect((await device.onServer()).teams.home.onCourt).toEqual(hawks);
+  });
+
+  it('opens the whole bench in the pad, to pick one or to come in for a floor player', async () => {
+    const device = await scoringDevice();
+    await device.tipOff();
+    // The team's header has the way to its bench, and each line of bench players an
+    // end tile for those it cannot hold (shown by the stylesheet only where needed).
+    const rest = drawn(device.view());
+    expect(tagWith(rest, 'data-bench-open="home"')).toContain('aria-expanded="false"');
+    expect(rest).toContain('>Bench 1<');
+    expect(rest).toContain('aria-label="Show all of the Hawks bench"');
+    const open = drawn(device.view(), { pad: { kind: 'bench', side: 'home', forId: null } });
+    expect(tagWith(open, 'data-bench-open="home"')).toContain('aria-expanded="true"');
+    const pad = padDrawn(open);
+    expect(pad).toContain('Hawks bench');
+    expect(tagWith(pad, `data-bench-pick="${hawkBench}"`)).toContain(
+      'aria-label="#13 Ray Hawkins"',
+    );
+    // Opened from a floor player's "Sub in": it asks who comes in for them.
+    const forOne = padDrawn(
+      drawn(device.view(), { pad: { kind: 'bench', side: 'home', forId: h1 } }),
+    );
+    expect(forOne).toContain('Who comes in for #3 Max Hawkins?');
+    expect(tagWith(forOne, `data-bench-pick="${hawkBench}"`)).toContain(
+      'aria-label="#13 Ray Hawkins in for #3 Max Hawkins"',
+    );
   });
 
   it('says so when everyone is on the court (E5)', async () => {

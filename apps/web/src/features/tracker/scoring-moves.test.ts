@@ -10,6 +10,7 @@ import {
   padFor,
   padIsFor,
   padTap,
+  pickFromBench,
   startShortHanded,
   subTap,
   swapColorsTap,
@@ -189,6 +190,47 @@ describe('substitutions (E1 to E3)', () => {
     expect(dropOn(view, 'h20', null)).toBeNull();
     expect(dropOn(view, 'h20', 'h20')).toBeNull();
     expect(dropOn(view, 'h20', 'nobody')).toBeNull();
+  });
+});
+
+describe('the whole bench, opened in the pad (area 4 review, M1 and M2)', () => {
+  it('opens a bench player’s options, or brings them in for the player it was opened for', () => {
+    const view = viewOf(tippedOff());
+    const open: PadMode = { kind: 'bench', side: 'home', forId: null };
+    expect(pickFromBench(view, open, 'h20')).toEqual({
+      kind: 'pad',
+      pad: { kind: 'player', playerId: 'h20' },
+    });
+    const forSeven: PadMode = { kind: 'bench', side: 'home', forId: 'h7' };
+    const picked = pickFromBench(view, forSeven, 'h20');
+    expect(picked).toMatchObject({ kind: 'sub', coming: { id: 'h20' }, going: { id: 'h7' } });
+    if (picked?.kind !== 'sub') throw new Error('not a substitution');
+    const game = after(tippedOff(), subTap(picked.coming, picked.going));
+    expect(basketball.derive(game).teams.home.onCourt).toContain('h20');
+  });
+
+  it('takes nothing from a floor player, the other team, or a pad that is not the bench', () => {
+    const view = viewOf(tippedOff());
+    const open: PadMode = { kind: 'bench', side: 'home', forId: 'h7' };
+    expect(pickFromBench(view, open, 'h3')).toBeNull();
+    expect(pickFromBench(view, open, 'a20')).toBeNull();
+    expect(pickFromBench(view, open, 'nobody')).toBeNull();
+    expect(pickFromBench(view, padAtRest, 'h20')).toBeNull();
+    // The player it was opened for has gone off since: nobody comes in for them.
+    expect(pickFromBench(view, { kind: 'bench', side: 'home', forId: 'h20' }, 'h21')).toBeNull();
+  });
+
+  it('closes when the player it was opened for is no longer on the court', () => {
+    const view = viewOf(tippedOff());
+    const open: PadMode = { kind: 'bench', side: 'away', forId: null };
+    expect(padFor(view, open)).toEqual(open);
+    expect(padFor(view, { kind: 'bench', side: 'away', forId: 'a3' })).toEqual({
+      kind: 'bench',
+      side: 'away',
+      forId: 'a3',
+    });
+    expect(padFor(view, { kind: 'bench', side: 'away', forId: 'a20' })).toEqual(padAtRest);
+    expect(padFor(viewOf(basketball.newGame()), open)).toEqual(padAtRest);
   });
 });
 

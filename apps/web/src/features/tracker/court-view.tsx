@@ -62,6 +62,10 @@ export type CourtHandlers = {
   ) => void;
   readonly closePad: () => void;
   readonly turnovers: (side: Side) => void;
+  /** Opens a team's whole bench in the pad: to pick one, or who comes in for `forId`. */
+  readonly bench: (side: Side, forId: string | null) => void;
+  /** A player tapped in the opened bench. */
+  readonly benchPick: (playerId: string, event: MouseEvent<HTMLButtonElement>) => void;
   readonly takeBackTurnover: (tile: PlayerTile) => void;
   readonly teamTurnover: (side: Side) => void;
   readonly takeBackTeamTurnover: (side: Side) => void;
@@ -232,6 +236,7 @@ function Score({ t, team }: { readonly t: Translate; readonly team: TeamPanel })
 function Team(props: CourtViewProps & { readonly team: TeamPanel }) {
   const { t, team, pad, on, slots = {} } = props;
   const turnoversOpen = pad.kind === 'turnovers' && pad.side === team.side;
+  const benchOpen = pad.kind === 'bench' && pad.side === team.side;
   const openId = pad.kind === 'player' ? pad.playerId : null;
   const nameId = `court-team-${team.side}`;
   return (
@@ -250,6 +255,20 @@ function Team(props: CourtViewProps & { readonly team: TeamPanel }) {
         </h2>
         <div className="court-team-chips">
           {slots.teamHead?.(team.side)}
+          {/* Where the bench is folded away (a short phone), this opens it in the pad. */}
+          {team.stage === 'set' ? (
+            <button
+              type="button"
+              className="court-chip court-bench-open"
+              data-bench-open={team.side}
+              aria-expanded={benchOpen}
+              aria-controls={padId}
+              onClick={() => on.bench(team.side, null)}
+            >
+              {t('tracker.bench.open', { count: team.bench.length })}
+              <span className="court-caret" aria-hidden="true" />
+            </button>
+          ) : null}
           <button
             type="button"
             className="court-chip"
@@ -319,10 +338,22 @@ function Team(props: CourtViewProps & { readonly team: TeamPanel }) {
             role="group"
             aria-label={t('tracker.bench.title')}
             data-bench={team.side}
+            data-fit=""
           >
             <span className="court-bench-label" aria-hidden="true">
               {t('tracker.bench.title')}
             </span>
+            {/* Shown where the bench does not all fit in its row: how many more, and
+                the way to all of them (scoring-screen.tsx counts what fits). */}
+            <button
+              type="button"
+              className="court-tile court-chip-tile court-more-tile"
+              data-more-bench={team.side}
+              aria-label={t('tracker.bench.showAll', { team: team.name })}
+              onClick={() => on.bench(team.side, null)}
+            >
+              <span className="court-more-count" aria-hidden="true" />
+            </button>
             {team.bench.length === 0 ? (
               <p className="court-quiet">{t('tracker.bench.everyoneOn')}</p>
             ) : (
@@ -440,7 +471,7 @@ function Pad(props: CourtViewProps) {
       data-color={
         tile !== undefined
           ? view.teams[tile.side].color
-          : pad.kind === 'turnovers'
+          : pad.kind === 'turnovers' || pad.kind === 'bench'
             ? view.teams[pad.side].color
             : undefined
       }
@@ -451,7 +482,10 @@ function Pad(props: CourtViewProps) {
       </p>
       {tile !== undefined ? <PlayerPad {...props} tile={tile} /> : null}
       {pad.kind === 'turnovers' ? <TurnoversPad {...props} team={view.teams[pad.side]} /> : null}
-      {tile === undefined && pad.kind !== 'turnovers' ? (
+      {pad.kind === 'bench' ? (
+        <BenchPad {...props} team={view.teams[pad.side]} forId={pad.forId} />
+      ) : null}
+      {tile === undefined && pad.kind !== 'turnovers' && pad.kind !== 'bench' ? (
         <div className="court-rest" data-rest="">
           <div className="court-slot-rest" data-slot="pad-rest">
             {slots.padRest}
@@ -535,7 +569,20 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
         <span className="court-label">
           {t(tile.onCourt ? 'tracker.pad.subIn' : 'tracker.pad.inFor')}
         </span>
-        <div className="court-subs-row">
+        <div className="court-subs-row" data-fit="">
+          {/* Where the bench does not all fit in this row: how many more, and the way
+              to all of them, to come in for this player. */}
+          {tile.onCourt ? (
+            <button
+              type="button"
+              className="court-opt court-opt-sub court-more-tile"
+              data-more-bench={tile.side}
+              aria-label={t('tracker.bench.showAll', { team: team.name })}
+              onClick={() => on.bench(tile.side, tile.id)}
+            >
+              <span className="court-more-count" aria-hidden="true" />
+            </button>
+          ) : null}
           {others.length === 0 ? (
             <p className="court-quiet">{t('tracker.bench.everyoneOn')}</p>
           ) : (
@@ -612,6 +659,70 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
           {t('tracker.pad.turnover')}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A team's whole bench, in the pad: where it is folded away (a short phone) or longer
+ * than its row. A tap opens that player's options, or brings them in for the floor
+ * player the bench was opened for.
+ */
+function BenchPad(
+  props: CourtViewProps & { readonly team: TeamPanel; readonly forId: string | null },
+) {
+  const { t, view, team, forId, on } = props;
+  const going = forId === null ? undefined : findTile(view, forId);
+  return (
+    <div className="court-options court-bench-pad" role="group" data-bench-list={team.side}>
+      <div className="court-who">
+        <span className="court-swatch" aria-hidden="true" />
+        <span className="court-who-text">
+          <span className="court-who-name">
+            {going === undefined
+              ? t('tracker.bench.of', { team: team.name })
+              : t('tracker.bench.comesInFor', { player: playerLabel(going.player, t) })}
+          </span>
+        </span>
+        <button
+          type="button"
+          className="court-close"
+          aria-label={t('tracker.pad.closeOptions')}
+          onClick={on.closePad}
+        >
+          <span className="court-cross" aria-hidden="true" />
+        </button>
+      </div>
+      {team.bench.length === 0 ? (
+        <p className="court-quiet court-turnovers-none">{t('tracker.bench.everyoneOn')}</p>
+      ) : (
+        <div className="court-bench-rows">
+          {team.bench.map((player) => (
+            <button
+              key={player.id}
+              type="button"
+              className="court-opt court-opt-sub"
+              data-bench-pick={player.id}
+              aria-label={
+                going === undefined
+                  ? playerLabel(player.player, t)
+                  : t('tracker.pad.inForPlayer', {
+                      in: playerLabel(player.player, t),
+                      out: playerLabel(going.player, t),
+                    })
+              }
+              onClick={(event) => on.benchPick(player.id, event)}
+            >
+              <span className="court-opt-number">
+                {player.number ?? t('tracker.tile.noNumber')}
+              </span>
+              <span className="court-opt-name">
+                {player.unlisted ? t('tracker.player.unlistedShort') : player.shortName}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -8,11 +8,17 @@ import type { LineupPicks } from './opened-game-storage.ts';
 import { findTile, type PlayerTile, type ScoringView, type Side } from './scoring-view.ts';
 import type { TapInput } from './tracker-controller.ts';
 
-/** What the pad shows: nothing picked, a player's options, or a team's turnovers. */
+/**
+ * What the pad shows: nothing picked, a player's options, a team's turnovers, or a
+ * team's whole bench. The bench opens where it does not all fit beside the court (a
+ * short phone folds it away; a long bench ends in "+5"): to pick a bench player
+ * (`forId` null), or who comes in for the floor player `forId`.
+ */
 export type PadMode =
   | { readonly kind: 'rest' }
   | { readonly kind: 'player'; readonly playerId: string }
-  | { readonly kind: 'turnovers'; readonly side: Side };
+  | { readonly kind: 'turnovers'; readonly side: Side }
+  | { readonly kind: 'bench'; readonly side: Side; readonly forId: string | null };
 
 export const padAtRest: PadMode = { kind: 'rest' };
 
@@ -135,7 +141,33 @@ export const swapColorsTap = (game: basketball.GameState): TapInput => ({
  * the game was rebuilt without them) is not left open.
  */
 export function padFor(view: ScoringView, pad: PadMode): PadMode {
+  if (pad.kind === 'bench') {
+    // The bench of a team with no lineup, or for a player no longer on the court, closes.
+    if (view.teams[pad.side].stage !== 'set') return padAtRest;
+    if (pad.forId === null) return pad;
+    return findTile(view, pad.forId)?.onCourt === true ? pad : padAtRest;
+  }
   if (pad.kind !== 'player') return pad;
   const tile = findTile(view, pad.playerId);
   return tile !== undefined && view.teams[tile.side].stage === 'set' ? pad : padAtRest;
+}
+
+/**
+ * Tapping a player in the opened bench: they come in for the floor player the bench was
+ * opened for, or their own options open.
+ */
+export function pickFromBench(
+  view: ScoringView,
+  pad: PadMode,
+  playerId: string,
+):
+  | { readonly kind: 'sub'; readonly coming: PlayerTile; readonly going: PlayerTile }
+  | TileTap
+  | null {
+  if (pad.kind !== 'bench') return null;
+  const coming = findTile(view, playerId);
+  if (coming === undefined || coming.onCourt || coming.side !== pad.side) return null;
+  if (pad.forId === null) return { kind: 'pad', pad: { kind: 'player', playerId } };
+  const going = findTile(view, pad.forId);
+  return going === undefined || !going.onCourt ? null : { kind: 'sub', coming, going };
 }

@@ -59,9 +59,14 @@
   --court-radius: 10px;
   --court-tile-height: 64px;
   --court-chip-height: 48px;
-  --court-points-height: 64px;
-  --court-acts-height: 52px;
-  --court-subs-height: 48px;
+  --court-points-height: 60px;
+  --court-acts-height: 48px;
+  --court-subs-height: 44px;
+  /* The pad's own parts: the line that says who, the label above the "Sub in" line (none
+     where it sits beside the line), and its padding and edges. */
+  --court-who-height: 44px;
+  --court-subs-label: 14px;
+  --court-pad-edge: 14px;
 
   position: fixed;
   inset: 0;
@@ -443,22 +448,29 @@
   align-items: center;
   justify-content: center;
   min-inline-size: 0;
-  padding-block: 4px 6px;
+  padding-block: 2px 4px;
   padding-inline: 8px;
   border: 2px solid var(--court-team-edge);
   border-radius: var(--court-radius);
   background: var(--court-team-ground);
   color: var(--court-team-ink);
 }
+/* A long name takes two lines before it is cut, so two teams of one school still read
+   apart ("KIPP ACADEMY WEST" and "KIPP ACADEMY EAST"). */
 .court-score-name {
+  display: -webkit-box;
   max-inline-size: 100%;
   overflow: hidden;
-  font-size: var(--court-size-small);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-overflow: ellipsis;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  text-align: center;
   text-transform: uppercase;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .court-score-value {
   font-size: var(--court-size-score);
@@ -736,35 +748,55 @@
   color: var(--court-text);
 }
 
-/* The bench: smaller, quieter tiles in one strip. Seven fit a phone; more scroll
-   sideways, and a strip that scrolls keeps its sideways swipe. */
-.court-bench {
-  display: flex;
-  gap: var(--court-gap);
-  min-block-size: var(--court-chip-height);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.court-bench::-webkit-scrollbar {
-  display: none;
+/* The bench: smaller, quieter tiles in one line. Nothing here scrolls sideways and no
+   tile is ever cut: the line shows as many as fit whole (seven on a phone), the rows
+   after the first have no height, and when there are more the line ends in a tile that
+   says how many more ("+5") and opens the whole bench in the pad. A bench tile can be
+   dragged from in any direction. */
+.court-bench,
+.court-subs-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  grid-template-rows: var(--court-chip-height);
+  grid-auto-rows: 0;
+  column-gap: var(--court-gap);
+  row-gap: 0;
+  block-size: var(--court-chip-height);
+  overflow: hidden;
 }
 .court-bench-label {
   display: none;
 }
-.court-bench > .court-quiet {
+.court-bench > .court-quiet,
+.court-subs-row > .court-quiet {
+  grid-column: 1 / -1;
   align-self: center;
   padding-inline: 4px;
 }
 .court-chip-tile {
-  flex: 1 0 44px;
-  max-inline-size: 76px;
   min-block-size: var(--court-chip-height);
   border-width: 1px;
   background: var(--court-team-bench);
   touch-action: none;
 }
-.court-bench[data-scrolls] .court-chip-tile {
-  touch-action: pan-x;
+/* "+5": the last place of the line, only where the line does not hold everyone. */
+.court-more-tile {
+  display: none;
+  grid-row: 1;
+  grid-column: -2 / -1;
+  border-style: dashed;
+}
+[data-more] > .court-more-tile {
+  display: flex;
+}
+.court-more-tile::before {
+  content: '+' attr(data-count);
+  font-size: 18px;
+  font-weight: 800;
+}
+/* Where the bench is folded away (a short phone), the team's header opens it. */
+.court-bench-open {
+  display: none;
 }
 .court-chip-tile .court-tile-number {
   font-size: 20px;
@@ -789,12 +821,14 @@
   font-size: 15px;
 }
 .court-bench-picking {
-  display: grid;
   grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  grid-template-rows: none;
+  grid-auto-rows: auto;
+  row-gap: var(--court-gap);
+  block-size: auto;
   overflow: visible;
 }
 .court-bench-picking .court-chip-tile {
-  max-inline-size: none;
   min-block-size: 52px;
   touch-action: manipulation;
 }
@@ -812,8 +846,9 @@
   gap: var(--court-gap);
   min-inline-size: 0;
   block-size: calc(
-    44px + var(--court-subs-height) + var(--court-points-height) + var(--court-acts-height) + 3 *
-      var(--court-gap) + 14px
+    var(--court-who-height) + var(--court-subs-label) + var(--court-subs-height) +
+      var(--court-points-height) + var(--court-acts-height) + 3 * var(--court-gap) +
+      var(--court-pad-edge)
   );
   padding: 6px;
   overflow: hidden;
@@ -936,34 +971,45 @@
 .court-opt:disabled {
   opacity: 0.4;
 }
+/* Who can come in, or who to come in for: its label above the line on a phone, so
+   seven fit across; one line that never scrolls (see the bench, above). */
 .court-subs {
   flex: none;
   display: flex;
-  align-items: center;
-  gap: var(--court-gap);
-  block-size: var(--court-subs-height);
+  flex-direction: column;
+  gap: 2px;
 }
 .court-subs > .court-label {
   flex: none;
-  inline-size: 34px;
+  block-size: calc(var(--court-subs-label) - 2px);
   font-size: 11px;
-  line-height: 1.15;
+  line-height: 1.1;
   letter-spacing: 0.04em;
 }
 .court-subs-row {
-  flex: 1;
-  display: flex;
-  gap: var(--court-gap);
-  block-size: 100%;
+  grid-template-rows: var(--court-subs-height);
+  block-size: var(--court-subs-height);
   min-inline-size: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-.court-subs-row::-webkit-scrollbar {
-  display: none;
+/* A team's whole bench, in the pad: every player, wrapping, the pad scrolling down only
+   for a very long bench. */
+.court-bench-rows {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  grid-auto-rows: var(--court-chip-height);
+  align-content: start;
+  gap: var(--court-gap);
+  min-block-size: 0;
+  overflow-y: auto;
+}
+.court-bench-pad .court-who {
+  padding-inline-start: 6px;
+}
+.court-bench-rows .court-opt-name {
+  display: block;
 }
 .court-opt-sub {
-  flex: 1 0 44px;
   border-color: var(--court-team-edge);
   background: var(--court-team-ground);
   color: var(--court-team-ink);
@@ -1131,7 +1177,8 @@
   inset-block-start: 0;
   inset-inline-start: 0;
   z-index: 40;
-  margin-block-start: -56px;
+  /* Well above the finger, so the tile it is over, and its number, stay in sight. */
+  margin-block-start: -92px;
   margin-inline-start: -40px;
   padding-block: 8px;
   padding-inline: 12px;
@@ -1200,6 +1247,8 @@
     --court-points-height: 56px;
     --court-acts-height: 44px;
     --court-subs-height: 44px;
+    /* The pad's own gaps are 6 here, not 8: three of them, taken off its edge. */
+    --court-pad-edge: 8px;
   }
   .court-play {
     gap: 4px;
@@ -1256,15 +1305,32 @@
   }
   .court-pad {
     gap: 6px;
-    block-size: calc(
-      44px + var(--court-subs-height) + var(--court-points-height) + var(--court-acts-height) +
-        18px + 14px
-    );
   }
   .court-options {
     gap: 6px;
   }
   .court-hint p {
+    font-size: 12px;
+  }
+}
+
+/* ---- The phone a scorekeeper really holds: a 390 x 844 phone shows about 390 x 664 in
+   its browser, whose bars never tuck away on a page that does not scroll. Below 760
+   high the two bench strips fold away, so both fives are whole and the pad is on the
+   screen with nothing scrolling; the bench is one tap away in the pad ("Bench 7" beside
+   the team's name), and "Sub in" on the player coming off needs no bench at all. ------- */
+@media (max-width: 699px) and (max-height: 759px) and (orientation: portrait) {
+  .court-team .court-bench:not(.court-bench-picking) {
+    display: none;
+  }
+  .court-bench-open {
+    display: inline-flex;
+  }
+  .court-team-chips {
+    gap: 6px;
+  }
+  .court-chip {
+    padding-inline: 8px;
     font-size: 12px;
   }
 }
@@ -1358,15 +1424,12 @@
   }
   .court-bench,
   .court-bench-picking {
-    display: grid;
     grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    row-gap: var(--court-gap);
+    block-size: auto;
     overflow: visible;
-  }
-  .court-bench > .court-quiet {
-    grid-column: 1 / -1;
-  }
-  .court-chip-tile {
-    max-inline-size: none;
   }
   .court-pad,
   .court[data-stage='lineups'] .court-pad {
@@ -1380,20 +1443,6 @@
   .court-who-number {
     block-size: 40px;
     font-size: 20px;
-  }
-  /* The row's label sits above it here, so all five on the court fit across. */
-  .court-subs {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 2px;
-    block-size: auto;
-  }
-  .court-subs > .court-label {
-    inline-size: auto;
-  }
-  .court-subs-row {
-    flex: none;
-    block-size: var(--court-subs-height);
   }
   .court-hint p {
     font-size: 12px;
@@ -1415,6 +1464,9 @@
     --court-points-height: 72px;
     --court-acts-height: 56px;
     --court-subs-height: 52px;
+    --court-who-height: 48px;
+    --court-subs-label: 0px;
+    --court-pad-edge: 22px;
     padding-block: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-bottom));
     padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
   }
@@ -1490,9 +1542,13 @@
   .court-tile-name {
     font-size: 14px;
   }
+  /* There is room here for the whole bench: it wraps, and nobody is behind a "+5". */
   .court-bench {
+    display: flex;
     flex-wrap: wrap;
     align-items: center;
+    gap: var(--court-gap);
+    block-size: auto;
     overflow: visible;
   }
   .court-bench-label {
@@ -1511,6 +1567,7 @@
     font-size: 24px;
   }
   .court-bench-picking {
+    display: grid;
     grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   }
   .court-bench-picking .court-chip-tile {
@@ -1518,10 +1575,15 @@
   }
   .court-pad {
     padding: 10px;
-    block-size: calc(
-      48px + var(--court-subs-height) + var(--court-points-height) + var(--court-acts-height) + 3 *
-        var(--court-gap) + 22px
-    );
+  }
+  /* The label sits beside the line here: there is width to spare. */
+  .court-subs {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--court-gap);
+  }
+  .court-subs-row {
+    flex: 1;
   }
   .court[data-stage='lineups'] .court-pad {
     block-size: auto;
@@ -1542,6 +1604,7 @@
   }
   .court-subs > .court-label {
     inline-size: 48px;
+    block-size: auto;
     font-size: 12px;
   }
   .court-opt {
@@ -1591,8 +1654,14 @@
     max-block-size: 100%;
     overflow-y: auto;
   }
+  /* The five in one line, as on the court's other sizes (66 wide here, 88 high). */
   .court-floor {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .court-floor .court-tile-stats,
+  .court-floor .court-tile-name {
+    font-size: 13px;
   }
   /* There is room below here: the bench's label has a line of its own. */
   .court-bench-label {
@@ -1600,12 +1669,6 @@
   }
   .court-rest {
     display: flex;
-  }
-  .court-pad {
-    block-size: calc(
-      48px + var(--court-subs-height) + var(--court-points-height) + var(--court-acts-height) + 3 *
-        var(--court-gap) + 22px
-    );
   }
   .court[data-stage='lineups'] .court-pad {
     block-size: auto;

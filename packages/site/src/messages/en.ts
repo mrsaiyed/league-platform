@@ -805,6 +805,10 @@ export const en = {
   'tracker.floor.title': 'On court',
   'tracker.bench.title': 'Bench',
   'tracker.bench.everyoneOn': 'Everyone is on the court.',
+  'tracker.bench.open': 'Bench {count}',
+  'tracker.bench.showAll': 'Show all of the {team} bench',
+  'tracker.bench.of': '{team} bench',
+  'tracker.bench.comesInFor': 'Who comes in for {player}?',
   'tracker.lineup.pick': 'Pick the starting {size}: tap players below.',
   'tracker.lineup.picked': '{count} of {size} picked.',
   'tracker.lineup.startWith': 'Start with {count}',
@@ -853,7 +857,7 @@ export const en = {
   'tracker.hint.players':
     'Tap a player, then +1, +2, +3, Foul or Turnover. −Foul takes back that player’s latest foul.',
   'tracker.hint.subs':
-    'To substitute, tap a bench player and then who they come in for, or drag them onto a player on the court.',
+    'To substitute, tap the player coming off and then who comes in, or tap a bench player and who they come in for. A bench player can also be dragged onto a player on the court.',
   'tracker.hint.turnovers':
     'Tap a team’s turnovers to see each player’s, take one back, or add a team turnover.',
   'tracker.hint.saved':

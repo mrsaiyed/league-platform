@@ -33,6 +33,7 @@ import {
   padFor,
   padIsFor,
   padTap,
+  pickFromBench,
   startShortHanded,
   subTap,
   swapColorsTap,
@@ -338,7 +339,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
       });
     },
     substitute(coming, going, event) {
-      if (!padIsFor(wanted.current, coming.id, going.id)) return;
+      // Once, from the pad of either player, or from the bench opened for the one going.
+      const now = wanted.current;
+      const fromBench = now.kind === 'bench' && now.forId === going.id;
+      if (!fromBench && !padIsFor(now, coming.id, going.id)) return;
       wanted.current = padAtRest;
       const marks = markSub(coming, going);
       const keyboard = byKeyboard(event);
@@ -359,6 +363,22 @@ export function ScoringScreen(props: ScoringScreenProps) {
       showPad(
         now.kind === 'turnovers' && now.side === side ? padAtRest : { kind: 'turnovers', side },
       );
+    },
+    bench(side, forId) {
+      const now = wanted.current;
+      const open = now.kind === 'bench' && now.side === side && now.forId === forId;
+      setSaid(null);
+      showPad(open ? padAtRest : { kind: 'bench', side, forId });
+    },
+    benchPick(playerId, event) {
+      const picked = pickFromBench(view, padFor(view, wanted.current), playerId);
+      if (picked === null) return;
+      if (picked.kind === 'sub') {
+        on.substitute(picked.coming, picked.going, event);
+      } else if (picked.kind === 'pad') {
+        showPad(picked.pad);
+        if (byKeyboard(event)) focusNext.current = 'pad';
+      }
     },
     takeBackTurnover(tile) {
       void send({ type: 'unturnover', side: tile.side, playerId: tile.id });
@@ -528,20 +548,32 @@ export function ScoringScreen(props: ScoringScreenProps) {
     },
   };
 
-  // A bench that is wider than its row scrolls sideways; one that fits is dragged from
-  // freely. Measured when a bench changes or the screen is turned, not on every tap.
+  // No bench player is hidden without a sign, and nothing scrolls sideways: a row that
+  // holds one line of players (a phone's bench strip, the pad's "Sub in") shows as many
+  // as fit whole and, when there are more, ends in a tile that says how many more and
+  // opens them all in the pad. Counted when a bench or the pad changes or the screen
+  // is turned, never in the turn of a tap.
   const benches = `${view.teams.home.stage}${view.teams.home.bench.length}${view.teams.away.stage}${view.teams.away.bench.length}`;
   useEffect(() => {
     const measure = () => {
-      const rows = root.current?.querySelectorAll<HTMLElement>('[data-bench]') ?? [];
+      const rows = root.current?.querySelectorAll<HTMLElement>('[data-fit]') ?? [];
       for (const row of rows) {
-        row.toggleAttribute('data-scrolls', row.scrollWidth > row.clientWidth + 1);
+        const style = getComputedStyle(row);
+        const players = row.querySelectorAll(':scope > [data-player], :scope > [data-other]');
+        const columns = style.gridTemplateColumns.split(' ').filter(Boolean).length;
+        // One line only where the stylesheet gives the rows after the first no height.
+        const more =
+          style.display === 'grid' && style.gridAutoRows === '0px' && players.length > columns
+            ? players.length - (columns - 1)
+            : 0;
+        row.toggleAttribute('data-more', more > 0);
+        row.querySelector(':scope > .court-more-tile')?.setAttribute('data-count', String(more));
       }
     };
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [benches]);
+  }, [benches, pad]);
 
   // The tiles are handed one tap handler that never changes, so a tile is drawn again
   // only when what it shows changed (finding M6).
