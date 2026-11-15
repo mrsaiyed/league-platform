@@ -6,7 +6,8 @@
 //
 // The output is read as ci.yml makes it: bash runs the chain with its trace on, so it
 // prints "+ node tests/browser/<file>.mjs" before it starts each test; every test prints
-// "<its name> … failed:" and one indented line per failing check; and a test that fails
+// "<its name> … failed:" (or "…: 2 problem(s)") and one indented line per failing check;
+// and a test that fails
 // prints the last lines of any Next.js build or server that did not finish well
 // ("The last 30 lines `next build` printed (…):", each line after it starting "  | ").
 // The notes are GitHub annotations: never more than nine (GitHub keeps ten per step).
@@ -42,7 +43,8 @@ export function browserFailureNotes(output, machine = []) {
   });
   const own = started >= 0 ? lines.slice(started + 1) : lines;
   const file = started >= 0 ? lines[started].split(' ')[2] : '';
-  const heading = own.find((line) => /\bfailed:\s*$/.test(line));
+  // "… check failed:", or as the scoring screen's test says it, "…: 4 problem(s)".
+  const heading = own.find((line) => /(\bfailed:|\d+ problems?(\(s\))?:?)\s*$/.test(line));
   notes.push(
     annotation(
       file ? `browser tests stopped in ${file}` : 'browser tests stopped',

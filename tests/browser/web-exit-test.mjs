@@ -37,7 +37,7 @@ import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sayOnFailure } from './web-browser-kit.mjs';
+import { sayOnFailure, whatWentWrong } from './web-browser-kit.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const app = path.join(root, 'apps/web');
@@ -99,7 +99,7 @@ const step = async (name, run) => {
   try {
     await run();
   } catch (error) {
-    failures.push(`${name}: ${String(error?.message ?? error).split('\n')[0]}`);
+    failures.push(`${name}: ${whatWentWrong(error)}`);
   }
 };
 

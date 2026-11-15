@@ -20,6 +20,7 @@ import {
   launch,
   startNext,
   waitFor,
+  whatWentWrong,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -32,7 +33,7 @@ const step = async (name, run) => {
   try {
     await run();
   } catch (error) {
-    failures.push(`${name}: ${String(error?.message ?? error).split('\n')[0]}`);
+    failures.push(`${name}: ${whatWentWrong(error)}`);
   }
 };
 

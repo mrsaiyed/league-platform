@@ -63,6 +63,22 @@ export function sayOnFailure(label, child, output) {
   });
 }
 
+/**
+ * A thrown error in one line, for a test's list of failed checks: its first line and, for
+ * a Playwright wait that ran out, what it was waiting for (the first "waiting for" line of
+ * its call log), so a timeout names the thing that never came (step 2.178).
+ */
+export function whatWentWrong(error) {
+  const lines = String(error?.message ?? error)
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+    .split('\n');
+  const waiting = lines
+    .find((line) => /^\s*-\s*waiting for /.test(line))
+    ?.trim()
+    .slice(2);
+  return waiting ? `${lines[0]} (${waiting})` : lines[0];
+}
+
 export function freePort() {
   return new Promise((resolve, reject) => {
     const probe = net.createServer();

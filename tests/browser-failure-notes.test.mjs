@@ -152,6 +152,29 @@ test('a check listed with "- " is not named a second time as an error', () => {
   assert.deepEqual(titled(notes, 'printed'), []);
 });
 
+test('a test that counts its problems is read the same way', () => {
+  // The shape GitHub printed for lane 2.35 on 2026-11-15 (step 2.178, try 2).
+  const notes = browserFailureNotes(
+    [
+      ...chain,
+      '+ node tests/browser/made-up-test.mjs --no-build',
+      'Made-up screen browser test: 2 problem(s)',
+      '  - the made-up phone: locator.waitFor: Timeout 30000ms exceeded.',
+      '  - the four made-up sizes: locator.waitFor: Timeout 30000ms exceeded.',
+      '▲ Next.js 16.0.0',
+    ].join('\n'),
+  );
+  assert.match(
+    decode(notes[0]),
+    /made-up-test\.mjs --no-build\nMade-up screen browser test: 2 problem\(s\)$/,
+  );
+  assert.deepEqual(titled(notes, 'failed check'), [
+    'the made-up phone: locator.waitFor: Timeout 30000ms exceeded.',
+    'the four made-up sizes: locator.waitFor: Timeout 30000ms exceeded.',
+  ]);
+  assert.deepEqual(titled(notes, 'printed'), []);
+});
+
 test('with no trace line and no list, it says so and still shows how the output ended', () => {
   const notes = browserFailureNotes('Killed\n');
   assert.equal(
