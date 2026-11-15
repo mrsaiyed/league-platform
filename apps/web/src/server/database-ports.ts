@@ -221,5 +221,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     },
     // No live hub until the tracker moves: nothing would publish to it.
     liveFeed: null,
+    madeUpWorld: false,
+    answersHost: () => true,
   };
 }

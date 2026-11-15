@@ -21,7 +21,7 @@ import {
   type ScoringSessionsStore,
   type TablePlayerRefusal,
 } from '@srleagues/core';
-import { randomUUID } from 'node:crypto';
+import { newId } from './stand-in-world-ids.ts';
 import { addDays, dayIn, momentIn } from './stand-in-world-clock.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld, WorldGame, WorldRosterEntry } from './stand-in-world-state.ts';
@@ -239,7 +239,7 @@ export function worldScoringSessions(s: LeagueWorld): ScoringSessionsStore {
     findForGame: async (gameId) => current(gameId),
     start: async (session) => {
       if (current(session.gameId) !== undefined) return undefined;
-      const started: ScoringSession = { ...session, id: randomUUID() };
+      const started: ScoringSession = { ...session, id: newId() };
       s.sessions = [...s.sessions, started];
       return started;
     },
@@ -401,7 +401,7 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
       s.roster = [
         ...s.roster,
         {
-          id: randomUUID(),
+          id: newId(),
           teamId,
           personId,
           jerseyNumber,

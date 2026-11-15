@@ -3,9 +3,16 @@ import { t } from '../../server/messages.ts';
 
 /**
  * The league's name, then terms, privacy and our small mark, on every league's pages,
- * always (U-8).
+ * always (U-8). On the app's made-up world on a computer (`madeUp`), one quiet line says
+ * the league is made up and starts over (step 2.152); never on a real league.
  */
-export function SiteFooter({ name }: { readonly name?: string | undefined }) {
+export function SiteFooter({
+  name,
+  madeUp = false,
+}: {
+  readonly name?: string | undefined;
+  readonly madeUp?: boolean;
+}) {
   return (
     <footer className="site-footer">
       <div className="site-column">
@@ -19,6 +26,11 @@ export function SiteFooter({ name }: { readonly name?: string | undefined }) {
           <a href={platformUrl('privacy')}>{t('footer.privacy')}</a>
         </nav>
         <small className="powered-by">{t('site.poweredBy')}</small>
+        {madeUp ? (
+          <small className="site-footer-made-up" data-made-up="">
+            {t('footer.madeUp')}
+          </small>
+        ) : null}
       </div>
     </footer>
   );

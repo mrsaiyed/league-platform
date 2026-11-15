@@ -30,8 +30,8 @@ const note = (label, ok, detail = '') => {
 
 const team = 'Kestrels';
 const players = [
-  { first: 'Robin', last: 'Ashgrove', number: '7' },
-  { first: 'Sasha', last: 'Fernwood', number: '12' },
+  { first: 'Robin', last: 'Ashgrove', number: '7', points: 21 },
+  { first: 'Sasha', last: 'Fernwood', number: '12', points: 19 },
 ];
 
 let built = true;
@@ -124,19 +124,24 @@ if (built) {
     const round = page.locator(`section[data-round]`, {
       has: page.locator(`details[data-add-game] input[name=date][value="${today}"]`),
     });
-    const thisRound =
-      (await round.count()) > 0 ? round.first() : page.locator('section[data-round]').nth(3);
+    // The seed always has a round dated today; without one this test proves nothing.
+    if ((await round.count()) !== 1) {
+      throw new Error(`${await round.count()} rounds are dated today (${today}), not one`);
+    }
+    const thisRound = round.first();
     const addGame = async (away, time) => {
       const add = thisRound.locator('details[data-add-game]');
       await add.locator('summary').click();
       await add.locator('select[name=homeTeamId]').selectOption({ label: team });
       await add.locator('select[name=awayTeamId]').selectOption({ label: away });
       await add.locator('input[name=time]').fill(time);
-      await add.locator('select[name=place]').selectOption({ label: 'Central Gym: Court 2' });
+      // A court no seed game uses, against teams whose own games today are at other hours,
+      // so no clash can come from the time of day the test runs at.
+      await add.locator('select[name=place]').selectOption({ label: 'Riverside Hall: Court A' });
       await tap(add.locator('button[type=submit]'), /done=saved/);
     };
     await addGame('Tigers', '13:00');
-    await addGame('Otters', '15:00');
+    await addGame('Herons', '15:00');
     note('the new games raise no clash', (await page.locator('[data-clashes] li').count()) === 0);
     await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
     await accessible('the published schedule in the admin');
@@ -157,14 +162,20 @@ if (built) {
 
     at = "the owner types the second game's box score";
     await tap(
-      gameRow('Otters').getByRole('link', { name: 'Box score' }),
+      gameRow('Herons').getByRole('link', { name: 'Box score' }),
       /\/admin\/games\/[0-9a-f-]{36}$/,
     );
     const ours = page.locator(`[role=region][aria-label="${team}"]`);
     const points = ours.locator('input[name^="stat.points."]');
-    await points.nth(0).fill('21');
-    await points.nth(1).fill('19');
-    const theirs = page.locator('[role=region][aria-label="Otters"] input[name^="stat.points."]');
+    if ((await points.count()) !== players.length) {
+      throw new Error(
+        `the grid has ${await points.count()} ${team} players, not ${players.length}`,
+      );
+    }
+    // Robin's row first: the roster's order.
+    await points.nth(0).fill(String(players[0].points));
+    await points.nth(1).fill(String(players[1].points));
+    const theirs = page.locator('[role=region][aria-label="Herons"] input[name^="stat.points."]');
     await theirs.nth(0).fill('30');
     await tap(page.getByRole('button', { name: 'Save box score and make it final' }), /done=/);
     await accessible('the box score saved');
@@ -186,7 +197,13 @@ if (built) {
       players.every((p) => teamPage.includes(`${p.first} ${p.last}`)),
       teamPage.slice(0, 400),
     );
-    note("the team's page shows its two wins", teamPage.includes('2-0'), teamPage.slice(0, 400));
+    // The record in the team's own facts, exactly: two games, two wins.
+    const record = await page
+      .locator('dl.ui-facts dt', { hasText: /^Record$/ })
+      .locator('xpath=following-sibling::dd[1]')
+      .first()
+      .textContent();
+    note("the team's page shows its two wins", record?.trim() === '2-0', record ?? 'no record');
     await accessible("the new team's page");
 
     at = 'a visitor finds the game and its result';
@@ -195,7 +212,11 @@ if (built) {
     const gamePage = await page.locator('main').innerText();
     const title = (await page.locator('h1').first().textContent()) ?? '';
     note('the game page is the game', title === `Tigers at ${team}`, title);
-    note('the game page shows the final score', gamePage.includes('55') && gamePage.includes('48'));
+    // The board's two scores, away team first, exactly.
+    const scores = (
+      await page.locator('.ui-scoreboard .ui-scoreboard-score').allTextContents()
+    ).map((s) => s.trim());
+    note('the game page shows the final score', scores.join() === '48,55', scores.join());
     note('the game page says it is final', /final/i.test(gamePage));
     await accessible('the game page');
 
@@ -217,12 +238,34 @@ if (built) {
     at = "a visitor finds the box score's points in the statistics";
     await openMenu();
     await tap(page.getByRole('link', { name: 'Stats', exact: true }).first(), /\/stats$/);
-    const stats = await page.locator('main').innerText();
-    note(
-      'the statistics list the players of the box score',
-      stats.includes(`${players[0].first} ${players[0].last}`),
-      stats.slice(0, 400),
-    );
+    // Each player's points in the full table, exactly: one game each, so a game's average
+    // is the box score's number.
+    for (const p of players) {
+      const name = `${p.first} ${p.last}`;
+      const tables = page.locator('main table', {
+        has: page.locator('tbody tr', { hasText: name }),
+      });
+      if ((await tables.count()) === 0) {
+        note(
+          `the statistics list ${name}`,
+          false,
+          (await page.locator('main').innerText()).slice(0, 400),
+        );
+        continue;
+      }
+      // The full table of every player comes after the leaders.
+      const table = tables.last();
+      const heads = (await table.locator('thead th').allInnerTexts()).map((c) => c.trim());
+      const cells = (
+        await table.locator('tbody tr', { hasText: name }).first().locator('th, td').allInnerTexts()
+      ).map((c) => c.trim());
+      const pts = cells[heads.findIndex((h) => /^PTS\b/.test(h))];
+      note(
+        `the statistics give ${name} the box score's ${p.points} points`,
+        pts === `${p.points}.0`,
+        `${heads.join(' | ')} / ${cells.join(' | ')}`,
+      );
+    }
   } catch (error) {
     failures.push(`${at}: ${String(error?.message ?? error).split('\n')[0]}`);
   } finally {

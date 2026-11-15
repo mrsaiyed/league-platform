@@ -9,6 +9,7 @@
 // Then it starts the app as staging with a database address that answers nobody,
 // and checks that it refuses to start (T-60). Nothing leaves this computer.
 import { spawn, spawnSync } from 'node:child_process';
+import http from 'node:http';
 import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
@@ -631,6 +632,7 @@ try {
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
   failures.push(...(await checkSettings(origin)));
+  failures.push(...(await checkOtherHosts(port)));
 } finally {
   server.child.kill();
 }
@@ -674,7 +676,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Web shell check passed: ${cases.length + spoofs.length + 5} checks against the built server.`,
+  `Web shell check passed: ${cases.length + spoofs.length + 6} checks against the built server.`,
 );
 
 // When Node refused a TypeScript file it was to run itself, the server prints only
@@ -1086,6 +1088,64 @@ async function checkSettings(origin) {
   }
   if ((await pageOf('owner')).includes('Now: set for this league.')) {
     problems.push('the scheduler changed a setting');
+  }
+  return problems;
+}
+
+/**
+ * The made-up world answers only this computer (step 2.152, the review's M4): a request
+ * addressed to another host gets the plain page and nothing of any league, with the
+ * made-up owner's cookie or without it, a page, an admin page or the API; the same
+ * address on this computer's name is answered as usual. Sent with node:http, since
+ * fetch keeps the Host header to itself.
+ */
+async function checkOtherHosts(port) {
+  const problems = [];
+  const ask = (host, address, cookie) =>
+    new Promise((resolve, reject) => {
+      const request = http.request(
+        {
+          host: '127.0.0.1',
+          port,
+          path: address,
+          headers: { host, ...(cookie === undefined ? {} : { cookie }) },
+        },
+        (response) => {
+          let body = '';
+          response.setEncoding('utf8');
+          response.on('data', (chunk) => (body += chunk));
+          response.on('end', () => resolve({ status: response.statusCode, body }));
+        },
+      );
+      request.on('error', reject);
+      request.end();
+    });
+  const owner = `srl_session=${tokens.owner}`;
+  for (const host of ['example.com', 'srleagues.example.com:443', 'localhost.evil.example']) {
+    for (const address of [
+      '/north-valley',
+      '/north-valley/admin/teams',
+      `/api/v1/leagues/${northValley}/games/${liveGame}/snapshot`,
+    ]) {
+      for (const cookie of [undefined, owner]) {
+        const { status, body } = await ask(host, address, cookie);
+        const label = `Host ${host} ${address}${cookie === undefined ? '' : ' (owner)'}`;
+        if (status !== 421) problems.push(`${label}: status ${status}, not 421`);
+        if (!body.includes('answers only on the computer it runs on')) {
+          problems.push(`${label}: not the plain page`);
+        }
+        if (/North Valley|Falcons|Add a team/.test(body)) {
+          problems.push(`${label}: shows the league`);
+        }
+      }
+    }
+  }
+  const here = await ask(`localhost:${port}`, '/north-valley', owner);
+  if (here.status !== 200 || !here.body.includes('North Valley League')) {
+    problems.push(`this computer's own name is not answered (${here.status})`);
+  }
+  if (!here.body.includes('A made-up league on this computer.')) {
+    problems.push('a made-up league page does not say it is made up');
   }
   return problems;
 }

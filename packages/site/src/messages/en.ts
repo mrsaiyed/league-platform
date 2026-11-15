@@ -11,6 +11,11 @@ export const en = {
   'footer.label': 'Footer',
   'footer.terms': 'Terms',
   'footer.privacy': 'Privacy',
+  // Only on the app's made-up world on a computer (step 2.152), never on a real league.
+  'footer.madeUp': 'A made-up league on this computer. It starts over when the app restarts.',
+  'standIn.otherHost.title': 'Not here',
+  'standIn.otherHost.body':
+    'This copy of SR Leagues holds only made-up leagues and answers only on the computer it runs on.',
   'common.loading': 'Loading',
   'common.notFound': 'We could not find that page.',
   'common.notFoundTitle': 'Page not found',

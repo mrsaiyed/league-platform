@@ -15,7 +15,7 @@ import type {
   VenueRecord,
 } from '@srleagues/core';
 import { recordingOf } from '@srleagues/core';
-import { randomUUID } from 'node:crypto';
+import { newId } from './stand-in-world-ids.ts';
 import { dayIn, momentIn, timeIn } from './stand-in-world-clock.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld, WorldGame } from './stand-in-world-state.ts';
@@ -62,7 +62,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
     insertDraft: async (seasonId, changes, basedOnRevision) => {
       if (season(seasonId) === undefined) return 'no-season';
       if (s.drafts.some((d) => d.seasonId === seasonId)) return 'exists';
-      const id = randomUUID();
+      const id = newId();
       s.drafts = [...s.drafts, { id, seasonId, changes, basedOnRevision, version: 1 }];
       return { id, version: 1 };
     },
@@ -217,7 +217,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
         })),
     createVenue: async (venue) => {
       if (venueNameTaken(venue.name)) return 'name-taken';
-      const id = randomUUID();
+      const id = newId();
       s.venues = [...s.venues, { id, ...venue, binned: false, version: 1 }];
       return id;
     },
@@ -244,7 +244,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
     findCourt: async (courtId) => s.courts.find((c) => c.id === courtId),
     createCourt: async (court) => {
       if (courtNameTaken(court.venueId, court.name)) return 'name-taken';
-      const id = randomUUID();
+      const id = newId();
       s.courts = [...s.courts, { id, ...court, binned: false, version: 1 }];
       return id;
     },
@@ -297,7 +297,7 @@ export function worldImportsStore(s: LeagueWorld, now: () => Date): ImportsStore
     }),
     insert: async (value) => {
       if (season(value.seasonId) === undefined) return 'no-season';
-      const id = randomUUID();
+      const id = newId();
       s.imports = [
         ...s.imports,
         {

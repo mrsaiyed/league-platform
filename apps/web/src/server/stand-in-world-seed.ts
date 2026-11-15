@@ -18,7 +18,7 @@
 // the world is made (stand-in-world.ts).
 import { defaultSeasonRules, SeasonRules } from '@srleagues/contracts';
 import { membersStartPage, whoMayScore, type Audience, type TeamRecord } from '@srleagues/core';
-import { addDays, dayIn, momentIn } from './stand-in-world-clock.ts';
+import { addDays, dayIn, momentIn, timeIn } from './stand-in-world-clock.ts';
 import {
   emptyLeagueWorld,
   type LeagueWorld,
@@ -282,6 +282,12 @@ type GameSpec = {
   readonly day?: number;
   /** HH:MM in the league's time zone; null for no time yet. */
   readonly time: string | null;
+  /**
+   * Minutes from the moment the world is made, in place of `day` and `time`: a game played
+   * earlier today, or under way now, is in the past whatever the time of day (it may then
+   * fall on yesterday, a little after midnight).
+   */
+  readonly fromNow?: number;
   readonly home: string;
   readonly away: string;
   readonly status: string;
@@ -433,6 +439,8 @@ const adultFall = (programId: string): SeasonSpec => ({
         {
           round: 3,
           time: '10:00',
+          // Finished two hours before now.
+          fromNow: -120,
           home: owls,
           away: otters,
           status: 'final',
@@ -552,6 +560,8 @@ const adultFall = (programId: string): SeasonSpec => ({
           n: 2,
           day: 0,
           time: '17:00',
+          // Under way: started half an hour before now.
+          fromNow: -30,
           home: hawks,
           away: bears,
           status: 'live',
@@ -582,6 +592,8 @@ const adultFall = (programId: string): SeasonSpec => ({
           n: 5,
           day: 0,
           time: '09:00',
+          // Finished three hours before now.
+          fromNow: -180,
           home: bears,
           away: lions,
           status: 'final',
@@ -999,8 +1011,19 @@ function leagueOf(
           : round === undefined
             ? null
             : addDays(today, round.days);
+      // A game set from now starts on a whole five minutes, `fromNow` minutes from now.
+      const fromNow =
+        g.fromNow === undefined
+          ? undefined
+          : new Date(Math.floor((now.getTime() + g.fromNow * 60_000) / 300_000) * 300_000);
       const startsAt =
-        day === null || g.time === null ? null : momentIn(day, g.time, facts.timeZone);
+        fromNow !== undefined
+          ? fromNow.toISOString()
+          : day === null || g.time === null
+            ? null
+            : momentIn(day, g.time, facts.timeZone);
+      const localDate = fromNow === undefined ? day : dayIn(fromNow, facts.timeZone);
+      const localTime = fromNow === undefined ? g.time : timeIn(fromNow, facts.timeZone);
       const home = s.teams.find((t) => t.id === g.home);
       const away = s.teams.find((t) => t.id === g.away);
       const decided = g.status === 'final' || g.status === 'forfeit';
@@ -1021,8 +1044,8 @@ function leagueOf(
         version: decided ? 2 : 1,
         roundId: round?.id ?? null,
         number: g.number,
-        localDate: day,
-        localTime: g.time,
+        localDate,
+        localTime,
         venueId: g.venue,
         courtId: g.court,
       };

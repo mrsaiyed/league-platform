@@ -14,7 +14,7 @@ import {
   type StandingsReadStore,
   type StandingsStore,
 } from '@srleagues/core';
-import { randomUUID } from 'node:crypto';
+import { newId } from './stand-in-world-ids.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld, SavedPlayerTotals } from './stand-in-world-state.ts';
 import type { Frozen, ReadWorld } from './stand-in-world.ts';
@@ -40,7 +40,7 @@ export function worldStandingsStore(s: LeagueWorld): StandingsStore {
       if (!s.teams.some((t) => t.seasonId === seasonId && t.id === adjustment.teamId)) {
         throw new Error('The database refuses an adjustment for a team of another season.');
       }
-      const id = randomUUID();
+      const id = newId();
       const { accountId: _account, ...fields } = adjustment;
       s.adjustments = [...s.adjustments, { id, seasonId, binned: false, ...fields }];
       return id;

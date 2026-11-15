@@ -428,21 +428,20 @@ if (browser) {
         .evaluateAll((items) => items.map((li) => li.getAttribute('data-game')));
       // Live now, today still to play (by time), the days ahead (by day), and the finished
       // games. The week's games of the one made-up world (step 2.152): this round's
-      // listed games are among them, Falcons v Herons at noon, Badgers v Owls at eight in
-      // the evening and Owls v Otters, finished this morning after Bears v Lions.
+      // listed games are among them, Falcons v Herons at noon and Badgers v Owls at eight in
+      // the evening. The two finished games, Bears v Lions three hours before the world was
+      // made and Owls v Otters two, are today's, and so listed, unless the server started
+      // in the first hours after midnight, when they were last night's: then neither is.
+      const toPlay = [liveGame, listedGame(7), finalScoreGame, listedGame(8), otherGame, laterGame];
+      const finished = order.slice(toPlay.length);
       note(
         'live first, then today, then the days ahead, finished last',
-        JSON.stringify(order) ===
-          JSON.stringify([
-            liveGame,
-            listedGame(7),
-            finalScoreGame,
-            listedGame(8),
-            otherGame,
-            laterGame,
-            finishedGame,
-            listedGame(6),
-          ]),
+        JSON.stringify(order.slice(0, toPlay.length)) === JSON.stringify(toPlay) &&
+          [
+            JSON.stringify([finishedGame, listedGame(6)]),
+            JSON.stringify([listedGame(6)]),
+            JSON.stringify([]),
+          ].includes(JSON.stringify(finished)),
         JSON.stringify(order),
       );
       const first = page.getByRole('link', { name: 'Score this game' }).first();

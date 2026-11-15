@@ -339,6 +339,10 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       warn: (message, fields) => options.warn?.(message, { kind: fields.reason }),
     }),
     liveFeed: (request) => hub.serve(request),
+    madeUpWorld: true,
+    // Only this computer's names (review M4): the made-up owner's cookie is in the code,
+    // and the world now takes writes, so a request from anywhere else gets nothing.
+    answersHost: (host) => plainHost.test(host) && isLocalOrTestHost(`http://${host}`),
     fixtureImport: standInFixtureImport(world),
     publicStats: standInPublicStats(world, namePolicy),
     adminTeams: standInAdminTeams(world),
@@ -349,6 +353,10 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     signUpMadeUpMember,
   };
 }
+
+/** A Host header that is only a name or an address, and a port: nothing a URL reads otherwise. */
+const plainHost =
+  /^(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:]+\]|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/i;
 
 /** Whether `address` is on this computer, or on a name kept for tests (`.test`). */
 export function isLocalOrTestHost(address: string): boolean {

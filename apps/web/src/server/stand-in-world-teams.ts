@@ -13,7 +13,7 @@ import type {
   TeamRecord,
   TeamsStore,
 } from '@srleagues/core';
-import { randomUUID } from 'node:crypto';
+import { newId } from './stand-in-world-ids.ts';
 import { uniqueJerseysOf } from './stand-in-world-games.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld, WorldPerson } from './stand-in-world-state.ts';
@@ -53,8 +53,8 @@ export function worldTeamsStore(s: LeagueWorld): TeamsStore {
     create: async (t) => {
       const taken = clash(t);
       if (taken !== undefined) return taken;
-      const id = randomUUID();
-      s.teams = [...s.teams, { id, ...t, lineageId: randomUUID(), binned: false, version: 1 }];
+      const id = newId();
+      s.teams = [...s.teams, { id, ...t, lineageId: newId(), binned: false, version: 1 }];
       return id;
     },
     update: async (id, change, version) => {
@@ -113,7 +113,7 @@ export function worldTeamsStore(s: LeagueWorld): TeamsStore {
         return 'already-on-team';
       }
       if (jerseyWorn(e.teamId, e.jerseyNumber)) return 'jersey-taken';
-      const id = randomUUID();
+      const id = newId();
       s.roster = [
         ...s.roster,
         {
@@ -179,7 +179,7 @@ export function worldPeopleStore(s: LeagueWorld): PeopleStore {
         .map((p) => shown(p, sensitive));
     },
     create: async (p) => {
-      const id = randomUUID();
+      const id = newId();
       s.people = [
         ...s.people,
         {

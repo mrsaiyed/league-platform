@@ -66,22 +66,31 @@ through the product's own commands, so what the admin does is what a visitor see
   the statistics settings for teams.
 
 The two made-up leagues are apart: North Valley (adults, nine teams, `/north-valley`) and
-Harbor City (children, three teams, `/harbor-city`), each with its own look. **The world is made
-again every time the server starts**: whatever you added is gone after a restart, and the
-games' days move with today's date, so this week's round is always this week.
+Harbor City (children, three teams, `/harbor-city`), each with its own look and its own
+venues. **The world is made again every time the server starts**: whatever you added is gone
+after a restart, and the games' days move with the time it starts, so this week's round is
+always this week, the games already played are in the past and the live game is under way.
+Every league page says so in one quiet line at the foot of the page: "A made-up league on
+this computer. It starts over when the app restarts." The made-up world answers only this
+computer (an address on `localhost`, `127.0.0.1`, `[::1]` or a name ending in `.localhost` or
+`.test`): asked for under any other name, it gives a plain page and nothing else.
 
 To try it as a league's admin:
 
 1. Start it with `npm run dev:web` and open `http://localhost:3000/north-valley`.
 2. Be the made-up owner: in the browser's developer tools, add a cookie `srl_session` with
    the value `local-owner-token` for `localhost` (the made-up people are given only by this
-   cookie, see `stand-in-ports.ts`), then open `http://localhost:3000/north-valley/admin`
-   (nothing links to the admin from the public pages yet).
-3. Teams: add a team, then add two players to it under "Add someone new".
-4. Schedule: in this week's round add a game for the new team, then "Publish this schedule".
-5. Games: type the game's final score (or open "Box score" and type the players' points), then
-   remove the cookie and look at the home page, the team, the game, the standings and the
-   statistics.
+   cookie, see `stand-in-cast.ts`), then open `http://localhost:3000/north-valley/admin`
+   (nothing links to the admin from the public pages yet). Step 2.127 replaces these two
+   steps: it gives the made-up owner a password, so you sign in by tapping.
+3. Teams: under "Add a team" type a name and tap "Add team". On the team's page, under
+   "Someone not in the list yet", type a first and last name and a number and tap "Add the
+   person and put them on the roster"; do it again for a second player.
+4. Schedule: in this week's round open "Add a game", choose the new team and another, a time
+   and a court, and tap "Add game"; then tap "Publish this schedule".
+5. Games: under the new game type both scores and tap "Save final score" (or tap "Box score",
+   type each player's points and tap "Save box score and make it final"). Then remove the
+   cookie and look at the home page, the team, the game, the standings and the statistics.
 
 To run it on the made-up database instead, put `LOCAL_DATA=made-up-database` in `.env` (local and test only). The app then builds a database in memory when it starts, with every migration and the two seed leagues (below), and reads leagues, signed-in people and what they hold from it. Sign-in still uses the stand-in's screens; the stand-in's made-up people do not exist there. The areas not yet moved onto the database (step 2.93, record 055) show an error page. It too opens no address and is gone when the app stops.
 
