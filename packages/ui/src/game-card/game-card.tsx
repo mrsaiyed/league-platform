@@ -30,10 +30,18 @@ export type GameCardProps = {
   readonly status: GameStatus;
   /** The date and time, already written for the reader by the page. */
   readonly whenText: string;
+  /** Where it is played, already written by the page; drawn on a line of its own. */
+  readonly placeText?: string;
   /** For example "Game 4", already written by the page. */
   readonly numberText?: string;
-  /** Where "view box score" goes. The page builds it with the address helper. */
+  /** The game's own page, which the whole card leads to. The page builds it with the address helper. */
   readonly detailsHref?: string;
+  /**
+   * What the card's link says to a screen reader, whole and already written by the page:
+   * "Herons against Falcons, live, 38 to 41". Left out, it says "view box score" and both
+   * teams' names.
+   */
+  readonly linkText?: string | undefined;
   readonly labels: GameCardLabels;
 };
 
@@ -71,6 +79,7 @@ function Team({
       data-winner={isWinner ? 'true' : undefined}
       style={color ? ({ '--team-color': color } as CSSProperties) : undefined}
     >
+      <span className="ui-team-chip" aria-hidden="true" />
       <span className="ui-game-team-name" dir="auto">
         {team.name}
       </span>
@@ -80,14 +89,21 @@ function Team({
   );
 }
 
-/** One game: both teams, the score once there is one, when it is, and its state. */
+/**
+ * One game as a compact card: a quiet line saying when, with its state as a small pill, and
+ * where on the line under it; then each team on its own row, its color and name at the start and its score at the
+ * end. A card with somewhere to go is one link, whole: the link's words are kept for screen
+ * readers and not drawn.
+ */
 export function GameCard({
   home,
   away,
   status,
   whenText,
+  placeText,
   numberText,
   detailsHref,
+  linkText,
   labels,
 }: GameCardProps) {
   const winner = winnerOf(status, home, away);
@@ -98,23 +114,33 @@ export function GameCard({
   return (
     <article className="ui-game-card" data-status={status}>
       <header className="ui-game-meta">
-        {numberText ? <span className="ui-game-number">{numberText}</span> : null}
-        <span className="ui-game-when">{whenText}</span>
+        <span className="ui-game-about">
+          {numberText ? <span className="ui-game-number">{numberText}</span> : null}
+          <span className="ui-game-when">{whenText}</span>
+        </span>
         {state}
+        {placeText ? (
+          <span className="ui-game-place" dir="auto">
+            {placeText}
+          </span>
+        ) : null}
       </header>
       <ul className="ui-game-teams">
         <Team team={away} isWinner={winner === 'away'} labels={labels} />
-        <li className="ui-game-versus" aria-hidden="true">
-          {labels.versus}
-        </li>
         <Team team={home} isWinner={winner === 'home'} labels={labels} />
       </ul>
       {detailsHref ? (
         <a className="ui-game-link" href={detailsHref}>
-          {labels.viewBoxScore}{' '}
-          <span className="ui-visually-hidden" dir="auto">
-            {away.name} {labels.versus} {home.name}
-          </span>
+          {linkText ? (
+            <span dir="auto">{linkText}</span>
+          ) : (
+            <>
+              {labels.viewBoxScore}{' '}
+              <span className="ui-visually-hidden" dir="auto">
+                {away.name} {labels.versus} {home.name}
+              </span>
+            </>
+          )}
         </a>
       ) : null}
     </article>

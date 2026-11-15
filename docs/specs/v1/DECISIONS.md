@@ -331,6 +331,7 @@ All dated November 12, 2026.
 | T-257                 | New                                                                          | The release makes pg-boss's schema, owned by queue_owner; pg-boss makes its own tables; the worker starts on checked settings (rec. 053)        | Step 2.94: the worker never started (R2); record 012 left open who makes pg-boss's tables (T-60)   |
 | T-256                 | New                                                                          | Account ids stay ours, linked to the sign-in user; the sign-in store in its own schema and role (rec. 052)                                      | Step 2.92: Supabase ids are not v7; the store and record 008's functions were missing              |
 | T-259                 | New                                                                          | Name settings read by one `readNamePolicy`; a setting value can need confirming; a person's request is a command, fixed-word reason (rec. 056)  | Step 2.126: nothing set the name policy or `people.visibility` (2.105 audit, H2)                   |
+| T-260                 | New                                                                          | Made from this computer by one script: the owner's account ahead by email, then the league and its first season by our staff at once (rec. 057) | Step 2.125: T10 line 31's internal tool did not exist; the leagues table had no city               |
 
 ## The full list
 
@@ -622,6 +623,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-242 | Each tap is saved once per game, in order, never changed; stat counts are whole numbers; a walk-up player is marked on their roster entry; imports keep what they made (rec. 030)              | Agreed (delegated) |         |
 | T-245 | Standings and totals are rebuilt per season by event handlers in the result's transaction, one at a time; totals hold every team's numbers (rec. 033)                                          | Agreed (delegated) |         |
 | T-246 | A fixtures file's text rides in its import's row only until the worker has read it, then is replaced by the report; an upload that is never read is discarded and the import failed (rec. 034) | Agreed (delegated) |         |
+| T-260 | A script makes a league: owner's account ahead by email; league and first season by staff in one transaction, under the app's login; migration login for accounts only (rec. 057)              | Agreed (delegated) |         |
 
 ### [T4 — Keeping leagues apart, sign-in, security](technical/T4-tenancy-auth-security.md)
 

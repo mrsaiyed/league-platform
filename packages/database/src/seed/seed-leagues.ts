@@ -4,9 +4,10 @@
 // it is not one of the product's commands.
 //
 // For each league it runs the product's own commands, each in its own scoped
-// transaction for that league (create league, status, season, divisions, teams,
-// people), acting as the people the data names: our own staff creates the league and
-// its owner does the rest. Two things are written directly, not by a command: accounts
+// transaction for that league (create the league with its first season, status,
+// divisions, teams, people), acting as the people the data names: our own staff
+// creates the league and its current season in one step (T-260), and its owner does
+// the rest. Two things are written directly, not by a command: accounts
 // (they come from signing in, which has no command here) and role grants (through the
 // access store, as the owner; the invite and accept commands need email tokens).
 //
@@ -19,7 +20,6 @@ import {
   createDivision,
   createLeague,
   createPerson,
-  createSeason,
   createTeam,
   leagueScope,
   setLeagueStatus,
@@ -140,17 +140,16 @@ async function loadLeague(
         audience: 'adult',
         ownerAccountId: ownerId,
         sportKey: 'basketball',
+        firstSeason: { ...league.season },
       },
       deps.leagues,
     ),
   );
+  const seasonId = created.firstSeasonId;
+  if (seasonId === null) throw new Error(`Seeding failed at season: ${league.slug} has none.`);
   must(
     'league status',
     await setLeagueStatus(as(ownerId), { status: 'live', version: created.version }, deps.leagues),
-  );
-  const { seasonId } = must(
-    'season',
-    await createSeason(as(ownerId), { ...league.season }, deps.leagues),
   );
   for (const division of league.divisions) {
     const { divisionId } = must(

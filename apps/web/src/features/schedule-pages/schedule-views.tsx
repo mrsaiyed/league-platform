@@ -1,7 +1,31 @@
+import { Group } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { t } from '../../server/messages.ts';
 import type { GameView, RoundView } from './build-schedule.ts';
+import type { GameLinkWords } from './game-link-text.ts';
 import { LiveGameList } from './live-game-list.tsx';
+
+/** The words of a game card's link, braces and all, for the page to fill (game-link-text.ts). */
+export function gameLinkWords(): GameLinkWords {
+  const teams = { away: '{away}', home: '{home}' };
+  return {
+    score: t('schedule.link.score', {
+      ...teams,
+      state: '{state}',
+      awayScore: '{awayScore}',
+      homeScore: '{homeScore}',
+    }),
+    state: t('schedule.link.state', { ...teams, state: '{state}' }),
+    when: t('schedule.link.when', { ...teams, when: '{when}' }),
+    states: {
+      live: t('schedule.link.live'),
+      final: t('schedule.link.final'),
+      forfeit: t('schedule.link.forfeit'),
+      postponed: t('schedule.link.postponed'),
+      cancelled: t('schedule.link.cancelled'),
+    },
+  };
+}
 
 /** A list of games as cards, kept up to date from the league's live channel. */
 export function GameList({
@@ -16,6 +40,7 @@ export function GameList({
       leagueId={leagueId}
       games={games}
       labels={displayLabels(t).game}
+      linkWords={gameLinkWords()}
       announcement={t('schedule.liveAnnouncement', {
         away: '{away}',
         awayScore: '{awayScore}',
@@ -28,8 +53,10 @@ export function GameList({
 }
 
 /**
- * The rounds of a season: finished ones closed, the current and coming ones open. A plain
- * disclosure, so it opens and closes without any script.
+ * The rounds of a season: finished ones closed, the current and coming ones open, the
+ * current one picked out. A finished round that still holds a postponed game says so
+ * beside its mark and is open. Each is a plain disclosure, so it opens and closes without
+ * any script.
  */
 export function RoundSections({
   leagueId,
@@ -41,14 +68,17 @@ export function RoundSections({
   return (
     <>
       {rounds.map((round) => (
-        <details key={round.key} open={round.open} data-phase={round.phase ?? 'other'}>
-          <summary>
-            <h2>{round.title}</h2>
-            {round.phase === null ? null : <span>{t(`schedule.phase.${round.phase}`)}</span>}{' '}
-            <span>{round.summary}</span>
-          </summary>
+        <Group
+          key={round.key}
+          title={round.title}
+          mark={round.phase === null ? undefined : t(`schedule.phase.${round.phase}`)}
+          note={round.note}
+          summary={round.summary}
+          open={round.open}
+          phase={round.phase ?? 'other'}
+        >
           <GameList leagueId={leagueId} games={round.games} />
-        </details>
+        </Group>
       ))}
     </>
   );
