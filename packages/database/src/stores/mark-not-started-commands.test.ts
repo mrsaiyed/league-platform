@@ -10,9 +10,13 @@ import { seasonRulesPreset } from '@srleagues/contracts';
 import {
   applyTrackerCommands,
   eventHandlers,
+  getBoxScoreSheet,
   markNotStarted,
   openScoringSession,
   recordFinalScore,
+  reopenGame,
+  setBoxScore,
+  takeOverScoring,
   type CommandDeps,
   type Job,
   type StandingsTx,
@@ -24,6 +28,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
+import { withTransaction } from '../db/with-transaction.ts';
+import { binPublishedGames, listGamesById } from '../queries/index.ts';
 import {
   freshSchema,
   newAccount,
@@ -137,7 +143,17 @@ async function trackedGame() {
       new Date(startOfTest + 120_000).toISOString(),
     ],
   );
-  return { ...l, seasonId, home, away, scorer, gameId, sessionId: session.id, as };
+  return {
+    ...l,
+    seasonId,
+    home,
+    away,
+    scorer,
+    gameId,
+    sessionId: session.id,
+    since: startOfTest,
+    as,
+  };
 }
 
 type Game = Awaited<ReturnType<typeof trackedGame>>;
@@ -213,6 +229,20 @@ const activityOf = async (g: Game) =>
     )
   ).rows;
 
+/** Takes the game over from the tablet, as the takeover question confirmed (S-42). */
+async function takeOver(g: Game, accountId: string) {
+  const taken = await takeOverScoring(
+    g.as(accountId),
+    { gameId: g.gameId, deviceId: 'laptop', confirmed: true, expectedHolderSince: g.since },
+    deps,
+  );
+  if (!taken.ok) throw new Error(`not taken over: ${JSON.stringify(taken)}`);
+}
+
+const versionOf = async (g: Game) =>
+  (await one<{ version: number }>(pglite, 'select version from games where id = $1', [g.gameId]))
+    .version;
+
 const mark = async (g: Game, accountId: string, reason?: string) => {
   const sequence = (await rowsOf(g)).state?.seq ?? 0;
   return markNotStarted(
@@ -258,7 +288,15 @@ describe('marking a game not started on the database (S-40)', () => {
       {
         action: 'games.mark_not_started',
         actor_account_id: g.scorer,
-        details: { clearedThrough: 6 },
+        details: {
+          clearedThrough: 6,
+          homeScore: 0,
+          awayScore: 0,
+          homeFouls: 0,
+          awayFouls: 0,
+          homeTurnovers: 0,
+          awayTurnovers: 0,
+        },
       },
     ]);
     expect(await standingsOf(g)).toEqual(standings);
@@ -309,15 +347,22 @@ describe('marking a game not started on the database (S-40)', () => {
       { type: 'score', side: 'home', playerId: g.home[1] ?? '', points: 2 },
     ]);
     const before = await rowsOf(g);
-    expect(await mark(g, g.scorer, 'Wrong game')).toEqual({
+    expect(await mark(g, g.scorer, 'wrongGame')).toEqual({
       ok: false,
       error: { code: 'not-allowed' },
     });
     expect(await rowsOf(g)).toEqual(before);
 
-    clock.at += 120_000;
+    // The tablet's session is on the game, its lease run out or not: refused until the
+    // owner takes the game over, which asks first (S-42).
+    clock.at += 180_000;
+    expect(await mark(g, g.ownerId, 'wrongGame')).toEqual({
+      ok: false,
+      error: { code: 'session-held' },
+    });
+    await takeOver(g, g.ownerId);
     expect(await mark(g, g.ownerId)).toEqual({ ok: false, error: { code: 'reason-needed' } });
-    expect(await mark(g, g.ownerId, 'Started the wrong game')).toMatchObject({ ok: true });
+    expect(await mark(g, g.ownerId, 'wrongGame')).toMatchObject({ ok: true });
     const after = await rowsOf(g);
     expect(after.game).toMatchObject({ status: 'scheduled', home_score: null, format: null });
     expect(after.events.map((e) => e.type)).toEqual([
@@ -332,9 +377,139 @@ describe('marking a game not started on the database (S-40)', () => {
       {
         action: 'games.mark_not_started',
         actor_account_id: g.ownerId,
-        details: { clearedThrough: 4, reason: 'Started the wrong game' },
+        details: {
+          clearedThrough: 4,
+          homeScore: 2,
+          awayScore: 0,
+          homeFouls: 0,
+          awayFouls: 0,
+          homeTurnovers: 0,
+          awayTurnovers: 0,
+          reason: 'wrongGame',
+        },
       },
     ]);
     expect(await standingsOf(g)).toEqual(standings);
+  });
+
+  it('never clears a game that was final and reopened, through the command or the database', async () => {
+    const g = await trackedGame();
+    const basket: Input = { type: 'score', side: 'home', playerId: g.home[0] ?? '', points: 2 };
+    await tap(g, [...tipOff(g), basket, { type: 'end' }]);
+    expect((await rowsOf(g)).game?.status).toBe('final');
+    const reopened = await reopenGame(
+      g.as(g.ownerId),
+      { gameId: g.gameId, version: await versionOf(g), reason: 'Ended by mistake' },
+      deps,
+    );
+    expect(reopened).toMatchObject({ ok: true });
+    // Back on the tracker, live, and the scorekeeper undoes the basket: nothing stands.
+    await tap(g, [{ type: 'undo' }]);
+    const before = await rowsOf(g);
+    expect(before.game).toMatchObject({ status: 'live', home_score: 0 });
+    expect(await mark(g, g.scorer)).toEqual({ ok: false, error: { code: 'was-decided' } });
+    await takeOver(g, g.ownerId);
+    expect(await mark(g, g.ownerId, 'wrongGame')).toEqual({
+      ok: false,
+      error: { code: 'was-decided' },
+    });
+    // The database refuses it too, even with a marker written by hand at the end of the log.
+    await pglite.query(
+      `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at)
+       values ($1, $2, $3, $4, 'reset', '{}', now())`,
+      [g.leagueId, g.gameId, before.events.length + 1, randomUUID()],
+    );
+    await expect(
+      pglite.query(
+        `update games set status = 'scheduled', home_score = null, away_score = null,
+           format = null where id = $1`,
+        [g.gameId],
+      ),
+    ).rejects.toMatchObject({ constraint: 'games_format_fixed_once_started' });
+  });
+
+  it('never clears a game decided by hand, reopened and then scored live', async () => {
+    const g = await trackedGame();
+    const decided = await recordFinalScore(
+      g.as(g.ownerId),
+      { gameId: g.gameId, version: await versionOf(g), homeScore: 40, awayScore: 30 },
+      deps,
+    );
+    expect(decided).toMatchObject({ ok: true });
+    const reopened = await reopenGame(
+      g.as(g.ownerId),
+      { gameId: g.gameId, version: await versionOf(g), reason: 'Wrong game' },
+      deps,
+    );
+    expect(reopened).toMatchObject({ ok: true });
+    await tap(g, tipOff(g));
+    expect((await rowsOf(g)).game?.status).toBe('live');
+    expect(await mark(g, g.scorer)).toEqual({ ok: false, error: { code: 'was-decided' } });
+  });
+
+  it('leaves a cleared game to box score entry and to a later publication, as one never scored', async () => {
+    const g = await trackedGame();
+    await tap(g, tipOff(g));
+    const facts = () =>
+      withTransaction(db, { leagueId: g.leagueId, accountId: g.ownerId }, (scope) =>
+        listGamesById(scope, g.seasonId, [g.gameId]),
+      );
+    const sheet = async () => {
+      const read = await getBoxScoreSheet(g.as(g.ownerId), { gameId: g.gameId }, deps);
+      if (!read.ok) throw new Error(read.error.code);
+      return read.value;
+    };
+    expect(await facts()).toMatchObject([{ hasEvents: true }]);
+    expect(await mark(g, g.scorer)).toMatchObject({ ok: true });
+
+    // Past its marker it has nothing recorded: the grid is open and a publication may
+    // remove it, as for a game never scored.
+    expect(await facts()).toMatchObject([{ hasEvents: false }]);
+    expect((await sheet()).locked).toBeNull();
+    // A tap after the marker makes it a tracked game again: the grid is locked.
+    const opened = await openScoringSession(
+      g.as(g.scorer),
+      { gameId: g.gameId, deviceId: 'tablet' },
+      deps,
+    );
+    if (!opened.ok || opened.value.status !== 'held-by-you') throw new Error('not opened');
+    await tap(g, [tipOff(g)[0] as Input], opened.value.sessionId);
+    expect(await facts()).toMatchObject([{ hasEvents: true }]);
+    expect((await sheet()).locked).toBe('tracked');
+    const refused = await setBoxScore(
+      g.as(g.ownerId),
+      { gameId: g.gameId, version: await versionOf(g), homeScore: 1, awayScore: 0, lines: [] },
+      deps,
+    );
+    expect(refused).toEqual({ ok: false, error: { code: 'game-is-tracked' } });
+    const kept = await withTransaction(
+      db,
+      { leagueId: g.leagueId, accountId: g.ownerId },
+      (scope) => binPublishedGames(scope, g.seasonId, [g.gameId]),
+    );
+    expect(kept).toBe(0);
+  });
+
+  it('takes a box score for a cleared game, and lets a publication bin one', async () => {
+    const g = await trackedGame();
+    await tap(g, tipOff(g));
+    expect(await mark(g, g.scorer)).toMatchObject({ ok: true });
+    const entered = await setBoxScore(
+      g.as(g.ownerId),
+      { gameId: g.gameId, version: await versionOf(g), homeScore: 1, awayScore: 0, lines: [] },
+      deps,
+    );
+    // The grid takes it (no player lines needed): the game is decided by hand now.
+    expect(entered).toMatchObject({ ok: true });
+
+    const other = await trackedGame();
+    await tap(other, tipOff(other));
+    expect(await mark(other, other.scorer)).toMatchObject({ ok: true });
+    const binned = await withTransaction(
+      db,
+      { leagueId: other.leagueId, accountId: other.ownerId },
+      (scope) => binPublishedGames(scope, other.seasonId, [other.gameId]),
+    );
+    expect(binned).toBe(1);
   });
 });

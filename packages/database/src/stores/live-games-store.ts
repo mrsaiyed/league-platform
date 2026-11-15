@@ -4,6 +4,7 @@ import type { LiveGamesStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
   findSavedGameState,
+  gameWasDecided,
   insertGameEvents,
   listGamePlayerLines,
   listGamePlayers,
@@ -27,6 +28,7 @@ export function liveGamesStore(scope: LeagueScope): LiveGamesStore {
     findState: (gameId) => findSavedGameState(scope, gameId),
     takenCommands: (gameId, commandIds) => listTakenCommands(scope, gameId, commandIds),
     addEvents: (events) => insertGameEvents(scope, events),
+    wasDecided: (gameId) => gameWasDecided(scope, gameId),
     saveState: (gameId, seq, state) => saveGameState(scope, gameId, seq, state),
     players: (gameId) => listGamePlayers(scope, gameId),
     lines: async (gameId) =>

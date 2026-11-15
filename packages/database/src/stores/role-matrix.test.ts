@@ -1078,7 +1078,7 @@ const gameCommandRows: readonly Row[] = [
         },
       ]),
       sequence: 2,
-      reason: 'Started by mistake',
+      reason: 'startedByMistake',
     }),
     (c, i) => markNotStarted(c, i, trackerDeps),
   ),

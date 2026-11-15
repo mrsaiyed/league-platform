@@ -1,15 +1,14 @@
 // Whether the tracker has recorded any play of a game in the scope's league (T3 §8
 // `game_events`): such a game is corrected through the tracker's commands (T-122),
-// never by replacing its box score.
+// never by replacing its box score. A game marked not started (S-40, record 061) has
+// its events still, behind its last `reset` marker: only what came after that counts,
+// as the database's own rule reads it (public.game_tracked_past_marker, migration 0016).
+import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
 export async function gameHasPlays(scope: LeagueScope, gameId: string): Promise<boolean> {
-  const row = await transactionOf(scope)
-    .selectFrom('game_events')
-    .select('id')
-    .where('league_id', '=', scope.leagueId)
-    .where('game_id', '=', gameId)
-    .limit(1)
-    .executeTakeFirst();
-  return row !== undefined;
+  const { rows } = await sql<{ tracked: boolean }>`
+    select public.game_tracked_past_marker(${scope.leagueId}::uuid, ${gameId}::uuid) as tracked
+  `.execute(transactionOf(scope));
+  return rows[0]?.tracked === true;
 }

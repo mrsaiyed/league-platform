@@ -170,6 +170,7 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     saveState: async () => {
       throw new Error('No game is tracked in the standings tests.');
     },
+    wasDecided: async () => false,
     players: async () => [],
     lines: async () => [],
     saveLines: async () => {

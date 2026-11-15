@@ -264,6 +264,11 @@ export type LiveGamesStore = {
     commandIds: readonly string[],
   ) => Promise<readonly string[]>;
   readonly addEvents: (events: readonly NewGameEvent[]) => Promise<void>;
+  /**
+   * Whether the game was ever final or forfeited: a correction for it, or an `end` or
+   * `reopen` in its event log. Such a game is never marked not started (S-40).
+   */
+  readonly wasDecided: (gameId: string) => Promise<boolean>;
   /** Writes the game's state as of event `seq`: the first time, or over the last one. */
   readonly saveState: (gameId: string, seq: number, state: unknown) => Promise<void>;
   /**

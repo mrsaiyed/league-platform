@@ -142,7 +142,7 @@ describe('POST …/games/{game}/not-started', () => {
       ...tipOff(),
       tap({ type: 'score', side: 'home', playerId: hawks[0], points: 2 }),
     ]);
-    const refused = await mark(world, { sequence: 4, reason: 'Wrong game' });
+    const refused = await mark(world, { sequence: 4, reason: 'wrongGame' });
     expect(refused.answer.status).toBe(403);
     expect(NotStartedReply.parse(refused.answer.body)).toMatchObject({
       status: 'refused',
@@ -151,12 +151,12 @@ describe('POST …/games/{game}/not-started', () => {
     expect(refused.afterwards).toBeNull();
 
     // The owner is on another device: refused while the tablet holds the game.
-    const held = await mark(world, { sequence: 4, reason: 'Wrong game' }, { as: 'owner' });
+    const held = await mark(world, { sequence: 4, reason: 'wrongGame' }, { as: 'owner' });
     expect(held.answer).toMatchObject({ status: 409, body: { code: 'session-held' } });
     await session(world, { type: 'release', sessionId });
     const noReason = await mark(world, { sequence: 4 }, { as: 'owner' });
     expect(noReason.answer).toMatchObject({ status: 409, body: { code: 'reason-needed' } });
-    const done = await mark(world, { sequence: 4, reason: 'Wrong game' }, { as: 'owner' });
+    const done = await mark(world, { sequence: 4, reason: 'wrongGame' }, { as: 'owner' });
     expect(done.answer).toMatchObject({
       status: 200,
       body: { status: 'not-started', sequence: 5 },
@@ -189,7 +189,13 @@ describe('POST …/games/{game}/not-started', () => {
       status: 401,
       body: { error: 'signed-out' },
     });
-    for (const body of [undefined, {}, { sequence: -1 }, { sequence: 3, reason: '  ' }]) {
+    for (const body of [
+      undefined,
+      {},
+      { sequence: -1 },
+      // The reason is one of a fixed list, never typed (A-6).
+      { sequence: 3, reason: 'Wrong game' },
+    ]) {
       const answer = (await mark(world, body)).answer;
       expect(answer.status, JSON.stringify(body)).toBe(400);
       expect(answer.body).toMatchObject({ error: 'invalid-input' });

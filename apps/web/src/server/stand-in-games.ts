@@ -33,6 +33,7 @@ import {
   liveGamesOf,
   scoringSessionsOf,
   seedTracker,
+  trackedPastMarker,
   type MadeUpTeam,
   type TrackerState,
 } from './stand-in-tracker.ts';
@@ -330,7 +331,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
             }),
         ),
       hasPlays: async (gameId) =>
-        s.tracked.includes(gameId) || s.tracker.events.some((e) => e.gameId === gameId),
+        s.tracked.includes(gameId) || trackedPastMarker(s.tracker.events, gameId),
       findSeason: async (seasonId) => s.seasons.find((x) => x.id === seasonId),
       leagueSettingRows: async (key) => s.settings[key] ?? [],
       isAssigned: async (gameId, accountId) => isAssigned(s, gameId, accountId),
@@ -369,7 +370,11 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     },
     clock: systemClock,
     scoringSessions: scoringSessionsOf(s.tracker, (gameId) => s.games.some((g) => g.id === gameId)),
-    liveGames: liveGamesOf(s.tracker, (gameId) => teamsOf(s, gameId)),
+    liveGames: liveGamesOf(
+      s.tracker,
+      (gameId) => teamsOf(s, gameId),
+      (gameId) => s.corrections.some((c) => c.gameId === gameId),
+    ),
   });
 
   const noticeOnly: EventHandler<TrackerTx>[] = ['games.finalized', 'games.reopened'].map(

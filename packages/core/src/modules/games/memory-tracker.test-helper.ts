@@ -72,6 +72,9 @@ export function liveGamesOf(s: MemoryTracker): LiveGamesStore {
         s.events.push(structuredClone(event));
       }
     },
+    wasDecided: async (gameId) =>
+      s.corrections.some((c) => c.gameId === gameId) ||
+      s.events.some((e) => e.gameId === gameId && (e.type === 'end' || e.type === 'reopen')),
     saveState: async (gameId, seq, state) => {
       s.states = [
         ...s.states.filter((x) => x.gameId !== gameId),

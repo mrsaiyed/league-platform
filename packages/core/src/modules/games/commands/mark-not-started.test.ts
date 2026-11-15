@@ -28,6 +28,8 @@ import { leaseMs } from '../scoring-session.ts';
 import { applyTrackerCommands } from './apply-tracker-commands.ts';
 import { markNotStarted } from './mark-not-started.ts';
 import { openScoringSession } from './open-scoring-session.ts';
+import { reopenGame } from './reopen-game.ts';
+import { takeOverScoring } from './take-over-scoring.ts';
 
 const gameId = gameUuid(1);
 const sessionId = sessionUuid(1);
@@ -115,6 +117,16 @@ const stateOf = (t: Tracker) =>
   t.db.state.states.find((s) => s.gameId === gameId)?.state as basketball.GameState;
 const gameOf = (t: Tracker) => t.db.state.games.find((g) => g.id === gameId);
 
+/** Takes the game over from the tablet, as the takeover question confirmed (S-42). */
+async function takeOver(t: Tracker, accountId: string) {
+  const taken = await takeOverScoring(
+    t.as(accountId),
+    { gameId, deviceId: 'laptop', confirmed: true, expectedHolderSince: startOfTest },
+    t.deps,
+  );
+  if (!taken.ok) throw new Error(`not taken over: ${JSON.stringify(taken)}`);
+}
+
 const mark = (t: Tracker, as: string, fields: { reason?: string; sequence?: number } = {}) =>
   markNotStarted(t.as(as), { gameId, sequence: sequenceOf(t), ...fields }, t.deps);
 
@@ -168,7 +180,15 @@ describe('marking a game not started, with only lineups and clock taps (S-40)', 
         targetType: 'game',
         targetId: gameId,
         summary: 'activity.games.mark_not_started',
-        details: { clearedThrough: 7 },
+        details: {
+          clearedThrough: 7,
+          homeScore: 0,
+          awayScore: 0,
+          homeFouls: 0,
+          awayFouls: 0,
+          homeTurnovers: 0,
+          awayTurnovers: 0,
+        },
       }),
     ]);
     // Nothing is announced: standings never counted a game that was only live.
@@ -178,12 +198,12 @@ describe('marking a game not started, with only lineups and clock taps (S-40)', 
   it('keeps a reason when one is given, though none is needed', async () => {
     const t = setUp();
     await tap(t, tipOff);
-    expect(await mark(t, scorekeeperId, { reason: 'Only trying the tracker' })).toMatchObject({
+    expect(await mark(t, scorekeeperId, { reason: 'onlyTrying' })).toMatchObject({
       ok: true,
     });
-    expect(t.db.state.activity[0]?.details).toEqual({
+    expect(t.db.state.activity[0]?.details).toMatchObject({
       clearedThrough: 3,
-      reason: 'Only trying the tracker',
+      reason: 'onlyTrying',
     });
   });
 
@@ -251,7 +271,7 @@ describe('marking a game not started once something is recorded (S-40)', () => {
     const t = setUp();
     await tap(t, [...tipOff, basket]);
     const before = structuredClone(t.db.state);
-    expect(await mark(t, scorekeeperId, { reason: 'Wrong game' })).toEqual({
+    expect(await mark(t, scorekeeperId, { reason: 'wrongGame' })).toEqual({
       ok: false,
       error: { code: 'not-allowed' },
     });
@@ -281,19 +301,30 @@ describe('marking a game not started once something is recorded (S-40)', () => {
     const t = setUp();
     await tap(t, [...tipOff, basket]);
     expect(gameOf(t)).toMatchObject({ homeScore: 2 });
-    // The scheduler is on another device than the tablet: while the tablet's lease
-    // runs, it may still be scoring (as for ending, record 038).
-    expect(await mark(t, schedulerId, { reason: 'Wrong game started' })).toEqual({
+    // The scheduler is on another device than the tablet: refused while the tablet's
+    // session is on the game, and still once its lease has run out (the tablet may be
+    // scoring with no signal). Changed by the area review (N1): it used to be allowed
+    // after the lease ran out.
+    expect(await mark(t, schedulerId, { reason: 'wrongGame' })).toEqual({
       ok: false,
       error: { code: 'session-held' },
     });
-    t.clock.advance(leaseMs / 1000);
-    expect(await mark(t, schedulerId)).toEqual({ ok: false, error: { code: 'reason-needed' } });
-    expect(await mark(t, schedulerId, { reason: '   ' })).toMatchObject({
+    t.clock.advance(leaseMs / 1000 + 60);
+    expect(await mark(t, schedulerId, { reason: 'wrongGame' })).toEqual({
       ok: false,
-      error: { code: 'invalid-input' },
+      error: { code: 'session-held' },
     });
-    const result = await mark(t, schedulerId, { reason: 'Wrong game started' });
+    // The way through is taking the game over, which asks first.
+    await takeOver(t, schedulerId);
+    expect(await mark(t, schedulerId)).toEqual({ ok: false, error: { code: 'reason-needed' } });
+    // The reason is one of a fixed list (the activity log keeps fixed words only).
+    for (const reason of ['   ', 'Wrong game started']) {
+      expect(await mark(t, schedulerId, { reason })).toMatchObject({
+        ok: false,
+        error: { code: 'invalid-input' },
+      });
+    }
+    const result = await mark(t, schedulerId, { reason: 'wrongGame' });
     expect(result).toMatchObject({ ok: true, value: { sequence: 5 } });
     expect(gameOf(t)).toMatchObject({ status: 'scheduled', homeScore: null, format: null });
     expect(t.db.state.events.map((e) => e.type)).toEqual([
@@ -303,18 +334,75 @@ describe('marking a game not started once something is recorded (S-40)', () => {
       'score',
       'reset',
     ]);
-    expect(t.db.state.activity[0]).toMatchObject({
+    // What was cleared, as numbers: how an admin reads it afterwards.
+    expect(t.db.state.activity.find((a) => a.action === 'games.mark_not_started')).toMatchObject({
       actorAccountId: schedulerId,
-      details: { clearedThrough: 4, reason: 'Wrong game started' },
+      details: {
+        clearedThrough: 4,
+        homeScore: 2,
+        awayScore: 0,
+        homeFouls: 0,
+        awayFouls: 0,
+        homeTurnovers: 0,
+        awayTurnovers: 0,
+        reason: 'wrongGame',
+      },
     });
     expect(t.db.state.liveLines).toEqual([]);
   });
 
-  it('lets the owner do it too', async () => {
+  it('lets the owner do it too, once the game is taken over', async () => {
     const t = setUp();
-    await tap(t, [...tipOff, basket]);
-    t.clock.advance(leaseMs / 1000);
-    expect(await mark(t, ownerId, { reason: 'Practice run' })).toMatchObject({ ok: true });
+    await tap(t, [...tipOff, basket, { type: 'foul', side: 'away', playerId: awayIds[1] ?? '' }]);
+    await takeOver(t, ownerId);
+    expect(await mark(t, ownerId, { reason: 'onlyTrying' })).toMatchObject({ ok: true });
+    expect(t.db.state.activity.at(-1)?.details).toMatchObject({ homeScore: 2, awayFouls: 1 });
+  });
+
+  it('lets the same account carry on from another device, its lease run out or not', async () => {
+    const t = setUp();
+    await tap(t, tipOff);
+    t.clock.advance(leaseMs / 1000 + 60);
+    expect(await mark(t, scorekeeperId)).toMatchObject({ ok: true });
+  });
+});
+
+describe('a game that was ever decided (S-40)', () => {
+  it('is refused once ended by its tracker and reopened, even with every play undone', async () => {
+    const t = setUp();
+    await tap(t, [...tipOff, basket, { type: 'end' }]);
+    expect(gameOf(t)?.status).toBe('final');
+    const reopened = await reopenGame(
+      t.as(ownerId),
+      { gameId, version: gameOf(t)?.version ?? 0, reason: 'Ended by mistake' },
+      t.deps,
+    );
+    expect(reopened).toMatchObject({ ok: true });
+    expect(gameOf(t)?.status).toBe('live');
+    // The scorekeeper undoes the basket, so nothing stands: still refused.
+    await tap(t, [{ type: 'undo' }]);
+    expect(gameOf(t)).toMatchObject({ status: 'live', homeScore: 0 });
+    const before = structuredClone(t.db.state);
+    expect(await mark(t, scorekeeperId)).toEqual({ ok: false, error: { code: 'was-decided' } });
+    expect(await mark(t, ownerId, { reason: 'wrongGame' })).toEqual({
+      ok: false,
+      error: { code: 'was-decided' },
+    });
+    expect(t.db.state).toEqual(before);
+  });
+
+  it('is refused once decided by hand, reopened with a correction and then scored live', async () => {
+    const t = setUp({ games: [finalGame(1, { captureMode: 'live', format: null })] });
+    const reopened = await reopenGame(
+      t.as(ownerId),
+      { gameId, version: 1, reason: 'Wrong score' },
+      t.deps,
+    );
+    expect(reopened).toMatchObject({ ok: true });
+    expect(gameOf(t)?.status).toBe('scheduled');
+    await tap(t, tipOff);
+    expect(gameOf(t)?.status).toBe('live');
+    expect(await mark(t, scorekeeperId)).toEqual({ ok: false, error: { code: 'was-decided' } });
   });
 });
 
@@ -337,7 +425,7 @@ describe('what cannot be marked not started', () => {
     const t = setUp();
     await tap(t, [...tipOff, basket, { type: 'end' }]);
     expect(gameOf(t)?.status).toBe('final');
-    expect(await mark(t, ownerId, { reason: 'Wrong game' })).toEqual({
+    expect(await mark(t, ownerId, { reason: 'wrongGame' })).toEqual({
       ok: false,
       error: { code: 'game-final' },
     });
@@ -354,7 +442,7 @@ describe('what cannot be marked not started', () => {
     ] as const;
     for (const [record, code] of cases) {
       const t = setUp({ games: [record] });
-      expect(await mark(t, ownerId, { reason: 'Wrong game' }), code).toEqual({
+      expect(await mark(t, ownerId, { reason: 'wrongGame' }), code).toEqual({
         ok: false,
         error: { code },
       });

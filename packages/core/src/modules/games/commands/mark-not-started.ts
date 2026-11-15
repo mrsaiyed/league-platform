@@ -6,9 +6,13 @@
 //
 // Who may (S-40): whoever may score the game, while its present state holds nothing but
 // lineups and clock taps (recorded-plays.ts draws the line); once it holds a basket, a
-// foul or a turnover, only someone who may correct games, with a reason. The game's
-// lock is taken before that is decided (T-111), so the plays judged are the plays
-// cleared: a batch saved a moment earlier is in them, one sent a moment later waits.
+// foul or a turnover, only someone who may correct games, with a reason from the fixed
+// list (the activity log keeps fixed words only, A-6). The game's lock is taken before
+// that is decided (T-111), so the plays judged are the plays cleared: a batch saved a
+// moment earlier is in them, one sent a moment later waits. A game that was ever
+// decided (a correction for it, or an end or reopen in its log) is never cleared, by
+// anyone: it was played, and it is corrected instead (S-40, S-7). The database refuses
+// it too (migration 0016).
 //
 // Nothing is edited or removed from the event log (T3: every tap, never edited): a
 // `reset` event, the engine's own command, is added after the cleared plays, naming the
@@ -19,10 +23,14 @@
 // The game's scoring session ends with it, so another device's waiting taps meet the
 // server's own "this device no longer holds the game" and are listed there as not
 // saved; the device that marked it opens the game again like any other (T-116). While
-// another account's device holds the game with its lease running, it is refused, as
-// ending is (record 038): that device may still be scoring. Written to the activity log
-// with who, and the reason when one is given. Standings never counted a game that was
-// only live, so nothing else moves.
+// another account's scoring session is on the game it is refused, whether its lease has
+// run out or not: a device quiet for two minutes may be scoring with no signal, and the
+// way through is taking the game over, which asks first (S-42). The same account on
+// another device may. Written to the activity log with who, the reason when one is
+// given, and the score, fouls and turnovers cleared, as numbers: that entry is how an
+// admin reads what was cleared. Standings never counted a game that was only live, so
+// nothing else moves.
+import { notStartedReasons } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
@@ -34,12 +42,12 @@ import {
   type Result,
 } from '../../../command/index.ts';
 import { engineRulesOf } from '../engine-rules.ts';
-import { correctionReason, isDecided } from '../game-fields.ts';
+import { isDecided } from '../game-fields.ts';
 import { readState, withCurrentRules } from '../live-game.ts';
 import { gameScope, mayChangeGames, mayScoreGame } from '../policy.ts';
 import type { GameRecord, TrackerTx } from '../ports.ts';
 import { holdsRecordedPlays } from '../recorded-plays.ts';
-import { hasLapsed, lowerId, scorerOf } from '../scoring-session.ts';
+import { lowerId, scorerOf } from '../scoring-session.ts';
 import { seasonRulesOf } from '../season-rules-of.ts';
 
 export type MarkNotStartedError = {
@@ -48,6 +56,7 @@ export type MarkNotStartedError = {
     | 'changed-since-read'
     | 'game-not-started'
     | 'game-final'
+    | 'was-decided'
     | 'entered-by-hand'
     | 'game-postponed'
     | 'game-cancelled'
@@ -96,8 +105,8 @@ export const markNotStarted = defineCommand({
     gameId: lowerId,
     /** The sequence number of the last play the asker has seen (the tracker's state's). */
     sequence: z.number().int().min(0),
-    /** Why: needed once a basket, foul or turnover is recorded (S-40, S-7). */
-    reason: correctionReason.optional(),
+    /** Why, from the fixed list: needed once a basket, foul or turnover is recorded (S-40). */
+    reason: z.enum(notStartedReasons).optional(),
   }),
   allowed: (context, input, tx: TrackerTx) => mayMarkNotStarted(context, tx, input.gameId),
   run: async ({
@@ -113,11 +122,13 @@ export const markNotStarted = defineCommand({
     const problem = notLiveProblem(game, saved !== undefined);
     if (problem !== undefined) return fail(problem);
     if (saved === undefined) return fail({ code: 'not-tracked' });
+    // Final once and reopened (by an admin, or by its scorekeeper): it was played.
+    if (await tx.liveGames.wasDecided(game.id)) return fail({ code: 'was-decided' });
     if (saved.seq !== input.sequence) return fail({ code: 'changed-since-read' });
     const now = tx.clock.now();
-    // Read as take_over_scoring reads it: a lapsed session holds nothing.
+    // Another account's session, lapsed or not: that device may be scoring offline.
     const session = await tx.scoringSessions.findForGame(game.id);
-    if (session !== undefined && !hasLapsed(session, now) && session.accountId !== accountId) {
+    if (session !== undefined && session.accountId !== accountId) {
       return fail({ code: 'session-held' });
     }
     const before = readState(saved.state);
@@ -158,11 +169,18 @@ export const markNotStarted = defineCommand({
     // The game is locked and was read after the lock: it cannot have moved on.
     if (version === undefined) throw new Error('A locked game changed while it was cleared.');
     if (session !== undefined) await tx.scoringSessions.end(game.id, session.id);
+    const { home, away } = basketball.derive(before).teams;
     await recordActivity(tx, context, {
       action: 'games.mark_not_started',
       target: { type: 'game', id: game.id },
       details: {
         clearedThrough: saved.seq,
+        homeScore: home.score,
+        awayScore: away.score,
+        homeFouls: home.fouls,
+        awayFouls: away.fouls,
+        homeTurnovers: home.turnovers,
+        awayTurnovers: away.turnovers,
         ...(input.reason === undefined ? {} : { reason: input.reason }),
       },
     });

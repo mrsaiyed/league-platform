@@ -87,6 +87,16 @@ export function seedTracker(
   return state;
 }
 
+/**
+ * Whether the tracker has recorded anything for the game since it was last marked not
+ * started (its last `reset` event), as the database's game_tracked_past_marker reads it.
+ */
+export function trackedPastMarker(events: readonly NewGameEvent[], gameId: string): boolean {
+  const own = events.filter((e) => e.gameId === gameId);
+  const marker = Math.max(0, ...own.filter((e) => e.type === 'reset').map((e) => e.seq));
+  return own.some((e) => e.seq > marker);
+}
+
 /** The game's sessions, over one state; `hasGame` says whether the game is in the league. */
 export function scoringSessionsOf(
   s: TrackerState,
@@ -121,10 +131,14 @@ export function scoringSessionsOf(
   };
 }
 
-/** The live game's storage, over one state; `teamsOf` gives a game's two teams. */
+/**
+ * The live game's storage, over one state; `teamsOf` gives a game's two teams and
+ * `corrected` whether a game has a correction (kept beside the games).
+ */
 export function liveGamesOf(
   s: TrackerState,
   teamsOf: (gameId: string) => readonly string[],
+  corrected: (gameId: string) => boolean = () => false,
 ): LiveGamesStore {
   return {
     findState: async (gameId) => {
@@ -145,6 +159,9 @@ export function liveGamesOf(
         s.events.push(event);
       }
     },
+    wasDecided: async (gameId) =>
+      corrected(gameId) ||
+      s.events.some((e) => e.gameId === gameId && (e.type === 'end' || e.type === 'reopen')),
     saveState: async (gameId, seq, state) => {
       s.states = [...s.states.filter((x) => x.gameId !== gameId), { gameId, seq, state }];
     },

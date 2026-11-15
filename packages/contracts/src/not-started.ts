@@ -8,6 +8,19 @@ import { z } from 'zod';
 
 const Ms = z.number().int().nonnegative();
 
+/**
+ * Why a game is marked not started, from a fixed list: the activity log keeps ids and
+ * fixed words only (A-6, 0004), so the reason is chosen, never typed, as R-23's is.
+ */
+export const notStartedReasons = [
+  'startedByMistake',
+  'onlyTrying',
+  'wrongGame',
+  'wrongFormat',
+  'other',
+] as const;
+export type NotStartedReason = (typeof notStartedReasons)[number];
+
 export const NotStartedRequest = z.strictObject({
   /**
    * The sequence number of the last play the asker has seen (the tracker's state's). The
@@ -16,10 +29,10 @@ export const NotStartedRequest = z.strictObject({
    */
   sequence: z.number().int().nonnegative(),
   /**
-   * Why. Needed once a basket, foul or turnover stands (S-40), and kept in the activity
-   * log, never shown publicly; kept when given at other times too.
+   * Why, from the fixed list. Needed once a basket, foul or turnover stands (S-40), and
+   * kept in the activity log, never shown publicly; kept when given at other times too.
    */
-  reason: z.string().trim().min(1).max(1000).optional(),
+  reason: z.enum(notStartedReasons).optional(),
 });
 export type NotStartedRequest = z.infer<typeof NotStartedRequest>;
 
@@ -35,13 +48,18 @@ export const notStartedRefusals = [
   'game-not-started',
   /** The tracker ended the game: reopening it is the way back. */
   'game-final',
+  /** Final once and reopened: it is corrected, never cleared (S-40). */
+  'was-decided',
   /** A final score, a box score or a forfeit entered by hand: it was never on the tracker. */
   'entered-by-hand',
   'game-postponed',
   'game-cancelled',
   /** Live, but with no plays from the tracker. */
   'not-tracked',
-  /** Another account's device holds the game and may still be scoring. */
+  /**
+   * Another account's scoring session is on the game, its lease run out or not: that
+   * device may be scoring with no signal. Taking it over, which asks, is the way through.
+   */
   'session-held',
   /** A basket, foul or turnover stands: a reason is needed. */
   'reason-needed',

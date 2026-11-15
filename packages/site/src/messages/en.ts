@@ -1218,11 +1218,16 @@ export const en = {
   'tracker.notStarted.questionDetail':
     'Its score and every stat recorded for it are cleared, here and on the live page. It shows as scheduled again.',
   'tracker.notStarted.reason': 'Why it needs clearing (kept in the log, never shown publicly)',
+  'tracker.notStarted.reasons.startedByMistake': 'Started by mistake',
+  'tracker.notStarted.reasons.onlyTrying': 'Only trying the tracker',
+  'tracker.notStarted.reasons.wrongGame': 'Wrong game',
+  'tracker.notStarted.reasons.wrongFormat': 'Wrong game format',
+  'tracker.notStarted.reasons.other': 'Another reason',
   'tracker.notStarted.yes': 'Yes, mark not started',
   'tracker.notStarted.no': 'Keep scoring',
   'tracker.notStarted.done': 'The game is scheduled again. Nothing recorded in it counts.',
   'tracker.notStarted.refused.not-allowed':
-    'You cannot mark this game not started. Once a basket, foul or turnover is recorded, only a league admin or scheduler can, with a reason.',
+    'A basket, foul or turnover is recorded. Undo them first, then mark the game not started; or a league admin can clear it with a reason.',
   'tracker.notStarted.refused.unknown-game': 'This game could not be found.',
   'tracker.notStarted.refused.changed-since-read':
     'Plays were saved for this game since this screen loaded them. Look again before you clear it.',
@@ -1230,6 +1235,8 @@ export const en = {
     'This game has not started, so there is nothing to clear.',
   'tracker.notStarted.refused.game-final':
     'This game is final. Reopen it to change it; it cannot be marked not started.',
+  'tracker.notStarted.refused.was-decided':
+    'This game was final once, so it was played and cannot be marked not started. Correct its plays instead.',
   'tracker.notStarted.refused.entered-by-hand':
     'This game’s result was entered by hand, not scored live. Reopen it to change it.',
   'tracker.notStarted.refused.game-postponed':
@@ -1239,7 +1246,7 @@ export const en = {
   'tracker.notStarted.refused.not-tracked':
     'This game has no plays from the tracker, so there is nothing to clear.',
   'tracker.notStarted.refused.session-held':
-    'Another device is scoring this game right now. Take it over, or wait until it stops, then try again.',
+    'Someone else has been scoring this game on another device, and may still be scoring it without a connection. Take the game over first, then try again.',
   'tracker.notStarted.refused.reason-needed':
     'A basket, foul or turnover is recorded in this game. Say why it needs clearing.',
   'tracker.readOnly.unknown-game': 'This game could not be found.',

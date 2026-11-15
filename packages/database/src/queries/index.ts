@@ -126,6 +126,7 @@ export { listGameLines } from './list-game-lines.ts';
 export { replaceGameLines } from './replace-game-lines.ts';
 export { listGameRoster } from './list-game-roster.ts';
 export { gameHasPlays } from './game-has-plays.ts';
+export { gameWasDecided } from './game-was-decided.ts';
 export { deleteGameAssignment } from './delete-game-assignment.ts';
 export { insertGameAssignment } from './insert-game-assignment.ts';
 export { isGameAssigned } from './is-game-assigned.ts';
