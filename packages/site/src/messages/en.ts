@@ -1631,7 +1631,7 @@ export const en = {
   'schedule.admin.refused.round-has-games':
     'This round has games. Move or remove its games first, then remove the round.',
   'schedule.admin.refused.too-many-rounds':
-    'This season has used every round number up to {max}, so no more rounds can be added.',
+    'This season has used every round number up to {max}. Start a new season to add more rounds.',
   'schedule.admin.refused.date-out-of-range': 'Choose a date between the years {first} and {last}.',
 } as const;
 
