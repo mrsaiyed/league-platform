@@ -5,6 +5,8 @@
 import { defaultNamePolicy, publicViewer, type PublicDisplay } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
+  findLeagueTimeZone,
+  findPublicGameFacts,
   findPublicSeason,
   findPublicTeam,
   listPublicGames,
@@ -67,6 +69,21 @@ registerIsolationCase({
     await openTargetSeason(scope, target);
     return listPublicSchedule(scope, target.seasonId, '2026-11-13');
   },
+});
+
+registerIsolationCase({
+  subject: findPublicGameFacts,
+  name: "find the target's final game's number, venue and season after opening its season",
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return findPublicGameFacts(scope, target.seasonId, target.gameId);
+  },
+});
+
+registerIsolationCase({
+  subject: findLeagueTimeZone,
+  name: "read the league's time zone (the target's own, in its scope)",
+  run: (scope) => findLeagueTimeZone(scope),
 });
 
 registerIsolationCase({

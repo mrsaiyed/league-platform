@@ -1,4 +1,4 @@
-import { leagueUrl, readStandings } from '@srleagues/core';
+import { leagueUrl } from '@srleagues/core';
 import { CallBand, EmptyPanel, Hero, Section, StandingsTable, StatStrip } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
@@ -66,9 +66,7 @@ export async function HomePage({
   const clock = await publicSchedule.clockOf(addressee.id);
   const schedule = await publicSchedule.scheduleOf(addressee.id, season.id, clock.today);
   if (schedule === undefined) return notFound();
-  const standings = await readStandings(publicStats.readStoreOf(addressee.id), {
-    seasonId: season.id,
-  });
+  const standings = await publicStats.standingsOf(addressee.id, season.id);
   const tables = standings.ok ? buildStandingsViews(standings.value) : [];
   const games = buildHomeGames(schedule, clock, addressee);
   const labels = displayLabels(t);
