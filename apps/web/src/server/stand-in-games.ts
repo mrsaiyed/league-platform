@@ -271,6 +271,23 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
         };
         return found.version + 1;
       },
+      // As the database does it: only a live game, its format emptied with it.
+      markNotStarted: async (gameId, version) => {
+        const index = s.games.findIndex((g) => g.id === gameId);
+        const found = s.games[index];
+        if (found === undefined || found.binned || found.version !== version) return undefined;
+        if (found.status !== 'live') return undefined;
+        s.games[index] = {
+          ...found,
+          status: 'scheduled',
+          homeScore: null,
+          awayScore: null,
+          finalizedAt: null,
+          format: null,
+          version: found.version + 1,
+        };
+        return found.version + 1;
+      },
       addCorrection: async (correction) => void s.corrections.push(correction),
       listPostponed: async (seasonId) =>
         s.games.filter(

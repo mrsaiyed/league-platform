@@ -116,6 +116,13 @@ export type GamesStore = {
     change: GameResultChange,
     version: number,
   ) => Promise<number | undefined>;
+  /**
+   * Marks a live game not started (S-40) if it is still at `version`: scheduled, no
+   * score, and no rules of its own (the database empties the time they were fixed in
+   * the same update, record 061). The new version, or undefined if it is not there,
+   * in the bin, not live or moved on.
+   */
+  readonly markNotStarted: (gameId: string, version: number) => Promise<number | undefined>;
   /** Writes the correction row (S-7) in this transaction; the database needs it to change a decided game. */
   readonly addCorrection: (correction: NewGameCorrection) => Promise<void>;
   /** Postponed games not in the bin, soonest first, of one season or all. */

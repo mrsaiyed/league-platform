@@ -108,6 +108,7 @@ import {
   readTrackerRosters,
   readTrackerState,
   endTrackedGame,
+  markNotStarted,
   engineRulesOf,
   renameShortName,
   resendInvitation,
@@ -1049,7 +1050,82 @@ const gameCommandRows: readonly Row[] = [
     },
     (c, i) => endTrackedGame(c, i, trackerDeps),
   ),
+  // Marking a game not started (S-40): whoever may score it while only lineups and
+  // clock taps are recorded; once a basket is, only those who may correct games, with
+  // a reason. Each game is live, scored by its tracker, with no session holding it.
+  ...gameRows(
+    'games.mark_not_started',
+    'mark a game not started with only clock taps',
+    'games.score',
+    async (league, program) => ({
+      gameId: await trackedLiveGame(league, program, [{ type: 'start' }]),
+      sequence: 1,
+    }),
+    (c, i) => markNotStarted(c, i, trackerDeps),
+  ),
+  ...gameRows(
+    'games.mark_not_started',
+    'mark a game not started once a basket is recorded',
+    'games.correct',
+    async (league, program) => ({
+      gameId: await trackedLiveGame(league, program, [
+        { type: 'start' },
+        {
+          type: 'score',
+          side: 'home',
+          playerId: await newPerson(pglite, league.leagueId),
+          points: 2,
+        },
+      ]),
+      sequence: 2,
+      reason: 'Started by mistake',
+    }),
+    (c, i) => markNotStarted(c, i, trackerDeps),
+  ),
 ];
+
+/**
+ * A live game of the league's season whose tracker has taken these taps, one event
+ * each, with its saved state and its score: what marking it not started clears.
+ */
+async function trackedLiveGame(
+  league: League,
+  program: boolean,
+  commands: readonly basketball.Command[],
+): Promise<string> {
+  const { gameId } = await gameIn(league, program, { capture_mode: 'live' });
+  const rules = defaultSeasonRules();
+  let state = basketball.newGame(engineRulesOf(rules), 0);
+  for (const [i, command] of commands.entries()) {
+    const commandId = randomUUID();
+    state = basketball.apply(state, command, { id: commandId, now: matrixNow });
+    const { type, ...payload } = command;
+    await pglite.query(
+      `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at, account_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        league.leagueId,
+        gameId,
+        i + 1,
+        commandId,
+        type,
+        JSON.stringify(payload),
+        new Date(matrixNow).toISOString(),
+        league.ownerId,
+      ],
+    );
+  }
+  await pglite.query(
+    'insert into game_states (league_id, game_id, seq, state) values ($1, $2, $3, $4)',
+    [league.leagueId, gameId, commands.length, JSON.stringify(state)],
+  );
+  const { home, away } = basketball.derive(state).teams;
+  await pglite.query(
+    `update games set status = 'live', home_score = $2, away_score = $3, format = $4 where id = $1`,
+    [gameId, home.score, away.score, JSON.stringify(rules)],
+  );
+  return gameId;
+}
 
 const divisionAndVenueRows: readonly Row[] = [
   // Divisions are checked at their season's program (P4 §4): the owner and admins.
@@ -1865,6 +1941,9 @@ const namedExceptions: Readonly<Record<string, readonly CommandRequirement[]>> =
   // Names `league.settings` for publishing and archiving; suspending and lifting a
   // suspension are our staff's (U-9), which its own check decides.
   'leagues.set_status': ['platform-staff'],
+  // Names `games.score`, for a game with only lineups and clock taps; once a basket,
+  // foul or turnover is recorded it takes `games.correct` (S-40), which its own check decides.
+  'games.mark_not_started': ['games.correct'],
 };
 
 describe('every role against every command (T4 §12)', () => {

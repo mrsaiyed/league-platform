@@ -1021,6 +1021,7 @@ export const en = {
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
   'activity.games.end_tracked_game': 'Ended a tracked game',
+  'activity.games.mark_not_started': 'Marked a started game not started',
   'activity.standings.add_adjustment': 'Added a standings adjustment',
   'activity.standings.remove_adjustment': 'Removed a standings adjustment',
   'activity.games.assign_scorekeeper': 'Assigned a scorekeeper to a game',
@@ -1209,6 +1210,38 @@ export const en = {
   'tracker.readOnly.game-not-live':
     'This game cannot be scored now: it is over, cancelled or postponed.',
   'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
+  // Marking a game not started (step 2.121, S-40): the Al-Hadi tracker's question
+  // (checklist J5), the reason asked for once a basket, foul or turnover stands, and
+  // each refusal of POST …/not-started by its code (NotStartedReply). Step 2.37 draws them.
+  'tracker.notStarted.button': 'Mark not started',
+  'tracker.notStarted.question': 'Mark this game as not started?',
+  'tracker.notStarted.questionDetail':
+    'Its score and every stat recorded for it are cleared, here and on the live page. It shows as scheduled again.',
+  'tracker.notStarted.reason': 'Why it needs clearing (kept in the log, never shown publicly)',
+  'tracker.notStarted.yes': 'Yes, mark not started',
+  'tracker.notStarted.no': 'Keep scoring',
+  'tracker.notStarted.done': 'The game is scheduled again. Nothing recorded in it counts.',
+  'tracker.notStarted.refused.not-allowed':
+    'You cannot mark this game not started. Once a basket, foul or turnover is recorded, only a league admin or scheduler can, with a reason.',
+  'tracker.notStarted.refused.unknown-game': 'This game could not be found.',
+  'tracker.notStarted.refused.changed-since-read':
+    'Plays were saved for this game since this screen loaded them. Look again before you clear it.',
+  'tracker.notStarted.refused.game-not-started':
+    'This game has not started, so there is nothing to clear.',
+  'tracker.notStarted.refused.game-final':
+    'This game is final. Reopen it to change it; it cannot be marked not started.',
+  'tracker.notStarted.refused.entered-by-hand':
+    'This game’s result was entered by hand, not scored live. Reopen it to change it.',
+  'tracker.notStarted.refused.game-postponed':
+    'This game is postponed, so there is nothing to clear.',
+  'tracker.notStarted.refused.game-cancelled':
+    'This game is cancelled, so there is nothing to clear.',
+  'tracker.notStarted.refused.not-tracked':
+    'This game has no plays from the tracker, so there is nothing to clear.',
+  'tracker.notStarted.refused.session-held':
+    'Another device is scoring this game right now. Take it over, or wait until it stops, then try again.',
+  'tracker.notStarted.refused.reason-needed':
+    'A basket, foul or turnover is recorded in this game. Say why it needs clearing.',
   'tracker.readOnly.unknown-game': 'This game could not be found.',
   'tracker.readOnly.request-refused':
     'Something went wrong opening the game. Tap Open the game again.',

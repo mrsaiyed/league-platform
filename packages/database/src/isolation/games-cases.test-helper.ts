@@ -473,7 +473,7 @@ registerIsolationCase({
 // that in the target's own league the batch is taken: a line-up and a basket for the
 // target's player (the away side). Anywhere else the takeover is refused, and the
 // batch is sent with the member's session, which must reach nothing.
-async function scoreTargetUpcomingGame(scope: LeagueScope, target: LeagueRecords) {
+export async function scoreTargetUpcomingGame(scope: LeagueScope, target: LeagueRecords) {
   const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
     gameId: target.upcomingGameId,
     deviceId: 'harness-device',
