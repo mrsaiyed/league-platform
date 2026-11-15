@@ -275,6 +275,21 @@ export const tableCss = String.raw`
 .ui-table td:has(> .ui-team-chip) {
   white-space: nowrap;
 }
+/* A team's emblem beside its name, where a table draws one in place of the chip. It is
+   wider than the chip, so the name gives up that much of its share of the box. */
+.ui-table .ui-emblem {
+  margin-inline-end: var(--step-2);
+  vertical-align: middle;
+}
+.ui-standings[data-emblems='true'] .ui-team-cell > [dir] {
+  max-inline-size: calc(45cqi - var(--step-6) - var(--step-3));
+}
+/* With emblems a team's place is set in the score face, in the color the eye lands on. */
+.ui-standings[data-emblems='true'] tbody td.ui-num:first-child {
+  color: var(--color-pop);
+  font-family: var(--font-score);
+  font-size: var(--text-16);
+}
 /* A note's number sits beside the name without making its row taller than the others. */
 .ui-note-mark {
   font-size: var(--text-12);

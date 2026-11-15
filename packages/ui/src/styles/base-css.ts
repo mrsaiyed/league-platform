@@ -25,7 +25,7 @@ body {
 .ui-root :where(h1, h2, h3, h4) {
   margin-block: 0 var(--step-3);
   font-family: var(--font-heading);
-  font-weight: 700;
+  font-weight: var(--heading-weight);
   line-height: 1.2;
   letter-spacing: var(--heading-tracking);
   text-transform: var(--heading-case);

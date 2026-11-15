@@ -160,6 +160,205 @@ export const gameCss = String.raw`
   white-space: nowrap;
 }
 
+/* A quiet word where a state's pill would be: "Awaiting result". */
+.ui-game-state[data-kind='quiet'] {
+  border-color: var(--color-line);
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+/* A game as a scoreboard: an emblem and a name on each side, the score or "VS" large
+   between them, a quiet line above (which game, when, its state) and below (where). The
+   card is the measure of what is in it: where it is too narrow for two teams side by
+   side, they stand one over the other. */
+.ui-game-card[data-layout='board'] {
+  grid-template-rows: auto 1fr auto;
+  gap: 0;
+  padding-block: var(--step-4);
+  padding-inline: var(--step-5);
+  /* Over the panel's own color: a little of the main color at one corner, never more than
+     the texts are fitted to (packages/site, hoverTintShare). */
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--color-primary) 9%, var(--color-panel)),
+    var(--color-panel) 70%
+  );
+  container-type: inline-size;
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+.ui-game-card[data-layout='board']:has(.ui-game-link):hover {
+  border-color: color-mix(in srgb, var(--color-pop) 55%, transparent);
+  transform: translateY(-2px);
+}
+.ui-game-card[data-layout='board'] .ui-game-meta {
+  padding-block-end: var(--step-3);
+  border-block-end: 1px solid var(--color-line);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ui-game-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--step-3);
+  padding-block: var(--step-5);
+}
+.ui-game-side {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: var(--step-2);
+  min-inline-size: 0;
+  text-align: center;
+}
+.ui-game-card[data-layout='board'] .ui-game-team-name {
+  max-inline-size: 100%;
+  font-family: var(--font-heading);
+  font-size: var(--text-18);
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+  line-height: 1.2;
+  /* A long name wraps under itself, whole words first; a word too long for its side is
+     broken at a syllable, with a hyphen, where the browser knows the language. */
+  overflow-wrap: break-word;
+  hyphens: auto;
+  text-wrap: balance;
+}
+/* The winner is said in words (kept for screen readers), by the weight of its name and
+   its score, and by a bar under its score: never by color alone. */
+.ui-game-side[data-winner='true'] .ui-game-team-name {
+  font-weight: 700;
+}
+.ui-game-versus {
+  margin: 0;
+  color: var(--color-muted);
+  font-family: var(--font-heading);
+  font-size: var(--text-14);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+/* A score is compared digit by digit with the one beside it: lining, even-width figures,
+   in a face that has them (--font-score), and the largest thing in its card. */
+.ui-game-score {
+  display: flex;
+  align-items: baseline;
+  gap: var(--step-2);
+  margin: 0;
+  color: var(--color-pop);
+  font-family: var(--font-score);
+  font-size: var(--text-28);
+  font-weight: var(--display-weight);
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ui-game-score > span {
+  padding-block-end: var(--step-1);
+  border-block-end: 2px solid transparent;
+}
+.ui-game-score-colon {
+  color: var(--color-muted);
+}
+.ui-game-score > [data-winner='true'] {
+  border-block-end-color: currentColor;
+  font-weight: 600;
+}
+/* Once a game is decided only the winner's score keeps the color the eye lands on, and
+   the other is set lighter than it in every face. */
+.ui-game-card:is([data-status='final'], [data-status='forfeit'])
+  .ui-game-score
+  > span:not([data-winner], .ui-game-score-colon) {
+  color: var(--color-text);
+  font-weight: 400;
+}
+.ui-game-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--step-2);
+  padding-block-start: var(--step-3);
+  border-block-start: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: var(--text-12);
+  line-height: 1.5;
+  text-align: center;
+}
+.ui-game-foot::before {
+  content: '';
+  flex: none;
+  inline-size: var(--step-4);
+  block-size: var(--step-4);
+  background: currentColor;
+  -webkit-mask: var(--ui-pin) center / contain no-repeat;
+  mask: var(--ui-pin) center / contain no-repeat;
+}
+/* Where the card has the room, everything on the board is a step larger. */
+@container (min-width: 26rem) {
+  .ui-game-board {
+    gap: var(--step-5);
+    padding-inline: var(--step-3);
+  }
+  .ui-game-board .ui-emblem {
+    block-size: calc(var(--step-7) + var(--step-2));
+  }
+  .ui-game-score {
+    font-size: var(--text-36);
+  }
+}
+/* Two teams that cannot sit side by side stand one over the other: every board in a card
+   too narrow for any two names, and a board with a long name (the card says so) wherever
+   half the card is too narrow for it. */
+@container (max-width: 12.99rem) {
+  .ui-game-board {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: var(--step-4);
+  }
+}
+@container (max-width: 21.99rem) {
+  .ui-game-card[data-names='long'] .ui-game-board {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: var(--step-4);
+  }
+}
+/* The board picked out from the others: the game being played now. */
+.ui-game-card[data-featured='true'] {
+  border-color: color-mix(in srgb, var(--color-pop) 45%, transparent);
+  box-shadow: var(--overlay-shadow);
+}
+.ui-game-card[data-featured='true'] .ui-emblem {
+  block-size: var(--step-8);
+}
+/* Its figures are a step larger wherever its card has the room for them and both names. */
+@container (min-width: 25rem) {
+  .ui-game-card[data-featured='true'] .ui-game-score {
+    font-size: var(--text-48);
+  }
+}
+@container (min-width: 34rem) {
+  .ui-game-card[data-featured='true'] .ui-game-team-name {
+    font-size: var(--text-22);
+  }
+}
+/* A list of boards: one across on a phone; from a tablet up two across where the list
+   has the page's width, and a board left over takes the whole row, so no card ever has
+   a hole beside it. */
+.ui-card-grid[data-layout='board'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 48rem) {
+  .ui-card-grid[data-layout='board'][data-across='two'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--step-5);
+  }
+  .ui-card-grid[data-layout='board'][data-across='two'] > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
 /* The big board of a game's page. The teams and what stands between them are held to a
    width the eye takes in at once, however wide the panel is. */
 .ui-scoreboard {

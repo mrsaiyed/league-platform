@@ -108,10 +108,35 @@ export const layoutCss = String.raw`
   color: var(--color-muted);
   font-size: var(--text-14);
 }
+/* A title with a kicker over it: set larger, with no rule of its own, and the way on
+   level with the foot of the title. */
+.ui-section-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-2);
+  min-inline-size: 0;
+}
+.ui-section-head:has(.ui-section-title) {
+  align-items: flex-end;
+  margin-block-end: var(--step-5);
+}
+.ui-root .ui-section-title h2 {
+  font-size: var(--text-22);
+}
+.ui-section-title h2::after {
+  content: none;
+}
+@media (min-width: 48rem) {
+  .ui-root .ui-section-title h2 {
+    font-size: var(--text-28);
+  }
+}
 .ui-more {
   display: inline-flex;
   align-items: center;
+  gap: var(--step-2);
   min-block-size: var(--tap);
+  color: var(--color-pop);
   font-size: var(--text-14);
   font-weight: 600;
   text-decoration: none;
@@ -149,52 +174,55 @@ export const layoutCss = String.raw`
   min-inline-size: 0;
 }
 
-/* The strip of big numbers a home page opens with. */
+/* The strip of big numbers under a home page's hero: four across at every width, open
+   to the page, between two fine lines in the color the eye lands on. The four stand in
+   one row and are read against each other, so they are set in lining figures. */
 .ui-stat-strip {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   margin: 0;
-  overflow: hidden;
-  background: var(--color-line);
-  border: var(--card-border-width) solid var(--color-line);
-  border-radius: var(--radius);
-  box-shadow: var(--card-shadow);
-}
-@media (min-width: 40rem) {
-  .ui-stat-strip {
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-  }
+  border-block: 1px solid color-mix(in srgb, var(--color-pop) 32%, transparent);
 }
 .ui-stat {
   display: flex;
   flex-direction: column-reverse;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--step-1);
   padding-block: var(--step-4);
-  padding-inline: var(--step-2);
-  background: var(--color-panel);
+  padding-inline: var(--step-1);
+  border-inline-start: 1px solid var(--color-line);
   text-align: center;
+}
+.ui-stat:first-child {
+  border-inline-start: 0;
 }
 .ui-stat dt {
   color: var(--color-muted);
   font-size: var(--text-12);
   font-weight: 600;
-  letter-spacing: var(--label-tracking);
+  letter-spacing: 0.08em;
+  line-height: 1.35;
   text-transform: uppercase;
 }
 .ui-stat dd {
   margin: 0;
-  color: var(--color-primary-text);
+  color: var(--color-pop);
   font-family: var(--font-heading);
   font-size: var(--text-28);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  font-weight: var(--display-weight);
+  font-variant-numeric: lining-nums;
   line-height: 1.1;
 }
 @media (min-width: 48rem) {
+  .ui-stat {
+    gap: var(--step-2);
+    padding-block: var(--step-5);
+  }
+  .ui-stat dt {
+    letter-spacing: 0.18em;
+  }
   .ui-stat dd {
     font-size: var(--text-36);
   }
@@ -220,7 +248,7 @@ export const layoutCss = String.raw`
   color: var(--color-text);
   font-family: var(--font-heading);
   font-size: var(--text-18);
-  font-weight: 700;
+  font-weight: var(--heading-weight);
   letter-spacing: var(--heading-tracking);
   text-transform: var(--heading-case);
 }
