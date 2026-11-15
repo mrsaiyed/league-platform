@@ -56,6 +56,8 @@ export function privacyNotes(input: PrivacyInput): SettingNotes {
   const row = input.rows.find((r) => r.key === confirmationKey);
   const given = row?.value === true;
   const area: Line[] = [{ key: `adminSettings.privacy.intro.${facts.audience}` }, nowLine(policy)];
+  // Right under "Now", so an owner who sees a coach by initial learns why (R-15).
+  if (facts.audience !== 'adult') area.push({ key: 'adminSettings.privacy.unknownAge' });
   if (given && policy.names !== 'full_name') {
     area.push({ key: 'adminSettings.privacy.keptNoEffect' });
   }

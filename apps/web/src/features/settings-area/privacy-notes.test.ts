@@ -43,10 +43,17 @@ const keys = (n: SettingNotes) => (n.area?.['privacy'] ?? []).map((line) => line
 
 describe('privacyNotes', () => {
   it('opens with a sentence for who plays and says what is in force now', () => {
-    for (const audience of ['adult', 'youth', 'mixed'] as const) {
+    expect(keys(notes('adult'))).toEqual([
+      'adminSettings.privacy.intro.adult',
+      'adminSettings.privacy.now.full',
+    ]);
+    // In a youth or mixed league, why someone with no age recorded shows by initial comes
+    // right under "Now".
+    for (const audience of ['youth', 'mixed'] as const) {
       expect(keys(notes(audience))).toEqual([
         `adminSettings.privacy.intro.${audience}`,
         'adminSettings.privacy.now.full',
+        'adminSettings.privacy.unknownAge',
       ]);
     }
     const now = (policy: Partial<NamePolicy>) => keys(notes('youth', { policy }))[1];
@@ -77,6 +84,7 @@ describe('privacyNotes', () => {
     expect(keys(kept)).toEqual([
       'adminSettings.privacy.intro.youth',
       'adminSettings.privacy.now.hidden',
+      'adminSettings.privacy.unknownAge',
       'adminSettings.privacy.keptNoEffect',
       'adminSettings.privacy.confirmedOn',
     ]);

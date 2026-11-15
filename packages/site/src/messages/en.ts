@@ -466,7 +466,7 @@ export const en = {
   'adminSettings.privacy.intro.adult':
     'Your league is for adults, so it starts with full names. Choose less here at any time.',
   'adminSettings.privacy.intro.youth':
-    'Your league is for young players. It starts as it always has: adults by full name, young players by first name and last initial. Choose less here at any time.',
+    'Your league is for young players. It starts with adults by full name and young players by first name and last initial. Choose less here at any time.',
   'adminSettings.privacy.intro.mixed':
     'Your league has both adults and young players. It starts with adults by full name and young players by first name and last initial. Choose less here at any time.',
   'adminSettings.privacy.now.full':
@@ -475,6 +475,8 @@ export const en = {
   'adminSettings.privacy.now.initial': 'Now: everyone is shown by first name and last initial.',
   'adminSettings.privacy.now.hidden':
     'Now: nobody is shown by name; players appear by jersey number.',
+  'adminSettings.privacy.unknownAge':
+    'In this league, anyone whose record does not say whether they are a child or an adult is shown as a child, coaches too.',
   'adminSettings.privacy.keptNoEffect':
     "The parents' confirmation is kept, but it has no effect while names are not on full names.",
   'adminSettings.privacy.confirmedOn': 'Confirmed on {date}.',
