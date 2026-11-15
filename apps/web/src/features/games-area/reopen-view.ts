@@ -8,7 +8,7 @@
 //   any time, the scorekeeper who ended it within the league's minutes;
 // - any other decided game (a final score or a box score typed by hand, a forfeit) through
 //   games.reopen_game, for someone who may correct games at its program.
-import type { GameReopenOffer as ReopenOffer } from '@srleagues/core';
+import type { BoxScoreSheet, GameReopenOffer as ReopenOffer } from '@srleagues/core';
 
 /** Which door reopens the game for this person. */
 export type ReopenDoor = 'tracked' | 'by-hand';
@@ -37,4 +37,29 @@ export function reopenViewOf(offer: ReopenOffer | undefined, mayCorrect: boolean
   }
   if (when.code === 'game-not-decided') return { kind: 'none' };
   return { kind: 'who', because: when.code === 'reopen-time-over' ? 'time-over' : 'admins' };
+}
+
+type SheetFacts = Pick<BoxScoreSheet, 'mayReopen' | 'mayCorrect' | 'locked'> & {
+  readonly game: Pick<BoxScoreSheet['game'], 'status'>;
+};
+
+/** Whether the game's page needs the tracker's read to know: a decided game locked as tracked. */
+export function sheetNeedsOffer(sheet: SheetFacts): boolean {
+  return (
+    !sheet.mayReopen &&
+    sheet.locked === 'tracked' &&
+    (sheet.game.status === 'final' || sheet.game.status === 'forfeit')
+  );
+}
+
+/**
+ * What the game's own page (its reopen form) offers this person: the admin's door as the
+ * sheet says; for a decided game locked as tracked, the tracker's answer, or, for one
+ * decided by hand while it had plays, the admin's door to whoever may correct games
+ * (games.reopen_game hands it back to its tracker, S-46); nothing for any other.
+ */
+export function sheetReopenViewOf(sheet: SheetFacts, offer: ReopenOffer | undefined): ReopenView {
+  if (sheet.mayReopen) return { kind: 'correct', door: 'by-hand', until: null };
+  if (!sheetNeedsOffer(sheet)) return { kind: 'none' };
+  return reopenViewOf(offer, sheet.mayCorrect);
 }

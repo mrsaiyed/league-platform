@@ -17,7 +17,7 @@ import { commandContextOf } from '../../server/context.ts';
 import { clockTimeText } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
-import { reopenViewOf, type ReopenView } from './reopen-view.ts';
+import { sheetNeedsOffer, sheetReopenViewOf, type ReopenView } from './reopen-view.ts';
 import { statLabel } from '../stats-pages/index.ts';
 import { hasName, rosterName } from '../teams-area/index.ts';
 import { reopenBoxScoreAction, saveBoxScoreAction } from './actions.ts';
@@ -181,16 +181,14 @@ export async function BoxScorePage({
   const notice = boxScoreNotice(search);
   // Who may reopen it here, and by which door (reopen-view.ts): the admin's door as the
   // sheet says, else, for a game its tracker ended, the tracker's own read.
-  const reopen: ReopenView = sheet.mayReopen
-    ? { kind: 'correct', door: 'by-hand', until: null }
-    : sheet.locked === 'tracked' && (game.status === 'final' || game.status === 'forfeit')
-      ? reopenViewOf(
-          await readReopenOffer(context, { gameId: game.id }, ports.games.deps).then((offer) =>
-            offer.ok ? offer.value : undefined,
-          ),
-          false,
+  const reopen: ReopenView = sheetReopenViewOf(
+    sheet,
+    sheetNeedsOffer(sheet)
+      ? await readReopenOffer(context, { gameId: game.id }, ports.games.deps).then((offer) =>
+          offer.ok ? offer.value : undefined,
         )
-      : { kind: 'none' };
+      : undefined,
+  );
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
   const teams = [
     { teamId: game.awayTeamId, name: awayName, score: game.awayScore, field: 'awayScore' },

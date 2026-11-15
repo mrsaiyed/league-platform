@@ -50,6 +50,20 @@ export async function runBoxScoreAction(
           )
         : await reopenGame(context, { gameId, version, reason: fields['reason'] }, deps);
     if (reopened.ok) return { ok: true };
+    // The admin's door sent twice (a double tap on "Reopen to correct"): the first reopened
+    // it, the second is refused as changed or not decided. The game is already where this
+    // tap asked it to be, so carry on as if it had done it (step 2.154).
+    if (
+      (reopened.error.code === 'changed-since-read' ||
+        reopened.error.code === 'game-not-decided') &&
+      version !== undefined
+    ) {
+      const now = await getBoxScoreSheet(context, { gameId }, deps);
+      const status = now.ok ? now.value.game.status : '';
+      if (now.ok && now.value.game.version > version && ['scheduled', 'live'].includes(status)) {
+        return { ok: true };
+      }
+    }
     // The reopen form's one typed field is the reason, so input it refuses is the reason
     // missing or too long: say that, not the grid's message about numbers.
     const code = reopened.error.code === 'invalid-input' ? 'reopen-reason' : reopened.error.code;
