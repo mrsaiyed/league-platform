@@ -614,7 +614,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-242 | Each tap is saved once per game, in order, never changed; stat counts are whole numbers; a walk-up player is marked on their roster entry; imports keep what they made (rec. 030)              | Agreed (delegated) |         |
 | T-245 | Standings and totals are rebuilt per season by event handlers in the result's transaction, one at a time; totals hold every team's numbers (rec. 033)                                          | Agreed (delegated) |         |
 | T-246 | A fixtures file's text rides in its import's row only until the worker has read it, then is replaced by the report; an upload that is never read is discarded and the import failed (rec. 034) | Agreed (delegated) |         |
-| T-260 | One script makes a league: the owner's account ahead by email, claimed at first sign-in; league and first season by our staff in one transaction; a `city` column (rec. 057)                   | Agreed (delegated) |         |
+| T-260 | A script makes a league: owner's account ahead by email; league and first season by staff in one transaction, under the app's login; migration login for accounts only (rec. 057)              | Agreed (delegated) |         |
 
 ### [T4 — Keeping leagues apart, sign-in, security](technical/T4-tenancy-auth-security.md)
 
