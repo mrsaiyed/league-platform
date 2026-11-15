@@ -4,7 +4,7 @@
 // only; this page can never publish (T-120). Where the channel cannot be reached the page
 // simply shows what it was given.
 import { useEffect, useState } from 'react';
-import { GameCard, type GameCardLabels, type GameStatus } from '@srleagues/ui';
+import { GameCard, listRoom, type GameCardLabels, type GameStatus } from '@srleagues/ui';
 import type { GameView } from './build-schedule.ts';
 import { gameLinkText, type GameLinkWords } from './game-link-text.ts';
 import { pageLeagueScores } from './shared-league-scores.ts';
@@ -54,7 +54,7 @@ export function LiveGameList({
   readonly games: readonly GameView[];
   /** Compact cards, or scoreboards: one across in a column of their own, or two. */
   readonly layout?: 'rows' | 'board';
-  readonly across?: 'one' | 'two';
+  readonly across?: 'one' | 'two' | 'pair';
   /** The game being played now, picked out from the others. */
   readonly featured?: boolean;
   /** The quiet word on a game whose start has passed with no result: "Awaiting result". */
@@ -101,6 +101,10 @@ export function LiveGameList({
       });
     });
   }, [leagueId, games, watched, labels, announcement]);
+  const shown = games.map((raw) => applyUpdate(raw, updates[raw.id]));
+  // Every board of the list reckons with the same room, so the list is one shape: all
+  // side by side, or all as two rows (never one of each under the other).
+  const room = layout === 'board' ? listRoom(shown) : undefined;
   return (
     <>
       <p className="ui-visually-hidden" role="status" aria-live="polite">
@@ -111,8 +115,7 @@ export function LiveGameList({
         data-layout={layout === 'board' ? 'board' : undefined}
         data-across={layout === 'board' ? across : undefined}
       >
-        {games.map((raw) => {
-          const g = applyUpdate(raw, updates[raw.id]);
+        {shown.map((g) => {
           return (
             <li key={g.id}>
               <GameCard
@@ -127,6 +130,7 @@ export function LiveGameList({
                 labels={labels}
                 layout={layout}
                 featured={featured}
+                room={room}
                 {...(g.awaiting === true && awaitingLabel !== undefined
                   ? { note: awaitingLabel }
                   : {})}

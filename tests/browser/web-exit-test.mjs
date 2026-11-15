@@ -233,9 +233,15 @@ async function accessible(page, label) {
  * stands between the rows.
  */
 async function measureBoards(page) {
-  return page.evaluate(() =>
-    [...document.querySelectorAll('.ui-game-board')].map((board) => {
-      const rect = (el) => el.getBoundingClientRect();
+  return page.evaluate(() => {
+    const rect = (el) => el.getBoundingClientRect();
+    // The boards that are drawn: on a phone a list may put its later boards away.
+    const drawnBoards = [...document.querySelectorAll('.ui-game-board')].filter(
+      (board) => rect(board).width > 0,
+    );
+    // One shape for every board of a list: the place of each board's list among the lists.
+    const lists = [...new Set(drawnBoards.map((board) => board.closest('ul')))];
+    return drawnBoards.map((board) => {
       const drawn = (r) => r.width > 1 && r.height > 1;
       const box = rect(board);
       const sides = [...board.querySelectorAll('.ui-game-side')];
@@ -273,6 +279,9 @@ async function measureBoards(page) {
       });
       return {
         stacked,
+        list: lists.indexOf(board.closest('ul')),
+        // The card's own width: boards of one list in cards of one width are one shape.
+        card: Math.round(rect(board.closest('.ui-game-card')).width),
         split,
         fromTheStart:
           !stacked ||
@@ -307,8 +316,8 @@ async function measureBoards(page) {
           ? !drawn(middle) && own.every((el) => drawn(rect(el)))
           : drawn(middle) && own.every((el) => !drawn(rect(el))),
       };
-    }),
-  );
+    });
+  });
 }
 /**
  * Puts long made-up names on the page's first two boards, as a league might have: a name
@@ -319,12 +328,18 @@ async function plantLongNames(page) {
   await page.evaluate(() => {
     const boards = [...document.querySelectorAll('.ui-game-board')];
     for (const [board, text, letters] of [
-      [boards[0], 'The Northside Community Thunderbolts', '22'],
-      [boards[1], 'Trailblazerettes', '16'],
+      [boards[0], 'The Northside Community Thunderbolts', 22],
+      [boards[1], 'Trailblazerettes', 16],
     ]) {
       if (!board) continue;
       board.querySelector('.ui-game-team-name').textContent = text;
-      board.style.setProperty('--letters', letters);
+      // Every board of a list reckons with the room of the list's longest name (the page
+      // tells them so: packages/ui, listRoom), so the whole list is told the new one.
+      const list = board.closest('ul')?.querySelectorAll('.ui-game-board') ?? [board];
+      for (const each of list) {
+        const now = Number(each.style.getPropertyValue('--letters'));
+        each.style.setProperty('--letters', String(Math.max(now, letters)));
+      }
     }
   });
 }
@@ -354,6 +369,18 @@ async function checkHomeBoards(page, address, label) {
         `at ${width} every board of ${label}${planted ? ' with long names' : ''} is drawn one way or the other, and no name is split inside a word`,
         boards.length >= 3 && boards.every(sound),
         JSON.stringify(boards.filter((b) => !sound(b))),
+      );
+      // Every board of one list, in cards of one width, is the same shape: all side by
+      // side or all in two rows, never one of each under the other.
+      const shapes = new Map();
+      for (const b of boards) {
+        const key = `${b.list}:${b.card}`;
+        shapes.set(key, (shapes.get(key) ?? new Set()).add(b.stacked));
+      }
+      note(
+        `at ${width} each list of ${label}${planted ? ' with long names' : ''} is one shape`,
+        [...shapes.values()].every((seen) => seen.size === 1),
+        JSON.stringify(boards.map((b) => [b.list, b.card, b.stacked])),
       );
       if (planted && width === 320) {
         note(

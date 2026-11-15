@@ -583,6 +583,13 @@ html {
 .league-site .home-live-title {
   font-family: var(--font-body);
 }
+/* On a phone the home page shows the next two matchups and leaves the rest to "See the
+   full schedule", so a reader reaches the standings after a few boards, not seven. */
+@media (max-width: 47.99rem) {
+  .home-next .ui-card-grid > li:nth-child(n + 3) {
+    display: none;
+  }
+}
 /* Results and standings share a row on a laptop, each with half of it, so neither column
    is left empty beside the other. A league with three divisions or more has too many
    tables for half a row: its results and its tables each take the width, two across.

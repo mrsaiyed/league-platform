@@ -160,11 +160,21 @@ export const gameCss = String.raw`
   white-space: nowrap;
 }
 
-/* A quiet word where a state's pill would be: "Awaiting result". */
-.ui-game-state[data-kind='quiet'] {
+/* A quiet word where a state's pill would be: "Awaiting result". "Final" is as quiet: a
+   decided game says so by its score, and its pill is never the loudest mark on its card. */
+.ui-game-state[data-kind='quiet'],
+.ui-game-card[data-status='final'] .ui-game-state {
   border-color: var(--color-line);
   color: var(--color-muted);
   font-weight: 600;
+}
+/* A game that was put off, called off or forfeited wears a soft tint of the league's main
+   color (no more of it than every text is fitted to), its words and edge in the accent. */
+.ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit'])
+  .ui-game-state {
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  background: var(--color-tint);
+  color: var(--color-accent-text);
 }
 
 /* A game as a scoreboard: an emblem and a name on each side, the score or "VS" large
@@ -224,6 +234,13 @@ export const gameCss = String.raw`
 .ui-game-card[data-layout='board'] :is(.ui-game-number, .ui-game-when) {
   white-space: nowrap;
 }
+/* In a card as narrow as a phone's the pill always has a line of its own under the date,
+   so it stands in one place on every card of a list, whatever the date's length. */
+@container card (max-width: 21.99rem) {
+  .ui-game-card[data-layout='board'] .ui-game-about {
+    flex-basis: 100%;
+  }
+}
 /* The two teams sit side by side with what stands between them, or, when they cannot,
    one over the other. The board works out the width they need side by side: each side
    has room for the longer of the two names (the card counts its letters, a name of
@@ -257,10 +274,17 @@ export const gameCss = String.raw`
   justify-content: center;
   /* Between the two rows, and (the same step --board-gap names) between the sides. */
   gap: var(--step-2) var(--step-3);
+  /* In a card with a whole row to itself the two teams are kept within reach of each
+     other, in the middle of the card. */
+  inline-size: 100%;
+  max-inline-size: 40rem;
+  margin-inline: auto;
   padding-block: var(--step-5);
   container: board / inline-size;
 }
-.ui-game-board[data-scored='true'] {
+/* The middle holds a score's figures in a board that has a score, and in every board of a
+   list where any has one (the list says so), so the boards of one list are drawn alike. */
+.ui-game-board:is([data-scored='true'], [data-room='scored']) {
   --board-middle: calc(var(--figures, 4) * 0.65 * var(--board-figure) + var(--step-5));
 }
 /* A side takes the whole row when the board is short of room, and shares what the middle
@@ -484,6 +508,35 @@ export const gameCss = String.raw`
     gap: var(--step-5);
   }
   .ui-card-grid[data-layout='board'][data-across='two'] > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+/* A list in a column narrower than the page (a team's games beside its roster): two
+   across from a tablet up, and a board left over takes the row. */
+@media (min-width: 48rem) {
+  .ui-card-grid[data-layout='board'][data-across='pair'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--step-5);
+  }
+  .ui-card-grid[data-layout='board'][data-across='pair'] > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+/* On a laptop a board left over is not stretched across the page: an odd number of boards
+   ends with three in a row, each a third of it (three boards are one row of three, five
+   are two and three). Only a board that is the whole list has the row to itself. */
+@media (min-width: 64rem) {
+  .ui-card-grid[data-layout='board'][data-across='two'] {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .ui-card-grid[data-layout='board'][data-across='two'] > li {
+    grid-column: span 3;
+  }
+  .ui-card-grid[data-layout='board'][data-across='two'] > li:nth-last-child(3):nth-child(odd),
+  .ui-card-grid[data-layout='board'][data-across='two'] > li:nth-last-child(3):nth-child(odd) ~ li {
+    grid-column: span 2;
+  }
+  .ui-card-grid[data-layout='board'][data-across='two'] > li:only-child {
     grid-column: 1 / -1;
   }
 }

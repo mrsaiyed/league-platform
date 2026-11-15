@@ -160,7 +160,11 @@ export async function HomePage({
             kicker={t('home.upcoming.kicker')}
             more={{ href: scheduleHref, label: t('home.fullSchedule') }}
           >
-            <GameList leagueId={addressee.id} games={next} layout="board" across="two" />
+            {/* On a phone only the first two are drawn, with the way to the full schedule
+                over them, so the standings are reached sooner (the stylesheet). */}
+            <div className="home-next">
+              <GameList leagueId={addressee.id} games={next} layout="board" across="two" />
+            </div>
           </Section>
         )}
         <div className="home-pair" data-tables={manyTables ? 'many' : 'few'}>

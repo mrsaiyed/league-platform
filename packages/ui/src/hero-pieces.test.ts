@@ -17,6 +17,7 @@ import {
   displayCss,
   initialOf,
   lettersWide,
+  listRoom,
   nameMeasure,
   titleLines,
 } from '../index.ts';
@@ -487,7 +488,7 @@ describe('a game as a scoreboard', () => {
       /\.ui-game-board \{[^}]*--board-name: var\(--text-18\);\s*--board-side: calc\(var\(--letters, 8\) \* var\(--heading-letter, 0\.6\) \* var\(--board-name\)\);[^}]*--board-needs: calc\(2 \* var\(--board-side\) \+ var\(--board-middle\) \+ 2 \* var\(--board-gap\)\);\s*--board-short: calc\(\(var\(--board-needs\) - 100cqi\) \* 999\);\s*--board-room: calc\(\(100cqi - var\(--board-needs\)\) \* 999\);[^}]*flex-wrap: wrap;[^}]*container: board \/ inline-size;/,
     );
     expect(css).toMatch(
-      /\.ui-game-board\[data-scored='true'\] \{\s*--board-middle: calc\(var\(--figures, 4\) \* 0\.65 \* var\(--board-figure\) \+ var\(--step-5\)\);/,
+      /\.ui-game-board:is\(\[data-scored='true'\], \[data-room='scored'\]\) \{\s*--board-middle: calc\(var\(--figures, 4\) \* 0\.65 \* var\(--board-figure\) \+ var\(--step-5\)\);/,
     );
     // Narrower than that, each team takes a row of its own; wide enough, the sides share
     // what the middle leaves.
@@ -567,6 +568,82 @@ describe('a game as a scoreboard', () => {
     );
     expect(css).toMatch(
       /\.ui-card-grid\[data-layout='board'\] \{\s*grid-template-columns: minmax\(0, 1fr\);/,
+    );
+  });
+
+  it('on a laptop ends an odd list with three boards in a row, never one stretched across the page', () => {
+    const laptop = css.slice(
+      css.indexOf("@media (min-width: 64rem) {\n  .ui-card-grid[data-layout='board']"),
+    );
+    expect(laptop.startsWith('@media')).toBe(true);
+    const grid = String.raw`\.ui-card-grid\[data-layout='board'\]\[data-across='two'\]`;
+    // Six narrow columns: a board of a pair takes three, a board of the last three two.
+    expect(laptop).toMatch(
+      new RegExp(String.raw`${grid} \{\s*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);`),
+    );
+    expect(laptop).toMatch(new RegExp(String.raw`${grid} > li \{\s*grid-column: span 3;`));
+    expect(laptop).toMatch(
+      new RegExp(
+        String.raw`${grid} > li:nth-last-child\(3\):nth-child\(odd\),\s*${grid} > li:nth-last-child\(3\):nth-child\(odd\) ~ li \{\s*grid-column: span 2;`,
+      ),
+    );
+    // Only a board that is the whole list has the row to itself, and there its two teams
+    // are kept within reach of each other in the middle of the card.
+    expect(laptop).toMatch(
+      new RegExp(String.raw`${grid} > li:only-child \{\s*grid-column: 1 \/ -1;`),
+    );
+    expect(css).toMatch(
+      /\.ui-game-board \{[^}]*inline-size: 100%;\s*max-inline-size: 40rem;\s*margin-inline: auto;/,
+    );
+  });
+
+  it('draws every board of a list the same way: the list tells each the room all of them need', () => {
+    const games = [
+      {
+        status: 'final' as const,
+        home: { name: 'Owls', score: 101 },
+        away: { name: 'Hawks', score: 98 },
+      },
+      {
+        status: 'scheduled' as const,
+        home: { name: 'North Side Hawks', score: null },
+        away: { name: 'Owls', score: null },
+      },
+    ];
+    // The longest name of the list (its better break is 10 letters), the longest score.
+    expect(listRoom(games)).toEqual({ letters: 10, figures: 5 });
+    expect(listRoom(games.slice(1))).toEqual({ letters: 10 });
+    expect(listRoom([])).toEqual({ letters: 0 });
+    // A board with no score of its own still reckons with the list's score, and says so.
+    expect(board({ status: 'scheduled', room: { letters: 10, figures: 5 } })).toContain(
+      '<div class="ui-game-board" data-room="scored" style="--letters:10;--figures:5">',
+    );
+    expect(board({ room: { letters: 10, figures: 5 } })).toContain(
+      '<div class="ui-game-board" data-scored="true" style="--letters:10;--figures:5">',
+    );
+    // In a list with no score anywhere, a board reckons with "VS" alone.
+    expect(board({ status: 'scheduled', room: { letters: 10 } })).toContain(
+      '<div class="ui-game-board" style="--letters:10">',
+    );
+    expect(css).toMatch(
+      /\.ui-game-board:is\(\[data-scored='true'\], \[data-room='scored'\]\) \{\s*--board-middle: calc\(var\(--figures, 4\) \* 0\.65 \* var\(--board-figure\) \+ var\(--step-5\)\);/,
+    );
+  });
+
+  it('keeps a state’s pill quiet or soft, and in one place on a phone', () => {
+    const flat = css.replace(/\s+/g, ' ');
+    // "Final" is as quiet as "Awaiting result".
+    expect(flat).toContain(
+      ".ui-game-state[data-kind='quiet'], .ui-game-card[data-status='final'] .ui-game-state { border-color: var(--color-line); color: var(--color-muted); font-weight: 600; }",
+    );
+    // Put off, called off, forfeited: a soft tint of the main color, no stronger than the
+    // tint every text is fitted to, with the accent for its words and its edge.
+    expect(flat).toContain(
+      ".ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit']) .ui-game-state { border-color: color-mix(in srgb, var(--color-accent) 35%, transparent); background: var(--color-tint); color: var(--color-accent-text); }",
+    );
+    // In a card as narrow as a phone's the pill always has its own line under the date.
+    expect(css).toMatch(
+      /@container card \(max-width: 21\.99rem\) \{\s*\.ui-game-card\[data-layout='board'\] \.ui-game-about \{\s*flex-basis: 100%;/,
     );
   });
 
