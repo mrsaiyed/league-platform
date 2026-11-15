@@ -15,7 +15,7 @@
 // - The archived league has 300 past games: Games still opens quickly and small, offering
 //   its thirty rounds and drawing one round's ten games at a time.
 // - In the league that scores assigned games only, a scorekeeper sees under "Needs a
-//   result" only games they may score, while its admin sees the game under way.
+//   result" only their one assigned past game, while its admin sees the game under way.
 // - Accessibility checks (T-186) and no sideways scrolling at phone width (A-2).
 import {
   accessibilityProblems,
@@ -46,6 +46,8 @@ const threeWeeksAgo = '01900000-0000-7000-8000-0000b20032c8'; // Herons at Falco
 const fallRoundOne = 'r-01900000-0000-7000-8000-0000b2000001';
 const historyRoundTen = 'r-01900000-0000-7000-8000-0000b600000a';
 const liveGame = '01900000-0000-7000-8000-006a00000002'; // Bears at Hawks, under way
+// The draft league's game two days ago with no score, assigned to its scorekeeper.
+const draftUnscored = '01900000-0000-7000-8000-0000b20003e8'; // Bears at Hawks
 const phone = { width: 390, height: 844 };
 
 let built = true;
@@ -279,8 +281,8 @@ if (browser) {
   });
 
   await step('a scorekeeper sees only the games they may score', async () => {
-    // The draft league scores assigned games only; its scorekeeper is given game 4 only
-    // (in two days), and its admin the game under way.
+    // The draft league scores assigned games only; its scorekeeper is given game 4 (in two
+    // days) and the game two days ago nobody scored, and its admin the game under way.
     const keeper = await signedInAs('local-scorekeeper-token');
     try {
       const { page } = keeper;
@@ -293,8 +295,8 @@ if (browser) {
       await page.getByRole('heading', { level: 1, name: 'Games' }).waitFor();
       const theirs = await idsIn(part(page, 'Needs a result'));
       note(
-        'the scorekeeper\'s "Needs a result" has no game they may not score',
-        !theirs.includes(liveGame),
+        'the scorekeeper\'s "Needs a result" is their one assigned past game, and no other',
+        theirs.length === 1 && theirs[0] === draftUnscored,
         theirs.join(' '),
       );
       await accessible(page, "a scorekeeper's Games");

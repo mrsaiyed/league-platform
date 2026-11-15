@@ -13,7 +13,8 @@
 // (Pia), and a player asked for their name not to be shown. The youth league: one season
 // ranked by points, named rounds, a make-up game with no round and no time yet, and its
 // members start on their team's page (a setting, as League settings saves it). The draft
-// league has the adult league's tracked games, scored by assigned scorekeepers only. The
+// league has the adult league's tracked games, scored by assigned scorekeepers only, and a
+// game two days ago whose score nobody entered, assigned to its scorekeeper. The
 // archived league has one long season behind it, 300 games all played, and no current
 // season (step 2.156: a league with many past games still opens quickly). The adult
 // league also has a game played three days ago whose score was never entered.
@@ -858,9 +859,28 @@ const draftLeagueSeason = (programId: string): SeasonSpec => {
         court: null,
         number: null,
       },
+      // Played two days ago, its score never entered, and assigned to the league's
+      // scorekeeper: the one game under their "Needs a result" (step 2.156).
+      draftUnscoredGame(),
     ],
   };
 };
+
+/** The draft league's game nobody scored, two days ago (step 2.156). */
+const draftUnscoredGameId = listedGameId(1, 0);
+const draftUnscoredGame = (): GameSpec => ({
+  id: draftUnscoredGameId,
+  round: null,
+  day: -2,
+  time: '19:00',
+  home: hawks,
+  away: bears,
+  status: 'scheduled',
+  capture: 'final',
+  venue: pines,
+  court: court(21),
+  number: null,
+});
 
 /** The archived league's one long season: twenty teams, thirty weekly rounds, all played. */
 const historyTeamNames = [
@@ -1311,6 +1331,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
     { gameId: standInGameId(1), accountId: draftFirst },
     { gameId: standInGameId(2), accountId: draftFirst },
     { gameId: standInGameId(4), accountId: draftSecond },
+    { gameId: draftUnscoredGameId, accountId: draftSecond },
   ];
 
   // The archived league's season is over: it has no current season, so no round today.
