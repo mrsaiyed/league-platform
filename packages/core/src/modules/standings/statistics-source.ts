@@ -3,6 +3,7 @@
 // before anything is ranked, so a rank, a gap in ranks or a count can never show that a
 // hidden player exists. Names come only through the one name function (T-81).
 import { seasonTotals, type CaptureMode, type StatsGame } from '@srleagues/sports';
+import { boxScoreColumns, rulesOfGame } from '../games/index.ts';
 import type { Audience } from '../leagues/index.ts';
 import {
   showName,
@@ -142,6 +143,17 @@ async function recompute(
   }));
 }
 
+/**
+ * The statistics a season's rules keep ("Statistics kept", P7 §1): the columns the box
+ * score grid asks for, its rules read as the games module reads them (rules that cannot
+ * be read, or none saved, are the starting set), so the page shows what was asked for. A
+ * season that names its statistics itself keeps those; one that names none (no command
+ * writes the list, record 070) keeps its rules' set.
+ */
+function keptByRules(rules: unknown): readonly string[] {
+  return boxScoreColumns(rulesOfGame(null, rules).statistics).statKeys;
+}
+
 /** Undefined when the season is not in this league. */
 export async function statisticsSource(
   store: StandingsReadStore,
@@ -149,8 +161,9 @@ export async function statisticsSource(
   viewing: StatisticsViewing,
 ): Promise<StatisticsSource | undefined> {
   const season = await store.findSeason(seasonId);
-  const keys = season === undefined ? undefined : await store.seasonStatKeys(season.id);
-  if (season === undefined || keys === undefined) return undefined;
+  const named = season === undefined ? undefined : await store.seasonStatKeys(season.id);
+  if (season === undefined || named === undefined) return undefined;
+  const keys = named.length > 0 ? named : keptByRules(season.rules);
   const [teams, totals, links, teamTotalRows] = await Promise.all([
     store.teams(season.id),
     store.playerTotals(season.id),
