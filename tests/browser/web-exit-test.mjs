@@ -738,6 +738,47 @@ if (browser) {
         );
         note('a long team name wraps whole, with nothing cut off', measured.whole);
         note('a long team name does not make the page scroll sideways', !measured.pageScrolls);
+        // The sign that a table goes on (the fade and the arrow at its far edge) is there
+        // only while columns are out of sight; and the column that stays put shows its
+        // edge only while the table is scrolled under it.
+        const signs = [];
+        for (const address of ['/harbor-city/standings', '/harbor-city/stats']) {
+          await open(page, address);
+          await page.waitForTimeout(200);
+          signs.push(
+            ...(await page.evaluate(async () => {
+              const seen = [];
+              const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+              for (const box of document.querySelectorAll('.ui-table-frame')) {
+                const wrap = box.querySelector('.ui-table-wrap');
+                const cell = box.querySelector('tbody .ui-team-cell');
+                const edge = () => (cell ? getComputedStyle(cell, '::after').opacity : null);
+                const goesOn = wrap.scrollWidth > wrap.clientWidth + 1;
+                const sign = getComputedStyle(box, '::before').opacity;
+                const edgeAtRest = edge();
+                wrap.scrollLeft = wrap.scrollWidth;
+                await frame();
+                await frame();
+                seen.push({ goesOn, sign, edgeAtRest, edgeScrolled: edge() });
+              }
+              return seen;
+            })),
+          );
+        }
+        note(
+          'the sign that a table goes on shows only while columns are out of sight',
+          signs.some((s) => s.goesOn) &&
+            signs.some((s) => !s.goesOn) &&
+            signs.every((s) => (s.goesOn ? s.sign === '1' : s.sign === '0')),
+          JSON.stringify(signs),
+        );
+        note(
+          'the column that stays put shows its edge only while the table is scrolled under it',
+          signs.every((s) => s.edgeAtRest === '0') &&
+            signs.filter((s) => s.goesOn).every((s) => s.edgeScrolled === '1') &&
+            signs.filter((s) => !s.goesOn).every((s) => s.edgeScrolled === '0'),
+          JSON.stringify(signs),
+        );
         // A heading's sort button, reached backwards by the keyboard, is scrolled clear of the
         // column that stays put, and its ring is drawn inside it.
         await open(page, '/north-valley/stats');

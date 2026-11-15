@@ -495,6 +495,13 @@ describe('tables', () => {
     );
     expect(hidden).toContain('<tfoot><tr><th scope="row" class="ui-team-cell">Total</th>');
   });
+  it('fade the far edge lightly: a column wholly in view under it keeps its digits', () => {
+    // Narrow, and reaching the panel's color only at the very edge: never a solid band.
+    expect(displayCss).toMatch(
+      /\.ui-table-frame::before \{[^}]*inline-size: var\(--step-5\);[^}]*linear-gradient\(to right, transparent, var\(--color-panel\)\);/,
+    );
+    expect(displayCss).not.toMatch(/transparent, var\(--color-panel\) \d+%\)/);
+  });
   it('never put the scroll arrow on a column heading: a table with no name in view gets a band for it', () => {
     expect(displayCss).toMatch(
       /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \{\s*--ui-table-arrow: var\(--step-1\);/,

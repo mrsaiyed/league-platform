@@ -68,36 +68,38 @@ export const tableCss = String.raw`
     animation: ui-table-more linear both;
     animation-timeline: --ui-table-scroll;
   }
-  /* The fade, with a clear patch behind the arrow so no heading shows through it. */
+  /* The fade, with a clear patch behind the arrow so no heading shows through it. It is
+     narrow and reaches the panel's color only at the very edge: a column that is wholly in
+     view under it keeps every digit readable, and only what runs off the edge is lost. */
   .ui-table-frame::before {
     inset-block: 0;
     inset-inline-end: 0;
-    inline-size: var(--step-6);
+    inline-size: var(--step-5);
     border-start-end-radius: inherit;
     border-end-end-radius: inherit;
     background:
       radial-gradient(
         circle at 50% calc(var(--ui-table-arrow) + var(--step-1)),
-        var(--color-panel) var(--step-3),
-        transparent var(--step-4)
+        var(--color-panel) var(--step-2),
+        transparent var(--step-3)
       ),
-      linear-gradient(to right, transparent, var(--color-panel) 75%);
+      linear-gradient(to right, transparent, var(--color-panel));
   }
   [dir='rtl'] .ui-table-frame::before {
     background:
       radial-gradient(
         circle at 50% calc(var(--ui-table-arrow) + var(--step-1)),
-        var(--color-panel) var(--step-3),
-        transparent var(--step-4)
+        var(--color-panel) var(--step-2),
+        transparent var(--step-3)
       ),
-      linear-gradient(to left, transparent, var(--color-panel) 75%);
+      linear-gradient(to left, transparent, var(--color-panel));
   }
   .ui-table-frame:has(caption.ui-visually-hidden)::after {
     inset-block-start: var(--step-1);
   }
   .ui-table-frame::after {
     inset-block-start: var(--step-4);
-    inset-inline-end: var(--step-3);
+    inset-inline-end: var(--step-2);
     inline-size: var(--step-2);
     block-size: var(--step-2);
     border-block-end: 2px solid var(--color-text);
