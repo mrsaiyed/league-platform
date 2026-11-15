@@ -29,7 +29,19 @@ jobs:
       - run: npm run test:varsity:browser
       - run: npm run test:stats:browser
       - run: npm run test:pages:browser
-      - run: npm run test:web:browser
+      # As for verify: the output also goes to a file, so the next step can say what failed.
+      # npm runs the chain in bash with its trace on, so bash prints "+ node tests/browser/…"
+      # before each test starts, and the notes can name the test that stopped (step 2.178).
+      - name: npm run test:web:browser
+        id: web-browser
+        shell: bash
+        run: |
+          set -o pipefail
+          env SHELLOPTS=xtrace npm_config_script_shell=bash npm run test:web:browser 2>&1 | tee "$RUNNER_TEMP/web-browser-output.txt"
+      - name: Say what failed in the browser tests
+        if: failure() && steps.web-browser.outcome == 'failure'
+        shell: bash
+        run: node scripts/browser-failure-notes.mjs "$RUNNER_TEMP/web-browser-output.txt"
   hosted-build:
     runs-on: ubuntu-latest
     steps:

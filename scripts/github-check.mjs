@@ -15,7 +15,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { describe, failureNoteLines, newestChecks } from './github-check-rules.mjs';
+import {
+  describe,
+  failedStepWords,
+  failureNoteLines,
+  newestChecks,
+} from './github-check-rules.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wanted = process.argv[2] ?? '';
@@ -99,9 +104,11 @@ if (check && check.state === 'failed') {
     for (const job of jobs.filter((one) => one.conclusion !== 'success')) {
       const steps = (job.steps ?? [])
         .filter((step) => step.conclusion !== 'success' && step.conclusion !== 'skipped')
-        .map((step) => step.name.replace(/^Run /, ''));
+        .map(failedStepWords);
       console.log(`  Failed step: ${steps.join(', ') || job.name}`);
-      const lines = failureNoteLines(await ask(`${api}/check-runs/${job.id}/annotations`));
+      // GitHub lists a job's annotations newest first; the notes read in the order written.
+      const notes = await ask(`${api}/check-runs/${job.id}/annotations`);
+      const lines = failureNoteLines(Array.isArray(notes) ? [...notes].reverse() : notes);
       for (const line of lines) console.log(line);
       if (lines.length === 0) {
         console.log(
