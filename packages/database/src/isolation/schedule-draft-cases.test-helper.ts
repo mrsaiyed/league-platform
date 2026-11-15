@@ -4,6 +4,7 @@
 // draft on it at version 1, so each edit names those as its basis.
 import {
   addDraftGame,
+  addDraftRound,
   changeDraftRoundDate,
   discardScheduleDraft,
   getScheduleDraft,
@@ -11,6 +12,7 @@ import {
   previewSchedulePublish,
   publishSchedule,
   removeDraftGame,
+  removeDraftRound,
   renameDraftRound,
   setDraftRecording,
   swapDraftGames,
@@ -34,6 +36,9 @@ import {
   updatePublishedGame,
   updateRound,
   updateScheduleDraft,
+  insertRounds,
+  deleteRounds,
+  listGamesInRounds,
 } from '../queries/index.ts';
 import { harnessTx, registerCommandCase, runAsApp } from './command-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
@@ -176,6 +181,22 @@ registerCommandCase(changeDraftRoundDate, harnessTx, {
   input: (target) => ({ ...basis(target), roundId: target.roundId, date: '2026-12-07' }),
 });
 
+// Step 2.160: a round added to the draft, and the target's empty round removed from it.
+registerCommandCase(addDraftRound, harnessTx, {
+  name: "add a round to the target's season's draft",
+  input: (target) => ({
+    ...basis(target),
+    roundId: '01900000-0000-7000-8000-0000000b0160',
+    label: 'Week 9',
+    date: '2026-12-27',
+  }),
+});
+
+registerCommandCase(removeDraftRound, harnessTx, {
+  name: "remove the target's empty round from its draft",
+  input: (target) => ({ ...basis(target), roundId: target.emptyRoundId }),
+});
+
 registerCommandCase(setDraftRecording, harnessTx, {
   name: "set how the target's upcoming game is recorded in its draft",
   input: (target) => ({ ...basis(target), gameId: target.upcomingGameId, recording: 'live' }),
@@ -263,6 +284,28 @@ registerIsolationCase({
   name: "rename the target's round",
   run: (scope, target) =>
     updateRound(scope, target.seasonId, target.roundId, { label: 'Opening night' }),
+});
+
+registerIsolationCase({
+  subject: insertRounds,
+  name: "add a round to the target's season",
+  run: (scope, target) =>
+    insertRounds(scope, target.seasonId, [
+      { id: randomUUID(), number: 9, label: 'Week 9', date: '2026-12-27' },
+    ]),
+});
+
+registerIsolationCase({
+  subject: deleteRounds,
+  name: "remove the target's empty round and its round with games",
+  run: (scope, target) =>
+    deleteRounds(scope, target.seasonId, [target.emptyRoundId, target.roundId]),
+});
+
+registerIsolationCase({
+  subject: listGamesInRounds,
+  name: "list the games in the target's round",
+  run: (scope, target) => listGamesInRounds(scope, target.seasonId, [target.roundId]),
 });
 
 registerIsolationCase({

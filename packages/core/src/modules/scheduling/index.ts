@@ -7,6 +7,7 @@ export type {
   Clash,
   DraftChange,
   GameRecording,
+  PlannedRound,
   ScheduleGame,
   ScheduleRound,
   ScheduleSlot,
@@ -49,6 +50,10 @@ export type {
   TeamUnavailableDate,
 } from './rules/pairing-types.ts';
 export { addDraftGame, type AddDraftGameError } from './commands/add-draft-game.ts';
+export { addDraftRound, type AddDraftRoundError } from './commands/add-draft-round.ts';
+export { removeDraftRound, type RemoveDraftRoundError } from './commands/remove-draft-round.ts';
+export { maxRounds, roundYears } from './rules/apply-change.ts';
+export { mayAtSeason, mayListSeason } from './policy.ts';
 export {
   changeDraftRoundDate,
   type ChangeDraftRoundDateError,
@@ -108,6 +113,8 @@ export {
 export type { PublishBlocker } from './publish-plan.ts';
 export type {
   GameFacts,
+  GameInRound,
+  NewRound,
   NewPublishedGame,
   NewScheduleRevision,
   PublishedGameChange,

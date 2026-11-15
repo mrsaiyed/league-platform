@@ -9,7 +9,7 @@ import type {
   SeasonCourt,
   StrictRule,
 } from './placement-types.ts';
-import type { ScheduleGame, ScheduleRound } from './schedule-types.ts';
+import type { PlannedRound, ScheduleGame } from './schedule-types.ts';
 import { seededOrder } from './seeded-order.ts';
 import { dayNumber, maxSeasonDays, seasonWeeks, type SeasonWeek } from './season-weeks.ts';
 
@@ -143,9 +143,9 @@ export function placeSchedule(input: PlacementInput): PlacementResult {
   const lockedRoundIds = new Set(locked.flatMap((g) => (g.roundId === null ? [] : [g.roundId])));
   const roundId = nextId('round', new Set(current.rounds.map((r) => r.id)));
   const newRoundIds = new Map<number, string>(); // week → id, kept across the clean-up passes
-  const build = (alive: readonly Placed[]): { rounds: ScheduleRound[]; games: ScheduleGame[] } => {
+  const build = (alive: readonly Placed[]): { rounds: PlannedRound[]; games: ScheduleGame[] } => {
     const weeksUsed = [...new Set(alive.map((p) => p.week))].sort((a, b) => a - b);
-    const keptRounds = new Map<string, ScheduleRound>();
+    const keptRounds = new Map<string, PlannedRound>();
     for (const r of current.rounds) if (lockedRoundIds.has(r.id)) keptRounds.set(r.id, r);
     const fresh: { id: string; date: string }[] = [];
     const roundOfWeek = new Map<number, string>();
@@ -218,7 +218,7 @@ export function placeSchedule(input: PlacementInput): PlacementResult {
     return { rounds, games };
   };
 
-  const reportOf = (schedule: { rounds: ScheduleRound[]; games: ScheduleGame[] }) =>
+  const reportOf = (schedule: { rounds: PlannedRound[]; games: ScheduleGame[] }) =>
     fairnessReport({
       teams: input.teams,
       rounds: schedule.rounds,

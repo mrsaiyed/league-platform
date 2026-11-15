@@ -31,10 +31,25 @@ const isTime = (v: string): boolean => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 
 const fail = (error: ChangeError): ApplyChangeResult => ({ ok: false, error });
 
+/** The highest number a round can have: the database numbers a season's rounds 1 to 1000. */
+export const maxRounds = 1000;
+
+/** The years a round's date may fall in: what the database takes (rounds_date_plausible). */
+export const roundYears = { first: 1900, last: 2999 } as const;
+
+const badRoundDate = (date: string): ApplyChangeResult | undefined => {
+  if (!isDate(date)) return fail({ code: 'invalid-date', value: date });
+  const year = Number(date.slice(0, 4));
+  return year < roundYears.first || year > roundYears.last
+    ? fail({ code: 'date-out-of-range', value: date })
+    : undefined;
+};
+
 /**
  * Applies one draft change to a schedule (P7 §4.3) and returns the new schedule with the
  * clashes that involve the games the change touched, flagged at once. The input is never
  * changed. Changing a round's date moves the games of that round that were on its old date.
+ * A round is added after the others and removed only while no game is in it (step 2.160).
  */
 export function applyDraftChange(
   state: ScheduleState,
@@ -112,7 +127,8 @@ export function applyDraftChange(
     case 'change-round-date': {
       const round = state.rounds.find((r) => r.id === change.roundId);
       if (!round) return fail({ code: 'unknown-round', roundId: change.roundId });
-      if (!isDate(change.date)) return fail({ code: 'invalid-date', value: change.date });
+      const bad = badRoundDate(change.date);
+      if (bad) return bad;
       const touched: string[] = [];
       const games = state.games.map((g) => {
         if (g.roundId !== round.id || g.date !== round.date) return g;
@@ -120,7 +136,41 @@ export function applyDraftChange(
         return { ...g, date: change.date };
       });
       const rounds = state.rounds.map((r) => (r.id === round.id ? { ...r, date: change.date } : r));
-      return done({ rounds, games }, touched);
+      return done({ ...state, rounds, games }, touched);
+    }
+    case 'add-round': {
+      const round = change.round;
+      const removed = state.removedRounds ?? [];
+      // A round the draft removed keeps its id and number until publishing ends: neither is
+      // given to a new round in the meantime (a number freed by a publication can be, see
+      // ScheduleRound.number).
+      if (hasRound(round.id) || removed.some((r) => r.id === round.id)) {
+        return fail({ code: 'round-exists', roundId: round.id });
+      }
+      const number = Math.max(0, ...[...state.rounds, ...removed].map((r) => r.number)) + 1;
+      if (number > maxRounds) return fail({ code: 'too-many-rounds', roundId: round.id });
+      const label = round.label.trim();
+      if (label === '') return fail({ code: 'empty-round-label', roundId: round.id });
+      if (round.date !== null) {
+        const bad = badRoundDate(round.date);
+        if (bad) return bad;
+      }
+      return done({ ...state, rounds: [...state.rounds, { ...round, number, label }] }, []);
+    }
+    case 'remove-round': {
+      const round = state.rounds.find((r) => r.id === change.roundId);
+      if (!round) return fail({ code: 'unknown-round', roundId: change.roundId });
+      if (state.games.some((g) => g.roundId === change.roundId)) {
+        return fail({ code: 'round-has-games', roundId: change.roundId });
+      }
+      return done(
+        {
+          ...state,
+          rounds: state.rounds.filter((r) => r.id !== change.roundId),
+          removedRounds: [...(state.removedRounds ?? []), round],
+        },
+        [],
+      );
     }
   }
 }

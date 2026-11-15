@@ -206,6 +206,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     games: notMovedYet('games area'),
     fixtureImport: notMovedYet('fixture import'),
     publicSchedule: databasePublicSchedule(database, db, now),
+    // When moved (step 2.93), its seasonsOf lists only what mayListSeason allows the holder.
     scheduleAdmin: notMovedYet('schedule grid'),
     publicTeams: databasePublicTeams(database, db),
     adminTeams: notMovedYet('Admin → Teams'),
