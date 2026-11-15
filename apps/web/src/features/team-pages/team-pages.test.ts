@@ -2,6 +2,9 @@
 // stand-in leagues: records and seeds, rosters through the one name function, statistics
 // following each team's setting, and who lands where.
 import { publicViewer, type AccessHolder } from '@srleagues/core';
+import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
@@ -15,6 +18,7 @@ import {
   loadTeamStats,
 } from './build-team.ts';
 import { chooseMyTeam, leagueHomeStayUrl, teamIdsFromGrants } from './start-page.ts';
+import { TeamCards } from './teams-page.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
@@ -52,12 +56,76 @@ describe('the teams list', () => {
   });
 });
 
+describe('the team cards', () => {
+  const card = (slug: string, divisionName: string | null) => ({
+    slug,
+    name: slug,
+    color: null,
+    href: `/x/teams/${slug}`,
+    seedText: '1',
+    recordText: '1-0',
+    divisionName,
+  });
+  const html = (cards: Parameters<typeof TeamCards>[0]['cards']) =>
+    renderToStaticMarkup(createElement(TeamCards, { cards }));
+
+  it('say nothing about divisions in a league that has none', () => {
+    const text = html([card('comets', null), card('rockets', null)]);
+    expect(text).not.toContain('Division');
+    expect(text).not.toContain('No division');
+    expect(text).toContain('Seed');
+  });
+
+  it('say which team has no division in a league that has them', () => {
+    const text = html([card('owls', 'East'), card('strays', null)]);
+    expect(text.match(/<dt>Division<\/dt>/g)).toHaveLength(2);
+    expect(text).toContain('East');
+    expect(text).toContain('No division');
+  });
+
+  it('are headed at level two: the page has its title, then its teams, with no level skipped', () => {
+    const text = html([card('owls', 'East'), card('strays', null)]);
+    expect(text.match(/<h2 class="ui-team-card-name">/g)).toHaveLength(2);
+    expect(text).not.toMatch(/<h[3-6]/);
+  });
+
+  it("a team's page puts its games before its roster, in the page and on the screen", () => {
+    const page = readFileSync(new URL('./team-page.tsx', import.meta.url), 'utf8');
+    expect(page.indexOf('className="team-games"')).toBeGreaterThan(-1);
+    expect(page.indexOf('className="team-games"')).toBeLessThan(
+      page.indexOf('className="team-roster"'),
+    );
+    // The stylesheet places nothing against that order: the keyboard goes as the eye does.
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).not.toMatch(/\.team-(games|roster)\b[^{]*\{[^}]*(grid-(row|column)|order):/);
+    expect(css).not.toMatch(/(^|[\s;{])order:\s*-/m);
+  });
+
+  it('the stand-in league without divisions has none on its cards', async () => {
+    const s = await season(youth);
+    const cards = await loadTeamCards(
+      stats.readStoreOf(youth),
+      { id: youth, slug: 'harbor-city', customDomain: null } as never,
+      s,
+      s.isCurrent,
+    );
+    expect(cards?.length).toBeGreaterThan(0);
+    expect(html(cards ?? [])).not.toContain('Division');
+  });
+});
+
 describe('a team page', () => {
   it('has the team, its record and its roster with those who left apart', async () => {
     const s = await season(adult);
     const head = await loadTeamHead(stats.readStoreOf(adult), adult, s.id, 'falcons');
     expect(head?.team.name).toBe('Falcons');
     expect(head?.seedText).toBe('Seed 2');
+    // The seed alone, for the row of facts under the team's name.
+    expect(head?.seedValue).toBe('2');
+    expect(head?.team.divisionName).toBe('East');
     expect(head?.recordText).toBe('5-1');
     const roster = buildRoster(
       await teams.rosterOf(adult, head?.teamId ?? '', {
@@ -107,6 +175,11 @@ describe('a team page', () => {
     expect(hidden?.playerLinesShown).toBe(false);
     expect(hidden?.playerRows).toEqual([]);
     expect(hidden?.totalsRows).toHaveLength(1);
+    // The totals row names the team under a plain "Team" heading, with the team's own color.
+    expect(hidden?.totalsColumns[0]?.label).toBe('Team');
+    expect(hidden?.totalsRows[0]?.cells['team']).toBe('Owls');
+    expect(hidden?.totalsRows[0]?.chips?.['team']).toBe(owls?.team.color);
+    expect(owls?.team.color).toMatch(/^#[0-9a-f]{6}$/i);
     expect(JSON.stringify(hidden)).not.toContain('Castellanos');
     const falcons = await loadTeamHead(store, adult, s.id, 'falcons');
     const shown = await loadTeamStats(store, settings, {
@@ -133,6 +206,54 @@ describe('a team page', () => {
       upcoming: [],
       results: [],
     });
+  });
+
+  it('lists a team its postponed game last, never first on the strength of its old date', async () => {
+    const s = await season(adult);
+    const clock = await schedules.clockOf(adult);
+    const schedule = await schedules.scheduleOf(adult, s.id, clock.today);
+    // The Herons have a game postponed two rounds ago and games still to play.
+    const statuses = buildTeamGames(schedule, 'herons', clock, addressee).upcoming.map(
+      (g) => g.status,
+    );
+    expect(statuses).toContain('scheduled');
+    expect(statuses.at(-1)).toBe('postponed');
+    expect(statuses.indexOf('postponed')).toBe(statuses.length - 1);
+  });
+
+  it("lists a team its game tonight ahead of one earlier today with no result yet, by the league's clock", async () => {
+    const s = await season(adult);
+    const real = await schedules.clockOf(adult);
+    const schedule = await schedules.scheduleOf(adult, s.id, real.today);
+    const base = schedule?.rounds.flatMap((r) => r.games).find((g) => g.homeTeam.slug === 'herons');
+    if (schedule === undefined || base === undefined) throw new Error('no game');
+    // 9:30 in the evening of the 13th in Chicago; already the 14th by UTC.
+    const clock = {
+      today: '2026-11-13',
+      now: '2026-11-14T03:30:00.000Z',
+      timeZone: 'America/Chicago',
+    };
+    const game = (id: string, startsAt: string) => ({
+      ...base,
+      id,
+      status: 'scheduled',
+      startsAt,
+      localDate: '2026-11-13',
+      homeScore: null,
+      awayScore: null,
+    });
+    const changed = {
+      ...schedule,
+      rounds: [],
+      unplacedGames: [
+        game('earlier-today', '2026-11-14T01:00:00.000Z'),
+        game('tonight', '2026-11-14T04:00:00.000Z'),
+      ],
+    };
+    expect(buildTeamGames(changed, 'herons', clock, addressee).upcoming.map((g) => g.id)).toEqual([
+      'tonight',
+      'earlier-today',
+    ]);
   });
 });
 

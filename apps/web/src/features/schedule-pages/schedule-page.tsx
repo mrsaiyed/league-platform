@@ -1,15 +1,19 @@
 import { leagueUrl } from '@srleagues/core';
-import { OptionPicker, RoundPicker } from '@srleagues/ui';
+import { EmptyPanel, FilterToolbar, OptionPicker, PageHead, RoundPicker } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
+import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
-import { chooseSeason, firstValue, SeasonChoice, type SearchParams } from '../stats-pages/index.ts';
+import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { buildScheduleView, parseRound } from './build-schedule.ts';
 import { RoundSections } from './schedule-views.tsx';
 
-/** `/{league}/schedule`: past rounds closed, the current one open, then the coming ones. */
+/**
+ * `/{league}/schedule`: past rounds closed, the current one open, then the coming ones. The
+ * season is picked in the header; the round and the team in the page's own toolbar.
+ */
 export async function SchedulePage({
   league,
   search,
@@ -20,8 +24,8 @@ export async function SchedulePage({
 }) {
   const view = await loadLeaguePage(league, 'site');
   const addressee = view.context.league;
-  const { publicStats, publicSchedule } = await webPorts();
-  const seasons = await publicStats.seasonsOf(addressee.id);
+  const { publicSchedule } = await webPorts();
+  const seasons = await seasonsOfLeague(addressee.id);
   const asked = firstValue(search['season']);
   const season = chooseSeason(seasons, asked);
   if (season === undefined && asked !== undefined && asked !== '') return notFound();
@@ -34,8 +38,8 @@ export async function SchedulePage({
   if (season === undefined || schedule === undefined) {
     return (
       <main>
-        <h1>{t('schedule.title')}</h1>
-        <p>{t('schedule.noSeason')}</p>
+        <PageHead title={t('schedule.title')} />
+        <EmptyPanel text={t('schedule.noSeason')} />
       </main>
     );
   }
@@ -54,18 +58,9 @@ export async function SchedulePage({
   const keepSeason = asked === undefined || asked === '' ? {} : { season: asked };
   return (
     <main>
-      <h1>{t('schedule.title')}</h1>
-      <SeasonChoice
-        seasons={seasons}
-        chosen={season}
-        action={action}
-        keep={{ ...(team === '' ? {} : { team }), ...(round === '' ? {} : { round }) }}
-      />
-      <p>{season.name}</p>
-      {built.seasonIsEmpty ? (
-        <p>{t('schedule.empty')}</p>
-      ) : (
-        <>
+      <PageHead title={t('schedule.title')} eyebrow={season.name} />
+      {built.seasonIsEmpty ? null : (
+        <FilterToolbar label={labels.filters}>
           <RoundPicker
             label={labels.round}
             submitLabel={labels.show}
@@ -83,12 +78,26 @@ export async function SchedulePage({
             options={built.teamOptions}
             keep={{ ...keepSeason, ...(round === '' ? {} : { round }) }}
           />
-          {built.rounds.length === 0 ? (
-            <p>{t('schedule.noMatch')}</p>
-          ) : (
-            <RoundSections leagueId={addressee.id} rounds={built.rounds} />
-          )}
-        </>
+        </FilterToolbar>
+      )}
+      {built.seasonIsEmpty ? (
+        <EmptyPanel
+          text={t('schedule.empty')}
+          action={{
+            href: leagueUrl(addressee, 'teams', { ...keepSeason }),
+            label: t('home.seeTeams'),
+          }}
+        />
+      ) : built.rounds.length === 0 ? (
+        <EmptyPanel
+          text={t('schedule.noMatch')}
+          action={{
+            href: leagueUrl(addressee, 'schedule', { ...keepSeason }),
+            label: t('schedule.showAll'),
+          }}
+        />
+      ) : (
+        <RoundSections leagueId={addressee.id} rounds={built.rounds} />
       )}
     </main>
   );

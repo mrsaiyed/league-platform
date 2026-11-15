@@ -46,8 +46,11 @@ export type ContrastWarning = {
 
 export function contrastWarnings(design: DesignDocument): ContrastWarning[] {
   const { background, panel, text, highlight, accent } = design.colors;
-  // The highlight is written as words (the Live marker, a score, the picker), so it must read
-  // like text. Left out, the accent stands in for it and is used the same way, so check that.
+  // The highlight is used for two things only (docs/build/DESIGN.md, section 4, line 16;
+  // C-15): it fills the Live marker and it is the figures of a winner's score. A score is
+  // read like text, so the highlight must read on the page and on a panel. A picker's chosen
+  // value is in the text color, never the highlight. Left out, the accent stands in for the
+  // highlight and is used the same way, so that is what is checked.
   const pairs: [string, string, string][] = [
     ['text on background', text, background],
     ['text on panel', text, panel],

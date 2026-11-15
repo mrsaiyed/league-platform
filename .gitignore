@@ -19,3 +19,5 @@ docs/build/.lock
 docs/build/dashboard.html
 .next/
 next-env.d.ts
+# Written by `next dev` every time it starts; it is Next.js's, not ours.
+apps/web/AGENTS.md
