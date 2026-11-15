@@ -331,6 +331,7 @@ All dated November 12, 2026.
 | T-257                 | New                                                                          | The release makes pg-boss's schema, owned by queue_owner; pg-boss makes its own tables; the worker starts on checked settings (rec. 053)        | Step 2.94: the worker never started (R2); record 012 left open who makes pg-boss's tables (T-60)   |
 | T-256                 | New                                                                          | Account ids stay ours, linked to the sign-in user; the sign-in store in its own schema and role (rec. 052)                                      | Step 2.92: Supabase ids are not v7; the store and record 008's functions were missing              |
 | T-259                 | New                                                                          | Name settings read by one `readNamePolicy`; a setting value can need confirming; a person's request is a command, fixed-word reason (rec. 056)  | Step 2.126: nothing set the name policy or `people.visibility` (2.105 audit, H2)                   |
+| T-262                 | New                                                                          | Every design face is served from our own address: open-licence `@fontsource-variable` packages, linked once, never another site (rec. 059)      | Step 2.147: T5 §1 says we host the fonts, but no font file was in the product (2.105 audit, L3)    |
 
 ## The full list
 
@@ -757,6 +758,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-102 | The 3D code is downloaded only on pages that use that style, so no other league's pages get slower because the trophy exists                        | Agreed (delegated)  |         |
 | T-103 | Faraj's acceptance is the feature list plus the founder's side-by-side review; after sign-off, screenshots of the new pages guard against drift     | Changed (delegated) |         |
 | T-104 | Every document (design, page, form, season rules) carries a version                                                                                 | Agreed (delegated)  |         |
+| T-262 | Every face a design can name is served from our own address, from open-licence packages the web app depends on, and holds up no page (rec. 059)     | Agreed (delegated)  |         |
 
 ### [T6 — Live stats and realtime](technical/T6-live-stats-and-realtime.md)
 
