@@ -491,30 +491,34 @@ describe('a game as a scoreboard', () => {
     // Narrower than that, each team takes a row of its own; wide enough, the sides share
     // what the middle leaves.
     expect(css).toMatch(/\.ui-game-side \{[^}]*flex: 1 1 var\(--board-short\);/);
-    // Stacked, a row is the team (emblem, then name) at the start and its own score at the
-    // end, and what stood between the teams takes no room at all; side by side it is the
-    // other way about.
-    expect(css).toMatch(
-      /\.ui-game-side-team \{[^}]*min-inline-size: clamp\(0px, var\(--board-room\), 100%\);/,
+    // A side is a measure of its own: what stands in it is laid out by its share of the
+    // board, so nothing in it does a sum with the board's width (inside a side, 100cqi
+    // would be the side's width and the sum would be wrong).
+    expect(css).toMatch(/\.ui-game-side \{[^}]*container: side \/ inline-size;/);
+    const inSide = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter((rule) =>
+      /\.ui-game-side-team|\.ui-game-side-score|\.ui-game-team-name|\.ui-emblem/.test(
+        rule[1] ?? '',
+      ),
     );
-    // Stacked, a long name wraps under itself beside its emblem and the score keeps its
-    // place: the team is held to the row less the room of its score, and the name to that
-    // less the emblem. The row is the board's own width, never a share of the team's
-    // (which is only as wide as its name).
+    expect(inSide.length).toBeGreaterThan(8);
+    for (const rule of inSide) expect(rule[2], rule[1]).not.toMatch(/cqi|--board-(?:short|room)/);
+    // Side by side (the plain rules): the name under the emblem, both in the middle, and
+    // no score of its own.
     expect(css).toMatch(
-      /\.ui-game-side-team \{[^}]*max-inline-size: max\(calc\(100cqi - var\(--board-own\)\), clamp\(0px, var\(--board-room\), 100cqi\)\);/,
-    );
-    expect(css).toMatch(
-      /\.ui-game-side-team \.ui-game-team-name \{[^}]*max-inline-size: max\(\s*min\(calc\(100cqi - var\(--board-own\) - var\(--step-6\) - var\(--step-3\)\), var\(--board-side\)\),\s*clamp\(0px, var\(--board-room\), 100cqi\)\s*\);/,
-    );
-    // A game with no score keeps no room for one.
-    expect(css).toMatch(/\.ui-game-board \{[^}]*--board-own: 0px;/);
-    expect(css).toMatch(
-      /\.ui-game-board\[data-scored='true'\] \{[^}]*--board-own: calc\(\(var\(--figures, 4\) \+ 2\) \* 0\.3 \* var\(--text-28\) \+ var\(--step-3\)\);/,
+      /\.ui-game-side-team \{\s*display: flex;\s*flex: 1 1 auto;\s*flex-direction: column;\s*align-items: center;[^}]*text-align: center;/,
     );
     expect(css).toMatch(
-      /\.ui-game-side-score \{[^}]*max-inline-size: clamp\(0px, var\(--board-short\), 8rem\);\s*max-block-size: clamp\(0px, var\(--board-short\), 4rem\);\s*margin-inline-start: auto;\s*overflow: hidden;\s*color: var\(--color-pop\);\s*font-family: var\(--font-score\);[^}]*font-variant-numeric: lining-nums tabular-nums;/,
+      /\.ui-game-side-score \{\s*display: none;\s*flex: none;\s*color: var\(--color-pop\);\s*font-family: var\(--font-score\);[^}]*font-variant-numeric: lining-nums tabular-nums;/,
     );
+    // Two rows: a side that has the whole board (side by side it has less than half; the
+    // measure is three quarters of the board) sets its team in a line from the start of
+    // the row, the name's lines from the start too, like the name in the other row, and
+    // draws its own score at the end.
+    expect(css).toMatch(
+      /@container side \(min-width: 75cqi\) \{\s*\.ui-game-side-team \{\s*flex-direction: row;\s*gap: var\(--step-3\);\s*text-align: start;\s*\}\s*\.ui-game-card\[data-layout='board'\] \.ui-game-side \.ui-emblem \{\s*block-size: var\(--step-6\);\s*\}\s*\.ui-game-side-score \{\s*display: block;\s*\}\s*\}/,
+    );
+    expect(css).not.toMatch(/\.ui-game-side-team \{[^}]*text-align: (?!center|start)/);
+    // What stood between the teams takes no room at all when the board is two rows.
     expect(css).toMatch(
       /\.ui-game-middle > \* \{\s*flex: none;\s*max-inline-size: clamp\(0px, var\(--board-room\), 20rem\);\s*max-block-size: clamp\(0px, var\(--board-room\), 6rem\);\s*overflow: hidden;/,
     );
@@ -533,10 +537,20 @@ describe('a game as a scoreboard', () => {
     expect(css).toMatch(
       /@container card \(min-width: 26rem\) \{\s*\.ui-game-board \{\s*--board-gap: var\(--step-5\);\s*--board-figure: var\(--text-36\);\s*gap: var\(--step-2\) var\(--step-5\);/,
     );
-    // A word too long even for the whole card is broken at a syllable, not cut off.
-    expect(css).toMatch(
-      /\.ui-game-card\[data-layout='board'\] \.ui-game-team-name \{[^}]*overflow-wrap: break-word;\s*hyphens: auto;/,
+    // A name breaks between its words and nowhere else: a short word never breaks, and a
+    // word too long even for a line of its own is cut short with "…", never split.
+    const name =
+      /\.ui-game-card\[data-layout='board'\] \.ui-game-team-name \{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(name).toMatch(
+      /overflow-wrap: normal;\s*hyphens: manual;\s*overflow-x: clip;\s*text-overflow: ellipsis;/,
     );
+    expect(name).toMatch(/flex: 0 1 auto;\s*min-inline-size: 0;\s*max-inline-size: 100%;/);
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\.ui-game-(?:board|side)|data-layout='board'/.test(rule[1] ?? '')) continue;
+      expect(rule[2], rule[1]).not.toMatch(
+        /overflow-wrap: (?:break-word|anywhere)|word-break: break|hyphens: auto/,
+      );
+    }
   });
 
   it('lays boards two across from a tablet up, and a board left over takes the row', () => {

@@ -238,7 +238,10 @@ export const gameCss = String.raw`
    script:
    - with room: emblem over name on each side, the score or "VS" large between them;
    - short of it: two rows, each team's emblem and name at the start and its own score at
-     the end, so nobody has to work out whose number is whose, and nothing between them. */
+     the end, so nobody has to work out whose number is whose, and nothing between them.
+   The two sums are for the board's own children (the sides and what stands between them).
+   What stands inside a side is laid out by the side's share of the board instead (below):
+   a side is a measure of its own, so 100cqi inside it would be the side's width. */
 .ui-game-board {
   --board-gap: var(--step-3);
   --board-figure: var(--text-28);
@@ -248,8 +251,6 @@ export const gameCss = String.raw`
   --board-needs: calc(2 * var(--board-side) + var(--board-middle) + 2 * var(--board-gap));
   --board-short: calc((var(--board-needs) - 100cqi) * 999);
   --board-room: calc((100cqi - var(--board-needs)) * 999);
-  /* The room a team's own score needs at the end of its row: none while there is no score. */
-  --board-own: 0px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -261,58 +262,37 @@ export const gameCss = String.raw`
 }
 .ui-game-board[data-scored='true'] {
   --board-middle: calc(var(--figures, 4) * 0.65 * var(--board-figure) + var(--step-5));
-  /* A score of its own is set at 28: room for the longer of the two (one figure more than
-     half of them, and a little over), and the gap before it. */
-  --board-own: calc((var(--figures, 4) + 2) * 0.3 * var(--text-28) + var(--step-3));
 }
 /* A side takes the whole row when the board is short of room, and shares what the middle
-   leaves when it is not. */
+   leaves when it is not. It is a measure of its own, named "side": what stands in it is
+   laid out by how much of the board the side has (the rule after these). */
 .ui-game-side {
   display: flex;
   flex: 1 1 var(--board-short);
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0 var(--step-3);
+  gap: var(--step-3);
   min-inline-size: 0;
+  container: side / inline-size;
 }
-/* The team: its emblem and its name. With room it fills its side and the name stands
-   under the emblem, both in the middle. Short of it the two sit in a line at the start of
-   the row: the team is then never wider than the row (the board's own width, 100cqi) less
-   the room of its score, and the name never wider than that less its emblem, so a long
-   name wraps under itself beside the emblem and the score keeps its place at the end.
-   The name is also held to the room the board reckons a name needs for two lines
-   (--board-side), so its lines stand together beside the emblem, not in the middle of
-   whatever room the row has left. */
+/* The team: its emblem and its name. With room, the name stands under the emblem, both in
+   the middle of the side. */
 .ui-game-side-team {
   display: flex;
-  flex: 0 1 auto;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--step-2) var(--step-3);
-  min-inline-size: clamp(0px, var(--board-room), 100%);
-  max-inline-size: max(calc(100cqi - var(--board-own)), clamp(0px, var(--board-room), 100cqi));
+  gap: var(--step-2);
+  min-inline-size: 0;
   text-align: center;
 }
-.ui-game-card[data-layout='board'] .ui-game-side-team .ui-game-team-name {
-  flex: 0 1 auto;
-  min-inline-size: clamp(0px, var(--board-room), 100%);
-  max-inline-size: max(
-    min(calc(100cqi - var(--board-own) - var(--step-6) - var(--step-3)), var(--board-side)),
-    clamp(0px, var(--board-room), 100cqi)
-  );
-}
 .ui-game-board .ui-emblem {
-  block-size: clamp(var(--step-6), var(--board-room), var(--step-7));
-}
-/* A team's own score, at the end of its row: there only when the board is short of room.
-   With room it has no width and no height, so it takes none from the side. */
-.ui-game-side-score {
   flex: none;
-  max-inline-size: clamp(0px, var(--board-short), 8rem);
-  max-block-size: clamp(0px, var(--board-short), 4rem);
-  margin-inline-start: auto;
-  overflow: hidden;
+  block-size: var(--step-7);
+}
+/* A team's own score, at the end of its row: drawn only when the board is two rows. */
+.ui-game-side-score {
+  display: none;
+  flex: none;
   color: var(--color-pop);
   font-family: var(--font-score);
   font-size: var(--text-28);
@@ -337,16 +317,21 @@ export const gameCss = String.raw`
   overflow: hidden;
 }
 .ui-game-card[data-layout='board'] .ui-game-team-name {
+  /* Only as wide as its words, and never wider than the room it is given. */
+  flex: 0 1 auto;
+  min-inline-size: 0;
   max-inline-size: 100%;
   font-family: var(--font-heading);
   font-size: var(--text-18);
   font-weight: var(--heading-weight);
   letter-spacing: var(--heading-tracking);
   line-height: 1.2;
-  /* A long name wraps under itself, whole words first; a word too long for its side is
-     broken at a syllable, with a hyphen, where the browser knows the language. */
-  overflow-wrap: break-word;
-  hyphens: auto;
+  /* A long name wraps under itself between its words, and only there: a word is never
+     split. A word too long even for a line of its own is cut short with "…". */
+  overflow-wrap: normal;
+  hyphens: manual;
+  overflow-x: clip;
+  text-overflow: ellipsis;
   text-wrap: balance;
 }
 /* The winner is said in words (kept for screen readers), by the weight of its name and
@@ -437,7 +422,7 @@ export const gameCss = String.raw`
     padding-inline: var(--step-3);
   }
   .ui-game-board .ui-emblem {
-    block-size: clamp(var(--step-6), var(--board-room), calc(var(--step-7) + var(--step-2)));
+    block-size: calc(var(--step-7) + var(--step-2));
   }
   .ui-game-score {
     font-size: var(--text-36);
@@ -449,7 +434,25 @@ export const gameCss = String.raw`
   box-shadow: var(--overlay-shadow);
 }
 .ui-game-card[data-featured='true'] .ui-emblem {
-  block-size: clamp(var(--step-6), var(--board-room), var(--step-8));
+  block-size: var(--step-8);
+}
+/* The board as two rows. A side that has the whole board to itself (side by side it has
+   less than half; 75cqi here is three quarters of the board, the side's own measure) lays
+   its team out in a line from the start of the row: a small emblem, then the name, which
+   wraps under itself from the start, as the name in the other row does; and its own score
+   is drawn at the end. */
+@container side (min-width: 75cqi) {
+  .ui-game-side-team {
+    flex-direction: row;
+    gap: var(--step-3);
+    text-align: start;
+  }
+  .ui-game-card[data-layout='board'] .ui-game-side .ui-emblem {
+    block-size: var(--step-6);
+  }
+  .ui-game-side-score {
+    display: block;
+  }
 }
 /* Its figures are a step larger wherever its card has the room for them and both names. */
 @container card (min-width: 25rem) {
