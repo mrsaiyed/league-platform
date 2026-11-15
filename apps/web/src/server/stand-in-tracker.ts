@@ -45,6 +45,8 @@ export type MadeUpTeam = {
   readonly id: string;
   readonly name: string;
   readonly slug: string;
+  /** The team's own color, #rrggbb; left out for a team with none. */
+  readonly color?: string;
   readonly statsVisibility: 'everyone' | 'staff';
   readonly players: readonly {
     readonly firstName: string;
@@ -65,7 +67,7 @@ export function seedTracker(
       id: team.id,
       name: team.name,
       slug: team.slug,
-      color: null,
+      color: team.color ?? null,
       statsVisibility: team.statsVisibility,
     });
     team.players.forEach((player, n) => {

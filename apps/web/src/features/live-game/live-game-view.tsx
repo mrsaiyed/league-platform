@@ -49,6 +49,8 @@ export type LiveGameLabels = {
   readonly nameNotShown: string;
   /** A player known by number only (S-34), with {jersey}: "#12". */
   readonly jerseyOnly: string;
+  /** The heading over the two teams' players while the game is under way. */
+  readonly playersTitle: string;
   readonly columns: readonly BoxScoreColumn[];
   readonly scoreboard: ScoreboardLabels;
   readonly boxScore: BoxScoreLabels;
@@ -66,6 +68,20 @@ export type LiveGameViewProps = {
   readonly showPlayers: boolean;
   readonly words: GameWords;
   readonly labels: LiveGameLabels;
+  /** What the scoreboard shows beside the scores: the teams' colors, when and where. */
+  readonly board?: LiveGameBoard | undefined;
+};
+
+/** The scoreboard's facts that do not change while the game is played. */
+export type LiveGameBoard = {
+  readonly colors?: { readonly home: string | null; readonly away: string | null } | undefined;
+  /** In the pill of a game not played or decided off the court: "Postponed", "Forfeit". */
+  readonly stateText?: string | undefined;
+  /** A game still to play: its day and time. */
+  readonly when?: { readonly day: string; readonly time?: string | undefined } | undefined;
+  readonly placeText?: string | undefined;
+  /** A sentence under a decided game: a forfeit says so. */
+  readonly noteText?: string | undefined;
 };
 
 type Side = 'home' | 'away';
@@ -160,6 +176,7 @@ export function LiveGameView({
   showPlayers,
   words,
   labels,
+  board,
 }: LiveGameViewProps) {
   const [followed, setFollowed] = useState<FollowedGame>(() => ({
     game: { ...initial, playersAsOfSequence: initial.sequence },
@@ -211,7 +228,9 @@ export function LiveGameView({
 
   const teams = game.teams ?? initial.teams;
   const periods = game.periods ?? initial.periods;
-  const latest = latestPlayText(game, words, labels);
+  // The latest play is news while the game is played; a finished game's result says it all.
+  const latest = game.status === 'live' ? latestPlayText(game, words, labels) : '';
+  const started = game.status !== 'scheduled';
   return (
     <section
       className="game-live"
@@ -220,54 +239,69 @@ export function LiveGameView({
       data-live-sequence={game.sequence}
       data-live-status={game.status}
     >
-      {game.status === 'scheduled' ? (
-        <p>{labels.notStarted}</p>
-      ) : (
-        <Scoreboard
-          home={{ name: teams.home.name, score: game.score.home }}
-          away={{ name: teams.away.name, score: game.score.away }}
-          state={game.status === 'live' ? 'live' : 'final'}
-          {...(game.status === 'live'
-            ? {
-                periodText: periodClockText(
-                  words,
-                  game.period,
-                  periods,
-                  clockRemainingMs(game.clock, serverNow),
-                ),
-              }
-            : {})}
-          labels={labels.scoreboard}
-        />
-      )}
-      {game.status === 'live' ? (
-        <p>
-          {fill(labels.teamFouls, {
-            away: teams.away.name,
-            awayFouls: game.teamFouls.away,
-            home: teams.home.name,
-            homeFouls: game.teamFouls.home,
-          })}
-        </p>
-      ) : null}
-      <p role="status" aria-live="polite" className="game-latest-play">
-        {game.status === 'scheduled' ? null : (
-          <span className="ui-visually-hidden">
-            {fill(labels.spokenScore, {
+      <Scoreboard
+        home={{
+          name: teams.home.name,
+          score: started ? game.score.home : null,
+          color: board?.colors?.home,
+        }}
+        away={{
+          name: teams.away.name,
+          score: started ? game.score.away : null,
+          color: board?.colors?.away,
+        }}
+        state={game.status === 'live' ? 'live' : game.status === 'final' ? 'final' : 'other'}
+        periodText={
+          game.status === 'live'
+            ? periodClockText(words, game.period, periods, clockRemainingMs(game.clock, serverNow))
+            : undefined
+        }
+        stateText={game.status === 'live' ? undefined : board?.stateText}
+        when={started ? undefined : board?.when}
+        placeText={board?.placeText}
+        noteText={started ? board?.noteText : labels.notStarted}
+        labels={labels.scoreboard}
+      >
+        {game.status === 'live' ? (
+          <p>
+            {fill(labels.teamFouls, {
               away: teams.away.name,
-              awayScore: game.score.away,
+              awayFouls: game.teamFouls.away,
               home: teams.home.name,
-              homeScore: game.score.home,
-            })}{' '}
-          </span>
-        )}
-        {latest === '' ? null : <span>{latest}</span>}
-      </p>
-      {showPlayers && game.status !== 'scheduled' ? (
-        <>
-          <PlayersTable game={game} side="away" labels={labels} />
-          <PlayersTable game={game} side="home" labels={labels} />
-        </>
+              homeFouls: game.teamFouls.home,
+            })}
+          </p>
+        ) : null}
+        {/* Always there, so a screen reader hears each change; out of sight when it has
+            nothing to show. */}
+        <p
+          role="status"
+          aria-live="polite"
+          className={latest === '' ? 'game-latest-play ui-visually-hidden' : 'game-latest-play'}
+        >
+          {started ? (
+            <span className="ui-visually-hidden">
+              {fill(labels.spokenScore, {
+                away: teams.away.name,
+                awayScore: game.score.away,
+                home: teams.home.name,
+                homeScore: game.score.home,
+              })}{' '}
+            </span>
+          ) : null}
+          {latest === '' ? null : <span>{latest}</span>}
+        </p>
+      </Scoreboard>
+      {showPlayers && started ? (
+        <section className="ui-section" aria-labelledby="game-players">
+          <div className="ui-section-head">
+            <h2 id="game-players">{labels.playersTitle}</h2>
+          </div>
+          <div className="game-tables">
+            <PlayersTable game={game} side="away" labels={labels} />
+            <PlayersTable game={game} side="home" labels={labels} />
+          </div>
+        </section>
       ) : null}
     </section>
   );

@@ -90,6 +90,18 @@ It is safe to run again: a game already brought over is only compared, and a run
 
 It opens a database folder on this computer and refuses anything that reads as a network address (T-201). Use it on made-up backups: a backup of the live tracker holds real people's names, and bringing one over waits for the founder.
 
+## Make a league
+
+```sh
+npm run league:make -- --name "Made-up Hoops" --short-name made-up-hoops --city Springfield --contact-email hello@example.test --owner-email owner@example.test --as you@example.test
+```
+
+This makes a league in draft, with its first season as the current one, in one step through the product's own commands (step 2.125, [record 057](../architecture/decisions/057-making-a-league-from-this-computer.md)). It is how we put a league on the platform until self-serve sign-up exists (P3 §8). Anything not given is asked for. **Who plays** (adults, under-18s or both) is left out of the example on purpose, so it is always answered when asked: it decides how players' names are shown and whether the league finder lists the league, and there is no screen to change it afterwards yet. The sport (basketball), the time zone (this computer's; a named zone such as America/Chicago, never an offset or an abbreviation) and the first season's name (from today's date in the league's time zone, such as "Fall 2026" or "Winter 2026–2027") have suggestions; the season's start and end dates (`--season-starts`, `--season-ends`, YYYY-MM-DD) may be left out. `--listed yes` or `--listed no` chooses whether the league finder lists it; otherwise adult leagues are listed and leagues with under-18s are not. `--as` is your own email, as our staff. The owner needs no account: one is made for their email, and it becomes theirs when they first sign in with it.
+
+It shows everything it will make, and where, and makes nothing unless you type `yes` at a terminal. Where: on this computer, in `--db <folder>` if given, otherwise the local test database in `.local/seed-db`, even when hosted settings are in the environment or `.env` (it says it is not using them). A short name another league holds, or a database that is not at this code's migrations (none applied, behind or ahead), makes nothing. If the league is refused, the accounts the run made are removed again, and it says so.
+
+A hosted database needs `--hosted`, a person at a terminal, two logins given for that one command, and the league's short name typed as the answer: follow [make a league on a real database](make-a-league.md), and only for the test copy, in a session the founder started (T-201).
+
 ## Checks
 
 These are the commands to run before a change is committed.

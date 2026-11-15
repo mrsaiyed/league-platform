@@ -10,7 +10,16 @@
 // it visits (T-186); and a person who is only a SCHEDULER of the first league (not its
 // owner: the made-up scheduler has the narrowest admin role, so being refused in the
 // second league shows more than being refused as an owner would not) being refused at
-// every admin address and the scoring address of the second league.
+// every admin address and the scoring address of the second league. And the frame every
+// league page has (step 2.85): the season picker in the header moves the page to another
+// season and keeps the page's other choices, the header is one row high on a phone, and a
+// page that is not there keeps the league's header and leads back to the league home, while
+// a league that may not be seen gets the plain screen. And the header for the keyboard and
+// with scripts off (2.85 review): the focus ring is measured against the header's bar on
+// the league's name, a tab, the season picker, Sign in and the phone menu button, in both
+// looks; an arrow key in a picker never reads the page again, and Enter or the Show
+// button applies the choice; with scripts off at 320, 360 and 390 wide the league's name
+// keeps its room and the season picker sits under it.
 // A part that throws (a wait that times out, a build that fails) is recorded by name and
 // the other parts still run and print.
 // Not covered: (1) the invitation email being captured and its link followed: the
@@ -261,6 +270,626 @@ if (browser) {
       await context.close();
     }
   });
+
+  await step("the league's frame: season picker, phone header, not found", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    try {
+      const page = await context.newPage();
+      await open(page, '/north-valley/schedule?team=owls');
+      const header = await page.locator('.site-header').boundingBox();
+      note(
+        'the header is one row high on a phone',
+        (header?.height ?? 999) <= 60,
+        `${header?.height}`,
+      );
+      const picker = page.locator('.site-header select[name=season]');
+      note('the season picker is in the header', (await picker.count()) === 1);
+      note(
+        'no page repeats the season picker',
+        (await page.locator('select[name=season]').count()) === 1,
+      );
+      await picker.selectOption({ label: 'Spring 2026' });
+      await page.waitForURL(/season=spring-2026/);
+      await page.locator('main').first().waitFor();
+      const moved = new URL(page.url());
+      note(
+        'choosing a season shows the same page of that season and keeps the team',
+        moved.pathname === '/north-valley/schedule' &&
+          moved.searchParams.get('season') === 'spring-2026' &&
+          moved.searchParams.get('team') === 'owls',
+        page.url(),
+      );
+      note(
+        'the picker shows the season the page is on',
+        (await page.locator('.site-header select[name=season]').inputValue()) === 'spring-2026',
+      );
+      await accessible(page, '/north-valley/schedule (phone, another season)');
+      await open(page, '/harbor-city/schedule');
+      note(
+        'a league with one season has no season picker',
+        (await page.locator('select[name=season]').count()) === 0,
+      );
+
+      for (const address of ['/north-valley/teams/lions', '/north-valley/no-such-page/at-all']) {
+        const response = await open(page, address);
+        note(`${address} is not found`, response?.status() === 404);
+        note(
+          `${address} keeps the league's header and menu`,
+          (await page.locator('.site-header .site-name').textContent()) === 'North Valley League' &&
+            (await page.locator('.site-footer').count()) === 1,
+        );
+        const back = page.getByRole('link', { name: 'Back to the league home' });
+        note(`${address} leads back to the league home`, (await back.count()) === 1);
+        note(
+          `${address} does not send the visitor off to the start page`,
+          (await page.getByRole('link', { name: 'Go to the SR Leagues start page' }).count()) === 0,
+        );
+        await accessible(page, `${address} (not found)`);
+      }
+      await page.getByRole('link', { name: 'Back to the league home' }).click();
+      await page.getByRole('heading', { level: 1, name: 'North Valley League' }).waitFor();
+      note('the way on from "not found" is the league home', pathOf(page) === '/north-valley');
+
+      // A league that may not be seen, and no league at all: the plain screen, no frame.
+      for (const address of ['/quiet-pines/teams/lions', '/nobody-has-this/no-such-page/at-all']) {
+        const response = await open(page, address);
+        note(`${address} is not found`, response?.status() === 404);
+        note(
+          `${address} shows no league's frame`,
+          (await page.locator('.site-header').count()) === 0 &&
+            (await page.getByRole('link', { name: 'Back to the league home' }).count()) === 0 &&
+            (await page.getByRole('link', { name: 'Go to the SR Leagues start page' }).count()) ===
+              1,
+        );
+      }
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('the header for the keyboard: a focus ring that shows, in both looks', async () => {
+    /** The ring `target` shows to the keyboard, and how it reads against the header's bar. */
+    const ringOf = async (target) => {
+      await target.focus();
+      return target.evaluate((el) => {
+        const parse = (value) => {
+          const [r, g, b, a = 1] = (/rgba?\(([^)]+)\)/.exec(value)?.[1] ?? '0 0 0 0')
+            .split(/[ ,/]+/)
+            .filter(Boolean)
+            .map(Number);
+          return { r, g, b, a };
+        };
+        const light = ({ r, g, b }) => {
+          const f = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+          return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+        };
+        const style = getComputedStyle(el);
+        const ring = parse(style.outlineColor);
+        const bar = parse(getComputedStyle(el.closest('.site-header')).backgroundColor);
+        const [hi, lo] = [light(ring), light(bar)].sort((a, b) => b - a);
+        return {
+          shown:
+            el.matches(':focus-visible') &&
+            style.outlineStyle === 'solid' &&
+            parseFloat(style.outlineWidth) >= 2 &&
+            ring.a === 1 &&
+            bar.a === 1,
+          ratio: (hi + 0.05) / (lo + 0.05),
+        };
+      });
+    };
+    const checkRing = async (label, target) => {
+      const ring = await ringOf(target);
+      note(
+        `the focus ring shows on ${label}`,
+        ring.shown && ring.ratio >= 3,
+        `shown ${ring.shown}, ${ring.ratio.toFixed(2)}:1 against the header`,
+      );
+    };
+    const laptop = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    try {
+      const page = await laptop.newPage();
+      const small = await phone.newPage();
+      for (const league of ['north-valley', 'harbor-city']) {
+        await open(page, `/${league}/schedule`);
+        // The keyboard is in use from here on, so what is focused shows its ring.
+        await page.keyboard.press('Tab');
+        const header = page.locator('.site-header');
+        await checkRing(`the league's name (${league})`, header.locator('.site-name'));
+        await checkRing(`a tab (${league})`, header.locator('.site-tabs a').nth(2));
+        await checkRing(
+          `the current tab (${league})`,
+          header.locator('.site-tabs a[aria-current=page]'),
+        );
+        await checkRing(`Sign in (${league})`, header.locator('.site-sign-in'));
+        await open(small, `/${league}/schedule`);
+        await small.keyboard.press('Tab');
+        await checkRing(
+          `the phone menu button (${league})`,
+          small.locator('.site-header .site-menu > summary'),
+        );
+      }
+      // The season picker: only the first league has two seasons, so it is measured there
+      // in its own look and then under the second league's design values, which is all
+      // that differs between two leagues' looks (T-90).
+      await open(page, '/north-valley/schedule');
+      await page.keyboard.press('Tab');
+      const picker = page.locator('.site-header select[name=season]');
+      await checkRing('the season picker (north-valley)', picker);
+      await page.evaluate(async () => {
+        const values = /:root \{[^}]*\}/.exec(await (await fetch('/harbor-city')).text())?.[0];
+        if (!values) throw new Error('no design values on /harbor-city');
+        for (const style of document.querySelectorAll('style')) {
+          if (/:root \{[^}]*--color-background/.test(style.textContent ?? ''))
+            style.textContent = style.textContent.replace(/:root \{[^}]*\}/, values);
+        }
+      });
+      note(
+        "the page took the second league's design values",
+        (await page.evaluate(() =>
+          getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim(),
+        )) === '#1f5fbf',
+      );
+      await checkRing("the season picker (under harbor-city's look)", picker);
+    } finally {
+      await laptop.close();
+      await phone.close();
+    }
+  });
+
+  await step('a picker and the keyboard: an arrow key never reads the page again', async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    try {
+      const page = await context.newPage();
+      await open(page, '/north-valley/schedule');
+      const quiet = () => new Promise((resolve) => setTimeout(resolve, 800));
+      const showOf = (name) => page.locator(`form:has(select[name=${name}]) button[type=submit]`);
+      // The toolbar says when its script is running; only then is the button put away.
+      await page.locator('.site-header .ui-toolbar[data-applies="true"]').waitFor();
+      note(
+        'a Show button is put away once the script says it applies choices itself',
+        (await showOf('season').evaluate((el) => getComputedStyle(el).opacity)) === '0',
+      );
+      // The season picker in the header: arrow, then Enter.
+      const season = page.locator('.site-header select[name=season]');
+      await page.keyboard.press('Tab');
+      await season.focus();
+      await page.keyboard.press('ArrowDown');
+      await quiet();
+      note(
+        'an arrow key moves the season without reading the page again',
+        (await season.inputValue()) === 'spring-2026' && !page.url().includes('season='),
+        `${await season.inputValue()} at ${page.url()}`,
+      );
+      note(
+        'the Show button is back while the keyboard is in its picker',
+        (await showOf('season').evaluate((el) => getComputedStyle(el).opacity)) === '1',
+      );
+      await page.keyboard.press('Enter');
+      await page.waitForURL(/season=spring-2026/);
+      note('Enter applies the season the keyboard chose', true);
+      // A picker of the page: arrow, then the Show button, which the keyboard reaches next.
+      await open(page, '/north-valley/schedule');
+      const round = page.locator('main select[name=round]');
+      await page.keyboard.press('Tab');
+      await round.focus();
+      await page.keyboard.press('ArrowDown');
+      await quiet();
+      note(
+        'an arrow key moves the round without reading the page again',
+        (await round.inputValue()) === '1' && !page.url().includes('round='),
+        `${await round.inputValue()} at ${page.url()}`,
+      );
+      await page.keyboard.press('Tab');
+      note(
+        'the next stop of the keyboard is the Show button of that picker',
+        await showOf('round').evaluate((el) => el === document.activeElement),
+      );
+      await page.keyboard.press('Enter');
+      await page.waitForURL(/round=1/);
+      note('the Show button applies the round the keyboard chose', true);
+      // A choice made by pointer is still applied at once.
+      await open(page, '/north-valley/schedule');
+      await page.locator('main select[name=round]').selectOption('2');
+      await page.waitForURL(/round=2/);
+      note('a choice made without the keyboard is applied at once', true);
+    } finally {
+      await context.close();
+    }
+    // The page's script blocked from loading (a slow phone, a failed download): a choice is
+    // not applied by itself, so the Show button must be there and work, for a page's
+    // picker and for the header's.
+    const blocked = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    try {
+      await blocked.route('**/_next/static/**/*.js', (route) => route.abort());
+      const page = await blocked.newPage();
+      const showOf = (name) => page.locator(`form:has(select[name=${name}]) button[type=submit]`);
+      for (const [name, value, where] of [
+        ['round', '2', 'main'],
+        ['season', 'spring-2026', '.site-header'],
+      ]) {
+        await open(page, '/north-valley/schedule');
+        note(
+          `with the script blocked the ${name} picker's toolbar never says it applies choices`,
+          (await page.locator(`${where} .ui-toolbar[data-applies]`).count()) === 0,
+        );
+        const header = await page.locator('.site-header').boundingBox();
+        await page.locator(`${where} select[name=${name}]`).selectOption(value);
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        note(
+          `with the script blocked a choice of ${name} is not applied by itself`,
+          !page.url().includes(`${name}=`),
+          page.url(),
+        );
+        // It appears by itself after a moment (in sight, and taking a tap), hanging under its
+        // picker and moving nothing.
+        const button = await showOf(name).elementHandle();
+        await page.waitForFunction(
+          (el) => {
+            const style = getComputedStyle(el);
+            return style.opacity === '1' && style.pointerEvents !== 'none';
+          },
+          button,
+          { timeout: 5_000 },
+        );
+        const after = await page.locator('.site-header').boundingBox();
+        note(
+          `the ${name} picker's Show button appears without moving the header`,
+          header?.height === after?.height,
+          `${header?.height} then ${after?.height}`,
+        );
+        await showOf(name).click();
+        await page.waitForURL(new RegExp(`${name}=${value}`));
+        note(`with the script blocked the Show button applies the ${name} chosen`, true);
+      }
+    } finally {
+      await blocked.close();
+    }
+  });
+
+  await step("with scripts off on a small phone the league's name keeps its room", async () => {
+    for (const width of [320, 360, 390]) {
+      const context = await browser.newContext({
+        viewport: { width, height: 740 },
+        javaScriptEnabled: false,
+      });
+      try {
+        const page = await context.newPage();
+        await open(page, '/north-valley/schedule');
+        const box = (selector) => page.locator(`.site-header ${selector}`).boundingBox();
+        const name = await box('.site-name');
+        const picker = await box('select[name=season]');
+        const show = await box('.site-season button[type=submit]');
+        note(
+          `at ${width} with scripts off the league's name has most of the header's width`,
+          (name?.width ?? 0) >= width * 0.6,
+          `${name?.width} of ${width}`,
+        );
+        note(
+          `at ${width} with scripts off the name is shown whole`,
+          // Its words take no more than the two lines the header shows, and none runs
+          // past the name's own box: nothing is cut off.
+          await page.locator('.site-header .site-name').evaluate((el) => {
+            const words = document.createRange();
+            words.selectNodeContents(el);
+            const lines = [...words.getClientRects()];
+            const box = el.getBoundingClientRect();
+            return (
+              new Set(lines.map((line) => Math.round(line.top))).size <= 2 &&
+              lines.every((line) => line.right <= box.right + 1 && line.left >= box.left - 1)
+            );
+          }),
+        );
+        note(
+          `at ${width} with scripts off the season picker and its Show button are there, under the name`,
+          picker !== null &&
+            show !== null &&
+            picker.y >= (name?.y ?? 0) + (name?.height ?? 0) - 1 &&
+            show.x + show.width <= width &&
+            show.height >= 44,
+          JSON.stringify({ name, picker, show }),
+        );
+        note(
+          `at ${width} with scripts off the page does not scroll sideways`,
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        );
+      } finally {
+        await context.close();
+      }
+    }
+  });
+
+  await step(
+    'on a phone: what a thumb taps, a long name in a table, one live connection',
+    async () => {
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      try {
+        const page = await context.newPage();
+        const live = [];
+        page.on('request', (request) => {
+          if (request.url().includes('/api/v1/live')) live.push(request.url());
+        });
+        // Everything a thumb taps is at least 44 high. A link in a sentence or in a row of a
+        // table is not a thing by itself and is left out; a card that is one link counts as
+        // the card its link covers.
+        for (const address of [
+          '/north-valley',
+          '/north-valley/schedule',
+          '/north-valley/standings',
+          '/north-valley/stats',
+          '/north-valley/teams',
+          '/north-valley/teams/owls',
+          '/harbor-city',
+          '/harbor-city/teams',
+        ]) {
+          await open(page, address);
+          const short = await page.evaluate(() => {
+            const found = [];
+            const tapped =
+              '.league-site :is(a[href], button, summary, select, input:not([type=hidden]))';
+            for (const el of document.querySelectorAll(tapped)) {
+              if (
+                el.closest(
+                  'p, td, th, sup, li.ui-leader, .ui-footnotes, details:not([open]) > :not(summary)',
+                )
+              )
+                continue;
+              const style = getComputedStyle(el);
+              if (style.display === 'none' || style.visibility === 'hidden') continue;
+              if (style.opacity === '0' || style.pointerEvents === 'none') continue;
+              let box = el.getBoundingClientRect();
+              const cover = getComputedStyle(el, '::after');
+              if (cover.position === 'absolute' && cover.content !== 'none') {
+                box = (el.offsetParent ?? el).getBoundingClientRect();
+              }
+              if (box.width === 0 || box.height === 0) continue;
+              if (box.height < 43.5) {
+                found.push(
+                  `${el.tagName.toLowerCase()} "${(el.textContent ?? '').trim().slice(0, 24)}" is ${Math.round(box.height)} high`,
+                );
+              }
+            }
+            return found;
+          });
+          note(
+            `everything a thumb taps on ${address} is 44 high`,
+            short.length === 0,
+            short.join('; '),
+          );
+        }
+        // One connection to the league's live scores, though the home page of a league with
+        // a game under way holds two lists of games.
+        live.length = 0;
+        await open(page, '/north-valley');
+        note(
+          'the home page shows a live game under its own heading and the games to come',
+          (await page.getByRole('heading', { name: 'Live now' }).count()) === 1 &&
+            (await page.locator('main .ui-card-grid').count()) >= 2,
+        );
+        await page.waitForTimeout(1500);
+        note('the home page opens one live connection', live.length === 1, `${live.length}`);
+        // The shared stylesheet is linked, not written into the page, and comes after the
+        // frame's own, as when it was written in.
+        const html = await (await fetch(`${origin}/north-valley`)).text();
+        note('the shared styles are not written into a page', !html.includes('.ui-table-frame {'));
+        const sheets = await page.evaluate(() =>
+          [...document.styleSheets].map((sheet) => sheet.href ?? 'inline'),
+        );
+        const shared = sheets.findIndex((href) => href.includes('/display.css?v='));
+        const frame = sheets.findIndex((href) => href.includes('/_next/'));
+        note(
+          "the shared stylesheet is linked after the frame's own",
+          shared > -1 && frame > -1 && frame < shared,
+          sheets.join(', '),
+        );
+        // The address the page links to carries the mark of the text: only that one is kept
+        // for good. The bare address, or another mark, gets the same styles for a minute.
+        const linked = sheets[shared] ?? '';
+        const answer = linked === '' ? undefined : await fetch(linked);
+        note(
+          'the shared stylesheet, as the page links to it, may be kept by the browser for good',
+          answer?.status === 200 &&
+            answer.headers.get('cache-control') === 'public, max-age=31536000, immutable',
+          `${answer?.status} ${answer?.headers.get('cache-control')}`,
+        );
+        for (const address of ['/display.css', '/display.css?v=0123456789ab']) {
+          const other = await fetch(origin + address);
+          note(
+            `${address} answers the styles but is not kept for good`,
+            other.status === 200 &&
+              other.headers.get('cache-control') === 'public, max-age=60' &&
+              (await other.text()) === (await (await fetch(linked)).text()),
+            `${other.status} ${other.headers.get('cache-control')}`,
+          );
+        }
+      } finally {
+        await context.close();
+      }
+      // A team name of 36 letters at 320 wide: the column that stays put takes about half the
+      // box at most, and the last column of numbers can be brought into view beside it.
+      const narrow = await browser.newContext({ viewport: { width: 320, height: 700 } });
+      try {
+        const page = await narrow.newPage();
+        await open(page, '/north-valley/standings');
+        const measured = await page.evaluate(() => {
+          const table = document.querySelector('table.ui-standings');
+          const box = table.closest('.ui-table-wrap');
+          const frame = box.getBoundingClientRect();
+          const long = 'The Northside Community Thunderbolts';
+          const rows = [...table.querySelectorAll('tbody tr')];
+          const shareWith = (row) => {
+            const name = row.querySelector('.ui-team-cell > [dir]');
+            const before = name.textContent;
+            name.textContent = long;
+            const share = name.closest('.ui-team-cell').getBoundingClientRect().width / frame.width;
+            name.textContent = before;
+            return share;
+          };
+          // A plain row, and one whose name carries a footnote's mark (24 wide) beside it.
+          const share = shareWith(rows.find((row) => !row.querySelector('.ui-note-mark')));
+          const shareWithMark = shareWith(rows.find((row) => row.querySelector('.ui-note-mark')));
+          const name = table.querySelector('tbody .ui-team-cell > [dir]');
+          name.textContent = long;
+          box.scrollLeft = box.scrollWidth;
+          const cell = name.closest('.ui-team-cell').getBoundingClientRect();
+          const last = table.querySelector('tbody tr > :last-child').getBoundingClientRect();
+          return {
+            share,
+            shareWithMark,
+            lastInView: last.left >= cell.right - 1 && last.right <= frame.right + 1,
+            whole: name.scrollWidth <= name.clientWidth + 1,
+            pageScrolls: document.documentElement.scrollWidth > window.innerWidth,
+          };
+        });
+        note(
+          'a long team name leaves the column that stays put about half the box at most',
+          measured.share <= 0.5 && measured.shareWithMark <= 0.6,
+          `${Math.round(measured.share * 100)}%, ${Math.round(measured.shareWithMark * 100)}% with a footnote's mark`,
+        );
+        note(
+          'with a long team name the last column can still be brought into view',
+          measured.lastInView,
+        );
+        note('a long team name wraps whole, with nothing cut off', measured.whole);
+        note('a long team name does not make the page scroll sideways', !measured.pageScrolls);
+        // The same long name wherever else a team is named, and a long league name in the
+        // header: nothing is pushed off the screen, and on a game's board each team stays
+        // in its own half.
+        await open(page, '/north-valley');
+        const postponed = await page
+          .locator('main article.ui-game-card[data-status="postponed"] a.ui-game-link')
+          .first()
+          .getAttribute('href');
+        for (const address of ['/north-valley', '/north-valley/teams', postponed ?? '']) {
+          await open(page, address);
+          const fits = await page.evaluate(() => {
+            const team = 'The Northside Community Thunderbolts';
+            const put = (el, text) => {
+              if (el) el.textContent = text;
+            };
+            put(
+              document.querySelector('.site-header .site-name > span'),
+              'The Greater Northside Community Basketball Association',
+            );
+            put(document.querySelector('.ui-scoreboard-name > [dir]'), team);
+            put(document.querySelector('.ui-game-card .ui-game-team-name'), team);
+            put(document.querySelector('.ui-team-card-name a'), team);
+            const names = [...document.querySelectorAll('.ui-scoreboard-name')].map((el) =>
+              el.getBoundingClientRect(),
+            );
+            const board = document.querySelector('.ui-scoreboard')?.getBoundingClientRect();
+            return {
+              pageScrolls: document.documentElement.scrollWidth > window.innerWidth,
+              // On a board: the first team's name ends before the second's begins, and both
+              // are inside the board.
+              apart:
+                names.length < 2 ||
+                (names[0].right <= names[1].left + 1 &&
+                  names[0].left >= board.left &&
+                  names[1].right <= board.right),
+            };
+          });
+          note(`long names on ${address} do not make the page scroll sideways`, !fits.pageScrolls);
+          note(`long names on ${address} keep each team of a board in its own half`, fits.apart);
+        }
+        // The divisions' tables on one page: each number column starts at the same place in
+        // all of them, on a phone (390) as on this narrowest one, so GP sits under GP.
+        for (const width of [320, 390]) {
+          await page.setViewportSize({ width, height: 800 });
+          await open(page, '/north-valley/standings');
+          const columns = await page.evaluate(() =>
+            [...document.querySelectorAll('table.ui-standings')].map((table) =>
+              [...table.querySelectorAll('thead th')].map((th) =>
+                Math.round(th.getBoundingClientRect().left),
+              ),
+            ),
+          );
+          note(
+            `at ${width} the divisions' tables have their columns in the same places`,
+            columns.length >= 2 && columns.every((c) => c.join() === columns[0].join()),
+            JSON.stringify(columns),
+          );
+        }
+        // The sign that a table goes on (the fade and the arrow at its far edge) is there
+        // only while columns are out of sight; and the column that stays put shows its
+        // edge only while the table is scrolled under it. At 390 wide these two pages
+        // hold tables of both kinds: ones that go on, and one that fits.
+        await page.setViewportSize({ width: 390, height: 800 });
+        const signs = [];
+        for (const address of ['/harbor-city/standings', '/harbor-city/stats']) {
+          await open(page, address);
+          await page.waitForTimeout(200);
+          signs.push(
+            ...(await page.evaluate(async () => {
+              const seen = [];
+              const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+              for (const box of document.querySelectorAll('.ui-table-frame')) {
+                const wrap = box.querySelector('.ui-table-wrap');
+                const cell = box.querySelector('tbody .ui-team-cell');
+                const edge = () => (cell ? getComputedStyle(cell, '::after').opacity : null);
+                const goesOn = wrap.scrollWidth > wrap.clientWidth + 1;
+                const sign = getComputedStyle(box, '::before').opacity;
+                const edgeAtRest = edge();
+                wrap.scrollLeft = wrap.scrollWidth;
+                await frame();
+                await frame();
+                seen.push({ goesOn, sign, edgeAtRest, edgeScrolled: edge() });
+              }
+              return seen;
+            })),
+          );
+        }
+        note(
+          'the sign that a table goes on shows only while columns are out of sight',
+          signs.some((s) => s.goesOn) &&
+            signs.some((s) => !s.goesOn) &&
+            signs.every((s) => (s.goesOn ? s.sign === '1' : s.sign === '0')),
+          JSON.stringify(signs),
+        );
+        note(
+          'the column that stays put shows its edge only while the table is scrolled under it',
+          signs.every((s) => s.edgeAtRest === '0') &&
+            signs.filter((s) => s.goesOn).every((s) => s.edgeScrolled === '1') &&
+            signs.filter((s) => !s.goesOn).every((s) => s.edgeScrolled === '0'),
+          JSON.stringify(signs),
+        );
+        await page.setViewportSize({ width: 320, height: 700 });
+        // A heading's sort button, reached backwards by the keyboard, is scrolled clear of the
+        // column that stays put, and its ring is drawn inside it.
+        await open(page, '/north-valley/stats');
+        await page.keyboard.press('Tab');
+        const buttons = page.locator('main table .ui-sort-button');
+        const table = buttons.first().locator('xpath=ancestor::table');
+        const own = table.locator('.ui-sort-button');
+        await own.last().focus();
+        for (let i = (await own.count()) - 1; i > 1; i -= 1) await page.keyboard.press('Shift+Tab');
+        const reached = await table.evaluate((el) => {
+          const focused = document.activeElement;
+          const stays = el.querySelector('thead .ui-team-cell').getBoundingClientRect();
+          const box = focused.getBoundingClientRect();
+          const style = getComputedStyle(focused);
+          return {
+            isButton:
+              focused.classList.contains('ui-sort-button') && !focused.closest('.ui-team-cell'),
+            clear: box.left >= stays.right - 1,
+            inside: parseFloat(style.outlineOffset) < 0 && style.outlineStyle === 'solid',
+          };
+        });
+        note(
+          'a sort button reached backwards by the keyboard is clear of the column that stays put',
+          reached.isButton && reached.clear,
+          JSON.stringify(reached),
+        );
+        note(
+          "a sort button's focus ring is drawn inside it, where the box cannot cut it",
+          reached.inside,
+        );
+      } finally {
+        await narrow.close();
+      }
+    },
+  );
 
   await step('sign in, close the browser, come back', async () => {
     const first = await launch();

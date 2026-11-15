@@ -14,5 +14,10 @@ export type {
   MigrationRunResult,
 } from './migration-types.ts';
 export { pgliteDriver } from './pglite-driver.ts';
-export { connectPostgresDriver, type PostgresDriverOptions } from './postgres-driver.ts';
+export {
+  connectPostgresDriver,
+  type ConnectedTo,
+  type PostgresDriver,
+  type PostgresDriverOptions,
+} from './postgres-driver.ts';
 export { defaultMigrationRunOptions, runMigrations } from './run-migrations.ts';

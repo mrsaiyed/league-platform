@@ -22,7 +22,7 @@ import type { StatRow, StatsColumn } from '@srleagues/ui';
 import type { LeagueClock } from '../../server/public-schedule.ts';
 import type { PublicStatsSettings } from '../../server/public-stats.ts';
 import { locale, t } from '../../server/messages.ts';
-import { gameView, type GameView } from '../schedule-pages/index.ts';
+import { comingOrder, gameView, type GameView } from '../schedule-pages/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
 
 export type TeamCard = {
@@ -121,7 +121,7 @@ const timeOf = (g: PublicGame): number | undefined =>
       ? Date.parse(`${g.localDate}T12:00:00Z`)
       : undefined;
 
-/** One team's games: the ones still to play by time (no time last), the finished ones newest first. */
+/** One team's games: the ones still to play, the next one first; the finished ones newest first. */
 export function buildTeamGames(
   schedule: PublicSchedule | undefined,
   teamSlug: string,
@@ -140,11 +140,11 @@ export function buildTeamGames(
       (a, b) => (timeOf(b) ?? Number.NEGATIVE_INFINITY) - (timeOf(a) ?? Number.NEGATIVE_INFINITY),
     )
     .map(view);
+  // The next game the team can go to comes first; a postponed game, which has no day to
+  // come, comes last (comingOrder), never first on the strength of its old date.
   const upcoming = mine
     .filter((g) => !decided(g) && g.status !== 'cancelled')
-    .sort(
-      (a, b) => (timeOf(a) ?? Number.POSITIVE_INFINITY) - (timeOf(b) ?? Number.POSITIVE_INFINITY),
-    )
+    .sort(comingOrder(clock))
     .map(view);
   return { upcoming, results };
 }
@@ -214,7 +214,7 @@ export async function loadTeamStats(
     },
   }));
   const totalsColumns: StatsColumn[] = [
-    { key: 'team', label: t('team.totalsRow') },
+    { key: 'team', label: t('stats.col.team') },
     ...statColumns,
   ];
   const totalsRows: StatRow[] =
@@ -232,6 +232,7 @@ export async function loadTeamStats(
                 }),
               ),
             },
+            chips: { team: team.color },
           },
         ];
   const hasNumbers =
@@ -251,9 +252,9 @@ export type TeamPageData = {
   };
   readonly teamId: string;
   readonly seedText: string;
+  /** The seed alone ("1"), or the words for a team with no place yet. */
+  readonly seedValue: string;
   readonly recordText: string;
-  /** The line under the team's name, whole: seed, record and, if it has one, division. */
-  readonly headline: string;
   readonly statsShown: 'player_lines' | 'team_totals';
 };
 
@@ -298,15 +299,8 @@ export async function loadTeamHead(
     },
     teamId: row.id,
     seedText,
+    seedValue: record.seed === null ? t('teams.noSeed') : String(record.seed),
     recordText: recordText(record),
-    headline:
-      division === undefined
-        ? t('team.headline', { seed: seedText, record: recordText(record) })
-        : t('team.headlineDivision', {
-            seed: seedText,
-            record: recordText(record),
-            name: division.name,
-          }),
     statsShown: shown.statsShown,
   };
 }

@@ -2,13 +2,13 @@
 // the step 2.32 snapshot, both read as a visitor (step 2.45; P7 §5.3; S-7, S-22). Only
 // words and numbers leave here; the page and its live part draw them.
 import type { GamePage, PlayLine } from '@srleagues/core';
-import type { BoxScoreColumn, BoxScorePlayer } from '@srleagues/ui';
+import type { BoxScoreColumn, BoxScorePlayer, PlayRow } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { locale, t } from '../../server/messages.ts';
 import { hasStatLabel, statLabel } from '../stats-pages/index.ts';
+import { formatClock } from './clock.ts';
 import {
   boxScoreName,
-  periodClockText,
   periodName,
   playSentence,
   playerText,
@@ -92,6 +92,7 @@ export function liveGameLabels(status: string): LiveGameLabels {
     playersHidden: t('game.playersHidden'),
     nameNotShown: t('game.nameNotShown'),
     jerseyOnly: t('game.jerseyOnly'),
+    playersTitle: t('game.liveStats'),
     columns: [column('points'), column('fouls')],
     scoreboard: labels.scoreboard,
     boxScore: labels.boxScore,
@@ -127,6 +128,22 @@ export function startText(
   if (notPlayed) return t('game.wasSetFor', { when });
   if (decided) return t('game.playedOn', { when });
   return t(status === 'live' ? 'game.scheduledFor' : 'game.startsAt', { when });
+}
+
+/**
+ * The line under the page's title. A game under way has none: the time it was set for is
+ * not the time it started, which the page does not have, and the board shows its clock.
+ * A game with no day yet has none either: the board says "Date to be announced", once.
+ * Every other game says when it starts, was played, or was set for (startText).
+ */
+export function titleLine(
+  startsAt: string | null,
+  timeZone: string,
+  status: string,
+): string | null {
+  if (status === 'live') return null;
+  if (status === 'scheduled' && startsAt === null) return null;
+  return startText(startsAt, timeZone, status);
 }
 
 /** "Corrected on 14 Nov 2026": the date only, never the reason (S-7); null if never corrected. */
@@ -199,32 +216,100 @@ export function buildBoxScores(page: GamePage): BoxScoresView {
 const playerOf = (words: GameWords, ref: PlayLine['player'] | undefined): string | null =>
   ref === null || ref === undefined ? null : playerText(words, ref.name, ref.jersey);
 
-/** The play-by-play, newest first, one sentence each. */
-export function buildPlays(page: GamePage, words: GameWords): readonly string[] {
+/** The plays of one period, as the play-by-play draws them: one table a period. */
+export type PlayPeriodView = {
+  readonly key: string;
+  /** "Half 2"; "Before the start" for plays recorded before the first period. */
+  readonly title: string;
+  readonly rows: readonly PlayRow[];
+};
+
+/**
+ * The play-by-play, newest first, a period at a time: each play's clock, its sentence, its
+ * team's color, and the score after a basket (away team first, as on the scoreboard).
+ */
+export function buildPlays(page: GamePage, words: GameWords): readonly PlayPeriodView[] {
   const periods = page.scoreboard.periods ?? 4;
   const teamName = (side: PlayLine['side']) => (side === null ? null : page.scoreboard[side].name);
-  return [...page.plays].reverse().map((line) => {
-    const play = playSentence(words, {
-      type: line.type,
-      team: teamName(line.side),
-      player: playerOf(words, line.player),
-      points: line.points,
-      playerIn: playerOf(words, line.playersIn[0]),
-      playerOut: playerOf(words, line.playersOut[0]),
-      period: line.period === null ? null : periodName(words, line.period, periods),
-    });
-    const score = {
-      play,
+  const colorOf = (side: 'home' | 'away') =>
+    page.boxScores.find((box) => box.side === side)?.color ?? null;
+  const groups: { key: string; title: string; rows: PlayRow[] }[] = [];
+  for (const line of [...page.plays].reverse()) {
+    const title =
+      line.period === null ? t('game.playsBeforeStart') : periodName(words, line.period, periods);
+    let group = groups.at(-1);
+    if (group === undefined || group.title !== title) {
+      group = { key: `${groups.length}-${line.period ?? 0}`, title, rows: [] };
+      groups.push(group);
+    }
+    const names = {
       away: page.scoreboard.away.name,
       awayScore: line.score.away,
       home: page.scoreboard.home.name,
       homeScore: line.score.home,
     };
-    return line.period !== null && line.clockMs !== null
-      ? t('game.playLine', {
-          ...score,
-          clock: periodClockText(words, line.period, periods, line.clockMs),
-        })
-      : t('game.playLineNoClock', score);
-  });
+    group.rows.push({
+      key: String(line.number),
+      clock: line.clockMs === null ? '' : formatClock(line.clockMs),
+      text: playSentence(words, {
+        type: line.type,
+        team: teamName(line.side),
+        player: playerOf(words, line.player),
+        points: line.points,
+        playerIn: playerOf(words, line.playersIn[0]),
+        playerOut: playerOf(words, line.playersOut[0]),
+        period: line.period === null ? null : periodName(words, line.period, periods),
+      }),
+      ...(line.side === null ? {} : { team: { color: colorOf(line.side) } }),
+      ...(line.type === 'score'
+        ? { score: { text: t('game.playScore', names), spoken: t('game.playScoreSpoken', names) } }
+        : {}),
+    });
+  }
+  return groups;
+}
+
+/** What the scoreboard shows beside the scores: nothing here changes while a game is played. */
+export type GameBoard = {
+  readonly colors: { readonly home: string | null; readonly away: string | null };
+  /** A game still to play: its day and, when it has one, its time, in the league's own zone. */
+  readonly when?: { readonly day: string; readonly time?: string } | undefined;
+  /** Where it is played: the venue, and the court when it has one. */
+  readonly placeText?: string | undefined;
+};
+
+/** The two teams' own colors, as the game's page read them. */
+export const boardColors = (page: GamePage): GameBoard['colors'] => ({
+  home: page.boxScores.find((box) => box.side === 'home')?.color ?? null,
+  away: page.boxScores.find((box) => box.side === 'away')?.color ?? null,
+});
+
+/**
+ * The day and time a game still to play is set for, short, for between the teams on the
+ * scoreboard. Nothing for any other game: a postponed game's old date is never drawn as
+ * if it were still coming.
+ */
+export function boardWhen(
+  startsAt: string | null,
+  timeZone: string,
+  status: string,
+): GameBoard['when'] {
+  if (status !== 'scheduled') return undefined;
+  if (startsAt === null) return { day: t('game.noDate') };
+  const at = new Date(startsAt);
+  const part = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(locale, { ...options, timeZone }).format(at);
+  return {
+    day: part({ weekday: 'short', month: 'short', day: 'numeric' }),
+    time: part({ hour: 'numeric', minute: '2-digit' }),
+  };
+}
+
+/** The pill of a game not played or decided off the court; undefined for every other game. */
+export function boardStateText(status: string): string | undefined {
+  const labels = displayLabels(t).game;
+  if (status === 'forfeit') return labels.forfeit;
+  if (status === 'postponed') return labels.postponed;
+  if (status === 'cancelled') return labels.cancelled;
+  return undefined;
 }

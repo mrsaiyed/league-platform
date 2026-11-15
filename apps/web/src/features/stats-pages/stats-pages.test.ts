@@ -87,6 +87,35 @@ describe('statistics page', () => {
     expect(data.leaders[0]?.rows[0]?.cells['player']).toBe('1. Dana Whitfield');
   });
 
+  it("carries each team's color for its chip, and a player's only team's color", async () => {
+    const data = await statsFor(adult);
+    const hex = /^#[0-9a-f]{6}$/i;
+    for (const row of data.teamRows) expect(row.chips?.['team']).toMatch(hex);
+    const colorOfTeam = new Map(data.teamRows.map((r) => [r.cells['team'], r.chips?.['team']]));
+    expect(new Set(colorOfTeam.values()).size).toBe(data.teamRows.length);
+    const dana = data.playerRows.find((r) => r.cells['player'] === 'Dana Whitfield');
+    expect(dana?.chips?.['team']).toBe(colorOfTeam.get('Falcons'));
+    const text = html(data);
+    expect(text).toContain(`--team-color:${colorOfTeam.get('Falcons')}`);
+    // One chip for each team in the teams table and one beside each player's team.
+    expect(text.match(/ui-team-chip/g)).toHaveLength(data.teamRows.length + data.playerRows.length);
+  });
+
+  it('gives an empty page a next step when it is told where the schedule is', async () => {
+    const data = await statsFor(adult);
+    const empty = { ...data, playerRows: [], teamRows: [] };
+    const told = renderToStaticMarkup(
+      createElement(StatsTables, { data: empty, scheduleHref: '/north-valley/schedule' }),
+    );
+    expect(told).toContain('Statistics appear here once games have been played.');
+    expect(told).toContain('<a class="ui-button" href="/north-valley/schedule">');
+    expect(html(empty)).not.toContain('<a');
+    const standings = renderToStaticMarkup(
+      createElement(StandingsTables, { tables: [], scheduleHref: '/north-valley/schedule' }),
+    );
+    expect(standings).toContain('<a class="ui-button" href="/north-valley/schedule">');
+  });
+
   it("follows the league's minimum games for leaders but keeps the player in the full table", async () => {
     const data = await statsFor(adult);
     const leaders = data.leaders.flatMap((b) => b.rows.map((r) => r.id));

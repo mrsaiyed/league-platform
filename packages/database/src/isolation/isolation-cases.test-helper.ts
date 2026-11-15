@@ -238,10 +238,13 @@ const newLeagueInput = (accountId: string | null) => ({
 
 registerIsolationCase({
   subject: createLeague,
-  name: 'create a league owned by the run account, in a fresh league id',
+  name: 'create a league owned by the run account, with its first season, in a fresh league id',
   run: (scope) =>
     inFreshLeague(scope, (fresh) =>
-      runAsApp(createLeague, harnessTx, fresh, newLeagueInput(scope.accountId)),
+      runAsApp(createLeague, harnessTx, fresh, {
+        ...newLeagueInput(scope.accountId),
+        firstSeason: { slug: 'harness-first', name: 'Harness first season' },
+      }),
     ),
 });
 
@@ -253,6 +256,8 @@ registerIsolationCase({
       const created = await insertLeague(fresh, {
         ...newLeagueInput(scope.accountId),
         listed: true,
+        contactEmail: 'harness@example.test',
+        city: 'Harness City',
         defaultProgram: { slug: 'main', name: 'Main', sportKey: 'basketball' },
       });
       // A refusal leaves the transaction unusable, as the commands treat it: roll back.
