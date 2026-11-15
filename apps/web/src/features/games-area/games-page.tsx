@@ -1,12 +1,29 @@
-// `/{league}/admin/games`: this week's games, and the changes this person may make to
-// each (steps 2.55, 2.154 and 2.155). Every form here is answered without the address
-// (T-271, record 067): a refusal or the question before a final score is saved in the
-// response to the post, beside the game (final-score-boxes.tsx, action-form.tsx); a save
-// by the one-time notice, read here once, which names the game and is said beside it.
-import { leagueUrl, listMyGames, type LeagueAddressee } from '@srleagues/core';
+// `/{league}/admin/games`: the games that still need a result, however old, then today,
+// this week by day, and earlier games a round at a time (step 2.156), and the changes this
+// person may make to each (steps 2.55, 2.154 and 2.155). Every form here is answered
+// without the address (T-271, record 067): a refusal or the question before a final score
+// is saved in the response to the post, beside the game (final-score-boxes.tsx,
+// action-form.tsx); a save by the one-time notice, read here once, which names the game
+// and is said beside it.
+import {
+  earlierRoundGamesLimit,
+  earlierRoundsLimit,
+  getBoxScoreSheet,
+  leagueUrl,
+  listEarlierGames,
+  listGamesNeedingResult,
+  listMyGames,
+  needsResultLimit,
+  type CommandContext,
+  type CommandDeps,
+  type LeagueAddressee,
+  type MyGame,
+  type TrackerTx,
+} from '@srleagues/core';
 import { displayLabels } from '@srleagues/site';
-import { GameCard } from '@srleagues/ui';
+import { EmptyPanel, FilterToolbar, GameCard, PageHead, RoundPicker, Section } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
+import type { GameNames } from '../../server/games-area-ports.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { gameWhenText, type LeagueTimes } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -21,13 +38,21 @@ import {
 } from './actions.ts';
 import { buildGameRows, type GameRowView } from './build-games-view.ts';
 import { FinalScoreBoxes, type FinalScoreTexts } from './final-score-boxes.tsx';
+import { dayHeadingText, earlierRoundText } from './game-day-text.ts';
+import { gamesSections } from './games-sections.ts';
 import { readReopenViews } from './read-reopen-views.ts';
 import { ReopenLine } from './reopen-line.tsx';
 import { SavedLine } from './saved-line.tsx';
 import { gameAnchor } from './score-fields.ts';
 
+/** What the words of a saved notice read of the game it names. */
+type NamedGame = Pick<
+  GameRowView,
+  'homeName' | 'awayName' | 'homeScore' | 'awayScore' | 'hasPlays'
+>;
+
 /** "Tigers 47, Lions 51": both teams and the score, away team first, as on the card. */
-function resultText(game: GameRowView, homeScore: number | string, awayScore: number | string) {
+function resultText(game: NamedGame, homeScore: number | string, awayScore: number | string) {
   return t('admin.games.result', {
     away: game.awayName,
     awayScore: String(awayScore),
@@ -37,7 +62,7 @@ function resultText(game: GameRowView, homeScore: number | string, awayScore: nu
 }
 
 /** "Tigers at Lions". */
-const gameText = (game: GameRowView) =>
+const gameText = (game: NamedGame) =>
   t('admin.games.game', { away: game.awayName, home: game.homeName });
 
 const savedKeys = ['forfeit', 'postpone', 'cancel'] as const;
@@ -46,7 +71,7 @@ const savedKeys = ['forfeit', 'postpone', 'cancel'] as const;
  * What was just saved, as words, naming the game, read from the game as it is now: a
  * final score names its score too ("Saved: Tigers 47, Lions 51 is final.").
  */
-function noticeText(notice: SavedNotice, game: GameRowView | undefined): string {
+function noticeText(notice: SavedNotice, game: NamedGame | undefined): string {
   const said = notice.said;
   if (said === 'reopen') {
     return t(
@@ -115,6 +140,7 @@ function Controls({
   reopened,
   times,
   now,
+  round,
 }: {
   readonly league: string;
   readonly here: LeagueAddressee;
@@ -124,10 +150,16 @@ function Controls({
   readonly times: LeagueTimes;
   /** The server's time now (ms), to say when a game's time has not come. */
   readonly now: number;
+  /** The earlier round the game is shown in, kept in its place's address. */
+  readonly round: string | undefined;
 }) {
   const trackerHref = leagueUrl(here, 'score', { game: game.id });
   const gameHref = leagueUrl(here, 'admin-area', { area: 'games', subpath: [game.id] });
-  const permalink = `${leagueUrl(here, 'admin-area', { area: 'games' })}#${gameAnchor(game.id)}`;
+  const list = leagueUrl(here, 'admin-area', {
+    area: 'games',
+    query: round === undefined ? undefined : { round },
+  });
+  const permalink = `${list}#${gameAnchor(game.id)}`;
   // A refusal names the game ("Tigers at Lions: …").
   const refusal = t('admin.games.refusedAbout', { game: gameText(game), problem: '{problem}' });
   const early =
@@ -218,79 +250,283 @@ function Controls({
   );
 }
 
-/** `/{league}/admin/games`: this week's games, and the changes this person may make to each. */
+/** What every game on the page is drawn with. */
+type ListScene = {
+  readonly league: string;
+  readonly here: LeagueAddressee;
+  readonly times: LeagueTimes;
+  readonly now: number;
+  readonly labels: ReturnType<typeof displayLabels>['game'];
+  /** The game a notice is about, and its words, when it is on the page. */
+  readonly saved: { readonly row: GameRowView; readonly text: string } | undefined;
+  readonly reopenedId: string | undefined;
+};
+
+/** One list of games, each with who scores it and what this person may do to it. */
+function GameList({
+  rows,
+  scene,
+  round,
+}: {
+  readonly rows: readonly GameRowView[];
+  readonly scene: ListScene;
+  /** The earlier round these are shown in, if they are. */
+  readonly round?: string;
+}) {
+  const { here, times, now, labels, saved } = scene;
+  return (
+    <ul className="admin-game-list ui-list">
+      {rows.map((game) => (
+        <li key={game.id} id={gameAnchor(game.id)} className="ui-stack">
+          <div className="ui-stack">
+            {saved !== undefined && game === saved.row ? <SavedLine text={saved.text} /> : null}
+            <GameCard
+              home={{ name: game.homeName, score: game.homeScore }}
+              away={{ name: game.awayName, score: game.awayScore }}
+              status={game.status}
+              whenText={gameWhenText(game.startsAt, times)}
+              {...(game.status === 'scheduled' &&
+              game.startsAt !== null &&
+              Date.parse(game.startsAt) <= now
+                ? { note: t('schedule.awaitingResult') }
+                : {})}
+              {...(game.status === 'final' || game.status === 'forfeit'
+                ? { detailsHref: leagueUrl(here, 'game', { game: game.id }) }
+                : {})}
+              labels={labels}
+            />
+            <p>
+              {game.scorekeepers.length === 0
+                ? t('admin.games.noScorekeeper')
+                : t('admin.games.scorekeeper', { names: game.scorekeepers.join(', ') })}
+            </p>
+            <Controls
+              league={scene.league}
+              here={here}
+              game={game}
+              reopened={game.id === scene.reopenedId}
+              times={times}
+              now={now}
+              round={round}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** One of the page's parts: its games, or a calm line when it has none. */
+function Part({
+  rows,
+  empty,
+  scene,
+}: {
+  readonly rows: readonly GameRowView[];
+  readonly empty: string;
+  readonly scene: ListScene;
+}) {
+  return rows.length === 0 ? <EmptyPanel text={empty} /> : <GameList rows={rows} scene={scene} />;
+}
+
+/**
+ * `/{league}/admin/games` (steps 2.55 and 2.156): the games that still need a result, however
+ * old, then today, this week by day, and earlier games a round at a time, and the changes
+ * this person may make to each. `round` is the earlier round asked for in the address
+ * (navigation only, never a form's answer: record 067).
+ */
 export async function GamesPage({
   league,
+  round,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
+  readonly round: string | undefined;
 }) {
   const view = await loadLeaguePage(league, 'admin', 'games');
   const addressee = view.context.league;
   const ports = await webPorts();
   const context = commandContextOf(view.context);
-  // Which games are listed is the command's own rule: a scorekeeper in a league that
+  // Which games are listed is the commands' own rule: a scorekeeper in a league that
   // scores assigned games only gets only theirs (P4 §4).
+  const needs = await listGamesNeedingResult(context, {}, ports.games.deps);
   const listed = await listMyGames(context, {}, ports.games.deps);
-  const games = listed.ok ? listed.value.games : [];
+  const earlier = await listEarlierGames(
+    context,
+    round === undefined ? {} : { round },
+    ports.games.deps,
+  );
+  const ok = needs.ok && listed.ok && earlier.ok;
+  const today = listed.ok ? listed.value.today : '';
+  const sections = gamesSections(
+    needs.ok ? needs.value.games : [],
+    listed.ok ? listed.value.games : [],
+    today,
+  );
+  const shownRound = earlier.ok ? earlier.value.shown : null;
+  const games = [
+    ...sections.needsResult,
+    ...sections.today,
+    ...sections.days.flatMap((d) => d.games),
+    ...(shownRound?.games ?? []),
+  ];
   const holder = await ports.accessOf(context);
   const reopens = await readReopenViews(games, context, holder, ports.games.deps);
-  const rows = buildGameRows(games, await ports.games.namesOf(addressee.id), holder, reopens);
+  const names = await ports.games.namesOf(addressee.id);
+  const rowsOf = (of: readonly MyGame[]) => buildGameRows(of, names, holder, reopens);
   const { timeZone } = await ports.publicSchedule.clockOf(addressee.id);
   const times: LeagueTimes = { locale, timeZone };
-  const labels = displayLabels(t).game;
   // What was just saved, taken (so a reload does not say it again): said beside its game;
-  // at the top only when the game is not listed.
+  // at the top when the game is not on the page (a result entered under "Needs a result"
+  // takes the game to its earlier round), naming it from the game as it is now.
   const noticeHolder = noticeHolderOf(context);
   const notice =
     noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'games');
-  const aboutRow = rows.find((row) => row.id === notice?.thing);
-  const saved = notice === undefined ? undefined : noticeText(notice, aboutRow);
-  const now = Date.now();
+  const aboutRow = rowsOf(games.filter((g) => g.id === notice?.thing))[0];
+  const offPage =
+    notice === undefined || aboutRow !== undefined
+      ? undefined
+      : await gameNamedOff(notice.thing, context, names, ports.games.deps);
+  const saved = notice === undefined ? undefined : noticeText(notice, aboutRow ?? offPage);
+  const scene: ListScene = {
+    league,
+    here: addressee,
+    times,
+    now: Date.now(),
+    labels: displayLabels(t).game,
+    saved:
+      aboutRow === undefined || saved === undefined ? undefined : { row: aboutRow, text: saved },
+    reopenedId: notice?.said === 'reopen' ? notice.thing : undefined,
+  };
+  // The same row object for a game wherever it is drawn, so its notice is beside it.
+  const rows = (of: readonly MyGame[]) =>
+    rowsOf(of).map((row) => (row.id === aboutRow?.id ? aboutRow : row));
+  const earlierRounds = earlier.ok ? earlier.value.rounds : [];
+  const severalSeasons = new Set(earlierRounds.map((r) => r.seasonId)).size > 1;
+  const roundOptions = earlierRounds.map((r) => ({
+    value: r.key,
+    label: earlierRoundText(r, severalSeasons ? names.seasons[r.seasonId] : undefined, locale),
+  }));
+  const list = leagueUrl(addressee, 'admin-area', { area: 'games' });
   return (
     <main className="admin-games">
-      <h1>{t('admin.area.games')}</h1>
-      <p>{t('admin.games.intro')}</p>
+      <PageHead title={t('admin.area.games')} sub={t('admin.games.intro')}>
+        <a className="ui-more" href={`${list}#earlier`}>
+          {t('admin.games.toEarlier')}
+        </a>
+      </PageHead>
       {saved === undefined || aboutRow !== undefined ? null : <SavedLine text={saved} />}
       {games.some((g) => !g.scorable) ? <p>{t('admin.games.notScorable')}</p> : null}
-      {!listed.ok ? (
-        <p role="alert">{t('admin.games.listProblem')}</p>
-      ) : rows.length === 0 ? (
-        <p>{t('admin.games.empty')}</p>
+      {!ok ? (
+        <p className="ui-notice" data-kind="error" role="alert">
+          {t('admin.games.listProblem')}
+        </p>
       ) : (
-        <ul className="admin-game-list ui-list">
-          {rows.map((game) => (
-            <li key={game.id} id={gameAnchor(game.id)} className="ui-stack">
+        <>
+          <Section
+            title={t('admin.games.needsResult.title')}
+            note={t('admin.games.needsResult.note')}
+          >
+            <Part
+              rows={rows(sections.needsResult)}
+              empty={t('admin.games.needsResult.empty')}
+              scene={scene}
+            />
+            {needs.ok && needs.value.more ? (
+              <p className="ui-section-note">
+                {t('admin.games.needsResult.more', { count: String(needsResultLimit) })}
+              </p>
+            ) : null}
+          </Section>
+          <Section title={t('admin.games.todayTitle')}>
+            <Part rows={rows(sections.today)} empty={t('admin.games.todayEmpty')} scene={scene} />
+          </Section>
+          <Section title={t('admin.games.weekTitle')}>
+            {sections.days.length === 0 ? (
+              <EmptyPanel text={t('admin.games.weekEmpty')} />
+            ) : (
               <div className="ui-stack">
-                {saved !== undefined && game === aboutRow ? <SavedLine text={saved} /> : null}
-                <GameCard
-                  home={{ name: game.homeName, score: game.homeScore }}
-                  away={{ name: game.awayName, score: game.awayScore }}
-                  status={game.status}
-                  whenText={gameWhenText(game.startsAt, times)}
-                  {...(game.status === 'final' || game.status === 'forfeit'
-                    ? { detailsHref: leagueUrl(addressee, 'game', { game: game.id }) }
-                    : {})}
-                  labels={labels}
-                />
-                <p>
-                  {game.scorekeepers.length === 0
-                    ? t('admin.games.noScorekeeper')
-                    : t('admin.games.scorekeeper', { names: game.scorekeepers.join(', ') })}
-                </p>
-                <Controls
-                  league={league}
-                  here={addressee}
-                  game={game}
-                  reopened={game === aboutRow && notice?.said === 'reopen'}
-                  times={times}
-                  now={now}
-                />
+                {sections.days.map((d) => (
+                  <section key={d.day} className="ui-stack" aria-labelledby={`day-${d.day}`}>
+                    <h3 id={`day-${d.day}`}>{dayHeadingText(d.day, today, locale)}</h3>
+                    <GameList rows={rows(d.games)} scene={scene} />
+                  </section>
+                ))}
               </div>
-            </li>
-          ))}
-        </ul>
+            )}
+          </Section>
+          <div id="earlier">
+            <Section title={t('admin.games.earlier.title')} note={t('admin.games.earlier.note')}>
+              {roundOptions.length === 0 ? (
+                <EmptyPanel text={t('admin.games.earlier.empty')} />
+              ) : (
+                <div className="ui-stack">
+                  <FilterToolbar label={t('admin.games.earlier.filters')}>
+                    <RoundPicker
+                      label={t('admin.games.earlier.round')}
+                      submitLabel={t('admin.games.earlier.show')}
+                      action={`${list}#earlier`}
+                      value={shownRound?.round.key ?? ''}
+                      options={[
+                        { value: '', label: t('admin.games.earlier.choose') },
+                        ...roundOptions,
+                      ]}
+                    />
+                  </FilterToolbar>
+                  {earlier.ok && earlier.value.moreRounds ? (
+                    <p className="ui-section-note">
+                      {t('admin.games.earlier.moreRounds', { count: String(earlierRoundsLimit) })}
+                    </p>
+                  ) : null}
+                  {shownRound === null ? (
+                    <p className="ui-section-note">{t('admin.games.earlier.pick')}</p>
+                  ) : (
+                    <section className="ui-stack" aria-labelledby="earlier-round">
+                      <h3 id="earlier-round">
+                        {roundOptions.find((o) => o.value === shownRound.round.key)?.label}
+                      </h3>
+                      <GameList
+                        rows={rows(shownRound.games)}
+                        scene={scene}
+                        round={shownRound.round.key}
+                      />
+                      {shownRound.more ? (
+                        <p className="ui-section-note">
+                          {t('admin.games.earlier.moreGames', {
+                            count: String(earlierRoundGamesLimit),
+                          })}
+                        </p>
+                      ) : null}
+                    </section>
+                  )}
+                </div>
+              )}
+            </Section>
+          </div>
+        </>
       )}
     </main>
   );
+}
+
+/**
+ * A game a notice is about that is not on the page, named from its record as it is now (a
+ * result just entered moves it to its earlier round), or undefined if it cannot be read.
+ */
+async function gameNamedOff(
+  gameId: string,
+  context: CommandContext,
+  names: GameNames,
+  deps: CommandDeps<TrackerTx>,
+): Promise<NamedGame | undefined> {
+  const sheet = await getBoxScoreSheet(context, { gameId }, deps);
+  if (!sheet.ok) return undefined;
+  const game = sheet.value.game;
+  return {
+    homeName: names.teams[game.homeTeamId] ?? '',
+    awayName: names.teams[game.awayTeamId] ?? '',
+    homeScore: game.homeScore,
+    awayScore: game.awayScore,
+    hasPlays: false,
+  };
 }

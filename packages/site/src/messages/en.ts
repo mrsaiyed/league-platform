@@ -593,10 +593,40 @@ export const en = {
   'admin.myGames.archived': 'This league is archived, so its games cannot be scored or changed.',
   'admin.myGames.suspended': 'This league is suspended, so its games cannot be scored or changed.',
   // The games area (step 2.55).
-  'admin.games.intro': 'The games of today and the week ahead.',
+  // Step 2.156: the games that still need a result come first, however old, then today,
+  // the week by day, and earlier games a round at a time.
+  'admin.games.intro':
+    'Games that still need a result come first, then today, this week and earlier games.',
   'admin.games.listProblem':
     'The games could not be shown. You may not have access to score or change games here.',
-  'admin.games.empty': 'There are no games this week.',
+  'admin.games.toEarlier': 'Earlier games',
+  'admin.games.needsResult.title': 'Needs a result',
+  'admin.games.needsResult.note':
+    'Games whose start has passed and that have no result yet, oldest first.',
+  'admin.games.needsResult.empty': 'Every game that has started has its result.',
+  'admin.games.needsResult.more':
+    'Only the oldest {count} are shown. Enter their results and the next ones appear here.',
+  'admin.games.todayTitle': 'Today',
+  'admin.games.todayEmpty': 'No more games today.',
+  'admin.games.weekTitle': 'This week',
+  'admin.games.weekEmpty': 'No more games in the next six days.',
+  'admin.games.tomorrow': 'Tomorrow',
+  'admin.games.earlier.title': 'Earlier games',
+  'admin.games.earlier.note':
+    'Finished, forfeited, postponed and cancelled games from before today, one round at a time, to look back or correct a result.',
+  'admin.games.earlier.empty': 'There are no earlier games yet.',
+  'admin.games.earlier.filters': 'Earlier games',
+  'admin.games.earlier.round': 'Round',
+  'admin.games.earlier.choose': 'Choose a round',
+  'admin.games.earlier.show': 'Show',
+  'admin.games.earlier.pick': 'Choose a round to see its games.',
+  'admin.games.earlier.roundNumber': 'Round {number}',
+  'admin.games.earlier.noRound': 'Games outside a round',
+  'admin.games.earlier.option': '{round}, {days} ({count})',
+  'admin.games.earlier.optionSeason': '{round}, {season}, {days} ({count})',
+  'admin.games.earlier.days': '{first} to {last}',
+  'admin.games.earlier.moreRounds': 'Only the latest {count} rounds are offered.',
+  'admin.games.earlier.moreGames': 'Only the first {count} games of this round are shown.',
   'admin.games.scorekeeper': 'Scorekeeper: {names}',
   'admin.games.noScorekeeper': 'No scorekeeper yet',
   'admin.games.scoreOf': 'Score for {team}',

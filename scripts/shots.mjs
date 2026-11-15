@@ -108,6 +108,38 @@ const gamePages = {
 const gamesStates = [
   { name: 'admin-games-boxes-open', at: '/admin/games', onlyIn: leagues[0], tap: openBoxes(1) },
   {
+    // Step 2.156: the game played three days ago with no score, first under "Needs a
+    // result", made final: "Saved" names it at the top, and it has left that list.
+    name: 'admin-games-needs-saved',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = page.locator(`li[id="game-${listedGame(13, 20)}"]`);
+      await game.locator('[data-score-boxes] > summary').click();
+      await game.locator('input[name="awayScore"]').fill('45');
+      await game.locator('input[name="homeScore"]').fill('50');
+      await game.locator('[data-score-boxes] button[type="submit"]').click();
+      await game.getByRole('button', { name: 'Yes, make it final' }).click();
+      await page.getByRole('status').filter({ hasText: 'Saved' }).waitFor();
+    },
+  },
+  {
+    // Step 2.156: "Earlier games" with its latest round chosen, a round at a time.
+    name: 'admin-games-earlier',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      const picker = page.locator('#earlier select[name="round"]');
+      const latest = await picker.locator('option').nth(1).getAttribute('value');
+      await Promise.all([
+        page.waitForURL((url) => url.searchParams.get('round') === latest),
+        picker.selectOption(latest ?? ''),
+      ]);
+      await page.locator('#earlier li[id^="game-"]').first().waitFor();
+    },
+  },
+  {
     name: 'admin-games-question',
     at: '/admin/games',
     onlyIn: leagues[0],
