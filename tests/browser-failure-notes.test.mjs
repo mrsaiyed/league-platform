@@ -20,6 +20,12 @@ const machine = [
   ['time zone', 'UTC (UTC+00:00; TZ not set)'],
   ['time (UTC)', '2026-11-15T11:40:19.000Z'],
 ];
+/**
+ * The heading sayOnFailure prints above a Next.js run's last lines, built as it builds it, so
+ * the scan of starters (tests/web-listen.test.mjs) does not read a made-up line as one.
+ */
+const lastOf = (count, command, how) =>
+  `The last ${count} lines \`next ${command}\` printed (${how}):`;
 const chain = [
   '> league-platform@0.1.0 test:web:browser',
   '> node tests/browser/web-exit-test.mjs && node tests/browser/made-up-test.mjs --no-build',
@@ -36,7 +42,7 @@ test('a failing check: the file, the check and the machine are named', () => {
       'Made-up browser check failed:',
       '  the made-up league home shows its name',
       '  accessibility: the made-up league home: low contrast 2.10:1 in "Made-up"',
-      'The last 2 lines `next start` printed (the test had stopped it):',
+      lastOf(2, 'start', 'the test had stopped it'),
       '  | ▲ Next.js 15.0.0',
       '  | ✓ Ready in 300ms',
     ].join('\n'),
@@ -66,7 +72,7 @@ test('a build that fails before any check: its own error is named', () => {
       '+ node tests/browser/web-exit-test.mjs',
       'Browser exit-test check failed:',
       '  building the web app: next build failed or took over 10 minutes',
-      'The last 4 lines `next build` printed (it ended with code 1):',
+      lastOf(4, 'build', 'it ended with code 1'),
       '  |    ▲ Next.js 15.0.0',
       '  | Failed to compile.',
       "  | ./src/server/made-up.ts:3:1 Module not found: Can't resolve './Made-Up-Name'",
@@ -97,7 +103,7 @@ test('a server that never answers: the server is named, with what it printed', (
       '+ node tests/browser/made-up-test.mjs --no-build',
       'Made-up browser check failed:',
       '  starting the server and the browser: the server did not answer within 90 seconds:',
-      'The last 2 lines `next start` printed (it ended with code 1):',
+      lastOf(2, 'start', 'it ended with code 1'),
       '  | Error: listen EADDRINUSE: address already in use :::3000',
       '  |     at Server.setupListenHandle (node:net:1908:16)',
     ].join('\n'),
@@ -142,7 +148,7 @@ test('a check listed with "- " is not named a second time as an error', () => {
       '+ node tests/browser/made-up-test.mjs --no-build',
       'Made-up browser test failed:',
       '- with plays waiting, signing out asks first: locator.waitFor: Timeout 30000ms exceeded.',
-      'The last 1 lines `next start` printed (the test had stopped it):',
+      lastOf(1, 'start', 'the test had stopped it'),
       '  | ✓ Ready in 123ms',
     ].join('\n'),
   );
