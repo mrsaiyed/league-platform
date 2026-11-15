@@ -8,6 +8,7 @@ import {
   dropOn,
   padAtRest,
   padFor,
+  padIsFor,
   padTap,
   startShortHanded,
   subTap,
@@ -55,9 +56,11 @@ describe('picking the starters (C1, C2)', () => {
       side: 'home',
       playerIds: ['h5', 'h7', 'h9', 'h11', 'h13'],
     });
-    // The picks are done with; the other team's stay.
-    expect(picks).toEqual({ home: [], away: ['a3'] });
+    // The five stay picked until the lineup is taken, so a refusal loses no tap; once
+    // the team's lineup is set the view no longer shows them.
+    expect(picks).toEqual({ home: ['h5', 'h7', 'h9', 'h11', 'h13'], away: ['a3'] });
     if (lineup === null) throw new Error('no lineup');
+    expect(viewOf(after(game, lineup), picks).teams.home.picks).toEqual([]);
     expect(basketball.derive(after(game, lineup)).teams.home.onCourt).toEqual([
       'h5',
       'h7',
@@ -118,6 +121,17 @@ describe('a player’s options (D4, D5)', () => {
     expect(tap('h5', 'unfoul').players.h5?.fouls).toBe(0);
     expect(tap('a3', 'turnover').teams.away.turnovers).toBe(1);
     expect(game.status).toBe('live');
+  });
+
+  it('takes an option only while the pad is that player’s: once, not twice', () => {
+    const open: PadMode = { kind: 'player', playerId: 'h5' };
+    expect(padIsFor(open, 'h5')).toBe(true);
+    // A substitution is taken from the pad of either of its two players.
+    expect(padIsFor(open, 'h20', 'h5')).toBe(true);
+    expect(padIsFor(open, 'h3')).toBe(false);
+    // The pad goes to rest with the tap: the same option tapped again is not a play.
+    expect(padIsFor(padAtRest, 'h5')).toBe(false);
+    expect(padIsFor({ kind: 'turnovers', side: 'home' }, 'h5')).toBe(false);
   });
 
   it('is closed for a player the game no longer shows', () => {

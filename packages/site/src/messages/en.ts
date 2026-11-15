@@ -870,6 +870,14 @@ export const en = {
     'This device is not scoring the game right now, so that was not recorded.',
   'tracker.say.storage':
     'This device could not keep that tap, so it was not recorded. Tap it again.',
+  'tracker.say.outRecorded': '{player} is out. The foul was recorded anyway.',
+  // On a tile for a moment, for the two players of a substitution.
+  'tracker.mark.on': 'On',
+  'tracker.mark.off': 'Off',
+  // On the page that replaces the scoring screen when the device stops scoring (taken
+  // over, signed out, no longer allowed) in the very moment a tap was made.
+  'tracker.lastTapNotRecorded':
+    'Your last tap was made as this device stopped scoring, so it was not recorded. Enter it again once the game is being scored.',
   // What the game's rules refuse, in the tracker's words (finding M3 of the 2.107 audit):
   // one sentence for each refusal of the engine (packages/sports/src/basketball/live.ts),
   // matched by apps/web/src/features/tracker/engine-words.ts. A test fails when the

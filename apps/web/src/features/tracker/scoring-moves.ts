@@ -16,6 +16,14 @@ export type PadMode =
 
 export const padAtRest: PadMode = { kind: 'rest' };
 
+/**
+ * Whether the pad is open on one of these players: an option is taken only while it is.
+ * The pad goes to rest with the tap, so the same option tapped again before the closed
+ * pad is drawn is not a second play.
+ */
+export const padIsFor = (pad: PadMode, ...playerIds: readonly string[]): boolean =>
+  pad.kind === 'player' && playerIds.includes(pad.playerId);
+
 /** The options of a player's pad, apart from the substitution row. */
 export type PadAction = 'p1' | 'p2' | 'p3' | 'foul' | 'unfoul' | 'turnover';
 
@@ -41,11 +49,13 @@ export function tapTile(
     const after = before.includes(playerId)
       ? before.filter((id) => id !== playerId)
       : [...before, playerId].slice(0, basketball.LINEUP_SIZE);
-    // The fifth pick sets the lineup at once; the picks are then done with.
+    // The fifth pick sets the lineup at once. The five stay picked until the lineup is
+    // taken (the screen forgets them once the team's lineup is set), so a refusal
+    // loses no tap.
     const full = after.length === basketball.LINEUP_SIZE;
     return {
       kind: 'pick',
-      picks: { ...picks, [tile.side]: full ? [] : after },
+      picks: { ...picks, [tile.side]: after },
       lineup: full ? { type: 'lineup', side: tile.side, playerIds: after } : null,
     };
   }

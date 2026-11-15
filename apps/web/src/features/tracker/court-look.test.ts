@@ -48,7 +48,11 @@ const glance: readonly (readonly [what: string, text: string, ground: string])[]
   ['the saved banner, all saved', 'text', 'page'],
   ['the saved banner, plays waiting', 'amber-ink', 'amber'],
   ['the saved banner, plays not saved', 'text', 'red'],
-  ['what was just tapped, on the tile', 'gold-ink', 'gold'],
+  // A tile's mark, read at a glance: taken (hollow), then stored in its color.
+  ['a tap taken, on the tile', 'text', 'page'],
+  ['a basket stored, on the tile', 'text', 'green-deep'],
+  ['a foul stored, on the tile', 'text', 'red'],
+  ['a turnover or a substitution stored, on the tile', 'gold-ink', 'gold'],
 ];
 
 /** Everything else that is read. */

@@ -25,6 +25,7 @@
   --court-gold-ink: #1c1507;
   /* Green: points and Start. */
   --court-green: #1b6842;
+  --court-green-deep: #155535;
   --court-green-line: #46b481;
   --court-green-text: #6adba6;
   /* Red: fouls, Pause and anything that takes away. */
@@ -697,26 +698,40 @@
   outline: 4px solid var(--court-green-line);
   outline-offset: 1px;
 }
-/* What was just tapped, shown on the tile the moment it is tapped, before it is saved
-   (finding M6): "+2", "Foul". Written by scoring-screen.tsx as `data-mark`. */
+/* What was just tapped, shown on the tile the moment it is tapped (finding M6): "+2",
+   "Foul". Written by tile-marks.ts as `data-mark`. Until the tap is stored the mark is
+   hollow (the page's ground, a dashed gold edge): it says the tap was taken, not that a
+   play is recorded. Stored, it is solid in the color of what it was; refused, it is
+   taken off at once. A mark is read at a glance, so it is held to 7 to 1. */
 .court-tile[data-mark]::after {
   content: attr(data-mark);
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  background: var(--court-gold);
-  color: var(--court-gold-ink);
+  border: 3px dashed var(--court-gold);
+  border-radius: 6px;
+  background: var(--court-page);
+  color: var(--court-text);
   font-size: 18px;
   font-weight: 800;
   line-height: 1;
 }
 .court-tile[data-mark-kind='points']::after {
-  background: var(--court-green);
-  color: var(--court-text);
   font-size: 24px;
 }
-.court-tile[data-mark-kind='foul']::after {
+.court-tile[data-mark-state='stored']::after {
+  border-style: solid;
+  background: var(--court-gold);
+  color: var(--court-gold-ink);
+}
+.court-tile[data-mark-state='stored'][data-mark-kind='points']::after {
+  border-color: var(--court-green-line);
+  background: var(--court-green-deep);
+  color: var(--court-text);
+}
+.court-tile[data-mark-state='stored'][data-mark-kind='foul']::after {
+  border-color: var(--court-red-line);
   background: var(--court-red);
   color: var(--court-text);
 }
@@ -1132,11 +1147,11 @@
 
 /* Movement is short, and stops for people who ask their device for less (checklist S5). */
 @media (prefers-reduced-motion: no-preference) {
-  .court-tile[data-mark]::after {
+  .court-tile[data-mark-state='stored']::after {
     animation: court-mark-a 650ms ease-out both;
   }
   /* The same fade under a second name: taken in turn, it starts again on the next tap. */
-  .court-tile[data-mark][data-mark-turn='b']::after {
+  .court-tile[data-mark-state='stored'][data-mark-turn='b']::after {
     animation-name: court-mark-b;
   }
   .court-sheet {

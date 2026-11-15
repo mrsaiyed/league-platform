@@ -4,10 +4,12 @@
 // action to the controller that exists (tracker-controller.ts). It keeps no copy of the
 // game: what is drawn is the controller's game, through scoring-view.ts.
 //
-// A tap answers at once (finding M6; DESIGN.md section 7, line 9): the tile is marked
-// with what was tapped ("+2") in the same turn, before the tap is stored. The numbers
-// change only once the controller has stored the tap and shows the game with it: the
-// write-before-show rule (T-114) stays.
+// A tap answers at once (finding M6; DESIGN.md section 7, line 9). What is painted before
+// the controller has the tap: a tapped player's ring, and for an option the tile's mark
+// ("+2"), drawn hollow, as taken and not as a recorded play. When the controller answers,
+// the mark turns solid (stored) or is taken off at once with the refusal's sentence
+// (tile-marks.ts). No number changes before the controller has stored the tap and shows
+// the game with it: the write-before-show rule (T-114) stays.
 import type { Translate } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
 import {
@@ -29,6 +31,7 @@ import {
   dropOn,
   padAtRest,
   padFor,
+  padIsFor,
   padTap,
   startShortHanded,
   subTap,
@@ -39,6 +42,7 @@ import {
 } from './scoring-moves.ts';
 import { findTile, scoringView, type PlayerTile } from './scoring-view.ts';
 import { createTileDrag, type TileDrag } from './tile-drag.ts';
+import { createTileMarks, type MarkKind, type TileMark } from './tile-marks.ts';
 import type { TapInput, TrackerControllerStatus } from './tracker-controller.ts';
 
 export type ScoringScreenProps = {
@@ -55,42 +59,50 @@ export type ScoringScreenProps = {
   readonly links: { readonly back: string; readonly account: string; readonly watch: string };
   readonly leave: (to: string) => (event: MouseEvent<HTMLAnchorElement>) => void;
   readonly slots?: CourtSlots;
+  /**
+   * A tap was made as this device stopped scoring and was not recorded: this screen is
+   * about to be replaced, so the page that replaces it says so.
+   */
+  readonly onNotRecorded?: () => void;
 };
 
 /** How long the latest sentence stays (checklist I5). */
 const saidForMs = 3200;
-/** How long a tile shows what was tapped on it. */
-const markForMs = 650;
-
-type Mark = 'points' | 'foul' | 'plain';
 
 /** The tile of a player, in the teams' panels (not the pad's buttons). */
 const tileElement = (root: HTMLElement | null, playerId: string): HTMLElement | null =>
   root?.querySelector<HTMLElement>(`[data-teams] [data-player="${CSS.escape(playerId)}"]`) ?? null;
 
-const markTimers = new WeakMap<HTMLElement, number>();
+/** The marks of every tile on the page (tile-marks.ts), on the browser's own timers. */
+const tileMarks = createTileMarks({
+  after: (ms, run) => {
+    const timer = window.setTimeout(run, ms);
+    return () => window.clearTimeout(timer);
+  },
+});
 
 /**
- * Marks a tile with what was tapped, now: written straight onto the element, so it is
- * painted in this turn whatever else the screen is working on.
+ * Marks a tile with what was tapped, now, as taken: written straight onto the element,
+ * so it is painted in this turn whatever else the screen is working on. The mark is told
+ * afterwards whether the tap was stored or not taken. Null for a tile not on the screen.
  */
-function markTile(root: HTMLElement | null, playerId: string, text: string, kind: Mark): void {
+function markTile(
+  root: HTMLElement | null,
+  playerId: string,
+  text: string,
+  kind: MarkKind,
+): TileMark | null {
   const tile = tileElement(root, playerId);
-  if (tile === null) return;
-  window.clearTimeout(markTimers.get(tile));
-  tile.setAttribute('data-mark', text);
-  tile.setAttribute('data-mark-kind', kind);
-  // The mark's short fade has two names, taken in turn, so it starts again on a second
-  // tap without the screen having to be measured in between.
-  tile.setAttribute('data-mark-turn', tile.getAttribute('data-mark-turn') === 'a' ? 'b' : 'a');
-  markTimers.set(
-    tile,
-    window.setTimeout(() => {
-      tile.removeAttribute('data-mark');
-      tile.removeAttribute('data-mark-kind');
-    }, markForMs),
-  );
+  return tile === null ? null : tileMarks.show(tile, text, kind);
 }
+
+/** Tells a tap's marks how the tap ended. */
+const answerMarks = (marks: readonly (TileMark | null)[], taken: boolean): void => {
+  for (const mark of marks) {
+    if (taken) mark?.stored();
+    else mark?.refused();
+  }
+};
 
 /**
  * Rings a tapped tile at once, before its options are drawn: written straight onto the
@@ -166,7 +178,7 @@ function ClockTime({
 }
 
 export function ScoringScreen(props: ScoringScreenProps) {
-  const { game, status, state, rosters, t } = props;
+  const { game, status, state, rosters, t, onNotRecorded } = props;
   const { controller } = game;
   const root = useRef<HTMLElement | null>(null);
   const [picks, setPicks] = useState<LineupPicks>(() => game.lineupPicks());
@@ -214,6 +226,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
         if (saidWhenTaken !== undefined) say(saidWhenTaken);
         return true;
       }
+      // The device stopped scoring as the tap was made: this screen is about to be
+      // taken away, so the page that replaces it is told, and says so there.
+      if (result.reason === 'not-scoring') onNotRecorded?.();
       say(
         result.reason === 'engine'
           ? refusalText(result.message, t)
@@ -221,7 +236,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       );
       return false;
     },
-    [controller, say, t],
+    [controller, say, t, onNotRecorded],
   );
 
   const keepPicks = useCallback(
@@ -231,6 +246,17 @@ export function ScoringScreen(props: ScoringScreenProps) {
     },
     [game],
   );
+  // The starters picked for a team are done with once its lineup is set: here (the
+  // lineup tap was taken; until then they stay, so a refusal loses no tap) or on
+  // another device. They are then forgotten on this device too.
+  const homeSet = view.teams.home.stage === 'set' && picks.home.length > 0;
+  const awaySet = view.teams.away.stage === 'set' && picks.away.length > 0;
+  useEffect(() => {
+    if (!homeSet && !awaySet) return;
+    keepPicks({ home: homeSet ? [] : picks.home, away: awaySet ? [] : picks.away });
+  }, [homeSet, awaySet, picks, keepPicks]);
+  /** Players already told "out: recorded anyway", so it is said once for each. */
+  const toldOut = useRef(new Set<string>());
 
   /** Where the keyboard goes next: back to a tile, or into the pad that just opened. */
   const focusNext = useRef<{ readonly tile: string } | 'pad' | null>(null);
@@ -247,8 +273,6 @@ export function ScoringScreen(props: ScoringScreenProps) {
   });
   /** A click with no pointer behind it is Enter or Space (checklist S4). */
   const byKeyboard = (event: MouseEvent) => event.detail === 0;
-  /** True from an option's tap until its options have closed, a frame later. */
-  const optionTaken = useRef(false);
 
   const on: CourtHandlers = {
     tile(playerId, event) {
@@ -272,57 +296,56 @@ export function ScoringScreen(props: ScoringScreenProps) {
     },
     startShortHanded(side) {
       const lineup = startShortHanded(view, side);
-      if (lineup === null) return;
-      keepPicks({ ...picks, [side]: [] });
-      void send(lineup);
+      if (lineup !== null) void send(lineup);
     },
     action(tile, action, event) {
-      // One option at a time: a second tap before the options have closed is not a play.
-      if (optionTaken.current) return;
-      optionTaken.current = true;
+      // One option, once: the pad is this player's until the tap, and at rest from it,
+      // so a second tap before the closed pad is drawn is not a play.
+      if (!padIsFor(wanted.current, tile.id)) return;
+      wanted.current = padAtRest;
       const input = padTap(tile, action);
       const name = playerLabel(tile.player, t);
-      // Shown on the tile at once, before the tap is stored (finding M6).
-      if (input.type === 'score') {
-        markTile(
-          root.current,
-          tile.id,
-          t('tracker.pad.points', { points: input.points }),
-          'points',
-        );
-      } else if (action === 'foul') {
-        markTile(root.current, tile.id, t('tracker.pad.foul'), 'foul');
-      } else if (action === 'unfoul') {
-        markTile(root.current, tile.id, t('tracker.pad.unfoul'), 'plain');
-      } else {
-        markTile(root.current, tile.id, t('tracker.pad.turnover'), 'plain');
-      }
-      // The options close with the tap (D7): a second tap by mistake lands on nothing.
-      // The mark is painted first; the tap is then handed to the controller, which
-      // stores it before the tile counts it (T-114).
+      // Shown on the tile at once as taken, before the tap is stored (finding M6); it
+      // is drawn as stored, or taken off, when the controller answers (tile-marks.ts).
+      const text =
+        input.type === 'score'
+          ? t('tracker.pad.points', { points: input.points })
+          : t(
+              action === 'foul'
+                ? 'tracker.pad.foul'
+                : action === 'unfoul'
+                  ? 'tracker.pad.unfoul'
+                  : 'tracker.pad.turnover',
+            );
+      const kind = input.type === 'score' ? 'points' : action === 'foul' ? 'foul' : 'plain';
+      const mark = markTile(root.current, tile.id, text, kind);
+      // A foul on a player already at the limit is recorded, and said once for each.
+      const alreadyOut = action === 'foul' && tile.fouledOut && !toldOut.current.has(tile.id);
+      if (alreadyOut) toldOut.current.add(tile.id);
+      const saidWhenTaken =
+        action === 'turnover'
+          ? t('tracker.say.turnover', { player: name })
+          : alreadyOut
+            ? t('tracker.say.outRecorded', { player: name })
+            : undefined;
+      // The options close with the tap (D7). The mark is painted first; the tap is then
+      // handed to the controller, which stores it before the tile counts it (T-114).
       const keyboard = byKeyboard(event);
-      wanted.current = padAtRest;
       afterPaint(() => {
-        optionTaken.current = false;
         setPadMode(wanted.current);
         if (keyboard) focusNext.current = { tile: tile.id };
-        void send(
-          input,
-          action === 'turnover' ? t('tracker.say.turnover', { player: name }) : undefined,
-        );
+        void send(input, saidWhenTaken).then((taken) => answerMarks([mark], taken));
       });
     },
     substitute(coming, going, event) {
-      if (optionTaken.current) return;
-      optionTaken.current = true;
-      markSub(coming, going);
-      const keyboard = byKeyboard(event);
+      if (!padIsFor(wanted.current, coming.id, going.id)) return;
       wanted.current = padAtRest;
+      const marks = markSub(coming, going);
+      const keyboard = byKeyboard(event);
       afterPaint(() => {
-        optionTaken.current = false;
         setPadMode(wanted.current);
         if (keyboard) focusNext.current = { tile: coming.id };
-        void send(subTap(coming, going));
+        void send(subTap(coming, going)).then((taken) => answerMarks(marks, taken));
       });
     },
     closePad() {
@@ -360,8 +383,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
   };
 
   function markSub(coming: PlayerTile, going: PlayerTile) {
-    markTile(root.current, going.id, t('tracker.tile.noNumber'), 'plain');
-    markTile(root.current, coming.id, t('tracker.pad.subIn'), 'plain');
+    return [
+      markTile(root.current, going.id, t('tracker.mark.off'), 'plain'),
+      markTile(root.current, coming.id, t('tracker.mark.on'), 'plain'),
+    ];
   }
 
   // --- More: opened as a dialog; Escape closes it, and the keyboard stays inside it. ---
@@ -482,9 +507,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
       }
       const coming = findTile(view, dropped.inId);
       const going = findTile(view, dropped.outId);
-      if (coming !== undefined && going !== undefined) markSub(coming, going);
+      const marks = coming !== undefined && going !== undefined ? markSub(coming, going) : [];
       showPad(padAtRest);
-      void send(dropped.input);
+      void send(dropped.input).then((taken) => answerMarks(marks, taken));
     },
     onPointerCancel(event: PointerEvent<HTMLElement>) {
       if (pressed.cancel(event.pointerId)) endDrag();

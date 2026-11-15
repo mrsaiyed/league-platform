@@ -235,7 +235,9 @@ describe('starting lineups (checklist C1 to C4)', () => {
     expect((await device.onServer()).teams.home.onCourt).toEqual([]);
 
     for (const id of hawks.slice(3)) await device.pick(id);
-    expect(device.picks().home).toEqual([]);
+    // The five stay picked until the lineup is taken; the view then drops them.
+    expect(device.picks().home).toEqual(hawks);
+    expect(device.view().teams.home.picks).toEqual([]);
     const server = await device.onServer();
     expect(server.teams.home.onCourt).toEqual(hawks);
     const set = drawn(device.view());

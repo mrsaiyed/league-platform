@@ -195,6 +195,19 @@ export function TrackerOpening({
     phase.kind === 'preparing' ||
     (phase.kind === 'open' && screenOf(phase.status, phase.confirmed).kind === 'opening');
   const slow = useSlowAfter(stillOpening, slowOpeningMs);
+  // A tap made in the very moment this device stopped scoring (taken over, signed out,
+  // no longer allowed) reaches no list of plays not saved, and the scoring screen that
+  // would have said so is gone: this page says it, until the game is scored here again.
+  const scoringNow =
+    phase.kind === 'open' &&
+    phase.status.game !== null &&
+    screenOf(phase.status, phase.confirmed).kind === 'scoring';
+  const [lastTapLost, setLastTapLost] = useState(false);
+  const wasScoring = useRef(false);
+  useEffect(() => {
+    if (scoringNow && !wasScoring.current) setLastTapLost(false);
+    wasScoring.current = scoringNow;
+  }, [scoringNow]);
   const openingText = (
     <p role="status" data-opening="">
       {t('tracker.opening')}
@@ -260,6 +273,7 @@ export function TrackerOpening({
         }
         links={{ back: backHref, account: accountHref, watch: watchHref }}
         leave={leaveBy}
+        onNotRecorded={() => setLastTapLost(true)}
       />
     );
   }
@@ -275,6 +289,11 @@ export function TrackerOpening({
           </h1>
         </header>
         <section className="court-card-body" aria-label={matchup}>
+          {lastTapLost ? (
+            <p className="court-notice" data-kind="error" role="alert" data-last-tap-lost="">
+              {t('tracker.lastTapNotRecorded')}
+            </p>
+          ) : null}
           {phase.kind === 'preparing' ? openingText : null}
           {phase.kind === 'no-storage' ? (
             <p className="court-notice" data-kind="error" role="alert">
