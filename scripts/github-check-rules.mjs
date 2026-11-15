@@ -37,8 +37,9 @@ export function newestChecks(runs) {
 
 // The lines to show under "Failed step" from GitHub's annotations of a failed job: each
 // failure note's title, then every line of its message (the gate's own notes, written by
-// scripts/verify-failure-notes.mjs, carry several), at most `most` lines in all.
-export function failureNoteLines(notes, most = 40) {
+// scripts/verify-failure-notes.mjs and scripts/browser-failure-notes.mjs, carry several),
+// at most `most` lines in all.
+export function failureNoteLines(notes, most = 60) {
   const failures = (Array.isArray(notes) ? notes : []).filter(
     (note) => note.annotation_level === 'failure' && !/^Process completed/.test(note.message ?? ''),
   );
@@ -53,6 +54,17 @@ export function failureNoteLines(notes, most = 40) {
   }
   if (lines.length <= most) return lines;
   return [...lines.slice(0, most - 1), `  (${lines.length - most + 1} more lines on GitHub)`];
+}
+
+// A failed step as GitHub's list of a job's steps gives it: its name, and when it ran in
+// UTC and for how long, when GitHub says.
+export function failedStepWords(step) {
+  const name = (step.name ?? '').replace(/^Run /, '');
+  const from = Date.parse(step.started_at ?? '');
+  const to = Date.parse(step.completed_at ?? '');
+  if (Number.isNaN(from) || Number.isNaN(to)) return name;
+  const time = (at) => new Date(at).toISOString().slice(11, 19);
+  return `${name} (${time(from)} to ${time(to)} UTC, ${Math.round((to - from) / 1000)} s)`;
 }
 
 // One plain line about a branch. `local` is this computer's newest commit on it, or ''.
