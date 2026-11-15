@@ -9,6 +9,7 @@ import { sendTrackerCommands } from '../../server/tracker-commands-endpoint.ts';
 import { trackerWorld, type Person } from '../../server/tracker-endpoints.test-helper.ts';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import type { ApiAnswer } from '../../server/league-api.ts';
+import type { TrackerPorts } from '../../server/tracker-ports.ts';
 
 export type NetworkMode = 'up' | 'down' | 'answers-lost';
 
@@ -29,8 +30,17 @@ const leagueKeyOf = (leagueId: string) => {
   return key;
 };
 
-export function endpointNetwork(): EndpointNetwork {
-  const world = trackerWorld();
+export type EndpointNetworkOptions = {
+  /** Wraps what the endpoints' commands run on: a season's rules changed in a test, say. */
+  readonly deps?: (deps: TrackerPorts['deps']) => TrackerPorts['deps'];
+};
+
+export function endpointNetwork(options: EndpointNetworkOptions = {}): EndpointNetwork {
+  const made = trackerWorld();
+  const world = {
+    ...made,
+    tracker: { ...made.tracker, deps: options.deps?.(made.tracker.deps) ?? made.tracker.deps },
+  };
   const reached: string[] = [];
 
   async function answer(person: Person, url: string, init: RequestInit | undefined) {
