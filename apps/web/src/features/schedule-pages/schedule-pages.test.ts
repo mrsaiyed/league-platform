@@ -147,8 +147,9 @@ describe('schedule', () => {
     const { clock, schedule } = await load(adult);
     const views = buildScheduleView(schedule, clock, addressee, {}).rounds.flatMap((r) => r.games);
     const words = gameLinkWords();
-    const said = (status: string) => {
-      const game = views.find((g) => g.status === status);
+    // A scheduled game is still to come, or (awaiting) its start has passed with no result.
+    const said = (status: string, awaiting = false) => {
+      const game = views.find((g) => g.status === status && (g.awaiting === true) === awaiting);
       if (game === undefined) throw new Error(`no ${status} game`);
       return gameLinkText(game, words);
     };
@@ -158,6 +159,10 @@ describe('schedule', () => {
     expect(said('forfeit')).toBe('Otters against Badgers, forfeit, 0 to 20');
     expect(said('postponed')).toBe('Herons against Otters, postponed');
     expect(said('scheduled')).toMatch(/^Herons against Falcons, [A-Z][a-z]{2}, [A-Z][a-z]{2} \d/);
+    // The made-up game nobody scored, three days before the world's today (step 2.156).
+    expect(said('scheduled', true)).toBe(
+      'Badgers against Herons, Tue, Nov 10, 7:00 PM, awaiting the result',
+    );
     // A live one with a score, a game with no day yet, a cancelled one, and a live one
     // whose score is not kept.
     const live = views.find((g) => g.status === 'live');

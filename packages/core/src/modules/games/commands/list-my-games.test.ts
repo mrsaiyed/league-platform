@@ -99,6 +99,22 @@ describe('listMyGames', () => {
     ]);
   });
 
+  it('keeps a game under way however long ago it started, before the midnight too (step 2.156)', async () => {
+    // Started at 11:30 PM yesterday and still being played at noon today; and yesterday's
+    // game that was never started stays off this list (it is under "Needs a result").
+    const live = game(9, { startsAt: '2026-12-05T23:30:00.000Z', status: 'live' });
+    expect(await listed(scorekeeperId, { games: [...games, live] })).toEqual([
+      '9',
+      '8',
+      '1',
+      '7',
+      '2',
+    ]);
+    const { deps, as } = memoryGames({ games: [live], grants });
+    const result = await listMyGames(as(scorekeeperId), {}, deps);
+    expect(result.ok && result.value.games[0]).toMatchObject({ day: '2026-12-05', isToday: false });
+  });
+
   it('shows a scorekeeper every game in reach while any scorekeeper may score', async () => {
     const assignments = [{ gameId: gameUuid(2), accountId: scorekeeperId }];
     expect(await listed(scorekeeperId, { assignments })).toEqual(['8', '1', '7', '2*']);

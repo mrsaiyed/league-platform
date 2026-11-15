@@ -43,12 +43,16 @@ export function standInGames(world: World, options: StandInGamesOptions): StandI
     },
     namesOf: async (leagueId): Promise<GameNames> => {
       const s = await world.read(leagueId);
-      if (s === undefined) return { teams: {}, scorekeepers: {} };
+      if (s === undefined) return { teams: {}, scorekeepers: {}, seasons: {} };
       const scorekeepers: Record<string, string[]> = {};
       for (const a of s.assignments) {
         (scorekeepers[a.gameId] ??= []).push(options.people[a.accountId] ?? '');
       }
-      return { teams: Object.fromEntries(s.teams.map((t) => [t.id, t.name])), scorekeepers };
+      return {
+        teams: Object.fromEntries(s.teams.map((t) => [t.id, t.name])),
+        scorekeepers,
+        seasons: Object.fromEntries(s.seasons.map((x) => [x.id, x.name])),
+      };
     },
   };
 }

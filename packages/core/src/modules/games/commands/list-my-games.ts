@@ -1,51 +1,18 @@
 // The signed-in person's games to score, today and the week ahead (P4 §4: "a
-// scorekeeper who opens the admin sees a list of their games"). The list follows
-// the same rule as scoring itself: in a league where any scorekeeper may score, it
-// is every game in the scorekeeper's reach; where only assigned ones may, it is the
-// games they are assigned to. The owner, admins and schedulers see every game they
-// may score. Each game says whether the person is assigned to it. "Today" is the
-// league's today, in its time zone, by the database's clock. In an archived or
-// suspended league the games are still listed, but marked not scorable (U-9). It changes nothing,
-// but runs in the same shape as a command (record 014).
+// scorekeeper who opens the admin sees a list of their games"), and every game under way
+// whenever it started, so one begun before the league's midnight is still there after it
+// (step 2.156). The list follows the same rule as scoring itself (my-games-of.ts). Each
+// game says whether the person is assigned to it. "Today" is the league's today, in its
+// time zone, by the database's clock. It changes nothing, but runs in the same shape as a
+// command (record 014).
 import { z } from 'zod';
-import { accessOfAccount, readOnlyLeagueStatuses, type Scope } from '../../access/index.ts';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
-import { myGamesDays, recordingOf } from '../game-fields.ts';
+import { myGamesDays } from '../game-fields.ts';
+import { myGamesOf, type MyGame } from '../my-games-of.ts';
 import { mayReadGames } from '../policy.ts';
-import type { GameInWindow, GamesTx } from '../ports.ts';
-import { mayScoreUnder, scoringRuleOf } from '../scoring-access.ts';
+import type { GamesTx } from '../ports.ts';
 
-/** A game on the list. */
-export type MyGame = {
-  readonly id: string;
-  readonly seasonId: string;
-  /** The program of the game's season, where changing its result is checked. */
-  readonly programId: string;
-  readonly divisionId: string | null;
-  readonly homeTeamId: string;
-  readonly awayTeamId: string;
-  readonly startsAt: string | null;
-  /** The day it is played in the league's time zone (YYYY-MM-DD), and whether that is today. */
-  readonly day: string;
-  readonly isToday: boolean;
-  readonly status: string;
-  /** The score so far, or null while there is none. */
-  readonly homeScore: number | null;
-  readonly awayScore: number | null;
-  readonly recording: ReturnType<typeof recordingOf>;
-  /** Whether the person is assigned to score it. */
-  readonly assignedToMe: boolean;
-  /** False while the league is archived or suspended: the game is shown, not scorable (U-9). */
-  readonly scorable: boolean;
-  /**
-   * Whether the live tracker has recorded plays of a game still to be decided (scheduled
-   * or live), by the store's own rule (plays since its last "not started" marker): such a
-   * game is ended in the tracker, never by a score typed by hand (S-46). False for a game
-   * that is decided, postponed or cancelled: it is not asked.
-   */
-  readonly hasPlays: boolean;
-  readonly version: number;
-};
+export type { MyGame } from '../my-games-of.ts';
 
 export type MyGames = {
   /** Today in the league's time zone (YYYY-MM-DD). */
@@ -53,34 +20,6 @@ export type MyGames = {
   /** Soonest first. */
   readonly games: readonly MyGame[];
 };
-
-const view = (
-  { game, day, assigned, programId }: GameInWindow,
-  today: string,
-  scorable: boolean,
-  hasPlays: boolean,
-): MyGame => ({
-  id: game.id,
-  seasonId: game.seasonId,
-  programId,
-  divisionId: game.divisionId,
-  homeTeamId: game.homeTeamId,
-  awayTeamId: game.awayTeamId,
-  startsAt: game.startsAt,
-  day,
-  isToday: day === today,
-  status: game.status,
-  homeScore: game.homeScore,
-  awayScore: game.awayScore,
-  recording: recordingOf(game.captureMode),
-  assignedToMe: assigned,
-  scorable,
-  hasPlays,
-  version: game.version,
-});
-
-/** Only a game still to be decided can be ended by hand, so only it is asked about. */
-const stillOpen = (status: string) => status === 'scheduled' || status === 'live';
 
 export const listMyGames = defineCommand({
   name: 'games.list_my_games',
@@ -90,22 +29,9 @@ export const listMyGames = defineCommand({
   allowed: (context, _input, tx: GamesTx) => mayReadGames(context, tx, 'games.score'),
   run: async ({ context, tx }): Promise<Result<MyGames, never>> => {
     const accountId = context.accountId;
-    const holder = accountId === null ? undefined : await accessOfAccount(tx, accountId);
-    if (accountId === null || holder === undefined) return ok({ today: '', games: [] });
+    if (accountId === null) return ok({ today: '', games: [] });
     const window = await tx.games.listWindow(accountId, myGamesDays);
-    const rule = await scoringRuleOf(tx);
-    const status = await tx.access.leagueStatus();
-    const scorable = status !== undefined && !readOnlyLeagueStatuses.includes(status);
-    const games = window.games.filter((entry) => {
-      const scope: Scope = { type: 'program', id: entry.programId };
-      return mayScoreUnder(holder, scope, rule, entry.assigned);
-    });
-    // One after another: they share the transaction's one connection.
-    const listed: MyGame[] = [];
-    for (const entry of games) {
-      const plays = stillOpen(entry.game.status) && (await tx.games.hasPlays(entry.game.id));
-      listed.push(view(entry, window.today, scorable, plays));
-    }
-    return ok({ today: window.today, games: listed });
+    const games = await myGamesOf(tx, accountId, window.games, window.today);
+    return ok(games === undefined ? { today: '', games: [] } : { today: window.today, games });
   },
 });

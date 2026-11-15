@@ -8,12 +8,35 @@ export {
 export { assignScorekeeper, type AssignScorekeeperError } from './commands/assign-scorekeeper.ts';
 export { cancelGame, type CancelGameError } from './commands/cancel-game.ts';
 export { listMyGames, type MyGame, type MyGames } from './commands/list-my-games.ts';
+// Games that still need a result, however old, and earlier games by round (step 2.156).
+export {
+  listGamesNeedingResult,
+  needsResultLimit,
+  type GamesNeedingResult,
+} from './commands/list-games-needing-result.ts';
+export {
+  earlierRoundGamesLimit,
+  earlierRoundsLimit,
+  listEarlierGames,
+  type EarlierGames,
+  type EarlierRound,
+} from './commands/list-earlier-games.ts';
+export { needsResult, oldestFirst, type ResultFacts } from './needs-result.ts';
+export { earlierRoundKey, parseEarlierRoundKey } from './earlier-round-key.ts';
+export {
+  earlierRoundsOf,
+  inEarlierRound,
+  isEarlierGame,
+  type GameWithRound,
+} from './earlier-rounds-of.ts';
 export {
   unassignScorekeeper,
   type UnassignScorekeeperError,
 } from './commands/unassign-scorekeeper.ts';
 export { mayScoreGame } from './policy.ts';
 export type { ScoringRule } from './scoring-access.ts';
+// What a person may score, as the stores filter the lists before they cut (step 2.156).
+export { inScoringReach } from './scoring-access.ts';
 export { listPostponedGames, type PostponedGame } from './commands/list-postponed-games.ts';
 export { postponeGame, type PostponeGameError } from './commands/postpone-game.ts';
 export { recordFinalScore, type RecordFinalScoreError } from './commands/record-final-score.ts';
@@ -42,7 +65,7 @@ export type {
 } from './reopen-window.ts';
 export { recordFinalScoreWithin } from './record-score-within.ts';
 export type { DecideGameError } from './decide-game.ts';
-export { recordingOf } from './game-fields.ts';
+export { isOverOrCalledOff, recordingOf } from './game-fields.ts';
 export {
   readGamePage,
   type BoxScore,
@@ -124,8 +147,11 @@ export type {
   TrackerTx,
 } from './ports.ts';
 export type {
+  EarlierRoundCount,
+  EarlierRoundRef,
   GameInWindow,
   GamesWindow,
+  ScoringReach,
   GameLine,
   GameRecord,
   GameRosterPlayer,

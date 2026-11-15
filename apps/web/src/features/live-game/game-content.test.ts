@@ -142,6 +142,8 @@ describe('a game page', () => {
       [standInLeagues.other.id, standInSeasonIds.youthWinter],
     ] as const;
     let opened = 0;
+    // The games of a day before today still with no result: shown awaiting it.
+    const unscored: string[] = [];
     for (const [leagueId, seasonId] of seasons) {
       const { today } = await world.ports.publicSchedule.clockOf(leagueId);
       const schedule = await world.ports.publicSchedule.scheduleOf(leagueId, seasonId, today);
@@ -163,10 +165,15 @@ describe('a game page', () => {
         // Their seasons play halves: no quarter is shown before a tracker has the game.
         expect(shot.value.periods).toBe(2);
         opened += 1;
+        if (game.status === 'scheduled' && game.localDate !== null && game.localDate < today) {
+          unscored.push(`${game.awayTeam.name} against ${game.homeTeam.name}`);
+        }
       }
     }
-    // Fall 2026's 22 (the tracked games among them), Spring 2026's 2 and the youth league's 5.
-    expect(opened).toBe(29);
+    // Fall 2026's 23 (the tracked games among them, and the game played three days ago
+    // whose score nobody entered, step 2.156), Spring 2026's 2 and the youth league's 5.
+    expect(opened).toBe(30);
+    expect(unscored).toEqual(['Badgers against Herons']);
   });
 
   it('says a game has not started yet', async () => {
