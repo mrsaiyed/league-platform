@@ -215,6 +215,18 @@ export function loadConfig(
       invalid.set(name, `${name}: invalid, may be set only when APP_ENV is local or test`);
     }
   }
+  // LOCAL_NOW moves only the stand-in's made-up world (step 2.179): the made-up database
+  // keeps this computer's clock, so with it the setting would silently do nothing.
+  if (
+    given['LOCAL_NOW'] !== undefined &&
+    given['LOCAL_DATA'] === 'made-up-database' &&
+    !invalid.has('LOCAL_NOW')
+  ) {
+    invalid.set(
+      'LOCAL_NOW',
+      'LOCAL_NOW: invalid, the made-up database keeps this computer’s clock, so it may not be set with LOCAL_DATA=made-up-database',
+    );
+  }
   const result = schema.safeParse(given);
   if (result.success && invalid.size === 0) return Object.freeze(result.data);
 

@@ -311,6 +311,19 @@ describe('loadConfig', () => {
     }
   });
 
+  it('refuses LOCAL_NOW with the made-up database, which keeps this computer’s clock', () => {
+    const at = '2026-11-15T06:10:00Z';
+    for (const appEnv of ['local', 'test']) {
+      expect(
+        failure({ ...localOnly, APP_ENV: appEnv, LOCAL_DATA: 'made-up-database', LOCAL_NOW: at })
+          .invalid,
+      ).toEqual([
+        'LOCAL_NOW: invalid, the made-up database keeps this computer’s clock, so it may not be set with LOCAL_DATA=made-up-database',
+      ]);
+    }
+    expect(loadConfig({ ...localOnly, LOCAL_DATA: 'stand-in', LOCAL_NOW: at }).LOCAL_NOW).toBe(at);
+  });
+
   it('ignores variables it does not know', () => {
     expect(loadConfig({ ...valid, PATH: '/bin' }).APP_ENV).toBe('test');
   });
