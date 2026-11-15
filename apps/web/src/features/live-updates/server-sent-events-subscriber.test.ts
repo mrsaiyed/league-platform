@@ -169,7 +169,7 @@ function handDriven(extra: Partial<ServerSentEventsSubscriberOptions> = {}) {
 }
 
 describe('server-sent events subscriber, on its own', () => {
-  it('drops anything that is not a message for this game', () => {
+  it('drops anything that is not a message for this game, and reads past fields it does not know', () => {
     const { sources, subscriber } = handDriven();
     const got: LiveMessage[] = [];
     subscriber.subscribeGame(leagueA, game1, { onMessage: (m) => got.push(m) });
@@ -178,12 +178,14 @@ describe('server-sent events subscriber, on its own', () => {
       `/api/v1/live?v=1&channel=${encodeURIComponent(gameChannelName(leagueA, game1))}`,
     );
     source.emit('update', 'not json');
-    source.emit('update', JSON.stringify({ ...message(1), players: [] }));
     source.emit('update', JSON.stringify(message(1, game2)));
     source.emit('update', JSON.stringify({ sequence: 1 }));
     source.emit('message', JSON.stringify(message(1)));
     source.emit('update', JSON.stringify(message(2)));
-    expect(got).toEqual([message(2)]);
+    // A field added after this page opened is left out, never a reason to drop the
+    // message (record 058), and never handed to the page.
+    source.emit('update', JSON.stringify({ ...message(3), players: [], added: 1 }));
+    expect(got).toEqual([message(2), message(3)]);
   });
 
   it('says unavailable when the connection drops, and open when it is back', () => {

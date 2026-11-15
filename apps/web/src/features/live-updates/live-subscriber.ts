@@ -4,9 +4,15 @@
 // providers package, which browser code cannot import (T-30, T-120).
 //
 // Every message is checked against its shape and its channel before the page sees
-// it; anything else is dropped. Order and gaps are the page's to judge from the
+// it; anything else is dropped. A game's message is read leaving out fields this page
+// does not know, so a field added after the page opened never drops it (record 058). Order and gaps are the page's to judge from the
 // sequence numbers (viewer-state.ts in live-game, T-118).
-import { LeagueScoreMessage, LiveMessage, type LiveChannel } from '@srleagues/contracts';
+import {
+  LeagueScoreMessage,
+  LiveMessageReading,
+  type LiveChannel,
+  type LiveMessage,
+} from '@srleagues/contracts';
 
 /**
  * Where the connection stands. `connecting`: the first attempt. `open`: messages
@@ -50,7 +56,7 @@ export type ChannelOpener = (channel: LiveChannel, events: ChannelEvents) => () 
 
 /** A game's message, checked against its shape and its game; else null. */
 export function readGameMessage(gameId: string, data: unknown): LiveMessage | null {
-  const parsed = LiveMessage.safeParse(data);
+  const parsed = LiveMessageReading.safeParse(data);
   return parsed.success && parsed.data.gameId === gameId.toLowerCase() ? parsed.data : null;
 }
 
