@@ -15,4 +15,10 @@ describe('the made-up world’s new ids', () => {
     const later = newId(1_800_000_000_001);
     expect(later > (made.at(-1) ?? '')).toBe(true);
   });
+
+  it('still sort when more are made in one millisecond than its count holds', () => {
+    const made = Array.from({ length: 10_000 }, () => newId(1_900_000_000_000));
+    expect([...made].sort()).toEqual(made);
+    expect(new Set(made).size).toBe(made.length);
+  });
 });

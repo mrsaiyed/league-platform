@@ -10,8 +10,13 @@ let sequence = 0;
 
 /** A new version 7 UUID; two made in the same millisecond still sort in the order made. */
 export function newId(now: number = Date.now()): string {
-  const ms = Math.max(now, lastMs);
+  let ms = Math.max(now, lastMs);
   sequence = ms === lastMs ? sequence + 1 : 0;
+  // The count has twelve bits: once full, the next id takes the next millisecond.
+  if (sequence > 0xfff) {
+    ms += 1;
+    sequence = 0;
+  }
   lastMs = ms;
   const bytes = randomBytes(16);
   // 48 bits of milliseconds, then the version, then 12 bits that count within the millisecond.
