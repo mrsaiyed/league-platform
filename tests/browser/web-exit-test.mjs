@@ -244,8 +244,45 @@ async function measureBoards(page) {
       const stacked = second.top >= first.bottom - 1;
       const own = sides.map((side) => side.querySelector('.ui-game-side-score')).filter(Boolean);
       const names = [...board.querySelectorAll('.ui-game-team-name')];
+      // The lines a piece of a name's text is drawn on, each as a box.
+      const linesOf = (node, from, to) => {
+        const range = document.createRange();
+        range.setStart(node, from);
+        range.setEnd(node, to);
+        return [...range.getClientRects()].filter((r) => r.width > 0);
+      };
+      // The words of a name that are drawn on more than one line: split inside the word.
+      const split = names.flatMap((name) => {
+        const node = name.firstChild;
+        if (!node || node.nodeType !== Node.TEXT_NODE) return [];
+        return [...node.textContent.matchAll(/\S+/g)]
+          .filter((word) => {
+            const tops = linesOf(node, word.index, word.index + word[0].length).map((r) =>
+              Math.round(r.top),
+            );
+            return new Set(tops).size > 1;
+          })
+          .map((word) => word[0]);
+      });
+      // In two rows both names start at the same place, after their emblems, and every
+      // line of a name that wraps starts there too (these pages are read left to right).
+      const starts = names.map((name) => {
+        const node = name.firstChild;
+        const lines = node ? linesOf(node, 0, node.textContent.length) : [];
+        return { box: rect(name).left, lines: lines.map((r) => r.left) };
+      });
       return {
         stacked,
+        split,
+        fromTheStart:
+          !stacked ||
+          (starts.every((s) => s.lines.every((left) => Math.abs(left - s.box) <= 1)) &&
+            Math.abs(starts[0].box - starts[1].box) <= 1 &&
+            sides.every(
+              (side) =>
+                rect(side.querySelector('.ui-emblem')).right <=
+                rect(side.querySelector('.ui-game-team-name')).left,
+            )),
         // Side by side: the first team ends before what stands between them begins, and
         // that ends before the second team. One over the other: a team's emblem and name
         // end before its own score begins.
@@ -272,6 +309,67 @@ async function measureBoards(page) {
       };
     }),
   );
+}
+/**
+ * Puts long made-up names on the page's first two boards, as a league might have: a name
+ * of 36 letters and one word of 16. A board is told the room its longer name needs, as
+ * the page's own code works it out (packages/ui, nameMeasure): 22 and 16 letters.
+ */
+async function plantLongNames(page) {
+  await page.evaluate(() => {
+    const boards = [...document.querySelectorAll('.ui-game-board')];
+    for (const [board, text, letters] of [
+      [boards[0], 'The Northside Community Thunderbolts', '22'],
+      [boards[1], 'Trailblazerettes', '16'],
+    ]) {
+      if (!board) continue;
+      board.querySelector('.ui-game-team-name').textContent = text;
+      board.style.setProperty('--letters', letters);
+    }
+  });
+}
+/**
+ * The boards of a league's home page at the four widths, as they are and with long names
+ * put in. However a board is drawn, nothing overlaps, no name is split inside a word, and
+ * in two rows both names start after their emblems. A name as the league wrote it is also
+ * whole; a made-up word too long for its row may be cut short with "…", never split.
+ */
+async function checkHomeBoards(page, address, label) {
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const planted of [false, true]) {
+      await page.goto(address);
+      await page.locator('main').first().waitFor();
+      await page.evaluate(() => document.fonts.ready);
+      if (planted) await plantLongNames(page);
+      const boards = await measureBoards(page);
+      const sound = (b) =>
+        b.apart &&
+        b.inside &&
+        b.drawnAsDecided &&
+        b.fromTheStart &&
+        b.split.length === 0 &&
+        (planted || (b.whole && (b.stacked || b.lines <= 2)));
+      note(
+        `at ${width} every board of ${label}${planted ? ' with long names' : ''} is drawn one way or the other, and no name is split inside a word`,
+        boards.length >= 3 && boards.every(sound),
+        JSON.stringify(boards.filter((b) => !sound(b))),
+      );
+      if (planted && width === 320) {
+        note(
+          `at 320 the board of ${label} with a 36-letter name stands its teams in two rows`,
+          boards[0]?.stacked === true,
+        );
+      }
+      if (!planted && width === 1280) {
+        note(
+          `at 1280 the boards of ${label} have their teams side by side`,
+          boards.filter((b) => !b.stacked).length >= 3,
+          `${boards.filter((b) => !b.stacked).length} of ${boards.length}`,
+        );
+      }
+    }
+  }
 }
 const pathOf = (page) => new URL(page.url()).pathname;
 const week = 7 * 24 * 3600;
@@ -1148,29 +1246,35 @@ if (browser) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     try {
       const page = await context.newPage();
+      // A board decides between its two drawings by a sum (packages/ui, the board's
+      // styles). Whatever it decides, what is drawn must agree with it and nothing may
+      // overlap, be cut off or be split inside a word (the code review of step 2.147, L10).
+      // The two leagues as they are: the first starting design and the plain light one.
+      for (const league of ['north-valley', 'harbor-city']) {
+        await checkHomeBoards(page, `${origin}/${league}`, `/${league}`);
+      }
+      // And the first league under the other three sets of colors and faces (a face of
+      // capitals is half as wide again as a serif): one more server for each, with the
+      // design named as the picture script names it.
+      for (const design of ['crest-light', 'pine', 'midnight-gold']) {
+        const base = `http://localhost:${await freePort()}`;
+        const other = start(['start', '--port', new URL(base).port], {
+          APP_ENV: 'test',
+          PUBLIC_BASE_URL: base,
+          LOCAL_DESIGN: design,
+        });
+        try {
+          await waitFor(`${base}/`, other);
+          await checkHomeBoards(page, `${base}/north-valley`, `/north-valley in ${design}`);
+        } finally {
+          other.child.kill();
+        }
+      }
       for (const width of [320, 390, 768, 1280]) {
         await page.setViewportSize({ width, height: 900 });
         for (const league of ['north-valley', 'harbor-city']) {
           await open(page, `/${league}`);
           await page.evaluate(() => document.fonts.ready);
-          // A board decides between its two drawings by a sum (packages/ui, the board's
-          // styles). Whatever it decides, what is drawn must agree with it and nothing may
-          // overlap or be cut off (the code review of step 2.147, L10).
-          const boards = await measureBoards(page);
-          const sound = (b) =>
-            b.apart && b.inside && b.whole && b.drawnAsDecided && (b.stacked || b.lines <= 2);
-          note(
-            `at ${width} every board of /${league} is drawn one way or the other, whole`,
-            boards.length >= 3 && boards.every(sound),
-            JSON.stringify(boards.filter((b) => !sound(b))),
-          );
-          if (width === 1280) {
-            note(
-              `at 1280 the boards of /${league} have their teams side by side`,
-              boards.filter((b) => !b.stacked).length >= 3,
-              `${boards.filter((b) => !b.stacked).length} of ${boards.length}`,
-            );
-          }
           // A card's top line never breaks inside the date and time: a line that cannot
           // hold them and the state's pill gives the pill a line of its own.
           const broken = await page.evaluate(() =>
