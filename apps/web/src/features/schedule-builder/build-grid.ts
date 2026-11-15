@@ -179,7 +179,9 @@ export function buildGrid(
   return {
     rounds: view.result.rounds.map((r, i) => ({
       id: r.id,
-      number: i + 1,
+      // As stored, so it matches the public `?round=` filter; a round with none (never one
+      // the store loads or a draft adds) is counted in order.
+      number: r.number ?? i + 1,
       label: r.label,
       date: r.date,
       games: all.filter((g) => g.roundId === r.id),

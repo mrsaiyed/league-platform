@@ -11,7 +11,7 @@ import { standInSeasonIds } from '../../server/stand-in-world-seed.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildGrid, dayText, daysAfter } from './build-grid.ts';
 import { answerParams, refusedAtOf, savedDetailOf } from './grid-answer.ts';
-import { noticeOf } from './notice.ts';
+import { addRoundProblemOf, noticeOf, whyNotSaved } from './notice.ts';
 import { runScheduleAction, type ScheduleActionKind } from './run-schedule-action.ts';
 
 const leagueId = standInLeagues.live.id;
@@ -85,7 +85,7 @@ describe('rounds an owner can make (step 2.160)', () => {
         time: '18:00',
         place: '',
       }),
-    ).toEqual({ kind: 'saved' });
+    ).toEqual({ kind: 'saved', detail: { what: 'game-saved', gameId } });
 
     // To Week 3 with the date left alone: saved, and the grid is told which game.
     const was = [roundId(1), '2026-11-15', '18:00', ''].join('~');
@@ -102,6 +102,8 @@ describe('rounds an owner can make (step 2.160)', () => {
     expect(moved).toEqual({ kind: 'saved', detail: { what: 'game-round', gameId } });
     const answer = answerParams(moved);
     expect(savedDetailOf(answer.query)).toEqual({ what: 'game-round', gameId });
+    // The phone is taken to the "Saved" beside the game.
+    expect(answer.hash).toBe('#saved');
     let grid = buildGrid(await read(), teams, []);
     const game = () => grid.allGames.find((g) => g.id === gameId);
     expect(game()).toMatchObject({
@@ -120,7 +122,7 @@ describe('rounds an owner can make (step 2.160)', () => {
       time: '18:00',
       place: '',
     });
-    expect(yes).toEqual({ kind: 'saved' });
+    expect(yes).toEqual({ kind: 'saved', detail: { what: 'game-saved', gameId } });
     grid = buildGrid(await read(), teams, []);
     expect(game()).toMatchObject({ date: '2026-11-29', offRoundDate: null, outsideRound: false });
 
@@ -134,7 +136,7 @@ describe('rounds an owner can make (step 2.160)', () => {
       time: '18:00',
       place: '',
     });
-    expect(typed).toEqual({ kind: 'saved' });
+    expect(typed).toEqual({ kind: 'saved', detail: { what: 'game-saved', gameId } });
     grid = buildGrid(await read(), teams, []);
     expect(game()).toMatchObject({
       date: '2026-11-23',
@@ -150,7 +152,7 @@ describe('rounds an owner can make (step 2.160)', () => {
       time: '18:00',
       place: '',
     });
-    expect(late).toEqual({ kind: 'saved' });
+    expect(late).toEqual({ kind: 'saved', detail: { what: 'game-saved', gameId } });
     grid = buildGrid(await read(), teams, []);
     expect(game()).toMatchObject({ outsideRound: true });
     const lastWeek = await press('save-game', {
@@ -161,7 +163,7 @@ describe('rounds an owner can make (step 2.160)', () => {
       time: '18:00',
       place: '',
     });
-    expect(lastWeek).toEqual({ kind: 'saved' });
+    expect(lastWeek).toEqual({ kind: 'saved', detail: { what: 'game-saved', gameId } });
     grid = buildGrid(await read(), teams, []);
     expect(game()).toMatchObject({ offRoundDate: '2026-11-29', outsideRound: false });
 
@@ -194,13 +196,14 @@ describe('rounds an owner can make (step 2.160)', () => {
     const back = answerParams(refused);
     expect(back.hash).toBe(`#round-${roundId(1)}`);
     expect(refusedAtOf(back.query)).toEqual({ form: 'round', roundId: roundId(1) });
-    expect(noticeOf(back.query)?.text).toBe(
-      'That was not saved: That change cannot be made to the schedule as it stands. This round has games. Move or remove its games first, then remove the round.',
+    // Beside the round, one sentence: the rule's own.
+    expect(whyNotSaved(back.query)).toBe(
+      'This round has games. Move or remove its games first, then remove the round.',
     );
 
-    expect(await press('remove-round', { roundId: roundId(2) })).toEqual({
+    expect(await press('remove-round', { roundId: roundId(2), afterRoundId: roundId(1) })).toEqual({
       kind: 'saved',
-      detail: { what: 'round-removed' },
+      detail: { what: 'round-removed', afterRoundId: roundId(1) },
     });
     expect((await read()).result.rounds.map((r) => r.id)).toEqual([roundId(1)]);
   });
@@ -225,7 +228,26 @@ describe('rounds an owner can make (step 2.160)', () => {
       label: 'Week 1',
       date: '2026-11-31',
     });
-    expect(noticeOf(back.query)?.text).toMatch(/That is not a date\.$/);
+    // Beside the date field, in one sentence.
+    expect(addRoundProblemOf(back.query, { label: 'Week 1', date: '' })).toEqual({
+      field: 'date',
+      text: 'Choose the day the round is played.',
+    });
+    const blank = answerParams(
+      await press('add-round', { roundId: roundId(1), label: '', date: '2026-11-29' }),
+    );
+    expect(addRoundProblemOf(blank.query, { label: '', date: '2026-11-29' })).toEqual({
+      field: 'label',
+      text: 'Give the round a name.',
+    });
+    const far = answerParams(
+      await press('add-round', { roundId: roundId(1), label: 'Week 1', date: '3026-11-29' }),
+    );
+    expect(addRoundProblemOf(far.query, { label: 'Week 1', date: '3026-11-29' })).toEqual({
+      field: 'date',
+      text: 'Choose a date between the years 1900 and 2999.',
+    });
+    expect(noticeOf(far.query)?.kind).toBe('problem');
     // An address that names no id, or a date of another shape, is not read as one.
     expect(savedDetailOf({ done: 'saved', saved: 'round-added', round: 'x' })).toBeUndefined();
     expect(refusedAtOf({ problem: 'invalid-input', at: 'add-round', date: '29/11' })).toEqual({
@@ -242,8 +264,24 @@ describe('rounds an owner can make (step 2.160)', () => {
     const view = await read();
     expect(view.draft).toBeNull();
     expect(view.published.rounds).toEqual(
-      weeks.map((w) => ({ id: w.roundId, label: w.label, date: w.date })),
+      weeks.map((w, i) => ({ id: w.roundId, number: i + 1, label: w.label, date: w.date })),
     );
+  });
+
+  it("numbers the grid's rounds as they are stored, gaps and all", async () => {
+    const { read, press } = setup();
+    for (const week of weeks) await press('add-round', week);
+    await press('remove-round', { roundId: roundId(2) });
+    await press('add-round', { roundId: roundId(4), label: 'Week 4', date: '2026-12-06' });
+    // Week 2's number is not given again until it is gone from the season.
+    const grid = buildGrid(await read(), [], []);
+    expect(grid.rounds.map((r) => [r.label, r.number])).toEqual([
+      ['Week 1', 1],
+      ['Week 3', 3],
+      ['Week 4', 4],
+    ]);
+    expect(await press('publish', {})).toEqual({ kind: 'published' });
+    expect((await read()).published.rounds.map((r) => r.number)).toEqual([1, 3, 4]);
   });
 
   it('suggests a day a week on', () => {

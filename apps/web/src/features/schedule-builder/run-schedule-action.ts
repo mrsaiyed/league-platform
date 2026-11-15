@@ -33,12 +33,18 @@ export type ScheduleActionKind =
   | 'publish'
   | 'discard';
 
-/** What a save did, when the grid names it (step 2.160). */
+/**
+ * What a save did, so the grid says "Saved" beside what was saved, naming it (step 2.160;
+ * A-4). A removed round is said where it was: after the round before it (null: first).
+ */
 export type SavedDetail =
-  | { readonly what: 'round-added'; readonly roundId: string }
-  | { readonly what: 'round-removed' }
+  | { readonly what: 'round-added' | 'round-saved'; readonly roundId: string }
+  | { readonly what: 'round-removed'; readonly afterRoundId: string | null }
+  | { readonly what: 'game-saved'; readonly gameId: string }
   /** A game went to another round and its date was left as it was: the grid offers the round's. */
-  | { readonly what: 'game-round'; readonly gameId: string };
+  | { readonly what: 'game-round'; readonly gameId: string }
+  /** A game was removed from this round (null: from the games with no round). */
+  | { readonly what: 'game-removed'; readonly roundId: string | null };
 
 /** Which form a refusal belongs beside: the new round's, or one round's own. */
 export type RefusedAt =
@@ -130,7 +136,7 @@ export async function runScheduleAction(
         },
         deps,
       );
-      return done.ok ? { kind: 'saved' } : refusal(done);
+      return done.ok ? { kind: 'saved', detail: { what: 'game-saved', gameId } } : refusal(done);
     }
     case 'save-game': {
       // Only what changed is sent, so a game that was not touched adds nothing to the draft.
@@ -162,7 +168,7 @@ export async function runScheduleAction(
       ) {
         return { kind: 'saved', detail: { what: 'game-round', gameId } };
       }
-      return { kind: 'saved' };
+      return { kind: 'saved', detail: { what: 'game-saved', gameId } };
     }
     case 'add-round': {
       const roundId = text(form, 'roundId');
@@ -177,34 +183,40 @@ export async function runScheduleAction(
       const roundId = text(form, 'roundId');
       const done = await removeDraftRound(context, { ...basis, roundId }, deps);
       return done.ok
-        ? { kind: 'saved', detail: { what: 'round-removed' } }
+        ? {
+            kind: 'saved',
+            detail: { what: 'round-removed', afterRoundId: orNull(text(form, 'afterRoundId')) },
+          }
         : { ...refusal(done), at: { form: 'round', roundId } };
     }
     case 'remove-game': {
       const done = await removeDraftGame(context, { ...basis, gameId }, deps);
-      return done.ok ? { kind: 'saved' } : refusal(done);
+      // Said in the round the game was in when the form was drawn.
+      const [wasRound] = text(form, 'wasSlot').split('~');
+      return done.ok
+        ? { kind: 'saved', detail: { what: 'game-removed', roundId: orNull(wasRound ?? '') } }
+        : refusal(done);
     }
     case 'swap-games': {
       const otherGameId = text(form, 'otherGameId');
       if (otherGameId === '') return invalid;
       const done = await swapDraftGames(context, { ...basis, gameId, otherGameId }, deps);
-      return done.ok ? { kind: 'saved' } : refusal(done);
+      return done.ok ? { kind: 'saved', detail: { what: 'game-saved', gameId } } : refusal(done);
     }
-    case 'rename-round': {
-      const done = await renameDraftRound(
-        context,
-        { ...basis, roundId: text(form, 'roundId'), label: text(form, 'label') },
-        deps,
-      );
-      return done.ok ? { kind: 'saved' } : refusal(done);
-    }
+    case 'rename-round':
     case 'change-round-date': {
-      const done = await changeDraftRoundDate(
-        context,
-        { ...basis, roundId: text(form, 'roundId'), date: text(form, 'date') },
-        deps,
-      );
-      return done.ok ? { kind: 'saved' } : refusal(done);
+      const roundId = text(form, 'roundId');
+      const done =
+        kind === 'rename-round'
+          ? await renameDraftRound(context, { ...basis, roundId, label: text(form, 'label') }, deps)
+          : await changeDraftRoundDate(
+              context,
+              { ...basis, roundId, date: text(form, 'date') },
+              deps,
+            );
+      return done.ok
+        ? { kind: 'saved', detail: { what: 'round-saved', roundId } }
+        : { ...refusal(done), at: { form: 'round', roundId } };
     }
     case 'publish': {
       if (basis.draftId === null || basis.version === null) return invalid;

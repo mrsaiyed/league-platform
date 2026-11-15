@@ -1,9 +1,9 @@
 // How a schedule button's answer travels back to the grid in its address (step 2.160),
-// beyond the fixed words notice.ts turns into text: which round was added or which game
-// went to another round (so the grid can name it and offer the round's date), and, for a
-// refused round form, which form it was and what was typed in it, so the form opens again
-// with it kept and the reason beside it. Ids must be ids and typed text is only ever put
-// back into its own field, never shown as text (T-187).
+// beyond the fixed words notice.ts turns into text: what was saved (a round, a game, the
+// place of a removed one), so the grid says "Saved" beside it and the address's anchor
+// takes the phone there; and, for a refused round form, which form it was and what was
+// typed in it, so the form opens again with it kept and the reason beside it. Ids must be
+// ids, and typed text is only ever put back into its own field, never shown as text (T-187).
 import type { RefusedAt, SavedDetail, ScheduleActionOutcome } from './run-schedule-action.ts';
 
 type Search = Readonly<Record<string, string | readonly string[] | undefined>>;
@@ -16,9 +16,11 @@ const dateShape = /^\d{4}-\d{2}-\d{2}$/;
 const idOf = (value: string | undefined): string | undefined =>
   value !== undefined && uuidShape.test(value) ? value : undefined;
 
-/** The anchor of a round's section, and of the "Add a round" form. */
+/** The anchors: a round's section, a game's line, the "Add a round" form, a "Saved". */
 export const roundAnchor = (roundId: string): string => `round-${roundId}`;
+export const gameAnchor = (gameId: string): string => `game-${gameId}`;
 export const addRoundAnchor = 'add-round';
+export const savedAnchor = 'saved';
 
 /** The address's query and anchor for an answer (the caller adds the season). */
 export function answerParams(outcome: ScheduleActionOutcome): {
@@ -50,13 +52,32 @@ export function answerParams(outcome: ScheduleActionOutcome): {
   const query: Record<string, string> = { done: outcome.kind };
   if (outcome.kind !== 'saved' || outcome.detail === undefined) return { query, hash: '' };
   const detail = outcome.detail;
+  const hash = `#${savedAnchor}`;
   switch (detail.what) {
     case 'round-added':
-      return { query: { ...query, saved: detail.what, round: detail.roundId }, hash: '' };
+    case 'round-saved':
+      return { query: { ...query, saved: detail.what, round: detail.roundId }, hash };
     case 'round-removed':
-      return { query: { ...query, saved: detail.what }, hash: '' };
+      return {
+        query: {
+          ...query,
+          saved: detail.what,
+          ...(detail.afterRoundId === null ? {} : { after: detail.afterRoundId }),
+        },
+        hash,
+      };
+    case 'game-removed':
+      return {
+        query: {
+          ...query,
+          saved: detail.what,
+          ...(detail.roundId === null ? {} : { round: detail.roundId }),
+        },
+        hash,
+      };
+    case 'game-saved':
     case 'game-round':
-      return { query: { ...query, saved: detail.what, game: detail.gameId }, hash: '' };
+      return { query: { ...query, saved: detail.what, game: detail.gameId }, hash };
   }
 }
 
@@ -64,16 +85,25 @@ export function answerParams(outcome: ScheduleActionOutcome): {
 export function savedDetailOf(search: Search): SavedDetail | undefined {
   if (first(search['done']) !== 'saved') return undefined;
   const what = first(search['saved']);
-  if (what === 'round-removed') return { what };
-  if (what === 'round-added') {
-    const roundId = idOf(first(search['round']));
-    return roundId === undefined ? undefined : { what, roundId };
+  const round = first(search['round']);
+  switch (what) {
+    case 'round-added':
+    case 'round-saved': {
+      const roundId = idOf(round);
+      return roundId === undefined ? undefined : { what, roundId };
+    }
+    case 'round-removed':
+      return { what, afterRoundId: idOf(first(search['after'])) ?? null };
+    case 'game-removed':
+      return { what, roundId: idOf(round) ?? null };
+    case 'game-saved':
+    case 'game-round': {
+      const gameId = idOf(first(search['game']));
+      return gameId === undefined ? undefined : { what, gameId };
+    }
+    default:
+      return undefined;
   }
-  if (what === 'game-round') {
-    const gameId = idOf(first(search['game']));
-    return gameId === undefined ? undefined : { what, gameId };
-  }
-  return undefined;
 }
 
 /** The form a refusal belongs beside, with what was typed in it, if the address names one. */

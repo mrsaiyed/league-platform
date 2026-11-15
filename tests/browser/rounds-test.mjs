@@ -6,12 +6,14 @@
 // The made-up owner signs in as the other browser tests do (the stand-in's session
 // cookie) and starts at the admin's home (/north-valley/admin, typed: no page links to it
 // yet, as tests/browser/one-world-test.mjs says). From there only taps: Schedule, then the
-// season not public yet, which has no rounds. The owner adds three rounds, adds a game to
-// the first, moves it to the third and is offered the third's date, says yes and the date
-// follows; a round with games cannot be removed and says why; an empty one is removed;
-// moved again and answered "No, keep", the game keeps its date and is flagged. Then, in
-// the public season, a new round with a game is not on the public schedule until it is
-// published, and is after.
+// season not public yet, which has no rounds: a calm panel with the first round's form, on
+// the first screen. The owner adds three rounds ("Saved" beside each, on the screen), adds
+// a game to the first, moves it to the third and is offered the third's date beside the
+// game, says yes and the date follows; a round with games cannot be removed and says why;
+// an empty one is removed; a date the database would refuse is refused beside its field
+// with what was typed kept; moved again and answered "No, keep", the game keeps its date
+// and is flagged. Then, in the public season, a new round with a game is not on the public
+// schedule until it is published, and is after.
 import {
   accessibilityProblems,
   buildNext,
@@ -19,6 +21,7 @@ import {
   launch,
   startNext,
   waitFor,
+  whatWentWrong,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -41,6 +44,7 @@ const weeks = [
   { label: 'Week 2', date: '2027-01-17', words: 'Sun, Jan 17' },
   { label: 'Week 3', date: '2027-01-24', words: 'Sun, Jan 24' },
 ];
+const screen = { width: 390, height: 844 };
 
 if (built) {
   const origin = `http://localhost:${await freePort()}`;
@@ -54,10 +58,7 @@ if (built) {
   try {
     await waitFor(`${origin}/`, server);
     browser = await launch();
-    const context = await browser.newContext({
-      javaScriptEnabled: false,
-      viewport: { width: 390, height: 844 },
-    });
+    const context = await browser.newContext({ javaScriptEnabled: false, viewport: screen });
     await context.addCookies([{ name: 'srl_session', value: 'local-owner-token', url: origin }]);
     const page = await context.newPage();
     page.setDefaultTimeout(dev ? 120_000 : 60_000);
@@ -74,13 +75,17 @@ if (built) {
       await Promise.all([page.waitForEvent('load'), locator.click()]);
       if (!url.test(page.url())) throw new Error(`landed on ${page.url()}, not ${url}`);
     };
-    /** The "saved" words: there, naming what was saved, and on the screen without scrolling. */
-    const saidAtTop = async (label, words) => {
-      const notice = page.locator('[data-notice=done]');
-      const text = (await notice.count()) === 1 ? ((await notice.textContent()) ?? '') : '';
-      note(`${label}: the page says so`, text.includes(words), text || 'no notice');
-      const box = await notice.first().boundingBox();
-      note(`${label}: said on the screen at 390 without scrolling`, box !== null && box.y < 844);
+    /** On the screen as the page shows it now, without scrolling. */
+    const onScreen = async (locator) => {
+      const box = await locator.first().boundingBox();
+      return box !== null && box.y >= 0 && box.y + Math.min(box.height, 40) <= screen.height;
+    };
+    /** "Saved", beside what was saved: naming it, and on the screen the page opened at. */
+    const saidBeside = async (label, words) => {
+      const saved = page.locator('#saved');
+      const text = (await saved.count()) === 1 ? ((await saved.textContent()) ?? '') : '';
+      note(`${label}: "Saved" names it`, text.includes(words), text || 'no "Saved"');
+      note(`${label}: said where the phone is looking`, await onScreen(saved));
     };
     const round = (label) =>
       page.locator('section[data-round]', { has: page.locator('h2', { hasText: label }) });
@@ -93,6 +98,15 @@ if (built) {
     // The date in the game's own edit form (the flag's button carries the round's date).
     const gameDate = async () =>
       game.locator('details input[type=date][name=date]').first().getAttribute('value');
+    /** The "Add a round" form: in the empty season's panel, else opened at the foot. */
+    const addRoundForm = async () => {
+      const panel = page.locator('[data-no-rounds] form');
+      if ((await panel.count()) === 1) return panel;
+      const foot = page.locator('details[data-add-round]');
+      if ((await foot.getAttribute('open')) === null) await foot.locator('summary').click();
+      return foot.locator('form');
+    };
+    const kindOf = (locator) => locator.getAttribute('data-kind');
 
     at = 'the owner opens the admin and taps Schedule';
     await page.goto(`${origin}/north-valley`);
@@ -111,28 +125,57 @@ if (built) {
     const empty = await page.locator('main').innerText();
     note('the season has no rounds yet', empty.includes('This season has no rounds yet.'));
     note(
-      '"Add a round" is open in a season with no rounds',
-      (await page.locator('details[data-add-round]').getAttribute('open')) !== null,
+      'the season not public yet is not called "the published schedule"',
+      !empty.includes('You are looking at the published schedule') &&
+        empty.includes('This season is not public yet'),
+    );
+    note('no "Clashes to fix" while there are no rounds', !empty.includes('Clashes to fix'));
+    note(
+      "the first round's form is on the first screen, in a panel under the intro",
+      (await page.locator('[data-no-rounds] form').count()) === 1 &&
+        (await onScreen(page.locator('[data-no-rounds] input[name=label]'))),
     );
     await accessible('a season with no rounds');
 
     at = 'the owner adds three rounds';
     for (const [i, week] of weeks.entries()) {
-      const add = page.locator('details[data-add-round]');
-      if ((await add.getAttribute('open')) === null) await add.locator('summary').click();
+      const form = await addRoundForm();
       if (i > 0) {
         note(
           `the date offered for ${week.label} is a week after the last round`,
-          (await add.locator('input[name=date]').inputValue()) === week.date,
+          (await form.locator('input[name=date]').inputValue()) === week.date,
         );
       }
-      await add.locator('input[name=label]').fill(week.label);
-      await add.locator('input[name=date]').fill(week.date);
-      await tap(add.getByRole('button', { name: 'Add round' }), /saved=round-added/);
-      await saidAtTop(`${week.label} added`, `Round ${i + 1}: ${week.label} was added`);
+      const submit = form.getByRole('button', { name: 'Add round' });
+      if (i === 0) note('"Add round" is the main button', (await kindOf(submit)) === 'main');
+      await form.locator('input[name=label]').fill(week.label);
+      await form.locator('input[name=date]').fill(week.date);
+      await tap(submit, /saved=round-added/);
+      await saidBeside(`${week.label} added`, `Round ${i + 1}: ${week.label} was added`);
     }
     note('three rounds are in the grid', (await page.locator('section[data-round]').count()) === 3);
+    const summary = page.locator('details[data-add-round] > summary');
+    const tall = (await summary.boundingBox())?.height ?? 0;
+    note('"Add a round" at the foot is at least 44 high', tall >= 44, `${tall}`);
     await accessible('three new rounds');
+
+    at = 'a date the database would not take is refused beside its field';
+    const refusedForm = await addRoundForm();
+    await refusedForm.locator('input[name=label]').fill('Far week');
+    await refusedForm.locator('input[name=date]').fill('3027-01-31');
+    await tap(refusedForm.getByRole('button', { name: 'Add round' }), /at=add-round/);
+    const kept = page.locator('details[data-add-round] form');
+    note(
+      'the refused round keeps its name',
+      (await kept.locator('input[name=label]').inputValue()) === 'Far week',
+    );
+    const error = (await kept.locator('.ui-field-error').textContent()) ?? '';
+    note(
+      'and says why beside the date, in one sentence',
+      error === 'Choose a date between the years 1900 and 2999.',
+      error,
+    );
+    note('the refusal is on the screen', await onScreen(kept.locator('.ui-field-error')));
 
     at = 'the owner adds a game to the first round';
     const add = round('Week 1').locator('details[data-add-game]');
@@ -149,6 +192,7 @@ if (built) {
     );
     await add.locator('input[name=time]').fill('18:00');
     await tap(add.getByRole('button', { name: 'Add game' }), /done=saved/);
+    await saidBeside('the new game', `${teams[1]} at ${teams[0]}`);
     note(
       'the game is in the first round',
       (await round('Week 1').locator('li[data-game]').count()) === 1,
@@ -156,23 +200,24 @@ if (built) {
 
     at = 'the owner moves the game to the third round';
     await editGame('Round 3: Week 3');
-    await saidAtTop('the move', 'is now in Round 3: Week 3');
-    const offer = page.locator('[data-follow-round-date]');
+    await saidBeside('the move', 'is now in Round 3: Week 3');
+    const offer = page.locator('#saved [data-follow-round-date]');
     note(
-      "the owner is offered the third round's date",
+      "the owner is offered the third round's date beside the game",
       (await offer.count()) === 1 &&
         ((await offer.textContent()) ?? '').includes(`Move it to ${weeks[2].words} too?`),
       (await offer.count()) === 1 ? ((await offer.textContent()) ?? '') : 'no offer',
     );
+    const yes = offer.getByRole('button', { name: `Yes, move it to ${weeks[2].words}` });
+    const no = offer.getByRole('link', { name: `No, keep ${weeks[0].words}` });
+    note('"Yes" is the main button', (await kindOf(yes)) === 'main');
+    note('"No, keep" is drawn as a button', (await no.getAttribute('class')) === 'ui-button');
     note(
-      "the game is flagged while it is off its round's date",
+      "the game is flagged while it is outside its round's days",
       (await page.locator('[data-off-round-date]').count()) === 1,
     );
     await accessible("the offer of the round's date");
-    await tap(
-      offer.getByRole('button', { name: `Yes, move it to ${weeks[2].words}` }),
-      /done=saved/,
-    );
+    await tap(yes, /done=saved/);
     note(
       'the game is in the third round',
       (await round('Week 3').locator('li[data-game]').count()) === 1,
@@ -200,11 +245,27 @@ if (built) {
       why,
     );
 
+    at = 'a round date the database would not take is refused beside the round';
+    const dateForm = third.locator('form', {
+      has: page.locator('button', { hasText: 'Change round date' }),
+    });
+    await dateForm.locator('input[name=date]').fill('1899-01-01');
+    await tap(dateForm.getByRole('button', { name: 'Change round date' }), /at=round/);
+    const roundError = round('Week 3').locator('[data-notice=problem]');
+    note(
+      'the round says why, in one sentence',
+      ((await roundError.textContent()) ?? '') === 'Choose a date between the years 1900 and 2999.',
+      (await roundError.textContent()) ?? 'nothing said',
+    );
+    note('beside the round, on the screen', await onScreen(roundError));
+
     at = 'the owner removes the empty second round';
     const second = round('Week 2');
     await second.locator('summary', { hasText: 'Change or remove this round' }).click();
-    await tap(second.getByRole('button', { name: 'Remove this round' }), /saved=round-removed/);
-    await saidAtTop('the removal', 'the round was removed');
+    const remove = second.getByRole('button', { name: 'Remove this round' });
+    note('"Remove this round" is drawn as a danger button', (await kindOf(remove)) === 'danger');
+    await tap(remove, /saved=round-removed/);
+    await saidBeside('the removal', 'the round was removed');
     note('two rounds are left', (await page.locator('section[data-round]').count()) === 2);
 
     at = 'the owner moves the game again and keeps its date';
@@ -213,7 +274,7 @@ if (built) {
       page
         .locator('[data-follow-round-date]')
         .getByRole('link', { name: `No, keep ${weeks[2].words}` }),
-      /\/admin\/schedule\?season=winter-2027$/,
+      /\/admin\/schedule\?season=winter-2027/,
     );
     note(
       'the game is in the first round',
@@ -226,26 +287,26 @@ if (built) {
     );
     const flag = (await page.locator('[data-off-round-date]').textContent()) ?? '';
     note(
-      "the game is flagged as off its round's date",
-      flag.includes(`Outside its round: Round 1: Week 1 is on ${weeks[0].words}.`),
+      "the game is flagged as outside its round's days, in one plain sentence",
+      flag.includes(`This game falls outside Week 1, which is on ${weeks[0].date}.`),
       flag,
     );
-    await accessible("a game off its round's date");
+    await accessible("a game outside its round's days");
 
     at = "the owner publishes the new season's schedule";
-    const summary = await page
+    const publishing = await page
       .locator('section', { has: page.locator('#publish-heading') })
       .innerText();
     note(
       'the publish summary counts the rounds',
-      summary.includes('Rounds added: 2. Rounds removed: 0.'),
-      summary.slice(0, 300),
+      publishing.includes('Rounds added: 2. Rounds removed: 0.'),
+      publishing.slice(0, 300),
     );
     await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
     note(
       'the rounds stay after publishing',
       (await page.locator('section[data-round]').count()) === 2 &&
-        (await page.locator('main').innerText()).includes('There is no draft yet.'),
+        (await page.locator('main').innerText()).includes('This season is not public yet'),
     );
 
     // The public season: a new round is not public until it is published.
@@ -255,12 +316,9 @@ if (built) {
       /\/admin\/schedule$/,
     );
     const finals = 'Finals week';
-    const addRound = page.locator('details[data-add-round]');
-    await addRound.locator('summary').click();
-    await addRound.locator('input[name=label]').fill(finals);
-    // The date offered: a week after the season's last round.
-    const finalsDate = await addRound.locator('input[name=date]').inputValue();
-    await tap(addRound.getByRole('button', { name: 'Add round' }), /saved=round-added/);
+    const finalsForm = await addRoundForm();
+    await finalsForm.locator('input[name=label]').fill(finals);
+    await tap(finalsForm.getByRole('button', { name: 'Add round' }), /saved=round-added/);
     const added = round(finals).locator('details[data-add-game]');
     await added.locator('summary').click();
     const names = await added
@@ -271,10 +329,7 @@ if (built) {
     await added.locator('input[name=time]').fill('20:00');
     await tap(added.getByRole('button', { name: 'Add game' }), /done=saved/);
 
-    const visitor = await browser.newContext({
-      javaScriptEnabled: false,
-      viewport: { width: 390, height: 844 },
-    });
+    const visitor = await browser.newContext({ javaScriptEnabled: false, viewport: screen });
     const publicPage = await visitor.newPage();
     publicPage.setDefaultTimeout(dev ? 120_000 : 60_000);
     const publicSchedule = async () => {
@@ -290,11 +345,11 @@ if (built) {
     note(
       'the new round is on the public schedule once published',
       after.includes(finals),
-      `${finalsDate}: ${after.slice(0, 300)}`,
+      after.slice(0, 300),
     );
     await visitor.close();
   } catch (error) {
-    failures.push(`${at}: ${String(error?.message ?? error).split('\n')[0]}`);
+    failures.push(`${at}: ${whatWentWrong(error)}`);
   } finally {
     await browser?.close();
     server.child.kill();

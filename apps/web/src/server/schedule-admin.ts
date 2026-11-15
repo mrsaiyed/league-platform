@@ -9,8 +9,14 @@ import type { PublicSeason } from './public-stats.ts';
 
 export type ScheduleTeam = { readonly id: string; readonly name: string };
 
-/** A season the schedule can be built for; `isPublic` is false while visitors cannot see it. */
-export type ScheduleSeason = PublicSeason & { readonly isPublic: boolean };
+/**
+ * A season the schedule can be built for; `isPublic` is false while visitors cannot see it.
+ * Its program says who may see it while it is not public (visible-seasons.ts).
+ */
+export type ScheduleSeason = PublicSeason & {
+  readonly isPublic: boolean;
+  readonly programId: string;
+};
 
 export type ScheduleAdminPorts = {
   /** Deps for the scheduling commands; the transaction follows the context's league. */
@@ -19,7 +25,8 @@ export type ScheduleAdminPorts = {
   readonly teamsOf: (leagueId: string, seasonId: string) => Promise<readonly ScheduleTeam[]>;
   /**
    * Every season of the league: the public ones in the order the public pages list them,
-   * then the ones not public yet, by name.
+   * then the ones not public yet, by name. Not filtered by who asks: the screen shows a
+   * season that is not public only to someone who may read its program's schedule.
    */
   readonly seasonsOf: (leagueId: string) => Promise<readonly ScheduleSeason[]>;
 };

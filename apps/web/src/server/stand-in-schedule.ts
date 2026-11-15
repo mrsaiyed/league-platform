@@ -18,8 +18,10 @@ export function standInSchedule(world: World): ScheduleAdminPorts {
         .map(({ id, name }) => ({ id, name })),
     seasonsOf: async (leagueId) => {
       const s = await world.read(leagueId);
+      const all = s?.seasons ?? [];
+      const programOf = (id: string) => all.find((x) => x.id === id)?.programId ?? '';
       const shown = worldPublicSeasons(s);
-      const hidden = (s?.seasons ?? [])
+      const hidden = all
         .filter((x) => !shown.some((p) => p.id === x.id))
         .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
         .map((x) => ({
@@ -28,8 +30,12 @@ export function standInSchedule(world: World): ScheduleAdminPorts {
           slug: x.slug,
           isCurrent: s?.currentSeasonId === x.id,
           isPublic: false,
+          programId: x.programId,
         }));
-      return [...shown.map((x) => ({ ...x, isPublic: true })), ...hidden];
+      return [
+        ...shown.map((x) => ({ ...x, isPublic: true, programId: programOf(x.id) })),
+        ...hidden,
+      ];
     },
   };
 }

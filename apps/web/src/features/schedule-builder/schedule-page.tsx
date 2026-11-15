@@ -7,10 +7,8 @@ import {
   previewSchedulePublish,
   type VenueWithCourts,
 } from '@srleagues/core';
-import { OptionPicker } from '@srleagues/ui';
-import { displayLabels } from '@srleagues/site';
 import { randomUUID } from 'node:crypto';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -37,10 +35,19 @@ import {
   type GridRound,
   type GridTeam,
 } from './build-grid.ts';
-import { addRoundAnchor, refusedAtOf, roundAnchor, savedDetailOf } from './grid-answer.ts';
+import {
+  addRoundAnchor,
+  gameAnchor,
+  refusedAtOf,
+  roundAnchor,
+  savedAnchor,
+  savedDetailOf,
+} from './grid-answer.ts';
 import type { SavedDetail } from './run-schedule-action.ts';
 import { importLinkOf } from './import-link.ts';
-import { noticeOf } from './notice.ts';
+import { addRoundProblemOf, noticeOf, whyNotSaved } from './notice.ts';
+import { ScheduleHeading } from './schedule-heading.tsx';
+import { visibleSeasons } from './visible-seasons.ts';
 
 type Basis = {
   readonly league: string;
@@ -69,10 +76,13 @@ export async function ScheduleBuilderPage({
   const addressee = view.context.league;
   const ports = await webPorts();
   const context = commandContextOf(view.context);
-  // Every season, the ones not public yet too: a season is scheduled before it is shown.
-  const seasons = await ports.scheduleAdmin.seasonsOf(addressee.id);
+  const holder = await ports.accessOf(context);
+  // Every season, the ones not public yet too (a season is scheduled before it is shown),
+  // but one not public only to someone who may read its program's schedule (P4 §4).
+  const seasons = visibleSeasons(holder, await ports.scheduleAdmin.seasonsOf(addressee.id));
   const asked = firstValue(search['season']);
-  const season = chooseSeason(seasons, asked);
+  const chosen = chooseSeason(seasons, asked);
+  const season = seasons.find((s) => s.id === chosen?.id);
   const notice = noticeOf(search);
   const action = leagueUrl(addressee, 'admin-area', { area: 'schedule' });
   if (season === undefined) {
@@ -89,28 +99,17 @@ export async function ScheduleBuilderPage({
     listVenues(context, {}, deps),
     ports.scheduleAdmin.teamsOf(addressee.id, season.id),
   ]);
-  const labels = displayLabels(t);
-  const heading = (top: ReactNode) => (
-    <>
-      <h1>{t('schedule.admin.title')}</h1>
-      <OptionPicker
-        name="season"
-        label={labels.season}
-        submitLabel={labels.show}
-        action={action}
-        value={season.slug}
-        options={seasons.map((s) => ({
-          value: s.slug,
-          label: s.isPublic ? s.name : t('schedule.admin.seasonNotPublic', { name: s.name }),
-        }))}
-      />
-      <p>{t('schedule.admin.seasonName', { name: season.name })}</p>
-      <p>{t('schedule.admin.intro')}</p>
-      <p>
-        <a href={importLinkOf(addressee)}>{t('schedule.admin.importLink')}</a>
-      </p>
+  const importLink = (
+    <p>
+      <a href={importLinkOf(addressee)}>{t('schedule.admin.importLink')}</a>
+    </p>
+  );
+  const heading = (top: ReactNode, firstRound: ReactNode = null) => (
+    <ScheduleHeading seasons={seasons} season={season} action={action}>
+      {firstRound}
+      {importLink}
       {top}
-    </>
+    </ScheduleHeading>
   );
   const plainNotice =
     notice === undefined ? null : (
@@ -143,8 +142,8 @@ export async function ScheduleBuilderPage({
       ? refusedAt.roundId
       : undefined;
   const besideAdd = refusedAt?.form === 'add-round' ? refusedAt : undefined;
-  const problemText = notice?.kind === 'problem' ? notice.text : undefined;
-  const holder = await ports.accessOf(context);
+  const roundProblem = besideRound === undefined ? undefined : whyNotSaved(search);
+  const addProblem = besideAdd === undefined ? undefined : addRoundProblemOf(search, besideAdd);
   const mayDo = (permission: 'schedule.edit' | 'schedule.publish'): boolean =>
     holder !== undefined && allows(holder, permission, leagueScope);
   const basis: Basis = {
@@ -164,16 +163,34 @@ export async function ScheduleBuilderPage({
   const saidBeside = basis.canEdit && (besideRound !== undefined || besideAdd !== undefined);
   const roundName = (r: GridRound) =>
     t('schedule.admin.round', { number: r.number, label: r.label });
-  const savedTop = savedNotice(saved, grid, roundName, basis, action);
-  const top = saidBeside ? null : (savedTop ?? plainNotice);
+  // "Saved", said beside what was saved (A-4); at the top only when that is not on the page.
+  const here = savedHere(saved, grid, roundName, basis, action);
+  const top = saidBeside || here !== undefined ? null : plainNotice;
+  const noRounds = grid.rounds.length === 0;
+  // A season with no rounds: a calm panel under the intro, the first round's form open in it.
+  const firstRound = noRounds ? (
+    <section className="ui-notice" aria-labelledby="no-rounds" data-no-rounds="">
+      <h2 id="no-rounds">{t('schedule.admin.noRounds')}</h2>
+      {basis.canEdit ? (
+        <>
+          <p>{t('schedule.admin.noRoundsHelp')}</p>
+          <AddRoundForm basis={basis} rounds={grid.rounds} typed={besideAdd} problem={addProblem} />
+        </>
+      ) : null}
+    </section>
+  ) : null;
+  const savedAt = (place: SavedPlace) =>
+    here !== undefined && samePlace(here.place, place) ? here.node : null;
 
   return (
     <main>
-      {heading(top)}
-      {draft.draft === null ? (
+      {heading(top, firstRound)}
+      {draft.draft !== null ? (
+        <p>{t.plural('schedule.admin.draftChanges', draft.draft.changeCount)}</p>
+      ) : season.isPublic ? (
         <p>{t('schedule.admin.noDraft')}</p>
       ) : (
-        <p>{t.plural('schedule.admin.draftChanges', draft.draft.changeCount)}</p>
+        <p>{t('schedule.admin.noDraftHidden')}</p>
       )}
       {draft.draft?.outOfDate === true ? (
         <p role="alert">{t('schedule.admin.draftOutOfDate')}</p>
@@ -181,45 +198,49 @@ export async function ScheduleBuilderPage({
       {draft.rejected.length === 0 ? null : (
         <p role="alert">{t.plural('schedule.admin.rejected', draft.rejected.length)}</p>
       )}
-      <section aria-labelledby="clashes-heading">
-        <h2 id="clashes-heading">{t('schedule.admin.clashes')}</h2>
-        {grid.clashes.length === 0 ? (
-          <p>{t('schedule.admin.clashesNone')}</p>
-        ) : (
-          <ul data-clashes="">
-            {grid.clashes.map((c) => (
-              <li key={c.key}>{c.text}</li>
-            ))}
-          </ul>
-        )}
-      </section>
-      {grid.rounds.length === 0 ? (
-        <>
-          <p>{t('schedule.admin.noRounds')}</p>
-          {basis.canEdit ? <p>{t('schedule.admin.noRoundsHelp')}</p> : null}
-        </>
-      ) : null}
+      {noRounds && grid.clashes.length === 0 ? null : (
+        <section aria-labelledby="clashes-heading">
+          <h2 id="clashes-heading">{t('schedule.admin.clashes')}</h2>
+          {grid.clashes.length === 0 ? (
+            <p>{t('schedule.admin.clashesNone')}</p>
+          ) : (
+            <ul data-clashes="">
+              {grid.clashes.map((c) => (
+                <li key={c.key}>{c.text}</li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+      {savedAt({ afterRound: null })}
       {grid.rounds.map((round) => (
-        <RoundSection
-          key={round.id}
-          round={round}
-          grid={grid}
-          teams={teams}
-          venues={venues}
-          basis={basis}
-          rounds={grid.rounds}
-          problem={besideRound === round.id ? problemText : undefined}
-        />
+        <Fragment key={round.id}>
+          <RoundSection
+            round={round}
+            grid={grid}
+            teams={teams}
+            venues={venues}
+            basis={basis}
+            rounds={grid.rounds}
+            problem={besideRound === round.id ? roundProblem : undefined}
+            saved={savedAt({ round: round.id })}
+            savedGame={(gameId) => savedAt({ game: gameId })}
+            previousRoundId={grid.rounds[grid.rounds.indexOf(round) - 1]?.id ?? null}
+          />
+          {savedAt({ afterRound: round.id })}
+        </Fragment>
       ))}
-      {basis.canEdit ? (
-        <AddRound
-          basis={basis}
-          rounds={grid.rounds}
-          typed={besideAdd}
-          problem={besideAdd === undefined ? undefined : problemText}
-        />
+      {basis.canEdit && !noRounds ? (
+        <AddRound basis={basis} rounds={grid.rounds} typed={besideAdd} problem={addProblem} />
       ) : null}
-      <LooseGames grid={grid} teams={teams} venues={venues} basis={basis} />
+      <LooseGames
+        grid={grid}
+        teams={teams}
+        venues={venues}
+        basis={basis}
+        saved={savedAt({ round: null })}
+        savedGame={(gameId) => savedAt({ game: gameId })}
+      />
       {draft.draft === null || !(basis.canEdit || basis.canPublish) ? null : (
         <section aria-labelledby="publish-heading">
           <h2 id="publish-heading">{t('schedule.admin.publish')}</h2>
@@ -339,6 +360,9 @@ function RoundSection({
   basis,
   rounds,
   problem,
+  saved,
+  savedGame,
+  previousRoundId,
 }: {
   readonly round: GridRound;
   readonly grid: Grid;
@@ -348,6 +372,11 @@ function RoundSection({
   readonly rounds: readonly GridRound[];
   /** Why the last change to this round was refused, said beside its forms. */
   readonly problem: string | undefined;
+  /** "Saved", when the last save was this round's. */
+  readonly saved: ReactNode;
+  readonly savedGame: (gameId: string) => ReactNode;
+  /** Where "the round was removed" is said if this one is: after the round before it. */
+  readonly previousRoundId: string | null;
 }) {
   const headingId = roundAnchor(round.id);
   return (
@@ -361,6 +390,7 @@ function RoundSection({
           : t('schedule.admin.roundDate', { date: round.date })}{' '}
         {t.plural('schedule.admin.roundGames', round.games.length)}
       </p>
+      {saved}
       {problem === undefined ? null : (
         <p className="ui-notice" data-kind="error" role="alert" data-notice="problem">
           {problem}
@@ -402,8 +432,11 @@ function RoundSection({
             <form action={removeRoundAction} data-remove-round={round.id}>
               <BasisFields basis={basis} />
               <input type="hidden" name="roundId" value={round.id} />
+              <input type="hidden" name="afterRoundId" value={previousRoundId ?? ''} />
               <p>{t('schedule.admin.removeRoundNote')}</p>
-              <button type="submit">{t('schedule.admin.removeRound')}</button>
+              <button type="submit" className="ui-button" data-kind="danger">
+                {t('schedule.admin.removeRound')}
+              </button>
             </form>
           ) : (
             <p data-remove-round-blocked={round.id}>
@@ -420,6 +453,7 @@ function RoundSection({
         venues={venues}
         basis={basis}
         rounds={rounds}
+        savedGame={savedGame}
       />
       {basis.canEdit ? <AddGame round={round} teams={teams} venues={venues} basis={basis} /> : null}
     </section>
@@ -431,15 +465,20 @@ function LooseGames({
   teams,
   venues,
   basis,
+  saved,
+  savedGame,
 }: {
   readonly grid: Grid;
   readonly teams: readonly GridTeam[];
   readonly venues: readonly VenueWithCourts[];
   readonly basis: Basis;
+  readonly saved: ReactNode;
+  readonly savedGame: (gameId: string) => ReactNode;
 }) {
   return (
     <section aria-labelledby="loose-heading">
       <h2 id="loose-heading">{t('schedule.admin.otherGames')}</h2>
+      {saved}
       <GameList
         games={grid.looseGames}
         grid={grid}
@@ -447,6 +486,7 @@ function LooseGames({
         venues={venues}
         basis={basis}
         rounds={grid.rounds}
+        savedGame={savedGame}
       />
       {basis.canEdit ? <AddGame round={null} teams={teams} venues={venues} basis={basis} /> : null}
     </section>
@@ -460,6 +500,7 @@ function GameList({
   venues,
   basis,
   rounds,
+  savedGame,
 }: {
   readonly games: readonly GridGame[];
   readonly grid: Grid;
@@ -467,6 +508,7 @@ function GameList({
   readonly venues: readonly VenueWithCourts[];
   readonly basis: Basis;
   readonly rounds: readonly GridRound[];
+  readonly savedGame: (gameId: string) => ReactNode;
 }) {
   if (games.length === 0) return null;
   return (
@@ -480,6 +522,7 @@ function GameList({
           venues={venues}
           basis={basis}
           rounds={rounds}
+          saved={savedGame(g.id)}
         />
       ))}
     </ol>
@@ -492,6 +535,7 @@ function GameItem({
   venues,
   basis,
   rounds,
+  saved,
 }: {
   readonly game: GridGame;
   readonly grid: Grid;
@@ -499,6 +543,8 @@ function GameItem({
   readonly venues: readonly VenueWithCourts[];
   readonly basis: Basis;
   readonly rounds: readonly GridRound[];
+  /** "Saved", when the last save was this game's. */
+  readonly saved: ReactNode;
 }) {
   const others = grid.allGames.filter((o) => o.id !== game.id && o.editable);
   const round = rounds.find((r) => r.id === game.roundId);
@@ -508,7 +554,7 @@ function GameItem({
   });
   const place = game.placeLabel ?? t('schedule.admin.noPlace');
   return (
-    <li data-game={game.id} data-clash={game.clashed ? 'yes' : 'no'}>
+    <li id={gameAnchor(game.id)} data-game={game.id} data-clash={game.clashed ? 'yes' : 'no'}>
       <p>
         <strong>{t('schedule.admin.gameVs', { away: game.awayName, home: game.homeName })}</strong>
         <br />
@@ -520,6 +566,7 @@ function GameItem({
               recording: t(`schedule.admin.recording.${game.recording}`),
             })}
       </p>
+      {saved}
       {game.clashed ? (
         <p role="status">
           <strong>{t('schedule.admin.clashFlag')}</strong>
@@ -529,10 +576,7 @@ function GameItem({
         <div data-off-round-date={game.id}>
           <p role="status">
             <strong>
-              {t('schedule.admin.offRoundDate', {
-                round: t('schedule.admin.round', { number: round.number, label: round.label }),
-                date: dayText(game.offRoundDate),
-              })}
+              {t('schedule.admin.offRoundDate', { round: round.label, date: game.offRoundDate })}
             </strong>
           </p>
           {basis.canEdit && game.editable ? (
@@ -540,7 +584,7 @@ function GameItem({
               game={game}
               date={game.offRoundDate}
               basis={basis}
-              label={t('schedule.admin.moveToRoundDate', { date: dayText(game.offRoundDate) })}
+              label={t('schedule.admin.moveToRoundDate', { date: game.offRoundDate })}
             />
           ) : null}
         </div>
@@ -661,11 +705,14 @@ function MoveToRoundDate({
   date,
   basis,
   label,
+  main = false,
 }: {
   readonly game: GridGame;
   readonly date: string;
   readonly basis: Basis;
   readonly label: string;
+  /** The answer the question expects: drawn as the main button. */
+  readonly main?: boolean;
 }) {
   return (
     <form action={saveGameAction}>
@@ -680,17 +727,21 @@ function MoveToRoundDate({
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="time" value={game.time ?? ''} />
       <input type="hidden" name="place" value={game.place} />
-      <button type="submit">{label}</button>
+      <button type="submit" className="ui-button" data-kind={main ? 'main' : undefined}>
+        {label}
+      </button>
     </form>
   );
 }
 
+type AddRoundProblem = ReturnType<typeof addRoundProblemOf>;
+
 /**
- * "Add a round" at the foot of the grid (step 2.160): a name and a date, the date
- * suggested a week after the last round's. Open when the season has no rounds, and
- * after a refusal, with what was typed kept and the reason beside it.
+ * The "Add a round" form (step 2.160): a name and a date, the date suggested a week after
+ * the last round's. After a refusal it keeps what was typed and says why beside the field
+ * it is about.
  */
-function AddRound({
+function AddRoundForm({
   basis,
   rounds,
   typed,
@@ -699,109 +750,175 @@ function AddRound({
   readonly basis: Basis;
   readonly rounds: readonly GridRound[];
   readonly typed: { readonly label: string; readonly date: string } | undefined;
-  readonly problem: string | undefined;
+  readonly problem: AddRoundProblem;
 }) {
   const lastDate = rounds.findLast((r) => r.date !== null)?.date ?? null;
   const suggested = lastDate === null ? '' : (daysAfter(lastDate, 7) ?? '');
+  const error = (field: 'label' | 'date' | 'form') =>
+    problem?.field !== field ? null : (
+      <p className="ui-field-error" role="alert" data-notice="problem">
+        {problem.text}
+      </p>
+    );
   return (
-    <details
-      id={addRoundAnchor}
-      data-add-round=""
-      open={rounds.length === 0 || problem !== undefined}
-    >
-      <summary>{t('schedule.admin.addRound')}</summary>
-      <form action={addRoundAction}>
-        <BasisFields basis={basis} />
-        <input type="hidden" name="roundId" value={randomUUID()} />
-        <Field label={t('schedule.admin.addRoundName')}>
-          <input
-            name="label"
-            defaultValue={typed?.label ?? ''}
-            required
-            maxLength={120}
-            aria-describedby="add-round-name-help"
-            style={wide}
-          />
-        </Field>
-        <p id="add-round-name-help" className="ui-field-help">
-          {t('schedule.admin.addRoundNameHelp')}
-        </p>
-        <Field label={t('schedule.admin.addRoundDate')}>
-          <input
-            type="date"
-            name="date"
-            defaultValue={typed?.date ?? suggested}
-            required
-            style={wide}
-          />
-        </Field>
-        {problem === undefined ? null : (
-          <p className="ui-field-error" role="alert" data-notice="problem">
-            {problem}
-          </p>
-        )}
-        <p>{t('schedule.admin.addRoundNote')}</p>
-        <button type="submit">{t('schedule.admin.addRoundSubmit')}</button>
-      </form>
-    </details>
+    <form action={addRoundAction} id={addRoundAnchor} data-add-round-form="">
+      <BasisFields basis={basis} />
+      <input type="hidden" name="roundId" value={randomUUID()} />
+      <Field label={t('schedule.admin.addRoundName')}>
+        <input
+          name="label"
+          defaultValue={typed?.label ?? ''}
+          required
+          maxLength={120}
+          aria-describedby="add-round-name-help"
+          style={wide}
+        />
+      </Field>
+      {error('label')}
+      <p id="add-round-name-help" className="ui-field-help">
+        {t('schedule.admin.addRoundNameHelp')}
+      </p>
+      <Field label={t('schedule.admin.addRoundDate')}>
+        <input
+          type="date"
+          name="date"
+          defaultValue={typed === undefined || typed.date === '' ? suggested : typed.date}
+          required
+          aria-describedby="add-round-date-help"
+          style={wide}
+        />
+      </Field>
+      {error('date')}
+      <p id="add-round-date-help" className="ui-field-help">
+        {t('schedule.admin.addRoundNote')}
+      </p>
+      {error('form')}
+      <p>
+        <button type="submit" className="ui-button" data-kind="main">
+          {t('schedule.admin.addRoundSubmit')}
+        </button>
+      </p>
+    </form>
   );
 }
 
 /**
- * The words at the top after a save the address names (step 2.160): which round was
- * added, or which game went to which round and, when it is not on that round's date, the
- * offer to move it there too, "No" keeping it where it is.
+ * "Add a round" under the grid's rounds: set apart from the last round by a rule, and
+ * opened by a button-sized control. Open after a refusal.
  */
-function savedNotice(
+function AddRound(props: {
+  readonly basis: Basis;
+  readonly rounds: readonly GridRound[];
+  readonly typed: { readonly label: string; readonly date: string } | undefined;
+  readonly problem: AddRoundProblem;
+}) {
+  return (
+    <section aria-label={t('schedule.admin.addRound')} data-add-round-section="">
+      <hr />
+      <details data-add-round="" open={props.problem !== undefined}>
+        <summary className="ui-button">{t('schedule.admin.addRound')}</summary>
+        <AddRoundForm {...props} />
+      </details>
+    </section>
+  );
+}
+
+/** Where "Saved" is said: in a round, at a game, after a round (null: before the first). */
+type SavedPlace =
+  | { readonly round: string | null }
+  | { readonly game: string }
+  | { readonly afterRound: string | null };
+
+const samePlace = (a: SavedPlace, b: SavedPlace): boolean =>
+  ('round' in a && 'round' in b && a.round === b.round) ||
+  ('game' in a && 'game' in b && a.game === b.game) ||
+  ('afterRound' in a && 'afterRound' in b && a.afterRound === b.afterRound);
+
+/**
+ * "Saved" beside what was saved, naming it (step 2.160, A-4): the address's anchor takes
+ * the phone to it. A game moved to another round with its date left alone is offered the
+ * round's date there, "No" keeping it as it is. Undefined when what it names is not on
+ * the page: the page then says it at the top.
+ */
+function savedHere(
   saved: SavedDetail | undefined,
   grid: Grid,
   roundName: (round: GridRound) => string,
   basis: Basis,
   gridAddress: string,
-): ReactNode {
+): { readonly place: SavedPlace; readonly node: ReactNode } | undefined {
   if (saved === undefined) return undefined;
   const said = (text: string, more?: ReactNode) => (
-    <>
-      <p className="ui-notice" role="status" data-notice="done">
-        {text}
-      </p>
+    <div id={savedAnchor} className="ui-notice" role="status" data-notice="done">
+      <p>{text}</p>
       {more}
-    </>
+    </div>
   );
+  const gameName = (g: GridGame) =>
+    t('schedule.admin.gameVs', { away: g.awayName, home: g.homeName });
+  const roundOf = (id: string | null) => grid.rounds.find((r) => r.id === id);
   switch (saved.what) {
-    case 'round-removed':
-      return said(t('schedule.admin.savedRoundRemoved'));
-    case 'round-added': {
-      const round = grid.rounds.find((r) => r.id === saved.roundId);
-      return round === undefined
-        ? undefined
-        : said(t('schedule.admin.savedRoundAdded', { round: roundName(round) }));
+    case 'round-added':
+    case 'round-saved': {
+      const round = roundOf(saved.roundId);
+      if (round === undefined) return undefined;
+      const key =
+        saved.what === 'round-added'
+          ? 'schedule.admin.savedRoundAdded'
+          : 'schedule.admin.savedRound';
+      return { place: { round: round.id }, node: said(t(key, { round: roundName(round) })) };
     }
+    case 'round-removed': {
+      const after = roundOf(saved.afterRoundId)?.id ?? null;
+      return { place: { afterRound: after }, node: said(t('schedule.admin.savedRoundRemoved')) };
+    }
+    case 'game-removed': {
+      const round = roundOf(saved.roundId)?.id ?? null;
+      return { place: { round }, node: said(t('schedule.admin.savedGameRemoved')) };
+    }
+    case 'game-saved':
     case 'game-round': {
       const game = grid.allGames.find((g) => g.id === saved.gameId);
-      const round = grid.rounds.find((r) => r.id === game?.roundId);
-      if (game === undefined || round === undefined) return undefined;
+      if (game === undefined) return undefined;
+      const round = roundOf(game.roundId);
+      if (saved.what === 'game-saved' || round === undefined) {
+        return {
+          place: { game: game.id },
+          node: said(t('schedule.admin.savedGame', { game: gameName(game) })),
+        };
+      }
       const text = t('schedule.admin.savedGameRound', {
-        game: t('schedule.admin.gameVs', { away: game.awayName, home: game.homeName }),
+        game: gameName(game),
         round: roundName(round),
       });
-      if (game.offRoundDate === null || !basis.canEdit || !game.editable) return said(text);
-      const keep = `${gridAddress}?${new URLSearchParams({ season: basis.seasonSlug }).toString()}`;
-      return said(
-        text,
-        <div data-follow-round-date={game.id}>
-          <p>{t('schedule.admin.followRoundDate', { date: dayText(game.offRoundDate) })}</p>
-          <MoveToRoundDate
-            game={game}
-            date={game.offRoundDate}
-            basis={basis}
-            label={t('schedule.admin.followRoundDateYes', { date: dayText(game.offRoundDate) })}
-          />
-          <p>
-            <a href={keep}>{t('schedule.admin.followRoundDateNo', { date: dayText(game.date) })}</a>
-          </p>
-        </div>,
-      );
+      if (game.offRoundDate === null || !basis.canEdit || !game.editable) {
+        return { place: { game: game.id }, node: said(text) };
+      }
+      const query = new URLSearchParams({ season: basis.seasonSlug }).toString();
+      const keep = `${gridAddress}?${query}#${gameAnchor(game.id)}`;
+      return {
+        place: { game: game.id },
+        node: said(
+          text,
+          <div data-follow-round-date={game.id}>
+            <p>{t('schedule.admin.followRoundDate', { date: dayText(game.offRoundDate) })}</p>
+            <MoveToRoundDate
+              game={game}
+              date={game.offRoundDate}
+              basis={basis}
+              main
+              label={t('schedule.admin.followRoundDateYes', {
+                date: dayText(game.offRoundDate),
+              })}
+            />
+            <p>
+              <a className="ui-button" href={keep}>
+                {t('schedule.admin.followRoundDateNo', { date: dayText(game.date) })}
+              </a>
+            </p>
+          </div>,
+        ),
+      };
     }
   }
 }
