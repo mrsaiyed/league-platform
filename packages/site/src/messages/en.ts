@@ -382,6 +382,10 @@ export const en = {
     'The league list could not be read just now, so it is not shown. Reload the page to try again.',
   // A person's name as the Teams screens show it; a language may put the parts the other way.
   'adminTeams.personName': '{firstName} {lastName}',
+  'adminTeams.byNumber': '#{number}',
+  'adminTeams.noName': 'No name yet',
+  'adminTeams.roster.toReview': '(added at the scorer’s table, to review)',
+  'adminTeams.roster.numberTwice': '(#{number} is worn by two players)',
   // After a team's name in the list, with the space before it: " (North)".
   'adminTeams.inDivision': ' ({division})',
   'adminTeams.add.title': 'Add a player',

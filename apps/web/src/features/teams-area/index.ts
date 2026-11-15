@@ -2,3 +2,4 @@
 export { TeamPage } from './team-page.tsx';
 export { TeamsPage } from './teams-page.tsx';
 export type { SearchProps } from './parts.tsx';
+export { hasName, numbersWornTwice, rosterName } from './roster-name.ts';
