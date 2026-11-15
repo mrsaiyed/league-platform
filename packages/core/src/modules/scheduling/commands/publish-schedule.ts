@@ -1,5 +1,6 @@
 // Publishes the season's schedule draft (P7 §4.4, A-9): new games are created, moved games
-// updated, removed games go to the bin, rounds are renamed or re-dated, a numbered schedule
+// updated, removed games go to the bin, rounds are added, renamed, re-dated or removed
+// (step 2.160), a numbered schedule
 // revision is written with its summary and the publication is logged (A-6). The admin
 // names the draft, its version and the revision it was based on, so a draft someone else
 // changed, or one made on an older schedule, is never published unseen (A-8). The draft is
@@ -21,7 +22,9 @@ export type PublishScheduleError =
         /** The draft was saved by someone else since the admin read it, or was discarded. */
         | 'changed-since-read'
         /** A round the plan edits is gone from the season. */
-        | 'round-cannot-be-updated';
+        | 'round-cannot-be-updated'
+        /** A round the draft adds has an id that is taken, or the season has no number left. */
+        | 'round-cannot-be-added';
     }
   | PublishBlocker;
 
@@ -78,6 +81,14 @@ export const publishSchedule = defineCommand({
     const before = new Map(plan.published.games.map((g) => [g.id, g]));
     const after = new Map(plan.result.games.map((g) => [g.id, g]));
     const oldRounds = new Map(plan.published.rounds.map((r) => [r.id, r]));
+    // New rounds first, so the games placed in them can name them; numbered in draft order.
+    const added = plan.result.rounds.filter((r) => summary.roundsAdded.includes(r.id));
+    const insertedRounds = await store.insertRounds(
+      input.seasonId,
+      // A round the draft added always has its number (apply-change.ts); 0 is refused.
+      added.map((r) => ({ id: r.id, number: r.number ?? 0, label: r.label, date: r.date })),
+    );
+    if (insertedRounds !== added.length) return fail({ code: 'round-cannot-be-added' });
     for (const round of plan.result.rounds) {
       const old = oldRounds.get(round.id);
       if (old === undefined) continue;
@@ -126,6 +137,10 @@ export const publishSchedule = defineCommand({
     const binned = await store.binPublishedGames(input.seasonId, summary.gamesRemoved);
     if (binned !== summary.gamesRemoved.length) return fail({ code: 'game-cannot-be-removed' });
 
+    // Last, once every game has left them: a round a game still names stays (the plan blocks it).
+    const removedRounds = await store.deleteRounds(input.seasonId, summary.roundsRemoved);
+    if (removedRounds !== summary.roundsRemoved.length) return fail({ code: 'round-in-use' });
+
     const revision = (latest ?? 0) + 1;
     const teamCount = summary.teamsAffected.length;
     const written = await store.insertRevision(input.seasonId, {
@@ -140,6 +155,8 @@ export const publishSchedule = defineCommand({
         gamesRecordingChanged: summary.gamesRecordingChanged.length,
         roundsRenamed: summary.roundsRenamed.length,
         roundsDateChanged: summary.roundsDateChanged.length,
+        roundsAdded: summary.roundsAdded.length,
+        roundsRemoved: summary.roundsRemoved.length,
         teamsAffected: teamCount,
         peopleAffected: plan.peopleAffected,
         gameIds: {

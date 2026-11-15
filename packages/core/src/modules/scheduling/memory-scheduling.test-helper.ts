@@ -12,7 +12,9 @@ import type {
   CourtRecord,
   DraftRecord,
   GameFacts,
+  GameInRound,
   NewPublishedGame,
+  NewRound,
   NewScheduleRevision,
   PublishedGameChange,
   SchedulingTx,
@@ -48,6 +50,11 @@ export type MemoryScheduling = {
   updated: { gameId: string; change: PublishedGameChange }[];
   binned: string[];
   roundChanges: { roundId: string; label?: string; date?: string }[];
+  /** Rounds publishing created and removed, in order. */
+  roundsAdded: NewRound[];
+  roundsRemoved: string[];
+  /** Games outside the published schedule (in the bin, undated) and the round each is in. */
+  gamesInOtherRounds: GameInRound[];
   revisions: NewScheduleRevision[];
   /** Makes every round update find no such round, to test the refusal. */
   roundsMissing?: boolean;
@@ -125,6 +132,9 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
     updated: [],
     binned: [],
     roundChanges: [],
+    roundsAdded: [],
+    roundsRemoved: [],
+    gamesInOtherRounds: [],
     revisions: [],
     ...state,
   });
@@ -200,6 +210,35 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           s.roundChanges.push({ roundId, ...change });
           return true;
         },
+        insertRounds: async (_season, rounds) => {
+          // As the database: a taken id or number is not added.
+          const taken = [...s.schedule.rounds, ...s.roundsAdded];
+          const fresh = rounds.filter(
+            (r) => !taken.some((x) => x.id === r.id || x.number === r.number),
+          );
+          s.roundsAdded.push(...fresh);
+          return fresh.length;
+        },
+        deleteRounds: async (_season, ids) => {
+          // A game publishing moved is in its new round; one it binned stays in its own.
+          const roundNow = (g: { id: string; roundId: string | null }) =>
+            s.updated.findLast((u) => u.gameId === g.id && u.change.slot !== undefined)?.change.slot
+              ?.roundId ?? g.roundId;
+          const named = new Set([
+            ...s.schedule.games.map(roundNow),
+            ...s.inserted.map((g) => g.roundId),
+            ...s.gamesInOtherRounds.map((g) => g.roundId),
+          ]);
+          const gone = ids.filter((id) => !named.has(id));
+          s.roundsRemoved.push(...gone);
+          return gone.length;
+        },
+        gamesInRounds: async (_season, ids) => [
+          ...s.schedule.games
+            .filter((g) => g.roundId !== null && ids.includes(g.roundId))
+            .map((g) => ({ id: g.id, roundId: g.roundId ?? '' })),
+          ...s.gamesInOtherRounds.filter((g) => ids.includes(g.roundId)),
+        ],
         insertRevision: async (_season, revision) => {
           if (s.latestRevision !== null && revision.number <= s.latestRevision) return false;
           s.revisions.push(revision);

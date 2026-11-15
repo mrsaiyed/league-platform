@@ -14,7 +14,7 @@ import type {
   SchedulingStore,
   VenueRecord,
 } from '@srleagues/core';
-import { recordingOf } from '@srleagues/core';
+import { maxRounds, recordingOf } from '@srleagues/core';
 import { newId } from './stand-in-world-ids.ts';
 import { dayIn, momentIn, timeIn } from './stand-in-world-clock.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
@@ -86,7 +86,12 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       rounds: s.rounds
         .filter((r) => r.seasonId === seasonId)
         .sort((a, b) => a.number - b.number)
-        .map((r) => ({ id: r.id, label: r.label ?? `Round ${r.number}`, date: r.date })),
+        .map((r) => ({
+          id: r.id,
+          number: r.number,
+          label: r.label ?? `Round ${r.number}`,
+          date: r.date,
+        })),
       games: s.games
         .filter((g) => g.seasonId === seasonId && !g.binned && g.startsAt !== null)
         .sort(
@@ -195,6 +200,39 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       });
       return true;
     },
+    insertRounds: async (seasonId, rounds) => {
+      // As insert-rounds.ts: with the draft's number; a taken id or number is left out.
+      let added = 0;
+      for (const round of rounds) {
+        const { number } = round;
+        if (!Number.isInteger(number) || number < 1 || number > maxRounds) continue;
+        if (s.rounds.some((r) => r.id === round.id)) continue;
+        if (s.rounds.some((r) => r.seasonId === seasonId && r.number === number)) continue;
+        s.rounds = [
+          ...s.rounds,
+          { id: round.id, seasonId, number, label: round.label, date: round.date },
+        ];
+        added += 1;
+      }
+      return added;
+    },
+    deleteRounds: async (seasonId, roundIds) => {
+      // As delete-rounds.ts: a round any game is in stays, in the bin or not.
+      const gone = s.rounds.filter(
+        (r) =>
+          r.seasonId === seasonId &&
+          roundIds.includes(r.id) &&
+          !s.games.some((g) => g.roundId === r.id),
+      );
+      s.rounds = s.rounds.filter((r) => !gone.includes(r));
+      return gone.length;
+    },
+    gamesInRounds: async (seasonId, roundIds) =>
+      s.games
+        .filter(
+          (g) => g.seasonId === seasonId && g.roundId !== null && roundIds.includes(g.roundId),
+        )
+        .map((g) => ({ id: g.id, roundId: g.roundId ?? '' })),
     insertRevision: async (seasonId, revision) => {
       if (s.revisions.some((r) => r.seasonId === seasonId && r.number === revision.number)) {
         return false;

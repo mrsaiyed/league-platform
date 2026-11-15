@@ -233,6 +233,29 @@ const adminPages = [
   { name: 'admin-teams', at: '/admin/teams' },
   { name: 'admin-team', at: '/admin/teams', first: '/admin/teams/' },
   { name: 'admin-schedule', at: '/admin/schedule' },
+  // Step 2.160, in the first made-up league's season that is not public yet (only it has
+  // one), each also in the second league's light look: the empty season with its form;
+  // "Saved" after adding a round; the moved game's question; a game outside its round with
+  // its button; a round's controls opened, one with "Remove this round" and one saying why
+  // it cannot be removed; a round date refused beside its round, and a new round's date
+  // refused beside its field. Each is reached by the owner's own taps (roundSteps).
+  ...[
+    { name: 'admin-schedule-no-rounds', steps: [] },
+    { name: 'admin-schedule-round-added', steps: ['rounds'] },
+    { name: 'admin-schedule-move-question', steps: ['rounds', 'game', 'move'] },
+    { name: 'admin-schedule-outside-round', steps: ['rounds', 'game', 'move', 'keep'] },
+    { name: 'admin-schedule-round-controls', steps: ['rounds', 'game', 'open'] },
+    { name: 'admin-schedule-round-refused', steps: ['rounds', 'game', 'bad-round-date'] },
+    { name: 'admin-schedule-add-round-refused', steps: ['rounds', 'bad-new-date'] },
+  ].flatMap(({ name, steps }) =>
+    [undefined, 'harbor-city'].map((lookOf) => ({
+      name: lookOf === undefined ? name : `${name}-light`,
+      at: '/admin/schedule?season=winter-2027',
+      league: 'north-valley',
+      steps: (page) => roundSteps(page, steps),
+      ...(lookOf === undefined ? {} : { lookOf }),
+    })),
+  ),
   { name: 'admin-import', at: '/admin/schedule/import' },
   { name: 'admin-season', at: '/admin/season' },
   { name: 'admin-settings', at: '/admin/settings' },
@@ -462,6 +485,86 @@ async function scoreTrackedGames(origin) {
   await done(...plays(lions), ...clock(0, 4), score('home', hawks[2], 2), { type: 'end' });
 }
 
+/**
+ * The owner's taps that bring Admin → Schedule's season not public yet to a state (step
+ * 2.160), from the season as the seed has it: any draft is discarded first, so each
+ * picture, at each width, starts from no rounds. Nothing is published.
+ */
+async function roundSteps(page, steps) {
+  // Scripts are off in this page (the grid is plain forms): each tap loads a whole page.
+  const tapTo = async (locator, url) => {
+    await Promise.all([page.waitForEvent('load'), locator.click()]);
+    if (!url.test(page.url())) throw new Error(`a step landed on ${page.url()}, not ${url}`);
+  };
+  const discard = page.locator('details', {
+    has: page.locator('button', { hasText: 'Discard all draft changes' }),
+  });
+  if ((await discard.count()) > 0) {
+    await discard.locator('summary').click();
+    await tapTo(discard.locator('button'), /done=discarded/);
+  }
+  const round = (label) =>
+    page.locator('section[data-round]', { has: page.locator('h2', { hasText: label }) });
+  const addRoundForm = async () => {
+    const panel = page.locator('[data-no-rounds] form');
+    if ((await panel.count()) === 1) return panel;
+    const foot = page.locator('details[data-add-round]');
+    if ((await foot.getAttribute('open')) === null) await foot.locator('summary').click();
+    return foot.locator('form');
+  };
+  const addRound = async (label, date) => {
+    const form = await addRoundForm();
+    await form.locator('input[name=label]').fill(label);
+    await form.locator('input[name=date]').fill(date);
+    await tapTo(form.locator('button', { hasText: 'Add round' }), /saved=round-added/);
+  };
+  const game = page.locator('li[data-game]').first();
+  for (const step of steps) {
+    if (step === 'rounds') {
+      await addRound('Week 1', '2027-01-10');
+      await addRound('Week 2', '2027-01-17');
+      await addRound('Week 3', '2027-01-24');
+    } else if (step === 'game') {
+      const add = round('Week 1').locator('details[data-add-game]');
+      await add.locator('summary').click();
+      for (const [field, n] of [
+        ['homeTeamId', 1],
+        ['awayTeamId', 2],
+      ]) {
+        await add.locator(`select[name=${field}]`).selectOption({ index: n });
+      }
+      await add.locator('input[name=time]').fill('18:00');
+      await tapTo(add.locator('button', { hasText: 'Add game' }), /done=saved/);
+    } else if (step === 'move') {
+      await game.locator('summary', { hasText: 'Edit this game' }).click();
+      await game.locator('select[name=roundId]').selectOption({ label: 'Round 3: Week 3' });
+      await tapTo(game.locator('button', { hasText: 'Save game' }), /saved=game-round/);
+    } else if (step === 'keep') {
+      await tapTo(
+        page.locator('[data-follow-round-date] a', { hasText: 'No, keep' }),
+        /season=winter-2027/,
+      );
+    } else if (step === 'open') {
+      for (const label of ['Week 1', 'Week 2']) {
+        await round(label).locator('summary', { hasText: 'Change or remove this round' }).click();
+      }
+    } else if (step === 'bad-round-date') {
+      const third = round('Week 3');
+      await third.locator('summary', { hasText: 'Change or remove this round' }).click();
+      const form = third.locator('form', {
+        has: page.locator('button', { hasText: 'Change round date' }),
+      });
+      await form.locator('input[name=date]').fill('1899-01-01');
+      await tapTo(form.locator('button', { hasText: 'Change round date' }), /at=round/);
+    } else if (step === 'bad-new-date') {
+      const form = await addRoundForm();
+      await form.locator('input[name=label]').fill('Far week');
+      await form.locator('input[name=date]').fill('3027-01-31');
+      await tapTo(form.locator('button', { hasText: 'Add round' }), /at=add-round/);
+    }
+  }
+}
+
 /** A league's design values as its pages carry them: the one `:root` block (T-90). */
 async function designValuesOf(origin, league) {
   const html = await (await fetch(`${origin}/${league}`)).text();
@@ -511,6 +614,13 @@ try {
     const visitor = await browser.newContext({ viewport: width.viewport });
     const staff = await browser.newContext({ viewport: width.viewport });
     await staff.addCookies([{ ...owner, url: origin }]);
+    // A page reached by taps (`steps`) is driven with scripts off, as the browser tests
+    // drive the grid: every form a whole page, so each tap's answer is waited for.
+    const staffTapping = await browser.newContext({
+      viewport: width.viewport,
+      javaScriptEnabled: false,
+    });
+    await staffTapping.addCookies([{ ...owner, url: origin }]);
     const keeper = await browser.newContext({ viewport: width.viewport });
     await keeper.addCookies([{ ...scorekeeper, url: origin }]);
     const jobs = [
@@ -530,11 +640,17 @@ try {
             base: `/${league}`,
           })),
         ...(design === '' ? adminPages : [])
-          .filter((page) => page.onlyIn === undefined || page.onlyIn === league)
+          // A page of one league's own season (`league`), or one state taken in one league
+          // only (`onlyIn`), is taken in that league only.
+          .filter(
+            (page) =>
+              (page.league === undefined || page.league === league) &&
+              (page.onlyIn === undefined || page.onlyIn === league),
+          )
           .map((page) => ({
             ...page,
             name: `${league}-${page.name}`,
-            context: staff,
+            context: page.steps === undefined ? staff : staffTapping,
             base: `/${league}`,
           })),
       ]),
@@ -574,6 +690,7 @@ try {
           }
           answer = await page.goto(new URL(link, origin).href, { waitUntil: 'networkidle' });
         }
+        if (job.steps) await job.steps(page);
         // A state reached by tapping (step 2.155): nothing of it rides in the address.
         if (job.tap) {
           await job.tap(page);
@@ -607,7 +724,12 @@ try {
         // Nothing of the tool on the screen: Next.js's dev indicator hidden, and the pointer
         // away from every card (step 2.155's design review). After the account button is
         // opened, so the pointer leaves it too; an opened panel stays open when it does.
-        await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
+        // (Inserted by hand: addStyleTag waits on a page with scripts off.)
+        await page.evaluate(() => {
+          const style = document.createElement('style');
+          style.textContent = 'nextjs-portal { display: none !important; }';
+          document.head.append(style);
+        });
         await page.mouse.move(0, 0);
         const file = path.join(out, width.name, `${fileName(job.name)}.jpg`);
         await page.screenshot({ path: file, fullPage: !job.opens, type: 'jpeg', quality: 80 });
@@ -622,6 +744,7 @@ try {
     }
     await visitor.close();
     await staff.close();
+    await staffTapping.close();
     await keeper.close();
   }
   // The phone menu, open (`--only=menu`), at 390 in each league's own look.

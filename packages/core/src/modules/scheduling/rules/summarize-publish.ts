@@ -9,6 +9,9 @@ export type PublishSummary = {
   gamesRecordingChanged: string[];
   roundsRenamed: string[];
   roundsDateChanged: string[];
+  /** Rounds the draft adds (a round added and removed again in the draft is in neither list). */
+  roundsAdded: string[];
+  roundsRemoved: string[];
   /** Every team in an added, removed or moved game. The caller finds the people from these. */
   teamsAffected: string[];
 };
@@ -55,11 +58,17 @@ export function summarizePublish(published: ScheduleState, draft: ScheduleState)
   }
 
   const oldRounds = new Map(published.rounds.map((r) => [r.id, r]));
+  const newRounds = new Set(draft.rounds.map((r) => r.id));
   const roundsRenamed: string[] = [];
   const roundsDateChanged: string[] = [];
+  const roundsAdded: string[] = [];
+  const roundsRemoved = published.rounds.filter((r) => !newRounds.has(r.id)).map((r) => r.id);
   for (const r of draft.rounds) {
     const old = oldRounds.get(r.id);
-    if (!old) continue;
+    if (!old) {
+      roundsAdded.push(r.id);
+      continue;
+    }
     if (old.label !== r.label) roundsRenamed.push(r.id);
     // A round never loses its date through a draft (a date change always names a date), and
     // publishing never clears one, so a missing date is not counted as a change.
@@ -73,6 +82,8 @@ export function summarizePublish(published: ScheduleState, draft: ScheduleState)
     gamesRecordingChanged: gamesRecordingChanged.sort(),
     roundsRenamed: roundsRenamed.sort(),
     roundsDateChanged: roundsDateChanged.sort(),
+    roundsAdded: roundsAdded.sort(),
+    roundsRemoved: roundsRemoved.sort(),
     teamsAffected: [...teams].sort(),
   };
 }

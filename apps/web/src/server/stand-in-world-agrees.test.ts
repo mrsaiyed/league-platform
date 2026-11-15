@@ -19,7 +19,7 @@
 // scheduling: findSeason, latestRevision, findDraft, insertDraft, updateDraft,
 // deleteDraft, loadSchedule, seasonRules, gamesById, countPeopleOnTeams,
 // insertPublishedGames, insertRevision, teamsOfSeason, findVenue, createVenue,
-// createCourt; standings: lockSeason, listTeams, listAdjustments, replaceRows,
+// createCourt, insertRounds, gamesInRounds; standings: lockSeason, listTeams, listAdjustments, replaceRows,
 // replaceTotals; all eleven standings reads; the public schedule and its games, the
 // game page's reads (game, teams, state, lines, people, correction date) and the public
 // roster. What it does not: games' markNotStarted, listPostponed, assign, unassign,
@@ -32,6 +32,7 @@
 // member's teams. Those are covered by the feature tests on the world alone.
 import {
   addDraftGame,
+  addDraftRound,
   addToRoster,
   applyTrackerCommands,
   cancelGame,
@@ -52,6 +53,7 @@ import {
   readStatisticsTable,
   recordFinalScore,
   recordForfeit,
+  removeDraftRound,
   reopenGame,
   setBoxScore,
   systemClock,
@@ -362,6 +364,37 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
     [gameIds.cancelled, 'Otters', 'Gulls', 4, '18:00', 'final'],
     [gameIds.tracked, 'Herons', 'Kestrels', 0, '00:00', 'live'],
   ];
+  // The season's rounds, made in the draft (step 2.160): two kept, one added and removed.
+  const rounds = [
+    { roundId: '01900000-0000-7000-8000-0000000b2160', label: 'Week 1', days: -3 },
+    { roundId: '01900000-0000-7000-8000-0000000b2161', label: 'Week 2', days: 3 },
+    { roundId: '01900000-0000-7000-8000-0000000b2162', label: 'Spare', days: 10 },
+  ] as const;
+  const basisNow = async () => {
+    const draft = ok('draft', await getScheduleDraft(as, { seasonId }, deps));
+    return {
+      seasonId,
+      basedOnRevision: draft.latestRevision,
+      draftId: draft.draft?.id ?? null,
+      version: draft.draft?.version ?? null,
+    };
+  };
+  for (const r of rounds) {
+    ok(
+      `add round ${r.label}`,
+      await addDraftRound(
+        as,
+        { ...(await basisNow()), roundId: r.roundId, label: r.label, date: addDays(today, r.days) },
+        deps,
+      ),
+    );
+  }
+  ok(
+    'remove the spare round',
+    await removeDraftRound(as, { ...(await basisNow()), roundId: rounds[2].roundId }, deps),
+  );
+  const roundOf = (days: number) =>
+    days < 0 ? rounds[0].roundId : days > 0 ? rounds[1].roundId : null;
   for (const [gameId, home, away, days, time, recording] of games) {
     const draft = ok('draft', await getScheduleDraft(as, { seasonId }, deps));
     ok(
@@ -376,7 +409,7 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
           gameId,
           homeTeamId: team(home),
           awayTeamId: team(away),
-          roundId: null,
+          roundId: roundOf(days),
           date: addDays(today, days),
           time,
           venueId: venue.venueId,
