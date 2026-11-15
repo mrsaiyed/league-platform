@@ -63,11 +63,15 @@ describe('the games area actions', () => {
     expect(await runGameAction('final', fields, as(owner), ports.deps)).toEqual({ ok: true });
     const after = (await games(owner)).find((g) => g.id === target?.id);
     expect(after).toMatchObject({ status: 'final', homeScore: 61, awayScore: 58 });
-    // Saving it again from the same page is refused: the game moved on.
-    expect(await runGameAction('final', fields, as(owner), ports.deps)).toEqual({
-      ok: false,
-      code: 'changed-since-read',
+    // The same score sent again (a double tap on "Yes", step 2.154) is answered as saved,
+    // and changes nothing; another score from the same page is refused: the game moved on.
+    expect(await runGameAction('final', fields, as(owner), ports.deps)).toEqual({ ok: true });
+    expect((await games(owner)).find((g) => g.id === target?.id)).toMatchObject({
+      version: after?.version,
     });
+    expect(
+      await runGameAction('final', { ...fields, homeScore: '60' }, as(owner), ports.deps),
+    ).toEqual({ ok: false, code: 'changed-since-read' });
   });
 
   it('refuses a score that is not two whole numbers', async () => {
