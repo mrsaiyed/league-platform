@@ -65,6 +65,8 @@ export type ScoringView = {
   readonly status: basketball.GameState['status'];
   readonly period: number;
   readonly periods: 2 | 4;
+  /** How many plays the game holds as the device shows it: one more for each tap taken. */
+  readonly plays: number;
   /** True until both teams that have players have their lineup set. */
   readonly pickingLineups: boolean;
   readonly teams: Readonly<Record<Side, TeamPanel>>;
@@ -170,6 +172,7 @@ export function scoringView(
     status: game.status,
     period: derived.period,
     periods: game.rules.periods,
+    plays: game.plays.length,
     pickingLineups: teams.home.stage === 'picking' || teams.away.stage === 'picking',
     teams,
   };

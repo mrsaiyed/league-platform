@@ -1,0 +1,1598 @@
+/* The courtside look: the scoring screen's own stylesheet (docs/build/DESIGN.md section 7;
+   record 064, T-267). For a scorekeeper at a noisy table, glancing down between plays in a
+   bright gym, on a phone or tablet that may be five years old.
+
+   Every value is a `--court-…` variable set here. Nothing reads a league's design values
+   (`--color-…`, `--font-…`, `--radius-…`, `--space`), so nothing a league saves can reach
+   this screen, and no font is downloaded: it opens with no signal. court-look.test.ts
+   holds this file to that, and to the contrast the look promises (7 to 1 for the score,
+   the clock, a player's number and the saved banner; 4.5 to 1 for the rest).
+
+   Flat panels with fine lines: no shadow, no gradient, no picture, so a slow tablet keeps
+   up. Logical properties only, so a right-to-left page mirrors (T-188). */
+
+.court {
+  /* Grounds: near-black, neutral, slightly warm. The standard's wine is taken out. */
+  --court-page: #121110;
+  --court-panel: #1c1a18;
+  --court-tile: #2b2926;
+  --court-line: #4a4640;
+  /* Words. */
+  --court-text: #f4f1ea;
+  --court-muted: #b5afa5;
+  /* Four colors, one meaning each. Gold: labels and the clock. */
+  --court-gold: #e8c268;
+  --court-gold-ink: #1c1507;
+  /* Green: points and Start. */
+  --court-green: #1b6842;
+  --court-green-line: #46b481;
+  --court-green-text: #6adba6;
+  /* Red: fouls, Pause and anything that takes away. */
+  --court-red: #8a2e2b;
+  --court-red-line: #dd847d;
+  --court-red-text: #ff9d94;
+  /* Blue: timeouts (step 2.36). */
+  --court-blue: #1c588a;
+  --court-blue-line: #74b6ec;
+  --court-blue-text: #92cdff;
+  /* Amber: the saved banner while plays are waiting. */
+  --court-amber: #f3b745;
+  --court-amber-ink: #1d1404;
+  --court-focus: #92cdff;
+  /* The team drawn light: a white jersey. Dark words on a pale ground. */
+  --court-light: #f1eee6;
+  --court-light-bench: #cfcbc2;
+  --court-light-ink: #141311;
+  --court-light-muted: #4a4741;
+  --court-light-red: #9d1f1a;
+  --court-light-green: #0f5a36;
+  /* The team drawn dark: pale words on the tile's ground, with an edge that shows. */
+  --court-dark-edge: #8f897e;
+  /* Sizes. Three do most of the work: the score and clock, a tile's number, the rest. */
+  --court-size-clock: 44px;
+  --court-size-score: 40px;
+  --court-size-number: 26px;
+  --court-size-text: 14px;
+  --court-size-small: 12px;
+  --court-gap: 8px;
+  --court-radius: 10px;
+  --court-tile-height: 64px;
+  --court-chip-height: 48px;
+  --court-points-height: 64px;
+  --court-acts-height: 52px;
+  --court-subs-height: 48px;
+
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  box-sizing: border-box;
+  margin: 0;
+  padding-block: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-bottom));
+  padding-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right));
+  overflow: hidden;
+  background: var(--court-page);
+  color: var(--court-text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: var(--court-size-text);
+  font-weight: 400;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: normal;
+  text-align: start;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Calm under the hand (checklist S1): nothing is selected by a long press, and a
+     double tap does not zoom. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+.court *,
+.court *::before,
+.court *::after {
+  box-sizing: border-box;
+}
+/* The browser's own looks are taken off first, at no weight (`:where`), so every rule
+   below wins over them whatever its own weight. */
+:where(.court) :where(h1, h2, p, ul) {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+:where(.court) :where(ul) {
+  list-style: none;
+}
+:where(.court) :where(button) {
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+:where(.court) :where(button:disabled) {
+  cursor: default;
+}
+:where(.court) :where(a) {
+  color: var(--court-gold);
+}
+.court :focus-visible {
+  outline: 3px solid var(--court-focus);
+  outline-offset: 2px;
+}
+.court-sr {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The two teams: home is drawn light and away dark unless swapped (checklist D3). The
+   difference is light against dark, never a hue, so it holds for every eye. */
+.court [data-color='light'] {
+  --court-team-ground: var(--court-light);
+  --court-team-bench: var(--court-light-bench);
+  --court-team-ink: var(--court-light-ink);
+  --court-team-muted: var(--court-light-muted);
+  --court-team-red: var(--court-light-red);
+  --court-team-green: var(--court-light-green);
+  --court-team-edge: var(--court-light);
+}
+.court [data-color='dark'] {
+  --court-team-ground: var(--court-tile);
+  --court-team-bench: var(--court-page);
+  --court-team-ink: var(--court-text);
+  --court-team-muted: var(--court-muted);
+  --court-team-red: var(--court-red-text);
+  --court-team-green: var(--court-green-text);
+  --court-team-edge: var(--court-dark-edge);
+}
+
+/* Small pieces used everywhere. */
+.court-label {
+  font-size: var(--court-size-small);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--court-gold);
+}
+.court-quiet {
+  color: var(--court-muted);
+}
+.court-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.court-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--court-gap);
+}
+.court-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-block-size: 48px;
+  min-inline-size: 48px;
+  padding-block: 8px;
+  padding-inline: 16px;
+  border: 1px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: var(--court-tile);
+  color: var(--court-text);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+.court a.court-button {
+  color: var(--court-text);
+}
+.court-button[data-kind='main'],
+.court a.court-button[data-kind='main'] {
+  border-color: var(--court-gold);
+  background: var(--court-gold);
+  color: var(--court-gold-ink);
+  font-weight: 700;
+}
+.court-button:disabled {
+  opacity: 0.45;
+}
+.court-notice {
+  padding-block: 8px;
+  padding-inline: 12px;
+  border-inline-start: 4px solid var(--court-gold);
+  border-radius: 4px;
+  background: var(--court-tile);
+}
+.court-notice[data-kind='error'] {
+  border-inline-start-color: var(--court-red-line);
+}
+.court-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  padding: 0;
+  border: 1px solid var(--court-line);
+  border-radius: 50%;
+  background: transparent;
+}
+/* A cross, a minus and a caret, drawn with lines: no icon font, no picture. */
+.court-cross,
+.court-minus {
+  position: relative;
+  inline-size: 16px;
+  block-size: 16px;
+}
+.court-cross::before,
+.court-cross::after,
+.court-minus::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 7px;
+  inset-inline-start: 0;
+  inline-size: 16px;
+  block-size: 2px;
+  background: currentColor;
+}
+.court-cross::before {
+  transform: rotate(45deg);
+}
+.court-cross::after {
+  transform: rotate(-45deg);
+}
+.court-caret {
+  inline-size: 0;
+  block-size: 0;
+  margin-inline-start: 6px;
+  border-inline: 5px solid transparent;
+  border-block-start: 6px solid currentColor;
+}
+[aria-expanded='true'] > .court-caret {
+  transform: rotate(180deg);
+}
+.court-swatch {
+  flex: none;
+  inline-size: 14px;
+  block-size: 14px;
+  border: 2px solid var(--court-team-edge);
+  border-radius: 3px;
+  background: var(--court-team-ground);
+}
+
+/* ---- Before scoring: opening the game, who holds it, the format ------------------- */
+.court-opening {
+  display: grid;
+  place-items: start center;
+  overflow-y: auto;
+  padding-block: max(24px, env(safe-area-inset-top)) 24px;
+  padding-inline: 16px;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.court-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  inline-size: min(100%, 520px);
+}
+.court-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.court-opening .court-title-teams {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.court-opening .court-title-when {
+  font-size: 16px;
+  color: var(--court-muted);
+}
+.court-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: var(--court-panel);
+}
+.court-card-body h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+.court-card-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+.court-format {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-block: 12px;
+  padding-inline: 16px;
+  border-radius: 8px;
+  background: var(--court-tile);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* ---- The scoring screen: one arrangement at each of four sizes --------------------
+   Here: a phone upright (390 x 844). The scoreboard never leaves the top; under it the
+   clock controls' row; then both teams, each one row of five floor tiles and a bench
+   strip; and at the bottom the pad, which never moves, so a basket, a foul or a
+   substitution for either team is two taps with no scrolling (checklist S6, finding H4). */
+.court-play {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'top'
+    'controls'
+    'teams'
+    'pad';
+  gap: 6px;
+}
+
+/* The scoreboard: the title, the two scores with the clock between them, the saved line. */
+.court-top {
+  grid-area: top;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title more'
+    'board board'
+    'banner banner'
+    'notices notices';
+  column-gap: var(--court-gap);
+  row-gap: 4px;
+  align-items: center;
+  min-inline-size: 0;
+}
+.court-title {
+  grid-area: title;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-block-size: 44px;
+  min-inline-size: 0;
+}
+.court-title-teams,
+.court-title-when {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.court-opening .court-title-teams,
+.court-opening .court-title-when {
+  white-space: normal;
+}
+.court-title-teams {
+  font-size: 15px;
+  font-weight: 700;
+}
+.court-title-when {
+  font-size: var(--court-size-small);
+  color: var(--court-muted);
+}
+.court-more-button {
+  grid-area: more;
+  min-block-size: 44px;
+  padding-inline: 12px;
+  font-size: var(--court-size-text);
+}
+/* Three dots, drawn. */
+.court-more-dots,
+.court-more-dots::before,
+.court-more-dots::after {
+  inline-size: 4px;
+  block-size: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.court-more-dots {
+  position: relative;
+  margin-inline: 8px;
+}
+.court-more-dots::before,
+.court-more-dots::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+}
+.court-more-dots::before {
+  inset-inline-start: -7px;
+}
+.court-more-dots::after {
+  inset-inline-start: 7px;
+}
+.court-board {
+  grid-area: board;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--court-gap);
+  align-items: stretch;
+}
+.court-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 0;
+  padding-block: 4px 6px;
+  padding-inline: 8px;
+  border: 2px solid var(--court-team-edge);
+  border-radius: var(--court-radius);
+  background: var(--court-team-ground);
+  color: var(--court-team-ink);
+}
+.court-score-name {
+  max-inline-size: 100%;
+  overflow: hidden;
+  font-size: var(--court-size-small);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.court-score-value {
+  font-size: var(--court-size-score);
+  font-weight: 800;
+  line-height: 1;
+}
+.court-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 116px;
+  color: var(--court-gold);
+}
+.court-clock-time {
+  font-size: var(--court-size-clock);
+  font-weight: 800;
+  line-height: 1;
+}
+.court-clock-period {
+  font-size: var(--court-size-text);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+/* The saved line: calm when all is saved, amber while plays wait, red when they cannot
+   be kept or were refused. It says so in words; the color only repeats it. */
+.court-banner {
+  grid-area: banner;
+  min-block-size: 20px;
+  padding-inline: 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--court-text);
+}
+.court-banner[data-state='waiting'] {
+  background: var(--court-amber);
+  color: var(--court-amber-ink);
+}
+.court-banner[data-state='trouble'] {
+  background: var(--court-red);
+  color: var(--court-text);
+}
+.court-notices {
+  grid-area: notices;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-block-size: 30vh;
+  overflow-y: auto;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* The places left for the steps that follow. An empty one is a faint dashed outline, so
+   the pictures show where the clock controls and the play log go. */
+.court-slot:empty {
+  border: 1px dashed var(--court-line);
+  border-radius: var(--court-radius);
+}
+.court-controls {
+  grid-area: controls;
+  display: flex;
+  gap: var(--court-gap);
+  min-block-size: 52px;
+  min-inline-size: 0;
+}
+/* On a phone the play log has no panel of its own: its latest plays go in the pad at
+   rest, and the whole list opens over the screen (step 2.37). */
+.court-log {
+  display: none;
+  grid-area: log;
+  min-block-size: 0;
+  overflow-y: auto;
+}
+.court-slot-rest:empty {
+  display: none;
+}
+
+/* The teams. */
+.court-teams {
+  grid-area: teams;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-block-size: 0;
+  overflow-y: auto;
+}
+.court-team {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--court-gap);
+  min-inline-size: 0;
+  padding-block: 0 4px;
+  padding-inline: 4px;
+  border: 2px solid var(--court-team-edge);
+  border-radius: var(--court-radius);
+  background: var(--court-panel);
+}
+.court-team-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--court-gap);
+  min-block-size: 44px;
+}
+.court-team-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-inline-size: 0;
+  padding-inline-start: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.court-team-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.court-team-chips {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--court-gap);
+}
+.court-chip {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  padding-block: 0;
+  padding-inline: 12px;
+  border: 1px solid var(--court-line);
+  border-radius: 22px;
+  background: var(--court-tile);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.court-chip[aria-expanded='true'] {
+  border-color: var(--court-gold);
+}
+
+/* A player's tile. The jersey number is what is read off the floor, so it is the
+   largest thing on it. */
+.court-floor {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--court-gap);
+}
+.court-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-inline-size: 0;
+  min-block-size: var(--court-tile-height);
+  padding: 2px;
+  overflow: hidden;
+  border: 2px solid var(--court-team-edge);
+  border-radius: 8px;
+  background: var(--court-team-ground);
+  color: var(--court-team-ink);
+  line-height: 1.1;
+  text-align: center;
+}
+.court-tile-number {
+  font-size: var(--court-size-number);
+  font-weight: 800;
+  line-height: 1;
+}
+.court-tile-number[data-none] {
+  color: var(--court-team-muted);
+}
+.court-tile-name {
+  max-inline-size: 100%;
+  overflow: hidden;
+  font-size: var(--court-size-small);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.court-tile-stats {
+  display: flex;
+  gap: 5px;
+  font-size: var(--court-size-small);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.court-tile-fouls {
+  color: var(--court-team-red);
+}
+.court-tile-fouls[data-fouls='0'] {
+  color: var(--court-team-muted);
+}
+.court-tile-minutes {
+  display: none;
+  font-size: var(--court-size-small);
+  color: var(--court-team-muted);
+}
+/* At the league's foul limit: a red edge and the word, never the color alone (D10). */
+.court-tile[data-out] {
+  border-color: var(--court-team-red);
+  border-width: 3px;
+}
+.court-tile-out {
+  color: var(--court-team-red);
+  text-transform: uppercase;
+}
+.court-tile[data-out] .court-tile-fouls {
+  display: none;
+}
+/* The tile whose options are open, and a starter picked: a gold ring outside the tile,
+   which shows on both teams' grounds. */
+.court-tile[data-open],
+.court-tile[data-tapped='on'],
+.court-tile[aria-pressed='true'] {
+  outline: 3px solid var(--court-gold);
+  outline-offset: 1px;
+}
+/* A tile just tapped is ringed at once (`data-tapped`, scoring-screen.tsx), a frame before
+   the screen draws its options; the tile that was open gives up its ring in that frame. */
+.court-tile[data-tapped='off'] {
+  outline-color: transparent;
+}
+.court-tile[aria-pressed='true'] {
+  border-color: var(--court-gold);
+}
+.court-tile[data-drop] {
+  outline: 4px solid var(--court-green-line);
+  outline-offset: 1px;
+}
+/* What was just tapped, shown on the tile the moment it is tapped, before it is saved
+   (finding M6): "+2", "Foul". Written by scoring-screen.tsx as `data-mark`. */
+.court-tile[data-mark]::after {
+  content: attr(data-mark);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--court-gold);
+  color: var(--court-gold-ink);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+.court-tile[data-mark-kind='points']::after {
+  background: var(--court-green);
+  color: var(--court-text);
+  font-size: 24px;
+}
+.court-tile[data-mark-kind='foul']::after {
+  background: var(--court-red);
+  color: var(--court-text);
+}
+
+/* The bench: smaller, quieter tiles in one strip. Seven fit a phone; more scroll
+   sideways, and a strip that scrolls keeps its sideways swipe. */
+.court-bench {
+  display: flex;
+  gap: var(--court-gap);
+  min-block-size: var(--court-chip-height);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.court-bench::-webkit-scrollbar {
+  display: none;
+}
+.court-bench-label {
+  display: none;
+}
+.court-bench > .court-quiet {
+  align-self: center;
+  padding-inline: 4px;
+}
+.court-chip-tile {
+  flex: 1 0 44px;
+  max-inline-size: 76px;
+  min-block-size: var(--court-chip-height);
+  border-width: 1px;
+  background: var(--court-team-bench);
+  touch-action: none;
+}
+.court-bench[data-scrolls] .court-chip-tile {
+  touch-action: pan-x;
+}
+.court-chip-tile .court-tile-number {
+  font-size: 20px;
+}
+.court-chip-tile .court-tile-name,
+.court-chip-tile .court-tile-points {
+  display: none;
+}
+.court-chip-tile .court-tile-fouls[data-fouls='0'] {
+  display: none;
+}
+
+/* Picking the starters: everyone, as tiles that wrap, and a line that counts. */
+.court-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--court-gap);
+  min-block-size: 48px;
+  padding-inline: 4px;
+  font-size: 15px;
+}
+.court-bench-picking {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  overflow: visible;
+}
+.court-bench-picking .court-chip-tile {
+  max-inline-size: none;
+  min-block-size: 52px;
+  touch-action: manipulation;
+}
+.court-bench-picking .court-chip-tile .court-tile-name {
+  display: block;
+}
+
+/* The pad: the one place where what is being done lives. A picked player's options, a
+   team's turnovers, the latest sentence, and at rest the hint. Its height does not
+   change while the game is played, so nothing above it moves. */
+.court-pad {
+  grid-area: pad;
+  display: flex;
+  flex-direction: column;
+  gap: var(--court-gap);
+  min-inline-size: 0;
+  block-size: calc(
+    44px + var(--court-subs-height) + var(--court-points-height) + var(--court-acts-height) + 3 *
+      var(--court-gap) + 14px
+  );
+  padding: 6px;
+  overflow: hidden;
+  border: 1px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: var(--court-panel);
+}
+.court-pad[data-color] {
+  border-color: var(--court-team-edge);
+}
+.court[data-stage='lineups'] .court-pad {
+  block-size: auto;
+  max-block-size: 34vh;
+}
+.court-say {
+  flex: none;
+  padding-block: 6px;
+  padding-inline: 10px;
+  border-radius: 6px;
+  background: var(--court-gold);
+  color: var(--court-gold-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+.court-say:empty {
+  display: none;
+}
+.court-rest {
+  display: flex;
+  flex-direction: column;
+  gap: var(--court-gap);
+  min-block-size: 0;
+  overflow-y: auto;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.court-pregame,
+.court-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-inline: 4px;
+}
+.court-hint p {
+  color: var(--court-muted);
+  font-size: 13px;
+}
+.court[data-stage='lineups'] .court-hint {
+  display: none;
+}
+.court-options {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--court-gap);
+  min-block-size: 0;
+}
+.court-who {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-block-size: 44px;
+}
+.court-who-number {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-inline-size: 44px;
+  block-size: 44px;
+  padding-inline: 6px;
+  border: 2px solid var(--court-team-edge);
+  border-radius: 8px;
+  background: var(--court-team-ground);
+  color: var(--court-team-ink);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+.court-who-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+.court-who-name {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.court-who-facts {
+  overflow: hidden;
+  color: var(--court-muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.court-who-facts[data-out] {
+  color: var(--court-red-text);
+}
+.court-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  padding: 2px 4px;
+  border: 2px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: var(--court-tile);
+  color: var(--court-text);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: center;
+}
+.court-opt:disabled {
+  opacity: 0.4;
+}
+.court-subs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--court-gap);
+  block-size: var(--court-subs-height);
+}
+.court-subs > .court-label {
+  flex: none;
+  inline-size: 34px;
+  font-size: 11px;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+}
+.court-subs-row {
+  flex: 1;
+  display: flex;
+  gap: var(--court-gap);
+  block-size: 100%;
+  min-inline-size: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.court-subs-row::-webkit-scrollbar {
+  display: none;
+}
+.court-opt-sub {
+  flex: 1 0 44px;
+  border-color: var(--court-team-edge);
+  background: var(--court-team-ground);
+  color: var(--court-team-ink);
+}
+.court-opt-number {
+  font-size: 20px;
+  font-weight: 800;
+}
+.court-opt-name {
+  display: none;
+  max-inline-size: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.court-points,
+.court-acts {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--court-gap);
+}
+.court-points {
+  block-size: var(--court-points-height);
+}
+.court-acts {
+  block-size: var(--court-acts-height);
+}
+.court-opt-points {
+  border-color: var(--court-green-line);
+  background: var(--court-green);
+}
+.court-opt-big {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+.court-opt-small {
+  font-size: var(--court-size-small);
+  font-weight: 600;
+}
+.court-opt-foul {
+  border-color: var(--court-red-line);
+  background: var(--court-red);
+}
+.court-opt-unfoul {
+  border-color: var(--court-red-line);
+  background: transparent;
+  color: var(--court-red-text);
+}
+
+/* A team's turnovers, in the pad. */
+.court-turnovers .court-who {
+  padding-inline-start: 6px;
+}
+.court-turnover-rows {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  align-content: start;
+  gap: var(--court-gap);
+  min-block-size: 0;
+  overflow-y: auto;
+}
+.court-turnover-rows > li {
+  display: flex;
+  align-items: center;
+  gap: var(--court-gap);
+  min-block-size: 44px;
+  padding-inline-start: 10px;
+  border-radius: var(--court-radius);
+  background: var(--court-tile);
+}
+.court-turnover-who {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.court-turnover-count {
+  font-size: 18px;
+  font-weight: 800;
+}
+.court-opt-minus {
+  flex: none;
+  inline-size: 44px;
+  block-size: 44px;
+  border-color: var(--court-red-line);
+  background: transparent;
+  color: var(--court-red-text);
+}
+.court-turnovers-none {
+  flex: 1;
+  padding-inline: 6px;
+}
+.court-opt-team-turnover {
+  flex: none;
+  min-block-size: 48px;
+}
+
+/* More: the buttons used once a game, behind one button (checklist S6). */
+.court-sheet-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+}
+.court-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--court-page);
+  opacity: 0.8;
+}
+.court-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  inline-size: min(100%, 400px);
+  max-block-size: 100%;
+  padding-block: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-bottom));
+  padding-inline: 16px;
+  overflow-y: auto;
+  border-inline-start: 1px solid var(--court-line);
+  background: var(--court-panel);
+  font-size: 16px;
+}
+.court-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--court-gap);
+}
+.court-sheet-head h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+.court-sheet-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.court-sheet-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.court-sheet-item .court-button {
+  justify-content: flex-start;
+  inline-size: 100%;
+  min-block-size: 52px;
+}
+.court-sheet .court-quiet {
+  font-size: 14px;
+}
+
+/* The label that follows the finger while a player is dragged (checklist E2). */
+.court-ghost {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: 40;
+  margin-block-start: -56px;
+  margin-inline-start: -40px;
+  padding-block: 8px;
+  padding-inline: 12px;
+  border: 2px solid var(--court-gold);
+  border-radius: 8px;
+  background: var(--court-team-ground);
+  color: var(--court-team-ink);
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Movement is short, and stops for people who ask their device for less (checklist S5). */
+@media (prefers-reduced-motion: no-preference) {
+  .court-tile[data-mark]::after {
+    animation: court-mark-a 650ms ease-out both;
+  }
+  /* The same fade under a second name: taken in turn, it starts again on the next tap. */
+  .court-tile[data-mark][data-mark-turn='b']::after {
+    animation-name: court-mark-b;
+  }
+  .court-sheet {
+    animation: court-sheet 160ms ease-out both;
+  }
+}
+@keyframes court-mark-a {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes court-mark-b {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes court-sheet {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- A short upright phone: the same phone with a browser's bars showing, or opened
+   from the home screen with the phone's own bars above and below (about 745 to 800 high).
+   The same arrangement, lower: the title is one thin line, More moves beside the
+   scoreboard, and every target keeps its least size (44; 56 for tiles and points). Both
+   teams and the pad fit from about 740 high; below that the teams' panels scroll under
+   the pad, and the phone is better turned on its side. --------------------------------- */
+@media (max-width: 699px) and (max-height: 800px) and (orientation: portrait) {
+  .court {
+    --court-size-clock: 34px;
+    --court-size-score: 30px;
+    --court-tile-height: 56px;
+    --court-chip-height: 44px;
+    --court-points-height: 56px;
+    --court-acts-height: 44px;
+    --court-subs-height: 44px;
+  }
+  .court-play {
+    gap: 4px;
+  }
+  .court-top {
+    grid-template-areas:
+      'title title'
+      'board more'
+      'banner banner'
+      'notices notices';
+    row-gap: 2px;
+  }
+  .court-title {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 8px;
+    min-block-size: 0;
+  }
+  .court-title-teams {
+    flex: none;
+    max-inline-size: 60%;
+    font-size: 13px;
+  }
+  .court-title-when {
+    flex: 1;
+    min-inline-size: 0;
+  }
+  .court-more-button {
+    align-self: stretch;
+    padding-inline: 6px;
+  }
+  .court-more-word {
+    display: none;
+  }
+  .court-score {
+    padding-block: 2px 4px;
+  }
+  .court-clock {
+    min-inline-size: 96px;
+  }
+  .court-clock-period {
+    font-size: var(--court-size-small);
+  }
+  .court-banner {
+    min-block-size: 18px;
+    font-size: var(--court-size-small);
+  }
+  .court-controls {
+    min-block-size: 48px;
+  }
+  .court-team-head {
+    min-block-size: 44px;
+  }
+  .court-pad {
+    gap: 6px;
+    block-size: calc(
+      44px + var(--court-subs-height) + var(--court-points-height) + var(--court-acts-height) +
+        18px + 14px
+    );
+  }
+  .court-options {
+    gap: 6px;
+  }
+  .court-hint p {
+    font-size: 12px;
+  }
+}
+
+/* ---- A phone lying down (844 x 390): the scoreboard in one row, then home | pad | away.
+   The thumbs are on the teams; the pad sits between them. ----------------------------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  .court {
+    --court-size-clock: 32px;
+    --court-size-score: 30px;
+    --court-size-number: 22px;
+    --court-tile-height: 56px;
+    --court-chip-height: 44px;
+    --court-points-height: 56px;
+    --court-acts-height: 48px;
+    --court-subs-height: 44px;
+    padding-block-start: max(4px, env(safe-area-inset-top));
+  }
+  .court-play {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 36%) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'top top top'
+      'home controls away'
+      'home pad away';
+  }
+  .court-top {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'board banner more'
+      'notices notices notices';
+  }
+  /* The title is kept for screen readers; the teams' names are on the scoreboard. */
+  .court-play .court-title {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    min-block-size: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .court-score {
+    flex-direction: row;
+    justify-content: space-between;
+    gap: var(--court-gap);
+    min-block-size: 44px;
+    padding-block: 2px;
+    padding-inline: 12px;
+  }
+  .court-score[data-side='away'] {
+    flex-direction: row-reverse;
+  }
+  .court-clock {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+    min-inline-size: 0;
+  }
+  .court-banner {
+    max-inline-size: 180px;
+    font-size: var(--court-size-small);
+    line-height: 1.2;
+  }
+  .court-more-word {
+    display: none;
+  }
+  .court-controls {
+    min-block-size: 48px;
+  }
+  .court-teams {
+    display: contents;
+  }
+  .court-team {
+    overflow-y: auto;
+    align-self: stretch;
+  }
+  .court-team[data-side='home'] {
+    grid-area: home;
+  }
+  .court-team[data-side='away'] {
+    grid-area: away;
+  }
+  .court-team-name-text {
+    font-size: var(--court-size-small);
+  }
+  /* As many across as fit at their least size: three floor tiles and four bench tiles
+     on a large phone, two and three on a small one, whose panels then scroll by
+     themselves. */
+  .court-floor {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  }
+  .court-bench,
+  .court-bench-picking {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+    overflow: visible;
+  }
+  .court-bench > .court-quiet {
+    grid-column: 1 / -1;
+  }
+  .court-chip-tile {
+    max-inline-size: none;
+  }
+  .court-pad,
+  .court[data-stage='lineups'] .court-pad {
+    block-size: auto;
+    max-block-size: none;
+    min-block-size: 0;
+  }
+  .court-who {
+    min-block-size: 40px;
+  }
+  .court-who-number {
+    block-size: 40px;
+    font-size: 20px;
+  }
+  /* The row's label sits above it here, so all five on the court fit across. */
+  .court-subs {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    block-size: auto;
+  }
+  .court-subs > .court-label {
+    inline-size: auto;
+  }
+  .court-subs-row {
+    flex: none;
+    block-size: var(--court-subs-height);
+  }
+  .court-hint p {
+    font-size: 12px;
+  }
+}
+
+/* ---- A tablet upright (820 x 1180): stacked, with the pad BETWEEN the two teams, so the
+   second tap is never more than one panel away. The play log takes what is left. ------ */
+@media (min-width: 700px) and (min-height: 521px) {
+  .court {
+    --court-size-clock: 60px;
+    --court-size-score: 56px;
+    --court-size-number: 34px;
+    --court-size-text: 16px;
+    --court-size-small: 13px;
+    --court-gap: 10px;
+    --court-tile-height: 88px;
+    --court-chip-height: 56px;
+    --court-points-height: 72px;
+    --court-acts-height: 56px;
+    --court-subs-height: 52px;
+    padding-block: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-bottom));
+    padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+  }
+  .court-play {
+    grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'top'
+      'controls'
+      'home'
+      'pad'
+      'away'
+      'log';
+    gap: 10px;
+  }
+  .court-teams {
+    display: contents;
+  }
+  .court-team[data-side='home'] {
+    grid-area: home;
+  }
+  .court-team[data-side='away'] {
+    grid-area: away;
+  }
+  .court-team {
+    padding-block: 0 8px;
+    padding-inline: 8px;
+  }
+  .court-title-teams {
+    font-size: 18px;
+  }
+  .court-title-when {
+    font-size: 14px;
+  }
+  .court-score-name {
+    font-size: 14px;
+  }
+  .court-score {
+    padding-block: 8px 10px;
+  }
+  .court-clock {
+    min-inline-size: 190px;
+  }
+  .court-clock-period {
+    font-size: 18px;
+  }
+  .court-banner {
+    min-block-size: 24px;
+    font-size: 15px;
+  }
+  .court-controls {
+    min-block-size: 60px;
+  }
+  .court-log {
+    display: block;
+    min-block-size: 60px;
+  }
+  .court-team-name {
+    font-size: 15px;
+  }
+  .court-chip {
+    min-block-size: 48px;
+    font-size: 15px;
+  }
+  .court-team-head {
+    min-block-size: 52px;
+  }
+  .court-tile-minutes {
+    display: block;
+  }
+  .court-tile-stats {
+    font-size: 14px;
+  }
+  .court-tile-name {
+    font-size: 14px;
+  }
+  .court-bench {
+    flex-wrap: wrap;
+    align-items: center;
+    overflow: visible;
+  }
+  .court-bench-label {
+    display: block;
+    flex: none;
+    color: var(--court-muted);
+    font-size: var(--court-size-small);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .court-chip-tile {
+    flex: 0 0 76px;
+  }
+  .court-chip-tile .court-tile-number {
+    font-size: 24px;
+  }
+  .court-bench-picking {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+  .court-bench-picking .court-chip-tile {
+    min-block-size: 68px;
+  }
+  .court-pad {
+    padding: 10px;
+    block-size: calc(
+      48px + var(--court-subs-height) + var(--court-points-height) + var(--court-acts-height) + 3 *
+        var(--court-gap) + 22px
+    );
+  }
+  .court[data-stage='lineups'] .court-pad {
+    block-size: auto;
+    max-block-size: none;
+  }
+  .court-who {
+    min-block-size: 48px;
+  }
+  .court-who-number {
+    min-inline-size: 48px;
+    block-size: 48px;
+  }
+  .court-who-name {
+    font-size: 18px;
+  }
+  .court-who-facts {
+    font-size: 15px;
+  }
+  .court-subs > .court-label {
+    inline-size: 48px;
+    font-size: 12px;
+  }
+  .court-opt {
+    font-size: 19px;
+  }
+  .court-opt-name {
+    display: block;
+  }
+  .court-opt-big {
+    font-size: 34px;
+  }
+  .court-hint p {
+    font-size: 15px;
+  }
+  .court-rest {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    column-gap: 24px;
+  }
+}
+
+/* ---- A tablet lying down (1180 x 820), and anything from 880 wide: the two teams side
+   by side with the pad and the play log between them (checklist S2). ----------------- */
+@media (min-width: 880px) and (min-height: 521px) {
+  .court-play {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 32%) minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'top top top'
+      'home controls away'
+      'home pad away'
+      'home log away';
+    column-gap: 12px;
+  }
+  .court-top {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'title banner more'
+      'board board board'
+      'notices notices notices';
+  }
+  .court-banner {
+    padding-inline: 12px;
+  }
+  .court-team {
+    align-self: start;
+    max-block-size: 100%;
+    overflow-y: auto;
+  }
+  .court-floor {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  /* There is room below here: the bench's label has a line of its own. */
+  .court-bench-label {
+    inline-size: 100%;
+  }
+  .court-rest {
+    display: flex;
+  }
+  .court-pad {
+    block-size: calc(
+      48px + var(--court-subs-height) + var(--court-points-height) + var(--court-acts-height) + 3 *
+        var(--court-gap) + 22px
+    );
+  }
+  .court[data-stage='lineups'] .court-pad {
+    block-size: auto;
+  }
+}

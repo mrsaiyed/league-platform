@@ -1,0 +1,568 @@
+'use client';
+// The scoring screen on the device (step 2.35): it holds what is picked on the screen
+// (the starters being tapped, whose options are open, what was last said) and sends every
+// action to the controller that exists (tracker-controller.ts). It keeps no copy of the
+// game: what is drawn is the controller's game, through scoring-view.ts.
+//
+// A tap answers at once (finding M6; DESIGN.md section 7, line 9): the tile is marked
+// with what was tapped ("+2") in the same turn, before the tap is stored. The numbers
+// change only once the controller has stored the tap and shows the game with it: the
+// write-before-show rule (T-114) stays.
+import type { Translate } from '@srleagues/site';
+import { basketball } from '@srleagues/sports';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
+import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
+import { playerLabel, refusalText } from './engine-words.ts';
+import type { OpenedTrackerGame } from './open-tracker-game.ts';
+import type { DeviceRosters, LineupPicks } from './opened-game-storage.ts';
+import {
+  dropOn,
+  padAtRest,
+  padFor,
+  padTap,
+  startShortHanded,
+  subTap,
+  swapColorsTap,
+  tapTile,
+  type PadAction,
+  type PadMode,
+} from './scoring-moves.ts';
+import { findTile, scoringView, type PlayerTile } from './scoring-view.ts';
+import type { TapInput, TrackerControllerStatus } from './tracker-controller.ts';
+
+export type ScoringScreenProps = {
+  readonly game: OpenedTrackerGame;
+  readonly status: TrackerControllerStatus;
+  /** The game as the controller shows it: never null on this screen. */
+  readonly state: basketball.GameState;
+  readonly rosters: DeviceRosters;
+  readonly t: Translate;
+  readonly title: string;
+  readonly when: string | null;
+  readonly banner: CourtBanner;
+  readonly notices?: ReactNode;
+  readonly links: { readonly back: string; readonly account: string; readonly watch: string };
+  readonly leave: (to: string) => (event: MouseEvent<HTMLAnchorElement>) => void;
+  readonly slots?: CourtSlots;
+};
+
+/** How long the latest sentence stays (checklist I5). */
+const saidForMs = 3200;
+/** How long a tile shows what was tapped on it. */
+const markForMs = 650;
+/** A press that moves less than this is a tap, not a drag (checklist E2). */
+const dragStartsAtPx = 8;
+
+type Mark = 'points' | 'foul' | 'plain';
+
+/** The tile of a player, in the teams' panels (not the pad's buttons). */
+const tileElement = (root: HTMLElement | null, playerId: string): HTMLElement | null =>
+  root?.querySelector<HTMLElement>(`[data-teams] [data-player="${CSS.escape(playerId)}"]`) ?? null;
+
+const markTimers = new WeakMap<HTMLElement, number>();
+
+/**
+ * Marks a tile with what was tapped, now: written straight onto the element, so it is
+ * painted in this turn whatever else the screen is working on.
+ */
+function markTile(root: HTMLElement | null, playerId: string, text: string, kind: Mark): void {
+  const tile = tileElement(root, playerId);
+  if (tile === null) return;
+  window.clearTimeout(markTimers.get(tile));
+  tile.setAttribute('data-mark', text);
+  tile.setAttribute('data-mark-kind', kind);
+  // The mark's short fade has two names, taken in turn, so it starts again on a second
+  // tap without the screen having to be measured in between.
+  tile.setAttribute('data-mark-turn', tile.getAttribute('data-mark-turn') === 'a' ? 'b' : 'a');
+  markTimers.set(
+    tile,
+    window.setTimeout(() => {
+      tile.removeAttribute('data-mark');
+      tile.removeAttribute('data-mark-kind');
+    }, markForMs),
+  );
+}
+
+/**
+ * Rings a tapped tile at once, before its options are drawn: written straight onto the
+ * element, under a name of its own (`data-tapped`) so the screen's next drawing, which
+ * rings the open tile itself (`data-open`), neither fights it nor leaves it behind.
+ */
+function ringTile(root: HTMLElement | null, playerId: string): void {
+  // The tile that was open gives up its ring in the same frame (`data-tapped="off"`).
+  // Only the two tiles are touched, so the browser has only those two to restyle.
+  for (const open of root?.querySelectorAll('[data-teams] [data-open]') ?? []) {
+    open.setAttribute('data-tapped', 'off');
+  }
+  tileElement(root, playerId)?.setAttribute('data-tapped', 'on');
+}
+
+/** Takes the rings of `ringTile` off again: the screen has drawn the open tile's own. */
+function unringTiles(root: HTMLElement | null): void {
+  for (const tile of root?.querySelectorAll('[data-tapped]') ?? []) {
+    tile.removeAttribute('data-tapped');
+  }
+}
+
+/**
+ * Runs `work` once the screen has been painted. What must show at once (a tile's ring,
+ * what was tapped) is written straight onto its element first; the rest of the screen is
+ * drawn again after that frame, so a slow tablet answers the tap before it does the work
+ * (finding M6). A page that is not being drawn still does the work, a moment later.
+ */
+function afterPaint(work: () => void): void {
+  let done = false;
+  const once = () => {
+    if (done) return;
+    done = true;
+    work();
+  };
+  window.requestAnimationFrame(() => window.setTimeout(once, 0));
+  window.setTimeout(once, 150);
+}
+
+/** Server time, read once a second while the clock runs: the minutes on the tiles. */
+function useElapsed(state: basketball.GameState, now: () => number): number {
+  const read = useCallback(() => basketball.clockAt(state, now()).elapsedMs, [state, now]);
+  const [elapsed, setElapsed] = useState(read);
+  useEffect(() => {
+    setElapsed(read());
+    if (!state.clock.running) return;
+    const timer = window.setInterval(() => setElapsed(read()), 1000);
+    return () => window.clearInterval(timer);
+  }, [read, state.clock.running]);
+  return elapsed;
+}
+
+/** The game clock as it reads now, four times a second while it runs, from the server's time. */
+function ClockTime({
+  state,
+  now,
+}: {
+  readonly state: basketball.GameState;
+  readonly now: () => number;
+}) {
+  const read = useCallback(
+    () => basketball.formatClock(basketball.clockAt(state, now()).remainingMs),
+    [state, now],
+  );
+  const [text, setText] = useState(read);
+  useEffect(() => {
+    setText(read());
+    if (!state.clock.running) return;
+    const timer = window.setInterval(() => setText(read()), 250);
+    return () => window.clearInterval(timer);
+  }, [read, state.clock.running]);
+  return text;
+}
+
+export function ScoringScreen(props: ScoringScreenProps) {
+  const { game, status, state, rosters, t } = props;
+  const { controller } = game;
+  const root = useRef<HTMLElement | null>(null);
+  const [picks, setPicks] = useState<LineupPicks>(() => game.lineupPicks());
+  const [padMode, setPadMode] = useState<PadMode>(padAtRest);
+  const [said, setSaid] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [dragging, setDragging] = useState<string | null>(null);
+
+  const elapsed = useElapsed(state, status.now);
+  const view = useMemo(
+    () => scoringView(state, rosters, picks, elapsed),
+    [state, rosters, picks, elapsed],
+  );
+  // The options of a player the game no longer shows are not left open.
+  const pad = padFor(view, padMode);
+  /**
+   * What the pad is to show, as the taps so far leave it. It is known at once, a frame
+   * before it is drawn (a tap is answered on its tile first), so a second tap made in
+   * that frame is read against what the first one did, not against what is still drawn.
+   */
+  const wanted = useRef<PadMode>(padAtRest);
+  const showPad = (mode: PadMode) => {
+    wanted.current = mode;
+    setPadMode(mode);
+  };
+
+  const sayTimer = useRef<number | null>(null);
+  const say = useCallback((text: string) => {
+    if (sayTimer.current !== null) window.clearTimeout(sayTimer.current);
+    setSaid(text);
+    sayTimer.current = window.setTimeout(() => setSaid(null), saidForMs);
+  }, []);
+  useEffect(
+    () => () => {
+      if (sayTimer.current !== null) window.clearTimeout(sayTimer.current);
+    },
+    [],
+  );
+
+  /** Sends a tap to the controller; a refusal is said in a sentence (checklist I6). */
+  const send = useCallback(
+    async (input: TapInput, saidWhenTaken?: string): Promise<boolean> => {
+      const result = await controller.tap(input);
+      if (result.ok) {
+        if (saidWhenTaken !== undefined) say(saidWhenTaken);
+        return true;
+      }
+      say(
+        result.reason === 'engine'
+          ? refusalText(result.message, t)
+          : t(result.reason === 'storage' ? 'tracker.say.storage' : 'tracker.say.notScoring'),
+      );
+      return false;
+    },
+    [controller, say, t],
+  );
+
+  const keepPicks = useCallback(
+    (next: LineupPicks) => {
+      setPicks(next);
+      void game.keepLineupPicks(next);
+    },
+    [game],
+  );
+
+  /** Where the keyboard goes next: back to a tile, or into the pad that just opened. */
+  const focusNext = useRef<{ readonly tile: string } | 'pad' | null>(null);
+  useEffect(() => {
+    const next = focusNext.current;
+    if (next === null) return;
+    focusNext.current = null;
+    if (next === 'pad') {
+      // The first point button, never a substitution: a second Enter must not swap players.
+      root.current?.querySelector<HTMLElement>('[data-pad] [data-act="p1"]')?.focus();
+    } else {
+      tileElement(root.current, next.tile)?.focus();
+    }
+  });
+  /** A click with no pointer behind it is Enter or Space (checklist S4). */
+  const byKeyboard = (event: MouseEvent) => event.detail === 0;
+  /** True from an option's tap until its options have closed, a frame later. */
+  const optionTaken = useRef(false);
+
+  const on: CourtHandlers = {
+    tile(playerId, event) {
+      const tapped = tapTile(view, picks, padFor(view, wanted.current), playerId);
+      if (tapped === null) return;
+      if (tapped.kind === 'pick') {
+        keepPicks(tapped.picks);
+        if (tapped.lineup !== null) void send(tapped.lineup);
+        return;
+      }
+      const keyboard = byKeyboard(event);
+      wanted.current = tapped.pad;
+      // The tile is ringed at once; its options are drawn in the pad right after.
+      if (tapped.pad.kind === 'player') ringTile(root.current, playerId);
+      afterPaint(() => {
+        unringTiles(root.current);
+        setSaid(null);
+        setPadMode(wanted.current);
+        if (keyboard) focusNext.current = tapped.pad.kind === 'player' ? 'pad' : null;
+      });
+    },
+    startShortHanded(side) {
+      const lineup = startShortHanded(view, side);
+      if (lineup === null) return;
+      keepPicks({ ...picks, [side]: [] });
+      void send(lineup);
+    },
+    action(tile, action, event) {
+      // One option at a time: a second tap before the options have closed is not a play.
+      if (optionTaken.current) return;
+      optionTaken.current = true;
+      const input = padTap(tile, action);
+      const name = playerLabel(tile.player, t);
+      // Shown on the tile at once, before the tap is stored (finding M6).
+      if (input.type === 'score') {
+        markTile(
+          root.current,
+          tile.id,
+          t('tracker.pad.points', { points: input.points }),
+          'points',
+        );
+      } else if (action === 'foul') {
+        markTile(root.current, tile.id, t('tracker.pad.foul'), 'foul');
+      } else if (action === 'unfoul') {
+        markTile(root.current, tile.id, t('tracker.pad.unfoul'), 'plain');
+      } else {
+        markTile(root.current, tile.id, t('tracker.pad.turnover'), 'plain');
+      }
+      // The options close with the tap (D7): a second tap by mistake lands on nothing.
+      // The mark is painted first; the tap is then handed to the controller, which
+      // stores it before the tile counts it (T-114).
+      const keyboard = byKeyboard(event);
+      wanted.current = padAtRest;
+      afterPaint(() => {
+        optionTaken.current = false;
+        setPadMode(wanted.current);
+        if (keyboard) focusNext.current = { tile: tile.id };
+        void send(
+          input,
+          action === 'turnover' ? t('tracker.say.turnover', { player: name }) : undefined,
+        );
+      });
+    },
+    substitute(coming, going, event) {
+      if (optionTaken.current) return;
+      optionTaken.current = true;
+      markSub(coming, going);
+      const keyboard = byKeyboard(event);
+      wanted.current = padAtRest;
+      afterPaint(() => {
+        optionTaken.current = false;
+        setPadMode(wanted.current);
+        if (keyboard) focusNext.current = { tile: coming.id };
+        void send(subTap(coming, going));
+      });
+    },
+    closePad() {
+      const open = pad.kind === 'player' ? pad.playerId : null;
+      showPad(padAtRest);
+      if (open !== null) focusNext.current = { tile: open };
+    },
+    turnovers(side) {
+      const now = wanted.current;
+      setSaid(null);
+      showPad(
+        now.kind === 'turnovers' && now.side === side ? padAtRest : { kind: 'turnovers', side },
+      );
+    },
+    takeBackTurnover(tile) {
+      void send({ type: 'unturnover', side: tile.side, playerId: tile.id });
+    },
+    teamTurnover(side) {
+      void send(
+        { type: 'team-turnover', side },
+        t('tracker.say.teamTurnover', { team: view.teams[side].name }),
+      );
+    },
+    takeBackTeamTurnover(side) {
+      void send({ type: 'team-unturnover', side });
+    },
+    more(open) {
+      setMoreOpen(open);
+    },
+    swapColors() {
+      setMoreOpen(false);
+      void send(swapColorsTap(state));
+    },
+    leave: props.leave,
+  };
+
+  function markSub(coming: PlayerTile, going: PlayerTile) {
+    markTile(root.current, going.id, t('tracker.tile.noNumber'), 'plain');
+    markTile(root.current, coming.id, t('tracker.pad.subIn'), 'plain');
+  }
+
+  // --- More: opened as a dialog; Escape closes it, and the keyboard stays inside it. ---
+  const moreButton = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const sheet = root.current?.querySelector<HTMLElement>('[data-more] [role="dialog"]');
+    moreButton.current = root.current?.querySelector<HTMLElement>('.court-more-button') ?? null;
+    sheet?.querySelector<HTMLElement>('button, a[href]')?.focus();
+    return () => moreButton.current?.focus();
+  }, [moreOpen]);
+
+  // --- The keyboard: Escape closes More, then the open options (checklist S4). ---
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Tab' && moreOpen) {
+        const sheet = root.current?.querySelector<HTMLElement>('[data-more] [role="dialog"]');
+        const stops = [...(sheet?.querySelectorAll<HTMLElement>('button, a[href]') ?? [])];
+        const [first, last] = [stops[0], stops.at(-1)];
+        if (first === undefined || last === undefined) return;
+        const at = document.activeElement;
+        if (event.shiftKey && (at === first || !sheet?.contains(at))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (at === last || !sheet?.contains(at))) {
+          event.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+      if (event.key !== 'Escape') return;
+      if (moreOpen) {
+        setMoreOpen(false);
+        return;
+      }
+      const now = wanted.current;
+      if (now.kind === 'rest') return;
+      const open = now.kind === 'player' ? now.playerId : null;
+      wanted.current = padAtRest;
+      setPadMode(padAtRest);
+      if (open !== null) focusNext.current = { tile: open };
+      else root.current?.querySelector<HTMLElement>('[aria-expanded="true"]')?.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [moreOpen, padMode]);
+
+  // --- Dragging a bench player onto a floor player (checklist E2, E3). ---
+  const drag = useRef<{
+    readonly id: string;
+    readonly x: number;
+    readonly y: number;
+    lastX: number;
+    lastY: number;
+    moved: boolean;
+    over: HTMLElement | null;
+  } | null>(null);
+  const ghost = useRef<HTMLDivElement | null>(null);
+  /** The click that ends a drag is not a tap. */
+  const swallowClick = useRef(false);
+
+  const tileAt = (x: number, y: number): HTMLElement | null =>
+    document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-teams] [data-player]') ?? null;
+  const endDrag = () => {
+    drag.current?.over?.removeAttribute('data-drop');
+    drag.current = null;
+    setDragging(null);
+  };
+  const dragHandlers = {
+    ref: root,
+    onPointerDown(event: PointerEvent<HTMLElement>) {
+      if (event.button !== 0 || !(event.target instanceof Element)) return;
+      const tile = event.target.closest<HTMLElement>('[data-teams] [data-player]');
+      const id = tile?.dataset.player;
+      if (id === undefined) return;
+      const found = findTile(view, id);
+      // Only once the lineup is set: while picking, a tile is tapped, never dragged.
+      if (found === undefined || view.teams[found.side].stage !== 'set') return;
+      const { clientX: x, clientY: y } = event;
+      drag.current = { id, x, y, lastX: x, lastY: y, moved: false, over: null };
+    },
+    onPointerMove(event: PointerEvent<HTMLElement>) {
+      const now = drag.current;
+      if (now === null) return;
+      const far = Math.hypot(event.clientX - now.x, event.clientY - now.y) >= dragStartsAtPx;
+      if (!now.moved && !far) return;
+      now.lastX = event.clientX;
+      now.lastY = event.clientY;
+      if (!now.moved) {
+        now.moved = true;
+        setDragging(now.id);
+      }
+      if (ghost.current !== null) {
+        ghost.current.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`;
+      }
+      const over = tileAt(event.clientX, event.clientY);
+      if (over !== now.over) {
+        now.over?.removeAttribute('data-drop');
+        if (over !== null && over.dataset.player !== now.id) over.setAttribute('data-drop', '');
+        now.over = over;
+      }
+    },
+    onPointerUp(event: PointerEvent<HTMLElement>) {
+      const now = drag.current;
+      if (now === null) return;
+      endDrag();
+      if (!now.moved) return;
+      swallowClick.current = true;
+      window.setTimeout(() => (swallowClick.current = false), 0);
+      const dropped = dropOn(
+        view,
+        now.id,
+        tileAt(event.clientX, event.clientY)?.dataset.player ?? null,
+      );
+      if (dropped === null) return;
+      if (dropped.kind === 'say') {
+        say(t(dropped.key));
+        return;
+      }
+      const coming = findTile(view, dropped.inId);
+      const going = findTile(view, dropped.outId);
+      if (coming !== undefined && going !== undefined) markSub(coming, going);
+      showPad(padAtRest);
+      void send(dropped.input);
+    },
+    onPointerCancel: endDrag,
+    onClickCapture(event: MouseEvent<HTMLElement>) {
+      if (!swallowClick.current) return;
+      swallowClick.current = false;
+      event.stopPropagation();
+      event.preventDefault();
+    },
+    /** A tap anywhere else closes a player's options (checklist D4). */
+    onClick(event: MouseEvent<HTMLElement>) {
+      if (wanted.current.kind !== 'player' || !(event.target instanceof Element)) return;
+      if (event.target.closest('button, a, [data-pad], [data-more]') !== null) return;
+      showPad(padAtRest);
+    },
+  };
+
+  // A bench that is wider than its row scrolls sideways; one that fits is dragged from
+  // freely. Measured when a bench changes or the screen is turned, not on every tap.
+  const benches = `${view.teams.home.stage}${view.teams.home.bench.length}${view.teams.away.stage}${view.teams.away.bench.length}`;
+  useEffect(() => {
+    const measure = () => {
+      const rows = root.current?.querySelectorAll<HTMLElement>('[data-bench]') ?? [];
+      for (const row of rows) {
+        row.toggleAttribute('data-scrolls', row.scrollWidth > row.clientWidth + 1);
+      }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [benches]);
+
+  // The tiles are handed one tap handler that never changes, so a tile is drawn again
+  // only when what it shows changed (finding M6).
+  const latestTileTap = useRef(on.tile);
+  useLayoutEffect(() => {
+    latestTileTap.current = on.tile;
+  });
+  const tileTap = useCallback<CourtHandlers['tile']>(
+    (playerId, event) => latestTileTap.current(playerId, event),
+    [],
+  );
+
+  const draggedTile = dragging === null ? undefined : findTile(view, dragging);
+  return (
+    <CourtView
+      t={t}
+      view={view}
+      title={props.title}
+      when={props.when}
+      clock={<ClockTime state={state} now={status.now} />}
+      banner={props.banner}
+      notices={props.notices}
+      pad={pad}
+      said={said}
+      moreOpen={moreOpen}
+      links={props.links}
+      on={{ ...on, tile: tileTap }}
+      drag={dragHandlers}
+      {...(props.slots === undefined ? {} : { slots: props.slots })}
+    >
+      {draggedTile === undefined ? null : (
+        <div
+          className="court-ghost"
+          aria-hidden="true"
+          data-color={view.teams[draggedTile.side].color}
+          ref={(element) => {
+            ghost.current = element;
+            const at = drag.current;
+            if (element !== null && at !== null) {
+              element.style.transform = `translate(${at.lastX}px, ${at.lastY}px)`;
+            }
+          }}
+        >
+          {playerLabel(draggedTile.player, t)}
+        </div>
+      )}
+    </CourtView>
+  );
+}

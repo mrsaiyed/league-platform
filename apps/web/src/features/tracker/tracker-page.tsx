@@ -21,13 +21,22 @@
 // The rosters go to the device with the page and are stored there under the signed-in
 // account, so the device can let go of another account's games (T-115); the device
 // then takes the scoring session and loads the state itself (tracker-opening.tsx).
+//
+// The tracker's address has no league frame around it (step 2.35; the league's layout
+// leaves it off): the scoring screen has a frame and a look of its own, the same for
+// every league (docs/build/DESIGN.md section 7; record 064). A refusal is still one of
+// the league's own message pages, so it draws the league's look around itself here.
 import { catalogs, en } from '@srleagues/site';
 import { MessagePage } from '@srleagues/ui';
-import { leagueUrl, platformUrl, readTrackerRosters } from '@srleagues/core';
+import { leagueUrl, listMyGames, platformUrl, readTrackerRosters } from '@srleagues/core';
 import { forbidden } from 'next/navigation';
+import type { ReactNode } from 'react';
+import { DesignStyle } from '../shell/index.ts';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
+import { gameWhenText } from '../../server/game-when.ts';
 import { isGameIdFormat } from '../../server/league-api.ts';
+import { leagueSites, siteOfLeague } from '../../server/league-site.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { signInFirstUrl } from '../../server/sign-in-first.ts';
@@ -51,25 +60,27 @@ export async function TrackerPage({
   const backHref = scoresOnly(view.areas)
     ? leagueUrl(here, 'admin')
     : leagueUrl(here, 'admin-area', { area: 'games' });
+  const refusal = (message: TextKey, enter?: { readonly href: string }) => (
+    <LeagueLook league={here}>
+      <TrackerRefusal
+        message={message}
+        backHref={backHref}
+        {...(enter === undefined ? {} : { enter })}
+      />
+    </LeagueLook>
+  );
   // Only someone who scores in this league is this far, so saying there is no such game
   // gives nothing away.
-  if (!isGameIdFormat(game)) {
-    return <TrackerRefusal message="tracker.unknownGame" backHref={backHref} />;
-  }
+  if (!isGameIdFormat(game)) return refusal('tracker.unknownGame');
   // The league's gate let only someone who scores here this far; nothing of the game is read.
   const stopped = notScoredBecause(here.status);
-  if (stopped !== null) {
-    return <TrackerRefusal message={`admin.myGames.${stopped}`} backHref={backHref} />;
-  }
+  if (stopped !== null) return refusal(`admin.myGames.${stopped}`);
   const ports = await webPorts();
   const context = commandContextOf(view.context);
   const read = await readTrackerRosters(context, { gameId: game }, ports.games.deps);
   if (!read.ok) {
-    return (
-      <TrackerRefusal
-        message={read.error.code === 'not-allowed' ? 'tracker.notAssigned' : 'tracker.unknownGame'}
-        backHref={backHref}
-      />
+    return refusal(
+      read.error.code === 'not-allowed' ? 'tracker.notAssigned' : 'tracker.unknownGame',
     );
   }
   // Only a signed-in account may score, so the read above already refused a visitor.
@@ -78,36 +89,62 @@ export async function TrackerPage({
     // A game still to be played or being played is scored in the games area; one over,
     // postponed or cancelled is not scored now at all.
     const open = read.value.status === 'scheduled' || read.value.status === 'live';
-    if (!open) {
-      return <TrackerRefusal message="tracker.readOnly.game-not-live" backHref={backHref} />;
-    }
+    if (!open) return refusal('tracker.readOnly.game-not-live');
     const boxScore = read.value.recording === 'box-score';
-    return (
-      <TrackerRefusal
-        message={boxScore ? 'tracker.notLive.box-score' : 'tracker.notLive.final-score'}
-        backHref={backHref}
-        enter={{
-          href: boxScore
-            ? leagueUrl(here, 'admin-area', { area: 'games', subpath: [read.value.gameId] })
-            : leagueUrl(here, 'admin-area', { area: 'games' }),
-        }}
-      />
-    );
+    return refusal(boxScore ? 'tracker.notLive.box-score' : 'tracker.notLive.final-score', {
+      href: boxScore
+        ? leagueUrl(here, 'admin-area', { area: 'games', subpath: [read.value.gameId] })
+        : leagueUrl(here, 'admin-area', { area: 'games' }),
+    });
   }
   const names = await ports.games.namesOf(here.id);
   const trackerHref = leagueUrl(here, 'score', { game: read.value.gameId });
+  // The title says the game's day and time (checklist A3), in the league's time zone. The
+  // scorekeeper's own list of games holds it; a game no longer on that list has none here.
+  const listed = await listMyGames(context, {}, ports.games.deps);
+  const mine = listed.ok ? listed.value.games.find((g) => g.id === read.value.gameId) : undefined;
+  const { timeZone } = await ports.publicSchedule.clockOf(here.id);
+  const when =
+    mine === undefined || mine.startsAt === null
+      ? null
+      : gameWhenText(mine.startsAt, { locale, timeZone });
   return (
     <TrackerOpening
       leagueId={here.id}
       accountId={context.accountId}
       gameId={read.value.gameId}
       rosters={deviceRosters(trackerRostersReply(read.value), names.teams)}
+      when={when}
+      watchHref={leagueUrl(here, 'game', { game: read.value.gameId })}
       backHref={backHref}
       accountHref={platformUrl('account')}
       signInHref={signInFirstUrl(trackerHref, { problem: 'signInAgain' })}
       locale={locale}
       catalog={trackerCatalog(catalogs[locale] ?? en)}
     />
+  );
+}
+
+/**
+ * The league's look around one of the tracker's refusals: its design as CSS variables and
+ * the page's body, with no header, menu or footer (the league's layout draws none at the
+ * tracker's address). The scoring screen is never inside this.
+ */
+function LeagueLook({
+  league,
+  children,
+}: {
+  readonly league: { readonly id: string; readonly slug: string };
+  readonly children: ReactNode;
+}) {
+  const site = siteOfLeague(league, leagueSites());
+  return (
+    <div className="league-site ui-root">
+      <DesignStyle design={site.design} />
+      <div className="site-body" id="content">
+        {children}
+      </div>
+    </div>
   );
 }
 
