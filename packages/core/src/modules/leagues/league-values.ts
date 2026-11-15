@@ -11,6 +11,10 @@ export type SeasonStatus = (typeof seasonStatuses)[number];
 export const audiences = ['adult', 'youth', 'mixed'] as const;
 export type Audience = (typeof audiences)[number];
 
+/** The sports a league may be made for (P3 §1 step 2: basketball, for now; B-6). */
+export const offeredSports = ['basketball'] as const;
+export type OfferedSport = (typeof offeredSports)[number];
+
 /** U-10: listed in /find by default for adult leagues only; "mixed" is treated like youth. */
 export const listedByDefault: Readonly<Record<Audience, boolean>> = {
   adult: true,

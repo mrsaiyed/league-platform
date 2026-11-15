@@ -37,6 +37,10 @@ export type NewLeague = {
   readonly audience: Audience;
   readonly listed: boolean;
   readonly ownerAccountId: string;
+  /** How people reach the league, or null until it is given. */
+  readonly contactEmail: string | null;
+  /** Where the league plays (P3 §1 step 2), or null until it is given. */
+  readonly city: string | null;
   /** The hidden default program that is created with it (U-3, U-12). */
   readonly defaultProgram: {
     readonly slug: string;

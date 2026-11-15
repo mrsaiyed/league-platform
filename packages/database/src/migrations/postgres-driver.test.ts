@@ -5,9 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
+import pg from 'pg';
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyMigrations } from './apply-migrations.ts';
-import { connectPostgresDriver, sslSetting } from './postgres-driver.ts';
+import {
+  connectPostgresDriver,
+  sslAddressKeys,
+  sslSetting,
+  withoutSslKeys,
+} from './postgres-driver.ts';
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -72,6 +78,75 @@ describe('connectPostgresDriver', () => {
     await server.stop();
     await new Promise((resolve) => setTimeout(resolve, 100));
     await expect(driver.query('select 1')).rejects.toThrow();
+  });
+});
+
+describe('the address cannot change how the connection is encrypted', () => {
+  it('takes no SSL setting from the address: with verify it still asks for SSL', async () => {
+    // PGlite's server speaks no SSL. Asked for SSL, the connection is refused; if
+    // the address could turn SSL off (ssl=0) or the check off (ssl=no-verify), or turn
+    // it on (ssl=true) where it was off, the outcome would follow the address instead.
+    // Each refused try gets a server of its own: one that refused SSL may drop the next.
+    for (const query of ['ssl=0', 'ssl=false', 'ssl=no-verify', 'SSL=0', 'sslmode=disable']) {
+      const db = new PGlite();
+      cleanup.push(() => db.close());
+      const address = await serverAddress(db);
+      await expect(
+        connectPostgresDriver(`${address}?${query}`, { ssl: 'verify', ca: 'made-up' }),
+        query,
+      ).rejects.toThrow();
+    }
+    const db = new PGlite();
+    cleanup.push(() => db.close());
+    const address = await serverAddress(db);
+    for (const query of ['ssl=true', 'ssl=1', 'sslnegotiation=direct', 'sslmode=require']) {
+      const driver = await connectPostgresDriver(`${address}?${query}`, { ssl: 'off' });
+      try {
+        const { rows } = await driver.query<{ one: number }>('select 1 as one');
+        expect(rows, query).toEqual([{ one: 1 }]);
+      } finally {
+        // The server takes one connection at a time.
+        await driver.close();
+      }
+    }
+  });
+
+  it('keeps the given certificate whatever the address says', () => {
+    const ca = '-----BEGIN CERTIFICATE-----made-up-----END CERTIFICATE-----';
+    const base = 'postgres://made-up:made-up@db.example.test:5432/league';
+    for (const query of [
+      'ssl=true',
+      'ssl=1',
+      'ssl=no-verify',
+      'sslnegotiation=direct',
+      'sslmode=no-verify',
+      'uselibpqcompat=true&sslmode=require',
+    ]) {
+      const client = new pg.Client({
+        connectionString: withoutSslKeys(`${base}?${query}&application_name=web`),
+        ssl: sslSetting({ ssl: 'verify', ca }),
+      });
+      const parameters = (client as unknown as { connectionParameters: { ssl: unknown } })
+        .connectionParameters;
+      expect(parameters.ssl, query).toEqual({ rejectUnauthorized: true, ca });
+    }
+  });
+
+  it('strips every key the parser reads for SSL, in any capitals, and keeps the rest', () => {
+    expect(sslAddressKeys).toEqual([
+      'ssl',
+      'sslmode',
+      'sslcert',
+      'sslkey',
+      'sslrootcert',
+      'sslnegotiation',
+      'uselibpqcompat',
+    ]);
+    expect(
+      withoutSslKeys(
+        'postgres://u:p@db.example.test/league?SSL=0&sslNegotiation=direct&sslrootcert=x&application_name=web',
+      ),
+    ).toBe('postgres://u:p@db.example.test/league?application_name=web');
   });
 });
 
