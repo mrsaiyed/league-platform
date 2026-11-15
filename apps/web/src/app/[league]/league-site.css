@@ -51,8 +51,7 @@ html {
   transform: none;
 }
 
-/* The header. First row: the league's mark and name with a small line under it, the
-   season picker and the way in. Second row: the menu. On a phone it is one row (the mark,
+/* The header. First row: the league's mark and name, the season picker and the way in. Second row: the menu. On a phone it is one row (the mark,
    the name and the menu button), and the button opens a panel in the header itself that
    holds the menu, sign-in and the season picker. */
 .site-header {
@@ -71,9 +70,8 @@ html {
 .league-site .site-header :focus-visible {
   outline-color: var(--header-text);
 }
-/* The first row is 56 high for a name of one line. A long name takes two lines, and then
-   the row grows by what they need: the name never touches the row's edges (8 clear above
-   its words, 6 under the small line). */
+/* The first row is 56 high. A long name takes two lines, which have room in it: the name
+   never touches the row's edges (about 10 clear above and below two lines). */
 .site-header-top {
   position: relative;
   display: flex;
@@ -83,10 +81,10 @@ html {
   min-block-size: calc(var(--tap) + var(--step-3));
   padding-block: calc(var(--step-3) / 2);
 }
-/* The league's mark, its name and the small line under the name. The whole of it is the
-   way home: the name's link covers it. The mark stands over the start of the link and the
-   small line over its foot, so the link is as tall as a thumb needs while the three read
-   as one. */
+/* The league's mark and its name. The whole of it is the way home: the name's link covers
+   it, and the mark stands over the start of the link, so the link is as tall as a thumb
+   needs while the two read as one. (A line of the league's own under the name is a
+   setting for a later step; until then there is none.) */
 .site-brand {
   position: relative;
   display: grid;
@@ -113,10 +111,10 @@ html {
   grid-area: 1 / 1;
   align-items: center;
   min-inline-size: 0;
-  /* The name is the way home: as tall as anything a thumb taps, its words over the small
-     line, with a little clear above them however many lines they take. */
+  /* The name is the way home: as tall as anything a thumb taps, its words in the middle of
+     it, with a little clear above and below them however many lines they take. */
   min-block-size: var(--tap);
-  padding-block: calc(var(--step-1) / 2) var(--step-4);
+  padding-block: calc(var(--step-1) / 2);
   /* The width of the mark (a shield 32 high is 28 wide) and the gap after it. */
   padding-inline-start: calc(var(--step-6) + var(--step-1));
   color: var(--header-name);
@@ -141,21 +139,6 @@ html {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
-}
-.site-tagline {
-  grid-area: 1 / 1;
-  align-self: end;
-  block-size: var(--step-4);
-  padding-inline-start: calc(var(--step-6) + var(--step-1));
-  overflow: hidden;
-  color: var(--header-muted);
-  font-size: var(--text-12);
-  letter-spacing: 0.16em;
-  line-height: var(--step-4);
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-  pointer-events: none;
 }
 .site-header .site-sign-in,
 .site-menu > summary {
@@ -417,7 +400,7 @@ html {
   }
   .site-header .site-name {
     min-block-size: calc(var(--tap) + var(--step-3));
-    padding-block: 0 var(--step-5);
+    padding-block: 0;
     /* The mark is a shield 48 high here. */
     padding-inline-start: calc(var(--step-7) + var(--step-4));
     font-size: var(--text-22);
@@ -428,10 +411,6 @@ html {
     display: block;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .site-tagline {
-    padding-inline-start: calc(var(--step-7) + var(--step-4));
-    letter-spacing: 0.22em;
   }
   .site-menu {
     display: none;
@@ -611,14 +590,23 @@ html {
    the full schedule", so a reader reaches the standings after a few boards, not seven. A
    game waiting for a new day is news, and is always shown. */
 @media (max-width: 47.99rem) {
-  .home-next .ui-card-grid > li:nth-child(n + 3):has(> .ui-game-card[data-status='scheduled']) {
+  /* Counted by what a card is, not by where it stands: a game still to start is put away
+     only when two such games stand before it, whatever else (a postponed game, one that
+     has just gone live) is in the list. */
+  .home-next
+    .ui-card-grid
+    > li:has(> .ui-game-card[data-status='scheduled'])
+    ~ li:has(> .ui-game-card[data-status='scheduled'])
+    ~ li:has(> .ui-game-card[data-status='scheduled']) {
     display: none;
   }
   /* While a game is being played its board already heads the page: the phone then shows
-     one coming game and the latest one, so the standings are still a few boards down. */
+     the next game that will be played (and a postponed one besides) and the latest one,
+     so the standings are still a few boards down. */
   .home-next[data-live='true']
     .ui-card-grid
-    > li:nth-child(n + 2):has(> .ui-game-card[data-status='scheduled']) {
+    > li:has(> .ui-game-card[data-status='scheduled'])
+    ~ li:has(> .ui-game-card[data-status='scheduled']) {
     display: none;
   }
   .home-pair[data-live='true'] > .ui-section:first-child .ui-card-grid > li:nth-child(n + 2) {
@@ -668,9 +656,16 @@ html {
 .league-site .home-leaders-title h3 {
   font-size: var(--text-22);
 }
-/* On a laptop they stand under the standings as a part of that column: the title is drawn
-   as a small label with its short rule, the kicker's own words are put away, and the
-   cards take the rest of the column's height, so the two columns end level. */
+/* The same title as a small label (the shared kicker), for a laptop: put away on a phone. */
+.league-site .home-leaders-label {
+  display: none;
+  margin: 0;
+  font-family: var(--font-body);
+}
+/* On a laptop they stand under the standings as a part of that column: the title is the
+   small label, the phone's kicker and title are put away, and the cards take the rest of
+   the column's height, so the two columns end level. Only one of the two titles is ever
+   drawn, or read out. */
 @media (min-width: 64rem) {
   .home-leaders-beside {
     display: flex;
@@ -682,27 +677,11 @@ html {
     align-items: center;
     margin-block-end: 0;
   }
-  .home-leaders-title .ui-kicker {
+  .home-leaders-title {
     display: none;
   }
-  .league-site .home-leaders-title h3 {
+  .league-site .home-leaders-label {
     display: flex;
-    align-items: center;
-    gap: var(--step-3);
-    color: var(--color-accent-text);
-    font-family: var(--font-body);
-    font-size: var(--text-12);
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    line-height: 1.5;
-    text-transform: uppercase;
-  }
-  .home-leaders-title h3::before {
-    content: '';
-    flex: none;
-    inline-size: var(--step-5);
-    block-size: 1px;
-    background: var(--color-ornament);
   }
   .home-leaders-beside > .ui-spot-row {
     flex: 1 1 auto;

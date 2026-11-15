@@ -1,6 +1,7 @@
 // The home page's leaders section as it is drawn (step 2.147 part 2), with made-up
 // leaders: across the page under its own title, or under the standings with the players'
 // names one heading level further down.
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -55,7 +56,20 @@ describe('the home page’s leaders section', () => {
     const html = render(three.slice(0, 1), 'beside');
     // A kicker and a title (a phone draws both; a laptop draws the title as a small label).
     expect(html).toContain(
-      '<div class="home-leaders-head"><div class="home-leaders-title"><p class="ui-kicker">The players to watch</p><h3>Leading the way</h3></div><a class="ui-more" href="/x/stats?season=fall">All player stats</a></div>',
+      '<div class="home-leaders-head"><div class="home-leaders-title"><p class="ui-kicker">The players to watch</p><h3>Leading the way</h3></div><h3 class="ui-kicker home-leaders-label">Leading the way</h3><a class="ui-more" href="/x/stats?season=fall">All player stats</a></div>',
+    );
+    // The title is written twice, for a phone and for a laptop; the stylesheet draws
+    // exactly one of them at any width.
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    const phone = css.slice(0, css.indexOf('@media (min-width: 64rem) {\n  .home-leaders-beside'));
+    const laptop = css.slice(phone.length);
+    expect(phone).toMatch(/\.league-site \.home-leaders-label \{\s*display: none;/);
+    expect(phone).not.toMatch(/\.home-leaders-title \{[^}]*display: none;/);
+    expect(laptop).toMatch(
+      /\.home-leaders-title \{\s*display: none;\s*\}\s*\.league-site \.home-leaders-label \{\s*display: flex;/,
     );
     expect(html).toContain('<h4 class="ui-spot-name" dir="auto">Sam R.</h4>');
     expect(html).not.toContain('<h2');

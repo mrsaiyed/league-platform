@@ -596,6 +596,17 @@ describe('the frame of a dark design and of a light one', () => {
       Object.keys(vars).filter((name) => name.startsWith('--spot-'));
     // A dark design says nothing: the shared pieces' own default is the band's colors.
     for (const vars of [crest, dark]) expect(spot(vars)).toEqual([]);
+    // In any design: a shield on the first card is drawn thinly, over nothing, only where
+    // the card itself is the panel (where every shield is drawn so). On a filled card it
+    // always keeps its team's own color.
+    for (const vars of [crest, dark, crestLight, light]) {
+      if (vars['--spot-shield-under'] !== 'transparent') {
+        expect(vars['--spot-shield-under']).toBeUndefined();
+        continue;
+      }
+      expect(vars['--spot-ground']).toBe('var(--color-panel)');
+      expect(vars['--spot-shield-share']).toBe(vars['--emblem-strength']);
+    }
     for (const vars of [crestLight, light]) {
       // The panel, with no more of the main color than every text is fitted to, an edge
       // of the main color no stronger than a picked-out card's, and the page's own words

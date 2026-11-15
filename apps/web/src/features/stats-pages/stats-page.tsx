@@ -72,44 +72,64 @@ export function StatsTables({
   // Few statistics: the players' table and the teams' sit side by side on a laptop, so a
   // row's numbers stay near its name. Many: each takes the page's width.
   const sideBySide = data.playerColumns.length <= 7;
+  // A leader who has a card is not said again as the first line of that statistic's list:
+  // the list goes on from second place (and is left out when nobody else is ranked).
+  const carded = new Set(firsts.slice(0, 3).map(({ board }) => board.key));
+  const lists = boards.flatMap((board) => {
+    const entries = leaderEntries(board);
+    const shown = carded.has(board.key) ? entries.slice(1) : entries;
+    return shown.length === 0 ? [] : [{ board, entries: shown }];
+  });
   return (
     <>
-      {firsts.length > 0 ? (
-        <ul
-          className="ui-spot-row stats-firsts"
-          data-across={(['one', 'two', 'three'] as const)[Math.min(firsts.length, 3) - 1]}
-        >
-          {firsts.slice(0, 3).map(({ board, first }, index) => (
-            <li key={board.key}>
-              <LeaderSpot
-                label={t('stats.leaderOf', { stat: board.title })}
-                value={first.value}
-                unit={t(data.by === 'average' ? 'home.leaders.perGame' : 'stats.inAll')}
-                name={first.name}
-                detail={t('stats.leaderDetail', {
-                  team: first.teams,
-                  games: t.plural('stats.leaderGames', first.games),
-                })}
-                team={first.team}
-                first={index === 0}
-                headingLevel={2}
-              />
-            </li>
-          ))}
-        </ul>
-      ) : null}
       <Section
         title={t('stats.leaders')}
         note={data.minimumGames > 0 ? t.plural('stats.minimumGames', data.minimumGames) : undefined}
       >
         {boards.length > 0 ? (
-          <ul className="ui-card-grid">
-            {boards.map((board) => (
-              <li key={board.key}>
-                <LeaderCard title={board.title} entries={leaderEntries(board)} />
-              </li>
-            ))}
-          </ul>
+          <>
+            {firsts.length > 0 ? (
+              <ul
+                className="ui-spot-row stats-firsts"
+                data-across={(['one', 'two', 'three'] as const)[Math.min(firsts.length, 3) - 1]}
+              >
+                {firsts.slice(0, 3).map(({ board, first }, index) => (
+                  <li key={board.key}>
+                    <LeaderSpot
+                      label={t('stats.leaderOf', { stat: board.title })}
+                      value={first.value}
+                      unit={t(data.by === 'average' ? 'home.leaders.perGame' : 'stats.inAll')}
+                      name={first.name}
+                      detail={t('stats.leaderDetail', {
+                        team: first.teams,
+                        games: t.plural('stats.leaderGames', first.games),
+                      })}
+                      team={first.team}
+                      first={index === 0}
+                    />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {lists.length > 0 ? (
+              <>
+                {carded.size > 0 ? (
+                  <p className="ui-section-note stats-after">{t('stats.afterLeader')}</p>
+                ) : null}
+                <ul className="ui-card-grid">
+                  {lists.map(({ board, entries }) => (
+                    <li key={board.key}>
+                      <LeaderCard
+                        title={board.title}
+                        entries={entries}
+                        afterLeader={carded.has(board.key)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+          </>
         ) : (
           <EmptyPanel text={t('stats.leadersNone')} />
         )}

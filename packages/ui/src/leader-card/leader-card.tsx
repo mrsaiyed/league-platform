@@ -13,12 +13,17 @@ export type LeaderCardProps = {
   readonly title: string;
   /** In order, the leader first. */
   readonly entries: readonly LeaderEntry[];
+  /**
+   * The list starts after the leader, who is shown on a card of their own above it: no
+   * line of the list is then picked out as the leader's.
+   */
+  readonly afterLeader?: boolean;
 };
 
 /** Who leads in one thing: the leader's number is the biggest thing on the card. */
-export function LeaderCard({ title, entries }: LeaderCardProps) {
+export function LeaderCard({ title, entries, afterLeader = false }: LeaderCardProps) {
   return (
-    <article className="ui-leader-card">
+    <article className="ui-leader-card" data-after-leader={afterLeader ? 'true' : undefined}>
       <h3>{title}</h3>
       <ol className="ui-leader-list">
         {entries.map((entry) => (

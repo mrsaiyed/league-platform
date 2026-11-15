@@ -126,8 +126,21 @@ describe('statistics page', () => {
       expect(top?.cells['player']).toBe(`1. ${board.first?.name}`);
       expect(board.first?.value).toBe(top?.cells['value']);
       expect(text).toContain(`<p class="ui-spot-label">${board.title} leader</p>`);
-      expect(text).toContain(`<h2 class="ui-spot-name" dir="auto">${board.first?.name}</h2>`);
+      // Under the section's own title ("Leaders", level two): the name is level three.
+      expect(text).toContain(`<h3 class="ui-spot-name" dir="auto">${board.first?.name}</h3>`);
+      // The leader is on the card and is not said again as the first line of the list:
+      // the list goes on from second place.
+      expect(text).not.toContain(`>1. ${board.first?.name}<`);
+      const second = board.rows[1]?.cells['player'];
+      if (second !== undefined) expect(text).toContain(`>${String(second)}<`);
     }
+    expect(text.indexOf('<h2>Leaders</h2>')).toBeLessThan(text.indexOf('ui-spot-row'));
+    expect(text).toContain(
+      '<p class="ui-section-note stats-after">Each list goes on from second place; its leader is on the card above.</p>',
+    );
+    expect(text.match(/<article class="ui-leader-card" data-after-leader="true">/g)).toHaveLength(
+      boards.slice(0, 3).filter((board) => board.rows.length > 1).length,
+    );
     // Never for fouls or turnovers.
     expect(text).not.toContain('Fouls leader');
     expect(text).not.toContain('Turnovers leader');

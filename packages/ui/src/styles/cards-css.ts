@@ -90,7 +90,7 @@ export const cardsCss = String.raw`
   transition: border-color 0.15s;
 }
 .ui-team-card:hover {
-  border-color: color-mix(in srgb, var(--color-pop) 55%, transparent);
+  border-color: color-mix(in srgb, var(--color-pop) 50%, transparent);
 }
 /* The team's shield is the largest thing on its card. */
 .ui-team-card > .ui-emblem {
@@ -234,6 +234,12 @@ export const cardsCss = String.raw`
 .ui-leader:first-child .ui-leader-value {
   color: var(--color-pop);
   font-size: var(--text-36);
+}
+/* A list that starts after the leader (who has a card of their own above it) picks out no
+   line: its first is second place. */
+.ui-leader-card[data-after-leader='true'] .ui-leader:first-child .ui-leader-value {
+  color: inherit;
+  font-size: var(--text-18);
 }
 
 /* One leader, picked out: a tiny label, one very large number, the player's name, a quiet

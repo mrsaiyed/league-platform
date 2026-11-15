@@ -40,8 +40,7 @@ function MenuLinks({
 
 /**
  * The header of every page of a league. First row: the league's mark (its first letter in
- * a shield, until it has a logo of its own) and its name (U-8) with a small line under it,
- * then the season picker on the pages that show one season, and the way in for a visitor.
+ * a shield, until it has a logo of its own) and its name (U-8), then the season picker on the pages that show one season, and the way in for a visitor.
  * Second row: the menu.
  *
  * On a phone the first row is the mark, the name and one menu button. The button opens a
@@ -75,7 +74,6 @@ export function SiteHeader({
           <a className="site-name" href={leagueHomeStayUrl(league)} dir="auto">
             <span>{name}</span>
           </a>
-          <span className="site-tagline">{t('shell.tagline')}</span>
         </div>
         <details className="site-menu">
           <summary>

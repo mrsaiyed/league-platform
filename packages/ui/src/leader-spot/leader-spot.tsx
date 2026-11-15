@@ -17,10 +17,9 @@ export type LeaderSpotProps = {
   readonly first?: boolean;
   /**
    * The level of the name's heading: 3 under a section's own title (the default), 4 where
-   * the cards stand under a small heading of level 3 inside another section, 2 where
-   * they stand straight under the page's title.
+   * the cards stand under a small heading of level 3 inside another section.
    */
-  readonly headingLevel?: 2 | 3 | 4;
+  readonly headingLevel?: 3 | 4;
 };
 
 /**
@@ -38,7 +37,7 @@ export function LeaderSpot({
   first = false,
   headingLevel = 3,
 }: LeaderSpotProps) {
-  const Name = headingLevel === 4 ? 'h4' : headingLevel === 2 ? 'h2' : 'h3';
+  const Name = headingLevel === 4 ? 'h4' : 'h3';
   return (
     <article className="ui-spot" data-first={first ? 'true' : undefined}>
       <p className="ui-spot-label">{label}</p>

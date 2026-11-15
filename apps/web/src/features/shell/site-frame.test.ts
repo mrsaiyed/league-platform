@@ -289,7 +289,10 @@ describe('header, menu and footer', () => {
   });
 
   // Step 2.147: the header with presence.
-  it("shows the league's mark, its name and a small line under it; the name alone is the link's words", () => {
+  // The fixed small line "Official league site" was taken out in the second landing of
+  // step 2.147's part 2 (the lead's decision): a line of the league's own is a setting
+  // for a later step, and until then none is shown.
+  it("shows the league's mark and its name, with no line under it; the name alone is the link's words", () => {
     const html = renderToStaticMarkup(
       createElement(SiteHeader, { league, name: 'North Valley League', signedIn: true }),
     );
@@ -297,11 +300,13 @@ describe('header, menu and footer', () => {
     // silent to a screen reader. It stands beside the link, not in it, so the link says
     // the league's name and nothing else.
     expect(html).toMatch(
-      /<div class="site-brand"><svg class="ui-emblem" data-size="card" data-kind="league"[^>]*aria-hidden="true"[^>]*>.*?>N<\/text><\/svg><a class="site-name" href="[^"]+" dir="auto"><span>North Valley League<\/span><\/a><span class="site-tagline">/,
+      /<div class="site-brand"><svg class="ui-emblem" data-size="card" data-kind="league"[^>]*aria-hidden="true"[^>]*>.*?>N<\/text><\/svg><a class="site-name" href="[^"]+" dir="auto"><span>North Valley League<\/span><\/a><\/div>/,
     );
-    expect(html).toContain(`<span class="site-tagline">${en['shell.tagline']}</span>`);
+    expect(html).not.toContain('site-tagline');
+    expect(html).not.toContain('Official league site');
+    expect(Object.keys(en)).not.toContain('shell.tagline');
     expect(html).not.toMatch(/<svg[^>]*>(?:(?!<\/svg>).)*<image/);
-    // The whole of it is the way home: the link covers the mark and the small line.
+    // The whole of it is the way home: the link covers the mark too.
     const css = readFileSync(
       new URL('../../app/[league]/league-site.css', import.meta.url),
       'utf8',
@@ -310,11 +315,11 @@ describe('header, menu and footer', () => {
     expect(css).toMatch(
       /\.site-header \.site-name::after \{\s*content: '';\s*position: absolute;\s*inset: 0;/,
     );
-    expect(css).toMatch(/\.site-tagline \{[^}]*pointer-events: none;/);
+    expect(css).not.toContain('site-tagline');
     expect(css).toMatch(/\.site-header \.site-brand \.ui-emblem \{[^}]*pointer-events: none;/);
   });
 
-  it('never lets a long name touch the top of its row on a phone: the row grows for two lines', () => {
+  it('never lets a long name touch the edges of its row on a phone: two lines have room in it', () => {
     const css = readFileSync(
       new URL('../../app/[league]/league-site.css', import.meta.url),
       'utf8',
@@ -326,13 +331,15 @@ describe('header, menu and footer', () => {
     expect(row).toMatch(/min-block-size: calc\(var\(--tap\) \+ var\(--step-3\)\);/);
     expect(row).toMatch(/padding-block: calc\(var\(--step-3\) \/ 2\);/);
     expect(row).not.toMatch(/(?:^|\s)(?:max-)?block-size:/);
-    // The name's link is at least as tall as a thumb needs and grows with its words: 2 more
-    // clear above them (8 in all), and under them the room of the small line.
+    // The name's link is at least as tall as a thumb needs (44) and would grow with its
+    // words: 2 clear above and below them, 8 in all with the row's own 6. Two lines of the
+    // name (about 35) are less than 44, so the row stays one height for every league.
     const name = /\.site-header \.site-name \{([^}]*)\}/.exec(phone)?.[1] ?? '';
     expect(name).toMatch(/min-block-size: var\(--tap\);/);
-    expect(name).toMatch(/padding-block: calc\(var\(--step-1\) \/ 2\) var\(--step-4\);/);
+    expect(name).toMatch(/padding-block: calc\(var\(--step-1\) \/ 2\);/);
+    expect(name).toMatch(/align-items: center;/);
+    expect(name).toMatch(/font-size: var\(--text-16\);[^}]*line-height: 1\.1;/);
     expect(name).not.toMatch(/(?:^|\s)(?:max-)?block-size:/);
-    expect(phone).toMatch(/\.site-tagline \{[^}]*align-self: end;\s*block-size: var\(--step-4\);/);
     // Cut short after two lines.
     expect(phone).toMatch(/\.site-header \.site-name > span \{[^}]*line-clamp: 2;/);
     // The mark and the menu button are both hung from the top of the row, at the same
@@ -395,11 +402,18 @@ describe('header, menu and footer', () => {
       '@supports not selector(:has(*))',
       // Not the column: the phone's home page puts its later matchups away (a browser
       // that does not know `:has()` shows them all).
-      ".home-next .ui-card-grid > li:nth-child(n + 3):has(> .ui-game-card[data-status='scheduled'])",
+      // Counted by what a card is, never by where it stands: a game still to start is put
+      // away only when two such games stand before it. A postponed game, or one that has
+      // just gone live in its place, takes no coming game's place (the code review found
+      // the rule by position could leave no coming game on the phone).
+      ".home-next .ui-card-grid > li:has(> .ui-game-card[data-status='scheduled']) ~ li:has(> .ui-game-card[data-status='scheduled']) ~ li:has(> .ui-game-card[data-status='scheduled'])",
       // (The open menu's button and line are checked in the test of the phone header below.)
-      // And one fewer while a game is being played (its board already heads the page).
-      ".home-next[data-live='true'] .ui-card-grid > li:nth-child(n + 2):has(> .ui-game-card[data-status='scheduled'])",
+      // And one fewer while a game is being played (its board already heads the page):
+      // the next game that will be played is always there.
+      ".home-next[data-live='true'] .ui-card-grid > li:has(> .ui-game-card[data-status='scheduled']) ~ li:has(> .ui-game-card[data-status='scheduled'])",
     ]);
+    // No coming game is ever put away by its place in the list.
+    expect(css).not.toMatch(/\.home-next[^{]*nth-child/);
     // The same phone, the same moment: the latest games show one board.
     expect(css).toMatch(
       /\.home-pair\[data-live='true'\] > \.ui-section:first-child \.ui-card-grid > li:nth-child\(n \+ 2\) \{\s*display: none;/,

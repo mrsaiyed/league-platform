@@ -27,9 +27,6 @@ export const en = {
   'shell.notBuilt': 'This page is not built yet.',
   'shell.backToLeague': 'Back to the league home',
   'shell.skipToContent': 'Skip to the content',
-  // The small line under a league's name in the header, the same for every league until a
-  // league can write its own.
-  'shell.tagline': 'Official league site',
   'shell.draftNotice': 'This league is not published. Only the people who run it can see it.',
   'shell.suspendedNotice':
     'This league has been taken down. Only the people who run it can see it, to export their data.',
@@ -172,8 +169,6 @@ export const en = {
   // result is still awaited, so its label is true of both.
   'home.results.kicker': 'Latest games',
   'home.standings.kicker': 'The race for the top',
-  // The season's leaders on the home page (step 2.147 part 2): a tiny label on each card
-  // (the leader's place and what is led), and what the number is.
   // The inner pages' heads (step 2.147 part 2, second landing): a phrased title and one
   // sentence under the season's name, so the inner pages and the home page are one
   // family. Each is written to read well for any league and any sport. The plain names
@@ -184,15 +179,21 @@ export const en = {
   'standings.lead': 'Where every team stands after each game.',
   'stats.heading': 'By the numbers.',
   'stats.lead': 'The season’s leaders, then every player and every team.',
-  // The number cards that open the statistics page: who leads a statistic, and what the
-  // number is when the page shows season totals.
+  // The number cards at the head of the statistics page's leaders: who leads a statistic,
+  // and what the number is when the page shows season totals.
   'stats.leaderOf': '{stat} leader',
   'stats.inAll': 'this season',
+  // A quiet line over the lists under those cards: a leader is on a card and is not said
+  // again as the first line of the list.
+  'stats.afterLeader': 'Each list goes on from second place; its leader is on the card above.',
   // The band that closes the teams page, with the way to the schedule.
   'teams.call.title': 'See them play.',
   'teams.call.text': 'Every game of the season, round by round.',
   'teams.heading': 'The teams.',
   'teams.lead': 'Every team’s record, roster and games.',
+  // The season's leaders on the home page (step 2.147 part 2): the section's title, its
+  // kicker and its way on, a tiny label on each card (the leader's place and what is
+  // led), and what the number is.
   'home.leaders': 'Leading the way',
   'home.leaders.kicker': 'The players to watch',
   'home.leaders.all': 'All player stats',

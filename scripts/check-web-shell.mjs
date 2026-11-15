@@ -120,9 +120,10 @@ const cases = [
       'Scores, standings and the schedule for every team, all season long.',
       'See the schedule',
       'Meet the teams',
-      'Official league site',
     ],
-    ['This page is not built yet.', 'Upcoming games'],
+    // No fixed line under the league's name: a line of the league's own is a setting for
+    // a later step, and until then none is shown.
+    ['This page is not built yet.', 'Upcoming games', 'Official league site'],
   ],
   [
     'visitor',

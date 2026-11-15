@@ -39,12 +39,14 @@ export function HomeLeaders({
       <div className="home-leaders-beside">
         <div className="home-leaders-head">
           {/* A kicker and a title, as a section has: on a phone, where the leaders are a
-              section of their own. On a laptop the stylesheet draws the title as a small
-              label and puts the kicker away. */}
+              section of their own. On a laptop, where they are a part of the standings'
+              column, the title is a small label (the shared kicker). The stylesheet draws
+              one of the two and puts the other away, from sight and from screen readers. */}
           <div className="home-leaders-title">
             <p className="ui-kicker">{t('home.leaders.kicker')}</p>
             <h3>{t('home.leaders')}</h3>
           </div>
+          <h3 className="ui-kicker home-leaders-label">{t('home.leaders')}</h3>
           <a className="ui-more" href={statsHref}>
             {t('home.leaders.all')}
           </a>

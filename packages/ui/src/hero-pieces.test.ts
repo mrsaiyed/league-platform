@@ -963,6 +963,17 @@ describe('a leader, picked out', () => {
         flat,
       );
     expect(Number(fill?.[1])).toBeGreaterThanOrEqual(75);
+    // The check that the shield is never laid thinly over the card's own color, in the
+    // form that holds for every design: the stylesheet itself never mixes the shield with
+    // nothing on the filled card (what stands under it is a named value whose default is
+    // the band's deep color). A design that names "transparent" there has also made the
+    // card a panel, where a thin fill is how every shield is drawn (packages/site,
+    // derived-values.test.ts checks that the two always go together).
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\.ui-spot\[data-first='true'\][^{]*\.ui-emblem-shield/.test(rule[1] ?? '')) continue;
+      expect(rule[2]).not.toMatch(/,\s*transparent\s*\)/);
+      expect(rule[2]).toContain('var(--spot-shield-under, var(--color-band-deep))');
+    }
     // Mirrored for a right-to-left page.
     expect(css).toMatch(
       /\[dir='rtl'\] \.ui-spot\[data-first='true'\] \{\s*background-image: linear-gradient\(\s*240deg,/,
