@@ -346,6 +346,7 @@ All dated November 12, 2026.
 | T-258                 | New                                                                          | The tracker opens for whoever may score that game; rosters and state kept on the device; format confirmed (rec. 054)                            | Step 2.33: T-115 said what is stored, not where, nor where rosters come from                       |
 | T-259                 | New                                                                          | Name settings read by one `readNamePolicy`; a setting value can need confirming; a person's request is a command, fixed-word reason (rec. 056)  | Step 2.126: nothing set the name policy or `people.visibility` (2.105 audit, H2)                   |
 | T-260                 | New                                                                          | Made from this computer by one script: the owner's account ahead by email, then the league and its first season by our staff at once (rec. 057) | Step 2.125: T10 line 31's internal tool did not exist; the leagues table had no city               |
+| T-266                 | New                                                                          | A draft league made by mistake goes by a second script: an owner-run, locked check, log and delete; its entry kept in a platform log (rec. 063) | Step 2.150: nothing could remove a league made with a wrong short name or who plays                |
 | T-261                 | New                                                                          | Agreed (delegated): players added, changed and taken off at the table travel in the tracker's queue (protocol 2); a rosters address (rec. 058)  | Step 2.117: no way to put a player into a game at the table (2.107 audit, H1)                      |
 
 ## The full list
@@ -652,6 +653,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-245 | Standings and totals are rebuilt per season by event handlers in the result's transaction, one at a time; totals hold every team's numbers (rec. 033)                                          | Agreed (delegated) |         |
 | T-246 | A fixtures file's text rides in its import's row only until the worker has read it, then is replaced by the report; an upload that is never read is discarded and the import failed (rec. 034) | Agreed (delegated) |         |
 | T-260 | A script makes a league: owner's account ahead by email; league and first season by staff in one transaction, under the app's login; migration login for accounts only (rec. 057)              | Agreed (delegated) |         |
+| T-266 | A draft league made by mistake is removed by a script: the migration login runs remove_draft_league (lock, checks, platform log, delete) for the set league only (rec. 063)                    | Agreed (delegated) |         |
 
 ### [T4 — Keeping leagues apart, sign-in, security](technical/T4-tenancy-auth-security.md)
 
