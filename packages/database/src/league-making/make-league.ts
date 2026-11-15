@@ -3,16 +3,19 @@
 // says what would happen and changes nothing; `makeLeague` makes it.
 //
 // `makeLeague`, in this order:
-//   1. checks the database is at this code's migrations (migration-state.ts) and that
-//      no league holds the short name, so either refusal makes nothing at all;
+//   1. asks each login whether it may do its part (probe-logins.ts), checks the
+//      database is at this code's migrations (migration-state.ts) and that no league
+//      holds the short name, so any refusal makes nothing at all. The preview asks
+//      the same first two questions before the plan is shown;
 //   2. finds the staff member's and the owner's accounts by email, and makes any that
 //      is missing, with no name and no sign-in link, as the migration login (the
 //      app's role may not add an account). The owner's first sign-in with that
 //      email, once the sign-in service has proved the mailbox, links that account
 //      (record 052), so whoever first signs in with it owns the league;
 //   3. runs createLeague, as our staff, with the first season: the league, its
-//      default program and its current season in one transaction (T-260). Nothing
-//      is ever done as the owner.
+//      default program and its current season in one transaction (T-260), under the
+//      app's own login on a hosted database, through the league fence, exactly as the
+//      web app would. Nothing is ever done as the owner.
 // Step 2's accounts cannot share step 3's transaction: they are written by the
 // migration login on its own connection, outside the league's fence, and the
 // commands run as the app's role. So when the league is not made, the accounts THIS
@@ -41,6 +44,7 @@ import {
   removeUnusedAccount,
 } from './login-queries.ts';
 import { migrationState, type MigrationState } from './migration-state.ts';
+import { probeLogins, type LoginProblem } from './probe-logins.ts';
 
 /**
  * Where an email stands: no account; an account made earlier (by this tool) that
@@ -48,9 +52,22 @@ import { migrationState, type MigrationState } from './migration-state.ts';
  */
 export type AccountState = 'none' | 'never-signed-in' | 'signed-up';
 
+/** Why nothing can be made there: a login that cannot do its part, or the migrations. */
+export type TargetProblem =
+  | { readonly kind: 'login'; readonly problems: readonly LoginProblem[] }
+  | { readonly kind: 'migrations'; readonly state: Exclude<MigrationState, 'ready'> };
+
+/** The logins first, then the migrations: undefined when both are right. Reads only. */
+async function targetProblem(target: LeagueMakingTarget): Promise<TargetProblem | undefined> {
+  const problems = await probeLogins(target);
+  if (problems.length > 0) return { kind: 'login', problems };
+  const state = await migrationState(target.login);
+  return state === 'ready' ? undefined : { kind: 'migrations', state };
+}
+
 export type NewLeaguePreview =
-  /** The database is not at this code's migrations: nothing else was read. */
-  | { readonly ready: false; readonly migrations: Exclude<MigrationState, 'ready'> }
+  /** A login cannot do its part, or the migrations are not right: nothing else was read. */
+  | { readonly ready: false; readonly problem: TargetProblem }
   | {
       readonly ready: true;
       readonly shortNameHeld: boolean;
@@ -61,13 +78,13 @@ export type NewLeaguePreview =
 const stateOf = (account: { readonly signedUp: boolean } | undefined): AccountState =>
   account === undefined ? 'none' : account.signedUp ? 'signed-up' : 'never-signed-in';
 
-/** What would happen. Reads only; the accounts only once the migrations are right. */
+/** What would happen. Reads only; the accounts only once the logins and migrations are right. */
 export async function previewNewLeague(
   target: LeagueMakingTarget,
   plan: NewLeaguePlan,
 ): Promise<NewLeaguePreview> {
-  const migrations = await migrationState(target.login);
-  if (migrations !== 'ready') return { ready: false, migrations };
+  const problem = await targetProblem(target);
+  if (problem !== undefined) return { ready: false, problem };
   return {
     ready: true,
     shortNameHeld: (await leagueHoldingShortName(target.login, plan.slug)) !== undefined,
@@ -95,7 +112,7 @@ export type AccountsLeft = {
 };
 
 export type MakeLeagueProblem =
-  | { readonly kind: 'migrations'; readonly state: Exclude<MigrationState, 'ready'> }
+  | TargetProblem
   | { readonly kind: 'short-name-held' }
   /** createLeague refused: nothing of the league was made. */
   | { readonly kind: 'refused'; readonly code: string }
@@ -155,14 +172,10 @@ export async function makeLeague(
   const madeNow: MadeAccount[] = [];
   let leagueId: string | undefined;
   try {
-    const migrations = await migrationState(target.login);
-    if (migrations !== 'ready') {
-      return {
-        ok: false,
-        problem: { kind: 'migrations', state: migrations },
-        accounts: nothingLeft,
-      };
-    }
+    // Asked again here, not only in the preview: the logins and the database may have
+    // changed while the plan was read.
+    const problem = await targetProblem(target);
+    if (problem !== undefined) return { ok: false, problem, accounts: nothingLeft };
     // Checked before any account is made, so a short name already held makes nothing.
     if ((await leagueHoldingShortName(target.login, plan.slug)) !== undefined) {
       return { ok: false, problem: { kind: 'short-name-held' }, accounts: nothingLeft };

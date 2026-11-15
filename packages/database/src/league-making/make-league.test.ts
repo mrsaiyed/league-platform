@@ -23,7 +23,7 @@ let target: LeagueMakingTarget;
 beforeAll(async () => {
   pglite = await freshSchema();
   const opened = await openLeagueMakingTarget({ kind: 'pglite', pglite });
-  if (!opened.ok) throw new Error(opened.problem);
+  if (!opened.ok) throw new Error(JSON.stringify(opened.problem));
   target = opened.target;
 });
 afterAll(async () => {
@@ -308,10 +308,42 @@ describe('makeLeague', () => {
   });
 });
 
+describe('makeLeague when a login may not do its part', () => {
+  it('refuses before the plan and again before anything is made: no account, no league', async () => {
+    // The commands under a login of their own, which here is the superuser PGlite
+    // logs in as: the app's login check (T-60) refuses it. Before this check the tool
+    // made the accounts and then failed after "yes" with nothing but a code.
+    const own: LeagueMakingTarget = { ...target, appLogin: 'own' };
+    const plan = planFor({
+      ownerEmail: 'probe.refused@example.test',
+      staffEmail: 'probe.staff@example.test',
+    });
+    const accounts = await accountCount();
+    const leagues = await leagueCount();
+    expect(await previewNewLeague(own, plan)).toEqual({
+      ready: false,
+      problem: {
+        kind: 'login',
+        problems: [{ login: 'app', problems: expect.arrayContaining(['it is a superuser']) }],
+      },
+    });
+    expect(await makeLeague(own, plan)).toEqual({
+      ok: false,
+      problem: {
+        kind: 'login',
+        problems: [{ login: 'app', problems: expect.arrayContaining(['it is a superuser']) }],
+      },
+      accounts: { removed: [], left: [] },
+    });
+    expect(await accountCount()).toBe(accounts);
+    expect(await leagueCount()).toBe(leagues);
+  });
+});
+
 describe('makeLeague on a database not at this code’s migrations', () => {
   const refusedOn = async (db: PGlite) => {
     const opened = await openLeagueMakingTarget({ kind: 'pglite', pglite: db });
-    if (!opened.ok) throw new Error(opened.problem);
+    if (!opened.ok) throw new Error(JSON.stringify(opened.problem));
     try {
       const plan = planFor();
       const preview = await previewNewLeague(opened.target, plan);
@@ -326,7 +358,7 @@ describe('makeLeague on a database not at this code’s migrations', () => {
     const empty = new PGlite();
     try {
       expect(await refusedOn(empty)).toEqual({
-        preview: { ready: false, migrations: 'none' },
+        preview: { ready: false, problem: { kind: 'migrations', state: 'none' } },
         outcome: {
           ok: false,
           problem: { kind: 'migrations', state: 'none' },
@@ -346,7 +378,7 @@ describe('makeLeague on a database not at this code’s migrations', () => {
       );
       const accounts = (await one<{ n: number }>(old, 'select count(*)::int as n from accounts')).n;
       expect(await refusedOn(old)).toMatchObject({
-        preview: { ready: false, migrations: 'behind' },
+        preview: { ready: false, problem: { kind: 'migrations', state: 'behind' } },
         outcome: { ok: false, problem: { kind: 'migrations', state: 'behind' } },
       });
       expect((await one<{ n: number }>(old, 'select count(*)::int as n from accounts')).n).toBe(
@@ -365,7 +397,7 @@ describe('makeLeague on a database not at this code’s migrations', () => {
          values (9999, '9999_from_a_later_version.sql', repeat('0', 64))`,
       );
       expect(await refusedOn(newer)).toMatchObject({
-        preview: { ready: false, migrations: 'ahead' },
+        preview: { ready: false, problem: { kind: 'migrations', state: 'ahead' } },
         outcome: { ok: false, problem: { kind: 'migrations', state: 'ahead' } },
       });
       expect((await one<{ n: number }>(newer, 'select count(*)::int as n from leagues')).n).toBe(0);

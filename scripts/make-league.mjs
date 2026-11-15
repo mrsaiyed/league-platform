@@ -5,20 +5,25 @@
 // before making anything. packages/core checks the answers (planNewLeague) and
 // packages/database makes the league through the product's own commands (makeLeague).
 //
-// Where: --db <folder> if given; otherwise the migration login's database,
-// MIGRATION_DATABASE_URL; otherwise the local test database in .local/seed-db. The
-// target is opened and described in one place (openLeagueMakingTarget) and the
-// question is asked in one place (askToMake, below).
+// Where: on this computer unless told otherwise (make-league-source.mjs): --db
+// <folder>, or the local test database in .local/seed-db. --hosted, only at a
+// terminal, uses a hosted database through two logins, each address first passing the
+// tracker's database guard. The target is opened and described in one place
+// (openLeagueMakingTarget), and the question is asked in one place (askToMake,
+// below): on a hosted database it is answered by typing the league's short name.
+// Ctrl+C at any question stops it cleanly, with nothing made.
 //
 // Whatever goes wrong, it says in plain words what was and was not made, never prints
 // an error's message (it can repeat an address with its login), and exits non-zero.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { leagueUrl, namedTimeZone, planNewLeague, suggestedSeason } from '@srleagues/core';
 import { makeLeague, openLeagueMakingTarget, previewNewLeague } from '@srleagues/database';
+import { trackerProjectFor } from '@srleagues/providers';
+import { answerGoesAhead, sourceFor } from './make-league-source.mjs';
 import * as words from './make-league.messages.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -47,6 +52,7 @@ try {
       'season-ends': { type: 'string' },
       as: { type: 'string' },
       db: { type: 'string' },
+      hosted: { type: 'boolean', default: false },
       help: { type: 'boolean', default: false },
     },
     strict: true,
@@ -95,13 +101,36 @@ const optional = new Set(['seasonStartsOn', 'seasonEndsOn']);
 const terminal = process.stdin.isTTY === true;
 const prompt = terminal ? createInterface({ input: process.stdin, output: process.stdout }) : null;
 
-/** The one place the tool asks whether to make it: only "yes" (any capitals) at a terminal. */
-async function askToMake() {
+/** Thrown when Ctrl+C is pressed at a question: the run stops, with nothing made. */
+const stoppedAtQuestion = new Error('stopped at a question');
+let stopQuestion = () => {};
+prompt?.on('SIGINT', () => stopQuestion());
+
+/** One question at the terminal; Ctrl+C stops the run. */
+async function ask(question) {
+  const controller = new AbortController();
+  stopQuestion = () => controller.abort();
+  try {
+    return await prompt.question(question, { signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw stoppedAtQuestion;
+    throw error;
+  } finally {
+    stopQuestion = () => {};
+  }
+}
+
+/**
+ * The one place the tool asks whether to make it, only at a terminal: "yes" (any
+ * capitals) on this computer, the league's exact short name on a hosted database.
+ */
+async function askToMake(plan, hosted) {
   if (prompt === null) {
     console.log(words.needsTerminal);
     return false;
   }
-  return (await prompt.question(words.confirm)).trim().toLowerCase() === 'yes';
+  const answer = await ask(hosted ? words.confirmHosted(plan.slug) : words.confirm);
+  return answerGoesAhead(answer, { hosted, slug: plan.slug });
 }
 
 async function askForMissing() {
@@ -114,7 +143,7 @@ async function askForMissing() {
     }
     const question = words.questions[field];
     const typed = (
-      await prompt.question(
+      await ask(
         fallback === undefined
           ? words.plainQuestion(question)
           : words.withDefault(question, fallback),
@@ -124,28 +153,26 @@ async function askForMissing() {
   }
 }
 
-function sourceFromSettings() {
-  if (values.db !== undefined) return { kind: 'folder', folder: values.db };
-  const url = process.env.MIGRATION_DATABASE_URL?.trim();
-  if (url === undefined || url === '') {
-    return { kind: 'folder', folder: path.join(root, '.local', 'seed-db') };
-  }
-  const ssl = process.env.MIGRATION_DATABASE_SSL?.trim() || 'verify';
-  if (!['verify', 'no-verify', 'off'].includes(ssl)) return { problem: words.badSsl };
-  const caFile = process.env.MIGRATION_DATABASE_CA?.trim();
-  let ca;
-  if (caFile) {
-    try {
-      ca = readFileSync(caFile, 'utf8');
-    } catch {
-      return { problem: words.caUnreadable };
-    }
-  }
-  return ca === undefined ? { kind: 'postgres', url, ssl } : { kind: 'postgres', url, ssl, ca };
-}
-
 /** The run: its exit code. `stage.making` is set once anything may have been made. */
 async function run(stage) {
+  // Where, before any question: a hosted database with no terminal opens nothing.
+  const envFile = path.join(root, '.env');
+  const chosen = sourceFor({
+    hosted: values.hosted,
+    db: values.db,
+    env: process.env,
+    envFileText: existsSync(envFile) ? readFileSync(envFile, 'utf8') : undefined,
+    terminal,
+    root,
+    trackerProject: trackerProjectFor(import.meta.url),
+  });
+  if ('problems' in chosen) {
+    for (const line of chosen.problems) console.error(line);
+    return 2;
+  }
+  if (chosen.note !== undefined) console.log(chosen.note);
+  const { source } = chosen;
+
   await askForMissing();
   const planned = planNewLeague(answers);
   if (!planned.ok) {
@@ -163,14 +190,9 @@ async function run(stage) {
   const plan = planned.plan;
   const address = leagueUrl(plan, 'home');
 
-  const source = sourceFromSettings();
-  if ('problem' in source) {
-    console.error(source.problem);
-    return 2;
-  }
   const opened = await openLeagueMakingTarget(source);
   if (!opened.ok) {
-    console.error(words.targetProblems[opened.problem]);
+    for (const line of words.targetProblemLines(opened.problem)) console.error(line);
     return 1;
   }
   const { target } = opened;
@@ -178,7 +200,7 @@ async function run(stage) {
 
   const preview = await previewNewLeague(target, plan);
   if (!preview.ready) {
-    console.error(words.migrationProblems[preview.migrations]);
+    for (const line of words.readinessLines(preview.problem)) console.error(line);
     return 1;
   }
   if (preview.shortNameHeld) {
@@ -186,7 +208,7 @@ async function run(stage) {
     return 1;
   }
   for (const line of words.planLines(plan, preview, target.place, address)) console.log(line);
-  if (!(await askToMake())) {
+  if (!(await askToMake(plan, source.kind === 'hosted'))) {
     console.log(words.notMade);
     return 1;
   }
@@ -206,9 +228,15 @@ let exitCode = 1;
 try {
   exitCode = await run(stage);
 } catch (error) {
-  const code = codeOf(error);
-  console.error(stage.making ? words.unexpectedWhileMaking(code) : words.unexpected(code));
-  exitCode = 1;
+  if (error === stoppedAtQuestion) {
+    console.log('');
+    console.log(words.stopped);
+    exitCode = 130;
+  } else {
+    const code = codeOf(error);
+    console.error(stage.making ? words.unexpectedWhileMaking(code) : words.unexpected(code));
+    exitCode = 1;
+  }
 } finally {
   prompt?.close();
   try {

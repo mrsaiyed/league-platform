@@ -2,7 +2,7 @@
 // made-up PGlite folder (T-201). It must never make anything without a "yes" typed at
 // a real terminal: not with every option given, and not with "yes" piped in.
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,16 +32,18 @@ afterAll(async () => {
 
 type Ran = { code: number | null; stdout: string; stderr: string };
 
-/** Runs the script with `args`, `input` piped in: stdin is not a terminal. */
-function runScript(args: readonly string[], input: string): Promise<Ran> {
+/**
+ * Runs the script with `args`, `input` piped in: stdin is not a terminal. The
+ * repository's .env is not read (no --env-file); `envFile` gives a made-up one instead.
+ */
+function runScript(args: readonly string[], input: string, envFile?: string): Promise<Ran> {
   return new Promise((resolve, reject) => {
-    // Every run names its database with --db, so no setting picks another one, and
-    // .env is not read (no --env-file).
-    const child = spawn(
-      process.execPath,
-      ['--disable-warning=ExperimentalWarning', script, ...args],
-      { cwd: repository, stdio: ['pipe', 'pipe', 'pipe'] },
-    );
+    const node = ['--disable-warning=ExperimentalWarning'];
+    if (envFile !== undefined) node.push(`--env-file=${envFile}`);
+    const child = spawn(process.execPath, [...node, script, ...args], {
+      cwd: repository,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     let stdout = '';
     let stderr = '';
     child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
@@ -127,5 +129,45 @@ describe('npm run league:make with no terminal', () => {
     expect(ran.stderr).toContain('An offset such as +05:00');
     expect(ran.stderr).toContain('First season ends: before it starts.');
     expect(ran.stdout).not.toContain('This will make');
+  });
+});
+
+describe('npm run league:make: local unless told otherwise', () => {
+  // Made-up hosted settings, as a .env would hold them. The hosts answer nobody.
+  const hostedSettings = async () => {
+    const file = path.join(root, 'made-up.env');
+    await writeFile(
+      file,
+      [
+        'MIGRATION_DATABASE_URL=postgres://made-up:made-up-secret@127.0.0.1:1/league',
+        'PLATFORM_DATABASE_URL=postgres://made-up-app:made-up-secret@127.0.0.1:1/league',
+        'MIGRATION_DATABASE_SSL=off',
+      ].join('\n'),
+    );
+    return file;
+  };
+
+  it('uses the local database even when hosted settings are present, and says it did', async () => {
+    const ran = await runScript(every(), '', await hostedSettings());
+    expect(ran.code).toBe(1);
+    expect(ran.stdout).toContain(
+      'MIGRATION_DATABASE_URL and PLATFORM_DATABASE_URL are set, and not used: this run is on this computer.',
+    );
+    expect(ran.stdout).toContain(`the local database in ${folder}, on this computer`);
+    expect(ran.stdout + ran.stderr).not.toContain('made-up-secret');
+    expect(await rowsIn('leagues')).toBe(0);
+  });
+
+  it('with --hosted and no terminal, opens nothing at all, not even to read, and exits 2', async () => {
+    const args = every();
+    args.splice(args.indexOf('--db'), 2, '--hosted');
+    const ran = await runScript(args, 'made-up-script-hoops\n', await hostedSettings());
+    expect(ran.code).toBe(2);
+    expect(ran.stderr).toContain('--hosted is used only at a terminal');
+    expect(ran.stderr).toContain('Nothing was opened.');
+    // Not asked, no plan, no attempt to connect (which would report a connection).
+    expect(ran.stdout).not.toContain('This will make');
+    expect(ran.stdout + ran.stderr).not.toContain('Could not connect');
+    expect(ran.stdout + ran.stderr).not.toContain('made-up-secret');
   });
 });

@@ -25,12 +25,20 @@ export const usage = [
   '  --season-starts <date>   when it starts, YYYY-MM-DD (optional)',
   '  --season-ends <date>     when it ends, YYYY-MM-DD (optional)',
   '  --as <email>             your own email, as SR Leagues staff',
-  '  --db <folder>            a local test database folder instead of the migration login’s',
+  '  --db <folder>            a local test database folder (default: .local/seed-db)',
+  '  --hosted                 a hosted database instead: see below',
   '',
-  'Where it makes the league: --db if given; otherwise the database of the migration',
-  'login, MIGRATION_DATABASE_URL (with MIGRATION_DATABASE_SSL: verify, no-verify or off,',
-  'and MIGRATION_DATABASE_CA: a certificate file), read from the environment or .env;',
-  'otherwise the local test database in .local/seed-db.',
+  'Where it makes the league: on this computer unless told otherwise, in --db or the',
+  'local test database in .local/seed-db, even when hosted settings are in .env.',
+  '',
+  'With --hosted, at a terminal only, on the database the two logins reach, given for',
+  'this one command and never kept in .env (docs/operations/make-a-league.md):',
+  '  MIGRATION_DATABASE_URL   the migration login: the account rows and the checks only',
+  '  PLATFORM_DATABASE_URL    the app’s own restricted login, which runs every command',
+  '  MIGRATION_DATABASE_SSL   verify (default), no-verify or off; for a database not on',
+  '                           this computer only verify, with',
+  '  MIGRATION_DATABASE_CA    the server’s certificate file (for Supabase, theirs)',
+  'The question is then answered by typing the league’s short name.',
 ].join('\n');
 
 export const questions = {
@@ -133,12 +141,20 @@ const accountWords = {
   },
 };
 
-const placeWords = (place) =>
-  place.kind === 'folder'
-    ? `the local database in ${place.folder}`
-    : place.kind === 'postgres'
-      ? `the database ${place.database} on ${place.host} (the migration login’s)`
-      : 'a database in memory';
+/**
+ * Where, from what was really connected to: the connection's host and port, the
+ * server's own database name, the Supabase project when there is one (it is public),
+ * and whether it is this computer. Never a user name or a password.
+ */
+export const placeWords = (place) => {
+  if (place.kind === 'folder') return `the local database in ${place.folder}, on this computer`;
+  if (place.kind === 'memory') return 'a database in memory, on this computer';
+  const project = place.project === null ? '' : `, Supabase project ${place.project}`;
+  const where = place.onThisComputer
+    ? 'on this computer'
+    : 'NOT on this computer: a hosted database';
+  return `the database ${place.database} on ${place.host}:${place.port}${project}, ${where}; the commands run under the app’s own login, which reaches the same database`;
+};
 
 const indent = '                  ';
 
@@ -164,21 +180,103 @@ export const planLines = (plan, preview, place, address) => [
 ];
 
 export const confirm = 'Make it? Type yes to go ahead: ';
+/** On a hosted database the question is answered by typing the league's short name. */
+export const confirmHosted = (slug) =>
+  `This is a hosted database. To make it there, type the league’s short name (${slug}): `;
 export const notMade = 'Nothing was made.';
+export const stopped = 'Stopped. Nothing was made.';
 export const needsTerminal =
   'It asks before making anything, and this is not a terminal that can ask: run it in a terminal.';
 export const notInteractive =
   'Some answers are missing and this is not a terminal that can ask. Give them as options.';
 
-export const targetProblems = {
-  'no-database':
-    'There is no database in that folder. Make the local test one with `npm run seed`. Nothing was made.',
-  'cannot-connect':
-    'Could not reach the migration login’s database. Check MIGRATION_DATABASE_URL and MIGRATION_DATABASE_SSL. Nothing was made.',
-};
+// Before anything connects (make-league-source.mjs).
+export const hostedSettingsIgnored = (names) =>
+  `Note: ${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} set, and not used: this run is on this computer. A hosted database needs --hosted.`;
+export const hostedAndFolder = '--hosted and --db cannot be given together: choose one.';
+export const hostedNeedsTerminal =
+  '--hosted is used only at a terminal, where a person reads the plan and answers. Nothing was opened.';
+export const addressesInEnvFile = (names) =>
+  `.env names ${names.join(' and ')}. For a hosted database, give the addresses for this one command only, never in .env: take them out of .env first. Nothing was opened.`;
+export const settingMissing = (name) =>
+  `${name}: missing. --hosted needs both logins: MIGRATION_DATABASE_URL (the migration login) and PLATFORM_DATABASE_URL (the app’s own login).`;
+export const notPostgres = (name) => `${name}: invalid, must be a postgres:// address.`;
+export const certificateNotChecked = (name) =>
+  `${name}: that database is not on this computer, so its certificate must be checked: set MIGRATION_DATABASE_SSL=verify (or leave it out) and MIGRATION_DATABASE_CA to the server’s certificate file (for Supabase, the one in the project’s database settings). Nothing was opened.`;
 
 export const caUnreadable = 'The file named by MIGRATION_DATABASE_CA cannot be read.';
 export const badSsl = 'MIGRATION_DATABASE_SSL must be verify, no-verify or off.';
+
+const loginWords = {
+  migration: 'the migration login (MIGRATION_DATABASE_URL)',
+  app: 'the app’s own login (PLATFORM_DATABASE_URL)',
+};
+
+/** What to look at when a connection fails: its likely cause first, then the usual ones. */
+const causeWords = {
+  login: 'the database refused the user name or password',
+  database: 'the database named in the address does not exist there',
+  host: 'the host name could not be found',
+  network: 'nothing answered at that host and port (the address, the port, or a firewall)',
+  certificate:
+    'the server’s certificate could not be checked (the file in MIGRATION_DATABASE_CA, or the host name)',
+  ssl: 'the connection’s SSL setting (MIGRATION_DATABASE_SSL) does not suit that server',
+  unknown: 'no particular cause could be told',
+};
+const usualCauses =
+  'The usual causes: the host or port, the user name or password, the database name, the certificate file in MIGRATION_DATABASE_CA, and a network or firewall in the way. The address is not printed.';
+
+/** Why the target could not be opened (openLeagueMakingTarget). */
+export const targetProblemLines = (problem) => {
+  if (problem.kind === 'no-database') {
+    return [
+      'There is no database in that folder. Make the local test one with `npm run seed`. Nothing was made.',
+    ];
+  }
+  if (problem.kind === 'certificate-not-checked') {
+    return [
+      certificateNotChecked(
+        problem.login === 'app' ? 'PLATFORM_DATABASE_URL' : 'MIGRATION_DATABASE_URL',
+      ),
+    ];
+  }
+  if (problem.kind === 'cannot-connect') {
+    return [
+      `Could not connect through ${loginWords[problem.login]}: ${causeWords[problem.cause]}. Nothing was made.`,
+      usualCauses,
+    ];
+  }
+  if (problem.kind === 'tracker-database') {
+    return [
+      `${loginWords[problem.login]} reaches a database that holds the tracker’s own data (the live_stats schema). The platform never uses the tracker’s database. Nothing was read and nothing was made.`,
+    ];
+  }
+  return [
+    'The two logins reach different databases. Both must be logins to the same database. Nothing was made.',
+  ];
+};
+
+const gapWords = {
+  'sees-past-fence':
+    'it cannot find accounts by email (it must be the tables’ owner login that bypasses row-level security, such as Supabase’s postgres)',
+  accounts: 'it may not read, add and remove rows in the accounts table',
+  'migration-log': 'it may not read the migration log',
+  functions: 'it may not call find_league_by_slug and uuid_v7',
+};
+
+/** Why a login may not do its part (probe-logins.ts), with what to do. */
+const loginProblemLines = (problems) =>
+  problems.map((found) =>
+    found.login === 'app'
+      ? `${loginWords.app} may not run the commands: ${found.problems.join('; ')}. Use the login the web app uses: a member of app_user, not a superuser, not the tables’ owner.`
+      : `${loginWords.migration} may not do its part: ${found.gaps.map((gap) => gapWords[gap]).join('; ')}. Use the migration login that applied the migrations.`,
+  );
+
+/** Why nothing can be made there: a login, or the migrations (the preview's and makeLeague's). */
+export const readinessLines = (problem) =>
+  problem.kind === 'login'
+    ? [...loginProblemLines(problem.problems), notMade]
+    : [migrationProblems[problem.state]];
 
 /** A database not at this code's migrations (migration-state.ts). */
 export const migrationProblems = {
@@ -211,7 +309,7 @@ const leftAccountLines = (accounts) => [
 
 /** What a run that made no league says (makeLeague's problem). */
 export const makeProblemLines = (problem, accounts) => {
-  if (problem.kind === 'migrations') return [migrationProblems[problem.state]];
+  if (problem.kind === 'migrations' || problem.kind === 'login') return readinessLines(problem);
   if (problem.kind === 'short-name-held') return [shortNameHeld];
   if (problem.kind === 'refused') {
     return [

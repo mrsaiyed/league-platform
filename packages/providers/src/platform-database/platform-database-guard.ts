@@ -1,5 +1,6 @@
-// The tracker's database guard (record 055): the one check the web app and the
-// worker both run on the platform's database setting before anything connects. The
+// The tracker's database guard (record 055): the one check the web app, the worker
+// and the tool that makes a league (npm run league:make, record 057) all run on a
+// database address of the platform's before anything connects. The
 // Al-Hadi tracker's Supabase project holds real games, and the platform never uses
 // it (T-201). It reads the setting as text only and never opens it.
 //
@@ -31,6 +32,12 @@ export type TrackerGuardFacts = {
   readonly env: Readonly<Record<string, string | undefined>>;
   /** APP_ENV as given (staging and production are stricter). */
   readonly appEnv: string | undefined;
+  /**
+   * True when the address is about to be opened on a hosted database whatever APP_ENV
+   * says: the tool that makes a league from this computer (record 057) has no APP_ENV
+   * and is as strict as staging and production. Left out, APP_ENV decides.
+   */
+  readonly hosted?: boolean | undefined;
   /**
    * The tracker's Supabase project reference (trackerProjectOf), null when
    * supabase/site.json could not be read, or undefined to leave that check out (tests
@@ -114,10 +121,13 @@ export function platformDatabaseProblem(
   if (!asciiOnly.test(target.host) || !asciiOnly.test(target.user)) {
     return refuse('must have a host and user of plain ASCII characters');
   }
-  const hosted = facts.appEnv === 'staging' || facts.appEnv === 'production';
+  const byAppEnv = facts.appEnv === 'staging' || facts.appEnv === 'production';
+  const hosted = facts.hosted ?? byAppEnv;
   if (hosted && isIpLiteral(target.host)) {
     return refuse(
-      `must name its server by a host name, not an IP address, when APP_ENV is ${facts.appEnv}`,
+      byAppEnv
+        ? `must name its server by a host name, not an IP address, when APP_ENV is ${facts.appEnv}`
+        : 'must name its server by a host name, not an IP address, for a hosted database',
     );
   }
   // Only where the address is opened: local work and tests never open it (T-201).
@@ -162,11 +172,34 @@ export function platformServiceProblem(
  */
 export function trackerProjectProblem(
   names: readonly string[],
-  facts: Pick<TrackerGuardFacts, 'appEnv' | 'trackerProject'>,
+  facts: Pick<TrackerGuardFacts, 'appEnv' | 'trackerProject' | 'hosted'>,
 ): string | undefined {
   if (facts.trackerProject !== null) return undefined;
-  if (facts.appEnv !== 'staging' && facts.appEnv !== 'production') return undefined;
+  const hosted = facts.hosted ?? (facts.appEnv === 'staging' || facts.appEnv === 'production');
+  if (!hosted) return undefined;
   return `supabase/site.json: could not be read, so ${names.join(' and ')} cannot be checked against the tracker's project`;
+}
+
+/** The host names that mean this computer, beside any loopback address. */
+const thisComputer = new Set(['localhost', 'localhost.localdomain']);
+
+/**
+ * Whether a postgres:// address connects to this computer (localhost, a loopback
+ * address, or a local socket folder), read the way `pg` reads it: true, false, or
+ * undefined when it cannot be read. A database anywhere else must have its
+ * certificate checked.
+ */
+export function addressOnThisComputer(given: string): boolean | undefined {
+  const value = given.trim();
+  if (!/^postgres(?:ql)?:\/\//.test(value)) return undefined;
+  const target = targetOf(value);
+  if (target === undefined) return undefined;
+  const host = target.host.replace(/^\[(.*)\]$/, '$1').toLowerCase();
+  if (host === '' || host.startsWith('/')) return true;
+  if (thisComputer.has(host) || host.endsWith('.localhost')) return true;
+  if (isIP(host) === 4) return host.startsWith('127.');
+  if (isIP(host) === 6) return host === '::1';
+  return false;
 }
 
 /** The parts of the address `pg` would use, decoded as `pg` decodes them; undefined if unreadable. */

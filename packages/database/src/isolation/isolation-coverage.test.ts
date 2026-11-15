@@ -153,16 +153,15 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.isDatabaseAddress, 'tells an address from a folder name; runs nothing'],
   [
     databasePackage.openLeagueMakingTarget,
-    'staff tool (step 2.125, record 057): opens a PGlite folder or the migration login; reads no rows',
+    'staff tool (step 2.125, record 057): opens a PGlite folder, or the migration login and the app login of a hosted database; each reads the catalog only (live_stats, current_database, the server start time); no league rows',
   ],
-  [databasePackage.placeOfAddress, 'reads the host and database name off an address; runs nothing'],
   [
     databasePackage.previewNewLeague,
-    'staff tool (step 2.125): as the migration login, reads the migration log, then whether one short name is held (find_league_by_slug) and whether two emails have accounts; no league rows',
+    'staff tool (step 2.125): asks each login what it may do (catalog only), then as the migration login reads the migration log, whether one short name is held (find_league_by_slug) and whether two emails have accounts; no league rows',
   ],
   [
     databasePackage.makeLeague,
-    'staff tool (step 2.125): as the migration login reads the migration log, checks one short name and makes accounts by email (removing those it made if no league is made), then reaches the one new league only through createLeague with its first season (own case), fenced to that league',
+    "staff tool (step 2.125): asks the logins and the migration log again, as the migration login checks one short name and makes accounts by email (removing those it made if no league is made), then reaches the one new league only through createLeague with its first season (own case), under the app's login on a hosted database, fenced to that league",
   ],
 ]);
 

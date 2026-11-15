@@ -26,6 +26,12 @@ export type PostgresDriverOptions = {
   ca?: string | undefined;
 };
 
+/** Where the connection really went, as pg read the address: host, port and user. */
+export type ConnectedTo = { readonly host: string; readonly port: number; readonly user: string };
+
+/** A migration driver on a PostgreSQL connection, which also says where it went. */
+export type PostgresDriver = MigrationDriver & { readonly connectedTo: ConnectedTo };
+
 type SslSetting = false | { rejectUnauthorized: boolean; ca?: string };
 
 /** The pg `ssl` setting for `options`. */
@@ -39,7 +45,7 @@ export function sslSetting(options: PostgresDriverOptions): SslSetting {
 export async function connectPostgresDriver(
   url: string,
   options: PostgresDriverOptions = {},
-): Promise<MigrationDriver> {
+): Promise<PostgresDriver> {
   // SSL is set here, not by the address, so a copied address behaves the same everywhere.
   const target = new URL(url);
   for (const key of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat'])
@@ -84,5 +90,6 @@ export async function connectPostgresDriver(
       }
     },
     close: () => client.end(),
+    connectedTo: { host: client.host, port: client.port, user: client.user ?? '' },
   };
 }

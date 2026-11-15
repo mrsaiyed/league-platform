@@ -1,6 +1,7 @@
 // The tracker's database guard (record 055), shared by the web app's and the worker's
 // settings checks. Used only through the package's index.ts.
 export {
+  addressOnThisComputer,
   isIpLiteral,
   platformDatabaseProblem,
   platformServiceProblem,

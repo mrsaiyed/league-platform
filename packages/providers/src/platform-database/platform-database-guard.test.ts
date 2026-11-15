@@ -3,6 +3,7 @@
 // Every address and project reference here is made up and answers nobody.
 import { describe, expect, it } from 'vitest';
 import {
+  addressOnThisComputer,
   isIpLiteral,
   platformDatabaseProblem,
   platformServiceProblem,
@@ -193,6 +194,75 @@ describe('platformDatabaseProblem', () => {
     expect(problem(named, { trackerProject: undefined })).toBeUndefined();
     expect(problem(named, { trackerProject: null })).toBeUndefined();
     expect(problem(`mysql://app:${secret}@db.${ref}.supabase.co/x`)).toBeUndefined();
+  });
+});
+
+describe('platformDatabaseProblem for a tool with no APP_ENV that opens a hosted database', () => {
+  const hosted = (value: string, env: Record<string, string> = {}) =>
+    platformDatabaseProblem(
+      'MIGRATION_DATABASE_URL',
+      value,
+      facts({ appEnv: undefined, hosted: true, env }),
+    );
+
+  it('is as strict as production, and names its own setting', () => {
+    expect(hosted(`postgres://app:${secret}@192.0.2.10:5432/league`)).toBe(
+      'MIGRATION_DATABASE_URL: invalid, must name its server by a host name, not an IP address, for a hosted database',
+    );
+    expect(hosted('postgres:///postgres', { PGHOST: 'db.example.test' })).toBe(
+      'MIGRATION_DATABASE_URL: invalid, must give its own host: PGHOST is set and would decide it',
+    );
+    expect(
+      hosted(
+        `postgres://postgres.${ref}:${secret}@aws-0-us-east-1.pooler.supabase.com:6543/postgres`,
+      ),
+    ).toBe(
+      "MIGRATION_DATABASE_URL: invalid, must not name the tracker's Supabase project (supabase/site.json)",
+    );
+    expect(
+      hosted(`postgres://app:${secret}@db.example.test:5432/league?host=elsewhere.example.test`),
+    ).toBe(
+      'MIGRATION_DATABASE_URL: invalid, must not take its host, port, user, password, options or database name from its query string',
+    );
+    expect(hosted(`postgres://app:${secret}@db.example.test:5432/league`)).toBeUndefined();
+  });
+
+  it('refuses it when the tracker’s project could not be read', () => {
+    expect(
+      trackerProjectProblem(['MIGRATION_DATABASE_URL'], {
+        appEnv: undefined,
+        hosted: true,
+        trackerProject: null,
+      }),
+    ).toBe(
+      "supabase/site.json: could not be read, so MIGRATION_DATABASE_URL cannot be checked against the tracker's project",
+    );
+  });
+});
+
+describe('addressOnThisComputer', () => {
+  it('knows this computer from anywhere else, read the way pg reads the address', () => {
+    for (const value of [
+      'postgres://app@localhost:5432/league',
+      'postgres://app@LOCALHOST/league',
+      'postgres://app@127.0.0.1:5432/league',
+      'postgres://app@127.0.0.2/league',
+      'postgres://app@[::1]:5432/league',
+      'postgres://app@db.localhost/league',
+    ]) {
+      expect(addressOnThisComputer(value), value).toBe(true);
+    }
+    for (const value of [
+      'postgres://app@db.example.test:5432/league',
+      `postgres://postgres.${ref}@aws-0-us-east-1.pooler.supabase.com:6543/postgres`,
+      'postgres://app@192.0.2.10/league',
+      'postgres://app@localhost.example.test/league',
+      'postgres://app@%6Cocalhost.example.test/league',
+    ]) {
+      expect(addressOnThisComputer(value), value).toBe(false);
+    }
+    expect(addressOnThisComputer('mysql://app@localhost/league')).toBeUndefined();
+    expect(addressOnThisComputer('postgres://app@[not-an-ip/league')).toBeUndefined();
   });
 });
 
