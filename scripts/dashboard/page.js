@@ -2,7 +2,7 @@
 // docs/build/dashboard.html after a line that defines D, the data read from the build files.
 // The page is a little village: each kind of job has its own home and its own character,
 // paths join the homes whose work depends on each other, and the lead's big top is at the top.
-/* global D, document, location, localStorage, requestAnimationFrame */
+/* global D, document, location, localStorage, sessionStorage, requestAnimationFrame, fetch */
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -427,22 +427,28 @@ if (preview) {
     if (s.state !== 'done') s.state = ids.has(s.id) ? 'now' : 'todo';
   });
 }
-// The newest sign that the team is alive: the lead's own time stamp, or newer saved work
-// on the build branch or in any builder's lane.
-const lastSign =
-  [D.lock, D.commits[0] && D.commits[0].time, D.newestWork]
-    .filter(Boolean)
-    .sort((a, b) => new Date(b) - new Date(a))[0] || '';
-const lockAge = D.lock ? (Date.now() - new Date(lastSign)) / 60000 : Infinity;
-// This page is a saved file: it knows only what was true when it was written. When it is
-// old it says so, and does not guess why the team looks quiet.
-const pageAge = (Date.now() - new Date(D.generatedAt)) / 60000;
+// ---------- who is really working ----------
+// D.live is read, for free, from files the Claude app keeps on this computer: one for each
+// helper the lead has started, saying what it was asked to do and when it last did anything
+// (scripts/dashboard/live.mjs). While the page is open it asks its own server for a newer
+// copy every few seconds (the end of this file), and everything below is judged again.
+let live = (!preview && D.live) || { known: false, at: D.generatedAt, lead: null, helpers: [] };
+let lockTime = D.lock;
+let offline = false;
 const building = D.state === 'building';
-const working = preview || (building && lockAge < 35);
-const silent = !preview && building && lockAge >= 35;
-const stale = silent && pageAge >= 25;
-const quiet = silent && !stale && lockAge < 600;
-const busy = working && lanes.length > 0;
+const cap = (word) => (word ? word[0].toUpperCase() + word.slice(1) : '');
+const minutesSince = (iso) => (Date.now() - new Date(iso)) / 60000;
+// What is true this minute. judge() fills these in, and runs again when newer facts arrive.
+let seen = false; // the page can see the helpers, and what it sees is fresh
+let crew = []; // helpers that have not finished
+let active = []; // helpers working this minute
+let reviews = []; // of those, the ones reviewing someone else's work
+let leadNow = false; // the lead itself is in the middle of something
+let lastSign = '';
+let working = false;
+let stale = false;
+let quiet = false;
+let busy = false;
 const doneCount = all.filter((s) => s.state === 'done').length;
 const laneOf = (id) => lanes.find((l) => l.id === id);
 // What a lane's builder is doing: the last part of its line in the status file,
@@ -454,15 +460,6 @@ const doing = (lane) => {
   return text.length > 110 ? text.slice(0, 108).trimEnd() + '…' : text;
 };
 const stat = {};
-[...JOBS, 'inspector'].forEach((job) => {
-  const mine = all.filter((s) => s.job === job);
-  stat[job] = {
-    total: mine.length,
-    done: mine.filter((s) => s.state === 'done').length,
-    now: busy ? mine.filter((s) => s.state === 'now') : [],
-  };
-});
-
 // Which homes depend on each other: count the steps of one job that wait for a step of another.
 const weight = {};
 const pair = (a, b) => [a, b].sort().join('|');
@@ -475,22 +472,67 @@ all.forEach((s) => {
   });
 });
 // A letter travels along a path when a builder at work is using another home's finished work.
-const letters = [];
-JOBS.forEach((job) => {
-  stat[job].now.forEach((s) => {
-    (s.needIds || []).forEach((id) => {
-      const other = stepOf(id);
-      if (!other || !JOBS.includes(other.job) || other.job === job) return;
-      if (!letters.some((x) => x.from === other.job && x.to === job)) {
-        letters.push({ from: other.job, to: job });
-      }
+let letters = [];
+let edges = [];
+function judge() {
+  // A page opened as a saved file knows only what was true when it was written.
+  seen = Boolean(live.known) && minutesSince(live.at) < 4;
+  crew = seen ? live.helpers.filter((h) => !h.finished) : [];
+  active = crew.filter((h) => h.active);
+  reviews = active.filter((h) => h.role === 'review');
+  leadNow = Boolean(seen && live.lead && live.lead.active);
+  // The newest sign that the team is alive: the lead's own time stamp, newer saved work on
+  // the build branch or in any builder's lane, or a helper doing something.
+  lastSign =
+    [
+      lockTime,
+      D.commits[0] && D.commits[0].time,
+      D.newestWork,
+      seen && live.lead ? live.lead.seenAt : '',
+      ...(seen ? live.helpers.map((h) => h.seenAt) : []),
+    ]
+      .filter(Boolean)
+      .sort((a, b) => new Date(b) - new Date(a))[0] || '';
+  const signAge = lastSign && (lockTime || seen) ? minutesSince(lastSign) : Infinity;
+  // When the page is old it says so, and does not guess why the team looks quiet.
+  const pageAge = minutesSince(seen ? live.at : D.generatedAt);
+  working = preview || (building && (signAge < 35 || active.length > 0 || leadNow));
+  const silent = !preview && building && !working;
+  stale = silent && pageAge >= 25;
+  quiet = silent && !stale && signAge < 600;
+  busy = working && lanes.length > 0;
+  [...JOBS, 'inspector'].forEach((job) => {
+    const mine = all.filter((s) => s.job === job);
+    const now = busy ? mine.filter((s) => s.state === 'now') : [];
+    stat[job] = {
+      total: mine.length,
+      done: mine.filter((s) => s.state === 'done').length,
+      now,
+      // The steps somebody is building this minute. Where the page cannot see the helpers,
+      // every open step counts, as it always did.
+      hot: seen
+        ? mine.filter((s) => active.some((h) => h.step === s.id && h.role !== 'review'))
+        : now,
+    };
+  });
+  letters = [];
+  JOBS.forEach((job) => {
+    stat[job].hot.forEach((s) => {
+      (s.needIds || []).forEach((id) => {
+        const other = stepOf(id);
+        if (!other || !JOBS.includes(other.job) || other.job === job) return;
+        if (!letters.some((x) => x.from === other.job && x.to === job)) {
+          letters.push({ from: other.job, to: job });
+        }
+      });
     });
   });
-});
-const edges = Object.entries(weight)
-  .sort((a, b) => b[1] - a[1])
-  .filter(([key], i) => i < 12 || letters.some((x) => pair(x.from, x.to) === key))
-  .map(([key, w]) => ({ a: key.split('|')[0], b: key.split('|')[1], w }));
+  edges = Object.entries(weight)
+    .sort((a, b) => b[1] - a[1])
+    .filter(([key], i) => i < 12 || letters.some((x) => pair(x.from, x.to) === key))
+    .map(([key, w]) => ({ a: key.split('|')[0], b: key.split('|')[1], w }));
+}
+judge();
 const partners = (job) =>
   edges
     .filter((e) => e.a === job || e.b === job)
@@ -498,19 +540,45 @@ const partners = (job) =>
     .sort((x, y) => y.w - x.w);
 
 // ---------- the top of the page ----------
-const pill = preview
-  ? ['go', 'Preview of a busy moment']
-  : D.state === 'waiting-for-founder'
-    ? ['wait', 'Waiting on you']
-    : working
-      ? ['go', 'The team is working (last save or check-in ' + ago(lastSign) + ')']
-      : stale
-        ? ['wait', 'This page is out of date: last refreshed ' + ago(D.generatedAt)]
-        : quiet
-          ? ['wait', 'Quiet: no saved work or check-in since ' + ago(lastSign)]
-          : ['', 'Between runs: the next one starts by itself'];
-$('pill').className = 'pill ' + pill[0];
-$('pilltext').textContent = pill[1];
+// "3 helpers are working right now: 2 building, 1 reviewing."
+const ROLE = { build: 'building', design: 'designing', review: 'reviewing', audit: 'auditing' };
+const roleWords = () => {
+  const parts = [];
+  ['build', 'design', 'review', 'audit', 'help'].forEach((role) => {
+    const n = active.filter((h) => h.role === role).length;
+    if (n) parts.push(n + ' ' + (ROLE[role] || 'helping'));
+  });
+  return parts.join(', ');
+};
+const helpersNow = () =>
+  active.length === 1 ? '1 helper is working' : active.length + ' helpers are working';
+function drawPill() {
+  const pill = preview
+    ? ['go', 'Preview of a busy moment']
+    : D.state === 'waiting-for-founder'
+      ? ['wait', 'Waiting on you']
+      : offline
+        ? ['wait', 'This page lost its server: it shows what was true ' + ago(live.at)]
+        : working && seen
+          ? [
+              'go',
+              active.length
+                ? helpersNow() + ' right now'
+                : leadNow
+                  ? 'Leo is working; no helper is, this minute'
+                  : 'Between jobs: last sign of work ' + ago(lastSign),
+            ]
+          : working
+            ? ['go', 'The team is working (last save or check-in ' + ago(lastSign) + ')']
+            : stale
+              ? ['wait', 'This page is out of date: last refreshed ' + ago(D.generatedAt)]
+              : quiet
+                ? ['wait', 'Quiet: no saved work or check-in since ' + ago(lastSign)]
+                : ['', 'Between runs: the next one starts by itself'];
+  $('pill').className = 'pill ' + pill[0] + (active.length ? ' live' : '');
+  $('pilltext').textContent = pill[1];
+}
+drawPill();
 $('preview').hidden = !preview;
 const stage = D.stages.find((s) => s.number === D.currentStage);
 $('sub').textContent =
@@ -549,19 +617,50 @@ const plate = (x, y, title, sub, colour, fraction) =>
     : `<rect class="track" x="${x - 64}" y="${y + 38.5}" width="128" height="3" rx="1.5"/>` +
       `<rect x="${x - 64}" y="${y + 38.5}" width="${(128 * fraction).toFixed(1)}" height="3" rx="1.5" fill="${colour}"/>`);
 // A step sign. It sits above a home with its tail pointing down, or below with its tail up.
-const sign = (x, y, text, who, below) => {
+// A still, grey sign is for work that is open but that nobody is on this minute.
+const sign = (x, y, text, who, below, still) => {
   const width = Math.max(96, text.length * 7.3 + 28);
+  const fill = still ? '#e9edf2' : who.c[0];
   return (
-    `<g class="sign"><rect x="${x - width / 2}" y="${y - 13}" width="${width}" height="26" rx="13" fill="${who.c[0]}" stroke="${who.c[1]}" stroke-width="1.5"/>` +
+    `<g class="sign${still ? ' still' : ''}"><rect x="${x - width / 2}" y="${y - 13}" width="${width}" height="26" rx="13" fill="${fill}" stroke="${still ? '#9aa7b5' : who.c[1]}" stroke-width="1.5"/>` +
     (below
-      ? `<path d="M${x - 6} ${y - 12.5}l6-7 6 7z" fill="${who.c[0]}"/>`
-      : `<path d="M${x - 6} ${y + 12.5}l6 7 6-7z" fill="${who.c[0]}"/>`) +
-    `<text class="t3" x="${x}" y="${y + 4.5}" text-anchor="middle" fill="${who.ink}">${esc(text)}</text></g>`
+      ? `<path d="M${x - 6} ${y - 12.5}l6-7 6 7z" fill="${fill}"/>`
+      : `<path d="M${x - 6} ${y + 12.5}l6 7 6-7z" fill="${fill}"/>`) +
+    `<text class="t3" x="${x}" y="${y + 4.5}" text-anchor="middle" fill="${still ? '#475569' : who.ink}">${esc(text)}</text></g>`
   );
 };
+// Little stars that pop beside a home while somebody is building there.
+const SPARK = 'M0-5l1.4 3.6 3.6 1.4-3.6 1.4-1.4 3.6-1.4-3.6-3.6-1.4 3.6-1.4z';
+const sparks = (x, y, colour) =>
+  `<g class="sparks">` +
+  [
+    [-62, -118],
+    [58, -132],
+    [-44, -150],
+    [68, -96],
+    [-70, -84],
+  ]
+    .map(
+      ([dx, dy], i) =>
+        `<path d="${SPARK}" transform="translate(${x + dx} ${y + dy})" fill="${i % 2 ? '#fff' : colour}" style="animation-delay:${(i * 0.37).toFixed(2)}s"/>`,
+    )
+    .join('') +
+  `</g>`;
+// A hot-air balloon that carries how much of everything planned is saved.
+const balloon = (x, y, label, title) =>
+  `<g transform="translate(${x} ${y})"><g class="balloon"><title>${esc(title)}</title>` +
+  `<path d="M0-46c27 0 42 19 42 40 0 23-23 39-33 51h-18c-10-12-33-28-33-51 0-21 15-40 42-40z" fill="#e25555"/>` +
+  `<path d="M0-46c10 0 15 19 15 40 0 23-7 39-9 51h-12c-2-12-9-28-9-51 0-21 5-40 15-40z" fill="#ffd34d"/>` +
+  `<path d="M-9 45l3 11M9 45l-3 11" stroke="#8a6d3b" stroke-width="1.5"/>` +
+  `<rect x="-9" y="56" width="18" height="12" rx="2.5" fill="#b07a45" stroke="#7a4f24" stroke-width="1.2"/>` +
+  `<text x="0" y="1" text-anchor="middle" font-size="12.5" font-weight="800" fill="#5a2a1a">${esc(label)}</text></g></g>`;
+const FLOWERS = ['#f277b0', '#ffd34d', '#9b7bf2', '#ffffff', '#f58a3c', '#5b9cf6'];
+let firstDraw = true;
 const short = (text, max) => (text.length > max ? text.slice(0, max - 1).trimEnd() + '…' : text);
+// The homes pop up one after another the first time the village is drawn.
+let homeOrder = 0;
 const home = (job, label, inner) =>
-  `<g class="home${inner.on ? ' on' : ''}" data-job="${job}" tabindex="0" role="button" aria-label="${esc(label)}"><title>${esc(label)}</title>${inner.html}</g>`;
+  `<g class="home${inner.on ? ' on' : ''}" data-job="${job}" tabindex="0" role="button" aria-label="${esc(label)}" style="animation-delay:${(homeOrder++ % 12) * 0.07}s"><title>${esc(label)}</title>${inner.html}</g>`;
 // Little flags on a string between two points.
 const bunting = (x1, y1, x2, y2, sag) => {
   const mx = (x1 + x2) / 2;
@@ -581,7 +680,7 @@ function drawVillage() {
   const day = working;
   const p = [];
   p.push(
-    `<svg class="scene ${day ? 'day' : 'night'}" viewBox="0 0 ${W} ${H}" role="group" aria-label="The village: one home for each kind of job">`,
+    `<svg class="scene ${day ? 'day' : 'night'}${firstDraw ? ' intro' : ''}" viewBox="0 0 ${W} ${H}" role="group" aria-label="The village: one home for each kind of job">`,
     `<defs><linearGradient id="skyDay" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd3ff"/><stop offset="1" stop-color="#e3f6ff"/></linearGradient>`,
     `<linearGradient id="skyNight" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1730"/><stop offset="1" stop-color="#27406b"/></linearGradient>`,
     `<linearGradient id="grassDay" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd18a"/><stop offset="1" stop-color="#5fb36a"/></linearGradient>`,
@@ -615,12 +714,47 @@ function drawVillage() {
       `<g class="cloud" style="animation-delay:${delay}s"><g transform="translate(0 ${y}) scale(${size})"><ellipse cx="70" cy="30" rx="60" ry="22"/><ellipse cx="110" cy="18" rx="42" ry="24"/><ellipse cx="150" cy="32" rx="52" ry="20"/></g></g>`,
     );
   });
+  const planned = all.length;
+  p.push(
+    balloon(
+      150,
+      112,
+      (planned ? Math.round((100 * doneCount) / planned) : 0) + '%',
+      doneCount + ' of ' + planned + ' planned steps are saved',
+    ),
+  );
+  if (day) {
+    for (let i = 0; i < 3; i++) {
+      p.push(
+        `<g class="bird"><path d="M-8 0q4-6 8 0q4-6 8 0" style="animation-delay:${-(i * 0.17).toFixed(2)}s"/>` +
+          `<animateMotion dur="${36 + i * 9}s" begin="${-i * 13}s" repeatCount="indefinite" path="M-40 ${64 + i * 30}q330 ${-34 + i * 12} 660 8t680-22"/></g>`,
+      );
+    }
+  } else {
+    p.push(`<path class="shoot" d="M0 0l-52 17"/>`);
+  }
   p.push(
     `<path class="hill" d="M0 262q150-78 330-14t320-26 300 8 290-30v90h-1240z"/>`,
     `<path class="ground" d="M0 268q310-46 620-12t620-14v${H}h-1240z"/>`,
     `<ellipse class="plaza" cx="${CX}" cy="${CY + 4}" rx="205" ry="80"/>`,
     `<path class="road" d="${ring}"/><path class="roadline" d="${ring}"/>`,
   );
+  // Flowers along the front of the village, and fireflies when everyone is asleep.
+  for (let i = 0; i < 16; i++) {
+    const fx = 34 + i * 78 + ((i * 29) % 23);
+    const fy = 884 + ((i * 13) % 14);
+    p.push(
+      `<g transform="translate(${fx} ${fy})"><g class="flower" style="animation-delay:${-(i * 0.43).toFixed(2)}s">` +
+        `<path d="M0 0v-13" stroke="#2f7d3c" stroke-width="2.2" stroke-linecap="round"/><circle cy="-15" r="4.6" fill="${FLOWERS[i % FLOWERS.length]}"/><circle cy="-15" r="1.7" fill="#fff3b0"/></g></g>`,
+    );
+  }
+  if (!day) {
+    for (let i = 0; i < 18; i++) {
+      p.push(
+        `<circle class="fly" cx="${(i * 149 + 70) % W}" cy="${330 + ((i * 97) % 520)}" r="2.3" style="animation-delay:${-(i * 0.61).toFixed(2)}s"/>`,
+      );
+    }
+  }
   edges.forEach((e) => {
     const live = letters.some((x) => pair(x.from, x.to) === pair(e.a, e.b));
     p.push(
@@ -656,11 +790,13 @@ function drawVillage() {
           CX,
           TOP,
           'Leo · The lead',
-          busy
-            ? lanes.length + ' of ' + (D.laneCount || lanes.length) + ' desks have work open'
-            : working
-              ? 'handing out work'
-              : 'resting',
+          seen && working
+            ? active.length + ' working now · ' + lanes.length + ' open'
+            : busy
+              ? lanes.length + ' of ' + (D.laneCount || lanes.length) + ' desks have work open'
+              : working
+                ? 'handing out work'
+                : 'resting',
           lead.c[1],
           null,
         ),
@@ -670,8 +806,13 @@ function drawVillage() {
     const who = CAST[job];
     const [x, y] = at(job);
     const mine = stat[job];
-    const on = mine.now.length > 0;
-    const first = mine.now[0];
+    // On: somebody is building one of this home's steps this minute. Waiting: a step is
+    // open here, but nobody is on it right now (it waits for a check, a review or the lead).
+    const on = mine.hot.length > 0;
+    const waiting = !on && mine.now.length > 0;
+    const shown = on ? mine.hot : mine.now;
+    const first = shown[0];
+    const low = job === 'database' || job === 'checks';
     const label =
       who.name +
       "'s home, " +
@@ -701,34 +842,45 @@ function drawVillage() {
             who.c[0],
             mine.total ? mine.done / mine.total : 0,
           ) +
-          (on
+          (on ? sparks(x, y, who.c[2]) : '') +
+          (on || waiting
             ? sign(
                 x,
                 // The two homes low on the sides carry their sign below, clear of the home above them.
-                job === 'database' || job === 'checks' ? y + 64 : y - 170 * SCALE - 24,
-                short(first.id + ' ' + first.name, 26) +
-                  (mine.now.length > 1 ? '  +' + (mine.now.length - 1) : ''),
+                low ? y + 64 : y - 170 * SCALE - 24,
+                short(first.id + ' ' + (on ? first.name : 'open, waiting'), 26) +
+                  (shown.length > 1 ? '  +' + (shown.length - 1) : ''),
                 who,
-                job === 'database' || job === 'checks',
+                low,
+                waiting,
               )
             : ''),
       }),
     });
   });
   const base = CY + 6;
+  // Rocky works only while a review is really running, when the page can see that.
+  const reviewing = seen ? reviews.length > 0 : busy;
+  const reviewed = [...new Set(reviews.map((h) => h.step).filter(Boolean))];
   things.push({
     y: base,
     html:
       home('inspector', "Rocky's checkpoint: every finished step is reviewed here", {
-        on: busy,
+        on: reviewing,
         html:
           `<g class="lift"><g transform="translate(${CX - 158} ${base - 90})">${checkpoint}</g></g>` +
-          crit('inspector', busy ? 'work' : day ? 'idle' : 'sleep', CX - 200, base - 50, 56) +
+          crit('inspector', reviewing ? 'work' : day ? 'idle' : 'sleep', CX - 200, base - 50, 56) +
           plate(
             CX - 96,
             base,
             'Rocky · Reviewer',
-            'checks every finished step',
+            !seen
+              ? 'checks every finished step'
+              : reviewed.length
+                ? 'reviewing ' + reviewed.slice(0, 3).join(', ')
+                : reviews.length
+                  ? 'reviewing now'
+                  : 'no review this minute',
             CAST.inspector.c[1],
             null,
           ),
@@ -743,44 +895,193 @@ function drawVillage() {
   things.sort((a, b) => a.y - b.y).forEach((thing) => p.push(thing.html));
   p.push('</svg>');
   $('scene').innerHTML = p.join('');
+  firstDraw = false;
 }
 drawVillage();
 
-// Leo's speech bubble.
+// Leo's speech bubble. He says first how many are really working, then how the team works.
 const bubble = $('bubble');
-const says = busy
-  ? [
-      'I brief every builder myself.',
-      'I read every change before it is saved.',
-      'Rocky reviews each step. He never reviews his own work.',
-      'Nothing goes in the vault until the full check passes.',
-      'When a desk frees up, the next step starts.',
-    ]
-  : working
-    ? ['Checking what the last run left…', 'Handing out the next steps…']
-    : stale
-      ? [
-          'This page has not been refreshed lately, so I cannot say what the team is doing right now.',
-          'It refreshes every ten minutes while the Claude app is open and has usage left.',
-        ]
-      : quiet
-        ? [
-            'No saved work for a while. A long check may be running.',
-            'If this run is stuck, the next one takes over by itself.',
-          ]
-        : D.state === 'waiting-for-founder'
-          ? ['We need an answer from you. Click my tent to see what.']
-          : ['Everyone is resting. The next run starts by itself in a few minutes.'];
+const ways = [
+  'I brief every builder myself.',
+  'I read every change before it is saved.',
+  'Rocky reviews each step. He never reviews his own work.',
+  'Nothing goes in the vault until the full check passes.',
+  'When a desk frees up, the next step starts.',
+];
+function sayLines() {
+  if (offline) {
+    return ['I cannot reach this page’s server, so I do not know what is happening right now.'];
+  }
+  if (busy && seen) {
+    const open = lanes.length + (lanes.length === 1 ? ' piece' : ' pieces') + ' of work open';
+    const first = active.length
+      ? helpersNow() + ' right now: ' + roleWords() + '.'
+      : leadNow
+        ? 'No helper is working this minute. I am checking results and handing out the next job.'
+        : 'Nobody is working this minute. We are waiting for a check to finish.';
+    const quietOnes = crew.length - active.length;
+    return [
+      first,
+      open +
+        '. Open is not the same as busy: ' +
+        (quietOnes
+          ? quietOnes + (quietOnes === 1 ? ' helper has' : ' helpers have') + ' gone quiet.'
+          : 'some wait for a check or a review.'),
+      first,
+      ...ways,
+    ];
+  }
+  if (busy) return ways;
+  if (working) return ['Checking what the last run left…', 'Handing out the next steps…'];
+  if (stale) {
+    return [
+      'This page has not been refreshed lately, so I cannot say what the team is doing right now.',
+      'Double-click "Open build progress.cmd" in the project folder for a page that is always fresh.',
+    ];
+  }
+  if (quiet) {
+    return [
+      'No saved work for a while. A long check may be running.',
+      'If this run is stuck, the next one takes over by itself.',
+    ];
+  }
+  if (D.state === 'waiting-for-founder') {
+    return ['We need an answer from you. Click my tent to see what.'];
+  }
+  return ['Everyone is resting. The next run starts by itself in a few minutes.'];
+}
 let line = 0;
-bubble.textContent = says[line++ % says.length];
-if (says.length > 1) {
-  setInterval(() => {
-    bubble.style.opacity = 0;
-    setTimeout(() => {
-      bubble.textContent = says[line++ % says.length];
-      bubble.style.opacity = 1;
-    }, 350);
-  }, 4200);
+let headline = '';
+const speak = () => {
+  const says = sayLines();
+  // When what Leo would say first has changed, he says it at once.
+  if (says[0] !== headline) line = 0;
+  headline = says[0];
+  bubble.textContent = says[line++ % says.length];
+};
+speak();
+setInterval(() => {
+  bubble.style.opacity = 0;
+  setTimeout(() => {
+    speak();
+    bubble.style.opacity = 1;
+  }, 350);
+}, 5200);
+
+// ---------- working right now: one card for Leo and one for each helper ----------
+const ROLE_NAME = {
+  build: 'Builder',
+  design: 'Designer',
+  review: 'Reviewer',
+  audit: 'Auditor',
+  help: 'Helper',
+};
+function crewCard(key, mode, title, sub, state, stateText, onclick) {
+  const card = el(onclick ? 'button' : 'div', 'mate ' + state);
+  card.style.setProperty('--c', (CAST[key] || CAST.groundwork).c[0]);
+  const text = el('span', 'matetext');
+  const status = el('span', 'matestate');
+  // The bars move only while this one is working; the words say the same thing.
+  const bars = el('i', 'eq');
+  bars.append(el('i'), el('i'), el('i'));
+  status.append(bars, document.createTextNode(stateText));
+  text.append(el('b', '', title), el('small', '', sub), status);
+  card.append(critter(key, 46, mode), text);
+  if (onclick) card.onclick = onclick;
+  return card;
+}
+let crewDrawn = '';
+let crewCounted = -1;
+function drawCrew() {
+  const box = $('crew');
+  if (preview) return;
+  // Drawn again only when something on it has changed, so the cards do not flicker.
+  const key = JSON.stringify([
+    seen,
+    offline,
+    leadNow,
+    working,
+    lanes.length,
+    seen && live.lead ? ago(live.lead.seenAt) : '',
+    seen ? live.helpers.map((h) => [h.id, h.active, h.finished, ago(h.seenAt)]) : [],
+  ]);
+  if (key === crewDrawn) return;
+  crewDrawn = key;
+  box.innerHTML = '';
+  const head = el('div', 'crewhead');
+  if (!seen) {
+    head.append(
+      el(
+        'span',
+        'muted small',
+        offline
+          ? 'The page lost its server, so it cannot say who is working right now.'
+          : 'Who is working this minute cannot be seen from here, so the village shows the work that is open.',
+      ),
+    );
+    box.append(head);
+    return;
+  }
+  // The number pops only when it changes, and the cards rise only the first time.
+  const count = el(
+    'b',
+    'crewcount' + (active.length ? '' : ' zero') + (active.length === crewCounted ? '' : ' pop'),
+    String(active.length),
+  );
+  box.classList.toggle('intro', crewCounted < 0);
+  crewCounted = active.length;
+  head.append(
+    count,
+    el('span', 'crewtitle', 'working right now'),
+    el(
+      'span',
+      'muted small',
+      (active.length ? roleWords() + ' · ' : '') +
+        lanes.length +
+        (lanes.length === 1 ? ' piece' : ' pieces') +
+        ' of work open' +
+        (location.protocol === 'file:'
+          ? ' · as of ' + clock(live.at)
+          : ' · checked every 5 seconds'),
+    ),
+  );
+  const row = el('div', 'crewrow');
+  row.append(
+    crewCard(
+      'lead',
+      leadNow ? 'work' : working ? 'idle' : 'sleep',
+      'Leo · the lead',
+      'Plans, briefs, checks and saves',
+      leadNow ? 'on' : 'off',
+      leadNow
+        ? 'working now'
+        : live.lead
+          ? (crew.length ? 'waiting for helpers · ' : 'last moved ') + ago(live.lead.seenAt)
+          : 'not seen lately',
+      () => pick('lead'),
+    ),
+  );
+  live.helpers.forEach((h) => {
+    const step = stepOf(h.step);
+    const key = h.role === 'review' ? 'inspector' : step ? step.job : 'groundwork';
+    const who = ROLE_NAME[h.role] + (h.model ? ' · ' + cap(h.model) : '');
+    row.append(
+      crewCard(
+        key,
+        h.active ? 'work' : h.finished ? 'happy' : 'idle',
+        step ? short(step.id + ' ' + step.name, 46) : h.what,
+        who + (step ? ' · ' + short(h.what, 44) : ''),
+        h.active ? 'on' : h.finished ? 'done' : 'off',
+        h.active
+          ? 'working now'
+          : h.finished
+            ? 'finished ' + ago(h.seenAt)
+            : 'quiet since ' + ago(h.seenAt),
+        step ? () => showStep(step) : null,
+      ),
+    );
+  });
+  box.append(head, row);
 }
 $('legend').textContent =
   'Each home is one kind of work. A dotted path joins two homes when one waits on the other’s work; a thicker path means more of it, and a letter travels along it when a builder is using another home’s finished work. The gold ring is Leo’s round: he briefs and checks every home. Click a home to see what is happening inside.';
@@ -846,19 +1147,37 @@ function openPanel(key, mode, colour) {
 }
 function showStep(step) {
   const who = CAST[step.job] || CAST.groundwork;
-  const mode = step.state === 'done' ? 'happy' : step.state === 'now' ? 'work' : 'idle';
+  const onIt = active.filter((h) => h.step === step.id);
+  const beingBuilt = step.state === 'now' && (!seen || onIt.length > 0);
+  const mode = step.state === 'done' ? 'happy' : beingBuilt ? 'work' : 'idle';
   const text = openPanel(step.job, mode, who.c[0]);
   const verb =
     step.state === 'done'
       ? who.name + ' finished this'
-      : step.state === 'now'
+      : beingBuilt
         ? who.name + ' is building this now'
-        : who.name + ' will build this';
+        : step.state === 'now'
+          ? 'Open, but nobody is on it this minute'
+          : who.name + ' will build this';
   text.append(el('span', 'muted small', verb), el('h3', '', step.id + ' ' + step.name));
   text.append(el('p', '', step.text));
   const lane = laneOf(step.id);
   [
-    ['Right now', lane && step.state === 'now' ? doing(lane) : ''],
+    [
+      'Working on it this minute',
+      onIt
+        .map(
+          (h) =>
+            'a ' +
+            ROLE_NAME[h.role].toLowerCase() +
+            (h.model ? ' on ' + cap(h.model) : '') +
+            ' (' +
+            h.what +
+            ')',
+        )
+        .join('; '),
+    ],
+    ['Where it stands', lane && step.state === 'now' ? doing(lane) : ''],
     ['Done when', step.test],
     ['Waits for', step.needs],
     ['AI model', step.model],
@@ -880,8 +1199,9 @@ function showStep(step) {
 function showHome(job) {
   const who = CAST[job];
   const mine = all.filter((s) => s.job === job);
-  const now = stat[job].now;
-  const text = openPanel(job, now.length ? 'work' : working ? 'idle' : 'sleep', who.c[0]);
+  const hot = stat[job].hot;
+  const open = stat[job].now.filter((s) => !hot.includes(s));
+  const text = openPanel(job, hot.length ? 'work' : working ? 'idle' : 'sleep', who.c[0]);
   text.append(
     el('span', 'muted small', who.home + ' · ' + who.job),
     el('h3', '', who.name + ' the ' + who.animal),
@@ -893,9 +1213,14 @@ function showHome(job) {
   const done = mine.filter((s) => s.state === 'done');
   cols.append(
     column2(
-      'Building now',
-      now.map((s) => stepLink(s, laneOf(s.id) ? doing(laneOf(s.id)) : '')),
-      working ? 'Nothing at this moment' : 'Resting',
+      'Building this minute',
+      hot.map((s) => stepLink(s, laneOf(s.id) ? doing(laneOf(s.id)) : '')),
+      working ? 'Nobody at this moment' : 'Resting',
+    ),
+    column2(
+      'Open, nobody on it this minute',
+      open.map((s) => stepLink(s, laneOf(s.id) ? doing(laneOf(s.id)) : '')),
+      'Nothing is waiting',
     ),
     column2(
       'Ready to start',
@@ -941,6 +1266,21 @@ function showLead() {
   const cols = el('div', 'cols');
   const open = D.needs.filter((n) => !n.done);
   cols.append(
+    column2(
+      'Working this minute (' + active.length + ')',
+      active.map((h) =>
+        el(
+          'div',
+          'small',
+          (h.step ? h.step + ' · ' : '') +
+            ROLE_NAME[h.role] +
+            (h.model ? ' on ' + cap(h.model) : '') +
+            ' · ' +
+            h.what,
+        ),
+      ),
+      seen ? 'No helper this minute' : 'Cannot be seen from here',
+    ),
     column2(
       'Work that is open now (' +
         lanes.length +
@@ -1009,6 +1349,19 @@ function showVault() {
 }
 function pick(job, quietly) {
   picked = picked === job && !quietly ? '' : job;
+  markPicked();
+  if (!picked) {
+    detail.className = '';
+    return;
+  }
+  if (picked === 'lead') showLead();
+  else if (picked === 'inspector') showReviewer();
+  else if (picked === 'vault') showVault();
+  else showHome(picked);
+  if (!quietly) detail.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+// Shows in the village which home is picked. Run again each time the village is redrawn.
+function markPicked() {
   const scene = document.querySelector('.scene');
   const pals = picked && JOBS.includes(picked) ? partners(picked).map((x) => x.job) : [];
   scene.classList.toggle('picking', Boolean(picked) && JOBS.includes(picked));
@@ -1025,32 +1378,26 @@ function pick(job, quietly) {
     node.classList.toggle('dim', Boolean(picked) && JOBS.includes(picked) && !mine);
     node.style.stroke = picked && mine ? CAST[picked].c[0] : '';
   });
-  if (!picked) {
-    detail.className = '';
-    return;
-  }
-  if (picked === 'lead') showLead();
-  else if (picked === 'inspector') showReviewer();
-  else if (picked === 'vault') showVault();
-  else showHome(picked);
-  if (!quietly) detail.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
-document.querySelectorAll('.home').forEach((node) => {
-  node.addEventListener('click', () => pick(node.dataset.job));
-  node.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      pick(node.dataset.job);
-    }
+function wireHomes() {
+  document.querySelectorAll('.home').forEach((node) => {
+    node.addEventListener('click', () => pick(node.dataset.job));
+    node.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        pick(node.dataset.job);
+      }
+    });
   });
-});
+}
+wireHomes();
 
 // ---------- how far along ----------
 plans.forEach((p) => {
   const steps = p.groups.flatMap((g) => g.steps);
   const done = steps.filter((s) => s.state === 'done').length;
   const row = el('div', 'prog');
-  const bar = el('div', 'bar');
+  const bar = el('div', 'bar' + (working && done < steps.length ? ' live' : ''));
   const fill = el('i');
   bar.append(fill);
   row.append(
@@ -1065,7 +1412,9 @@ plans.forEach((p) => {
 });
 
 // ---------- every step, one by one ----------
+let boardStage = 0;
 function drawBoard(number) {
+  boardStage = number;
   $('lanes').innerHTML = '';
   document.querySelectorAll('.tab').forEach((t) => {
     t.classList.toggle('sel', Number(t.dataset.stage) === number);
@@ -1083,7 +1432,8 @@ function drawBoard(number) {
     const chips = el('div', 'chips');
     group.steps.forEach((step) => {
       const who = CAST[step.job] || CAST.groundwork;
-      const chip = el('button', 'chip ' + step.state);
+      const hot = Boolean(stat[step.job] && stat[step.job].hot.includes(step));
+      const chip = el('button', 'chip ' + step.state + (hot ? ' hot' : ''));
       chip.style.setProperty('--c', who.c[0]);
       const text = el('span');
       text.append(
@@ -1093,12 +1443,14 @@ function drawBoard(number) {
           '',
           step.state === 'done'
             ? 'done'
-            : step.state === 'now'
-              ? who.name + ' is on it'
-              : 'planned · ' + who.job.toLowerCase(),
+            : hot
+              ? who.name + ' is on it now'
+              : step.state === 'now'
+                ? 'open · nobody on it this minute'
+                : 'planned · ' + who.job.toLowerCase(),
         ),
       );
-      chip.append(critter(step.job, 30, step.state === 'now' && busy ? 'work' : 'idle'), text);
+      chip.append(critter(step.job, 30, hot ? 'work' : 'idle'), text);
       chip.onclick = () => showStep(step);
       chips.append(chip);
     });
@@ -1157,7 +1509,7 @@ $('foot').textContent =
   clock(D.generatedAt) +
   (location.protocol === 'file:'
     ? '. Opened as a file, it shows what the last ten-minute check wrote. For a page that is fresh every time it loads, and costs nothing, double-click "Open build progress.cmd" in the project folder. '
-    : '. It is written fresh each time it loads, and reloads itself every minute. Nothing about this page uses the usage allowance. ') +
+    : '. It is written fresh each time it loads, asks every five seconds who is working, and reloads itself when the plans change. All of it is read from files on this computer: nothing about this page uses the usage allowance. ') +
   'Each character stands for a kind of work: every step is built by a fresh AI builder, and the character shows which kind of work it is. ';
 const toggle = el(
   'button',
@@ -1177,11 +1529,68 @@ try {
 } catch {
   // No storage: nothing to restore.
 }
-setInterval(() => {
+
+// ---------- staying current ----------
+// Everything that depends on who is working is drawn again when newer facts arrive. The
+// village is redrawn only when what it shows has changed, so it does not flicker.
+const sceneKey = () =>
+  JSON.stringify([
+    working,
+    seen,
+    active.length,
+    lanes.length,
+    JOBS.map((job) => stat[job].hot.map((s) => s.id).join() + '|' + stat[job].now.length),
+    reviews.map((h) => h.step).sort(),
+  ]);
+let drawn = sceneKey();
+function refresh() {
+  judge();
+  drawPill();
+  drawCrew();
+  if (sayLines()[0] !== headline) speak();
+  const key = sceneKey();
+  if (key === drawn) return;
+  drawn = key;
+  drawVillage();
+  wireHomes();
+  markPicked();
+  drawBoard(boardStage);
+}
+drawCrew();
+const reload = () => {
   try {
     sessionStorage.setItem('srl-build-picked', picked);
   } catch {
     // No storage: the page just reloads without it.
   }
   location.reload();
-}, 60000);
+};
+if (location.protocol !== 'file:' && !preview) {
+  const loadedAt = Date.now();
+  let stamp = D.stamp || '';
+  setInterval(async () => {
+    if (document.hidden) return;
+    try {
+      const answer = await fetch('live.json', { cache: 'no-store' });
+      const next = await answer.json();
+      offline = false;
+      // The status file or a plan was saved again: load the whole page afresh.
+      if (stamp && next.stamp && next.stamp !== stamp && Date.now() - loadedAt > 20000) {
+        reload();
+        return;
+      }
+      stamp = stamp || next.stamp;
+      live = next;
+      lockTime = next.lock || '';
+    } catch {
+      // The server was closed. Say so, and keep showing what was true.
+      offline = true;
+    }
+    refresh();
+  }, 5000);
+  // A safety net: the whole page afresh every fifteen minutes, whatever happens.
+  setInterval(reload, 900000);
+} else {
+  // Opened as a saved file: only the "x min ago" words can change.
+  setInterval(refresh, 60000);
+}

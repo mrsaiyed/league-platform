@@ -261,8 +261,12 @@ describe('tracker controller: a refused tap (T-113)', () => {
     // The rest went on; the game is the server's: nobody on the floor for the home side.
     const server = await serverGame(network);
     expect(server.sequence).toBe(2);
-    // Loaded on opening, and again after the refusal.
-    expect(network.reached.filter((r) => r === 'GET state')).toHaveLength(2);
+    // Loaded on opening, and again after the refusal; and, while the game had not
+    // started, after each batch the server took (the line-up, then the basket), since
+    // until then the server plays it under its rules as they stand (record 062). Four
+    // only because the wrong line-up and the basket go in separate batches here: in one
+    // batch, the refusal's reload would be the only load after it.
+    expect(network.reached.filter((r) => r === 'GET state')).toHaveLength(4);
     expect(status.serverSequence).toBeGreaterThanOrEqual(1);
     expect(status.game?.plays).toEqual(server.state.plays);
     expect(basketball.derive(status.game ?? server.state).teams.home.onCourt).toEqual([]);

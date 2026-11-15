@@ -17,14 +17,16 @@
 // - swapping colors on an ended game changes nothing that is kept, and the door turns
 //   away anything sent to an ended game, so those are left out.
 // Every stored action is checked against the tracker's own command shape before any of
-// this: a backup is data from elsewhere, never trusted as it is.
-import { TrackerCommand } from '@srleagues/contracts';
+// this: a backup is data from elsewhere, never trusted as it is. That shape is the
+// Al-Hadi tracker's (`TrackerCommandV1`), not the platform's wider one (record 062):
+// that tracker never had a clock-mode switch, so a backup holding one is not its own.
+import { TrackerCommandV1 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
 import type { TrackerGame } from './tracker-transfer-data.ts';
 
 /** An action as the door takes it: the tracker's command, its id and when it was tapped. */
-export type TrackerInput = TrackerCommand['input'];
+export type TrackerInput = z.infer<typeof TrackerCommandV1>['input'];
 
 /** The actions played again: every one but the tracker's format setting. */
 export type ReplayInput = Exclude<TrackerInput, { readonly type: 'rules' }>;
@@ -62,7 +64,7 @@ export type ReplayProblem =
   | { readonly kind: 'unreadable-action'; readonly seq: number }
   | { readonly kind: 'unreadable-state' };
 
-const Input = TrackerCommand.shape.input;
+const Input = TrackerCommandV1.shape.input;
 const Stored = z.union([
   z.strictObject({ at: z.number().int().nonnegative().nullable().optional(), input: Input }),
   Input,

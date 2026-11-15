@@ -168,6 +168,14 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.makeLeague,
     "staff tool (step 2.125): asks the logins and the migration log again, as the migration login checks one short name and makes accounts by email (removing those it made if no league is made), then reaches the one new league only through createLeague with its first season (own case), under the app's login on a hosted database, fenced to that league",
   ],
+  [
+    databasePackage.previewLeagueRemoval,
+    "staff tool (step 2.150, record 063): asks the logins as makeLeague does, then as the migration login reads the one league one short name names (find_league_by_slug), that league's own rows and league_removal_problems for it, and two accounts (staff by email, the league's owner); changes nothing",
+  ],
+  [
+    databasePackage.removeLeague,
+    "staff tool (step 2.150, record 063): the preview's reads again, then reaches the one league only through removeDraftLeague (own case), in a transaction set to that league and account, where remove_draft_league refuses any other (schema/league-removal.test.ts); then removes that league's owner's account only through removeUnusedAccount; tested two leagues at once in league-making/remove-league.test.ts",
+  ],
 ]);
 
 /**

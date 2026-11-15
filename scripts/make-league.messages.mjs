@@ -285,6 +285,9 @@ const gapWords = {
   accounts: 'it may not read, add and remove rows in the accounts table',
   'migration-log': 'it may not read the migration log',
   functions: 'it may not call find_league_by_slug and uuid_v7',
+  // Asked by npm run league:remove only (step 2.150).
+  removal:
+    'it may not run the removal (remove_draft_league, league_removal_problems, league_rows) or write the platform log',
 };
 
 /** Why a login may not do its part (probe-logins.ts), with what to do. */
