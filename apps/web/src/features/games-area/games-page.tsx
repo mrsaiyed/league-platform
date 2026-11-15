@@ -1,3 +1,8 @@
+// `/{league}/admin/games`: this week's games, and the changes this person may make to
+// each (steps 2.55, 2.154 and 2.155). Every form here is answered without the address
+// (T-271, record 067): a refusal or the question before a final score is saved in the
+// response to the post, beside the game (final-score-boxes.tsx, action-form.tsx); a save
+// by the one-time notice, read here once, which names the game and is said beside it.
 import { leagueUrl, listMyGames, type LeagueAddressee } from '@srleagues/core';
 import { displayLabels } from '@srleagues/site';
 import { GameCard } from '@srleagues/ui';
@@ -6,44 +11,20 @@ import { commandContextOf } from '../../server/context.ts';
 import { gameWhenText, type LeagueTimes } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
+import { noticeHolderOf, savedNoticesHere, type SavedNotice } from '../../server/saved-notice.ts';
+import { ActionForm } from './action-form.tsx';
 import {
-  askFinalScoreAction,
   cancelGameAction,
-  enterFinalScoreAction,
+  finalScoreAction,
   postponeGameAction,
   recordForfeitAction,
 } from './actions.ts';
 import { buildGameRows, type GameRowView } from './build-games-view.ts';
-import {
-  gameAnchor,
-  gamesReturn,
-  readGamesSearch,
-  type GamesSearch,
-  type SearchParams,
-} from './games-search.ts';
+import { FinalScoreBoxes, type FinalScoreTexts } from './final-score-boxes.tsx';
 import { readReopenViews } from './read-reopen-views.ts';
 import { ReopenLine } from './reopen-line.tsx';
-
-export type { SearchParams } from './games-search.ts';
-
-/** A refusal, as words: the command's code where the list knows it. */
-function problemKey(problem: string): TextKey {
-  const key = `admin.games.error.${problem}`;
-  const known: readonly TextKey[] = [
-    'admin.games.error.not-allowed',
-    'admin.games.error.invalid-input',
-    'admin.games.error.game-not-found',
-    'admin.games.error.changed-since-read',
-    'admin.games.error.game-already-decided',
-    'admin.games.error.game-cancelled',
-    'admin.games.error.tie-not-allowed',
-    'admin.games.error.team-not-in-game',
-    'admin.games.error.game-is-tracked',
-    'admin.games.error.game-not-postponable',
-    'admin.games.error.game-not-cancellable',
-  ];
-  return known.find((k) => k === key) ?? 'admin.games.error.unknown';
-}
+import { SavedLine } from './saved-line.tsx';
+import { gameAnchor } from './score-fields.ts';
 
 /** "Tigers 47, Lions 51": both teams and the score, away team first, as on the card. */
 function resultText(game: GameRowView, homeScore: number | string, awayScore: number | string) {
@@ -55,180 +36,100 @@ function resultText(game: GameRowView, homeScore: number | string, awayScore: nu
   });
 }
 
-type Notice = { readonly text: string; readonly problem: boolean };
+/** "Tigers at Lions". */
+const gameText = (game: GameRowView) =>
+  t('admin.games.game', { away: game.awayName, home: game.homeName });
+
+const savedKeys = ['forfeit', 'postpone', 'cancel'] as const;
 
 /**
- * What was just done or refused, as words. A saved final score names the game and its
- * score ("Saved: Tigers 47, Lions 51 is final."), read from the game as it is now.
+ * What was just saved, as words, naming the game, read from the game as it is now: a
+ * final score names its score too ("Saved: Tigers 47, Lions 51 is final.").
  */
-function noticeOf(search: GamesSearch, game: GameRowView | undefined): Notice | undefined {
-  if (search.problem !== undefined) return { text: t(problemKey(search.problem)), problem: true };
-  const done = search.done;
-  if (done === undefined) return undefined;
-  if (done === 'reopen') {
-    return {
-      text: t(
-        game?.hasPlays === true ? 'admin.games.done.reopenTracked' : 'admin.games.done.reopen',
-      ),
-      problem: false,
-    };
+function noticeText(notice: SavedNotice, game: GameRowView | undefined): string {
+  const said = notice.said;
+  if (said === 'reopen') {
+    return t(
+      game?.hasPlays === true ? 'admin.games.done.reopenTracked' : 'admin.games.done.reopen',
+    );
   }
-  if (
-    done === 'final' &&
-    game?.status === 'final' &&
-    game.homeScore !== null &&
-    game.awayScore !== null
-  ) {
-    const result = resultText(game, game.homeScore, game.awayScore);
-    return { text: t('admin.games.saved.final', { result }), problem: false };
+  if (game === undefined) {
+    const doneKeys: readonly TextKey[] = [
+      'admin.games.done.final',
+      'admin.games.done.forfeit',
+      'admin.games.done.postpone',
+      'admin.games.done.cancel',
+    ];
+    return t(doneKeys.find((k) => k === `admin.games.done.${said}`) ?? 'admin.games.done.final');
   }
-  return { text: t(`admin.games.done.${done}`), problem: false };
+  if (said === 'final' && game.homeScore !== null && game.awayScore !== null) {
+    return t('admin.games.saved.final', {
+      result: resultText(game, game.homeScore, game.awayScore),
+    });
+  }
+  const kind = savedKeys.find((k) => k === said);
+  return kind === undefined
+    ? t('admin.games.done.final')
+    : t(`admin.games.saved.${kind}`, { game: gameText(game) });
 }
 
-function NoticeLine({ notice }: { readonly notice: Notice }) {
-  return notice.problem ? (
-    <p className="ui-notice" data-kind="error" role="alert">
-      {notice.text}
-    </p>
-  ) : (
-    <p className="ui-notice" role="status">
-      {notice.text}
-    </p>
-  );
+/** The words of a game's score boxes and its question, for the client form. */
+function finalScoreTexts(game: GameRowView, early: string | undefined): FinalScoreTexts {
+  const result = resultText(game, '{homeScore}', '{awayScore}');
+  const team = { awayScore: game.awayName, homeScore: game.homeName } as const;
+  return {
+    enterFinal: t('admin.games.enterFinal'),
+    save: t('admin.games.saveScore'),
+    labels: {
+      awayScore: t('admin.games.scoreOf', { team: team.awayScore }),
+      homeScore: t('admin.games.scoreOf', { team: team.homeScore }),
+    },
+    ask:
+      early === undefined
+        ? t('admin.games.confirm.ask', { result })
+        : t('admin.games.confirm.early', { result, when: early }),
+    yes: t('admin.games.confirm.yes'),
+    no: t('admin.games.confirm.no'),
+    wrongBox: {
+      awayScore: t('admin.games.refused.score', { team: team.awayScore }),
+      homeScore: t('admin.games.refused.score', { team: team.homeScore }),
+    },
+    tie: t('admin.games.refused.tie', { result }),
+  };
 }
 
-function Fields({ league, game }: { readonly league: string; readonly game: GameRowView }) {
-  return (
-    <>
-      <input type="hidden" name="league" value={league} />
-      <input type="hidden" name="gameId" value={game.id} />
-      <input type="hidden" name="version" value={game.version} />
-    </>
-  );
-}
-
-/**
- * The game's score boxes, behind "Enter the final score" on this game alone. Saving them
- * only asks (askFinalScoreAction). Open, with what was typed, when the person comes back
- * from the question to change the score, or after the game was reopened to correct it.
- */
-function ScoreBoxes({
-  league,
-  game,
-  enter,
-}: {
-  readonly league: string;
-  readonly game: GameRowView;
-  readonly enter: GamesSearch['enter'];
-}) {
-  const open = enter?.gameId === game.id;
-  const typed = open ? enter.typed : undefined;
-  return (
-    <details open={open} data-score-boxes="">
-      <summary className="ui-button">{t('admin.games.enterFinal')}</summary>
-      <form action={askFinalScoreAction} className="ui-panel ui-stack">
-        <Fields league={league} game={game} />
-        {(['awayScore', 'homeScore'] as const).map((name) => (
-          <label key={name} className="ui-stack">
-            <span>
-              {t('admin.games.scoreOf', {
-                team: name === 'homeScore' ? game.homeName : game.awayName,
-              })}
-            </span>
-            <input
-              type="number"
-              name={name}
-              inputMode="numeric"
-              min={0}
-              max={999}
-              step={1}
-              required
-              defaultValue={typed?.[name] ?? ''}
-            />
-          </label>
-        ))}
-        <p>
-          <button type="submit" className="ui-button" data-kind="main">
-            {t('admin.games.saveScore')}
-          </button>
-        </p>
-      </form>
-    </details>
-  );
-}
-
-/**
- * The question before a final score is saved (A-5): both teams and the score, and first
- * that the game's time has not come when it has not. "Yes" is the one form that saves a
- * final score; "No" opens the boxes again with what was typed.
- */
-function ScoreQuestion({
-  league,
-  here,
-  game,
-  ask,
-  early,
-}: {
-  readonly league: string;
-  readonly here: LeagueAddressee;
-  readonly game: GameRowView;
-  readonly ask: NonNullable<GamesSearch['ask']>;
-  /** When the game is set for, written for the reader, when that time has not come. */
-  readonly early: string | undefined;
-}) {
-  const result = resultText(game, ask.homeScore, ask.awayScore);
-  const questionId = `${gameAnchor(game.id)}-question`;
-  const change =
-    leagueUrl(here, 'admin-area', { area: 'games' }) +
-    gamesReturn({ enter: game.id, home: ask.homeScore, away: ask.awayScore }, game.id);
-  return (
-    <div className="ui-panel ui-stack" role="group" aria-labelledby={questionId} data-question="">
-      <p id={questionId}>
-        <strong>
-          {early === undefined
-            ? t('admin.games.confirm.ask', { result })
-            : t('admin.games.confirm.early', { result, when: early })}
-        </strong>
-      </p>
-      <form action={enterFinalScoreAction}>
-        <input type="hidden" name="league" value={league} />
-        <input type="hidden" name="gameId" value={game.id} />
-        <input type="hidden" name="version" value={ask.version} />
-        <input type="hidden" name="homeScore" value={ask.homeScore} />
-        <input type="hidden" name="awayScore" value={ask.awayScore} />
-        <input type="hidden" name="confirmed" value="yes" />
-        <button type="submit" className="ui-button" data-kind="main">
-          {t('admin.games.confirm.yes')}
-        </button>
-      </form>
-      <p>
-        <a className="ui-button" href={change}>
-          {t('admin.games.confirm.no')}
-        </a>
-      </p>
-    </div>
-  );
+/** A game's form's hidden values: which game as it was read, and the form's one-time token. */
+function hiddenOf(league: string, game: GameRowView): Record<string, string> {
+  return {
+    league,
+    gameId: game.id,
+    version: String(game.version),
+    requestToken: crypto.randomUUID(),
+  };
 }
 
 function Controls({
   league,
   here,
   game,
-  search,
+  reopened,
   times,
   now,
 }: {
   readonly league: string;
   readonly here: LeagueAddressee;
   readonly game: GameRowView;
-  readonly search: GamesSearch;
+  /** The game was just reopened to correct it: its boxes start open. */
+  readonly reopened: boolean;
   readonly times: LeagueTimes;
   /** The server's time now (ms), to say when a game's time has not come. */
   readonly now: number;
 }) {
   const trackerHref = leagueUrl(here, 'score', { game: game.id });
   const gameHref = leagueUrl(here, 'admin-area', { area: 'games', subpath: [game.id] });
-  const asking = game.canScore && search.ask?.gameId === game.id ? search.ask : undefined;
+  const permalink = `${leagueUrl(here, 'admin-area', { area: 'games' })}#${gameAnchor(game.id)}`;
+  // A refusal names the game ("Tigers at Lions: …").
+  const refusal = t('admin.games.refusedAbout', { game: gameText(game), problem: '{problem}' });
   const early =
     game.startsAt !== null && Date.parse(game.startsAt) > now
       ? gameWhenText(game.startsAt, times)
@@ -248,10 +149,17 @@ function Controls({
           ) : null}
         </>
       ) : null}
-      {asking !== undefined ? (
-        <ScoreQuestion league={league} here={here} game={game} ask={asking} early={early} />
-      ) : game.canScore ? (
-        <ScoreBoxes league={league} game={game} enter={search.enter} />
+      {game.canScore ? (
+        <FinalScoreBoxes
+          action={finalScoreAction}
+          league={league}
+          gameId={game.id}
+          version={game.version}
+          token={crypto.randomUUID()}
+          open={reopened}
+          permalink={permalink}
+          texts={finalScoreTexts(game, early)}
+        />
       ) : null}
       {game.trackerLink && !game.hasPlays ? (
         <p>
@@ -271,27 +179,37 @@ function Controls({
       {game.canForfeit ? (
         <details>
           <summary>{t('admin.games.otherActions')}</summary>
-          <form action={recordForfeitAction}>
-            <Fields league={league} game={game} />
-            <label>
-              <span>{t('admin.games.forfeitBy')}</span>
-              <select name="forfeitingTeamId" required>
-                <option value={game.homeTeamId}>{game.homeName}</option>
-                <option value={game.awayTeamId}>{game.awayName}</option>
-              </select>
-            </label>
-            <button type="submit">{t('admin.games.recordForfeit')}</button>
-          </form>
+          <ActionForm
+            action={recordForfeitAction}
+            permalink={permalink}
+            hidden={hiddenOf(league, game)}
+            choice={{
+              name: 'forfeitingTeamId',
+              label: t('admin.games.forfeitBy'),
+              options: [
+                { value: game.homeTeamId, label: game.homeName },
+                { value: game.awayTeamId, label: game.awayName },
+              ],
+            }}
+            button={t('admin.games.recordForfeit')}
+            refusal={refusal}
+          />
           {game.canCallOff ? (
             <>
-              <form action={postponeGameAction}>
-                <Fields league={league} game={game} />
-                <button type="submit">{t('admin.games.postpone')}</button>
-              </form>
-              <form action={cancelGameAction}>
-                <Fields league={league} game={game} />
-                <button type="submit">{t('admin.games.cancel')}</button>
-              </form>
+              <ActionForm
+                action={postponeGameAction}
+                permalink={permalink}
+                hidden={hiddenOf(league, game)}
+                button={t('admin.games.postpone')}
+                refusal={refusal}
+              />
+              <ActionForm
+                action={cancelGameAction}
+                permalink={permalink}
+                hidden={hiddenOf(league, game)}
+                button={t('admin.games.cancel')}
+                refusal={refusal}
+              />
             </>
           ) : null}
         </details>
@@ -303,11 +221,9 @@ function Controls({
 /** `/{league}/admin/games`: this week's games, and the changes this person may make to each. */
 export async function GamesPage({
   league,
-  search,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
-  readonly search: SearchParams;
 }) {
   const view = await loadLeaguePage(league, 'admin', 'games');
   const addressee = view.context.league;
@@ -323,16 +239,19 @@ export async function GamesPage({
   const { timeZone } = await ports.publicSchedule.clockOf(addressee.id);
   const times: LeagueTimes = { locale, timeZone };
   const labels = displayLabels(t).game;
-  const said = readGamesSearch(search);
-  // The answer to a tap is said beside its game; at the top only when the game is not listed.
-  const aboutRow = rows.find((row) => row.id === said.game);
-  const notice = noticeOf(said, aboutRow);
+  // What was just saved, taken (so a reload does not say it again): said beside its game;
+  // at the top only when the game is not listed.
+  const noticeHolder = noticeHolderOf(context);
+  const notice =
+    noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'games');
+  const aboutRow = rows.find((row) => row.id === notice?.thing);
+  const saved = notice === undefined ? undefined : noticeText(notice, aboutRow);
   const now = Date.now();
   return (
     <main className="admin-games">
       <h1>{t('admin.area.games')}</h1>
       <p>{t('admin.games.intro')}</p>
-      {notice === undefined || aboutRow !== undefined ? null : <NoticeLine notice={notice} />}
+      {saved === undefined || aboutRow !== undefined ? null : <SavedLine text={saved} />}
       {games.some((g) => !g.scorable) ? <p>{t('admin.games.notScorable')}</p> : null}
       {!listed.ok ? (
         <p role="alert">{t('admin.games.listProblem')}</p>
@@ -343,7 +262,7 @@ export async function GamesPage({
           {rows.map((game) => (
             <li key={game.id} id={gameAnchor(game.id)} className="ui-stack">
               <div className="ui-stack">
-                {notice !== undefined && game === aboutRow ? <NoticeLine notice={notice} /> : null}
+                {saved !== undefined && game === aboutRow ? <SavedLine text={saved} /> : null}
                 <GameCard
                   home={{ name: game.homeName, score: game.homeScore }}
                   away={{ name: game.awayName, score: game.awayScore }}
@@ -363,7 +282,7 @@ export async function GamesPage({
                   league={league}
                   here={addressee}
                   game={game}
-                  search={said}
+                  reopened={game === aboutRow && notice?.said === 'reopen'}
                   times={times}
                   now={now}
                 />

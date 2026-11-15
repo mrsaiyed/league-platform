@@ -357,6 +357,7 @@ All dated November 12, 2026.
 | T-268                 | New                                                                          | The parents' confirmation is a setting of its own; a same-value save writes nothing; the store says when a value was saved (rec. 065)           | Step 2.162: a confirmation kept only in how the names value was written could not be told apart    |
 | T-269                 | New                                                                          | Agreed (delegated): the leagues of the signed-in account: one owner-run function, no argument, that account only (rec. 066)                     | Step 2.127: no fenced query can list an account's leagues (2.105 audit, H3)                        |
 | T-270                 | New (refines T-9)                                                            | Agreed (delegated): the first online test copy runs on Render at Render's own address with the Supabase test project; Vercel rejected           | The founder asked where to test online for free (2026-11-15); the chat lead decided                |
+| T-271                 | Each form answered with the answer in the address                            | Agreed (delegated): refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)           | Step 2.155: a refusal emptied a box score; "Saved" off screen; a reload said it again (H6, M2, M8) |
 
 ## The full list
 
@@ -637,6 +638,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-33  | Size is a signal. A file past about 300 lines, or a command doing three separate things, gets split                                                                    | Agreed (delegated) |         |
 | T-34  | Every address is built by one function, and the league a request is for is worked out in one place                                                                     | Agreed (delegated) | yes     |
 | T-232 | The shell works a request out once, then each page answers shown, not found, forwarded or no access (403); pages check, layouts never refuse; Next.js 16 (record 020)  | Agreed (delegated) | yes     |
+| T-271 | A form's answer never rides in the address: refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)          | Agreed (delegated) |         |
 
 ### [T3 — Data model](technical/T3-data-model.md)
 
