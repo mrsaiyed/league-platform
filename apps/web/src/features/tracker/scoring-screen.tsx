@@ -551,9 +551,13 @@ export function ScoringScreen(props: ScoringScreenProps) {
   // No bench player is hidden without a sign, and nothing scrolls sideways: a row that
   // holds one line of players (a phone's bench strip, the pad's "Sub in") shows as many
   // as fit whole and, when there are more, ends in a tile that says how many more and
-  // opens them all in the pad. Counted when a bench or the pad changes or the screen
+  // opens them all in the pad. The players a line does not hold are marked, so the
+  // stylesheet takes them out of the keyboard's way too (a focused thing that is cut
+  // off would be scrolled to). Counted when a bench or the pad changes or the screen
   // is turned, never in the turn of a tap.
-  const benches = `${view.teams.home.stage}${view.teams.home.bench.length}${view.teams.away.stage}${view.teams.away.bench.length}`;
+  const benches = (['home', 'away'] as const)
+    .map((side) => `${view.teams[side].stage} ${view.teams[side].bench.map((p) => p.id).join(' ')}`)
+    .join('|');
   useEffect(() => {
     const measure = () => {
       const rows = root.current?.querySelectorAll<HTMLElement>('[data-fit]') ?? [];
@@ -568,6 +572,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
             : 0;
         row.toggleAttribute('data-more', more > 0);
         row.querySelector(':scope > .court-more-tile')?.setAttribute('data-count', String(more));
+        players.forEach((player, place) =>
+          player.toggleAttribute('data-folded', more > 0 && place >= columns - 1),
+        );
       }
     };
     measure();

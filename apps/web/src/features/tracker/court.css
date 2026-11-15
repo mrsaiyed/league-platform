@@ -789,6 +789,11 @@
 [data-more] > .court-more-tile {
   display: flex;
 }
+/* The players the line does not hold are out of the keyboard's way as well as out of
+   sight: they are reached through the end tile. */
+[data-fit] > [data-folded] {
+  visibility: hidden;
+}
 .court-more-tile::before {
   content: '+' attr(data-count);
   font-size: 18px;
