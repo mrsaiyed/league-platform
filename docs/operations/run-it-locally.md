@@ -71,22 +71,34 @@ venues. **The world is made again every time the server starts**: whatever you a
 after a restart, and the games' days move with the time it starts, so this week's round is
 always this week, the games already played are in the past and the live game is under way.
 Every league page says so in one quiet line at the foot of the page: "A made-up league on
-this computer. It starts over when the app restarts." The made-up world listens on this
-computer's loopback address only (`127.0.0.1`), so no other computer can reach it at all;
-open it at `http://localhost:<port>` or `http://127.0.0.1:<port>`. It answers only a request
-addressed to `localhost`, `127.0.0.1`, `[::1]`, a name ending in `.localhost`, or the `.test`
-name `PUBLIC_BASE_URL` gives, and only one not passed on by another server (no `Forwarded`
-or `Via` header, no `X-Forwarded-For` or `X-Forwarded-Host` from elsewhere). Anything else
-gets a plain page and nothing more. On the made-up database (`LOCAL_DATA=made-up-database`)
+this computer. It starts over when the app restarts."
+
+**Open it at the `127.0.0.1` address.** The made-up world listens on this computer's
+loopback address only (`127.0.0.1`), so no other computer can reach it at all, and a league
+page answers only for the exact address `PUBLIC_BASE_URL` names. So:
+
+- put `PUBLIC_BASE_URL=http://127.0.0.1:3000` in `.env` and open
+  `http://127.0.0.1:3000/north-valley`;
+- the preview (`node scripts/preview-web.mjs`) sets this itself: open
+  `http://127.0.0.1:3210/north-valley`. There `http://localhost:3210` answers "not found"
+  (404), because `localhost` is not the address `PUBLIC_BASE_URL` names;
+- `http://[::1]:<port>` reaches nothing at all: the server does not listen on that address.
+
+Before any page is looked at, the server answers only a request addressed to `localhost`,
+`127.0.0.1`, `[::1]`, a name ending in `.localhost`, or the `.test` name `PUBLIC_BASE_URL`
+gives, and only one not passed on by another server (no `Forwarded` or `Via` header, no
+`X-Forwarded-For` or `X-Forwarded-Host` from elsewhere). Anything else gets a plain page and
+nothing more. On the made-up database (`LOCAL_DATA=made-up-database`)
 it listens on `127.0.0.1` only too, as everything does with `APP_ENV` local or test: the
 made-up member's password is written in the code there as well.
 
 To try it as a league's admin:
 
-1. Start it with `npm run dev:web` and open `http://localhost:3000/north-valley`.
+1. With `PUBLIC_BASE_URL=http://127.0.0.1:3000` in `.env`, start it with `npm run dev:web`
+   and open `http://127.0.0.1:3000/north-valley`.
 2. Be the made-up owner: in the browser's developer tools, add a cookie `srl_session` with
-   the value `local-owner-token` for `localhost` (the made-up people are given only by this
-   cookie, see `stand-in-cast.ts`), then open `http://localhost:3000/north-valley/admin`
+   the value `local-owner-token` for `127.0.0.1` (the made-up people are given only by this
+   cookie, see `stand-in-cast.ts`), then open `http://127.0.0.1:3000/north-valley/admin`
    (nothing links to the admin from the public pages yet). Step 2.127 replaces these two
    steps: it gives the made-up owner a password, so you sign in by tapping.
 3. Teams: under "Add a team" type a name and tap "Add team". On the team's page, under
@@ -218,7 +230,7 @@ Open `http://127.0.0.1:4180`. Without `DATABASE_URL`, it saves to embedded Postg
 ## If something does not start
 
 - A `ConfigError` names each missing or invalid setting. Fix that line in `.env`; the message never shows a value.
-- If `npm run dev:web` fails with a stand-in refusal, check that `PUBLIC_BASE_URL` uses `localhost` and that `APP_ENV` is `local`.
+- If `npm run dev:web` fails with a stand-in refusal, check that `PUBLIC_BASE_URL` uses `127.0.0.1` (or `localhost`) and that `APP_ENV` is `local`. If a league page answers "not found", check that the address in the browser is exactly the one `PUBLIC_BASE_URL` names.
 - If a test fails only on one run, run `npm run test:units` again on its own. Database tests can be slow on a busy machine; they use long timeouts on purpose.
 
 Related: [applying migrations](apply-migrations.md), [verification](verification.md), and the decisions in `docs/architecture/decisions/` (records 041 to 048 cover the stack this guide uses).
