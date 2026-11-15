@@ -546,12 +546,23 @@ export const gameCss = String.raw`
 .ui-scoreboard {
   padding-block: var(--step-5);
   padding-inline: var(--space);
-  background: var(--color-panel);
+  /* As a game's card: the panel, warmed at one corner in a dark design, with the fine line
+     of the league's color of decoration at its top. */
+  background-color: var(--color-panel);
+  background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   color: var(--color-text);
   border: var(--card-border-width) solid var(--color-line);
+  border-block-start: 2px solid var(--color-ornament-line);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   text-align: center;
+}
+/* The state's pill on the big board is soft: a tint of the main color, the accent for its
+   words and its edge. */
+.ui-scoreboard .ui-game-state {
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  background: var(--color-tint);
+  color: var(--color-accent-text);
 }
 /* On a phone the state of the game (its pill and clock, or when it will be played) has a
    quiet line of its own above the two teams, so nothing stands between their names and
@@ -621,9 +632,11 @@ export const gameCss = String.raw`
 }
 .ui-scoreboard-name {
   display: flex;
+  /* The team's shield stands over its name, both in the middle of the team's half. */
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--step-2);
+  justify-content: flex-start;
+  gap: var(--step-3);
   max-inline-size: 100%;
   font-family: var(--font-heading);
   /* One step smaller on a phone, where a team has half the board for its name. */
@@ -655,18 +668,41 @@ export const gameCss = String.raw`
     font-size: var(--text-22);
   }
 }
-/* A score is set in the reading face, whose figures are lining and even-width on every
-   device: two scores side by side are compared digit by digit. */
+/* A score is set in a face whose figures are lining and even-width (--font-score): two
+   scores side by side are compared digit by digit. It is the largest thing on the page and
+   is in the color the eye lands on: both scores while the game is played, and once it is
+   decided only the winner's, with a bar under it in the league's color of decoration. */
 .ui-scoreboard-score {
-  font-family: var(--font-body);
-  font-size: var(--text-36);
-  font-weight: 700;
+  justify-self: center;
+  padding-block-end: var(--step-1);
+  border-block-end: 2px solid transparent;
+  font-family: var(--font-score);
+  font-size: var(--text-48);
+  font-weight: var(--display-weight);
   line-height: 1;
   font-variant-numeric: lining-nums tabular-nums;
+  color: var(--color-pop);
+}
+.ui-scoreboard[data-state='final'] .ui-scoreboard-side:not([data-winner='true']) .ui-scoreboard-score {
   color: var(--color-text);
 }
 .ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score {
-  color: var(--color-highlight);
+  border-block-end-color: var(--color-ornament);
+  font-weight: 600;
+}
+.ui-scoreboard .ui-emblem {
+  block-size: var(--step-8);
+}
+@media (min-width: 48rem) {
+  .ui-scoreboard {
+    padding-block: var(--step-6);
+  }
+  .ui-scoreboard-score {
+    font-size: var(--text-64);
+  }
+  .ui-scoreboard .ui-emblem {
+    block-size: calc(var(--step-8) + var(--step-5));
+  }
 }
 .ui-scoreboard-period {
   color: var(--color-muted);

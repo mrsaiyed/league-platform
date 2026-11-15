@@ -670,6 +670,28 @@ html {
   font-size: var(--text-14);
 }
 
+/* A game's page opens with its board: the two teams, their shields and the score. The
+   page's title says the same two names, so it is kept for screen readers and for the
+   browser's tab and not drawn; the game's number and its day stand over the board as one
+   quiet line. */
+.game-page > .ui-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--step-1) var(--step-3);
+  margin-block-end: var(--step-3);
+}
+.game-page > .ui-page-head > h1 {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.game-page > .ui-page-head > .game-corrected {
+  flex: 1 1 100%;
+}
 /* A game's page: its tables (the two teams' box scores, the periods of the play-by-play)
    sit two across on a laptop, so a row's numbers stay near the name they belong to and no
    line of words runs the width of the screen. */

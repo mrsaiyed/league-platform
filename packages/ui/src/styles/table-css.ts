@@ -289,6 +289,9 @@ export const tableCss = String.raw`
   margin-inline-end: var(--step-2);
   vertical-align: middle;
 }
+.ui-table td:has(> .ui-emblem) {
+  white-space: nowrap;
+}
 .ui-standings[data-emblems='true'] .ui-team-cell > [dir] {
   max-inline-size: calc(45cqi - var(--step-6) - var(--step-3));
 }

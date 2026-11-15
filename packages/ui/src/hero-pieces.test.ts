@@ -853,7 +853,12 @@ describe('color where the eye should land (C-16)', () => {
         '.ui-leader:first-child .ui-leader-value',
         // A leader's one big number.
         '.ui-spot-value',
+        // The scores of a game's big board (the loser's is set back to the text color).
+        '.ui-scoreboard-score',
       ].sort(),
+    );
+    expect(css.replace(/\s+/g, ' ')).toContain(
+      ".ui-scoreboard[data-state='final'] .ui-scoreboard-side:not([data-winner='true']) .ui-scoreboard-score { color: var(--color-text); }",
     );
   });
 
@@ -864,6 +869,7 @@ describe('color where the eye should land (C-16)', () => {
         '.ui-kicker::before',
         ".ui-game-score > [data-winner='true']",
         ".ui-game-side[data-winner='true'] .ui-game-side-score",
+        ".ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score",
       ].sort(),
     );
     // Laid on the page only as strongly as it takes to be seen: the lines that frame.
@@ -871,6 +877,7 @@ describe('color where the eye should land (C-16)', () => {
       [
         '.ui-stat-strip',
         ".ui-game-card[data-layout='board']",
+        '.ui-scoreboard',
         ".ui-table-frame:has(.ui-standings[data-emblems='true'])",
       ].sort(),
     );

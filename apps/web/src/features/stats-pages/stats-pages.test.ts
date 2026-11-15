@@ -97,8 +97,12 @@ describe('statistics page', () => {
     expect(dana?.chips?.['team']).toBe(colorOfTeam.get('Falcons'));
     const text = html(data);
     expect(text).toContain(`--team-color:${colorOfTeam.get('Falcons')}`);
-    // One chip for each team in the teams table and one beside each player's team.
-    expect(text.match(/ui-team-chip/g)).toHaveLength(data.teamRows.length + data.playerRows.length);
+    // One mark for each team in the teams table and one beside each player's team. Since
+    // step 2.147 part 2 the mark is the team's small shield, where a chip used to be.
+    expect(text.match(/<svg class="ui-emblem" data-size="small"/g)).toHaveLength(
+      data.teamRows.length + data.playerRows.length,
+    );
+    expect(text).not.toContain('ui-team-chip');
   });
 
   it('gives an empty page a next step when it is told where the schedule is', async () => {
