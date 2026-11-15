@@ -1,5 +1,6 @@
-// The tracker's database guard (record 055): the one check the web app and the
-// worker both run on the platform's database setting before anything connects. The
+// The tracker's database guard (record 055): the one check the web app, the worker
+// and the tool that makes a league (npm run league:make, record 057) all run on a
+// database address of the platform's before anything connects. The
 // Al-Hadi tracker's Supabase project holds real games, and the platform never uses
 // it (T-201). It reads the setting as text only and never opens it.
 //
@@ -14,6 +15,9 @@
 //   as the direct host (db.{ref}.supabase.co) and the pooler's user (postgres.{ref}) do;
 // - a host, port, user, password, options or database name taken from the query
 //   string, where they would win over the address itself;
+// - any query string key that changes whether the connection is encrypted or which
+//   certificate is trusted (ssl, sslmode, sslnegotiation and the rest, sslKeys): pg
+//   lets the address win over its ssl option, so ssl=0 would turn encryption off;
 // - a host or user that is not plain ASCII, which could stand for another spelling;
 // - in staging and production, a host that is an IP address, which no name check can
 //   tell from the tracker's;
@@ -31,6 +35,13 @@ export type TrackerGuardFacts = {
   readonly env: Readonly<Record<string, string | undefined>>;
   /** APP_ENV as given (staging and production are stricter). */
   readonly appEnv: string | undefined;
+  /**
+   * True when the address is about to be opened on a hosted database whatever APP_ENV
+   * says: the tool that makes a league from this computer (record 057) has no APP_ENV
+   * and is as strict as staging and production. Left out, APP_ENV decides. It can
+   * only make the guard stricter: false never undoes staging or production.
+   */
+  readonly hosted?: boolean | undefined;
   /**
    * The tracker's Supabase project reference (trackerProjectOf), null when
    * supabase/site.json could not be read, or undefined to leave that check out (tests
@@ -53,8 +64,21 @@ const placeKeys = new Set([
   'service',
 ]);
 
-/** What packages/database takes out of the address before `pg` reads it (create-database.ts). */
-const sslKeys = ['sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat'];
+/**
+ * Every query string key pg-connection-string reads that changes whether the
+ * connection is encrypted or which certificate is trusted: the same list packages/
+ * database takes out of an address before `pg` reads it (sslAddressKeys). An address
+ * carrying one is refused by name; the SSL setting decides, never the address.
+ */
+const sslKeys = [
+  'ssl',
+  'sslmode',
+  'sslcert',
+  'sslkey',
+  'sslrootcert',
+  'sslnegotiation',
+  'uselibpqcompat',
+];
 
 /** The PG variables `pg` reads for a part the address leaves empty. */
 const fromEnvironment = [
@@ -71,6 +95,8 @@ type Target = {
   readonly database: string;
   readonly options: string;
   readonly queryKeys: readonly string[];
+  /** The SSL keys the address carries (sslKeys), lower-cased, as written in it. */
+  readonly sslKeysGiven: readonly string[];
 };
 
 const asciiOnly = /^[\x20-\x7e]*$/;
@@ -106,6 +132,12 @@ export function platformDatabaseProblem(
       return refuse("must not name the tracker's Supabase project (supabase/site.json)");
     }
   }
+  const sslKey = target.sslKeysGiven[0];
+  if (sslKey !== undefined) {
+    return refuse(
+      `must not set ${sslKey} in its query string: whether and how the connection is encrypted is never taken from the address`,
+    );
+  }
   if (target.queryKeys.some((key) => placeKeys.has(key.toLowerCase()))) {
     return refuse(
       'must not take its host, port, user, password, options or database name from its query string',
@@ -114,10 +146,13 @@ export function platformDatabaseProblem(
   if (!asciiOnly.test(target.host) || !asciiOnly.test(target.user)) {
     return refuse('must have a host and user of plain ASCII characters');
   }
-  const hosted = facts.appEnv === 'staging' || facts.appEnv === 'production';
+  const byAppEnv = facts.appEnv === 'staging' || facts.appEnv === 'production';
+  const hosted = facts.hosted === true || byAppEnv;
   if (hosted && isIpLiteral(target.host)) {
     return refuse(
-      `must name its server by a host name, not an IP address, when APP_ENV is ${facts.appEnv}`,
+      byAppEnv
+        ? `must name its server by a host name, not an IP address, when APP_ENV is ${facts.appEnv}`
+        : 'must name its server by a host name, not an IP address, for a hosted database',
     );
   }
   // Only where the address is opened: local work and tests never open it (T-201).
@@ -162,18 +197,44 @@ export function platformServiceProblem(
  */
 export function trackerProjectProblem(
   names: readonly string[],
-  facts: Pick<TrackerGuardFacts, 'appEnv' | 'trackerProject'>,
+  facts: Pick<TrackerGuardFacts, 'appEnv' | 'trackerProject' | 'hosted'>,
 ): string | undefined {
   if (facts.trackerProject !== null) return undefined;
-  if (facts.appEnv !== 'staging' && facts.appEnv !== 'production') return undefined;
+  const hosted =
+    facts.hosted === true || facts.appEnv === 'staging' || facts.appEnv === 'production';
+  if (!hosted) return undefined;
   return `supabase/site.json: could not be read, so ${names.join(' and ')} cannot be checked against the tracker's project`;
+}
+
+/** The only hosts that count as this computer: no other name, no socket, no tunnel. */
+const thisComputer = new Set(['localhost', '127.0.0.1', '::1']);
+
+/**
+ * Whether a postgres:// address names this computer, read the way `pg` reads it:
+ * only the bare name localhost, 127.0.0.1 or ::1 counts, never another name that may
+ * resolve there (*.localhost), another loopback address or a socket folder. True,
+ * false, or undefined when it cannot be read. A database anywhere else must have its
+ * certificate checked. A tunnel that brings a hosted database to localhost defeats
+ * this check: the operations page says not to use one.
+ */
+export function addressOnThisComputer(given: string): boolean | undefined {
+  const value = given.trim();
+  if (!/^postgres(?:ql)?:\/\//.test(value)) return undefined;
+  const target = targetOf(value);
+  if (target === undefined) return undefined;
+  return thisComputer.has(target.host.replace(/^\[(.*)\]$/, '$1').toLowerCase());
 }
 
 /** The parts of the address `pg` would use, decoded as `pg` decodes them; undefined if unreadable. */
 function targetOf(value: string): Target | undefined {
   try {
     const url = new URL(value);
-    for (const key of sslKeys) url.searchParams.delete(key);
+    const sslKeysGiven = [...url.searchParams.keys()]
+      .map((key) => key.toLowerCase())
+      .filter((key) => sslKeys.includes(key));
+    for (const key of [...url.searchParams.keys()]) {
+      if (sslKeys.includes(key.toLowerCase())) url.searchParams.delete(key);
+    }
     const final = url.toString();
     const config = parse(final);
     return {
@@ -185,6 +246,7 @@ function targetOf(value: string): Target | undefined {
       database: config.database ?? '',
       options: typeof config.options === 'string' ? config.options : '',
       queryKeys: [...new URL(final).searchParams.keys()],
+      sslKeysGiven,
     };
   } catch {
     return undefined;

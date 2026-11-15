@@ -35,12 +35,16 @@ export const setupProblems = {
 
 export const backupProblems = {
   missing: 'There is no backup folder there.',
-  unreadable: 'The backup folder could not be copied: a file in it cannot be read.',
+  unreadable:
+    'The backup folder could not be copied: a file in it cannot be read, or it holds a link or something else that is not a plain file or folder.',
   'not-a-database': 'That folder holds no tracker database, or one that will not open.',
   'not-a-tracker-backup': 'That database is not a backup of the tracker: its tables are missing.',
   'in-use': 'A running stats server has the backup open. Stop it first.',
   'work-dir-unusable': 'The working folder cannot be used. Pick another with --work.',
 };
+
+export const workLeftBehind = (folder) =>
+  `The copy of the backup made for reading it could not be removed. It holds the backup's data: delete this folder by hand: ${folder}`;
 
 export const dryRunDone = 'Dry run: nothing was changed. Run again with --run to carry it out.';
 export const databaseLine = (folder) => `Test database: ${folder}`;

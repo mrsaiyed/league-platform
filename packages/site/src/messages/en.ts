@@ -401,6 +401,10 @@ export const en = {
     'The league list could not be read just now, so it is not shown. Reload the page to try again.',
   // A person's name as the Teams screens show it; a language may put the parts the other way.
   'adminTeams.personName': '{firstName} {lastName}',
+  'adminTeams.byNumber': '#{number}',
+  'adminTeams.noName': 'No name yet',
+  'adminTeams.roster.toReview': '(added at the scorer’s table, to review)',
+  'adminTeams.roster.numberTwice': '(#{number} is worn by two players)',
   // After a team's name in the list, with the space before it: " (North)".
   'adminTeams.inDivision': ' ({division})',
   'adminTeams.add.title': 'Add a player',
@@ -535,6 +539,18 @@ export const en = {
     'This league does not offer initials for adults, so nothing was changed. You can still choose "removed" to take their name off the public pages.',
   'error.people.remove_person.person-on-a-roster':
     'That person is still on a roster. Mark them as having left their team first, then take them off the list.',
+  // A scorekeeper's admin: only their games, each with a way to the tracker (P4 §4, step 2.33).
+  'admin.myGames.title': 'Your games',
+  'admin.myGames.intro': 'Tonight’s games first. Tap Score this game to open one.',
+  'admin.myGames.empty': 'You have no games to score this week.',
+  'admin.myGames.score': 'Score this game',
+  // A game whose score is entered in the games area, not in the tracker.
+  'admin.myGames.recording.final-score': 'Final score only',
+  'admin.myGames.recording.box-score': 'Box score',
+  'admin.myGames.enterScore': 'Enter the score',
+  // Why a league's games are not scored (U-9), saying which.
+  'admin.myGames.archived': 'This league is archived, so its games cannot be scored or changed.',
+  'admin.myGames.suspended': 'This league is suspended, so its games cannot be scored or changed.',
   // The games area (step 2.55).
   'admin.games.intro': 'The games of today and the week ahead.',
   'admin.games.listProblem':
@@ -552,6 +568,7 @@ export const en = {
   'admin.games.openTracker': 'Open the tracker',
   'admin.games.when': '{day}, {time}',
   'admin.games.noTime': 'No time set',
+  'admin.games.today': 'Today, {time}',
   'admin.games.notScorable': 'This league is archived or suspended, so games cannot be changed.',
   'admin.games.done.final': 'The final score is saved.',
   'admin.games.done.forfeit': 'The forfeit is recorded.',
@@ -727,8 +744,49 @@ export const en = {
   'access.noAccess.title': 'You do not have access',
   'access.noAccess.body':
     'This page is for the people who run this league. If you should have access, ask the league to invite you.',
-  // The courtside tracker (P2 §4), rebuilt here in a later step.
+  // The courtside tracker (P2 §4): opening a game on the device (step 2.33). The
+  // scoring screens come with steps 2.35 to 2.37.
   'tracker.title': 'Score a game',
+  'tracker.matchup': '{away} at {home}',
+  'tracker.opening': 'Opening the game…',
+  'tracker.openingSlow': 'No answer yet. Check the connection; this keeps trying.',
+  'tracker.noStorage':
+    'This browser window cannot save the game on this device, so scoring is off. If this is a private window, open the tracker in a normal one.',
+  'tracker.storeFailed':
+    'This device could not keep its own copy of the game. Keep scoring: your plays are still saved. If the page reloads with no connection, the game may not open.',
+  'tracker.takeOver': 'Take over scoring',
+  'tracker.takeOverQuestion':
+    'Take over scoring from {name}? Their device stops scoring. Plays it has not sent yet will not be saved and must be entered again.',
+  'tracker.takeOverYes': 'Yes, take over',
+  'tracker.takeOverNo': 'Not now',
+  'tracker.openAgain': 'Open the game again',
+  'tracker.seeWhoIsScoring': 'See who is scoring',
+  'tracker.signIn': 'Sign in',
+  'tracker.sharedDevice.text': 'On a shared phone or tablet, sign out when you finish.',
+  'tracker.sharedDevice.link': 'Sign out on your account page',
+  'tracker.back': 'Back to your games',
+  'tracker.format.title': 'Check the game format',
+  'tracker.format.intro': 'This game is set up to be played like this. Check it before you start.',
+  'tracker.format.halves': '2 halves of {minutes} minutes',
+  'tracker.format.quarters': '4 quarters of {minutes} minutes',
+  'tracker.format.overtime': 'Overtime periods of {minutes} minutes',
+  'tracker.format.clock.stop': 'Stop clock: fouls and timeouts stop the clock',
+  'tracker.format.clock.running': 'Running clock: the clock keeps going through fouls and timeouts',
+  'tracker.format.wrong':
+    'If this is not how the game is being played, ask a league admin to change the game format before you start.',
+  'tracker.format.confirm': 'Confirm and start scoring',
+  'tracker.ready':
+    'This device is scoring the game. The scoring screen will appear here in a later version.',
+  'tracker.savedOnDevice':
+    'Saved on this device: {home} ({homeCount} players) and {away} ({awayCount} players), and the game as it stands.',
+  // The tracker's own refusals, each with the way back to the games (step 2.33).
+  'tracker.notLive.final-score':
+    'This game is set to final score only, so there is no live scoring. Enter its score in Games.',
+  'tracker.notLive.box-score':
+    'This game is set to box score, so there is no live scoring. Enter its score in Games.',
+  'tracker.notAssigned':
+    'You are not assigned to score this game. Ask a league admin to assign it to you.',
+  'tracker.unknownGame': 'We could not find that game.',
   // The fixed roles (A-3, P4 §4), by the name the access module gives each.
   'role.owner': 'Owner',
   'role.admin': 'Admin',
@@ -781,6 +839,43 @@ export const en = {
   'error.games.renew_scoring_session.game-closed':
     'That game is now decided or cancelled, so scoring it has stopped.',
   'error.games.release_scoring_session.game-not-found': 'That game is not there.',
+  // Why the scorekeeper's reopening of a game they ended was refused (step 2.120, S-36).
+  // The tracker shows them by the code its endpoint answers.
+  'error.games.reopen_tracked_game.game-not-found': 'That game is not there.',
+  'error.games.reopen_tracked_game.changed-since-read':
+    'This game changed since your device last read it. Open the game again, then reopen it if it still needs it.',
+  'error.games.reopen_tracked_game.game-not-decided':
+    'This game is not over, so there is nothing to reopen.',
+  'error.games.reopen_tracked_game.not-ended-by-tracker':
+    'This game was not ended from the tracker, so it cannot be reopened here. A league admin can reopen it from the games area.',
+  'error.games.reopen_tracked_game.scorekeepers-may-not-reopen':
+    'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.not-ended-by-you':
+    '{name} ended this game, so only they can reopen it here. A league admin can reopen it.',
+  // When the server knows no account for the end (a game brought over from elsewhere).
+  'error.games.reopen_tracked_game.not-ended-by-you.unknown':
+    'Only the scorekeeper who ended this game can reopen it here. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.reopen-time-over':
+    'It is too long since this game ended for a scorekeeper to reopen it. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.reason-needed':
+    'Say in a few words why the game is being reopened (up to 1000 characters). It is kept in the game’s corrections, never shown publicly.',
+  'error.games.reopen_tracked_game.not-allowed':
+    'You cannot score this game, so you cannot reopen it. A league admin can reopen it.',
+  // Reopen game on the tracker's final panel (step 2.37 draws it), from the server's
+  // answer to GET …/games/{game}/reopen before the tap (step 2.120, S-36).
+  'tracker.reopen.button': 'Reopen game',
+  'tracker.reopen.until': 'You can reopen this game until {time}.',
+  'tracker.reopen.adminCan': 'A league admin can reopen this game.',
+  'tracker.reopen.question':
+    'Reopen this game? It goes back to live with every play as it was, and it stops counting in the standings until you end it again.',
+  'tracker.reopen.reasonLabel':
+    'Why it is being reopened (kept in the game’s corrections, never shown publicly)',
+  'tracker.reopen.reasonReady': 'End game tapped by mistake',
+  'tracker.reopen.confirm': 'Reopen the game',
+  'tracker.reopen.cancel': 'Keep it final',
+  'tracker.reopen.noConnection':
+    'No connection. The game reopens as soon as the connection is back.',
+  'tracker.reopen.done': 'The game is live again. Carry on scoring.',
   // Why a schedule draft edit was refused (T-187).
   'error.scheduling.add_draft_game.changed-since-read':
     'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
@@ -986,6 +1081,8 @@ export const en = {
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
   'activity.games.end_tracked_game': 'Ended a tracked game',
+  'activity.games.reopen_tracked_game': 'Reopened a game ended from the tracker',
+  'activity.games.apply_tracker_commands': "Changed a team's players at the scorer's table",
   'activity.standings.add_adjustment': 'Added a standings adjustment',
   'activity.standings.remove_adjustment': 'Removed a standings adjustment',
   'activity.games.assign_scorekeeper': 'Assigned a scorekeeper to a game',
@@ -1039,6 +1136,8 @@ export const en = {
     'Which games a scorekeeper may score: any game, or only the games they are assigned to',
   'setting.games.whoMayScore.option.anyScorekeeper': 'Any game',
   'setting.games.whoMayScore.option.assignedOnly': 'Only games they are assigned to',
+  'setting.games.scorekeeperReopenMinutes.label':
+    'Minutes after a game ends during which the scorekeeper who ended it may reopen it from the tracker, with a reason, if they tapped End game too soon. 0 means never. After that, only an admin can reopen it.',
   'setting.teams.startingStatsLevel.label':
     "Who sees a new team's players' statistics until the team chooses",
   'setting.teams.startingStatsLevel.option.everyone': 'Everyone',
@@ -1152,6 +1251,7 @@ export const en = {
   'problem.signOutEverywhereFailed':
     'We could not sign out your other devices. This one is signed out: sign in and try again.',
   'problem.noPassword': 'Your account has no password. Sign in with Google again instead.',
+  'problem.signInToScore': 'Sign in to score this game.',
   // The tracker's saved banner (T6 §4), chosen from the queue's status by
   // apps/web/src/features/tracker/queue-banner.ts.
   'tracker.queue.allSaved': 'All saved',
@@ -1164,18 +1264,18 @@ export const en = {
   // What the tracker says about holding the game and refused taps (T6 §5, T-113),
   // chosen from the controller's status by apps/web/src/features/tracker/tracker-notice.ts.
   'tracker.readOnly.taken-over':
-    'Another device has taken over scoring this game. This one is now read-only.',
+    'Someone else is now scoring this game on another device. This device can no longer score it.',
   'tracker.readOnly.expired':
     'This device was away too long and another device has had the game since. This one is now read-only.',
   'tracker.readOnly.released':
     'This device has left the game. It is read-only until you open it again.',
-  'tracker.readOnly.not-held': 'This device no longer holds the game, so it is read-only.',
+  'tracker.readOnly.not-held': 'This device is no longer the one scoring this game.',
   'tracker.readOnly.game-not-live':
     'This game cannot be scored now: it is over, cancelled or postponed.',
   'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
   'tracker.readOnly.unknown-game': 'This game could not be found.',
   'tracker.readOnly.request-refused':
-    'The server could not take what this device asked for. Open the game again to try once more.',
+    'Something went wrong opening the game. Tap Open the game again.',
   'tracker.readOnly.storage-failed':
     'This device could not read what it has saved, so it is read-only. Open the game again to try once more.',
   'tracker.readOnly.signed-out':

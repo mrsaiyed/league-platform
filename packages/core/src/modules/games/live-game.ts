@@ -94,7 +94,7 @@ export function withCurrentRules(
 }
 
 /** The players a command names. A team's own play (a timeout, a team turnover) names none. */
-function playersNamed(input: TrackerInput): readonly string[] {
+export function playersNamed(input: TrackerInput): readonly string[] {
   switch (input.type) {
     case 'lineup':
       return input.playerIds;
@@ -118,8 +118,12 @@ export const teamOfSide = (game: GameRecord, side: basketball.Side) =>
 /** A player key: one person on one team. */
 const keyOf = (teamId: string, personId: string) => `${teamId}|${personId}`;
 
+/** The key `rosterOf` files a player under (the person's id in lower case). */
+export const playerKey = (teamId: string, personId: string) =>
+  keyOf(teamId, personId.toLowerCase());
+
 /** The game's players by team and person. */
-export function rosterOf(players: readonly GamePlayer[]): ReadonlyMap<string, GamePlayer> {
+export function rosterOf(players: readonly GamePlayer[]): Map<string, GamePlayer> {
   const byKey = new Map<string, GamePlayer>();
   for (const player of players) {
     const key = keyOf(player.teamId, player.personId.toLowerCase());
@@ -129,18 +133,20 @@ export function rosterOf(players: readonly GamePlayer[]): ReadonlyMap<string, Ga
   return byKey;
 }
 
-/** Why a command naming someone not on that side's roster is refused, or undefined. */
-export function playerProblem(
+/**
+ * The first player a command names who is not on that side's roster (their id in lower
+ * case), or undefined. Such a command is refused (`not-on-team`, naming them).
+ */
+export function playerNotOnTeam(
   game: GameRecord,
   roster: ReadonlyMap<string, GamePlayer>,
   input: TrackerInput,
 ): string | undefined {
   if (!('side' in input)) return undefined;
   const teamId = teamOfSide(game, input.side);
-  const named = playersNamed(input);
-  return named.some((id) => !roster.has(keyOf(teamId, id.toLowerCase())))
-    ? 'That player is not on this team. Reload the roster.'
-    : undefined;
+  return playersNamed(input)
+    .map((id) => id.toLowerCase())
+    .find((id) => !roster.has(keyOf(teamId, id)));
 }
 
 /**

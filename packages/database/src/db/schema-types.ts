@@ -241,6 +241,7 @@ export interface LeaguesTable {
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  city: string | null;
 }
 
 export interface PeopleTable {
@@ -259,6 +260,8 @@ export interface PeopleTable {
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  previous_first_name: string | null;
+  previous_last_name: string | null;
 }
 
 export interface PlayerGameStatsTable {

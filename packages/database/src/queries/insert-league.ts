@@ -14,6 +14,8 @@ export type NewLeagueRows = {
   audience: string;
   listed: boolean;
   ownerAccountId: string;
+  contactEmail: string | null;
+  city: string | null;
   defaultProgram: { slug: string; name: string; sportKey: string };
 };
 
@@ -42,6 +44,8 @@ export async function insertLeague(
         audience: league.audience,
         listed: league.listed,
         owner_account_id: league.ownerAccountId,
+        contact_email: league.contactEmail,
+        city: league.city,
       })
       .returning(leagueColumns)
       .executeTakeFirstOrThrow();

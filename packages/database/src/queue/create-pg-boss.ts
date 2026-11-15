@@ -11,7 +11,7 @@
 // itself, as there is no release there.
 import { PgBoss, fromPglite } from 'pg-boss';
 import { queueSchema } from '../db/check-queue-schema.ts';
-import { sslSetting } from '../migrations/postgres-driver.ts';
+import { sslSetting, withoutSslKeys } from '../migrations/postgres-driver.ts';
 import type { DatabaseSource } from '../db/create-database.ts';
 
 /** A pg-boss for `source`. Nothing connects until the queue starts it. */
@@ -19,11 +19,9 @@ export function createPgBoss(source: DatabaseSource): PgBoss {
   if (source.kind === 'pglite') {
     return new PgBoss({ db: fromPglite(source.pglite), backend: 'pglite', schema: queueSchema });
   }
-  const target = new URL(source.url);
-  for (const key of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat'])
-    target.searchParams.delete(key);
   return new PgBoss({
-    connectionString: target.toString(),
+    // The address may not turn SSL off or change the certificate: `ssl` decides.
+    connectionString: withoutSslKeys(source.url),
     ssl: sslSetting(source),
     max: source.maxConnections ?? 4,
     schema: queueSchema,

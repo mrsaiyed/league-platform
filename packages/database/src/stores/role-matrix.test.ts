@@ -105,8 +105,11 @@ import {
   renewScoringSession,
   takeOverScoring,
   applyTrackerCommands,
+  readTrackerRosters,
   readTrackerState,
   endTrackedGame,
+  reopenTrackedGame,
+  readReopenOffer,
   engineRulesOf,
   renameShortName,
   resendInvitation,
@@ -989,6 +992,101 @@ const gameCommandRows: readonly Row[] = [
     }),
     (c, i) => applyTrackerCommands(c, i, trackerDeps),
   ),
+  // The players at the scorer's table (record 058) travel in the same batch: whoever may
+  // score the game. With no session held, each is answered refused and nothing changes.
+  ...gameRows(
+    'games.apply_tracker_commands',
+    'add and renumber players at the scorer’s table',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      protocolVersion: 2,
+      sessionId: randomUUID(),
+      commands: [
+        {
+          commandId: randomUUID(),
+          at: matrixNow,
+          input: {
+            type: 'add-player',
+            side: 'away',
+            playerId: randomUUID(),
+            jersey: '12',
+            name: '',
+          },
+        },
+        {
+          commandId: randomUUID(),
+          at: matrixNow,
+          input: { type: 'change-player', side: 'away', playerId: randomUUID(), jersey: '5' },
+        },
+      ],
+    }),
+    (c, i) => applyTrackerCommands(c, i, trackerDeps),
+  ),
+  // The strongest takeover (review of step 2.117, item 10): with a session held, an add
+  // whose device-made id is a person of ANOTHER league (a random id, as a device makes,
+  // so the database itself must refuse it). Allowed callers get the batch answered,
+  // with the add refused as taken; nothing is written in either league.
+  ...gameRows(
+    'games.apply_tracker_commands',
+    'add a player whose id is another league’s person, with a session held',
+    'games.score',
+    async (league, program) => {
+      const other = await newLeague(pglite);
+      const stranger = randomUUID();
+      await pglite.query(
+        `insert into people (id, league_id, first_name, last_name) values ($1, $2, 'Other', 'League')`,
+        [stranger, other.leagueId],
+      );
+      return { gameId: (await gameIn(league, program)).gameId, stranger };
+    },
+    async (c, i) => {
+      const { gameId, stranger } = i as { gameId: string; stranger: string };
+      const opened = await openScoringSession(c, { gameId, deviceId: 'matrix' }, scoringDeps);
+      if (!opened.ok) return opened;
+      const { sessionId } = opened.value as { sessionId?: string };
+      const before = await pglite.query('select id from roster_entries');
+      const result = await applyTrackerCommands(
+        c,
+        {
+          gameId,
+          protocolVersion: 2,
+          sessionId: sessionId ?? randomUUID(),
+          commands: [
+            {
+              commandId: randomUUID(),
+              at: matrixNow,
+              input: {
+                type: 'add-player',
+                side: 'away',
+                playerId: stranger,
+                jersey: '9',
+                name: '',
+              },
+            },
+          ],
+        },
+        trackerDeps,
+      );
+      if (!result.ok) return result;
+      const [answer] = result.value.results;
+      const after = await pglite.query('select id from roster_entries');
+      const person = await pglite.query<{ league_id: string }>(
+        'select league_id from people where id = $1',
+        [stranger],
+      );
+      if (
+        answer?.status !== 'refused' ||
+        answer.reason.problem !== 'player-id-taken' ||
+        after.rows.length !== before.rows.length ||
+        person.rows.length !== 1 ||
+        person.rows[0]?.league_id === c.leagueId
+      ) {
+        throw new Error(`the stranger's id was not refused cleanly: ${JSON.stringify(answer)}`);
+      }
+      return result;
+    },
+  ),
   // The engine's state for the scorekeeper's device (T-113, T-253): whoever may score
   // the game. A game with no taps yet is read as a new one; nothing changes.
   ...gameRows(
@@ -997,6 +1095,15 @@ const gameCommandRows: readonly Row[] = [
     'games.score',
     async (league, program) => ({ gameId: (await gameIn(league, program)).gameId }),
     (c, i) => readTrackerState(c, i, trackerDeps),
+  ),
+  // The rosters stored on the scorekeeper's device (T-115, T-258): whoever may score
+  // the game. Nothing changes.
+  ...gameRows(
+    'games.read_tracker_rosters',
+    'read the rosters for the tracker',
+    'games.score',
+    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId }),
+    (c, i) => readTrackerRosters(c, i, gamesDeps),
   ),
   // Ending a tracked game (T6 §7): whoever may score it. The game is live with one
   // basket recorded by its tracker, so it can be ended.
@@ -1039,7 +1146,70 @@ const gameCommandRows: readonly Row[] = [
     },
     (c, i) => endTrackedGame(c, i, trackerDeps),
   ),
+  // The scorekeeper's reopening of a game they ended (step 2.120, S-36): whoever may
+  // score it. The game was ended from the tracker five minutes ago, by the database's
+  // clock, by the matrix's scorekeeper, so the scorekeeper may within the league's 30
+  // minutes; everyone else who scores here may also correct games, which reopens it
+  // at any time.
+  ...gameRows(
+    'games.reopen_tracked_game',
+    'reopen a game ended from the tracker',
+    'games.score',
+    async (league, program) => ({
+      gameId: await trackedGameEndedIn(league, program),
+      requestId: randomUUID(),
+      reason: 'End game was tapped too soon',
+    }),
+    (c, i) => reopenTrackedGame(c, i, trackerDeps),
+  ),
+  // Whether Reopen is offered, before the tap: whoever may score the game. A read.
+  ...gameRows(
+    'games.read_reopen_offer',
+    'see whether a game ended from the tracker can be reopened',
+    'games.score',
+    async (league, program) => ({ gameId: await trackedGameEndedIn(league, program) }),
+    (c, i) => readReopenOffer(c, i, trackerDeps),
+  ),
 ];
+
+/** A game the matrix's scorekeeper ended from the tracker five minutes ago: a basket, then the end. */
+async function trackedGameEndedIn(league: League, program: boolean): Promise<string> {
+  const { gameId } = await gameIn(league, program, {
+    capture_mode: 'live',
+    status: 'final',
+    home_score: 2,
+    away_score: 0,
+    finalized_at: new Date(Date.now() - 300_000).toISOString(),
+  });
+  const personId = await newPerson(pglite, league.leagueId);
+  const basket = { type: 'score', side: 'home', playerId: personId, points: 2 } as const;
+  let state = basketball.newGame(engineRulesOf(defaultSeasonRules()), 0);
+  const taps = [basket, { type: 'end' } as const];
+  for (const [i, command] of taps.entries()) {
+    const commandId = randomUUID();
+    state = basketball.apply(state, command, { id: commandId, now: matrixNow - 300_000 });
+    const { type, ...payload } = command;
+    await pglite.query(
+      `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at, account_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        league.leagueId,
+        gameId,
+        i + 1,
+        commandId,
+        type,
+        JSON.stringify(payload),
+        new Date(matrixNow - 300_000).toISOString(),
+        league.accountOf('scorekeeper'),
+      ],
+    );
+  }
+  await pglite.query(
+    'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 2, $3)',
+    [league.leagueId, gameId, JSON.stringify(state)],
+  );
+  return gameId;
+}
 
 const divisionAndVenueRows: readonly Row[] = [
   // Divisions are checked at their season's program (P4 §4): the owner and admins.
@@ -1717,6 +1887,7 @@ const rows: readonly Row[] = [
         audience: 'adult',
         ownerAccountId: league.ownerId,
         sportKey: 'basketball',
+        firstSeason: { slug: 'first', name: 'First season' },
       },
     }),
     run: (c, i) => createLeague(c, i, leaguesDeps),

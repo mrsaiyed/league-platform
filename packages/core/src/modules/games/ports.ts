@@ -74,6 +74,10 @@ export type GameRosterPlayer = {
   readonly jerseyNumber: string | null;
   /** The player has left the team since (R-17); still listed, as they may have played this game. */
   readonly left: boolean;
+  /** The game at whose scorer's table they were added (S-6), or null; absent where not read. */
+  readonly addedAtGameId?: string | null;
+  /** Added at a table and not yet reviewed by an admin (S-6, S-45); absent where not read. */
+  readonly needsReview?: boolean;
 };
 
 /** One reopening, with numbers only, never names (T-220). */
@@ -246,6 +250,67 @@ export type GamePlayer = {
 export type LiveGameLine = GameLine & { readonly jerseyNumber: string | null };
 
 /**
+ * A player of one of a game's teams as the scorer's table changes them (record 058):
+ * their current roster entry (not left) and the name on their person.
+ */
+export type TablePlayer = {
+  readonly entryId: string;
+  readonly teamId: string;
+  readonly personId: string;
+  readonly jerseyNumber: string | null;
+  readonly firstName: string;
+  readonly lastName: string;
+  /** The game at whose scorer's table they were added (S-6), or null. */
+  readonly addedAtGameId: string | null;
+  /** Added at a table and not yet reviewed by an admin (S-6): only then theirs to rename or take off (S-45). */
+  readonly needsReview: boolean;
+};
+
+/** A player added at a game's scorer's table: a new person on one of its teams (S-6, S-34). */
+export type NewTablePlayer = {
+  /** Made by the device, so the plays after it can name them (record 058). */
+  readonly personId: string;
+  readonly teamId: string;
+  readonly gameId: string;
+  readonly jerseyNumber: string | null;
+  readonly firstName: string;
+  readonly lastName: string;
+  /** Marked for the league's admin to review (S-6). */
+  readonly needsReview: boolean;
+};
+
+/** What a change of players writes: a field left out stays as it is. */
+export type TablePlayerChange = {
+  readonly jerseyNumber?: string | null;
+  readonly firstName?: string;
+  readonly lastName?: string;
+};
+
+/** An add the server refused, as its event keeps it: no name, only why. */
+export type RefusedAdd = {
+  readonly commandId: string;
+  readonly playerId: string;
+  /** The refusal's fixed code, as it was answered. */
+  readonly problem: string;
+};
+
+/**
+ * Why the database turned a change of players away. Each write runs in a savepoint of
+ * its own, so the batch's transaction carries on (record 058), whatever the reason.
+ */
+export type TablePlayerRefusal =
+  /** The season wants unique numbers and someone on the team wears it (0008, 0015). */
+  | 'jersey-taken'
+  /** The person's id is already taken, in this league or another. */
+  | 'id-taken'
+  /** The player has a box score line in another game. */
+  | 'has-lines'
+  /** The player has a line in this game's box score, entered by hand. */
+  | 'in-box-score'
+  /** Refused for a reason the database gave no known name to. */
+  | 'failed';
+
+/**
  * The live game's storage (T3 §8, T6 §1): its state, events and box score lines. Its
  * lock is the game's (ScoringSessionsStore.lockGame), shared with the session commands.
  */
@@ -272,6 +337,59 @@ export type LiveGamesStore = {
     lines: readonly LiveGameLine[],
     removed: readonly string[],
   ) => Promise<void>;
+  /**
+   * Who sent the game's latest end (its last `end` event): the account, null for an
+   * event with none, or undefined if the game was never ended by its tracker.
+   */
+  readonly findLastEnd: (
+    gameId: string,
+  ) => Promise<{ readonly accountId: string | null } | undefined>;
+  /**
+   * How long ago the game was decided, in milliseconds, measured inside the database
+   * (the start of the asking statement less the game's `finalized_at`, both its own
+   * clock, so a wait for the game's lock counts), or undefined if
+   * it is not decided. Never below 0.
+   */
+  readonly endedAgo: (gameId: string) => Promise<number | undefined>;
+  /** The game's event made by this command id: its number, type and sender, or undefined. */
+  readonly findEvent: (
+    gameId: string,
+    commandId: string,
+  ) => Promise<
+    { readonly seq: number; readonly type: string; readonly accountId: string | null } | undefined
+  >;
+  /** The person's current entry (not left) on the team, or undefined (record 058). */
+  readonly findTablePlayer: (teamId: string, personId: string) => Promise<TablePlayer | undefined>;
+  /** Adds a new person and their roster entry, marked as added at the game (S-6). */
+  readonly addTablePlayer: (player: NewTablePlayer) => Promise<'added' | TablePlayerRefusal>;
+  /**
+   * Gives a roster entry a new number (or none) and its person a new name (either part
+   * may be empty, S-34), together or not at all. A rename keeps the name the player was
+   * first given, the first time only, on the person for an admin to see and restore (S-45).
+   */
+  readonly changeTablePlayer: (
+    entryId: string,
+    personId: string,
+    change: TablePlayerChange,
+  ) => Promise<'changed' | TablePlayerRefusal>;
+  /**
+   * Takes a roster entry away and sends its person to the bin (T-45) when nothing else
+   * holds them (no other entry, no account): a player added by mistake. Refused with
+   * `has-lines` while the person has a box score line in a game other than `gameId`.
+   * This game's lines follow its plays, which the command has already looked at, but only
+   * once it has an engine state: with `thisGameToo` (none yet), a line of this game, one
+   * entered from paper, refuses it too (`in-box-score`).
+   */
+  readonly removeTablePlayer: (
+    entryId: string,
+    personId: string,
+    gameId: string,
+    thisGameToo: boolean,
+  ) => Promise<'removed' | TablePlayerRefusal>;
+  /** The adds of this game the server refused, kept as events (record 058), oldest first. */
+  readonly refusedAdds: (gameId: string) => Promise<readonly RefusedAdd[]>;
+  /** The sequence number of the game's last event, its plays and its changes of players; 0 if none. */
+  readonly lastEventSeq: (gameId: string) => Promise<number>;
 };
 
 /** The tracker's commands' transaction (step 2.29): the scoring one and the live game. */

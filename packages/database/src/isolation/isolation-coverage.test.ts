@@ -17,6 +17,7 @@ import {
   scopeColumns,
 } from '../queries/access-rows.ts';
 import { constraintOf } from '../queries/constraint-of.ts';
+import { inSavepoint } from '../queries/in-savepoint.ts';
 import { currentLeague } from '../queries/find-current-league.ts';
 import { leagueStatusOf } from '../queries/league-status-of.ts';
 import { divisionSummary } from '../queries/division-summary.ts';
@@ -73,6 +74,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     'binds the scoring session queries (own cases) to a scope',
   ],
   [databasePackage.liveGamesStore, 'binds the live game queries (own cases) to a scope'],
+  [
+    inSavepoint,
+    "wraps a write (own cases) in a savepoint of the scope's own transaction; reads and writes no rows itself",
+  ],
   [scoringSessionSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [databasePackage.standingsStore, 'binds the standings queries (own cases) to a scope'],
   [
@@ -151,6 +156,18 @@ const reachNoLeagueData = new Map<unknown, string>([
     'opens a PGlite folder on disk (never an address) and runs transferTrackerGames on it',
   ],
   [databasePackage.isDatabaseAddress, 'tells an address from a folder name; runs nothing'],
+  [
+    databasePackage.openLeagueMakingTarget,
+    'staff tool (step 2.125, record 057): opens a PGlite folder, or the migration login and the app login of a hosted database; each reads the catalog only (live_stats, current_database, the server start time); no league rows',
+  ],
+  [
+    databasePackage.previewNewLeague,
+    'staff tool (step 2.125): asks each login what it may do (catalog only), then as the migration login reads the migration log, whether one short name is held (find_league_by_slug) and whether two emails have accounts; no league rows',
+  ],
+  [
+    databasePackage.makeLeague,
+    "staff tool (step 2.125): asks the logins and the migration log again, as the migration login checks one short name and makes accounts by email (removing those it made if no league is made), then reaches the one new league only through createLeague with its first season (own case), under the app's login on a hosted database, fenced to that league",
+  ],
 ]);
 
 /**

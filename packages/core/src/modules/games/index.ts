@@ -31,6 +31,13 @@ export {
 export { boxScoreColumns } from './box-score-columns.ts';
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
 export { endTrackedGame, type EndTrackedGameError } from './commands/end-tracked-game.ts';
+export { reopenTrackedGame, type ReopenTrackedGameError } from './commands/reopen-tracked-game.ts';
+export { readReopenOffer, type ReadReopenOfferError } from './commands/read-reopen-offer.ts';
+export type {
+  ReopenNotOffered as GameReopenNotOffered,
+  ReopenOffer as GameReopenOffer,
+  ReopenWhen as GameReopenWhen,
+} from './reopen-window.ts';
 export { recordFinalScoreWithin } from './record-score-within.ts';
 export type { DecideGameError } from './decide-game.ts';
 export { recordingOf } from './game-fields.ts';
@@ -80,6 +87,11 @@ export {
   type ReadTrackerStateError,
   type TrackerGameState,
 } from './commands/read-tracker-state.ts';
+export {
+  readTrackerRosters,
+  type ReadTrackerRostersError,
+  type TrackerRosters,
+} from './commands/read-tracker-rosters.ts';
 export { engineRulesOf } from './engine-rules.ts';
 export { rulesOfGame } from './season-rules-of.ts';
 export {
@@ -101,7 +113,12 @@ export type {
   LiveGameLine,
   LiveGamesStore,
   NewGameEvent,
+  NewTablePlayer,
+  RefusedAdd,
   SavedGameState,
+  TablePlayer,
+  TablePlayerChange,
+  TablePlayerRefusal,
   TrackerTx,
 } from './ports.ts';
 export type {

@@ -21,6 +21,8 @@ export const problems = {
   wrongPassword: 'problem.wrongPassword',
   googleFailed: 'problem.googleFailed',
   signInAgain: 'problem.signInAgain',
+  /** Sent from the tracker's address with no session (step 2.33). */
+  signInToScore: 'problem.signInToScore',
   noPassword: 'problem.noPassword',
   signOutEverywhereFailed: 'problem.signOutEverywhereFailed',
 } as const satisfies Record<string, TextKey>;

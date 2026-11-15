@@ -35,6 +35,11 @@ export type PlayerRef = {
   /** Null when the person asked to be taken off or no name was recorded. */
   readonly name: string | null;
   readonly jersey: string | null;
+  /**
+   * True when no name was ever recorded: a player added at the scorer's table by number
+   * only (S-34), shown as "#12", not as a name withheld.
+   */
+  readonly unnamed: boolean;
 };
 
 export type BoxScorePlayer = PlayerRef & {
@@ -213,6 +218,7 @@ export async function readGamePage(
       personId,
       name: name !== null && name.shown ? name.text : null,
       jersey: jerseyOf.get(personId) ?? null,
+      unnamed: name !== null && !name.shown && name.why === 'no_name',
     };
   };
 

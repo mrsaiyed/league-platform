@@ -26,7 +26,7 @@ Set in **Admin → Season settings**. This is the first thing an organizer settl
 
 **S-42 (decided for you, November 14): a game under way is never handed to another scorekeeper without a question.** If the first scorekeeper's device has gone quiet (no signal in the gym), the next person who opens the game is told who was scoring and when that device was last heard from, and takes over only by saying yes. **S-43 (decided for you, November 14): plays that were not saved can be sent after all,** by the scorekeeper's own tap, when nobody has recorded anything in that game since; otherwise they are entered again. No play is ever counted twice.
 
-**S-41 (decided for you, November 14): what the roster rules do.** A team's roster cannot grow past the season's largest size. After the lock date only the owner and admins change rosters. A roster under the smallest size is a warning, never a refusal. A player added at the scorer's table (S-6) is refused by neither rule, so a game is never stopped by them, and is marked for the admin to review.
+**S-41 (decided for you, November 14): what the roster rules do.** A team's roster cannot grow past the season's largest size. After the lock date only the owner and admins change rosters. A roster under the smallest size is a warning, never a refusal. A player added at the scorer's table (S-6) is refused by neither rule, so a game is never stopped by them, and is marked for the admin to review. **S-44 (decided for you, November 14): a player added at the scorer's table is never refused because their number is already worn.** They are taken, marked for review (S-6), and the clash is marked on both players for the admin; the season's unique-numbers rule applies when the admin confirms the player and on the league's own roster screens. Only a change of number at the table to one already worn is refused (S-37), with a sentence naming who wears it. **S-45 (decided for you, November 14): at the table a scorekeeper may rename, or take off, only a player who was added at a scorer's table and not yet reviewed by an admin.** Never the league's own roster, never a player an admin has confirmed. Taking off is for such a player added at this or an earlier game who has no line in any game, and sends them to the bin (T-45). A player added at the table stays on that team's roster for the season, marked for review.
 
 ## 2. Teams
 
@@ -77,7 +77,7 @@ The schedule is a draft until published. After that, every change is also a draf
 ### Also
 
 - **Import** a schedule from a spreadsheet, for leagues that already have one. This is how the demo league's fixtures come in.
-- **Game states**: scheduled, live, final, postponed, cancelled, forfeited. A postponed game sits in a "to be rescheduled" list until given a new slot.
+- **Game states**: scheduled, live, final, postponed, cancelled, forfeited. A postponed game sits in a "to be rescheduled" list until given a new slot. Postponing offers a new date at once, or "decide later" (**S-49**, decided for you).
 - **Calendar feed**: every team and the whole league has a calendar link that phones subscribe to.
 
 **S-3 (agreed, changed November 12): the admin decides the schedule's format; what we automate grows over time.** We do not choose a league's format for it. From the first release an admin can build or import any schedule by hand in the grid: any number of games, any matchups, any mix of divisions. The generator automates the common case first: every team plays every other team a chosen number of times, within divisions or across them, with the fairness rules above. More automatic formats are added as leagues ask. What the generator does not handle yet is referee assignment, travel distance and sharing venues between programs, which come with stage 6.
@@ -93,13 +93,15 @@ When the regular season ends, the admin creates a **bracket**: choose how many t
 ### 5.1 Before the game
 
 - The league's reminders go out ([P8](P8-notifications.md)).
-- A scorekeeper is assigned to the game, or any scorekeeper opens it from their list. The league chooses which.
-- The scorekeeper opens `/{league}/score/{game}` on a phone or tablet and confirms the game format. Only games recorded live have a "Score this game" button (**S-38**, decided for you); an admin can switch a game to live in the schedule.
+- A scorekeeper is assigned to the game, or any scorekeeper opens it from their list. The league chooses which. Signed in, they also find "Score this game" on that game's card and page on the league's public site, shown to nobody else (**S-50**, decided for you).
+- The scorekeeper opens `/{league}/score/{game}` on a phone or tablet and confirms the game format. Only games recorded live have a "Score this game" button (**S-38**, decided for you); an admin can switch a game to live in the schedule. A game recorded as a final score or a box score says so on the scorekeeper's list and on its tracker address, with a link to enter its score in Games, which a scorekeeper may do.
+- The scorekeeper's list puts tonight first: games being played now, then today's games still to play, then the days ahead, and finished games last.
+- Someone not signed in who opens the tracker's address, or the scorekeeper's list, is sent to sign in and brought back to it (**U-15**, decided for you); a device signed out while a game is open keeps scoring and offers the same. In an archived league, a scorekeeper who still holds the role is told the league is archived, with a way back, rather than "you do not have access". A scorekeeper who may not score a game (one assigned to someone else, in a league that scores assigned games only) is told so, with the way back to their games.
 - The confirmation lists every rule of the game, the clock mode (stop or running) included (**S-39**, decided for you). If the officials are playing a different format, the scorekeeper changes it for this game before the first play, where the league allows it: a league setting, "Scorekeepers may change a game's format before it starts", on to begin with (**S-35**, decided for you). With it off, the scorekeeper asks an admin, who can give any game its own format.
 
 ### 5.2 Three ways to record a game
 
-**Final score only.** Two numbers and a tap. For leagues and sports where that is all that is wanted.
+**Final score only.** Two numbers and a tap. For leagues and sports where that is all that is wanted. A game that has plays recorded by the live tracker is refused here too, in a plain sentence, and is ended in the tracker (**S-46**, decided for you); a game set to live tracking that has no plays yet can still be finished with two numbers.
 
 **Box score afterwards.** A grid of players and stats filled in from a paper sheet.
 
@@ -155,8 +157,9 @@ How the grid works (built in step 2.64):
 
 ### 5.5 Corrections
 
-- An admin (or the scorekeeper, within a time the league sets) can **reopen** a final game with a reason, fix it, and finalize again. Everything recalculates. The scorekeeper's time is a league setting, 30 minutes after the end to begin with (**S-36**, decided for you); after it, only an admin reopens the game.
+- An admin (or the scorekeeper, within a time the league sets) can **reopen** a final game with a reason, fix it, and finalize again. Everything recalculates. The scorekeeper's time is a league setting, 30 minutes after the end to begin with, 0 for never and at most a day (**S-36**, decided for you); after it, only an admin reopens the game. Only the account that ended the game reopens it this way; someone who may correct games (an admin, a scheduler) can reopen it at any time. Before the tap the tracker is told whether Reopen is offered and until when, so no one gives a reason and is then told it is too late.
 - **S-7:** every correction is logged with who, when and why. The public page shows "corrected" with the date, not the reason.
+- **S-47 (decided for you, November 15):** while a final game is reopened, its public page shows the result as it stood, marked "Being corrected". It never says the game has not started.
 - **S-8:** if a correction changes the winner or the score, people who got the recap get a short correction notice. Other fixes (a foul moved to the right player) send nothing.
 
 ### 5.6 Unusual outcomes
@@ -170,11 +173,13 @@ How the grid works (built in step 2.64):
 | Overtime     | Added periods; shown on the result                                               |
 | Did not play | A rostered player who never entered gets no "game played"                        |
 
+A cancelled game can be put back, with a reason, by whoever may cancel it; it is a scheduled game again (**S-51**, decided for you).
+
 ## 6. Standings and statistics
 
 - **S-9: standings are always calculated from final games; nobody types them in.** Each division has its own table with seeds. When teams are level, the page can show why one is ahead ("head-to-head").
 - **S-10: an admin can add an adjustment** (a points deduction, a forfeit win awarded by ruling) with a reason. It shows as a footnote under the table.
-- **Statistics**: season totals and per-game averages for every stat the season keeps; leaders with a minimum-games rule the league sets; a full sortable table.
+- **Statistics**: season totals and per-game averages for every stat the season keeps; leaders with a minimum-games rule the league sets; a full sortable table. Fouls and turnovers get no leaders card unless the league switches it on (**S-48**, decided for you); they stay in the tables.
 - **Player pages** (if the league shows them): this season, past seasons, and career totals within the league.
 - **S-11: only final games count.** A live game's numbers show on its own page but not in season totals until it ends.
 - **S-22 (new, the founder's direction, November 12): who can see players' statistics is a setting, and each team can choose for itself.**

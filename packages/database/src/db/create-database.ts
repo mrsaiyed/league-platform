@@ -15,7 +15,11 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
-import { sslSetting, type PostgresDriverOptions } from '../migrations/postgres-driver.ts';
+import {
+  sslSetting,
+  withoutSslKeys,
+  type PostgresDriverOptions,
+} from '../migrations/postgres-driver.ts';
 import { handleFor, type DatabaseHandle } from './database-handle.ts';
 import { guardedDialect } from './guarded-dialect.ts';
 import { pgliteDialect } from './pglite-dialect.ts';
@@ -42,11 +46,9 @@ export type DatabaseSource =
 const dateOid = 1082;
 
 function postgresDialect(source: Extract<DatabaseSource, { kind: 'postgres' }>) {
-  const target = new URL(source.url);
-  for (const key of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat'])
-    target.searchParams.delete(key);
   const pool = new pg.Pool({
-    connectionString: target.toString(),
+    // The address may not turn SSL off or change the certificate: `ssl` decides.
+    connectionString: withoutSslKeys(source.url),
     ssl: sslSetting(source),
     max: source.maxConnections ?? 10,
     connectionTimeoutMillis: source.connectionTimeoutMillis ?? 10_000,

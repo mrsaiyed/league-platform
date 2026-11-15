@@ -2,6 +2,7 @@ import { platformUrl } from '@srleagues/core';
 import type { SessionSummary } from '@srleagues/providers';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { SignOutForm } from '../../../features/tracker/index.ts';
 import { webPorts } from '../../../server/container.ts';
 import type { AccountProblem } from '../../../server/context.ts';
 import { t, type TextKey } from '../../../server/messages.ts';
@@ -12,6 +13,7 @@ import { timeInWords } from '../../../server/sign-in/sign-in-mail.ts';
 
 // The account page (P6 §5): the devices signed in, by device and time, with "sign
 // out" and "sign out everywhere" (T-71). Signed out, it sends the person to sign in.
+// Either one also clears the games the tracker kept on this device (T-115).
 // Signed in to a session that is none of our accounts' (record 055), it says so
 // plainly and still offers to sign out; every league page sends such a person here.
 export default async function Page() {
@@ -43,13 +45,13 @@ export default async function Page() {
           </li>
         ))}
       </ul>
-      <form action={signOutAction}>
+      <SignOutForm action={signOutAction}>
         <button type="submit">{t('account.signOut')}</button>
-      </form>
-      <form action={signOutEverywhereAction}>
+      </SignOutForm>
+      <SignOutForm action={signOutEverywhereAction}>
         <p>{t('account.signOutEverywhereHelp')}</p>
         <button type="submit">{t('account.signOutEverywhere')}</button>
-      </form>
+      </SignOutForm>
     </main>
   );
 }
