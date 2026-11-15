@@ -1,6 +1,6 @@
 import { leagueUrl, platformUrl, type LeagueAddressee } from '@srleagues/core';
 import { displayLabels } from '@srleagues/site';
-import { FilterToolbar, SeasonPicker } from '@srleagues/ui';
+import { Emblem, FilterToolbar, SeasonPicker } from '@srleagues/ui';
 import { t } from '../../server/messages.ts';
 import { leagueHomeStayUrl } from '../team-pages/index.ts';
 import { menuPages, type MenuPage } from './current-menu-page.ts';
@@ -39,12 +39,17 @@ function MenuLinks({
 }
 
 /**
- * The header stays at the top of every page of a league. First row: the league's name
- * (U-8), the season picker on the pages that show one season, and sign-in for a visitor.
- * Second row: the menu as tabs. On a phone the first row is the name on one line, the
- * season and one menu button; the menu opens as a panel that also holds sign-in. The panel
- * is a plain disclosure, so it works with scripts switched off. Only one of the two menus,
- * and one of the two sign-in links, is ever drawn, whatever the width.
+ * The header of every page of a league. First row: the league's mark (its first letter in
+ * a shield, until it has a logo of its own) and its name (U-8) with a small line under it,
+ * then the season picker on the pages that show one season, and the way in for a visitor.
+ * Second row: the menu.
+ *
+ * On a phone the first row is the mark, the name and one menu button. The button opens a
+ * panel in the header itself: the menu's links and sign-in, then the season picker. The
+ * panel is a plain disclosure and the picker has its own button, so all of it works with
+ * scripts switched off. The picker is in the page once, after the menu, and only one of
+ * the two menus and one of the two sign-in links is ever drawn, whatever the width: so the
+ * keyboard goes through the header in the order the eye does, on a phone and on a laptop.
  */
 export function SiteHeader({
   league,
@@ -65,9 +70,27 @@ export function SiteHeader({
   return (
     <header className="site-header">
       <div className="site-column site-header-top">
-        <a className="site-name" href={leagueHomeStayUrl(league)} dir="auto">
-          <span>{name}</span>
-        </a>
+        <div className="site-brand">
+          <Emblem name={name} kind="league" />
+          <a className="site-name" href={leagueHomeStayUrl(league)} dir="auto">
+            <span>{name}</span>
+          </a>
+          <span className="site-tagline">{t('shell.tagline')}</span>
+        </div>
+        <details className="site-menu">
+          <summary>
+            <span className="site-menu-icon" aria-hidden="true" />
+            <span className="ui-visually-hidden">{t('nav.menu')}</span>
+          </summary>
+          <nav className="site-menu-panel" aria-label={t('nav.menu')}>
+            <MenuLinks league={league} current={current} />
+            {signedIn ? null : (
+              <a className="site-menu-sign-in" href={platformUrl('signin')}>
+                {t('nav.signIn')}
+              </a>
+            )}
+          </nav>
+        </details>
         {season === null ? null : (
           <div className="site-season">
             <FilterToolbar label={words.filters}>
@@ -88,20 +111,6 @@ export function SiteHeader({
             {t('nav.signIn')}
           </a>
         )}
-        <details className="site-menu">
-          <summary>
-            <span className="site-menu-icon" aria-hidden="true" />
-            <span className="ui-visually-hidden">{t('nav.menu')}</span>
-          </summary>
-          <nav className="site-menu-panel" aria-label={t('nav.menu')}>
-            <MenuLinks league={league} current={current} />
-            {signedIn ? null : (
-              <a className="site-menu-sign-in" href={platformUrl('signin')}>
-                {t('nav.signIn')}
-              </a>
-            )}
-          </nav>
-        </details>
       </div>
       <nav className="site-tabs" aria-label={t('nav.menu')}>
         <div className="site-column">

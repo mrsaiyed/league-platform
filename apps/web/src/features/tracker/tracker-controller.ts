@@ -11,6 +11,11 @@
 // - A tap the server refused (T-113) makes the controller reload the server's state
 //   and rebuild the game on it, without the refused taps, which are listed as not
 //   applied until the scorekeeper has seen them (`dismissNotApplied`).
+// - Until a game starts, the server plays it under its rules as they stand at each
+//   batch (S-1), which the admin may change after this device loaded it. So while the
+//   state the device works from has not started, each batch the server takes makes it
+//   load the state once more and rebuild on it (record 062): from the batch that
+//   starts the game, the device has the rules the server fixed.
 // - When another device takes over (the renewal says so, or the server refuses taps
 //   because this session no longer holds the game), or the game is decided or gone
 //   while this device holds it, the device turns read-only, says why, and lists the
@@ -586,6 +591,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     sessionId = null;
     cancelRenew?.();
     cancelRenew = null;
+    cancelSettle?.();
+    cancelSettle = null;
     clearTimer();
     if (current.reloading) update({ reloading: false });
   };
@@ -744,6 +751,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       return true;
     }
     await serially(() => {
+      // Two loads can be under way at once (one after a refusal, one for a game not
+      // started) and be answered out of order: an answer older than the state the game
+      // is built on now is left, or the taps the server took since would vanish from the
+      // screen until the next load.
+      if (base !== null && loaded.value.sequence < base.sequence) return;
       const taken = new Set(loaded.value.state.recent.map((id) => id.toLowerCase()));
       made = made.filter(
         (c) =>
@@ -896,6 +908,56 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   /** The queue's sequence when last seen, to tell when the server took a batch. */
   let seenSequence: number | null = null;
 
+  /** A load under way because the server took a batch of a game not started. */
+  let settling = false;
+  /** The server took another batch while that load was under way. */
+  let settleAgain = false;
+  /** Asking for that load again, after one that got no answer. */
+  let cancelSettle: (() => void) | null = null;
+  let settleFailures = 0;
+
+  /**
+   * The server took a batch while the state this device works from has not started
+   * (record 062): until then the server takes the game's rules as they stand at each
+   * batch, so the state is loaded again and the game rebuilt on it, with the taps the
+   * server does not have yet on top (`load`). A load that gets no answer is asked
+   * again after a wait that grows, as opening does, on a timer of its own, so the
+   * batch that started the game is followed by a load even if it was the last one.
+   * Once the state has started, nothing happens here.
+   */
+  const settle = async (): Promise<void> => {
+    settling = true;
+    let unanswered = false;
+    try {
+      do {
+        settleAgain = false;
+        if (current.mode.kind !== 'scoring') return;
+        if (!(await load())) {
+          unanswered = true;
+          break;
+        }
+        settleFailures = 0;
+      } while (settleAgain && base?.state.status === 'scheduled');
+    } finally {
+      settling = false;
+    }
+    if (unanswered) settleLater();
+  };
+
+  const settleLater = (): void => {
+    cancelSettle?.();
+    cancelSettle = null;
+    if (stopped || sessionId === null) return;
+    settleFailures += 1;
+    cancelSettle = clock.after(retryDelayMs(settleFailures, random(), retry), () => {
+      cancelSettle = null;
+      // Another load may have brought the game as started meanwhile: nothing to do then.
+      if (base?.state.status !== 'scheduled') return;
+      if (settling) settleAgain = true;
+      else void track(settle());
+    });
+  };
+
   queue.subscribe((status) => {
     // The time of the last save, on the server's clock (L1).
     const saved =
@@ -904,8 +966,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         : {};
     seenSavedAt = status.savedAt;
     update({ queue: status, notApplied: status.refused, waiting: status.waitingTaps, ...saved });
+    let tookBatch = false;
     if (status.sequence !== null && status.sequence !== seenSequence) {
       seenSequence = status.sequence;
+      tookBatch = true;
       // The server took taps from this session: a later "not held" is checked afresh.
       if (status.halted === null) resumedAfterNotHeld = 0;
     }
@@ -926,6 +990,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         update({ reloading: false });
       };
       void track(reload());
+    } else if (
+      tookBatch &&
+      base !== null &&
+      base.state.status === 'scheduled' &&
+      current.mode.kind === 'scoring'
+    ) {
+      if (settling) settleAgain = true;
+      else void track(settle());
     }
     if (status.halted !== null && !checkingHalt && current.mode.kind === 'scoring') {
       checkingHalt = true;

@@ -347,10 +347,13 @@ All dated November 12, 2026.
 | T-259                 | New                                                                          | Name settings read by one `readNamePolicy`; a setting value can need confirming; a person's request is a command, fixed-word reason (rec. 056)  | Step 2.126: nothing set the name policy or `people.visibility` (2.105 audit, H2)                   |
 | T-260                 | New                                                                          | Made from this computer by one script: the owner's account ahead by email, then the league and its first season by our staff at once (rec. 057) | Step 2.125: T10 line 31's internal tool did not exist; the leagues table had no city               |
 | T-261                 | New                                                                          | Agreed (delegated): players added, changed and taken off at the table travel in the tracker's queue (protocol 2); a rosters address (rec. 058)  | Step 2.117: no way to put a player into a game at the table (2.107 audit, H1)                      |
+| T-262                 | New                                                                          | Every design face is served from our own address: open-licence `@fontsource-variable` packages, linked once, never another site (rec. 059)      | Step 2.147: T5 §1 says we host the fonts, but no font file was in the product (2.105 audit, L3)    |
 | T-263                 | New                                                                          | The scorekeeper's reopen: a second door, for who sent the end; timed in the database; offered before the tap; safe twice (rec. 060)             | Step 2.120: S-36 did not say who "the scorekeeper" is, whose clock counts, or a limit              |
 | T-264                 | A started game's rules stay fixed even if it goes back to scheduled (T-237)  | Agreed (delegated): a game marked not started has no rules of its own again; it takes its season's when it next starts (rec. 061)               | Step 2.121: record 025 kept a started game's rules even after it went back to scheduled            |
+| T-265                 | New                                                                          | Agreed (delegated): the engine gets the foul limit, mercy lead and last-minutes clock; taps take the platform shape, protocol 2 (rec. 062)      | Step 2.122: the clock switch was refused and the three rules dropped (2.107 audit, M7)             |
 | T-266                 | New                                                                          | A draft league made by mistake goes by a second script: an owner-run, locked check, log and delete; its entry kept in a platform log (rec. 063) | Step 2.150: nothing could remove a league made with a wrong short name or who plays                |
 | T-267                 | New                                                                          | Agreed (delegated): the scoring screen is styled by the product, not by the league's design values: one dark courtside look (rec. 064)          | Before step 2.35: nobody had decided how the tracker looks (2.107 audit, M10)                      |
+| T-270                 | New (refines T-9)                                                            | Agreed (delegated): the first online test copy runs on Render at Render's own address with the Supabase test project; Vercel rejected           | The founder asked where to test online for free (2026-11-15); the chat lead decided                |
 
 ## The full list
 
@@ -793,6 +796,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-102 | The 3D code is downloaded only on pages that use that style, so no other league's pages get slower because the trophy exists                        | Agreed (delegated)  |         |
 | T-103 | Faraj's acceptance is the feature list plus the founder's side-by-side review; after sign-off, screenshots of the new pages guard against drift     | Changed (delegated) |         |
 | T-104 | Every document (design, page, form, season rules) carries a version                                                                                 | Agreed (delegated)  |         |
+| T-262 | Every face a design can name is served from our own address, from open-licence packages the web app depends on, and holds up no page (rec. 059)     | Agreed (delegated)  |         |
 | T-267 | The scoring screen has one look of its own for every league; a league's design values do not reach it (record 064; DESIGN.md section 7)             | Agreed (delegated)  |         |
 
 ### [T6 — Live stats and realtime](technical/T6-live-stats-and-realtime.md)
@@ -830,6 +834,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-258 | `/{league}/score/{game}` opens for whoever may score that game; rosters from `games.read_tracker_rosters`; the device keeps them, the state as loaded and the confirmed format in its own browser database; a scorekeeper's admin home lists their games (record 054)   | Agreed (delegated) |         |
 | T-261 | Players added, changed and taken off at the scorer's table travel in the tracker's own queue (protocol 2), handled before the engine and kept as events without names; the device refreshes rosters from `GET …/games/{game}/rosters` (record 058)                      | Agreed (delegated) |         |
 | T-263 | `games.reopen_tracked_game`: a game its tracker ended, by whoever may score it, if they may correct games or sent its end within `games.scorekeeperReopenMinutes` (0 to 1440) of `finalized_at`, timed in the database; GET says before the tap (record 060)            | Agreed (delegated) |         |
+| T-265 | A season's foul limit, mercy lead and last-minutes stop clock reach the engine, left out when off; the device gets them in the state it loads; taps take the platform's command shape, clock-mode switch included, still protocol 2, version 1 as it was (record 062)   | Agreed (delegated) |         |
 
 ### [T7 — Notifications and jobs](technical/T7-notifications-and-jobs.md)
 
@@ -881,6 +886,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-166 | Saif Ghori is the trusted second person who can reach the vendor accounts and the written procedures in an emergency                                   | Agreed             |         |
 | T-167 | Which paid tier of each vendor to start on (decided from prices at build time)                                                                         | Open               |         |
 | T-168 | Whether to pay for a second database region (not until an association contract requires it)                                                            | Open               |         |
+| T-270 | The first online test copy: web on Render's free instance, worker on its smallest paid one, the Supabase test project; no Cloudflare or domain yet     | Agreed (delegated) |         |
 
 ### [T9 — Quality and maintainability](technical/T9-quality-and-maintainability.md)
 

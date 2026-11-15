@@ -8,6 +8,7 @@ import {
   type TrackerGuardFacts,
 } from '@srleagues/providers';
 import { z } from 'zod';
+import { picturedDesignKeys } from './stand-in-designs.ts';
 
 export type ConfigField = {
   /** Secret values never appear in any message, log or screen. */
@@ -26,6 +27,7 @@ export const fields = {
   TRUSTED_PROXY: { secret: false },
   PLATFORM_DATABASE_URL: { secret: true },
   LOCAL_DATA: { secret: false },
+  LOCAL_DESIGN: { secret: false },
   SESSION_SECRET: { secret: true },
   SUPABASE_URL: { secret: false },
   SUPABASE_SECRET_KEY: { secret: true },
@@ -64,6 +66,10 @@ const schema = z.object({
   // this process's memory (the default), or 'made-up-database', the made-up seed
   // leagues in a database in memory with every migration. Only local and test read it.
   LOCAL_DATA: z.enum(['stand-in', 'made-up-database']).default('stand-in'),
+  // The design the first made-up league of the stand-in is drawn under, so that every
+  // page can be pictured in every color set (scripts/shots.mjs --design, step 2.147): a
+  // starting design, or a made-up one kept for pictures. Only local and test read it.
+  LOCAL_DESIGN: z.enum(picturedDesignKeys).optional(),
   // Nothing uses these yet (R8): each becomes required, where it is used, with the
   // step that first uses it. Given now, they are still checked.
   SESSION_SECRET: secretText(32).optional(),
@@ -86,6 +92,7 @@ const optional: readonly ConfigName[] = [
   'TRUSTED_PROXY',
   'PLATFORM_DATABASE_URL',
   'LOCAL_DATA',
+  'LOCAL_DESIGN',
   'SESSION_SECRET',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
@@ -110,6 +117,7 @@ const requiredIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
 /** Read only in local work and tests; set anywhere else, it is a mistake. */
 const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   LOCAL_DATA: ['local', 'test'],
+  LOCAL_DESIGN: ['local', 'test'],
 };
 
 /** The settings that name a database or a Supabase project of the platform's own. */

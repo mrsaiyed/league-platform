@@ -521,3 +521,37 @@ describe('the engine’s state for the tracker (T-253)', () => {
     expect(TrackerGameState.safeParse({ sequence: -1, state }).success).toBe(false);
   });
 });
+
+describe('the platform’s command shape at the door (record 062, T-128)', () => {
+  const batch = (protocolVersion: number, ...commands: object[]) => ({
+    protocolVersion,
+    sessionId: id(99),
+    commands,
+  });
+  const switchTo = (mode: string) => tap(1, { type: 'clock-mode', mode });
+
+  it('version 2 takes the clock-mode switch, still at version 2', () => {
+    expect(trackerProtocolVersion).toBe(2);
+    expect(CommandBatch.safeParse(batch(2, switchTo('running'), tap(2))).success).toBe(true);
+    expect(CommandBatch.safeParse(batch(2, switchTo('stop'))).success).toBe(true);
+    expect(CommandBatch.safeParse(batch(2, switchTo('fast'))).success).toBe(false);
+    expect(isTablePlayerCommand(switchTo('running') as BatchCommand)).toBe(false);
+  });
+
+  it('keeps every tap the present tracker sends, in version 1 and 2 alike (T-127)', () => {
+    const present = [
+      tap(1, { type: 'lineup', side: 'home', playerIds: [id(5)] }),
+      tap(2, { type: 'score', side: 'home', playerId: id(5), points: 3 }),
+      tap(3, { type: 'foul', side: 'home', playerId: id(5) }),
+      tap(4, { type: 'timeout', side: 'away', seconds: 30 }),
+      tap(5, { type: 'set-clock', ms: 30_000 }),
+      tap(6, { type: 'end' }),
+    ];
+    expect(CommandBatch.safeParse(batch(2, ...present)).success).toBe(true);
+    expect(CommandBatchV1.safeParse(batch(1, ...present)).success).toBe(true);
+  });
+
+  it('keeps version 1 as it was: the first tracker’s shape, which has no switch', () => {
+    expect(CommandBatchV1.safeParse(batch(1, switchTo('running'))).success).toBe(false);
+  });
+});

@@ -17,6 +17,7 @@ export function gameLinkWords(): GameLinkWords {
     }),
     state: t('schedule.link.state', { ...teams, state: '{state}' }),
     when: t('schedule.link.when', { ...teams, when: '{when}' }),
+    awaiting: t('schedule.link.awaiting', { ...teams, when: '{when}' }),
     states: {
       live: t('schedule.link.live'),
       final: t('schedule.link.final'),
@@ -27,18 +28,32 @@ export function gameLinkWords(): GameLinkWords {
   };
 }
 
-/** A list of games as cards, kept up to date from the league's live channel. */
+/**
+ * A list of games as cards, kept up to date from the league's live channel. `layout`
+ * draws them as scoreboards: `two` across where the list has the page's width, `one`
+ * where it stands in a column of its own, and `featured` for the game being played now.
+ */
 export function GameList({
   leagueId,
   games,
+  layout = 'rows',
+  across = 'two',
+  featured = false,
 }: {
   readonly leagueId: string;
   readonly games: readonly GameView[];
+  readonly layout?: 'rows' | 'board';
+  readonly across?: 'one' | 'two';
+  readonly featured?: boolean;
 }) {
   return (
     <LiveGameList
       leagueId={leagueId}
       games={games}
+      layout={layout}
+      across={across}
+      featured={featured}
+      awaitingLabel={t('schedule.awaitingResult')}
       labels={displayLabels(t).game}
       linkWords={gameLinkWords()}
       announcement={t('schedule.liveAnnouncement', {
