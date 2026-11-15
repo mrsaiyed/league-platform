@@ -38,6 +38,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withLoopback } from '../../scripts/web-listen.mjs';
+import { sayOnFailure, whatWentWrong } from './web-browser-kit.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const app = path.join(root, 'apps/web');
@@ -63,6 +64,7 @@ function start(args, env) {
   });
   child.stdout.on('data', (c) => (output += c));
   child.stderr.on('data', (c) => (output += c));
+  sayOnFailure(`next ${args[0]}`, child, () => output);
   return { child, output: () => output };
 }
 function freePort() {
@@ -100,7 +102,7 @@ const step = async (name, run) => {
   try {
     await run();
   } catch (error) {
-    failures.push(`${name}: ${String(error?.message ?? error).split('\n')[0]}`);
+    failures.push(`${name}: ${whatWentWrong(error)}`);
   }
 };
 

@@ -34,7 +34,52 @@ export function startNext(args, env) {
   });
   child.stdout.on('data', (c) => (output += c));
   child.stderr.on('data', (c) => (output += c));
+  sayOnFailure(`next ${args[0]}`, child, () => output);
   return { child, output: () => output };
+}
+
+/**
+ * When the test ends in failure, prints the last 30 lines a Next.js run printed, unless that
+ * run finished well: so a build's or a server's own error is in the test's output, where
+ * the gate's notes on GitHub find it (step 2.178). Prints nothing when the test passes.
+ */
+export function sayOnFailure(label, child, output) {
+  process.on('exit', (code) => {
+    if (code === 0 || child.exitCode === 0) return;
+    const lines = output()
+      .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+      .split(/\r?\n/)
+      .map((line) => line.trimEnd())
+      .filter((line) => line.trim() !== '')
+      .slice(-30);
+    const how =
+      child.exitCode !== null
+        ? `it ended with code ${child.exitCode}`
+        : child.killed
+          ? 'the test had stopped it'
+          : 'it was still running';
+    const shown =
+      lines.length > 0 ? lines.map((line) => `  | ${line}`).join('\n') : '  | (nothing)';
+    process.stderr.write(
+      `The last ${lines.length} lines \`${label}\` printed (${how}):\n${shown}\n`,
+    );
+  });
+}
+
+/**
+ * A thrown error in one line, for a test's list of failed checks: its first line and, for
+ * a Playwright wait that ran out, what it was waiting for (the first "waiting for" line of
+ * its call log), so a timeout names the thing that never came (step 2.178).
+ */
+export function whatWentWrong(error) {
+  const lines = String(error?.message ?? error)
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+    .split('\n');
+  const waiting = lines
+    .find((line) => /^\s*-\s*waiting for /.test(line))
+    ?.trim()
+    .slice(2);
+  return waiting ? `${lines[0]} (${waiting})` : lines[0];
 }
 
 export function freePort() {
