@@ -751,6 +751,46 @@ if (browser) {
         );
         note('a long team name wraps whole, with nothing cut off', measured.whole);
         note('a long team name does not make the page scroll sideways', !measured.pageScrolls);
+        // The same long name wherever else a team is named, and a long league name in the
+        // header: nothing is pushed off the screen, and on a game's board each team stays
+        // in its own half.
+        await open(page, '/north-valley');
+        const postponed = await page
+          .locator('main article.ui-game-card[data-status="postponed"] a.ui-game-link')
+          .first()
+          .getAttribute('href');
+        for (const address of ['/north-valley', '/north-valley/teams', postponed ?? '']) {
+          await open(page, address);
+          const fits = await page.evaluate(() => {
+            const team = 'The Northside Community Thunderbolts';
+            const put = (el, text) => {
+              if (el) el.textContent = text;
+            };
+            put(
+              document.querySelector('.site-header .site-name > span'),
+              'The Greater Northside Community Basketball Association',
+            );
+            put(document.querySelector('.ui-scoreboard-name > [dir]'), team);
+            put(document.querySelector('.ui-game-card .ui-game-team-name'), team);
+            put(document.querySelector('.ui-team-card-name a'), team);
+            const names = [...document.querySelectorAll('.ui-scoreboard-name')].map((el) =>
+              el.getBoundingClientRect(),
+            );
+            const board = document.querySelector('.ui-scoreboard')?.getBoundingClientRect();
+            return {
+              pageScrolls: document.documentElement.scrollWidth > window.innerWidth,
+              // On a board: the first team's name ends before the second's begins, and both
+              // are inside the board.
+              apart:
+                names.length < 2 ||
+                (names[0].right <= names[1].left + 1 &&
+                  names[0].left >= board.left &&
+                  names[1].right <= board.right),
+            };
+          });
+          note(`long names on ${address} do not make the page scroll sideways`, !fits.pageScrolls);
+          note(`long names on ${address} keep each team of a board in its own half`, fits.apart);
+        }
         // The divisions' tables on one page: each number column starts at the same place in
         // all of them, on a phone (390) as on this narrowest one, so GP sits under GP.
         for (const width of [320, 390]) {

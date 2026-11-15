@@ -187,6 +187,9 @@ export const gameCss = String.raw`
 .ui-scoreboard-side {
   display: grid;
   grid-row: 2 / span 3;
+  /* One column exactly as wide as the team's half: a long name wraps inside it and can
+     never push into the other team's. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: subgrid;
   justify-items: center;
   gap: var(--step-2);
@@ -320,6 +323,8 @@ export const gameCss = String.raw`
   max-inline-size: 40rem;
   color: var(--color-muted);
   font-size: var(--text-14);
+  /* A line too long for a phone breaks in the middle, never leaving one word alone. */
+  text-wrap: balance;
 }
 .ui-scoreboard-foot > :first-child {
   margin-block-start: var(--step-4);

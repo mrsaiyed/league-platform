@@ -45,6 +45,9 @@ export const cardsCss = String.raw`
 .ui-team-card-text {
   display: grid;
   flex: 1 1 auto;
+  /* One column exactly as wide as the room there is: a long word in a name wraps or is
+     broken inside it, and never makes the card wider than the screen. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--step-1);
   min-inline-size: 0;
 }
@@ -152,6 +155,7 @@ export const cardsCss = String.raw`
 .ui-leader-who {
   display: grid;
   flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr);
   min-inline-size: 0;
 }
 .ui-leader-name {

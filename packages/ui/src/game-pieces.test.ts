@@ -114,8 +114,23 @@ describe('the scoreboard of a game page', () => {
       /\.ui-scoreboard-teams \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\);/,
     );
     expect(tablet).toMatch(/\.ui-scoreboard-middle \{[^}]*grid-column: 2;/);
-    // A long name wraps beside its chip instead of pushing the other team off the board.
+    // A long name wraps beside its chip instead of pushing the other team off the board:
+    // each team's column is exactly its half, never as wide as its longest word.
     expect(css).toMatch(/\.ui-scoreboard-name > \[dir\] \{[^}]*overflow-wrap: break-word;/);
+    expect(phone).toMatch(/\.ui-scoreboard-side \{[^}]*grid-template-columns: minmax\(0, 1fr\);/);
+    // The same for the other pieces that hold a name in a grid of their own.
+    for (const piece of [
+      '.ui-team-card-text',
+      '.ui-leader-who',
+      '.ui-page-head',
+      '.ui-page-head-text',
+    ]) {
+      expect(css, piece).toMatch(
+        new RegExp(
+          `\\n${piece.replace('.', '\\.')} \\{[^}]*grid-template-columns: minmax\\(0, 1fr\\);`,
+        ),
+      );
+    }
   });
   it('marks the winner of a decided game by weight as well as color', () => {
     const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');

@@ -29,6 +29,8 @@ export const layoutCss = String.raw`
 /* The head of a page: one title, a line under it, and what the page lets you do. */
 .ui-page-head {
   display: grid;
+  /* As wide as the page's column and no wider, whatever the title's longest word. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--step-2);
   margin-block-end: var(--step-5);
 }
@@ -47,6 +49,7 @@ export const layoutCss = String.raw`
 }
 .ui-page-head-text {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--step-2);
   flex: 1 1 16rem;
   min-inline-size: 0;
