@@ -659,7 +659,8 @@ try {
         context: staff,
         base: '',
       })),
-      ...(design === '' ? accountMenuPages : []).map((page) => ({
+      // Under a named design too: the account button sits in the header every design draws.
+      ...accountMenuPages.map((page) => ({
         ...page,
         name: `${leagues[0]}-${page.name}`,
         context: staff,
