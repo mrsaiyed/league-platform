@@ -13,6 +13,7 @@ import * as browserSecrets from './browser-secrets.mjs';
 import * as migrationSafety from './migration-safety.mjs';
 import * as workerOnly from './worker-only.mjs';
 import * as interfaceText from './interface-text.mjs';
+import * as nodeStrip from './node-strip.mjs';
 
 export const checks = [
   importDirections,
@@ -24,6 +25,7 @@ export const checks = [
   migrationSafety,
   workerOnly,
   interfaceText,
+  nodeStrip,
 ];
 
 /** Runs every check (or those whose rule is in `only`) over the repository at `root`. */

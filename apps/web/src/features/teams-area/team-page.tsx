@@ -14,6 +14,7 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
+import { numbersWornTwice, rosterName } from './roster-name.ts';
 import {
   addNewPersonAction,
   addToRosterAction,
@@ -43,9 +44,8 @@ const roleText = (role: string): string =>
     ? t(`adminTeams.roster.role.${role}` as TextKey)
     : role;
 
-/** A person's name; the order of its parts is the message file's (T-187). */
-const nameOf = (line: { readonly firstName: string; readonly lastName: string }): string =>
-  t('adminTeams.personName', { firstName: line.firstName, lastName: line.lastName }).trim();
+/** A person's name, "#12" for one added at the scorer's table by number only (S-34). */
+const nameOf = rosterName;
 
 export async function TeamPage({
   league,
@@ -75,6 +75,8 @@ export async function TeamPage({
   const roster = await listRoster(context, { teamId: team.id }, ports.deps);
   const lines: readonly RosterLine[] = roster.ok ? roster.value : [];
   const open = lines.filter((line) => line.leftOn === null);
+  // S-44: a clash of numbers is marked on both players, for the admin to put right.
+  const wornTwice = numbersWornTwice(open);
   const left = lines.filter((line) => line.leftOn !== null);
   const people = await listPeople(context, { limit: 200 }, ports.deps);
   const everyone: readonly PersonRecord[] = people.ok ? people.value : [];
@@ -147,6 +149,10 @@ export async function TeamPage({
             {open.map((line, place) => (
               <li key={line.id}>
                 <strong>{nameOf(line)}</strong>
+                {line.needsReview === true ? <> {t('adminTeams.roster.toReview')}</> : null}
+                {line.jerseyNumber !== null && wornTwice.has(line.jerseyNumber) ? (
+                  <> {t('adminTeams.roster.numberTwice', { number: line.jerseyNumber })}</>
+                ) : null}
                 <form action={changeEntryAction}>
                   <LeagueField league={here.slug} />
                   <input type="hidden" name="team" value={team.id} />

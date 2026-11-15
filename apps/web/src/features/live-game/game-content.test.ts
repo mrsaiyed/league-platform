@@ -356,6 +356,16 @@ describe('a game page', () => {
               seconds: null,
               stats: { mystery_stat: 1 },
             },
+            // Added at the scorer's table by number only (S-34): "#12", not a name withheld.
+            {
+              personId: 'q',
+              name: null,
+              jersey: '12',
+              unnamed: true,
+              played: true,
+              seconds: null,
+              stats: { mystery_stat: 0 },
+            },
           ],
         },
         {
@@ -371,7 +381,7 @@ describe('a game page', () => {
     if (built.kind !== 'tables') throw new Error(built.kind);
     expect(built.tables.map((x) => x.teamName)).toEqual(['Bears', 'Hawks']);
     expect(built.tables[0]?.players).toBeNull();
-    expect(built.tables[1]?.players?.[0]?.name).toBe('Name not shown');
+    expect(built.tables[1]?.players?.map((p) => p.name)).toEqual(['Name not shown', '#12']);
     expect(built.tables[0]?.columns.map((c) => c.label)).toEqual(['PTS']);
   });
 

@@ -20,8 +20,7 @@ export async function binPublishedGames(
     .where('id', 'in', [...gameIds])
     .where('deleted_at', 'is', null)
     .where('status', 'in', ['scheduled', 'postponed', 'cancelled'])
-    .where(sql<boolean>`not public.game_tracked_past_marker(games.league_id, games.id)`)
-    .where(sql<boolean>`not public.game_ever_decided(games.league_id, games.id)`)
+    .where(sql<boolean>`not public.game_scored_for_bin(games.league_id, games.id)`)
     .returning('id')
     .execute();
   return rows.length;

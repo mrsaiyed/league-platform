@@ -20,8 +20,11 @@
 -- before (a postponed or cancelled game that had started, a decided game, the format
 -- replaced rather than emptied, a game whose log does not end at a marker).
 --
--- A game cleared that way has nothing recorded after its marker, so it may go to the bin
--- like any game never scored (`games_scored_not_binned`), unless it was ever decided.
+-- A game cleared that way has no play recorded after its marker (the players the
+-- scorer's table changed are not plays, record 058), so it may go to the bin like any
+-- game never scored (`games_scored_not_binned`), unless it was ever decided
+-- (public.game_scored_for_bin; a game decided by hand, with no events, still goes with
+-- a correction, as before).
 -- Its events stay: the bin keeps the game's row, and the app never removes a game.
 --
 -- Functions only, each replaced or made whole; the triggers stay as 0009 and 0010 made
@@ -51,6 +54,9 @@ as $$
   select exists (
     select 1 from public.game_events e
     where e.league_id = league and e.game_id = game
+      -- The players the scorer's table changed are events but not plays (record 058,
+      -- tablePlayerEventTypes in packages/contracts).
+      and e.type not in ('add-player', 'change-player', 'remove-player', 'add-player-refused')
       and e.seq > coalesce((
         select max(r.seq) from public.game_events r
         where r.league_id = league and r.game_id = game and r.type = 'reset'
@@ -59,7 +65,7 @@ as $$
 $$;
 
 comment on function public.game_tracked_past_marker(uuid, uuid) is
-  'Whether the tracker has recorded anything for a game since it was last marked not started (its last reset event), or at all if it never was (record 061). Runs as the caller.';
+  'Whether the tracker has recorded a play of a game since it was last marked not started (its last reset event), or at all if it never was; the players the scorer''s table changed are not plays (records 058, 061). Runs as the caller.';
 
 create or replace function public.game_marked_not_started(league uuid, game uuid) returns boolean
 language sql
@@ -78,11 +84,29 @@ $$;
 comment on function public.game_marked_not_started(uuid, uuid) is
   'Whether a game''s latest event is the reset marker games.mark_not_started writes, and the game was never decided (S-40, record 061). Runs as the caller.';
 
+create or replace function public.game_scored_for_bin(league uuid, game uuid) returns boolean
+language sql
+stable
+set search_path = pg_catalog, pg_temp
+as $$
+  select public.game_tracked_past_marker(league, game)
+    or (
+      public.game_ever_decided(league, game)
+      and exists (
+        select 1 from public.game_events e where e.league_id = league and e.game_id = game
+      )
+    )
+$$;
+
+comment on function public.game_scored_for_bin(uuid, uuid) is
+  'Whether a game''s events keep it out of the bin: a play since its last not-started marker, or events in a game that was ever decided. A game decided by hand, with no events, goes to the bin with a correction as before (S-7, records 030 and 061). Runs as the caller.';
+
 -- The triggers on games run as the caller: the app's role reads its own league's events
 -- and corrections through these (0005 grants no function to anyone by default).
 grant execute on function public.game_ever_decided(uuid, uuid) to app_user;
 grant execute on function public.game_tracked_past_marker(uuid, uuid) to app_user;
 grant execute on function public.game_marked_not_started(uuid, uuid) to app_user;
+grant execute on function public.game_scored_for_bin(uuid, uuid) to app_user;
 
 create or replace function public.stamp_game_format_fixed() returns trigger
 language plpgsql
@@ -136,8 +160,7 @@ language plpgsql
 set search_path = pg_catalog, pg_temp
 as $$
 begin
-  if public.game_tracked_past_marker(new.league_id, new.id)
-     or public.game_ever_decided(new.league_id, new.id) then
+  if public.game_scored_for_bin(new.league_id, new.id) then
     raise exception 'game % has been scored, so it cannot go to the bin', new.id
       using errcode = 'restrict_violation', constraint = 'games_scored_not_binned',
             hint = 'Correct or reopen the game instead (S-7).';
@@ -147,4 +170,4 @@ end
 $$;
 
 comment on function public.check_game_bin_unscored() is
-  'BEFORE UPDATE OF deleted_at on games: a game with game events is never put in the bin, unless everything in it was cleared by marking it not started and it was never decided (record 061).';
+  'BEFORE UPDATE OF deleted_at on games: a game with game events is never put in the bin, unless everything in it was cleared by marking it not started and it was never decided; the players the scorer''s table changed are not plays (records 030, 058, 061).';

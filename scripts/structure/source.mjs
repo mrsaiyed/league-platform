@@ -172,7 +172,7 @@ function pickTarget(value) {
   return undefined;
 }
 
-function makeFile(abs, rel) {
+export function makeFile(abs, rel) {
   const text = fs.readFileSync(abs, 'utf8');
   const ext = path.extname(rel);
   let lexed;

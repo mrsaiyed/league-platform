@@ -991,6 +991,101 @@ const gameCommandRows: readonly Row[] = [
     }),
     (c, i) => applyTrackerCommands(c, i, trackerDeps),
   ),
+  // The players at the scorer's table (record 058) travel in the same batch: whoever may
+  // score the game. With no session held, each is answered refused and nothing changes.
+  ...gameRows(
+    'games.apply_tracker_commands',
+    'add and renumber players at the scorer’s table',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      protocolVersion: 2,
+      sessionId: randomUUID(),
+      commands: [
+        {
+          commandId: randomUUID(),
+          at: matrixNow,
+          input: {
+            type: 'add-player',
+            side: 'away',
+            playerId: randomUUID(),
+            jersey: '12',
+            name: '',
+          },
+        },
+        {
+          commandId: randomUUID(),
+          at: matrixNow,
+          input: { type: 'change-player', side: 'away', playerId: randomUUID(), jersey: '5' },
+        },
+      ],
+    }),
+    (c, i) => applyTrackerCommands(c, i, trackerDeps),
+  ),
+  // The strongest takeover (review of step 2.117, item 10): with a session held, an add
+  // whose device-made id is a person of ANOTHER league (a random id, as a device makes,
+  // so the database itself must refuse it). Allowed callers get the batch answered,
+  // with the add refused as taken; nothing is written in either league.
+  ...gameRows(
+    'games.apply_tracker_commands',
+    'add a player whose id is another league’s person, with a session held',
+    'games.score',
+    async (league, program) => {
+      const other = await newLeague(pglite);
+      const stranger = randomUUID();
+      await pglite.query(
+        `insert into people (id, league_id, first_name, last_name) values ($1, $2, 'Other', 'League')`,
+        [stranger, other.leagueId],
+      );
+      return { gameId: (await gameIn(league, program)).gameId, stranger };
+    },
+    async (c, i) => {
+      const { gameId, stranger } = i as { gameId: string; stranger: string };
+      const opened = await openScoringSession(c, { gameId, deviceId: 'matrix' }, scoringDeps);
+      if (!opened.ok) return opened;
+      const { sessionId } = opened.value as { sessionId?: string };
+      const before = await pglite.query('select id from roster_entries');
+      const result = await applyTrackerCommands(
+        c,
+        {
+          gameId,
+          protocolVersion: 2,
+          sessionId: sessionId ?? randomUUID(),
+          commands: [
+            {
+              commandId: randomUUID(),
+              at: matrixNow,
+              input: {
+                type: 'add-player',
+                side: 'away',
+                playerId: stranger,
+                jersey: '9',
+                name: '',
+              },
+            },
+          ],
+        },
+        trackerDeps,
+      );
+      if (!result.ok) return result;
+      const [answer] = result.value.results;
+      const after = await pglite.query('select id from roster_entries');
+      const person = await pglite.query<{ league_id: string }>(
+        'select league_id from people where id = $1',
+        [stranger],
+      );
+      if (
+        answer?.status !== 'refused' ||
+        answer.reason.problem !== 'player-id-taken' ||
+        after.rows.length !== before.rows.length ||
+        person.rows.length !== 1 ||
+        person.rows[0]?.league_id === c.leagueId
+      ) {
+        throw new Error(`the stranger's id was not refused cleanly: ${JSON.stringify(answer)}`);
+      }
+      return result;
+    },
+  ),
   // The engine's state for the scorekeeper's device (T-113, T-253): whoever may score
   // the game. A game with no taps yet is read as a new one; nothing changes.
   ...gameRows(

@@ -73,6 +73,27 @@ export function periodClockText(
   });
 }
 
+/**
+ * A box score's name: the name shown, "#12" for a player whose name was never recorded
+ * (added at the scorer's table by number only, S-34), else the words for a name not
+ * shown (`notShown`), as for a removed or hidden one.
+ */
+export function boxScoreName(
+  jerseyOnly: string,
+  notShown: string,
+  player: {
+    readonly name: string | null;
+    readonly jersey: string | null;
+    readonly unnamed?: boolean | undefined;
+  },
+): string {
+  if (player.name !== null) return player.name;
+  if (player.unnamed === true && player.jersey !== null && player.jersey !== '') {
+    return fill(jerseyOnly, { jersey: player.jersey });
+  }
+  return notShown;
+}
+
 /** A player as the page shows them: "#7 Ada Lionel", "Ada Lionel", "#7", or null. */
 export function playerText(
   words: GameWords,

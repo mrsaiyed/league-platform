@@ -210,7 +210,7 @@ describe('supabaseRealtimeSubscriber', () => {
     expect(page.got[0]).toEqual(message(1));
   });
 
-  it('drops anything that is not a message for this channel and game', () => {
+  it('drops anything that is not a message for this channel and game, and reads past fields it does not know', () => {
     const page = watchGame(subscriber());
     const socket = sockets[0]!;
     socket.opened();
@@ -218,7 +218,6 @@ describe('supabaseRealtimeSubscriber', () => {
     socket.receive(broadcast(gameTopic, message(1)));
     socket.receive(joinOk(gameTopic, socket.joinRef(gameTopic)));
     socket.receive(broadcast(gameTopic, message(2), 'other-event'));
-    socket.receive(broadcast(gameTopic, { ...message(2), players: [] }));
     socket.receive(broadcast(gameTopic, message(2, game2)));
     socket.receive(broadcast(`realtime:${gameChannelName(league, game2)}`, message(2)));
     socket.receive(broadcast(gameTopic.replace('realtime:', ''), message(2)));
@@ -226,7 +225,10 @@ describe('supabaseRealtimeSubscriber', () => {
     socket.receive({ event: 'broadcast' });
     socket.receive(null);
     socket.receive(broadcast(gameTopic, message(3)));
-    expect(page.got.map((m) => m.sequence)).toEqual([3]);
+    // A field added after this page opened is left out (record 058).
+    socket.receive(broadcast(gameTopic, { ...message(4), players: [], added: 1 }));
+    expect(page.got.map((m) => m.sequence)).toEqual([3, 4]);
+    expect(page.got[1]).toEqual(message(4));
   });
 
   it('shares one connection and one join between pages of the same channel', () => {

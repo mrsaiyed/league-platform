@@ -382,6 +382,10 @@ export const en = {
     'The league list could not be read just now, so it is not shown. Reload the page to try again.',
   // A person's name as the Teams screens show it; a language may put the parts the other way.
   'adminTeams.personName': '{firstName} {lastName}',
+  'adminTeams.byNumber': '#{number}',
+  'adminTeams.noName': 'No name yet',
+  'adminTeams.roster.toReview': '(added at the scorer’s table, to review)',
+  'adminTeams.roster.numberTwice': '(#{number} is worn by two players)',
   // After a team's name in the list, with the space before it: " (North)".
   'adminTeams.inDivision': ' ({division})',
   'adminTeams.add.title': 'Add a player',
@@ -1022,6 +1026,7 @@ export const en = {
   'activity.games.reopen_game': 'Reopened a final game to correct it',
   'activity.games.end_tracked_game': 'Ended a tracked game',
   'activity.games.mark_not_started': 'Marked a started game not started',
+  'activity.games.apply_tracker_commands': "Changed a team's players at the scorer's table",
   'activity.standings.add_adjustment': 'Added a standings adjustment',
   'activity.standings.remove_adjustment': 'Removed a standings adjustment',
   'activity.games.assign_scorekeeper': 'Assigned a scorekeeper to a game',

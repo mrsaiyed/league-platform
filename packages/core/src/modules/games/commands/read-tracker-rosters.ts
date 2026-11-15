@@ -11,12 +11,18 @@
 // are listed and marked, as the box score grid lists them (R-17). It says how the game is
 // recorded, as only a game recorded live is scored in the tracker. It changes nothing,
 // but runs in the same shape as a command (record 014).
+//
+// Step 2.117 (record 058) added what the Players panel needs: whether the season wants
+// unique numbers, and for each player whether they were added at a scorer's table, at
+// which game, and whether they still wait for an admin's review (only then may the table
+// rename them or take them off, S-45).
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { recordingOf } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GameRosterPlayer, GamesTx } from '../ports.ts';
 import { lowerId } from '../scoring-session.ts';
+import { seasonRulesOf } from '../season-rules-of.ts';
 
 /** The game's two teams and their players, by team, roster order and name. */
 export type TrackerRosters = {
@@ -27,6 +33,8 @@ export type TrackerRosters = {
   readonly recording: ReturnType<typeof recordingOf>;
   /** Where the game stands (scheduled, live, final...): a game over is not entered again. */
   readonly status: string;
+  /** The game's season wants unique numbers on a team (S-37). */
+  readonly uniqueJerseys: boolean;
   readonly players: readonly GameRosterPlayer[];
 };
 
@@ -41,12 +49,14 @@ export const readTrackerRosters = defineCommand({
     const game = await tx.games.find(input.gameId);
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
     const players = await tx.games.listRoster(game.id);
+    const { uniqueJerseys } = (await seasonRulesOf(tx, game.seasonId)).rosters;
     return ok({
       gameId: game.id,
       homeTeamId: game.homeTeamId,
       awayTeamId: game.awayTeamId,
       recording: recordingOf(game.captureMode),
       status: game.status,
+      uniqueJerseys,
       players,
     });
   },

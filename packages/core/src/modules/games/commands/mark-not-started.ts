@@ -124,7 +124,10 @@ export const markNotStarted = defineCommand({
     if (saved === undefined) return fail({ code: 'not-tracked' });
     // Final once and reopened (by an admin, or by its scorekeeper): it was played.
     if (await tx.liveGames.wasDecided(game.id)) return fail({ code: 'was-decided' });
-    if (saved.seq !== input.sequence) return fail({ code: 'changed-since-read' });
+    // The game's last event, its plays and its changes of players (record 058): the
+    // sequence number the tracker is told, and the one the marker follows.
+    const last = Math.max(saved.seq, await tx.liveGames.lastEventSeq(game.id));
+    if (last !== input.sequence) return fail({ code: 'changed-since-read' });
     const now = tx.clock.now();
     // Another account's session, lapsed or not: that device may be scoring offline.
     const session = await tx.scoringSessions.findForGame(game.id);
@@ -144,14 +147,14 @@ export const markNotStarted = defineCommand({
       basketball.apply(before, { type: 'reset' }, { id: commandId, now }),
       seasonRules,
     );
-    const sequence = saved.seq + 1;
+    const sequence = last + 1;
     await tx.liveGames.addEvents([
       {
         gameId: game.id,
         seq: sequence,
         commandId,
         type: 'reset',
-        payload: { clearedThrough: saved.seq },
+        payload: { clearedThrough: last },
         tappedAt: now,
         accountId,
       },
@@ -174,7 +177,7 @@ export const markNotStarted = defineCommand({
       action: 'games.mark_not_started',
       target: { type: 'game', id: game.id },
       details: {
-        clearedThrough: saved.seq,
+        clearedThrough: last,
         homeScore: home.score,
         awayScore: away.score,
         homeFouls: home.fouls,

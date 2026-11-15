@@ -175,10 +175,10 @@ export async function readGameSnapshot(
       jerseyOf.set(line.personId, line.jerseyNumber);
     }
   }
-  const nameOf = (side: Side, personId: string): string | null => {
+  const shownOf = (side: Side, personId: string) => {
     const person = personOf.get(personId);
-    if (person === undefined) return null;
-    const name = showName(
+    if (person === undefined) return undefined;
+    return showName(
       {
         firstName: person.firstName,
         lastName: person.lastName,
@@ -192,7 +192,15 @@ export async function readGameSnapshot(
         statsOf: settingOf(team[side]),
       },
     );
-    return name.shown ? short(name.text) : null;
+  };
+  const nameOf = (side: Side, personId: string): string | null => {
+    const name = shownOf(side, personId);
+    return name?.shown === true ? short(name.text) : null;
+  };
+  /** No name was ever recorded: a player added at the table by number only (S-34). */
+  const unnamed = (side: Side, personId: string) => {
+    const name = shownOf(side, personId);
+    return name !== undefined && !name.shown && name.why === 'no_name';
   };
 
   const onCourt = (side: Side) => new Set(view?.teams[side].onCourt ?? []);
@@ -203,6 +211,8 @@ export async function readGameSnapshot(
       side,
       name: nameOf(side, personId),
       jersey: jerseyOf.get(personId) ?? null,
+      // Only when true, so a page opened before the mark existed reads the rest as before.
+      ...(unnamed(side, personId) ? { unnamed: true as const } : {}),
       points: line.points,
       fouls: line.fouls,
       onCourt: court[side].has(personId),

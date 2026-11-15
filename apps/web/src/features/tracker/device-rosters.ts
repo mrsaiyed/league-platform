@@ -1,7 +1,8 @@
-// The rosters as the device keeps them (T-115), from the staff read of the game's rosters
-// (games.read_tracker_rosters, T-258) and the teams' names the league shows. Worked out
-// on the server when the tracker's page is drawn; the page hands them to the device.
-import type { TrackerRosters } from '@srleagues/core';
+// The rosters as the device keeps them (T-115), from the one shape the server hands the
+// device (`TrackerRosters`, record 058): the tracker's page when it is drawn, and the
+// rosters address when the device refreshes them (a player added a minute ago on another
+// device), with the teams' names the league shows.
+import type { TrackerRosters } from '@srleagues/contracts';
 import type { DevicePlayer, DeviceRosters, DeviceTeam } from './opened-game-storage.ts';
 
 export function deviceRosters(
@@ -20,8 +21,24 @@ export function deviceRosters(
           lastName: p.lastName,
           jerseyNumber: p.jerseyNumber,
           left: p.left,
+          addedAtGameId: p.addedAtGameId,
+          toReview: p.toReview,
         }),
       ),
   });
-  return { home: team(rosters.homeTeamId), away: team(rosters.awayTeamId) };
+  return {
+    home: team(rosters.homeTeamId),
+    away: team(rosters.awayTeamId),
+    uniqueJerseys: rosters.uniqueJerseys,
+  };
 }
+
+/**
+ * The rosters the address gave, kept as the device keeps them, with the teams' names it
+ * already holds (the address does not repeat them).
+ */
+export const refreshedRosters = (kept: DeviceRosters, rosters: TrackerRosters): DeviceRosters =>
+  deviceRosters(rosters, {
+    [kept.home.teamId]: kept.home.name,
+    [kept.away.teamId]: kept.away.name,
+  });

@@ -11,6 +11,8 @@ import {
   gameUuid,
   homeTeamId,
   memoryGames,
+  rules,
+  seasonId,
   ownerId,
   scorekeeperGrant,
   scorekeeperId,
@@ -55,8 +57,37 @@ describe('reading the rosters for the tracker (T-115, T-258)', () => {
         awayTeamId,
         recording: 'live',
         status: 'scheduled',
+        uniqueJerseys: false,
         players: roster.slice(0, 3),
       },
+    });
+  });
+
+  it('says whether the season wants unique numbers, and which players were added at a table and wait for review (record 058)', async () => {
+    const walkUp = {
+      ...player(awayTeamId, 5),
+      addedAtGameId: gameUuid(1),
+      needsReview: true,
+    };
+    const { deps, as } = memoryGames({
+      status: 'live',
+      seasons: [
+        {
+          id: seasonId,
+          programId: 'p1',
+          rules: rules((r) => {
+            r.rosters.uniqueJerseys = true;
+          }),
+        },
+      ],
+      games: [game(1, { captureMode: 'live' })],
+      grants: [scorekeeperGrant],
+      roster: [player(homeTeamId, 1), walkUp],
+    });
+    const result = await readTrackerRosters(as(scorekeeperId), { gameId: gameUuid(1) }, deps);
+    expect(result).toMatchObject({
+      ok: true,
+      value: { uniqueJerseys: true, players: [player(homeTeamId, 1), walkUp] },
     });
   });
 

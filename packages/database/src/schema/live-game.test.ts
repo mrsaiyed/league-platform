@@ -3,6 +3,7 @@
 // one device scores a game at a time; a game has one state; a player has one line
 // per game, for a team playing in it; a player added at the scorer's table says so.
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -457,6 +458,86 @@ describe("players added at the scorer's table (S-6)", () => {
       [rows[0]?.id],
     );
     expect(needs_review).toBe(false);
+  });
+
+  it('are not held to unique numbers until an admin confirms them, then are (S-44, 0015)', async () => {
+    const g = await game();
+    await db.query(
+      `update seasons set rules = jsonb_set(
+         jsonb_set(rules, '{rosters}', coalesce(rules -> 'rosters', '{}'::jsonb)),
+         '{rosters,uniqueJerseys}', 'true'::jsonb)
+       where id = $1`,
+      [g.seasonId],
+    );
+    const wearer = await newPerson(db, g.leagueId);
+    const worn = await one<{ id: string }>(
+      db,
+      `insert into roster_entries (league_id, team_id, person_id, jersey_number)
+       values ($1, $2, $3, '5') returning id`,
+      [g.leagueId, g.homeTeamId, wearer],
+    );
+    // Added at the table with the same number: taken, waiting for review.
+    const { rows } = await walkUp(db, g, g.gameId, true);
+    const added = rows[0]?.id;
+    await db.query(`update roster_entries set jersey_number = '5' where id = $1`, [added]);
+    // The other way: the league's own roster is not refused because a walk-up wears it.
+    const second = await newPerson(db, g.leagueId);
+    const { rows: other } = await walkUp(db, g, g.gameId, true);
+    await db.query(`update roster_entries set jersey_number = '7' where id = $1`, [other[0]?.id]);
+    await db.query(
+      `insert into roster_entries (league_id, team_id, person_id, jersey_number)
+       values ($1, $2, $3, '7')`,
+      [g.leagueId, g.homeTeamId, second],
+    );
+    // Confirming the walk-up applies the rule: refused while the clash stands.
+    await expect(
+      db.query('update roster_entries set needs_review = false where id = $1', [added]),
+    ).rejects.toMatchObject({ ...refused.unique, constraint: 'roster_entries_unique_jersey' });
+    await db.query(`update roster_entries set left_on = current_date where id = $1`, [worn.id]);
+    await db.query('update roster_entries set needs_review = false where id = $1', [added]);
+    // Switching the rule on counts no entry waiting for review.
+    await db.query(
+      `update seasons set rules = jsonb_set(rules, '{rosters,uniqueJerseys}', 'false'::jsonb) where id = $1`,
+      [g.seasonId],
+    );
+    await db.query(
+      `update seasons set rules = jsonb_set(rules, '{rosters,uniqueJerseys}', 'true'::jsonb) where id = $1`,
+      [g.seasonId],
+    );
+  });
+
+  it('come from a migration that is safe to run twice (0015)', async () => {
+    const text = readFileSync(
+      new URL('../../../../supabase/migrations/0015_table_players_review.sql', import.meta.url),
+      'utf8',
+    );
+    await db.exec(text);
+    await db.exec(text);
+    const g = await game();
+    await walkUp(db, g, g.gameId, true);
+  });
+
+  it('keep the name they had before a rename at the table, for an admin (S-45, 0015)', async () => {
+    const g = await game();
+    const { rows } = await walkUp(db, g, g.gameId, true);
+    const { person_id } = await one<{ person_id: string }>(
+      db,
+      'select person_id from roster_entries where id = $1',
+      [rows[0]?.id],
+    );
+    await db.query(
+      `update people set previous_first_name = first_name, previous_last_name = last_name,
+         first_name = 'Sam', last_name = '' where id = $1`,
+      [person_id],
+    );
+    expect(
+      await one(db, 'select previous_first_name, previous_last_name from people where id = $1', [
+        person_id,
+      ]),
+    ).toEqual({ previous_first_name: 'Walk', previous_last_name: 'Up' });
+    await expect(
+      db.query(`update people set previous_first_name = '  ' where id = $1`, [person_id]),
+    ).rejects.toMatchObject(refusedBy('people_previous_first_name_length'));
   });
 
   it('keep the game they were added at, of their own league', async () => {

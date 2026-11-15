@@ -249,6 +249,16 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     const game = s.games.find((g) => g.id === gameId);
     return game === undefined ? [] : [game.homeTeamId, game.awayTeamId];
   };
+  /** Whether the season a team plays its games in asks for unique numbers (0008, record 058). */
+  const uniqueJerseysOf = (s: State, teamId: string) => {
+    const game = s.games.find((g) => g.homeTeamId === teamId || g.awayTeamId === teamId);
+    const rules = s.seasons.find((x) => x.id === game?.seasonId)?.rules;
+    const rosters =
+      typeof rules === 'object' && rules !== null
+        ? (rules as { rosters?: { uniqueJerseys?: unknown } }).rosters
+        : undefined;
+    return rosters?.uniqueJerseys === true;
+  };
 
   const txOf = (leagueId: string, s: State): TrackerTx => ({
     jobs: { enqueue: async () => {} },
@@ -320,6 +330,9 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
             .filter((p) => p.teamId === teamId)
             .map((p) => {
               const person = s.tracker.people.find((x) => x.id === p.personId);
+              const mark = s.tracker.tableMarks.find(
+                (m) => m.teamId === teamId && m.personId === p.personId,
+              );
               return {
                 teamId,
                 personId: p.personId,
@@ -327,9 +340,12 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
                 lastName: person?.lastName ?? '',
                 jerseyNumber: p.jerseyNumber,
                 left: !p.onGameDay,
+                addedAtGameId: mark?.addedAtGameId ?? null,
+                needsReview: mark?.needsReview ?? false,
               };
             }),
         ),
+      // The players the scorer's table changed are events too, but not plays (record 058).
       hasPlays: async (gameId) =>
         s.tracked.includes(gameId) || trackedPastMarker(s.tracker.events, gameId),
       findSeason: async (seasonId) => s.seasons.find((x) => x.id === seasonId),
@@ -373,6 +389,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     liveGames: liveGamesOf(
       s.tracker,
       (gameId) => teamsOf(s, gameId),
+      (teamId) => uniqueJerseysOf(s, teamId),
       (gameId) => s.corrections.some((c) => c.gameId === gameId),
     ),
   });

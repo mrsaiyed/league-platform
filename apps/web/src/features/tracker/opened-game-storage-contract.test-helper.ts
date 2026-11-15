@@ -25,14 +25,28 @@ export const madeUpRosters: DeviceRosters = {
         lastName: 'Example',
         jerseyNumber: '4',
         left: false,
+        addedAtGameId: null,
+        toReview: false,
       },
     ],
   },
   away: {
     teamId: '00000000-0000-4000-8000-0000000000d2',
     name: 'Made-up Away',
-    players: [],
+    players: [
+      // Added at the table by number only, waiting for review (record 058).
+      {
+        personId: '00000000-0000-4000-8000-0000000000e2',
+        firstName: '',
+        lastName: '',
+        jerseyNumber: '12',
+        left: false,
+        addedAtGameId: '00000000-0000-4000-8000-0000000000a1',
+        toReview: true,
+      },
+    ],
   },
+  uniqueJerseys: true,
 };
 
 const state = { sequence: 3, state: basketball.newGame(basketball.HALVES, 0) };

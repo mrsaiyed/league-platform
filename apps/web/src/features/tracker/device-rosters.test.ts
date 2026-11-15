@@ -1,8 +1,10 @@
+import type { TrackerRosters } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
-import { deviceRosters } from './device-rosters.ts';
+import { deviceRosters, refreshedRosters } from './device-rosters.ts';
 
 const home = '00000000-0000-4000-8000-0000000000d1';
 const away = '00000000-0000-4000-8000-0000000000d2';
+const gameId = '00000000-0000-4000-8000-0000000000a1';
 const player = (teamId: string, n: number, left = false) => ({
   teamId,
   personId: `00000000-0000-4000-8000-0000000000e${n}`,
@@ -10,70 +12,67 @@ const player = (teamId: string, n: number, left = false) => ({
   lastName: `Last${n}`,
   jerseyNumber: n === 3 ? null : String(n),
   left,
+  addedAtGameId: null,
+  toReview: false,
 });
+/** Added at this game's table by number only, waiting for review (record 058). */
+const walkUp = {
+  teamId: away,
+  personId: '00000000-0000-4000-8000-0000000000e9',
+  firstName: '',
+  lastName: '',
+  jerseyNumber: '12',
+  left: false,
+  addedAtGameId: gameId,
+  toReview: true,
+};
+const rostersOf = (players: TrackerRosters['players'], uniqueJerseys = false): TrackerRosters => ({
+  gameId,
+  homeTeamId: home,
+  awayTeamId: away,
+  recording: 'live',
+  status: 'scheduled',
+  uniqueJerseys,
+  players,
+});
+const kept = ({ teamId, ...p }: TrackerRosters['players'][number]) => p;
 
 describe('the rosters as the device keeps them', () => {
   it('puts each player under their team, in the order read, with the team’s name', () => {
-    const kept = deviceRosters(
-      {
-        gameId: '00000000-0000-4000-8000-0000000000a1',
-        homeTeamId: home,
-        awayTeamId: away,
-        recording: 'live',
-        status: 'scheduled',
-        players: [player(away, 1), player(home, 2), player(home, 3, true)],
-      },
+    const rosters = deviceRosters(
+      rostersOf([player(away, 1), player(home, 2), player(home, 3, true)]),
       { [home]: 'Made-up Home', [away]: 'Made-up Away' },
     );
-    expect(kept).toEqual({
+    expect(rosters).toEqual({
       home: {
         teamId: home,
         name: 'Made-up Home',
-        players: [
-          {
-            personId: player(home, 2).personId,
-            firstName: 'First2',
-            lastName: 'Last2',
-            jerseyNumber: '2',
-            left: false,
-          },
-          {
-            personId: player(home, 3).personId,
-            firstName: 'First3',
-            lastName: 'Last3',
-            jerseyNumber: null,
-            left: true,
-          },
-        ],
+        players: [kept(player(home, 2)), kept(player(home, 3, true))],
       },
-      away: {
-        teamId: away,
-        name: 'Made-up Away',
-        players: [
-          {
-            personId: player(away, 1).personId,
-            firstName: 'First1',
-            lastName: 'Last1',
-            jerseyNumber: '1',
-            left: false,
-          },
-        ],
-      },
+      away: { teamId: away, name: 'Made-up Away', players: [kept(player(away, 1))] },
+      uniqueJerseys: false,
     });
   });
 
+  it('keeps what the Players panel needs: unique numbers, and who was added at a table to review (record 058)', () => {
+    const rosters = deviceRosters(rostersOf([player(home, 2), walkUp], true), {});
+    expect(rosters.uniqueJerseys).toBe(true);
+    expect(rosters.away.players).toEqual([kept(walkUp)]);
+    expect(rosters.home.players[0]).toMatchObject({ addedAtGameId: null, toReview: false });
+  });
+
+  it('takes the rosters address’s answer as the page’s, keeping the teams’ names it holds', () => {
+    const before = deviceRosters(rostersOf([player(home, 2)]), {
+      [home]: 'Made-up Home',
+      [away]: 'Made-up Away',
+    });
+    const after = refreshedRosters(before, rostersOf([player(home, 2), walkUp]));
+    expect(after.home.name).toBe('Made-up Home');
+    expect(after.away).toEqual({ teamId: away, name: 'Made-up Away', players: [kept(walkUp)] });
+  });
+
   it('keeps a team with no name known as an empty name, not a missing one', () => {
-    const kept = deviceRosters(
-      {
-        gameId: 'g',
-        homeTeamId: home,
-        awayTeamId: away,
-        recording: 'live',
-        status: 'scheduled',
-        players: [],
-      },
-      {},
-    );
-    expect(kept.home).toEqual({ teamId: home, name: '', players: [] });
+    const rosters = deviceRosters(rostersOf([]), {});
+    expect(rosters.home).toEqual({ teamId: home, name: '', players: [] });
   });
 });

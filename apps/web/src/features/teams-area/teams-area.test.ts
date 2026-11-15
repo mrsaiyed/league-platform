@@ -12,6 +12,7 @@ import {
   shortNameFrom,
   shortNameNeeded,
 } from './form-input.ts';
+import { hasName, numbersWornTwice, rosterName } from './roster-name.ts';
 
 const t = createTranslator('en');
 
@@ -81,6 +82,36 @@ describe('words the screens build from parts', () => {
   it('takes the name order and the division brackets from the message file', () => {
     expect(t('adminTeams.personName', { firstName: 'Ali', lastName: 'Test' })).toBe('Ali Test');
     expect(t('adminTeams.inDivision', { division: 'North' })).toBe(' (North)');
+  });
+});
+
+describe('a player added at the scorer’s table by number only (S-34)', () => {
+  it('is "#12" on the admin’s roster and box score grid, never a blank name', () => {
+    expect(rosterName({ firstName: '', lastName: '', jerseyNumber: '12' })).toBe('#12');
+    expect(rosterName({ firstName: 'Yusuf', lastName: '', jerseyNumber: '12' })).toBe('Yusuf');
+    expect(rosterName({ firstName: 'Ada', lastName: 'Lionel', jerseyNumber: null })).toBe(
+      'Ada Lionel',
+    );
+    expect(rosterName({ firstName: '', lastName: '', jerseyNumber: null })).toBe('No name yet');
+    expect(rosterName({ firstName: '', lastName: '' })).toBe('No name yet');
+    expect(hasName({ firstName: '', lastName: ' ' })).toBe(false);
+    expect(hasName({ firstName: 'Yusuf', lastName: '' })).toBe(true);
+  });
+
+  it('has words for the mark that a player waits for review', () => {
+    expect(t('adminTeams.roster.toReview')).toMatch(/review/);
+  });
+
+  it('marks a number worn by two players now, on both, for the admin (S-44)', () => {
+    const line = (jerseyNumber: string | null, leftOn: string | null = null) => ({
+      jerseyNumber,
+      leftOn,
+    });
+    expect([
+      ...numbersWornTwice([line('5'), line('5'), line('7'), line(null), line(null)]),
+    ]).toEqual(['5']);
+    expect([...numbersWornTwice([line('5'), line('5', '2026-10-01')])]).toEqual([]);
+    expect(t('adminTeams.roster.numberTwice', { number: '5' })).toBe('(#5 is worn by two players)');
   });
 });
 

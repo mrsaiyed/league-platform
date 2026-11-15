@@ -549,6 +549,16 @@ describe('the rules a game is played under (S-1, S-21)', () => {
     // Cleared, with nothing after its marker, the game may go to the bin like one never
     // scored; with a tap after the marker, or once decided, it may not.
     await set(byApp, { deleted_at: new Date().toISOString() });
+    // The players the scorer's table changed are not plays (record 058), after a marker
+    // or with none at all.
+    for (const types of [
+      ['start', 'reset', 'add-player', 'change-player'],
+      ['add-player', 'add-player-refused', 'remove-player'],
+    ]) {
+      const tableOnly = await tracked(types);
+      await set(tableOnly, toScheduled);
+      await set(tableOnly, { deleted_at: new Date().toISOString() });
+    }
     const scoredBin = { ...refused.restrict, constraint: 'games_scored_not_binned' };
     const tappedAgain = await tracked(['start', 'reset', 'lineup']);
     await set(tappedAgain, { ...toScheduled });

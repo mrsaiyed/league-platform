@@ -15,6 +15,7 @@ import type {
   ScoringSession,
   ScoringSessionsStore,
 } from '@srleagues/core';
+import { refusedAddEventType, tablePlayerEventTypes } from '@srleagues/contracts';
 import { randomUUID } from 'node:crypto';
 
 export type TrackerState = {
@@ -25,6 +26,10 @@ export type TrackerState = {
   players: GamePlayer[];
   people: GamePersonRecord[];
   teams: GamePageTeam[];
+  /** Players added at a scorer's table: where, and whether they wait for review (S-6, record 058). */
+  tableMarks: { teamId: string; personId: string; addedAtGameId: string; needsReview: boolean }[];
+  /** People taken off at the table and sent to the bin (T-45). */
+  binned: string[];
 };
 
 export const emptyTracker = (): TrackerState => ({
@@ -35,6 +40,8 @@ export const emptyTracker = (): TrackerState => ({
   players: [],
   people: [],
   teams: [],
+  tableMarks: [],
+  binned: [],
 });
 
 /** One made-up team: its name, whether its player numbers are for staff only, and its players. */
@@ -88,13 +95,16 @@ export function seedTracker(
 }
 
 /**
- * Whether the tracker has recorded anything for the game since it was last marked not
- * started (its last `reset` event), as the database's game_tracked_past_marker reads it.
+ * Whether the tracker has recorded a play of the game since it was last marked not
+ * started (its last `reset` event): the players the scorer's table changed are not
+ * plays (record 058). As the database's game_tracked_past_marker reads it.
  */
 export function trackedPastMarker(events: readonly NewGameEvent[], gameId: string): boolean {
   const own = events.filter((e) => e.gameId === gameId);
   const marker = Math.max(0, ...own.filter((e) => e.type === 'reset').map((e) => e.seq));
-  return own.some((e) => e.seq > marker);
+  return own.some(
+    (e) => e.seq > marker && !(tablePlayerEventTypes as readonly string[]).includes(e.type),
+  );
 }
 
 /** The game's sessions, over one state; `hasGame` says whether the game is in the league. */
@@ -132,12 +142,133 @@ export function scoringSessionsOf(
 }
 
 /**
+ * The players the scorer's table adds, changes and takes off (record 058), over the
+ * made-up rosters: `players` (a person on a team with a number) and `people` (their
+ * names). A roster entry's id here is "team|person". The database's rules are stood in
+ * for: an id once, a number worn once on a team where its season asks
+ * (`uniqueJerseys`), nothing taken away that has a box score line.
+ */
+function tablePlayersOf(
+  s: TrackerState,
+  uniqueJerseys: (teamId: string) => boolean,
+): Pick<
+  LiveGamesStore,
+  | 'findTablePlayer'
+  | 'addTablePlayer'
+  | 'changeTablePlayer'
+  | 'removeTablePlayer'
+  | 'lastEventSeq'
+  | 'refusedAdds'
+> {
+  const split = (entryId: string) => {
+    const [teamId = '', personId = ''] = entryId.split('|');
+    return { teamId, personId };
+  };
+  const onTeam = (teamId: string, personId: string) => (p: GamePlayer) =>
+    p.teamId === teamId && p.personId.toLowerCase() === personId && p.onGameDay;
+  const reviewing = (teamId: string, personId: string) =>
+    s.tableMarks.some((m) => m.teamId === teamId && m.personId === personId && m.needsReview);
+  // 0015: an entry waiting for review is neither checked nor counted.
+  const worn = (teamId: string, personId: string, jersey: string | null) =>
+    jersey !== null &&
+    uniqueJerseys(teamId) &&
+    !reviewing(teamId, personId) &&
+    s.players.some(
+      (p) =>
+        p.teamId === teamId &&
+        p.onGameDay &&
+        p.jerseyNumber === jersey &&
+        p.personId !== personId &&
+        !reviewing(teamId, p.personId),
+    );
+  return {
+    findTablePlayer: async (teamId, personId) => {
+      const player = s.players.find(onTeam(teamId, personId));
+      if (player === undefined) return undefined;
+      const person = s.people.find((p) => p.id.toLowerCase() === personId);
+      const mark = s.tableMarks.find((m) => m.teamId === teamId && m.personId === personId);
+      return {
+        entryId: `${teamId}|${personId}`,
+        teamId,
+        personId,
+        jerseyNumber: player.jerseyNumber,
+        firstName: person?.firstName ?? '',
+        lastName: person?.lastName ?? '',
+        addedAtGameId: mark?.addedAtGameId ?? null,
+        needsReview: mark?.needsReview ?? false,
+      };
+    },
+    addTablePlayer: async (player) => {
+      if (s.people.some((p) => p.id.toLowerCase() === player.personId)) return 'id-taken';
+      if (worn(player.teamId, player.personId, player.jerseyNumber)) return 'jersey-taken';
+      const { personId, teamId, jerseyNumber, firstName, lastName } = player;
+      s.people.push({ id: personId, firstName, lastName, isMinor: null, visibility: 'none' });
+      s.players.push({ personId, teamId, jerseyNumber, onGameDay: true });
+      s.tableMarks.push({
+        teamId,
+        personId,
+        addedAtGameId: player.gameId,
+        needsReview: player.needsReview,
+      });
+      return 'added';
+    },
+    changeTablePlayer: async (entryId, personId, change) => {
+      const { teamId } = split(entryId);
+      const jerseyNumber = change.jerseyNumber;
+      if (jerseyNumber !== undefined && worn(teamId, personId, jerseyNumber)) {
+        return 'jersey-taken';
+      }
+      if (jerseyNumber !== undefined) {
+        s.players = s.players.map((p) =>
+          onTeam(teamId, personId)(p) ? { ...p, jerseyNumber } : p,
+        );
+      }
+      if (change.firstName !== undefined || change.lastName !== undefined) {
+        s.people = s.people.map((p) =>
+          p.id.toLowerCase() === personId
+            ? {
+                ...p,
+                firstName: change.firstName ?? p.firstName,
+                lastName: change.lastName ?? p.lastName,
+              }
+            : p,
+        );
+      }
+      return 'changed';
+    },
+    removeTablePlayer: async (entryId, personId, gameId, thisGameToo) => {
+      const { teamId } = split(entryId);
+      const theirs = s.lines.filter((l) => l.personId.toLowerCase() === personId);
+      if (theirs.some((l) => l.gameId !== gameId)) return 'has-lines';
+      if (thisGameToo && theirs.length > 0) return 'in-box-score';
+      s.players = s.players.filter((p) => !onTeam(teamId, personId)(p));
+      s.tableMarks = s.tableMarks.filter((m) => !(m.teamId === teamId && m.personId === personId));
+      // To the bin (T-45): the person stays, on no team, and their id stays taken.
+      if (!s.players.some((p) => p.personId.toLowerCase() === personId)) s.binned.push(personId);
+      return 'removed';
+    },
+    refusedAdds: async (gameId) =>
+      s.events
+        .filter((e) => e.gameId === gameId && e.type === refusedAddEventType)
+        .map((e) => ({
+          commandId: e.commandId,
+          playerId: String(e.payload['playerId'] ?? ''),
+          problem: String(e.payload['problem'] ?? ''),
+        })),
+    lastEventSeq: async (gameId) =>
+      Math.max(0, ...s.events.filter((e) => e.gameId === gameId).map((e) => e.seq)),
+  };
+}
+
+/**
  * The live game's storage, over one state; `teamsOf` gives a game's two teams and
- * `corrected` whether a game has a correction (kept beside the games).
+ * `uniqueJerseys` whether a team's season asks for unique numbers (none, if not given),
+ * and `corrected` whether a game has a correction (kept beside the games).
  */
 export function liveGamesOf(
   s: TrackerState,
   teamsOf: (gameId: string) => readonly string[],
+  uniqueJerseys: (teamId: string) => boolean = () => false,
   corrected: (gameId: string) => boolean = () => false,
 ): LiveGamesStore {
   return {
@@ -177,5 +308,6 @@ export function liveGamesOf(
         ...lines,
       ];
     },
+    ...tablePlayersOf(s, uniqueJerseys),
   };
 }
