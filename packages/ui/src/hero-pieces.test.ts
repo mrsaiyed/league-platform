@@ -599,17 +599,22 @@ describe('a game as a scoreboard', () => {
     );
   });
 
-  it('gives the cards of one row the same top line, board and foot, so shields and names stand on one line', () => {
-    // Each card lends its three rows to the list's grid; the cards of a row then share
-    // them. Only where a browser knows how, and only where cards stand side by side.
-    const shared = css.slice(css.indexOf('@supports (grid-template-rows: subgrid) {'));
-    expect(shared.startsWith('@supports')).toBe(true);
-    const list = String.raw`\.ui-card-grid\[data-layout='board'\]:is\(\[data-across='two'\], \[data-across='pair'\]\)`;
-    expect(shared).toMatch(
-      new RegExp(
-        String.raw`^@supports \(grid-template-rows: subgrid\) \{\s*@media \(min-width: 48rem\) \{\s*${list} \{\s*row-gap: 0;\s*margin-block-end: calc\(-1 \* var\(--step-5\)\);\s*\}\s*${list} > li \{\s*grid-row: span 3;\s*grid-template-rows: subgrid;\s*margin-block-end: var\(--step-5\);\s*\}\s*${list}\s*> li\s*> \.ui-game-card \{\s*grid-row: 1 \/ -1;\s*grid-template-rows: subgrid;`,
-      ),
+  it('stands the shields and names of a row of cards on one line', () => {
+    // A card's top line takes what it needs and its board the rest of the card's height
+    // (the cards of a row are one height).
+    expect(css).toMatch(
+      /\.ui-game-card\[data-layout='board'\] \{\s*grid-template-rows: auto 1fr auto;/,
     );
+    // A card is a measure of its own (its parts size themselves by it), and a browser
+    // does not let such a box share its rows with its neighbors: the card must never be
+    // told to (a rule that tried made the cards of a row unlevel).
+    expect(css).toMatch(
+      /\.ui-game-card\[data-layout='board'\] \{[^}]*container: card \/ inline-size;/,
+    );
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\.ui-game-card|\.ui-card-grid/.test(rule[1] ?? '')) continue;
+      expect(rule[2], rule[1]).not.toContain('subgrid');
+    }
     // Inside a board the two sides begin at its top, and a board taller than its teams
     // (its row's tallest neighbor sets the height) keeps them at the top: so one card's
     // two-line name never lowers its neighbors' shields.
