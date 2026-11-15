@@ -279,6 +279,21 @@ export type NewTablePlayer = {
   readonly needsReview: boolean;
 };
 
+/** What a change of players writes: a field left out stays as it is. */
+export type TablePlayerChange = {
+  readonly jerseyNumber?: string | null;
+  readonly firstName?: string;
+  readonly lastName?: string;
+};
+
+/** An add the server refused, as its event keeps it: no name, only why. */
+export type RefusedAdd = {
+  readonly commandId: string;
+  readonly playerId: string;
+  /** The refusal's fixed code, as it was answered. */
+  readonly problem: string;
+};
+
 /**
  * Why the database turned a change of players away. Each write runs in a savepoint of
  * its own, so the batch's transaction carries on (record 058), whatever the reason.
@@ -290,6 +305,8 @@ export type TablePlayerRefusal =
   | 'id-taken'
   /** The player has a box score line in another game. */
   | 'has-lines'
+  /** The player has a line in this game's box score, entered by hand. */
+  | 'in-box-score'
   /** Refused for a reason the database gave no known name to. */
   | 'failed';
 
@@ -324,33 +341,32 @@ export type LiveGamesStore = {
   readonly findTablePlayer: (teamId: string, personId: string) => Promise<TablePlayer | undefined>;
   /** Adds a new person and their roster entry, marked as added at the game (S-6). */
   readonly addTablePlayer: (player: NewTablePlayer) => Promise<'added' | TablePlayerRefusal>;
-  /** Gives a roster entry a new number, or none. */
-  readonly setTablePlayerNumber: (
-    entryId: string,
-    jerseyNumber: string | null,
-  ) => Promise<'changed' | TablePlayerRefusal>;
   /**
-   * Gives a person a new first and last name (either may be empty, S-34), keeping the
-   * one they had before on the person for an admin to see and restore, and marks their
-   * entry for review again (S-45).
+   * Gives a roster entry a new number (or none) and its person a new name (either part
+   * may be empty, S-34), together or not at all. A rename keeps the name the player was
+   * first given, the first time only, on the person for an admin to see and restore (S-45).
    */
-  readonly renameTablePlayer: (
+  readonly changeTablePlayer: (
     entryId: string,
     personId: string,
-    firstName: string,
-    lastName: string,
-  ) => Promise<'renamed' | TablePlayerRefusal>;
+    change: TablePlayerChange,
+  ) => Promise<'changed' | TablePlayerRefusal>;
   /**
    * Takes a roster entry away and sends its person to the bin (T-45) when nothing else
    * holds them (no other entry, no account): a player added by mistake. Refused with
-   * `has-lines` while the person has a box score line in a game other than `gameId`;
-   * this game's lines follow its plays, which the command has already looked at.
+   * `has-lines` while the person has a box score line in a game other than `gameId`.
+   * This game's lines follow its plays, which the command has already looked at, but only
+   * once it has an engine state: with `thisGameToo` (none yet), a line of this game, one
+   * entered from paper, refuses it too (`in-box-score`).
    */
   readonly removeTablePlayer: (
     entryId: string,
     personId: string,
     gameId: string,
+    thisGameToo: boolean,
   ) => Promise<'removed' | TablePlayerRefusal>;
+  /** The adds of this game the server refused, kept as events (record 058), oldest first. */
+  readonly refusedAdds: (gameId: string) => Promise<readonly RefusedAdd[]>;
   /** The sequence number of the game's last event, its plays and its changes of players; 0 if none. */
   readonly lastEventSeq: (gameId: string) => Promise<number>;
 };

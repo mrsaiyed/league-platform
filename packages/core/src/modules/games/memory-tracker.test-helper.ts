@@ -7,7 +7,7 @@
 // `lockingTracker` runs transactions over one shared state with a real lock per game,
 // to show batches for different games never wait for each other (T-112): PGlite has
 // one connection and runs transactions one after another, so it cannot show that.
-import { tablePlayerCommandTypes } from '@srleagues/contracts';
+import { refusedAddEventType, tablePlayerEventTypes } from '@srleagues/contracts';
 import type {
   DomainEvent,
   EventHandler,
@@ -45,6 +45,8 @@ export type MemoryTracker = MemoryScoring & {
   previousNames: { personId: string; firstName: string; lastName: string }[];
   /** Every write of a change of players fails, as a database fault would. */
   failWrites: boolean;
+  /** A rename fails, as a database fault would; any number in the same change with it. */
+  failRenames: boolean;
 };
 
 const initialTracker = (state: Partial<MemoryTracker>): MemoryTracker => ({
@@ -59,6 +61,7 @@ const initialTracker = (state: Partial<MemoryTracker>): MemoryTracker => ({
   otherLeaguePeople: [],
   previousNames: [],
   failWrites: false,
+  failRenames: false,
   ...state,
 });
 
@@ -74,10 +77,10 @@ function tablePlayersOf(
   LiveGamesStore,
   | 'findTablePlayer'
   | 'addTablePlayer'
-  | 'setTablePlayerNumber'
-  | 'renameTablePlayer'
+  | 'changeTablePlayer'
   | 'removeTablePlayer'
   | 'lastEventSeq'
+  | 'refusedAdds'
 > {
   const split = (entryId: string) => {
     const [teamId = '', personId = ''] = entryId.split('|');
@@ -137,38 +140,51 @@ function tablePlayersOf(
       });
       return 'added';
     },
-    setTablePlayerNumber: async (entryId, jerseyNumber) => {
-      const { teamId, personId } = split(entryId);
-      if (s.failWrites) return 'failed';
-      if (worn(teamId, personId, jerseyNumber)) return 'jersey-taken';
+    changeTablePlayer: async (entryId, personId, change) => {
+      const { teamId } = split(entryId);
+      const renaming = change.firstName !== undefined || change.lastName !== undefined;
+      if (s.failWrites || (renaming && s.failRenames)) return 'failed';
+      const jerseyNumber = change.jerseyNumber;
+      if (jerseyNumber !== undefined && worn(teamId, personId, jerseyNumber)) {
+        return 'jersey-taken';
+      }
       const same = (p: { teamId: string; personId: string }) =>
         p.teamId === teamId && p.personId.toLowerCase() === personId;
-      s.players = s.players.map((p) => (same(p) ? { ...p, jerseyNumber } : p));
-      s.roster = s.roster.map((r) => (same(r) && !r.left ? { ...r, jerseyNumber } : r));
+      if (jerseyNumber !== undefined) {
+        s.players = s.players.map((p) => (same(p) ? { ...p, jerseyNumber } : p));
+        s.roster = s.roster.map((r) => (same(r) && !r.left ? { ...r, jerseyNumber } : r));
+      }
+      if (renaming) {
+        const before = s.roster.find((r) => r.personId.toLowerCase() === personId);
+        // The first name given is kept, the first time only (0015).
+        const kept = s.previousNames.some((n) => n.personId === personId);
+        if (before !== undefined && !kept) {
+          s.previousNames.push({
+            personId,
+            firstName: before.firstName,
+            lastName: before.lastName,
+          });
+        }
+        s.roster = s.roster.map((r) =>
+          r.personId.toLowerCase() === personId
+            ? {
+                ...r,
+                firstName: change.firstName ?? r.firstName,
+                lastName: change.lastName ?? r.lastName,
+              }
+            : r,
+        );
+      }
       return 'changed';
     },
-    renameTablePlayer: async (entryId, personId, firstName, lastName) => {
-      if (s.failWrites) return 'failed';
+    removeTablePlayer: async (entryId, personId, gameId, thisGameToo) => {
       const { teamId } = split(entryId);
-      const before = s.roster.find((r) => r.personId.toLowerCase() === personId);
-      if (before !== undefined) {
-        s.previousNames.push({ personId, firstName: before.firstName, lastName: before.lastName });
-      }
-      s.roster = s.roster.map((r) =>
-        r.personId.toLowerCase() === personId ? { ...r, firstName, lastName } : r,
+      // This game's lines only while it has no engine state: else they follow its plays.
+      const theirs = [...s.liveLines, ...s.lines].filter(
+        (l) => l.personId.toLowerCase() === personId,
       );
-      s.tableMarks = s.tableMarks.map((m) =>
-        m.teamId === teamId && m.personId === personId ? { ...m, needsReview: true } : m,
-      );
-      return 'renamed';
-    },
-    removeTablePlayer: async (entryId, personId, gameId) => {
-      const { teamId } = split(entryId);
-      // Lines of other games only: this game's follow its plays, which the command read.
-      const elsewhere = [...s.liveLines, ...s.lines].some(
-        (l) => l.personId.toLowerCase() === personId && l.gameId !== gameId,
-      );
-      if (elsewhere) return 'has-lines';
+      if (theirs.some((l) => l.gameId !== gameId)) return 'has-lines';
+      if (thisGameToo && theirs.length > 0) return 'in-box-score';
       if (s.failWrites) return 'failed';
       const other = (p: { teamId: string; personId: string }) =>
         !(p.teamId === teamId && p.personId.toLowerCase() === personId);
@@ -179,6 +195,14 @@ function tablePlayersOf(
       s.binnedPeople.push(personId);
       return 'removed';
     },
+    refusedAdds: async (gameId) =>
+      s.events
+        .filter((e) => e.gameId === gameId && e.type === refusedAddEventType)
+        .map((e) => ({
+          commandId: e.commandId,
+          playerId: String(e.payload['playerId'] ?? ''),
+          problem: String(e.payload['problem'] ?? ''),
+        })),
     lastEventSeq: async (gameId) =>
       Math.max(0, ...s.events.filter((e) => e.gameId === gameId).map((e) => e.seq)),
   };
@@ -254,7 +278,7 @@ const trackerTxOf = (
  * the tracker that is not a change of players, or a game the test marks as tracked.
  */
 function withPlaysFromEvents(s: MemoryTracker, tx: TrackerTx): TrackerTx {
-  const tableTypes: readonly string[] = tablePlayerCommandTypes;
+  const tableTypes: readonly string[] = tablePlayerEventTypes;
   return {
     ...tx,
     games: {

@@ -15,6 +15,7 @@ import type {
   ScoringSession,
   ScoringSessionsStore,
 } from '@srleagues/core';
+import { refusedAddEventType } from '@srleagues/contracts';
 import { randomUUID } from 'node:crypto';
 
 export type TrackerState = {
@@ -141,10 +142,10 @@ function tablePlayersOf(
   LiveGamesStore,
   | 'findTablePlayer'
   | 'addTablePlayer'
-  | 'setTablePlayerNumber'
-  | 'renameTablePlayer'
+  | 'changeTablePlayer'
   | 'removeTablePlayer'
   | 'lastEventSeq'
+  | 'refusedAdds'
 > {
   const split = (entryId: string) => {
     const [teamId = '', personId = ''] = entryId.split('|');
@@ -198,34 +199,49 @@ function tablePlayersOf(
       });
       return 'added';
     },
-    setTablePlayerNumber: async (entryId, jerseyNumber) => {
-      const { teamId, personId } = split(entryId);
-      if (worn(teamId, personId, jerseyNumber)) return 'jersey-taken';
-      s.players = s.players.map((p) => (onTeam(teamId, personId)(p) ? { ...p, jerseyNumber } : p));
+    changeTablePlayer: async (entryId, personId, change) => {
+      const { teamId } = split(entryId);
+      const jerseyNumber = change.jerseyNumber;
+      if (jerseyNumber !== undefined && worn(teamId, personId, jerseyNumber)) {
+        return 'jersey-taken';
+      }
+      if (jerseyNumber !== undefined) {
+        s.players = s.players.map((p) =>
+          onTeam(teamId, personId)(p) ? { ...p, jerseyNumber } : p,
+        );
+      }
+      if (change.firstName !== undefined || change.lastName !== undefined) {
+        s.people = s.people.map((p) =>
+          p.id.toLowerCase() === personId
+            ? {
+                ...p,
+                firstName: change.firstName ?? p.firstName,
+                lastName: change.lastName ?? p.lastName,
+              }
+            : p,
+        );
+      }
       return 'changed';
     },
-    renameTablePlayer: async (entryId, personId, firstName, lastName) => {
+    removeTablePlayer: async (entryId, personId, gameId, thisGameToo) => {
       const { teamId } = split(entryId);
-      s.people = s.people.map((p) =>
-        p.id.toLowerCase() === personId ? { ...p, firstName, lastName } : p,
-      );
-      s.tableMarks = s.tableMarks.map((m) =>
-        m.teamId === teamId && m.personId === personId ? { ...m, needsReview: true } : m,
-      );
-      return 'renamed';
-    },
-    removeTablePlayer: async (entryId, personId, gameId) => {
-      const { teamId } = split(entryId);
-      const elsewhere = s.lines.some(
-        (l) => l.personId.toLowerCase() === personId && l.gameId !== gameId,
-      );
-      if (elsewhere) return 'has-lines';
+      const theirs = s.lines.filter((l) => l.personId.toLowerCase() === personId);
+      if (theirs.some((l) => l.gameId !== gameId)) return 'has-lines';
+      if (thisGameToo && theirs.length > 0) return 'in-box-score';
       s.players = s.players.filter((p) => !onTeam(teamId, personId)(p));
       s.tableMarks = s.tableMarks.filter((m) => !(m.teamId === teamId && m.personId === personId));
       // To the bin (T-45): the person stays, on no team, and their id stays taken.
       if (!s.players.some((p) => p.personId.toLowerCase() === personId)) s.binned.push(personId);
       return 'removed';
     },
+    refusedAdds: async (gameId) =>
+      s.events
+        .filter((e) => e.gameId === gameId && e.type === refusedAddEventType)
+        .map((e) => ({
+          commandId: e.commandId,
+          playerId: String(e.payload['playerId'] ?? ''),
+          problem: String(e.payload['problem'] ?? ''),
+        })),
     lastEventSeq: async (gameId) =>
       Math.max(0, ...s.events.filter((e) => e.gameId === gameId).map((e) => e.seq)),
   };

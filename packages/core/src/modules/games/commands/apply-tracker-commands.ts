@@ -42,10 +42,13 @@ import {
   CommandBatchV1,
   isAcceptedProtocolVersion,
   isTablePlayerCommand,
+  refusedAddEventType,
+  tablePlayerProblems,
   type CommandReply,
   type CommandResult,
   type RefusalCode,
   type TablePlayerInput,
+  type TablePlayerProblem,
 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
@@ -55,8 +58,9 @@ import {
   changedLines,
   linesOf,
   platformProblem,
+  playerKey,
   playerNotOnTeam,
-  playersNamed,
+  teamOfSide,
   readState,
   rosterOf,
   scoreOf,
@@ -173,6 +177,11 @@ export const applyTrackerCommands = defineCommand({
     }
     const saved = await tx.liveGames.findState(gameId);
     const taken = new Set(await tx.liveGames.takenCommands(gameId, ids));
+    // Adds refused before are kept as events (record 058): answered again the same way,
+    // never as duplicates, and still named by the commands that name their player.
+    const refusedBefore = await tx.liveGames.refusedAdds(gameId);
+    const refusedById = new Map(refusedBefore.map((r) => [r.commandId.toLowerCase(), r]));
+    for (const id of refusedById.keys()) taken.delete(id);
     // The last event, whether a play or a change of players: a batch of changes only
     // saves no state (below), so the state's own number can be behind the events'.
     let seq = Math.max(saved?.seq ?? 0, await tx.liveGames.lastEventSeq(gameId));
@@ -203,8 +212,13 @@ export const applyTrackerCommands = defineCommand({
     const events: NewGameEvent[] = [];
     /** Whether a play was taken: only then is a state saved for a game that has none. */
     let played = false;
-    /** Players whose adding was refused in this batch, with the refused command's ID. */
-    const notAdded = new Map<string, string>();
+    /**
+     * Players whose adding was refused, in this batch or one before, and not added since,
+     * with the refused command's ID.
+     */
+    const notAdded = new Map<string, string>(
+      refusedBefore.map((r) => [r.playerId.toLowerCase(), r.commandId]),
+    );
     /** A refusal of a play or a change of players, said in version 2 only (T-127). */
     const tableReason = (refusal: TableRefusal, more: { playerId?: string; follows?: string }) =>
       version >= 2
@@ -216,14 +230,22 @@ export const applyTrackerCommands = defineCommand({
             ...more,
           }
         : { code: 'rule' as const, message: refusal.message.slice(0, 300) };
-    /** The first player a command names whose adding was refused earlier in the batch. */
-    const namesNotAdded = (named: readonly string[]) =>
-      named.map((id) => id.toLowerCase()).find((id) => notAdded.has(id));
+
     const applyOne = async (
       commandId: string,
       command: CommandBatch['commands'][number],
     ): Promise<CommandResult> => {
       if (taken.has(commandId)) return { commandId: command.commandId, status: 'duplicate' };
+      const again = refusedById.get(commandId);
+      if (again !== undefined) {
+        const known = (tablePlayerProblems as readonly string[]).includes(again.problem);
+        const problem = known ? (again.problem as TablePlayerProblem) : 'not-saved';
+        return {
+          commandId: command.commandId,
+          status: 'refused',
+          reason: tableReason(tableRefusal(problem), {}),
+        };
+      }
       const refused = (message: string): CommandResult => ({
         commandId: command.commandId,
         status: 'refused',
@@ -240,8 +262,12 @@ export const applyTrackerCommands = defineCommand({
         }),
       });
       if (isTablePlayerCommand(command)) {
-        const earlier = namesNotAdded([command.input.playerId]);
-        if (earlier !== undefined) return notAddedRefusal(earlier);
+        const playerId = command.input.playerId.toLowerCase();
+        // An add is always looked at itself: a corrected one may add the player.
+        const onTeam = roster.has(playerKey(teamOfSide(game, command.input.side), playerId));
+        if (command.input.type !== 'add-player' && !onTeam && notAdded.has(playerId)) {
+          return notAddedRefusal(playerId);
+        }
         const outcome = await applyTablePlayer({
           context,
           tx,
@@ -249,12 +275,25 @@ export const applyTrackerCommands = defineCommand({
           roster,
           state,
           uniqueJerseys,
+          linesKept: before === undefined,
           input: command.input,
         });
         if ('refused' in outcome) {
-          // The player was never added: every later command naming them says so.
+          // The player was never added: every later command naming them says so, in this
+          // batch and the ones after it, so the refused add is kept as an event.
           if (command.input.type === 'add-player') {
-            notAdded.set(command.input.playerId.toLowerCase(), command.commandId);
+            notAdded.set(playerId, command.commandId);
+            seq += 1;
+            events.push({
+              gameId,
+              seq,
+              commandId,
+              type: refusedAddEventType,
+              payload: { side: command.input.side, playerId, problem: outcome.refused.problem },
+              tappedAt: at,
+              accountId,
+            });
+            taken.add(commandId);
           }
           return {
             commandId: command.commandId,
@@ -274,6 +313,7 @@ export const applyTrackerCommands = defineCommand({
           accountId,
         });
         taken.add(commandId);
+        if (command.input.type === 'add-player') notAdded.delete(playerId);
         const { notice } = outcome.taken;
         return {
           commandId: command.commandId,
@@ -284,9 +324,8 @@ export const applyTrackerCommands = defineCommand({
       const input: TrackerInput = withLowerIds(command.input);
       const platform = platformProblem(input);
       if (platform !== undefined) return refused(platform);
-      const earlier = namesNotAdded(playersNamed(input));
-      if (earlier !== undefined) return notAddedRefusal(earlier);
       const missing = playerNotOnTeam(game, roster, input);
+      if (missing !== undefined && notAdded.has(missing)) return notAddedRefusal(missing);
       if (missing !== undefined) {
         return {
           commandId: command.commandId,

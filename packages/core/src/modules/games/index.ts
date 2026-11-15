@@ -107,8 +107,10 @@ export type {
   LiveGamesStore,
   NewGameEvent,
   NewTablePlayer,
+  RefusedAdd,
   SavedGameState,
   TablePlayer,
+  TablePlayerChange,
   TablePlayerRefusal,
   TrackerTx,
 } from './ports.ts';

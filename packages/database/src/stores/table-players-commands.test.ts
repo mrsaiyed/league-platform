@@ -415,6 +415,95 @@ describe('players at the scorer’s table on the database (record 058)', () => {
     expect(after[0]).toMatchObject({ reason: { problem: 'reviewed' } });
   });
 
+  it('keeps a walk-up whose line is in this game’s paper box score, after a reopening (M1)', async () => {
+    const l = await leagueWithGame();
+    const walkUp = randomUUID();
+    await l.send(
+      commandsOf([{ type: 'add-player', side: 'away', playerId: walkUp, jersey: '4', name: '' }]),
+    );
+    const version = async () =>
+      (
+        await pglite.query<{ version: number }>('select version from games where id = $1', [
+          l.gameId,
+        ])
+      ).rows[0]?.version ?? 0;
+    const boxed = await setBoxScore(
+      l.as(l.scorekeeperId),
+      {
+        gameId: l.gameId,
+        version: await version(),
+        homeScore: 0,
+        awayScore: 4,
+        lines: [
+          {
+            teamId: l.awayTeamId,
+            personId: walkUp,
+            played: true,
+            secondsPlayed: null,
+            stats: { points: 4 },
+          },
+        ],
+      },
+      deps,
+    );
+    expect(boxed).toMatchObject({ ok: true });
+    await reopenGame(
+      l.as(l.ownerId),
+      { gameId: l.gameId, version: await version(), reason: 'A wrong name on the sheet' },
+      deps,
+    );
+    const results = resultsOf(
+      await l.send(commandsOf([{ type: 'remove-player', side: 'away', playerId: walkUp }])),
+    );
+    expect(results[0]).toMatchObject({ status: 'refused', reason: { problem: 'in-box-score' } });
+    const line = await pglite.query('select 1 from player_game_stats where person_id = $1', [
+      walkUp,
+    ]);
+    expect(line.rows).toHaveLength(1);
+    const person = await pglite.query<{ deleted_at: Date | null }>(
+      'select deleted_at from people where id = $1',
+      [walkUp],
+    );
+    expect(person.rows[0]?.deleted_at).toBeNull();
+  });
+
+  it('points a later batch’s plays at an add refused in an earlier one (L4)', async () => {
+    const l = await leagueWithGame();
+    const other = await newLeague(pglite);
+    const stranger = randomUUID();
+    await pglite.query(
+      `insert into people (id, league_id, first_name, last_name) values ($1, $2, 'Other', 'League')`,
+      [stranger, other.leagueId],
+    );
+    const [add] = commandsOf([
+      { type: 'add-player', side: 'away', playerId: stranger, jersey: '4', name: '' },
+    ]);
+    if (add === undefined) throw new Error('no add');
+    expect(resultsOf(await l.send([add]))[0]).toMatchObject({
+      reason: { problem: 'player-id-taken' },
+    });
+    const later = resultsOf(
+      await l.send(commandsOf([{ type: 'lineup', side: 'away', playerIds: [stranger] }])),
+    );
+    expect(later[0]).toMatchObject({
+      status: 'refused',
+      reason: { problem: 'player-not-added', playerId: stranger, follows: add.commandId },
+    });
+    expect(resultsOf(await l.send([add]))[0]).toMatchObject({
+      status: 'refused',
+      reason: { problem: 'player-id-taken' },
+    });
+    // Nothing written about the stranger in either league but the refusal's event.
+    const rows = await pglite.query('select 1 from roster_entries where person_id = $1', [
+      stranger,
+    ]);
+    expect(rows.rows).toEqual([]);
+    const plays = await withTransaction(db, { leagueId: l.leagueId }, (scope) =>
+      gameHasPlays(scope, l.gameId),
+    );
+    expect(plays).toBe(false);
+  });
+
   it('keeps a paper box score through a reopening, after only players were added at the table', async () => {
     const l = await leagueWithGame();
     await l.send(

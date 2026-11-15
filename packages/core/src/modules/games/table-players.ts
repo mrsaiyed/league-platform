@@ -18,21 +18,24 @@
 //   played keep the number they were played in.
 // - A name is changed, and a player taken off, only while they were added at a
 //   scorer's table and have not been reviewed by an admin (S-45): never the league's
-//   own roster, never a player an admin has confirmed. Renaming keeps the name before
-//   on the person, for an admin to see and put back, and marks them for review again.
-//   Taking off sends the person to the bin (T-45), unless a play of this game names
-//   them, judged by the batch's own state, or they have a line in another game.
+//   own roster, never a player an admin has confirmed. Renaming keeps the name the
+//   player was first given on the person, for an admin to see and put back (the player
+//   still waits for review, as only such a player may be renamed). Taking off sends the
+//   person to the bin (T-45), unless a play of this game names them, judged by the
+//   batch's own state, they have a line in another game, or, while the game has no
+//   engine state, a line in this game's box score entered from paper.
 // - Nothing is taken once the game was ended earlier in the batch.
 //
 // Each answer that turns a change away is the refusal `rule` with a fixed `problem`
 // the tracker words (T-187); `message` is for the log and holds no name (T-86). Each
 // change taken is logged (A-6) with ids and fixed words, and kept as one of the game's
 // events like a tap.
-import type {
-  TableNotice,
-  TablePlayerInput,
-  TablePlayerProblem,
-  WornBy,
+import {
+  wornByNameMax,
+  type TableNotice,
+  type TablePlayerInput,
+  type TablePlayerProblem,
+  type WornBy,
 } from '@srleagues/contracts';
 import type { basketball } from '@srleagues/sports';
 import { recordActivity } from '../access/index.ts';
@@ -68,7 +71,9 @@ export function splitTableName(
   const words = name.normalize('NFKC').trim().split(/\s+/u).filter(Boolean);
   const [first = '', ...rest] = words;
   const last = rest.join(' ');
-  if (first.length > tableNamePartMax || last.length > tableNamePartMax) return undefined;
+  // Characters, as the database counts them (0008), not UTF-16 units.
+  const length = (part: string) => Array.from(part).length;
+  if (length(first) > tableNamePartMax || length(last) > tableNamePartMax) return undefined;
   return { firstName: first, lastName: last };
 }
 
@@ -88,6 +93,8 @@ const refusalMessages: Readonly<Record<TablePlayerProblem, string>> = {
   'has-plays':
     'This player has plays recorded in this game, so they stay on its list and its box score.',
   'has-lines': 'This player has a line in another game, so they stay on the team.',
+  'in-box-score':
+    'This player has a line in this game’s box score, entered by hand, so they stay on its list.',
   'game-over': 'This game was ended earlier in the batch.',
   'player-not-added': 'This names a player whose adding was refused earlier in the batch.',
   'not-saved': 'The database could not save this change.',
@@ -120,7 +127,22 @@ async function wearerOf(
   );
   return wearer === undefined
     ? undefined
-    : { playerId: wearer.personId.toLowerCase(), jersey, name: fullName(wearer) };
+    : { playerId: wearer.personId.toLowerCase(), jersey, name: fitWornByName(fullName(wearer)) };
+}
+
+/**
+ * A wearer's name cut to what a reply may carry (`wornByNameMax`, counted in UTF-16 units
+ * as the device's schema counts them), whole characters only: a name the database keeps
+ * (100 characters a part) can be longer than that, and a reply the device cannot read
+ * would be asked again for ever.
+ */
+export function fitWornByName(name: string): string {
+  let fitted = '';
+  for (const character of name) {
+    if (fitted.length + character.length > wornByNameMax) break;
+    fitted += character;
+  }
+  return fitted.trimEnd();
 }
 
 /** Whether a play of the state names the person: on its list of plays, or waiting to be redone. */
@@ -176,9 +198,14 @@ export async function applyTablePlayer(args: {
   readonly state: basketball.GameState;
   /** The game's season wants unique numbers on a team (0008). */
   readonly uniqueJerseys: boolean;
+  /**
+   * The game had no engine state when the batch began: its stored lines (a box score
+   * entered from paper) are not rebuilt from plays, so they hold a player too.
+   */
+  readonly linesKept: boolean;
   readonly input: TablePlayerInput;
 }): Promise<{ readonly taken: TableTaken } | { readonly refused: TableRefusal }> {
-  const { context, tx, game, roster, state, uniqueJerseys, input } = args;
+  const { context, tx, game, roster, state, uniqueJerseys, linesKept, input } = args;
   const refuse = (problem: TablePlayerProblem, wornBy?: WornBy) => ({
     refused: tableRefusal(problem, wornBy),
   });
@@ -194,9 +221,12 @@ export async function applyTablePlayer(args: {
     if (name === undefined) return refuse('name-not-readable');
     const jerseyNumber = numberOf(input.jersey);
     if (jerseyNumber === null && name.firstName === '') return refuse('needs-name-or-number');
-    // S-44: a number already worn is said, never refused.
+    // S-44: a number already worn is said, never refused; said only where the season
+    // wants unique numbers (elsewhere the screen marks a number worn twice by itself).
     const wornBy =
-      jerseyNumber === null ? undefined : await wearerOf(tx, game, teamId, jerseyNumber, personId);
+      jerseyNumber === null || !uniqueJerseys
+        ? undefined
+        : await wearerOf(tx, game, teamId, jerseyNumber, personId);
     const added = await tx.liveGames.addTablePlayer({
       personId,
       teamId,
@@ -225,8 +255,13 @@ export async function applyTablePlayer(args: {
     if (not !== undefined) return refuse(not);
     // The batch's own state, so a play undone a moment ago no longer holds them.
     if (namedInState(state, personId)) return refuse('has-plays');
-    const removed = await tx.liveGames.removeTablePlayer(player.entryId, personId, game.id);
-    if (removed === 'has-lines') return refuse('has-lines');
+    const removed = await tx.liveGames.removeTablePlayer(
+      player.entryId,
+      personId,
+      game.id,
+      linesKept,
+    );
+    if (removed === 'has-lines' || removed === 'in-box-score') return refuse(removed);
     if (removed !== 'removed') return refuse('not-saved');
     roster.delete(playerKey(teamId, personId));
     await recordActivity(tx, context, {
@@ -257,23 +292,18 @@ export async function applyTablePlayer(args: {
     const wornBy = await wearerOf(tx, game, teamId, jerseyNumber, personId);
     if (wornBy !== undefined) return refuse('jersey-taken', wornBy);
   }
-  if (renumbered) {
-    const set = await tx.liveGames.setTablePlayerNumber(player.entryId, jerseyNumber);
-    if (set === 'jersey-taken' && jerseyNumber !== null) {
+  const renamed = firstName !== player.firstName || lastName !== player.lastName;
+  if (renumbered || renamed) {
+    // The number and the name together, or neither: one command is one change.
+    const done = await tx.liveGames.changeTablePlayer(player.entryId, personId, {
+      ...(renumbered ? { jerseyNumber } : {}),
+      ...(renamed ? { firstName, lastName } : {}),
+    });
+    if (done === 'jersey-taken' && jerseyNumber !== null) {
       const wornBy = await wearerOf(tx, game, teamId, jerseyNumber, personId);
       return refuse('jersey-taken', wornBy);
     }
-    if (set !== 'changed') return refuse('not-saved');
-  }
-  const renamed = firstName !== player.firstName || lastName !== player.lastName;
-  if (renamed) {
-    const done = await tx.liveGames.renameTablePlayer(
-      player.entryId,
-      personId,
-      firstName,
-      lastName,
-    );
-    if (done !== 'renamed') return refuse('not-saved');
+    if (done !== 'changed') return refuse('not-saved');
   }
   const key = playerKey(teamId, personId);
   const listed = roster.get(key);

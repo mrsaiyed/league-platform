@@ -10,7 +10,7 @@
 // endpoints (step 2.32) run on the same games, with made-up rosters (stand-in-tracker.ts).
 // A game's page also reads the games of the public schedule's stand-in (`listedGames`),
 // so every card on the home and schedule pages opens the game it shows.
-import { defaultSeasonRules, tablePlayerCommandTypes } from '@srleagues/contracts';
+import { defaultSeasonRules, tablePlayerEventTypes } from '@srleagues/contracts';
 import {
   systemClock,
   type AccessReader,
@@ -332,7 +332,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
         s.tracked.includes(gameId) ||
         s.tracker.events.some(
           (e) =>
-            e.gameId === gameId && !(tablePlayerCommandTypes as readonly string[]).includes(e.type),
+            e.gameId === gameId && !(tablePlayerEventTypes as readonly string[]).includes(e.type),
         ),
       findSeason: async (seasonId) => s.seasons.find((x) => x.id === seasonId),
       leagueSettingRows: async (key) => s.settings[key] ?? [],

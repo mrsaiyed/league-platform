@@ -6,6 +6,7 @@
 // (stores/table-players-commands.test.ts, the two-league harness and the role matrix).
 import {
   CommandBatchV1,
+  CommandReply,
   seasonRulesPreset,
   type BatchCommand,
   type CommandResult,
@@ -35,7 +36,7 @@ import { sessionUuid, startOfTest } from './memory-scoring.test-helper.ts';
 import { memoryTracker, type MemoryTracker } from './memory-tracker.test-helper.ts';
 import type { GamePlayer, GameRosterPlayer } from './ports.ts';
 import { leaseMs } from './scoring-session.ts';
-import { namedInState, splitTableName } from './table-players.ts';
+import { fitWornByName, namedInState, splitTableName } from './table-players.ts';
 
 const gameId = gameUuid(1);
 const sessionId = sessionUuid(1);
@@ -812,6 +813,168 @@ describe('taking a player off (S-45)', () => {
     expect(reasonOf(result, 1)).toMatchObject({ problem: 'reviewed' });
     expect(reasonOf(result, 2)).toMatchObject({ problem: 'not-on-team' });
     expect(t.db.state.binnedPeople).toEqual([]);
+  });
+});
+
+describe('the second review’s fixes', () => {
+  it('keeps a walk-up with a line in this game’s paper box score while it has no engine state (M1)', async () => {
+    const t = setUp();
+    await run(t, commands(addEight.slice(0, 1)));
+    expect(t.db.state.states).toEqual([]);
+    // The game is entered from paper, with a line for the walk-up.
+    t.db.state.lines.push({
+      gameId,
+      teamId: awayTeamId,
+      personId: walkUp(1),
+      played: true,
+      secondsPlayed: null,
+      stats: { points: 4 },
+    });
+    const result = await run(
+      t,
+      commands([{ type: 'remove-player', side: 'away', playerId: walkUp(1) }], 10),
+    );
+    expect(reasonOf(result)).toEqual({
+      code: 'rule',
+      message:
+        'This player has a line in this game’s box score, entered by hand, so they stay on its list.',
+      problem: 'in-box-score',
+    });
+    expect(t.db.state.binnedPeople).toEqual([]);
+    expect(t.db.state.roster.map((r) => r.personId)).toContain(walkUp(1));
+  });
+
+  it('changes a number and a name together or not at all (L1)', async () => {
+    const t = setUp({ failRenames: true });
+    await run(t, commands(addEight.slice(0, 1)));
+    const result = await run(
+      t,
+      commands(
+        [{ type: 'change-player', side: 'away', playerId: walkUp(1), jersey: '44', name: 'Sam' }],
+        10,
+      ),
+    );
+    expect(reasonOf(result)).toMatchObject({ problem: 'not-saved' });
+    expect(t.db.state.roster.find((r) => r.personId === walkUp(1))?.jerseyNumber).toBe('3');
+    expect(t.db.state.events.map((e) => e.type)).toEqual(['add-player']);
+  });
+
+  it('keeps the name the player was first given through a second rename (L3)', async () => {
+    const t = setUp();
+    await run(t, commands([{ ...addEight[0], name: 'Sam Lee' } as TablePlayerInput]));
+    for (const [n, name] of [
+      [10, 'Samir Lee'],
+      [20, 'Samuel Lee'],
+    ] as const) {
+      await run(
+        t,
+        commands([{ type: 'change-player', side: 'away', playerId: walkUp(1), name }], n),
+      );
+    }
+    expect(t.db.state.previousNames).toEqual([
+      { personId: walkUp(1), firstName: 'Sam', lastName: 'Lee' },
+    ]);
+    expect(t.db.state.roster.find((r) => r.personId === walkUp(1))?.firstName).toBe('Samuel');
+  });
+
+  it('points a later batch’s plays at an add refused in an earlier one, and answers its retry the same (L4)', async () => {
+    const t = setUp({ otherLeaguePeople: [walkUp(1)] });
+    const [add] = commands([addEight[0] as TablePlayerInput]);
+    if (add === undefined) throw new Error('no add');
+    const first = await run(t, [add]);
+    expect(reasonOf(first)).toMatchObject({ problem: 'player-id-taken' });
+    // The batch split: the plays naming the player come in the next one.
+    const later = await run(
+      t,
+      commands(
+        [
+          { type: 'lineup', side: 'away', playerIds: [walkUp(1)] },
+          { type: 'change-player', side: 'away', playerId: walkUp(1), jersey: '4' },
+        ],
+        10,
+      ),
+    );
+    for (const n of [0, 1]) {
+      expect(reasonOf(later, n)).toMatchObject({
+        problem: 'player-not-added',
+        playerId: walkUp(1),
+        follows: add.commandId,
+      });
+    }
+    // The refused add sent again (its answer was lost) is refused again, never a duplicate.
+    expect(resultsOf(await run(t, [add]))[0]).toMatchObject({
+      status: 'refused',
+      reason: { problem: 'player-id-taken' },
+    });
+    // A refused add is no play: the game can still have its box score entered from paper.
+    expect(await t.deps.transaction(t.as(scorekeeperId), (tx) => tx.games.hasPlays(gameId))).toBe(
+      false,
+    );
+    expect(t.db.state.events.map((e) => [e.type, e.payload])).toEqual([
+      ['add-player-refused', { side: 'away', playerId: walkUp(1), problem: 'player-id-taken' }],
+    ]);
+  });
+
+  it('looks at a corrected re-add of the same player itself, in the same batch (L4)', async () => {
+    const t = setUp();
+    const list = commands([
+      { type: 'add-player', side: 'away', playerId: walkUp(1), jersey: '3', name: 'x'.repeat(101) },
+      { type: 'add-player', side: 'away', playerId: walkUp(1), jersey: '3', name: 'Sam' },
+      { type: 'lineup', side: 'away', playerIds: [walkUp(1)] },
+    ]);
+    const result = await run(t, list);
+    expect(statusesOf(result)).toEqual(['refused', 'accepted', 'accepted']);
+    expect(reasonOf(result)).toMatchObject({ problem: 'name-not-readable' });
+    // Added after all: a later batch names them as any player.
+    const later = await run(
+      t,
+      commands([{ type: 'change-player', side: 'away', playerId: walkUp(1), jersey: '4' }], 10),
+    );
+    expect(statusesOf(later)).toEqual(['accepted']);
+  });
+
+  it('says a number is also worn only where the season wants unique numbers (L6)', async () => {
+    const jordan: GameRosterPlayer = {
+      teamId: awayTeamId,
+      personId: walkUp(90),
+      firstName: 'Jordan',
+      lastName: 'Ellis',
+      jerseyNumber: '5',
+      left: false,
+    };
+    const t = setUp({ roster: [...homeRoster, jordan] });
+    const list = commands([
+      { type: 'add-player', side: 'away', playerId: walkUp(1), jersey: '5', name: '' },
+    ]);
+    expect(resultsOf(await run(t, list))).toEqual([
+      { commandId: list[0]?.commandId, status: 'accepted' },
+    ]);
+  });
+
+  it('cuts a wearer’s long name to fit the reply, never splitting a character (L2)', async () => {
+    // 100 characters outside the basic plane each way: what the database keeps, 400 units.
+    const long = '𝔸'.repeat(100);
+    const wearer: GameRosterPlayer = {
+      teamId: awayTeamId,
+      personId: walkUp(90),
+      firstName: long,
+      lastName: long,
+      jerseyNumber: '5',
+      left: false,
+    };
+    const t = setUp({ uniqueJerseys: true, roster: [...homeRoster, wearer] });
+    const list = commands([
+      { type: 'add-player', side: 'away', playerId: walkUp(1), jersey: '5', name: '' },
+    ]);
+    const result = await run(t, list);
+    if (!result.ok) throw new Error(result.error.code);
+    expect(CommandReply.safeParse(result.value).success).toBe(true);
+    const name = (resultsOf(result)[0] as { notice?: { wornBy: { name: string } } }).notice?.wornBy
+      .name;
+    expect(name).toBe('𝔸'.repeat(100));
+    expect(fitWornByName(`${'𝔸'.repeat(100)} ${'𝔸'.repeat(100)}`).length).toBeLessThanOrEqual(201);
+    expect(fitWornByName('a'.repeat(200) + '𝔸')).toBe('a'.repeat(200));
+    expect(fitWornByName('Jordan Ellis')).toBe('Jordan Ellis');
   });
 });
 

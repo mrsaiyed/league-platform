@@ -53,8 +53,8 @@ import {
   findTablePlayer,
   insertTablePlayer,
   removeTablePlayer,
-  renameTablePlayer,
-  setTablePlayerNumber,
+  changeTablePlayer,
+  listRefusedAdds,
 } from '../queries/index.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
@@ -673,22 +673,58 @@ registerIsolationCase({
 });
 
 registerIsolationCase({
-  subject: setTablePlayerNumber,
-  name: "renumber the target's walk-up player",
-  run: (scope, target) => setTablePlayerNumber(scope, target.walkUpRosterEntryId, '77'),
-});
-
-registerIsolationCase({
-  subject: renameTablePlayer,
-  name: "rename the target's walk-up player",
+  subject: changeTablePlayer,
+  name: "renumber and rename the target's walk-up player",
   run: async (scope, target) =>
-    renameTablePlayer(
+    changeTablePlayer(
       scope,
       target.walkUpRosterEntryId,
       (await walkUpPersonOf(scope, target)) ?? randomUUID(),
-      'Renamed',
-      'Elsewhere',
+      { jerseyNumber: '77', firstName: 'Renamed', lastName: 'Elsewhere' },
     ),
+});
+
+// An add refused at the target's upcoming game (review of step 2.117, L4), kept as one of
+// its events: after taking the game over, an add with an id the platform made is refused
+// and kept; then the refused adds are listed. Anywhere else the takeover is refused and
+// there is nothing to list.
+registerIsolationCase({
+  subject: listRefusedAdds,
+  name: "list the adds refused at the target's upcoming game",
+  run: async (scope, target) => {
+    const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      deviceId: 'harness-device',
+      confirmed: true,
+      expectedHolderSince: target.scoringSessionSince,
+    }).catch((thrown: unknown) => {
+      if (thrown instanceof CommandRefused) return undefined;
+      throw thrown;
+    });
+    const reply = taken?.value as { status?: string; sessionId?: string } | undefined;
+    await runAsApp(applyTrackerCommands, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      protocolVersion: 2,
+      sessionId: reply?.sessionId ?? target.scoringSessionId,
+      commands: [
+        {
+          commandId: harnessCommandIds[0],
+          at: harnessNow - 1000,
+          input: {
+            type: 'add-player',
+            side: 'away',
+            playerId: target.personId,
+            jersey: '9',
+            name: '',
+          },
+        },
+      ],
+    }).catch((thrown: unknown) => {
+      if (thrown instanceof CommandRefused) return undefined;
+      throw thrown;
+    });
+    return listRefusedAdds(scope, target.upcomingGameId);
+  },
 });
 
 registerIsolationCase({
@@ -700,6 +736,7 @@ registerIsolationCase({
       target.walkUpRosterEntryId,
       (await walkUpPersonOf(scope, target)) ?? randomUUID(),
       target.upcomingGameId,
+      true,
     ),
 });
 

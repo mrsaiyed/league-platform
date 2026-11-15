@@ -256,13 +256,12 @@ export interface PeopleTable {
   is_minor: boolean | null;
   visibility: Generated<string>;
   merged_into_id: string | null;
-  /** The name before a rename at the scorer's table (S-45, 0015). */
-  previous_first_name: string | null;
-  previous_last_name: string | null;
   deleted_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  previous_first_name: string | null;
+  previous_last_name: string | null;
 }
 
 export interface PlayerGameStatsTable {

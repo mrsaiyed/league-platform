@@ -113,6 +113,16 @@ export type TablePlayerInput = z.infer<typeof TablePlayerInput>;
 /** The command types of the players at the table: none is a play of the game. */
 export const tablePlayerCommandTypes = ['add-player', 'change-player', 'remove-player'] as const;
 
+/**
+ * The event an add the server refused is kept as (record 058): so a retry is answered
+ * the same way, and a later batch's commands naming that player still point at it.
+ * Like the changes of players, it is not a play.
+ */
+export const refusedAddEventType = 'add-player-refused';
+
+/** Every event type of the players at the table: none is a play of the game. */
+export const tablePlayerEventTypes = [...tablePlayerCommandTypes, refusedAddEventType] as const;
+
 /** A change of players as sent: like a tap, with its ID and when it was made. */
 export const TablePlayerCommand = z.strictObject({
   commandId: Id,
@@ -186,11 +196,14 @@ export const tablePlayerProblems = [
   'has-plays',
   /** The player has a box score line in another game, so they stay on the team. */
   'has-lines',
+  /** The player has a line in this game's box score, entered by hand, so they stay. */
+  'in-box-score',
   /** The game was ended earlier in the batch: nothing more is taken for it. */
   'game-over',
   /**
-   * An earlier change in the batch that added this player was refused (`follows` is its
-   * command ID, `playerId` the player), so this command, which names them, is too.
+   * The change that would have added this player was refused, earlier in this batch or
+   * in one before (`follows` is its command ID, `playerId` the player), so this command,
+   * which names them, is too.
    */
   'player-not-added',
   /** The database turned this one change away for a reason it gave no name to. */
@@ -208,8 +221,12 @@ export type TablePlayerProblem = z.infer<typeof TablePlayerProblem>;
 export const WornBy = z.strictObject({
   playerId: Id,
   jersey: Jersey.min(1),
+  /** Cut by the server to fit, never splitting a character (`wornByNameMax`). */
   name: z.string().max(201),
 });
+
+/** The longest wearer's name a reply carries, in UTF-16 units as the schema counts. */
+export const wornByNameMax = 201;
 export type WornBy = z.infer<typeof WornBy>;
 
 /**
@@ -421,8 +438,9 @@ export type TrackerGameState = z.infer<typeof TrackerGameState>;
 export const TrackerRosterPlayer = z.strictObject({
   teamId: Id,
   personId: Id,
-  firstName: z.string().max(100),
-  lastName: z.string().max(100),
+  /** Up to 100 characters, as the database keeps them: 200 UTF-16 units at most. */
+  firstName: z.string().max(200),
+  lastName: z.string().max(200),
   jerseyNumber: Jersey.min(1).nullable(),
   left: z.boolean(),
   /** The game at whose scorer's table they were added (S-6), or null for the team's own roster. */

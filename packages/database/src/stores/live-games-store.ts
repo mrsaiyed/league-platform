@@ -3,19 +3,19 @@
 import type { LiveGamesStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
+  changeTablePlayer,
   findLastEventSeq,
   findSavedGameState,
   findTablePlayer,
   insertGameEvents,
   insertTablePlayer,
+  listRefusedAdds,
   listGamePlayerLines,
   listGamePlayers,
   listTakenCommands,
   removeTablePlayer,
-  renameTablePlayer,
   saveGameLines,
   saveGameState,
-  setTablePlayerNumber,
 } from '../queries/index.ts';
 
 /** A line's stats as counts: the database keeps only whole numbers there (is_stat_counts). */
@@ -45,11 +45,11 @@ export function liveGamesStore(scope: LeagueScope): LiveGamesStore {
     // The players the scorer's table adds, changes and takes off (record 058).
     findTablePlayer: (teamId, personId) => findTablePlayer(scope, teamId, personId),
     addTablePlayer: (player) => insertTablePlayer(scope, player),
-    setTablePlayerNumber: (entryId, jersey) => setTablePlayerNumber(scope, entryId, jersey),
-    renameTablePlayer: (entryId, personId, first, last) =>
-      renameTablePlayer(scope, entryId, personId, first, last),
-    removeTablePlayer: (entryId, personId, gameId) =>
-      removeTablePlayer(scope, entryId, personId, gameId),
+    changeTablePlayer: (entryId, personId, change) =>
+      changeTablePlayer(scope, entryId, personId, change),
+    removeTablePlayer: (entryId, personId, gameId, thisGameToo) =>
+      removeTablePlayer(scope, entryId, personId, gameId, thisGameToo),
+    refusedAdds: (gameId) => listRefusedAdds(scope, gameId),
     lastEventSeq: (gameId) => findLastEventSeq(scope, gameId),
   };
 }

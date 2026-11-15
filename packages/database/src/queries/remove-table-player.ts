@@ -3,8 +3,10 @@
 // nothing else holds them (no other roster entry, no account), so a player added by
 // mistake can still be brought back. Refused with `has-lines` while the person has a
 // box score line in a game other than `gameId`: their numbers stay with them. This
-// game's lines are not looked at: they are rewritten at the end of the batch from its
-// plays, which the command has already judged. Run in a savepoint (in-savepoint.ts): a
+// game's lines are rewritten at the end of the batch from its plays, which the command
+// has already judged, but only once the game has an engine state: with `thisGameToo`
+// (none yet), a line of this game, one entered from paper, refuses it (`in-box-score`),
+// so no line is left for a person in the bin. Run in a savepoint (in-savepoint.ts): a
 // refusal is `failed`, never thrown. Every table is filtered to the league (T-28).
 import type { TablePlayerRefusal } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -15,17 +17,17 @@ export async function removeTablePlayer(
   entryId: string,
   personId: string,
   gameId: string,
+  thisGameToo: boolean,
 ): Promise<'removed' | TablePlayerRefusal> {
   const tx = transactionOf(scope);
-  const line = await tx
+  const lines = await tx
     .selectFrom('player_game_stats')
-    .select('id')
+    .select('game_id')
     .where('league_id', '=', scope.leagueId)
     .where('person_id', '=', personId)
-    .where('game_id', '<>', gameId)
-    .limit(1)
-    .executeTakeFirst();
-  if (line !== undefined) return 'has-lines';
+    .execute();
+  if (lines.some((l) => l.game_id !== gameId)) return 'has-lines';
+  if (thisGameToo && lines.length > 0) return 'in-box-score';
   try {
     return await inSavepoint(scope, async () => {
       await tx
