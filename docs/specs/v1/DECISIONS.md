@@ -349,6 +349,7 @@ All dated November 12, 2026.
 | T-261                 | New                                                                          | Agreed (delegated): players added, changed and taken off at the table travel in the tracker's queue (protocol 2); a rosters address (rec. 058)  | Step 2.117: no way to put a player into a game at the table (2.107 audit, H1)                      |
 | T-263                 | New                                                                          | The scorekeeper's reopen: a second door, for who sent the end; timed in the database; offered before the tap; safe twice (rec. 060)             | Step 2.120: S-36 did not say who "the scorekeeper" is, whose clock counts, or a limit              |
 | T-267                 | New                                                                          | Agreed (delegated): the scoring screen is styled by the product, not by the league's design values: one dark courtside look (rec. 064)          | Before step 2.35: nobody had decided how the tracker looks (2.107 audit, M10)                      |
+| T-268                 | New                                                                          | A setting may start where who plays says: an adult league on full names; its unconfirmed full names is its start, kept as no value (rec. 065)   | Step 2.162: R-29 needs an adult league to start on full names, and one starting value per setting  |
 
 ## The full list
 
@@ -769,6 +770,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-225 | Sign-in numbers: codes last 10 minutes, 5 tries, 5 an hour per address and 30 per network; passwords 8 characters to 72 bytes, NFKC; wrong guesses slowed, then locked, per address and network (record 013)                                     | Agreed (delegated)  | yes     |
 | T-256 | Our account ids stay ours, linked to the sign-in user; the sign-in store has its own schema and role; app_user changes only name, phone, last seen (record 052)                                                                                  | Agreed (delegated)  | yes     |
 | T-259 | Name settings `privacy.publicNames` (three values) and `privacy.playersMayAskForInitials`, read by one `readNamePolicy`; full names need confirming; `protectiveOrder` (R-26); `people.set_name_request`, fixed-list reason (rec. 056)           | Agreed (delegated)  | yes     |
+| T-268 | `startsAs` by audience, read each time; `privacy.publicNames` starts adults on `fullName`; full names unconfirmed in an adult league goes back to the start; only a stored one shows a child in full (rec. 065)                                  | Agreed (delegated)  |         |
 
 ### [T5 — Customization engine](technical/T5-customization-engine.md)
 

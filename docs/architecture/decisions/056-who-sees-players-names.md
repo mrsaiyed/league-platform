@@ -2,6 +2,8 @@
 
 Date: 2026-11-14. Step 2.126 (part 1); answers the 2.105 audit's finding H2; serves T4 §7 (T-81), T5 §6 (T-98), R-14, R-15, R-17, R-23, R-24, R-25, R-26, R-27. Decided by the builder of step 2.126 for the lead (technical). T-259. Corrected the same day after the step's review: three choices for names (R-24), a child's request always honoured (R-25), protective changes in a read-only league (R-26), a recorded request that keeps taking effect (R-27), and each game surface told who plays in the league.
 
+Extended by record 065 (step 2.162, R-29): the names setting is now followed for every player, an adult league starts on full names, and a stored full names is always a confirmed one. Where this record says the setting decides only how children are shown, record 065 is what holds.
+
 ## Problem
 
 Step 2.11 built the one name function (`showName`) and the display policy it applies, but nothing set the policy: every public page, live message and statistic read the fixed starting value `defaultNamePolicy`. No setting held the league's choice (R-14, R-15), no command wrote a person's own request to `people.visibility` (R-23), and switching to full names had nowhere to ask the admin to confirm that the league has the permission it needs (R-14).
