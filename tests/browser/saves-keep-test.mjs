@@ -89,7 +89,10 @@ async function openGames(page) {
   await page.goto(`${origin}/north-valley/admin`);
   await Promise.all([
     page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
-    page.locator('a[href="/north-valley/admin/games"]').first().click(),
+    page
+      .getByRole('navigation', { name: 'Admin areas' })
+      .locator('a[href="/north-valley/admin/games"]')
+      .click(),
   ]);
   await page.getByRole('heading', { level: 1, name: 'Games' }).waitFor();
 }
