@@ -1219,6 +1219,30 @@ export const en = {
     'The schedule draft has grown too large. Publish it or discard it before adding more.',
   'error.scheduling.change_draft_round_date.change-refused':
     'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.add_draft_round.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.add_draft_round.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.add_draft_round.season-not-found': 'That season is not there.',
+  'error.scheduling.add_draft_round.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.add_draft_round.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.add_draft_round.change-refused':
+    'That round cannot be added to the schedule as it stands.',
+  'error.scheduling.remove_draft_round.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.remove_draft_round.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.remove_draft_round.season-not-found': 'That season is not there.',
+  'error.scheduling.remove_draft_round.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.remove_draft_round.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.remove_draft_round.change-refused':
+    'That round cannot be removed from the schedule as it stands.',
+  'error.scheduling.remove_draft_round.round-in-use':
+    'A game that is in the bin, has no date yet or was removed in this draft is still in this round, so it cannot be removed.',
   'error.scheduling.set_draft_recording.season-not-found': 'That season is not there.',
   'error.scheduling.set_draft_recording.draft-unreadable':
     'The saved schedule draft cannot be read. Discard it and start again.',
@@ -1378,6 +1402,8 @@ export const en = {
   'activity.scheduling.remove_draft_game': 'Removed a game in the schedule draft',
   'activity.scheduling.rename_draft_round': 'Renamed a round in the schedule draft',
   'activity.scheduling.change_draft_round_date': "Changed a round's date in the schedule draft",
+  'activity.scheduling.add_draft_round': 'Added a round to the schedule draft',
+  'activity.scheduling.remove_draft_round': 'Removed a round in the schedule draft',
   'activity.scheduling.set_draft_recording': 'Changed how a game is recorded in the schedule draft',
   'activity.scheduling.discard_schedule_draft': 'Discarded the schedule draft',
   'activity.imports.start_fixture_import': 'Uploaded a fixtures file to import',
@@ -1670,6 +1696,39 @@ export const en = {
   'schedule.admin.problemPartial':
     'The new time and place were saved to the draft, but the recording change was not: {reason}',
   'schedule.admin.noRounds': 'This season has no rounds yet.',
+  'schedule.admin.noRoundsHelp': 'Add the first one here, then add its games.',
+  'schedule.admin.noDraftHidden':
+    'No changes are waiting. This season is not public yet, so visitors see none of its schedule.',
+  'schedule.admin.seasonNotPublic': '{name} (not public yet)',
+  'schedule.admin.roundEdit': 'Change or remove this round',
+  'schedule.admin.addRound': 'Add a round',
+  'schedule.admin.addRoundName': 'Round name',
+  'schedule.admin.addRoundNameHelp': 'For example "Week 1" or "Opening night".',
+  'schedule.admin.addRoundDate': 'Round date',
+  'schedule.admin.addRoundNote':
+    'The round goes after the others. Its games default to this date. Nobody else sees it until you publish.',
+  'schedule.admin.addRoundSubmit': 'Add round',
+  'schedule.admin.removeRound': 'Remove this round',
+  'schedule.admin.removeRoundNote': 'It has no games, so it can be removed from the draft.',
+  'schedule.admin.removeRoundBlocked_one':
+    'This round has {count} game, so it cannot be removed. Move or remove its game first.',
+  'schedule.admin.removeRoundBlocked_other':
+    'This round has {count} games, so it cannot be removed. Move or remove its games first.',
+  'schedule.admin.addRoundError.name': 'Give the round a name.',
+  'schedule.admin.addRoundError.date': 'Choose the day the round is played.',
+  'schedule.admin.savedRoundAdded':
+    'Saved to the draft: {round} was added. It is not public until you publish.',
+  'schedule.admin.savedRound': 'Saved to the draft: {round}.',
+  'schedule.admin.savedRoundRemoved':
+    'Saved to the draft: the round was removed. It is not public until you publish.',
+  'schedule.admin.savedGame': 'Saved to the draft: {game}.',
+  'schedule.admin.savedGameRemoved': 'Saved to the draft: a game was removed here.',
+  'schedule.admin.savedGameRound': 'Saved to the draft: {game} is now in {round}.',
+  'schedule.admin.followRoundDate': 'Move it to {date} too?',
+  'schedule.admin.followRoundDateYes': 'Yes, move it to {date}',
+  'schedule.admin.followRoundDateNo': 'No, keep {date}',
+  'schedule.admin.offRoundDate': 'This game falls outside {round}, which is on {date}.',
+  'schedule.admin.moveToRoundDate': 'Move it to {date}',
   'schedule.admin.clashes': 'Clashes to fix',
   'schedule.admin.clashesNone': 'No clashes.',
   'schedule.admin.clash.team': '{team} is in two games at {time} on {date}: {games}.',
@@ -1730,7 +1789,8 @@ export const en = {
   'schedule.admin.publishNothing': 'There is nothing to publish.',
   'schedule.admin.publishSummary':
     'Publishing will add {added}, move {moved}, remove {removed}, and change how {recorded} are recorded. It reaches {teams} teams and {people} people.',
-  'schedule.admin.publishRounds': 'Rounds renamed: {renamed}. Round dates changed: {dates}.',
+  'schedule.admin.publishRounds':
+    'Rounds added: {added}. Rounds removed: {removed}. Rounds renamed: {renamed}. Round dates changed: {dates}.',
   'schedule.admin.publishClashes_one': '{count} clash is still in the schedule.',
   'schedule.admin.publishClashes_other': '{count} clashes are still in the schedule.',
   'schedule.admin.publishBlocked': 'It cannot be published yet:',
@@ -1751,6 +1811,8 @@ export const en = {
   'schedule.admin.blocker.unknown-venue': 'A game in the draft names a venue that is gone.',
   'schedule.admin.blocker.unknown-court': 'A game in the draft names a court that is gone.',
   'schedule.admin.blocker.draft-unreadable': 'The saved draft cannot be read.',
+  'schedule.admin.blocker.round-in-use':
+    'The draft removes a round that a game in the bin or with no date is still in.',
   'schedule.admin.discard': 'Discard the draft',
   'schedule.admin.discardNote': 'This throws away every unpublished change. It cannot be undone.',
   'schedule.admin.discardSubmit': 'Discard all draft changes',
@@ -1778,6 +1840,10 @@ export const en = {
   'schedule.admin.error.game-without-time': 'A new game in the draft has no time.',
   'schedule.admin.error.change-no-longer-fits': 'A change in the draft no longer fits.',
   'schedule.admin.error.nothing-to-publish': 'The draft changes nothing.',
+  'schedule.admin.error.round-in-use':
+    'A game that is in the bin, has no date yet or was removed in this draft is still in this round, so it cannot be removed.',
+  'schedule.admin.error.round-cannot-be-added':
+    'A new round in the draft could not be added to the season. Discard the draft and add it again.',
   'schedule.admin.error.no-account': 'You need to be signed in.',
   'schedule.admin.refused.unknown-game': 'That game is not in the schedule.',
   'schedule.admin.refused.unknown-round': 'That round is not in the schedule.',
@@ -1787,6 +1853,12 @@ export const en = {
   'schedule.admin.refused.empty-round-label': 'A round needs a name.',
   'schedule.admin.refused.invalid-date': 'That is not a date.',
   'schedule.admin.refused.invalid-time': 'That is not a time.',
+  'schedule.admin.refused.round-exists': 'That round is already in the schedule.',
+  'schedule.admin.refused.round-has-games':
+    'This round has games. Move or remove its games first, then remove the round.',
+  'schedule.admin.refused.too-many-rounds':
+    'This season has used every round number up to {max}. Start a new season to add more rounds.',
+  'schedule.admin.refused.date-out-of-range': 'Choose a date between the years {first} and {last}.',
 } as const;
 
 export type MessageKey = keyof typeof en;

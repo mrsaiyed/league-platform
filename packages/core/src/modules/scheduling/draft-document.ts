@@ -34,6 +34,15 @@ const change = z.discriminatedUnion('kind', [
   }),
   z.strictObject({ kind: z.literal('rename-round'), roundId: text, label: z.string().max(120) }),
   z.strictObject({ kind: z.literal('change-round-date'), roundId: text, date: z.string().max(10) }),
+  z.strictObject({
+    kind: z.literal('add-round'),
+    round: z.strictObject({
+      id: text,
+      label: z.string().max(120),
+      date: z.string().max(10).nullable(),
+    }),
+  }),
+  z.strictObject({ kind: z.literal('remove-round'), roundId: text }),
 ]);
 
 export const draftDocument = z.strictObject({

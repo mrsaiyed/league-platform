@@ -21,6 +21,12 @@ export async function renameRoundAction(form: FormData): Promise<never> {
 export async function changeRoundDateAction(form: FormData): Promise<never> {
   return performScheduleAction('change-round-date', form);
 }
+export async function addRoundAction(form: FormData): Promise<never> {
+  return performScheduleAction('add-round', form);
+}
+export async function removeRoundAction(form: FormData): Promise<never> {
+  return performScheduleAction('remove-round', form);
+}
 export async function publishAction(form: FormData): Promise<never> {
   return performScheduleAction('publish', form);
 }

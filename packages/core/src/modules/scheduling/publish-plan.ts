@@ -7,6 +7,7 @@ import { upgradeSeasonRules } from '@srleagues/contracts';
 import { parseDraftDocument } from './draft-document.ts';
 import { checkSlotPlace } from './draft-edit.ts';
 import type { DraftRecord, NewPublishedGame, SchedulingTx } from './ports.ts';
+import { roundsStillInUse } from './round-use.ts';
 import { applyDraft, type ApplyDraftResult } from './rules/apply-draft.ts';
 import type { Clash, ScheduleGame, ScheduleState } from './rules/schedule-types.ts';
 import { summarizePublish, type PublishSummary } from './rules/summarize-publish.ts';
@@ -26,8 +27,11 @@ export type PublishBlocker =
         | 'game-without-time'
         | 'unknown-team'
         | 'unknown-venue'
-        | 'unknown-court';
+        | 'unknown-court'
+        /** The draft removes a round a game it does not hold is still in (step 2.160). */
+        | 'round-in-use';
       readonly gameId?: string;
+      readonly roundId?: string;
     }
   | { readonly code: 'draft-unreadable' };
 
@@ -73,9 +77,15 @@ export async function planPublication(
       summary.gamesMoved.length +
       summary.gamesRecordingChanged.length +
       summary.roundsRenamed.length +
-      summary.roundsDateChanged.length ===
+      summary.roundsDateChanged.length +
+      summary.roundsAdded.length +
+      summary.roundsRemoved.length ===
     0;
   if (nothing) blockers.push({ code: 'nothing-to-publish' });
+  const inUse = await roundsStillInUse(tx, seasonId, summary.roundsRemoved, applied.state);
+  for (const roundId of summary.roundsRemoved) {
+    if (inUse.has(roundId)) blockers.push({ code: 'round-in-use', roundId });
+  }
 
   const before = new Map(published.games.map((g) => [g.id, g]));
   const after = new Map(applied.state.games.map((g) => [g.id, g]));

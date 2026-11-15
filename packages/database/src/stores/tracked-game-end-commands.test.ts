@@ -94,30 +94,12 @@ async function squad(leagueId: string, teamId: string, first: number) {
 }
 
 /**
- * Waits until the database's clock has moved on to the next millisecond. Ids are
- * version 7 UUIDs that start with the time (public.uuid_v7()); PGlite's clock moves in
- * whole milliseconds, so of two ids made in the same one, either may sort first. An id
- * made after this sorts after every id made before it.
- */
-async function nextMillisecond() {
-  const now = async () =>
-    (
-      await one<{ ms: string }>(
-        pglite,
-        `select floor(extract(epoch from clock_timestamp()) * 1000)::text as ms`,
-      )
-    ).ms;
-  const start = await now();
-  while ((await now()) === start) {
-    // The next reading is a new query: the clock is read again.
-  }
-}
-
-/**
  * A season under the high-school rules with one live-tracked game between two teams
  * of six, held by a scorekeeper's tablet, and a seventh home player who has left.
- * `awayTeamFirst` makes the away team first, a millisecond apart, so its id sorts
- * before the home team's; otherwise the home team's sorts first.
+ * `awayTeamFirst` makes the away team first, so its id sorts before the home team's;
+ * otherwise the home team's sorts first. Ids made one after another on one connection
+ * keep their order (public.uuid_v7(), migration 0019, record 068), PGlite's included,
+ * whose clock moves in whole milliseconds.
  */
 async function trackedGame({ awayTeamFirst = false } = {}) {
   clock.at = startOfTest;
@@ -129,13 +111,8 @@ async function trackedGame({ awayTeamFirst = false } = {}) {
     JSON.stringify(seasonRulesPreset('high-school')),
   ]);
   const stageId = await newStage(pglite, l.leagueId, seasonId);
-  const team = async () => {
-    const id = await newTeam(pglite, l.leagueId, seasonId);
-    await nextMillisecond();
-    return id;
-  };
-  const first = await team();
-  const second = await team();
+  const first = await newTeam(pglite, l.leagueId, seasonId);
+  const second = await newTeam(pglite, l.leagueId, seasonId);
   const homeTeamId = awayTeamFirst ? second : first;
   const awayTeamId = awayTeamFirst ? first : second;
   const home = await squad(l.leagueId, homeTeamId, 10);
@@ -417,10 +394,11 @@ describe('ending a tracked game on the database (T6 §7)', () => {
 describe('reopening a tracked game on the database (T6 §8)', () => {
   it('end, reopen with a reason, fix with the tracker, end again: one correct result', async () => {
     const g = await trackedGame();
-    // The activity log's entries in the order they were made, each picked up as it is.
-    // The log keeps each entry's transaction start time, and PGlite's clock moves in
-    // whole milliseconds: two entries can share a time, and then the log's own order
-    // (time, then id) does not say which came first.
+    // The activity log's entries in the order they were made, each picked up as it is:
+    // each command adds exactly one. The log keeps each entry's transaction start time,
+    // and PGlite's clock moves in whole milliseconds, so two entries can share a time;
+    // then the id decides, and on one connection ids keep their order (migration 0019),
+    // so the log's own order (time, then id) is checked against these at the end.
     const made: string[] = [];
     const pickUpNew = async () => {
       const all = await actions(g);
@@ -524,6 +502,6 @@ describe('reopening a tracked game on the database (T6 §8)', () => {
     };
     expect(await shape(g)).toEqual(await shape(right));
     expect(made).toEqual(['games.end_tracked_game', 'games.reopen_game', 'games.end_tracked_game']);
-    expect((await actions(g)).sort()).toEqual([...made].sort());
+    expect(await actions(g)).toEqual(made);
   });
 });
