@@ -1,6 +1,8 @@
 import { listMyGames, type AccessReader, type Grant } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
+import { namesShownOf, startingNamePolicy } from '../../server/name-policy-of.ts';
 import { standInGames } from '../../server/stand-in-games.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildGameRows } from './build-games-view.ts';
 import { runGameAction } from './run-game-action.ts';
 
@@ -24,24 +26,19 @@ const access: AccessReader = {
   activeGrantsOf: async (account) => grants.filter((g) => g.accountId === account),
 };
 
+/** The made-up draft league: the same games, scored by assigned scorekeepers only (its setting). */
+const assignedOnlyLeagueId = '01900000-0000-7000-8000-000000000003';
+
 function setup(assignedOnly = false) {
-  const ports = standInGames({
-    leagueId,
-    people: { [keeper]: 'Sam' },
-    assignees: [keeper, other],
-    accessOf: () => access,
-    log: () => {},
-    ...(assignedOnly
-      ? {
-          settings: {
-            'games.whoMayScore': [
-              { level: 'league' as const, document: { version: 1, value: 'assignedOnly' } },
-            ],
-          },
-        }
-      : {}),
-  });
-  const as = (accountId: string) => ({ leagueId, accountId, requestId: 'r1' });
+  const ports = standInGames(
+    testWorld(() => access),
+    {
+      people: { [keeper]: 'Sam' },
+      namesShownOf: namesShownOf(startingNamePolicy, () => 'adult'),
+    },
+  );
+  const league = assignedOnly ? assignedOnlyLeagueId : leagueId;
+  const as = (accountId: string) => ({ leagueId: league, accountId, requestId: 'r1' });
   const games = async (accountId: string) => {
     const listed = await listMyGames(as(accountId), {}, ports.deps);
     return listed.ok ? listed.value.games : [];
@@ -167,7 +164,7 @@ describe('the games area actions', () => {
     expect(result).toEqual({ ok: false, code: 'not-allowed' });
     // And a scorekeeper is offered the score form only, with the names beside each game;
     // a game the tracker has recorded plays of offers no form at all (S-46, step 2.154).
-    const rows = buildGameRows(mine, await ports.namesOf(leagueId), {
+    const rows = buildGameRows(mine, await ports.namesOf(assignedOnlyLeagueId), {
       accountId: keeper,
       isOwner: false,
       grants,
@@ -179,14 +176,22 @@ describe('the games area actions', () => {
     expect(rows[0]?.homeName).not.toBe('');
   });
 
-  it('lists no games for another league', async () => {
-    const { ports, as } = setup();
-    const listed = await listMyGames(
-      { leagueId: '01900000-0000-7000-8000-000000000002', accountId: owner, requestId: 'r' },
-      {},
-      ports.deps,
-    );
-    expect(listed.ok && listed.value.games).toEqual([]);
+  it("lists none of this league's games for another league, and none for a league with none", async () => {
+    const { ports, as, games } = setup();
+    const ours = (await games(owner)).map((g) => g.id);
+    const listOf = async (league: string) => {
+      const listed = await listMyGames(
+        { leagueId: league, accountId: owner, requestId: 'r' },
+        {},
+        ports.deps,
+      );
+      return listed.ok ? listed.value.games.map((g) => g.id) : [];
+    };
+    // The youth league has games of its own this week, never the first league's.
+    const theirs = await listOf('01900000-0000-7000-8000-000000000002');
+    expect(theirs.length).toBeGreaterThan(0);
+    expect(theirs.some((id) => ours.includes(id))).toBe(false);
+    expect(await listOf('01900000-0000-7000-8000-000000000007')).toEqual([]);
     expect(as(owner).leagueId).toBe(leagueId);
   });
 

@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withLoopback } from '../../scripts/web-listen.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const app = path.join(root, 'apps/web');
@@ -27,9 +28,11 @@ const launch = () => (process.env.CI ? chromium.launch() : chromium.launch({ cha
 
 function start(args, env) {
   let output = '';
-  const child = spawn(process.execPath, [nextBin, ...args], {
+  // On the made-up stand-in, on this computer's loopback address only (web-listen.mjs).
+  const environment = { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env };
+  const child = spawn(process.execPath, [nextBin, ...withLoopback(args, environment)], {
     cwd: app,
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env },
+    env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (c) => (output += c));
@@ -124,6 +127,8 @@ if (built) {
     );
     note(teams.length >= 4, `only ${teams.length} teams to choose from`);
     const hour = (i) => `${String(9 + i).padStart(2, '0')}:00`;
+    // The season's games already published (one made-up world, step 2.152).
+    const published = await page.locator('li[data-game]').count();
     for (let i = 0; i < 6; i += 1) {
       await addGame(
         1,
@@ -142,7 +147,10 @@ if (built) {
         'Court 1',
       );
     }
-    note((await page.locator('li[data-game]').count()) === 10, 'ten games are in the grid');
+    note(
+      (await page.locator('li[data-game]').count()) === published + 10,
+      'ten games are added to the grid',
+    );
     note((await page.locator('[data-clashes] li').count()) === 0, 'no clash yet');
 
     // A game on top of the 09:00 game of round 1: flagged at once.
