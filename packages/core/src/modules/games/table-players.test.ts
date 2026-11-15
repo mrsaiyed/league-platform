@@ -14,7 +14,10 @@ import {
 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { applyTrackerCommands } from './commands/apply-tracker-commands.ts';
+import { reopenGame } from './commands/reopen-game.ts';
+import { setBoxScore } from './commands/set-box-score.ts';
 import {
   awayTeamId,
   editorGrant,
@@ -22,6 +25,7 @@ import {
   game,
   gameUuid,
   homeTeamId,
+  ownerId,
   scorekeeperGrant,
   scorekeeperId,
   scoringRule,
@@ -37,7 +41,7 @@ const gameId = gameUuid(1);
 const sessionId = sessionUuid(1);
 const homeIds = [1, 2, 3, 4, 5].map((n) => `01900000-0000-7000-8000-00000001000${n}`);
 /** The ids the device makes for the visitors it enters by number. */
-const walkUp = (n: number) => `01900000-0000-7000-8000-0000000f${String(n).padStart(4, '0')}`;
+const walkUp = (n: number) => `01900000-0000-4000-8000-0000000f${String(n).padStart(4, '0')}`;
 const commandUuid = (n: number) => `01900000-0000-7000-8000-0000c0${String(n).padStart(6, '0')}`;
 
 /** The home team: five named players numbered 10 to 14. The visitors have no roster. */
@@ -57,10 +61,26 @@ const players = (list: readonly GameRosterPlayer[]): GamePlayer[] =>
     onGameDay: true,
   }));
 
+/** A refusal as a tracker of version 1 reads it: a code and a message, nothing else. */
+const CommandReplyV1Reason = z.strictObject({
+  commandId: z.string(),
+  status: z.literal('refused'),
+  reason: z.strictObject({ code: z.string(), message: z.string() }),
+});
+
 function setUp(state: Partial<MemoryTracker> = {}) {
   const roster = state.roster ?? homeRoster;
+  const rules = seasonRulesPreset('high-school');
+  // The season's rule, as the command reads it; the store's flag, as the database does.
+  const uniqueJerseys = state.uniqueJerseys ?? false;
   return memoryTracker({
-    seasons: [{ id: seasonId, programId: 'p1', rules: seasonRulesPreset('high-school') }],
+    seasons: [
+      {
+        id: seasonId,
+        programId: 'p1',
+        rules: { ...rules, rosters: { ...rules.rosters, uniqueJerseys } },
+      },
+    ],
     games: [game(1, { captureMode: 'live' })],
     grants: [scorekeeperGrant, editorGrant],
     sessions: [
@@ -303,60 +323,71 @@ describe('who may change the players (whoever may score this game, its two teams
   });
 });
 
-describe('numbers (S-37)', () => {
-  it('refuses a second "5" where the season wants unique numbers, naming who wears it, and goes on', async () => {
-    const named: GameRosterPlayer = {
-      teamId: awayTeamId,
-      personId: walkUp(90),
-      firstName: 'Jordan',
-      lastName: 'Ellis',
-      jerseyNumber: '5',
-      left: false,
-    };
-    const t = setUp({ uniqueJerseys: true, roster: [...homeRoster, named] });
+describe('numbers (S-37, S-44)', () => {
+  const jordan: GameRosterPlayer = {
+    teamId: awayTeamId,
+    personId: walkUp(90),
+    firstName: 'Jordan',
+    lastName: 'Ellis',
+    jerseyNumber: '5',
+    left: false,
+  };
+
+  it('takes a player added with a number already worn, saying who wears it (S-44)', async () => {
+    const t = setUp({ uniqueJerseys: true, roster: [...homeRoster, jordan] });
+    const list = commands([
+      { type: 'add-player', side: 'away', playerId: walkUp(1), jersey: '5', name: '' },
+      { type: 'lineup', side: 'away', playerIds: [walkUp(1)] },
+    ]);
+    const result = await run(t, list);
+    expect(resultsOf(result)).toEqual([
+      {
+        commandId: list[0]?.commandId,
+        status: 'accepted',
+        notice: {
+          kind: 'jersey-also-worn',
+          wornBy: { playerId: walkUp(90), jersey: '5', name: 'Jordan Ellis' },
+        },
+      },
+      { commandId: list[1]?.commandId, status: 'accepted' },
+    ]);
+    // Both wear 5; the new one waits for the admin's review, who sees the clash then.
+    expect(t.db.state.roster.filter((r) => r.jerseyNumber === '5')).toHaveLength(2);
+    expect(t.db.state.tableMarks).toMatchObject([{ personId: walkUp(1), needsReview: true }]);
+  });
+
+  it('refuses a change of number to one already worn where the season wants unique ones, naming no one in the log', async () => {
+    const t = setUp({ uniqueJerseys: true, roster: [...homeRoster, jordan] });
+    await run(t, commands(addEight.slice(0, 1)));
+    const change = await run(
+      t,
+      commands(
+        [
+          { type: 'change-player', side: 'away', playerId: walkUp(1), jersey: '5' },
+          { type: 'change-player', side: 'away', playerId: walkUp(1), jersey: '6' },
+        ],
+        10,
+      ),
+    );
+    expect(statusesOf(change)).toEqual(['refused', 'accepted']);
+    expect(reasonOf(change)).toEqual({
+      code: 'rule',
+      message: 'That number is already worn on this team, which wants unique numbers.',
+      problem: 'jersey-taken',
+      wornBy: { playerId: walkUp(90), jersey: '5', name: 'Jordan Ellis' },
+    });
+    expect(reasonOf(change)?.message).not.toContain('Jordan');
+    expect(t.db.state.roster.find((r) => r.personId === walkUp(1))?.jerseyNumber).toBe('6');
+  });
+
+  it('takes two of the same number, and a change to one, where the season does not ask for unique ones', async () => {
+    const t = setUp({ roster: [...homeRoster, jordan] });
     const list = commands([
       { type: 'add-player', side: 'away', playerId: walkUp(1), jersey: '5', name: '' },
       { type: 'add-player', side: 'away', playerId: walkUp(2), jersey: '6', name: '' },
+      { type: 'change-player', side: 'away', playerId: walkUp(2), jersey: '5' },
     ]);
-    const result = await run(t, list);
-    expect(statusesOf(result)).toEqual(['refused', 'accepted']);
-    expect(reasonOf(result)).toEqual({
-      code: 'rule',
-      message: 'Number 5 is already worn by Jordan Ellis on this team.',
-      problem: 'jersey-taken',
-      wornBy: walkUp(90),
-    });
-    // A change to a number worn is refused the same way.
-    const change = await run(
-      t,
-      commands([{ type: 'change-player', side: 'away', playerId: walkUp(2), jersey: '5' }], 10),
-    );
-    expect(reasonOf(change)).toMatchObject({ problem: 'jersey-taken', wornBy: walkUp(90) });
-    expect(t.db.state.roster.filter((r) => r.jerseyNumber === '5')).toHaveLength(1);
-  });
-
-  it('names a wearer with no name as another player on the team', async () => {
-    const t = setUp({ uniqueJerseys: true });
-    const list = commands([
-      { type: 'add-player', side: 'away', playerId: walkUp(1), jersey: '5', name: '' },
-      { type: 'add-player', side: 'away', playerId: walkUp(2), jersey: '5', name: '' },
-    ]);
-    const result = await run(t, list);
-    expect(reasonOf(result, 1)).toEqual({
-      code: 'rule',
-      message: 'Number 5 is already worn by another player on this team.',
-      problem: 'jersey-taken',
-      wornBy: walkUp(1),
-    });
-  });
-
-  it('takes two of the same number where the season does not ask for unique ones', async () => {
-    const t = setUp();
-    const list = commands([
-      { type: 'add-player', side: 'away', playerId: walkUp(1), jersey: '5', name: '' },
-      { type: 'add-player', side: 'away', playerId: walkUp(2), jersey: '5', name: '' },
-    ]);
-    expect(statusesOf(await run(t, list))).toEqual(['accepted', 'accepted']);
+    expect(statusesOf(await run(t, list))).toEqual(['accepted', 'accepted', 'accepted']);
   });
 
   it('changes a rostered player’s number, and the line of this game takes it', async () => {
@@ -402,35 +433,59 @@ describe('numbers (S-37)', () => {
   });
 });
 
-describe('names (S-34, S-37)', () => {
-  it('renames a player added at the table, but not one from the team’s roster', async () => {
+describe('names (S-34, S-45)', () => {
+  it('renames a player added at the table and waiting for review, keeping the name before', async () => {
     const t = setUp();
-    await run(t, commands(addEight.slice(0, 1)));
+    await run(t, commands([{ ...addEight[0], name: 'Sam Lee' } as TablePlayerInput]));
     const renamed = await run(
       t,
       commands(
-        [{ type: 'change-player', side: 'away', playerId: walkUp(1), name: '  Sam   Lee ' }],
+        [{ type: 'change-player', side: 'away', playerId: walkUp(1), name: '  Samir   Lee ' }],
         10,
       ),
     );
     expect(statusesOf(renamed)).toEqual(['accepted']);
     expect(t.db.state.roster.find((r) => r.personId === walkUp(1))).toMatchObject({
-      firstName: 'Sam',
+      firstName: 'Samir',
       lastName: 'Lee',
       jerseyNumber: '3',
     });
-    const rostered = await run(
-      t,
-      commands(
-        [{ type: 'change-player', side: 'home', playerId: homeIds[0] ?? '', name: 'Someone Else' }],
-        20,
-      ),
-    );
-    expect(reasonOf(rostered)).toMatchObject({ code: 'rule', problem: 'name-from-roster' });
-    expect(t.db.state.roster.find((r) => r.personId === homeIds[0])?.firstName).toBe('Home1');
+    // Where an admin's review finds it: on the person, never in the log or the events.
+    expect(t.db.state.previousNames).toEqual([
+      { personId: walkUp(1), firstName: 'Sam', lastName: 'Lee' },
+    ]);
+    expect(JSON.stringify([t.db.state.events, t.db.state.activity])).not.toMatch(/Sam/);
+    expect(t.db.state.tableMarks).toMatchObject([{ personId: walkUp(1), needsReview: true }]);
   });
 
-  it('adds a player by name only, and refuses one with neither', async () => {
+  it('renames no player of the team’s own roster, and none an admin has reviewed', async () => {
+    const reviewed: GameRosterPlayer = {
+      teamId: awayTeamId,
+      personId: walkUp(1),
+      firstName: 'Kept',
+      lastName: 'Name',
+      jerseyNumber: '3',
+      left: false,
+    };
+    const t = setUp({
+      roster: [...homeRoster, reviewed],
+      tableMarks: [
+        { teamId: awayTeamId, personId: walkUp(1), addedAtGameId: gameUuid(7), needsReview: false },
+      ],
+    });
+    const result = await run(
+      t,
+      commands([
+        { type: 'change-player', side: 'home', playerId: homeIds[0] ?? '', name: 'Someone Else' },
+        { type: 'change-player', side: 'away', playerId: walkUp(1), name: 'Someone Else' },
+      ]),
+    );
+    expect(reasonOf(result, 0)).toMatchObject({ code: 'rule', problem: 'on-team-roster' });
+    expect(reasonOf(result, 1)).toMatchObject({ code: 'rule', problem: 'reviewed' });
+    expect(t.db.state.roster.map((r) => r.firstName)).not.toContain('Someone');
+  });
+
+  it('adds a player by name only', async () => {
     const t = setUp();
     const result = await run(
       t,
@@ -445,10 +500,160 @@ describe('names (S-34, S-37)', () => {
       jerseyNumber: null,
     });
   });
+
+  it('refuses a name that only grows too long once tidied, as one change, never the batch', async () => {
+    const t = setUp();
+    // "ﬃ" is one character that NFKC turns into three: 40 of them become 120.
+    const long = 'ﬃ'.repeat(40);
+    expect(long.length).toBeLessThanOrEqual(100);
+    const list = commands([
+      { type: 'add-player', side: 'away', playerId: walkUp(1), jersey: '3', name: long },
+      { type: 'lineup', side: 'home', playerIds: homeIds },
+    ]);
+    const result = await run(t, list);
+    expect(statusesOf(result)).toEqual(['refused', 'accepted']);
+    expect(reasonOf(result)).toMatchObject({ problem: 'name-not-readable' });
+  });
 });
 
-describe('taking a player off the game’s list', () => {
-  it('takes off a player added here by mistake, and a play naming them after is refused', async () => {
+describe('a change refused, and what names that player after it (S-44)', () => {
+  it('refuses every later command naming a player whose adding was refused, pointing at that change', async () => {
+    const t = setUp({ otherLeaguePeople: [walkUp(1)] });
+    const list = commands([
+      { type: 'add-player', side: 'away', playerId: walkUp(1), jersey: '3', name: '' },
+      { type: 'lineup', side: 'away', playerIds: [walkUp(1)] },
+      { type: 'change-player', side: 'away', playerId: walkUp(1), jersey: '4' },
+      { type: 'lineup', side: 'home', playerIds: homeIds },
+    ]);
+    const result = await run(t, list);
+    expect(statusesOf(result)).toEqual(['refused', 'refused', 'refused', 'accepted']);
+    // An id of another league's person: refused, and nothing written anywhere.
+    expect(reasonOf(result, 0)).toMatchObject({ problem: 'player-id-taken' });
+    for (const n of [1, 2]) {
+      expect(reasonOf(result, n)).toMatchObject({
+        code: 'rule',
+        problem: 'player-not-added',
+        playerId: walkUp(1),
+        follows: list[0]?.commandId,
+      });
+    }
+    expect(t.db.state.roster.map((r) => r.personId)).not.toContain(walkUp(1));
+  });
+
+  it('says which player a play names who is not on the team, never only "not on this team"', async () => {
+    const t = setUp();
+    const result = await run(
+      t,
+      commands([{ type: 'lineup', side: 'away', playerIds: [walkUp(9)] }]),
+    );
+    expect(reasonOf(result)).toEqual({
+      code: 'rule',
+      message: 'That player is not on this team. Reload the roster.',
+      problem: 'not-on-team',
+      playerId: walkUp(9),
+    });
+  });
+
+  it('says nothing of the kind to a tracker of version 1, which would not read it (T-127)', async () => {
+    const t = setUp();
+    const result = await applyTrackerCommands(
+      t.as(scorekeeperId),
+      {
+        ...batchOf(commands([{ type: 'lineup', side: 'away', playerIds: [walkUp(9)] }])),
+        protocolVersion: 1,
+      },
+      t.deps,
+    );
+    if (!result.ok) throw new Error(result.error.code);
+    expect(CommandReplyV1Reason.safeParse(result.value.results[0]).success).toBe(true);
+  });
+
+  it('answers a change the database could not save as that change refused, never a fault of the batch', async () => {
+    const t = setUp({ failWrites: true });
+    const list = commands([
+      addEight[0] as TablePlayerInput,
+      { type: 'lineup', side: 'home', playerIds: homeIds },
+    ]);
+    const result = await run(t, list);
+    expect(statusesOf(result)).toEqual(['refused', 'accepted']);
+    expect(reasonOf(result)).toMatchObject({ problem: 'not-saved' });
+  });
+});
+
+describe('after the end (review, item 3)', () => {
+  it('takes no change of players after the game was ended in the same batch', async () => {
+    const t = setUp();
+    const list = commands([
+      { type: 'lineup', side: 'home', playerIds: homeIds },
+      { type: 'start' },
+      { type: 'score', side: 'home', playerId: homeIds[0] ?? '', points: 2 },
+      { type: 'end' },
+      addEight[0] as TablePlayerInput,
+      { type: 'change-player', side: 'home', playerId: homeIds[0] ?? '', jersey: '44' },
+    ]);
+    const result = await run(t, list);
+    expect(statusesOf(result).slice(4)).toEqual(['refused', 'refused']);
+    expect(reasonOf(result, 4)).toMatchObject({ problem: 'game-over' });
+    expect(reasonOf(result, 5)).toMatchObject({ problem: 'game-over' });
+    expect(t.db.state.roster).toEqual(homeRoster);
+  });
+});
+
+describe('changes of players are not plays (review, item 2)', () => {
+  it('saves no state for a batch of them alone, and numbers the next batch on from their events', async () => {
+    const t = setUp();
+    await run(t, commands(addEight.slice(0, 2)));
+    expect(t.db.state.states).toEqual([]);
+    expect(t.db.state.events.map((e) => e.seq)).toEqual([1, 2]);
+    await run(t, commands([{ type: 'lineup', side: 'home', playerIds: homeIds }], 10));
+    expect(t.db.state.events.map((e) => e.seq)).toEqual([1, 2, 3]);
+    expect(t.db.state.states[0]?.seq).toBe(3);
+  });
+
+  it('reopens a game entered from paper after only players were added at its table as a game entered by hand', async () => {
+    const t = setUp();
+    await run(t, commands(addEight.slice(0, 1)));
+    // A state of such a game saved before this fix: reopening must still not take it for tracked.
+    t.db.state.states.push({
+      gameId,
+      seq: 1,
+      state: basketball.newGame(basketball.DEFAULT_RULES, 0),
+    });
+    const box = await setBoxScore(
+      t.as(scorekeeperId),
+      {
+        gameId,
+        version: 1,
+        homeScore: 2,
+        awayScore: 0,
+        lines: [
+          {
+            teamId: homeTeamId,
+            personId: homeIds[0] ?? '',
+            played: true,
+            secondsPlayed: null,
+            stats: { points: 2 },
+          },
+        ],
+      },
+      t.deps,
+    );
+    expect(box).toMatchObject({ ok: true });
+    const version = t.db.state.games[0]?.version ?? 0;
+    const reopened = await reopenGame(
+      t.as(ownerId),
+      { gameId, version, reason: 'A wrong score on the sheet' },
+      t.deps,
+    );
+    expect(reopened).toMatchObject({ ok: true });
+    expect(t.db.state.games[0]).toMatchObject({ status: 'scheduled' });
+    expect(t.db.state.lines).toHaveLength(1);
+    expect(t.db.state.events.map((e) => e.type)).toEqual(['add-player']);
+  });
+});
+
+describe('taking a player off (S-45)', () => {
+  it('takes off a player added here by mistake, to the bin, and a play naming them after is refused', async () => {
     const t = setUp();
     await run(t, commands(addEight.slice(0, 2)));
     const result = await run(
@@ -463,11 +668,36 @@ describe('taking a player off the game’s list', () => {
     );
     expect(statusesOf(result)).toEqual(['accepted', 'refused']);
     expect(t.db.state.roster.map((r) => r.personId)).not.toContain(walkUp(2));
+    expect(t.db.state.binnedPeople).toEqual([walkUp(2)]);
     expect(t.db.state.tableMarks.map((m) => m.personId)).toEqual([walkUp(1)]);
     expect(t.db.state.events.at(-1)).toMatchObject({
       type: 'remove-player',
       payload: { side: 'away', playerId: walkUp(2) },
     });
+  });
+
+  it('takes off one added at an earlier game’s table, still waiting for review', async () => {
+    const t = setUp({
+      roster: [
+        ...homeRoster,
+        {
+          teamId: awayTeamId,
+          personId: walkUp(1),
+          firstName: '',
+          lastName: '',
+          jerseyNumber: '3',
+          left: false,
+        },
+      ],
+      tableMarks: [
+        { teamId: awayTeamId, personId: walkUp(1), addedAtGameId: gameUuid(7), needsReview: true },
+      ],
+    });
+    const result = await run(
+      t,
+      commands([{ type: 'remove-player', side: 'away', playerId: walkUp(1) }]),
+    );
+    expect(statusesOf(result)).toEqual(['accepted']);
   });
 
   it('keeps a player a play of this game names, even one undone and waiting to be redone', async () => {
@@ -493,7 +723,46 @@ describe('taking a player off the game’s list', () => {
     expect(t.db.state.roster.map((r) => r.personId)).toContain(twelve);
   });
 
-  it('keeps a player with a box score line anywhere', async () => {
+  it('judges by the batch’s own plays: undone and replaced in the batch, the player can go (item 7)', async () => {
+    const t = setUp();
+    const twentyOne = walkUp(6);
+    await run(
+      t,
+      commands([
+        ...addEight,
+        { type: 'lineup', side: 'home', playerIds: homeIds },
+        { type: 'lineup', side: 'away', playerIds: [twentyOne] },
+        { type: 'start' },
+        { type: 'score', side: 'away', playerId: twentyOne, points: 2 },
+      ]),
+    );
+    expect(t.db.state.liveLines.map((l) => l.personId)).toContain(twentyOne);
+    // Offline: undo the basket and the lineup, a basket for #12 (which empties redo),
+    // then #21 is taken off. No play of the batch's state names #21 any more.
+    const result = await run(
+      t,
+      commands(
+        [
+          { type: 'undo' },
+          { type: 'undo' },
+          { type: 'lineup', side: 'away', playerIds: [twelve] },
+          { type: 'score', side: 'away', playerId: twelve, points: 2 },
+          { type: 'remove-player', side: 'away', playerId: twentyOne },
+        ],
+        30,
+      ),
+    );
+    expect(statusesOf(result)).toEqual([
+      'accepted',
+      'accepted',
+      'accepted',
+      'accepted',
+      'accepted',
+    ]);
+    expect(t.db.state.liveLines.map((l) => l.personId)).not.toContain(twentyOne);
+  });
+
+  it('keeps a player with a line in another game, and says that, not "plays in this game"', async () => {
     const t = setUp({
       lines: [
         {
@@ -511,25 +780,10 @@ describe('taking a player off the game’s list', () => {
       t,
       commands([{ type: 'remove-player', side: 'away', playerId: walkUp(1) }], 10),
     );
-    expect(reasonOf(result)).toMatchObject({ problem: 'has-plays' });
+    expect(reasonOf(result)).toMatchObject({ problem: 'has-lines' });
   });
 
-  it('does not take off a player from the team’s own roster, nor one who is not on the team', async () => {
-    const t = setUp();
-    const rostered = await run(
-      t,
-      commands([{ type: 'remove-player', side: 'home', playerId: homeIds[0] ?? '' }]),
-    );
-    expect(reasonOf(rostered)).toMatchObject({ problem: 'not-added-here' });
-    const stranger = await run(
-      t,
-      commands([{ type: 'remove-player', side: 'away', playerId: walkUp(77) }], 10),
-    );
-    expect(reasonOf(stranger)).toMatchObject({ problem: 'not-on-team' });
-    expect(t.db.state.roster).toEqual(homeRoster);
-  });
-
-  it('does not take off a player added at another game’s table', async () => {
+  it('does not take off a player of the team’s own roster, one reviewed, nor one not on the team', async () => {
     const t = setUp({
       roster: [
         ...homeRoster,
@@ -543,19 +797,26 @@ describe('taking a player off the game’s list', () => {
         },
       ],
       tableMarks: [
-        { teamId: awayTeamId, personId: walkUp(1), addedAtGameId: gameUuid(7), needsReview: true },
+        { teamId: awayTeamId, personId: walkUp(1), addedAtGameId: gameId, needsReview: false },
       ],
     });
     const result = await run(
       t,
-      commands([{ type: 'remove-player', side: 'away', playerId: walkUp(1) }]),
+      commands([
+        { type: 'remove-player', side: 'home', playerId: homeIds[0] ?? '' },
+        { type: 'remove-player', side: 'away', playerId: walkUp(1) },
+        { type: 'remove-player', side: 'away', playerId: walkUp(77) },
+      ]),
     );
-    expect(reasonOf(result)).toMatchObject({ problem: 'not-added-here' });
+    expect(reasonOf(result, 0)).toMatchObject({ problem: 'on-team-roster' });
+    expect(reasonOf(result, 1)).toMatchObject({ problem: 'reviewed' });
+    expect(reasonOf(result, 2)).toMatchObject({ problem: 'not-on-team' });
+    expect(t.db.state.binnedPeople).toEqual([]);
   });
 });
 
 describe('the parts', () => {
-  it('splits a typed name into a first word and the rest', () => {
+  it('splits a typed name into a first word and the rest, tidied before it is measured', () => {
     expect(splitTableName('')).toEqual({ firstName: '', lastName: '' });
     expect(splitTableName('   ')).toEqual({ firstName: '', lastName: '' });
     expect(splitTableName(' Yusuf ')).toEqual({ firstName: 'Yusuf', lastName: '' });
@@ -563,6 +824,9 @@ describe('the parts', () => {
       firstName: 'Mary',
       lastName: 'Ann Smith',
     });
+    expect(splitTableName('a'.repeat(100))).toEqual({ firstName: 'a'.repeat(100), lastName: '' });
+    expect(splitTableName('a'.repeat(101))).toBeUndefined();
+    expect(splitTableName('ﬃ'.repeat(34))).toBeUndefined();
   });
 
   it('finds a player named by any play, in the list or waiting to be redone', () => {

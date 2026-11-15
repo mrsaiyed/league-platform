@@ -51,6 +51,8 @@ export async function trackerRostersRequest(
       lastName: p.lastName,
       jerseyNumber: p.jerseyNumber,
       left: p.left,
+      addedAtGameId: p.addedAtGameId ?? null,
+      toReview: p.needsReview ?? false,
     })),
   };
   return { status: 200, body, headers: { 'Cache-Control': 'private, no-store' } };

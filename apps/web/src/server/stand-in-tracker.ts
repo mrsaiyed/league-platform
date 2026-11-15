@@ -27,6 +27,8 @@ export type TrackerState = {
   teams: GamePageTeam[];
   /** Players added at a scorer's table: where, and whether they wait for review (S-6, record 058). */
   tableMarks: { teamId: string; personId: string; addedAtGameId: string; needsReview: boolean }[];
+  /** People taken off at the table and sent to the bin (T-45). */
+  binned: string[];
 };
 
 export const emptyTracker = (): TrackerState => ({
@@ -38,6 +40,7 @@ export const emptyTracker = (): TrackerState => ({
   people: [],
   teams: [],
   tableMarks: [],
+  binned: [],
 });
 
 /** One made-up team: its name, whether its player numbers are for staff only, and its players. */
@@ -141,6 +144,7 @@ function tablePlayersOf(
   | 'setTablePlayerNumber'
   | 'renameTablePlayer'
   | 'removeTablePlayer'
+  | 'lastEventSeq'
 > {
   const split = (entryId: string) => {
     const [teamId = '', personId = ''] = entryId.split('|');
@@ -148,12 +152,20 @@ function tablePlayersOf(
   };
   const onTeam = (teamId: string, personId: string) => (p: GamePlayer) =>
     p.teamId === teamId && p.personId.toLowerCase() === personId && p.onGameDay;
+  const reviewing = (teamId: string, personId: string) =>
+    s.tableMarks.some((m) => m.teamId === teamId && m.personId === personId && m.needsReview);
+  // 0015: an entry waiting for review is neither checked nor counted.
   const worn = (teamId: string, personId: string, jersey: string | null) =>
     jersey !== null &&
     uniqueJerseys(teamId) &&
+    !reviewing(teamId, personId) &&
     s.players.some(
       (p) =>
-        p.teamId === teamId && p.onGameDay && p.jerseyNumber === jersey && p.personId !== personId,
+        p.teamId === teamId &&
+        p.onGameDay &&
+        p.jerseyNumber === jersey &&
+        p.personId !== personId &&
+        !reviewing(teamId, p.personId),
     );
   return {
     findTablePlayer: async (teamId, personId) => {
@@ -169,6 +181,7 @@ function tablePlayersOf(
         firstName: person?.firstName ?? '',
         lastName: person?.lastName ?? '',
         addedAtGameId: mark?.addedAtGameId ?? null,
+        needsReview: mark?.needsReview ?? false,
       };
     },
     addTablePlayer: async (player) => {
@@ -191,21 +204,30 @@ function tablePlayersOf(
       s.players = s.players.map((p) => (onTeam(teamId, personId)(p) ? { ...p, jerseyNumber } : p));
       return 'changed';
     },
-    renameTablePlayer: async (personId, firstName, lastName) => {
+    renameTablePlayer: async (entryId, personId, firstName, lastName) => {
+      const { teamId } = split(entryId);
       s.people = s.people.map((p) =>
         p.id.toLowerCase() === personId ? { ...p, firstName, lastName } : p,
       );
+      s.tableMarks = s.tableMarks.map((m) =>
+        m.teamId === teamId && m.personId === personId ? { ...m, needsReview: true } : m,
+      );
+      return 'renamed';
     },
-    removeTablePlayer: async (entryId, personId) => {
+    removeTablePlayer: async (entryId, personId, gameId) => {
       const { teamId } = split(entryId);
-      if (s.lines.some((l) => l.personId.toLowerCase() === personId)) return 'has-lines';
+      const elsewhere = s.lines.some(
+        (l) => l.personId.toLowerCase() === personId && l.gameId !== gameId,
+      );
+      if (elsewhere) return 'has-lines';
       s.players = s.players.filter((p) => !onTeam(teamId, personId)(p));
       s.tableMarks = s.tableMarks.filter((m) => !(m.teamId === teamId && m.personId === personId));
-      if (!s.players.some((p) => p.personId.toLowerCase() === personId)) {
-        s.people = s.people.filter((p) => p.id.toLowerCase() !== personId);
-      }
+      // To the bin (T-45): the person stays, on no team, and their id stays taken.
+      if (!s.players.some((p) => p.personId.toLowerCase() === personId)) s.binned.push(personId);
       return 'removed';
     },
+    lastEventSeq: async (gameId) =>
+      Math.max(0, ...s.events.filter((e) => e.gameId === gameId).map((e) => e.seq)),
   };
 }
 

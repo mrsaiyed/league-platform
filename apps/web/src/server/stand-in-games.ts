@@ -304,6 +304,9 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
             .filter((p) => p.teamId === teamId)
             .map((p) => {
               const person = s.tracker.people.find((x) => x.id === p.personId);
+              const mark = s.tracker.tableMarks.find(
+                (m) => m.teamId === teamId && m.personId === p.personId,
+              );
               return {
                 teamId,
                 personId: p.personId,
@@ -311,6 +314,8 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
                 lastName: person?.lastName ?? '',
                 jerseyNumber: p.jerseyNumber,
                 left: !p.onGameDay,
+                addedAtGameId: mark?.addedAtGameId ?? null,
+                needsReview: mark?.needsReview ?? false,
               };
             }),
         ),

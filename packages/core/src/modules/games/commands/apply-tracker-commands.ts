@@ -55,7 +55,8 @@ import {
   changedLines,
   linesOf,
   platformProblem,
-  playerProblem,
+  playerNotOnTeam,
+  playersNamed,
   readState,
   rosterOf,
   scoreOf,
@@ -68,8 +69,8 @@ import { finishTrackedGame, liveResultOf } from '../finish-tracked-game.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GameRecord, NewGameEvent, TrackerTx } from '../ports.ts';
 import { lowerId, scorerOf, sessionStanding } from '../scoring-session.ts';
-import { effectiveRulesOf } from '../season-rules-of.ts';
-import { applyTablePlayer } from '../table-players.ts';
+import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
+import { applyTablePlayer, tableRefusal, type TableRefusal } from '../table-players.ts';
 
 export type ApplyTrackerCommandsError =
   | { readonly code: 'unsupported-protocol-version'; readonly accepted: readonly number[] }
@@ -172,7 +173,9 @@ export const applyTrackerCommands = defineCommand({
     }
     const saved = await tx.liveGames.findState(gameId);
     const taken = new Set(await tx.liveGames.takenCommands(gameId, ids));
-    let seq = saved?.seq ?? 0;
+    // The last event, whether a play or a change of players: a batch of changes only
+    // saves no state (below), so the state's own number can be behind the events'.
+    let seq = Math.max(saved?.seq ?? 0, await tx.liveGames.lastEventSeq(gameId));
     if (!isPlayable(game)) {
       return ok(reply(seq, refuseAll('game-not-live', messages['game-not-live'], taken)));
     }
@@ -196,7 +199,26 @@ export const applyTrackerCommands = defineCommand({
     const roster = rosterOf(await tx.liveGames.players(gameId));
     // The rosters as the batch found them, for the lines it started with.
     const rosterAtStart = new Map(roster);
+    const { uniqueJerseys } = (await seasonRulesOf(tx, game.seasonId)).rosters;
     const events: NewGameEvent[] = [];
+    /** Whether a play was taken: only then is a state saved for a game that has none. */
+    let played = false;
+    /** Players whose adding was refused in this batch, with the refused command's ID. */
+    const notAdded = new Map<string, string>();
+    /** A refusal of a play or a change of players, said in version 2 only (T-127). */
+    const tableReason = (refusal: TableRefusal, more: { playerId?: string; follows?: string }) =>
+      version >= 2
+        ? {
+            code: 'rule' as const,
+            message: refusal.message.slice(0, 300),
+            problem: refusal.problem,
+            ...(refusal.wornBy === undefined ? {} : { wornBy: refusal.wornBy }),
+            ...more,
+          }
+        : { code: 'rule' as const, message: refusal.message.slice(0, 300) };
+    /** The first player a command names whose adding was refused earlier in the batch. */
+    const namesNotAdded = (named: readonly string[]) =>
+      named.map((id) => id.toLowerCase()).find((id) => notAdded.has(id));
     const applyOne = async (
       commandId: string,
       command: CommandBatch['commands'][number],
@@ -209,25 +231,35 @@ export const applyTrackerCommands = defineCommand({
       });
       // A tap that waited out a dropped connection lands where it happened, never later than now.
       const at = Math.min(now, command.at);
+      const notAddedRefusal = (playerId: string): CommandResult => ({
+        commandId: command.commandId,
+        status: 'refused',
+        reason: tableReason(tableRefusal('player-not-added'), {
+          playerId,
+          follows: notAdded.get(playerId) ?? '',
+        }),
+      });
       if (isTablePlayerCommand(command)) {
-        const refusal = await applyTablePlayer({
+        const earlier = namesNotAdded([command.input.playerId]);
+        if (earlier !== undefined) return notAddedRefusal(earlier);
+        const outcome = await applyTablePlayer({
           context,
           tx,
           game,
           roster,
           state,
+          uniqueJerseys,
           input: command.input,
         });
-        if (refusal !== undefined) {
+        if ('refused' in outcome) {
+          // The player was never added: every later command naming them says so.
+          if (command.input.type === 'add-player') {
+            notAdded.set(command.input.playerId.toLowerCase(), command.commandId);
+          }
           return {
             commandId: command.commandId,
             status: 'refused',
-            reason: {
-              code: 'rule',
-              message: refusal.message.slice(0, 300),
-              problem: refusal.problem,
-              ...(refusal.wornBy === undefined ? {} : { wornBy: refusal.wornBy }),
-            },
+            reason: tableReason(outcome.refused, {}),
           };
         }
         seq += 1;
@@ -242,11 +274,26 @@ export const applyTrackerCommands = defineCommand({
           accountId,
         });
         taken.add(commandId);
-        return { commandId: command.commandId, status: 'accepted' };
+        const { notice } = outcome.taken;
+        return {
+          commandId: command.commandId,
+          status: 'accepted',
+          ...(notice === undefined || version < 2 ? {} : { notice }),
+        };
       }
       const input: TrackerInput = withLowerIds(command.input);
-      const problem = platformProblem(input) ?? playerProblem(game, roster, input);
-      if (problem !== undefined) return refused(problem);
+      const platform = platformProblem(input);
+      if (platform !== undefined) return refused(platform);
+      const earlier = namesNotAdded(playersNamed(input));
+      if (earlier !== undefined) return notAddedRefusal(earlier);
+      const missing = playerNotOnTeam(game, roster, input);
+      if (missing !== undefined) {
+        return {
+          commandId: command.commandId,
+          status: 'refused',
+          reason: tableReason(tableRefusal('not-on-team'), { playerId: missing }),
+        };
+      }
       // platformProblem refuses every rules command; this tells the type checker so.
       if (input.type === 'rules') return refused('The game’s rules come from the league.');
       let next: basketball.GameState;
@@ -263,6 +310,7 @@ export const applyTrackerCommands = defineCommand({
         if (score.home === score.away && !rules.allowTies) return refused(tieProblem);
       }
       state = next;
+      played = true;
       const { type, ...payload } = input;
       seq += 1;
       events.push({ gameId, seq, commandId, type, payload, tappedAt: at, accountId });
@@ -278,6 +326,10 @@ export const applyTrackerCommands = defineCommand({
 
     // T6 §1: the events, the state, every changed line and the score, all together.
     await tx.liveGames.addEvents(events);
+    // Changes of players alone are not plays: a game with no state is not given one,
+    // so it is not taken for a tracked game (its box score can be entered from paper,
+    // and reopening it later keeps that box score). A state it has follows the events.
+    if (before === undefined && !played) return ok(reply(seq, results));
     await tx.liveGames.saveState(gameId, seq, state);
     if (state.status === 'final') {
       await finishTrackedGame({ context, tx, emit, game, state, rules });

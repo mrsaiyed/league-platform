@@ -188,6 +188,7 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     removeTablePlayer: async () => {
       throw new Error('No game is tracked in the standings tests.');
     },
+    lastEventSeq: async () => 0,
   };
   const transaction = memoryTransaction(db, (s, jobs): TrackerTx & StandingsTx => ({
     jobs,

@@ -3,6 +3,7 @@
 import type { LiveGamesStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
+  findLastEventSeq,
   findSavedGameState,
   findTablePlayer,
   insertGameEvents,
@@ -45,7 +46,10 @@ export function liveGamesStore(scope: LeagueScope): LiveGamesStore {
     findTablePlayer: (teamId, personId) => findTablePlayer(scope, teamId, personId),
     addTablePlayer: (player) => insertTablePlayer(scope, player),
     setTablePlayerNumber: (entryId, jersey) => setTablePlayerNumber(scope, entryId, jersey),
-    renameTablePlayer: (personId, first, last) => renameTablePlayer(scope, personId, first, last),
-    removeTablePlayer: (entryId, personId) => removeTablePlayer(scope, entryId, personId),
+    renameTablePlayer: (entryId, personId, first, last) =>
+      renameTablePlayer(scope, entryId, personId, first, last),
+    removeTablePlayer: (entryId, personId, gameId) =>
+      removeTablePlayer(scope, entryId, personId, gameId),
+    lastEventSeq: (gameId) => findLastEventSeq(scope, gameId),
   };
 }

@@ -1,6 +1,6 @@
 // A person's current entry (not left) on a team of the scope's league, with the name on
-// their person and where the entry was added (0010), for the scorer's table (record
-// 058). A person or a team in the bin is not found. Every table is filtered to the
+// their person, where the entry was added and whether it waits for review (0010), for
+// the scorer's table (record 058, S-45). A person or a team in the bin is not found. Every table is filtered to the
 // league (T-28).
 import type { TablePlayer } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -24,6 +24,7 @@ export async function findTablePlayer(
       'r.person_id',
       'r.jersey_number',
       'r.added_at_game_id',
+      'r.needs_review',
       'p.first_name',
       'p.last_name',
     ])
@@ -46,5 +47,6 @@ export async function findTablePlayer(
         firstName: row.first_name,
         lastName: row.last_name,
         addedAtGameId: row.added_at_game_id,
+        needsReview: row.needs_review,
       };
 }

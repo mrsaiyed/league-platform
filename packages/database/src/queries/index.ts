@@ -145,6 +145,7 @@ export { insertTablePlayer } from './insert-table-player.ts';
 export { setTablePlayerNumber } from './set-table-player-number.ts';
 export { renameTablePlayer } from './rename-table-player.ts';
 export { removeTablePlayer } from './remove-table-player.ts';
+export { findLastEventSeq } from './find-last-event-seq.ts';
 export { listTableTeams } from './list-table-teams.ts';
 export { listStandingsAdjustments } from './list-standings-adjustments.ts';
 export { insertStandingsAdjustment } from './insert-standings-adjustment.ts';

@@ -2,9 +2,11 @@
 // S-34): a new person with the id the device made, a number, a name, or both (either
 // name may be empty: 0008 allows it), and their entry at the end of the team's roster,
 // naming the game and marked for review as the league asks (0010). The database
-// checks the rest: the team plays in that game (check_roster_added_at_game) and, where
-// the season wants unique numbers, no one on the team wears the number (0008). Run in
-// a savepoint (in-savepoint.ts), so a refusal leaves the batch's transaction usable.
+// checks the rest: the team plays in that game (check_roster_added_at_game). A number
+// already worn is not refused while the entry waits for review (S-44, 0015). Run in a
+// savepoint (in-savepoint.ts), so any refusal leaves the batch's transaction usable,
+// and answered: one the database gives no known name to is `failed`, never thrown, so
+// one bad change can never hold up the taps after it.
 import type { NewTablePlayer, TablePlayerRefusal } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -46,6 +48,6 @@ export async function insertTablePlayer(
     const constraint = constraintOf(error)?.constraint;
     if (constraint === 'roster_entries_unique_jersey') return 'jersey-taken';
     if (constraint === 'people_pkey' || constraint === 'roster_entries_once') return 'id-taken';
-    throw error;
+    return 'failed';
   }
 }

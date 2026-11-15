@@ -6,15 +6,20 @@
 import type { BatchCommand, RefusalCode, TablePlayerProblem } from '@srleagues/contracts';
 
 /**
- * Why the server would not apply a command (T-113), as its reply said. A change of
- * players at the scorer's table (record 058) also says why as a fixed code, and for a
- * number already worn who wears it, so the tracker can word it (T-187).
+ * Why the server would not apply a command (T-113), as its reply said. Since protocol
+ * 2 (record 058) a play or a change of players also says why as a fixed code, with the
+ * player it names, the refused change it follows, and for a number already worn who
+ * wears it, so the tracker can word it (T-187). The wearer is kept by id and number
+ * only: their name is never stored in the queue (record 054); the screen takes it from
+ * the device's rosters.
  */
 export type CommandRefusal = {
   readonly code: RefusalCode;
   readonly message: string;
   readonly problem?: TablePlayerProblem;
-  readonly wornBy?: string;
+  readonly wornBy?: { readonly playerId: string; readonly jersey: string };
+  readonly playerId?: string;
+  readonly follows?: string;
 };
 
 /**

@@ -7,6 +7,7 @@
 // `lockingTracker` runs transactions over one shared state with a real lock per game,
 // to show batches for different games never wait for each other (T-112): PGlite has
 // one connection and runs transactions one after another, so it cannot show that.
+import { tablePlayerCommandTypes } from '@srleagues/contracts';
 import type {
   DomainEvent,
   EventHandler,
@@ -34,8 +35,16 @@ export type MemoryTracker = MemoryScoring & {
   players: GamePlayer[];
   /** Where each player added at a scorer's table was added, and whether they wait for review (0010). */
   tableMarks: { teamId: string; personId: string; addedAtGameId: string; needsReview: boolean }[];
-  /** The season wants unique numbers on a team (0008). */
+  /** The season wants unique numbers on a team (0008), as the database reads it. */
   uniqueJerseys: boolean;
+  /** People sent to the bin by taking them off at the table (T-45). */
+  binnedPeople: string[];
+  /** Ids of people of another league: an id the database would refuse. */
+  otherLeaguePeople: string[];
+  /** The names people had before a rename at the table (0015). */
+  previousNames: { personId: string; firstName: string; lastName: string }[];
+  /** Every write of a change of players fails, as a database fault would. */
+  failWrites: boolean;
 };
 
 const initialTracker = (state: Partial<MemoryTracker>): MemoryTracker => ({
@@ -46,6 +55,10 @@ const initialTracker = (state: Partial<MemoryTracker>): MemoryTracker => ({
   players: [],
   tableMarks: [],
   uniqueJerseys: false,
+  binnedPeople: [],
+  otherLeaguePeople: [],
+  previousNames: [],
+  failWrites: false,
   ...state,
 });
 
@@ -64,16 +77,26 @@ function tablePlayersOf(
   | 'setTablePlayerNumber'
   | 'renameTablePlayer'
   | 'removeTablePlayer'
+  | 'lastEventSeq'
 > {
   const split = (entryId: string) => {
     const [teamId = '', personId = ''] = entryId.split('|');
     return { teamId, personId };
   };
+  const reviewing = (teamId: string, personId: string) =>
+    s.tableMarks.some((m) => m.teamId === teamId && m.personId === personId && m.needsReview);
+  // 0015: an entry waiting for review is neither checked nor counted.
   const worn = (teamId: string, personId: string, jersey: string | null) =>
     s.uniqueJerseys &&
     jersey !== null &&
+    !reviewing(teamId, personId) &&
     s.roster.some(
-      (r) => r.teamId === teamId && !r.left && r.jerseyNumber === jersey && r.personId !== personId,
+      (r) =>
+        r.teamId === teamId &&
+        !r.left &&
+        r.jerseyNumber === jersey &&
+        r.personId !== personId &&
+        !reviewing(teamId, r.personId),
     );
   return {
     findTablePlayer: async (teamId, personId) => {
@@ -90,12 +113,19 @@ function tablePlayersOf(
         firstName: entry.firstName,
         lastName: entry.lastName,
         addedAtGameId: mark?.addedAtGameId ?? null,
+        needsReview: mark?.needsReview ?? false,
       };
     },
     addTablePlayer: async (player) => {
-      const ids = [...s.players, ...s.roster].map((p) => p.personId.toLowerCase());
-      if (ids.includes(player.personId)) return 'id-taken';
-      if (worn(player.teamId, player.personId, player.jerseyNumber)) return 'jersey-taken';
+      const ids = [
+        ...s.players,
+        ...s.roster,
+        ...s.binnedPeople.map((personId) => ({ personId })),
+      ].map((p) => p.personId.toLowerCase());
+      if (ids.includes(player.personId) || s.otherLeaguePeople.includes(player.personId)) {
+        return 'id-taken';
+      }
+      if (s.failWrites) return 'failed';
       const { teamId, personId, jerseyNumber, firstName, lastName } = player;
       s.players.push({ personId, teamId, jerseyNumber, onGameDay: true });
       s.roster.push({ teamId, personId, firstName, lastName, jerseyNumber, left: false });
@@ -109,6 +139,7 @@ function tablePlayersOf(
     },
     setTablePlayerNumber: async (entryId, jerseyNumber) => {
       const { teamId, personId } = split(entryId);
+      if (s.failWrites) return 'failed';
       if (worn(teamId, personId, jerseyNumber)) return 'jersey-taken';
       const same = (p: { teamId: string; personId: string }) =>
         p.teamId === teamId && p.personId.toLowerCase() === personId;
@@ -116,23 +147,40 @@ function tablePlayersOf(
       s.roster = s.roster.map((r) => (same(r) && !r.left ? { ...r, jerseyNumber } : r));
       return 'changed';
     },
-    renameTablePlayer: async (personId, firstName, lastName) => {
+    renameTablePlayer: async (entryId, personId, firstName, lastName) => {
+      if (s.failWrites) return 'failed';
+      const { teamId } = split(entryId);
+      const before = s.roster.find((r) => r.personId.toLowerCase() === personId);
+      if (before !== undefined) {
+        s.previousNames.push({ personId, firstName: before.firstName, lastName: before.lastName });
+      }
       s.roster = s.roster.map((r) =>
         r.personId.toLowerCase() === personId ? { ...r, firstName, lastName } : r,
       );
+      s.tableMarks = s.tableMarks.map((m) =>
+        m.teamId === teamId && m.personId === personId ? { ...m, needsReview: true } : m,
+      );
+      return 'renamed';
     },
-    removeTablePlayer: async (entryId, personId) => {
+    removeTablePlayer: async (entryId, personId, gameId) => {
       const { teamId } = split(entryId);
-      if ([...s.liveLines, ...s.lines].some((l) => l.personId.toLowerCase() === personId)) {
-        return 'has-lines';
-      }
+      // Lines of other games only: this game's follow its plays, which the command read.
+      const elsewhere = [...s.liveLines, ...s.lines].some(
+        (l) => l.personId.toLowerCase() === personId && l.gameId !== gameId,
+      );
+      if (elsewhere) return 'has-lines';
+      if (s.failWrites) return 'failed';
       const other = (p: { teamId: string; personId: string }) =>
         !(p.teamId === teamId && p.personId.toLowerCase() === personId);
       s.players = s.players.filter(other);
       s.roster = s.roster.filter(other);
       s.tableMarks = s.tableMarks.filter(other);
+      // To the bin (T-45), not gone: the person can be brought back.
+      s.binnedPeople.push(personId);
       return 'removed';
     },
+    lastEventSeq: async (gameId) =>
+      Math.max(0, ...s.events.filter((e) => e.gameId === gameId).map((e) => e.seq)),
   };
 }
 
@@ -192,13 +240,31 @@ const trackerTxOf = (
   jobs: JobQueue,
   clock: ReturnType<typeof testClock>,
   lock?: (gameId: string) => Promise<void>,
-): TrackerTx => ({
-  ...gamesTxOf(s, jobs),
-  clock,
-  // The session commands take the same lock, so a takeover and a batch race for real.
-  scoringSessions: sessionsOf(s, lock === undefined ? {} : { lockGame: lock }),
-  liveGames: liveGamesOf(s),
-});
+): TrackerTx =>
+  withPlaysFromEvents(s, {
+    ...gamesTxOf(s, jobs),
+    clock,
+    // The session commands take the same lock, so a takeover and a batch race for real.
+    scoringSessions: sessionsOf(s, lock === undefined ? {} : { lockGame: lock }),
+    liveGames: liveGamesOf(s),
+  });
+
+/**
+ * Whether a game has plays, as the database reads it (game-has-plays.ts): an event of
+ * the tracker that is not a change of players, or a game the test marks as tracked.
+ */
+function withPlaysFromEvents(s: MemoryTracker, tx: TrackerTx): TrackerTx {
+  const tableTypes: readonly string[] = tablePlayerCommandTypes;
+  return {
+    ...tx,
+    games: {
+      ...tx.games,
+      hasPlays: async (gameId) =>
+        s.tracked.includes(gameId) ||
+        s.events.some((e) => e.gameId === gameId && !tableTypes.includes(e.type)),
+    },
+  };
+}
 
 /**
  * Each transaction works on a copy, kept only if it returns (nothing kept on a

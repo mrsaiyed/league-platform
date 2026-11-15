@@ -4,6 +4,8 @@ import {
   CommandBatch,
   CommandBatchV1,
   CommandReply,
+  GameSnapshotReading,
+  LiveMessageReading,
   TrackerRosters,
   isTablePlayerCommand,
   type BatchCommand,
@@ -100,7 +102,13 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
     expect(CommandBatchV1.safeParse({ ...batch(add({})), protocolVersion: 1 }).success).toBe(false);
   });
 
-  it('says why a change of players was refused, and who wears a number already worn', () => {
+  it('takes a long name in the batch, as the server measures it once tidied', () => {
+    expect(CommandBatch.safeParse(batch(add({ name: 'x'.repeat(400) }))).success).toBe(true);
+    expect(CommandBatch.safeParse(batch(add({ name: 'x'.repeat(401) }))).success).toBe(false);
+  });
+
+  it('says why a change of players was refused, who wears a number, and what a refusal follows', () => {
+    const wornBy = { playerId: id(7), jersey: '5', name: 'Jordan Ellis' };
     const reply = {
       protocolVersion: 2,
       sequence: 3,
@@ -110,10 +118,27 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
           status: 'refused',
           reason: {
             code: 'rule',
-            message: 'Number 5 is already worn by Jordan Ellis on this team.',
+            message: 'That number is already worn on this team, which wants unique numbers.',
             problem: 'jersey-taken',
-            wornBy: id(7),
+            wornBy,
           },
+        },
+        {
+          commandId: id(2),
+          status: 'refused',
+          reason: {
+            code: 'rule',
+            message: 'This names a player whose adding was refused earlier in the batch.',
+            problem: 'player-not-added',
+            playerId: id(50),
+            follows: id(1),
+          },
+        },
+        // S-44: a player added with a number already worn is taken, with a notice.
+        {
+          commandId: id(3),
+          status: 'accepted',
+          notice: { kind: 'jersey-also-worn', wornBy },
         },
       ],
     };
@@ -121,6 +146,9 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
     const unknown = structuredClone(reply);
     (unknown.results[0]?.reason as { problem: string }).problem = 'too-tall';
     expect(CommandReply.safeParse(unknown).success).toBe(false);
+    const bareWearer = structuredClone(reply);
+    (bareWearer.results[0]?.reason as { wornBy: unknown }).wornBy = id(7);
+    expect(CommandReply.safeParse(bareWearer).success).toBe(false);
   });
 
   it('gives the rosters for the device, a player known by number only included', () => {
@@ -130,6 +158,7 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
       awayTeamId: id(3),
       recording: 'live',
       status: 'scheduled',
+      uniqueJerseys: true,
       players: [
         {
           teamId: id(3),
@@ -138,6 +167,8 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
           lastName: '',
           jerseyNumber: '12',
           left: false,
+          addedAtGameId: id(1),
+          toReview: true,
         },
         {
           teamId: id(2),
@@ -146,6 +177,8 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
           lastName: 'Lionel',
           jerseyNumber: null,
           left: true,
+          addedAtGameId: null,
+          toReview: false,
         },
       ],
     };
@@ -154,6 +187,11 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
     expect(TrackerRosters.safeParse(unknownMode).success).toBe(true);
     const badNumber = { ...rosters, players: [{ ...rosters.players[0], jerseyNumber: '' }] };
     expect(TrackerRosters.safeParse(badNumber).success).toBe(false);
+    // What the Players panel needs is part of the shape from the start (T-127).
+    const { uniqueJerseys: _u, ...noRule } = rosters;
+    expect(TrackerRosters.safeParse(noRule).success).toBe(false);
+    const { toReview: _t, ...noMark } = rosters.players[0] ?? {};
+    expect(TrackerRosters.safeParse({ ...rosters, players: [noMark] }).success).toBe(false);
   });
 });
 
@@ -392,6 +430,46 @@ describe('live message and snapshot', () => {
     expect(GameSnapshot.safeParse({ ...snap, correctedOn: 'yesterday' }).success).toBe(false);
     expect(GameSnapshot.safeParse({ ...snap, periods: 3 }).success).toBe(false);
   });
+  it('is read by a page leaving out any field it does not know, at every level (record 058)', () => {
+    const player = {
+      playerId: id(5),
+      side: 'away',
+      name: null,
+      jersey: '12',
+      points: 2,
+      fouls: 0,
+      onCourt: true,
+    };
+    const snap = {
+      ...msg,
+      periods: 4,
+      teams: {
+        home: { name: 'Home', statsVisible: true },
+        away: { name: 'Away', statsVisible: true },
+      },
+      players: [player],
+    };
+    const later = {
+      ...snap,
+      added: 1,
+      clock: { ...snap.clock, drift: 0 },
+      latestPlay: { ...snap.latestPlay, assist: null },
+      score: { ...snap.score, extra: 0 },
+      teams: { ...snap.teams, home: { ...snap.teams.home, colour: '#000000' } },
+      players: [{ ...player, unnamed: true, minutes: 4 }],
+    };
+    expect(GameSnapshot.safeParse(later).success).toBe(false);
+    expect(GameSnapshotReading.parse(later)).toEqual({
+      ...snap,
+      players: [{ ...player, unnamed: true }],
+    });
+    expect(LiveMessage.safeParse({ ...msg, added: 1 }).success).toBe(false);
+    expect(LiveMessageReading.parse({ ...msg, added: 1 })).toEqual(msg);
+    // Still the same checks on what it does know.
+    expect(LiveMessageReading.safeParse({ ...msg, sequence: -1 }).success).toBe(false);
+    expect(GameSnapshotReading.parse(snap)).toEqual(snap);
+  });
+
   it('marks a player known by number only, and only as true (S-34)', () => {
     const player = {
       playerId: id(5),

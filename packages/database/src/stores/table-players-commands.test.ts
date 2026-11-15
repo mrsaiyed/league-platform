@@ -13,6 +13,8 @@ import {
   publicViewer,
   readGamePage,
   readGameSnapshot,
+  reopenGame,
+  setBoxScore,
   type AccessTx,
   type CommandDeps,
   type Job,
@@ -137,7 +139,8 @@ async function leagueWithGame({ uniqueJerseys = false } = {}) {
       { gameId, protocolVersion: 2, sessionId, commands },
       deps,
     );
-  return { ...l, seasonId, homeTeamId, awayTeamId, home, gameId, send };
+  const as = (accountId: string) => ({ leagueId: l.leagueId, accountId, requestId: 'r-1' });
+  return { ...l, seasonId, homeTeamId, awayTeamId, home, gameId, scorekeeperId, as, send };
 }
 
 type Input = BatchCommand['input'];
@@ -275,47 +278,90 @@ describe('players at the scorer’s table on the database (record 058)', () => {
     expect(await visitorsOf(l.awayTeamId)).toHaveLength(8);
   });
 
-  it('refuses a number already worn where the season wants unique ones, naming who wears it, and saves the rest', async () => {
+  it('takes a player added with a number already worn, and refuses only a change to one (S-44, S-37)', async () => {
     const l = await leagueWithGame({ uniqueJerseys: true });
     const [a, b] = [randomUUID(), randomUUID()];
     const commands = commandsOf([
       { type: 'add-player', side: 'home', playerId: a, jersey: '10', name: '' },
+      { type: 'lineup', side: 'home', playerIds: [a] },
       { type: 'add-player', side: 'home', playerId: b, jersey: '15', name: 'Sam Lee' },
       { type: 'change-player', side: 'home', playerId: b, jersey: '11' },
       { type: 'change-player', side: 'home', playerId: b, jersey: '16' },
     ]);
     const results = resultsOf(await l.send(commands));
-    expect(statusesOf(results)).toEqual(['refused', 'accepted', 'refused', 'accepted']);
-    expect(results[0]).toMatchObject({
+    expect(statusesOf(results)).toEqual([
+      'accepted',
+      'accepted',
+      'accepted',
+      'refused',
+      'accepted',
+    ]);
+    const jordan = { playerId: l.home[0], jersey: '10', name: 'Jordan Ellis0' };
+    expect(results[0]).toEqual({
+      commandId: commands[0]?.commandId,
+      status: 'accepted',
+      notice: { kind: 'jersey-also-worn', wornBy: jordan },
+    });
+    expect(results[3]).toEqual({
+      commandId: commands[3]?.commandId,
       status: 'refused',
       reason: {
         code: 'rule',
-        message: 'Number 10 is already worn by Jordan Ellis0 on this team.',
+        message: 'That number is already worn on this team, which wants unique numbers.',
         problem: 'jersey-taken',
-        wornBy: l.home[0],
+        wornBy: { playerId: l.home[1], jersey: '11', name: 'Jordan Ellis1' },
       },
     });
-    expect(results[2]).toMatchObject({ reason: { problem: 'jersey-taken', wornBy: l.home[1] } });
     const rows = await visitorsOf(l.homeTeamId);
-    expect(rows.map((r) => r.person_id)).not.toContain(a);
+    expect(rows.filter((r) => r.jersey_number === '10').map((r) => r.needs_review)).toEqual([
+      false,
+      true,
+    ]);
     expect(rows.find((r) => r.person_id === b)).toMatchObject({
       jersey_number: '16',
       first_name: 'Sam',
       last_name: 'Lee',
       needs_review: true,
     });
-    expect(await pglite.query('select 1 from people where id = $1', [a])).toMatchObject({
-      rows: [],
-    });
+    // The admin confirming #10 while Jordan wears it is refused by the season's rule.
+    await expect(
+      pglite.query('update roster_entries set needs_review = false where person_id = $1', [a]),
+    ).rejects.toMatchObject({ constraint: 'roster_entries_unique_jersey' });
   });
 
-  it('takes off a player added by mistake, leaving nothing behind, but keeps one a play names', async () => {
+  it('answers an unexpected database refusal as that change refused, and saves the rest of the batch', async () => {
+    const l = await leagueWithGame();
+    const bad = randomUUID();
+    // A trigger refusing this one id for a reason with no name: a stand-in for any
+    // refusal the command does not know.
+    await pglite.query(
+      `create or replace function public.refuse_people_for_test() returns trigger
+       language plpgsql as $$ begin raise exception 'refused for no named reason'; end $$`,
+    );
+    await pglite.query(
+      `create trigger refuse_people_for_test before insert on people for each row
+       when (new.id = '${bad}') execute function public.refuse_people_for_test()`,
+    );
+    try {
+      const commands = commandsOf([
+        { type: 'add-player', side: 'away', playerId: bad, jersey: '4', name: '' },
+        { type: 'lineup', side: 'home', playerIds: l.home },
+      ]);
+      const results = resultsOf(await l.send(commands));
+      expect(statusesOf(results)).toEqual(['refused', 'accepted']);
+      expect(results[0]).toMatchObject({ reason: { problem: 'not-saved' } });
+    } finally {
+      await pglite.query('drop trigger refuse_people_for_test on people');
+    }
+  });
+
+  it('takes off a player added by mistake to the bin, keeps one a play names, renames keeping the name before', async () => {
     const l = await leagueWithGame();
     const [mistake, starter] = [randomUUID(), randomUUID()];
     await l.send(
       commandsOf([
         { type: 'add-player', side: 'away', playerId: mistake, jersey: '7', name: '' },
-        { type: 'add-player', side: 'away', playerId: starter, jersey: '8', name: '' },
+        { type: 'add-player', side: 'away', playerId: starter, jersey: '8', name: 'Sam Lee' },
         { type: 'lineup', side: 'away', playerIds: [starter] },
       ]),
     );
@@ -325,18 +371,94 @@ describe('players at the scorer’s table on the database (record 058)', () => {
           { type: 'remove-player', side: 'away', playerId: mistake },
           { type: 'remove-player', side: 'away', playerId: starter },
           { type: 'remove-player', side: 'home', playerId: l.home[0] ?? '' },
+          { type: 'change-player', side: 'away', playerId: starter, name: 'Samir Lee' },
         ]),
       ),
     );
     expect(results.map((r) => (r.status === 'refused' ? r.reason.problem : r.status))).toEqual([
       'accepted',
       'has-plays',
-      'not-added-here',
+      'on-team-roster',
+      'accepted',
     ]);
     expect((await visitorsOf(l.awayTeamId)).map((r) => r.person_id)).toEqual([starter]);
-    expect(await pglite.query('select 1 from people where id = $1', [mistake])).toMatchObject({
-      rows: [],
+    // To the bin (T-45), not gone.
+    const binned = await pglite.query<{ deleted_at: Date | null }>(
+      'select deleted_at from people where id = $1',
+      [mistake],
+    );
+    expect(binned.rows[0]?.deleted_at).not.toBeNull();
+    const renamed = await pglite.query(
+      'select first_name, last_name, previous_first_name, previous_last_name from people where id = $1',
+      [starter],
+    );
+    expect(renamed.rows[0]).toEqual({
+      first_name: 'Samir',
+      last_name: 'Lee',
+      previous_first_name: 'Sam',
+      previous_last_name: 'Lee',
     });
+    const logged = await pglite.query<{ details: unknown }>(
+      `select details from activity_log where league_id = $1`,
+      [l.leagueId],
+    );
+    expect(JSON.stringify(logged.rows)).not.toMatch(/Sam/);
+    // Once an admin has reviewed the player, the table may not rename them.
+    await pglite.query('update roster_entries set needs_review = false where person_id = $1', [
+      starter,
+    ]);
+    const after = resultsOf(
+      await l.send(
+        commandsOf([{ type: 'change-player', side: 'away', playerId: starter, name: 'Someone' }]),
+      ),
+    );
+    expect(after[0]).toMatchObject({ reason: { problem: 'reviewed' } });
+  });
+
+  it('keeps a paper box score through a reopening, after only players were added at the table', async () => {
+    const l = await leagueWithGame();
+    await l.send(
+      commandsOf([
+        { type: 'add-player', side: 'away', playerId: randomUUID(), jersey: '4', name: '' },
+      ]),
+    );
+    const state = await pglite.query('select 1 from game_states where game_id = $1', [l.gameId]);
+    expect(state.rows).toEqual([]);
+    const version = async () =>
+      (
+        await pglite.query<{ version: number }>('select version from games where id = $1', [
+          l.gameId,
+        ])
+      ).rows[0]?.version ?? 0;
+    const lines = l.home.map((personId, n) => ({
+      teamId: l.homeTeamId,
+      personId,
+      played: true,
+      secondsPlayed: null,
+      stats: { points: n + 1 },
+    }));
+    const boxed = await setBoxScore(
+      l.as(l.scorekeeperId),
+      { gameId: l.gameId, version: await version(), homeScore: 15, awayScore: 0, lines },
+      deps,
+    );
+    expect(boxed).toMatchObject({ ok: true });
+    const reopened = await reopenGame(
+      l.as(l.ownerId),
+      { gameId: l.gameId, version: await version(), reason: 'The sheet had a wrong score' },
+      deps,
+    );
+    expect(reopened).toMatchObject({ ok: true });
+    const kept = await pglite.query<{ person_id: string; stats: Record<string, number> }>(
+      'select person_id, stats from player_game_stats where game_id = $1 order by person_id',
+      [l.gameId],
+    );
+    expect(kept.rows).toHaveLength(5);
+    expect(kept.rows.map((r) => r.stats.points).sort()).toEqual([1, 2, 3, 4, 5]);
+    const game = await pglite.query<{ status: string }>('select status from games where id = $1', [
+      l.gameId,
+    ]);
+    expect(game.rows[0]?.status).toBe('scheduled');
   });
 
   it('does not count changes of players as plays: the box score can still be entered', async () => {

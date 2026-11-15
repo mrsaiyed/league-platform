@@ -53,7 +53,7 @@ async function send(world: World, sessionId: string, commands: unknown[], game =
   return sent.answer;
 }
 
-const walkUp = (n: number) => `01900000-0000-7000-8000-0000000fa${String(n).padStart(3, '0')}`;
+const walkUp = (n: number) => `01900000-0000-4000-8000-0000000fa${String(n).padStart(3, '0')}`;
 
 describe('GET …/games/{game}/rosters', () => {
   it('gives both teams’ players in the page’s shape, staff-only ones included, never cached', async () => {
@@ -102,6 +102,8 @@ describe('GET …/games/{game}/rosters', () => {
         lastName: '',
         jerseyNumber: '12',
         left: false,
+        addedAtGameId: games.hawksBears,
+        toReview: true,
       },
       {
         teamId: body.awayTeamId,
@@ -110,6 +112,8 @@ describe('GET …/games/{game}/rosters', () => {
         lastName: 'Ali',
         jerseyNumber: null,
         left: false,
+        addedAtGameId: games.hawksBears,
+        toReview: true,
       },
     ]);
   });

@@ -17,7 +17,7 @@ import { createFakeServer, createManualClock } from './tracker-queue.test-helper
 import { createTrackerQueue } from './tracker-queue.ts';
 
 const gameId = games.hawksBears;
-const walkUp = (n: number) => `01900000-0000-7000-8000-0000000fb${String(n).padStart(3, '0')}`;
+const walkUp = (n: number) => `01900000-0000-4000-8000-0000000fb${String(n).padStart(3, '0')}`;
 let commandNumber = 0;
 const command = (input: TrackerCommand['input'] | TablePlayerInput): BatchCommand => {
   commandNumber += 1;
@@ -117,61 +117,77 @@ describe('the device’s queue and the players at the table (record 058)', () =>
     });
   });
 
-  it('sets aside a change of players the server turns away, keeping why and who wears the number', async () => {
+  it('sets aside a change refused, keeping why and who wears the number, never their name', async () => {
     const clock = createManualClock();
     const server = createFakeServer(clock);
+    const storage = createMemoryQueueStorage();
     const queue = createTrackerQueue({
       gameId,
-      storage: createMemoryQueueStorage(),
+      storage,
       transport: server.transport,
       clock,
       sessionId: () => '01900000-0000-7000-8000-0000000005e5',
       random: () => 1,
     });
     await queue.start();
-    const refused = command({
+    const added = command({
       type: 'add-player',
       side: 'away',
       playerId: walkUp(9),
       jersey: '5',
       name: '',
     });
+    const refused = command({
+      type: 'change-player',
+      side: 'away',
+      playerId: walkUp(8),
+      jersey: '5',
+    });
     const next = command({ type: 'start' });
+    const wornBy = { playerId: walkUp(1), jersey: '5', name: 'Jordan Ellis' };
     server.answerWith = {
       kind: 'reply',
       reply: {
         protocolVersion: 2,
-        sequence: 1,
+        sequence: 2,
         results: [
+          // S-44: taken, with a notice for the screen.
+          {
+            commandId: added.commandId,
+            status: 'accepted',
+            notice: { kind: 'jersey-also-worn', wornBy },
+          },
           {
             commandId: refused.commandId,
             status: 'refused',
             reason: {
               code: 'rule',
-              message: 'Number 5 is already worn by another player on this team.',
+              message: 'That number is already worn on this team, which wants unique numbers.',
               problem: 'jersey-taken',
-              wornBy: walkUp(1),
+              wornBy,
             },
           },
           { commandId: next.commandId, status: 'accepted' },
         ],
       },
     };
-    await queue.enqueue(refused);
-    await queue.enqueue(next);
+    for (const c of [added, refused, next]) await queue.enqueue(c);
     await queue.idle();
     expect(server.received[0]).toMatchObject({ protocolVersion: 2 });
     expect(queue.status().halted).toBeNull();
-    expect(queue.status().refused).toEqual([
-      {
-        command: refused,
-        refusal: {
-          code: 'rule',
-          message: 'Number 5 is already worn by another player on this team.',
-          problem: 'jersey-taken',
-          wornBy: walkUp(1),
-        },
-      },
+    const refusal = {
+      code: 'rule',
+      message: 'That number is already worn on this team, which wants unique numbers.',
+      problem: 'jersey-taken',
+      wornBy: { playerId: walkUp(1), jersey: '5' },
+    };
+    expect(queue.status().refused).toEqual([{ command: refused, refusal }]);
+    // The wearer's name is shown, never stored on the device (record 054).
+    expect(JSON.stringify(await storage.list(gameId))).not.toContain('Jordan');
+    expect(queue.status().notices).toEqual([
+      { command: added, notice: { kind: 'jersey-also-worn', wornBy } },
     ]);
+    queue.dismissNotices([added.commandId]);
+    expect(queue.status().notices).toEqual([]);
   });
 });

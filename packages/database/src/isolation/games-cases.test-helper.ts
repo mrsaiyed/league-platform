@@ -49,6 +49,7 @@ import {
   listPostponedGames,
   replaceGameLines,
   updateGameResult,
+  findLastEventSeq,
   findTablePlayer,
   insertTablePlayer,
   removeTablePlayer,
@@ -411,6 +412,12 @@ registerIsolationCase({
 });
 
 registerIsolationCase({
+  subject: findLastEventSeq,
+  name: "read the number of the target's final game's last event",
+  run: (scope, target) => findLastEventSeq(scope, target.gameId),
+});
+
+registerIsolationCase({
   subject: listTakenCommands,
   name: "ask which of the target's final game's commands it has taken",
   run: (scope, target) => listTakenCommands(scope, target.gameId, target.gameCommandIds),
@@ -565,6 +572,59 @@ registerIsolationCase({
   },
 });
 
+// The strongest takeover (review of step 2.117, item 10): the scope's account holds a
+// game of its own league (it takes it over from its member), then adds a player whose
+// device-made id is the target's person. It must be refused as taken, and the same
+// answer must come whether or not the target's rows are there, so nothing tells the
+// device that the id is anyone's: an id the platform made (not a random one) is
+// refused without looking (table-players.ts). In the target's own league the takeover
+// reaches it.
+registerIsolationCase({
+  subject: applyTrackerCommands,
+  name: "add a player at the scope's own table whose id is the target's person",
+  run: async (scope, target) => {
+    const own = await transactionOf(scope)
+      .selectFrom('scoring_sessions')
+      .select('game_id')
+      .where('league_id', '=', scope.leagueId)
+      .limit(1)
+      .executeTakeFirst();
+    const gameId = own?.game_id ?? randomUUID();
+    const holder = own === undefined ? undefined : await findScoringSession(scope, gameId);
+    const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
+      gameId,
+      deviceId: 'harness-device',
+      confirmed: true,
+      expectedHolderSince: holder?.since ?? 0,
+    }).catch((thrown: unknown) => {
+      if (thrown instanceof CommandRefused) return undefined;
+      throw thrown;
+    });
+    const reply = taken?.value as { status?: string; sessionId?: string } | undefined;
+    return runAsApp(applyTrackerCommands, harnessTx, scope, {
+      gameId,
+      protocolVersion: 2,
+      sessionId: reply?.sessionId ?? randomUUID(),
+      commands: [
+        {
+          commandId: harnessCommandIds[0],
+          at: harnessNow - 1000,
+          input: {
+            type: 'add-player',
+            side: 'away',
+            playerId: target.personId,
+            jersey: '9',
+            name: '',
+          },
+        },
+      ],
+    }).catch((thrown: unknown) => {
+      if (thrown instanceof CommandRefused) return 'refused';
+      throw thrown;
+    });
+  },
+});
+
 // The table players' queries (record 058). A write that makes a new row uses a game
 // and its home team of the scope's own league, so a refusal never names the target's
 // ids; with none in sight it uses ids that are nowhere.
@@ -576,6 +636,17 @@ async function ownGameAndTeam(scope: LeagueScope) {
     .limit(1)
     .executeTakeFirst();
   return { gameId: row?.id ?? randomUUID(), teamId: row?.home_team_id ?? randomUUID() };
+}
+
+/** The target's walk-up's person, as the scope's fence lets it be read: in another league, none. */
+async function walkUpPersonOf(scope: LeagueScope, target: LeagueRecords) {
+  const entry = await transactionOf(scope)
+    .selectFrom('roster_entries')
+    .select('person_id')
+    .where('league_id', '=', scope.leagueId)
+    .where('id', '=', target.walkUpRosterEntryId)
+    .executeTakeFirst();
+  return entry?.person_id;
 }
 
 registerIsolationCase({
@@ -609,23 +680,27 @@ registerIsolationCase({
 
 registerIsolationCase({
   subject: renameTablePlayer,
-  name: "rename the target's player",
-  run: (scope, target) => renameTablePlayer(scope, target.personId, 'Renamed', 'Elsewhere'),
+  name: "rename the target's walk-up player",
+  run: async (scope, target) =>
+    renameTablePlayer(
+      scope,
+      target.walkUpRosterEntryId,
+      (await walkUpPersonOf(scope, target)) ?? randomUUID(),
+      'Renamed',
+      'Elsewhere',
+    ),
 });
 
 registerIsolationCase({
   subject: removeTablePlayer,
   name: "take the target's walk-up player off its team",
-  run: async (scope, target) => {
-    // The walk-up's person, as the scope's fence lets it be read: in another league, none.
-    const entry = await transactionOf(scope)
-      .selectFrom('roster_entries')
-      .select('person_id')
-      .where('league_id', '=', scope.leagueId)
-      .where('id', '=', target.walkUpRosterEntryId)
-      .executeTakeFirst();
-    return removeTablePlayer(scope, target.walkUpRosterEntryId, entry?.person_id ?? randomUUID());
-  },
+  run: async (scope, target) =>
+    removeTablePlayer(
+      scope,
+      target.walkUpRosterEntryId,
+      (await walkUpPersonOf(scope, target)) ?? randomUUID(),
+      target.upcomingGameId,
+    ),
 });
 
 // The engine's state for the scorekeeper's device (record 049, T-253): the target's

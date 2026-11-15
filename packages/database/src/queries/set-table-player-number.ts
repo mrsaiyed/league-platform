@@ -1,7 +1,7 @@
 // Gives a roster entry of the scope's league a new number, or none, at the scorer's
 // table (record 058, S-37). Where the season wants unique numbers the database refuses
-// one someone on the team wears (0008); run in a savepoint (in-savepoint.ts), so that
-// refusal leaves the batch's transaction usable.
+// one someone on the team wears (0008, 0015); run in a savepoint (in-savepoint.ts), so
+// that refusal, or any other, leaves the batch's transaction usable.
 import type { TablePlayerRefusal } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { constraintOf } from './constraint-of.ts';
@@ -24,6 +24,7 @@ export async function setTablePlayerNumber(
     });
   } catch (error) {
     if (constraintOf(error)?.constraint === 'roster_entries_unique_jersey') return 'jersey-taken';
-    throw error;
+    // Any other refusal is this change's alone, never the batch's (record 058).
+    return 'failed';
   }
 }
