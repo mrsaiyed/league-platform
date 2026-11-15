@@ -232,7 +232,24 @@ const adminPages = [
   ]),
   { name: 'admin-teams', at: '/admin/teams' },
   { name: 'admin-team', at: '/admin/teams', first: '/admin/teams/' },
+  // Step 2.161, in the first made-up league, by the owner's own taps (undoSteps): a leaving
+  // date of next year refused beside its field, with the date kept; the Falcons' page,
+  // whose "Left the team" line has its put-back button and whose bin says how many people
+  // are on the roster, ticked and ready to confirm; and a game removed from the schedule
+  // draft, answered "Removed: … Put it back".
+  ...['team-leaving-refused', 'team-left-and-bin'].map((step) => ({
+    name: `admin-${step}`,
+    at: '/admin/teams',
+    league: 'north-valley',
+    steps: (page) => undoSteps(page, step),
+  })),
   { name: 'admin-schedule', at: '/admin/schedule' },
+  {
+    name: 'admin-schedule-game-removed',
+    at: '/admin/schedule',
+    league: 'north-valley',
+    steps: (page) => undoSteps(page, 'schedule-game-removed'),
+  },
   // Step 2.160, in the first made-up league's season that is not public yet (only it has
   // one), each also in the second league's light look: the empty season with its form;
   // "Saved" after adding a round; the moved game's question; a game outside its round with
@@ -490,6 +507,37 @@ async function scoreTrackedGames(origin) {
  * 2.160), from the season as the seed has it: any draft is discarded first, so each
  * picture, at each width, starts from no rounds. Nothing is published.
  */
+/** The owner's taps for step 2.161's pictures (see adminPages). Scripts are off. */
+async function undoSteps(page, what) {
+  const tapTo = async (locator, url) => {
+    await Promise.all([page.waitForEvent('load'), locator.click()]);
+    if (!url.test(page.url())) throw new Error(`a step landed on ${page.url()}, not ${url}`);
+  };
+  if (what === 'schedule-game-removed') {
+    const game = page
+      .locator('li[data-game]', { has: page.locator('summary', { hasText: 'Edit this game' }) })
+      .first();
+    await game.locator('summary', { hasText: 'Edit this game' }).click();
+    await tapTo(game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+    return;
+  }
+  await tapTo(
+    page.locator('main').getByRole('link', { name: 'Falcons', exact: true }),
+    /\/admin\/teams\//,
+  );
+  if (what === 'team-leaving-refused') {
+    const line = page.locator('main ol > li', { hasText: 'Marcus Oyelaran' });
+    await line.locator('input[name=leftOn]').fill(`${new Date().getFullYear() + 1}-06-01`);
+    await tapTo(line.getByRole('button', { name: 'Mark as left' }), /problem=/);
+    return;
+  }
+  // The seed's Falcons already have a player who left; the bin's box is ticked, not sent.
+  await page
+    .locator('section', { has: page.getByRole('heading', { name: 'Remove this team' }) })
+    .locator('input[name=confirm]')
+    .check();
+}
+
 async function roundSteps(page, steps) {
   // Scripts are off in this page (the grid is plain forms): each tap loads a whole page.
   const tapTo = async (locator, url) => {
