@@ -326,19 +326,21 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
   };
   const accessOf = accessOfVia(deps);
+  const scheduled = {
+    adultLeagueId: standInLeagues.live.id,
+    youthLeagueId: standInLeagues.other.id,
+  };
+  // Who plays in each made-up league, read by every page that shows a name (R-15) and by
+  // the settings whose start depends on it (record 065).
+  const audienceOf = standInAudienceOf(scheduled);
   // The League settings screen's settings: the public pages read how names show from them.
   // There is exactly one: a second copy would keep the admin's saved setting from the pages.
   const adminSettings = standInAdminSettings({
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
+    audienceOf,
   });
   const namePolicy = namePolicyOf(adminSettings.deps);
-  const scheduled = {
-    adultLeagueId: standInLeagues.live.id,
-    youthLeagueId: standInLeagues.other.id,
-  };
-  // Who plays in each made-up league, read by every page that shows a name (R-15).
-  const audienceOf = standInAudienceOf(scheduled);
   const games = standInGames({
     namesShownOf: namesShownOf(namePolicy, audienceOf),
     leagueId: standInLeagues.live.id,

@@ -13,7 +13,7 @@ import {
   standingsStores,
   type StandingsData,
 } from '../../command/testing/memory-standings-stores.ts';
-import type { SeasonStatus } from './league-values.ts';
+import type { Audience, SeasonStatus } from './league-values.ts';
 import type { DivisionRecord, LeagueRecord, LeaguesTx, NewLeague, SettingPlace } from './ports.ts';
 
 export type MemoryLeagues = {
@@ -52,6 +52,8 @@ export type MemoryLeagues = {
     document: { version: number; value: unknown };
     version: number;
   }[];
+  /** Who plays in the league (record 065); youth unless a test says otherwise. */
+  audience: Audience;
   activity: ActivityEntry[];
   /** The season's teams, results, adjustments and saved standings (the standings module's). */
   standing: Omit<StandingsData, 'seasons'>;
@@ -98,6 +100,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
     divisionsWithTeams: [],
     grants: [],
     settings: [],
+    audience: 'youth',
     activity: [],
     standing: {
       teams: [],
@@ -189,6 +192,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           s.league = { ...s.league, name, version: next };
           return next;
         },
+        leagueAudience: async () => s.audience,
         isPlatformStaff: async () => accountId !== null && s.staff.includes(accountId),
         createLeague: async (league) => {
           if (s.league !== undefined) return 'league-exists';

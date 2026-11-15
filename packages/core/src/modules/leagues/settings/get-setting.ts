@@ -4,6 +4,7 @@
 import type { LeaguesTx } from '../ports.ts';
 import type { Setting } from './define-setting.ts';
 import { lookupSetting, type SettingValue } from './lookup-setting.ts';
+import { audienceFor } from './place.ts';
 
 export async function getSetting<Value>(
   tx: LeaguesTx,
@@ -18,5 +19,5 @@ export async function getSetting<Value>(
     ...(programId === undefined ? {} : { programId }),
     ...(place.seasonId === undefined ? {} : { seasonId: place.seasonId }),
   });
-  return lookupSetting(setting, rows);
+  return lookupSetting(setting, rows, await audienceFor(tx, setting));
 }

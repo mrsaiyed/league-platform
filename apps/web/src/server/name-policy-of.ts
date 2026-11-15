@@ -3,6 +3,7 @@
 // League settings → Privacy into the display policy the public pages, the live messages
 // and the statistics hand to the one name function. Reads run as no one (a public page
 // has no permission to check) on the settings' own transaction, bound to one league.
+// The league's start depends on who plays in it (record 065), so the audience is given.
 import {
   readNamePolicy,
   type Audience,
@@ -11,8 +12,8 @@ import {
   type NamePolicy,
 } from '@srleagues/core';
 
-/** Gives the league's display policy, by league id. */
-export type NamePolicyOf = (leagueId: string) => Promise<NamePolicy>;
+/** Gives the league's display policy, by league id and who plays in it. */
+export type NamePolicyOf = (leagueId: string, audience: Audience) => Promise<NamePolicy>;
 
 /** Who plays in a league (adult, youth or mixed), or undefined where it is not known. */
 export type AudienceOf = (leagueId: string) => Audience | undefined;
@@ -22,24 +23,24 @@ export type NamesShown = { readonly audience: Audience; readonly policy: NamePol
 export type NamesShownOf = (leagueId: string) => Promise<NamesShown>;
 
 export function namePolicyOf(deps: CommandDeps<LeaguesTx>): NamePolicyOf {
-  return (leagueId) =>
+  return (leagueId, audience) =>
     deps.transaction({ leagueId, accountId: null, requestId: 'name-policy' }, (tx) =>
-      readNamePolicy(tx.leagues),
+      readNamePolicy(tx.leagues, audience),
     );
 }
 
-/** The policy of a league that has set nothing: our starting values (R-14, R-15). */
-export const startingNamePolicy: NamePolicyOf = () =>
-  readNamePolicy({ settingRows: async () => [] });
+/** The policy of a league that has set nothing: our starting values (R-14, R-15, R-29). */
+export const startingNamePolicy: NamePolicyOf = (_leagueId, audience) =>
+  readNamePolicy({ settingRows: async () => [] }, audience);
 
 /**
  * A league's audience and policy together. A league whose audience is not known counts
- * as youth, so a person of unknown age in it is shown as a child (R-15): the careful
- * reading, never the adult one.
+ * as youth, so a person of unknown age in it is shown as a child (R-15) and the league
+ * starts on first name and last initial: the careful reading, never the adult one.
  */
 export function namesShownOf(policyOf: NamePolicyOf, audienceOf: AudienceOf): NamesShownOf {
-  return async (leagueId) => ({
-    audience: audienceOf(leagueId) ?? 'youth',
-    policy: await policyOf(leagueId),
-  });
+  return async (leagueId) => {
+    const audience = audienceOf(leagueId) ?? 'youth';
+    return { audience, policy: await policyOf(leagueId, audience) };
+  };
 }

@@ -86,6 +86,12 @@ export type LeaguesStore = {
   readonly currentLeague: () => Promise<LeagueRecord | undefined>;
   /** Sets its name if it is still at `version` (T-46): the new version, or undefined. */
   readonly setName: (name: string, version: number) => Promise<number | undefined>;
+  /**
+   * Who plays in the league (adult, youth or mixed), for a setting whose starting value
+   * depends on it (record 065). A league whose audience cannot be read is youth: the
+   * careful reading, as the people module's own (PeopleStore.leagueAudience).
+   */
+  readonly leagueAudience: () => Promise<Audience>;
   /** Whether the acting account is one of our own staff (named in the app settings; not a league role). */
   readonly isPlatformStaff: () => Promise<boolean>;
   /** Creates the transaction's league and its default program together. */

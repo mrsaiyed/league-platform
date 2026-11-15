@@ -2,7 +2,7 @@
 // scoreboard, latest play and players, a staff-only team's names nowhere (S-22, T-87), a
 // finished game's box scores, and "corrected" with the date and never the reason (S-7).
 import {
-  defaultNamePolicy,
+  adultStartNamePolicy,
   publicViewer,
   readGamePage,
   readGameSnapshot,
@@ -44,7 +44,8 @@ const viewing = {
   leagueId: liveLeagueId,
   viewer: publicViewer(liveLeagueId),
   audience: 'adult' as const,
-  policy: defaultNamePolicy,
+  // The adult league on its start (record 065).
+  policy: adultStartNamePolicy,
 };
 
 async function scoreHawksBears(world: ReturnType<typeof trackerWorld>) {

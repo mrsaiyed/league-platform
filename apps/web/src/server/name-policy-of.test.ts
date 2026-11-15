@@ -5,6 +5,8 @@
 // surface, is names-through-ports.test.ts; across every surface and every person's
 // request, core's modules/name-policy-scan.test.ts.
 import {
+  adultStartNamePolicy,
+  defaultNamePolicy,
   findPrivateFields,
   privateValuesOf,
   publicViewer,
@@ -15,7 +17,12 @@ import {
 import { describe, expect, it } from 'vitest';
 import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
-import { standInPublicStats, youthTeams } from './stand-in-public-stats.ts';
+import {
+  adultTeams,
+  standInAudienceOf,
+  standInPublicStats,
+  youthTeams,
+} from './stand-in-public-stats.ts';
 import { standInPublicTeams } from './stand-in-public-teams.ts';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -46,8 +53,12 @@ const as = (accountId: string, leagueId = youth): CommandContext => ({
 });
 
 function made() {
-  const settings = standInAdminSettings({ accessOf: () => access, log: () => undefined });
   const ids = { adultLeagueId: adult, youthLeagueId: youth };
+  const settings = standInAdminSettings({
+    accessOf: () => access,
+    log: () => undefined,
+    audienceOf: standInAudienceOf(ids),
+  });
   const stats = standInPublicStats(ids, namePolicyOf(settings.deps));
   const teams = standInPublicTeams(ids, ownerId);
   const rockets = youthTeams.find((t) => t.slug === 'rockets')?.id ?? '';
@@ -56,9 +67,19 @@ function made() {
     const roster = await teams.rosterOf(youth, rockets, { viewer: publicViewer(youth), policy });
     return roster.lines;
   };
-  const set = (key: string, value: unknown, extra: Record<string, unknown> = {}, who = ownerId) =>
-    setSetting(as(who), { level: 'league', key, value, version: null, ...extra }, settings.deps);
-  return { stats, rosterNames, set };
+  const set = (
+    key: string,
+    value: unknown,
+    extra: Record<string, unknown> = {},
+    who = ownerId,
+    leagueId = youth,
+  ) =>
+    setSetting(
+      as(who, leagueId),
+      { level: 'league', key, value, version: null, ...extra },
+      settings.deps,
+    );
+  return { stats, rosterNames, set, teams };
 }
 
 const texts = (lines: readonly { readonly name: { shown: boolean } }[]) =>
@@ -76,8 +97,39 @@ describe("the league's privacy settings on its public pages (T-81)", () => {
       ok: true,
     });
     expect(texts(await rosterNames())).toEqual(['Noor Haddad', 'Jay Whitaker', 'Tess Moreno']);
-    // Each league has its own settings: the adult league is untouched.
-    expect((await stats.settingsOf(adult)).namePolicy.children).toBe('first_name_last_initial');
+    // Each league has its own settings: the adult league is untouched, on its start.
+    expect((await stats.settingsOf(adult)).namePolicy).toEqual(adultStartNamePolicy);
+  });
+
+  it("follows an adult league's choice of less for its adults, and full names with no confirmation (R-29)", async () => {
+    const { stats, set, teams } = made();
+    const falcons = adultTeams.find((t) => t.slug === 'falcons')?.id ?? '';
+    const adultRoster = async () => {
+      const policy = (await stats.settingsOf(adult)).namePolicy;
+      const roster = await teams.rosterOf(adult, falcons, { viewer: publicViewer(adult), policy });
+      return texts(roster.lines);
+    };
+    const names = (value: string, version: number | null) =>
+      set('privacy.publicNames', value, { version }, ownerId, adult);
+    // Rosa Delgado is the coach, with no number.
+    expect(await adultRoster()).toEqual([
+      'Dana Whitfield',
+      'Marcus Oyelaran',
+      null,
+      'Rosa Delgado',
+      'Pat Gorski',
+    ]);
+    expect(await names('hidden', null)).toMatchObject({ ok: true });
+    expect(await adultRoster()).toEqual([null, null, null, null, null]);
+    expect(await names('firstNameLastInitial', 1)).toMatchObject({ ok: true });
+    expect(await adultRoster()).toEqual(['Dana W.', 'Marcus O.', null, 'Rosa D.', 'Pat G.']);
+    // Full names again: no confirmation asked, and the league is back on its start.
+    expect(await names('fullName', 2)).toEqual({
+      ok: true,
+      value: { key: 'privacy.publicNames', version: null },
+    });
+    expect((await adultRoster())[0]).toBe('Dana Whitfield');
+    expect((await stats.settingsOf(adult)).namePolicy).toEqual(adultStartNamePolicy);
   });
 
   it('lets no scorekeeper change either setting', async () => {
@@ -139,9 +191,8 @@ describe('namesShownOf', () => {
     );
     expect((await names(adult)).audience).toBe('adult');
     expect((await names(youth)).audience).toBe('youth');
-    expect((await names(youth)).policy).toEqual({
-      children: 'first_name_last_initial',
-      playersMayAskForInitials: false,
-    });
+    expect((await names(youth)).policy).toEqual(defaultNamePolicy);
+    // An adult league starts on full names, not confirmed for children (record 065).
+    expect((await names(adult)).policy).toEqual(adultStartNamePolicy);
   });
 });

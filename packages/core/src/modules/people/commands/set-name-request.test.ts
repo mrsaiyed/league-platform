@@ -216,7 +216,8 @@ describe('a recorded request keeps taking effect (R-27)', () => {
       },
       {
         audience,
-        policy: { children: 'first_name_last_initial', playersMayAskForInitials },
+        // An adult league on its start: full names, not confirmed for children (record 065).
+        policy: { names: 'full_name', childrenInFull: false, playersMayAskForInitials },
         viewer: publicViewer('L1'),
         statsOf: null,
       },

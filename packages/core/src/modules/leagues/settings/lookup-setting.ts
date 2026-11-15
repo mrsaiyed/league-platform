@@ -1,8 +1,10 @@
 // The value of a setting at a place: most specific first, season, then program, then
-// league, then our default (T5 §6). A stored value that no longer passes the
+// league, then our default (T5 §6), which for some settings depends on who plays in the
+// league (record 065). A stored value that no longer passes the
 // declaration (a limit tightened, a level it is no longer set at) is ignored, so the
 // lookup falls to the next level and never returns something the schema refuses.
-import type { Setting, SettingLevel } from './define-setting.ts';
+import type { Audience } from '../league-values.ts';
+import { startingValue, type Setting, type SettingLevel } from './define-setting.ts';
 
 /** A row of setting_values as storage hands it over: the level and the stored document. */
 export type StoredSetting = { readonly level: SettingLevel; readonly document: unknown };
@@ -35,9 +37,14 @@ function valueOf<Value>(setting: Setting<Value>, document: unknown): Value | und
   return parsed.success ? parsed.data : undefined;
 }
 
+/**
+ * `audience` is who plays in the league, for a setting whose start depends on it
+ * (`startsAs`, record 065); left out, the lookup falls to the declared default.
+ */
 export function lookupSetting<Value>(
   setting: Setting<Value>,
   stored: readonly StoredSetting[],
+  audience?: Audience,
 ): SettingValue<Value> {
   for (const level of mostSpecificFirst) {
     if (!setting.levels.includes(level)) continue;
@@ -47,7 +54,7 @@ export function lookupSetting<Value>(
       if (value !== undefined) return { value, source: level };
     }
   }
-  return { value: setting.default, source: 'default' };
+  return { value: startingValue(setting, audience), source: 'default' };
 }
 
 /** The document a value is stored as (record 019). */

@@ -314,6 +314,89 @@ describe('the names setting in an archived or suspended league (R-26)', () => {
   );
 });
 
+describe('a setting whose start depends on who plays in the league (record 065)', () => {
+  const key = 'privacy.publicNames';
+  const at = (value: unknown, version: number | null, confirmed?: boolean) => ({
+    level: 'league',
+    key,
+    value,
+    version,
+    ...(confirmed === undefined ? {} : { confirmed }),
+  });
+  const stored = (m: ReturnType<typeof setUp>) =>
+    m.db.state.settings.filter((s) => s.key === key).map((s) => s.document.value);
+
+  it("saves an adult league's full names with no confirmation, as its start, kept as no value", async () => {
+    const m = setUp();
+    m.db.state.audience = 'adult';
+    m.db.state.league = { ...m.db.state.league!, status: 'live' };
+    const owner = m.as(ownerId);
+    // Hidden, then first name and last initial: stored, no confirmation asked.
+    expect(await setSetting(owner, at('hidden', null), m.deps)).toEqual({
+      ok: true,
+      value: { key, version: 1 },
+    });
+    expect(await setSetting(owner, at('firstNameLastInitial', 1), m.deps)).toMatchObject({
+      ok: true,
+    });
+    // Full names again, not confirmed: the league is back on its start, nothing stored.
+    expect(await setSetting(owner, at('fullName', 2), m.deps)).toEqual({
+      ok: true,
+      value: { key, version: null },
+    });
+    expect(stored(m)).toEqual([]);
+    expect(m.db.state.activity.map((a) => a.action)).toEqual([
+      'leagues.set_setting',
+      'leagues.set_setting',
+      'leagues.set_setting',
+    ]);
+    expect(m.db.state.activity[2]?.details).not.toHaveProperty('confirmed');
+    // Saving the start again while on it changes nothing and still answers saved.
+    expect(await setSetting(owner, at('fullName', null), m.deps)).toMatchObject({ ok: true });
+    // Saving it from a version that is no longer there is refused, as any stale save is.
+    expect(await setSetting(owner, at('fullName', 1), m.deps)).toEqual({
+      ok: false,
+      error: { code: 'changed-since-read' },
+    });
+    // A confirmed full names is stored, as anywhere: it lets a child be shown in full.
+    expect(await setSetting(owner, at('fullName', null, true), m.deps)).toEqual({
+      ok: true,
+      value: { key, version: 1 },
+    });
+    expect(stored(m)).toEqual(['fullName']);
+    expect(m.db.state.activity.at(-1)?.details).toMatchObject({ confirmed: true });
+  });
+
+  it('still asks a youth or mixed league to confirm full names (R-14)', async () => {
+    for (const audience of ['youth', 'mixed'] as const) {
+      const m = setUp();
+      m.db.state.audience = audience;
+      expect(await setSetting(m.as(ownerId), at('fullName', null), m.deps), audience).toEqual({
+        ok: false,
+        error: { code: 'confirmation-needed' },
+      });
+      expect(stored(m)).toEqual([]);
+    }
+  });
+
+  it('refuses the way back to an adult start that would show more while archived (R-26)', async () => {
+    const m = setUp();
+    m.db.state.audience = 'adult';
+    expect(await setSetting(m.as(ownerId), at('hidden', null), m.deps)).toMatchObject({
+      ok: true,
+    });
+    m.db.state.league = { ...m.db.state.league!, status: 'archived' };
+    expect(await setSetting(m.as(ownerId), at('fullName', 1), m.deps)).toMatchObject({
+      ok: false,
+      error: { code: 'not-allowed' },
+    });
+    expect(
+      await clearSetting(m.as(ownerId), { level: 'league', key, version: 1 }, m.deps),
+    ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+    expect(stored(m)).toEqual(['hidden']);
+  });
+});
+
 describe('program admins and the activity log', () => {
   const programAdmin = '01900000-0000-7000-8000-0000000000a4';
   const adminOf = (id: string) => ({

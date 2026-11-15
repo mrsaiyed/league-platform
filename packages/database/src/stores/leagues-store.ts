@@ -7,6 +7,7 @@ import {
   deleteSettingValue,
   findSeason,
   findCurrentLeague,
+  findLeagueAudience,
   findProgramId,
   findSeasonProgramId,
   insertLeague,
@@ -36,6 +37,7 @@ export function leaguesStore(
   return {
     currentLeague: () => findCurrentLeague(scope),
     setName: (name, version) => updateLeagueName(scope, name, version),
+    leagueAudience: () => findLeagueAudience(scope),
     isPlatformStaff: async () =>
       scope.accountId !== null && platformStaff.includes(scope.accountId),
     createLeague: (league) => insertLeague(scope, league),

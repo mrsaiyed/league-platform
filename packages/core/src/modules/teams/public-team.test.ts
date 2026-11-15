@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  defaultNamePolicy,
+  adultStartNamePolicy,
   findPrivateFields,
   privateValuesOf,
   publicViewer,
 } from '../people/index.ts';
 import { publicRosterLine, publicTeam, type RosterLineSource } from './public-team.ts';
 
-const display = { viewer: publicViewer('L1'), policy: defaultNamePolicy };
+// An adult league on its start (record 065): adults in full, children with care.
+const display = { viewer: publicViewer('L1'), policy: adultStartNamePolicy };
 const source = (extra: Partial<RosterLineSource> = {}): RosterLineSource => ({
   entryId: 'e1',
   jerseyNumber: '7',

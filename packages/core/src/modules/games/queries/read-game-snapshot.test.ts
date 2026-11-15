@@ -2,7 +2,7 @@ import { GameSnapshot, LiveMessage, seasonRulesPreset } from '@srleagues/contrac
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import {
-  defaultNamePolicy,
+  adultStartNamePolicy,
   findPrivateFields,
   privateValuesOf,
   publicViewer,
@@ -107,7 +107,8 @@ const viewing = (viewer: Viewer): GameViewing => ({
   leagueId,
   viewer,
   audience: 'adult',
-  policy: defaultNamePolicy,
+  // An adult league on its start (record 065).
+  policy: adultStartNamePolicy,
 });
 const visitor = viewing(publicViewer(leagueId));
 

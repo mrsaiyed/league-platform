@@ -4,12 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { isPermission, roleHasPermission, roles } from '../../access/index.ts';
 import { declaredSettings } from './declarations.ts';
 import {
+  confirmedValuesFor,
   defineSetting,
   hasLimits,
   needsConfirming,
   settingRegistry,
   SettingDeclarationError,
   showsLess,
+  startingValue,
 } from './define-setting.ts';
 
 const good = {
@@ -128,6 +130,19 @@ describe('defineSetting', () => {
     expect(() => declare({ confirm: 72 })).toThrow(/confirm/);
   });
 
+  it('keeps starting values by audience, and refuses ones that are not (record 065)', () => {
+    expect(defineSetting(good).startsAs).toEqual({});
+    expect(startingValue(defineSetting(good), 'adult')).toBe(24);
+    const byAudience = declare({ startsAs: { adult: 48 } });
+    expect(startingValue(byAudience, 'adult')).toBe(48);
+    expect(startingValue(byAudience, 'youth')).toBe(24);
+    expect(startingValue(byAudience)).toBe(24);
+    expect(() => declare({ startsAs: { adult: 100 } })).toThrow(/starting values/);
+    expect(() => declare({ startsAs: { seniors: 48 } })).toThrow(/starting values/);
+    expect(() => declare({ startsAs: [48] })).toThrow(/starting values/);
+    expect(() => declare({ startsAs: 48 })).toThrow(/starting values/);
+  });
+
   it('refuses the same key twice in one list', () => {
     const one = defineSetting(good);
     expect(() => settingRegistry([one, one])).toThrow(/twice/);
@@ -209,6 +224,26 @@ describe('the settings stage 2 declares', () => {
     expect(names !== undefined && needsConfirming(names, 'firstNameLastInitial')).toBe(false);
     expect(names !== undefined && needsConfirming(names, 'hidden')).toBe(false);
     expect(names?.type.safeParse('everything').success).toBe(false);
+  });
+
+  it('start an adult league on full names and any other on first name and last initial (R-29)', () => {
+    const names = declaredSettings.get('privacy.publicNames');
+    if (names === undefined) throw new Error('expected the setting');
+    expect(startingValue(names, 'adult')).toBe('fullName');
+    expect(startingValue(names, 'youth')).toBe('firstNameLastInitial');
+    expect(startingValue(names, 'mixed')).toBe('firstNameLastInitial');
+    expect(startingValue(names)).toBe('firstNameLastInitial');
+    // Only a league that does not start on full names is asked to confirm them (record 065).
+    expect(confirmedValuesFor(names, 'adult')).toEqual([]);
+    expect(confirmedValuesFor(names, 'youth')).toEqual(['fullName']);
+    expect(confirmedValuesFor(names, 'mixed')).toEqual(['fullName']);
+    // Every other setting starts at its default, whoever plays.
+    for (const setting of declaredSettings.all()) {
+      if (setting.key === names.key) continue;
+      for (const audience of ['adult', 'youth', 'mixed'] as const) {
+        expect(startingValue(setting, audience), setting.key).toEqual(setting.default);
+      }
+    }
   });
 
   it('offer three choices for names, and know which way shows less (R-24, R-26)', () => {

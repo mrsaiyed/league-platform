@@ -9,7 +9,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { seasonRulesPreset, type BatchCommand, type CommandResult } from '@srleagues/contracts';
 import {
   applyTrackerCommands,
-  defaultNamePolicy,
+  adultStartNamePolicy,
   publicViewer,
   readGamePage,
   readGameSnapshot,
@@ -236,13 +236,14 @@ describe('players at the scorer’s table on the database (record 058)', () => {
       leagueId: l.leagueId,
       viewer: publicViewer(l.leagueId),
       audience: 'adult' as const,
-      policy: defaultNamePolicy,
+      // An adult league on its start (record 065).
+      policy: adultStartNamePolicy,
     };
     const seen = await withTransaction(db, { leagueId: l.leagueId }, async (scope) => ({
       page: await readGamePage(gamesReadStore(scope), { gameId: l.gameId }, viewing),
       snapshot: await readGameSnapshot(gamesReadStore(scope), { gameId: l.gameId }, viewing, 1),
       roster: await listPublicRoster(scope, l.awayTeamId, {
-        policy: defaultNamePolicy,
+        policy: adultStartNamePolicy,
         viewer: viewing.viewer,
       }),
     }));

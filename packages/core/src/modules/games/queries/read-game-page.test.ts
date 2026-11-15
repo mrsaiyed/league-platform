@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultNamePolicy, publicViewer, type Viewer } from '../../people/index.ts';
+import { adultStartNamePolicy, publicViewer, type Viewer } from '../../people/index.ts';
 import type { GamesReadStore } from '../read-ports.ts';
 import { readGamePage, type GameViewing } from './read-game-page.ts';
 
@@ -80,7 +80,8 @@ const viewing = (viewer: Viewer): GameViewing => ({
   leagueId,
   viewer,
   audience: 'adult',
-  policy: defaultNamePolicy,
+  // An adult league on its start (record 065).
+  policy: adultStartNamePolicy,
 });
 
 describe('readGamePage', () => {

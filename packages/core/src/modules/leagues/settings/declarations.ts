@@ -10,9 +10,11 @@
 //   - the statistics level a new team starts with (S-22; S-23, the founder: everyone
 //     can see its players' statistics), and whether teams may choose their own (S-24:
 //     yes, the league can switch it off);
-//   - how names show on public pages (R-14, R-24: full names, first name and last
-//     initial, which every league starts with, or hidden; switching to full names asks
-//     the admin to confirm the league has the permission it needs), and whether an
+//   - how names show on public pages (R-24, R-29: full names, which an adult league
+//     starts with, first name and last initial, which a youth or mixed league starts
+//     with, or hidden, followed for every player; switching to full names asks the
+//     admin to confirm the league has the permission it needs, except where full names
+//     is the league's own start, record 065), and whether an
 //     adult may ask to appear as initials (R-15: off to start; R-25: a child always
 //     may). The people module reads both (readNamePolicy, T-81).
 import { z } from 'zod';
@@ -93,11 +95,14 @@ export const teamsMayChooseStatsLevel = defineSetting({
 });
 
 /**
- * How children's names show on public pages (R-14, R-24, T-81): full names, first name
- * and last initial (the start), or hidden (by jersey number only). Adults are shown by
- * full name unless they ask otherwise (R-15). A person whose age the league does not
- * know counts as a child in a youth or mixed league. A child's own request for less
- * (initials, or removed) always wins over this (R-25).
+ * How every player's name shows on public pages (R-24, R-29, T-81): full names, first
+ * name and last initial, or hidden (by jersey number only). An adult league starts on
+ * full names (R-15) and a youth or mixed league, or one whose audience is not known, on
+ * first name and last initial (R-14); record 065. Full names show a child in full only
+ * once the admin has confirmed the league has the permission it needs (R-14): an
+ * adult league's start was never confirmed, so its children are shown by first name
+ * and last initial. A person whose age the league does not know counts as a child in a
+ * youth or mixed league. A person's own recorded request for less always wins (R-25, R-27).
  */
 export const publicNamesChoices = ['fullName', 'firstNameLastInitial', 'hidden'] as const;
 
@@ -105,6 +110,7 @@ export const publicNames = defineSetting({
   key: 'privacy.publicNames',
   type: z.enum(publicNamesChoices),
   default: 'firstNameLastInitial',
+  startsAs: { adult: 'fullName' },
   levels: ['league'],
   permission: 'league.settings',
   label: 'setting.privacy.publicNames.label',

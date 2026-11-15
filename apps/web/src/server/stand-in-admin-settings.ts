@@ -12,6 +12,7 @@ import {
   leagueStatuses,
   type AccessReader,
   type ActivityEntry,
+  type Audience,
   type CommandDeps,
   type DivisionsStore,
   type LeaguesStore,
@@ -33,6 +34,11 @@ export type StandInAdminSettingsOptions = {
   readonly accessOf: (leagueId: string) => AccessReader;
   /** Where the commands' T-196 lines go. */
   readonly log: CommandDeps<LeaguesTx>['log'];
+  /**
+   * Who plays in each made-up league (standInAudienceOf), for a setting whose start
+   * depends on it (record 065). A league it does not know is youth: the careful reading.
+   */
+  readonly audienceOf?: (leagueId: string) => Audience | undefined;
 };
 
 /** A store of which only the named parts are made up; any other part is a mistake to call. */
@@ -47,8 +53,14 @@ function partial<Store extends object>(name: string, made: Partial<Store>): Stor
 
 const samePlace = (a: SettingPlace, b: SettingPlace) => JSON.stringify(a) === JSON.stringify(b);
 
-function txOver(leagueId: string, s: LeagueState, access: AccessReader): LeaguesTx {
+function txOver(
+  leagueId: string,
+  s: LeagueState,
+  access: AccessReader,
+  audience: Audience,
+): LeaguesTx {
   const leagues = partial<LeaguesStore>('leagues', {
+    leagueAudience: async () => audience,
     // The permission check asks who the league is and whether it may be changed.
     currentLeague: async () => {
       const status = await access.leagueStatus();
@@ -126,7 +138,12 @@ export function standInAdminSettings(options: StandInAdminSettingsOptions): Admi
       serially(async () => {
         const draft = structuredClone(stateOf(context.leagueId));
         const result = await work(
-          txOver(context.leagueId, draft, options.accessOf(context.leagueId)),
+          txOver(
+            context.leagueId,
+            draft,
+            options.accessOf(context.leagueId),
+            options.audienceOf?.(context.leagueId) ?? 'youth',
+          ),
         );
         states.set(context.leagueId, draft);
         return result;

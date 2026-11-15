@@ -37,8 +37,39 @@ describe('listLeagueSettings', () => {
         value: 24,
         source: 'default',
         version: null,
+        audience: null,
       },
     ]);
+  });
+
+  it("gives a setting whose start depends on who plays its league's own start (record 065)", async () => {
+    const names = defineSetting({
+      key: 'privacy.publicNames',
+      type: z.enum(['fullName', 'firstNameLastInitial', 'hidden']),
+      default: 'firstNameLastInitial',
+      startsAs: { adult: 'fullName' },
+      levels: ['league'],
+      permission: 'league.settings',
+      label: 'setting.privacy.publicNames.label',
+      confirm: ['fullName'],
+    });
+    const only = settingRegistry([names]);
+    for (const [audience, start, confirm] of [
+      ['adult', 'fullName', []],
+      ['youth', 'firstNameLastInitial', ['fullName']],
+      ['mixed', 'firstNameLastInitial', ['fullName']],
+    ] as const) {
+      const m = memoryLeagues({ audience });
+      const [row] = await m.deps.transaction(m.as(ownerId), (tx) => listLeagueSettings(tx, only));
+      // An adult league starts on full names and is not asked to confirm its own start.
+      expect(row, audience).toMatchObject({
+        default: start,
+        value: start,
+        source: 'default',
+        confirm,
+        audience,
+      });
+    }
   });
 
   it('shows the league value and the version to save from once one is set', async () => {
