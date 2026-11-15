@@ -565,10 +565,16 @@ export function ScoringScreen(props: ScoringScreenProps) {
         const style = getComputedStyle(row);
         const players = row.querySelectorAll(':scope > [data-player], :scope > [data-other]');
         const columns = style.gridTemplateColumns.split(' ').filter(Boolean).length;
-        // One line only where the stylesheet gives the rows after the first no height.
+        // The rows the stylesheet gives a height (one on an upright phone, two on a
+        // phone lying down); the rows after them have none, and that is what says the
+        // row holds only so many.
+        const rowsHigh = style.gridTemplateRows
+          .split(' ')
+          .filter((size) => Number.parseFloat(size) > 0).length;
+        const holds = columns * rowsHigh;
         const more =
-          style.display === 'grid' && style.gridAutoRows === '0px' && players.length > columns
-            ? players.length - (columns - 1)
+          style.display === 'grid' && style.gridAutoRows === '0px' && players.length > holds
+            ? players.length - (holds - 1)
             : 0;
         row.toggleAttribute('data-more', more > 0);
         // The end tile says it in words ("3 more"), from the message file: never "+3",
@@ -578,7 +584,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
         const words = end?.querySelector('.court-more-count');
         if (words) words.textContent = more > 0 ? t.plural('tracker.bench.more', more) : '';
         players.forEach((player, place) =>
-          player.toggleAttribute('data-folded', more > 0 && place >= columns - 1),
+          player.toggleAttribute('data-folded', more > 0 && place >= holds - 1),
         );
       }
     };

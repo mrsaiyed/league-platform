@@ -1448,12 +1448,22 @@
   .court-floor {
     grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
   }
-  .court-bench,
-  .court-bench-picking {
+  /* The bench in play: two rows and no more, which is what fits under the five with
+     nothing cut and the panel not scrolling. A bench longer than the two rows hold ends
+     in the tile that says how many more, as a single line does. */
+  .court-bench {
     grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+    grid-template-rows: repeat(2, var(--court-chip-height));
+    row-gap: var(--court-gap);
+    block-size: calc(2 * var(--court-chip-height) + var(--court-gap));
+  }
+  .court-bench > .court-more-tile {
+    grid-row: 2;
+  }
+  /* While starters are picked everyone is listed, in as many rows as it takes. */
+  .court-bench-picking {
     grid-template-rows: none;
     grid-auto-rows: auto;
-    row-gap: var(--court-gap);
     block-size: auto;
     overflow: visible;
   }

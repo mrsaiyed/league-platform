@@ -1278,6 +1278,14 @@ if (browser) {
         const c = await openCourt(page);
         await noSidewaysScroll(page, label);
         await measureTargets(page, `${label}, the pad at rest`);
+        note(
+          `${label}: neither team’s panel scrolls, so no row of it is cut`,
+          await page.evaluate(() =>
+            [...document.querySelectorAll('.court-team')].every(
+              (panel) => panel.scrollHeight <= panel.clientHeight,
+            ),
+          ),
+        );
         // Where only its three dots show, More is still named for a screen reader.
         note(
           `${label}: the More button is named "More" for a screen reader, word shown or not`,
@@ -1660,6 +1668,26 @@ if (browser) {
       await measureTargets(page, 'fifteen a side, in play');
       await accessible(page, 'fifteen a side, in play');
       await noSidewaysScroll(page, 'fifteen a side');
+
+      // The phone turned on its side (second look, L1): a bench of ten is two rows ending
+      // in the tile that says how many more; no third row is cut and neither team's
+      // panel scrolls. Then it is turned back.
+      await page.setViewportSize({ width: phoneLying.width, height: phoneLying.height });
+      const lying = await measureLines(page, 'fifteen a side, the phone lying down', 2);
+      const panels = await page.evaluate(() =>
+        [...document.querySelectorAll('.court-team')].map(
+          (panel) => panel.scrollHeight - panel.clientHeight,
+        ),
+      );
+      note(
+        'fifteen a side, the phone lying down: two rows of bench and "N more", no panel scrolling',
+        lying.every((line) => line.players === 10 && line.more >= 2 && line.end === 'whole') &&
+          panels.every((over) => over <= 0),
+        JSON.stringify({ lying, panels }),
+      );
+      await measureTargets(page, 'fifteen a side, the phone lying down');
+      await page.setViewportSize({ width: phone.width, height: phone.height });
+      await measureLines(page, 'fifteen a side, the phone upright again', 2);
 
       // The keyboard goes through the bench without landing on a player who is not
       // shown, and without scrolling the line to one.
