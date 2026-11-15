@@ -12,8 +12,41 @@ describe('summarizePublish (P7 §4.4)', () => {
       gamesRecordingChanged: [],
       roundsRenamed: [],
       roundsDateChanged: [],
+      roundsAdded: [],
+      roundsRemoved: [],
       teamsAffected: [],
     });
+  });
+
+  it('counts the rounds a draft adds and removes, and not one added and removed again', () => {
+    const published = baseState();
+    const { state, rejected } = applyDraft(
+      published,
+      [
+        { kind: 'add-round', round: { id: 'r3', label: 'Week 3', date: '2026-10-18' } },
+        { kind: 'add-round', round: { id: 'r4', label: 'Week 4', date: '2026-10-25' } },
+        { kind: 'add-round', round: { id: 'r5', label: 'Oops', date: null } },
+        { kind: 'remove-round', roundId: 'r5' },
+        // Week 2's one game goes to the new Week 3, then Week 2 can go.
+        {
+          kind: 'move-game',
+          gameId: 'g3',
+          to: { ...game('g3'), roundId: 'r3', date: '2026-10-18' },
+        },
+        { kind: 'remove-round', roundId: 'r2' },
+        // A new round renamed or re-dated in the draft is only added.
+        { kind: 'rename-round', roundId: 'r4', label: 'Week 4, finals' },
+        { kind: 'change-round-date', roundId: 'r4', date: '2026-10-26' },
+      ],
+      [],
+    );
+    expect(rejected).toEqual([]);
+    const summary = summarizePublish(published, state);
+    expect(summary.roundsAdded).toEqual(['r3', 'r4']);
+    expect(summary.roundsRemoved).toEqual(['r2']);
+    expect(summary.roundsRenamed).toEqual([]);
+    expect(summary.roundsDateChanged).toEqual([]);
+    expect(summary.gamesMoved).toEqual(['g3']);
   });
 
   it('counts added, removed and moved games, renamed rounds and affected teams', () => {

@@ -2,11 +2,13 @@
 // minute around the one GitHub failed at (2026-11-15 20:01 UTC) and at every ten minutes
 // across a week that takes in a month's end and the autumn clock change, and each made-up
 // league's current season is read as Admin → Schedule reads it (core's getScheduleDraft,
-// whose clash rule is findClashes). No clash, no change refused, no game outside the
-// season's rounds or outside its own round's days, exactly one round dated today, every
+// whose clash rule is findClashes, and the grid's own rows, build-grid.ts). No clash, no
+// change refused, no game outside the season's rounds or outside its own round's days by
+// the grid's rule, exactly one round dated today, every
 // finished game in the past, and the game under way started and on the scorekeeper's list.
 import { getScheduleDraft, type ScheduleDraftView } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
+import { buildGrid } from '../features/schedule-builder/build-grid.ts';
 import { standInPeople } from './stand-in-cast.ts';
 import { dayIn } from './stand-in-world-clock.ts';
 import { worldGamesStore } from './stand-in-world-games.ts';
@@ -35,20 +37,21 @@ function faultsOf(view: ScheduleDraftView, today: string): string[] {
   const { rounds, games } = view.result;
   for (const clash of view.clashes) faults.push(`clash ${JSON.stringify(clash)}`);
   for (const r of view.rejected) faults.push(`change refused ${JSON.stringify(r)}`);
+  // The grid's own rows and flags (build-grid.ts): its clashes, the games in no round, and
+  // a game outside its round's days (step 2.160: before the round's date, or on or after
+  // the next round's, a week on for the last).
+  const grid = buildGrid(view, [], []);
+  for (const clash of grid.clashes) faults.push(`the grid lists a clash: ${clash.text}`);
+  for (const game of grid.looseGames) {
+    faults.push(`game ${game.id} on ${game.date} is in no round of the season`);
+  }
+  for (const game of grid.allGames) {
+    if (game.clashed) faults.push(`game ${game.id} is marked as in a clash`);
+    if (game.outsideRound) {
+      faults.push(`game ${game.id} on ${game.date} is outside its round's days`);
+    }
+  }
   for (const game of games) {
-    const round = rounds.find((r) => r.id === game.roundId);
-    if (round === undefined) {
-      faults.push(`game ${game.id} on ${game.date} is in no round of the season`);
-      continue;
-    }
-    // A round holds the days from its own date to the day before the next round's.
-    const next = rounds.find((r) => r.date !== null && round.date !== null && r.date > round.date);
-    if (round.date !== null && game.date < round.date) {
-      faults.push(`game ${game.id} on ${game.date} is before its round's date ${round.date}`);
-    }
-    if (next?.date != null && game.date >= next.date) {
-      faults.push(`game ${game.id} on ${game.date} is in the next round's days (${next.date})`);
-    }
     if ((game.status === 'final' || game.status === 'forfeit') && game.date > today) {
       faults.push(`finished game ${game.id} is dated after today`);
     }

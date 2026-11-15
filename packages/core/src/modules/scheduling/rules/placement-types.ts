@@ -8,7 +8,7 @@ import type {
   PairingsError,
   TeamUnavailableDate,
 } from './pairing-types.ts';
-import type { ScheduleGame, ScheduleRound, ScheduleState } from './schedule-types.ts';
+import type { PlannedRound, ScheduleGame, ScheduleState } from './schedule-types.ts';
 
 /** A court games can be played on. `court` is the canonical court name, compared exactly. */
 export type SeasonCourt = { venueId: string | null; court: string };
@@ -40,8 +40,11 @@ export type PlacementInput = {
    * always give the same schedule. 0 keeps the teams in the order given. A whole number, 0 or more.
    */
   arrangement?: number;
-  /** The schedule as it stands, when generating again. Only its locked games are kept. */
-  current?: ScheduleState;
+  /**
+   * The schedule as it stands, when generating again (a stored one, or what was generated
+   * before, whose new rounds have no number yet). Only its locked games are kept.
+   */
+  current?: { readonly rounds: readonly PlannedRound[]; readonly games: ScheduleState['games'] };
   /** The games of `current` the admin locked: they stay exactly where they are. */
   lockedGameIds?: readonly string[];
   /**
@@ -69,7 +72,7 @@ export type PlacementResult =
   | {
       ok: true;
       /** The kept rounds and the new ones, in date order. */
-      rounds: ScheduleRound[];
+      rounds: PlannedRound[];
       /** The locked games, unchanged, and the new games, in date, time and court order. */
       games: ScheduleGame[];
       /**

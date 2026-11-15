@@ -58,8 +58,8 @@ const world = (changes: DraftChange[], state: Partial<MemoryScheduling> = {}) =>
     people: 38,
     schedule: {
       rounds: [
-        { id: roundUuid(1), label: 'Week 1', date: '2026-10-04' },
-        { id: roundUuid(2), label: 'Week 2', date: '2026-10-11' },
+        { id: roundUuid(1), number: 1, label: 'Week 1', date: '2026-10-04' },
+        { id: roundUuid(2), number: 2, label: 'Week 2', date: '2026-10-11' },
       ],
       games: [
         game(1),
@@ -175,8 +175,8 @@ describe('publishing the schedule', () => {
       const { db, deps, as } = world([{ kind: 'move-game', gameId: gameUuid(1), to: slot }], {
         schedule: {
           rounds: [
-            { id: roundUuid(1), label: 'Week 1', date: '2026-10-04' },
-            { id: roundUuid(2), label: 'Week 2', date: '2026-10-11' },
+            { id: roundUuid(1), number: 1, label: 'Week 1', date: '2026-10-04' },
+            { id: roundUuid(2), number: 2, label: 'Week 2', date: '2026-10-11' },
           ],
           games: [game(1, { status })],
         },
@@ -189,7 +189,7 @@ describe('publishing the schedule', () => {
     }
     const removal = world([{ kind: 'remove-game', gameId: gameUuid(1) }], {
       schedule: {
-        rounds: [{ id: roundUuid(1), label: 'Week 1', date: '2026-10-04' }],
+        rounds: [{ id: roundUuid(1), number: 1, label: 'Week 1', date: '2026-10-04' }],
         games: [game(1, { status: 'final' })],
       },
     });

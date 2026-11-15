@@ -19,8 +19,8 @@ export function game(id: string, over: Partial<ScheduleGame> = {}): ScheduleGame
 export function baseState(): ScheduleState {
   return {
     rounds: [
-      { id: 'r1', label: 'Week 1', date: '2026-10-04' },
-      { id: 'r2', label: 'Week 2', date: '2026-10-11' },
+      { id: 'r1', number: 1, label: 'Week 1', date: '2026-10-04' },
+      { id: 'r2', number: 2, label: 'Week 2', date: '2026-10-11' },
     ],
     games: [
       game('g1'),

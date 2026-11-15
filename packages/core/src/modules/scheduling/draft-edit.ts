@@ -14,7 +14,13 @@ import {
 import type { SchedulingTx } from './ports.ts';
 import { applyDraft } from './rules/apply-draft.ts';
 import { applyDraftChange } from './rules/apply-change.ts';
-import type { ChangeError, Clash, DraftChange, ScheduleSlot } from './rules/schedule-types.ts';
+import type {
+  ChangeError,
+  Clash,
+  DraftChange,
+  ScheduleSlot,
+  ScheduleState,
+} from './rules/schedule-types.ts';
 
 /**
  * What an edit says it was based on: the season, the schedule revision the admin was
@@ -41,7 +47,12 @@ export type DraftEditError =
         | 'draft-too-large'
         | 'unknown-team'
         | 'unknown-venue'
-        | 'unknown-court';
+        | 'unknown-court'
+        /**
+         * A game the draft does not hold is in the round: one in the bin, one with no
+         * date, or one the draft removes (step 2.160).
+         */
+        | 'round-in-use';
     }
   | { readonly code: 'change-refused'; readonly reason: ChangeError };
 
@@ -80,8 +91,11 @@ export async function editDraft(args: {
     draftId: string | null;
   };
   change: DraftChange;
-  /** Further checks on what the change names, run once the basis is known to be current. */
-  check?: () => Promise<DraftEditError | undefined>;
+  /**
+   * Further checks on what the change names, run once the basis is known to be current,
+   * on the schedule as the draft so far leaves it.
+   */
+  check?: (sofar: ScheduleState) => Promise<DraftEditError | undefined>;
 }): Promise<Result<DraftEditValue, DraftEditError>> {
   const { context, tx, input, change } = args;
   const store = tx.scheduling;
@@ -107,12 +121,12 @@ export async function editDraft(args: {
     document = parsed;
   }
 
-  const refused = await args.check?.();
-  if (refused !== undefined) return fail(refused);
-
   // The draft so far is replayed on the published schedule; the new change must fit on it.
   const published = await store.loadSchedule(input.seasonId);
   const sofar = applyDraft(published, document.changes, []).state;
+  const refused = await args.check?.(sofar);
+  if (refused !== undefined) return fail(refused);
+
   const applied = applyDraftChange(sofar, change, []);
   if (!applied.ok) return fail({ code: 'change-refused', reason: applied.error });
 
