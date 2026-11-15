@@ -12,9 +12,11 @@ import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkStructure, formatViolation } from './structure/index.mjs';
+import { withLoopback } from './web-listen.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = path.join(root, 'apps/web');
@@ -701,10 +703,12 @@ function serverEnvironment(env) {
 
 function start(args, env) {
   let output = '';
-  // Next.js itself, not scripts/web.mjs, so stopping it stops the server.
-  const child = spawn(process.execPath, [nextBin, ...args], {
+  // Next.js itself, not scripts/web.mjs, so stopping it stops the server. On the made-up
+  // stand-in, on this computer's loopback address only (web-listen.mjs).
+  const environment = serverEnvironment(env);
+  const child = spawn(process.execPath, [nextBin, ...withLoopback(args, environment)], {
     cwd: app,
-    env: serverEnvironment(env),
+    env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (chunk) => (output += chunk));
@@ -1093,22 +1097,26 @@ async function checkSettings(origin) {
 }
 
 /**
- * The made-up world answers only this computer (step 2.152, the review's M4): a request
- * addressed to another host gets the plain page and nothing of any league, with the
- * made-up owner's cookie or without it, a page, an admin page or the API; the same
- * address on this computer's name is answered as usual. Sent with node:http, since
- * fetch keeps the Host header to itself.
+ * The made-up world answers only this computer (step 2.152; review 1 M4, review 2 M1).
+ * Another computer cannot connect at all: the server listens on the loopback address
+ * only, so this computer's own network address is refused. A request addressed to another
+ * host (a `.test` name included, unless it is PUBLIC_BASE_URL's), or carrying a sign of
+ * having been passed on by another server (Forwarded, Via, an X-Forwarded-For from
+ * elsewhere, an X-Forwarded-Host of another name), gets the plain page and nothing of any
+ * league, with the made-up owner's cookie or without it, a page, an admin page or the API;
+ * the same address on this computer's name is answered as usual. Sent with node:http,
+ * since fetch keeps the Host header to itself.
  */
 async function checkOtherHosts(port) {
   const problems = [];
-  const ask = (host, address, cookie) =>
+  const ask = (host, address, cookie, more = {}) =>
     new Promise((resolve, reject) => {
       const request = http.request(
         {
           host: '127.0.0.1',
           port,
           path: address,
-          headers: { host, ...(cookie === undefined ? {} : { cookie }) },
+          headers: { host, ...(cookie === undefined ? {} : { cookie }), ...more },
         },
         (response) => {
           let body = '';
@@ -1121,17 +1129,28 @@ async function checkOtherHosts(port) {
       request.end();
     });
   const owner = `srl_session=${tokens.owner}`;
-  for (const host of ['example.com', 'srleagues.example.com:443', 'localhost.evil.example']) {
+  const local = `localhost:${port}`;
+  const refused = [
+    ...['example.com', 'srleagues.example.com:443', 'localhost.evil.example', 'other.test'].map(
+      (host) => [`Host ${host}`, host, {}],
+    ),
+    ['Forwarded', local, { forwarded: 'for=10.0.0.5' }],
+    ['Via', local, { via: '1.1 a-proxy' }],
+    ['X-Forwarded-For from elsewhere', local, { 'x-forwarded-for': '10.0.0.5' }],
+    ['X-Forwarded-For passed on', local, { 'x-forwarded-for': '127.0.0.1, 10.0.0.5' }],
+    ['X-Forwarded-Host of another name', local, { 'x-forwarded-host': 'example.com' }],
+  ];
+  for (const [what, host, more] of refused) {
     for (const address of [
       '/north-valley',
       '/north-valley/admin/teams',
       `/api/v1/leagues/${northValley}/games/${liveGame}/snapshot`,
     ]) {
       for (const cookie of [undefined, owner]) {
-        const { status, body } = await ask(host, address, cookie);
-        const label = `Host ${host} ${address}${cookie === undefined ? '' : ' (owner)'}`;
+        const { status, body } = await ask(host, address, cookie, more);
+        const label = `${what} ${address}${cookie === undefined ? '' : ' (owner)'}`;
         if (status !== 421) problems.push(`${label}: status ${status}, not 421`);
-        if (!body.includes('answers only on the computer it runs on')) {
+        if (!body.includes('not requests passed on by another server')) {
           problems.push(`${label}: not the plain page`);
         }
         if (/North Valley|Falcons|Add a team/.test(body)) {
@@ -1140,14 +1159,52 @@ async function checkOtherHosts(port) {
       }
     }
   }
-  const here = await ask(`localhost:${port}`, '/north-valley', owner);
+  const here = await ask(local, '/north-valley', owner);
   if (here.status !== 200 || !here.body.includes('North Valley League')) {
     problems.push(`this computer's own name is not answered (${here.status})`);
+  }
+  // What Next.js itself writes for a request from this computer is no sign of passing on.
+  const asNextWrites = await ask(local, '/north-valley', owner, {
+    'x-forwarded-for': '127.0.0.1',
+    'x-forwarded-host': local,
+  });
+  if (asNextWrites.status !== 200) {
+    problems.push(
+      `a request with Next.js's own forwarding headers is refused (${asNextWrites.status})`,
+    );
+  }
+  // This computer's own network addresses are not listened on: no other computer can connect.
+  for (const address of networkAddresses()) {
+    if (await connects(address, port)) {
+      problems.push(`the made-up world can be reached at ${address}, not only at 127.0.0.1`);
+    }
   }
   if (!here.body.includes('A made-up league on this computer.')) {
     problems.push('a made-up league page does not say it is made up');
   }
   return problems;
+}
+
+/** This computer's addresses on its networks (not loopback), as other computers reach it. */
+function networkAddresses() {
+  return Object.values(os.networkInterfaces())
+    .flat()
+    .filter((entry) => entry !== undefined && !entry.internal)
+    .map((entry) => entry.address);
+}
+
+/** Whether a connection to `address` on `port` is taken, within two seconds. */
+function connects(address, port) {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host: address, port });
+    const done = (answer) => {
+      socket.destroy();
+      resolve(answer);
+    };
+    socket.setTimeout(2000, () => done(false));
+    socket.once('connect', () => done(true));
+    socket.once('error', () => done(false));
+  });
 }
 
 /**

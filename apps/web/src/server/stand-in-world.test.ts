@@ -3,7 +3,8 @@
 // from another's context; a reader cannot change the world; asking for the world inside
 // one of its own transactions fails at once instead of waiting for ever; a league with no
 // world is refused; a transaction copies only the tables it writes. And the stand-in
-// answers only this computer (the review's M4).
+// answers only requests made on this computer to its own names, not passed on by another
+// server (review 1 M4, review 2 M1 and L1).
 import {
   createTeam,
   listMyGames,
@@ -208,24 +209,27 @@ describe('what a page reads of the made-up world', () => {
   });
 });
 
-describe('the made-up world answers only this computer (M4)', () => {
-  const ports = standInPorts({
-    appEnv: 'test',
-    publicBaseUrl: 'http://localhost:3000',
-    log: () => {},
-    emailFrom: 'hello@example.test',
-  });
+describe('the made-up world answers only this computer (review 1 M4, review 2 M1)', () => {
+  const portsAt = (publicBaseUrl: string) =>
+    standInPorts({
+      appEnv: 'test',
+      publicBaseUrl,
+      log: () => {},
+      emailFrom: 'hello@example.test',
+    });
+  const ports = portsAt('http://localhost:3000');
+  const request = (host: string, more: Record<string, string> = {}) =>
+    new Headers({ host, ...more });
 
-  it("answers this computer's names and a test name, with or without a port", () => {
+  it("answers this computer's names, with or without a port", () => {
     for (const host of [
       'localhost',
       'localhost:3000',
       '127.0.0.1:3000',
       '[::1]:3000',
       'app.localhost',
-      'league.test:8443',
     ]) {
-      expect(ports.answersHost(host), host).toBe(true);
+      expect(ports.answers(request(host)), host).toBe(true);
     }
     expect(ports.madeUpWorld).toBe(true);
   });
@@ -241,7 +245,44 @@ describe('the made-up world answers only this computer (M4)', () => {
       '10.0.0.5',
       'localhost:3000 example.com',
     ]) {
-      expect(ports.answersHost(host), host).toBe(false);
+      expect(ports.answers(request(host)), host).toBe(false);
+    }
+  });
+
+  it("answers a .test name only when it is PUBLIC_BASE_URL's own (L1)", () => {
+    expect(ports.answers(request('league.test:8443'))).toBe(false);
+    const onTestName = portsAt('http://league.test:8443');
+    expect(onTestName.answers(request('league.test:8443'))).toBe(true);
+    expect(onTestName.answers(request('LEAGUE.test'))).toBe(true);
+    expect(onTestName.answers(request('other.test:8443'))).toBe(false);
+    expect(onTestName.answers(request('sub.league.test'))).toBe(false);
+    expect(onTestName.answers(request('localhost:3000'))).toBe(true);
+  });
+
+  it('answers nothing passed on by another server', () => {
+    for (const more of [
+      { forwarded: 'for=10.0.0.5' },
+      { forwarded: 'for=127.0.0.1' },
+      { via: '1.1 a-proxy' },
+      { 'x-forwarded-for': '10.0.0.5' },
+      { 'x-forwarded-for': '127.0.0.1, 10.0.0.5' },
+      { 'x-forwarded-for': '' },
+      { 'x-forwarded-host': 'example.com' },
+      { 'x-forwarded-host': 'localhost:4000' },
+    ]) {
+      expect(ports.answers(request('localhost:3000', more)), JSON.stringify(more)).toBe(false);
+    }
+  });
+
+  it('answers what Next.js itself writes for a request from this computer', () => {
+    for (const from of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+      const headers = request('localhost:3000', {
+        'x-forwarded-for': from,
+        'x-forwarded-host': 'localhost:3000',
+        'x-forwarded-port': '3000',
+        'x-forwarded-proto': 'http',
+      });
+      expect(ports.answers(headers), from).toBe(true);
     }
   });
 });

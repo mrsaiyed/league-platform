@@ -3,9 +3,12 @@
 // any header of that name the browser sent, because the pages are given only the
 // decoded parts and context.ts must see the address as it came (T-34, U-7).
 //
-// First of all, on the made-up world (local work and tests), a request addressed to any
-// host but this computer's names gets a plain page and nothing else (step 2.152): the
-// made-up people's cookies are in the code, so only where the app runs may use them.
+// First of all, on the made-up world (local work and tests), a request gets a plain page
+// and nothing else unless it is addressed to this computer's own names (or the app's own
+// `.test` name) and carries no sign of having been passed on by another server (step
+// 2.152; stand-in-ports.ts, answersOnlyHere). The made-up people's cookies are in the code.
+// What keeps other computers out is that the made-up world listens on the loopback address
+// only (scripts/web-listen.mjs); this check keeps out what can still arrive here.
 //
 // It also keeps a session going (T-69, T-70): when the browser sends the renewing
 // token and no session cookie (it ran out), the session is renewed here, the page
@@ -23,8 +26,9 @@ type Change =
   | { readonly name: string; readonly value: null };
 
 /**
- * The plain page a request gets when it is addressed to a host the app does not answer:
- * the made-up world answers only this computer (step 2.152). No session is read first.
+ * The plain page a request gets when the app does not answer it: the made-up world
+ * answers only requests made on this computer, to its own names (step 2.152). No session
+ * is read first.
  */
 function notAnswered(): NextResponse {
   const escape = (text: string) =>
@@ -51,7 +55,7 @@ async function portsIfStarted() {
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const ports = await portsIfStarted();
-  if (ports?.answersHost(request.headers.get('host') ?? '') === false) return notAnswered();
+  if (ports?.answers(request.headers) === false) return notAnswered();
   const url = new URL(request.url);
   const changes: Change[] = [];
   if (

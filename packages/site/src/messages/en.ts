@@ -15,7 +15,7 @@ export const en = {
   'footer.madeUp': 'A made-up league on this computer. It starts over when the app restarts.',
   'standIn.otherHost.title': 'Not here',
   'standIn.otherHost.body':
-    'This copy of SR Leagues holds only made-up leagues and answers only on the computer it runs on.',
+    'This copy of SR Leagues holds only made-up leagues. It answers only requests made on the computer it runs on, to that computer’s own address, and not requests passed on by another server.',
   'common.loading': 'Loading',
   'common.notFound': 'We could not find that page.',
   'common.notFoundTitle': 'Page not found',

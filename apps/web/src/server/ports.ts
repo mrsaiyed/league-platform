@@ -63,12 +63,13 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly liveFeed: ((request: Request) => Promise<Response>) | null;
   /**
    * The made-up world in this process's memory (stand-in-world.ts), not a database: its
-   * pages say so, and it answers only requests addressed to this computer (step 2.152).
+   * pages say so, and it answers only requests made on this computer (step 2.152).
    */
   readonly madeUpWorld: boolean;
   /**
-   * Whether a request addressed to this host (its Host header) may be answered at all.
-   * The made-up world answers only this computer's names; a database always answers.
+   * Whether a request with these headers may be answered at all. The made-up world answers
+   * only one addressed to this computer's names (or its own `.test` name) and not passed
+   * on by another server (stand-in-ports.ts, answersOnlyHere); a database always answers.
    */
-  readonly answersHost: (host: string) => boolean;
+  readonly answers: (headers: Headers) => boolean;
 };

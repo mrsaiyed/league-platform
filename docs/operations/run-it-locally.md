@@ -71,9 +71,14 @@ venues. **The world is made again every time the server starts**: whatever you a
 after a restart, and the games' days move with the time it starts, so this week's round is
 always this week, the games already played are in the past and the live game is under way.
 Every league page says so in one quiet line at the foot of the page: "A made-up league on
-this computer. It starts over when the app restarts." The made-up world answers only this
-computer (an address on `localhost`, `127.0.0.1`, `[::1]` or a name ending in `.localhost` or
-`.test`): asked for under any other name, it gives a plain page and nothing else.
+this computer. It starts over when the app restarts." The made-up world listens on this
+computer's loopback address only (`127.0.0.1`), so no other computer can reach it at all;
+open it at `http://localhost:<port>` or `http://127.0.0.1:<port>`. It answers only a request
+addressed to `localhost`, `127.0.0.1`, `[::1]`, a name ending in `.localhost`, or the `.test`
+name `PUBLIC_BASE_URL` gives, and only one not passed on by another server (no `Forwarded`
+or `Via` header, no `X-Forwarded-For` or `X-Forwarded-Host` from elsewhere). Anything else
+gets a plain page and nothing more. On the made-up database (`LOCAL_DATA=made-up-database`)
+the app listens as before.
 
 To try it as a league's admin:
 

@@ -43,6 +43,7 @@ import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withLoopback } from './web-listen.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = path.join(root, 'apps/web');
@@ -189,9 +190,11 @@ const launch = () => (process.env.CI ? chromium.launch() : chromium.launch({ cha
 
 function start(args, env = {}) {
   let output = '';
-  const child = spawn(process.execPath, [nextBin, ...args], {
+  // On the made-up stand-in, on this computer's loopback address only (web-listen.mjs).
+  const environment = { ...process.env, ...madeUp, ...env };
+  const child = spawn(process.execPath, [nextBin, ...withLoopback(args, environment)], {
     cwd: app,
-    env: { ...process.env, ...madeUp, ...env },
+    env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (chunk) => (output += chunk));
