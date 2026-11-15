@@ -7,7 +7,7 @@
 // `lockingTracker` runs transactions over one shared state with a real lock per game,
 // to show batches for different games never wait for each other (T-112): PGlite has
 // one connection and runs transactions one after another, so it cannot show that.
-import { refusedAddEventType, tablePlayerEventTypes } from '@srleagues/contracts';
+import { refusedAddEventType } from '@srleagues/contracts';
 import type {
   DomainEvent,
   EventHandler,
@@ -20,6 +20,7 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import { gamesTxOf, leagueId, type MemoryGames } from './memory-games.test-helper.ts';
+import { hasPlaysPastMarker } from './plays-past-marker.ts';
 import {
   initialScoring,
   sessionsOf,
@@ -277,18 +278,17 @@ const trackerTxOf = (
   });
 
 /**
- * Whether a game has plays, as the database reads it (game-has-plays.ts): an event of
- * the tracker that is not a change of players, or a game the test marks as tracked.
+ * Whether a game has plays, as the database reads it (game-has-plays.ts): a play since
+ * its last "not started" marker, never a change of players (hasPlaysPastMarker), or a
+ * game the test marks as tracked.
  */
 function withPlaysFromEvents(s: MemoryTracker, tx: TrackerTx): TrackerTx {
-  const tableTypes: readonly string[] = tablePlayerEventTypes;
   return {
     ...tx,
     games: {
       ...tx.games,
       hasPlays: async (gameId) =>
-        s.tracked.includes(gameId) ||
-        s.events.some((e) => e.gameId === gameId && !tableTypes.includes(e.type)),
+        s.tracked.includes(gameId) || hasPlaysPastMarker(s.events, gameId),
     },
   };
 }

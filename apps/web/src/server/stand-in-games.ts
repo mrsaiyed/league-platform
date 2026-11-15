@@ -12,6 +12,7 @@
 // so every card on the home and schedule pages opens the game it shows.
 import { defaultSeasonRules } from '@srleagues/contracts';
 import {
+  hasPlaysPastMarker,
   systemClock,
   type AccessReader,
   type ActivityEntry,
@@ -33,7 +34,6 @@ import {
   liveGamesOf,
   scoringSessionsOf,
   seedTracker,
-  trackedPastMarker,
   type MadeUpTeam,
   type TrackerState,
 } from './stand-in-tracker.ts';
@@ -347,7 +347,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
         ),
       // The players the scorer's table changed are events too, but not plays (record 058).
       hasPlays: async (gameId) =>
-        s.tracked.includes(gameId) || trackedPastMarker(s.tracker.events, gameId),
+        s.tracked.includes(gameId) || hasPlaysPastMarker(s.tracker.events, gameId),
       findSeason: async (seasonId) => s.seasons.find((x) => x.id === seasonId),
       leagueSettingRows: async (key) => s.settings[key] ?? [],
       isAssigned: async (gameId, accountId) => isAssigned(s, gameId, accountId),

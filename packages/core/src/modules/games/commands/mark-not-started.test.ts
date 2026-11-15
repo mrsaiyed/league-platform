@@ -26,6 +26,7 @@ import { memoryTracker, type MemoryTracker } from '../memory-tracker.test-helper
 import type { GamePlayer } from '../ports.ts';
 import { leaseMs } from '../scoring-session.ts';
 import { applyTrackerCommands } from './apply-tracker-commands.ts';
+import { getBoxScoreSheet } from './get-box-score-sheet.ts';
 import { markNotStarted } from './mark-not-started.ts';
 import { openScoringSession } from './open-scoring-session.ts';
 import { reopenGame } from './reopen-game.ts';
@@ -403,6 +404,28 @@ describe('a game that was ever decided (S-40)', () => {
     await tap(t, tipOff);
     expect(gameOf(t)?.status).toBe('live');
     expect(await mark(t, scorekeeperId)).toEqual({ ok: false, error: { code: 'was-decided' } });
+  });
+});
+
+describe('a cleared game, to what asks whether it was tracked (record 061)', () => {
+  it('has no plays until the tracker records one after the marker', async () => {
+    const t = setUp();
+    const locked = async () => {
+      const sheet = await getBoxScoreSheet(t.as(ownerId), { gameId }, t.deps);
+      if (!sheet.ok) throw new Error(sheet.error.code);
+      return sheet.value.locked;
+    };
+    await tap(t, tipOff);
+    expect(await mark(t, scorekeeperId)).toMatchObject({ ok: true });
+    expect(await locked()).toBeNull();
+    const opened = await openScoringSession(
+      t.as(scorekeeperId),
+      { gameId, deviceId: 'tablet' },
+      t.deps,
+    );
+    if (!opened.ok || opened.value.status !== 'held-by-you') throw new Error('not opened');
+    await tap(t, tipOff.slice(0, 1), opened.value.sessionId);
+    expect(await locked()).toBe('tracked');
   });
 });
 

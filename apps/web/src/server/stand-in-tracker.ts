@@ -15,7 +15,7 @@ import type {
   ScoringSession,
   ScoringSessionsStore,
 } from '@srleagues/core';
-import { refusedAddEventType, tablePlayerEventTypes } from '@srleagues/contracts';
+import { refusedAddEventType } from '@srleagues/contracts';
 import { randomUUID } from 'node:crypto';
 
 export type TrackerState = {
@@ -92,19 +92,6 @@ export function seedTracker(
     });
   });
   return state;
-}
-
-/**
- * Whether the tracker has recorded a play of the game since it was last marked not
- * started (its last `reset` event): the players the scorer's table changed are not
- * plays (record 058). As the database's game_tracked_past_marker reads it.
- */
-export function trackedPastMarker(events: readonly NewGameEvent[], gameId: string): boolean {
-  const own = events.filter((e) => e.gameId === gameId);
-  const marker = Math.max(0, ...own.filter((e) => e.type === 'reset').map((e) => e.seq));
-  return own.some(
-    (e) => e.seq > marker && !(tablePlayerEventTypes as readonly string[]).includes(e.type),
-  );
 }
 
 /** The game's sessions, over one state; `hasGame` says whether the game is in the league. */

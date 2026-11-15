@@ -32,6 +32,7 @@ export { boxScoreColumns } from './box-score-columns.ts';
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
 export { endTrackedGame, type EndTrackedGameError } from './commands/end-tracked-game.ts';
 export { markNotStarted, type MarkNotStartedError } from './commands/mark-not-started.ts';
+export { hasPlaysPastMarker } from './plays-past-marker.ts';
 export { recordFinalScoreWithin } from './record-score-within.ts';
 export type { DecideGameError } from './decide-game.ts';
 export { recordingOf } from './game-fields.ts';
