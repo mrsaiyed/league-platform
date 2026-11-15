@@ -107,6 +107,23 @@ const gamePages = {
 const adminPages = [
   { name: 'admin-home', at: '/admin' },
   { name: 'admin-games', at: '/admin/games' },
+  // Step 2.154's states of the games list, as its forms leave the address: one game's
+  // score boxes open, the question before a final score is saved (for a game whose time
+  // has not come), "Saved" beside a final game, and the reopen form a final game leads to.
+  // The live game, with plays, is on `admin-games` itself, with no score boxes.
+  {
+    name: 'admin-games-boxes-open',
+    at: `/admin/games?enter=${trackedGame(1)}#game-${trackedGame(1)}`,
+  },
+  {
+    name: 'admin-games-question',
+    at: `/admin/games?ask=${trackedGame(4)}&v=1&home=51&away=47#game-${trackedGame(4)}`,
+  },
+  {
+    name: 'admin-games-saved',
+    at: `/admin/games?done=final&game=${trackedGame(5)}#game-${trackedGame(5)}`,
+  },
+  { name: 'admin-games-correct-form', at: `/admin/games/${trackedGame(5)}` },
   { name: 'admin-teams', at: '/admin/teams' },
   { name: 'admin-team', at: '/admin/teams', first: '/admin/teams/' },
   { name: 'admin-schedule', at: '/admin/schedule' },
@@ -120,6 +137,8 @@ const adminPages = [
 const scorekeeperPages = [
   { name: 'scorekeeper-games', at: '/admin' },
   { name: 'scorekeeper-tracker', at: '/admin', first: '/score/' },
+  // The games list as a scorekeeper sees it: a final game says who can reopen it (2.154).
+  { name: 'scorekeeper-games-list', at: '/admin/games' },
 ];
 // SR Leagues' own pages, which belong to no league.
 const platformPages = [

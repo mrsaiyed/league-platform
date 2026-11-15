@@ -1,10 +1,11 @@
 // One change from the box score grid: save the sheet, or reopen a final game to correct
-// it (S-7). The form's words become a games command's input, and the command runs with
+// it (S-7), by the door the page offered (reopen-view.ts). The form's words become a games command's input, and the command runs with
 // the context the server worked out from the session (T-23). The sheet is read again
 // first, so the grid is read against the players and columns the game has now.
 import {
   getBoxScoreSheet,
   reopenGame,
+  reopenTrackedGame,
   setBoxScore,
   type CommandContext,
   type CommandDeps,
@@ -32,7 +33,22 @@ export async function runBoxScoreAction(
   const gameId = fields['gameId'];
   const version = versionOf(fields['version']);
   if (action === 'reopen') {
-    const reopened = await reopenGame(context, { gameId, version, reason: fields['reason'] }, deps);
+    // A game its tracker ended is reopened through the tracker's own door (step 2.120),
+    // which also lets the scorekeeper who ended it do so within the league's minutes; the
+    // form's request id, made once when the form was drawn, makes a second send of it
+    // the same reopen. Any other decided game through the admin's door (S-7).
+    const reopened =
+      fields['door'] === 'tracked'
+        ? await reopenTrackedGame(
+            context,
+            {
+              gameId: gameId?.toLowerCase(),
+              requestId: fields['requestId'],
+              reason: fields['reason'],
+            },
+            deps,
+          )
+        : await reopenGame(context, { gameId, version, reason: fields['reason'] }, deps);
     if (reopened.ok) return { ok: true };
     // The reopen form's one typed field is the reason, so input it refuses is the reason
     // missing or too long: say that, not the grid's message about numbers.

@@ -560,6 +560,30 @@ export const en = {
   'admin.games.noScorekeeper': 'No scorekeeper yet',
   'admin.games.scoreOf': 'Score for {team}',
   'admin.games.saveScore': 'Save final score',
+  // One wrong tap does no harm (step 2.154; A-5): the boxes open on the one game, and
+  // saving asks once, naming both teams and the score, away team first as on the card.
+  'admin.games.enterFinal': 'Enter the final score',
+  'admin.games.result': '{away} {awayScore}, {home} {homeScore}',
+  'admin.games.confirm.ask': '{result}. Make this final?',
+  'admin.games.confirm.early': '{result}. This game is set for {when}. Make it final now?',
+  'admin.games.confirm.yes': 'Yes, make it final',
+  'admin.games.confirm.no': 'No, change the score',
+  'admin.games.saved.final': 'Saved: {result} is final.',
+  // A game the live tracker has recorded plays of is ended there (S-46).
+  'admin.games.tracked':
+    'Plays are being recorded for this game in the tracker, so it is ended there, not by typing a score.',
+  'admin.games.scoreGame': 'Score this game',
+  // Putting a wrong result right (P7 §5.5, S-36): for whoever may reopen the game, and
+  // who can for everyone else.
+  'admin.games.correct': 'Correct this result',
+  'admin.games.reopenUntil':
+    'You ended this game in the tracker, so you can reopen it until {time}.',
+  'admin.games.reopenWho.admins': 'Only a league admin or a scheduler can reopen this game.',
+  'admin.games.reopenWho.time-over':
+    'Your time to reopen this game is over. Only a league admin or a scheduler can reopen it now.',
+  'admin.games.done.reopen': 'The game is reopened. Enter the right result.',
+  'admin.games.done.reopenTracked':
+    'The game is live again. Correct it in the tracker, then end it again.',
   'admin.games.forfeitBy': 'Team that forfeits',
   'admin.games.recordForfeit': 'Record forfeit',
   'admin.games.postpone': 'Postpone',
@@ -584,6 +608,8 @@ export const en = {
   'admin.games.error.game-cancelled': 'That game was cancelled, so it cannot be scored.',
   'admin.games.error.tie-not-allowed': 'This season does not allow ties. Enter a winner.',
   'admin.games.error.team-not-in-game': 'That team is not in this game.',
+  'admin.games.error.game-is-tracked':
+    'Plays are being recorded for this game in the tracker, so it cannot be ended here. End it in the tracker.',
   'admin.games.error.game-not-postponable': 'Only a game that has not started can be postponed.',
   'admin.games.error.game-not-cancellable': 'Only a game that has not started can be cancelled.',
   'admin.games.error.unknown': 'That did not work. Nothing was changed.',
@@ -629,6 +655,8 @@ export const en = {
   'admin.boxScore.error.did-not-play-has-stats':
     'A player marked as not playing has numbers. Tick “Played” or clear the numbers.',
   'admin.boxScore.error.game-not-decided': 'That game is not final, so there is nothing to reopen.',
+  'admin.boxScore.error.reopen-time-over':
+    'Your time to reopen this game is over. Ask a league admin or a scheduler.',
   'stat.fg3': '3-pointers made',
   'stat.fg3.short': '3PM',
   'stat.fg1': 'Free throws made',

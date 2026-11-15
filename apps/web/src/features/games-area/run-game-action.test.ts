@@ -161,13 +161,16 @@ describe('the games area actions', () => {
       ports.deps,
     );
     expect(result).toEqual({ ok: false, code: 'not-allowed' });
-    // And a scorekeeper is offered the score form only, with the names beside each game.
+    // And a scorekeeper is offered the score form only, with the names beside each game;
+    // a game the tracker has recorded plays of offers no form at all (S-46, step 2.154).
     const rows = buildGameRows(mine, await ports.namesOf(leagueId), {
       accountId: keeper,
       isOwner: false,
       grants,
     });
-    expect(rows.every((r) => r.canScore || r.status === 'final')).toBe(true);
+    expect(rows.every((r) => (r.hasPlays ? !r.canScore : r.canScore || r.status === 'final'))).toBe(
+      true,
+    );
     expect(rows.some((r) => r.canForfeit || r.canCallOff)).toBe(false);
     expect(rows[0]?.homeName).not.toBe('');
   });

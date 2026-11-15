@@ -6,6 +6,7 @@
 import {
   getBoxScoreSheet,
   leagueUrl,
+  readReopenOffer,
   type BoxScoreSheet,
   type GameLine,
   type GameRosterPlayer,
@@ -13,14 +14,16 @@ import {
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
+import { clockTimeText } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { t, type TextKey } from '../../server/messages.ts';
+import { locale, t, type TextKey } from '../../server/messages.ts';
+import { reopenViewOf, type ReopenView } from './reopen-view.ts';
 import { statLabel } from '../stats-pages/index.ts';
 import { hasName, rosterName } from '../teams-area/index.ts';
 import { reopenBoxScoreAction, saveBoxScoreAction } from './actions.ts';
 import { boxScoreField } from './box-score-form.ts';
 import { boxScoreNotice } from './box-score-notice.ts';
-import type { SearchParams } from './games-page.tsx';
+import type { SearchParams } from './games-search.ts';
 import { ScoreCheck } from './score-check.tsx';
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -176,6 +179,19 @@ export async function BoxScorePage({
   const awayName = names[game.awayTeamId] ?? '';
   const editable = sheet.locked === null;
   const notice = boxScoreNotice(search);
+  // Who may reopen it here, and by which door (reopen-view.ts): the admin's door as the
+  // sheet says, else, for a game its tracker ended, the tracker's own read.
+  const reopen: ReopenView = sheet.mayReopen
+    ? { kind: 'correct', door: 'by-hand', until: null }
+    : sheet.locked === 'tracked' && (game.status === 'final' || game.status === 'forfeit')
+      ? reopenViewOf(
+          await readReopenOffer(context, { gameId: game.id }, ports.games.deps).then((offer) =>
+            offer.ok ? offer.value : undefined,
+          ),
+          false,
+        )
+      : { kind: 'none' };
+  const { timeZone } = await ports.publicSchedule.clockOf(here.id);
   const teams = [
     { teamId: game.awayTeamId, name: awayName, score: game.awayScore, field: 'awayScore' },
     { teamId: game.homeTeamId, name: homeName, score: game.homeScore, field: 'homeScore' },
@@ -194,17 +210,37 @@ export async function BoxScorePage({
       ) : (
         <p>{t(`admin.boxScore.locked.${sheet.locked}`)}</p>
       )}
-      {sheet.mayReopen ? (
-        <form action={reopenBoxScoreAction}>
+      {reopen.kind === 'correct' ? (
+        <form action={reopenBoxScoreAction} className="ui-stack">
           <input type="hidden" name="league" value={league} />
           <input type="hidden" name="gameId" value={game.id} />
           <input type="hidden" name="version" value={game.version} />
-          <label>
+          <input type="hidden" name="door" value={reopen.door} />
+          {reopen.door === 'tracked' ? (
+            // Made once as the form is drawn: a second send of it is the same reopen.
+            <input type="hidden" name="requestId" value={crypto.randomUUID()} />
+          ) : null}
+          {/* A game not entered as a box score is put right on the games list, beside it. */}
+          {game.captureMode === 'box' ? null : <input type="hidden" name="then" value="games" />}
+          {reopen.until === null ? null : (
+            <p>
+              {t('admin.games.reopenUntil', {
+                time: clockTimeText(reopen.until, { locale, timeZone }),
+              })}
+            </p>
+          )}
+          <label className="ui-stack">
             <span>{t('admin.boxScore.reopenReason')}</span>
             <input type="text" name="reason" required maxLength={1000} autoComplete="off" />
           </label>
-          <button type="submit">{t('admin.boxScore.reopen')}</button>
+          <p>
+            <button type="submit" className="ui-button" data-kind="main">
+              {t('admin.boxScore.reopen')}
+            </button>
+          </p>
         </form>
+      ) : reopen.kind === 'who' ? (
+        <p data-reopen="who">{t(`admin.games.reopenWho.${reopen.because}`)}</p>
       ) : null}
       <form action={saveBoxScoreAction}>
         <input type="hidden" name="league" value={league} />
