@@ -27,13 +27,25 @@
 // (finish-tracked-game.ts). A tie is refused unless the game's rules allow ties. Taps
 // after it in the batch meet the engine's own "this game is final". Reopening is not
 // a tap: it needs a reason and the permission to correct games (games.reopen_game).
+//
+// Since version 2 (record 058, T-261) a batch also carries the players the scorer's
+// table adds, changes and takes off, in order with the taps. Each is handled before
+// the engine, which never sees it (table-players.ts), and is kept as one of the game's
+// events, so a retry is a duplicate like any tap and a player added offline is on the
+// team before the plays after it that name them. Its event keeps ids and the number
+// only, never the typed name: events are never changed, and a name must stay
+// erasable (T-52). The lines a batch started with are worked out from the rosters as
+// they were then, so a number changed in the batch is written to the lines it reaches.
 import {
   buildVersionRefusal,
   CommandBatch,
+  CommandBatchV1,
   isAcceptedProtocolVersion,
+  isTablePlayerCommand,
   type CommandReply,
   type CommandResult,
   type RefusalCode,
+  type TablePlayerInput,
 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
@@ -57,6 +69,7 @@ import { mayScoreGame } from '../policy.ts';
 import type { GameRecord, NewGameEvent, TrackerTx } from '../ports.ts';
 import { lowerId, scorerOf, sessionStanding } from '../scoring-session.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
+import { applyTablePlayer } from '../table-players.ts';
 
 export type ApplyTrackerCommandsError =
   | { readonly code: 'unsupported-protocol-version'; readonly accepted: readonly number[] }
@@ -69,10 +82,32 @@ export type ApplyTrackerCommandsError =
  * How each protocol version's batch is read, into the current shape (T-127). When
  * `trackerProtocolVersion` goes up, the previous version's schema stays here, with
  * what turns it into the current batch; a test fails if an accepted version has none.
+ * Version 1 is taps only: each of its batches is already a version 2 batch.
  */
 export const batchReaders: Readonly<Record<number, z.ZodType<CommandBatch>>> = {
-  1: CommandBatch,
+  1: CommandBatchV1,
+  2: CommandBatch,
 };
+
+/**
+ * What a change of players keeps as its event: ids and the number, never the typed
+ * name (events are never changed, and a name must stay erasable, T-52).
+ */
+function tableEventPayload(input: TablePlayerInput): Readonly<Record<string, unknown>> {
+  const base = { side: input.side, playerId: input.playerId.toLowerCase() };
+  switch (input.type) {
+    case 'add-player':
+      return { ...base, jersey: input.jersey, named: input.name !== '' };
+    case 'change-player':
+      return {
+        ...base,
+        ...(input.jersey === undefined ? {} : { jersey: input.jersey }),
+        renamed: input.name !== undefined,
+      };
+    case 'remove-player':
+      return base;
+  }
+}
 
 /** A game the tracker may score: not decided, called off or put off. */
 const isPlayable = (game: GameRecord) => game.status === 'scheduled' || game.status === 'live';
@@ -159,22 +194,61 @@ export const applyTrackerCommands = defineCommand({
         ? basketball.newGame(engineRulesOf(rules), 0)
         : withCurrentRules(before, engineRulesOf(rules));
     const roster = rosterOf(await tx.liveGames.players(gameId));
+    // The rosters as the batch found them, for the lines it started with.
+    const rosterAtStart = new Map(roster);
     const events: NewGameEvent[] = [];
-    const results = batch.commands.map((command, i): CommandResult => {
-      const commandId = ids[i] ?? command.commandId.toLowerCase();
+    const applyOne = async (
+      commandId: string,
+      command: CommandBatch['commands'][number],
+    ): Promise<CommandResult> => {
       if (taken.has(commandId)) return { commandId: command.commandId, status: 'duplicate' };
       const refused = (message: string): CommandResult => ({
         commandId: command.commandId,
         status: 'refused',
         reason: { code: 'rule', message: message.slice(0, 300) },
       });
+      // A tap that waited out a dropped connection lands where it happened, never later than now.
+      const at = Math.min(now, command.at);
+      if (isTablePlayerCommand(command)) {
+        const refusal = await applyTablePlayer({
+          context,
+          tx,
+          game,
+          roster,
+          state,
+          input: command.input,
+        });
+        if (refusal !== undefined) {
+          return {
+            commandId: command.commandId,
+            status: 'refused',
+            reason: {
+              code: 'rule',
+              message: refusal.message.slice(0, 300),
+              problem: refusal.problem,
+              ...(refusal.wornBy === undefined ? {} : { wornBy: refusal.wornBy }),
+            },
+          };
+        }
+        seq += 1;
+        const payload = tableEventPayload(command.input);
+        events.push({
+          gameId,
+          seq,
+          commandId,
+          type: command.input.type,
+          payload,
+          tappedAt: at,
+          accountId,
+        });
+        taken.add(commandId);
+        return { commandId: command.commandId, status: 'accepted' };
+      }
       const input: TrackerInput = withLowerIds(command.input);
       const problem = platformProblem(input) ?? playerProblem(game, roster, input);
       if (problem !== undefined) return refused(problem);
       // platformProblem refuses every rules command; this tells the type checker so.
       if (input.type === 'rules') return refused('The game’s rules come from the league.');
-      // A tap that waited out a dropped connection lands where it happened, never later than now.
-      const at = Math.min(now, command.at);
       let next: basketball.GameState;
       try {
         next = basketball.apply(state, input, { id: commandId, now: at });
@@ -194,7 +268,12 @@ export const applyTrackerCommands = defineCommand({
       events.push({ gameId, seq, commandId, type, payload, tappedAt: at, accountId });
       taken.add(commandId);
       return { commandId: command.commandId, status: 'accepted' };
-    });
+    };
+    // One after another: a change of players is written before the commands after it.
+    const results: CommandResult[] = [];
+    for (const [i, command] of batch.commands.entries()) {
+      results.push(await applyOne(ids[i] ?? command.commandId.toLowerCase(), command));
+    }
     if (events.length === 0) return ok(reply(seq, results));
 
     // T6 §1: the events, the state, every changed line and the score, all together.
@@ -205,7 +284,7 @@ export const applyTrackerCommands = defineCommand({
       return ok(reply(seq, results));
     }
     const changed = changedLines(
-      before === undefined ? new Map() : linesOf(game, roster, before),
+      before === undefined ? new Map() : linesOf(game, rosterAtStart, before),
       linesOf(game, roster, state),
     );
     if (changed.lines.length > 0 || changed.removed.length > 0) {

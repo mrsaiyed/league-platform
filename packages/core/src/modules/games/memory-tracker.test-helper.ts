@@ -32,6 +32,10 @@ export type MemoryTracker = MemoryScoring & {
   events: NewGameEvent[];
   liveLines: LiveGameLine[];
   players: GamePlayer[];
+  /** Where each player added at a scorer's table was added, and whether they wait for review (0010). */
+  tableMarks: { teamId: string; personId: string; addedAtGameId: string; needsReview: boolean }[];
+  /** The season wants unique numbers on a team (0008). */
+  uniqueJerseys: boolean;
 };
 
 const initialTracker = (state: Partial<MemoryTracker>): MemoryTracker => ({
@@ -40,8 +44,97 @@ const initialTracker = (state: Partial<MemoryTracker>): MemoryTracker => ({
   events: [],
   liveLines: [],
   players: [],
+  tableMarks: [],
+  uniqueJerseys: false,
   ...state,
 });
+
+/**
+ * The scorer's table's changes (record 058) over the game's two lists: `players` (the
+ * tracker's) and `roster` (with names), kept in step. A roster entry's id here is
+ * "team|person". The database's rules (unique numbers where the season wants them, an
+ * id once, nothing removed that has lines) are stood in for by the checks made here.
+ */
+function tablePlayersOf(
+  s: MemoryTracker,
+): Pick<
+  LiveGamesStore,
+  | 'findTablePlayer'
+  | 'addTablePlayer'
+  | 'setTablePlayerNumber'
+  | 'renameTablePlayer'
+  | 'removeTablePlayer'
+> {
+  const split = (entryId: string) => {
+    const [teamId = '', personId = ''] = entryId.split('|');
+    return { teamId, personId };
+  };
+  const worn = (teamId: string, personId: string, jersey: string | null) =>
+    s.uniqueJerseys &&
+    jersey !== null &&
+    s.roster.some(
+      (r) => r.teamId === teamId && !r.left && r.jerseyNumber === jersey && r.personId !== personId,
+    );
+  return {
+    findTablePlayer: async (teamId, personId) => {
+      const entry = s.roster.find(
+        (r) => r.teamId === teamId && r.personId.toLowerCase() === personId && !r.left,
+      );
+      if (entry === undefined) return undefined;
+      const mark = s.tableMarks.find((m) => m.teamId === teamId && m.personId === personId);
+      return {
+        entryId: `${teamId}|${personId}`,
+        teamId,
+        personId,
+        jerseyNumber: entry.jerseyNumber,
+        firstName: entry.firstName,
+        lastName: entry.lastName,
+        addedAtGameId: mark?.addedAtGameId ?? null,
+      };
+    },
+    addTablePlayer: async (player) => {
+      const ids = [...s.players, ...s.roster].map((p) => p.personId.toLowerCase());
+      if (ids.includes(player.personId)) return 'id-taken';
+      if (worn(player.teamId, player.personId, player.jerseyNumber)) return 'jersey-taken';
+      const { teamId, personId, jerseyNumber, firstName, lastName } = player;
+      s.players.push({ personId, teamId, jerseyNumber, onGameDay: true });
+      s.roster.push({ teamId, personId, firstName, lastName, jerseyNumber, left: false });
+      s.tableMarks.push({
+        teamId,
+        personId,
+        addedAtGameId: player.gameId,
+        needsReview: player.needsReview,
+      });
+      return 'added';
+    },
+    setTablePlayerNumber: async (entryId, jerseyNumber) => {
+      const { teamId, personId } = split(entryId);
+      if (worn(teamId, personId, jerseyNumber)) return 'jersey-taken';
+      const same = (p: { teamId: string; personId: string }) =>
+        p.teamId === teamId && p.personId.toLowerCase() === personId;
+      s.players = s.players.map((p) => (same(p) ? { ...p, jerseyNumber } : p));
+      s.roster = s.roster.map((r) => (same(r) && !r.left ? { ...r, jerseyNumber } : r));
+      return 'changed';
+    },
+    renameTablePlayer: async (personId, firstName, lastName) => {
+      s.roster = s.roster.map((r) =>
+        r.personId.toLowerCase() === personId ? { ...r, firstName, lastName } : r,
+      );
+    },
+    removeTablePlayer: async (entryId, personId) => {
+      const { teamId } = split(entryId);
+      if ([...s.liveLines, ...s.lines].some((l) => l.personId.toLowerCase() === personId)) {
+        return 'has-lines';
+      }
+      const other = (p: { teamId: string; personId: string }) =>
+        !(p.teamId === teamId && p.personId.toLowerCase() === personId);
+      s.players = s.players.filter(other);
+      s.roster = s.roster.filter(other);
+      s.tableMarks = s.tableMarks.filter(other);
+      return 'removed';
+    },
+  };
+}
 
 /** The game's teams, read as the database's players query reads them. */
 const teamsOf = (s: MemoryGames, gameId: string) => {
@@ -90,6 +183,7 @@ export function liveGamesOf(s: MemoryTracker): LiveGamesStore {
         ...structuredClone(lines),
       ];
     },
+    ...tablePlayersOf(s),
   };
 }
 

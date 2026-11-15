@@ -1,8 +1,11 @@
 // The tracker's door (T6 §3, §5, §6; T-111, T-113, T-116, T-117, T-118, T-121, T-127):
 // the shapes that cross between the tracker, the server and the people watching.
-// The commands themselves are the ones in live-stats.ts, reused as they are.
+// The engine's commands are the ones in live-stats.ts, reused as they are; the
+// players added, changed and taken off at the scorer's table (version 2, record 058,
+// T-261) are this door's own.
 import { z } from 'zod';
 import { Envelope, Jersey } from './live-stats.ts';
+import { RecordingMode } from './season-rules.ts';
 
 const Side = z.enum(['home', 'away']);
 const Id = z.uuid();
@@ -10,8 +13,11 @@ const Ms = z.number().int().nonnegative();
 
 // ---------------------------------------------------------------- version (T-127)
 
-/** The protocol the current tracker speaks. It goes up when the shapes below change. */
-export const trackerProtocolVersion = 1;
+/**
+ * The protocol the current tracker speaks. It goes up when the shapes below change.
+ * Version 2 (record 058) added the players at the scorer's table to the batch.
+ */
+export const trackerProtocolVersion = 2;
 
 /**
  * T-127: the server takes the current version and the one before it, so a tracker
@@ -50,19 +56,123 @@ export const maxCommandsPerBatch = 50;
 export const TrackerCommand = Envelope.required({ at: true });
 export type TrackerCommand = z.infer<typeof TrackerCommand>;
 
+// ---------------------------------------------------------------- players at the table (record 058)
+
+/**
+ * A name typed at the scorer's table, in one box as the Al-Hadi tracker has it: empty
+ * for a player known by number only (S-34). The server takes the first word as the
+ * first name and the rest as the last name.
+ */
+export const TableName = z.string().trim().max(100);
+
+/**
+ * What the scorer's table changes in a game's two rosters (P7 §2 and §5.2; S-6, S-34,
+ * S-37). They travel in the tracker's own queue, in order with the taps (record 058):
+ * a player added with no signal is on the server before the plays that name them, and
+ * each is taken once, by its command ID. The server handles them before the engine,
+ * which never sees them.
+ *
+ * - `add-player`: a new person on that side's team, with a number, a name, or both.
+ *   `playerId` is made by the device, so the plays it records next can name them before
+ *   the server has answered. Marked as added at this game and to review (S-6).
+ * - `change-player`: a new number (empty takes it away) or name for a player of that
+ *   side's team. A name is changed only for a player added at a scorer's table.
+ * - `remove-player`: takes a player added at this game's table off its list, unless a
+ *   play of the game names them.
+ */
+export const TablePlayerInput = z.discriminatedUnion('type', [
+  z
+    .strictObject({
+      type: z.literal('add-player'),
+      side: Side,
+      playerId: Id,
+      jersey: Jersey,
+      name: TableName,
+    })
+    .refine((p) => p.jersey !== '' || p.name !== '', 'Enter a name or a jersey number.'),
+  z
+    .strictObject({
+      type: z.literal('change-player'),
+      side: Side,
+      playerId: Id,
+      jersey: Jersey.optional(),
+      name: TableName.optional(),
+    })
+    .refine((p) => p.jersey !== undefined || p.name !== undefined, 'Nothing to change.'),
+  z.strictObject({ type: z.literal('remove-player'), side: Side, playerId: Id }),
+]);
+export type TablePlayerInput = z.infer<typeof TablePlayerInput>;
+
+/** The command types of the players at the table: none is a play of the game. */
+export const tablePlayerCommandTypes = ['add-player', 'change-player', 'remove-player'] as const;
+
+/** A change of players as sent: like a tap, with its ID and when it was made. */
+export const TablePlayerCommand = z.strictObject({
+  commandId: Id,
+  at: z.number().int().nonnegative(),
+  input: TablePlayerInput,
+});
+export type TablePlayerCommand = z.infer<typeof TablePlayerCommand>;
+
+/** Anything the tracker's queue sends (version 2): a tap or a change of players. */
+export const BatchCommand = z.union([TrackerCommand, TablePlayerCommand]);
+export type BatchCommand = z.infer<typeof BatchCommand>;
+
+/** A change of players, told from a tap. */
+export const isTablePlayerCommand = (command: BatchCommand): command is TablePlayerCommand =>
+  (tablePlayerCommandTypes as readonly string[]).includes(command.input.type);
+
+const uniqueIds = (list: readonly { readonly commandId: string }[]) =>
+  new Set(list.map((c) => c.commandId)).size === list.length;
+
+const commandList = <T extends z.ZodType<{ readonly commandId: string }>>(command: T) =>
+  z
+    .array(command)
+    .min(1)
+    .max(maxCommandsPerBatch)
+    .refine(uniqueIds, { message: 'A command ID appears twice in the batch.' });
+
+/**
+ * The batch of version 1, taps only: what a tracker opened before version 2 sends.
+ * Kept as it was, so that tracker keeps working (T-127).
+ */
+export const CommandBatchV1 = z.strictObject({
+  protocolVersion: z.number().int().min(1),
+  sessionId: Id,
+  commands: commandList(TrackerCommand),
+});
+
 /** What the tracker posts to `POST /api/v1/leagues/{leagueId}/games/{game}/commands` (T-229). */
 export const CommandBatch = z.strictObject({
   protocolVersion: z.number().int().min(1),
   sessionId: Id,
-  commands: z
-    .array(TrackerCommand)
-    .min(1)
-    .max(maxCommandsPerBatch)
-    .refine((list) => new Set(list.map((c) => c.commandId)).size === list.length, {
-      message: 'A command ID appears twice in the batch.',
-    }),
+  commands: commandList(BatchCommand),
 });
 export type CommandBatch = z.infer<typeof CommandBatch>;
+
+/**
+ * Why a change of players was refused, as a fixed code the tracker words (T-187). The
+ * refusal's code is `rule`: it is about this one command, so the queue sets it aside
+ * and sends the rest.
+ */
+export const tablePlayerProblems = [
+  /** The season wants unique numbers and someone on the team wears it (S-37): `wornBy` names them. */
+  'jersey-taken',
+  /** The change would leave a player with neither a number nor a name (S-34). */
+  'needs-name-or-number',
+  /** The new player's id is already someone's: a fault in the device. */
+  'player-id-taken',
+  /** No such player on that side's team now. */
+  'not-on-team',
+  /** Only a player added at this game's table is taken off its list here. */
+  'not-added-here',
+  /** The name of a player on the team's own roster is the league's to change. */
+  'name-from-roster',
+  /** A play of this game names the player, so they stay on its list and its box score. */
+  'has-plays',
+] as const;
+export const TablePlayerProblem = z.enum(tablePlayerProblems);
+export type TablePlayerProblem = z.infer<typeof TablePlayerProblem>;
 
 /**
  * Why a command was refused (T-113). The tracker reloads the server's state and tells
@@ -84,7 +194,14 @@ export const CommandResult = z.discriminatedUnion('status', [
   z.strictObject({
     commandId: Id,
     status: z.literal('refused'),
-    reason: z.strictObject({ code: RefusalCode, message: z.string().max(300) }),
+    reason: z.strictObject({
+      code: RefusalCode,
+      message: z.string().max(300),
+      /** A change of players only (version 2): why, for the tracker to word. */
+      problem: TablePlayerProblem.optional(),
+      /** With `jersey-taken`: the player who wears the number, on the tracker's rosters. */
+      wornBy: Id.optional(),
+    }),
   }),
 ]);
 export type CommandResult = z.infer<typeof CommandResult>;
@@ -239,6 +356,40 @@ export const TrackerGameState = z.strictObject({
 });
 export type TrackerGameState = z.infer<typeof TrackerGameState>;
 
+// ---------------------------------------------------------------- the rosters (record 058)
+
+/**
+ * One player of a game's two rosters as the scorekeeper's device holds them (record 054):
+ * names and numbers only (R-16), those who left marked (R-17). A player added by number
+ * only has an empty first and last name (S-34): the tracker shows them as "#12".
+ */
+export const TrackerRosterPlayer = z.strictObject({
+  teamId: Id,
+  personId: Id,
+  firstName: z.string().max(100),
+  lastName: z.string().max(100),
+  jerseyNumber: Jersey.min(1).nullable(),
+  left: z.boolean(),
+});
+
+/**
+ * What `GET /api/v1/leagues/{leagueId}/games/{game}/rosters` answers whoever may score
+ * the game (record 058): the same rosters the tracker's page hands the device (record
+ * 054), so the device can take a player added a minute ago on another device. Never
+ * cached, and never for visitors: a team that shows its players to staff only is
+ * listed in full.
+ */
+export const TrackerRosters = z.strictObject({
+  gameId: Id,
+  homeTeamId: Id,
+  awayTeamId: Id,
+  /** How the game is recorded; absent for a mode this version does not know. */
+  recording: RecordingMode.optional(),
+  status: z.string().max(20),
+  players: z.array(TrackerRosterPlayer).max(1000),
+});
+export type TrackerRosters = z.infer<typeof TrackerRosters>;
+
 // ---------------------------------------------------------------- the clock (T-121)
 
 /**
@@ -299,6 +450,13 @@ const SnapshotPlayer = z.strictObject({
   side: Side,
   name: z.string().max(120).nullable(),
   jersey: z.string().max(2).nullable(),
+  /**
+   * Present, and true, only for a player whose name was never recorded: added at the
+   * scorer's table by number only (S-34). The page shows them as "#12", not as a name
+   * withheld. Absent for everyone else, so a page opened before it was added still
+   * reads every snapshot without such a player.
+   */
+  unnamed: z.literal(true).optional(),
   /** Null means hidden for this team (S-22, T-87); never zero standing in for hidden. */
   points: Ms.nullable(),
   fouls: Ms.nullable(),

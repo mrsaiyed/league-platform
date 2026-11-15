@@ -56,6 +56,7 @@ import {
   applyTrackerCommands,
   endTrackedGame,
   readTrackerState,
+  readTrackerRosters,
   unassignScorekeeper,
 } from './modules/games/index.ts';
 import {
@@ -167,6 +168,7 @@ export const commands = commandRegistry([
   releaseScoringSession,
   applyTrackerCommands,
   readTrackerState,
+  readTrackerRosters,
   endTrackedGame,
   rebuildStandings,
   addAdjustment,

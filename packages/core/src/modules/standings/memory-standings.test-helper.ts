@@ -175,6 +175,19 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     saveLines: async () => {
       throw new Error('No game is tracked in the standings tests.');
     },
+    findTablePlayer: async () => undefined,
+    addTablePlayer: async () => {
+      throw new Error('No game is tracked in the standings tests.');
+    },
+    setTablePlayerNumber: async () => {
+      throw new Error('No game is tracked in the standings tests.');
+    },
+    renameTablePlayer: async () => {
+      throw new Error('No game is tracked in the standings tests.');
+    },
+    removeTablePlayer: async () => {
+      throw new Error('No game is tracked in the standings tests.');
+    },
   };
   const transaction = memoryTransaction(db, (s, jobs): TrackerTx & StandingsTx => ({
     jobs,

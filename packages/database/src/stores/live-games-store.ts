@@ -4,12 +4,17 @@ import type { LiveGamesStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
   findSavedGameState,
+  findTablePlayer,
   insertGameEvents,
+  insertTablePlayer,
   listGamePlayerLines,
   listGamePlayers,
   listTakenCommands,
+  removeTablePlayer,
+  renameTablePlayer,
   saveGameLines,
   saveGameState,
+  setTablePlayerNumber,
 } from '../queries/index.ts';
 
 /** A line's stats as counts: the database keeps only whole numbers there (is_stat_counts). */
@@ -36,5 +41,11 @@ export function liveGamesStore(scope: LeagueScope): LiveGamesStore {
         stats: countsOf(line.stats),
       })),
     saveLines: (gameId, lines, removed) => saveGameLines(scope, gameId, lines, removed),
+    // The players the scorer's table adds, changes and takes off (record 058).
+    findTablePlayer: (teamId, personId) => findTablePlayer(scope, teamId, personId),
+    addTablePlayer: (player) => insertTablePlayer(scope, player),
+    setTablePlayerNumber: (entryId, jersey) => setTablePlayerNumber(scope, entryId, jersey),
+    renameTablePlayer: (personId, first, last) => renameTablePlayer(scope, personId, first, last),
+    removeTablePlayer: (entryId, personId) => removeTablePlayer(scope, entryId, personId),
   };
 }

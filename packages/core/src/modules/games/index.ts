@@ -80,6 +80,11 @@ export {
   type ReadTrackerStateError,
   type TrackerGameState,
 } from './commands/read-tracker-state.ts';
+export {
+  readTrackerRosters,
+  type ReadTrackerRostersError,
+  type TrackerRosters,
+} from './commands/read-tracker-rosters.ts';
 export { engineRulesOf } from './engine-rules.ts';
 export { rulesOfGame } from './season-rules-of.ts';
 export {
@@ -101,7 +106,10 @@ export type {
   LiveGameLine,
   LiveGamesStore,
   NewGameEvent,
+  NewTablePlayer,
   SavedGameState,
+  TablePlayer,
+  TablePlayerRefusal,
   TrackerTx,
 } from './ports.ts';
 export type {

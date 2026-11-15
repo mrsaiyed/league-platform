@@ -118,8 +118,12 @@ export const teamOfSide = (game: GameRecord, side: basketball.Side) =>
 /** A player key: one person on one team. */
 const keyOf = (teamId: string, personId: string) => `${teamId}|${personId}`;
 
+/** The key `rosterOf` files a player under (the person's id in lower case). */
+export const playerKey = (teamId: string, personId: string) =>
+  keyOf(teamId, personId.toLowerCase());
+
 /** The game's players by team and person. */
-export function rosterOf(players: readonly GamePlayer[]): ReadonlyMap<string, GamePlayer> {
+export function rosterOf(players: readonly GamePlayer[]): Map<string, GamePlayer> {
   const byKey = new Map<string, GamePlayer>();
   for (const player of players) {
     const key = keyOf(player.teamId, player.personId.toLowerCase());

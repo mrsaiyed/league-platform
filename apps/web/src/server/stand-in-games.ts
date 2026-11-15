@@ -9,7 +9,7 @@
 // endpoints (step 2.32) run on the same games, with made-up rosters (stand-in-tracker.ts).
 // A game's page also reads the games of the public schedule's stand-in (`listedGames`),
 // so every card on the home and schedule pages opens the game it shows.
-import { defaultSeasonRules } from '@srleagues/contracts';
+import { defaultSeasonRules, tablePlayerCommandTypes } from '@srleagues/contracts';
 import {
   systemClock,
   type AccessReader,
@@ -233,6 +233,16 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     const game = s.games.find((g) => g.id === gameId);
     return game === undefined ? [] : [game.homeTeamId, game.awayTeamId];
   };
+  /** Whether the season a team plays its games in asks for unique numbers (0008, record 058). */
+  const uniqueJerseysOf = (s: State, teamId: string) => {
+    const game = s.games.find((g) => g.homeTeamId === teamId || g.awayTeamId === teamId);
+    const rules = s.seasons.find((x) => x.id === game?.seasonId)?.rules;
+    const rosters =
+      typeof rules === 'object' && rules !== null
+        ? (rules as { rosters?: { uniqueJerseys?: unknown } }).rosters
+        : undefined;
+    return rosters?.uniqueJerseys === true;
+  };
 
   const txOf = (leagueId: string, s: State): TrackerTx => ({
     jobs: { enqueue: async () => {} },
@@ -297,8 +307,13 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
               };
             }),
         ),
+      // The players the scorer's table changed are events too, but not plays (record 058).
       hasPlays: async (gameId) =>
-        s.tracked.includes(gameId) || s.tracker.events.some((e) => e.gameId === gameId),
+        s.tracked.includes(gameId) ||
+        s.tracker.events.some(
+          (e) =>
+            e.gameId === gameId && !(tablePlayerCommandTypes as readonly string[]).includes(e.type),
+        ),
       findSeason: async (seasonId) => s.seasons.find((x) => x.id === seasonId),
       leagueSettingRows: async (key) => s.settings[key] ?? [],
       isAssigned: async (gameId, accountId) => isAssigned(s, gameId, accountId),
@@ -337,7 +352,11 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     },
     clock: systemClock,
     scoringSessions: scoringSessionsOf(s.tracker, (gameId) => s.games.some((g) => g.id === gameId)),
-    liveGames: liveGamesOf(s.tracker, (gameId) => teamsOf(s, gameId)),
+    liveGames: liveGamesOf(
+      s.tracker,
+      (gameId) => teamsOf(s, gameId),
+      (teamId) => uniqueJerseysOf(s, teamId),
+    ),
   });
 
   const noticeOnly: EventHandler<TrackerTx>[] = ['games.finalized', 'games.reopened'].map(

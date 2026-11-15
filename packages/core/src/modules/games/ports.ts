@@ -246,6 +246,46 @@ export type GamePlayer = {
 export type LiveGameLine = GameLine & { readonly jerseyNumber: string | null };
 
 /**
+ * A player of one of a game's teams as the scorer's table changes them (record 058):
+ * their current roster entry (not left) and the name on their person.
+ */
+export type TablePlayer = {
+  readonly entryId: string;
+  readonly teamId: string;
+  readonly personId: string;
+  readonly jerseyNumber: string | null;
+  readonly firstName: string;
+  readonly lastName: string;
+  /** The game at whose scorer's table they were added (S-6), or null. */
+  readonly addedAtGameId: string | null;
+};
+
+/** A player added at a game's scorer's table: a new person on one of its teams (S-6, S-34). */
+export type NewTablePlayer = {
+  /** Made by the device, so the plays after it can name them (record 058). */
+  readonly personId: string;
+  readonly teamId: string;
+  readonly gameId: string;
+  readonly jerseyNumber: string | null;
+  readonly firstName: string;
+  readonly lastName: string;
+  /** Marked for the league's admin to review (S-6). */
+  readonly needsReview: boolean;
+};
+
+/**
+ * Why the database turned a change of players away. Each is checked in a savepoint of
+ * its own, so the batch's transaction carries on (record 058).
+ */
+export type TablePlayerRefusal =
+  /** The season wants unique numbers and someone on the team wears it (0008). */
+  | 'jersey-taken'
+  /** The person's id is already taken. */
+  | 'id-taken'
+  /** The player has box score lines, in this game or another. */
+  | 'has-lines';
+
+/**
  * The live game's storage (T3 §8, T6 §1): its state, events and box score lines. Its
  * lock is the game's (ScoringSessionsStore.lockGame), shared with the session commands.
  */
@@ -272,6 +312,30 @@ export type LiveGamesStore = {
     lines: readonly LiveGameLine[],
     removed: readonly string[],
   ) => Promise<void>;
+  /** The person's current entry (not left) on the team, or undefined (record 058). */
+  readonly findTablePlayer: (teamId: string, personId: string) => Promise<TablePlayer | undefined>;
+  /** Adds a new person and their roster entry, marked as added at the game (S-6). */
+  readonly addTablePlayer: (player: NewTablePlayer) => Promise<'added' | TablePlayerRefusal>;
+  /** Gives a roster entry a new number, or none. */
+  readonly setTablePlayerNumber: (
+    entryId: string,
+    jerseyNumber: string | null,
+  ) => Promise<'changed' | TablePlayerRefusal>;
+  /** Gives a person a new first and last name (either may be empty, S-34). */
+  readonly renameTablePlayer: (
+    personId: string,
+    firstName: string,
+    lastName: string,
+  ) => Promise<void>;
+  /**
+   * Takes a roster entry away, and its person too when nothing else holds them (no
+   * other entry, no account, no statistics): a player added by mistake leaves nothing
+   * behind. Refused with `has-lines` while the person has a box score line anywhere.
+   */
+  readonly removeTablePlayer: (
+    entryId: string,
+    personId: string,
+  ) => Promise<'removed' | TablePlayerRefusal>;
 };
 
 /** The tracker's commands' transaction (step 2.29): the scoring one and the live game. */
