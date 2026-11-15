@@ -360,10 +360,8 @@ describe('databasePorts (record 055)', () => {
 
   it('refuses each area not yet on the database when it is reached, not before', async () => {
     const areas = [
-      ports.publicStats,
       ports.games,
       ports.fixtureImport,
-      ports.publicSchedule,
       ports.scheduleAdmin,
       ports.publicTeams,
       ports.adminTeams,
@@ -378,5 +376,18 @@ describe('databasePorts (record 055)', () => {
       NotOnTheDatabaseYet,
     );
     expect(ports.liveFeed).toBeNull();
+    // The statistics (part 3) refuse within the standings' ports, which have moved.
+    await expect(ports.publicStats.settingsOf(lakeside().leagueId)).rejects.toThrow(
+      NotOnTheDatabaseYet,
+    );
+  });
+
+  it('reads the public schedule and standings from the database (part 2)', async () => {
+    // The seed's season is still being set up here, so a visitor is offered none, as a
+    // season in set-up is hidden on the stand-in too.
+    expect(await ports.publicStats.seasonsOf(lakeside().leagueId)).toEqual([]);
+    expect((await ports.publicSchedule.clockOf(lakeside().leagueId)).timeZone).toBe(
+      'America/Chicago',
+    );
   });
 });
