@@ -53,10 +53,17 @@ function networkWith(rulesNow: () => SeasonRules): EndpointNetwork {
   });
 }
 
-function device(network: EndpointNetwork, deviceId = 'tablet-1') {
+function device(
+  network: EndpointNetwork,
+  deviceId = 'tablet-1',
+  /** Waited for before each load of the state is answered, to hold one back in a test. */
+  beforeState: () => Promise<void> = async () => {},
+) {
   const clock = createManualClock();
-  const fetch: typeof globalThis.fetch = (input, init) =>
-    network.fetchAs('scorekeeper')(input, init);
+  const fetch: typeof globalThis.fetch = async (input, init) => {
+    if (String(input).endsWith('/state')) await beforeState();
+    return network.fetchAs('scorekeeper')(input, init);
+  };
   return createTrackerController({
     gameId,
     deviceId,
@@ -162,6 +169,104 @@ describe('the season’s rules on the scorekeeper’s device (step 2.122)', () =
     const server = await serverGame(network);
     expect(server.plays.at(-1)).toMatchObject({ type: 'clock-mode', mode: 'running' });
     expect(basketball.derive(server).clockMode).toBe('running');
+    await controller.leave();
+  });
+});
+
+describe('the season changed after the device loaded the game, before tip-off (record 062)', () => {
+  /** The same board on the device and on the server, and nothing refused. */
+  async function sameAsServer(controller: Controller, network: EndpointNetwork) {
+    await controller.idle();
+    expect(controller.status().notApplied).toEqual([]);
+    expect(controller.status().waiting).toEqual([]);
+    const server = await serverGame(network);
+    expect(shown(controller).rules).toEqual(server.rules);
+    expect(shown(controller).plays).toEqual(server.plays);
+    expect(basketball.derive(shown(controller)).players).toEqual(basketball.derive(server).players);
+    return server;
+  }
+
+  it('a limit lowered from six to four: the device takes the server’s at the first batch, and both mark the player out', async () => {
+    let rules = withLimit(6);
+    const network = networkWith(() => rules);
+    const controller = await opened(device(network));
+    expect(shown(controller).rules.playerFoulLimit).toBe(6);
+    rules = withLimit(4);
+    await tapAll(controller, [...tipOff, foul, foul, foul, foul]);
+    const server = await sameAsServer(controller, network);
+    expect(server.rules.playerFoulLimit).toBe(4);
+    expect(lineOf(shown(controller), fouler)).toMatchObject({ fouls: 4, fouledOut: true });
+    await controller.leave();
+  });
+
+  it('a mercy lead set meanwhile: the device’s clock switches with the server’s, and its next start is not refused', async () => {
+    let rules = seasonRulesPreset('high-school');
+    const network = networkWith(() => rules);
+    const controller = await opened(device(network));
+    rules = seasonRulesPreset('high-school');
+    rules.clock = { mode: 'stop', stopClockLastSeconds: null, mercyLead: 6 };
+    const three: TapInput = { type: 'score', side: 'home', playerId: fouler, points: 3 };
+    await tapAll(controller, [...tipOff, { type: 'start' }]);
+    await controller.idle();
+    await tapAll(controller, [three, three]);
+    expect(basketball.derive(shown(controller)).clockMode).toBe('running');
+    // Under the running clock the whistle does not stop it, so there is no start to refuse.
+    await tapAll(controller, [{ type: 'foul', side: 'away', playerId: bears[0] ?? '' }]);
+    expect(shown(controller).clock.running).toBe(true);
+    await sameAsServer(controller, network);
+    await controller.leave();
+  });
+
+  it('taps made while that load is under way are neither lost nor counted twice', async () => {
+    let rules = withLimit(6);
+    const network = networkWith(() => rules);
+    let release: () => void = () => {};
+    let holding = false;
+    const beforeState = () =>
+      holding ? new Promise<void>((resolve) => (release = resolve)) : Promise.resolve();
+    const controller = await opened(device(network, 'tablet-1', beforeState));
+    rules = withLimit(4);
+    holding = true;
+    await tapAll(controller, tipOff);
+    // The server has taken the line-ups; the load they asked for is held back.
+    await tapAll(controller, [foul, foul, foul, foul]);
+    holding = false;
+    release();
+    const server = await sameAsServer(controller, network);
+    expect(lineOf(server, fouler)).toMatchObject({ fouls: 4, fouledOut: true });
+    expect(server.plays.filter((p) => p.type === 'foul')).toHaveLength(4);
+    await controller.leave();
+  });
+
+  it('a device that tipped off offline converges at its first batch once back', async () => {
+    let rules = withLimit(6);
+    const network = networkWith(() => rules);
+    const controller = await opened(device(network));
+    network.mode = 'down';
+    rules = withLimit(4);
+    await tapAll(controller, [...tipOff, foul, foul, foul, foul]);
+    // Offline its own picture is the rules it loaded: not out yet.
+    expect(lineOf(shown(controller), fouler)?.fouledOut).toBeUndefined();
+    network.mode = 'up';
+    controller.online();
+    await sameAsServer(controller, network);
+    expect(lineOf(shown(controller), fouler)?.fouledOut).toBe(true);
+    await controller.leave();
+  });
+
+  it('nothing changes for a game already under way: no further loads', async () => {
+    let rules = withLimit(4);
+    const network = networkWith(() => rules);
+    const controller = await opened(device(network));
+    await tapAll(controller, [...tipOff, foul]);
+    await controller.idle();
+    const loads = network.reached.filter((r) => r === 'GET state').length;
+    rules = withLimit(2);
+    await tapAll(controller, [foul, foul, foul]);
+    await controller.idle();
+    expect(network.reached.filter((r) => r === 'GET state')).toHaveLength(loads);
+    const server = await sameAsServer(controller, network);
+    expect(server.rules.playerFoulLimit).toBe(4);
     await controller.leave();
   });
 });
