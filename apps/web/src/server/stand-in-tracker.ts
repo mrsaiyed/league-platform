@@ -121,10 +121,14 @@ export function scoringSessionsOf(
   };
 }
 
-/** The live game's storage, over one state; `teamsOf` gives a game's two teams. */
+/**
+ * The live game's storage, over one state; `teamsOf` gives a game's two teams and
+ * `decidedAt` when it was decided (its `finalizedAt`).
+ */
 export function liveGamesOf(
   s: TrackerState,
   teamsOf: (gameId: string) => readonly string[],
+  decidedAt: (gameId: string) => string | null | undefined,
 ): LiveGamesStore {
   return {
     findState: async (gameId) => {
@@ -163,6 +167,19 @@ export function liveGamesOf(
     findLastEnd: async (gameId) => {
       const end = s.events.filter((e) => e.gameId === gameId && e.type === 'end').at(-1);
       return end === undefined ? undefined : { accountId: end.accountId };
+    },
+    // The stand-in's "database clock" is this process's.
+    endedAgo: async (gameId) => {
+      const decided = decidedAt(gameId);
+      return decided === null || decided === undefined
+        ? undefined
+        : Math.max(0, Date.now() - Date.parse(decided));
+    },
+    findEvent: async (gameId, commandId) => {
+      const found = s.events.find((e) => e.gameId === gameId && e.commandId === commandId);
+      return found === undefined
+        ? undefined
+        : { seq: found.seq, type: found.type, accountId: found.accountId };
     },
   };
 }

@@ -279,6 +279,19 @@ export type LiveGamesStore = {
   readonly findLastEnd: (
     gameId: string,
   ) => Promise<{ readonly accountId: string | null } | undefined>;
+  /**
+   * How long ago the game was decided, in milliseconds, measured inside the database
+   * (its `now()` less the game's `finalized_at`, both its own clock), or undefined if
+   * it is not decided. Never below 0.
+   */
+  readonly endedAgo: (gameId: string) => Promise<number | undefined>;
+  /** The game's event made by this command id: its number, type and sender, or undefined. */
+  readonly findEvent: (
+    gameId: string,
+    commandId: string,
+  ) => Promise<
+    { readonly seq: number; readonly type: string; readonly accountId: string | null } | undefined
+  >;
 };
 
 /** The tracker's commands' transaction (step 2.29): the scoring one and the live game. */

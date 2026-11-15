@@ -828,6 +828,9 @@ export const en = {
   'error.games.reopen_tracked_game.scorekeepers-may-not-reopen':
     'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
   'error.games.reopen_tracked_game.not-ended-by-you':
+    '{name} ended this game, so only they can reopen it here. A league admin can reopen it.',
+  // When the server knows no account for the end (a game brought over from elsewhere).
+  'error.games.reopen_tracked_game.not-ended-by-you.unknown':
     'Only the scorekeeper who ended this game can reopen it here. A league admin can reopen it.',
   'error.games.reopen_tracked_game.reopen-time-over':
     'It is too long since this game ended for a scorekeeper to reopen it. A league admin can reopen it.',
@@ -835,6 +838,21 @@ export const en = {
     'Say in a few words why the game is being reopened (up to 1000 characters). It is kept in the game’s corrections, never shown publicly.',
   'error.games.reopen_tracked_game.not-allowed':
     'You cannot score this game, so you cannot reopen it. A league admin can reopen it.',
+  // Reopen game on the tracker's final panel (step 2.37 draws it), from the server's
+  // answer to GET …/games/{game}/reopen before the tap (step 2.120, S-36).
+  'tracker.reopen.button': 'Reopen game',
+  'tracker.reopen.until': 'You can reopen this game until {time}.',
+  'tracker.reopen.adminCan': 'A league admin can reopen this game.',
+  'tracker.reopen.question':
+    'Reopen this game? It goes back to live with every play as it was, and it stops counting in the standings until you end it again.',
+  'tracker.reopen.reasonLabel':
+    'Why it is being reopened (kept in the game’s corrections, never shown publicly)',
+  'tracker.reopen.reasonReady': 'End game tapped by mistake',
+  'tracker.reopen.confirm': 'Reopen the game',
+  'tracker.reopen.cancel': 'Keep it final',
+  'tracker.reopen.noConnection':
+    'No connection. The game reopens as soon as the connection is back.',
+  'tracker.reopen.done': 'The game is live again. Carry on scoring.',
   // Why a schedule draft edit was refused (T-187).
   'error.scheduling.add_draft_game.changed-since-read':
     'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',

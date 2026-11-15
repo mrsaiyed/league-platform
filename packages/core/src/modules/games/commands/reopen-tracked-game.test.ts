@@ -30,6 +30,7 @@ import { leaseMs } from '../scoring-session.ts';
 import { applyTrackerCommands } from './apply-tracker-commands.ts';
 import { endTrackedGame } from './end-tracked-game.ts';
 import { openScoringSession } from './open-scoring-session.ts';
+import { readReopenOffer } from './read-reopen-offer.ts';
 import { reopenGame } from './reopen-game.ts';
 import { reopenTrackedGame } from './reopen-tracked-game.ts';
 
@@ -93,11 +94,14 @@ type Tracker = ReturnType<typeof setUp>;
 type Input = TrackerCommand['input'];
 
 let numbered = 0;
-/** Sends taps from the tablet; their statuses. */
-async function tap(t: Tracker, inputs: readonly Input[]) {
+/**
+ * Sends taps from the tablet; their statuses. `deviceAhead` is how far the tablet's own
+ * clock is ahead of the server's (behind when negative): the time each tap carries.
+ */
+async function tap(t: Tracker, inputs: readonly Input[], deviceAhead = 0) {
   const commands = inputs.map((input) => {
     numbered += 1;
-    return { commandId: commandUuid(numbered), at: t.clock.now(), input };
+    return { commandId: commandUuid(numbered), at: t.clock.now() + deviceAhead, input };
   });
   const result = await applyTrackerCommands(
     t.as(scorekeeperId),
@@ -113,17 +117,21 @@ async function tap(t: Tracker, inputs: readonly Input[]) {
  * the database's own clock; the stand-in stamps a fixed time, so it is set here to the
  * moment the server took the end, as the database would.
  */
-async function endedOnTablet(t: Tracker) {
-  await tap(t, [
-    { type: 'lineup', side: 'home', playerIds: homeIds },
-    { type: 'lineup', side: 'away', playerIds: awayIds },
-    { type: 'start' },
-    { type: 'score', side: 'home', playerId: homeIds[0] ?? '', points: 3 },
-    { type: 'score', side: 'home', playerId: homeIds[1] ?? '', points: 2 },
-    { type: 'score', side: 'away', playerId: awayIds[0] ?? '', points: 2 },
-  ]);
+async function endedOnTablet(t: Tracker, deviceAhead = 0) {
+  await tap(
+    t,
+    [
+      { type: 'lineup', side: 'home', playerIds: homeIds },
+      { type: 'lineup', side: 'away', playerIds: awayIds },
+      { type: 'start' },
+      { type: 'score', side: 'home', playerId: homeIds[0] ?? '', points: 3 },
+      { type: 'score', side: 'home', playerId: homeIds[1] ?? '', points: 2 },
+      { type: 'score', side: 'away', playerId: awayIds[0] ?? '', points: 2 },
+    ],
+    deviceAhead,
+  );
   t.clock.advance(1800);
-  expect(await tap(t, [{ type: 'end' }])).toEqual(['accepted']);
+  expect(await tap(t, [{ type: 'end' }], deviceAhead)).toEqual(['accepted']);
   const [ended] = t.db.state.games;
   if (ended === undefined) throw new Error('no game');
   t.db.state.games[0] = { ...ended, finalizedAt: new Date(t.clock.now()).toISOString() };
@@ -135,14 +143,28 @@ const versionOf = (t: Tracker) => t.db.state.games[0]?.version ?? 0;
 const sequenceOf = (t: Tracker, id = gameId) =>
   t.db.state.states.find((x) => x.gameId === id)?.seq ?? 0;
 
+let requests = 0;
+/** A fresh id for one reopen, as the device makes it. */
+const requestUuid = () => {
+  requests += 1;
+  return `01900000-0000-7000-8000-0000e0${String(requests).padStart(6, '0')}`;
+};
+
+/** Reopens with a fresh request id and no sequence number, unless `extra` gives them. */
 async function reopenAs(t: Tracker, accountId: string | null, extra: object = {}) {
   const result = await reopenTrackedGame(
     t.as(accountId),
-    { gameId, sequence: sequenceOf(t), reason, ...extra },
+    { gameId, requestId: requestUuid(), reason, ...extra },
     t.deps,
   );
   return result.ok ? 'ok' : result.error.code;
 }
+
+const offerTo = async (t: Tracker, accountId: string) => {
+  const result = await readReopenOffer(t.as(accountId), { gameId }, t.deps);
+  if (!result.ok) throw new Error(`offer refused: ${result.error.code}`);
+  return result.value;
+};
 
 const minutesSetting = (value: number) => ({
   'games.scorekeeperReopenMinutes': [{ level: 'league' as const, document: { version: 1, value } }],
@@ -154,13 +176,19 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
     const endedAt = await endedOnTablet(t);
     t.clock.at = endedAt + minutes(29);
     const before = t.db.state.games[0];
+    const requestId = requestUuid();
     const result = await reopenTrackedGame(
       t.as(scorekeeperId),
-      { gameId, sequence: 7, reason },
+      { gameId, requestId, sequence: 7, reason },
       t.deps,
     );
     // The tablet is told the reopen's own number: the event after its End game.
     expect(result).toEqual({ ok: true, value: { sequence: 8 } });
+    expect(t.db.state.events.at(-1)).toMatchObject({
+      seq: 8,
+      type: 'reopen',
+      commandId: requestId,
+    });
     const s = t.db.state;
     expect(s.games[0]).toMatchObject({
       status: 'live',
@@ -205,18 +233,38 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
     expect(await reopenAs(t, ownerId)).toBe('ok');
   });
 
-  it('counts exactly the minutes the league sets, never the device: 30 opens, a minute more does not', async () => {
+  it('counts exactly the minutes the league sets: 30 opens, a moment more does not', async () => {
     const t = setUp();
     const endedAt = await endedOnTablet(t);
     t.clock.at = endedAt + minutes(30);
     expect(await reopenAs(t, scorekeeperId)).toBe('ok');
-    // Ended again with the same tablet; its taps carry the device's time, which counts for nothing.
     expect(await tap(t, [{ type: 'end' }])).toEqual(['accepted']);
     const second = t.db.state.games[0];
     if (second === undefined) throw new Error('no game');
     t.db.state.games[0] = { ...second, finalizedAt: new Date(t.clock.now()).toISOString() };
     t.clock.at += minutes(30) + 1;
     expect(await reopenAs(t, scorekeeperId)).toBe('reopen-time-over');
+  });
+
+  it("never counts the device's clock: a tablet two hours behind or ahead changes nothing", async () => {
+    for (const deviceAhead of [-minutes(120), minutes(120)]) {
+      const t = setUp();
+      const endedAt = await endedOnTablet(t, deviceAhead);
+      // The End tap carries the tablet's time (never later than the server's) ...
+      const end = t.db.state.events.find((e) => e.type === 'end');
+      expect(end?.tappedAt).toBe(Math.min(endedAt, endedAt + deviceAhead));
+      // ... but the time allowed runs from when the server took it.
+      t.clock.at = endedAt + minutes(29);
+      expect((await offerTo(t, scorekeeperId)).reopen).toEqual({
+        when: 'until',
+        until: endedAt + minutes(30),
+      });
+      expect(await reopenAs(t, scorekeeperId), String(deviceAhead)).toBe('ok');
+    }
+    const late = setUp();
+    const endedAt = await endedOnTablet(late, -minutes(120));
+    late.clock.at = endedAt + minutes(31);
+    expect(await reopenAs(late, scorekeeperId)).toBe('reopen-time-over');
   });
 
   it("follows the league's setting: 10 minutes, and 0 for never", async () => {
@@ -306,10 +354,10 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
       ],
     });
     await endedOnTablet(t);
-    const code = async (n: number, sequence = 1) => {
+    const code = async (n: number, sequence?: number) => {
       const result = await reopenTrackedGame(
         t.as(scorekeeperId),
-        { gameId: gameUuid(n), sequence, reason },
+        { gameId: gameUuid(n), requestId: requestUuid(), reason, sequence },
         t.deps,
       );
       return result.ok ? 'ok' : result.error.code;
@@ -322,6 +370,8 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
     // The tablet knows an older number than the game's: it moved on since.
     expect(await code(1, sequenceOf(t) - 1)).toBe('changed-since-read');
     expect(await code(1, 0)).toBe('invalid-input');
+    // The number is optional; the right one, or none, reopens it.
+    expect(await code(1, sequenceOf(t))).toBe('ok');
     // Decided by hand while its tracker was live: the state never ended.
     const live = setUp();
     await tap(live, [
@@ -366,5 +416,121 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
       ]),
     ).toEqual(['accepted', 'accepted', 'accepted']);
     expect(t.db.state.games[0]).toMatchObject({ status: 'final', homeScore: 7, awayScore: 4 });
+  });
+
+  it('is safe to send twice: the same request id is answered "reopened" again, nothing twice', async () => {
+    const t = setUp();
+    const endedAt = await endedOnTablet(t);
+    t.clock.at = endedAt + minutes(5);
+    const requestId = requestUuid();
+    const send = (accountId = scorekeeperId) =>
+      reopenTrackedGame(t.as(accountId), { gameId, requestId, sequence: 7, reason }, t.deps);
+    expect(await send()).toEqual({ ok: true, value: { sequence: 8 } });
+    const once = structuredClone(t.db.state);
+    // The answer was lost on the gym's Wi-Fi; the device sends the same request again.
+    expect(await send()).toEqual({ ok: true, value: { sequence: 8 } });
+    expect(t.db.state).toEqual(once);
+    expect(t.db.state.corrections).toHaveLength(1);
+    // Later taps have been saved since: still "reopened", with the game's number now.
+    await tap(t, [{ type: 'score', side: 'away', playerId: awayIds[1] ?? '', points: 2 }]);
+    t.clock.at = endedAt + minutes(45);
+    expect(await send()).toEqual({ ok: true, value: { sequence: 9 } });
+    // Another account sending that id, or an id a tap already used, is refused.
+    expect(await send(ownerId)).toMatchObject({ ok: false, error: { code: 'changed-since-read' } });
+    const tapId = t.db.state.events.find((e) => e.type === 'start')?.commandId ?? '';
+    expect(await reopenAs(t, ownerId, { requestId: tapId })).toBe('changed-since-read');
+  });
+
+  it('tells who ended the game when it was not this scorekeeper', async () => {
+    const t = setUp();
+    await endedOnTablet(t);
+    const result = await reopenTrackedGame(
+      t.as(otherScorekeeperId),
+      { gameId, requestId: requestUuid(), reason },
+      t.deps,
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'not-ended-by-you', endedBy: scorekeeperId },
+    });
+  });
+
+  it('may correct games only in another program: then only as the one who ended it, in time', async () => {
+    const adminElsewhere = (accountId: string, n: string): Grant => ({
+      ...scorekeeperGrant,
+      id: `01900000-0000-7000-8000-0000000000${n}`,
+      accountId,
+      role: 'admin',
+      scope: { type: 'program', id: 'p2' },
+    });
+    const t = setUp();
+    t.db.state.grants = [
+      ...t.db.state.grants,
+      adminElsewhere(scorekeeperId, 'd1'),
+      adminElsewhere(otherScorekeeperId, 'd2'),
+    ];
+    const endedAt = await endedOnTablet(t);
+    t.clock.at = endedAt + minutes(5);
+    expect(await reopenAs(t, otherScorekeeperId)).toBe('not-ended-by-you');
+    t.clock.at = endedAt + minutes(31);
+    expect((await offerTo(t, scorekeeperId)).reopen).toEqual({
+      when: 'no',
+      code: 'reopen-time-over',
+    });
+    expect(await reopenAs(t, scorekeeperId)).toBe('reopen-time-over');
+    t.clock.at = endedAt + minutes(29);
+    expect(await reopenAs(t, scorekeeperId)).toBe('ok');
+  });
+});
+
+describe('what the device is told before the tap (games.read_reopen_offer)', () => {
+  it('offers it until a server time to the one who ended it, always to a corrector, and says who ended it', async () => {
+    const t = setUp();
+    const endedAt = await endedOnTablet(t);
+    t.clock.at = endedAt + minutes(10);
+    expect(await offerTo(t, scorekeeperId)).toEqual({
+      reopen: { when: 'until', until: endedAt + minutes(30) },
+      endedBy: scorekeeperId,
+    });
+    expect(await offerTo(t, schedulerId)).toEqual({
+      reopen: { when: 'always' },
+      endedBy: scorekeeperId,
+    });
+    expect(await offerTo(t, otherScorekeeperId)).toEqual({
+      reopen: { when: 'no', code: 'not-ended-by-you' },
+      endedBy: scorekeeperId,
+    });
+    t.clock.at = endedAt + minutes(31);
+    expect((await offerTo(t, scorekeeperId)).reopen).toEqual({
+      when: 'no',
+      code: 'reopen-time-over',
+    });
+    // The read changes nothing.
+    expect(t.db.state.corrections).toEqual([]);
+  });
+
+  it('answers "no" with the reason for every game it would refuse, and refuses whoever may not score it', async () => {
+    const t = setUp({
+      games: [game(1, { captureMode: 'live' }), finalGame(2)],
+      settings: minutesSetting(0),
+    });
+    expect((await offerTo(t, scorekeeperId)).reopen).toEqual({
+      when: 'no',
+      code: 'game-not-decided',
+    });
+    const byHand = await readReopenOffer(t.as(scorekeeperId), { gameId: gameUuid(2) }, t.deps);
+    expect(byHand).toMatchObject({
+      ok: true,
+      value: { reopen: { when: 'no', code: 'not-ended-by-tracker' }, endedBy: null },
+    });
+    await endedOnTablet(t);
+    expect((await offerTo(t, scorekeeperId)).reopen).toEqual({
+      when: 'no',
+      code: 'scorekeepers-may-not-reopen',
+    });
+    const stranger = await readReopenOffer(t.as(programScorekeeperId), { gameId }, t.deps);
+    expect(stranger).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+    const missing = await readReopenOffer(t.as(ownerId), { gameId: gameUuid(9) }, t.deps);
+    expect(missing).toMatchObject({ ok: false, error: { code: 'game-not-found' } });
   });
 });

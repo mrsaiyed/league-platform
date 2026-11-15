@@ -352,7 +352,11 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     },
     clock: systemClock,
     scoringSessions: scoringSessionsOf(s.tracker, (gameId) => s.games.some((g) => g.id === gameId)),
-    liveGames: liveGamesOf(s.tracker, (gameId) => teamsOf(s, gameId)),
+    liveGames: liveGamesOf(
+      s.tracker,
+      (gameId) => teamsOf(s, gameId),
+      (gameId) => s.games.find((g) => g.id === gameId)?.finalizedAt,
+    ),
   });
 
   const noticeOnly: EventHandler<TrackerTx>[] = ['games.finalized', 'games.reopened'].map(

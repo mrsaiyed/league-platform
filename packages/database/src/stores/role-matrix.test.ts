@@ -109,6 +109,7 @@ import {
   readTrackerState,
   endTrackedGame,
   reopenTrackedGame,
+  readReopenOffer,
   engineRulesOf,
   renameShortName,
   resendInvitation,
@@ -1051,54 +1052,69 @@ const gameCommandRows: readonly Row[] = [
     (c, i) => endTrackedGame(c, i, trackerDeps),
   ),
   // The scorekeeper's reopening of a game they ended (step 2.120, S-36): whoever may
-  // score it. The game was ended from the tracker five minutes before the matrix's
-  // clock by the matrix's scorekeeper, so the scorekeeper may within the league's 30
+  // score it. The game was ended from the tracker five minutes ago, by the database's
+  // clock, by the matrix's scorekeeper, so the scorekeeper may within the league's 30
   // minutes; everyone else who scores here may also correct games, which reopens it
   // at any time.
   ...gameRows(
     'games.reopen_tracked_game',
     'reopen a game ended from the tracker',
     'games.score',
-    async (league, program) => {
-      const { gameId } = await gameIn(league, program, {
-        capture_mode: 'live',
-        status: 'final',
-        home_score: 2,
-        away_score: 0,
-        finalized_at: new Date(matrixNow - 300_000).toISOString(),
-      });
-      const personId = await newPerson(pglite, league.leagueId);
-      const basket = { type: 'score', side: 'home', playerId: personId, points: 2 } as const;
-      let state = basketball.newGame(engineRulesOf(defaultSeasonRules()), 0);
-      const taps = [basket, { type: 'end' } as const];
-      for (const [i, command] of taps.entries()) {
-        const commandId = randomUUID();
-        state = basketball.apply(state, command, { id: commandId, now: matrixNow - 300_000 });
-        const { type, ...payload } = command;
-        await pglite.query(
-          `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at, account_id)
-           values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [
-            league.leagueId,
-            gameId,
-            i + 1,
-            commandId,
-            type,
-            JSON.stringify(payload),
-            new Date(matrixNow - 300_000).toISOString(),
-            league.accountOf('scorekeeper'),
-          ],
-        );
-      }
-      await pglite.query(
-        'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 2, $3)',
-        [league.leagueId, gameId, JSON.stringify(state)],
-      );
-      return { gameId, sequence: 2, reason: 'End game was tapped too soon' };
-    },
+    async (league, program) => ({
+      gameId: await trackedGameEndedIn(league, program),
+      requestId: randomUUID(),
+      reason: 'End game was tapped too soon',
+    }),
     (c, i) => reopenTrackedGame(c, i, trackerDeps),
   ),
+  // Whether Reopen is offered, before the tap: whoever may score the game. A read.
+  ...gameRows(
+    'games.read_reopen_offer',
+    'see whether a game ended from the tracker can be reopened',
+    'games.score',
+    async (league, program) => ({ gameId: await trackedGameEndedIn(league, program) }),
+    (c, i) => readReopenOffer(c, i, trackerDeps),
+  ),
 ];
+
+/** A game the matrix's scorekeeper ended from the tracker five minutes ago: a basket, then the end. */
+async function trackedGameEndedIn(league: League, program: boolean): Promise<string> {
+  const { gameId } = await gameIn(league, program, {
+    capture_mode: 'live',
+    status: 'final',
+    home_score: 2,
+    away_score: 0,
+    finalized_at: new Date(Date.now() - 300_000).toISOString(),
+  });
+  const personId = await newPerson(pglite, league.leagueId);
+  const basket = { type: 'score', side: 'home', playerId: personId, points: 2 } as const;
+  let state = basketball.newGame(engineRulesOf(defaultSeasonRules()), 0);
+  const taps = [basket, { type: 'end' } as const];
+  for (const [i, command] of taps.entries()) {
+    const commandId = randomUUID();
+    state = basketball.apply(state, command, { id: commandId, now: matrixNow - 300_000 });
+    const { type, ...payload } = command;
+    await pglite.query(
+      `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at, account_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        league.leagueId,
+        gameId,
+        i + 1,
+        commandId,
+        type,
+        JSON.stringify(payload),
+        new Date(matrixNow - 300_000).toISOString(),
+        league.accountOf('scorekeeper'),
+      ],
+    );
+  }
+  await pglite.query(
+    'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 2, $3)',
+    [league.leagueId, gameId, JSON.stringify(state)],
+  );
+  return gameId;
+}
 
 const divisionAndVenueRows: readonly Row[] = [
   // Divisions are checked at their season's program (P4 §4): the owner and admins.

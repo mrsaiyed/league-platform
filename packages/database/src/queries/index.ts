@@ -141,6 +141,8 @@ export { saveGameState } from './save-game-state.ts';
 export { listGamePlayers } from './list-game-players.ts';
 export { saveGameLines } from './save-game-lines.ts';
 export { findLastGameEnd } from './find-last-game-end.ts';
+export { findGameEndedAgo } from './find-game-ended-ago.ts';
+export { findGameEvent } from './find-game-event.ts';
 export { listTableTeams } from './list-table-teams.ts';
 export { listStandingsAdjustments } from './list-standings-adjustments.ts';
 export { insertStandingsAdjustment } from './insert-standings-adjustment.ts';

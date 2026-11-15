@@ -36,6 +36,8 @@ const reads = new Set([
   'games.read_tracker_state',
   // The rosters stored on the scorekeeper's device when it opens a game (T-258): a read.
   'games.read_tracker_rosters',
+  // Whether the device may offer Reopen, before the tap (step 2.120): a read.
+  'games.read_reopen_offer',
 ]);
 
 /** Entries the nightly worker writes itself, not through a registered command (T-51). */

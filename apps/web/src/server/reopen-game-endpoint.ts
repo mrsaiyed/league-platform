@@ -1,65 +1,56 @@
-// POST /api/v1/leagues/{leagueId}/games/{game}/reopen (step 2.120, S-36; record 060):
-// the scorekeeper who tapped End game too soon reopens the game from the tracker, with
-// a reason. A thin handler (T-25, T-26): who is asking and which league come from the
-// context (T-23), the game from the address, and the body carries only `sequence`, the
-// number of the last tap the device knows of (its End game, as the commands endpoint
-// answered it), and `reason`. One command does the rest (games.reopen_tracked_game).
-// The tracker's button is step 2.37's.
+// /api/v1/leagues/{leagueId}/games/{game}/reopen (step 2.120, S-36; record 060, T-263):
+// the scorekeeper who tapped End game too soon reopens the game from the tracker. Thin
+// handlers (T-25, T-26): who is asking and which league come from the context (T-23),
+// the game from the address, and one command or read does the rest. The shapes are the
+// contract's (packages/contracts/src/reopen-game.ts); the tracker's button is step 2.37's.
 //
-// Answers:
+// - GET (games.read_reopen_offer): 200 `ReopenOffer`: Reopen offered always, until a
+//   server time, or not with the reason, and who ended the game by name. 401, 403 and
+//   404 are the contract's `TrackerRefusal`, as the state endpoint answers.
+// - POST (games.reopen_tracked_game) takes a `ReopenRequest`: 200 `reopened`, or
+//   `refused` with its code at `reopenRefusalStatus` (with who ended it, by name, when
+//   that is the reason). 401 and 400 (not a reopen request) are the `TrackerRefusal`.
+//   A missing or blank reason is `reason-needed`. Once reopened, the game is published
+//   for the people watching (T-117), after the answer.
 //
-// - 200 `{ status: 'reopened', sequence, sentAt }`: the game is live again, and
-//   `sequence` is the number of the reopen itself; the device opens the game again
-//   through the session endpoint and carries on.
-// - 401 signed-out and 400 invalid-input (not a reopening, or no sequence): the
-//   contract's `TrackerRefusal`, as the other tracker endpoints answer.
-// - `{ status: 'refused', code, sentAt }` at the code's own status otherwise. Each code
-//   has its sentence in the message files, `error.games.reopen_tracked_game.<code>`;
-//   the ones a scorekeeper meets once it is too late say an admin can reopen it.
-//
-// Once reopened, the game is published for the people watching (T-117): the route does
-// that after answering.
-import { trackerRefusalStatus, type TrackerRefusal } from '@srleagues/contracts';
-import { reopenTrackedGame, type ReopenTrackedGameError } from '@srleagues/core';
+// Names are what another scorekeeper is shown of an account (`displayNameOf`), never
+// the account id.
+import {
+  ReopenRequest,
+  reopenRefusalStatus,
+  trackerRefusalStatus,
+  type ReopenOffer,
+  type ReopenRefusalCode,
+  type ReopenReply,
+  type TrackerRefusal,
+} from '@srleagues/contracts';
+import { readReopenOffer, reopenTrackedGame, type ReopenTrackedGameError } from '@srleagues/core';
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { isGameIdFormat, type ApiAnswer } from './league-api.ts';
 import type { CommandsOutcome, PublishPlays } from './tracker-commands-endpoint.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
-/** Every refusal the endpoint answers, by code, with its HTTP status. */
-export const reopenRefusalStatus = {
-  'not-allowed': 403,
-  'reason-needed': 400,
-  'game-not-found': 404,
-  'changed-since-read': 409,
-  'game-not-decided': 409,
-  'not-ended-by-tracker': 409,
-  'scorekeepers-may-not-reopen': 403,
-  'not-ended-by-you': 403,
-  'reopen-time-over': 403,
-} as const satisfies Readonly<
-  Record<ReopenTrackedGameError['code'] | 'not-allowed' | 'reason-needed', number>
->;
-
-export type ReopenRefusal = keyof typeof reopenRefusalStatus;
-
-export type ReopenReply =
-  | { readonly status: 'reopened'; readonly sequence: number; readonly sentAt: number }
-  | { readonly status: 'refused'; readonly code: ReopenRefusal; readonly sentAt: number };
+type ReopenPorts = Pick<TrackerPorts, 'deps' | 'clock' | 'displayNameOf'>;
 
 const done = (answer: ApiAnswer): CommandsOutcome => ({ answer, afterwards: null });
 
-const turnedAway = (body: TrackerRefusal): CommandsOutcome =>
-  done({ status: trackerRefusalStatus[body.error], body });
+const turnedAway = (body: TrackerRefusal): ApiAnswer => ({
+  status: trackerRefusalStatus[body.error],
+  body,
+});
 
-const refused = (code: ReopenRefusal, sentAt: number): CommandsOutcome =>
-  done({
-    status: reopenRefusalStatus[code],
-    body: { status: 'refused', code, sentAt } satisfies ReopenReply,
-  });
+/** Who ended the game, by name; null when no account is known. */
+async function endedByName(
+  leagueId: string,
+  accountId: string | null | undefined,
+  ports: ReopenPorts,
+): Promise<{ displayName: string } | null> {
+  if (accountId === null || accountId === undefined) return null;
+  return { displayName: (await ports.displayNameOf(leagueId, accountId)).slice(0, 120) };
+}
 
 /** The command's own error codes, every one named, so a new one fails the type check here. */
-const refusalOf = (code: ReopenTrackedGameError['code']): ReopenRefusal => {
+const refusalOf = (code: ReopenTrackedGameError['code']): ReopenRefusalCode => {
   switch (code) {
     case 'game-not-found':
     case 'changed-since-read':
@@ -77,33 +68,50 @@ export async function reopenTrackedGameRequest(
   game: string,
   /** The body as JSON, or undefined when it was not JSON. */
   body: unknown,
-  ports: Pick<TrackerPorts, 'deps' | 'clock'>,
+  ports: ReopenPorts,
   publish: PublishPlays,
 ): Promise<CommandsOutcome> {
-  if (context.account === null) return turnedAway({ error: 'signed-out' });
-  if (!isGameIdFormat(game)) return refused('game-not-found', ports.clock.now());
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-    return turnedAway({ error: 'invalid-input', issues: [] });
+  const leagueId = context.league.id;
+  const refused = async (
+    code: ReopenRefusalCode,
+    endedBy: string | null = null,
+  ): Promise<CommandsOutcome> =>
+    done({
+      status: reopenRefusalStatus[code],
+      body: {
+        status: 'refused',
+        code,
+        endedBy: await endedByName(leagueId, endedBy, ports),
+        sentAt: ports.clock.now(),
+      } satisfies ReopenReply,
+    });
+  if (context.account === null) return done(turnedAway({ error: 'signed-out' }));
+  if (!isGameIdFormat(game)) return refused('game-not-found');
+  const request = ReopenRequest.safeParse(body);
+  if (!request.success) {
+    if (request.error.issues.some((issue) => issue.path[0] === 'reason')) {
+      return refused('reason-needed');
+    }
+    const issues = request.error.issues.map((issue) => ({
+      path: issue.path.map(String).join('.'),
+      problem: issue.code,
+    }));
+    return done(turnedAway({ error: 'invalid-input', issues }));
   }
-  const { sequence, reason } = body as { sequence?: unknown; reason?: unknown };
   // The address names the game; nothing else in the body is read.
   const result = await reopenTrackedGame(
     commandContextOf(context),
-    { gameId: game, sequence, reason },
+    { gameId: game, ...request.data },
     ports.deps,
   );
   if (!result.ok) {
     const error = result.error;
-    if (error.code === 'not-allowed') return refused('not-allowed', ports.clock.now());
+    if (error.code === 'not-allowed') return refused('not-allowed');
     if (error.code === 'invalid-input') {
-      if (error.issues.some((issue) => issue.path === 'reason')) {
-        return refused('reason-needed', ports.clock.now());
-      }
-      return turnedAway({ error: 'invalid-input', issues: [...error.issues] });
+      return done(turnedAway({ error: 'invalid-input', issues: [...error.issues] }));
     }
-    return refused(refusalOf(error.code), ports.clock.now());
+    return refused(refusalOf(error.code), 'endedBy' in error ? error.endedBy : null);
   }
-  const leagueId = context.league.id;
   return {
     answer: {
       status: 200,
@@ -114,5 +122,34 @@ export async function reopenTrackedGameRequest(
       } satisfies ReopenReply,
     },
     afterwards: () => publish(leagueId, game),
+  };
+}
+
+export async function reopenOfferRequest(
+  context: LeagueRequestContext,
+  game: string,
+  ports: ReopenPorts,
+): Promise<ApiAnswer> {
+  if (context.account === null) return turnedAway({ error: 'signed-out' });
+  if (!isGameIdFormat(game)) return turnedAway({ error: 'not-found' });
+  const result = await readReopenOffer(commandContextOf(context), { gameId: game }, ports.deps);
+  if (!result.ok) {
+    switch (result.error.code) {
+      case 'not-allowed':
+        return turnedAway({ error: 'not-allowed' });
+      case 'game-not-found':
+        return turnedAway({ error: 'not-found' });
+      case 'invalid-input':
+        return turnedAway({ error: 'invalid-input', issues: [...result.error.issues] });
+    }
+  }
+  const offer = result.value;
+  return {
+    status: 200,
+    body: {
+      reopen: offer.reopen,
+      endedBy: await endedByName(context.league.id, offer.endedBy, ports),
+      sentAt: ports.clock.now(),
+    } satisfies ReopenOffer,
   };
 }

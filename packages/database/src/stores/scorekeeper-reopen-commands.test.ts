@@ -2,9 +2,10 @@
 // reopens the game with a reason, within the league's minutes (S-36). The correction
 // says who and why, in the same transaction as the result change (S-7, which the
 // database enforces); standings and season totals follow the game out and back in;
-// past the minutes, or for a scorekeeper who did not end it, nothing changes. The time
-// is measured from the game's finalized_at, which the database stamps when it takes
-// the end, to the command's clock, set here by hand. Each call is one transaction
+// past the minutes, or for a scorekeeper who did not end it, nothing changes; the same
+// request sent twice reopens once. The time is measured inside the database, from the
+// game's finalized_at (which it stamps when it takes the end) to its now(); time passing
+// is shown by moving finalized_at back (`endedMinutesAgo`). Each call is one transaction
 // (commandTransaction), with the apps' event handlers. Isolation cases are in
 // ../isolation; the role rows in role-matrix.test.ts.
 import type { PGlite } from '@electric-sql/pglite';
@@ -13,6 +14,7 @@ import {
   applyTrackerCommands,
   eventHandlers,
   openScoringSession,
+  readReopenOffer,
   reopenTrackedGame,
   type CommandDeps,
   type Job,
@@ -45,9 +47,8 @@ import { liveGamesStore } from './live-games-store.ts';
 import { scoringSessionsStore } from './scoring-sessions-store.ts';
 import { standingsStore } from './standings-store.ts';
 
-/** The command's clock, moved by hand. */
+/** The app server's clock: the taps' times and the time Reopen is offered until. */
 const clock = { at: Date.now(), now: () => clock.at };
-const minutes = (n: number) => n * 60_000;
 
 let pglite: PGlite;
 let db: DatabaseHandle;
@@ -154,8 +155,8 @@ async function tap(g: Game, inputs: readonly Input[]) {
   return result.ok ? result.value.results.map((r) => r.status) : [result.error.code];
 }
 
-/** Home 5, away 2, then End game on the tablet; when the database took the end. */
-async function endedOnTablet(g: Game): Promise<number> {
+/** Home 5, away 2, then End game on the tablet. */
+async function endedOnTablet(g: Game): Promise<void> {
   await tap(g, [
     { type: 'lineup', side: 'home', playerIds: g.home },
     { type: 'lineup', side: 'away', playerIds: g.away },
@@ -165,26 +166,50 @@ async function endedOnTablet(g: Game): Promise<number> {
     { type: 'score', side: 'away', playerId: g.away[0] ?? '', points: 2 },
   ]);
   expect(await tap(g, [{ type: 'end' }])).toEqual(['accepted']);
-  const row = await one<{ finalized_at: Date }>(
-    pglite,
-    'select finalized_at from games where id = $1',
-    [g.gameId],
-  );
-  return row.finalized_at.getTime();
 }
+
+/**
+ * Changes a stored row with the database's own triggers held off, as only a test may:
+ * the result-change check (S-7) and the events' never-changed rule would rightly refuse
+ * it. Used to stand for time that has passed, or for an end the transfer brought in
+ * with no account.
+ */
+async function rewrite(text: string, params: unknown[]) {
+  await pglite.transaction(async (tx) => {
+    await tx.query('set local session_replication_role = replica');
+    await tx.query(text, params);
+  });
+}
+
+/** As if the game had been decided `n` minutes ago by the database's own clock. */
+const endedMinutesAgo = (g: Game, n: number) =>
+  rewrite(`update games set finalized_at = now() - make_interval(mins => $2) where id = $1`, [
+    g.gameId,
+    n,
+  ]);
 
 /** The number of the game's last saved tap: what the tablet knows of it. */
 const sequenceOf = async (g: Game) =>
   (await one<{ seq: number }>(pglite, 'select seq from game_states where game_id = $1', [g.gameId]))
     .seq;
 
-async function reopenAs(g: Game, accountId: string, reason = 'Tapped End game, meant Pause') {
+async function reopenAs(
+  g: Game,
+  accountId: string,
+  { requestId = randomUUID(), reason = 'Tapped End game, meant Pause' } = {},
+) {
   const result = await reopenTrackedGame(
     g.as(accountId),
-    { gameId: g.gameId, sequence: await sequenceOf(g), reason },
+    { gameId: g.gameId, requestId, sequence: await sequenceOf(g), reason },
     deps,
   );
   return result.ok ? 'ok' : result.error.code;
+}
+
+async function offerTo(g: Game, accountId: string) {
+  const result = await readReopenOffer(g.as(accountId), { gameId: g.gameId }, deps);
+  if (!result.ok) throw new Error(`offer refused: ${result.error.code}`);
+  return result.value;
 }
 
 async function rowsOf(g: Game) {
@@ -232,11 +257,17 @@ const actions = async (g: Game) =>
 describe('a scorekeeper reopening a game they ended, on the database (S-36)', () => {
   it('reopens at 29 minutes: the correction says who and why, and the standings follow both ways', async () => {
     const g = await trackedGame();
-    const endedAt = await endedOnTablet(g);
+    await endedOnTablet(g);
     const counted = { home: { wins: 1, losses: 0 }, away: { wins: 0, losses: 1 }, played: 10 };
     expect(await standingsOf(g)).toEqual(counted);
 
-    clock.at = endedAt + minutes(29);
+    await endedMinutesAgo(g, 29);
+    const offer = await offerTo(g, g.scorer);
+    expect(offer.endedBy).toBe(g.scorer);
+    // About a minute left, by the app server's clock.
+    const left = offer.reopen.when === 'until' ? offer.reopen.until - clock.now() : -1;
+    expect(left).toBeGreaterThan(55_000);
+    expect(left).toBeLessThanOrEqual(60_000);
     expect(await reopenAs(g, g.scorer)).toBe('ok');
     const rows = await rowsOf(g);
     expect(rows.game).toEqual({ status: 'live', home_score: 5, away_score: 2 });
@@ -285,12 +316,13 @@ describe('a scorekeeper reopening a game they ended, on the database (S-36)', ()
 
   it('is refused at 31 minutes, and to a scorekeeper who did not end it; nothing changes', async () => {
     const g = await trackedGame();
-    const endedAt = await endedOnTablet(g);
+    await endedOnTablet(g);
+    await endedMinutesAgo(g, 5);
     const before = { rows: await rowsOf(g), standings: await standingsOf(g) };
-    clock.at = endedAt + minutes(5);
     expect(await reopenAs(g, g.otherScorer)).toBe('not-ended-by-you');
-    clock.at = endedAt + minutes(31);
+    await endedMinutesAgo(g, 31);
     expect(await reopenAs(g, g.scorer)).toBe('reopen-time-over');
+    expect((await offerTo(g, g.scorer)).reopen).toEqual({ when: 'no', code: 'reopen-time-over' });
     expect({ rows: await rowsOf(g), standings: await standingsOf(g) }).toEqual(before);
     expect((await actions(g)).map((a) => a.action)).toEqual(['games.end_tracked_game']);
     // The owner may correct games, so may still reopen it.
@@ -304,8 +336,38 @@ describe('a scorekeeper reopening a game they ended, on the database (S-36)', ()
        values ($1, 'league', 'games.scorekeeperReopenMinutes', $2::jsonb)`,
       [g.leagueId, JSON.stringify({ version: 1, value: 45 })],
     );
-    const endedAt = await endedOnTablet(g);
-    clock.at = endedAt + minutes(44);
+    await endedOnTablet(g);
+    await endedMinutesAgo(g, 44);
     expect(await reopenAs(g, g.scorer)).toBe('ok');
+  });
+
+  it('reopens once when the same request is sent twice', async () => {
+    const g = await trackedGame();
+    await endedOnTablet(g);
+    const requestId = randomUUID();
+    expect(await reopenAs(g, g.scorer, { requestId })).toBe('ok');
+    const once = { rows: await rowsOf(g), standings: await standingsOf(g) };
+    const again = await reopenTrackedGame(
+      g.as(g.scorer),
+      { gameId: g.gameId, requestId, reason: 'Tapped End game, meant Pause' },
+      deps,
+    );
+    expect(again).toEqual({ ok: true, value: { sequence: 8 } });
+    expect({ rows: await rowsOf(g), standings: await standingsOf(g) }).toEqual(once);
+    expect(once.rows.corrections).toHaveLength(1);
+  });
+
+  it('an end with no account on it is no scorekeeper’s to reopen, but an admin’s', async () => {
+    const g = await trackedGame();
+    await endedOnTablet(g);
+    await rewrite(`update game_events set account_id = null where game_id = $1 and type = 'end'`, [
+      g.gameId,
+    ]);
+    expect(await offerTo(g, g.scorer)).toEqual({
+      reopen: { when: 'no', code: 'not-ended-by-you' },
+      endedBy: null,
+    });
+    expect(await reopenAs(g, g.scorer)).toBe('not-ended-by-you');
+    expect(await reopenAs(g, g.ownerId)).toBe('ok');
   });
 });
