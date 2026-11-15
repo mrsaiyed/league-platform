@@ -378,7 +378,7 @@ describe('a team emblem', () => {
       );
     expect(table(true)).toMatch(
       new RegExp(
-        `<th scope="row" class="ui-team-cell"><svg class="ui-emblem" data-size="small"[^>]*style="--team-color:#663399">.*?</svg><span dir="auto">${arabicName}</span>`,
+        `<th scope="row" class="ui-team-cell"><svg class="ui-emblem" data-size="small"[^>]*style="--team-color:#663399">.*?</svg><span dir="auto"><span class="ui-team-name">${arabicName}</span></span>`,
       ),
     );
     expect(table(true)).not.toContain('ui-team-chip');

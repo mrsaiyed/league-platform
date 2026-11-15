@@ -342,7 +342,9 @@ export const tableCss = String.raw`
 .ui-standings[data-emblems='true'] .ui-team-cell > [dir]:has(> .ui-note-mark) {
   max-inline-size: calc(45cqi - var(--step-6) - var(--step-3) + var(--step-5));
 }
-.ui-team-cell > [dir] > .ui-note-mark:last-child a {
+/* The pull-back is under the same condition as the room it hangs in: a browser that does
+   not know ':has()' drops both, and the mark simply takes its own room in the line. */
+.ui-team-cell > [dir]:has(> .ui-note-mark) > .ui-note-mark:last-child a {
   margin-inline-end: calc(-1 * var(--step-5));
 }
 /* Notes under a table stay put while it scrolls, and are never faded by the sign above. */

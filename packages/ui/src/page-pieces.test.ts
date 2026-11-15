@@ -458,7 +458,8 @@ describe('tables', () => {
     for (const html of tables) {
       expect(html).toMatch(
         new RegExp(
-          `<th scope="row" class="ui-team-cell">(<span class="ui-team-chip"[^>]*></span>)?<span dir="auto">${long}</span>`,
+          // In the standings the name's own words have an element of their own inside it.
+          `<th scope="row" class="ui-team-cell">(<span class="ui-team-chip"[^>]*></span>)?<span dir="auto">(<span class="ui-team-name">)?${long}</span>`,
         ),
       );
     }

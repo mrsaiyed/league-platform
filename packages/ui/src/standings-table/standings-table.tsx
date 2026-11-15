@@ -101,12 +101,18 @@ export function StandingsTable({
                       <span className="ui-team-chip" aria-hidden="true" />
                     )}
                     {/* A note's mark is part of the name's own flow, so on a name long enough
-                        to wrap it follows the last word, not the first line. */}
+                        to wrap it follows the last word, not the first line. The name's own
+                        words have an element of their own (ui-team-name), so whatever reads
+                        a team's name gets the name alone. Each mark has a direction of its
+                        own, which keeps its hidden word out of the reckoning of the name's
+                        (dir="auto" passes over a child that states one), and opens with a
+                        space, so the cell reads "Owls Note 1", never "OwlsNote 1". */}
                     <span dir="auto">
-                      {row.team}
+                      <span className="ui-team-name">{row.team}</span>
                       {marks.map((m) => (
-                        <sup key={m.id} className="ui-note-mark">
+                        <sup key={m.id} className="ui-note-mark" dir="auto">
                           <a href={`#${idPrefix}-note-${m.id}`}>
+                            {' '}
                             <span className="ui-visually-hidden">{labels.note}</span> {m.n}
                           </a>
                         </sup>

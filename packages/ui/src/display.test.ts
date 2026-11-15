@@ -140,18 +140,37 @@ describe('standings table', () => {
     expect(html).toContain('Ahead on head-to-head');
   });
   it('shows an Arabic team name with its own direction', () => {
-    // Since step 2.147 part 2 a note's mark is inside the name's own element, after the
-    // name, so that on a long name it follows the last word: the element still opens with
-    // the name and takes its direction from it.
+    // Since step 2.147 part 2 the name's flow also holds a note's mark, after the name, so
+    // that on a long name the mark follows the last word. The flow still opens with the
+    // name, in an element of its own, and takes its direction from it.
+    expect(html).toContain(`<span dir="auto"><span class="ui-team-name">${arabicName}</span>`);
+  });
+  it('gives the name’s own words an element of their own, so a reader of the name gets the name alone', () => {
+    // Every row, marked or not: the element holds the name and nothing else.
+    const names = [...html.matchAll(/<span class="ui-team-name">([^<]*)<\/span>/g)].map(
+      (m) => m[1],
+    );
+    expect(names.length).toBeGreaterThan(1);
+    expect(html.match(/<th scope="row" class="ui-team-cell">/g)).toHaveLength(names.length);
+    for (const name of names) expect(name).not.toMatch(/Note|\d+$/);
+    // A mark states a direction of its own: the browser then passes over it, and over its
+    // hidden word, when it works out the direction of the name's flow (dir="auto").
+    expect(html).toContain('</span><sup class="ui-note-mark" dir="auto"><a href="#');
+    expect(html).not.toMatch(/<sup class="ui-note-mark">/);
+    // The mark's link opens with a space, so the cell reads "… Note 1" as words of their
+    // own and never run into the name; the link's own name is still "Note 1".
     expect(html).toMatch(
-      new RegExp(`<span dir="auto">${arabicName}(?:<sup class="ui-note-mark">|</span>)`),
+      /<a href="#[^"]+"> <span class="ui-visually-hidden">Note<\/span> \d+<\/a>/,
     );
   });
   it('puts a note’s mark after the last word of the name, inside the name’s own flow', () => {
-    const marked = /<span dir="auto">([^<]+)<sup class="ui-note-mark"><a href="#[^"]+">/.exec(html);
+    const marked =
+      /<span dir="auto"><span class="ui-team-name">[^<]+<\/span><sup class="ui-note-mark" dir="auto"><a href="#[^"]+">/.exec(
+        html,
+      );
     expect(marked).not.toBeNull();
-    // Nothing of a mark stands outside a name's element.
-    expect(html).not.toMatch(/<\/span><sup class="ui-note-mark">/);
+    // Nothing of a mark stands outside a name's flow.
+    expect(html).not.toMatch(/<\/span><\/span><sup class="ui-note-mark"/);
     // The name keeps room for the mark at its end and the mark hangs in that room, taking
     // none in the line: under a long name it cannot be left on a line of its own.
     expect(displayCss).toMatch(
@@ -164,9 +183,12 @@ describe('standings table', () => {
     expect(displayCss).toMatch(
       /\.ui-standings\[data-emblems='true'\] \.ui-team-cell > \[dir\]:has\(> \.ui-note-mark\) \{\s*max-inline-size: calc\(45cqi - var\(--step-6\) - var\(--step-3\) \+ var\(--step-5\)\);/,
     );
+    // The pull-back stands under the same condition as its room: a browser that drops one
+    // (no ':has()') drops the other.
     expect(displayCss).toMatch(
-      /\.ui-team-cell > \[dir\] > \.ui-note-mark:last-child a \{\s*margin-inline-end: calc\(-1 \* var\(--step-5\)\);/,
+      /\.ui-team-cell > \[dir\]:has\(> \.ui-note-mark\) > \.ui-note-mark:last-child a \{\s*margin-inline-end: calc\(-1 \* var\(--step-5\)\);/,
     );
+    expect(displayCss).not.toMatch(/\.ui-team-cell > \[dir\] > \.ui-note-mark/);
     // The room is the mark's own width: what a finger needs (1.5rem is step-5).
     expect(displayCss).toMatch(/\.ui-note-mark a \{[^}]*min-inline-size: 1\.5rem;/);
   });

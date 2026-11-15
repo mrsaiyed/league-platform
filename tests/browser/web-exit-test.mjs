@@ -1097,8 +1097,10 @@ if (browser) {
           const frame = box.getBoundingClientRect();
           const long = 'The Northside Community Thunderbolts';
           const rows = [...table.querySelectorAll('tbody tr')];
+          // Only the name's own words are changed (they have an element of their own): a
+          // note's mark stands in the same flow, after them, and must stay.
           const shareWith = (row) => {
-            const name = row.querySelector('.ui-team-cell > [dir]');
+            const name = row.querySelector('.ui-team-cell .ui-team-name');
             const before = name.textContent;
             name.textContent = long;
             const share = name.closest('.ui-team-cell').getBoundingClientRect().width / frame.width;
@@ -1106,16 +1108,20 @@ if (browser) {
             return share;
           };
           // A plain row, and one whose name carries a footnote's mark (24 wide) beside it.
+          const marked = rows.find((row) => row.querySelector('.ui-note-mark'));
           const share = shareWith(rows.find((row) => !row.querySelector('.ui-note-mark')));
-          const shareWithMark = shareWith(rows.find((row) => row.querySelector('.ui-note-mark')));
+          const shareWithMark = shareWith(marked);
+          const marksKept = marked.querySelectorAll('.ui-note-mark').length;
+          // The flow that holds the first row's name (and its mark, if it has one).
           const name = table.querySelector('tbody .ui-team-cell > [dir]');
-          name.textContent = long;
+          name.querySelector('.ui-team-name').textContent = long;
           box.scrollLeft = box.scrollWidth;
           const cell = name.closest('.ui-team-cell').getBoundingClientRect();
           const last = table.querySelector('tbody tr > :last-child').getBoundingClientRect();
           return {
             share,
             shareWithMark,
+            marksKept,
             lastInView: last.left >= cell.right - 1 && last.right <= frame.right + 1,
             whole: name.scrollWidth <= name.clientWidth + 1,
             pageScrolls: document.documentElement.scrollWidth > window.innerWidth,
@@ -1125,6 +1131,11 @@ if (browser) {
           'a long team name leaves the column that stays put about half the box at most',
           measured.share <= 0.5 && measured.shareWithMark <= 0.6,
           `${Math.round(measured.share * 100)}%, ${Math.round(measured.shareWithMark * 100)}% with a footnote's mark`,
+        );
+        note(
+          'the row measured with a footnote’s mark still has its mark beside the long name',
+          measured.marksKept >= 1,
+          String(measured.marksKept),
         );
         note(
           'with a long team name the last column can still be brought into view',

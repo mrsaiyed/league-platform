@@ -810,12 +810,11 @@ try {
             };
             put(document.querySelector('.site-header .site-name > span'), league);
             for (const table of document.querySelectorAll('table.ui-table')) {
-              // Only the name's own words are replaced: a note's mark stands inside the
-              // name's element, after it, and the picture must show where it lands.
+              // Only the name's own words are replaced. In the standings they have an
+              // element of their own, with a note's mark after it in the same flow, and
+              // the picture must show where the mark lands.
               const cell = table.querySelector('tbody .ui-team-cell > [dir]');
-              const words = cell?.firstChild;
-              if (words?.nodeType === Node.TEXT_NODE) words.textContent = name;
-              else put(cell, name);
+              put(cell?.querySelector('.ui-team-name') ?? cell, name);
             }
             put(document.querySelector('.ui-scoreboard-name > [dir]'), name);
             // The first game card gets the long name, and the next card one long word. A
