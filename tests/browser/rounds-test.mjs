@@ -213,8 +213,9 @@ if (built) {
     note('"Yes" is the main button', (await kindOf(yes)) === 'main');
     note('"No, keep" is drawn as a button', (await no.getAttribute('class')) === 'ui-button');
     note(
-      "the game is flagged while it is outside its round's days",
-      (await page.locator('[data-off-round-date]').count()) === 1,
+      // The question is the one offer while it is asked; the flag comes back after "No".
+      "the round's date is offered once, by the question alone",
+      (await page.locator('[data-off-round-date]').count()) === 0,
     );
     await accessible("the offer of the round's date");
     await tap(yes, /done=saved/);
