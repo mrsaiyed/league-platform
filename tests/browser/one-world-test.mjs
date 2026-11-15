@@ -161,8 +161,21 @@ if (built) {
     await first.getByText('Enter the final score').click();
     await first.locator('input[name=awayScore]').fill('48');
     await first.locator('input[name=homeScore]').fill('55');
-    await tap(first.getByRole('button', { name: 'Save final score' }), /[?&]ask=/);
-    await tap(gameRow('Tigers').getByRole('button', { name: 'Yes, make it final' }), /done=final/);
+    // Since step 2.155 no answer rides in the address (record 067): the question and "Saved"
+    // are on the page the post answers, at the game's place on the list.
+    await tap(first.getByRole('button', { name: 'Save final score' }), /\/admin\/games#game-/);
+    note(
+      'saving the score asks first',
+      (await gameRow('Tigers').locator('[data-question]').count()) === 1,
+    );
+    await tap(
+      gameRow('Tigers').getByRole('button', { name: 'Yes, make it final' }),
+      /\/admin\/games#game-/,
+    );
+    note(
+      'the games area says "Saved" beside the first game',
+      /^Saved: /.test((await gameRow('Tigers').getByRole('status').textContent()) ?? ''),
+    );
     note(
       'the games area says the first game is final',
       /final/i.test(await gameRow('Tigers').innerText()),
@@ -186,7 +199,14 @@ if (built) {
     await points.nth(1).fill(String(players[1].points));
     const theirs = page.locator('[role=region][aria-label="Herons"] input[name^="stat.points."]');
     await theirs.nth(0).fill('30');
-    await tap(page.getByRole('button', { name: 'Save box score and make it final' }), /done=/);
+    await tap(
+      page.getByRole('button', { name: 'Save box score and make it final' }),
+      /\/admin\/games\/[0-9a-f-]{36}#box-score-scores$/,
+    );
+    note(
+      'the box score says "Saved" beside the scores',
+      /^Saved: /.test((await page.locator('#box-score-scores [role=status]').textContent()) ?? ''),
+    );
     await accessible('the box score saved');
 
     // A visitor: signed out, from the league home, tapping only.

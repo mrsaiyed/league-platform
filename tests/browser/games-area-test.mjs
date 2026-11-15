@@ -11,6 +11,8 @@
 //   teams and the score, and says first when the game's time has not come; "No" keeps
 //   what was typed; a double tap on the save button only asks; only "Yes" saves, and
 //   "Saved" names the game and its score, beside it, on the screen without scrolling.
+//   Since step 2.155 none of these answers rides in the address (record 067): the test
+//   waits for what is on the screen.
 // - The live game, which the tracker has recorded plays of, has no score boxes and offers
 //   "Score this game" (S-46).
 // - A scheduler saves a wrong final score, taps "Correct this result", gives a reason and
@@ -92,7 +94,10 @@ async function openGames(page) {
   await page.goto(`${origin}/north-valley/admin`);
   await Promise.all([
     page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
-    page.locator('a[href="/north-valley/admin/games"]').first().click(),
+    page
+      .getByRole('navigation', { name: 'Admin areas' })
+      .locator('a[href="/north-valley/admin/games"]')
+      .click(),
   ]);
   await page.getByRole('heading', { level: 1, name: 'Games' }).waitFor();
 }
@@ -176,21 +181,18 @@ async function typeAndSave(page, id, scores) {
   for (const [team, score] of Object.entries(scores)) {
     await game.getByLabel(`Score for ${team}`).fill(String(score));
   }
-  await Promise.all([
-    page.waitForURL((url) => url.searchParams.get('ask') === id),
-    game.getByRole('button', { name: 'Save final score' }).click(),
-  ]);
+  await game.getByRole('button', { name: 'Save final score' }).click();
   await game.locator('[data-question]').waitFor();
 }
 
-async function sayYes(page, id) {
+/**
+ * Taps "Yes, make it final" and waits for the answer beside the game: "Saved", or a
+ * refusal. Since step 2.155 neither rides in the address (record 067).
+ */
+async function sayYes(page, id, tap = 'click') {
   const game = gameOn(page, id);
-  await Promise.all([
-    page.waitForURL(
-      (url) => url.searchParams.get('done') === 'final' || url.searchParams.has('problem'),
-    ),
-    game.getByRole('button', { name: 'Yes, make it final' }).click(),
-  ]);
+  await game.getByRole('button', { name: 'Yes, make it final' })[tap]();
+  await gameOn(page, id).getByRole('status').or(gameOn(page, id).getByRole('alert')).waitFor();
 }
 
 if (browser) {
@@ -250,10 +252,8 @@ if (browser) {
       await accessible(page, 'the question');
 
       // "No" keeps what was typed.
-      await Promise.all([
-        page.waitForURL((url) => url.searchParams.get('enter') === finalScoreGame),
-        game.getByRole('link', { name: 'No, change the score' }).click(),
-      ]);
+      await game.getByRole('button', { name: 'No, change the score' }).click();
+      await game.getByLabel('Score for Tigers').waitFor();
       note(
         '"No, change the score" opens the boxes again with what was typed',
         (await game.getByLabel('Score for Tigers').inputValue()) === '47' &&
@@ -278,10 +278,7 @@ if (browser) {
       await later.getByText('Enter the final score').click();
       await later.getByLabel('Score for Bears').fill('30');
       await later.getByLabel('Score for Tigers').fill('28');
-      await Promise.all([
-        page.waitForURL((url) => url.searchParams.get('ask') === laterGame),
-        later.getByRole('button', { name: 'Save final score' }).dblclick(),
-      ]);
+      await later.getByRole('button', { name: 'Save final score' }).dblclick();
       await page.waitForTimeout(1500);
       await later.locator('[data-question]').waitFor();
       note(
@@ -341,10 +338,7 @@ if (browser) {
       );
       await typeAndSave(page, finalScoreGame, { Tigers: 49, Lions: 51 });
       // A real double tap on "Yes, make it final": saved once, and "Saved" is what is read.
-      await Promise.all([
-        page.waitForURL((url) => url.searchParams.get('done') === 'final'),
-        gameOn(page, finalScoreGame).getByRole('button', { name: 'Yes, make it final' }).dblclick(),
-      ]);
+      await sayYes(page, finalScoreGame, 'dblclick');
       await settle(page);
       note(
         'the right score is saved and named, after a double tap on "Yes"',
@@ -501,15 +495,11 @@ if (browser) {
       await page.keyboard.press('Tab');
       await page.keyboard.type('28');
       await page.keyboard.press('Tab');
-      await Promise.all([
-        page.waitForURL((url) => url.searchParams.get('ask') === laterGame),
-        page.keyboard.press('Enter'),
-      ]);
+      await page.keyboard.press('Enter');
+      await gameOn(page, laterGame).locator('[data-question]').waitFor();
       await gameOn(page, laterGame).getByRole('button', { name: 'Yes, make it final' }).focus();
-      await Promise.all([
-        page.waitForURL((url) => url.searchParams.get('done') === 'final'),
-        page.keyboard.press('Enter'),
-      ]);
+      await page.keyboard.press('Enter');
+      await gameOn(page, laterGame).getByRole('status').waitFor();
       note(
         'by keyboard the score is asked about and then saved',
         (await gameOn(page, laterGame).getByRole('status').textContent()) ===

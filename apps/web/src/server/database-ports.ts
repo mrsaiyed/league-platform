@@ -4,7 +4,8 @@
 // every area has moved, on PostgreSQL in staging and production.
 //
 // Moved so far: finding a league by its short name or id, who the signed-in person
-// is (identify, below) and what they hold in a league (accessOf). Every other area
+// is (identify, below), what they hold in a league (accessOf) and the leagues they
+// belong to (leaguesOfAccount, step 2.127). Every other area
 // still runs on the stand-in only: here each one refuses with NotOnTheDatabaseYet
 // the first time it is used, so its page shows the error page rather than made-up
 // data that is not in the database. Each moves in a part of its own.
@@ -40,6 +41,7 @@ export type DatabaseQueries = Pick<
   | 'accountForSignIn'
   | 'isSignInLinkConflict'
   | 'isSignInRefusal'
+  | 'listMyLeagues'
   | 'accessStore'
   | 'activityLogStore'
   | 'jobsStore'
@@ -207,6 +209,10 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     signInMail: options.signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf: accessOfVia(deps),
+    // The one read across leagues (record 066): in a transaction set to the session's
+    // account and no league, through my_leagues(), which answers for that account only.
+    leaguesOfAccount: (accountId) =>
+      database.withTransaction(db, { accountId }, (scope) => database.listMyLeagues(scope)),
     publicStats: notMovedYet('public standings and statistics'),
     games: notMovedYet('games area'),
     fixtureImport: notMovedYet('fixture import'),

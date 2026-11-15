@@ -170,6 +170,8 @@ Our own top-level names (`account`, `find`, `start`...) are real folders, so the
 
 **T-26: two ways in, one set of commands.** Admin screens submit through server actions. The tracker and anything that must work offline or be retried uses versioned JSON endpoints under `/api/v1`. Both end at the same command. An endpoint about one league sits under `/api/v1/leagues/{leagueId}/...` ([T-229](T4-tenancy-auth-security.md)).
 
+**T-271 (agreed, delegated): how a form's answer travels** ([record 067](../../../architecture/decisions/067-how-a-forms-answer-travels.md)). Never in the address. A refused save is answered in the response to the post itself, drawn from the posted values: every field keeps what was typed, the wrong one is marked and its sentence sits beside it, naming it (A-4). A save is answered with a one-time notice (which thing, and a message key; never typed data), read once as the screen is drawn, so a reload shows nothing old; with scripts off by post-redirect-get, with scripts on by drawing the form's own screen again in the answer to the post. A repeated post of the same form (its one-time token and what it held) is the same request and gets the first answer, so a double tap saves once and is never answered "someone changed this".
+
 ## 5. Sections of a page
 
 Each section type from [P5](../product/P5-site-customization.md) is one folder:
@@ -188,7 +190,7 @@ Adding a section type is adding a folder and one line in the registry. No other 
 ## 6. Rules for all code
 
 - **T-27: no league is ever named in code.** A check fails the build on anything like `if (league.slug === 'farajleague')`. Differences between leagues are data.
-- **T-28: no query without a league.** Every function in `packages/database` that touches league data requires a league ID argument; there is no way to call it without one. The database enforces the same thing again underneath ([T4](T4-tenancy-auth-security.md)).
+- **T-28: no query without a league.** Every function in `packages/database` that touches league data requires a league ID argument; there is no way to call it without one. The database enforces the same thing again underneath ([T4](T4-tenancy-auth-security.md)). The narrow lookups of T-221 are the only exceptions, each one owner-run function; one of them, the leagues of the signed-in account (T-269, record 066), is the product's one read across leagues for an ordinary person, and it is by account, never by a league id from the request.
 - **T-29: what goes to the browser is chosen, not leaked.** Queries return objects built field by field for their screen. A new private column is invisible to every screen until someone deliberately adds it.
 - **T-30: settings and secrets are read in one place** at startup, checked against a schema, and the app refuses to start if one is missing. Secrets never appear in browser code; a build check confirms it.
 - **T-31: naming.** Files are `kebab-case.ts`. One command or query per file, named for what it does (`end-game.ts`). Tests sit beside the code as `end-game.test.ts`. Database tables and columns are `snake_case`.

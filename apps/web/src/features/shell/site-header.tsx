@@ -1,8 +1,11 @@
-import { leagueUrl, platformUrl, type LeagueAddressee } from '@srleagues/core';
+import { leagueUrl, type LeagueAddressee } from '@srleagues/core';
 import { displayLabels } from '@srleagues/site';
 import { Emblem, FilterToolbar, SeasonPicker } from '@srleagues/ui';
 import { t } from '../../server/messages.ts';
+import { signOutAction } from '../../server/sign-in/actions.ts';
 import { leagueHomeStayUrl } from '../team-pages/index.ts';
+import { SignOutForm, SignOutLink } from '../tracker/index.ts';
+import { waitingQuestionWords, type AccountMenu } from './account-menu.ts';
 import { menuPages, type MenuPage } from './current-menu-page.ts';
 import type { HeaderSeason } from './header-season.ts';
 
@@ -39,9 +42,59 @@ function MenuLinks({
 }
 
 /**
+ * What the account button holds for a signed-in person (U-8): who they are signed in as,
+ * then the admin, their games, their account, and signing out. Drawn twice, as the menu
+ * and sign-in are: in the phone menu's panel and in the account button of the first row;
+ * only one of the two is shown at any width. Signing out also clears the games the tracker
+ * kept on this device (T-115), so a shared tablet can be signed out from any page. On the
+ * scoring page it leaves the open game first, as the tracker's own way out does: it asks
+ * when plays are waiting to be sent, releases the scoring session, and with scripts off is
+ * a link to the account page (tracker-sign-out.ts).
+ */
+function AccountEntries({ account }: { readonly account: AccountMenu }) {
+  return (
+    <>
+      <p className="site-account-who">{t('account.signedInAs', { email: account.email })}</p>
+      <ul>
+        {account.adminHref === null ? null : (
+          <li>
+            <a href={account.adminHref}>{t('account.menu.admin')}</a>
+          </li>
+        )}
+        {account.gamesHref === null ? null : (
+          <li>
+            <a href={account.gamesHref}>{t('account.menu.myGames')}</a>
+          </li>
+        )}
+        <li>
+          <a href={account.accountHref}>{t('account.menu.account')}</a>
+        </li>
+      </ul>
+      {account.onScoringPage ? (
+        <SignOutLink
+          action={signOutAction}
+          waitingQuestion={waitingQuestionWords()}
+          href={account.accountHref}
+          className="site-account-sign-out"
+        >
+          {t('account.signOut')}
+        </SignOutLink>
+      ) : (
+        <SignOutForm action={signOutAction} waitingQuestion={waitingQuestionWords()}>
+          <button className="site-account-sign-out" type="submit">
+            {t('account.signOut')}
+          </button>
+        </SignOutForm>
+      )}
+    </>
+  );
+}
+
+/**
  * The header of every page of a league. First row: the league's mark (its first letter in
  * a shield, until it has a logo of its own) and its name (U-8) with a small line under it,
- * then the season picker on the pages that show one season, and the way in for a visitor.
+ * then the season picker on the pages that show one season, and the account button: the way
+ * in for a visitor, coming back to this page; for a signed-in person, their menu.
  * Second row: the menu.
  *
  * On a phone the first row is the mark, the name and one menu button. The button opens a
@@ -54,13 +107,17 @@ function MenuLinks({
 export function SiteHeader({
   league,
   name,
-  signedIn,
+  account,
+  signInHref,
   current = null,
   season = null,
 }: {
   readonly league: LeagueAddressee;
   readonly name: string;
-  readonly signedIn: boolean;
+  /** The signed-in person's account button (account-menu.ts), or null for a visitor. */
+  readonly account: AccountMenu | null;
+  /** Where signing in leads: the sign-in screen, coming back to this page. */
+  readonly signInHref: string;
   /** The page of the menu the visitor is on, if any. */
   readonly current?: MenuPage | null;
   /** The season picker, on a page that has one (header-season.ts). */
@@ -84,10 +141,14 @@ export function SiteHeader({
           </summary>
           <nav className="site-menu-panel" aria-label={t('nav.menu')}>
             <MenuLinks league={league} current={current} />
-            {signedIn ? null : (
-              <a className="site-menu-sign-in" href={platformUrl('signin')}>
-                {t('nav.signIn')}
+            {account === null ? (
+              <a className="site-menu-sign-in" href={signInHref}>
+                {t('account.signInOrCreate')}
               </a>
+            ) : (
+              <div className="site-menu-account">
+                <AccountEntries account={account} />
+              </div>
             )}
           </nav>
         </details>
@@ -106,10 +167,22 @@ export function SiteHeader({
             </FilterToolbar>
           </div>
         )}
-        {signedIn ? null : (
-          <a className="site-sign-in" href={platformUrl('signin')}>
-            {t('nav.signIn')}
+        {account === null ? (
+          <a className="site-sign-in" href={signInHref}>
+            {t('account.signInOrCreate')}
           </a>
+        ) : (
+          <details className="site-account">
+            <summary>
+              <span className="site-account-initial" aria-hidden="true">
+                {account.initial}
+              </span>
+              <span className="ui-visually-hidden">{t('account.menu')}</span>
+            </summary>
+            <nav className="site-account-panel" aria-label={t('account.menu')}>
+              <AccountEntries account={account} />
+            </nav>
+          </details>
         )}
       </div>
       <nav className="site-tabs" aria-label={t('nav.menu')}>

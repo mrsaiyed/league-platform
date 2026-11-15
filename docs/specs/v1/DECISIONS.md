@@ -355,7 +355,9 @@ All dated November 12, 2026.
 | T-266                 | New                                                                          | A draft league made by mistake goes by a second script: an owner-run, locked check, log and delete; its entry kept in a platform log (rec. 063) | Step 2.150: nothing could remove a league made with a wrong short name or who plays                |
 | T-267                 | New                                                                          | Agreed (delegated): the scoring screen is styled by the product, not by the league's design values: one dark courtside look (rec. 064)          | Before step 2.35: nobody had decided how the tracker looks (2.107 audit, M10)                      |
 | T-268                 | New                                                                          | The parents' confirmation is a setting of its own; a same-value save writes nothing; the store says when a value was saved (rec. 065)           | Step 2.162: a confirmation kept only in how the names value was written could not be told apart    |
+| T-269                 | New                                                                          | Agreed (delegated): the leagues of the signed-in account: one owner-run function, no argument, that account only (rec. 066)                     | Step 2.127: no fenced query can list an account's leagues (2.105 audit, H3)                        |
 | T-270                 | New (refines T-9)                                                            | Agreed (delegated): the first online test copy runs on Render at Render's own address with the Supabase test project; Vercel rejected           | The founder asked where to test online for free (2026-11-15); the chat lead decided                |
+| T-271                 | Each form answered with the answer in the address                            | Agreed (delegated): refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)           | Step 2.155: a refusal emptied a box score; "Saved" off screen; a reload said it again (H6, M2, M8) |
 
 ## The full list
 
@@ -636,6 +638,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-33  | Size is a signal. A file past about 300 lines, or a command doing three separate things, gets split                                                                    | Agreed (delegated) |         |
 | T-34  | Every address is built by one function, and the league a request is for is worked out in one place                                                                     | Agreed (delegated) | yes     |
 | T-232 | The shell works a request out once, then each page answers shown, not found, forwarded or no access (403); pages check, layouts never refuse; Next.js 16 (record 020)  | Agreed (delegated) | yes     |
+| T-271 | A form's answer never rides in the address: refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)          | Agreed (delegated) |         |
 
 ### [T3 — Data model](technical/T3-data-model.md)
 
@@ -778,6 +781,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-223 | The command shape: Zod input, one transaction, permission inside it, events inside it, jobs through the transaction object, one log line; core defines ports, database implements them (record 010)                                              | Agreed (delegated)  | yes     |
 | T-225 | Sign-in numbers: codes last 10 minutes, 5 tries, 5 an hour per address and 30 per network; passwords 8 characters to 72 bytes, NFKC; wrong guesses slowed, then locked, per address and network (record 013)                                     | Agreed (delegated)  | yes     |
 | T-256 | Our account ids stay ours, linked to the sign-in user; the sign-in store has its own schema and role; app_user changes only name, phone, last seen (record 052)                                                                                  | Agreed (delegated)  | yes     |
+| T-269 | The leagues a signed-in person belongs to come from one owner-run function with no argument, for the account set only; core decides U-9 before any name shows (record 066)                                                                       | Agreed (delegated)  |         |
 | T-259 | Name settings `privacy.publicNames` (three values) and `privacy.playersMayAskForInitials`, read by one `readNamePolicy`; full names need confirming; `protectiveOrder` (R-26); `people.set_name_request`, fixed-list reason (rec. 056)           | Agreed (delegated)  | yes     |
 | T-268 | `privacy.childrenInFullConfirmed` (yes or no, no to start, a tick to give it, R-26 order); a child in full only with full names AND it; one writer checked by a test; same-value saves not logged (rec. 065)                                     | Agreed (delegated)  |         |
 

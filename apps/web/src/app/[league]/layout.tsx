@@ -1,10 +1,12 @@
 import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 import {
+  accountMenuOf,
   currentMenuPage,
   DesignStyle,
   headerSeason,
   LeagueNotice,
+  signInHrefFrom,
   SiteFooter,
   SiteHeader,
   type LeagueRouteProps,
@@ -12,7 +14,7 @@ import {
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { leagueSites, siteOfLeague } from '../../server/league-site.ts';
-import { leagueView } from '../../server/load-league-page.ts';
+import { leagueView, signedInEmail } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { pathHeader } from '../../server/request-facts-header.ts';
 import './league-site.css';
@@ -26,7 +28,9 @@ import './league-site.css';
  * on its main area (`site-wide`, league-site.css). The menu marks the page the
  * visitor is on, read from the address as it arrived (the proxy's header). On the menu's
  * pages the header also holds the season picker, so the seasons are read here; the page
- * under it reads the same ones without asking again (league-seasons.ts).
+ * under it reads the same ones without asking again (league-seasons.ts). The account button
+ * (U-8) is the signed-in person's own, drawn for this request only (account-menu.ts); it is
+ * on the admin's pages and the scoring page too, which sit under this layout.
  */
 export default async function LeagueLayout({
   children,
@@ -49,7 +53,8 @@ export default async function LeagueLayout({
       <SiteHeader
         league={league}
         name={site.name}
-        signedIn={view.context.account !== null}
+        account={accountMenuOf(view, await signedInEmail(), path)}
+        signInHref={signInHrefFrom(path)}
         current={current}
         season={season}
       />

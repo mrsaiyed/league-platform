@@ -610,6 +610,16 @@ export const en = {
   'admin.games.confirm.yes': 'Yes, make it final',
   'admin.games.confirm.no': 'No, change the score',
   'admin.games.saved.final': 'Saved: {result} is final.',
+  // A save said beside the game it saved, naming it (step 2.155; A-4).
+  'admin.games.game': '{away} at {home}',
+  'admin.games.saved.forfeit': 'Saved: {game} is recorded as a forfeit.',
+  'admin.games.saved.postpone': 'Saved: {game} is postponed.',
+  'admin.games.saved.cancel': 'Saved: {game} is cancelled.',
+  // A refused score said beside the boxes, naming the box or the score (step 2.155; A-4).
+  'admin.games.refused.score': 'Enter the score for {team} as a whole number from 0 to 999.',
+  'admin.games.refusedAbout': '{game}: {problem}',
+  'admin.games.refused.tie':
+    '{result} is a tie, and this season does not allow ties. Change a score so one team wins.',
   // A game the live tracker has recorded plays of is ended there (S-46).
   'admin.games.tracked':
     'Plays are being recorded for this game in the tracker, so it is ended there, not by typing a score.',
@@ -683,6 +693,13 @@ export const en = {
   'admin.boxScore.reopen': 'Reopen to correct',
   'admin.boxScore.notFound': 'That game is not there, or you may not score it.',
   'admin.boxScore.done.save': 'The box score is saved and the game is final.',
+  'admin.boxScore.saved': 'Saved: {result} is final, with its box score.',
+  // A refused box beside the scores, naming it (step 2.155; A-4).
+  'admin.boxScore.refused.cell': '{cell}: enter a whole number from 0 to 999, or leave it empty.',
+  'admin.boxScore.refused.minutes':
+    '{cell}: enter whole minutes from 0 to 1440, or leave it empty.',
+  'admin.boxScore.refused.score':
+    'Enter the score for {team} as a whole number from 0 to 999, or leave it empty to use the total of its players’ points.',
   'admin.boxScore.done.reopen': 'The game is reopened. Fix the grid and save it again.',
   'admin.boxScore.error.invalid-input':
     'Enter every number as a whole number from 0 to 999 (minutes up to 1440).',
@@ -1324,6 +1341,31 @@ export const en = {
   'account.signOut': 'Sign out',
   'account.signOutEverywhere': 'Sign out everywhere',
   'account.signOutEverywhereHelp': 'Signs out every device that uses your account, this one too.',
+  // Finding one's way when signed in (step 2.127): the account button at the top right of
+  // every league page (U-8), the account page's leagues, the front page.
+  'account.signedInAs': 'Signed in as {email}',
+  'account.signInOrCreate': 'Sign in or create an account',
+  'account.menu': 'Your account menu',
+  'account.menu.admin': 'Admin',
+  'account.menu.myGames': 'My games to score',
+  'account.menu.account': 'Your account',
+  'account.leagues': 'Your leagues',
+  'account.leaguesEmpty':
+    'The leagues you belong to will be listed here, with your role in each, once a league adds you.',
+  'account.role.on-a-team': 'On a team',
+  'front.title': 'SR Leagues',
+  'front.about':
+    'SR Leagues runs the websites of sports leagues: their schedules, scores, standings and statistics, kept by the people who run each league.',
+  'front.signIn': 'Sign in',
+  'signIn.fromLeague': 'Sign in to carry on at {league}.',
+  'signIn.backTo': 'Back to {league}',
+  'access.noAccess.signedInAs': 'You are signed in as {email}.',
+  'access.noAccess.switch': 'Use another account',
+  // Signing out with a game open on the device and plays not yet sent (step 2.127).
+  'account.signOutWaiting_one':
+    '{count} play is not sent yet. It stays on this device and is sent when you sign in again. Sign out?',
+  'account.signOutWaiting_other':
+    '{count} plays are not sent yet. They stay on this device and are sent when you sign in again. Sign out?',
   'account.problem.title': 'We cannot open your account',
   'account.problem.notConfirmed':
     'You are signed in, but your email address has not been confirmed yet, so we cannot open your account. Sign out, then sign in again. If this keeps happening, please contact us.',

@@ -376,6 +376,16 @@ describe('review fixes', () => {
 
 describe('the stylesheet', () => {
   const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  it('keeps the focus ring on a field a refusal is about (WCAG 2.4.7)', () => {
+    // Its danger edge is a border always, and an outline only while it is not focused, so
+    // the focus ring (an outline too, with the same weight) is never drawn over.
+    const marked = [...css.matchAll(/([^{}]*\[aria-invalid='true'\][^{}]*)\{([^{}]*)\}/g)];
+    expect(marked.length).toBeGreaterThan(0);
+    for (const [, selector = '', body = ''] of marked) {
+      if (/\boutline\b/.test(body)) expect(selector).toContain(':not(:focus-visible)');
+    }
+    expect(css).toMatch(/\.ui-root \[aria-invalid='true'\] \{\s*border-color: [^;]*--color-danger/);
+  });
   it('holds no color of its own: only the design variables (T-90)', () => {
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(css).not.toMatch(/\brgba?\(|\bhsla?\(/);
