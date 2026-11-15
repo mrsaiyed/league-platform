@@ -751,8 +751,8 @@
 /* The bench: smaller, quieter tiles in one line. Nothing here scrolls sideways and no
    tile is ever cut: the line shows as many as fit whole (seven on a phone), the rows
    after the first have no height, and when there are more the line ends in a tile that
-   says how many more ("+5") and opens the whole bench in the pad. A bench tile can be
-   dragged from in any direction. */
+   says how many more ("5 more") and opens the whole bench in the pad. A bench tile can
+   be dragged from in any direction. */
 .court-bench,
 .court-subs-row {
   display: grid;
@@ -779,13 +779,18 @@
   background: var(--court-team-bench);
   touch-action: none;
 }
-/* "+5": the last place of the line, only where the line does not hold everyone. (Said
-   with the line's own name, so no button's own `display` further down outweighs it.) */
+/* "5 more": the last place of the line, only where the line does not hold everyone.
+   (Said with the line's own name, so no button's own `display` further down outweighs
+   it.) It is not a player and not a points button, and is drawn as neither: no ground
+   of its own, a dashed edge, small words and never a "+", which here means points. */
 [data-fit] > .court-more-tile {
   display: none;
   grid-row: 1;
   grid-column: -2 / -1;
-  border-style: dashed;
+  padding-inline: 2px;
+  border: 1px dashed var(--court-muted);
+  background: transparent;
+  color: var(--court-text);
 }
 [data-fit][data-more] > .court-more-tile {
   display: flex;
@@ -795,10 +800,12 @@
 [data-fit] > [data-folded] {
   visibility: hidden;
 }
-.court-more-tile::before {
-  content: '+' attr(data-count);
-  font-size: 18px;
-  font-weight: 800;
+.court-more-count {
+  max-inline-size: 100%;
+  font-size: var(--court-size-small);
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
 }
 /* Where the bench is folded away (a short phone), the team's header opens it. */
 .court-bench-open {
@@ -1561,7 +1568,7 @@
   .court-tile-name {
     font-size: 14px;
   }
-  /* There is room here for the whole bench: it wraps, and nobody is behind a "+5". */
+  /* There is room here for the whole bench: it wraps, and nobody is behind a "5 more". */
   .court-bench {
     display: flex;
     flex-wrap: wrap;

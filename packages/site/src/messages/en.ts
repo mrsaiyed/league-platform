@@ -876,6 +876,8 @@ export const en = {
   'tracker.bench.everyoneOn': 'Everyone is on the court.',
   'tracker.bench.open': 'Bench {count}',
   'tracker.bench.showAll': 'Show all of the {team} bench',
+  'tracker.bench.more_one': '{count} more',
+  'tracker.bench.more_other': '{count} more',
   'tracker.bench.of': '{team} bench',
   'tracker.bench.comesInFor': 'Who comes in for {player}?',
   'tracker.lineup.pick': 'Pick the starting {size}: tap players below.',

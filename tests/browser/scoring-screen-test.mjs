@@ -361,7 +361,8 @@ async function measureTargets(page, label) {
 /**
  * Every line of players on the screen now (a team's bench, the pad's "Sub in" and "In
  * for"): how many players it has, how many show whole, how many are cut by the line's or
- * the screen's edge, and what its end tile ("+5") says.
+ * the screen's edge, and what its end tile says ("5 more": read from its words, as a
+ * scorekeeper reads it).
  */
 const playerLines = (page) =>
   page.evaluate(() =>
@@ -385,13 +386,15 @@ const playerLines = (page) =>
         ].map(seen);
         const end = row.querySelector(':scope > .court-more-tile');
         const endShown = end !== null && getComputedStyle(end).display !== 'none';
+        const says = endShown ? end.innerText.trim().replace(/\s+/g, ' ') : '';
         return {
           line: row.getAttribute('data-bench') ?? 'pad',
           players: players.length,
           whole: players.filter((state) => state === 'whole').length,
           cut: players.filter((state) => state === 'cut').length,
           end: endShown ? seen(end) : 'none',
-          more: endShown ? Number(end.getAttribute('data-count')) : 0,
+          says,
+          more: endShown ? Number(/^(\d+) more$/.exec(says)?.[1] ?? NaN) : 0,
           scrolled: row.scrollLeft !== 0 || row.scrollTop !== 0,
         };
       }),
@@ -417,6 +420,29 @@ async function measureLines(page, label, expected) {
     `${label}: every player in a line is whole or counted on its end tile (${lines.length} lines)`,
     lines.length === expected && wrong.length === 0,
     `${lines.length} lines, ${expected} expected; ${JSON.stringify(wrong)}`,
+  );
+  // "+" means points on this screen, and nothing else (the second look's F1): no
+  // player's tile and no tile of a line of players starts with one, in its words or in
+  // anything the stylesheet draws before them. Only the points buttons do.
+  const plus = await page.evaluate(() => {
+    const starts = (text) => /^\s*["']?\s*\+/.test(text);
+    const drawnBefore = (el) => {
+      const content = getComputedStyle(el, '::before').content;
+      return content === 'none' || content === 'normal' ? '' : content;
+    };
+    return [...document.querySelectorAll('[data-scoring] :is(.court-tile, .court-opt)')]
+      .filter((el) => el.getClientRects().length > 0 && !el.matches('.court-opt-points'))
+      .filter(
+        (el) =>
+          starts(el.innerText) ||
+          [el, ...el.querySelectorAll('*')].some((n) => starts(drawnBefore(n))),
+      )
+      .map((el) => (el.getAttribute('aria-label') || el.innerText).trim().slice(0, 40));
+  });
+  note(
+    `${label}: no tile but the points buttons starts with "+"`,
+    plus.length === 0,
+    plus.join('; '),
   );
   return lines;
 }

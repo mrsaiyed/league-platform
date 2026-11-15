@@ -571,7 +571,12 @@ export function ScoringScreen(props: ScoringScreenProps) {
             ? players.length - (columns - 1)
             : 0;
         row.toggleAttribute('data-more', more > 0);
-        row.querySelector(':scope > .court-more-tile')?.setAttribute('data-count', String(more));
+        // The end tile says it in words ("3 more"), from the message file: never "+3",
+        // which sits beside the points buttons and reads as one.
+        const end = row.querySelector(':scope > .court-more-tile');
+        end?.setAttribute('data-count', String(more));
+        const words = end?.querySelector('.court-more-count');
+        if (words) words.textContent = more > 0 ? t.plural('tracker.bench.more', more) : '';
         players.forEach((player, place) =>
           player.toggleAttribute('data-folded', more > 0 && place >= columns - 1),
         );
@@ -580,7 +585,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [benches, pad]);
+  }, [benches, pad, t]);
 
   // The tiles are handed one tap handler that never changes, so a tile is drawn again
   // only when what it shows changed (finding M6).

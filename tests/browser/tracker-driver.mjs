@@ -209,7 +209,7 @@ export function court(page) {
       pad.locator('[data-bench-pick]').filter({
         has: page.locator('.court-opt-number', { hasText: new RegExp(`^${jersey}$`) }),
       }),
-    /** The end tile of a line of bench players that does not hold them all ("+5"). */
+    /** The end tile of a line of bench players that does not hold them all ("5 more"). */
     moreTile: (within) => within.locator('.court-more-tile'),
     /** A bench player comes in for a floor player, by "In for". */
     async substitute(side, coming, going) {
