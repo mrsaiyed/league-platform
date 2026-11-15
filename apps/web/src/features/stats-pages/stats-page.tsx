@@ -146,7 +146,7 @@ export async function StatsPage({
   const action = leagueUrl(addressee, 'stats');
   return (
     <main>
-      <PageHead title={t('stats.title')} eyebrow={season?.name} />
+      <PageHead title={t('stats.heading')} kicker={season?.name} sub={t('stats.lead')} />
       {season === undefined || data === undefined ? (
         <EmptyPanel text={t('stats.noSeason')} />
       ) : (

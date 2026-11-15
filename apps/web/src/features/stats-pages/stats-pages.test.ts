@@ -87,6 +87,23 @@ describe('statistics page', () => {
     expect(data.leaders[0]?.rows[0]?.cells['player']).toBe('1. Dana Whitfield');
   });
 
+  it('gives fouls and turnovers no leaders card, and keeps them in the tables (S-48)', async () => {
+    const data = await statsFor(adult);
+    const cards = data.leaders.map((board) => board.key);
+    expect(cards.length).toBeGreaterThan(0);
+    expect(cards).not.toContain('fouls');
+    expect(cards).not.toContain('turnovers');
+    // What the made-up league records of the two (fouls) is still a column of the
+    // players' table and of the teams' table.
+    const columns = data.playerColumns.map((column) => column.key);
+    expect(columns).toContain('fouls');
+    expect(data.teamColumns.map((column) => column.key)).toContain('fouls');
+    // Every other statistic of the sport has its card.
+    expect(cards).toEqual(
+      columns.filter((key) => !['player', 'team', 'games', 'fouls', 'turnovers'].includes(key)),
+    );
+  });
+
   it("carries each team's color for its chip, and a player's only team's color", async () => {
     const data = await statsFor(adult);
     const hex = /^#[0-9a-f]{6}$/i;

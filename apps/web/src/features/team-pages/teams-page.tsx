@@ -73,7 +73,7 @@ export async function TeamsPage({
   if (season !== undefined && cards === undefined) return notFound();
   return (
     <main>
-      <PageHead title={t('teams.title')} eyebrow={season?.name} />
+      <PageHead title={t('teams.heading')} kicker={season?.name} sub={t('teams.lead')} />
       {season === undefined || cards === undefined ? (
         <EmptyPanel text={t('teams.noSeason')} />
       ) : (

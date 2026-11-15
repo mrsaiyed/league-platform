@@ -169,6 +169,18 @@ export const en = {
   'home.standings.kicker': 'The race for the top',
   // The season's leaders on the home page (step 2.147 part 2): a tiny label on each card
   // (the leader's place and what is led), and what the number is.
+  // The inner pages' heads (step 2.147 part 2, second landing): a phrased title and one
+  // sentence under the season's name, so the inner pages and the home page are one
+  // family. Each is written to read well for any league and any sport. The plain names
+  // ("Schedule", "Standings") stay for the menu and the browser's tab.
+  'schedule.heading': 'Every game, every round.',
+  'schedule.lead': 'Scores as they come in, and everything still to be played.',
+  'standings.heading': 'The standings.',
+  'standings.lead': 'Where every team stands after each game.',
+  'stats.heading': 'By the numbers.',
+  'stats.lead': 'The season’s leaders, then every player and every team.',
+  'teams.heading': 'The teams.',
+  'teams.lead': 'Every team’s record, roster and games.',
   'home.leaders': 'Leading the way',
   'home.leaders.kicker': 'The players to watch',
   'home.leaders.all': 'All player stats',

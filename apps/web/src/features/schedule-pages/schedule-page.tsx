@@ -58,7 +58,7 @@ export async function SchedulePage({
   const keepSeason = asked === undefined || asked === '' ? {} : { season: asked };
   return (
     <main>
-      <PageHead title={t('schedule.title')} eyebrow={season.name} />
+      <PageHead title={t('schedule.heading')} kicker={season.name} sub={t('schedule.lead')} />
       {built.seasonIsEmpty ? null : (
         <FilterToolbar label={labels.filters}>
           <RoundPicker

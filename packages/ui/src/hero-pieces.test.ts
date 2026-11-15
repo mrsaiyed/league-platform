@@ -11,6 +11,7 @@ import {
   GameCard,
   Hero,
   LeaderSpot,
+  PageHead,
   Scoreboard,
   Section,
   SortableStatsTable,
@@ -37,6 +38,31 @@ const labels = {
   winner: 'Winner',
   viewBoxScore: 'View box score',
 };
+
+describe('the head of an inner page', () => {
+  it('is a kicker, a phrased title and one sentence, like a section of the home page', () => {
+    const html = render(
+      createElement(PageHead, {
+        title: 'The standings.',
+        kicker: 'Fall 2026',
+        sub: 'Where every team stands after each game.',
+      }),
+    );
+    expect(html).toContain('<header class="ui-page-head" data-phrased="true">');
+    expect(html).toContain(
+      '<p class="ui-kicker">Fall 2026</p><h1 dir="auto">The standings.</h1><p class="ui-page-sub">Where every team stands after each game.</p>',
+    );
+    expect(html).not.toContain('ui-eyebrow');
+    expect(html.match(/<h1/g)).toHaveLength(1);
+    // Without a kicker the head is as it was: the small label is an eyebrow.
+    const plain = render(createElement(PageHead, { title: 'Owls', eyebrow: 'Fall 2026' }));
+    expect(plain).toContain('<header class="ui-page-head">');
+    expect(plain).toContain('<p class="ui-eyebrow">Fall 2026</p>');
+    expect(css).toMatch(
+      /\.ui-page-head\[data-phrased='true'\] \{\s*gap: var\(--step-3\);\s*margin-block: var\(--step-4\) var\(--step-6\);/,
+    );
+  });
+});
 
 describe('a kicker over a title', () => {
   it('is a tiny label before the level-two title, which then has no rule of its own', () => {

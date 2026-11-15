@@ -37,6 +37,18 @@ export const layoutCss = String.raw`
 .ui-page-head h1 {
   margin: 0;
 }
+/* A page whose title is a phrase under a kicker, with one sentence beneath: a little more
+   air, the sentence held to a line a reader takes in at once. */
+.ui-page-head[data-phrased='true'] {
+  gap: var(--step-3);
+  margin-block: var(--step-4) var(--step-6);
+}
+.ui-page-head[data-phrased='true'] .ui-page-head-text {
+  gap: var(--step-3);
+}
+.ui-page-head[data-phrased='true'] .ui-page-sub {
+  max-inline-size: 36rem;
+}
 .ui-page-sub {
   margin: 0;
   color: var(--color-muted);

@@ -78,6 +78,13 @@ export type StatsFailure = { readonly code: 'season-not-found' | 'invalid-input'
 
 const leaderLimit = 5;
 
+/**
+ * Statistics nobody is glad to lead: they stay in the tables and get no leaders card, on
+ * the statistics page or the home page (decision S-48: in any league, until a league's
+ * setting switches the cards on; that setting is a later step's).
+ */
+export const noLeaderCard: ReadonlySet<string> = new Set(['fouls', 'turnovers']);
+
 export async function loadStatsPage(
   store: StandingsReadStore,
   settings: PublicStatsSettings,
@@ -93,6 +100,8 @@ export async function loadStatsPage(
   if (!table.ok) return { code: table.error.code };
   const boards: StatLeaders[] = [];
   for (const measure of table.value.statKeys) {
+    // Fouls and turnovers are in the tables below and have no leaders card (S-48).
+    if (noLeaderCard.has(measure)) continue;
     const result = await readStatLeaders(
       store,
       {
