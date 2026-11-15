@@ -165,6 +165,7 @@ describe('findPrivateFields (T-81, T4 §12)', () => {
   });
 
   it('catches the first name alone only when the person asked for initials or removal', () => {
+    // `mayAsk` is the league's switch now; the request was recorded before (R-27).
     const asked = (nameRequest: NameRequest, mayAsk: boolean): string[] => {
       const person = { ...amina, nameRequest, isMinor: false };
       const result = showName(person, {
@@ -177,7 +178,10 @@ describe('findPrivateFields (T-81, T4 §12)', () => {
     };
     const firstOnly = { caption: 'Amina scored' };
     expect(findPrivateFields(firstOnly, { privateValues: asked('none', false) })).toEqual([]);
-    expect(findPrivateFields(firstOnly, { privateValues: asked('initials', false) })).toEqual([]);
+    // A recorded request for initials holds whatever the switch now says (R-27).
+    expect(
+      paths(findPrivateFields(firstOnly, { privateValues: asked('initials', false) })),
+    ).toEqual(['$.caption']);
     expect(paths(findPrivateFields(firstOnly, { privateValues: asked('initials', true) }))).toEqual(
       ['$.caption'],
     );

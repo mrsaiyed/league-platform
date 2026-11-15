@@ -11,7 +11,6 @@
 // so every card on the home and schedule pages opens the game it shows.
 import { defaultSeasonRules } from '@srleagues/contracts';
 import {
-  defaultNamePolicy,
   systemClock,
   type AccessReader,
   type ActivityEntry,
@@ -26,6 +25,7 @@ import {
   type TransactionRunner,
 } from '@srleagues/core';
 import type { GameNames, GamesAreaPorts } from './games-area-ports.ts';
+import { namesShownOf, startingNamePolicy, type NamesShownOf } from './name-policy-of.ts';
 import type { StandInListedGame } from './stand-in-public-schedule.ts';
 import {
   emptyTracker,
@@ -70,6 +70,12 @@ export type StandInGamesOptions = {
   readonly log: (line: CommandLogLine) => void;
   /** The league's own stored settings to start with, by key (for checks). */
   readonly settings?: Readonly<Record<string, StoredSetting[]>>;
+  /**
+   * Who plays in each league and how it shows names, for the game's page, its snapshot
+   * and its live messages: the league's privacy settings (T-81). Where not given, our
+   * starting policy, and every league counts as youth (the careful reading).
+   */
+  readonly namesShownOf?: NamesShownOf;
   /** The public schedule's made-up games of a league (stand-in-public-schedule.ts), which a
    * game's page reads too; only the final score was kept for them. */
   readonly listedGames?: (leagueId: string) => readonly StandInListedGame[];
@@ -84,12 +90,16 @@ const teamNames: Readonly<Record<string, string>> = {
 const [lions, tigers, hawks, bears] = Object.keys(teamNames) as [string, string, string, string];
 
 const player = (firstName: string, lastName: string) => ({ firstName, lastName });
-/** The made-up rosters. The Bears show their players' numbers to their staff only (S-22). */
+/**
+ * The made-up rosters, each team with a color of its own for its chip on a game's page.
+ * The Bears show their players' numbers to their staff only (S-22).
+ */
 const madeUpTeams: readonly MadeUpTeam[] = [
   {
     id: lions,
     name: 'Lions',
     slug: 'lions',
+    color: '#c8862a',
     statsVisibility: 'everyone',
     players: ['Ada', 'Ben', 'Cy', 'Dee', 'Eli', 'Fay'].map((n) => player(n, 'Lionel')),
   },
@@ -97,6 +107,7 @@ const madeUpTeams: readonly MadeUpTeam[] = [
     id: tigers,
     name: 'Tigers',
     slug: 'tigers',
+    color: '#d2562c',
     statsVisibility: 'everyone',
     players: ['Gus', 'Hal', 'Ivy', 'Jo', 'Kit', 'Lu'].map((n) => player(n, 'Tigerton')),
   },
@@ -104,13 +115,20 @@ const madeUpTeams: readonly MadeUpTeam[] = [
     id: hawks,
     name: 'Hawks',
     slug: 'hawks',
+    color: '#2f7fb8',
     statsVisibility: 'everyone',
-    players: ['Max', 'Ned', 'Oz', 'Pia', 'Quin', 'Ray'].map((n) => player(n, 'Hawkins')),
+    // Pia is a child playing in the adult league, so the league's names setting shows on
+    // its game pages and live messages too (R-14, R-24).
+    players: ['Max', 'Ned', 'Oz', 'Pia', 'Quin', 'Ray'].map((n) => ({
+      ...player(n, 'Hawkins'),
+      ...(n === 'Pia' ? { isMinor: true } : {}),
+    })),
   },
   {
     id: bears,
     name: 'Bears',
     slug: 'bears',
+    color: '#6a4c93',
     statsVisibility: 'staff',
     players: ['Sol', 'Tam', 'Uma', 'Vic', 'Wes', 'Xan'].map((n) => player(n, 'Bearsley')),
   },
@@ -414,7 +432,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     tracker: {
       deps: { transaction, events: [], log: options.log, now: () => performance.now() },
       snapshotStoreOf,
-      namesShownOf: async () => ({ audience: 'adult', policy: defaultNamePolicy }),
+      namesShownOf: options.namesShownOf ?? namesShownOf(startingNamePolicy, () => undefined),
       displayNameOf: async (leagueId, accountId) =>
         leagueId === options.leagueId ? (options.people[accountId] ?? '') : '',
       clock: systemClock,

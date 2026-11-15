@@ -9,6 +9,8 @@ export type PersonChangeRow = {
   contactEmail?: string | null;
   birthDate?: string | null;
   isMinor?: boolean | null;
+  /** What the person asked for on public pages (R-23): none, initials or removed. */
+  visibility?: 'none' | 'initials' | 'removed';
 };
 
 /** The new version, or undefined if the person is not there, is in the bin, was merged into another or moved on. */
@@ -27,6 +29,7 @@ export async function updatePerson(
       ...(change.contactEmail === undefined ? {} : { contact_email: change.contactEmail }),
       ...(change.birthDate === undefined ? {} : { birth_date: change.birthDate }),
       ...(change.isMinor === undefined ? {} : { is_minor: change.isMinor }),
+      ...(change.visibility === undefined ? {} : { visibility: change.visibility }),
     })
     .where('league_id', '=', scope.leagueId)
     .where('id', '=', personId)

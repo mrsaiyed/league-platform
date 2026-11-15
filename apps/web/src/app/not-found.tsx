@@ -1,14 +1,11 @@
-import { t } from '../server/messages.ts';
+import { PlatformNotFound } from '../features/shell/index.ts';
 
 /**
- * A refusal stays bare on purpose (U-9): it must not reveal whether a league exists, so it
- * draws none of a league's own frame. U-8's mark (terms, privacy, "powered by") is carried
- * by every page of a league that may be shown, in the league layout, not here.
+ * An address that is no league's: the neutral "not found" (U-9). U-8's mark (terms, privacy,
+ * "powered by") is carried by every page of a league that may be shown, in the league
+ * layout, not here. A page that is not found inside a league has its own screen
+ * (`[league]/not-found.tsx`).
  */
 export default function NotFound() {
-  return (
-    <main>
-      <h1>{t('common.notFound')}</h1>
-    </main>
-  );
+  return <PlatformNotFound />;
 }

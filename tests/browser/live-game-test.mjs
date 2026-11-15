@@ -13,7 +13,10 @@
 // - the Bears show their players' numbers to their staff only, so none of their names
 //   reaches a viewer (S-22); accessibility checks (T-186) and no sideways scrolling at
 //   phone width (A-2);
-// - a game card on the home and schedule pages opens its game's page;
+// - a game card on the home and schedule pages opens its game's page; every card is a
+//   link, whatever the game's state: from the home page a tap on the live game's card
+//   lands on its page with the live board, a coming game's card on its panel, and a
+//   postponed game's on a page that says so;
 // - a page opened before tip-off of Hawks v Lions, a halves game, says "Half 1" once it
 //   starts, and is drawn again with its play-by-play when it starts and with both box
 //   scores when it ends.
@@ -333,6 +336,78 @@ if (browser) {
   });
 
   await step(
+    'every card leads to its game: a live one to its board, a coming one to its panel',
+    async () => {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      try {
+        const page = await context.newPage();
+        /** Taps the first card of a state on the home page; says what its link said. */
+        const tap = async (status) => {
+          await page.goto(`${origin}/north-valley`);
+          const link = page
+            .locator(`main article.ui-game-card[data-status="${status}"] a.ui-game-link`)
+            .first();
+          const said = ((await link.textContent()) ?? '').trim();
+          await Promise.all([page.waitForURL(/\/games\//), link.click()]);
+          await page.locator('main .ui-scoreboard').waitFor();
+          return said;
+        };
+        // The league's own live game (Herons at Falcons), under "Live now" on the home page.
+        const live = await tap('live');
+        note(
+          "the live card's link says what the game is and how it stands",
+          /^Herons against Falcons, live, \d+ to \d+$/.test(live),
+          live,
+        );
+        note(
+          "a tap on the live game's card lands on its page",
+          ((await page.locator('h1').first().textContent()) ?? '') === 'Herons at Falcons',
+        );
+        note(
+          'the page it lands on shows the live board',
+          (await page.locator('.ui-scoreboard[data-state="live"] .ui-live').count()) === 1 &&
+            (await page.locator('[data-live-status="live"]').count()) === 1 &&
+            (await page.locator('.ui-scoreboard-score').count()) === 2,
+        );
+        // A game still to play, under "Upcoming games".
+        const coming = await tap('scheduled');
+        note(
+          "a coming game's link says who plays and when",
+          / against .+, .+\d/.test(coming),
+          coming,
+        );
+        const [away = '', home = ''] = (
+          (await page.locator('h1').first().textContent()) ?? ''
+        ).split(' at ');
+        note(
+          "a tap on a coming game's card lands on that game's page",
+          away !== '' && home !== '' && coming.startsWith(`${away} against ${home}`),
+          `${away} at ${home} from "${coming}"`,
+        );
+        note(
+          'the page it lands on shows the panel of a game still to play',
+          (await page.locator('.ui-scoreboard[data-state="other"]').count()) === 1 &&
+            (await page.locator('.ui-scoreboard-score').count()) === 0 &&
+            (await page.locator('.ui-scoreboard-when').count()) === 1 &&
+            (await page.getByText('This game has not started yet.').count()) === 1,
+        );
+        // And one that is off: its card leads to a page that says so.
+        const off = await tap('postponed');
+        note("a postponed game's link says so", off.endsWith(', postponed'), off);
+        note(
+          'the page it lands on says the game has been postponed',
+          (await page.getByText('This game has been postponed.').count()) === 1 &&
+            (await page.locator('.ui-scoreboard .ui-game-state').textContent()) === 'Postponed',
+        );
+        const problems = await accessibilityProblems(page);
+        note('accessibility: a postponed game', problems.length === 0, problems.join('; '));
+      } finally {
+        await context.close();
+      }
+    },
+  );
+
+  await step(
     'a page opened before tip-off is drawn again when the game starts and ends',
     async () => {
       const screen = await viewer({ at: `/north-valley/games/${laterGameId}` });
@@ -361,10 +436,22 @@ if (browser) {
         await owner.tap({ type: 'end' });
         await page.getByRole('heading', { name: 'Box scores' }).waitFor({ timeout: 10_000 });
         note('once it ends the page shows the box scores', true);
+        // The box score tables themselves, under their own heading, one a team: the
+        // play-by-play is drawn as tables too, so counting every table proved nothing.
+        const boxScores = page.locator(
+          'section[aria-labelledby="game-box-scores"] table.ui-box-score',
+        );
         note(
           'both teams have a box score',
-          (await page.locator('table').count()) >= 2,
-          `${await page.locator('table').count()} tables`,
+          (await boxScores.count()) === 2 &&
+            (await page.locator('table.ui-box-score').count()) === 2,
+          `${await boxScores.count()} box score tables of ${await page.locator('table').count()} tables`,
+        );
+        const named = await boxScores.locator('caption').allTextContents();
+        note(
+          'the two box scores are the two teams of the game, away team first',
+          named.join() === 'Lions,Hawks',
+          named.join(),
         );
         note(
           'a finished game has no link to newer plays',

@@ -37,6 +37,7 @@ import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import { liveListenAuthorize } from './live-listen.ts';
 import type { WebPorts } from './ports.ts';
+import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
 import { createPlayPublisher } from './publish-plays.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
@@ -45,6 +46,7 @@ import { standInGames } from './stand-in-games.ts';
 import { standInListedGames, standInPublicSchedule } from './stand-in-public-schedule.ts';
 import {
   adultTeams,
+  standInAudienceOf,
   standInPublicStats,
   standInSeasonIds,
   youthTeams,
@@ -320,11 +322,21 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
   };
   const accessOf = accessOfVia(deps);
+  // The League settings screen's settings: the public pages read how names show from them.
+  // There is exactly one: a second copy would keep the admin's saved setting from the pages.
+  const adminSettings = standInAdminSettings({
+    accessOf: (leagueId) => accessTx(leagueId).access,
+    log: options.log,
+  });
+  const namePolicy = namePolicyOf(adminSettings.deps);
   const scheduled = {
     adultLeagueId: standInLeagues.live.id,
     youthLeagueId: standInLeagues.other.id,
   };
+  // Who plays in each made-up league, read by every page that shows a name (R-15).
+  const audienceOf = standInAudienceOf(scheduled);
   const games = standInGames({
+    namesShownOf: namesShownOf(namePolicy, audienceOf),
     leagueId: standInLeagues.live.id,
     people: {
       [owner.accountId]: 'Olive Owner',
@@ -379,19 +391,20 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       accessOf: (leagueId) => accessTx(leagueId).access,
       log: options.log,
     }),
-    publicStats: standInPublicStats({
-      adultLeagueId: standInLeagues.live.id,
-      youthLeagueId: standInLeagues.other.id,
-    }),
+    publicStats: standInPublicStats(scheduled, namePolicy),
     adminTeams: standInAdminTeams({
       accessOf: (leagueId) => accessTx(leagueId).access,
       log: options.log,
       seededLeagueId: standInLeagues.live.id,
+      audienceOf: (leagueId) => audienceOf(leagueId) ?? 'youth',
+      // A person's name request reads the settings the admin saves (R-25).
+      settingRowsOf: (leagueId, key) =>
+        adminSettings.deps.transaction(
+          { leagueId, accountId: null, requestId: 'name-settings' },
+          (tx) => tx.leagues.settingRows(key, {}),
+        ),
     }),
-    adminSettings: standInAdminSettings({
-      accessOf: (leagueId) => accessTx(leagueId).access,
-      log: options.log,
-    }),
+    adminSettings,
     publicSchedule: standInPublicSchedule(scheduled, now),
     scheduleAdmin: standInSchedule({
       leagues: [
@@ -412,10 +425,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       log: options.log,
       today: () => new Date().toISOString().slice(0, 10),
     }),
-    publicTeams: standInPublicTeams(
-      { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
-      coach.accountId,
-    ),
+    publicTeams: standInPublicTeams(scheduled, coach.accountId),
     signUpMadeUpMember,
   };
 }
