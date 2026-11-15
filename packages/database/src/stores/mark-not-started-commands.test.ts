@@ -588,3 +588,42 @@ describe('marking a game not started on the database (S-40)', () => {
     }
   });
 });
+
+describe('a final score typed by hand and a batch of lineups, in both orders (T-111, step 2.154)', () => {
+  const typed = (g: Game, version: number) =>
+    recordFinalScore(
+      g.as(g.ownerId),
+      { gameId: g.gameId, version, homeScore: 40, awayScore: 38 },
+      deps,
+    );
+
+  it("holds the game with the tracker's own lock, in its league only", async () => {
+    const g = await trackedGame();
+    const other = await trackedGame();
+    const locked = await deps.transaction(g.as(g.ownerId), async (tx) => [
+      await tx.games.lockGame(g.gameId),
+      await tx.games.lockGame(other.gameId),
+    ]);
+    expect(locked).toEqual([true, false]);
+  });
+
+  it('lineups first: the typed score is refused and the game keeps its lineups', async () => {
+    const g = await trackedGame();
+    expect((await tap(g, [tipOff(g)[0] as Input])).map((r) => r.status)).toEqual(['accepted']);
+    const version = (
+      await one<{ version: number }>(pglite, 'select version from games where id = $1', [g.gameId])
+    ).version;
+    expect(await typed(g, version)).toEqual({ ok: false, error: { code: 'game-is-tracked' } });
+    const rows = await rowsOf(g);
+    expect(rows.game?.status).not.toBe('final');
+    expect(rows.events.map((e) => e.type)).toEqual(['lineup']);
+  });
+
+  it('the typed score first: the game is final with it, whatever the batch then does', async () => {
+    const g = await trackedGame();
+    expect(await typed(g, 1)).toMatchObject({ ok: true });
+    await tap(g, [tipOff(g)[0] as Input]).catch(() => []);
+    const rows = await rowsOf(g);
+    expect(rows.game).toMatchObject({ status: 'final', home_score: 40, away_score: 38 });
+  });
+});

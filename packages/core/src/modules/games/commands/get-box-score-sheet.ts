@@ -18,6 +18,12 @@ export type BoxScoreSheet = {
   readonly game: GameRecord;
   /** Whether this reader may reopen the game here: games.reopen_game would accept it. */
   readonly mayReopen: boolean;
+  /**
+   * Whether this reader may correct games at the game's program (games.reopen_game's own
+   * check), whatever the sheet's lock: a game decided by hand while it had plays is
+   * reopened by them through games.reopen_game, which hands it back to its tracker (S-46).
+   */
+  readonly mayCorrect: boolean;
   readonly players: readonly GameRosterPlayer[];
   readonly lines: readonly GameLine[];
   readonly statKeys: readonly string[];
@@ -57,13 +63,14 @@ export const getBoxScoreSheet = defineCommand({
           : isDecided(game.status)
             ? 'decided'
             : null;
-    const mayReopen =
-      locked === 'decided' &&
+    const mayCorrect =
       context.accountId !== null &&
       (await mayChangeGames(context, tx, 'games.correct', await gameScope(tx, game.id)));
+    const mayReopen = locked === 'decided' && mayCorrect;
     return ok({
       game,
       mayReopen,
+      mayCorrect,
       players,
       lines,
       statKeys,

@@ -119,4 +119,26 @@ describe('recordForfeit', () => {
     });
     expect(await recordForfeit(as(schedulerId), input, deps)).toMatchObject({ ok: true });
   });
+
+  it('refuses a game the live tracker has recorded plays of, as a final score is (S-46)', async () => {
+    const live = game(1, { status: 'live', captureMode: 'live', homeScore: 12, awayScore: 9 });
+    for (const account of [ownerId, schedulerId]) {
+      const { db, deps, as, events } = memoryGames({
+        games: [live],
+        grants: [schedulerGrant],
+        tracked: [gameUuid(1)],
+      });
+      expect(await recordForfeit(as(account), input, deps), account).toEqual({
+        ok: false,
+        error: { code: 'game-is-tracked' },
+      });
+      expect(db.state.games[0]).toEqual(live);
+      expect(events).toEqual([]);
+    }
+    // Set to live tracking with no plays yet: a forfeit can still be recorded.
+    const unplayed = memoryGames({ games: [game(1, { captureMode: 'live' })] });
+    expect(await recordForfeit(unplayed.as(ownerId), input, unplayed.deps)).toMatchObject({
+      ok: true,
+    });
+  });
 });

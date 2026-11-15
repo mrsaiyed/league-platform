@@ -109,6 +109,21 @@ describe('getBoxScoreSheet', () => {
     });
   });
 
+  it('says whether the reader may correct games here, whatever the lock (step 2.154)', async () => {
+    const mayCorrect = async (who: string) => {
+      // A game decided by hand while it held plays: locked as tracked.
+      const { deps, as } = memoryGames({
+        games: [finalGame(1)],
+        tracked: [gameUuid(1)],
+        grants: [scorekeeperGrant],
+      });
+      const sheet = await getBoxScoreSheet(as(who), { gameId: gameUuid(1) }, deps);
+      return sheet.ok ? [sheet.value.locked, sheet.value.mayCorrect] : undefined;
+    };
+    expect(await mayCorrect(ownerId)).toEqual(['tracked', true]);
+    expect(await mayCorrect(scorekeeperId)).toEqual(['tracked', false]);
+  });
+
   it('says a cancelled or tracked game cannot be saved here', async () => {
     const cancelled = memoryGames({ games: [game(1, { status: 'cancelled' })] });
     expect(
