@@ -6,7 +6,7 @@
 import { TrackerGameState } from '@srleagues/contracts';
 import { createTranslator, en } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { bears, games, hawks, liveLeagueId } from '../../server/tracker-endpoints.test-helper.ts';
@@ -170,6 +170,7 @@ function drawn(
     readonly moreOpen?: boolean;
     readonly slots?: CourtSlots;
     readonly when?: string | null;
+    readonly account?: ReactNode;
   } = {},
 ): string {
   return renderToStaticMarkup(
@@ -186,6 +187,7 @@ function drawn(
       links: { back: '/back', account: '/account', watch: '/watch' },
       on: noHandlers,
       ...(options.slots === undefined ? {} : { slots: options.slots }),
+      ...(options.account === undefined ? {} : { account: options.account }),
     }),
   );
 }
@@ -620,6 +622,18 @@ describe('the frame (checklist A3, A4, A6, I7, T1; DESIGN.md section 7, line 11)
     expect(hint.slice(0, hint.indexOf('</div>')).match(/<p>/g)).toHaveLength(4);
     // No game's day and time: only the teams.
     expect(drawn(device.view(), { when: null })).not.toContain('court-title-when');
+  });
+
+  it('draws the account button of step 2.127 in the first row, before More (line 11)', async () => {
+    const device = await scoringDevice();
+    await device.tipOff();
+    const button = createElement('details', { 'data-account': '' }, 'S');
+    const top = (html: string) =>
+      html.slice(html.indexOf('<header class="court-top"'), html.indexOf('</header>'));
+    const withIt = top(drawn(device.view(), { account: button }));
+    expect(withIt).toContain('<div class="court-account"><details data-account="">S</details>');
+    expect(withIt.indexOf('data-account')).toBeLessThan(withIt.indexOf('court-more-button'));
+    expect(top(drawn(device.view()))).not.toContain('court-account');
   });
 
   it('draws what later steps hand it in the places left for them', async () => {

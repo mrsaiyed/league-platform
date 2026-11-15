@@ -489,14 +489,23 @@ if (browser) {
       note('the address is the game’s tracker', page.url().endsWith(trackerPath(otherGame)));
 
       // The frame: the tracker's own, nothing of the public site (DESIGN.md section 7, line 11).
+      // The one navigation the frame holds is the account button's own menu (step 2.127,
+      // line 11), and it is in the account button: any other counts as a public part.
       const frame = await page.evaluate(() => ({
-        publicParts: document.querySelectorAll('.site-header, .site-footer, .site-skip, nav')
+        publicParts: [
+          ...document.querySelectorAll('.site-header, .site-footer, .site-skip, nav'),
+        ].filter((el) => !(el.matches('nav') && el.closest('[data-scoring] [data-account]')))
           .length,
+        accountMenus: document.querySelectorAll('[data-scoring] [data-account] nav').length,
         leagueLook: document.querySelectorAll('.league-site, .ui-root').length,
         title: document.querySelector('h1')?.innerText ?? '',
         font: getComputedStyle(document.querySelector('[data-scoring]')).fontFamily,
       }));
       note('no public header, menu or footer around the scoring screen', frame.publicParts === 0);
+      note(
+        'the frame holds the account button of step 2.127, with its one menu (line 11)',
+        frame.accountMenus === 1,
+      );
       note('nothing of the league’s design around the scoring screen', frame.leagueLook === 0);
       note(
         'the title says the two teams, the day and the time (A3)',
@@ -1671,6 +1680,57 @@ if (browser) {
           `${label}: both teams’ five and the pad are on the screen`,
           places.floorTilesOnScreen && places.padOnScreen,
         );
+        // The account button of step 2.127 is in the frame (DESIGN.md section 7, line 11):
+        // its menu opens inside the screen, whole, over everything (not under the pad),
+        // and opening it scrolls nothing.
+        await watchScrolling(page);
+        const account = c.root.locator('[data-account]');
+        const summary = account.locator(':scope > summary');
+        await summary.click();
+        await account.locator('.site-account-panel').waitFor();
+        const menu = await account.evaluate((el) => {
+          const panel = el.querySelector('.site-account-panel').getBoundingClientRect();
+          const button = el.querySelector(':scope > summary').getBoundingClientRect();
+          const entries = [
+            ...el.querySelectorAll('.site-account-panel a, .site-account-panel button'),
+          ];
+          return {
+            inside:
+              panel.left >= 0 &&
+              panel.top >= 0 &&
+              panel.right <= window.innerWidth &&
+              panel.bottom <= window.innerHeight,
+            button: [Math.round(button.width), Math.round(button.height)],
+            entries: entries.length,
+            onTop: entries.every((entry) => {
+              const r = entry.getBoundingClientRect();
+              return (
+                r.height >= 43.99 &&
+                entry.contains(
+                  document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2),
+                )
+              );
+            }),
+            signOut: entries.some((entry) => entry.textContent.trim() === 'Sign out'),
+            page: document.scrollingElement.scrollHeight - window.innerHeight,
+          };
+        });
+        const scrolledByMenu = await scrollsSeen(page);
+        note(
+          `${label}: the account button’s menu opens inside the screen, over the pad, nothing scrolling`,
+          menu.inside &&
+            menu.onTop &&
+            menu.signOut &&
+            menu.entries >= 3 &&
+            menu.button[0] >= 44 &&
+            menu.button[1] >= 44 &&
+            menu.page <= 0 &&
+            scrolledByMenu.events === 0 &&
+            scrolledByMenu.moved.length === 0,
+          JSON.stringify({ menu, scrolledByMenu }),
+        );
+        await summary.click();
+        await account.locator('.site-account-panel').waitFor({ state: 'hidden' });
         // With a floor player's options open, and a bench player's.
         const first = c.root.locator('[data-floor="home"] .court-tile').first();
         await first.click();

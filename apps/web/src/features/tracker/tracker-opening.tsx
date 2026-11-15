@@ -36,6 +36,12 @@ export type TrackerOpeningProps = {
   readonly backHref: string;
   /** The account page, where a shared device is signed out (and its kept games cleared). */
   readonly accountHref: string;
+  /**
+   * The account button of step 2.127 (the shell's AccountButton), drawn by the server: in
+   * the frame's first row, so a shared tablet can be signed out (DESIGN.md section 7,
+   * line 11). Its "Sign out" leaves the game first (holdSignOut, below). Null: none.
+   */
+  readonly account?: ReactNode;
   /** The sign-in screen, coming back to this game: offered once the device is signed out. */
   readonly signInHref: string;
   readonly locale: string;
@@ -62,6 +68,7 @@ export function TrackerOpening({
   watchHref,
   backHref,
   accountHref,
+  account = null,
   signInHref,
   locale,
   catalog,
@@ -182,7 +189,7 @@ export function TrackerOpening({
       window.location.assign(to);
     }
   };
-  // The account button's "Sign out" (in the league's header, above this page) leaves the
+  // The account button's "Sign out" (in this frame's first row: `account`) leaves the
   // game this way too (tracker-sign-out.ts): it asks when plays are waiting, then the
   // session is released before the device is signed out (T6 §5).
   useEffect(
@@ -289,6 +296,7 @@ export function TrackerOpening({
           ) : null
         }
         links={{ back: backHref, account: accountHref, watch: watchHref }}
+        account={account}
         leave={leaveBy}
         onNotRecorded={() => setLastTapLost(true)}
       />
@@ -298,7 +306,8 @@ export function TrackerOpening({
   return (
     <main className="court court-opening" data-tracker="">
       <div className="court-card">
-        <header className="court-card-head">
+        <header className="court-card-head" data-with-account={account === null ? undefined : ''}>
+          {account === null ? null : <div className="court-account">{account}</div>}
           <p className="court-label">{t('tracker.title')}</p>
           <h1 className="court-title">
             <span className="court-title-teams">{matchup}</span>

@@ -99,6 +99,11 @@ export type CourtViewProps = {
   };
   readonly on: CourtHandlers;
   readonly slots?: CourtSlots;
+  /**
+   * The account button of step 2.127 (DESIGN.md section 7, line 11), beside More in the
+   * first row, so a shared tablet can be signed out. Null or left out: none.
+   */
+  readonly account?: ReactNode;
   /** Drawn over the screen: the label that follows the finger while a player is dragged. */
   readonly children?: ReactNode;
   /** The drag of a bench player onto a floor player (scoring-screen.tsx). */
@@ -145,17 +150,22 @@ export function CourtView(props: CourtViewProps) {
           <span className="court-title-teams">{props.title}</span>
           {props.when === null ? null : <span className="court-title-when">{props.when}</span>}
         </h1>
-        <button
-          type="button"
-          className="court-button court-more-button"
-          aria-haspopup="dialog"
-          aria-expanded={props.moreOpen}
-          aria-controls={moreId}
-          onClick={() => on.more(true)}
-        >
-          <span className="court-more-dots" aria-hidden="true" />
-          <span className="court-more-word">{t('tracker.court.more')}</span>
-        </button>
+        <div className="court-top-end">
+          {props.account === undefined || props.account === null ? null : (
+            <div className="court-account">{props.account}</div>
+          )}
+          <button
+            type="button"
+            className="court-button court-more-button"
+            aria-haspopup="dialog"
+            aria-expanded={props.moreOpen}
+            aria-controls={moreId}
+            onClick={() => on.more(true)}
+          >
+            <span className="court-more-dots" aria-hidden="true" />
+            <span className="court-more-word">{t('tracker.court.more')}</span>
+          </button>
+        </div>
         <div className="court-board" role="group" aria-label={t('tracker.court.scoreboard')}>
           <Score t={t} team={view.teams.home} />
           <div className="court-clock" data-clock="">

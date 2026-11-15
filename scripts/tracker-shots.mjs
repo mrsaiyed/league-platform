@@ -47,6 +47,7 @@ const only = process.argv
 /**
  * The states photographed, in the order a game reaches them. `run` brings the screen from
  * the state before to this one; it is run even when the state is left out by `--only`.
+ * `sizes`, when given, names the sizes (tracker-driver.mjs) it is photographed at.
  */
 const states = [
   {
@@ -214,6 +215,19 @@ const states = [
       await c.pad.locator('[data-bench-list="home"]').waitFor();
     },
   },
+  {
+    name: '18-account',
+    about: 'the account button’s menu open (step 2.127): signing a shared tablet out',
+    // Where the first row is shortest: the phone in its browser, and lying down.
+    sizes: ['phone-in-browser', 'phone-lying'],
+    run: async (page) => {
+      const c = court(page);
+      await c.pad.locator('.court-close').click();
+      await c.pad.locator('[data-rest]').waitFor();
+      await c.root.locator('[data-account] > summary').click();
+      await c.root.locator('[data-account] .site-account-panel').waitFor();
+    },
+  },
 ];
 
 async function main() {
@@ -247,6 +261,8 @@ async function main() {
       // What was just tapped has stopped showing on its tile.
       await page.waitForTimeout(800);
       for (const size of sizes) {
+        // A state photographed at some sizes only names them.
+        if (state.sizes !== undefined && !state.sizes.includes(size.name)) continue;
         await page.setViewportSize({ width: size.width, height: size.height });
         await page.waitForTimeout(200);
         await page.screenshot({

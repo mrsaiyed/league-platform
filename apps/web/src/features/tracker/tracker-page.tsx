@@ -31,13 +31,13 @@ import { MessagePage } from '@srleagues/ui';
 import { leagueUrl, listMyGames, platformUrl, readTrackerRosters } from '@srleagues/core';
 import { forbidden } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { DesignStyle } from '../shell/index.ts';
+import { AccountButton, accountMenuOf, DesignStyle } from '../shell/index.ts';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { gameWhenText } from '../../server/game-when.ts';
 import { isGameIdFormat } from '../../server/league-api.ts';
 import { leagueSites, siteOfLeague } from '../../server/league-site.ts';
-import { loadLeaguePage } from '../../server/load-league-page.ts';
+import { loadLeaguePage, signedInEmail } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { signInFirstUrl } from '../../server/sign-in-first.ts';
 import { deviceRosters } from './device-rosters.ts';
@@ -108,6 +108,9 @@ export async function TrackerPage({
     mine === undefined || mine.startsAt === null
       ? null
       : gameWhenText(mine.startsAt, { locale, timeZone });
+  // The account button of step 2.127, in the tracker's own frame (DESIGN.md section 7,
+  // line 11): a shared tablet is signed out from here, leaving the game first.
+  const menu = accountMenuOf(view, await signedInEmail(), trackerHref);
   return (
     <TrackerOpening
       leagueId={here.id}
@@ -118,6 +121,7 @@ export async function TrackerPage({
       watchHref={leagueUrl(here, 'game', { game: read.value.gameId })}
       backHref={backHref}
       accountHref={platformUrl('account')}
+      account={menu === null ? null : <AccountButton account={menu} />}
       signInHref={signInFirstUrl(trackerHref, { problem: 'signInAgain' })}
       locale={locale}
       catalog={trackerCatalog(catalogs[locale] ?? en)}

@@ -404,11 +404,158 @@
   font-size: var(--court-size-small);
   color: var(--court-muted);
 }
-.court-more-button {
+/* The end of the first row: the account button, then More. */
+.court-top-end {
   grid-area: more;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-inline-size: 0;
+}
+.court-more-button {
   min-block-size: 44px;
   padding-inline: 12px;
   font-size: var(--court-size-text);
+}
+
+/* The account button of step 2.127 (DESIGN.md section 7, line 11): the person's initial
+   in a round mark, opening a small panel under it with who they are signed in as, their
+   games, their account and "Sign out", so a shared tablet can be signed out. It is the
+   shell's own button (site-header.tsx), drawn here in the court's look: the league's
+   stylesheet gives it the league's design values, which never reach this screen. The
+   panel is laid over the screen, so nothing under it moves and nothing scrolls. */
+/* The panel is laid from the end of the first row (the end of More), not from the
+   button, so it is never cut off at the screen's start edge on a narrow phone. */
+.court-top-end {
+  position: relative;
+}
+.court .site-account {
+  position: static;
+  display: flex;
+  flex: none;
+}
+.court-opening .court-card-head[data-with-account] {
+  position: relative;
+  padding-inline-end: 56px;
+}
+.court-opening .court-account {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  z-index: 20;
+}
+.court .site-account > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  border: 1px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: var(--court-tile);
+  color: var(--court-text);
+  list-style: none;
+  cursor: pointer;
+}
+.court .site-account > summary::-webkit-details-marker {
+  display: none;
+}
+/* The button's name, for a screen reader: out of sight, never out of the page (the
+   league's base styles that do this elsewhere are not on this screen). */
+.court .site-account .ui-visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.court .site-account > summary:focus-visible {
+  outline: 3px solid var(--court-gold);
+  outline-offset: 2px;
+}
+.court .site-account-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 28px;
+  block-size: 28px;
+  border: 1px solid var(--court-muted);
+  border-radius: 50%;
+  color: var(--court-text);
+  font-size: var(--court-size-small);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.court .site-account[open] > summary {
+  border-color: var(--court-gold);
+}
+.court .site-account[open] .site-account-initial {
+  border-color: var(--court-gold);
+  color: var(--court-gold);
+}
+.court .site-account-panel {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-end: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  inline-size: max-content;
+  min-inline-size: 220px;
+  max-inline-size: min(300px, calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: var(--court-panel);
+  color: var(--court-text);
+  font-size: var(--court-size-text);
+}
+.court .site-account-who {
+  margin: 0;
+  padding-block: 4px;
+  padding-inline: 8px;
+  overflow-wrap: anywhere;
+  color: var(--court-muted);
+  font-size: var(--court-size-small);
+}
+.court .site-account-panel ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.court .site-account-panel li a,
+.court .site-account-sign-out {
+  display: flex;
+  align-items: center;
+  min-block-size: 44px;
+  padding-inline: 12px;
+  border-radius: 8px;
+  color: var(--court-text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+.court .site-account-panel li a:hover {
+  background: var(--court-tile);
+}
+.court .site-account-sign-out {
+  justify-content: center;
+  inline-size: 100%;
+  margin-block-start: 4px;
+  border: 1px solid var(--court-red-line);
+  background: transparent;
+  color: var(--court-red-text);
+  cursor: pointer;
+}
+.court .site-account-panel a:focus-visible,
+.court .site-account-sign-out:focus-visible {
+  outline: 3px solid var(--court-gold);
+  outline-offset: 2px;
 }
 /* Three dots, drawn. */
 .court-more-dots,

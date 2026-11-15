@@ -91,6 +91,28 @@ function AccountEntries({ account }: { readonly account: AccountMenu }) {
 }
 
 /**
+ * The account button of a signed-in person: their initial, opening a small panel of their
+ * account's entries. A plain disclosure, so it works with scripts switched off. In the
+ * first row of a league's header, and in the scoring screen's own frame (step 2.35;
+ * DESIGN.md section 7, line 11), which draws it in its own look.
+ */
+export function AccountButton({ account }: { readonly account: AccountMenu }) {
+  return (
+    <details className="site-account" data-account="">
+      <summary>
+        <span className="site-account-initial" aria-hidden="true">
+          {account.initial}
+        </span>
+        <span className="ui-visually-hidden">{t('account.menu')}</span>
+      </summary>
+      <nav className="site-account-panel" aria-label={t('account.menu')}>
+        <AccountEntries account={account} />
+      </nav>
+    </details>
+  );
+}
+
+/**
  * The header of every page of a league. First row: the league's mark (its first letter in
  * a shield, until it has a logo of its own) and its name (U-8) with a small line under it,
  * then the season picker on the pages that show one season, and the account button: the way
@@ -172,17 +194,7 @@ export function SiteHeader({
             {t('account.signInOrCreate')}
           </a>
         ) : (
-          <details className="site-account">
-            <summary>
-              <span className="site-account-initial" aria-hidden="true">
-                {account.initial}
-              </span>
-              <span className="ui-visually-hidden">{t('account.menu')}</span>
-            </summary>
-            <nav className="site-account-panel" aria-label={t('account.menu')}>
-              <AccountEntries account={account} />
-            </nav>
-          </details>
+          <AccountButton account={account} />
         )}
       </div>
       <nav className="site-tabs" aria-label={t('nav.menu')}>

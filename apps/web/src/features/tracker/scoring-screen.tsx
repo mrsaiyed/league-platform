@@ -60,6 +60,8 @@ export type ScoringScreenProps = {
   readonly links: { readonly back: string; readonly account: string; readonly watch: string };
   readonly leave: (to: string) => (event: MouseEvent<HTMLAnchorElement>) => void;
   readonly slots?: CourtSlots;
+  /** The account button of step 2.127, beside More in the frame's first row. */
+  readonly account?: ReactNode;
   /**
    * A tap was made as this device stopped scoring and was not recorded: this screen is
    * about to be replaced, so the page that replaces it says so.
@@ -564,7 +566,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
     /** A tap anywhere else closes a player's options (checklist D4). */
     onClick(event: MouseEvent<HTMLElement>) {
       if (wanted.current.kind !== 'player' || !(event.target instanceof Element)) return;
-      if (event.target.closest('button, a, [data-pad], [data-more]') !== null) return;
+      if (event.target.closest('button, a, [data-pad], [data-more], [data-account]') !== null)
+        return;
       showPad(padAtRest);
     },
   };
@@ -642,6 +645,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       on={{ ...on, tile: tileTap }}
       drag={dragHandlers}
       {...(props.slots === undefined ? {} : { slots: props.slots })}
+      account={props.account ?? null}
     >
       {draggedTile === undefined ? null : (
         <div
