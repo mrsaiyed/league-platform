@@ -4,6 +4,11 @@ export {
   type CreatedLeague,
   type CreateLeagueError,
 } from './commands/create-league.ts';
+export {
+  removeDraftLeague,
+  type RemovedDraftLeague,
+  type RemoveDraftLeagueError,
+} from './commands/remove-draft-league.ts';
 export { namedTimeZone } from './time-zone.ts';
 export { createDivision, type CreateDivisionError } from './commands/create-division.ts';
 export { listDivisions } from './commands/list-divisions.ts';
@@ -116,7 +121,11 @@ export type {
   DivisionChange,
   DivisionRecord,
   DivisionsStore,
+  DraftLeagueRemoval,
   LeagueRecord,
+  LeagueRemovalFinding,
+  LeagueRemovalStore,
+  LeagueRemovalTx,
   LeaguesStore,
   LeaguesTx,
   NewDivision,
