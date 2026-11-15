@@ -18,11 +18,16 @@ export const heroCss = String.raw`
   line-height: 1.5;
   text-transform: uppercase;
 }
+/* The short rule is in the league's color of decoration (its gold, where it has one),
+   which need not be read; on a band, in the color of the label itself. */
 .ui-kicker::before {
   content: '';
   flex: none;
   inline-size: var(--step-5);
   block-size: 1px;
+  background: var(--color-ornament);
+}
+.ui-hero .ui-kicker::before {
   background: currentColor;
 }
 
@@ -113,14 +118,17 @@ export const heroCss = String.raw`
   );
 }
 /* The pattern's mark: the shield, in fine lines, with the league's first letter. It sits
-   at the far side, behind whatever stands there. On a phone it is measured by the band's
-   width and runs off the far edge; from a tablet up, by the band's height. */
+   at the far side of a laptop's band, where the words leave room for it. On a phone and a
+   tablet the band is all words and buttons from edge to edge, so the mark is not drawn
+   there: nothing of it may pass under text or a button. The fine lines of the pattern
+   and the glow are the band's finish at those widths. */
 .ui-hero-art {
+  display: none;
   position: absolute;
   inset-block-start: 50%;
-  inset-inline-end: calc(-1 * var(--step-8));
+  inset-inline-end: 4%;
   z-index: -1;
-  inline-size: 72%;
+  block-size: 120%;
   aspect-ratio: 6 / 7;
   overflow: visible;
   fill: none;
@@ -228,11 +236,6 @@ export const heroCss = String.raw`
   min-inline-size: 0;
 }
 @media (min-width: 40rem) {
-  .ui-hero-art {
-    inset-inline-end: 4%;
-    inline-size: auto;
-    block-size: 120%;
-  }
   .ui-hero-inner {
     padding-block: var(--step-8);
   }
@@ -250,6 +253,12 @@ export const heroCss = String.raw`
   }
 }
 @media (min-width: 64rem) {
+  .ui-hero-art {
+    display: block;
+  }
+  .ui-hero:has(.ui-hero-picture) .ui-hero-art {
+    display: none;
+  }
   .ui-hero-inner {
     min-block-size: 30rem;
     gap: var(--step-7);

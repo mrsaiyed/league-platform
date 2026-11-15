@@ -22,8 +22,11 @@ export const cardsCss = String.raw`
 .ui-emblem[data-size='large'] {
   block-size: calc(var(--step-8) + var(--step-5));
 }
+/* How much of the team's color fills the shield is the design's (--emblem-strength): a
+   third on a dark panel, more than half on a white one, so it has the same strength on
+   either. */
 .ui-emblem-shield {
-  fill: color-mix(in srgb, var(--emblem-color) 30%, transparent);
+  fill: color-mix(in srgb, var(--emblem-color) var(--emblem-strength, 30%), transparent);
   stroke: currentColor;
   stroke-width: 1.4;
 }

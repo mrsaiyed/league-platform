@@ -176,66 +176,165 @@ export const gameCss = String.raw`
   gap: 0;
   padding-block: var(--step-4);
   padding-inline: var(--step-5);
-  /* Over the panel's own color: a little of the main color at one corner, never more than
-     the texts are fitted to (packages/site, hoverTintShare). */
-  background-image: linear-gradient(
-    120deg,
-    color-mix(in srgb, var(--color-primary) 9%, var(--color-panel)),
-    var(--color-panel) 70%
-  );
-  container-type: inline-size;
+  /* Over the panel's own color: in a dark design a little of the main color at one corner
+     (never more than the texts are fitted to); in a light one nothing, so cards and tables
+     are one tint (packages/site, frame-look.ts). */
+  background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
+  /* A fine line at the card's top in the league's color of decoration. */
+  border-block-start: 2px solid var(--color-ornament-line);
+  container: card / inline-size;
   transition:
     border-color 0.15s,
     transform 0.15s;
 }
 .ui-game-card[data-layout='board']:has(.ui-game-link):hover {
   border-color: color-mix(in srgb, var(--color-pop) 55%, transparent);
-  transform: translateY(-2px);
 }
+/* The card lifts a little under the pointer, for readers who have not asked for less
+   movement. */
+@media (prefers-reduced-motion: no-preference) {
+  .ui-game-card[data-layout='board']:has(.ui-game-link):hover {
+    transform: translateY(-2px);
+  }
+}
+/* The quiet line above: which game and when, and its state. A date and a time never break
+   inside themselves: when the line cannot hold both them and the state's pill, the pill
+   takes a line of its own. */
 .ui-game-card[data-layout='board'] .ui-game-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-1) var(--step-3);
   padding-block-end: var(--step-3);
   border-block-end: 1px solid var(--color-line);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+.ui-game-card[data-layout='board'] .ui-game-about {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--step-2);
+  min-block-size: var(--step-5);
+}
+.ui-game-card[data-layout='board'] .ui-game-number {
+  margin-inline-end: 0;
+}
+.ui-game-card[data-layout='board'] :is(.ui-game-number, .ui-game-when) {
+  white-space: nowrap;
+}
 /* The two teams sit side by side with what stands between them, or, when they cannot,
-   one over the other. The board works out the width they need: each side has room for
-   the longer of the two names (the card counts its letters, a name of several words
-   taking two lines: --letters), at the width of a letter in the design's heading face
-   (--heading-letter); the middle has room for "VS", or for the score's figures
-   (--figures). Narrower than that, every part of the board takes a row of its own: the
-   difference times a large number is either more than the board's width or nothing. */
+   one over the other. The board works out the width they need side by side: each side
+   has room for the longer of the two names (the card counts its letters, a name of
+   several words taking two lines: --letters), at the width of a letter in the design's
+   heading face (--heading-letter) and the size the names are set in (--board-name); the
+   middle has room for "VS", or for the score's figures (--figures).
+
+   The board is the measure (100cqi is its width). --board-short is more than nothing only
+   when the board is narrower than that sum, and --board-room only when it is not: each is
+   the difference times a large number, so a width held between nothing and one of them is
+   either nothing or all of it. That is how the same board is drawn two ways with no
+   script:
+   - with room: emblem over name on each side, the score or "VS" large between them;
+   - short of it: two rows, each team's emblem and name at the start and its own score at
+     the end, so nobody has to work out whose number is whose, and nothing between them. */
 .ui-game-board {
   --board-gap: var(--step-3);
   --board-figure: var(--text-28);
-  --board-side: calc(var(--letters, 8) * var(--heading-letter, 0.6) * var(--text-18));
+  --board-name: var(--text-18);
+  --board-side: calc(var(--letters, 8) * var(--heading-letter, 0.6) * var(--board-name));
   --board-middle: var(--step-6);
   --board-needs: calc(2 * var(--board-side) + var(--board-middle) + 2 * var(--board-gap));
+  --board-short: calc((var(--board-needs) - 100cqi) * 999);
+  --board-room: calc((100cqi - var(--board-needs)) * 999);
+  /* The room a team's own score needs at the end of its row: none while there is no score. */
+  --board-own: 0px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  /* The same step --board-gap names for the sum above. */
-  gap: var(--step-3);
+  /* Between the two rows, and (the same step --board-gap names) between the sides. */
+  gap: var(--step-2) var(--step-3);
   padding-block: var(--step-5);
+  container: board / inline-size;
 }
 .ui-game-board[data-scored='true'] {
   --board-middle: calc(var(--figures, 4) * 0.65 * var(--board-figure) + var(--step-5));
+  /* A score of its own is set at 28: room for the longer of the two (one figure more than
+     half of them, and a little over), and the gap before it. */
+  --board-own: calc((var(--figures, 4) + 2) * 0.3 * var(--text-28) + var(--step-3));
 }
+/* A side takes the whole row when the board is short of room, and shares what the middle
+   leaves when it is not. */
 .ui-game-side {
-  display: grid;
-  flex: 1 1 calc((var(--board-needs) - 100%) * 999);
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
-  gap: var(--step-2);
+  display: flex;
+  flex: 1 1 var(--board-short);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--step-3);
   min-inline-size: 0;
+}
+/* The team: its emblem and its name. With room it fills its side and the name stands
+   under the emblem, both in the middle. Short of it the two sit in a line at the start of
+   the row: the team is then never wider than the row (the board's own width, 100cqi) less
+   the room of its score, and the name never wider than that less its emblem, so a long
+   name wraps under itself beside the emblem and the score keeps its place at the end.
+   The name is also held to the room the board reckons a name needs for two lines
+   (--board-side), so its lines stand together beside the emblem, not in the middle of
+   whatever room the row has left. */
+.ui-game-side-team {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--step-2) var(--step-3);
+  min-inline-size: clamp(0px, var(--board-room), 100%);
+  max-inline-size: max(calc(100cqi - var(--board-own)), clamp(0px, var(--board-room), 100cqi));
   text-align: center;
 }
-.ui-game-board > .ui-game-versus,
-.ui-game-board > .ui-game-score {
-  flex: 0 1 calc((var(--board-needs) - 100%) * 999);
+.ui-game-card[data-layout='board'] .ui-game-side-team .ui-game-team-name {
+  flex: 0 1 auto;
+  min-inline-size: clamp(0px, var(--board-room), 100%);
+  max-inline-size: max(
+    min(calc(100cqi - var(--board-own) - var(--step-6) - var(--step-3)), var(--board-side)),
+    clamp(0px, var(--board-room), 100cqi)
+  );
+}
+.ui-game-board .ui-emblem {
+  block-size: clamp(var(--step-6), var(--board-room), var(--step-7));
+}
+/* A team's own score, at the end of its row: there only when the board is short of room.
+   With room it has no width and no height, so it takes none from the side. */
+.ui-game-side-score {
+  flex: none;
+  max-inline-size: clamp(0px, var(--board-short), 8rem);
+  max-block-size: clamp(0px, var(--board-short), 4rem);
+  margin-inline-start: auto;
+  overflow: hidden;
+  color: var(--color-pop);
+  font-family: var(--font-score);
+  font-size: var(--text-28);
+  font-weight: var(--display-weight);
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+/* What stands between the sides, the score or "VS": there only when the board has room.
+   Short of it, it has no width and no height, and its line between the two rows is no
+   line at all. */
+.ui-game-middle {
+  display: flex;
+  flex: none;
+  align-items: center;
   justify-content: center;
-  text-align: center;
+}
+.ui-game-middle > * {
+  flex: none;
+  max-inline-size: clamp(0px, var(--board-room), 20rem);
+  max-block-size: clamp(0px, var(--board-room), 6rem);
+  overflow: hidden;
 }
 .ui-game-card[data-layout='board'] .ui-game-team-name {
   max-inline-size: 100%;
@@ -285,15 +384,25 @@ export const gameCss = String.raw`
 .ui-game-score-colon {
   color: var(--color-muted);
 }
+/* The bar under the winner's score is in the league's color of decoration (its gold, where
+   it has one), which need not be read. */
 .ui-game-score > [data-winner='true'] {
-  border-block-end-color: currentColor;
+  border-block-end-color: var(--color-ornament);
   font-weight: 600;
+}
+.ui-game-side[data-winner='true'] .ui-game-side-score {
+  font-weight: 600;
+  text-decoration: underline 2px var(--color-ornament);
+  text-underline-offset: 0.2em;
 }
 /* Once a game is decided only the winner's score keeps the color the eye lands on, and
    the other is set lighter than it in every face. */
 .ui-game-card:is([data-status='final'], [data-status='forfeit'])
   .ui-game-score
-  > span:not([data-winner], .ui-game-score-colon) {
+  > span:not([data-winner], .ui-game-score-colon),
+.ui-game-card:is([data-status='final'], [data-status='forfeit'])
+  .ui-game-side:not([data-winner])
+  .ui-game-side-score {
   color: var(--color-text);
   font-weight: 400;
 }
@@ -318,16 +427,17 @@ export const gameCss = String.raw`
   -webkit-mask: var(--ui-pin) center / contain no-repeat;
   mask: var(--ui-pin) center / contain no-repeat;
 }
-/* Where the card has the room, everything on the board is a step larger. */
-@container (min-width: 26rem) {
+/* Where the card has the room, everything on the board is a step larger (the card is the
+   measure here, by its name, not the board inside it). */
+@container card (min-width: 26rem) {
   .ui-game-board {
     --board-gap: var(--step-5);
     --board-figure: var(--text-36);
-    gap: var(--step-5);
+    gap: var(--step-2) var(--step-5);
     padding-inline: var(--step-3);
   }
   .ui-game-board .ui-emblem {
-    block-size: calc(var(--step-7) + var(--step-2));
+    block-size: clamp(var(--step-6), var(--board-room), calc(var(--step-7) + var(--step-2)));
   }
   .ui-game-score {
     font-size: var(--text-36);
@@ -339,10 +449,10 @@ export const gameCss = String.raw`
   box-shadow: var(--overlay-shadow);
 }
 .ui-game-card[data-featured='true'] .ui-emblem {
-  block-size: var(--step-8);
+  block-size: clamp(var(--step-6), var(--board-room), var(--step-8));
 }
 /* Its figures are a step larger wherever its card has the room for them and both names. */
-@container (min-width: 25rem) {
+@container card (min-width: 25rem) {
   .ui-game-card[data-featured='true'] .ui-game-board {
     --board-figure: var(--text-48);
   }
@@ -350,7 +460,11 @@ export const gameCss = String.raw`
     font-size: var(--text-48);
   }
 }
-@container (min-width: 34rem) {
+/* And its names, in a card wider still: the board's sum is told the size they are set in. */
+@container card (min-width: 34rem) {
+  .ui-game-card[data-featured='true'] .ui-game-board {
+    --board-name: var(--text-22);
+  }
   .ui-game-card[data-featured='true'] .ui-game-team-name {
     font-size: var(--text-22);
   }

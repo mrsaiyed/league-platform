@@ -1,9 +1,24 @@
 import type { CSSProperties } from 'react';
 import { safeColor } from '../team-color.ts';
 
-/** The first letter of a name, whatever script it is written in. */
+/** Splits text into the characters a reader sees, where the runtime can. */
+const characters =
+  typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : undefined;
+
+/**
+ * The first letter of a name, whatever script it is written in: the whole character a
+ * reader sees, so a letter with its accent, a flag or a picture made of several parts is
+ * never cut in two.
+ */
 export function initialOf(name: string): string {
-  return Array.from(name.trim())[0] ?? '';
+  const trimmed = name.trim();
+  if (characters !== undefined) {
+    for (const { segment } of characters.segment(trimmed)) return segment;
+    return '';
+  }
+  return Array.from(trimmed)[0] ?? '';
 }
 
 /**

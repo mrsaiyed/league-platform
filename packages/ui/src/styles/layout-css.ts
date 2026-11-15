@@ -176,15 +176,16 @@ export const layoutCss = String.raw`
   min-inline-size: 0;
 }
 
-/* The strip of big numbers under a home page's hero: four across at every width, open
-   to the page, between two fine lines in the color the eye lands on. The four stand in
-   one row and are read against each other, so they are set in lining figures. */
+/* The strip of big numbers under a home page's hero: four across, open to the page,
+   between two fine lines in the league's color of decoration (laid on only as strongly as
+   it takes to be seen). The four stand in one row and are read against each other, so
+   they are set in lining, even-width figures. */
 .ui-stat-strip {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   margin: 0;
-  border-block: 1px solid color-mix(in srgb, var(--color-pop) 32%, transparent);
+  border-block: 1px solid var(--color-ornament-line);
 }
 .ui-stat {
   display: flex;
@@ -192,6 +193,7 @@ export const layoutCss = String.raw`
   align-items: center;
   justify-content: flex-end;
   gap: var(--step-1);
+  min-inline-size: 0;
   padding-block: var(--step-4);
   padding-inline: var(--step-1);
   border-inline-start: 1px solid var(--color-line);
@@ -200,13 +202,19 @@ export const layoutCss = String.raw`
 .ui-stat:first-child {
   border-inline-start: 0;
 }
+/* A label of two words takes two even lines where four cells leave it no room for one; a
+   word too long for its cell is broken, never run into the next cell. */
 .ui-stat dt {
+  max-inline-size: 100%;
   color: var(--color-muted);
   font-size: var(--text-12);
   font-weight: 600;
   letter-spacing: 0.08em;
   line-height: 1.35;
   text-transform: uppercase;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 .ui-stat dd {
   margin: 0;
@@ -214,8 +222,22 @@ export const layoutCss = String.raw`
   font-family: var(--font-heading);
   font-size: var(--text-28);
   font-weight: var(--display-weight);
-  font-variant-numeric: lining-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   line-height: 1.1;
+}
+/* On the narrowest phones four cells are too narrow for any label: two rows of two, each
+   label on one line. */
+@media (max-width: 22.49rem) {
+  .ui-stat-strip {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ui-stat:nth-child(odd) {
+    border-inline-start: 0;
+  }
+  .ui-stat:nth-child(n + 3) {
+    border-block-start: 1px solid var(--color-line);
+  }
 }
 @media (min-width: 48rem) {
   .ui-stat {

@@ -104,36 +104,77 @@ function Team({
 }
 
 /**
- * How many letters wide a side of a scoreboard must be for a name to sit there: its
- * longest word, which cannot wrap, or half the whole name, so that a name of several
- * words takes two lines and no more. The board gives each side room for the longer of its
- * two names and, where the card is too narrow for that, stands the teams one over the
- * other (the stylesheet does the sum, from this number and the face's letter width).
+ * A letter drawn about twice as wide as a Latin one: Chinese, Japanese, Korean (with the
+ * marks only those scripts use, like the long-vowel line), a picture, a full-width form.
  */
-export function nameMeasure(name: string): number {
-  const letters = (text: string) => Array.from(text).length;
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const longest = Math.max(0, ...words.map(letters));
-  return Math.max(longest, Math.ceil(letters(words.join(' ')) / 2));
+const wideLetter =
+  /[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}\p{scx=Hangul}\p{Extended_Pictographic}！-｠￠-￦]/u;
+/** A mark that sits on the letter before it and takes no room of its own. */
+const noRoom = /[\p{M}‍︎️]/u;
+
+/**
+ * The width of a piece of text counted in Latin letters, whatever script it is written
+ * in: a wide letter counts as two, a mark that sits on another letter as none.
+ */
+export function lettersWide(text: string): number {
+  let count = 0;
+  for (const letter of text) count += noRoom.test(letter) ? 0 : wideLetter.test(letter) ? 2 : 1;
+  return count;
 }
 
-/** One side of a scoreboard: the team's emblem over its name. */
+/**
+ * How many letters wide a side of a scoreboard must be for a name to sit there on two
+ * lines and no more: the longer line of the name's best break into two. A name breaks
+ * only between its words, so that is not always half of it ("North Side Hawks" breaks
+ * into 10 and 5, or 5 and 10, never 8 and 8), and a name of one word needs the whole word.
+ * The board gives each side room for the longer of its two names and, where the card is
+ * too narrow for that, stands the teams one over the other (the stylesheet does the sum,
+ * from this number and the face's letter width).
+ */
+export function nameMeasure(name: string): number {
+  const words = name.trim().split(/\s+/).filter(Boolean).map(lettersWide);
+  // The whole name on one line: its words and the spaces between them.
+  const whole = words.reduce((sum, word) => sum + word, 0) + Math.max(0, words.length - 1);
+  let best = whole;
+  // The first line as it grows by a word at a time; the second is what is left.
+  let first = -1;
+  for (const word of words.slice(0, -1)) {
+    first += word + 1;
+    best = Math.min(best, Math.max(first, whole - first - 1));
+  }
+  return best;
+}
+
+/** One side of a scoreboard: the team's emblem and its name, and its own score. */
 function Side({
   team,
   isWinner,
+  scored,
   labels,
 }: {
   readonly team: GameCardTeam;
   readonly isWinner: boolean;
+  /** The game has a score to show: this side carries its own, for the stacked board. */
+  readonly scored: boolean;
   readonly labels: GameCardLabels;
 }) {
   return (
     <div className="ui-game-side" data-winner={isWinner ? 'true' : undefined}>
-      <Emblem name={team.name} color={team.color} />
-      <span className="ui-game-team-name" dir="auto">
-        {team.name}
+      <span className="ui-game-side-team">
+        <Emblem name={team.name} color={team.color} />
+        <span className="ui-game-team-name" dir="auto">
+          {team.name}
+        </span>
       </span>
       {isWinner ? <span className="ui-visually-hidden">{labels.winner}</span> : null}
+      {/* Drawn only where the two teams stand one over the other, each then with its own
+          score at the end of its row. The score between the teams is the one a screen
+          reader is given, so this one is kept from it. */}
+      {scored ? (
+        <span className="ui-game-side-score" aria-hidden="true">
+          {team.score}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -214,19 +255,21 @@ export function GameCard({
             } as CSSProperties
           }
         >
-          <Side team={away} isWinner={winner === 'away'} labels={labels} />
-          {scored ? (
-            <p className="ui-game-score">
-              <span data-winner={winner === 'away' ? 'true' : undefined}>{away.score}</span>
-              <span className="ui-game-score-colon" aria-hidden="true">
-                :
-              </span>{' '}
-              <span data-winner={winner === 'home' ? 'true' : undefined}>{home.score}</span>
-            </p>
-          ) : (
-            <p className="ui-game-versus">{labels.versus}</p>
-          )}
-          <Side team={home} isWinner={winner === 'home'} labels={labels} />
+          <Side team={away} isWinner={winner === 'away'} scored={scored} labels={labels} />
+          <div className="ui-game-middle">
+            {scored ? (
+              <p className="ui-game-score">
+                <span data-winner={winner === 'away' ? 'true' : undefined}>{away.score}</span>
+                <span className="ui-game-score-colon" aria-hidden="true">
+                  :
+                </span>{' '}
+                <span data-winner={winner === 'home' ? 'true' : undefined}>{home.score}</span>
+              </p>
+            ) : (
+              <p className="ui-game-versus">{labels.versus}</p>
+            )}
+          </div>
+          <Side team={home} isWinner={winner === 'home'} scored={scored} labels={labels} />
         </div>
         {placeText ? (
           <footer className="ui-game-foot">

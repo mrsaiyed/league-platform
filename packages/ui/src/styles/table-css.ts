@@ -292,6 +292,10 @@ export const tableCss = String.raw`
 .ui-standings[data-emblems='true'] .ui-team-cell > [dir] {
   max-inline-size: calc(45cqi - var(--step-6) - var(--step-3));
 }
+/* A table with emblems stands among scoreboards, and has their fine line at its top. */
+.ui-table-frame:has(.ui-standings[data-emblems='true']) {
+  border-block-start: 2px solid var(--color-ornament-line);
+}
 /* With emblems a team's place is set in the score face, in the color the eye lands on. */
 .ui-standings[data-emblems='true'] tbody td.ui-num:first-child {
   color: var(--color-pop);

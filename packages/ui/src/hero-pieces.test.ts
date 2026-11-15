@@ -12,7 +12,10 @@ import {
   Hero,
   Section,
   StandingsTable,
+  StatStrip,
   displayCss,
+  initialOf,
+  lettersWide,
   nameMeasure,
   titleLines,
 } from '../index.ts';
@@ -46,14 +49,16 @@ describe('a kicker over a title', () => {
     );
     expect(html).toContain('<a class="ui-more" href="/x/schedule">See the full schedule</a>');
     expect(css).toMatch(/\.ui-section-title h2::after \{\s*content: none;/);
-    // A short rule, drawn in the label's own color, then the label: small, in capitals,
-    // widely spaced.
+    // A short rule, then the label: small, in capitals, widely spaced. The rule is in the
+    // league's color of decoration (its gold, where it has one), which need not be read;
+    // on a band it is in the label's own color.
     expect(css).toMatch(
       /\.ui-kicker \{[^}]*font-size: var\(--text-12\);[^}]*letter-spacing: 0\.2em;[^}]*text-transform: uppercase;/,
     );
     expect(css).toMatch(
-      /\.ui-kicker::before \{[^}]*inline-size: var\(--step-5\);\s*block-size: 1px;\s*background: currentColor;/,
+      /\.ui-kicker::before \{[^}]*inline-size: var\(--step-5\);\s*block-size: 1px;\s*background: var\(--color-ornament\);/,
     );
+    expect(css).toMatch(/\.ui-hero \.ui-kicker::before \{\s*background: currentColor;/);
     // A section with no kicker is as it was: its title carries the short rule.
     expect(render(createElement(Section, { title: 'A', children: 'b' }))).not.toContain(
       'ui-kicker',
@@ -138,6 +143,21 @@ describe('the hero', () => {
     expect(css).toMatch(/\[dir='rtl'\] \.ui-hero \{\s*background-image: linear-gradient\(260deg,/);
   });
 
+  it('draws its mark only on a laptop: on a phone nothing of it passes under words or a button', () => {
+    // Put away by its own rule, and shown only from the width where the words leave the
+    // far side of the band free.
+    expect(css).toMatch(/\.ui-hero-art \{\s*display: none;/);
+    const shown = [
+      ...css.matchAll(
+        /@media \(min-width: ([\d.]+)rem\) \{[^@]*?\.ui-hero-art \{\s*display: block;/g,
+      ),
+    ];
+    expect(shown.map((m) => m[1])).toEqual(['64']);
+    expect(css.slice(0, css.indexOf('@media (min-width: 64rem) {\n  .ui-hero-art'))).not.toMatch(
+      /\.ui-hero-art \{[^}]*display: block;/,
+    );
+  });
+
   it('takes a league’s own picture, laid under the band’s color, when it has one', () => {
     const pictured = render(
       createElement(Hero, { title: 'Owls', picture: { src: '/files/hero.jpg' } }),
@@ -199,6 +219,13 @@ describe('a team emblem', () => {
     expect(html).toMatch(/<text class="ui-emblem-letter"[^>]*>o<\/text>/);
     expect(html).not.toMatch(/<image|href=|url\(/);
     expect(render(createElement(Emblem, { name: arabicName }))).toMatch(/>ن<\/text>/);
+    // The initial is the whole character a reader sees (found by the code review, L4): a
+    // letter with its accent written as two parts, a flag, a picture made of several.
+    expect(initialOf('e\u{301}toiles')).toBe('e\u{301}');
+    expect(initialOf('\u{1F1E8}\u{1F1E6} Canada')).toBe('\u{1F1E8}\u{1F1E6}');
+    expect(initialOf('\u{1F469}\u{200D}\u{1F467} Family')).toBe('\u{1F469}\u{200D}\u{1F467}');
+    expect(initialOf('  owls')).toBe('o');
+    expect(initialOf('   ')).toBe('');
     // Three sizes: in a row of a table, in a card, at the head of a page.
     for (const size of ['small', 'card', 'large'] as const) {
       expect(render(createElement(Emblem, { name: 'Owls', size }))).toContain(
@@ -211,8 +238,10 @@ describe('a team emblem', () => {
     expect(css).toMatch(
       /\.ui-emblem \{\s*--emblem-color: var\(--team-color, var\(--color-accent\)\);[^}]*color: color-mix\(in srgb, var\(--emblem-color\) 74%, var\(--color-text\)\);/,
     );
+    // How much of the color fills the shield is the design's: more on a white panel than
+    // on a dark one, so a shield has the same strength on either.
     expect(css).toMatch(
-      /\.ui-emblem-shield \{\s*fill: color-mix\(in srgb, var\(--emblem-color\) 30%, transparent\);\s*stroke: currentColor;/,
+      /\.ui-emblem-shield \{\s*fill: color-mix\(in srgb, var\(--emblem-color\) var\(--emblem-strength, 30%\), transparent\);\s*stroke: currentColor;/,
     );
     // The letter is in the page's text color, so it reads whatever color the team chose.
     expect(css).toMatch(
@@ -332,14 +361,23 @@ describe('a game as a scoreboard', () => {
     const html = board();
     expect(html.match(/Winner/g)).toHaveLength(1);
     expect(html).toMatch(
-      /<div class="ui-game-side" data-winner="true"><svg class="ui-emblem"[^>]*style="--team-color:#ff0000">.*?<\/svg><span class="ui-game-team-name" dir="auto">Hawks<\/span><span class="ui-visually-hidden">Winner<\/span><\/div>/,
+      /<div class="ui-game-side" data-winner="true"><span class="ui-game-side-team"><svg class="ui-emblem"[^>]*style="--team-color:#ff0000">.*?<\/svg><span class="ui-game-team-name" dir="auto">Hawks<\/span><\/span><span class="ui-visually-hidden">Winner<\/span><span class="ui-game-side-score" aria-hidden="true">61<\/span><\/div>/,
     );
     const flat = css.replace(/\s+/g, ' ');
     expect(flat).toContain(
       ".ui-game-side[data-winner='true'] .ui-game-team-name { font-weight: 700; }",
     );
+    // The bar is in the league's color of decoration (its gold, where it has one): it need
+    // not be read, the figure over it is.
     expect(flat).toContain(
-      ".ui-game-score > [data-winner='true'] { border-block-end-color: currentColor; font-weight: 600; }",
+      ".ui-game-score > [data-winner='true'] { border-block-end-color: var(--color-ornament); font-weight: 600; }",
+    );
+    expect(flat).toContain(
+      ".ui-game-side[data-winner='true'] .ui-game-side-score { font-weight: 600; text-decoration: underline 2px var(--color-ornament); text-underline-offset: 0.2em; }",
+    );
+    // Once decided, the other score is in the page's own text color, wherever it stands.
+    expect(flat).toMatch(
+      /\.ui-game-side:not\(\[data-winner\]\) \.ui-game-side-score \{ color: var\(--color-text\); font-weight: 400; \}/,
     );
     // A level game, a live one and one still to play have no winner.
     for (const html of [
@@ -402,14 +440,31 @@ describe('a game as a scoreboard', () => {
   });
 
   it('stands two teams one over the other where they cannot sit side by side', () => {
-    // A side needs room for a name's longest word, which cannot wrap, or for half the
-    // name, so a name of several words takes two lines and no more.
+    // A side needs room for the longer line of a name's best break into two, so a name
+    // of several words takes two lines and no more. A name breaks only between words, so
+    // that is not always half of it: "North Side Hawks" is 10 and 5, never 8 and 8; the
+    // long one is "The Northside" over "Community Thunderbolts", 22. One word is whole.
     expect(nameMeasure('Owls')).toBe(4);
-    expect(nameMeasure('  North   Side Hawks ')).toBe(8);
+    expect(nameMeasure('  North   Side Hawks ')).toBe(10);
     expect(nameMeasure('Trailblazerettes')).toBe(16);
-    expect(nameMeasure('The Northside Community Thunderbolts')).toBe(18);
+    expect(nameMeasure('The Northside Community Thunderbolts')).toBe(22);
+    expect(nameMeasure('Red Wings')).toBe(5);
+    expect(nameMeasure('A Very Long Team Name Indeed')).toBe(16);
     expect(nameMeasure(arabicName)).toBe(7);
     expect(nameMeasure('')).toBe(0);
+    // A letter of Chinese, Japanese or Korean, or a picture, is about two Latin letters
+    // wide, and a mark that sits on another letter takes no room (the code review, L3).
+    expect(lettersWide('Owls')).toBe(4);
+    expect(lettersWide('猛虎')).toBe(4);
+    expect(lettersWide('タイガース')).toBe(10);
+    expect(lettersWide('호랑이')).toBe(6);
+    expect(lettersWide('e\u{301}')).toBe(1);
+    expect(lettersWide('\u{1F985}')).toBe(2);
+    expect(nameMeasure('上海猛虎篮球队')).toBe(14);
+    expect(nameMeasure('北京 猛虎')).toBe(4);
+    expect(
+      board({ home: { name: '上海猛虎篮球队', score: 61 }, away: { name: 'Owls', score: 55 } }),
+    ).toContain('style="--letters:14;--figures:4"');
     // The board is told the longer of its two names, and how many figures its score has.
     expect(board()).toContain(
       '<div class="ui-game-board" data-scored="true" style="--letters:7;--figures:4">',
@@ -425,26 +480,58 @@ describe('a game as a scoreboard', () => {
     );
     // From those it works out the width the teams need side by side: two sides at the
     // heading face's letter width, the middle ("VS", or the score's figures) and the gaps.
+    // The name's size is a value of the board's, so the sum is right where names are set
+    // larger (the code review, L2).
     expect(css).toMatch(
-      /\.ui-game-board \{[^}]*--board-side: calc\(var\(--letters, 8\) \* var\(--heading-letter, 0\.6\) \* var\(--text-18\)\);[^}]*--board-needs: calc\(2 \* var\(--board-side\) \+ var\(--board-middle\) \+ 2 \* var\(--board-gap\)\);[^}]*flex-wrap: wrap;/,
+      /\.ui-game-board \{[^}]*--board-name: var\(--text-18\);\s*--board-side: calc\(var\(--letters, 8\) \* var\(--heading-letter, 0\.6\) \* var\(--board-name\)\);[^}]*--board-needs: calc\(2 \* var\(--board-side\) \+ var\(--board-middle\) \+ 2 \* var\(--board-gap\)\);\s*--board-short: calc\(\(var\(--board-needs\) - 100cqi\) \* 999\);\s*--board-room: calc\(\(100cqi - var\(--board-needs\)\) \* 999\);[^}]*flex-wrap: wrap;[^}]*container: board \/ inline-size;/,
     );
     expect(css).toMatch(
       /\.ui-game-board\[data-scored='true'\] \{\s*--board-middle: calc\(var\(--figures, 4\) \* 0\.65 \* var\(--board-figure\) \+ var\(--step-5\)\);/,
     );
-    // Narrower than that, each part of the board takes a row of its own; wide enough, the
-    // sides share what the middle leaves.
+    // Narrower than that, each team takes a row of its own; wide enough, the sides share
+    // what the middle leaves.
+    expect(css).toMatch(/\.ui-game-side \{[^}]*flex: 1 1 var\(--board-short\);/);
+    // Stacked, a row is the team (emblem, then name) at the start and its own score at the
+    // end, and what stood between the teams takes no room at all; side by side it is the
+    // other way about.
     expect(css).toMatch(
-      /\.ui-game-side \{[^}]*flex: 1 1 calc\(\(var\(--board-needs\) - 100%\) \* 999\);/,
+      /\.ui-game-side-team \{[^}]*min-inline-size: clamp\(0px, var\(--board-room\), 100%\);/,
+    );
+    // Stacked, a long name wraps under itself beside its emblem and the score keeps its
+    // place: the team is held to the row less the room of its score, and the name to that
+    // less the emblem. The row is the board's own width, never a share of the team's
+    // (which is only as wide as its name).
+    expect(css).toMatch(
+      /\.ui-game-side-team \{[^}]*max-inline-size: max\(calc\(100cqi - var\(--board-own\)\), clamp\(0px, var\(--board-room\), 100cqi\)\);/,
     );
     expect(css).toMatch(
-      /\.ui-game-board > \.ui-game-versus,\s*\.ui-game-board > \.ui-game-score \{\s*flex: 0 1 calc\(\(var\(--board-needs\) - 100%\) \* 999\);/,
+      /\.ui-game-side-team \.ui-game-team-name \{[^}]*max-inline-size: max\(\s*min\(calc\(100cqi - var\(--board-own\) - var\(--step-6\) - var\(--step-3\)\), var\(--board-side\)\),\s*clamp\(0px, var\(--board-room\), 100cqi\)\s*\);/,
+    );
+    // A game with no score keeps no room for one.
+    expect(css).toMatch(/\.ui-game-board \{[^}]*--board-own: 0px;/);
+    expect(css).toMatch(
+      /\.ui-game-board\[data-scored='true'\] \{[^}]*--board-own: calc\(\(var\(--figures, 4\) \+ 2\) \* 0\.3 \* var\(--text-28\) \+ var\(--step-3\)\);/,
+    );
+    expect(css).toMatch(
+      /\.ui-game-side-score \{[^}]*max-inline-size: clamp\(0px, var\(--board-short\), 8rem\);\s*max-block-size: clamp\(0px, var\(--board-short\), 4rem\);\s*margin-inline-start: auto;\s*overflow: hidden;\s*color: var\(--color-pop\);\s*font-family: var\(--font-score\);[^}]*font-variant-numeric: lining-nums tabular-nums;/,
+    );
+    expect(css).toMatch(
+      /\.ui-game-middle > \* \{\s*flex: none;\s*max-inline-size: clamp\(0px, var\(--board-room\), 20rem\);\s*max-block-size: clamp\(0px, var\(--board-room\), 6rem\);\s*overflow: hidden;/,
+    );
+    // A score is said once to a screen reader: the one between the teams.
+    const scored = board();
+    expect(scored.match(/class="ui-game-side-score" aria-hidden="true"/g)).toHaveLength(2);
+    expect(scored).toMatch(/<div class="ui-game-middle"><p class="ui-game-score">/);
+    expect(board({ status: 'scheduled' })).not.toContain('ui-game-side-score');
+    expect(board({ status: 'scheduled' })).toContain(
+      '<div class="ui-game-middle"><p class="ui-game-versus">vs</p></div>',
     );
     // Where a card is wide its figures and gaps are larger, and the sum knows it.
     expect(css).toMatch(
-      /\.ui-game-card\[data-layout='board'\] \{[^}]*container-type: inline-size;/,
+      /\.ui-game-card\[data-layout='board'\] \{[^}]*container: card \/ inline-size;/,
     );
     expect(css).toMatch(
-      /@container \(min-width: 26rem\) \{\s*\.ui-game-board \{\s*--board-gap: var\(--step-5\);\s*--board-figure: var\(--text-36\);\s*gap: var\(--step-5\);/,
+      /@container card \(min-width: 26rem\) \{\s*\.ui-game-board \{\s*--board-gap: var\(--step-5\);\s*--board-figure: var\(--text-36\);\s*gap: var\(--step-2\) var\(--step-5\);/,
     );
     // A word too long even for the whole card is broken at a syllable, not cut off.
     expect(css).toMatch(
@@ -474,7 +561,83 @@ describe('a game as a scoreboard', () => {
     // Larger figures only where its card has room for them, and the board's sum of what
     // the teams need side by side is told the larger size.
     expect(css).toMatch(
-      /@container \(min-width: 25rem\) \{\s*\.ui-game-card\[data-featured='true'\] \.ui-game-board \{\s*--board-figure: var\(--text-48\);\s*\}\s*\.ui-game-card\[data-featured='true'\] \.ui-game-score \{\s*font-size: var\(--text-48\);/,
+      /@container card \(min-width: 25rem\) \{\s*\.ui-game-card\[data-featured='true'\] \.ui-game-board \{\s*--board-figure: var\(--text-48\);\s*\}\s*\.ui-game-card\[data-featured='true'\] \.ui-game-score \{\s*font-size: var\(--text-48\);/,
+    );
+    // Its names are a step larger in a card wider still, and the sum is told that size too
+    // (the code review, L2): the size and the value change in the same rule.
+    expect(css).toMatch(
+      /@container card \(min-width: 34rem\) \{\s*\.ui-game-card\[data-featured='true'\] \.ui-game-board \{\s*--board-name: var\(--text-22\);\s*\}\s*\.ui-game-card\[data-featured='true'\] \.ui-game-team-name \{\s*font-size: var\(--text-22\);/,
+    );
+    // No other rule sets a board's names at a size the sum is not told.
+    const nameSizes = [
+      ...css.matchAll(/([^{}]*\.ui-game-team-name) \{[^}]*font-size: var\(--(text-\d+)\)/g),
+    ].map((m) => `${(m[1] ?? '').trim().replace(/\s+/g, ' ')} ${m[2]}`);
+    expect(nameSizes).toEqual([
+      '.ui-game-team-name text-16',
+      ".ui-game-card[data-layout='board'] .ui-game-team-name text-18",
+      ".ui-game-card[data-featured='true'] .ui-game-team-name text-22",
+    ]);
+  });
+
+  it('never breaks its top line inside the date and time: the pill takes a line of its own', () => {
+    expect(css).toMatch(
+      /\.ui-game-card\[data-layout='board'\] \.ui-game-meta \{\s*display: flex;\s*flex-wrap: wrap;\s*align-items: center;\s*justify-content: space-between;/,
+    );
+    expect(css).toMatch(
+      /\.ui-game-card\[data-layout='board'\] :is\(\.ui-game-number, \.ui-game-when\) \{\s*white-space: nowrap;/,
+    );
+    expect(css).toMatch(/\.ui-game-state \{[^}]*flex: none;[^}]*white-space: nowrap;/);
+  });
+
+  it('lifts under the pointer only for a reader who has not asked for less movement', () => {
+    // The code review, L7: the only rule that moves a card is inside the guard.
+    const moving = [...css.matchAll(/:hover \{[^}]*transform:/g)];
+    expect(moving).toHaveLength(1);
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: no-preference\) \{\s*\.ui-game-card\[data-layout='board'\]:has\(\.ui-game-link\):hover \{\s*transform: translateY\(-2px\);\s*\}\s*\}/,
+    );
+  });
+
+  it('wears the league’s color of decoration as a fine line at its top, over one tint', () => {
+    expect(css).toMatch(
+      /\.ui-game-card\[data-layout='board'\] \{[^}]*background-image: linear-gradient\(120deg, var\(--card-wash\), var\(--color-panel\) 70%\);\s*border-block-start: 2px solid var\(--color-ornament-line\);/,
+    );
+  });
+});
+
+describe('the strip of big numbers', () => {
+  const html = render(
+    createElement(StatStrip, {
+      label: 'This season',
+      items: [
+        { key: 'teams', label: 'Teams', value: '8' },
+        { key: 'played', label: 'Games played', value: '24' },
+      ],
+    }),
+  );
+
+  it('sets its numbers in even-width figures, read against each other across the row', () => {
+    expect(html).toContain('Games played');
+    expect(css).toMatch(
+      /\.ui-stat dd \{[^}]*color: var\(--color-pop\);[^}]*font-variant-numeric: lining-nums tabular-nums;/,
+    );
+  });
+
+  it('lets a label of two words take two lines, and stands two rows of two on the narrowest phones', () => {
+    // The code review, L7: at 320 a label ran into the next cell.
+    expect(css).toMatch(/\.ui-stat \{[^}]*min-inline-size: 0;/);
+    expect(css).toMatch(
+      /\.ui-stat dt \{\s*max-inline-size: 100%;[^}]*text-wrap: balance;\s*overflow-wrap: break-word;\s*hyphens: auto;/,
+    );
+    expect(css).not.toMatch(/\.ui-stat dt \{[^}]*white-space: nowrap;/);
+    expect(css).toMatch(
+      /@media \(max-width: 22\.49rem\) \{\s*\.ui-stat-strip \{\s*grid-auto-flow: row;\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+    );
+  });
+
+  it('stands between two fine lines in the league’s color of decoration', () => {
+    expect(css).toMatch(
+      /\.ui-stat-strip \{[^}]*border-block: 1px solid var\(--color-ornament-line\);/,
     );
   });
 });
@@ -517,9 +680,9 @@ describe('color where the eye should land (C-16)', () => {
         // The short rule under a title, and the mark of a page that is only a message.
         '.ui-section-head h2::after',
         '.ui-message-mark',
-        '.ui-stat-strip',
         '.ui-stat dd',
         '.ui-game-score',
+        '.ui-game-side-score',
         ".ui-game-card[data-layout='board']:has(.ui-game-link):hover",
         ".ui-game-card[data-featured='true']",
         ".ui-standings[data-emblems='true'] tbody td.ui-num:first-child",
@@ -527,6 +690,33 @@ describe('color where the eye should land (C-16)', () => {
         '.ui-leader:first-child .ui-leader-value',
       ].sort(),
     );
+  });
+
+  it('the league’s color of decoration only where it need not be read: a rule, a bar, a fine line', () => {
+    // The color as the league gave it: small marks beside words, never the words.
+    expect(usedBy('--color-ornament')).toEqual(
+      [
+        '.ui-kicker::before',
+        ".ui-game-score > [data-winner='true']",
+        ".ui-game-side[data-winner='true'] .ui-game-side-score",
+      ].sort(),
+    );
+    // Laid on the page only as strongly as it takes to be seen: the lines that frame.
+    expect(usedBy('--color-ornament-line')).toEqual(
+      [
+        '.ui-stat-strip',
+        ".ui-game-card[data-layout='board']",
+        ".ui-table-frame:has(.ui-standings[data-emblems='true'])",
+      ].sort(),
+    );
+    for (const name of ['--color-ornament', '--color-ornament-line']) {
+      for (const rule of css.matchAll(/([^{}]+){([^{}]*)}/g)) {
+        for (const line of (rule[2] ?? '').split(';')) {
+          if (!line.includes(`var(${name})`)) continue;
+          expect(line.trim(), rule[1]).toMatch(/^(background|border-[a-z-]+|text-decoration):/);
+        }
+      }
+    }
   });
 
   it('on a band: the kicker, the second line of the title, the one button and the pattern', () => {
