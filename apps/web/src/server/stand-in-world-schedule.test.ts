@@ -18,18 +18,46 @@ import { testWorld } from './stand-in-world.test-helper.ts';
 
 const minute = 60_000;
 
-/** Every minute from 19:30 to 20:30 UTC on 15 November, then every ten minutes of a week. */
-const moments = (() => {
+/** A stretch of time the world is made at, every `step` minutes from `from` up to `to`. */
+type Window = { readonly name: string; readonly from: string; readonly to: string; step: number };
+
+/** Each day (UTC) from `first` for `days` days, every ten minutes. */
+const daysFrom = (first: string, days: number, why: string): Window[] =>
+  Array.from({ length: days }, (_, i) => {
+    const from = new Date(Date.parse(`${first}T00:00:00Z`) + i * 86_400_000);
+    const to = new Date(from.getTime() + 86_400_000);
+    const day = from.toISOString().slice(0, 10);
+    return { name: `${day}, ${why}`, from: from.toISOString(), to: to.toISOString(), step: 10 };
+  });
+
+/**
+ * The stretches the world is made in, one test each so none comes near the time limit: the
+ * hour GitHub failed in, every minute; a week with a month's end and the autumn clock change
+ * (Chicago and Los Angeles fall back on 1 November), day by day, every ten minutes, and that
+ * clock-change night every minute.
+ */
+const windows: readonly Window[] = [
+  {
+    name: 'the hour GitHub failed in, every minute',
+    from: '2026-11-15T19:30:00Z',
+    to: '2026-11-15T20:31:00Z',
+    step: 1,
+  },
+  ...daysFrom('2026-10-29', 7, 'a week with a month’s end and the autumn clock change'),
+  {
+    name: 'the autumn clock-change night, every minute',
+    from: '2026-11-01T05:00:00Z',
+    to: '2026-11-01T10:00:00Z',
+    step: 1,
+  },
+];
+
+const momentsOf = (w: Window): Date[] => {
   const all: Date[] = [];
-  for (let t = Date.UTC(2026, 10, 15, 19, 30); t <= Date.UTC(2026, 10, 15, 20, 30); t += minute) {
+  for (let t = Date.parse(w.from); t < Date.parse(w.to); t += w.step * minute)
     all.push(new Date(t));
-  }
-  // 29 October to 5 November: Chicago and Los Angeles both fall back on 1 November.
-  for (let t = Date.UTC(2026, 9, 29, 0, 0); t < Date.UTC(2026, 10, 5, 0, 0); t += 10 * minute) {
-    all.push(new Date(t));
-  }
   return all;
-})();
+};
 
 /** What is wrong with one season's schedule as the grid reads it, in words; empty when nothing. */
 function faultsOf(view: ScheduleDraftView, today: string): string[] {
@@ -62,9 +90,10 @@ function faultsOf(view: ScheduleDraftView, today: string): string[] {
   return faults;
 }
 
-describe('the made-up schedule, at every hour', () => {
-  it('has no clash and no flag in any made-up league with a schedule', async () => {
-    expect(moments.length).toBeGreaterThan(1000);
+describe('the made-up schedule, at every hour: no clash and no flag in any league', () => {
+  it.each(windows.map((w) => [w.name, w] as const))('%s', async (_name, window) => {
+    const moments = momentsOf(window);
+    expect(moments.length).toBeGreaterThan(60);
     const faults: string[] = [];
     let read = 0;
     for (const now of moments) {
