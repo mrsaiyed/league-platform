@@ -8,6 +8,10 @@ The session that reads this is the **lead**. The lead plans, delegates, checks e
 
 ## 1. Start of a run
 
+**Who is in charge (the founder through the chat lead, 2026-11-15).** There are two lead sessions: one on the strongest model (Fable) and a standby on Opus. Line 1 of `.local/fable-lead.txt` is the id of the lead IN CHARGE; line 2 is the time that lead last woke; then a line `fable <id>` and a line `opus <id>`. Whoever writes line 2 keeps all four lines. **Every lead reads line 1 first, every turn.** If it is not your id, you are not in charge: change nothing in the main folder or the plans, pass what you have just learned (a helper's report) to the lead in charge in one message (`mcp__ccd_session_mgmt__send_message` to the id on line 1), and end your turn. A lead that finds itself in charge again after being out reads `STATUS.md` from the top before anything else.
+
+**The hand-over between the two leads.** When the Fable lead's 30-minute reading shows "Weekly · Fable" at 95% or more, it hands over in good order instead of being cut off mid-step: it brings `STATUS.md` fully up to date, commits and pushes it, replaces line 1 with the id on the `opus ` line, sends that session "The Fable lead hands the build to you at <UTC time>: the week's Fable allowance is used up, so you are in charge (line 1 of .local/fable-lead.txt is your id). Read docs/build/STATUS.md from the top, take the lock and carry on.", and writes the time on line 2 and in `docs/build/.lock`. The standby hands back when Fable is below 90% again (the founder reset the allowance, or the week turned over); the scheduled check makes the same switch by itself if a lead is cut off before it can. Under the standby, the work that needs Fable waits while anything else is opened: the design steps, the scoring screens, and landings whose review found a High fault or that touch children's data, sign-in, money or the league fence. So the Fable lead, while in charge, puts that work first.
+
 1. Read `CLAUDE.md`, this file and `STATUS.md`.
 2. **If `STATUS.md` says the state is `waiting-for-founder`: stop.** Reply with one line saying why, and do nothing else. This keeps idle runs cheap.
 3. **If `docs/build/.lock` exists and there has been a sign of life in the last 40 minutes: stop.** Another run is working. A sign of life is the time in the lock, or the newest commit on any branch (`git log -1 --all --format=%cI`): builders commit to their lanes as they work, so a busy run shows there even when its lead is late rewriting the lock. If both are older than 40 minutes, the earlier run died or is stuck; delete the lock and take over.
@@ -130,7 +134,7 @@ A large step can also be split among builders inside its lane, when their files 
 
 Working side by side finishes sooner by the clock. It does not make the usage allowance go further: five builders use it about five times as fast.
 
-**Watching the allowance** (the chat lead, for the founder, 2026-11-14, after two cut-offs in one day killed helpers mid-work). The lead reads the plan's usage every 30 minutes with the app's usage tool (`mcp__ccd_session_mgmt__get_usage`) and writes the weekly figure and the time into the log, so the cost of a day's building is known. If the weekly figure for all models passes 85%: start no new helper, tell the running ones to commit what works and report, land what has passed, write it under "Needs the founder" in `STATUS.md`, and end the run, so that the founder can still talk to the chat lead. A helper cut off by a limit is not replaced: once requests are accepted again it is sent back to its lane with a message and carries on from where it stopped. One helper writes in a lane at a time, and a reviewer and a fixer for the same lane run one after the other.
+**Watching the allowance** (the chat lead, for the founder, 2026-11-14, after two cut-offs in one day killed helpers mid-work). The lead reads the plan's usage every 30 minutes with the app's usage tool (`mcp__ccd_session_mgmt__get_usage`) and writes the weekly figure and the time into the log, so the cost of a day's building is known. There is no reserve to keep: the founder withdrew it on 2026-11-15 ("dont worry about the reserve we can drain the week thats fine just make sure its easy to hand off"). The week is used to its end; what is watched is who leads (section 1: the hand-over at 95% of the Fable allowance) and that the build can be picked up by anyone at any moment (section 7). A helper cut off by a limit is not replaced: once requests are accepted again it is sent back to its lane with a message and carries on from where it stopped. One helper writes in a lane at a time, and a reviewer and a fixer for the same lane run one after the other.
 
 ## 4. Sub-agents: who does what
 
@@ -148,6 +152,8 @@ Use sub-agents for the building and the reviewing. Keep the lead's own context f
 | An area lead's audit or review, and the chief of quality (LEADS.md)                                | fable                   | high    |
 | The look of a screen: a design step, or the design review of any step that adds a screen           | fable                   | high    |
 | Finding where something is in the code                                                             | the Explore agent       | its own |
+
+**A tool without these model names** (the founder may carry the build on with another tool, such as OpenAI's Codex, when the week is drained; `AGENTS.md` at the root is what it reads first) uses its strongest model at high effort for everything, never a small or fast one.
 
 **Every result has an owner, and nothing is built below `opus`.** The founder, 2026-11-14: "this isn't about UI, it's about not compromising on ANY part of this". [LEADS.md](LEADS.md) is the rule: eight areas, each with a lead on `fable` that audits the whole area and reviews what a person will see or rely on before it lands; a chief of quality on `fable` at the start of every run; and the brief check before a step opens. The table above is the floor since that day. Where a step's own line names a weaker model than the table gives for its kind of work, the table wins: read `haiku` as `sonnet`, and `sonnet` as `opus`. A lane lands only when its code review is closed and, where LEADS.md asks for one, its area lead's review is closed too; the landing's log line says which reviews it had. If the Agent tool refuses `fable`, use `opus` at xhigh and say so in the log.
 
@@ -179,7 +185,14 @@ Rules for delegating:
 
 ## 7. End of a run
 
-**The only reasons to end a run** are: your context is more than about 60% full; no step in any plan can be opened and no lane is open; or the state is `waiting-for-founder`. "A good share of the run is used", "a step just finished" and "the next step is a big one" are not reasons. If you are unsure whether to stop, open the next lane.
+**A lead never stops for its context, and never goes quiet with the lock held** (the founder through the chat lead, 2026-11-15: "we need to go til completion. however u need to set that up so we dont die out again").
+
+- A lead session does not end because its context is filling: the app shortens it by itself (it "compacts") and the lead carries on. Before the context is 90% full, bring `STATUS.md` up to date. After a compaction, re-read `CLAUDE.md`, `STATUS.md`, this file, `LEADS.md` and `DESIGN.md` before the next decision.
+- A turn that ends while helpers are still running keeps the lock: their reports bring the lead back. If a turn ever ends while NO helper is running, so that nothing will bring the lead back, delete `docs/build/.lock` first: the scheduled check then wakes the lead within ten minutes, not forty.
+- Keep the lead's own context lean. Every tool call the lead makes re-reads all of it, and that is where most of the Fable allowance went on 2026-11-14 and 15. Helpers read the long diffs, logs and audits and report in a page: ask each helper for a report of at most 40 lines. Never print a whole file or a whole test run into the lead's session; read the part that decides something.
+- **Ready for a successor at any moment.** `STATUS.md`'s "Now" and "In progress" must always be enough for an agent that knows nothing else, in plain words, with no reference to what an earlier lead knew. Every lane's work is committed in its lane. Nothing a successor would need lives only in a helper's head or under `.local`, except pictures.
+
+**The only reasons to end a run** are: no step in any plan can be opened and no lane is open; or the state is `waiting-for-founder`. "A good share of the run is used", "a step just finished" and "the next step is a big one" are not reasons. If you are unsure whether to stop, open the next lane.
 
 When one of the real reasons holds:
 
