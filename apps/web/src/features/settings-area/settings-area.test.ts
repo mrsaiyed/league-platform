@@ -100,6 +100,13 @@ describe('the settings form', () => {
         const confirm = setting.label.replace(/\.label$/, '.confirm');
         expect(Object.hasOwn(en, confirm), confirm).toBe(true);
       }
+      // A setting whose start depends on who plays says why, for each audience (record 065).
+      if (Object.keys(setting.startsAs).length > 0) {
+        for (const audience of ['adult', 'youth', 'mixed']) {
+          const start = setting.label.replace(/\.label$/, `.start.${audience}`);
+          expect(Object.hasOwn(en, start), start).toBe(true);
+        }
+      }
     }
   });
 
@@ -161,12 +168,16 @@ describe('the settings form', () => {
     expect(privacy).toContain(
       'I confirm that the parents or guardians of the children in this league have agreed to their full names being shown publicly',
     );
-    // The words say who each setting changes, and that a parent's request always wins.
-    expect(privacy).toContain('This decides how children are shown');
-    expect(privacy).toContain('coaches too, until you mark them as adults');
-    expect(privacy).toContain('Adults are shown by their full name unless they ask for less.');
-    expect(privacy).toContain('that always wins over this setting');
-    expect(privacy).toContain('arrives with the next part of this work.');
+    // The words say who the setting changes (everyone, R-29), and that a request wins.
+    expect(privacy).toContain('how every player is shown on the team pages');
+    expect(privacy).toContain('always wins over this setting');
+    // A league whose audience is not known is read as youth, and says why it starts there.
+    expect(privacy).toContain(
+      'Your league is for young players, so it starts with first name and last initial.',
+    );
+    // No sentence promises what no screen does (2.106 audit, H13).
+    expect(privacy).not.toContain('until you mark them as adults');
+    expect(privacy).not.toContain('next part of this work');
     expect(privacy).toContain('Adults may ask to appear as initials on public pages.');
     expect(privacy).toContain('Children always can, whatever this says');
     // R-27: switching it off takes no one's initials away.
@@ -174,6 +185,42 @@ describe('the settings form', () => {
     expect(privacy).toContain('stays that way until their own record is changed');
     // Only the names setting asks to confirm.
     expect(html.match(/name="confirmed"/g)).toHaveLength(1);
+  });
+
+  it('opens Privacy with a sentence that fits who plays, and asks to confirm only where there are children (R-29)', async () => {
+    const privacyOf = async (audience: 'adult' | 'youth' | 'mixed') => {
+      const { deps } = standInAdminSettings({
+        accessOf: () => access,
+        log: () => undefined,
+        audienceOf: () => audience,
+      });
+      const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
+      const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
+      return html.slice(html.indexOf('data-area="privacy"'));
+    };
+    const quote = (text: string) => `&quot;${text}&quot;`;
+    const adult = await privacyOf('adult');
+    expect(adult).toContain(
+      'Your league is for adults, so it starts with full names. Choose less here at any time.',
+    );
+    // The sentence comes first, right under the heading.
+    expect(adult).toMatch(
+      /^data-area="privacy"><h2>Privacy<\/h2><section[^>]*><p>Your league is for adults/,
+    );
+    expect(adult).toContain(`Full names, like ${quote('Jordan Ellis')} (the default)`);
+    expect(adult).toContain('Default: Full names');
+    expect(adult).not.toContain('name="confirmed"');
+    expect(adult).not.toContain('Tick this only if');
+    for (const audience of ['youth', 'mixed'] as const) {
+      const html = await privacyOf(audience);
+      expect(html, audience).toContain('so it starts with first name and last initial');
+      expect(html, audience).toContain('which you confirm below.');
+      expect(html, audience).toContain(
+        `First name and last initial, like ${quote('Jordan E.')} (the default)`,
+      );
+      expect(html.match(/name="confirmed"/g), audience).toHaveLength(1);
+    }
+    expect(await privacyOf('mixed')).toContain('Your league has both adults and young players');
   });
 });
 

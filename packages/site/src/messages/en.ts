@@ -1126,7 +1126,15 @@ export const en = {
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
   'setting.privacy.publicNames.label':
-    "Names on public pages. This decides how children are shown, and, in a youth or mixed league, anyone whose record does not say whether they are a child or an adult (coaches too, until you mark them as adults). Adults are shown by their full name unless they ask for less. If a parent asks for less for their child (initials, or the name taken off), that always wins over this setting. Recording it on the child's own record arrives with the next part of this work.",
+    'Names on public pages: how every player is shown on the team pages, game pages and statistics. Anyone recorded as a child is shown by full name only where the league has confirmed that their parents or guardians agreed. A request for less that was recorded for one person (initials, or their name taken off) always wins over this setting.',
+  // The sentence the setting opens with, by who plays in the league (record 065):
+  // `setting.<key>.start.<audience>`.
+  'setting.privacy.publicNames.start.adult':
+    'Your league is for adults, so it starts with full names. Choose less here at any time.',
+  'setting.privacy.publicNames.start.youth':
+    "Your league is for young players, so it starts with first name and last initial. Full names need their parents' or guardians' agreement, which you confirm below.",
+  'setting.privacy.publicNames.start.mixed':
+    "Your league has both adults and young players, so it starts with first name and last initial for everyone. Full names need the young players' parents' or guardians' agreement, which you confirm below.",
   'setting.privacy.publicNames.option.fullName': 'Full names, like "Jordan Ellis"',
   'setting.privacy.publicNames.option.firstNameLastInitial':
     'First name and last initial, like "Jordan E."',
