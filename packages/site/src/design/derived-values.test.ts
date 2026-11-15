@@ -3,11 +3,17 @@
 // design and of a light one.
 import { describe, expect, it } from 'vitest';
 import {
+  bandSurfaces,
   contrastRatio,
   contrastWarnings,
   derivedColorWarnings,
   derivedColors,
   designToCssVariables,
+  evenFigureFonts,
+  fontKeys,
+  headerSurfaces,
+  headingTraits,
+  scoreFont,
   hoverTintShare,
   hoveredSurface,
   mixColors,
@@ -49,6 +55,80 @@ describe('colors worked out from a design', () => {
       expect(contrastRatio(derived.onHighlight, colors.highlight)).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(derived.onDanger, derived.danger)).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  // Step 2.147 (C-16): the color the eye lands on, a band's own colors, and the header's.
+  it('give every starting design a color the eye lands on that reads, on the page and on a band', () => {
+    for (const key of startingDesignKeys) {
+      const design = startingDesign(key);
+      const colors = colorsOf(design);
+      const derived = derivedColors(colors, design.base);
+      const reads = (text: string, surface: string, what: string) =>
+        expect(contrastRatio(text, surface), `${key} ${what}`).toBeGreaterThanOrEqual(4.5);
+      for (const surface of textSurfaces(colors)) reads(derived.pop, surface, 'pop on the page');
+      reads(derived.onPop, derived.pop, 'words on pop');
+      const band = bandSurfaces(colors, design.base);
+      expect(derived).toMatchObject(band);
+      for (const [where, surface] of Object.entries(band)) {
+        reads(derived.onBand, surface, `words on ${where}`);
+        reads(derived.bandMuted, surface, `quiet words on ${where}`);
+        reads(derived.bandPop, surface, `pop on ${where}`);
+      }
+      // The one button that matters: its words read on its fill, still and hovered.
+      reads(derived.onBandPop, derived.bandPop, 'words on the button');
+      reads(derived.onBandPop, derived.bandPopHover, 'words on the hovered button');
+      expect(derived.bandPopHover).not.toBe(derived.bandPop);
+      for (const surface of headerSurfaces(colors, design.base)) {
+        reads(derived.headerMuted, surface, 'the menu in the header');
+        reads(derived.headerPop, surface, 'the current page in the header');
+      }
+      for (const value of Object.values(derived)) expect(value).toMatch(hex);
+    }
+  });
+
+  it('gives the eye the main color where that reads, and the highlight where it does not', () => {
+    const of = (key: (typeof startingDesignKeys)[number]) => {
+      const design = startingDesign(key);
+      return { colors: colorsOf(design), derived: derivedColors(colorsOf(design), design.base) };
+    };
+    // A gold on navy and a blue on white read as they are: numbers and the current page
+    // stay in the league's main color.
+    expect(of('midnight-gold').derived.pop).toBe(of('midnight-gold').colors.primary);
+    expect(of('clean-court').derived.pop).toBe(of('clean-court').colors.primary);
+    // A maroon on wine-black does not: the gold takes over, untouched.
+    const crest = of('crest');
+    expect(contrastRatio(crest.colors.primary, crest.colors.background)).toBeLessThan(4.5);
+    expect(crest.derived.pop).toBe(crest.colors.highlight);
+    expect(crest.derived.bandPop).toBe(crest.colors.highlight);
+    expect(crest.derived.headerPop).toBe(crest.colors.highlight);
+    // Its light sibling: maroon on the white page, and the same gold, untouched, wherever
+    // the maroon is the ground (the header's bar, a band).
+    const light = of('crest-light');
+    expect(light.derived.pop).toBe(light.colors.primary);
+    expect(light.derived.bandPop).toBe('#d3b780');
+    expect(light.derived.headerPop).toBe('#d3b780');
+  });
+
+  it('makes a band from the main color: laid over a panel in a dark design, itself in a light one', () => {
+    const crest = colorsOf(startingDesign('crest'));
+    const dark = bandSurfaces(crest, 'dark');
+    // A fifth of the maroon over the panel: the wine of the first design's bands.
+    expect(dark.band).toBe(mixColors(crest.panel, crest.primary, 0.2));
+    expect(dark.bandDeep).toBe(crest.background);
+    // A bright main color is laid on thinly, so the panel does not turn to mud.
+    const gold = colorsOf(startingDesign('midnight-gold'));
+    expect(bandSurfaces(gold, 'dark').band).toBe(mixColors(gold.panel, gold.primary, 0.06));
+    // A light design's band is its main color, deepened, and never lighter than it starts.
+    const light = colorsOf(startingDesign('crest-light'));
+    const bar = bandSurfaces(light, 'light');
+    expect(bar.band).toBe(mixColors(light.primary, '#000000', 0.2));
+    expect(bar.bandGlow).toBe(bar.band);
+    expect(contrastRatio(bar.bandDeep, '#ffffff')).toBeGreaterThan(
+      contrastRatio(bar.band, '#ffffff'),
+    );
+    // Left unsaid, the base is read from the page's own color.
+    expect(bandSurfaces(crest)).toEqual(dark);
+    expect(bandSurfaces(light)).toEqual(bar);
   });
 
   it('leave a color alone when it already reads, and move it only as far as it must', () => {
@@ -224,11 +304,14 @@ describe('the scales every screen is built from', () => {
     ]);
   });
 
-  it('one type scale: 12, 14, 16, 18, 22, 28, 36', () => {
+  it('one type scale: 12, 14, 16, 18, 22, 28, 36, and 48, 64, 88 for display', () => {
     const vars = designToCssVariables(startingDesign('midnight-gold'));
-    expect([12, 14, 16, 18, 22, 28, 36].map((n) => rem(vars[`--text-${n}`]))).toEqual([
-      12, 14, 16, 18, 22, 28, 36,
-    ]);
+    const sizes = [12, 14, 16, 18, 22, 28, 36, 48, 64, 88];
+    expect(sizes.map((n) => rem(vars[`--text-${n}`]))).toEqual(sizes);
+    // And nothing between: these are all the sizes there are.
+    expect(Object.keys(vars).filter((name) => name.startsWith('--text-'))).toEqual(
+      sizes.map((n) => `--text-${n}`),
+    );
   });
 
   it('one height for anything a thumb taps: 44, in every design', () => {
@@ -286,6 +369,75 @@ describe('the frame of a dark design and of a light one', () => {
         expect(value, name).not.toMatch(/[;{}<>]|url\(|@import/);
       }
     }
+  });
+
+  // Step 2.147: the frame follows a design's base, its corners and its heading face.
+  const crest = designToCssVariables(startingDesign('crest'));
+  const crestLight = designToCssVariables(startingDesign('crest-light'));
+
+  it('draws hairlines in the text color where a dark design’s main color is too deep to show', () => {
+    // Gold on navy shows as a line; maroon on wine-black does not.
+    expect(dark['--color-line']).toContain('var(--color-primary)');
+    expect(crest['--color-line']).toContain('var(--color-text)');
+    for (const vars of [crest, crestLight]) {
+      const found = /color-mix\(in srgb, var\(--color-text\) (\d+)%, transparent\)/.exec(
+        vars['--color-line'] ?? '',
+      );
+      expect(Number(found?.[1])).toBeGreaterThanOrEqual(12);
+      expect(Number(found?.[1])).toBeLessThanOrEqual(25);
+    }
+  });
+
+  it('writes the menu as small widely spaced capitals unless the corners are round', () => {
+    for (const vars of [crest, crestLight, dark]) {
+      expect(vars['--tab-case']).toBe('uppercase');
+      expect(vars['--tab-size']).toBe('var(--text-12)');
+      expect(vars['--tab-current-background']).toBe('transparent');
+      expect(vars['--tab-text']).toBe('var(--header-muted)');
+    }
+    // The current page: a line in the header's eye-catching color; a dark design whose
+    // main color shows on the page keeps it in that.
+    expect(crest['--tab-current-line']).toBe('var(--header-pop)');
+    expect(crestLight['--tab-current-line']).toBe('var(--header-pop)');
+    expect(crest['--header-name']).toBe('var(--color-text)');
+    // Its light sibling keeps the bar of the main color every light design has.
+    expect(crestLight['--header-background']).toBe('var(--color-primary)');
+    expect(light['--tab-size']).toBe('var(--text-14)');
+    expect(light['--tab-radius']).toBe('var(--radius-pill)');
+  });
+
+  it('sets titles as their face is drawn: a serif light and close, capitals only where a face is made of them', () => {
+    expect(crest).toMatchObject({
+      '--heading-weight': '500',
+      '--display-weight': '400',
+      '--heading-case': 'none',
+      '--hero-case': 'uppercase',
+      '--brand-case': 'uppercase',
+    });
+    expect(dark['--heading-case']).toBe('uppercase');
+    expect(light).toMatchObject({ '--heading-case': 'none', '--hero-case': 'none' });
+    // Every face of the list has its traits, each a plain value: a case, a weight, or a
+    // distance written as a length (so a stylesheet can halve it).
+    for (const key of fontKeys) {
+      for (const value of Object.values(headingTraits[key])) {
+        expect(value, key).toMatch(/^(uppercase|none|\d{3}|0em|0\.\d+em)$/);
+      }
+    }
+  });
+
+  it('sets a score only in a face with lining, even-width figures', () => {
+    expect(scoreFont({ heading: 'gelasio', body: 'source-sans' })).toBe('gelasio');
+    // Cinzel and Playfair Display have no even-width figures: the body face is used.
+    expect(scoreFont({ heading: 'cinzel', body: 'jost' })).toBe('jost');
+    expect(scoreFont({ heading: 'playfair-display', body: 'inter' })).toBe('inter');
+    expect(scoreFont({ heading: 'oswald', body: 'cinzel' })).toBe('source-sans');
+    for (const key of fontKeys) {
+      for (const body of fontKeys) {
+        expect(evenFigureFonts).toContain(scoreFont({ heading: key, body }));
+      }
+    }
+    expect(crest['--font-score']).toBe(crest['--font-heading']);
+    expect(dark['--font-score']).toBe(dark['--font-body']);
   });
 
   it('gives the two starting designs different corners, and both a pill', () => {
