@@ -295,6 +295,12 @@ export const tableCss = String.raw`
 .ui-standings[data-emblems='true'] .ui-team-cell > [dir] {
   max-inline-size: calc(45cqi - var(--step-6) - var(--step-3));
 }
+/* And the one width the team column has in every division's table grows by what the emblem
+   is wider than the chip, so it still holds a name of about ten letters and a note's mark:
+   the numbers of two divisions stay under each other. */
+.ui-standings[data-emblems='true'] .ui-team-cell {
+  min-inline-size: calc(7.5rem + var(--step-3));
+}
 /* A table with emblems stands among scoreboards, and has their fine line at its top. */
 .ui-table-frame:has(.ui-standings[data-emblems='true']) {
   border-block-start: var(--line-heavy) solid var(--color-ornament-line);

@@ -505,6 +505,15 @@ describe('tables', () => {
   });
   it("give the team column one width in every division's table, so the numbers line up down the page", () => {
     expect(displayCss).toMatch(/\.ui-standings \.ui-team-cell \{\s*min-inline-size: 7\.5rem;/);
+    // With emblems the column is wider by what a shield is wider than a chip (24 and 12),
+    // as the name's own limit is narrower by it, so a name of seven letters with a note's
+    // mark still fits the column in every division.
+    expect(displayCss).toMatch(
+      /\.ui-standings\[data-emblems='true'\] \.ui-team-cell \{\s*min-inline-size: calc\(7\.5rem \+ var\(--step-3\)\);/,
+    );
+    expect(displayCss).toMatch(
+      /\.ui-standings\[data-emblems='true'\] \.ui-team-cell > \[dir\] \{\s*max-inline-size: calc\(45cqi - var\(--step-6\) - var\(--step-3\)\);/,
+    );
     // Both the heading and the rows carry it, so it holds for a table of any number of rows.
     const html = render(
       createElement(StandingsTable, {

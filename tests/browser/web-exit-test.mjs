@@ -1395,8 +1395,13 @@ if (browser) {
           const pill = document.createElement('span');
           pill.className = 'ui-game-state';
           pill.dataset.kind = 'quiet';
-          pill.textContent = 'Awaiting the official result of this game';
+          pill.textContent = 'Awaiting the official result';
           metas[0].append(pill);
+          // Whatever the card's width and the fonts of the machine, the pill is made long
+          // enough to need a line of its own: words are added until its top line has grown.
+          for (let i = 0; i < 12 && metas[0].getBoundingClientRect().height <= before[0] + 8; i++) {
+            pill.textContent += ' of this game';
+          }
           const tops = (selector) =>
             [...list.querySelectorAll(selector)].map((el) =>
               Math.round(el.getBoundingClientRect().top),
