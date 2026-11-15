@@ -4,7 +4,7 @@ This page is for the day the lead and the founder sit together and put a league 
 
 **It has not yet been run against a real database.** Everything it does is tested on made-up databases on this computer only (T-201). The first real run is on the test copy ("staging"), in a session the founder started. It is never run on production, and never on the Al-Hadi tracker's database.
 
-**There is no way yet to remove a wrong league.** No command, script or written procedure removes a league once it is made. Do not use this tool on a real league until there is one (see "Before a real school's league" below).
+**A wrong league can be removed only while it is still exactly as this tool made it.** `npm run league:remove` removes a league that is in draft and has no games, no people and no roles but its owner's (see "Remove a league made by mistake" below). Once anything at all is added to it, or it is published, this tool does not remove it: that is step 2.133, not built yet. So read the plan carefully before you answer, and if something is wrong, remove the league straight away.
 
 ## What it does
 
@@ -53,13 +53,13 @@ A database counts as "on this computer" only when its address names `localhost`.
 
 ### Before the day
 
-1. **Know beforehand how a wrong league will be removed, and that today there is no way.** Until a written and tried way exists, only make throwaway leagues on the test copy.
+1. **Know beforehand how a wrong league will be removed.** Read "Remove a league made by mistake" below. It works only while nothing has been added to the league.
 2. **Check "Confirm email" is on.** In the test copy project's sign-in settings, "Confirm email" must be on. If it is off, the first person to sign up with the owner's address takes the league. Step 2.115's start-up check must have landed too.
 3. **Apply the migrations fully** to the test copy ([applying migrations](apply-migrations.md)).
 
 ### A practice run on the test copy
 
-4. **Run it once with a throwaway short name**, such as `practice-1`, following steps 6 to 11 below. Look at what it prints at the end.
+4. **Run it once with a throwaway short name**, such as `practice-1`, following steps 6 to 11 below. Look at what it prints at the end. Then **remove that practice league** with `npm run league:remove`, following "Remove a league made by mistake" below, so the removal has been tried once before the real run.
 5. **Press Ctrl+C at the question once**, on a second run, to see that it stops cleanly and makes nothing. Ctrl+C is honoured at every question. While it is connecting or making the league it is not: if the window is closed or the computer stops part-way, run the tool again with the same answers and it will say what exists (step 12).
 
 ### The real run
@@ -90,7 +90,7 @@ A database counts as "on this computer" only when its address names `localhost`.
 
 8. **Certificate checking on.** Leave `MIGRATION_DATABASE_SSL` out (it then means `verify`) and set `MIGRATION_DATABASE_CA` to Supabase's certificate file. For a database that is not on this computer the tool refuses `off` and `no-verify`.
 9. **Both checks passing, and the migrations right.** If the tool says the database is behind, ahead or different, or that a login may not do its part, stop and put that right first.
-10. **The owner's exact address, and who plays.** The founder confirms the exact email address the owner will sign in with: a Google address written with different dots counts as a second account. The founder also says aloud who plays. A school league is **under-18s**. That choice decides how players' names are shown and whether the league finder lists the league, and nothing can change it afterwards yet.
+10. **The owner's exact address, and who plays.** The founder confirms the exact email address the owner will sign in with: a Google address written with different dots counts as a second account. The founder also says aloud who plays. A school league is **under-18s**. That choice decides how players' names are shown and whether the league finder lists the league, and nothing can change it afterwards yet. If it turns out wrong, remove the league at once, before anything is added to it, and make it again.
 11. **Read the whole plan, then answer.** Check the league, who plays, the listing, the owner, the season, and the "Where" line. "Where" must name the right database, host and Supabase project, and say "NOT on this computer". Right above the question the tool shows the Supabase project reference again: check it against the dashboard. Then type the league's short name. The question does not print it for you.
 12. **Read what it prints at the end.** It reads back from the database and prints:
     - one league, in draft;
@@ -110,6 +110,37 @@ It never prints an address, a user name or a password. What it says depends on w
 - **It stopped after the league was made.** It says the league is there, whole, with its id.
 - **It could not tell whether the league was made** (a dropped connection, say). It says so. It says the accounts it made are still there and may belong to the league, and that nothing should be removed. Do not remove anything: run the tool again with the same answers, and it will say what exists.
 
+## Remove a league made by mistake
+
+This is for the day a league was just made on a real database with a wrong short name, a wrong "who plays", or for the wrong owner. The tool is `npm run league:remove` ([record 063](../architecture/decisions/063-removing-a-league-made-by-mistake.md)). It has the same checks as `npm run league:make`, the same two addresses, and the same rule: **the founder types, at their own terminal**, and no AI session ever passes `--hosted`.
+
+What it removes, and nothing else: a league still in draft, exactly as `league:make` left it, with its first season, its default program and the two lines its making wrote in the league's own activity log. The owner's account goes too, but only if nobody has ever signed in with it and nothing else uses it. One line stays, in the platform's own log: which league, who removed it and when.
+
+What it refuses, with nothing removed: a league with any game, any person, any role given to anyone (even one that has ended), an invitation, a setting saved, anything in its bin, anything changed since it was made, or one that is published, archived or suspended. It says what it found. Removing a league like that is step 2.133, not this tool.
+
+1. **Run it as soon as you see the mistake**, before anyone adds anything to the league.
+   **One terminal only**: never leave its question waiting, and never make or remove a league in another window meanwhile. (If the league was removed and made again elsewhere while a question waited, the tool now refuses, but do not count on it.)
+2. **Give the addresses the same way as for making**, for that one command only (step 7 above), with `npm run league:remove -- --hosted --short-name <the league's short name> --as founder@example.test` in place of the `league:make` command. On this computer, to practise, leave out `--hosted`.
+3. **Check the certificate and both checks**, as in steps 8 and 9 above. If the tool says a login may not run the removal, stop: the migration login must be the one that applied the migrations.
+4. **Read the whole plan.** Check the league's name and short name, when it was made (the date, the time and how long ago) and by whom, its season, what it says about the owner's account (removed too, or kept and why), and the "Where" line, exactly as in step 11 above. **Stop if this league was not made today, by you.** Stop too if it says "Its owner has already signed in" and you did not expect that: ask the lead first.
+5. **Type the league's short name** to remove it. The question does not print it for you. Anything else, even "yes", removes nothing. If its owner has already signed in, it then asks for the owner's email address too: type it exactly as the plan shows it.
+6. **Read what it prints at the end.** It reads back from the database and prints:
+   - the league gone, with nothing of it left in any table;
+   - its short name free again;
+   - one line in the platform's log, naming our staff member;
+   - the owner's account gone, or kept, with the reason (for example "it has signed in before").
+
+   Anything not as it should be is marked "NOT as it should be".
+
+7. **Run it a second time** if you are unsure: it says no league has that short name.
+8. **If its owner had already signed in, tell the owner yourself** that the league was removed, and why. The tool sends nothing to anyone.
+
+**After any refusal**, whatever it says: stop. Change nothing by hand in the Supabase dashboard. Tell the lead exactly what the tool printed. The league stays in draft, which only its own staff can see, until it is put right.
+
+If it stops part-way, it says whether the league is still there. Removing is one step: the league is either all there or all gone, never half. If it cannot tell, run it again with the same answers and it will say.
+
+**Reading the platform's log afterwards.** The line about a removed league is kept in the table `platform.activity_log`. No page shows it yet, and the app's own login cannot read it. Only the migration login can: in the test copy's Supabase dashboard, open the SQL editor (which runs as that login) and run `select at, league_slug, league_name, details from platform.activity_log order by at desc;`. It shows which league, when, who removed it, who made it and when, and who played in it. No line there can be changed or removed.
+
 ## Before a real school's league
 
 These are still missing before this is used for a real league with real children's data:
@@ -117,6 +148,10 @@ These are still missing before this is used for a real league with real children
 - step 2.115 landed (the start-up check that "Confirm email" is on);
 - a restore of the database, tried once;
 - the release procedure;
-- a written and tried way to remove a wrong league (there is none yet);
+- the removal tried once on the test copy (step 4 of the practice run does it);
 - part 2 of step 2.125, so "who plays" can be corrected and the league published;
+- step 2.133: until it is built, a league that has been used in any way cannot be deleted by anyone, its owner included;
+- step 2.114: until it is built, a person on a roster cannot be erased;
 - the founder's legal sign-off on holding children's data.
+
+The two steps above are duties about children's data: a family that asks for their child's details, or a school's whole league, to be removed must be able to have that done.

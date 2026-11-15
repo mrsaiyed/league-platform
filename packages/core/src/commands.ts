@@ -20,6 +20,7 @@ import {
   createLeague,
   createSeason,
   listDivisions,
+  removeDraftLeague,
   removeDivision,
   reorderDivisions,
   restoreDivision,
@@ -115,6 +116,7 @@ import {
 export const commands = commandRegistry([
   setLeagueName,
   createLeague,
+  removeDraftLeague,
   renameShortName,
   setLeagueStatus,
   createSeason,

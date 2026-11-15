@@ -370,3 +370,39 @@ describe('the transfer plan', () => {
     expect(plan.ready).toBe(false);
   });
 });
+
+describe('rules the tracker never had (record 062)', () => {
+  // A stop-clock game: a foul stops the clock, the scorer starts it again.
+  const blowout: Input[] = [
+    { type: 'lineup', side: 'home', playerIds: [sam.id] },
+    { type: 'lineup', side: 'away', playerIds: [fox.id] },
+    { type: 'start' },
+    { type: 'score', side: 'home', playerId: sam.id, points: 3 },
+    { type: 'foul', side: 'away', playerId: fox.id },
+    { type: 'start' },
+    { type: 'pause' },
+    { type: 'end' },
+  ];
+  const season = (change: (rules: ReturnType<typeof seasonRulesPreset>) => void) => {
+    const rules = seasonRulesPreset('high-school');
+    change(rules);
+    return readsOf({ facts: { [gameUuid(1)]: { rules } } });
+  };
+
+  it('replays a game without the season’s mercy lead, which the tracker never had', async () => {
+    const reads = season((r) => {
+      r.clock = { mode: 'stop', stopClockLastSeconds: null, mercyLead: 3 };
+    });
+    const plan = await planTrackerTransfer(data([trackerGame(1, blowout)]), reads, options);
+    expect(plan.games.map((g) => g.outcome.kind)).toEqual(['transfer']);
+    expect(plan.ready).toBe(true);
+  });
+
+  it('keeps the season’s foul limit, which only marks a player', async () => {
+    const reads = season((r) => {
+      r.fouls.playerFoulLimit = 1;
+    });
+    const plan = await planTrackerTransfer(data([trackerGame(1, blowout)]), reads, options);
+    expect(plan.games.map((g) => g.outcome.kind)).toEqual(['transfer']);
+  });
+});
