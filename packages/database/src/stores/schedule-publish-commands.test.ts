@@ -6,12 +6,14 @@
 import type { PGlite } from '@electric-sql/pglite';
 import {
   addDraftGame,
+  addDraftRound,
   changeDraftRoundDate,
   getScheduleDraft,
   moveDraftGame,
   previewSchedulePublish,
   publishSchedule,
   removeDraftGame,
+  removeDraftRound,
   renameDraftRound,
   type CommandDeps,
   type Job,
@@ -500,6 +502,107 @@ describe('publishing against the database', () => {
       ok: true,
       value: { blockers: [{ code: 'game-id-taken', gameId: binned }] },
     });
+  });
+
+  it('adds rounds numbered after the others and removes an empty one, as the preview said (step 2.160)', async () => {
+    const s = await season();
+    const week3 = randomUUID();
+    const week4 = randomUUID();
+    const added = randomUUID();
+    let last = await addDraftRound(
+      s.as,
+      { ...basis(s), roundId: week3, label: 'Week 3', date: '2026-12-20' },
+      deps,
+    );
+    const step = async (run: (b: ReturnType<typeof basis>) => Promise<typeof last>) => {
+      const draft = await draftState(s);
+      last = await run(basis(s, draft.version, draft.id));
+      expect(last).toMatchObject({ ok: true });
+    };
+    await step((b) =>
+      addDraftRound(s.as, { ...b, roundId: week4, label: 'Week 4', date: '2026-12-27' }, deps),
+    );
+    await step((b) =>
+      addDraftGame(
+        s.as,
+        {
+          ...b,
+          gameId: added,
+          homeTeamId: s.teams.a,
+          awayTeamId: s.teams.b,
+          roundId: week4,
+          date: '2026-12-27',
+          time: '18:00',
+          venueId: s.venueId,
+          court: null,
+        },
+        deps,
+      ),
+    );
+    await step((b) => removeDraftRound(s.as, { ...b, roundId: s.round2 }, deps));
+    // Nothing is in the rounds table yet: the public reads it (A-9).
+    const before = await pglite.query('select id from rounds where league_id = $1', [s.leagueId]);
+    expect(before.rows).toHaveLength(2);
+
+    const preview = await previewSchedulePublish(s.as, { seasonId: s.seasonId }, deps);
+    expect(preview).toMatchObject({
+      ok: true,
+      value: {
+        canPublish: true,
+        summary: { roundsAdded: [week3, week4].sort(), roundsRemoved: [s.round2] },
+      },
+    });
+    const draft = await draftState(s);
+    const published = await publishSchedule(
+      s.as,
+      { seasonId: s.seasonId, basedOnRevision: 1, draftId: draft.id, version: draft.version },
+      deps,
+    );
+    expect(published).toMatchObject({ ok: true, value: { revision: 2 } });
+    const rounds = await pglite.query<{ id: string; number: number; label: string | null }>(
+      'select id, number, label from rounds where league_id = $1 order by number',
+      [s.leagueId],
+    );
+    expect(rounds.rows).toEqual([
+      { id: s.round1, number: 1, label: 'Week 1' },
+      { id: week3, number: 3, label: 'Week 3' },
+      { id: week4, number: 4, label: 'Week 4' },
+    ]);
+    expect((await gameRow(added)).round_id).toBe(week4);
+    const revision = await one<{ summary: Record<string, unknown> }>(
+      pglite,
+      'select summary from schedule_revisions where league_id = $1 and number = 2',
+      [s.leagueId],
+    );
+    expect(revision.summary).toMatchObject({ roundsAdded: 2, roundsRemoved: 1 });
+  });
+
+  it('keeps a round a game in the bin is still in (step 2.160)', async () => {
+    const s = await season();
+    await s.game(s.teams.a, s.teams.b, {
+      round_id: s.round2,
+      starts_at: '2026-12-14T00:30:00Z',
+      deleted_at: '2026-12-01T00:00:00Z',
+    });
+    const refused = await removeDraftRound(s.as, { ...basis(s), roundId: s.round2 }, deps);
+    expect(refused).toEqual({ ok: false, error: { code: 'round-in-use' } });
+    // A draft written some other way is still blocked, and the round stays.
+    await pglite.query(
+      `insert into schedule_drafts (league_id, season_id, changes, based_on_revision)
+       values ($1, $2, $3, 1)`,
+      [
+        s.leagueId,
+        s.seasonId,
+        JSON.stringify({ version: 1, changes: [{ kind: 'remove-round', roundId: s.round2 }] }),
+      ],
+    );
+    const preview = await previewSchedulePublish(s.as, { seasonId: s.seasonId }, deps);
+    expect(preview).toMatchObject({
+      ok: true,
+      value: { canPublish: false, blockers: [{ code: 'round-in-use', roundId: s.round2 }] },
+    });
+    const kept = await pglite.query('select id from rounds where id = $1', [s.round2]);
+    expect(kept.rows).toHaveLength(1);
   });
 
   it('shows another league nothing: a season of another league is not found', async () => {

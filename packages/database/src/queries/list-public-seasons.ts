@@ -1,11 +1,12 @@
 // The seasons a visitor can pick from (P2 §4, `?season=`): running and finished ones,
 // newest first. A season still being set up, or in the bin, is not offered. Built
-// field by field for the season picker (T-29).
+// field by field for the season picker (T-29), each with the id the other public
+// queries take (step 2.93: the web app's seasons port).
 import { sql } from 'kysely';
-import type { PublicSeasonChoice } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
+import type { FoundPublicSeason } from './find-public-season.ts';
 
-export async function listPublicSeasons(scope: LeagueScope): Promise<PublicSeasonChoice[]> {
+export async function listPublicSeasons(scope: LeagueScope): Promise<FoundPublicSeason[]> {
   const rows = await transactionOf(scope)
     .selectFrom('seasons')
     .innerJoin('programs', (join) =>
@@ -14,6 +15,7 @@ export async function listPublicSeasons(scope: LeagueScope): Promise<PublicSeaso
         .onRef('programs.id', '=', 'seasons.program_id'),
     )
     .select([
+      'seasons.id as id',
       'seasons.slug as slug',
       'seasons.name as name',
       'programs.slug as program_slug',
@@ -31,6 +33,7 @@ export async function listPublicSeasons(scope: LeagueScope): Promise<PublicSeaso
     .orderBy('seasons.id')
     .execute();
   return rows.map((row) => ({
+    id: row.id,
     slug: row.slug,
     name: row.name,
     programSlug: row.program_slug,

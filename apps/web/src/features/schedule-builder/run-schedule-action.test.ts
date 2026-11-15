@@ -86,7 +86,7 @@ describe('schedule grid', () => {
         place,
         recording: n === 1 ? 'live' : '',
       });
-      expect(done).toEqual({ kind: 'saved' });
+      expect(done).toEqual({ kind: 'saved', detail: { what: 'game-saved', gameId: gameId(n) } });
     }
     let view = await read();
     expect(view.result.games).toHaveLength(publishedBefore + 10);
@@ -104,7 +104,7 @@ describe('schedule grid', () => {
       time: '09:00',
       place,
     });
-    expect(dup).toEqual({ kind: 'saved' });
+    expect(dup).toEqual({ kind: 'saved', detail: { what: 'game-saved', gameId: gameId(11) } });
     view = await read();
     expect(view.clashes.length).toBeGreaterThan(0);
     const grid = buildGrid(view, teams, venues.value);
@@ -123,7 +123,7 @@ describe('schedule grid', () => {
       recording: '',
       wasRecording: '',
     });
-    expect(fixed).toEqual({ kind: 'saved' });
+    expect(fixed).toEqual({ kind: 'saved', detail: { what: 'game-saved', gameId: gameId(11) } });
     view = await read();
     expect(view.clashes).toEqual([]);
 
@@ -139,14 +139,20 @@ describe('schedule grid', () => {
         recording: 'box-score',
         wasRecording: '',
       }),
-    ).toEqual({ kind: 'saved' });
+    ).toEqual({ kind: 'saved', detail: { what: 'game-saved', gameId: gameId(2) } });
     expect(await press('swap-games', { gameId: gameId(3), otherGameId: gameId(4) })).toEqual({
       kind: 'saved',
+      detail: { what: 'game-saved', gameId: gameId(3) },
     });
-    expect(await press('remove-game', { gameId: gameId(10) })).toEqual({ kind: 'saved' });
+    expect(
+      await press('remove-game', {
+        gameId: gameId(10),
+        wasSlot: [round.id, round.date, '17:00', place].join('~'),
+      }),
+    ).toEqual({ kind: 'saved', detail: { what: 'game-removed', roundId: round.id } });
     expect(
       await press('rename-round', { roundId: round.id, label: 'Week 5, Rivalry Week' }),
-    ).toEqual({ kind: 'saved' });
+    ).toEqual({ kind: 'saved', detail: { what: 'round-saved', roundId: round.id } });
     view = await read();
     expect(view.result.games).toHaveLength(publishedBefore + 10);
     expect(view.result.games.find((g) => g.id === gameId(2))?.recording).toBe('box-score');
@@ -175,7 +181,7 @@ describe('schedule grid', () => {
       time: '10:00',
       place: '',
     });
-    expect(added).toEqual({ kind: 'saved' });
+    expect(added).toEqual({ kind: 'saved', detail: { what: 'game-saved', gameId: gameId(1) } });
     const saved = await press('save-game', {
       gameId: gameId(1),
       roundId: round.id,
@@ -197,14 +203,22 @@ describe('schedule grid', () => {
       roundId: '01900000-0000-7000-8000-0000b2000001',
       label: 'First',
     });
-    expect(done).toEqual({ kind: 'saved' });
+    expect(done).toEqual({
+      kind: 'saved',
+      detail: { what: 'round-saved', roundId: '01900000-0000-7000-8000-0000b2000001' },
+    });
     const stale = await press('rename-round', {
       roundId: '01900000-0000-7000-8000-0000b2000001',
       label: 'Second',
       version: '1',
       draftId: '01900000-0000-7000-8000-0000d2000099',
     });
-    expect(stale).toEqual({ kind: 'refused', code: 'changed-since-read' });
+    // Said beside the round it was about.
+    expect(stale).toEqual({
+      kind: 'refused',
+      code: 'changed-since-read',
+      at: { form: 'round', roundId: '01900000-0000-7000-8000-0000b2000001' },
+    });
   });
 
   it('says a bad form is invalid and a team cannot play itself', async () => {

@@ -90,6 +90,18 @@ export type PublishedGameChange = {
   readonly captureMode?: NewPublishedGame['captureMode'];
 };
 
+/** A round a publication creates (step 2.160), with the number the draft gave it. */
+export type NewRound = {
+  readonly id: string;
+  readonly number: number;
+  readonly label: string;
+  /** YYYY-MM-DD, or null for none. */
+  readonly date: string | null;
+};
+
+/** A game that is in a round, whatever it is: in the bin, with no date, scored or not. */
+export type GameInRound = { readonly id: string; readonly roundId: string };
+
 export type NewScheduleRevision = {
   readonly number: number;
   readonly publishedByAccountId: string | null;
@@ -158,6 +170,18 @@ export type SchedulingStore = {
     roundId: string,
     change: { readonly label?: string; readonly date?: string },
   ) => Promise<boolean>;
+  /**
+   * Adds rounds to the season with their numbers (step 2.160): how many were added. One
+   * whose id or number is taken is not added.
+   */
+  readonly insertRounds: (seasonId: string, rounds: readonly NewRound[]) => Promise<number>;
+  /** Removes these rounds of the season that no game names, in the bin or not: how many went. */
+  readonly deleteRounds: (seasonId: string, roundIds: readonly string[]) => Promise<number>;
+  /** The season's games, in the bin or not, dated or not, that are in any of these rounds. */
+  readonly gamesInRounds: (
+    seasonId: string,
+    roundIds: readonly string[],
+  ) => Promise<readonly GameInRound[]>;
   /** Writes the season's next revision; false if its number is already taken. */
   readonly insertRevision: (seasonId: string, revision: NewScheduleRevision) => Promise<boolean>;
   /** Which of these teams are teams of the season that are not in the bin. */

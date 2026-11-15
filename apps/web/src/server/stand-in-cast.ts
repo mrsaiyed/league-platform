@@ -59,11 +59,12 @@ function league(
 export const standInLeagues = {
   live: league(1, 'north-valley', 'live', ['north-vale'], 'North Valley League'),
   other: league(2, 'harbor-city', 'live', [], 'Harbor City League'),
-  draft: league(3, 'quiet-pines', 'draft', ['quiet-pine']),
-  archived: league(4, 'old-meadow', 'archived'),
-  suspended: league(5, 'closed-gate', 'suspended'),
-  inBin: { ...league(6, 'binned-league', 'live'), inBin: true },
-  otherDraft: league(7, 'still-waters', 'draft'),
+  // The leagues in the other states have a name of their own too (step 2.127).
+  draft: league(3, 'quiet-pines', 'draft', ['quiet-pine'], 'Quiet Pines League'),
+  archived: league(4, 'old-meadow', 'archived', [], 'Old Meadow League'),
+  suspended: league(5, 'closed-gate', 'suspended', [], 'Closed Gate League'),
+  inBin: { ...league(6, 'binned-league', 'live', [], 'Binned League'), inBin: true },
+  otherDraft: league(7, 'still-waters', 'draft', [], 'Still Waters League'),
 } as const satisfies Record<string, MadeUpLeague>;
 
 /** The draft league's one program: a made-up scheduler is given that program only. */

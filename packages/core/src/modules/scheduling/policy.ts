@@ -3,10 +3,12 @@
 // league-wide: a role limited to one program does not manage them.
 import type { CommandContext } from '../../command/index.ts';
 import {
+  allows,
   hasPermission,
   hasPermissionAnywhere,
   leagueScope,
   readOnlyLeagueStatuses,
+  type AccessHolder,
   type Permission,
   type Scope,
 } from '../access/index.ts';
@@ -36,10 +38,40 @@ export async function mayChangeSchedule(
   return status !== undefined && !readOnlyLeagueStatuses.includes(status);
 }
 
+/** The scope a season's schedule is checked at: its program (P4 §3). */
+export function programScopeOf(programId: string): Scope {
+  return { type: 'program', id: programId };
+}
+
 /** The scope of a season's program (league-wide if the season is not there). */
 export async function seasonScope(tx: SchedulingTx, seasonId: string): Promise<Scope> {
   const season = await tx.scheduling.findSeason(seasonId);
-  return season === undefined ? leagueScope : { type: 'program', id: season.programId };
+  return season === undefined ? leagueScope : programScopeOf(season.programId);
+}
+
+/**
+ * The schedule permission at a season's program, for a holder already read: the check the
+ * commands below make (`hasPermission` at `seasonScope`), so a screen shows exactly the
+ * controls the commands would allow. Nobody signed in holds nothing.
+ */
+export function mayAtSeason(
+  holder: AccessHolder | undefined,
+  permission: 'schedule.read' | 'schedule.edit' | 'schedule.publish',
+  season: { readonly programId: string },
+): boolean {
+  return holder !== undefined && allows(holder, permission, programScopeOf(season.programId));
+}
+
+/**
+ * May a season be named to this holder in the schedule admin (P4 §4): a public season to
+ * anyone; one not public yet only to someone who may see its draft (`maySeeSchedule`:
+ * `schedule.read` at its program). The one rule every list of seasons for staff applies.
+ */
+export function mayListSeason(
+  holder: AccessHolder | undefined,
+  season: { readonly isPublic: boolean; readonly programId: string },
+): boolean {
+  return season.isPublic || mayAtSeason(holder, 'schedule.read', season);
 }
 
 /**

@@ -83,6 +83,7 @@ import {
 import { addAdjustment, rebuildStandings, removeAdjustment } from './modules/standings/index.ts';
 import {
   addDraftGame,
+  addDraftRound,
   changeDraftRoundDate,
   createCourt,
   createVenue,
@@ -93,6 +94,7 @@ import {
   previewSchedulePublish,
   publishSchedule,
   removeDraftGame,
+  removeDraftRound,
   renameDraftRound,
   setDraftRecording,
   swapDraftGames,
@@ -153,6 +155,8 @@ export const commands = commandRegistry([
   removeDraftGame,
   renameDraftRound,
   changeDraftRoundDate,
+  addDraftRound,
+  removeDraftRound,
   setDraftRecording,
   discardScheduleDraft,
   getScheduleDraft,

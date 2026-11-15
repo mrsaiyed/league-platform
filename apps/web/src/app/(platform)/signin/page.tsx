@@ -1,4 +1,3 @@
-import { platformUrl } from '@srleagues/core';
 import {
   EmailField,
   NextField,
@@ -11,14 +10,22 @@ import { t } from '../../../server/messages.ts';
 import { googleAction, signInAction } from '../../../server/sign-in/actions.ts';
 import { safeReturnPath } from '../../../server/sign-in/device.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
+import { returnLeagueOf } from '../../../server/sign-in/return-league.ts';
 
 // Email and password, or Google (R-2, T-67). The same screen whether or not the
-// address has an account (T-68).
+// address has an account (T-68). Opened from a league's page, it names the league and
+// leads back to that page (step 2.127); "Forgot your password?" keeps the page to come
+// back to as well. A league this person may not see is not named (return-league.ts).
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const next = safeReturnPath(search['next']);
+  const from = await returnLeagueOf(next);
   return (
-    <SignInScreen title="page.signIn" search={search}>
+    <SignInScreen
+      title="page.signIn"
+      intro={from === null ? undefined : t('signIn.fromLeague', { league: from.name })}
+      search={search}
+    >
       <form action={signInAction}>
         <NextField next={next} />
         <EmailField />
@@ -26,7 +33,9 @@ export default async function Page({ searchParams }: SearchProps) {
         <SubmitButton words="signIn.submit" />
       </form>
       <p>
-        <a href={platformUrl('forgotPassword')}>{t('signIn.forgot')}</a>
+        <a className="ui-button" data-kind="quiet" href={screenUrl('forgotPassword', { next })}>
+          {t('signIn.forgot')}
+        </a>
       </p>
       <p>{t('signIn.or')}</p>
       <form action={googleAction}>
@@ -34,8 +43,17 @@ export default async function Page({ searchParams }: SearchProps) {
         <SubmitButton words="signIn.google" />
       </form>
       <p>
-        <a href={screenUrl('signup', { next })}>{t('signIn.createAccount')}</a>
+        <a className="ui-button" data-kind="quiet" href={screenUrl('signup', { next })}>
+          {t('signIn.createAccount')}
+        </a>
       </p>
+      {from === null ? null : (
+        <p>
+          <a className="ui-button" data-kind="quiet" href={from.href}>
+            {t('signIn.backTo', { league: from.name })}
+          </a>
+        </p>
+      )}
     </SignInScreen>
   );
 }
