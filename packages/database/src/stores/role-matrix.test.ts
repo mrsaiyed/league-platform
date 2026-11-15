@@ -1094,7 +1094,7 @@ const gameCommandRows: readonly Row[] = [
         'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 2, $3)',
         [league.leagueId, gameId, JSON.stringify(state)],
       );
-      return { gameId, version: 1, reason: 'End game was tapped too soon' };
+      return { gameId, sequence: 2, reason: 'End game was tapped too soon' };
     },
     (c, i) => reopenTrackedGame(c, i, trackerDeps),
   ),

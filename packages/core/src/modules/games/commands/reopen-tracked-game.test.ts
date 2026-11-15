@@ -131,11 +131,14 @@ async function endedOnTablet(t: Tracker) {
 }
 
 const versionOf = (t: Tracker) => t.db.state.games[0]?.version ?? 0;
+/** The number of the last tap saved: what the tablet knows of the game. */
+const sequenceOf = (t: Tracker, id = gameId) =>
+  t.db.state.states.find((x) => x.gameId === id)?.seq ?? 0;
 
 async function reopenAs(t: Tracker, accountId: string | null, extra: object = {}) {
   const result = await reopenTrackedGame(
     t.as(accountId),
-    { gameId, version: versionOf(t), reason, ...extra },
+    { gameId, sequence: sequenceOf(t), reason, ...extra },
     t.deps,
   );
   return result.ok ? 'ok' : result.error.code;
@@ -151,7 +154,13 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
     const endedAt = await endedOnTablet(t);
     t.clock.at = endedAt + minutes(29);
     const before = t.db.state.games[0];
-    expect(await reopenAs(t, scorekeeperId)).toBe('ok');
+    const result = await reopenTrackedGame(
+      t.as(scorekeeperId),
+      { gameId, sequence: 7, reason },
+      t.deps,
+    );
+    // The tablet is told the reopen's own number: the event after its End game.
+    expect(result).toEqual({ ok: true, value: { sequence: 8 } });
     const s = t.db.state;
     expect(s.games[0]).toMatchObject({
       status: 'live',
@@ -294,14 +303,13 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
         finalGame(2),
         finalGame(3, { status: 'forfeit', captureMode: 'live' }),
         game(4, { status: 'live', captureMode: 'live' }),
-        finalGame(5, { version: 4 }),
       ],
     });
     await endedOnTablet(t);
-    const code = async (n: number, version = 1) => {
+    const code = async (n: number, sequence = 1) => {
       const result = await reopenTrackedGame(
         t.as(scorekeeperId),
-        { gameId: gameUuid(n), version, reason },
+        { gameId: gameUuid(n), sequence, reason },
         t.deps,
       );
       return result.ok ? 'ok' : result.error.code;
@@ -310,8 +318,10 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
     expect(await code(2)).toBe('not-ended-by-tracker');
     expect(await code(3)).toBe('not-ended-by-tracker');
     expect(await code(4)).toBe('game-not-decided');
-    expect(await code(5)).toBe('changed-since-read');
     expect(await code(9)).toBe('game-not-found');
+    // The tablet knows an older number than the game's: it moved on since.
+    expect(await code(1, sequenceOf(t) - 1)).toBe('changed-since-read');
+    expect(await code(1, 0)).toBe('invalid-input');
     // Decided by hand while its tracker was live: the state never ended.
     const live = setUp();
     await tap(live, [

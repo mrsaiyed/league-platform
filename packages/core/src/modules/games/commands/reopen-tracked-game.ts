@@ -18,6 +18,9 @@
 //   setting's minutes still counts.
 // - A reason, as for an admin (S-7): written as a game_corrections row in the same
 //   transaction, with who, and the result before and after as numbers only (T-220).
+// - The sequence number of the end as the device knows it (the tracker holds the
+//   game's event numbers, not its version): a game that moved on since, reopened and
+//   ended again by someone else for one, is refused (changed-since-read).
 //
 // What reopening does is the admin's own for a tracked game (finish-tracked-game.ts):
 // the engine's reopen is kept in the event log, the game is live again with the score
@@ -35,7 +38,7 @@ import { recordActivity } from '../../access/index.ts';
 import { lookupSetting, scorekeeperReopenMinutes } from '../../leagues/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { gameReopened, type GameReopened } from '../../../events/game-events.ts';
-import { correctionReason, gameVersion, isDecided } from '../game-fields.ts';
+import { correctionReason, isDecided } from '../game-fields.ts';
 import { handBackTrackedGame } from '../finish-tracked-game.ts';
 import { readState } from '../live-game.ts';
 import { gameScope, mayChangeGames, mayScoreGame } from '../policy.ts';
@@ -55,6 +58,9 @@ export type ReopenTrackedGameError = {
 
 const minuteMs = 60_000;
 
+/** A tap's place in the game's event log (1, 2, 3 …), as the tracker numbers them. */
+const tapSequence = z.number().int().positive();
+
 /** How long ago the game ended by the server's clock, in milliseconds; never below 0. */
 function sinceEnded(game: GameRecord, now: number): number {
   const ended = game.finalizedAt === null ? Number.NaN : Date.parse(game.finalizedAt);
@@ -64,25 +70,27 @@ function sinceEnded(game: GameRecord, now: number): number {
 export const reopenTrackedGame = defineCommand({
   name: 'games.reopen_tracked_game',
   permission: 'games.score',
-  input: z.object({ gameId: lowerId, version: gameVersion, reason: correctionReason }),
+  // `sequence`: the number of the last tap the device knows of, its End game (the
+  // tracker holds that, not the game's version): a game that moved on since is refused.
+  input: z.object({ gameId: lowerId, sequence: tapSequence, reason: correctionReason }),
   allowed: (context, input, tx: TrackerTx) => mayScoreGame(context, tx, input.gameId),
   run: async ({
     context,
     input,
     tx,
     emit,
-  }): Promise<Result<{ version: number }, ReopenTrackedGameError>> => {
+  }): Promise<Result<{ sequence: number }, ReopenTrackedGameError>> => {
     const accountId = scorerOf(context);
     if (!(await tx.scoringSessions.lockGame(input.gameId))) return fail({ code: 'game-not-found' });
     const game = await tx.games.find(input.gameId);
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
-    if (game.version !== input.version) return fail({ code: 'changed-since-read' });
     if (!isDecided(game.status)) return fail({ code: 'game-not-decided' });
     const saved = await tx.liveGames.findState(game.id);
     if (game.status !== 'final' || saved === undefined) {
       return fail({ code: 'not-ended-by-tracker' });
     }
     if (readState(saved.state).status !== 'final') return fail({ code: 'not-ended-by-tracker' });
+    if (saved.seq !== input.sequence) return fail({ code: 'changed-since-read' });
     const corrects = await mayChangeGames(
       context,
       tx,
@@ -114,8 +122,9 @@ export const reopenTrackedGame = defineCommand({
       },
       after: { version: 1 as const, ...after },
     });
-    const updated = await tx.games.setResult(game.id, { ...after, decided: false }, input.version);
-    if (updated === undefined) return fail({ code: 'changed-since-read' });
+    // The game is locked and was read after the lock: it cannot have moved on.
+    const updated = await tx.games.setResult(game.id, { ...after, decided: false }, game.version);
+    if (updated === undefined) throw new Error('A locked game changed while it was reopened.');
     await recordActivity(tx, context, {
       action: 'games.reopen_tracked_game',
       target: { type: 'game', id: game.id },
@@ -127,6 +136,7 @@ export const reopenTrackedGame = defineCommand({
       seasonId: game.seasonId,
     };
     emit(event);
-    return ok({ version: updated });
+    // The engine's reopen was saved as the event after the end (handBackTrackedGame).
+    return ok({ sequence: saved.seq + 1 });
   },
 });

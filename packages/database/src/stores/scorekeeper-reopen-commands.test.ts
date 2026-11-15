@@ -173,14 +173,15 @@ async function endedOnTablet(g: Game): Promise<number> {
   return row.finalized_at.getTime();
 }
 
-const versionOf = async (g: Game) =>
-  (await one<{ version: number }>(pglite, 'select version from games where id = $1', [g.gameId]))
-    .version;
+/** The number of the game's last saved tap: what the tablet knows of it. */
+const sequenceOf = async (g: Game) =>
+  (await one<{ seq: number }>(pglite, 'select seq from game_states where game_id = $1', [g.gameId]))
+    .seq;
 
 async function reopenAs(g: Game, accountId: string, reason = 'Tapped End game, meant Pause') {
   const result = await reopenTrackedGame(
     g.as(accountId),
-    { gameId: g.gameId, version: await versionOf(g), reason },
+    { gameId: g.gameId, sequence: await sequenceOf(g), reason },
     deps,
   );
   return result.ok ? 'ok' : result.error.code;

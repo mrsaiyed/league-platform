@@ -164,7 +164,8 @@ registerCommandCase(reopenGame, harnessTx, {
 // refused or finds no game.
 registerCommandCase(reopenTrackedGame, harnessTx, {
   name: "reopen the target's final game from its tracker",
-  input: (target) => ({ gameId: target.gameId, version: 1, reason: 'Harness reopening' }),
+  // Its seeded events are a basket and the end: the end is the second.
+  input: (target) => ({ gameId: target.gameId, sequence: 2, reason: 'Harness reopening' }),
 });
 
 // Box scores entered afterwards (step 2.64) -------------------------------------------
