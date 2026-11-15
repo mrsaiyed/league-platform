@@ -31,7 +31,7 @@ const putBack = (
   as: ReturnType<typeof memoryTeams>['as'],
   n: number,
   version = 1,
-  who = ownerId,
+  who: string | null = ownerId,
   teamId = teamUuid(1),
 ) => putBackOnRoster(as(who), { teamId, rosterEntryId: entryUuid(n), version }, deps);
 
