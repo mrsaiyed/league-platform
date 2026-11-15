@@ -52,6 +52,7 @@ export { addDraftGame, type AddDraftGameError } from './commands/add-draft-game.
 export { addDraftRound, type AddDraftRoundError } from './commands/add-draft-round.ts';
 export { removeDraftRound, type RemoveDraftRoundError } from './commands/remove-draft-round.ts';
 export { maxRounds, roundYears } from './rules/apply-change.ts';
+export { mayAtSeason, mayListSeason } from './policy.ts';
 export {
   changeDraftRoundDate,
   type ChangeDraftRoundDateError,

@@ -1,7 +1,5 @@
 import {
-  allows,
   getScheduleDraft,
-  leagueScope,
   leagueUrl,
   listVenues,
   previewSchedulePublish,
@@ -47,6 +45,7 @@ import type { SavedDetail } from './run-schedule-action.ts';
 import { importLinkOf } from './import-link.ts';
 import { addRoundProblemOf, noticeOf, whyNotSaved } from './notice.ts';
 import { ScheduleHeading } from './schedule-heading.tsx';
+import { seasonControls } from './season-controls.ts';
 import { visibleSeasons } from './visible-seasons.ts';
 
 type Basis = {
@@ -144,11 +143,8 @@ export async function ScheduleBuilderPage({
   const besideAdd = refusedAt?.form === 'add-round' ? refusedAt : undefined;
   const roundProblem = besideRound === undefined ? undefined : whyNotSaved(search);
   const addProblem = besideAdd === undefined ? undefined : addRoundProblemOf(search, besideAdd);
-  const mayDo = (permission: 'schedule.edit' | 'schedule.publish'): boolean =>
-    holder !== undefined && allows(holder, permission, leagueScope);
   const basis: Basis = {
-    canEdit: mayDo('schedule.edit'),
-    canPublish: mayDo('schedule.publish'),
+    ...seasonControls(holder, season),
     league,
     seasonSlug: season.slug,
     seasonId: season.id,
