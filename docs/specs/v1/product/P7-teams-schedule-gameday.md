@@ -77,7 +77,7 @@ The schedule is a draft until published. After that, every change is also a draf
 ### Also
 
 - **Import** a schedule from a spreadsheet, for leagues that already have one. This is how the demo league's fixtures come in.
-- **Game states**: scheduled, live, final, postponed, cancelled, forfeited. A postponed game sits in a "to be rescheduled" list until given a new slot.
+- **Game states**: scheduled, live, final, postponed, cancelled, forfeited. A postponed game sits in a "to be rescheduled" list until given a new slot. Postponing offers a new date at once, or "decide later" (**S-49**, decided for you).
 - **Calendar feed**: every team and the whole league has a calendar link that phones subscribe to.
 
 **S-3 (agreed, changed November 12): the admin decides the schedule's format; what we automate grows over time.** We do not choose a league's format for it. From the first release an admin can build or import any schedule by hand in the grid: any number of games, any matchups, any mix of divisions. The generator automates the common case first: every team plays every other team a chosen number of times, within divisions or across them, with the fairness rules above. More automatic formats are added as leagues ask. What the generator does not handle yet is referee assignment, travel distance and sharing venues between programs, which come with stage 6.
@@ -93,7 +93,7 @@ When the regular season ends, the admin creates a **bracket**: choose how many t
 ### 5.1 Before the game
 
 - The league's reminders go out ([P8](P8-notifications.md)).
-- A scorekeeper is assigned to the game, or any scorekeeper opens it from their list. The league chooses which.
+- A scorekeeper is assigned to the game, or any scorekeeper opens it from their list. The league chooses which. Signed in, they also find "Score this game" on that game's card and page on the league's public site, shown to nobody else (**S-50**, decided for you).
 - The scorekeeper opens `/{league}/score/{game}` on a phone or tablet and confirms the game format. Only games recorded live have a "Score this game" button (**S-38**, decided for you); an admin can switch a game to live in the schedule. A game recorded as a final score or a box score says so on the scorekeeper's list and on its tracker address, with a link to enter its score in Games, which a scorekeeper may do.
 - The scorekeeper's list puts tonight first: games being played now, then today's games still to play, then the days ahead, and finished games last.
 - Someone not signed in who opens the tracker's address, or the scorekeeper's list, is sent to sign in and brought back to it (**U-15**, decided for you); a device signed out while a game is open keeps scoring and offers the same. In an archived league, a scorekeeper who still holds the role is told the league is archived, with a way back, rather than "you do not have access". A scorekeeper who may not score a game (one assigned to someone else, in a league that scores assigned games only) is told so, with the way back to their games.
@@ -101,7 +101,7 @@ When the regular season ends, the admin creates a **bracket**: choose how many t
 
 ### 5.2 Three ways to record a game
 
-**Final score only.** Two numbers and a tap. For leagues and sports where that is all that is wanted.
+**Final score only.** Two numbers and a tap. For leagues and sports where that is all that is wanted. A game that has plays recorded by the live tracker is refused here too, in a plain sentence, and is ended in the tracker (**S-46**, decided for you); a game set to live tracking that has no plays yet can still be finished with two numbers.
 
 **Box score afterwards.** A grid of players and stats filled in from a paper sheet.
 
@@ -159,6 +159,7 @@ How the grid works (built in step 2.64):
 
 - An admin (or the scorekeeper, within a time the league sets) can **reopen** a final game with a reason, fix it, and finalize again. Everything recalculates. The scorekeeper's time is a league setting, 30 minutes after the end to begin with (**S-36**, decided for you); after it, only an admin reopens the game.
 - **S-7:** every correction is logged with who, when and why. The public page shows "corrected" with the date, not the reason.
+- **S-47 (decided for you, November 15):** while a final game is reopened, its public page shows the result as it stood, marked "Being corrected". It never says the game has not started.
 - **S-8:** if a correction changes the winner or the score, people who got the recap get a short correction notice. Other fixes (a foul moved to the right player) send nothing.
 
 ### 5.6 Unusual outcomes
@@ -172,11 +173,13 @@ How the grid works (built in step 2.64):
 | Overtime     | Added periods; shown on the result                                               |
 | Did not play | A rostered player who never entered gets no "game played"                        |
 
+A cancelled game can be put back, with a reason, by whoever may cancel it; it is a scheduled game again (**S-51**, decided for you).
+
 ## 6. Standings and statistics
 
 - **S-9: standings are always calculated from final games; nobody types them in.** Each division has its own table with seeds. When teams are level, the page can show why one is ahead ("head-to-head").
 - **S-10: an admin can add an adjustment** (a points deduction, a forfeit win awarded by ruling) with a reason. It shows as a footnote under the table.
-- **Statistics**: season totals and per-game averages for every stat the season keeps; leaders with a minimum-games rule the league sets; a full sortable table.
+- **Statistics**: season totals and per-game averages for every stat the season keeps; leaders with a minimum-games rule the league sets; a full sortable table. Fouls and turnovers get no leaders card unless the league switches it on (**S-48**, decided for you); they stay in the tables.
 - **Player pages** (if the league shows them): this season, past seasons, and career totals within the league.
 - **S-11: only final games count.** A live game's numbers show on its own page but not in season totals until it ends.
 - **S-22 (new, the founder's direction, November 12): who can see players' statistics is a setting, and each team can choose for itself.**
