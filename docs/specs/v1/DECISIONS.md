@@ -331,6 +331,7 @@ All dated November 12, 2026.
 | T-257                 | New                                                                          | The release makes pg-boss's schema, owned by queue_owner; pg-boss makes its own tables; the worker starts on checked settings (rec. 053)        | Step 2.94: the worker never started (R2); record 012 left open who makes pg-boss's tables (T-60)   |
 | T-256                 | New                                                                          | Account ids stay ours, linked to the sign-in user; the sign-in store in its own schema and role (rec. 052)                                      | Step 2.92: Supabase ids are not v7; the store and record 008's functions were missing              |
 | T-259                 | New                                                                          | Name settings read by one `readNamePolicy`; a setting value can need confirming; a person's request is a command, fixed-word reason (rec. 056)  | Step 2.126: nothing set the name policy or `people.visibility` (2.105 audit, H2)                   |
+| T-261                 | New                                                                          | Agreed (delegated): players added, changed and taken off at the table travel in the tracker's queue (protocol 2); a rosters address (rec. 058)  | Step 2.117: no way to put a player into a game at the table (2.107 audit, H1)                      |
 
 ## The full list
 
@@ -790,6 +791,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-253 | The tracker loads and reloads the engine's state through `GET …/games/{game}/state` (whoever may score the game, never cached); its controller applies each tap at once, rebuilds on the server's state after a refusal, and turns read-only on a takeover (record 049) | Agreed (delegated) |         |
 | T-254 | The Al-Hadi transfer checks its account first, works out its whole plan before writing (nothing while a game has a problem), runs only the product's own commands, keeps the tracker's action ids so a rerun changes nothing, and compares every line (record 050)      | Agreed (delegated) |         |
 | T-255 | A game page also fetches a snapshot when its live connection opens, at most every 5 s while its players are older than the score, and every 30 s while a live game is quiet; final games are not followed (rec. 051)                                                    | Agreed (delegated) |         |
+| T-261 | Players added, changed and taken off at the scorer's table travel in the tracker's own queue (protocol 2), handled before the engine and kept as events without names; the device refreshes rosters from `GET …/games/{game}/rosters` (record 058)                      | Agreed (delegated) |         |
 
 ### [T7 — Notifications and jobs](technical/T7-notifications-and-jobs.md)
 
