@@ -82,36 +82,123 @@ function repositoryFiles() {
     .filter((file) => fs.existsSync(path.join(root, file)));
 }
 
+/** Next.js's own starter, in any quotes: '…', "…" or `…`. */
+const starterPath = /(['"`])next\/dist\/bin\/next\1/;
+/**
+ * Other ways a script can start Next.js: `next dev` or `next start` in a string, as exec, npx
+ * or a shell would be given it (at the string's start, or after npx, a path or a shell's
+ * `&&`, `;` or `|`, so a sentence like "on the next start" is not one); ['next', 'dev'] as
+ * the arguments of spawn or npx; and spawn('next', …) or exec('next …'), `next` with no
+ * command being `next dev`.
+ */
+const otherStarts = [
+  /(['"`])(?:(?:(?!\1)[^\n])*?(?:\bnpx(?:\.cmd)?\s+|&&\s*|;\s*|\|\s*|\/))?next(?:\.cmd)?\s+(?:dev|start)\b/,
+  /\[\s*(['"`])next\1\s*,\s*(['"`])(?:dev|start)\2/,
+  /\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|fork)\s*\(\s*(['"`])(?:npx\s+)?next(?:\.cmd)?(?:\s[^\n]*?)?\1/,
+  /\b(?:spawn|spawnSync|execFile|execFileSync)\s*\(\s*(['"`])npx(?:\.cmd)?\1\s*,\s*\[\s*(['"`])next\2/,
+];
+
+/** The file without its comment lines: a comment that names `next start` starts nothing. */
+const withoutCommentLines = (text) =>
+  text
+    .split('\n')
+    .filter((line) => !/^\s*(?:\/\/|\/\*|\*)/.test(line))
+    .join('\n');
+
+/**
+ * Whether a script starts Next.js, and what is wrong with how: every start must go through
+ * the one named starter, its arguments passed through withLoopback, or be a build.
+ */
+function readStarter(file, text) {
+  const code = withoutCommentLines(text);
+  const problems = [];
+  if (otherStarts.some((pattern) => pattern.test(code))) {
+    problems.push(
+      `${file}: starts Next.js through a command (next dev or start, npx, spawn or exec), not its named starter with withLoopback`,
+    );
+  }
+  if (!starterPath.test(code)) return { starts: problems.length > 0, problems };
+  const named = /const (\w+) = [^\n]*\.resolve\((['"`])next\/dist\/bin\/next\2\)/.exec(code);
+  if (named === null) {
+    problems.push(`${file}: finds Next.js's starter without naming it, so cannot be checked`);
+    return { starts: true, problems };
+  }
+  const name = named[1];
+  const uses = code.split(name).length - 2; // less the declaration
+  const builds = (code.match(new RegExp(`\\[${name}, (['"\`])build\\1\\]`, 'g')) ?? []).length;
+  const wrapped = code.split(`[${name}, ...withLoopback(`).length - 1;
+  if (uses !== builds + wrapped) {
+    problems.push(
+      `${file}: starts Next.js ${uses - builds - wrapped} time(s) without withLoopback (scripts/web-listen.mjs)`,
+    );
+  }
+  if (
+    wrapped > 0 &&
+    !/import \{[^}]*\bwithLoopback\b[^}]*\} from (['"])[^'"]*web-listen\.mjs\1/.test(code)
+  ) {
+    problems.push(`${file}: does not take withLoopback from scripts/web-listen.mjs`);
+  }
+  return { starts: true, problems };
+}
+
+test('the scan of starters finds Next.js started in any way it can be written', () => {
+  const resolved = (quote) =>
+    `const nextBin = require.resolve(${quote}next/dist/bin/next${quote});\n` +
+    "import { withLoopback } from './web-listen.mjs';\n";
+  // Each starts Next.js and is refused.
+  const refused = {
+    'starter, double quotes, not wrapped': `${resolved('"')}spawn(process.execPath, [nextBin, "start"]);`,
+    'starter, back quotes, not wrapped': `${resolved('`')}spawn(process.execPath, [nextBin, 'dev']);`,
+    'starter not named': 'spawn(process.execPath, [require.resolve("next/dist/bin/next"), "dev"]);',
+    'npx next dev in a string': "execSync('npx next dev --port 3000');",
+    'next start in a template': 'exec(`next start --port ${port}`);',
+    'npm script of next start': 'spawn("sh", ["-c", "next start"]);',
+    'npx with next and dev': "spawn('npx', ['next', 'dev']);",
+    'npx.cmd with next': "spawnSync('npx.cmd', ['next', '--port', '1']);",
+    'next as the command': "spawn('next', ['start', '--port', '1']);",
+    'next with no command': "exec('next');",
+    'next and start as arguments': "run(['next', 'start']);",
+  };
+  for (const [what, text] of Object.entries(refused)) {
+    const read = readStarter('made-up.mjs', text);
+    assert.equal(read.starts, true, what);
+    assert.notDeepEqual(read.problems, [], what);
+  }
+  // Each starts Next.js as it must, in any quotes, or only builds it.
+  const kept = {
+    'single quotes': `${resolved("'")}spawn(process.execPath, [nextBin, ...withLoopback(args, env)]);`,
+    'double quotes': `${resolved('"')}spawn(process.execPath, [nextBin, ...withLoopback(args, env)]);`,
+    'a build': `${resolved("'")}spawnSync(process.execPath, [nextBin, 'build']);`,
+  };
+  for (const [what, text] of Object.entries(kept)) {
+    assert.deepEqual(readStarter('made-up.mjs', text), { starts: true, problems: [] }, what);
+  }
+  // A comment or a word that only looks like it starts nothing.
+  for (const text of [
+    '// the app is started with next start',
+    "test('a database gains them on the next start', () => {});",
+    "const asked = params.get('next');",
+    'throw new Error(`next ${args[0]} failed`);',
+  ]) {
+    assert.deepEqual(readStarter('made-up.mjs', text), { starts: false, problems: [] }, text);
+  }
+});
+
 test('every place that starts the web app passes its arguments through withLoopback', () => {
-  const scripts = repositoryFiles().filter((file) => /\.(?:mjs|cjs|js|ts)$/.test(file));
+  // This file holds made-up starters to test the scan: it is not one itself.
+  const self = path
+    .relative(root, fileURLToPath(import.meta.url))
+    .split(path.sep)
+    .join('/');
+  const scripts = repositoryFiles().filter(
+    (file) => /\.(?:mjs|cjs|js|mts|cts|ts|tsx)$/.test(file) && file !== self,
+  );
   const starters = [];
   const problems = [];
-  // Written in parts so that this file itself is not read as a starter.
-  const starterPath = `'${['next', 'dist', 'bin', 'next'].join('/')}'`;
   for (const file of scripts) {
-    const text = fs.readFileSync(path.join(root, file), 'utf8');
-    if (!text.includes(starterPath)) continue;
-    const named = /const (\w+) = [^\n]*\.resolve\('next\/dist\/bin\/next'\)/.exec(text);
-    if (named === null) {
-      problems.push(`${file}: finds Next.js's starter without naming it, so cannot be checked`);
-      continue;
-    }
-    const name = named[1];
-    starters.push(file);
-    const uses = text.split(name).length - 2; // less the declaration
-    const build = text.split(`[${name}, 'build']`).length - 1;
-    const wrapped = text.split(`[${name}, ...withLoopback(`).length - 1;
-    if (uses !== build + wrapped) {
-      problems.push(
-        `${file}: starts Next.js ${uses - build - wrapped} time(s) without withLoopback (scripts/web-listen.mjs)`,
-      );
-    }
-    if (
-      wrapped > 0 &&
-      !/import \{[^}]*\bwithLoopback\b[^}]*\} from '[^']*web-listen\.mjs'/.test(text)
-    ) {
-      problems.push(`${file}: does not take withLoopback from scripts/web-listen.mjs`);
-    }
+    const read = readStarter(file, fs.readFileSync(path.join(root, file), 'utf8'));
+    if (read.starts) starters.push(file);
+    problems.push(...read.problems);
   }
   assert.deepEqual(problems, []);
   // The scan finds the starters there are today, so it cannot pass by finding none.
@@ -128,12 +215,34 @@ test('every place that starts the web app passes its arguments through withLoopb
   }
 });
 
+/**
+ * An npm script that starts Next.js itself: `next dev`, `next start`, `next` with no command
+ * or only options (which is `next dev`), through npx or not, or Next.js's own starter run
+ * with node. `next build` builds and starts nothing.
+ */
+const npmStart =
+  /(?:^|[\s;&|(/])next(?:\.cmd)?(?:\s+(?:dev|start)\b|\s*$|\s*[;&|)]|\s+-)|next\/dist\/bin\/next/;
+
 test('no npm script starts Next.js itself, around scripts/web.mjs', () => {
+  for (const command of [
+    'next dev',
+    'next start --port 3000',
+    'npx next dev',
+    'next',
+    'next --port 3000',
+    'cd apps/web && next',
+    'node node_modules/next/dist/bin/next start',
+  ]) {
+    assert.match(command, npmStart, command);
+  }
+  for (const command of ['next build', 'node scripts/web.mjs dev', 'eslint --fix next.config.ts']) {
+    assert.doesNotMatch(command, npmStart, command);
+  }
   const packages = repositoryFiles().filter((file) => path.basename(file) === 'package.json');
   for (const file of packages) {
     const { scripts = {} } = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
     for (const [name, command] of Object.entries(scripts)) {
-      assert.doesNotMatch(command, /\bnext\s+(?:dev|start)\b/, `${file} "${name}"`);
+      assert.doesNotMatch(command, npmStart, `${file} "${name}"`);
     }
   }
 });
