@@ -4,6 +4,7 @@
 // (stand-in-world.ts): the same core queries run here as on the database, over the
 // standings rows and player totals core itself worked out from the season's results, so
 // a score typed in the games area or a tracked game that ends moves them.
+import { readStandings } from '@srleagues/core';
 import type { NamePolicyOf } from './name-policy-of.ts';
 import type { PublicStatsPorts, PublicStatsSettings } from './public-stats.ts';
 import { worldPublicSeasons } from './stand-in-world-reads.ts';
@@ -29,5 +30,10 @@ export function standInPublicStats(
       };
     },
     readStoreOf: (leagueId) => worldStandingsRead(() => world.read(leagueId)),
+    standingsOf: (leagueId, seasonId) =>
+      readStandings(
+        worldStandingsRead(() => world.read(leagueId)),
+        { seasonId },
+      ),
   };
 }

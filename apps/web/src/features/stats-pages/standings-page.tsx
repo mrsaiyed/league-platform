@@ -1,4 +1,4 @@
-import { leagueUrl, readStandings } from '@srleagues/core';
+import { leagueUrl } from '@srleagues/core';
 import { EmptyPanel, PageHead, StandingsTable } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
@@ -68,7 +68,7 @@ export async function StandingsPage({
   const result =
     season === undefined
       ? undefined
-      : await readStandings(publicStats.readStoreOf(addressee.id), { seasonId: season.id });
+      : await publicStats.standingsOf(addressee.id, season.id);
   if (result !== undefined && !result.ok) return notFound();
   return (
     <main>

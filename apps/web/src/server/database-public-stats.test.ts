@@ -25,6 +25,22 @@ const seasonOf = async (slug: string) => {
   return season;
 };
 
+/** The ports, keeping the transaction (scope) each standings read was made in. */
+const countingScopes = () => {
+  const scopes: database.LeagueScope[] = [];
+  const counted = databasePublicStats(
+    {
+      ...database,
+      standingsReadStore: (scope) => {
+        scopes.push(scope);
+        return database.standingsReadStore(scope);
+      },
+    },
+    db,
+  );
+  return { scopes, counted };
+};
+
 beforeAll(async () => {
   made = await database.madeUpDatabase({ underWay: true });
   db = database.createDatabase(made.source);
@@ -73,12 +89,47 @@ describe('databasePublicStats', () => {
     expect(records.ok).toBe(true);
   });
 
+  it('reads the standings as one snapshot: one transaction, set to the league', async () => {
+    const season = await seasonOf('lakeside');
+    const { scopes, counted } = countingScopes();
+    const standings = await counted.standingsOf(league('lakeside'), season.id);
+    expect(standings.ok).toBe(true);
+    // Every read ran in the one transaction, and it is set to the page's league.
+    expect(scopes.length).toBe(5);
+    expect(new Set(scopes).size).toBe(1);
+    expect(scopes[0]?.leagueId).toBe(league('lakeside'));
+    // Read one by one through the store, the same reads take five transactions.
+    const split = countingScopes();
+    const oneByOne = await readStandings(split.counted.readStoreOf(league('lakeside')), {
+      seasonId: season.id,
+    });
+    expect(new Set(split.scopes).size).toBe(5);
+    expect(standings).toEqual(oneByOne);
+  });
+
+  it('finds no season for an id that is not a UUID, asking no database', async () => {
+    const { scopes, counted } = countingScopes();
+    expect(await counted.standingsOf(league('lakeside'), 'not-an-id')).toEqual({
+      ok: false,
+      error: { code: 'season-not-found' },
+    });
+    const store = counted.readStoreOf(league('lakeside'));
+    expect(await store.findSeason('not-an-id')).toBeUndefined();
+    expect(await store.teams('not-an-id')).toEqual([]);
+    expect(await readStandings(store, { seasonId: 'winter-seed' })).toEqual({
+      ok: false,
+      error: { code: 'season-not-found' },
+    });
+    expect(scopes).toEqual([]);
+  });
+
   it("finds no season of one league in another's", async () => {
     const season = await seasonOf('lakeside');
     const elsewhere = await readStandings(ports.readStoreOf(league('maple-street')), {
       seasonId: season.id,
     });
     expect(elsewhere).toEqual({ ok: false, error: { code: 'season-not-found' } });
+    expect(await ports.standingsOf(league('maple-street'), season.id)).toEqual(elsewhere);
   });
 
   it('refuses the statistics reads and the name settings until they move (part 3)', async () => {

@@ -9,6 +9,7 @@
 import { dayIn } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle, LeagueScope } from '@srleagues/database';
+import { isDatabaseId as isId } from './database-id.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
 
 /** What these ports use of packages/database. */
@@ -16,10 +17,6 @@ export type PublicScheduleQueries = Pick<
   typeof DatabaseModule,
   'withTransaction' | 'findLeagueTimeZone' | 'listPublicSchedule' | 'findPublicGameFacts'
 >;
-
-/** A UUID, as the database stores ids: anything else is no row, asked of no database. */
-const idPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isId = (value: string) => idPattern.test(value);
 
 export function databasePublicSchedule(
   database: PublicScheduleQueries,
