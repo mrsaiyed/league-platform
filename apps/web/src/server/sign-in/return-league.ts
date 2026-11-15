@@ -6,9 +6,10 @@
 // found" (U-9). Never used to decide access: it only names a league already allowed.
 import { getConfig } from '../config.ts';
 import { webPorts } from '../container.ts';
-import { resolveLeagueRequest } from '../league-gate.ts';
-import { leagueSites, siteOfLeague } from '../league-site.ts';
-import { requestFacts } from '../request-facts.ts';
+import type { RequestFacts } from '../context.ts';
+import { resolveLeagueRequest, type GateDeps } from '../league-gate.ts';
+import { leagueSites, siteOfLeague, type LeagueSiteSource } from '../league-site.ts';
+import { thisRequestFacts } from '../this-request.ts';
 
 export type ReturnLeague = {
   /** The league's own name, as its pages show it. */
@@ -17,15 +18,29 @@ export type ReturnLeague = {
   readonly href: string;
 };
 
-/** The league of `next` (a path already checked by safeReturnPath), if this person may see it. */
+/**
+ * The league of `next` (a path already checked by safeReturnPath) for the person of
+ * `facts`, if they may see it: the gate's own answer for that address, by that person.
+ */
+export async function returnLeagueFor(
+  next: string | null,
+  facts: RequestFacts,
+  deps: GateDeps,
+  sites: LeagueSiteSource,
+): Promise<ReturnLeague | null> {
+  if (next === null) return null;
+  const resolved = await resolveLeagueRequest({ ...facts, path: next }, deps);
+  if (resolved.kind !== 'league') return null;
+  return { name: siteOfLeague(resolved.context.league, sites).name, href: next };
+}
+
+/** The league of `next` for the person of this request. */
 export async function returnLeagueOf(next: string | null): Promise<ReturnLeague | null> {
   if (next === null) return null;
-  const ports = await webPorts();
-  const facts = await requestFacts(ports);
-  const resolved = await resolveLeagueRequest(
-    { ...facts, path: next },
-    { ...ports, siteOrigin: getConfig().PUBLIC_BASE_URL },
+  return returnLeagueFor(
+    next,
+    await thisRequestFacts(),
+    { ...(await webPorts()), siteOrigin: getConfig().PUBLIC_BASE_URL },
+    leagueSites(),
   );
-  if (resolved.kind !== 'league') return null;
-  return { name: siteOfLeague(resolved.context.league, leagueSites()).name, href: next };
 }

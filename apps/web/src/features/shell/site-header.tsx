@@ -4,8 +4,8 @@ import { Emblem, FilterToolbar, SeasonPicker } from '@srleagues/ui';
 import { t } from '../../server/messages.ts';
 import { signOutAction } from '../../server/sign-in/actions.ts';
 import { leagueHomeStayUrl } from '../team-pages/index.ts';
-import { SignOutForm } from '../tracker/index.ts';
-import type { AccountMenu } from './account-menu.ts';
+import { SignOutForm, SignOutLink } from '../tracker/index.ts';
+import { waitingQuestionWords, type AccountMenu } from './account-menu.ts';
 import { menuPages, type MenuPage } from './current-menu-page.ts';
 import type { HeaderSeason } from './header-season.ts';
 
@@ -46,7 +46,10 @@ function MenuLinks({
  * then the admin, their games, their account, and signing out. Drawn twice, as the menu
  * and sign-in are: in the phone menu's panel and in the account button of the first row;
  * only one of the two is shown at any width. Signing out also clears the games the tracker
- * kept on this device (T-115), so a shared tablet can be signed out from any page.
+ * kept on this device (T-115), so a shared tablet can be signed out from any page. On the
+ * scoring page it leaves the open game first, as the tracker's own way out does: it asks
+ * when plays are waiting to be sent, releases the scoring session, and with scripts off is
+ * a link to the account page (tracker-sign-out.ts).
  */
 function AccountEntries({ account }: { readonly account: AccountMenu }) {
   return (
@@ -67,11 +70,22 @@ function AccountEntries({ account }: { readonly account: AccountMenu }) {
           <a href={account.accountHref}>{t('account.menu.account')}</a>
         </li>
       </ul>
-      <SignOutForm action={signOutAction}>
-        <button className="site-account-sign-out" type="submit">
+      {account.onScoringPage ? (
+        <SignOutLink
+          action={signOutAction}
+          waitingQuestion={waitingQuestionWords()}
+          href={account.accountHref}
+          className="site-account-sign-out"
+        >
           {t('account.signOut')}
-        </button>
-      </SignOutForm>
+        </SignOutLink>
+      ) : (
+        <SignOutForm action={signOutAction} waitingQuestion={waitingQuestionWords()}>
+          <button className="site-account-sign-out" type="submit">
+            {t('account.signOut')}
+          </button>
+        </SignOutForm>
+      )}
     </>
   );
 }

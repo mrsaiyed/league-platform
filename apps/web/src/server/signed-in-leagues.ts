@@ -1,14 +1,19 @@
 // Who is signed in on one of our own pages (`/`, `/account`), and the leagues they
-// belong to (record 066), for those pages only. The account is the session's, read
-// from its cookie by the sign-in service (T-6), never one from the request; the list is
-// core's myLeagues, which drops every league the person may not see (U-9) before its
-// name comes back. A league's name is the one its own pages show (league-site.ts).
+// belong to (record 066), for those pages only. The account is the session's, read once
+// per request from its cookie by the sign-in service (this-request.ts), never one from
+// the request; the list is core's myLeagues, which drops every league the person may not
+// see (U-9) before its name comes back. A league's name is the one its own pages show
+// (league-site.ts).
+//
+// This is the one caller of the leaguesOfAccount port, and it passes only the session's
+// account: no function here takes an account id (signed-in-leagues.test.ts checks that
+// nothing else calls the port).
 import { myLeagues, type MyLeague } from '@srleagues/core';
-import { cookies } from 'next/headers';
+import type { AccountProblem, RequestFacts } from './context.ts';
+import { leagueSites, type LeagueSiteSource } from './league-site.ts';
+import type { WebPorts } from './ports.ts';
+import { thisRequestFacts } from './this-request.ts';
 import { webPorts } from './container.ts';
-import type { AccountProblem } from './context.ts';
-import { leagueSites } from './league-site.ts';
-import { cookieNames } from './sign-in/cookies.ts';
 
 export type SignedInPerson =
   | { readonly kind: 'visitor' }
@@ -21,29 +26,45 @@ export type SignedInPerson =
       readonly email: string;
     };
 
-/** The person this request's session cookie is, read per request (it reads the cookies). */
-export async function signedInPerson(): Promise<SignedInPerson> {
-  const accessToken = (await cookies()).get(cookieNames.session)?.value ?? '';
-  if (accessToken === '') return { kind: 'visitor' };
-  const who = await (await webPorts()).identify(accessToken);
-  if (who.ok) {
+/** Who the session in `facts` is: a visitor too when it has ended or ran out. */
+export function personOf(facts: RequestFacts): SignedInPerson {
+  const session = facts.session;
+  if (session === null) return { kind: 'visitor' };
+  if (session.ok) {
     return {
       kind: 'signed-in',
-      accountId: who.value.accountId.toLowerCase(),
-      email: who.value.email,
+      accountId: session.value.accountId.toLowerCase(),
+      email: session.value.email,
     };
   }
-  return who.error.code === 'account-problem'
-    ? { kind: 'account-problem', problem: who.error.problem }
+  return session.error.code === 'account-problem'
+    ? { kind: 'account-problem', problem: session.error.problem }
     : { kind: 'visitor' };
 }
 
-/** The leagues `accountId` (the session's) belongs to and may see, by the names their pages show. */
-export async function leaguesOf(accountId: string): Promise<readonly MyLeague[]> {
-  const ports = await webPorts();
-  const sites = leagueSites();
+/** The person this request's session cookie is, read once per request. */
+export async function signedInPerson(): Promise<SignedInPerson> {
+  return personOf(await thisRequestFacts());
+}
+
+/**
+ * The leagues `person` belongs to and may see, by the names their pages show; none for
+ * anyone not signed in. `person` is what signedInPerson read from this request's session.
+ */
+export async function leaguesOfPerson(
+  person: SignedInPerson,
+  ports: Pick<WebPorts, 'leaguesOfAccount'>,
+  sites: LeagueSiteSource,
+): Promise<readonly MyLeague[]> {
+  if (person.kind !== 'signed-in') return [];
+  const { accountId } = person;
   const found = await myLeagues(accountId, () => ports.leaguesOfAccount(accountId));
   return found
     .map((league) => ({ ...league, name: sites(league.leagueId)?.name ?? league.name }))
     .sort((a, b) => a.name.localeCompare(b.name, 'en') || a.leagueId.localeCompare(b.leagueId));
+}
+
+/** The leagues of the person signed in on this request (the front and account pages). */
+export async function leaguesOfThisRequest(): Promise<readonly MyLeague[]> {
+  return leaguesOfPerson(await signedInPerson(), await webPorts(), leagueSites());
 }

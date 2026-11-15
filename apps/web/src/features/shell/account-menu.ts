@@ -6,10 +6,12 @@
 // drawn per request (they read the session cookie), and an answer that carries the
 // signed-in form is never kept by a shared cache (T5 §4, T-95; the browser test checks
 // both). When pages are kept for visitors, this moves to a small read after the page.
-import { leagueUrl, platformUrl } from '@srleagues/core';
+import { leagueUrl, platformUrl, type LeagueAddressee } from '@srleagues/core';
 import type { LeagueView } from '../../server/league-gate.ts';
 import { signInFirstUrl } from '../../server/sign-in-first.ts';
-import { scoresOnly } from '../tracker/index.ts';
+import { catalogs, en } from '@srleagues/site';
+import { locale } from '../../server/messages.ts';
+import { scoresOnly, waitingQuestionOf, type WaitingQuestion } from '../tracker/index.ts';
 
 /** The account button of a signed-in person. */
 export type AccountMenu = {
@@ -22,10 +24,19 @@ export type AccountMenu = {
   /** Their games to score, for someone who may score here. */
   readonly gamesHref: string | null;
   readonly accountHref: string;
+  /**
+   * On the scoring page: "Sign out" leaves the open game first, as the tracker's own way
+   * out does, and with scripts off is a link to the account page (tracker-sign-out.ts).
+   */
+  readonly onScoringPage: boolean;
 };
 
 /** The account button for the person `view` is for, or null for a visitor. */
-export function accountMenuOf(view: LeagueView, email: string | null): AccountMenu | null {
+export function accountMenuOf(
+  view: LeagueView,
+  email: string | null,
+  path: string,
+): AccountMenu | null {
   if (view.context.account === null || email === null) return null;
   const league = view.context.league;
   const onlyScores = scoresOnly(view.areas);
@@ -41,7 +52,23 @@ export function accountMenuOf(view: LeagueView, email: string | null): AccountMe
         ? leagueUrl(league, 'admin')
         : leagueUrl(league, 'admin-area', { area: 'games' }),
     accountHref: platformUrl('account'),
+    onScoringPage: isScoringPage(league, path),
   };
+}
+
+const plain = (address: string): string => (address.split(/[?#]/)[0] ?? '').toLowerCase();
+
+/** Whether `path` (the address as it arrived) is a game's scoring page in `league`. */
+export function isScoringPage(league: LeagueAddressee, path: string): boolean {
+  const sample = leagueUrl(league, 'score', { game: 'game' });
+  const base = plain(sample.slice(0, sample.length - 'game'.length));
+  const at = plain(path);
+  return at.startsWith(base) && at.length > base.length;
+}
+
+/** The question asked before signing out with plays waiting, in the page's words. */
+export function waitingQuestionWords(): WaitingQuestion {
+  return waitingQuestionOf(locale, catalogs[locale] ?? en);
 }
 
 /** Where "Sign in or create an account" leads from the page at `path`: back to it after. */

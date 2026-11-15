@@ -2,7 +2,13 @@
 // admin's navigation, the notice on a league that is not public, and the league's
 // design, header (with its season picker) and footer; the frame of a page that belongs to no
 // league, and the two "not found" screens (step 2.85).
-export { accountMenuOf, signInHrefFrom, type AccountMenu } from './account-menu.ts';
+export {
+  accountMenuOf,
+  isScoringPage,
+  signInHrefFrom,
+  waitingQuestionWords,
+  type AccountMenu,
+} from './account-menu.ts';
 export { AdminArea } from './admin-area.tsx';
 export { AdminNav } from './admin-nav.tsx';
 export { currentMenuPage, type MenuPage } from './current-menu-page.ts';

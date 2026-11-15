@@ -7,7 +7,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { AdminArea } from '@srleagues/core';
 import type { LeagueView } from '../../server/league-gate.ts';
-import { accountMenuOf, signInHrefFrom } from './account-menu.ts';
+import { waitingQuestionText } from '../tracker/index.ts';
+import {
+  accountMenuOf,
+  isScoringPage,
+  signInHrefFrom,
+  waitingQuestionWords,
+} from './account-menu.ts';
 import { SiteHeader } from './site-header.tsx';
 
 const league = { id: '01900000-0000-7000-8000-000000000001', slug: 'north-valley', status: 'live' };
@@ -32,30 +38,37 @@ const everyArea: readonly AdminArea[] = ['people', 'teams', 'schedule', 'games',
 
 describe('accountMenuOf', () => {
   it('gives a visitor no account button', () => {
-    expect(accountMenuOf(viewOf([], false, null), null)).toBeNull();
-    expect(accountMenuOf(viewOf([], false, null), 'someone@example.test')).toBeNull();
+    expect(accountMenuOf(viewOf([], false, null), null, '/north-valley')).toBeNull();
+    expect(
+      accountMenuOf(viewOf([], false, null), 'someone@example.test', '/north-valley'),
+    ).toBeNull();
   });
 
   it('gives the owner the admin and the games area', () => {
-    expect(accountMenuOf(viewOf(everyArea, true), 'olive@example.test')).toEqual({
+    expect(accountMenuOf(viewOf(everyArea, true), 'olive@example.test', '/north-valley')).toEqual({
       initial: 'O',
       email: 'olive@example.test',
       adminHref: '/north-valley/admin',
       gamesHref: '/north-valley/admin/games',
       accountHref: '/account',
+      onScoringPage: false,
     });
   });
 
   it('gives a scorekeeper their games, which are their admin home, and no second "Admin"', () => {
-    const menu = accountMenuOf(viewOf(['games'], true), 'sam@example.test');
+    const menu = accountMenuOf(viewOf(['games'], true), 'sam@example.test', '/north-valley');
     expect(menu?.adminHref).toBeNull();
     expect(menu?.gamesHref).toBe('/north-valley/admin');
   });
 
   it('gives a scheduler the admin and no games, a coach or a player neither', () => {
-    const scheduler = accountMenuOf(viewOf(['schedule'], false), 'sky@example.test');
+    const scheduler = accountMenuOf(
+      viewOf(['schedule'], false),
+      'sky@example.test',
+      '/north-valley',
+    );
     expect([scheduler?.adminHref, scheduler?.gamesHref]).toEqual(['/north-valley/admin', null]);
-    const coach = accountMenuOf(viewOf([], false), 'cat@example.test');
+    const coach = accountMenuOf(viewOf([], false), 'cat@example.test', '/north-valley');
     expect([coach?.adminHref, coach?.gamesHref]).toEqual([null, null]);
     expect(coach?.accountHref).toBe('/account');
   });
@@ -67,10 +80,61 @@ describe('accountMenuOf', () => {
     expect(signInHrefFrom('//elsewhere.example/x')).toBe('/signin');
     expect(signInHrefFrom('https://elsewhere.example/x')).toBe('/signin');
   });
+
+  it("knows a game's scoring page, and no other page, by its address", () => {
+    const game = '/north-valley/score/01900000-0000-7000-8000-006a00000002';
+    expect(isScoringPage(league, game)).toBe(true);
+    expect(isScoringPage(league, `${game}?x=1`)).toBe(true);
+    expect(isScoringPage(league, game.toUpperCase())).toBe(true);
+    for (const other of [
+      '/north-valley',
+      '/north-valley/score',
+      '/north-valley/score/',
+      '/north-valley/admin',
+      '/harbor-city/score/x',
+    ]) {
+      expect(isScoringPage(league, other), other).toBe(false);
+    }
+    expect(accountMenuOf(viewOf(['games'], true), 'sam@example.test', game)?.onScoringPage).toBe(
+      true,
+    );
+  });
+});
+
+describe('signing out on the scoring page', () => {
+  const scorer = accountMenuOf(
+    viewOf(['games'], true),
+    'sam@example.test',
+    '/north-valley/score/01900000-0000-7000-8000-006a00000002',
+  );
+  it('is a link to the account page, as the tracker’s own way out is, with scripts off', () => {
+    const html = renderToStaticMarkup(
+      createElement(SiteHeader, {
+        league,
+        name: 'North Valley League',
+        account: scorer,
+        signInHref: '/signin',
+      }),
+    );
+    expect(html).toContain(
+      `<a class="site-account-sign-out" href="/account">${en['account.signOut']}</a>`,
+    );
+    expect(html).not.toContain(`>${en['account.signOut']}</button>`);
+  });
+
+  it('asks in the message file’s words, with the number of plays', () => {
+    const words = waitingQuestionWords();
+    expect(waitingQuestionText(words, 3)).toBe(
+      '3 plays are not sent yet. They stay on this device and are sent when you sign in again. Sign out?',
+    );
+    expect(waitingQuestionText(words, 1)).toBe(
+      '1 play is not sent yet. It stays on this device and is sent when you sign in again. Sign out?',
+    );
+  });
 });
 
 describe('the account button in the header', () => {
-  const owner = accountMenuOf(viewOf(everyArea, true), 'olive@example.test');
+  const owner = accountMenuOf(viewOf(everyArea, true), 'olive@example.test', '/north-valley');
   const signInHref = '/signin?next=%2Fnorth-valley';
   const header = (account: typeof owner) =>
     renderToStaticMarkup(

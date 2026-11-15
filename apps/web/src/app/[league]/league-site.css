@@ -314,6 +314,7 @@ html {
   font: inherit;
   font-size: var(--text-14);
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
 }
 .site-header .site-account-sign-out:hover {

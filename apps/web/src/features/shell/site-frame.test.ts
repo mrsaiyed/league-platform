@@ -22,6 +22,7 @@ const madeUpAccount: AccountMenu = {
   adminHref: '/north-valley/admin',
   gamesHref: '/north-valley/admin/games',
   accountHref: '/account',
+  onScoringPage: false,
 };
 
 describe('league design', () => {

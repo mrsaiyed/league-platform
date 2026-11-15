@@ -52,7 +52,7 @@ export default async function LeagueLayout({
       <SiteHeader
         league={league}
         name={site.name}
-        account={accountMenuOf(view, await signedInEmail())}
+        account={accountMenuOf(view, await signedInEmail(), path)}
         signInHref={signInHrefFrom(path)}
         current={current}
         season={season}

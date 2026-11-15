@@ -40,7 +40,7 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * The leagues the signed-in account belongs to (record 066): the product's one read across
    * leagues for an ordinary person, by the account the server's session gives, never one
    * from the request. Rows before the rule of what the person may see: only core's
-   * myLeagues may turn them into a list (my-leagues-list.ts).
+   * myLeagues may turn them into a list, in its one caller (signed-in-leagues.ts).
    */
   readonly leaguesOfAccount: (accountId: string) => Promise<readonly AccountLeagueRow[]>;
   /** What the public standings and statistics pages read (step 2.43). */

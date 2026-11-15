@@ -17,6 +17,7 @@
 // address the proxy wrote down, the proxy did not run for this request, and the
 // answer is "not found" (league-gate.ts, addressMatchesRoute).
 import { platformUrl, type AdminArea } from '@srleagues/core';
+import { headers } from 'next/headers';
 import { forbidden, notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { getConfig } from './config.ts';
@@ -32,7 +33,8 @@ import {
   type LeagueWant,
   type ResolvedLeagueRequest,
 } from './league-gate.ts';
-import { requestFacts } from './request-facts.ts';
+import { pathHeader } from './request-facts-header.ts';
+import { thisRequestFacts } from './this-request.ts';
 
 /** This request, worked out once however many layouts and pages ask (React cache). */
 const resolvedRequest = cache(
@@ -42,7 +44,7 @@ const resolvedRequest = cache(
     readonly email: string | null;
   }> => {
     const ports = await webPorts();
-    const facts = await requestFacts(ports);
+    const facts = await thisRequestFacts();
     const resolved = await resolveLeagueRequest(facts, {
       ...ports,
       siteOrigin: getConfig().PUBLIC_BASE_URL,
@@ -120,12 +122,20 @@ export async function leagueViewOfAddress(): Promise<LeagueView | null> {
  * request only: the pages it appears on are drawn per request (record 066).
  */
 export async function signedInEmail(): Promise<string | null> {
-  return (await resolvedRequest()).email;
+  // The refusal screen asks on every page (Next.js draws it into each one): a session
+  // that cannot be read just now is drawn as a visitor's, never as someone else, and
+  // never breaks a page that does not touch a league.
+  try {
+    return (await resolvedRequest()).email;
+  } catch {
+    return null;
+  }
 }
 
 /** The address of this request as it arrived, for a way back to it after signing in. */
 export async function requestPath(): Promise<string> {
-  return (await resolvedRequest()).path;
+  // Read from the proxy's header alone, so it never waits on (or fails with) the session.
+  return (await headers()).get(pathHeader) ?? '';
 }
 
 /** For a layout: the view when the page may be shown, else null (the page refuses). */

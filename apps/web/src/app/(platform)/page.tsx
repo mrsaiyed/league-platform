@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { MyLeaguesList, StandalonePage } from '../../features/shell/index.ts';
 import { t } from '../../server/messages.ts';
 import { screenUrl } from '../../server/sign-in/problems.ts';
-import { leaguesOf, signedInPerson } from '../../server/signed-in-leagues.ts';
+import { leaguesOfThisRequest, signedInPerson } from '../../server/signed-in-leagues.ts';
 
 // Our front page (P2 line 67), as far as step 2.127 builds it: a signed-in person sees
 // the leagues they belong to first, each a link, with their role in each (record 066); a
@@ -30,7 +30,7 @@ export default async function Page() {
       </StandalonePage>
     );
   }
-  const leagues = await leaguesOf(person.accountId);
+  const leagues = await leaguesOfThisRequest();
   return (
     <StandalonePage>
       <main className="ui-message front">

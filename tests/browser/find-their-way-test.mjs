@@ -51,6 +51,79 @@ const people = {
 };
 const phone = { width: 390, height: 844 };
 const laptop = { width: 1280, height: 800 };
+const liveGame = '01900000-0000-7000-8000-006a00000002'; // Hawks v Bears, live, the scorekeeper's
+const gameOpen = (page) =>
+  page
+    .getByText('This device is scoring the game.')
+    .or(page.getByRole('heading', { level: 2, name: 'Check the game format' }));
+/** What the device keeps in its browser database: the opened games and the queue's rows. */
+const keptOnDevice = (page) =>
+  page.evaluate(async () => {
+    const all = (name, store) =>
+      new Promise((resolve) => {
+        const request = indexedDB.open(name);
+        request.onerror = () => resolve([]);
+        request.onsuccess = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains(store)) {
+            db.close();
+            resolve([]);
+            return;
+          }
+          const read = db.transaction(store).objectStore(store).getAll();
+          read.onsuccess = () => {
+            db.close();
+            resolve(read.result);
+          };
+          read.onerror = () => resolve([]);
+        };
+      });
+    return {
+      games: (await all('srleagues-tracker-games', 'games')).map((g) => g.gameId),
+      queue: (await all('srleagues-tracker-queue', 'commands')).map((c) => [c.gameId, c.state]),
+    };
+  });
+/**
+ * Puts one play the server has not answered for into the device's queue for `game`, as
+ * the queue stores it (indexeddb-queue-storage.ts): the scoring screens that make plays
+ * are steps 2.35 to 2.37, so this is how a play is waiting today.
+ */
+const seedWaitingPlay = (page, game) =>
+  page.evaluate(
+    (gameId) =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open('srleagues-tracker-queue', 1);
+        request.onupgradeneeded = () => {
+          const commands = request.result.createObjectStore('commands', {
+            keyPath: 'position',
+            autoIncrement: true,
+          });
+          commands.createIndex('by-game', 'gameId');
+          commands.createIndex('by-command', 'command.commandId', { unique: true });
+        };
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction('commands', 'readwrite');
+          tx.objectStore('commands').add({
+            gameId,
+            protocolVersion: 2,
+            command: {
+              commandId: crypto.randomUUID(),
+              at: 1,
+              input: { type: 'remove-player', side: 'home', playerId: crypto.randomUUID() },
+            },
+            state: 'waiting',
+          });
+          tx.oncomplete = () => {
+            db.close();
+            resolve(undefined);
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+    game,
+  );
 
 let built = true;
 if (!process.argv.includes('--no-build')) {
@@ -276,7 +349,9 @@ if (browser) {
       const visitorText = await page.locator('main').innerText();
       note(
         'a visitor sees no league at all, none in draft',
-        !/quiet-pines|North Valley|Harbor City|still-waters/.test(visitorText),
+        !/Quiet Pines|quiet-pines|North Valley|Harbor City|Still Waters|still-waters/.test(
+          visitorText,
+        ),
         visitorText,
       );
       await accessible(page, 'the front page, a visitor');
@@ -337,7 +412,11 @@ if (browser) {
             (text.match(/On a team/g) ?? []).length === 2,
           text,
         );
-        note('the draft league they play in is not listed', !text.includes('quiet-pines'), text);
+        note(
+          'the draft league they play in is not listed',
+          !/Quiet Pines|quiet-pines/.test(text),
+          text,
+        );
       } finally {
         await context.close();
       }
@@ -356,9 +435,25 @@ if (browser) {
       const cacheControl = signedIn.headers()['cache-control'] ?? '';
       note(
         'the page drawn for a signed-in person is never kept by a shared cache',
-        /private|no-store/.test(cacheControl),
+        /private/.test(cacheControl) && /no-store/.test(cacheControl),
         cacheControl,
       );
+      // Record 066: until the signed-in parts are read after the page, no page is kept by
+      // a shared cache, signed in or not.
+      for (const path of ['/north-valley', '/north-valley/schedule', '/', '/account', '/signin']) {
+        for (const [who, context] of [
+          ['signed in', owner.context],
+          ['a visitor', visitor.context],
+        ]) {
+          const answer = await context.request.get(`${origin}${path}`, { maxRedirects: 0 });
+          const kept = answer.headers()['cache-control'] ?? '';
+          note(
+            `${path} for ${who} answers private, no-store`,
+            /private/.test(kept) && /no-store/.test(kept),
+            `${answer.status()} ${kept}`,
+          );
+        }
+      }
       note(
         'the signed-in page does hold the account button',
         (await signedIn.text()).includes('Signed in as owner@example.test'),
@@ -406,6 +501,91 @@ if (browser) {
         'after switching, the owner is on the page that was refused',
         pathOf(page) === '/north-valley/admin/people',
         page.url(),
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('signing out on the scoring page leaves the game for the next person', async () => {
+    const { context, page } = await fresh();
+    try {
+      await page.goto(`${origin}/north-valley`);
+      await openMenu(page);
+      await link(page, 'Sign in or create an account').click();
+      await signIn(page, people.scorekeeper);
+      await openMenu(page);
+      await link(page, 'My games to score').click();
+      await page.locator(`li[data-game="${liveGame}"] a[href*="/score/"]`).click();
+      await gameOpen(page).waitFor();
+      await openMenu(page);
+      const signOut = page.getByRole('link', { name: 'Sign out', exact: true });
+      note(
+        'on the scoring page "Sign out" is a link to the account page with scripts off',
+        (await signOut.getAttribute('href')) === '/account',
+      );
+      await Promise.all([page.waitForURL((url) => url.pathname === '/signin'), signOut.click()]);
+      const session = (await context.cookies()).find((c) => c.name === 'srl_session');
+      note('signed out from the scoring page', !session?.value);
+      // The next person on the same device opens the same game: it is free, not held.
+      // (The game's address is typed here: "Score this game" on the league's pages is 2.153.)
+      await signIn(page, people.owner);
+      await page.goto(`${origin}/north-valley/score/${liveGame}`);
+      await gameOpen(page).or(page.getByText('is scoring this game on another device')).waitFor();
+      note(
+        'the scoring session was released: the next person is not told it is held elsewhere',
+        (await page.getByText('is scoring this game on another device').count()) === 0,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('with plays waiting, signing out asks first and loses nothing', async () => {
+    const { context, page } = await fresh();
+    try {
+      await page.goto(`${origin}/north-valley`);
+      await openMenu(page);
+      await link(page, 'Sign in or create an account').click();
+      await signIn(page, people.scorekeeper);
+      // A play made while the connection to the server is down stays waiting.
+      await seedWaitingPlay(page, liveGame);
+      await context.route('**/commands', (route) => route.abort());
+      await openMenu(page);
+      await link(page, 'My games to score').click();
+      await page.locator(`li[data-game="${liveGame}"] a[href*="/score/"]`).click();
+      await gameOpen(page).waitFor();
+      const asked = [];
+      let answer = false;
+      page.on('dialog', (dialog) => {
+        asked.push(dialog.message());
+        void (answer ? dialog.accept() : dialog.dismiss());
+      });
+      await openMenu(page);
+      await page.getByRole('link', { name: 'Sign out', exact: true }).click();
+      await page.waitForTimeout(1500);
+      note(
+        'with a play waiting, signing out asks first, with the number of plays',
+        asked[0] ===
+          '1 play is not sent yet. It stays on this device and is sent when you sign in again. Sign out?',
+        String(asked[0]),
+      );
+      note(
+        'answering no keeps the person signed in on the game',
+        pathOf(page) === `/north-valley/score/${liveGame}` &&
+          !!(await context.cookies()).find((c) => c.name === 'srl_session')?.value,
+      );
+      answer = true;
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === '/signin'),
+        page.getByRole('link', { name: 'Sign out', exact: true }).click(),
+      ]);
+      const kept = await keptOnDevice(page);
+      note(
+        'signed out with a play waiting: the play and the game stay on the device',
+        kept.queue.some(([game, state]) => game === liveGame && state === 'waiting') &&
+          kept.games.includes(liveGame),
+        JSON.stringify(kept),
       );
     } finally {
       await context.close();

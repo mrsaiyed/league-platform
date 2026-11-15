@@ -1244,6 +1244,11 @@ export const en = {
   'signIn.backTo': 'Back to {league}',
   'access.noAccess.signedInAs': 'You are signed in as {email}.',
   'access.noAccess.switch': 'Use another account',
+  // Signing out with a game open on the device and plays not yet sent (step 2.127).
+  'account.signOutWaiting_one':
+    '{count} play is not sent yet. It stays on this device and is sent when you sign in again. Sign out?',
+  'account.signOutWaiting_other':
+    '{count} plays are not sent yet. They stay on this device and are sent when you sign in again. Sign out?',
   'account.problem.title': 'We cannot open your account',
   'account.problem.notConfirmed':
     'You are signed in, but your email address has not been confirmed yet, so we cannot open your account. Sign out, then sign in again. If this keeps happening, please contact us.',

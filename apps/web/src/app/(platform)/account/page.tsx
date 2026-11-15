@@ -2,7 +2,11 @@ import { platformUrl } from '@srleagues/core';
 import type { SessionSummary } from '@srleagues/providers';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { MyLeaguesList, StandalonePage } from '../../../features/shell/index.ts';
+import {
+  MyLeaguesList,
+  StandalonePage,
+  waitingQuestionWords,
+} from '../../../features/shell/index.ts';
 import { SignOutForm } from '../../../features/tracker/index.ts';
 import { webPorts } from '../../../server/container.ts';
 import type { AccountProblem } from '../../../server/context.ts';
@@ -10,7 +14,7 @@ import { t, type TextKey } from '../../../server/messages.ts';
 import { signOutAction, signOutEverywhereAction } from '../../../server/sign-in/actions.ts';
 import { cookieNames } from '../../../server/sign-in/cookies.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
-import { leaguesOf } from '../../../server/signed-in-leagues.ts';
+import { leaguesOfThisRequest, signedInPerson } from '../../../server/signed-in-leagues.ts';
 import { timeInWords } from '../../../server/sign-in/sign-in-mail.ts';
 
 // The account page (P6 §5): the devices signed in, by device and time, with "sign
@@ -23,22 +27,19 @@ import { timeInWords } from '../../../server/sign-in/sign-in-mail.ts';
 // link (P2 line 71; record 066), before the devices.
 export default async function Page() {
   // The cookies first: this makes the page drawn per request, never at build time.
+  // The session is identified once for the whole request (this-request.ts).
   const accessToken = (await cookies()).get(cookieNames.session)?.value ?? '';
   const ports = await webPorts();
-  const who = accessToken === '' ? undefined : await ports.identify(accessToken);
-  if (who !== undefined && !who.ok && who.error.code === 'account-problem') {
-    return <AccountProblemPage problem={who.error.problem} />;
-  }
-  if (who === undefined || !who.ok) {
-    redirect(screenUrl('signin', { next: platformUrl('account') }));
-  }
+  const who = await signedInPerson();
+  if (who.kind === 'account-problem') return <AccountProblemPage problem={who.problem} />;
+  if (who.kind === 'visitor') redirect(screenUrl('signin', { next: platformUrl('account') }));
   const listed = await ports.signIn.listSessions({ accessToken });
   const sessions: readonly SessionSummary[] = listed.ok ? listed.value : [];
-  const leagues = await leaguesOf(who.value.accountId.toLowerCase());
+  const leagues = await leaguesOfThisRequest();
   return (
     <StandalonePage>
       <main className="ui-message account">
-        <p className="account-who">{t('account.signedInAs', { email: who.value.email })}</p>
+        <p className="account-who">{t('account.signedInAs', { email: who.email })}</p>
         <h1>{t('page.account')}</h1>
         <h2>{t('account.leagues')}</h2>
         <MyLeaguesList leagues={leagues} />
@@ -55,10 +56,10 @@ export default async function Page() {
             </li>
           ))}
         </ul>
-        <SignOutForm action={signOutAction}>
+        <SignOutForm action={signOutAction} waitingQuestion={waitingQuestionWords()}>
           <button type="submit">{t('account.signOut')}</button>
         </SignOutForm>
-        <SignOutForm action={signOutEverywhereAction}>
+        <SignOutForm action={signOutEverywhereAction} waitingQuestion={waitingQuestionWords()}>
           <p>{t('account.signOutEverywhereHelp')}</p>
           <button type="submit">{t('account.signOutEverywhere')}</button>
         </SignOutForm>

@@ -1,4 +1,3 @@
-import { platformUrl } from '@srleagues/core';
 import { MessagePage } from '@srleagues/ui';
 import { cookies } from 'next/headers';
 import { StandalonePage } from '../features/shell/index.ts';
@@ -11,7 +10,9 @@ import { signInFirstUrl } from '../server/sign-in-first.ts';
  *
  * Someone signed in is told which account they are signed in as, with a way to switch to
  * another: signing in again on this device ends this session first, and brings them back
- * to the page they asked for (step 2.127). The rest of its words are step 2.157's.
+ * to the page they asked for (step 2.127). A visitor's "Sign in" brings them back to it too.
+ * The session is read once per request, shared with the page (this-request.ts); if it
+ * cannot be read the screen is a visitor's. The rest of its words are step 2.157's.
  */
 export default async function Forbidden() {
   // Next.js draws this screen into every page it sends, before it is known whether the
@@ -24,7 +25,7 @@ export default async function Forbidden() {
       <StandalonePage>
         <MessagePage
           title={t('access.noAccess.title')}
-          action={{ href: platformUrl('signin'), label: t('nav.signIn') }}
+          action={{ href: signInFirstUrl(await requestPath()), label: t('nav.signIn') }}
         >
           <p>{t('access.noAccess.body')}</p>
         </MessagePage>
