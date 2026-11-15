@@ -221,17 +221,57 @@ function same(x: Outcome, y: Outcome, known: Known): boolean {
   return 'refused' in x && 'refused' in y && both(message(x.refused), message(y.refused));
 }
 
+/** Every row in the database, league by league and table by table. */
+export function readDatabase({ db, a }: TwoLeagues): Promise<DatabaseRows> {
+  return withUnfencedScope(db, a.leagueId, async (s) => readRows(transactionOf(s)));
+}
+
+/** A failure for each table that differs between two readings: a case committed. */
+export function committedChanges(
+  { a, b }: TwoLeagues,
+  before: DatabaseRows,
+  after: DatabaseRows,
+): IsolationFailure[] {
+  const markers = new Map([a, b].map((league) => [league.leagueId, league.marker]));
+  const failures: IsolationFailure[] = [];
+  for (const group of new Set([...before.keys(), ...after.keys()])) {
+    for (const table of changedTables(before, after, group)) {
+      const whose =
+        group === outside ? 'outside any league' : `league ${markers.get(group) ?? group}`;
+      failures.push({
+        subject: '(harness)',
+        name: 'every run rolled back',
+        run: 'afterwards',
+        problem: `${table} (${whose}) changed for good: a case committed`,
+      });
+    }
+  }
+  return failures;
+}
+
+export type FindIsolationFailuresOptions = {
+  /**
+   * A reading of the database taken before any case ran (readDatabase). With it, the
+   * database is not read again before the cases, and the check that every run rolled
+   * back is left to the caller: read it again after the last case and compare
+   * (committedChanges). A caller that runs its cases in several groups reads twice in
+   * all instead of twice per group.
+   */
+  readonly before?: DatabaseRows;
+};
+
 /**
  * Runs every case against leagues A and B and returns what went wrong; an empty
  * list means no case reached another league. It throws only if the harness itself
  * cannot run.
  */
 export async function findIsolationFailures(
-  { db, a, b, sharedAccountId }: TwoLeagues,
+  leagues: TwoLeagues,
   cases: readonly IsolationCase[],
+  options: FindIsolationFailuresOptions = {},
 ): Promise<IsolationFailure[]> {
-  const read = () => withUnfencedScope(db, a.leagueId, async (s) => readRows(transactionOf(s)));
-  const before = await read();
+  const { db, a, b, sharedAccountId } = leagues;
+  const before = options.before ?? (await readDatabase(leagues));
   const markers = new Map([a, b].map((league) => [league.leagueId, league.marker]));
   const prints = footprints(before, markers);
   const known = knownIn(before);
@@ -344,18 +384,6 @@ export async function findIsolationFailures(
       if (difference !== null) fail(difference);
     }
   }
-  const after = await read();
-  for (const group of new Set([...before.keys(), ...after.keys()])) {
-    for (const table of changedTables(before, after, group)) {
-      const whose =
-        group === outside ? 'outside any league' : `league ${markers.get(group) ?? group}`;
-      failures.push({
-        subject: '(harness)',
-        name: 'every run rolled back',
-        run: 'afterwards',
-        problem: `${table} (${whose}) changed for good: a case committed`,
-      });
-    }
-  }
-  return failures;
+  if (options.before !== undefined) return failures;
+  return [...failures, ...committedChanges(leagues, before, await readDatabase(leagues))];
 }

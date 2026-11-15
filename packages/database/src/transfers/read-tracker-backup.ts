@@ -18,7 +18,22 @@ import { TrackerBackupError } from './tracker-backup.ts';
 export type ReadTrackerBackupOptions = {
   /** Where the working copy is made; the system's temporary folder by default. */
   workDir?: string;
+  /**
+   * Told the working copy's folder when it could not be removed after the read, so a
+   * person can remove it: it holds a copy of the backup. The read's own result or problem
+   * comes out as usual. By default a Node warning names the folder.
+   */
+  onWorkLeftBehind?: (folder: string, error: unknown) => void;
 };
+
+const removeFolder = (folder: string) =>
+  rm(folder, { recursive: true, force: true, maxRetries: 5 });
+
+const warnWorkLeftBehind = (folder: string) =>
+  process.emitWarning(
+    `The working copy of a tracker backup could not be removed. Remove this folder: ${folder}`,
+    { code: 'TRACKER_BACKUP_WORK_LEFT_BEHIND' },
+  );
 
 /**
  * Reads a backup of the current live tracker's database: the folder that
@@ -38,9 +53,21 @@ export type ReadTrackerBackupOptions = {
  * but not for real use: the caller (the import, step 2.58) should pass its own `workDir`,
  * a folder it owns on a disk with room for a copy of the backup.
  */
-export async function readTrackerBackup(
+export function readTrackerBackup(
   folder: string,
   options: ReadTrackerBackupOptions = {},
+): Promise<TrackerBackup> {
+  return readTrackerBackupWith(folder, options, removeFolder);
+}
+
+/**
+ * readTrackerBackup with the way the working copy is removed given, so its tests can
+ * make the removal fail. Not part of the module's index.
+ */
+export async function readTrackerBackupWith(
+  folder: string,
+  options: ReadTrackerBackupOptions,
+  remove: (folder: string) => Promise<void>,
 ): Promise<TrackerBackup> {
   const source = path.resolve(folder);
   if (!existsSync(source)) throw new TrackerBackupError('missing', source);
@@ -67,9 +94,18 @@ export async function readTrackerBackup(
     if (await heldByRunningServer(source)) throw new TrackerBackupError('in-use', source);
     return await readCopy(copy, source);
   } finally {
-    // Windows can refuse for a moment to remove a file that was just closed (while it is
-    // scanned, say): a read that worked must not fail for that, nor leave the copy behind.
-    await rm(work, { recursive: true, force: true, maxRetries: 5 });
+    // Windows can refuse for a moment to remove a file that was just closed, so the
+    // removal tries a few times. If it still fails, the read's own result or problem is
+    // kept, and the folder left behind is reported for a person to remove.
+    try {
+      await remove(work);
+    } catch (error) {
+      try {
+        (options.onWorkLeftBehind ?? warnWorkLeftBehind)(work, error);
+      } catch {
+        // A report that fails must not lose the read's result either.
+      }
+    }
   }
 }
 

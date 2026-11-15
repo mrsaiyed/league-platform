@@ -11,6 +11,11 @@ export type Subject = (...args: never[]) => unknown;
 export type IsolationCase = {
   /** The exported function this case runs. Coverage is checked against it. */
   subject: Subject;
+  /**
+   * What the tests call the subject, when its own name does not say which function it
+   * is (every event handler's function is called `handle`). The function's name if not.
+   */
+  subjectName?: string;
   /** What the case tries, for the failure message. */
   name: string;
   /**

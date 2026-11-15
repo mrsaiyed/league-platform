@@ -1,15 +1,26 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { copyFolder } from './copy-folder.ts';
-import { writeDataFolder } from './data-folder.test-helper.ts';
+import { controlFileState, writeDataFolder } from './data-folder.test-helper.ts';
 import type { TrackerBackup } from './index.ts';
 import { TrackerBackupError, readTrackerBackup } from './index.ts';
+import { readTrackerBackupWith } from './read-tracker-backup.ts';
 
 // The tracker's own schema, as its stats server creates it.
 const schemaFile = fileURLToPath(new URL('../live-stats/001-schema.sql', import.meta.url));
@@ -417,5 +428,53 @@ describe('readTrackerBackup', () => {
 
     // A folder beside the backup whose name only starts the same is fine.
     expect(results.beside.problem).toBe('read');
+  });
+
+  // Windows keeps no such permissions, so there they are not checked.
+  it(`is read from a backup shaped like a real one: closed cleanly, no postmaster.pid${process.platform === 'win32' ? '' : ', private (0700, 0600)'}`, async () => {
+    // `npm run stats:copy` closes its database before the backup is used.
+    expect(existsSync(path.join(backup, 'postmaster.pid'))).toBe(false);
+    expect(await controlFileState(backup)).toBe('shut down');
+    if (process.platform !== 'win32') {
+      expect((await stat(backup)).mode & 0o777).toBe(0o700);
+      expect((await stat(path.join(backup, 'PG_VERSION'))).mode & 0o777).toBe(0o600);
+    }
+  });
+
+  it('keeps the result when the working copy cannot be removed, and names the folder', async () => {
+    const leftIn = path.join(root, 'left-behind');
+    const refuse = () => Promise.reject(new Error('made-up: removing refused'));
+    const left: string[] = [];
+    const onWorkLeftBehind = (folder: string) => left.push(folder);
+
+    const read = await readTrackerBackupWith(backup, { workDir: leftIn, onWorkLeftBehind }, refuse);
+    expect(read.games).toHaveLength(3);
+    // The problem a read ran into comes out as it would have, too.
+    const other = path.join(root, 'other-database');
+    const failed = await readTrackerBackupWith(
+      other,
+      { workDir: leftIn, onWorkLeftBehind },
+      refuse,
+    ).catch((e: unknown) => e);
+    expect((failed as TrackerBackupError).problem).toBe('not-a-tracker-backup');
+
+    expect(left).toHaveLength(2);
+    for (const folder of left) {
+      expect(path.dirname(folder)).toBe(await realpath(leftIn));
+      expect(existsSync(path.join(folder, 'db', 'PG_VERSION'))).toBe(true);
+    }
+
+    // With no one told, a warning names the folder.
+    const warnings: string[] = [];
+    const warn = vi.spyOn(process, 'emitWarning').mockImplementation((warning) => {
+      warnings.push(String(warning));
+    });
+    try {
+      await readTrackerBackupWith(backup, { workDir: leftIn }, refuse);
+    } finally {
+      warn.mockRestore();
+    }
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/could not be removed\. Remove this folder: .*tracker-backup-/);
   });
 });
