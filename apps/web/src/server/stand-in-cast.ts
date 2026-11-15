@@ -80,12 +80,9 @@ export const standInSeedCast: SeedCast = {
   // admin is given the live ones: its scorekeeper is refused those (P7 §5.1).
   draftLeague: standInLeagues.draft,
   draftProgramId: standInDraftProgramId,
-  otherLeagues: [
-    standInLeagues.archived,
-    standInLeagues.suspended,
-    standInLeagues.inBin,
-    standInLeagues.otherDraft,
-  ],
+  // The archived league has a long season behind it: 300 games, all played (step 2.156).
+  historyLeague: standInLeagues.archived,
+  otherLeagues: [standInLeagues.suspended, standInLeagues.inBin, standInLeagues.otherDraft],
   // The made-up coach has a roster place on a team of each league.
   memberAccountId: standInPeople.coach.accountId,
   assignees: [standInPeople.scorekeeper.accountId, standInPeople.owner.accountId],
