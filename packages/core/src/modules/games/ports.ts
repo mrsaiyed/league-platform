@@ -108,6 +108,30 @@ export type GamesWindow = {
   readonly games: readonly GameInWindow[];
 };
 
+/**
+ * One round of earlier games, as the store counts them (step 2.156): the games of a round,
+ * or of a season in no round, that started before the league's today and are decided or
+ * called off (final, forfeit, postponed, cancelled), in no bin.
+ */
+export type EarlierRoundCount = {
+  readonly seasonId: string;
+  /** The program of the season: where scoring its games is checked. */
+  readonly programId: string;
+  /** Null for the season's games in no round. */
+  readonly roundId: string | null;
+  readonly number: number | null;
+  readonly label: string | null;
+  /** The first and last day its earlier games were played, in the league's time zone. */
+  readonly firstDay: string;
+  readonly lastDay: string;
+  readonly games: number;
+  /** How many of them the account asked about is assigned to score. */
+  readonly assigned: number;
+};
+
+/** One round of earlier games: a round, or a season's games in no round. */
+export type EarlierRoundRef = { readonly roundId: string } | { readonly seasonId: string };
+
 export type GamesStore = {
   /** The game with this id, in the bin or not, or undefined if it is not in this league. */
   readonly find: (gameId: string) => Promise<GameRecord | undefined>;
@@ -164,8 +188,29 @@ export type GamesStore = {
   readonly assign: (gameId: string, accountId: string) => Promise<boolean>;
   /** Removes the account's assignment to the game: false if there was none. */
   readonly unassign: (gameId: string, accountId: string) => Promise<boolean>;
-  /** The games of `days` days from the start of the league's today, with the account's assignments. */
+  /**
+   * The games of `days` days from the start of the league's today, with the account's
+   * assignments, and every live game whenever it started (step 2.156: a game under way
+   * since before the league's midnight is still on the list).
+   */
   readonly listWindow: (accountId: string, days: number) => Promise<GamesWindow>;
+  /**
+   * The games that still need a result (needs-result.ts) by the store's clock: live, or
+   * scheduled with their start passed; in no bin, of a season in no bin; oldest first, at
+   * most `limit`.
+   */
+  readonly listNeedingResult: (accountId: string, limit: number) => Promise<GamesWindow>;
+  /** The rounds of earlier games (EarlierRoundCount), the latest played first, at most `limit`. */
+  readonly listEarlierRounds: (
+    accountId: string,
+    limit: number,
+  ) => Promise<readonly EarlierRoundCount[]>;
+  /** One round's earlier games (as EarlierRoundCount counts them), soonest first, at most `limit`. */
+  readonly listEarlierRound: (
+    accountId: string,
+    round: EarlierRoundRef,
+    limit: number,
+  ) => Promise<GamesWindow>;
 };
 
 /** A games command's transaction: its store, the access reader and the activity log (A-6). */

@@ -6,6 +6,8 @@ import {
   cancelGame,
   endTrackedGame,
   getBoxScoreSheet,
+  listEarlierGames,
+  listGamesNeedingResult as listGamesNeedingResultCommand,
   listMyGames,
   listPostponedGames as listPostponedGamesCommand,
   openScoringSession,
@@ -52,7 +54,10 @@ import {
   listDecidedGames,
   listGameLines,
   listGameRoster,
+  listEarlierRound,
+  listEarlierRounds,
   listGamesInWindow,
+  listGamesNeedingResult,
   listPostponedGames,
   replaceGameLines,
   updateGameResult,
@@ -64,6 +69,7 @@ import {
   listRefusedAdds,
 } from '../queries/index.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
+import { leagueDayOf } from '../queries/games-for-lists.ts';
 import {
   CommandRefused,
   harnessTx,
@@ -307,6 +313,73 @@ registerIsolationCase({
   run: async (scope, target) => {
     await bringTargetGameNear(scope, target);
     return listGamesInWindow(scope, target.memberId, 7);
+  },
+});
+
+// Step 2.156: the games that still need a result, and the earlier games by round.
+const startTargetGameAnHourAgo = (scope: LeagueScope, target: LeagueRecords) =>
+  sql`update games set starts_at = now() - interval '1 hour'
+      where league_id = ${scope.leagueId} and id = ${target.upcomingGameId}`.execute(
+    transactionOf(scope),
+  );
+
+/** The target's upcoming game postponed three days ago: one of its earlier games. */
+async function postponeTargetGameDaysAgo(scope: LeagueScope, target: LeagueRecords) {
+  await postponeTargetGame(scope, target);
+  await sql`update games set starts_at = now() - interval '3 days'
+      where league_id = ${scope.leagueId} and id = ${target.upcomingGameId}`.execute(
+    transactionOf(scope),
+  );
+}
+
+registerIsolationCase({
+  subject: leagueDayOf,
+  name: "read the scope's own league's day, with the target's in the database",
+  run: (scope) => leagueDayOf(scope),
+});
+
+registerIsolationCase({
+  subject: listGamesNeedingResult,
+  name: "list the games needing a result after the target's upcoming game's start has passed",
+  run: async (scope, target) => {
+    await startTargetGameAnHourAgo(scope, target);
+    return listGamesNeedingResult(scope, target.memberId, 100);
+  },
+});
+
+registerIsolationCase({
+  subject: listEarlierRounds,
+  name: "count the earlier rounds after the target's upcoming game was postponed days ago",
+  run: async (scope, target) => {
+    await postponeTargetGameDaysAgo(scope, target);
+    return listEarlierRounds(scope, target.memberId, 100);
+  },
+});
+
+registerIsolationCase({
+  subject: listEarlierRound,
+  name: "list the target's round's earlier games after its upcoming game was postponed days ago",
+  run: async (scope, target) => {
+    await postponeTargetGameDaysAgo(scope, target);
+    return listEarlierRound(scope, target.memberId, { roundId: target.roundId }, 100);
+  },
+});
+
+registerIsolationCase({
+  subject: listGamesNeedingResultCommand,
+  name: "list the scope's account's games needing a result after the target's start has passed",
+  run: async (scope, target) => {
+    await startTargetGameAnHourAgo(scope, target);
+    return runAsApp(listGamesNeedingResultCommand, harnessTx, scope, {});
+  },
+});
+
+registerIsolationCase({
+  subject: listEarlierGames,
+  name: "list the scope's earlier games, asking for the target's round",
+  run: async (scope, target) => {
+    await postponeTargetGameDaysAgo(scope, target);
+    return runAsApp(listEarlierGames, harnessTx, scope, { round: `r-${target.roundId}` });
   },
 });
 

@@ -8,6 +8,27 @@ export {
 export { assignScorekeeper, type AssignScorekeeperError } from './commands/assign-scorekeeper.ts';
 export { cancelGame, type CancelGameError } from './commands/cancel-game.ts';
 export { listMyGames, type MyGame, type MyGames } from './commands/list-my-games.ts';
+// Games that still need a result, however old, and earlier games by round (step 2.156).
+export {
+  listGamesNeedingResult,
+  needsResultLimit,
+  type GamesNeedingResult,
+} from './commands/list-games-needing-result.ts';
+export {
+  earlierRoundGamesLimit,
+  earlierRoundsLimit,
+  listEarlierGames,
+  type EarlierGames,
+  type EarlierRound,
+} from './commands/list-earlier-games.ts';
+export { needsResult, oldestFirst, type ResultFacts } from './needs-result.ts';
+export { earlierRoundKey, parseEarlierRoundKey } from './earlier-round-key.ts';
+export {
+  earlierRoundsOf,
+  inEarlierRound,
+  isEarlierGame,
+  type GameWithRound,
+} from './earlier-rounds-of.ts';
 export {
   unassignScorekeeper,
   type UnassignScorekeeperError,
@@ -42,7 +63,7 @@ export type {
 } from './reopen-window.ts';
 export { recordFinalScoreWithin } from './record-score-within.ts';
 export type { DecideGameError } from './decide-game.ts';
-export { recordingOf } from './game-fields.ts';
+export { isOverOrCalledOff, recordingOf } from './game-fields.ts';
 export {
   readGamePage,
   type BoxScore,
@@ -124,6 +145,8 @@ export type {
   TrackerTx,
 } from './ports.ts';
 export type {
+  EarlierRoundCount,
+  EarlierRoundRef,
   GameInWindow,
   GamesWindow,
   GameLine,

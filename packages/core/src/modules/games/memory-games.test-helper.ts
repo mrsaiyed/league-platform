@@ -13,7 +13,15 @@ import type { DomainEvent, EventHandler, JobQueue } from '../../command/index.ts
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { StoredSetting } from '../leagues/index.ts';
 import { isDecided } from './game-fields.ts';
+import {
+  earlierRoundsOf,
+  inEarlierRound,
+  isEarlierGame,
+  type GameWithRound,
+} from './earlier-rounds-of.ts';
+import { needsResult, oldestFirst } from './needs-result.ts';
 import type {
+  GameInWindow,
   GameLine,
   GameRecord,
   GameRosterPlayer,
@@ -39,6 +47,10 @@ export type MemoryGames = {
   settings: Record<string, StoredSetting[]>;
   /** The league's today (YYYY-MM-DD); the stand-in's league keeps UTC. */
   today: string;
+  /** The store's clock now, on the league's today. */
+  now: string;
+  /** The round each game is in, by game id; a game not here is in no round. */
+  rounds: Record<string, { id: string; number: number; label: string | null }>;
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -125,6 +137,21 @@ export const decidedOf = (s: Pick<MemoryGames, 'games'>, season: string) =>
 const isAssigned = (s: Pick<MemoryGames, 'assignments'>, gameId: string, accountId: string) =>
   s.assignments.some((a) => a.gameId === gameId && a.accountId === accountId);
 
+/** The day a game is played (the stand-in's league keeps UTC); today for one with no time. */
+const dayOf = (s: MemoryGames, g: GameRecord) => (g.startsAt ?? s.today).slice(0, 10);
+
+const entryOf = (s: MemoryGames, g: GameRecord, accountId: string): GameInWindow => ({
+  game: g,
+  programId: s.seasons.find((x) => x.id === g.seasonId)?.programId ?? '',
+  day: dayOf(s, g),
+  assigned: isAssigned(s, g.id, accountId),
+});
+
+const withRound = (s: MemoryGames, g: GameRecord, accountId: string): GameWithRound => ({
+  ...entryOf(s, g, accountId),
+  round: s.rounds[g.id] ?? null,
+});
+
 /** The league's stored choice of who may score (P4 §4), as setting_values keeps it. */
 export const scoringRule = (value: 'anyScorekeeper' | 'assignedOnly') => ({
   'games.whoMayScore': [{ level: 'league' as const, document: { version: 1, value } }],
@@ -147,6 +174,8 @@ export const emptyGames = (): MemoryGames => ({
   assignments: [],
   settings: {},
   today: '2026-12-06',
+  now: '2026-12-06T12:00:00.000Z',
+  rounds: {},
 });
 
 export function memoryGames(state: Partial<MemoryGames> = {}) {
@@ -244,23 +273,42 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
         );
         return true;
       },
+      // The window, and every live game whenever it started (step 2.156).
       listWindow: async (accountId, days) => {
         const end = new Date(`${s.today}T00:00:00.000Z`);
         end.setUTCDate(end.getUTCDate() + days);
         const until = end.toISOString().slice(0, 10);
         const games = s.games
-          .filter((g) => !g.binned && g.startsAt !== null)
-          .map((g) => ({ g, day: (g.startsAt ?? '').slice(0, 10) }))
-          .filter(({ day }) => day >= s.today && day < until)
-          .sort((a, b) => (a.g.startsAt ?? '').localeCompare(b.g.startsAt ?? ''))
-          .map(({ g, day }) => ({
-            game: g,
-            programId: s.seasons.find((x) => x.id === g.seasonId)?.programId ?? '',
-            day,
-            assigned: isAssigned(s, g.id, accountId),
-          }));
+          .filter((g) => !g.binned && (g.startsAt !== null || g.status === 'live'))
+          .map((g) => ({ g, day: dayOf(s, g) }))
+          .filter(({ g, day }) => g.status === 'live' || (day >= s.today && day < until))
+          .sort((a, b) => oldestFirst(a.g, b.g))
+          .map(({ g }) => entryOf(s, g, accountId));
         return { today: s.today, games };
       },
+      listNeedingResult: async (accountId, limit) => ({
+        today: s.today,
+        games: s.games
+          .filter((g) => !g.binned && needsResult(g, Date.parse(s.now)))
+          .sort(oldestFirst)
+          .slice(0, limit)
+          .map((g) => entryOf(s, g, accountId)),
+      }),
+      listEarlierRounds: async (accountId, limit) =>
+        earlierRoundsOf(
+          s.games.map((g) => withRound(s, g, accountId)),
+          s.today,
+          limit,
+        ),
+      listEarlierRound: async (accountId, ref, limit) => ({
+        today: s.today,
+        games: s.games
+          .map((g) => withRound(s, g, accountId))
+          .filter((e) => isEarlierGame(e, s.today) && inEarlierRound(e, ref))
+          .sort((a, b) => oldestFirst(a.game, b.game))
+          .slice(0, limit)
+          .map(({ round: _round, ...e }) => e),
+      }),
     },
   };
 }
