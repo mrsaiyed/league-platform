@@ -52,25 +52,43 @@ const finalGame = '01900000-0000-7000-8000-006a00000005'; // Lions at Bears, fin
 const phone = { width: 390, height: 844 };
 const someoneChanged = /Someone changed/;
 
+/** The made-up league's own zone (stand-in-world-seed.ts). */
+const leagueZone = 'America/Chicago';
+
+/** The wall clock at `moment` in the league's zone, as if it were UTC: milliseconds. */
+function wallClock(moment) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: leagueZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+    })
+      .formatToParts(moment)
+      .map((p) => [p.type, Number(p.value)]),
+  );
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+}
+
 /**
- * When the made-up world's clock starts (LOCAL_NOW, step 2.179). The day's final game was
- * played three hours before the world is made, and the games list starts at the league's
- * midnight, so in the first hours of the league's day (America/Chicago) that game was last
- * night's and is not on the list. Then the world starts four hours on, so it always is;
- * at any other hour it keeps this computer's clock. `--now=<UTC time>` starts it there.
+ * When the made-up world's clock starts (LOCAL_NOW, step 2.179): always at noon in the
+ * league's zone on the league's today, so this test never depends on the hour, the day or
+ * a clock change it is run at. The day's final game was played three hours before the
+ * world is made and the games list starts at the league's midnight: at noon it is always
+ * this morning's, on the list, and already played. `--now=<UTC time>` starts it elsewhere.
  */
 const worldNow = (() => {
   const asked = process.argv.find((a) => a.startsWith('--now='))?.slice('--now='.length);
   if (asked !== undefined) return asked;
-  const now = new Date();
-  const hour = Number(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Chicago',
-      hourCycle: 'h23',
-      hour: 'numeric',
-    }).format(now),
-  );
-  return hour < 4 ? new Date(now.getTime() + 4 * 3_600_000).toISOString() : undefined;
+  const today = new Date(wallClock(new Date())).toISOString().slice(0, 10);
+  const wanted = Date.parse(`${today}T12:00:00Z`);
+  // Noon there: moved by the zone's offset, twice so a day of a clock change settles too.
+  let guess = wanted;
+  for (let i = 0; i < 2; i += 1) guess += wanted - wallClock(new Date(guess));
+  return new Date(guess).toISOString();
 })();
 
 let built = true;
@@ -89,7 +107,7 @@ if (built) {
   server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
-    ...(worldNow === undefined ? {} : { LOCAL_NOW: worldNow }),
+    LOCAL_NOW: worldNow,
   });
   await step('starting the server and the browser', async () => {
     await waitFor(`${origin}/`, server);
@@ -427,6 +445,14 @@ if (browser) {
         page.waitForEvent('load'),
         gameOn(page, finalGame).getByRole('button', { name: 'Save final score' }).click(),
       ]);
+      // Played this morning by the world's clock, which is the page's clock too (step
+      // 2.179): the ordinary question, never "This game is set for …".
+      const asked = (await gameOn(page, finalGame).locator('[data-question]').textContent()) ?? '';
+      note(
+        "the played game's question is the ordinary one, by the world's clock",
+        /Lions 40, Bears 38\. Make this final\?/.test(asked) && !/set for/.test(asked),
+        asked,
+      );
       await Promise.all([
         page.waitForEvent('load'),
         gameOn(page, finalGame).getByRole('button', { name: 'Yes, make it final' }).click(),
