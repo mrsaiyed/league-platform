@@ -27,4 +27,5 @@ On the database (`LOCAL_DATA=made-up-database` today, staging and production onc
 ## Revisit if
 
 - Part 3 moves the statistics and the team pages: `settingsOf`, the six reads, `rosterOf` and `teamIdsOfAccount` move, the home page's leaders appear on the database, and a "my team" league's home sends a signed-in member to their team page again.
+- A league gets a second program. `is_current` is per program, and the public pages do not know their program (no address names one), so `chooseSeason` picks among every program's seasons and could open another program's current season. No command makes a second program yet, and no step in the plan brings one (programs beyond the hidden default are left out of the first release, U-12): the step that does must give the pages their program and choose within it.
 - The seed leagues gain venues or rounds: the seeded games could use them.
