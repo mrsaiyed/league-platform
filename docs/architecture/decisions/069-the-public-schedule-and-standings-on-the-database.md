@@ -1,6 +1,6 @@
 # 069 — The web app on the database, part 2: the public schedule and the standings
 
-Date: 2026-11-15. Step 2.93 part 2 (T-273); follows record 055 (part 1). Serves T2 §4, T-30, T-60. Decided by the builder of step 2.93 part 2 for the lead (technical), to be confirmed when the part lands.
+Date: 2026-11-15. Step 2.93 part 2 (T-273); follows record 055 (part 1). Serves T2 §4, T-30, T-60. Decided by the builder of step 2.93 part 2 for the lead, and confirmed by the lead on 2026-11-15.
 
 **Not verified against a real PostgreSQL server or Supabase.** Everything below runs on the made-up database (PGlite) only.
 
