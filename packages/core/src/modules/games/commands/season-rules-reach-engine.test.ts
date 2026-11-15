@@ -23,6 +23,8 @@ import { memoryTracker, type MemoryTracker } from '../memory-tracker.test-helper
 import type { GamePlayer } from '../ports.ts';
 import { leaseMs } from '../scoring-session.ts';
 import { applyTrackerCommands } from './apply-tracker-commands.ts';
+import { markNotStarted } from './mark-not-started.ts';
+import { openScoringSession } from './open-scoring-session.ts';
 import { readTrackerState } from './read-tracker-state.ts';
 
 const gameId = gameUuid(1);
@@ -452,5 +454,79 @@ describe('a game brought over from a tracker without those rules (the transfer; 
     const result = await applyTrackerCommands(t.as(scorekeeperId), replayed(), t.deps);
     expect(result).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
     expect(t.db.state.events).toEqual([]);
+  });
+
+  it('once ended, it cannot be marked not started, which would bring the two rules back', async () => {
+    const t = setUp(mercy, heldBy(schedulerId));
+    t.clock.advance(1);
+    const batch = replayed();
+    const ended = await applyTrackerCommands(
+      t.as(schedulerId),
+      { ...batch, commands: [...batch.commands, ...taps([{ type: 'pause' }, { type: 'end' }])] },
+      t.deps,
+    );
+    expect(ended.ok && ended.value.results.every((r) => r.status === 'accepted')).toBe(true);
+    expect(savedState(t).status).toBe('final');
+    const marked = await markNotStarted(
+      t.as(schedulerId),
+      { gameId, sequence: lastSequence(t) },
+      t.deps,
+    );
+    expect(marked).toMatchObject({ ok: false, error: { code: 'game-final' } });
+    expect(savedState(t).rules.mercyLead).toBeUndefined();
+    expect(t.db.state.games[0]?.format).toMatchObject({ clock: { mercyLead: null } });
+  });
+});
+
+/** The game's last event, or its state's number: what marking it not started names. */
+const lastSequence = (t: ReturnType<typeof setUp>) =>
+  Math.max(
+    0,
+    ...t.db.state.states.filter((s) => s.gameId === gameId).map((s) => s.seq),
+    ...t.db.state.events.filter((e) => e.gameId === gameId).map((e) => e.seq),
+  );
+
+describe('a game marked not started (step 2.121) takes the season’s rules as they stand', () => {
+  it('started under a limit of six, marked not started, started again under four: out at four', async () => {
+    const t = setUp(withLimit(6));
+    await send(t, [...tipOff, { type: 'start' }]);
+    expect(savedState(t).rules.playerFoulLimit).toBe(6);
+    expect(t.db.state.games[0]?.format).toEqual(withLimit(6));
+    const season = t.db.state.seasons[0];
+    if (season === undefined) throw new Error('no season');
+    season.rules = withLimit(4);
+
+    t.clock.advance(1);
+    const marked = await markNotStarted(
+      t.as(scorekeeperId),
+      { gameId, sequence: lastSequence(t) },
+      t.deps,
+    );
+    expect(marked.ok).toBe(true);
+    expect(savedState(t).rules.playerFoulLimit).toBe(4);
+    expect((await deviceState(t)).rules.playerFoulLimit).toBe(4);
+
+    // Its session ended with it: the scorekeeper opens the game again and plays it.
+    const opened = await openScoringSession(
+      t.as(scorekeeperId),
+      { gameId, deviceId: 'tablet' },
+      t.deps,
+    );
+    const again = opened.ok && opened.value.status === 'held-by-you' ? opened.value : undefined;
+    if (again === undefined) throw new Error('not opened again');
+    t.clock.advance(1);
+    const result = await applyTrackerCommands(
+      t.as(scorekeeperId),
+      {
+        gameId,
+        protocolVersion: 2,
+        sessionId: again.sessionId,
+        commands: taps([...tipOff, ...fouls(4)]),
+      },
+      t.deps,
+    );
+    expect(result.ok && result.value.results.every((r) => r.status === 'accepted')).toBe(true);
+    expect(lineOf(savedState(t), fouler)).toMatchObject({ fouls: 4, fouledOut: true });
+    expect(t.db.state.games[0]?.format).toEqual(withLimit(4));
   });
 });
