@@ -134,6 +134,24 @@ test('a test that times out: the wait that ran out is named, and long lists are 
   assert.ok(notes.length <= 9);
 });
 
+test('a check listed with "- " is not named a second time as an error', () => {
+  // The shape GitHub printed for lane 2.127 on 2026-11-15 (step 2.178, try 1).
+  const notes = browserFailureNotes(
+    [
+      ...chain,
+      '+ node tests/browser/made-up-test.mjs --no-build',
+      'Made-up browser test failed:',
+      '- with plays waiting, signing out asks first: locator.waitFor: Timeout 30000ms exceeded.',
+      'The last 1 lines `next start` printed (the test had stopped it):',
+      '  | ✓ Ready in 123ms',
+    ].join('\n'),
+  );
+  assert.deepEqual(titled(notes, 'failed check'), [
+    'with plays waiting, signing out asks first: locator.waitFor: Timeout 30000ms exceeded.',
+  ]);
+  assert.deepEqual(titled(notes, 'printed'), []);
+});
+
 test('with no trace line and no list, it says so and still shows how the output ended', () => {
   const notes = browserFailureNotes('Killed\n');
   assert.equal(

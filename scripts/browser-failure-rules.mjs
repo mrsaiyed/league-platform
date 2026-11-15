@@ -55,16 +55,18 @@ export function browserFailureNotes(output, machine = []) {
 
   // The failing checks: the indented lines under the heading.
   const checks = [];
+  const listed = new Set();
   if (heading) {
-    for (const line of own.slice(own.indexOf(heading) + 1)) {
-      if (!/^(\s+|- )\S/.test(line) || /^\s*\|/.test(line)) break;
-      checks.push(line.trim().replace(/^- /, ''));
+    for (let i = own.indexOf(heading) + 1; i < own.length; i += 1) {
+      if (!/^(\s+|- )\S/.test(own[i]) || /^\s*\|/.test(own[i])) break;
+      listed.add(i);
+      checks.push(own[i].trim().replace(/^- /, ''));
     }
   }
+  // Other lines that name an error, a build's or a server's among them; not the checks again.
   const errors = own
-    .filter((line) => errorLine.some((pattern) => pattern.test(line)))
-    .map((line) => line.replace(/^\s*\|\s?/, '').trim())
-    .filter((line) => !checks.some((check) => check.includes(line)));
+    .filter((line, i) => !listed.has(i) && errorLine.some((pattern) => pattern.test(line)))
+    .map((line) => line.replace(/^\s*\|\s?/, '').trim());
   const failures = [
     ...checks.map((line) => ['failed check', line]),
     ...[...new Set(errors)].map((line) => ['printed', line]),

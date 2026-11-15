@@ -106,7 +106,9 @@ if (check && check.state === 'failed') {
         .filter((step) => step.conclusion !== 'success' && step.conclusion !== 'skipped')
         .map(failedStepWords);
       console.log(`  Failed step: ${steps.join(', ') || job.name}`);
-      const lines = failureNoteLines(await ask(`${api}/check-runs/${job.id}/annotations`));
+      // GitHub lists a job's annotations newest first; the notes read in the order written.
+      const notes = await ask(`${api}/check-runs/${job.id}/annotations`);
+      const lines = failureNoteLines(Array.isArray(notes) ? [...notes].reverse() : notes);
       for (const line of lines) console.log(line);
       if (lines.length === 0) {
         console.log(
