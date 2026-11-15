@@ -1,10 +1,21 @@
 // T-114: where the tracker's queue lives on the device. The browser keeps it in its
 // database storage (IndexedDB, indexeddb-queue-storage.ts); tests keep it in memory
 // (memory-queue-storage.ts). Both behave the same, and the queue knows only this shape.
-import type { RefusalCode, TrackerCommand } from '@srleagues/contracts';
+// A "tap" here is anything the queue sends: since protocol 2 (record 058) a change of
+// players at the scorer's table too, kept and sent in order with the plays.
+import type { BatchCommand, RefusalCode, TablePlayerProblem } from '@srleagues/contracts';
 
-/** Why the server would not apply a command (T-113), as its reply said. */
-export type CommandRefusal = { readonly code: RefusalCode; readonly message: string };
+/**
+ * Why the server would not apply a command (T-113), as its reply said. A change of
+ * players at the scorer's table (record 058) also says why as a fixed code, and for a
+ * number already worn who wears it, so the tracker can word it (T-187).
+ */
+export type CommandRefusal = {
+  readonly code: RefusalCode;
+  readonly message: string;
+  readonly problem?: TablePlayerProblem;
+  readonly wornBy?: string;
+};
 
 /**
  * Where in the game a tap was made (finding I): the period and the game clock left in
@@ -21,7 +32,7 @@ export type GameMoment = {
 
 /** A tap as the screens list it: the command, and where in the game it was made if known. */
 export type KeptTap = {
-  readonly command: TrackerCommand;
+  readonly command: BatchCommand;
   /** Null for a tap stored before this was kept. */
   readonly moment: GameMoment | null;
 };
@@ -34,7 +45,7 @@ export type QueuedCommand = {
    * command, so a queue written before a release still goes out as it was made (T-127).
    */
   readonly protocolVersion: number;
-  readonly command: TrackerCommand;
+  readonly command: BatchCommand;
   /**
    * The scoring session the tap was made under (T-116), so it is never sent under
    * another one once that session lost the game (T6 §5, record 049). Absent on a tap
@@ -112,7 +123,7 @@ export interface QueueStorage {
     gameId: string,
     entry: {
       readonly protocolVersion: number;
-      readonly command: TrackerCommand;
+      readonly command: BatchCommand;
       readonly sessionId?: string;
       readonly moment?: GameMoment;
     },

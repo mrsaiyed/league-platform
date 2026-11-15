@@ -29,9 +29,9 @@
 import {
   maxCommandsPerBatch,
   trackerProtocolVersion,
+  type BatchCommand,
   type CommandBatch,
   type RefusalCode,
-  type TrackerCommand,
 } from '@srleagues/contracts';
 import type { CommandTransport, TransportOutcome } from './command-transport.ts';
 import {
@@ -76,7 +76,7 @@ export type QueueHalt =
   | { readonly kind: 'rejected'; readonly httpStatus: number };
 
 export type RefusedCommand = {
-  readonly command: TrackerCommand;
+  readonly command: BatchCommand;
   readonly refusal: CommandRefusal;
 };
 
@@ -143,7 +143,7 @@ export type TrackerQueue = {
    * then (T-114). Rejects if it could not be stored, or if its command ID is already
    * held for another game (`command-id-in-other-game`).
    */
-  enqueue(command: TrackerCommand, moment?: GameMoment): Promise<void>;
+  enqueue(command: BatchCommand, moment?: GameMoment): Promise<void>;
   /** Sends now instead of waiting: the network is back, or a scoring session was taken. */
   wake(): void;
   /**
@@ -311,7 +311,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     if (first === undefined) return null;
     // A batch carries one version: taps stored before a release go out as they were made.
     const most = singlesLeft > 0 ? 1 : size;
-    const commands: TrackerCommand[] = [];
+    const commands: BatchCommand[] = [];
     for (const entry of waiting) {
       if (entry.protocolVersion !== first.protocolVersion || commands.length === most) break;
       commands.push(entry.command);
@@ -380,11 +380,17 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
         remove.push(result.commandId);
         continue;
       }
-      const { code, message } = result.reason;
+      const { code, message, problem, wornBy } = result.reason;
       // Only a game rule is about the tap. Any other reason is about the request (the
-      // session, the game, the person): the tap stays waiting for `resume`.
-      if (code === 'rule') refuse.push({ commandId: result.commandId, refusal: { code, message } });
-      else halt ??= { kind: 'refused', code };
+      // session, the game, the person): the tap stays waiting for `resume`. A change of
+      // players keeps why, and who wears a number already worn (record 058).
+      const why = {
+        ...(problem === undefined ? {} : { problem }),
+        ...(wornBy === undefined ? {} : { wornBy }),
+      };
+      if (code === 'rule') {
+        refuse.push({ commandId: result.commandId, refusal: { code, message, ...why } });
+      } else halt ??= { kind: 'refused', code };
     }
     if (remove.length === 0 && refuse.length === 0 && halt === null) {
       // An answer about none of what was sent is no answer.

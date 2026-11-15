@@ -1,7 +1,7 @@
 // What every QueueStorage must do, written once so each implementation is held to the
 // same promises. The in-memory storage runs it in memory-queue-storage.test.ts, the
 // IndexedDB one in indexeddb-queue-storage.test.ts on a stand-in database (record 024).
-import type { TrackerCommand } from '@srleagues/contracts';
+import type { BatchCommand, TrackerCommand } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import type { QueueStorage } from './queue-storage.ts';
 
@@ -18,7 +18,7 @@ export const tap = (n: number): TrackerCommand => ({
   input: { type: 'score', side: 'home', playerId: player, points: 2 },
 });
 
-const ids = (list: readonly { command: TrackerCommand }[]) =>
+const ids = (list: readonly { command: BatchCommand }[]) =>
   list.map((entry) => entry.command.commandId);
 
 export function queueStorageContract(name: string, make: () => Promise<QueueStorage>): void {
