@@ -237,6 +237,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
           };
           return found.version + 1;
         },
+        markNotStarted: async () => undefined,
         addCorrection: async () => undefined,
         listPostponed: async () => [],
         listDecided: async () => [],

@@ -29,7 +29,7 @@ A league's design is a small JSON document, checked against a schema.
 }
 ```
 
-- **T-90:** the league layout turns this into CSS variables (`--color-primary` and so on) once per page. Every component is styled in terms of those variables. There is no per-league stylesheet and no generated CSS file.
+- **T-90:** the league layout turns this into CSS variables (`--color-primary` and so on) once per page. Every component is styled in terms of those variables. There is no per-league stylesheet and no generated CSS file. One screen is outside this on purpose (**T-267**, record 064): the scoring screen has one look of its own for every league, with its own variables, because it is read at arm's length in a gym and a league's colors must never make a score hard to read. Sign-in, the account pages and our own pages carry our neutral look in the same way.
 - `highlight` is the third color of C-15: `--color-highlight`, used sparingly by the display pieces and never for body text. A document saved without one uses its accent, so a design stored before the highlight existed stays valid.
 - Fonts come from a fixed list we host ourselves. The document stores a font's key, never a web address.
 - A **starting design** is simply a stored copy of such a document plus default page layouts.

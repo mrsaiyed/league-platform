@@ -98,8 +98,8 @@ async function fetchSnapshot(address: string): Promise<GameSnapshot | null> {
 }
 
 /**
- * Whether the page must be drawn again from the server: the game has started, ended or
- * been reopened since the snapshot the page arrived with, by a newer message or snapshot. The page's
+ * Whether the page must be drawn again from the server: the game has started, ended,
+ * been reopened or been marked not started since the snapshot the page arrived with, by a newer message or snapshot. The page's
  * server-drawn parts (the play-by-play, the box scores) stand on how it arrived.
  */
 export function redrawsFor(
@@ -109,7 +109,8 @@ export function redrawsFor(
   if (now.sequence <= arrived.sequence) return false;
   if (arrived.status === 'scheduled') return now.status !== 'scheduled';
   if (arrived.status === 'final') return now.status !== 'final'; // reopened
-  return arrived.status === 'live' && now.status === 'final';
+  // Ended, or marked not started (S-40): either way its plays are no longer the page's.
+  return arrived.status === 'live' && now.status !== 'live';
 }
 
 /**

@@ -31,14 +31,14 @@ export function readState(stored: unknown): basketball.GameState {
  * permission to correct games and a reason, which a tap carries neither of, so it is
  * done through games.reopen_game (T6 §8, S-7). Ending a game is taken here: it ends
  * the game in the batch's transaction (step 2.30, T6 §7). Resetting is refused too:
- * it wipes the plays and the lines and puts a live game back to scheduled, which must
- * leave a trace in the activity log, so a game is reset through a later step's own
- * command, not through the tracker's taps.
+ * it clears the plays and the lines and puts a live game back to scheduled, which may
+ * need a reason and leaves a trace in the activity log, so a game is marked not
+ * started through its own command (games.mark_not_started, S-40), not a tap.
  */
 export function platformProblem(input: TrackerInput): string | undefined {
   if (input.type === 'rules') return 'The game’s rules come from the league’s settings.';
   if (input.type === 'reopen') return 'A final game is reopened by an admin, with a reason.';
-  if (input.type === 'reset') return 'Resetting a game is not taken here yet.';
+  if (input.type === 'reset') return 'A game is marked not started with its own button, not a tap.';
   return undefined;
 }
 

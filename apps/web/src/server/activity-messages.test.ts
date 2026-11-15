@@ -36,6 +36,8 @@ const reads = new Set([
   'leagues.remove_draft',
   // The rosters stored on the scorekeeper's device when it opens a game (T-258): a read.
   'games.read_tracker_rosters',
+  // Whether the device may offer Reopen, before the tap (step 2.120): a read.
+  'games.read_reopen_offer',
 ]);
 // The tracker's taps (step 2.29) are not copied into the activity log: every one is
 // already kept as a game event with who sent it, and a game sends hundreds. The players

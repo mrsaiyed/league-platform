@@ -248,13 +248,17 @@ function tablePlayersOf(
 }
 
 /**
- * The live game's storage, over one state; `teamsOf` gives a game's two teams and
- * `uniqueJerseys` whether a team's season asks for unique numbers (none, if not given).
+ * The live game's storage, over one state; `teamsOf` gives a game's two teams,
+ * `decidedAt` when it was decided (its `finalizedAt`), `uniqueJerseys` whether a
+ * team's season asks for unique numbers (none, if not given), and `corrected` whether a
+ * game has a correction (kept beside the games).
  */
 export function liveGamesOf(
   s: TrackerState,
   teamsOf: (gameId: string) => readonly string[],
+  decidedAt: (gameId: string) => string | null | undefined,
   uniqueJerseys: (teamId: string) => boolean = () => false,
+  corrected: (gameId: string) => boolean = () => false,
 ): LiveGamesStore {
   return {
     findState: async (gameId) => {
@@ -275,6 +279,9 @@ export function liveGamesOf(
         s.events.push(event);
       }
     },
+    wasDecided: async (gameId) =>
+      corrected(gameId) ||
+      s.events.some((e) => e.gameId === gameId && (e.type === 'end' || e.type === 'reopen')),
     saveState: async (gameId, seq, state) => {
       s.states = [...s.states.filter((x) => x.gameId !== gameId), { gameId, seq, state }];
     },
@@ -289,6 +296,23 @@ export function liveGamesOf(
         ...s.lines.filter((l) => !(l.gameId === gameId && replaced.has(l.personId))),
         ...lines,
       ];
+    },
+    findLastEnd: async (gameId) => {
+      const end = s.events.filter((e) => e.gameId === gameId && e.type === 'end').at(-1);
+      return end === undefined ? undefined : { accountId: end.accountId };
+    },
+    // The stand-in's "database clock" is this process's.
+    endedAgo: async (gameId) => {
+      const decided = decidedAt(gameId);
+      return decided === null || decided === undefined
+        ? undefined
+        : Math.max(0, Date.now() - Date.parse(decided));
+    },
+    findEvent: async (gameId, commandId) => {
+      const found = s.events.find((e) => e.gameId === gameId && e.commandId === commandId);
+      return found === undefined
+        ? undefined
+        : { seq: found.seq, type: found.type, accountId: found.accountId };
     },
     ...tablePlayersOf(s, uniqueJerseys),
   };

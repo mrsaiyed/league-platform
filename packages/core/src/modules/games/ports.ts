@@ -120,6 +120,13 @@ export type GamesStore = {
     change: GameResultChange,
     version: number,
   ) => Promise<number | undefined>;
+  /**
+   * Marks a live game not started (S-40) if it is still at `version`: scheduled, no
+   * score, and no rules of its own (the database empties the time they were fixed in
+   * the same update, record 061). The new version, or undefined if it is not there,
+   * in the bin, not live or moved on.
+   */
+  readonly markNotStarted: (gameId: string, version: number) => Promise<number | undefined>;
   /** Writes the correction row (S-7) in this transaction; the database needs it to change a decided game. */
   readonly addCorrection: (correction: NewGameCorrection) => Promise<void>;
   /** Postponed games not in the bin, soonest first, of one season or all. */
@@ -322,6 +329,11 @@ export type LiveGamesStore = {
     commandIds: readonly string[],
   ) => Promise<readonly string[]>;
   readonly addEvents: (events: readonly NewGameEvent[]) => Promise<void>;
+  /**
+   * Whether the game was ever final or forfeited: a correction for it, or an `end` or
+   * `reopen` in its event log. Such a game is never marked not started (S-40).
+   */
+  readonly wasDecided: (gameId: string) => Promise<boolean>;
   /** Writes the game's state as of event `seq`: the first time, or over the last one. */
   readonly saveState: (gameId: string, seq: number, state: unknown) => Promise<void>;
   /**
@@ -337,6 +349,27 @@ export type LiveGamesStore = {
     lines: readonly LiveGameLine[],
     removed: readonly string[],
   ) => Promise<void>;
+  /**
+   * Who sent the game's latest end (its last `end` event): the account, null for an
+   * event with none, or undefined if the game was never ended by its tracker.
+   */
+  readonly findLastEnd: (
+    gameId: string,
+  ) => Promise<{ readonly accountId: string | null } | undefined>;
+  /**
+   * How long ago the game was decided, in milliseconds, measured inside the database
+   * (the start of the asking statement less the game's `finalized_at`, both its own
+   * clock, so a wait for the game's lock counts), or undefined if
+   * it is not decided. Never below 0.
+   */
+  readonly endedAgo: (gameId: string) => Promise<number | undefined>;
+  /** The game's event made by this command id: its number, type and sender, or undefined. */
+  readonly findEvent: (
+    gameId: string,
+    commandId: string,
+  ) => Promise<
+    { readonly seq: number; readonly type: string; readonly accountId: string | null } | undefined
+  >;
   /** The person's current entry (not left) on the team, or undefined (record 058). */
   readonly findTablePlayer: (teamId: string, personId: string) => Promise<TablePlayer | undefined>;
   /** Adds a new person and their roster entry, marked as added at the game (S-6). */
