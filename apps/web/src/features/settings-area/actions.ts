@@ -24,7 +24,13 @@ export async function saveSettingAction(form: FormData): Promise<never> {
     const setting = declaredSettings.get(key);
     const value =
       setting === undefined ? undefined : valueOf(describeSetting(setting).field, fields['value']);
-    const result = await setSetting(context, { level: 'league', key, value, version }, ports.deps);
+    // The box ticked to confirm a value that asks for it (R-14); the command checks it.
+    const confirmed = fields['confirmed'] === 'yes';
+    const result = await setSetting(
+      context,
+      { level: 'league', key, value, version, confirmed },
+      ports.deps,
+    );
     return result.ok ? done('saved') : refused(setSetting.commandName, result.error.code);
   });
 }

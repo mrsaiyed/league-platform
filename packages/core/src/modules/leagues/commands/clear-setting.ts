@@ -27,7 +27,10 @@ export function clearSettingFor(registry: SettingRegistry) {
       placeFields,
       z.object({ key: settingKey, version: z.number().int().positive() }),
     ),
-    allowed: (context, input, tx: LeaguesTx) => mayChangeSetting(context, tx, registry, input),
+    // Going back to the default is a change to the default: in a read-only league it
+    // works only where that shows less of people (R-26).
+    allowed: (context, input, tx: LeaguesTx) =>
+      mayChangeSetting(context, tx, registry, input, 'default'),
     run: async ({ context, input, tx }): Promise<Result<{ key: string }, ClearSettingError>> => {
       const setting = registry.get(input.key);
       if (setting === undefined) return fail({ code: 'unknown-setting' });

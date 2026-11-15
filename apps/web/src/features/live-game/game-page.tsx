@@ -16,13 +16,17 @@ import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { isGameIdFormat } from '../../server/league-api.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
+import { t } from '../../server/messages.ts';
+import { placeOf } from '../schedule-pages/index.ts';
 import {
+  boardColors,
+  boardWhen,
   buildBoxScores,
   buildPlays,
   correctedText,
   gameTitle,
   gameWords,
-  startText,
+  titleLine,
 } from './build-game.ts';
 import { GameContent } from './game-content.tsx';
 
@@ -54,19 +58,44 @@ export async function GamePage({
   ]);
   if (!snapshot.ok || !page.ok) return notFound();
   const words = gameWords();
+  // Where the game is played and its number are the published schedule's to say (step
+  // 2.39), as on the game's card; a game the schedule does not list shows neither. Only
+  // this game's facts are read, not its whole season: this page is read again at every
+  // "Show newer plays" of a game under way.
+  const listed = await publicSchedule.gameFactsOf(
+    addressee.id,
+    page.value.game.seasonId,
+    page.value.game.id,
+  );
+  const place = listed === undefined ? undefined : placeOf(listed);
+  const when = boardWhen(page.value.game.startsAt, clock.timeZone, page.value.game.status);
   return (
     <GameContent
       view={{
         leagueId: addressee.id,
         title: gameTitle(page.value),
         status: page.value.game.status,
-        start: startText(page.value.game.startsAt, clock.timeZone, page.value.game.status),
+        start: titleLine(page.value.game.startsAt, clock.timeZone, page.value.game.status),
         corrected: correctedText(snapshot.value.correctedOn ?? page.value.game.correctedOn),
         snapshot: snapshot.value,
         snapshotAddress: leagueApiUrl(addressee, ['games', snapshot.value.gameId, 'snapshot']),
         selfAddress: leagueUrl(addressee, 'game', { game: snapshot.value.gameId }),
         boxScores: snapshot.value.status === 'final' ? buildBoxScores(page.value) : null,
         plays: buildPlays(page.value, words),
+        // Back to the schedule the game is on: an earlier season's, when it is one of those.
+        scheduleAddress: leagueUrl(
+          addressee,
+          'schedule',
+          listed === undefined || listed.season.isCurrent ? {} : { season: listed.season.slug },
+        ),
+        ...(listed === undefined || listed.number === null
+          ? {}
+          : { numberText: t('schedule.gameNumber', { number: listed.number }) }),
+        board: {
+          colors: boardColors(page.value),
+          ...(when === undefined ? {} : { when }),
+          ...(place === undefined ? {} : { placeText: place }),
+        },
       }}
     />
   );

@@ -4,6 +4,7 @@
 export { countPrograms } from './count-programs.ts';
 export { deleteSettingValue } from './delete-setting-value.ts';
 export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts';
+export { findLeagueAudience } from './find-league-audience.ts';
 export { findCourt } from './find-court.ts';
 export { findDivision } from './find-division.ts';
 export { findPerson } from './find-person.ts';
@@ -55,7 +56,7 @@ export { updateVenue, type VenueChangeRow } from './update-venue.ts';
 export { findInvitation } from './find-invitation.ts';
 export { findInvitationByTokenHash } from './find-invitation-by-token-hash.ts';
 export { findLeagueByShortName, type LeagueByShortName } from './find-league-by-short-name.ts';
-export { accountForSignIn } from './account-for-sign-in.ts';
+export { accountForSignIn, isSignInLinkConflict, isSignInRefusal } from './account-for-sign-in.ts';
 export { createOwnProfile, type OwnProfile } from './create-own-profile.ts';
 export { eraseAccount, type EraseAccountAnswer } from './erase-account.ts';
 export { findAccountOfSignIn } from './find-account-of-sign-in.ts';

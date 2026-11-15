@@ -225,7 +225,12 @@ export async function statisticsSource(
         ? { text: null, hiddenBecause: 'no_name' }
         : shown.shown
           ? { text: shown.text, hiddenBecause: null }
-          : { text: null, hiddenBecause: shown.why === 'removed' ? 'removed' : 'no_name' };
+          : // A name the league hides (R-24) is worded as a removed one's: no name at all.
+            {
+              text: null,
+              hiddenBecause:
+                shown.why === 'removed' || shown.why === 'hidden' ? 'removed' : 'no_name',
+            };
     return {
       personId: row.personId,
       name,

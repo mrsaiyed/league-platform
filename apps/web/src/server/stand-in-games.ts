@@ -5,13 +5,13 @@
 // store, so what they refuse and record is what the database-backed store is held to.
 // Like the database, a transaction works on a copy and keeps it only if the work returns,
 // and transactions run one at a time, so two at once cannot lose either's work.
-// Only one made-up league has games; every other league has none. The tracker's
+// Only one made-up league has games, and any named in `moreLeagues` the same games of
+// their own (one that scores assigned games only, say); every other league has none. The tracker's
 // endpoints (step 2.32) run on the same games, with made-up rosters (stand-in-tracker.ts).
 // A game's page also reads the games of the public schedule's stand-in (`listedGames`),
 // so every card on the home and schedule pages opens the game it shows.
 import { defaultSeasonRules } from '@srleagues/contracts';
 import {
-  defaultNamePolicy,
   systemClock,
   type AccessReader,
   type ActivityEntry,
@@ -26,6 +26,7 @@ import {
   type TransactionRunner,
 } from '@srleagues/core';
 import type { GameNames, GamesAreaPorts } from './games-area-ports.ts';
+import { namesShownOf, startingNamePolicy, type NamesShownOf } from './name-policy-of.ts';
 import type { StandInListedGame } from './stand-in-public-schedule.ts';
 import {
   emptyTracker,
@@ -70,10 +71,21 @@ export type StandInGamesOptions = {
   readonly log: (line: CommandLogLine) => void;
   /** The league's own stored settings to start with, by key (for checks). */
   readonly settings?: Readonly<Record<string, StoredSetting[]>>;
+  /** Other leagues given the same made-up games, each its own copy, assignees and settings. */
+  readonly moreLeagues?: readonly LeagueSeed[];
+  /**
+   * Who plays in each league and how it shows names, for the game's page, its snapshot
+   * and its live messages: the league's privacy settings (T-81). Where not given, our
+   * starting policy, and every league counts as youth (the careful reading).
+   */
+  readonly namesShownOf?: NamesShownOf;
   /** The public schedule's made-up games of a league (stand-in-public-schedule.ts), which a
    * game's page reads too; only the final score was kept for them. */
   readonly listedGames?: (leagueId: string) => readonly StandInListedGame[];
 };
+
+/** What one league's made-up games are seeded with. */
+export type LeagueSeed = Pick<StandInGamesOptions, 'leagueId' | 'assignees' | 'settings'>;
 
 const teamNames: Readonly<Record<string, string>> = {
   [id(0x7e, 1)]: 'Lions',
@@ -84,12 +96,16 @@ const teamNames: Readonly<Record<string, string>> = {
 const [lions, tigers, hawks, bears] = Object.keys(teamNames) as [string, string, string, string];
 
 const player = (firstName: string, lastName: string) => ({ firstName, lastName });
-/** The made-up rosters. The Bears show their players' numbers to their staff only (S-22). */
+/**
+ * The made-up rosters, each team with a color of its own for its chip on a game's page.
+ * The Bears show their players' numbers to their staff only (S-22).
+ */
 const madeUpTeams: readonly MadeUpTeam[] = [
   {
     id: lions,
     name: 'Lions',
     slug: 'lions',
+    color: '#c8862a',
     statsVisibility: 'everyone',
     players: ['Ada', 'Ben', 'Cy', 'Dee', 'Eli', 'Fay'].map((n) => player(n, 'Lionel')),
   },
@@ -97,6 +113,7 @@ const madeUpTeams: readonly MadeUpTeam[] = [
     id: tigers,
     name: 'Tigers',
     slug: 'tigers',
+    color: '#d2562c',
     statsVisibility: 'everyone',
     players: ['Gus', 'Hal', 'Ivy', 'Jo', 'Kit', 'Lu'].map((n) => player(n, 'Tigerton')),
   },
@@ -104,13 +121,20 @@ const madeUpTeams: readonly MadeUpTeam[] = [
     id: hawks,
     name: 'Hawks',
     slug: 'hawks',
+    color: '#2f7fb8',
     statsVisibility: 'everyone',
-    players: ['Max', 'Ned', 'Oz', 'Pia', 'Quin', 'Ray'].map((n) => player(n, 'Hawkins')),
+    // Pia is a child playing in the adult league, so the league's names setting shows on
+    // its game pages and live messages too (R-14, R-24).
+    players: ['Max', 'Ned', 'Oz', 'Pia', 'Quin', 'Ray'].map((n) => ({
+      ...player(n, 'Hawkins'),
+      ...(n === 'Pia' ? { isMinor: true } : {}),
+    })),
   },
   {
     id: bears,
     name: 'Bears',
     slug: 'bears',
+    color: '#6a4c93',
     statsVisibility: 'staff',
     players: ['Sol', 'Tam', 'Uma', 'Vic', 'Wes', 'Xan'].map((n) => player(n, 'Bearsley')),
   },
@@ -140,7 +164,7 @@ function emptyState(): State {
   };
 }
 
-function seed(options: StandInGamesOptions): State {
+function seed(options: LeagueSeed): State {
   const seasonId = id(0x5e, 1);
   /** A season still being set up, with one game and no date yet (hidden from the public). */
   const draftSeasonId = id(0x5e, 2);
@@ -216,8 +240,10 @@ export type StandInGames = GamesAreaPorts & {
 };
 
 export function standInGames(options: StandInGamesOptions): StandInGames {
-  let state = seed(options);
-  const stateOf = (leagueId: string) => (leagueId === options.leagueId ? state : emptyState());
+  const states = new Map<string, State>(
+    [options, ...(options.moreLeagues ?? [])].map((l) => [l.leagueId, seed(l)]),
+  );
+  const stateOf = (leagueId: string) => states.get(leagueId) ?? emptyState();
   const teamsOf = (s: State, gameId: string) => {
     const game = s.games.find((g) => g.id === gameId);
     return game === undefined ? [] : [game.homeTeamId, game.awayTeamId];
@@ -344,7 +370,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
       // Kept only when the command succeeded: a refusal leaves nothing behind.
       const refused =
         typeof result === 'object' && result !== null && 'ok' in result && result.ok === false;
-      if (!refused && context.leagueId === options.leagueId) state = draft;
+      if (!refused && states.has(context.leagueId)) states.set(context.leagueId, draft);
       return result;
     });
     queue = run.catch(() => undefined);
@@ -414,13 +440,14 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     tracker: {
       deps: { transaction, events: [], log: options.log, now: () => performance.now() },
       snapshotStoreOf,
-      namesShownOf: async () => ({ audience: 'adult', policy: defaultNamePolicy }),
+      namesShownOf: options.namesShownOf ?? namesShownOf(startingNamePolicy, () => undefined),
       displayNameOf: async (leagueId, accountId) =>
-        leagueId === options.leagueId ? (options.people[accountId] ?? '') : '',
+        states.has(leagueId) ? (options.people[accountId] ?? '') : '',
       clock: systemClock,
     },
     namesOf: async (leagueId): Promise<GameNames> => {
-      if (leagueId !== options.leagueId) return { teams: {}, scorekeepers: {} };
+      const state = states.get(leagueId);
+      if (state === undefined) return { teams: {}, scorekeepers: {} };
       const scorekeepers: Record<string, string[]> = {};
       for (const a of state.assignments) {
         (scorekeepers[a.gameId] ??= []).push(options.people[a.accountId] ?? '');

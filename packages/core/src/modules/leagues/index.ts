@@ -1,5 +1,10 @@
 // The leagues module (T2 §3). Other modules and packages use only what is here.
-export { createLeague, type CreateLeagueError } from './commands/create-league.ts';
+export {
+  createLeague,
+  type CreatedLeague,
+  type CreateLeagueError,
+} from './commands/create-league.ts';
+export { namedTimeZone } from './time-zone.ts';
 export { createDivision, type CreateDivisionError } from './commands/create-division.ts';
 export { listDivisions } from './commands/list-divisions.ts';
 export { removeDivision, type RemoveDivisionError } from './commands/remove-division.ts';
@@ -43,10 +48,14 @@ export {
   startingStatsLevel,
   statsLevelChoices,
   teamsMayChooseStatsLevel,
+  publicNames,
+  publicNamesChoices,
+  playersMayAskForInitials,
 } from './settings/declarations.ts';
 export {
   defineSetting,
   hasLimits,
+  needsConfirming,
   settingLevels,
   settingRegistry,
   SettingDeclarationError,
@@ -78,11 +87,31 @@ export { leagueTransitions, readOnlyStatuses, type Transition } from './league-s
 export {
   audiences,
   leagueStatuses,
+  offeredSports,
   seasonStatuses,
   type Audience,
   type LeagueStatus,
+  type OfferedSport,
   type SeasonStatus,
 } from './league-values.ts';
+export {
+  dayIn,
+  newLeagueFields,
+  planNewLeague,
+  seasonPartOf,
+  seasonParts,
+  seasonSlugOf,
+  suggestedSeason,
+  whoPlaysChoices,
+  type NewLeagueAnswers,
+  type NewLeagueField,
+  type NewLeaguePlan,
+  type NewLeaguePlanResult,
+  type NewLeagueProblem,
+  type SeasonPart,
+  type SeasonSuggestion,
+  type WhoPlays,
+} from './rules/new-league-plan.ts';
 export type {
   DivisionChange,
   DivisionRecord,

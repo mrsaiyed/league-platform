@@ -24,7 +24,15 @@ export type PostgresDriverOptions = {
   ssl?: 'verify' | 'no-verify' | 'off';
   /** The server's certificate authority, as PEM text. */
   ca?: string | undefined;
+  /** How long connecting may take, in ms, before it fails. Default 15 000. */
+  connectionTimeoutMillis?: number;
 };
+
+/** Where the connection really went, as pg read the address: host, port and user. */
+export type ConnectedTo = { readonly host: string; readonly port: number; readonly user: string };
+
+/** A migration driver on a PostgreSQL connection, which also says where it went. */
+export type PostgresDriver = MigrationDriver & { readonly connectedTo: ConnectedTo };
 
 type SslSetting = false | { rejectUnauthorized: boolean; ca?: string };
 
@@ -35,16 +43,46 @@ export function sslSetting(options: PostgresDriverOptions): SslSetting {
   return options.ca ? { rejectUnauthorized: true, ca: options.ca } : { rejectUnauthorized: true };
 }
 
+/**
+ * Every query string key pg-connection-string (the parser `pg` uses) reads that changes
+ * whether the connection is encrypted or which certificate is trusted: `ssl` (0, 1,
+ * true, no-verify), `sslmode`, `sslcert`, `sslkey`, `sslrootcert` (it reads those
+ * files), `sslnegotiation` (direct turns SSL on, dropping a given certificate) and
+ * `uselibpqcompat`. `pg` lets the address win over its `ssl` option, so all of them
+ * are taken out before an address is handed to `pg`: `ssl` alone decides.
+ */
+export const sslAddressKeys = [
+  'ssl',
+  'sslmode',
+  'sslcert',
+  'sslkey',
+  'sslrootcert',
+  'sslnegotiation',
+  'uselibpqcompat',
+] as const;
+
+/** The address with every key of sslAddressKeys taken out, in any capitals. */
+export function withoutSslKeys(url: string): string {
+  const target = new URL(url);
+  const strip = new Set<string>(sslAddressKeys);
+  for (const key of [...target.searchParams.keys()]) {
+    if (strip.has(key.toLowerCase())) target.searchParams.delete(key);
+  }
+  return target.toString();
+}
+
 /** Connects to `url` (a postgres:// address). `close()` ends the connection. */
 export async function connectPostgresDriver(
   url: string,
   options: PostgresDriverOptions = {},
-): Promise<MigrationDriver> {
+): Promise<PostgresDriver> {
   // SSL is set here, not by the address, so a copied address behaves the same everywhere.
-  const target = new URL(url);
-  for (const key of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat'])
-    target.searchParams.delete(key);
-  const client = new pg.Client({ connectionString: target.toString(), ssl: sslSetting(options) });
+  const client = new pg.Client({
+    connectionString: withoutSslKeys(url),
+    ssl: sslSetting(options),
+    // A server that never answers is given up on, with a plain message from the caller.
+    connectionTimeoutMillis: options.connectionTimeoutMillis ?? 15_000,
+  });
 
   // A dropped connection emits 'error'; unhandled, it would end the process. Remember
   // it, and fail every later call with it instead.
@@ -84,5 +122,6 @@ export async function connectPostgresDriver(
       }
     },
     close: () => client.end(),
+    connectedTo: { host: client.host, port: client.port, user: client.user ?? '' },
   };
 }

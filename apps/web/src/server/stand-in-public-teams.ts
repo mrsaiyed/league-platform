@@ -7,7 +7,12 @@
 // both settings can be tried. One made-up account has a roster place on a team of each.
 import { publicRosterLine, type PublicRoster, type RosterLineSource } from '@srleagues/core';
 import type { PublicTeamsPorts, StartPage } from './public-teams.ts';
-import { adultTeams, standInSeasonIds, youthTeams } from './stand-in-public-stats.ts';
+import {
+  adultTeams,
+  standInAudienceOf,
+  standInSeasonIds,
+  youthTeams,
+} from './stand-in-public-stats.ts';
 
 type Spec = {
   first: string;
@@ -75,6 +80,7 @@ export function standInPublicTeams(
   /** The made-up account that has a roster place on a team of each league. */
   memberAccountId: string,
 ): PublicTeamsPorts {
+  const audienceOf = standInAudienceOf(ids);
   const teamsOf = (leagueId: string) =>
     leagueId === ids.adultLeagueId ? adultTeams : leagueId === ids.youthLeagueId ? youthTeams : [];
   const startPage = (leagueId: string): StartPage =>
@@ -84,7 +90,7 @@ export function standInPublicTeams(
     rosterOf: async (leagueId, teamId, display): Promise<PublicRoster> => {
       const team = teamsOf(leagueId).find((t) => t.id === teamId);
       const specs = team === undefined ? [] : (rosterSpecs[team.slug] ?? []);
-      const audience = leagueId === ids.youthLeagueId ? 'youth' : 'adult';
+      const audience = audienceOf(leagueId) ?? 'youth';
       const ordered = [
         ...specs.filter((s) => s.left === undefined),
         ...specs.filter((s) => s.left !== undefined),

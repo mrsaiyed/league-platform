@@ -11,26 +11,34 @@
 // - 403 not-allowed: may not score this game.
 // - 404 not-found: no such game in this league, one of another league asked for
 //   through this one's address included.
-import type { TrackerGameState } from '@srleagues/contracts';
+//
+// Each refusal is the contract's `TrackerRefusal` at its own status: the tracker takes
+// nothing else as the server's word.
+import {
+  trackerRefusalStatus,
+  type TrackerGameState,
+  type TrackerRefusal,
+} from '@srleagues/contracts';
 import { readTrackerState } from '@srleagues/core';
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { isGameIdFormat, type ApiAnswer } from './league-api.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
-const notFound: ApiAnswer = { status: 404, body: { error: 'not-found' } };
+const refuse = (body: TrackerRefusal): ApiAnswer => ({
+  status: trackerRefusalStatus[body.error],
+  body,
+});
 
 export async function trackerStateRequest(
   context: LeagueRequestContext,
   game: string,
   ports: Pick<TrackerPorts, 'deps'>,
 ): Promise<ApiAnswer> {
-  if (context.account === null) return { status: 401, body: { error: 'signed-out' } };
-  if (!isGameIdFormat(game)) return notFound;
+  if (context.account === null) return refuse({ error: 'signed-out' });
+  if (!isGameIdFormat(game)) return refuse({ error: 'not-found' });
   const result = await readTrackerState(commandContextOf(context), { gameId: game }, ports.deps);
   if (!result.ok) {
-    return result.error.code === 'not-allowed'
-      ? { status: 403, body: { error: 'not-allowed' } }
-      : notFound;
+    return refuse({ error: result.error.code === 'not-allowed' ? 'not-allowed' : 'not-found' });
   }
   const body: TrackerGameState = result.value;
   return { status: 200, body, headers: { 'Cache-Control': 'private, no-store' } };

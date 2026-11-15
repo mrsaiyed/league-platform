@@ -25,6 +25,7 @@ import {
   type LeagueStatus,
   type Role,
   type Scope,
+  whoMayScore,
 } from '@srleagues/core';
 import {
   captureEmail,
@@ -37,6 +38,7 @@ import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import { liveListenAuthorize } from './live-listen.ts';
 import type { WebPorts } from './ports.ts';
+import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
 import { createPlayPublisher } from './publish-plays.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
@@ -45,6 +47,7 @@ import { standInGames } from './stand-in-games.ts';
 import { standInListedGames, standInPublicSchedule } from './stand-in-public-schedule.ts';
 import {
   adultTeams,
+  standInAudienceOf,
   standInPublicStats,
   standInSeasonIds,
   youthTeams,
@@ -148,6 +151,9 @@ const grants = [
     id: id(0xc1),
   }),
   grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.otherDraft.id),
+  // A scorekeeper still holding the role in an archived league is told it is archived,
+  // not "no access" (step 2.33).
+  grantOf(13, scorekeeper.accountId, 'scorekeeper', standInLeagues.archived.id),
 ];
 
 const leagues: readonly MadeUpLeague[] = Object.values(standInLeagues);
@@ -158,6 +164,7 @@ function identityOf(person: MadeUpPerson): SessionIdentity {
   return {
     accountId: person.accountId,
     email: `${person.token}@example.test`,
+    emailConfirmed: true,
     sessionId: `session-${person.token}`,
     hasPassword: true,
     passwordEnteredAt: signedInAt,
@@ -233,7 +240,15 @@ export type StandInPorts = WebPorts & {
   readonly signUpMadeUpMember: () => Promise<void>;
 };
 
-export function standInPorts(options: StandInOptions): StandInPorts {
+/** The sign-in stand-in and its emails, for the stand-in and for the made-up database. */
+export type StandInSignIn = Pick<StandInPorts, 'signIn' | 'signInMail' | 'signUpMadeUpMember'>;
+
+/**
+ * The sign-in screens' stand-in (record 031), with the same refusals as the stand-in
+ * itself: local work and tests only, on this computer or a test name. The made-up
+ * database (record 055) signs people in with it too.
+ */
+export function standInSignIn(options: StandInOptions): StandInSignIn {
   if (options.appEnv !== 'local' && options.appEnv !== 'test') {
     throw new Error(
       `The web app's made-up stand-in is for local work and tests only, not "${options.appEnv}".`,
@@ -245,7 +260,6 @@ export function standInPorts(options: StandInOptions): StandInPorts {
         'must be on localhost, 127.0.0.1, [::1], or a name ending in .localhost or .test.',
     );
   }
-  const people: readonly MadeUpPerson[] = Object.values(standInPeople);
   const now = () => new Date();
   const outbox = captureEmail({ now });
   const signInMail = createSignInMail({
@@ -266,6 +280,35 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     returnOrigins: [options.publicBaseUrl],
     now,
   });
+  return {
+    signIn,
+    signInMail,
+    signUpMadeUpMember: async () => {
+      const here = '127.0.0.1';
+      const { email, password } = standInMember;
+      const asked = await signIn.startSignUp({ email, networkAddress: here });
+      // The code email is handed over without waiting: let it reach the capture.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const sent = outbox.messages().findLast((m) => m.to === email);
+      const code = /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
+      if (!asked.ok || code === undefined) throw new Error('The made-up member got no code.');
+      const proved = await signIn.verifyCode({ email, code, networkAddress: here });
+      if (!proved.ok) throw new Error('The made-up member could not be proved.');
+      const set = await signIn.setPassword({
+        proof: proved.value.proof,
+        password,
+        device: { deviceId: 'made-up-member-device', label: 'made-up', networkAddress: here },
+      });
+      if (!set.ok) throw new Error('The made-up member could not choose a password.');
+      await signIn.signOut({ accessToken: set.value.session.accessToken });
+    },
+  };
+}
+
+export function standInPorts(options: StandInOptions): StandInPorts {
+  const { signIn, signInMail, signUpMadeUpMember } = standInSignIn(options);
+  const people: readonly MadeUpPerson[] = Object.values(standInPeople);
+  const now = () => new Date();
   const deps: CommandDeps<AccessTx> = {
     transaction: (context, work) => work(accessTx(context.leagueId)),
     events: [],
@@ -283,18 +326,42 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
   };
   const accessOf = accessOfVia(deps);
+  // The League settings screen's settings: the public pages read how names show from them.
+  // There is exactly one: a second copy would keep the admin's saved setting from the pages.
+  const adminSettings = standInAdminSettings({
+    accessOf: (leagueId) => accessTx(leagueId).access,
+    log: options.log,
+  });
+  const namePolicy = namePolicyOf(adminSettings.deps);
   const scheduled = {
     adultLeagueId: standInLeagues.live.id,
     youthLeagueId: standInLeagues.other.id,
   };
+  // Who plays in each made-up league, read by every page that shows a name (R-15).
+  const audienceOf = standInAudienceOf(scheduled);
   const games = standInGames({
+    namesShownOf: namesShownOf(namePolicy, audienceOf),
     leagueId: standInLeagues.live.id,
     people: {
       [owner.accountId]: 'Olive Owner',
       [scheduler.accountId]: 'Sky Scheduler',
       [scorekeeper.accountId]: 'Sam Scorekeeper',
+      [standInPeople.admin.accountId]: 'Avery Admin',
     },
     assignees: [scorekeeper.accountId, owner.accountId],
+    // The draft league has the same games, but scores assigned games only, and its
+    // admin is given the live ones: its scorekeeper is refused those (P7 §5.1).
+    moreLeagues: [
+      {
+        leagueId: standInLeagues.draft.id,
+        assignees: [standInPeople.admin.accountId, scorekeeper.accountId],
+        settings: {
+          [whoMayScore.key]: [
+            { level: 'league', document: { version: whoMayScore.version, value: 'assignedOnly' } },
+          ],
+        },
+      },
+    ],
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
     // The home and schedule pages' games, so each card opens its game's page.
@@ -342,19 +409,20 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       accessOf: (leagueId) => accessTx(leagueId).access,
       log: options.log,
     }),
-    publicStats: standInPublicStats({
-      adultLeagueId: standInLeagues.live.id,
-      youthLeagueId: standInLeagues.other.id,
-    }),
+    publicStats: standInPublicStats(scheduled, namePolicy),
     adminTeams: standInAdminTeams({
       accessOf: (leagueId) => accessTx(leagueId).access,
       log: options.log,
       seededLeagueId: standInLeagues.live.id,
+      audienceOf: (leagueId) => audienceOf(leagueId) ?? 'youth',
+      // A person's name request reads the settings the admin saves (R-25).
+      settingRowsOf: (leagueId, key) =>
+        adminSettings.deps.transaction(
+          { leagueId, accountId: null, requestId: 'name-settings' },
+          (tx) => tx.leagues.settingRows(key, {}),
+        ),
     }),
-    adminSettings: standInAdminSettings({
-      accessOf: (leagueId) => accessTx(leagueId).access,
-      log: options.log,
-    }),
+    adminSettings,
     publicSchedule: standInPublicSchedule(scheduled, now),
     scheduleAdmin: standInSchedule({
       leagues: [
@@ -375,29 +443,8 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       log: options.log,
       today: () => new Date().toISOString().slice(0, 10),
     }),
-    publicTeams: standInPublicTeams(
-      { adultLeagueId: standInLeagues.live.id, youthLeagueId: standInLeagues.other.id },
-      coach.accountId,
-    ),
-    signUpMadeUpMember: async () => {
-      const here = '127.0.0.1';
-      const { email, password } = standInMember;
-      const asked = await signIn.startSignUp({ email, networkAddress: here });
-      // The code email is handed over without waiting: let it reach the capture.
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      const sent = outbox.messages().findLast((m) => m.to === email);
-      const code = /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
-      if (!asked.ok || code === undefined) throw new Error('The made-up member got no code.');
-      const proved = await signIn.verifyCode({ email, code, networkAddress: here });
-      if (!proved.ok) throw new Error('The made-up member could not be proved.');
-      const set = await signIn.setPassword({
-        proof: proved.value.proof,
-        password,
-        device: { deviceId: 'made-up-member-device', label: 'made-up', networkAddress: here },
-      });
-      if (!set.ok) throw new Error('The made-up member could not choose a password.');
-      await signIn.signOut({ accessToken: set.value.session.accessToken });
-    },
+    publicTeams: standInPublicTeams(scheduled, coach.accountId),
+    signUpMadeUpMember,
   };
 }
 

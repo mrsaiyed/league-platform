@@ -13,11 +13,15 @@ export const en = {
   'footer.privacy': 'Privacy',
   'common.loading': 'Loading',
   'common.notFound': 'We could not find that page.',
+  'common.notFoundTitle': 'Page not found',
+  'common.goToStart': 'Go to the SR Leagues start page',
   'schedule.games_one': '{count} game on {date}',
   'schedule.games_other': '{count} games on {date}',
   // The web app's shell (step 1.17). Pages not built yet say so plainly.
   'shell.siteName': 'SR Leagues',
   'shell.notBuilt': 'This page is not built yet.',
+  'shell.backToLeague': 'Back to the league home',
+  'shell.skipToContent': 'Skip to the content',
   'shell.draftNotice': 'This league is not published. Only the people who run it can see it.',
   'shell.suspendedNotice':
     'This league has been taken down. Only the people who run it can see it, to export their data.',
@@ -60,12 +64,14 @@ export const en = {
   'display.note': 'Note',
   'display.notes': 'Notes',
   'display.jersey': 'Number',
+  'display.jerseyShort': '#',
   'display.player': 'Player',
   'display.total': 'Total',
   'display.sortBy': 'Sort by',
   'display.round': 'Round',
   'display.season': 'Season',
   'display.show': 'Show',
+  'display.filters': 'Choose what to show',
   // The standings and statistics pages (step 2.43).
   'standings.title': 'Standings',
   'standings.allTeams': 'All teams',
@@ -116,6 +122,9 @@ export const en = {
   'stats.by.total': 'Season totals',
   'stats.leaderName': '{rank}. {name}',
   'stats.unnamedPlayer': 'A player (name not shown)',
+  'stats.leaderDetail': '{team} · {games}',
+  'stats.leaderGames_one': '{count} game',
+  'stats.leaderGames_other': '{count} games',
   'stats.col.player': 'Player',
   'stats.col.team': 'Team',
   'stats.col.games': 'GP',
@@ -136,10 +145,20 @@ export const en = {
   'home.standingsEmpty': 'The standings appear here once games have been played.',
   'home.fullStandings': 'See the full standings',
   'home.fullSchedule': 'See the full schedule',
+  'home.seeTeams': 'See the teams',
+  // The look of the home page (step 2.85): a live game under its own heading, and the
+  // season in four numbers.
+  'home.liveNow': 'Live now',
+  'home.numbers': 'The season in numbers',
+  'home.number.teams': 'Teams',
+  'home.number.played': 'Games played',
+  'home.number.toPlay': 'Games to play',
+  'home.number.rounds': 'Rounds',
   'schedule.title': 'Schedule',
   'schedule.noSeason': 'There is no season to show yet.',
   'schedule.empty': 'No games have been scheduled for this season yet.',
   'schedule.noMatch': 'No games match that choice.',
+  'schedule.showAll': 'Show every game',
   'schedule.allRounds': 'All rounds',
   'schedule.team': 'Team',
   'schedule.allTeams': 'All teams',
@@ -154,7 +173,21 @@ export const en = {
   'schedule.gameNumber': 'Game {number}',
   'schedule.dateToBeSet': 'Date to be announced',
   'schedule.dateAndTimeToBeSet': '{date}, time to be announced',
-  'schedule.whenWhere': '{when} at {where}',
+  // What a game card's link says to a screen reader: every card leads to its game's page.
+  'schedule.link.score': '{away} against {home}, {state}, {awayScore} to {homeScore}',
+  'schedule.link.state': '{away} against {home}, {state}',
+  'schedule.link.when': '{away} against {home}, {when}',
+  'schedule.link.live': 'live',
+  'schedule.link.final': 'final',
+  'schedule.link.forfeit': 'forfeit',
+  'schedule.link.postponed': 'postponed',
+  'schedule.link.cancelled': 'cancelled',
+  // A finished round that still holds a game waiting for a new day says so beside its mark.
+  'schedule.postponedCount_one': '{count} game postponed',
+  'schedule.postponedCount_other': '{count} games postponed',
+  // A postponed game has no day to come: its old day is never written bare.
+  'schedule.postponedFrom': 'Postponed from {date}',
+  'schedule.postponedNoDate': 'New date to be announced',
   'schedule.venueCourt': '{venue}, {court}',
   // The teams list and a team's page (step 2.44).
   'teams.title': 'Teams',
@@ -170,8 +203,6 @@ export const en = {
   'teams.recordTies': '{wins}-{losses}-{ties}',
   'team.seedLine': 'Seed {seed}',
   'team.noSeed': 'Not seeded yet',
-  'team.headline': '{seed}. Record: {record}',
-  'team.headlineDivision': '{seed}. Record: {record}. Division: {name}',
   'team.allTeams': 'All teams',
   'team.leagueHome': 'League home',
   'team.roster': 'Roster',
@@ -184,6 +215,8 @@ export const en = {
   'team.role.captain': 'Captain',
   'team.role.coach': 'Coach',
   'team.nameNotShown': 'Name not shown',
+  // A child the league shows by number only (R-24).
+  'team.byNumber': '#{number}',
   'team.nameLeft': '{name} (left {date})',
   'team.schedule': 'Schedule',
   'team.noSchedule': 'No games are coming up for this team.',
@@ -194,7 +227,6 @@ export const en = {
   'team.statsTotalsOnly': "Only this team's totals are shown. Its players' numbers are not public.",
   'team.statsPlayers': 'Players',
   'team.statsTotals': 'Team totals',
-  'team.totalsRow': 'Team total',
   'team.makeMine': 'Make this my team',
   'team.isMine': 'This is your team on this device.',
   'team.clearMine': 'Stop using this as my team',
@@ -258,8 +290,17 @@ export const en = {
   'game.noPlays': 'No plays have been recorded yet.',
   'game.playsAsOpened': 'These are the plays up to when you opened this page.',
   'game.newerPlays': 'Show newer plays',
-  'game.playLine': '{clock}: {play} ({away} {awayScore}, {home} {homeScore})',
-  'game.playLineNoClock': '{play} ({away} {awayScore}, {home} {homeScore})',
+  // The play-by-play is one table a period (step 2.85): when on the clock, the play, and
+  // the score after a basket, away team first as on the board above it.
+  'game.col.time': 'Time',
+  'game.col.play': 'Play',
+  'game.col.score': 'Score',
+  'game.playScore': '{awayScore}–{homeScore}',
+  'game.playScoreSpoken': '{away} {awayScore}, {home} {homeScore}',
+  'game.playsBeforeStart': 'Before the start',
+  // The players' tables of a game under way hold two numbers each.
+  'game.liveStats': 'Points and fouls',
+  'game.back': 'Schedule',
   'stat.points': 'Points',
   'stat.points.short': 'PTS',
   'stat.rebounds': 'Rebounds',
@@ -410,6 +451,15 @@ export const en = {
   'adminSettings.clear': 'Go back to the default',
   'adminSettings.done.saved': 'The setting was saved.',
   'adminSettings.done.cleared': 'The setting is back to its default.',
+  // A heading for each group of settings, by the first part of their keys.
+  'adminSettings.area.members': 'Start page for members',
+  'adminSettings.area.games': 'Scoring',
+  'adminSettings.area.teams': 'Team statistics',
+  'adminSettings.area.privacy': 'Privacy',
+  // Beside a setting whose value asks to be confirmed (its `setting.<key>.confirm`).
+  'adminSettings.confirmNote': 'Tick this only if you are choosing {choice}:',
+  'error.leagues.set_setting.confirmation-needed':
+    'This choice needs you to tick the box to confirm before it is saved. Nothing was changed.',
   'error.leagues.set_setting.invalid-value':
     'That value is not allowed for this setting. Check what it accepts and try again.',
   'error.leagues.set_setting.changed-since-read':
@@ -461,8 +511,23 @@ export const en = {
   'error.people.create_person.sensitive-fields-not-allowed':
     'You are not allowed to enter those details.',
   'error.people.remove_person.person-not-found': 'That person is not in the league list.',
+  'error.people.set_name_request.person-not-found': 'That person is not in the league list.',
+  'error.people.set_name_request.initials-not-offered':
+    'This league does not offer initials for adults, so nothing was changed. You can still choose "removed" to take their name off the public pages.',
   'error.people.remove_person.person-on-a-roster':
     'That person is still on a roster. Mark them as having left their team first, then take them off the list.',
+  // A scorekeeper's admin: only their games, each with a way to the tracker (P4 §4, step 2.33).
+  'admin.myGames.title': 'Your games',
+  'admin.myGames.intro': 'Tonight’s games first. Tap Score this game to open one.',
+  'admin.myGames.empty': 'You have no games to score this week.',
+  'admin.myGames.score': 'Score this game',
+  // A game whose score is entered in the games area, not in the tracker.
+  'admin.myGames.recording.final-score': 'Final score only',
+  'admin.myGames.recording.box-score': 'Box score',
+  'admin.myGames.enterScore': 'Enter the score',
+  // Why a league's games are not scored (U-9), saying which.
+  'admin.myGames.archived': 'This league is archived, so its games cannot be scored or changed.',
+  'admin.myGames.suspended': 'This league is suspended, so its games cannot be scored or changed.',
   // The games area (step 2.55).
   'admin.games.intro': 'The games of today and the week ahead.',
   'admin.games.listProblem':
@@ -480,6 +545,7 @@ export const en = {
   'admin.games.openTracker': 'Open the tracker',
   'admin.games.when': '{day}, {time}',
   'admin.games.noTime': 'No time set',
+  'admin.games.today': 'Today, {time}',
   'admin.games.notScorable': 'This league is archived or suspended, so games cannot be changed.',
   'admin.games.done.final': 'The final score is saved.',
   'admin.games.done.forfeit': 'The forfeit is recorded.',
@@ -655,8 +721,49 @@ export const en = {
   'access.noAccess.title': 'You do not have access',
   'access.noAccess.body':
     'This page is for the people who run this league. If you should have access, ask the league to invite you.',
-  // The courtside tracker (P2 §4), rebuilt here in a later step.
+  // The courtside tracker (P2 §4): opening a game on the device (step 2.33). The
+  // scoring screens come with steps 2.35 to 2.37.
   'tracker.title': 'Score a game',
+  'tracker.matchup': '{away} at {home}',
+  'tracker.opening': 'Opening the game…',
+  'tracker.openingSlow': 'No answer yet. Check the connection; this keeps trying.',
+  'tracker.noStorage':
+    'This browser window cannot save the game on this device, so scoring is off. If this is a private window, open the tracker in a normal one.',
+  'tracker.storeFailed':
+    'This device could not keep its own copy of the game. Keep scoring: your plays are still saved. If the page reloads with no connection, the game may not open.',
+  'tracker.takeOver': 'Take over scoring',
+  'tracker.takeOverQuestion':
+    'Take over scoring from {name}? Their device stops scoring. Plays it has not sent yet will not be saved and must be entered again.',
+  'tracker.takeOverYes': 'Yes, take over',
+  'tracker.takeOverNo': 'Not now',
+  'tracker.openAgain': 'Open the game again',
+  'tracker.seeWhoIsScoring': 'See who is scoring',
+  'tracker.signIn': 'Sign in',
+  'tracker.sharedDevice.text': 'On a shared phone or tablet, sign out when you finish.',
+  'tracker.sharedDevice.link': 'Sign out on your account page',
+  'tracker.back': 'Back to your games',
+  'tracker.format.title': 'Check the game format',
+  'tracker.format.intro': 'This game is set up to be played like this. Check it before you start.',
+  'tracker.format.halves': '2 halves of {minutes} minutes',
+  'tracker.format.quarters': '4 quarters of {minutes} minutes',
+  'tracker.format.overtime': 'Overtime periods of {minutes} minutes',
+  'tracker.format.clock.stop': 'Stop clock: fouls and timeouts stop the clock',
+  'tracker.format.clock.running': 'Running clock: the clock keeps going through fouls and timeouts',
+  'tracker.format.wrong':
+    'If this is not how the game is being played, ask a league admin to change the game format before you start.',
+  'tracker.format.confirm': 'Confirm and start scoring',
+  'tracker.ready':
+    'This device is scoring the game. The scoring screen will appear here in a later version.',
+  'tracker.savedOnDevice':
+    'Saved on this device: {home} ({homeCount} players) and {away} ({awayCount} players), and the game as it stands.',
+  // The tracker's own refusals, each with the way back to the games (step 2.33).
+  'tracker.notLive.final-score':
+    'This game is set to final score only, so there is no live scoring. Enter its score in Games.',
+  'tracker.notLive.box-score':
+    'This game is set to box score, so there is no live scoring. Enter its score in Games.',
+  'tracker.notAssigned':
+    'You are not assigned to score this game. Ask a league admin to assign it to you.',
+  'tracker.unknownGame': 'We could not find that game.',
   // The fixed roles (A-3, P4 §4), by the name the access module gives each.
   'role.owner': 'Owner',
   'role.admin': 'Admin',
@@ -923,6 +1030,7 @@ export const en = {
   'activity.people.create_person': 'Added a person',
   'activity.people.update_person': 'Changed a person',
   'activity.people.remove_person': 'Moved a person to the bin',
+  'activity.people.set_name_request': "Changed how a person's name shows on public pages",
   'activity.teams.create_team': 'Added a team',
   'activity.teams.update_team': 'Changed a team',
   'activity.teams.remove_team': 'Moved a team to the bin',
@@ -972,6 +1080,17 @@ export const en = {
   'setting.teams.startingStatsLevel.option.staff': "Only the team's staff and the league's admins",
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
+  'setting.privacy.publicNames.label':
+    "Names on public pages. This decides how children are shown, and, in a youth or mixed league, anyone whose record does not say whether they are a child or an adult (coaches too, until you mark them as adults). Adults are shown by their full name unless they ask for less. If a parent asks for less for their child (initials, or the name taken off), that always wins over this setting. Recording it on the child's own record arrives with the next part of this work.",
+  'setting.privacy.publicNames.option.fullName': 'Full names, like "Jordan Ellis"',
+  'setting.privacy.publicNames.option.firstNameLastInitial':
+    'First name and last initial, like "Jordan E."',
+  'setting.privacy.publicNames.option.hidden':
+    'Hidden: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
+  'setting.privacy.publicNames.confirm':
+    'I confirm that the parents or guardians of the children in this league have agreed to their full names being shown publicly, for example on the registration form.',
+  'setting.privacy.playersMayAskForInitials.label':
+    'Adults may ask to appear as initials on public pages. Children always can, whatever this says: a request from a parent is always followed. Anyone can ask to have their name taken off. Switching this off only stops new requests: anyone already shown as initials stays that way until their own record is changed.',
   // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
   // league's name, {role} a role's name from above, {days} how long a link works.
   'email.invitation.subject': 'You are invited to help run {league}',
@@ -1040,6 +1159,13 @@ export const en = {
   'account.signOut': 'Sign out',
   'account.signOutEverywhere': 'Sign out everywhere',
   'account.signOutEverywhereHelp': 'Signs out every device that uses your account, this one too.',
+  'account.problem.title': 'We cannot open your account',
+  'account.problem.notConfirmed':
+    'You are signed in, but your email address has not been confirmed yet, so we cannot open your account. Sign out, then sign in again. If this keeps happening, please contact us.',
+  'account.problem.linkConflict':
+    'You are signed in, but your email address belongs to an account that is joined to a different sign-in. Nothing has been lost: this needs putting right on our side, and we have noted it. Please contact us. Until then, you can sign out here.',
+  'account.problem.addressRefused':
+    'You are signed in, but we cannot open an account for this email address. Nothing has been lost, and we have noted it. Please contact us, or sign out and sign in with another email address.',
   'device.label': '{browser} on {system}',
   'device.unknown': 'A web browser',
   'problem.invalidEmail': 'That does not look like an email address.',
@@ -1061,6 +1187,7 @@ export const en = {
   'problem.signOutEverywhereFailed':
     'We could not sign out your other devices. This one is signed out: sign in and try again.',
   'problem.noPassword': 'Your account has no password. Sign in with Google again instead.',
+  'problem.signInToScore': 'Sign in to score this game.',
   // The tracker's saved banner (T6 §4), chosen from the queue's status by
   // apps/web/src/features/tracker/queue-banner.ts.
   'tracker.queue.allSaved': 'All saved',
@@ -1073,25 +1200,40 @@ export const en = {
   // What the tracker says about holding the game and refused taps (T6 §5, T-113),
   // chosen from the controller's status by apps/web/src/features/tracker/tracker-notice.ts.
   'tracker.readOnly.taken-over':
-    'Another device has taken over scoring this game. This one is now read-only.',
+    'Someone else is now scoring this game on another device. This device can no longer score it.',
   'tracker.readOnly.expired':
     'This device was away too long and another device has had the game since. This one is now read-only.',
   'tracker.readOnly.released':
     'This device has left the game. It is read-only until you open it again.',
-  'tracker.readOnly.not-held': 'This device no longer holds the game, so it is read-only.',
+  'tracker.readOnly.not-held': 'This device is no longer the one scoring this game.',
   'tracker.readOnly.game-not-live':
     'This game cannot be scored now: it is over, cancelled or postponed.',
   'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
   'tracker.readOnly.unknown-game': 'This game could not be found.',
   'tracker.readOnly.request-refused':
-    'The server could not take what this device asked for. Open the game again to try once more.',
+    'Something went wrong opening the game. Tap Open the game again.',
   'tracker.readOnly.storage-failed':
     'This device could not read what it has saved, so it is read-only. Open the game again to try once more.',
   'tracker.readOnly.signed-out':
     'You are signed out. Sign in again to keep scoring. What you entered on this device is kept and sent once you are back, so do not enter it again.',
+  'tracker.readOnly.signed-in-as-other':
+    'You signed in again, but this game is no longer being scored on this device: someone else is signed in here now, or another device took the game over while you were signed out. This one is now read-only.',
   'tracker.readOnly.update-needed':
     'This tracker needs an update. Reload the page to keep scoring.',
   'tracker.heldByOther': '{name} is scoring this game on another device.',
+  // Signed out while scoring (finding M2): scoring goes on, and nothing is sent until
+  // the scorekeeper signs in again, so these never say "waiting to send".
+  'tracker.signedOut':
+    'You are signed out. Keep scoring: what you enter is kept on this device and sent once you sign in again.',
+  'tracker.signedOutKept_one':
+    'You are signed out. {count} play is being kept on this device and is sent once you sign in again.',
+  'tracker.signedOutKept_other':
+    'You are signed out. {count} plays are being kept on this device and are sent once you sign in again.',
+  // No longer allowed to score, with plays still on the device (finding M2).
+  'tracker.notAllowedKept_one':
+    'You are no longer allowed to score this game. {count} play is still on this device and is not saved. If an admin gives the game back to you, open it again here and it is sent.',
+  'tracker.notAllowedKept_other':
+    'You are no longer allowed to score this game. {count} plays are still on this device and are not saved. If an admin gives the game back to you, open it again here and they are sent.',
   'tracker.notApplied_one': '{count} action was not applied. The game now shows what was saved.',
   'tracker.notApplied_other':
     '{count} actions were not applied. The game now shows what was saved.',

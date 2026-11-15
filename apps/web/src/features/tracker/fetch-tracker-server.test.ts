@@ -21,6 +21,24 @@ const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }),
   );
 const signal = new AbortController().signal;
+const page = (status: number) => () =>
+  Promise.resolve(
+    new Response('<html>Blocked by the network</html>', {
+      status,
+      headers: { 'content-type': 'text/html' },
+    }),
+  );
+/** Refusals that are not the server's own: a page in between, another body, the wrong status. */
+const foreignRefusals: (() => Promise<Response>)[] = [
+  page(401),
+  page(403),
+  page(404),
+  page(400),
+  () => json(403, { error: 'x' }),
+  () => json(404, { message: 'Not Found' }),
+  () => json(403, { error: 'not-found' }),
+  () => json(401, { error: 'not-allowed' }),
+];
 
 describe('fetch tracker server: the session', () => {
   it("posts the request to the game's session endpoint, named by the league's id (T-229)", async () => {
@@ -32,6 +50,13 @@ describe('fetch tracker server: the session', () => {
     expect(calls[0]?.init?.method).toBe('POST');
     expect(calls[0]?.init?.signal).toBe(signal);
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual(request);
+  });
+
+  it('is sent even as the page goes away, so leaving the page releases the session', async () => {
+    const reply: SessionReply = { status: 'ended', reason: 'released', sentAt: 5 };
+    const { calls, server } = serverAnswering(() => json(200, reply));
+    await server.session({ type: 'release', sessionId }, signal);
+    expect(calls[0]?.init?.keepalive).toBe(true);
   });
 
   it('reads a refusal from its body, whatever the status', async () => {
@@ -46,9 +71,11 @@ describe('fetch tracker server: the session', () => {
   it('is turned away when signed out, and unanswered with no network or a page not ours', async () => {
     const answers: [() => Promise<Response>, string][] = [
       [() => json(401, { error: 'signed-out' }), 'rejected'],
+      [() => json(400, { error: 'invalid-input', issues: [] }), 'rejected'],
       [() => Promise.reject(new TypeError('Failed to fetch')), 'unanswered'],
       [() => json(503, {}), 'unanswered'],
       [() => Promise.resolve(new Response('<html>Wi-Fi</html>', { status: 200 })), 'unanswered'],
+      ...foreignRefusals.map((answer): [() => Promise<Response>, string] => [answer, 'unanswered']),
     ];
     for (const [answer, kind] of answers) {
       const { server } = serverAnswering(answer);
@@ -70,13 +97,29 @@ describe('fetch tracker server: the state', () => {
     expect(calls[0]?.init?.cache).toBe('no-store');
   });
 
-  it('is turned away for 401, 403 and 404, and unanswered otherwise', async () => {
-    for (const status of [401, 403, 404]) {
-      const { server } = serverAnswering(() => json(status, { error: 'x' }));
+  it("is turned away by the server's own 401, 403 and 404, and unanswered otherwise", async () => {
+    const own = [
+      [401, 'signed-out'],
+      [403, 'not-allowed'],
+      [404, 'not-found'],
+    ] as const;
+    for (const [status, error] of own) {
+      const { server } = serverAnswering(() => json(status, { error }));
       expect(await server.loadState(signal)).toEqual({ kind: 'rejected', httpStatus: status });
+    }
+    // Not the server's (finding G): a page in between, another body, or the wrong status.
+    for (const answer of foreignRefusals) {
+      const { server } = serverAnswering(answer);
+      expect(await server.loadState(signal)).toEqual({ kind: 'unanswered' });
     }
     const notState = serverAnswering(() => json(200, { sequence: 1, state: { version: 2 } }));
     expect(await notState.server.loadState(signal)).toEqual({ kind: 'unanswered' });
+    // It has the contract's marks, but the engine cannot read its plays.
+    for (const plays of [[null], [{ type: 'score' }]]) {
+      const malformed = { ...basketball.newGame(), plays };
+      const answer = serverAnswering(() => json(200, { sequence: 1, state: malformed }));
+      expect(await answer.server.loadState(signal)).toEqual({ kind: 'unanswered' });
+    }
     const down = serverAnswering(() => Promise.reject(new TypeError('offline')));
     expect(await down.server.loadState(signal)).toEqual({ kind: 'unanswered' });
   });

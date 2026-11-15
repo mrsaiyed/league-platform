@@ -14,13 +14,14 @@
 //   game is not live, the person may not score it, no such game): the tap stays
 //   waiting and the queue halts, because every later tap would be refused too. After
 //   `resume` the waiting taps go out in order, none skipped; `forget` drops them.
-// - the server could not take the batch as sent (400, 413, 422): the queue sends the
+// - the server could not take the batch as sent (its own 400): the queue sends the
 //   batch's taps one at a time; the one still turned away is kept as refused (`rule`),
 //   and the rest go on.
 // - the server does not speak the batch's protocol version, or turns the request away
 //   whole (signed out, not allowed, no such game): the queue halts with nothing changed.
-// - no answer (no network, a timeout, a server error): nothing changes, and the queue
-//   tries again after a wait that doubles up to half a minute (retry-delay.ts).
+// - no answer (no network, a timeout, a server error, a page that is not the server's
+//   own answer whatever its status): nothing changes, and the queue tries again after a
+//   wait that doubles up to half a minute (retry-delay.ts).
 // - the device's storage fails: nothing is lost that was stored; `storageFailure` says
 //   so (never `unansweredSince`: it is not the network), and the queue tries again.
 //
@@ -35,7 +36,10 @@ import {
 import type { CommandTransport, TransportOutcome } from './command-transport.ts';
 import {
   QueueError,
+  keptTap,
   type CommandRefusal,
+  type GameMoment,
+  type KeptTap,
   type QueueErrorCode,
   type QueueStorage,
   type QueuedCommand,
@@ -44,14 +48,18 @@ import { defaultRetryTiming, retryDelayMs, type RetryTiming } from './retry-dela
 
 /** Time as the queue sees it, so tests can move it on by hand. */
 export type QueueClock = {
-  /** Milliseconds, as Date.now(). */
+  /**
+   * Milliseconds on a steady clock (finding M3): near Date.now() when the page opened,
+   * then counting on by itself, never moved when the device's clock is changed. The
+   * server's time is measured against it, and replies are timed by it.
+   */
   readonly now: () => number;
   /** Runs `run` once after `ms`; the function returned cancels it. */
   readonly after: (ms: number, run: () => void) => () => void;
 };
 
 export const browserClock: QueueClock = {
-  now: () => Date.now(),
+  now: () => performance.timeOrigin + performance.now(),
   after: (ms, run) => {
     const timer = setTimeout(run, ms);
     return () => clearTimeout(timer);
@@ -75,6 +83,12 @@ export type RefusedCommand = {
 export type QueueStatus = {
   /** Taps stored and not yet answered for, including any being sent now. */
   readonly waiting: number;
+  /**
+   * Those taps, oldest first, with where in the game each was made, so the screens can
+   * say which plays are not on the server yet (findings L1, I). Read with the count, so
+   * the two always agree.
+   */
+  readonly waitingTaps: readonly KeptTap[];
   /** Taps the server refused, oldest first, until `forget` drops them. */
   readonly refused: readonly RefusedCommand[];
   /** True while the queue is sending or about to. */
@@ -93,6 +107,11 @@ export type QueueStatus = {
   readonly storageFailure: StorageFailure | null;
   /** The game's sequence number in the server's latest answer. */
   readonly sequence: number | null;
+  /**
+   * When the server last answered that it has taps of this queue (accepted or
+   * duplicate), in clock milliseconds; null until it has (finding L1).
+   */
+  readonly savedAt: number | null;
 };
 
 export type StorageFailure = { readonly code: QueueErrorCode; readonly since: number };
@@ -119,11 +138,12 @@ export type TrackerQueue = {
   /** Reads what the device already holds for the game, and starts sending it. */
   start(): Promise<void>;
   /**
-   * Stores a tap at the end of the queue. Resolves once it is stored: confirm the tap
-   * on screen only then (T-114). Rejects if it could not be stored, or if its command
-   * ID is already held for another game (`command-id-in-other-game`).
+   * Stores a tap at the end of the queue, with where in the game it was made (kept
+   * beside it, never sent). Resolves once it is stored: confirm the tap on screen only
+   * then (T-114). Rejects if it could not be stored, or if its command ID is already
+   * held for another game (`command-id-in-other-game`).
    */
-  enqueue(command: TrackerCommand): Promise<void>;
+  enqueue(command: TrackerCommand, moment?: GameMoment): Promise<void>;
   /** Sends now instead of waiting: the network is back, or a scoring session was taken. */
   wake(): void;
   /**
@@ -137,6 +157,11 @@ export type TrackerQueue = {
    * A halt is cleared once no waiting tap is left for it to hold back.
    */
   forget(commandIds: readonly string[]): Promise<void>;
+  /**
+   * Keeps waiting taps as not saved: never sent, still stored until `forget`, so the
+   * list survives a reload (T6 §5). A halt is cleared as `forget` clears it.
+   */
+  setAside(commandIds: readonly string[]): Promise<void>;
   status(): QueueStatus;
   /** Called with the new status after every change. Returns the unsubscribe. */
   subscribe(listener: (status: QueueStatus) => void): () => void;
@@ -167,12 +192,14 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
 
   let current: QueueStatus = {
     waiting: 0,
+    waitingTaps: [],
     refused: [],
     sending: false,
     halted: null,
     unansweredSince: null,
     storageFailure: null,
     sequence: null,
+    savedAt: null,
   };
   const listeners = new Set<(status: QueueStatus) => void>();
   let started = false;
@@ -216,8 +243,12 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     const list = await stored('storage-read-failed', () => storage.list(gameId));
     if (ticket > readsShown) {
       readsShown = ticket;
+      const waitingTaps = list.flatMap((entry) =>
+        entry.state === 'waiting' ? [keptTap(entry)] : [],
+      );
       update({
-        waiting: list.filter((entry) => entry.state === 'waiting').length,
+        waiting: waitingTaps.length,
+        waitingTaps,
         refused: list.flatMap((entry) =>
           entry.state === 'refused' ? [{ command: entry.command, refusal: entry.refusal }] : [],
         ),
@@ -262,11 +293,20 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     update({ unansweredSince: null, ...change });
   };
 
-  const settle = (remove: readonly string[], refuse: readonly RefusedEntry[]): Promise<void> =>
-    stored('storage-write-failed', () => storage.settle(gameId, { remove, refuse }));
+  const settle = (
+    remove: readonly string[],
+    refuse: readonly RefusedEntry[],
+    notSaved: readonly string[] = [],
+  ): Promise<void> =>
+    stored('storage-write-failed', () => storage.settle(gameId, { remove, refuse, notSaved }));
 
   const nextBatch = (list: readonly QueuedCommand[], session: string): CommandBatch | null => {
-    const waiting = list.filter((entry) => entry.state === 'waiting');
+    // A tap made under another session is never sent under this one (T6 §5, record 049):
+    // it stays waiting until the tracker sets it aside as not saved.
+    const waiting = list.filter(
+      (entry) =>
+        entry.state === 'waiting' && (entry.sessionId === undefined || entry.sessionId === session),
+    );
     const first = waiting[0];
     if (first === undefined) return null;
     // A batch carries one version: taps stored before a release go out as they were made.
@@ -356,6 +396,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     answered({
       sequence: Math.max(current.sequence ?? 0, outcome.reply.sequence),
       ...(halt === null ? {} : { halted: halt }),
+      ...(remove.length === 0 ? {} : { savedAt: clock.now() }),
     });
     await refresh();
     return halt === null;
@@ -387,6 +428,17 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     }
   };
 
+  /** Drops taps, or keeps them as not saved; either way they are never sent. */
+  const putAway = async (remove: readonly string[], notSaved: readonly string[]) => {
+    await settle(remove, [], notSaved);
+    const list = await refresh();
+    // Nothing left for the halt to hold back: the queue is free again.
+    if (current.halted !== null && !list.some((entry) => entry.state === 'waiting')) {
+      update({ halted: null });
+    }
+    kick();
+  };
+
   return {
     async start() {
       if (started || stopped) return;
@@ -395,13 +447,15 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       kick();
     },
 
-    async enqueue(command) {
+    async enqueue(command, moment) {
       if (stopped) throw new QueueError('queue-stopped');
-      // Each tap keeps the session it was made under (T6 §5, record 049).
+      // Each tap keeps the session it was made under (T6 §5, record 049), and where in
+      // the game it was made (finding I).
       const session = sessionId();
       const madeUnder = session === null ? {} : { sessionId: session };
+      const madeAt = moment === undefined ? {} : { moment };
       const added = await stored('storage-write-failed', () =>
-        storage.add(gameId, { protocolVersion, command, ...madeUnder }),
+        storage.add(gameId, { protocolVersion, command, ...madeUnder, ...madeAt }),
       );
       // Stored: whatever happens next, the tap is kept. If the read after it fails, the
       // count goes up by hand, so the screen never shows fewer waiting than are held.
@@ -409,7 +463,12 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       try {
         await refresh();
       } catch {
-        if (added === 'added' && readsShown === shown) update({ waiting: current.waiting + 1 });
+        if (added === 'added' && readsShown === shown) {
+          update({
+            waiting: current.waiting + 1,
+            waitingTaps: [...current.waitingTaps, { command, moment: moment ?? null }],
+          });
+        }
       }
       kick();
     },
@@ -425,15 +484,9 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       kick();
     },
 
-    async forget(commandIds) {
-      await settle(commandIds, []);
-      const list = await refresh();
-      // Nothing left for the halt to hold back: the queue is free again.
-      if (current.halted !== null && !list.some((entry) => entry.state === 'waiting')) {
-        update({ halted: null });
-      }
-      kick();
-    },
+    forget: (commandIds) => putAway(commandIds, []),
+
+    setAside: (commandIds) => putAway([], commandIds),
 
     status: () => current,
 

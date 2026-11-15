@@ -14,11 +14,13 @@ import {
   type StandingsData,
 } from '../../command/testing/memory-standings-stores.ts';
 import type { SeasonStatus } from './league-values.ts';
-import type { DivisionRecord, LeagueRecord, LeaguesTx, SettingPlace } from './ports.ts';
+import type { DivisionRecord, LeagueRecord, LeaguesTx, NewLeague, SettingPlace } from './ports.ts';
 
 export type MemoryLeagues = {
   /** Undefined until createLeague runs. */
   league: LeagueRecord | undefined;
+  /** What createLeague was asked to store, once it ran. */
+  made?: NewLeague;
   staff: string[];
   /** Short names held by other leagues or their forwarding. */
   otherLeaguesSlugs: string[];
@@ -191,6 +193,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
         createLeague: async (league) => {
           if (s.league !== undefined) return 'league-exists';
           if (s.otherLeaguesSlugs.includes(league.slug)) return 'short-name-taken';
+          s.made = league;
           s.league = {
             id: leagueId,
             name: league.name,
@@ -223,7 +226,15 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
             return 'slug-taken';
           }
           const id = `season-${s.seasons.length + 1}`;
-          s.seasons.push({ id, programId: season.programId, slug: season.slug, isCurrent: false });
+          s.seasons.push({
+            id,
+            programId: season.programId,
+            slug: season.slug,
+            isCurrent: false,
+            name: season.name,
+            startsOn: season.startsOn,
+            endsOn: season.endsOn,
+          });
           return id;
         },
         findSeason: async (seasonId) => {

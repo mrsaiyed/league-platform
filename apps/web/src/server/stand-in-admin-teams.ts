@@ -11,11 +11,13 @@
 import type {
   AccessReader,
   ActivityEntry,
+  Audience,
   CommandDeps,
   PeopleStore,
   PersonRecord,
   RosterEntryRecord,
   StoredSetting,
+  StoredSettingRow,
   TeamRecord,
   TeamsStore,
 } from '@srleagues/core';
@@ -46,6 +48,13 @@ export type StandInAdminTeamsOptions = {
   readonly seededLeagueId?: string;
   /** The season asks for a different number for each player (default: it does not). */
   readonly uniqueJerseys?: boolean;
+  /** Who plays in each league (R-25); youth, the careful reading, where not given. */
+  readonly audienceOf?: (leagueId: string) => Audience;
+  /**
+   * The league's own stored values of a setting from League settings (the name policy's,
+   * R-25). Where not given, this stand-in's own made-up settings.
+   */
+  readonly settingRowsOf?: (leagueId: string, key: string) => Promise<readonly StoredSettingRow[]>;
 };
 
 const uuid = () => randomUUID();
@@ -138,7 +147,16 @@ export function standInAdminTeams(options: StandInAdminTeamsOptions): AdminTeams
     transaction: (context, work) =>
       serially(async () => {
         const draft = structuredClone(stateOf(context.leagueId));
-        const result = await work(txOver(draft, options.accessOf(context.leagueId)));
+        const { leagueId } = context;
+        const result = await work(
+          txOver(draft, options.accessOf(leagueId), {
+            audience: options.audienceOf?.(leagueId) ?? 'youth',
+            settingRows:
+              options.settingRowsOf === undefined
+                ? undefined
+                : (key) => options.settingRowsOf?.(leagueId, key) ?? Promise.resolve([]),
+          }),
+        );
         states.set(context.leagueId, draft);
         return result;
       }),
@@ -164,7 +182,13 @@ export function standInAdminTeams(options: StandInAdminTeamsOptions): AdminTeams
   };
 }
 
-function txOver(s: LeagueState, access: AccessReader): AdminTeamsTx {
+/** What a person's name request reads of the league (R-25). */
+type NameRules = {
+  readonly audience: Audience;
+  readonly settingRows: ((key: string) => Promise<readonly StoredSettingRow[]>) | undefined;
+};
+
+function txOver(s: LeagueState, access: AccessReader, names: NameRules): AdminTeamsTx {
   const clash = (t: { seasonId: string; slug: string; name: string }, except?: string) => {
     const others = s.teams.filter((o) => o.id !== except && !o.binned && o.seasonId === t.seasonId);
     if (others.some((o) => o.slug === t.slug)) return 'slug-taken' as const;
@@ -347,6 +371,13 @@ function txOver(s: LeagueState, access: AccessReader): AdminTeamsTx {
     },
     isOnRoster: async (personId) =>
       s.roster.some((r) => r.personId === personId && r.leftOn === null),
+    leagueAudience: async () => names.audience,
+    leagueSettingRows: async (key) =>
+      names.settingRows !== undefined
+        ? (await names.settingRows(key)).filter((row) => row.level === 'league')
+        : (s.settings[key] ?? [])
+            .filter((row) => row.level === 'league')
+            .map((row) => ({ ...row, version: 1 })),
   };
 
   return {

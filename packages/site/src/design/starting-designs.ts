@@ -30,8 +30,10 @@ const definitions = {
       accent: '#e8590c',
       highlight: '#b4236b',
     },
-    fonts: { heading: 'oswald', body: 'inter' },
-    corners: 'sharp',
+    // Plain type and rounded panels: what the light standard is made of (docs/build/DESIGN.md,
+    // section 3).
+    fonts: { heading: 'source-sans', body: 'inter' },
+    corners: 'round',
     cards: 'raised',
     spacing: 'comfortable',
   },

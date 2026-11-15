@@ -28,7 +28,9 @@ To start, copy the example file:
 cp .env.example .env
 ```
 
-`.env.example` holds only made-up values, so the copy works as it is for local work. Every setting it lists is checked when the web app starts. The only optional ones are `LOG_LEVEL` and `TRUSTED_PROXY`. If a required setting is missing or invalid, the app refuses to start and names the setting; it never prints a value.
+`.env.example` holds only made-up values, so the copy works as it is for local work. Local work needs only the lines that are not commented out: `APP_ENV`, `PUBLIC_BASE_URL` and `EMAIL_FROM` (with `LOG_LEVEL` and `TRUSTED_PROXY`, which have defaults). The database address, the sign-in service and the email key are needed only in staging and production, and the session secret and the two Stripe keys only once something uses them (finding R8); any of them given is still checked. If a setting the app needs is missing, or one given is invalid, the app refuses to start and names the setting; it never prints a value.
+
+The web app and the worker name their database `PLATFORM_DATABASE_URL`. The live tracker's is `DATABASE_URL`. The names differ on purpose, so a settings file made for one can never point the other at its database.
 
 Two rules to keep in mind:
 
@@ -44,6 +46,8 @@ npm run dev:web
 This starts Next.js in development mode, with the address in `PUBLIC_BASE_URL` (the example uses `http://localhost:3000`). Stop it with Ctrl+C.
 
 With `APP_ENV=local`, the web app holds made-up leagues and made-up people in memory, in the process. It opens **no database and no sign-in service**: the sign-in screens and the made-up people are described in record 031 and in the header of `apps/web/src/server/stand-in-ports.ts`. Restarting the app puts the made-up data back to its starting state.
+
+To run it on the made-up database instead, put `LOCAL_DATA=made-up-database` in `.env` (local and test only). The app then builds a database in memory when it starts, with every migration and the two seed leagues (below), and reads leagues, signed-in people and what they hold from it. Sign-in still uses the stand-in's screens; the stand-in's made-up people do not exist there. The areas not yet moved onto the database (step 2.93, record 055) show an error page. It too opens no address and is gone when the app stops.
 
 To build and run the production build locally:
 
@@ -68,7 +72,7 @@ To keep the database in another folder, pass the folder after `--`:
 npm run seed -- path/to/folder
 ```
 
-Nothing in the web app reads `.local/seed-db` yet. The web app's local mode uses its own in-memory stand-in (above). The seeded database is used by the database tests and is ready for the stage that connects the web app to it (record 048).
+Nothing in the web app reads `.local/seed-db`: its local mode uses its own in-memory stand-in, or with `LOCAL_DATA=made-up-database` a fresh database in memory loaded the same way (above). The seeded folder is for the database tests and the tracker transfer (record 048).
 
 The seed script opens a folder on this computer, never a network address (T-201).
 
@@ -85,6 +89,18 @@ Without `--run` it only shows the plan and changes nothing: which teams and play
 It is safe to run again: a game already brought over is only compared, and a run that was stopped part-way carries on where it was (a person it had added but not yet put on their team is put on it, not added twice).
 
 It opens a database folder on this computer and refuses anything that reads as a network address (T-201). Use it on made-up backups: a backup of the live tracker holds real people's names, and bringing one over waits for the founder.
+
+## Make a league
+
+```sh
+npm run league:make -- --name "Made-up Hoops" --short-name made-up-hoops --city Springfield --contact-email hello@example.test --owner-email owner@example.test --as you@example.test
+```
+
+This makes a league in draft, with its first season as the current one, in one step through the product's own commands (step 2.125, [record 057](../architecture/decisions/057-making-a-league-from-this-computer.md)). It is how we put a league on the platform until self-serve sign-up exists (P3 §8). Anything not given is asked for. **Who plays** (adults, under-18s or both) is left out of the example on purpose, so it is always answered when asked: it decides how players' names are shown and whether the league finder lists the league, and there is no screen to change it afterwards yet. The sport (basketball), the time zone (this computer's; a named zone such as America/Chicago, never an offset or an abbreviation) and the first season's name (from today's date in the league's time zone, such as "Fall 2026" or "Winter 2026–2027") have suggestions; the season's start and end dates (`--season-starts`, `--season-ends`, YYYY-MM-DD) may be left out. `--listed yes` or `--listed no` chooses whether the league finder lists it; otherwise adult leagues are listed and leagues with under-18s are not. `--as` is your own email, as our staff. The owner needs no account: one is made for their email, and it becomes theirs when they first sign in with it.
+
+It shows everything it will make, and where, and makes nothing unless you type `yes` at a terminal. Where: on this computer, in `--db <folder>` if given, otherwise the local test database in `.local/seed-db`, even when hosted settings are in the environment or `.env` (it says it is not using them). A short name another league holds, or a database that is not at this code's migrations (none applied, behind or ahead), makes nothing. If the league is refused, the accounts the run made are removed again, and it says so.
+
+A hosted database needs `--hosted`, a person at a terminal, two logins given for that one command, and the league's short name typed as the answer: follow [make a league on a real database](make-a-league.md), and only for the test copy, in a session the founder started (T-201).
 
 ## Checks
 
@@ -143,7 +159,7 @@ Open `http://127.0.0.1:4180`. Without `DATABASE_URL`, it saves to embedded Postg
 ## What not to do
 
 - Do not put a real connection string, password or key in `.env` for local work.
-- Do not point `DATABASE_URL` at a production database. Real people's data is only in production, and nothing on a laptop should reach it (T-13, T-201).
+- Do not point `PLATFORM_DATABASE_URL` or `DATABASE_URL` at a production database. Real people's data is only in production, and nothing on a laptop should reach it (T-13, T-201).
 - Do not commit `.env`, `.local/` or any `.env.*` file except `.env.example`. Git ignores them, but check `git status` before committing.
 
 ## If something does not start

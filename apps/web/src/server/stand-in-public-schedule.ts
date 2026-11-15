@@ -475,15 +475,38 @@ export function standInPublicSchedule(
   const find = (leagueId: string, seasonId: string): League | undefined =>
     seasonsOf(ids, leagueId).find((l) => l.seasonId === seasonId);
   return {
-    clockOf: async (leagueId): Promise<LeagueClock> => ({
-      today: todayIn(now(), zoneOf(leagueId)),
-      timeZone: zoneOf(leagueId),
-    }),
+    clockOf: async (leagueId): Promise<LeagueClock> => {
+      const moment = now();
+      return {
+        today: todayIn(moment, zoneOf(leagueId)),
+        now: moment.toISOString(),
+        timeZone: zoneOf(leagueId),
+      };
+    },
     scheduleOf: async (leagueId, seasonId, today) => {
       const found = find(leagueId, seasonId);
       return found === undefined
         ? undefined
         : build(found.spec, found.teams, today, zoneOf(leagueId));
+    },
+    // One game's facts. The made-up schedules are small and in memory, so this looks the
+    // game up in its season; the database-backed source reads the one row.
+    gameFactsOf: async (leagueId, seasonId, gameId) => {
+      const found = find(leagueId, seasonId);
+      if (found === undefined) return undefined;
+      const zone = zoneOf(leagueId);
+      const schedule = build(found.spec, found.teams, todayIn(now(), zone), zone);
+      const game = [...schedule.rounds.flatMap((r) => r.games), ...schedule.unplacedGames].find(
+        (g) => g.id === gameId,
+      );
+      return game === undefined
+        ? undefined
+        : {
+            number: game.number,
+            venue: game.venue,
+            courtName: game.courtName,
+            season: { slug: found.spec.choice.slug, isCurrent: found.spec.choice.isCurrent },
+          };
     },
   };
 }

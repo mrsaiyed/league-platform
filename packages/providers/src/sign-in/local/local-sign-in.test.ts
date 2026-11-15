@@ -100,6 +100,7 @@ describe('sign-up with an emailed code', () => {
     expect(who).toEqual({
       accountId: created.accountId,
       email: 'ana@example.test',
+      emailConfirmed: true,
       sessionId: created.session.sessionId,
       hasPassword: true,
       passwordEnteredAt: new Date(Date.UTC(2026, 10, 13, 12)),
@@ -517,6 +518,7 @@ describe('Google sign-in', () => {
     const who = value(await env.sign.identify({ accessToken: created.session.accessToken }));
     expect(who).toMatchObject({
       email: 'cara@example.test',
+      emailConfirmed: true,
       hasPassword: false,
       passwordEnteredAt: null,
       lastSignInAt: new Date(Date.UTC(2026, 10, 13, 12)),
