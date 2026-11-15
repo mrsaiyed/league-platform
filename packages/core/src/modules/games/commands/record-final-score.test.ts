@@ -1,11 +1,15 @@
 import { tablePlayerEventTypes } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
-import { memoryTracker } from '../memory-tracker.test-helper.ts';
+import { sessionUuid, startOfTest } from '../memory-scoring.test-helper.ts';
+import { lockingTracker, memoryTracker } from '../memory-tracker.test-helper.ts';
 import type { NewGameEvent } from '../ports.ts';
+import { leaseMs } from '../scoring-session.ts';
+import { applyTrackerCommands } from './apply-tracker-commands.ts';
 import {
   finalGame,
   game,
   gameUuid,
+  homeTeamId,
   memoryGames,
   ownerId,
   programAdminGrant,
@@ -218,6 +222,79 @@ describe('recordFinalScore over a game the live tracker scores (S-46)', () => {
     });
     expect(await recordFinalScore(as(ownerId), input, deps)).toMatchObject({ ok: true });
     expect(db.state.games[0]).toMatchObject({ status: 'final', homeScore: 52, awayScore: 48 });
+  });
+
+  it("takes the game's lock (T-111): a batch of lineups and a typed score never pass each other", async () => {
+    const homePlayer = '01900000-0000-7000-8000-000000010001';
+    const lineups = {
+      gameId: gameUuid(1),
+      protocolVersion: 1,
+      sessionId: sessionUuid(1),
+      commands: [
+        {
+          commandId: '01900000-0000-7000-8000-0000c0000001',
+          at: startOfTest,
+          input: { type: 'lineup' as const, side: 'home' as const, playerIds: [homePlayer] },
+        },
+      ],
+    };
+    /** The first to take the lock holds it until the second has started and is waiting. */
+    const race = async (first: 'batch' | 'score') => {
+      let letGo = () => {};
+      const held = new Promise<void>((resolve) => (letGo = resolve));
+      let locks = 0;
+      const t = lockingTracker(
+        {
+          games: [game(1, { captureMode: 'live' })],
+          grants: [scorekeeperGrant],
+          sessions: [
+            {
+              id: sessionUuid(1),
+              gameId: gameUuid(1),
+              accountId: scorekeeperId,
+              deviceId: 'tablet',
+              since: startOfTest,
+              heldUntil: startOfTest + leaseMs,
+            },
+          ],
+          players: [
+            { personId: homePlayer, teamId: homeTeamId, jerseyNumber: '4', onGameDay: true },
+          ],
+        },
+        async () => {
+          locks += 1;
+          if (locks === 1) await held;
+        },
+      );
+      const batch = () => applyTrackerCommands(t.as(scorekeeperId), lineups, t.deps);
+      const score = () => recordFinalScore(t.as(ownerId), input, t.deps);
+      const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
+      const one = first === 'batch' ? batch() : score();
+      await tick();
+      let twoDone = false;
+      const two = (first === 'batch' ? score() : batch()).finally(() => (twoDone = true));
+      await tick();
+      // The second is waiting for the game: it has not got it, and has not finished.
+      expect([locks, twoDone]).toEqual([1, false]);
+      letGo();
+      await Promise.all([one, two]);
+      return { t, typed: await (first === 'batch' ? two : one) };
+    };
+
+    // The batch holds the game first: the typed score waits, then sees the lineups (S-46).
+    const batchFirst = await race('batch');
+    expect(batchFirst.typed).toEqual({ ok: false, error: { code: 'game-is-tracked' } });
+    expect(batchFirst.t.db.state.events.map((e) => e.type)).toEqual(['lineup']);
+    expect(batchFirst.t.db.state.games[0]?.status).not.toBe('final');
+
+    // The typed score holds the game first: it is saved before the batch is looked at.
+    const scoreFirst = await race('score');
+    expect(scoreFirst.typed).toMatchObject({ ok: true });
+    expect(scoreFirst.t.db.state.games[0]).toMatchObject({
+      status: 'final',
+      homeScore: 52,
+      awayScore: 48,
+    });
   });
 
   it('counts only the plays since the game was last marked not started (record 061)', async () => {

@@ -266,6 +266,8 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     activity: { record: async (entry) => void s.activity.push(entry), list: async () => [] },
     games: {
       find: async (gameId) => s.games.find((g) => g.id === gameId),
+      // Step 2.154: the stand-in runs one change at a time, so the lock is whether it is here.
+      lockGame: async (gameId) => s.games.some((g) => g.id === gameId),
       setResult: async (gameId, change, version) => {
         const index = s.games.findIndex((g) => g.id === gameId);
         const found = s.games[index];

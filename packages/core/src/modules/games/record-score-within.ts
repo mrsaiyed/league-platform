@@ -24,11 +24,10 @@ export async function recordFinalScoreWithin(args: {
   readonly action: string;
 }): Promise<Result<{ version: number }, DecideGameError>> {
   const { context, tx, emit } = args;
-  const found = await tx.games.find(args.gameId);
-  const version = args.version ?? found?.version ?? 0;
-  const open = await openGameByHand(tx, found, version);
+  const open = await openGameByHand(tx, args.gameId, args.version);
   if (!open.ok) return open;
   const game = open.value;
+  const version = game.version;
   if (args.homeScore === args.awayScore) {
     const rules = await effectiveRulesOf(tx, game);
     if (!rules.allowTies) return fail({ code: 'tie-not-allowed' });

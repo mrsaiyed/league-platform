@@ -44,13 +44,20 @@ export function openGame(
  * store's own rule (`hasPlays`): plays since the game was last marked not started, never
  * the players added at its scorer's table. A game set to live tracking with none yet can
  * still be finished by hand.
+ *
+ * It takes the game's lock first, as the tracker's commands do (T-111), and reads the
+ * game under it: a batch of plays in flight (which may change no `games` row, only add
+ * lineups) commits first and is seen, and none can arrive until this one has decided.
  */
 export async function openGameByHand(
   tx: GamesTx,
-  game: GameRecord | undefined,
-  version: number,
+  gameId: string,
+  /** The version the caller saw; the game's own, as read under the lock, when left out. */
+  version: number | undefined,
 ): Promise<Result<GameRecord, DecideGameError>> {
-  const open = openGame(game, version);
+  if (!(await tx.games.lockGame(gameId))) return fail({ code: 'game-not-found' });
+  const found = await tx.games.find(gameId);
+  const open = openGame(found, version ?? found?.version ?? 0);
   if (!open.ok) return open;
   if (await tx.games.hasPlays(open.value.id)) return fail({ code: 'game-is-tracked' });
   return open;

@@ -34,7 +34,7 @@ export const recordFinalScore = defineCommand({
     tx,
     emit,
   }): Promise<Result<{ version: number }, RecordFinalScoreError>> => {
-    const open = await openGameByHand(tx, await tx.games.find(input.gameId), input.version);
+    const open = await openGameByHand(tx, input.gameId, input.version);
     if (!open.ok) return open;
     const game = open.value;
     if (input.homeScore === input.awayScore) {
