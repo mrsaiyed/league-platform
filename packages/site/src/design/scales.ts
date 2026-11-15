@@ -14,7 +14,10 @@ export const stepVariables = {
   '--step-8': '4rem',
 } as const;
 
-/** 12, 14, 16, 18, 22, 28, 36. */
+/**
+ * 12, 14, 16, 18, 22, 28, 36 for reading and titles; 48, 64 and 88 for display: a hero's
+ * title, a big number, the score of a scoreboard.
+ */
 export const textVariables = {
   '--text-12': '0.75rem',
   '--text-14': '0.875rem',
@@ -23,6 +26,9 @@ export const textVariables = {
   '--text-22': '1.375rem',
   '--text-28': '1.75rem',
   '--text-36': '2.25rem',
+  '--text-48': '3rem',
+  '--text-64': '4rem',
+  '--text-88': '5.5rem',
 } as const;
 
 /**

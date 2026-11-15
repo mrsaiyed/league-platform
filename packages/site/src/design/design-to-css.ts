@@ -5,7 +5,7 @@
 // is built from (scales.ts), so the stylesheets hold no color, size or gap of their own.
 import type { DesignDocument } from './design-document.ts';
 import { derivedColors } from './derived-colors.ts';
-import { fontStacks } from './fonts.ts';
+import { fontStacks, scoreFont } from './fonts.ts';
 import { frameVariables } from './frame-look.ts';
 import { spacingVariables, stepVariables, tapVariables, textVariables } from './scales.ts';
 
@@ -53,7 +53,19 @@ export function designToCssVariables(design: DesignDocument): Record<string, str
     accent: color(design.colors.accent, 'accent'),
     highlight: color(design.colors.highlight ?? design.colors.accent, 'highlight'),
   };
-  const derived = derivedColors(chosen);
+  const derived = derivedColors(chosen, base);
+  // Checked before the frame is worked out from them: a font or a corner that is not one
+  // of ours is refused here.
+  const fonts = {
+    '--font-heading': known(fontStacks, design.fonts.heading, 'font'),
+    '--font-body': known(fontStacks, design.fonts.body, 'font'),
+    '--font-score': fontStacks[scoreFont(design.fonts)],
+  };
+  const shape = {
+    ...known(corners, design.corners, 'corners'),
+    ...known(cards, design.cards, 'cards'),
+    ...known(spacingVariables, design.spacing, 'spacing'),
+  };
   return {
     '--color-background': chosen.background,
     '--color-panel': chosen.panel,
@@ -69,15 +81,26 @@ export function designToCssVariables(design: DesignDocument): Record<string, str
     '--color-on-highlight': derived.onHighlight,
     '--color-danger': derived.danger,
     '--color-on-danger': derived.onDanger,
-    '--font-heading': known(fontStacks, design.fonts.heading, 'font'),
-    '--font-body': known(fontStacks, design.fonts.body, 'font'),
-    ...known(corners, design.corners, 'corners'),
-    ...known(cards, design.cards, 'cards'),
-    ...known(spacingVariables, design.spacing, 'spacing'),
+    '--color-pop': derived.pop,
+    '--color-on-pop': derived.onPop,
+    '--color-band': derived.band,
+    '--color-band-deep': derived.bandDeep,
+    '--color-band-glow': derived.bandGlow,
+    '--color-on-band': derived.onBand,
+    '--color-band-muted': derived.bandMuted,
+    '--color-band-pop': derived.bandPop,
+    '--color-on-band-pop': derived.onBandPop,
+    '--color-band-pop-hover': derived.bandPopHover,
+    '--header-muted': derived.headerMuted,
+    '--header-pop': derived.headerPop,
+    '--color-ornament': derived.ornament,
+    '--color-ornament-line': derived.ornamentLine,
+    ...fonts,
+    ...shape,
     ...stepVariables,
     ...textVariables,
     ...tapVariables,
-    ...frameVariables[base],
+    ...frameVariables({ ...design, base, colors: chosen }),
     'color-scheme': base,
   };
 }

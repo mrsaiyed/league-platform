@@ -1,30 +1,71 @@
 import type { CSSProperties } from 'react';
 import { safeColor } from '../team-color.ts';
 
-/** The first letter of a name, whatever script it is written in. */
+/** Splits text into the characters a reader sees, where the runtime can. */
+const characters =
+  typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : undefined;
+
+/**
+ * The first letter of a name, whatever script it is written in: the whole character a
+ * reader sees, so a letter with its accent, a flag or a picture made of several parts is
+ * never cut in two.
+ */
 export function initialOf(name: string): string {
-  return Array.from(name.trim())[0] ?? '';
+  const trimmed = name.trim();
+  if (characters !== undefined) {
+    for (const { segment } of characters.segment(trimmed)) return segment;
+    return '';
+  }
+  return Array.from(trimmed)[0] ?? '';
 }
+
+/**
+ * The shield, drawn on a field 48 wide and 56 high: its outline, a second line just inside
+ * it, and a short bar over the letter. The hero's pattern is drawn from the same outline.
+ */
+export const shieldOutline = 'M3.5 3h41v27.5c0 12.2-20.5 22.7-20.5 22.7S3.5 42.7 3.5 30.5Z';
+const shieldInner = 'M7.5 7h33v23.3c0 9.4-16.5 18-16.5 18s-16.5-8.6-16.5-18Z';
+const shieldBar = 'M17 12.5h14';
 
 export type EmblemProps = {
   /** The team's name; only its first letter is drawn, and screen readers skip it. */
   readonly name: string;
   /** The team's own color, #rrggbb. */
   readonly color?: string | null | undefined;
-  readonly size?: 'card' | 'large';
+  /** `small` sits in a row of a table, `card` in a card, `large` at the head of a page. */
+  readonly size?: 'small' | 'card' | 'large';
+  /**
+   * A team's shield is drawn in the team's own color. The league's, in the header, is
+   * filled with the league's main color.
+   */
+  readonly kind?: 'team' | 'league';
 };
 
-/** A team's round emblem: its first letter in a ring of its own color. */
-export function Emblem({ name, color, size = 'card' }: EmblemProps) {
+/**
+ * A team's emblem: a shield with its first letter, drawn in the team's own color. Made
+ * from the team's data alone, as part of the page, so there is no picture to fetch. It
+ * says nothing to a screen reader: the team's name is always written beside it.
+ */
+export function Emblem({ name, color, size = 'card', kind = 'team' }: EmblemProps) {
   const safe = safeColor(color);
   return (
-    <span
+    <svg
       className="ui-emblem"
       data-size={size}
+      data-kind={kind}
+      viewBox="0 0 48 56"
       aria-hidden="true"
+      focusable="false"
       style={safe ? ({ '--team-color': safe } as CSSProperties) : undefined}
     >
-      {initialOf(name)}
-    </span>
+      <path className="ui-emblem-shield" d={shieldOutline} />
+      <path className="ui-emblem-inner" d={shieldInner} />
+      <path className="ui-emblem-bar" d={shieldBar} />
+      <text className="ui-emblem-letter" x="24" y="36.5" fontSize="23" textAnchor="middle">
+        {initialOf(name)}
+      </text>
+    </svg>
   );
 }

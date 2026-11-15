@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { Emblem } from '../emblem/emblem.tsx';
 import { safeColor } from '../team-color.ts';
 
 export type StandingsColumn = {
@@ -38,6 +39,11 @@ export type StandingsTableProps = {
   /** Makes the footnote addresses unique when a page holds several tables. */
   readonly idPrefix: string;
   readonly labels: StandingsTableLabels;
+  /**
+   * Draws each team's emblem (a shield with its first letter, in its color) beside its
+   * name, where the table otherwise draws a small chip of the team's color.
+   */
+  readonly emblems?: boolean;
 };
 
 /** One division's table, in the order given: the page ranks, this only shows. */
@@ -49,13 +55,14 @@ export function StandingsTable({
   footnotes = [],
   idPrefix,
   labels,
+  emblems = false,
 }: StandingsTableProps) {
   const numberOf = new Map(footnotes.map((n, i) => [n.id, i + 1]));
   const hasSeeds = rows.some((r) => r.seed !== undefined && r.seed !== null);
   return (
     <div className="ui-table-frame">
       <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? caption}>
-        <table className="ui-table ui-standings">
+        <table className="ui-table ui-standings" data-emblems={emblems ? 'true' : undefined}>
           <caption dir="auto">{caption}</caption>
           <thead>
             <tr>
@@ -88,7 +95,11 @@ export function StandingsTable({
                 >
                   {hasSeeds ? <td className="ui-num">{row.seed ?? ''}</td> : null}
                   <th scope="row" className="ui-team-cell">
-                    <span className="ui-team-chip" aria-hidden="true" />
+                    {emblems ? (
+                      <Emblem name={row.team} color={row.color} size="small" />
+                    ) : (
+                      <span className="ui-team-chip" aria-hidden="true" />
+                    )}
                     <span dir="auto">{row.team}</span>
                     {marks.map((m) => (
                       <sup key={m.id} className="ui-note-mark">

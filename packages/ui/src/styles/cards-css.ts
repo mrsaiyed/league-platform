@@ -2,27 +2,70 @@
 // number, and a group that opens and closes, such as a round of the schedule
 // (docs/build/DESIGN.md, section 3).
 export const cardsCss = String.raw`
-/* A team's round emblem: its first letter in a ring of its own color. */
+/* A team's emblem: a shield with its first letter, drawn in the team's own color. The
+   color is laid inside the shield and drawn strongly along its lines, with a little of the
+   page's text color in it, so a team's dark color still shows on a dark page and a pale
+   one on a light page. The letter is in the page's text color: it reads whatever color the
+   team chose. A team with no color of its own takes the league's accent. */
 .ui-emblem {
-  display: grid;
+  --emblem-color: var(--team-color, var(--color-accent));
   flex: none;
-  place-items: center;
-  inline-size: var(--step-7);
+  inline-size: auto;
   block-size: var(--step-7);
-  border: 2px solid var(--team-color, var(--color-line-strong));
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--team-color, var(--color-primary)) 18%, transparent);
-  color: var(--color-text);
-  font-family: var(--font-heading);
-  font-size: var(--text-18);
-  font-weight: 700;
-  line-height: 1;
-  text-transform: uppercase;
+  aspect-ratio: 6 / 7;
+  overflow: visible;
+  color: color-mix(in srgb, var(--emblem-color) 74%, var(--color-text));
+}
+.ui-emblem[data-size='small'] {
+  block-size: var(--step-5);
 }
 .ui-emblem[data-size='large'] {
-  inline-size: var(--step-8);
-  block-size: var(--step-8);
-  font-size: var(--text-28);
+  block-size: calc(var(--step-8) + var(--step-5));
+}
+/* How much of the team's color fills the shield is the design's (--emblem-strength): a
+   third on a dark panel, more than half on a white one, so it has the same strength on
+   either. */
+.ui-emblem-shield {
+  fill: color-mix(in srgb, var(--emblem-color) var(--emblem-strength, 30%), transparent);
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+.ui-emblem-inner,
+.ui-emblem-bar {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.6;
+  opacity: 0.8;
+}
+.ui-emblem-letter {
+  color: var(--color-text);
+  fill: currentColor;
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+  text-transform: uppercase;
+}
+/* In a row of a table the shield is small: only its outline and its letter are drawn. */
+.ui-emblem[data-size='small'] .ui-emblem-inner,
+.ui-emblem[data-size='small'] .ui-emblem-bar {
+  display: none;
+}
+.ui-emblem[data-size='small'] .ui-emblem-shield {
+  stroke-width: 2.4;
+}
+.ui-emblem[data-size='small'] .ui-emblem-letter {
+  font-weight: 700;
+}
+/* The league's own mark, in the header: a shield filled with the strongest color of its
+   bands (its main color, laid over a panel or deepened), edged in the color the eye lands
+   on in the header, its letter in the color of a band's words. */
+.ui-emblem[data-kind='league'] {
+  color: var(--header-pop);
+}
+.ui-emblem[data-kind='league'] .ui-emblem-shield {
+  fill: var(--color-band-glow);
+}
+.ui-emblem[data-kind='league'] .ui-emblem-letter {
+  color: var(--color-on-band);
 }
 
 .ui-team-card {
@@ -55,7 +98,7 @@ export const cardsCss = String.raw`
   margin: 0;
   font-family: var(--font-heading);
   font-size: var(--text-18);
-  font-weight: 700;
+  font-weight: var(--heading-weight);
   letter-spacing: var(--heading-tracking);
   line-height: 1.2;
   text-transform: var(--heading-case);
@@ -108,10 +151,10 @@ export const cardsCss = String.raw`
 }
 .ui-team-card-figure {
   flex: none;
-  color: var(--color-primary-text);
-  font-family: var(--font-heading);
+  color: var(--color-pop);
+  font-family: var(--font-score);
   font-size: var(--text-22);
-  font-weight: 700;
+  font-weight: var(--heading-weight);
   font-variant-numeric: lining-nums tabular-nums;
   line-height: 1;
 }
@@ -171,14 +214,14 @@ export const cardsCss = String.raw`
 }
 .ui-leader-value {
   flex: none;
-  font-family: var(--font-heading);
+  font-family: var(--font-score);
   font-size: var(--text-18);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  font-weight: var(--heading-weight);
+  font-variant-numeric: lining-nums tabular-nums;
   line-height: 1;
 }
 .ui-leader:first-child .ui-leader-value {
-  color: var(--color-primary-text);
+  color: var(--color-pop);
   font-size: var(--text-36);
 }
 

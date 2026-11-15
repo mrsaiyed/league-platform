@@ -41,7 +41,7 @@ export const seedLeagues: readonly SeedLeague[] = [
     slug: 'lakeside',
     name: 'Lakeside Hoops League',
     timeZone: 'America/Chicago',
-    design: 'midnight-gold',
+    design: 'crest',
     owner: { email: 'owner@lakeside.example.test', displayName: 'Ola Lakeside' },
     members: [
       { email: 'admin@lakeside.example.test', displayName: 'Adele Admin', role: 'admin' },

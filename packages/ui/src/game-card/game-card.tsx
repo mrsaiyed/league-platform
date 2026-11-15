@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { Emblem } from '../emblem/emblem.tsx';
 import { LiveMarker } from '../live-marker/live-marker.tsx';
 import { safeColor } from '../team-color.ts';
 
@@ -43,6 +44,19 @@ export type GameCardProps = {
    */
   readonly linkText?: string | undefined;
   readonly labels: GameCardLabels;
+  /**
+   * `rows` (the default) is the compact card: each team on its own row. `board` is the
+   * scoreboard: an emblem and a name on each side, and the score or "VS" large between
+   * them (docs/build/DESIGN.md, section 4, lines 10 and 27).
+   */
+  readonly layout?: 'rows' | 'board';
+  /**
+   * A quiet word about a game still marked to be played, already written by the page:
+   * "Awaiting result" for one whose start has passed. Drawn where a state's pill would be.
+   */
+  readonly note?: string | undefined;
+  /** A board picked out from the others: the game being played now. Larger figures. */
+  readonly featured?: boolean;
 };
 
 const statusKey = {
@@ -90,10 +104,87 @@ function Team({
 }
 
 /**
- * One game as a compact card: a quiet line saying when, with its state as a small pill, and
- * where on the line under it; then each team on its own row, its color and name at the start and its score at the
- * end. A card with somewhere to go is one link, whole: the link's words are kept for screen
- * readers and not drawn.
+ * A letter drawn about twice as wide as a Latin one: Chinese, Japanese, Korean (with the
+ * marks only those scripts use, like the long-vowel line), a picture, a full-width form.
+ */
+const wideLetter =
+  /[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}\p{scx=Hangul}\p{Extended_Pictographic}！-｠￠-￦]/u;
+/** A mark that sits on the letter before it and takes no room of its own. */
+const noRoom = /[\p{M}‍︎️]/u;
+
+/**
+ * The width of a piece of text counted in Latin letters, whatever script it is written
+ * in: a wide letter counts as two, a mark that sits on another letter as none.
+ */
+export function lettersWide(text: string): number {
+  let count = 0;
+  for (const letter of text) count += noRoom.test(letter) ? 0 : wideLetter.test(letter) ? 2 : 1;
+  return count;
+}
+
+/**
+ * How many letters wide a side of a scoreboard must be for a name to sit there on two
+ * lines and no more: the longer line of the name's best break into two. A name breaks
+ * only between its words, so that is not always half of it ("North Side Hawks" breaks
+ * into 10 and 5, or 5 and 10, never 8 and 8), and a name of one word needs the whole word.
+ * The board gives each side room for the longer of its two names and, where the card is
+ * too narrow for that, stands the teams one over the other (the stylesheet does the sum,
+ * from this number and the face's letter width).
+ */
+export function nameMeasure(name: string): number {
+  const words = name.trim().split(/\s+/).filter(Boolean).map(lettersWide);
+  // The whole name on one line: its words and the spaces between them.
+  const whole = words.reduce((sum, word) => sum + word, 0) + Math.max(0, words.length - 1);
+  let best = whole;
+  // The first line as it grows by a word at a time; the second is what is left.
+  let first = -1;
+  for (const word of words.slice(0, -1)) {
+    first += word + 1;
+    best = Math.min(best, Math.max(first, whole - first - 1));
+  }
+  return best;
+}
+
+/** One side of a scoreboard: the team's emblem and its name, and its own score. */
+function Side({
+  team,
+  isWinner,
+  scored,
+  labels,
+}: {
+  readonly team: GameCardTeam;
+  readonly isWinner: boolean;
+  /** The game has a score to show: this side carries its own, for the stacked board. */
+  readonly scored: boolean;
+  readonly labels: GameCardLabels;
+}) {
+  return (
+    <div className="ui-game-side" data-winner={isWinner ? 'true' : undefined}>
+      <span className="ui-game-side-team">
+        <Emblem name={team.name} color={team.color} />
+        <span className="ui-game-team-name" dir="auto">
+          {team.name}
+        </span>
+      </span>
+      {isWinner ? <span className="ui-visually-hidden">{labels.winner}</span> : null}
+      {/* Drawn only where the two teams stand one over the other, each then with its own
+          score at the end of its row. The score between the teams is the one a screen
+          reader is given, so this one is kept from it. */}
+      {scored ? (
+        <span className="ui-game-side-score" aria-hidden="true">
+          {team.score}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One game as a card. A quiet line says which game and when, with its state as a small
+ * pill. Then the teams: as a scoreboard (`board`), an emblem and a name on each side with
+ * the score or "VS" large between them and the place on a quiet line beneath; or compact
+ * (`rows`), each team on its own row with its score at the end. A card with somewhere to
+ * go is one link, whole: the link's words are kept for screen readers and not drawn.
  */
 export function GameCard({
   home,
@@ -105,12 +196,92 @@ export function GameCard({
   detailsHref,
   linkText,
   labels,
+  layout = 'rows',
+  note,
+  featured = false,
 }: GameCardProps) {
   const winner = winnerOf(status, home, away);
   let state: ReactNode = null;
   if (status === 'live') state = <LiveMarker label={labels.live} />;
   else if (status !== 'scheduled')
     state = <span className="ui-game-state">{labels[statusKey[status]]}</span>;
+  else if (note)
+    state = (
+      <span className="ui-game-state" data-kind="quiet">
+        {note}
+      </span>
+    );
+  const link = detailsHref ? (
+    <a className="ui-game-link" href={detailsHref}>
+      {linkText ? (
+        <span dir="auto">{linkText}</span>
+      ) : (
+        <>
+          {labels.viewBoxScore}{' '}
+          <span className="ui-visually-hidden" dir="auto">
+            {away.name} {labels.versus} {home.name}
+          </span>
+        </>
+      )}
+    </a>
+  ) : null;
+  if (layout === 'board') {
+    // A game shows its score once it has one to show: while it is played and after.
+    const scored =
+      (status === 'live' || status === 'final' || status === 'forfeit') &&
+      home.score !== null &&
+      away.score !== null;
+    return (
+      <article
+        className="ui-game-card"
+        data-status={status}
+        data-layout="board"
+        data-featured={featured ? 'true' : undefined}
+      >
+        <header className="ui-game-meta">
+          <span className="ui-game-about">
+            {numberText ? <span className="ui-game-number">{numberText}</span> : null}
+            <span className="ui-game-when">{whenText}</span>
+          </span>
+          {state}
+        </header>
+        <div
+          className="ui-game-board"
+          data-scored={scored ? 'true' : undefined}
+          style={
+            {
+              '--letters': Math.max(nameMeasure(home.name), nameMeasure(away.name)),
+              ...(scored ? { '--figures': `${away.score}${home.score}`.length } : {}),
+            } as CSSProperties
+          }
+        >
+          <Side team={away} isWinner={winner === 'away'} scored={scored} labels={labels} />
+          <div className="ui-game-middle">
+            {scored ? (
+              <p className="ui-game-score">
+                <span data-winner={winner === 'away' ? 'true' : undefined}>{away.score}</span>
+                <span className="ui-game-score-colon" aria-hidden="true">
+                  :
+                </span>{' '}
+                <span data-winner={winner === 'home' ? 'true' : undefined}>{home.score}</span>
+              </p>
+            ) : (
+              <p className="ui-game-versus">{labels.versus}</p>
+            )}
+          </div>
+          <Side team={home} isWinner={winner === 'home'} scored={scored} labels={labels} />
+        </div>
+        {placeText ? (
+          <footer className="ui-game-foot">
+            <span className="ui-game-place" dir="auto">
+              {placeText}
+            </span>
+          </footer>
+        ) : null}
+        {link}
+      </article>
+    );
+  }
   return (
     <article className="ui-game-card" data-status={status}>
       <header className="ui-game-meta">
@@ -129,20 +300,7 @@ export function GameCard({
         <Team team={away} isWinner={winner === 'away'} labels={labels} />
         <Team team={home} isWinner={winner === 'home'} labels={labels} />
       </ul>
-      {detailsHref ? (
-        <a className="ui-game-link" href={detailsHref}>
-          {linkText ? (
-            <span dir="auto">{linkText}</span>
-          ) : (
-            <>
-              {labels.viewBoxScore}{' '}
-              <span className="ui-visually-hidden" dir="auto">
-                {away.name} {labels.versus} {home.name}
-              </span>
-            </>
-          )}
-        </a>
-      ) : null}
+      {link}
     </article>
   );
 }
