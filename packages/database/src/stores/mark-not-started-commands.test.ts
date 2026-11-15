@@ -15,6 +15,7 @@ import {
   openScoringSession,
   recordFinalScore,
   reopenGame,
+  reopenTrackedGame,
   setBoxScore,
   takeOverScoring,
   type CommandDeps,
@@ -426,6 +427,33 @@ describe('marking a game not started on the database (S-40)', () => {
         [g.gameId],
       ),
     ).rejects.toMatchObject({ constraint: 'games_format_fixed_once_started' });
+  });
+
+  it('never clears a game its scorekeeper reopened through the tracker’s door (S-36), plays undone', async () => {
+    const g = await trackedGame();
+    const basket: Input = { type: 'score', side: 'home', playerId: g.home[0] ?? '', points: 2 };
+    await tap(g, [...tipOff(g), basket, { type: 'end' }]);
+    const reopened = await reopenTrackedGame(
+      g.as(g.scorer),
+      {
+        gameId: g.gameId,
+        requestId: randomUUID(),
+        sequence: (await rowsOf(g)).state?.seq ?? 0,
+        reason: 'End game was tapped too soon',
+      },
+      deps,
+    );
+    expect(reopened).toMatchObject({ ok: true });
+    await tap(g, [{ type: 'undo' }]);
+    const before = await rowsOf(g);
+    expect(before.game).toMatchObject({ status: 'live', home_score: 0 });
+    expect(before.events.at(-2)?.type).toBe('reopen');
+    const corrections = await pglite.query('select 1 from game_corrections where game_id = $1', [
+      g.gameId,
+    ]);
+    expect(corrections.rows).toHaveLength(1);
+    expect(await mark(g, g.scorer)).toEqual({ ok: false, error: { code: 'was-decided' } });
+    expect(await rowsOf(g)).toEqual(before);
   });
 
   it('never clears a game decided by hand, reopened and then scored live', async () => {

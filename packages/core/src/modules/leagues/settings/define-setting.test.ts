@@ -175,6 +175,19 @@ describe('the settings stage 2 declares', () => {
     expect(setting?.type.safeParse('nobody').success).toBe(false);
   });
 
+  it('let the scorekeeper reopen a game for 30 minutes, from never to a day (S-36)', () => {
+    const setting = declaredSettings.get('games.scorekeeperReopenMinutes');
+    expect(setting?.default).toBe(30);
+    expect(setting?.levels).toEqual(['league']);
+    expect(setting?.permission).toBe('league.settings');
+    for (const minutes of [0, 30, 1440]) {
+      expect(setting?.type.safeParse(minutes).success, String(minutes)).toBe(true);
+    }
+    for (const minutes of [-1, 1441, 2.5, '30']) {
+      expect(setting?.type.safeParse(minutes).success, String(minutes)).toBe(false);
+    }
+  });
+
   it('start a new team at everyone and let teams choose (S-22, S-23, S-24)', () => {
     const level = declaredSettings.get('teams.startingStatsLevel');
     expect(level?.default).toBe('everyone');

@@ -30,6 +30,7 @@ import { getBoxScoreSheet } from './get-box-score-sheet.ts';
 import { markNotStarted } from './mark-not-started.ts';
 import { openScoringSession } from './open-scoring-session.ts';
 import { reopenGame } from './reopen-game.ts';
+import { reopenTrackedGame } from './reopen-tracked-game.ts';
 import { takeOverScoring } from './take-over-scoring.ts';
 
 const gameId = gameUuid(1);
@@ -391,6 +392,30 @@ describe('a game that was ever decided (S-40)', () => {
       error: { code: 'was-decided' },
     });
     expect(t.db.state).toEqual(before);
+  });
+
+  it('is refused once its scorekeeper reopened it through the tracker’s door (S-36), plays undone', async () => {
+    const t = setUp();
+    await tap(t, [...tipOff, basket, { type: 'end' }]);
+    expect(gameOf(t)?.status).toBe('final');
+    const reopened = await reopenTrackedGame(
+      t.as(scorekeeperId),
+      {
+        gameId,
+        requestId: '01900000-0000-7000-8000-0000d0000001',
+        sequence: sequenceOf(t),
+        reason: 'End game was tapped too soon',
+      },
+      t.deps,
+    );
+    expect(reopened).toMatchObject({ ok: true });
+    expect(gameOf(t)?.status).toBe('live');
+    // Both traces are there: the reopen event and the correction.
+    expect(t.db.state.events.at(-1)?.type).toBe('reopen');
+    expect(t.db.state.corrections).toHaveLength(1);
+    await tap(t, [{ type: 'undo' }]);
+    expect(gameOf(t)).toMatchObject({ status: 'live', homeScore: 0 });
+    expect(await mark(t, scorekeeperId)).toEqual({ ok: false, error: { code: 'was-decided' } });
   });
 
   it('is refused once decided by hand, reopened with a correction and then scored live', async () => {
