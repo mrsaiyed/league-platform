@@ -721,6 +721,11 @@ html {
 .stats-firsts {
   margin-block-start: var(--step-5);
 }
+/* The quiet line that says the lists go on from second place belongs to the lists under
+   it: it stands clear of the cards above and close to what it speaks of. */
+.stats-after {
+  margin-block: var(--step-5) var(--step-3);
+}
 .stats-tables {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
