@@ -830,18 +830,31 @@ html {
   }
 }
 
-/* The statistics page. It opens with its number cards. With few statistics the players'
-   table and the teams' table sit side by side on a laptop, so a row's numbers stay near
-   the name they belong to; with many, each table takes the page's width. */
-.stats-firsts {
+/* The statistics page. Each statistic is a column of its own: its number card and, right
+   under it at the same width, the rest of its list; a statistic with no card is a plain
+   list. With few statistics the players' table and the teams' table sit side by side on a
+   laptop, so a row's numbers stay near the name they belong to; with many, each table
+   takes the page's width. */
+.stats-leaders {
   margin-block-start: var(--step-5);
 }
-/* The quiet line that says the lists go on from second place belongs to the lists under
-   it: it stands clear of the cards above and close to what it speaks of. (Named with the
-   shared piece's own class, so this wins over that piece's margins wherever its
-   stylesheet is loaded.) */
-.ui-section-note.stats-after {
-  margin-block: var(--step-5) var(--step-3);
+.stats-leader {
+  align-content: start;
+  row-gap: var(--step-2);
+}
+/* Side by side, the cards of a row are one height and the lists start on one line; a
+   plain list starts where the cards beside it do. */
+@supports (grid-template-rows: subgrid) {
+  @media (min-width: 48rem) {
+    .stats-leader {
+      grid-row: span 2;
+      grid-template-rows: subgrid;
+    }
+    .stats-leader > .ui-leader-card:only-child {
+      grid-row: 1 / -1;
+      align-self: start;
+    }
+  }
 }
 .stats-tables {
   display: grid;

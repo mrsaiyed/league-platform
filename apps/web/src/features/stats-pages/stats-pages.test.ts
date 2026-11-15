@@ -2,6 +2,7 @@
 // and core's own queries: a staff-only team shows totals only to a visitor, leaders follow
 // the league's minimum games, and standings carry their footnotes.
 import { readStandings } from '@srleagues/core';
+import { en } from '@srleagues/site';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -112,13 +113,16 @@ describe('statistics page', () => {
   it('opens with a number card for who leads each statistic, the first on the main color', async () => {
     const data = await statsFor(adult);
     const text = html(data);
-    const boards = data.leaders.filter((board) => board.first !== undefined);
+    // The made-up season has no tie for first place (a statistic with one has no card: the
+    // test below).
+    const boards = data.leaders.filter((board) => board.first !== undefined && !board.first.tied);
     expect(boards.length).toBeGreaterThan(0);
-    // One card for each of the first three boards, before the leaders' lists.
+    expect(boards).toHaveLength(data.leaders.filter((board) => board.rows.length > 0).length);
+    // One card for each of the first three boards, each at the head of its own column.
     const cards = Math.min(boards.length, 3);
     expect(text.match(/<article class="ui-spot"/g)).toHaveLength(cards);
     expect(text.match(/<article class="ui-spot" data-first="true"/g)).toHaveLength(1);
-    expect(text.indexOf('ui-spot-row')).toBeLessThan(text.indexOf('ui-leader-card'));
+    expect(text.match(/<li class="stats-leader"><article class="ui-spot"/g)).toHaveLength(cards);
     for (const board of boards.slice(0, 3)) {
       // The same person, name and number as the first line of that board's list.
       const top = board.rows[0];
@@ -135,15 +139,113 @@ describe('statistics page', () => {
       if (second !== undefined) expect(text).toContain(`>${String(second)}<`);
     }
     expect(text.indexOf('<h2>Leaders</h2>')).toBeLessThan(text.indexOf('ui-spot-row'));
-    expect(text).toContain(
-      '<p class="ui-section-note stats-after">Each list goes on from second place; its leader is on the card above.</p>',
-    );
-    expect(text.match(/<article class="ui-leader-card" data-after-leader="true">/g)).toHaveLength(
-      boards.slice(0, 3).filter((board) => board.rows.length > 1).length,
-    );
+    // The rest of a statistic's list stands right under its own card, in the same column,
+    // with its title kept for screen readers; no sentence has to explain where a list starts.
+    expect(
+      text.match(
+        /<\/article><article class="ui-leader-card" data-after-leader="true"><h3 class="ui-visually-hidden">/g,
+      ),
+    ).toHaveLength(boards.slice(0, 3).filter((board) => board.rows.length > 1).length);
+    expect(text).not.toContain('goes on from second place');
+    expect(Object.keys(en)).not.toContain('stats.afterLeader');
     // Never for fouls or turnovers.
     expect(text).not.toContain('Fouls leader');
     expect(text).not.toContain('Turnovers leader');
+  });
+
+  // A page's data made by hand: `names` statistics, each led by its own made-up player,
+  // with second place shared or not.
+  const madeUp = (names: readonly string[], tiedFirst: readonly string[] = []): StatsPageData => ({
+    by: 'average',
+    minimumGames: 0,
+    leaders: names.map((name, n) => {
+      const tied = tiedFirst.includes(name);
+      const row = (place: number, who: string, value: string) => ({
+        id: `${name}-${who}`,
+        cells: { player: `${place}. ${who}`, team: 'Owls', games: 3, value },
+      });
+      return {
+        key: name.toLowerCase(),
+        title: name,
+        columns: [],
+        first: {
+          id: `${name}-Ada ${n}`,
+          name: `Ada ${n}`,
+          value: '9.0',
+          games: 3,
+          teams: 'Owls',
+          tied,
+        },
+        rows: [
+          row(1, `Ada ${n}`, '9.0'),
+          tied ? row(1, `Ben ${n}`, '9.0') : row(2, `Ben ${n}`, '7.0'),
+          row(3, `Cy ${n}`, '5.0'),
+        ],
+      };
+    }),
+    playerColumns: [{ key: 'player', label: 'Player' }],
+    playerRows: [{ id: 'p1', cells: { player: 'Ada 0' } }],
+    teamColumns: [{ key: 'team', label: 'Team' }],
+    teamRows: [],
+    totalsOnlyTeams: [],
+  });
+  // The lists of the page, in order: each one's title, whether it follows a card, and the
+  // place its first line shows.
+  const listsOf = (text: string) =>
+    [
+      ...text.matchAll(
+        /<article class="ui-leader-card"( data-after-leader="true")?><h3[^>]*>([^<]+)<\/h3>.*?<span class="ui-leader-name" dir="auto">(\d+)\. /g,
+      ),
+    ].map((m) => ({ title: m[2], afterCard: m[1] !== undefined, startsAt: Number(m[3]) }));
+
+  it('with five statistics gives the first three a card and the others a plain list from first place', () => {
+    const names = ['Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'];
+    const text = html(madeUp(names));
+    expect(text.match(/<article class="ui-spot"/g)).toHaveLength(3);
+    expect(text.match(/<li class="stats-leader">/g)).toHaveLength(5);
+    expect(listsOf(text)).toEqual([
+      { title: 'Points', afterCard: true, startsAt: 2 },
+      { title: 'Rebounds', afterCard: true, startsAt: 2 },
+      { title: 'Assists', afterCard: true, startsAt: 2 },
+      { title: 'Steals', afterCard: false, startsAt: 1 },
+      { title: 'Blocks', afterCard: false, startsAt: 1 },
+    ]);
+    // A plain list's title is drawn; it stands alone in its column.
+    expect(text).toContain(
+      '<li class="stats-leader"><article class="ui-leader-card"><h3>Steals</h3>',
+    );
+    for (const name of ['Steals', 'Blocks']) expect(text).not.toContain(`${name} leader`);
+  });
+
+  it('names no one leader where first place is shared: no card, and the list shows them level', () => {
+    const text = html(madeUp(['Points', 'Rebounds', 'Assists', 'Steals'], ['Points']));
+    // Points is shared: a plain list from 1, both players at 1, and no "Points leader".
+    expect(text).not.toContain('Points leader');
+    expect(text).toContain(
+      '<li class="stats-leader"><article class="ui-leader-card"><h3>Points</h3>',
+    );
+    expect(text).toContain('>1. Ada 0<');
+    expect(text).toContain('>1. Ben 0<');
+    // The three cards go to the next three statistics, the first of them on the main color.
+    expect(text.match(/<article class="ui-spot"/g)).toHaveLength(3);
+    expect(text).toContain(
+      '<article class="ui-spot" data-first="true"><p class="ui-spot-label">Rebounds leader</p>',
+    );
+    expect(listsOf(text)).toEqual([
+      { title: 'Points', afterCard: false, startsAt: 1 },
+      { title: 'Rebounds', afterCard: true, startsAt: 2 },
+      { title: 'Assists', afterCard: true, startsAt: 2 },
+      { title: 'Steals', afterCard: true, startsAt: 2 },
+    ]);
+  });
+
+  it('says first place is shared when the made-up numbers make it so', async () => {
+    const data = await statsFor(adult);
+    for (const board of data.leaders) {
+      if (board.first === undefined) continue;
+      const places = board.rows.map((row) => String(row.cells['player']).split('.')[0]);
+      expect(board.first.tied).toBe(places[1] === places[0]);
+    }
   });
 
   it("carries each team's color for its chip, and a player's only team's color", async () => {

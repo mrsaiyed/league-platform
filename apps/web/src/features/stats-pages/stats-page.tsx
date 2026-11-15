@@ -20,6 +20,9 @@ import { loadStatsPage, parseBy, type LeaderBoard, type StatsPageData } from './
 import { chooseSeason, firstValue } from './choose-season.ts';
 import type { SearchParams } from './standings-page.tsx';
 
+/** How many statistics open with a number card: three, as many as stand across a laptop. */
+const cardLimit = 3;
+
 /** One leader board as the card draws it: each leader's place and name, team and games, and number. */
 function leaderEntries(board: LeaderBoard): readonly LeaderEntry[] {
   return board.rows.map((row) => {
@@ -64,22 +67,23 @@ export function StatsTables({
       />
     );
   }
-  // The page opens with its number cards: who leads each of the first three statistics,
-  // one very large number each, the first on the league's main color.
-  const firsts = boards.flatMap((board) =>
-    board.first === undefined ? [] : [{ board, first: board.first }],
-  );
+  // Each statistic is a column of its own. The first three that one player leads alone
+  // open with a number card (one very large number, the first on the league's main color),
+  // and the rest of that statistic's list stands right under its own card, going on from
+  // second place: the leader is not said twice. A statistic whose first place is shared
+  // names no one leader: it has no card, and its list shows the players level at 1. So
+  // does a statistic after the third card: a plain list from first place.
+  const alone = boards.filter((board) => board.first !== undefined && !board.first.tied);
+  const carded = new Set(alone.slice(0, cardLimit).map((board) => board.key));
+  const columns = boards.map((board) => {
+    const entries = leaderEntries(board);
+    const card = carded.has(board.key) ? board.first : undefined;
+    return { board, card, entries: card === undefined ? entries : entries.slice(1) };
+  });
+  const firstCard = columns.find((column) => column.card !== undefined)?.board.key;
   // Few statistics: the players' table and the teams' sit side by side on a laptop, so a
   // row's numbers stay near its name. Many: each takes the page's width.
   const sideBySide = data.playerColumns.length <= 7;
-  // A leader who has a card is not said again as the first line of that statistic's list:
-  // the list goes on from second place (and is left out when nobody else is ranked).
-  const carded = new Set(firsts.slice(0, 3).map(({ board }) => board.key));
-  const lists = boards.flatMap((board) => {
-    const entries = leaderEntries(board);
-    const shown = carded.has(board.key) ? entries.slice(1) : entries;
-    return shown.length === 0 ? [] : [{ board, entries: shown }];
-  });
   return (
     <>
       <Section
@@ -87,49 +91,36 @@ export function StatsTables({
         note={data.minimumGames > 0 ? t.plural('stats.minimumGames', data.minimumGames) : undefined}
       >
         {boards.length > 0 ? (
-          <>
-            {firsts.length > 0 ? (
-              <ul
-                className="ui-spot-row stats-firsts"
-                data-across={(['one', 'two', 'three'] as const)[Math.min(firsts.length, 3) - 1]}
-              >
-                {firsts.slice(0, 3).map(({ board, first }, index) => (
-                  <li key={board.key}>
-                    <LeaderSpot
-                      label={t('stats.leaderOf', { stat: board.title })}
-                      value={first.value}
-                      unit={t(data.by === 'average' ? 'home.leaders.perGame' : 'stats.inAll')}
-                      name={first.name}
-                      detail={t('stats.leaderDetail', {
-                        team: first.teams,
-                        games: t.plural('stats.leaderGames', first.games),
-                      })}
-                      team={first.team}
-                      first={index === 0}
-                    />
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {lists.length > 0 ? (
-              <>
-                {carded.size > 0 ? (
-                  <p className="ui-section-note stats-after">{t('stats.afterLeader')}</p>
-                ) : null}
-                <ul className="ui-card-grid">
-                  {lists.map(({ board, entries }) => (
-                    <li key={board.key}>
-                      <LeaderCard
-                        title={board.title}
-                        entries={entries}
-                        afterLeader={carded.has(board.key)}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : null}
-          </>
+          <ul
+            className="ui-spot-row stats-leaders"
+            data-across={(['one', 'two', 'three'] as const)[Math.min(columns.length, 3) - 1]}
+          >
+            {columns.map(({ board, card, entries }) => (
+              <li key={board.key} className="stats-leader">
+                {card === undefined ? null : (
+                  <LeaderSpot
+                    label={t('stats.leaderOf', { stat: board.title })}
+                    value={card.value}
+                    unit={t(data.by === 'average' ? 'home.leaders.perGame' : 'stats.inAll')}
+                    name={card.name}
+                    detail={t('stats.leaderDetail', {
+                      team: card.teams,
+                      games: t.plural('stats.leaderGames', card.games),
+                    })}
+                    team={card.team}
+                    first={board.key === firstCard}
+                  />
+                )}
+                {entries.length === 0 ? null : (
+                  <LeaderCard
+                    title={board.title}
+                    entries={entries}
+                    afterLeader={card !== undefined}
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
         ) : (
           <EmptyPanel text={t('stats.leadersNone')} />
         )}

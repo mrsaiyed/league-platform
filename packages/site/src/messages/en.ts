@@ -185,9 +185,6 @@ export const en = {
   // and what the number is when the page shows season totals.
   'stats.leaderOf': '{stat} leader',
   'stats.inAll': 'this season',
-  // A quiet line over the lists under those cards: a leader is on a card and is not said
-  // again as the first line of the list.
-  'stats.afterLeader': 'Each list goes on from second place; its leader is on the card above.',
   // The band that closes the teams page, with the way to the schedule.
   'teams.call.title': 'See them play.',
   'teams.call.text': 'Every game of the season, round by round.',

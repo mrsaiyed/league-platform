@@ -74,6 +74,11 @@ export type LeaderBoard = {
         readonly games: number;
         readonly teams: string;
         readonly team?: { readonly name: string; readonly color: string | null } | undefined;
+        /**
+         * First place is shared: the next player has the same place. A page then names no
+         * one leader on a card of their own; the list shows them level.
+         */
+        readonly tied: boolean;
       };
 };
 
@@ -179,6 +184,7 @@ function pageData(
       games: leader.gamesPlayed,
       teams: teamsOf(leader.teamIds),
       team: name === undefined ? undefined : { name, color: teamColor.get(only) ?? null },
+      tied: board.leaders[1]?.rank === leader.rank,
     };
   };
   const leaders: LeaderBoard[] = boards.map((board) => ({
