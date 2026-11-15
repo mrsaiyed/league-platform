@@ -14,12 +14,18 @@ import {
   watchLines,
   withAges,
 } from './build-watch-rules.mjs';
+import { planStamp, readLive, sessionsFolder } from './dashboard/live.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const buildDir = path.join(root, 'docs/build');
 const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '');
 const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' }).stdout ?? '';
+// The main folder of this repository, also when this runs from a lane's private copy: the
+// Claude app files its sessions under the main folder's name.
+const mainRoot = path.dirname(
+  path.resolve(root, git('rev-parse', '--git-common-dir').trim() || '.git'),
+);
 const plain = (text) => text.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[`*_]/g, '');
 
 const status = read(path.join(buildDir, 'STATUS.md'));
@@ -104,7 +110,9 @@ const stagePlans = fs
         id: step[2],
         name: plain(step[3]),
         text: plain(body),
-        job: jobOf(step[3], meta),
+        // Words in brackets say where a step came from ("area 5 review of 2.125"), not what
+        // kind of work it is, so they are left out when the job is worked out.
+        job: jobOf(step[3].replace(/\s*\([^)]*\)/g, ''), meta),
         model: plain(meta.match(/Model: ([^_]*)/)?.[1] ?? '').replace(/\.$/, ''),
         spec: part('Spec'),
         test: part('Done test'),
@@ -255,6 +263,9 @@ const data = {
   lanes,
   laneCount: Number(field('Lanes').match(/\d+/)?.[0] ?? 0),
   ready,
+  // Who is really working this minute, read for free from this computer (dashboard/live.mjs).
+  live: readLive(sessionsFolder(mainRoot)),
+  stamp: planStamp(buildDir),
 };
 
 const css = read(path.join(here, 'dashboard/page.css'));
@@ -277,6 +288,8 @@ const html = [
   '    <div class="pill" id="pill"><span class="dot"></span><span id="pilltext"></span></div>',
   '  </div>',
   '  <div class="banner" id="preview" hidden>Preview only: this shows what a busy moment looks like, not what is happening now.</div>',
+  '',
+  '  <section class="crew" id="crew" aria-label="Who is working right now"></section>',
   '',
   '  <div class="card village"><div class="villagein">',
   '    <div id="scene"></div>',
@@ -388,6 +401,9 @@ if (process.argv.includes('--watch')) {
       `last landing ${lastLanding ? `${span(minutesSince(lastLanding))} ago` : 'unknown'}`,
       `newest saved work ${newestWork ? `${span(minutesSince(newestWork))} ago` : 'unknown'}`,
       `${lanes.length} of ${data.laneCount} lanes open`,
+      data.live.known
+        ? `${data.live.helpers.filter((helper) => helper.active).length} helper(s) working this minute`
+        : 'helpers cannot be seen from here',
       perStage,
     ].join('; ') + '.',
   );

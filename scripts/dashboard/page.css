@@ -452,6 +452,193 @@ button {
 .legend {
   margin: 8px 4px 0;
 }
+.sign.still {
+  animation: none;
+}
+.sparks path {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.home.on .sparks path {
+  animation: spark 1.9s ease-out infinite;
+}
+.balloon {
+  animation: balloon 18s ease-in-out infinite alternate;
+}
+.bird path {
+  fill: none;
+  stroke: #40566b;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: flap 0.45s ease-in-out infinite alternate;
+}
+.flower {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: sway 2.6s ease-in-out infinite alternate;
+}
+.fly {
+  fill: #fff59a;
+  filter: drop-shadow(0 0 4px #fff59a);
+  transform-box: fill-box;
+  animation: firefly 5.5s ease-in-out infinite;
+}
+.shoot {
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0;
+  animation: shoot 11s linear infinite;
+}
+.scene.intro .home {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: popin 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
+}
+
+/* ---------- working right now ---------- */
+.crew {
+  margin-bottom: 12px;
+}
+.crewhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0 4px 8px;
+}
+.crewcount {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--go);
+  font-variant-numeric: tabular-nums;
+}
+.crewcount.zero {
+  color: var(--soft);
+}
+.crewcount.pop {
+  animation: pop 0.5s ease-out;
+}
+.crewtitle {
+  font-weight: 700;
+  font-size: 16px;
+}
+.crewrow {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+}
+.mate {
+  --c: var(--dim);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--c);
+  background: var(--card);
+  border-radius: 14px;
+  padding: 8px 12px 8px 8px;
+}
+.crew.intro .mate {
+  animation: rise 0.35s backwards;
+}
+button.mate {
+  cursor: pointer;
+}
+button.mate:hover,
+.mate.on {
+  border-color: var(--c);
+}
+.mate.on {
+  background: color-mix(in srgb, var(--c) 9%, var(--card));
+}
+/* A light that crosses the card of whoever is working. */
+.mate.on::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--c) 20%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: sheen 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.matetext {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.matetext b,
+.matetext small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.matetext b {
+  font-size: 13.5px;
+  line-height: 1.3;
+}
+.matetext small {
+  color: var(--soft);
+  font-size: 12px;
+}
+.matestate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--soft);
+}
+.mate.on .matestate {
+  color: var(--ink);
+}
+.eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+.eq i {
+  width: 3px;
+  height: 4px;
+  border-radius: 1.5px;
+  background: var(--dim);
+}
+.mate.on .eq i {
+  background: var(--go);
+  animation: eq 0.7s ease-in-out infinite alternate;
+}
+.mate.on .eq i:nth-child(2) {
+  animation-delay: -0.25s;
+}
+.mate.on .eq i:nth-child(3) {
+  animation-delay: -0.5s;
+}
+.mate.done .eq {
+  display: none;
+}
+.mate.done .matestate::before {
+  content: '✓';
+  color: var(--go);
+  font-weight: 800;
+}
+.pill.live {
+  border-color: var(--go);
+}
 
 /* ---------- the panel under the village ---------- */
 #detail {
@@ -527,6 +714,12 @@ button {
   border-radius: 999px;
   transition: width 1.2s ease;
 }
+/* The bar of a stage that is being built keeps moving. */
+.bar.live i {
+  background: linear-gradient(90deg, var(--go), var(--now), var(--go), var(--now));
+  background-size: 300% 100%;
+  animation: slide 4s linear infinite;
+}
 
 /* ---------- every step ---------- */
 details.card > summary {
@@ -592,6 +785,9 @@ details.card > summary {
   border-color: var(--c);
   background: color-mix(in srgb, var(--c) 12%, var(--bg));
 }
+.chip.hot {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 35%, transparent);
+}
 .chip.todo b {
   color: var(--soft);
   font-weight: 600;
@@ -647,6 +843,9 @@ code {
   }
   #detail.open {
     flex-direction: column;
+  }
+  .crewrow {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -825,6 +1024,100 @@ code {
   100% {
     opacity: 0;
     transform: translate(var(--dx, 0), 260px) rotate(540deg);
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes sheen {
+  0%,
+  40% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes eq {
+  from {
+    height: 3px;
+  }
+  to {
+    height: 12px;
+  }
+}
+@keyframes spark {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0deg);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.15) rotate(40deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.4) rotate(90deg);
+  }
+}
+@keyframes balloon {
+  from {
+    transform: translate(0, 0) rotate(-2deg);
+  }
+  to {
+    transform: translate(70px, -16px) rotate(2deg);
+  }
+}
+@keyframes flap {
+  from {
+    transform: scaleY(1);
+  }
+  to {
+    transform: scaleY(0.3);
+  }
+}
+@keyframes firefly {
+  0%,
+  100% {
+    opacity: 0.1;
+    transform: translate(0, 0);
+  }
+  30% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(14px, -18px);
+  }
+  70% {
+    opacity: 0.6;
+  }
+}
+@keyframes shoot {
+  0%,
+  90% {
+    opacity: 0;
+    transform: translate(900px, 20px);
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(520px, 150px);
+  }
+}
+@keyframes popin {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.7);
+  }
+}
+@keyframes slide {
+  to {
+    background-position: -300% 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
