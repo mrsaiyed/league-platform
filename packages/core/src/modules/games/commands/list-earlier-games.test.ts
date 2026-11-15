@@ -16,7 +16,11 @@ import {
   seasonId,
   type MemoryGames,
 } from '../memory-games.test-helper.ts';
-import { earlierRoundGamesLimit, listEarlierGames } from './list-earlier-games.ts';
+import {
+  earlierRoundGamesLimit,
+  earlierRoundsLimit,
+  listEarlierGames,
+} from './list-earlier-games.ts';
 
 // The league's today is 6 December (the stand-in keeps UTC).
 const r1 = { id: '01900000-0000-7000-8000-0000000d0001', number: 1, label: null };
@@ -109,6 +113,55 @@ describe('listEarlierGames', () => {
     expect(value.rounds.map((r) => r.games)).toEqual([earlierRoundGamesLimit + 3]);
     expect(value.shown?.games.length).toBe(earlierRoundGamesLimit);
     expect(value.shown?.more).toBe(true);
+  });
+
+  // The review's M1: the rounds are counted from the person's own games, then cut.
+  it("still offers a program scorekeeper's older round behind more rounds than the limit of another program", async () => {
+    const hours = (i: number) => new Date(Date.UTC(2026, 10, 1, 8) + i * 3_600_000).toISOString();
+    const newer = Array.from({ length: earlierRoundsLimit }, (_, i) =>
+      finalGame(100 + i, { startsAt: hours(i) }),
+    );
+    const roundOf = (i: number) => ({
+      id: `01900000-0000-7000-8000-0000000e${String(i).padStart(4, '0')}`,
+      number: i + 1,
+      label: null,
+    });
+    const theirs = finalGame(950, {
+      startsAt: '2026-10-01T18:00:00.000Z',
+      seasonId: otherSeasonId,
+    });
+    const state = {
+      games: [...newer, theirs],
+      rounds: {
+        ...Object.fromEntries(newer.map((g, i) => [g.id, roundOf(i)])),
+        [theirs.id]: r9,
+      },
+    };
+    const program = await earlier(programScorekeeperId, `r-${r9.id}`, state);
+    expect(program.rounds.map((r) => [r.key, r.games])).toEqual([[`r-${r9.id}`, 1]]);
+    expect(program.moreRounds).toBe(false);
+    expect(program.shown?.games.map((g) => g.id)).toEqual([gameUuid(950)]);
+    const owner = await earlier(ownerId, undefined, state);
+    expect(owner.rounds).toHaveLength(earlierRoundsLimit);
+    expect(owner.moreRounds).toBe(true);
+  });
+
+  it("still shows an assigned-only scorekeeper's game behind more games than a round's limit", async () => {
+    const many = Array.from({ length: earlierRoundGamesLimit + 3 }, (_, i) =>
+      finalGame(100 + i, {
+        startsAt: new Date(Date.UTC(2026, 10, 1, 8) + i * 60_000).toISOString(),
+      }),
+    );
+    const last = gameUuid(100 + earlierRoundGamesLimit + 2);
+    const value = await earlier(scorekeeperId, `r-${r1.id}`, {
+      games: many,
+      rounds: Object.fromEntries(many.map((g) => [g.id, r1])),
+      settings: scoringRule('assignedOnly'),
+      assignments: [{ gameId: last, accountId: scorekeeperId }],
+    });
+    expect(value.rounds.map((r) => r.games)).toEqual([1]);
+    expect(value.shown?.games.map((g) => g.id)).toEqual([last]);
+    expect(value.shown?.more).toBe(false);
   });
 
   it('refuses anyone who scores nowhere, and a visitor', async () => {

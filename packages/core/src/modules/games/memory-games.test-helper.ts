@@ -297,17 +297,19 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
           .filter((e) => inScoringReach(reach, e))
           .slice(0, limit),
       }),
-      listEarlierRounds: async (accountId, limit) =>
+      listEarlierRounds: async (accountId, reach, limit) =>
         earlierRoundsOf(
-          s.games.map((g) => withRound(s, g, accountId)),
+          s.games.map((g) => withRound(s, g, accountId)).filter((e) => inScoringReach(reach, e)),
           s.today,
           limit,
         ),
-      listEarlierRound: async (accountId, ref, limit) => ({
+      listEarlierRound: async (accountId, reach, ref, limit) => ({
         today: s.today,
         games: s.games
           .map((g) => withRound(s, g, accountId))
-          .filter((e) => isEarlierGame(e, s.today) && inEarlierRound(e, ref))
+          .filter(
+            (e) => isEarlierGame(e, s.today) && inEarlierRound(e, ref) && inScoringReach(reach, e),
+          )
           .sort((a, b) => oldestFirst(a.game, b.game))
           .slice(0, limit)
           .map(({ round: _round, ...e }) => e),

@@ -352,7 +352,7 @@ registerIsolationCase({
   name: "count the earlier rounds after the target's upcoming game was postponed days ago",
   run: async (scope, target) => {
     await postponeTargetGameDaysAgo(scope, target);
-    return listEarlierRounds(scope, target.memberId, 100);
+    return listEarlierRounds(scope, target.memberId, { every: 'all', assigned: 'all' }, 100);
   },
 });
 
@@ -361,7 +361,13 @@ registerIsolationCase({
   name: "list the target's round's earlier games after its upcoming game was postponed days ago",
   run: async (scope, target) => {
     await postponeTargetGameDaysAgo(scope, target);
-    return listEarlierRound(scope, target.memberId, { roundId: target.roundId }, 100);
+    return listEarlierRound(
+      scope,
+      target.memberId,
+      { every: 'all', assigned: 'all' },
+      { roundId: target.roundId },
+      100,
+    );
   },
 });
 

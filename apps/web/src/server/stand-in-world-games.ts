@@ -263,22 +263,29 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       };
     },
     // As list-earlier-rounds.ts and list-earlier-round.ts, by core's own counting.
-    listEarlierRounds: async (accountId, limit) => {
+    // The games in the person's reach first, then the counting and the cut.
+    listEarlierRounds: async (accountId, reach, limit) => {
       const today = dayIn(now(), s.timeZone);
       return earlierRoundsOf(
-        s.games.map((g) => withRound(g, accountId, today)),
+        s.games
+          .map((g) => withRound(g, accountId, today))
+          .filter((entry) => inScoringReach(reach, entry)),
         today,
         limit,
       );
     },
-    listEarlierRound: async (accountId, round, limit) => {
+    listEarlierRound: async (accountId, reach, round, limit) => {
       const today = dayIn(now(), s.timeZone);
       return {
         today,
         games: s.games
           .filter((g) => {
             const entry = withRound(g, accountId, today);
-            return isEarlierGame(entry, today) && inEarlierRound(entry, round);
+            return (
+              isEarlierGame(entry, today) &&
+              inEarlierRound(entry, round) &&
+              inScoringReach(reach, entry)
+            );
           })
           .sort(oldestFirst)
           .slice(0, limit)

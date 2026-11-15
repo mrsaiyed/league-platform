@@ -216,14 +216,22 @@ export type GamesStore = {
     reach: ScoringReach,
     limit: number,
   ) => Promise<GamesWindow>;
-  /** The rounds of earlier games (EarlierRoundCount), the latest played first, at most `limit`. */
+  /**
+   * The rounds of earlier games (EarlierRoundCount), counting only the games in `reach`
+   * (a round with none of them is left out), the latest played first, at most `limit`.
+   */
   readonly listEarlierRounds: (
     accountId: string,
+    reach: ScoringReach,
     limit: number,
   ) => Promise<readonly EarlierRoundCount[]>;
-  /** One round's earlier games (as EarlierRoundCount counts them), soonest first, at most `limit`. */
+  /**
+   * One round's earlier games (as EarlierRoundCount counts them) in `reach`, soonest first,
+   * at most `limit`.
+   */
   readonly listEarlierRound: (
     accountId: string,
+    reach: ScoringReach,
     round: EarlierRoundRef,
     limit: number,
   ) => Promise<GamesWindow>;

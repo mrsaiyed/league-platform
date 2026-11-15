@@ -458,7 +458,15 @@ export async function GamesPage({
           <div id="earlier">
             <Section title={t('admin.games.earlier.title')} note={t('admin.games.earlier.note')}>
               {roundOptions.length === 0 ? (
-                <EmptyPanel text={t('admin.games.earlier.empty')} />
+                <div className="ui-stack">
+                  <EmptyPanel text={t('admin.games.earlier.empty')} />
+                  {/* Never "none" alone while rounds were left out: say only the latest are offered. */}
+                  {earlier.ok && earlier.value.moreRounds ? (
+                    <p className="ui-section-note">
+                      {t('admin.games.earlier.moreRounds', { count: String(earlierRoundsLimit) })}
+                    </p>
+                  ) : null}
+                </div>
               ) : (
                 <div className="ui-stack">
                   <FilterToolbar label={t('admin.games.earlier.filters')}>

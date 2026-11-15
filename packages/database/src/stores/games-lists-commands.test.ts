@@ -6,6 +6,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import {
   earlierRoundGamesLimit,
+  earlierRoundsLimit,
   listEarlierGames,
   listGamesNeedingResult,
   listMyGames,
@@ -29,6 +30,7 @@ import {
   newGame,
   newLeague,
   newProgram,
+  newRound,
   newSeason,
   newStage,
   newTeam,
@@ -207,6 +209,52 @@ describe('the games that need a result, for a person who scores only some, on th
   });
 });
 
+// The review's M1: the rounds are counted from the person's own games, then cut.
+describe('the earlier rounds, for a person who scores only one program, on the database', () => {
+  it('never pushes their older round out with more rounds than the limit of another program', async () => {
+    const l = await league();
+    // More newer rounds of the first program than are offered, one final game each.
+    await pglite.query(
+      `with r as (
+         insert into rounds (league_id, season_id, number)
+         select $1, $2, n from generate_series(1, $6::integer) n returning id, number)
+       insert into games (league_id, season_id, stage_id, round_id, home_team_id, away_team_id,
+         starts_at, status, capture_mode, home_score, away_score, format, finalized_at)
+       select $1, $2, $3, r.id, $4, $5, t, 'final', 'final', 50, 40, $7, t
+       from r, lateral (select now() - interval '300 days' + r.number * interval '1 day' as t) s`,
+      [l.leagueId, l.seasonId, l.stageId, l.home, l.away, earlierRoundsLimit + 1, gameRules],
+    );
+    // An older round of a second program, and its own scorekeeper.
+    const other = await newProgram(pglite, l.leagueId);
+    const otherSeason = await newSeason(pglite, l.leagueId, other);
+    const otherStage = await newStage(pglite, l.leagueId, otherSeason);
+    const otherRound = await newRound(pglite, l.leagueId, otherSeason, 1);
+    const theirs = await newGame(pglite, {
+      leagueId: l.leagueId,
+      seasonId: otherSeason,
+      stageId: otherStage,
+      homeTeamId: await newTeam(pglite, l.leagueId, otherSeason),
+      awayTeamId: await newTeam(pglite, l.leagueId, otherSeason),
+      columns: { ...final(l.at(-400 * day)), round_id: otherRound },
+    });
+    const programScorekeeper = await grant(l.leagueId, 'scorekeeper', other);
+
+    const owner = await listEarlierGames(l.as(), {}, deps);
+    expect(owner.ok && owner.value.rounds).toHaveLength(earlierRoundsLimit);
+    expect(owner.ok && owner.value.moreRounds).toBe(true);
+    const program = await listEarlierGames(asAccount(l.leagueId, programScorekeeper), {}, deps);
+    if (!program.ok) throw new Error(program.error.code);
+    expect(program.value.rounds.map((r) => [r.roundId, r.games])).toEqual([[otherRound, 1]]);
+    expect(program.value.moreRounds).toBe(false);
+    const shown = await listEarlierGames(
+      asAccount(l.leagueId, programScorekeeper),
+      { round: program.value.rounds[0]?.key ?? '' },
+      deps,
+    );
+    expect(shown.ok && shown.value.shown?.games.map((g) => g.id)).toEqual([theirs]);
+  });
+});
+
 describe('the earlier games by round, on the database', () => {
   it('counts 300 past games by round, shows one round at a time, and keeps to its limits', async () => {
     const l = await league();
@@ -245,12 +293,13 @@ describe('the earlier games by round, on the database', () => {
 
     // The queries hold to the limit they are given.
     const as = { leagueId: l.leagueId, accountId: l.ownerId };
+    const everything = { every: 'all', assigned: 'all' } as const;
     const counted = await withTransaction(db, as, (scope) =>
-      listEarlierRounds(scope, l.ownerId, 5),
+      listEarlierRounds(scope, l.ownerId, everything, 5),
     );
     expect(counted.map((r) => r.number)).toEqual([30, 29, 28, 27, 26]);
     const round = await withTransaction(db, as, (scope) =>
-      listEarlierRound(scope, l.ownerId, { roundId: fourWeeks?.roundId ?? '' }, 3),
+      listEarlierRound(scope, l.ownerId, everything, { roundId: fourWeeks?.roundId ?? '' }, 3),
     );
     expect(round.games).toHaveLength(3);
   });

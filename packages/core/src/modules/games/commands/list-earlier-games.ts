@@ -13,7 +13,7 @@ import { earlierRoundKey, parseEarlierRoundKey } from '../earlier-round-key.ts';
 import { myGamesOf, type MyGame } from '../my-games-of.ts';
 import { mayReadGames } from '../policy.ts';
 import type { EarlierRoundCount, EarlierRoundRef, GamesTx } from '../ports.ts';
-import { mayScoreUnder, scoringRuleOf } from '../scoring-access.ts';
+import { mayScoreUnder, scoringReachOf, scoringRuleOf } from '../scoring-access.ts';
 
 /** The most rounds offered at once, and the most games of one round shown. */
 export const earlierRoundsLimit = 200;
@@ -62,13 +62,16 @@ export const listEarlierGames = defineCommand({
     const holder = await accessOfAccount(tx, accountId);
     if (holder === undefined) return ok(none);
     const rule = await scoringRuleOf(tx);
+    // The store counts only the games this person may score, then cuts, so no round of
+    // theirs is pushed out by rounds they do not score, and "more" speaks only of theirs.
+    const reach = scoringReachOf(holder, rule);
     // How many of a round's games this person may score: all, those assigned to them, or none.
     const mine = (round: EarlierRoundCount): number => {
       const scope: Scope = { type: 'program', id: round.programId };
       if (mayScoreUnder(holder, scope, rule, false)) return round.games;
       return mayScoreUnder(holder, scope, rule, true) ? round.assigned : 0;
     };
-    const counted = await tx.games.listEarlierRounds(accountId, earlierRoundsLimit + 1);
+    const counted = await tx.games.listEarlierRounds(accountId, reach, earlierRoundsLimit + 1);
     const rounds = counted
       .slice(0, earlierRoundsLimit)
       .map(
@@ -89,7 +92,12 @@ export const listEarlierGames = defineCommand({
     const asked = parseEarlierRoundKey(input.round);
     const round = asked === undefined ? undefined : rounds.find((r) => r.key === keyOf(asked));
     if (asked === undefined || round === undefined) return ok({ rounds, moreRounds, shown: null });
-    const found = await tx.games.listEarlierRound(accountId, asked, earlierRoundGamesLimit + 1);
+    const found = await tx.games.listEarlierRound(
+      accountId,
+      reach,
+      asked,
+      earlierRoundGamesLimit + 1,
+    );
     const games = await myGamesOf(
       tx,
       accountId,

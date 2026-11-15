@@ -54,7 +54,9 @@ export function gamesStore(scope: LeagueScope): GamesStore {
     listWindow: (accountId, days) => listGamesInWindow(scope, accountId, days),
     listNeedingResult: (accountId, reach, limit) =>
       listGamesNeedingResult(scope, accountId, reach, limit),
-    listEarlierRounds: (accountId, limit) => listEarlierRounds(scope, accountId, limit),
-    listEarlierRound: (accountId, round, limit) => listEarlierRound(scope, accountId, round, limit),
+    listEarlierRounds: (accountId, reach, limit) =>
+      listEarlierRounds(scope, accountId, reach, limit),
+    listEarlierRound: (accountId, reach, round, limit) =>
+      listEarlierRound(scope, accountId, reach, round, limit),
   };
 }
