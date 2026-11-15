@@ -35,6 +35,11 @@
 // (.local/shots/320 and /390, `…-long-name.jpg` and `…-long-name-scrolled.jpg`).
 //
 // `--only=menu` takes the phone menu, open, at 390 in each league's look (`…-menu-open.jpg`).
+//
+// Signed in as the made-up owner (step 2.127): the front page and the account page with
+// their leagues (`platform-home-signed-in`, `platform-account`), and the account button's
+// menu, open, on the first league's home (`north-valley-account-menu-open`): in the phone
+// menu's panel at 390, under the account button at 1280; the screen as it is held.
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -104,27 +109,127 @@ const gamePages = {
     { name: 'game-undated', at: `/games/${listedGame(5, 4)}` },
   ],
 };
+// The games area's states, reached by tapping (steps 2.154 and 2.155); see adminPages.
+const gamesStates = [
+  { name: 'admin-games-boxes-open', at: '/admin/games', onlyIn: leagues[0], tap: openBoxes(1) },
+  {
+    name: 'admin-games-question',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      await askFinal(page, 4, 47, 51);
+    },
+  },
+  {
+    name: 'admin-games-refused',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      const game = await askFinal(page, 1, 40, 40);
+      await game.getByRole('button', { name: 'Yes, make it final' }).click();
+      await game.getByRole('alert').waitFor();
+    },
+  },
+  {
+    name: 'admin-games-saved',
+    // From the game's reopen form, which "Correct this result" leads to.
+    at: `/admin/games/${trackedGame(5)}`,
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      await page.locator('[data-reopen-form] input[name="reason"]').fill('Pictures');
+      await Promise.all([
+        page.waitForURL((url) => url.pathname.endsWith('/admin/games')),
+        page.locator('[data-reopen-form] button[type="submit"]').click(),
+      ]);
+      const again = await askFinal(page, 5, 50, 44);
+      await again.getByRole('button', { name: 'Yes, make it final' }).click();
+      await gameRow(page, 5).getByRole('status').filter({ hasText: 'Saved' }).waitFor();
+    },
+  },
+  {
+    // The reopen form of the league's first game that has one ("Correct this result").
+    // The second league has no final game this week, so its grid is taken instead (below).
+    name: 'admin-games-correct-form',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const correct = page.locator('main').getByRole('link', { name: 'Correct this result' });
+      await Promise.all([
+        page.waitForURL(/\/admin\/games\/[0-9a-f-]{36}$/),
+        correct.first().click(),
+      ]);
+    },
+  },
+  {
+    name: 'admin-games-box',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    first: `/admin/games/${trackedGame(1)}`,
+  },
+  {
+    // The second league's grid: its first game with "Box score" this week.
+    name: 'admin-games-box',
+    at: '/admin/games',
+    onlyIn: leagues[1],
+    tap: async (page) => {
+      const grid = page.locator('main').getByRole('link', { name: 'Box score' });
+      await Promise.all([page.waitForURL(/\/admin\/games\/[0-9a-f-]{36}$/), grid.first().click()]);
+    },
+  },
+  {
+    name: 'admin-games-box-refused',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    first: `/admin/games/${trackedGame(1)}`,
+    light: true,
+    tap: async (page) => {
+      const points = page.locator('main input[name^="stat.points."]');
+      const typed = [3, 4, 5, 6, 7, 5, 10, 4, 4, 4, 4, 4];
+      for (const [i, value] of typed.entries()) await points.nth(i).fill(String(value));
+      await page.locator('main input[name="awayScore"]').fill('30');
+      await page.locator('main input[name="homeScore"]').fill('30');
+      await page.locator('main form button[type="submit"]').last().click();
+      await page.locator('#box-score-scores [role="alert"]').waitFor();
+    },
+  },
+  {
+    name: 'admin-games-box-wrong-box',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    first: `/admin/games/${trackedGame(1)}`,
+    tap: async (page) => {
+      // A count the phone's own check would stop: the form is sent as a browser that does
+      // not check would send it, so the server's refusal is what is pictured.
+      const points = page.locator('main input[name^="stat.points."]');
+      await points.nth(3).fill('1000');
+      await page.locator('main form:has(#box-score-scores)').evaluate((form) => {
+        form.noValidate = true;
+      });
+      await page.locator('main form button[type="submit"]').last().click();
+      await page.locator('#box-score-scores [role="alert"]').waitFor();
+    },
+  },
+];
+
 // What the league's owner sees.
 const adminPages = [
   { name: 'admin-home', at: '/admin' },
   { name: 'admin-games', at: '/admin/games' },
-  // Step 2.154's states of the games list, as its forms leave the address: one game's
-  // score boxes open, the question before a final score is saved (for a game whose time
-  // has not come), "Saved" beside a final game, and the reopen form a final game leads to.
-  // The live game, with plays, is on `admin-games` itself, with no score boxes.
-  {
-    name: 'admin-games-boxes-open',
-    at: `/admin/games?enter=${trackedGame(1)}#game-${trackedGame(1)}`,
-  },
-  {
-    name: 'admin-games-question',
-    at: `/admin/games?ask=${trackedGame(4)}&v=1&home=51&away=47#game-${trackedGame(4)}`,
-  },
-  {
-    name: 'admin-games-saved',
-    at: `/admin/games?done=final&game=${trackedGame(5)}#game-${trackedGame(5)}`,
-  },
-  { name: 'admin-games-correct-form', at: `/admin/games/${trackedGame(5)}` },
+  // The states of the games list (steps 2.154 and 2.155), reached by tapping, as none of
+  // them rides in the address (record 067): one game's score boxes open, the question
+  // before a final score is saved (for a game whose time has not come), a tie refused
+  // beside the boxes, "Saved" beside a final game (this morning's game reopened and its
+  // score entered again as it was), and the reopen form a final game leads to. The live
+  // game, with plays, is on `admin-games` itself, with no score boxes. Then the box score
+  // grid, a tie refused there with twelve players' points kept, and a player's box refused
+  // (the sentence names the player and the column; the box has the focus). The refusals
+  // and "Saved" are taken again in the second league's light design (`…-light`).
+  ...gamesStates.flatMap((job) => [
+    job,
+    ...(job.light ? [{ ...job, name: `${job.name}-light`, lookOf: leagues[1] }] : []),
+  ]),
   { name: 'admin-teams', at: '/admin/teams' },
   { name: 'admin-team', at: '/admin/teams', first: '/admin/teams/' },
   { name: 'admin-schedule', at: '/admin/schedule' },
@@ -134,6 +239,28 @@ const adminPages = [
   { name: 'admin-people', at: '/admin/people' },
   { name: 'admin-standings', at: '/admin/standings' },
 ];
+// The games list's taps (step 2.155): a game's place on the list, its boxes opened, and a
+// score typed and saved, which only asks.
+function gameRow(page, n) {
+  return page.locator(`li[id="game-${trackedGame(n)}"]`);
+}
+function openBoxes(n) {
+  return async (page) => {
+    const boxes = gameRow(page, n).locator('[data-score-boxes]');
+    // A game just reopened has its boxes open already.
+    if ((await boxes.getAttribute('open')) === null) await boxes.locator('> summary').click();
+  };
+}
+async function askFinal(page, n, away, home) {
+  const game = gameRow(page, n);
+  await openBoxes(n)(page);
+  await game.locator('input[name="awayScore"]').fill(String(away));
+  await game.locator('input[name="homeScore"]').fill(String(home));
+  await game.locator('[data-score-boxes] button[type="submit"]').click();
+  await game.locator('[data-question]').waitFor();
+  return game;
+}
+
 // What the scorekeeper sees (step 2.33): their games, and the tracker opened from them.
 const scorekeeperPages = [
   { name: 'scorekeeper-games', at: '/admin' },
@@ -141,6 +268,13 @@ const scorekeeperPages = [
   // The games list as a scorekeeper sees it: a final game says who can reopen it (2.154).
   { name: 'scorekeeper-games-list', at: '/admin/games' },
 ];
+// SR Leagues' own pages, signed in as the made-up owner (step 2.127).
+const signedInPlatformPages = [
+  { name: 'platform-home-signed-in', at: '/' },
+  { name: 'platform-account', at: '/account' },
+];
+// The account button's menu, open, on the first league's home (step 2.127).
+const accountMenuPages = [{ name: 'account-menu-open', at: '', opens: true }];
 // SR Leagues' own pages, which belong to no league.
 const platformPages = [
   { name: 'platform-home', at: '/' },
@@ -395,13 +529,26 @@ try {
             context: visitor,
             base: `/${league}`,
           })),
-        ...(design === '' ? adminPages : []).map((page) => ({
-          ...page,
-          name: `${league}-${page.name}`,
-          context: staff,
-          base: `/${league}`,
-        })),
+        ...(design === '' ? adminPages : [])
+          .filter((page) => page.onlyIn === undefined || page.onlyIn === league)
+          .map((page) => ({
+            ...page,
+            name: `${league}-${page.name}`,
+            context: staff,
+            base: `/${league}`,
+          })),
       ]),
+      ...(design === '' ? signedInPlatformPages : []).map((page) => ({
+        ...page,
+        context: staff,
+        base: '',
+      })),
+      ...(design === '' ? accountMenuPages : []).map((page) => ({
+        ...page,
+        name: `${leagues[0]}-${page.name}`,
+        context: staff,
+        base: `/${leagues[0]}`,
+      })),
       ...scorekeeperPages.map((page) => ({
         ...page,
         name: `${leagues[0]}-${page.name}`,
@@ -427,6 +574,11 @@ try {
           }
           answer = await page.goto(new URL(link, origin).href, { waitUntil: 'networkidle' });
         }
+        // A state reached by tapping (step 2.155): nothing of it rides in the address.
+        if (job.tap) {
+          await job.tap(page);
+          await page.waitForLoadState('networkidle');
+        }
         if (job.lookOf) {
           // The same page under another league's design values: only the `:root` block changes.
           looks[job.lookOf] ??= await designValuesOf(origin, job.lookOf);
@@ -443,8 +595,22 @@ try {
         // The faces a page draws are fetched as it is laid out: wait for them, so no
         // picture shows the stand-in face a reader sees for the first moment.
         await page.evaluate(() => document.fonts.ready.then(() => undefined));
+        if (job.opens) {
+          // The account button: in the phone menu's panel on a phone, its own from a tablet up.
+          const phone = width.viewport.width < 768;
+          await page.locator(phone ? '.site-menu > summary' : '.site-account > summary').click();
+          await page
+            .locator(phone ? '.site-menu-account' : '.site-account-panel')
+            .waitFor({ state: 'visible' });
+          await page.waitForTimeout(300);
+        }
+        // Nothing of the tool on the screen: Next.js's dev indicator hidden, and the pointer
+        // away from every card (step 2.155's design review). After the account button is
+        // opened, so the pointer leaves it too; an opened panel stays open when it does.
+        await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
+        await page.mouse.move(0, 0);
         const file = path.join(out, width.name, `${fileName(job.name)}.jpg`);
-        await page.screenshot({ path: file, fullPage: true, type: 'jpeg', quality: 80 });
+        await page.screenshot({ path: file, fullPage: !job.opens, type: 'jpeg', quality: 80 });
         taken.push(
           `${label}.jpg${(answer?.status() ?? 200) >= 400 ? ` (the page answered ${answer.status()})` : ''}`,
         );

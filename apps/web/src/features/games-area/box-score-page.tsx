@@ -3,6 +3,11 @@
 // saved, and the game is final. A final game is shown as it was saved, with a way to
 // reopen it with a reason (S-7) and correct it. On a phone the grid scrolls sideways
 // inside its own box, never the page (A-2). Words come from the message files (T-187).
+//
+// Its forms are answered without the address (T-271, record 067, step 2.155): a refusal
+// in the response to the post, keeping every box as typed (box-score-sheet-form.tsx,
+// reopen-form.tsx); a save by the one-time notice, read here once and said under the
+// title, which names the game, naming its score.
 import {
   getBoxScoreSheet,
   leagueUrl,
@@ -16,15 +21,17 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { clockTimeText } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { locale, t, type TextKey } from '../../server/messages.ts';
-import { sheetNeedsOffer, sheetReopenViewOf, type ReopenView } from './reopen-view.ts';
+import { locale, t } from '../../server/messages.ts';
+import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { statLabel } from '../stats-pages/index.ts';
 import { hasName, rosterName } from '../teams-area/index.ts';
 import { reopenBoxScoreAction, saveBoxScoreAction } from './actions.ts';
 import { boxScoreField } from './box-score-form.ts';
-import { boxScoreNotice } from './box-score-notice.ts';
-import type { SearchParams } from './games-search.ts';
-import { ScoreCheck } from './score-check.tsx';
+import { BoxScoreSheetForm, type SheetRow, type SheetTeam } from './box-score-sheet-form.tsx';
+import { sheetScoresId } from './form-state.ts';
+import { ReopenForm } from './reopen-form.tsx';
+import { SavedLine } from './saved-line.tsx';
+import { sheetNeedsOffer, sheetReopenViewOf, type ReopenView } from './reopen-view.ts';
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -37,125 +44,63 @@ function savedText(line: GameLine | undefined, key: string): string {
   return value === undefined ? '' : String(value);
 }
 
-function TeamGrid({
-  sheet,
-  teamName,
-  players,
-  editable,
-}: {
-  readonly sheet: BoxScoreSheet;
-  readonly teamName: string;
-  readonly players: readonly GameRosterPlayer[];
-  readonly editable: boolean;
-}) {
+/** A team's rows of the grid, with the words each box is read by. */
+function rowsOf(sheet: BoxScoreSheet, players: readonly GameRosterPlayer[]): SheetRow[] {
   const lineOf = new Map(sheet.lines.map((line) => [line.personId, line]));
-  const columns = sheet.statKeys.map((key) => ({ key, label: statLabel(key) }));
-  return (
-    <section>
-      <h2>{teamName}</h2>
-      {players.length === 0 ? (
-        <p>{t('admin.boxScore.noPlayers')}</p>
-      ) : (
-        <div className="box-score-grid" role="region" aria-label={teamName} tabIndex={0}>
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">{t('admin.boxScore.player')}</th>
-                <th scope="col">{t('admin.boxScore.played')}</th>
-                {sheet.minutes ? (
-                  <th scope="col">
-                    <abbr title={t('admin.boxScore.minutes')}>
-                      {t('admin.boxScore.minutes.short')}
-                    </abbr>
-                  </th>
-                ) : null}
-                {columns.map(({ key, label }) => (
-                  <th scope="col" key={key}>
-                    <abbr title={label.full}>{label.short}</abbr>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {players.map((player) => {
-                const line = lineOf.get(player.personId);
-                const name = nameOf(player);
-                const minutes =
-                  line?.secondsPlayed === null || line?.secondsPlayed === undefined
-                    ? ''
-                    : String(Math.round(line.secondsPlayed / 60));
-                return (
-                  <tr key={player.personId}>
-                    <th scope="row">
-                      {player.jerseyNumber === null || !hasName(player)
-                        ? null
-                        : `${t('admin.boxScore.jersey', { number: player.jerseyNumber })} `}
-                      {name}
-                      {player.left ? ` ${t('admin.boxScore.left')}` : null}
-                    </th>
-                    <td>
-                      <input
-                        type="checkbox"
-                        name={boxScoreField.played(player.personId)}
-                        defaultChecked={line?.played === true}
-                        disabled={!editable}
-                        aria-label={t('admin.boxScore.playedBy', { name })}
-                      />
-                    </td>
-                    {sheet.minutes ? (
-                      <td>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min={0}
-                          max={1440}
-                          step={1}
-                          name={boxScoreField.minutes(player.personId)}
-                          defaultValue={minutes}
-                          disabled={!editable}
-                          aria-label={t('admin.boxScore.cellLabel', {
-                            stat: t('admin.boxScore.minutes'),
-                            name,
-                          })}
-                        />
-                      </td>
-                    ) : null}
-                    {columns.map(({ key, label }) => (
-                      <td key={key}>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min={0}
-                          max={999}
-                          step={1}
-                          name={boxScoreField.stat(player.personId, key)}
-                          defaultValue={savedText(line, key)}
-                          disabled={!editable}
-                          aria-label={t('admin.boxScore.cellLabel', { stat: label.full, name })}
-                        />
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
+  return players.map((player) => {
+    const line = lineOf.get(player.personId);
+    const name = nameOf(player);
+    const jersey =
+      player.jerseyNumber === null || !hasName(player)
+        ? ''
+        : `${t('admin.boxScore.jersey', { number: player.jerseyNumber })} `;
+    const left = player.left ? ` ${t('admin.boxScore.left')}` : '';
+    const minutes =
+      line?.secondsPlayed === null || line?.secondsPlayed === undefined
+        ? ''
+        : String(Math.round(line.secondsPlayed / 60));
+    return {
+      personId: player.personId,
+      heading: `${jersey}${name}${left}`,
+      played: {
+        field: boxScoreField.played(player.personId),
+        label: t('admin.boxScore.playedBy', { name }),
+        saved: line?.played === true,
+      },
+      ...(sheet.minutes
+        ? {
+            minutes: {
+              field: boxScoreField.minutes(player.personId),
+              label: t('admin.boxScore.cellLabel', { stat: t('admin.boxScore.minutes'), name }),
+              named: t('admin.boxScore.cellLabel', {
+                stat: t('admin.boxScore.minutes'),
+                name: `${jersey}${name}`,
+              }),
+              saved: minutes,
+            },
+          }
+        : {}),
+      stats: sheet.statKeys.map((key) => ({
+        field: boxScoreField.stat(player.personId, key),
+        label: t('admin.boxScore.cellLabel', { stat: statLabel(key).full, name }),
+        named: t('admin.boxScore.cellLabel', {
+          stat: statLabel(key).full,
+          name: `${jersey}${name}`,
+        }),
+        saved: savedText(line, key),
+      })),
+    };
+  });
 }
 
 export async function BoxScorePage({
   league,
   gameId,
-  search,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
   /** The route's game value: the game's id. */
   readonly gameId: string;
-  readonly search: SearchParams;
 }) {
   const view = await loadLeaguePage(league, 'admin', 'games');
   const here = view.context.league;
@@ -178,7 +123,24 @@ export async function BoxScorePage({
   const homeName = names[game.homeTeamId] ?? '';
   const awayName = names[game.awayTeamId] ?? '';
   const editable = sheet.locked === null;
-  const notice = boxScoreNotice(search);
+  const sheetHref = leagueUrl(here, 'admin-area', { area: 'games', subpath: [game.id] });
+  const result = (homeScore: string, awayScore: string) =>
+    t('admin.games.result', { away: awayName, awayScore, home: homeName, homeScore });
+  // What was just saved here, taken (so a reload does not say it again), said where it
+  // was done: a reopen under the title, where its form was; a saved sheet beside the
+  // scores, just above where its save button was, naming the game and its score.
+  const holder = noticeHolderOf(context);
+  const notice = holder === undefined ? undefined : savedNoticesHere().take(holder, 'box-score');
+  const mine = notice?.thing === game.id ? notice : undefined;
+  const reopened = mine?.said === 'reopen' ? t('admin.boxScore.done.reopen') : undefined;
+  const saved =
+    mine === undefined || reopened !== undefined
+      ? undefined
+      : game.homeScore !== null && game.awayScore !== null
+        ? t('admin.boxScore.saved', {
+            result: result(String(game.homeScore), String(game.awayScore)),
+          })
+        : t('admin.boxScore.done.save');
   // Who may reopen it here, and by which door (reopen-view.ts): the admin's door as the
   // sheet says, else, for a game its tracker ended, the tracker's own read.
   const reopen: ReopenView = sheetReopenViewOf(
@@ -190,104 +152,116 @@ export async function BoxScorePage({
       : undefined,
   );
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
-  const teams = [
+  const sides = [
     { teamId: game.awayTeamId, name: awayName, score: game.awayScore, field: 'awayScore' },
     { teamId: game.homeTeamId, name: homeName, score: game.homeScore, field: 'homeScore' },
   ] as const;
+  const teams: readonly SheetTeam[] = sides.map((side) => ({
+    teamId: side.teamId,
+    name: side.name,
+    rows: rowsOf(
+      sheet,
+      sheet.players.filter((p) => p.teamId === side.teamId),
+    ),
+    score: {
+      field: side.field,
+      label: t('admin.games.scoreOf', { team: side.name }),
+      saved: side.score === null ? '' : String(side.score),
+    },
+    wrongScore: t('admin.boxScore.refused.score', { team: side.name }),
+  }));
   return (
     <main className="admin-games">
       <p>
         <a href={back}>{t('admin.boxScore.back')}</a>
       </p>
       <h1>{t('admin.boxScore.title', { away: awayName, home: homeName })}</h1>
-      {notice === undefined ? null : (
-        <p role={notice.problem ? 'alert' : 'status'}>{t(notice.key)}</p>
-      )}
+      {reopened === undefined ? null : <SavedLine text={reopened} />}
       {sheet.locked === null ? (
         <p>{t('admin.boxScore.help')}</p>
       ) : (
         <p>{t(`admin.boxScore.locked.${sheet.locked}`)}</p>
       )}
       {reopen.kind === 'correct' ? (
-        <form action={reopenBoxScoreAction} className="ui-stack">
-          <input type="hidden" name="league" value={league} />
-          <input type="hidden" name="gameId" value={game.id} />
-          <input type="hidden" name="version" value={game.version} />
-          <input type="hidden" name="door" value={reopen.door} />
-          {reopen.door === 'tracked' ? (
+        <ReopenForm
+          action={reopenBoxScoreAction}
+          permalink={sheetHref}
+          hidden={{
+            league,
+            gameId: game.id,
+            version: String(game.version),
+            door: reopen.door,
+            requestToken: crypto.randomUUID(),
             // Made once as the form is drawn: a second send of it is the same reopen.
-            <input type="hidden" name="requestId" value={crypto.randomUUID()} />
-          ) : null}
-          {/* A game not entered as a box score is put right on the games list, beside it. */}
-          {game.captureMode === 'box' ? null : <input type="hidden" name="then" value="games" />}
-          {reopen.until === null ? null : (
-            <p>
-              {t('admin.games.reopenUntil', {
-                time: clockTimeText(reopen.until, { locale, timeZone }),
-              })}
-            </p>
-          )}
-          <label className="ui-stack">
-            <span>{t('admin.boxScore.reopenReason')}</span>
-            <input type="text" name="reason" required maxLength={1000} autoComplete="off" />
-          </label>
-          <p>
-            <button type="submit" className="ui-button" data-kind="main">
-              {t('admin.boxScore.reopen')}
-            </button>
-          </p>
-        </form>
+            ...(reopen.door === 'tracked' ? { requestId: crypto.randomUUID() } : {}),
+            // A game not entered as a box score is put right on the games list, beside it.
+            ...(game.captureMode === 'box' ? {} : { then: 'games' }),
+          }}
+          texts={{
+            ...(reopen.until === null
+              ? {}
+              : {
+                  until: t('admin.games.reopenUntil', {
+                    time: clockTimeText(reopen.until, { locale, timeZone }),
+                  }),
+                }),
+            reason: t('admin.boxScore.reopenReason'),
+            reopen: t('admin.boxScore.reopen'),
+          }}
+        />
       ) : reopen.kind === 'who' ? (
         <p data-reopen="who">{t(`admin.games.reopenWho.${reopen.because}`)}</p>
       ) : null}
-      <form action={saveBoxScoreAction}>
-        <input type="hidden" name="league" value={league} />
-        <input type="hidden" name="gameId" value={game.id} />
-        <input type="hidden" name="version" value={game.version} />
-        {teams.map((team) => (
-          <TeamGrid
-            key={team.teamId}
-            sheet={sheet}
-            teamName={team.name}
-            players={sheet.players.filter((p) => p.teamId === team.teamId)}
-            editable={editable}
-          />
-        ))}
-        <fieldset>
-          {teams.map((team) => (
-            <label key={team.field}>
-              <span>{t('admin.games.scoreOf', { team: team.name })}</span>
-              <input
-                type="number"
-                name={team.field}
-                inputMode="numeric"
-                min={0}
-                max={999}
-                step={1}
-                defaultValue={team.score === null ? '' : String(team.score)}
-                disabled={!editable}
-              />
-            </label>
-          ))}
-          {editable ? <p>{t('admin.boxScore.scoreHelp')}</p> : null}
-          {editable && sheet.statKeys.includes('points') ? (
-            <ScoreCheck
-              teams={teams.map((team) => ({
-                scoreField: team.field,
-                personIds: sheet.players
-                  .filter((p) => p.teamId === team.teamId)
-                  .map((p) => p.personId),
-                warning: t('admin.boxScore.scoreMismatch', {
-                  team: team.name,
-                  score: '{score}',
-                  points: '{points}',
-                }),
-              }))}
-            />
-          ) : null}
-        </fieldset>
-        {editable ? <button type="submit">{t('admin.boxScore.save')}</button> : null}
-      </form>
+      <BoxScoreSheetForm
+        action={saveBoxScoreAction}
+        permalink={`${sheetHref}#${sheetScoresId}`}
+        hidden={{
+          league,
+          gameId: game.id,
+          version: String(game.version),
+          requestToken: crypto.randomUUID(),
+        }}
+        teams={teams}
+        editable={editable}
+        {...(saved === undefined ? {} : { saved })}
+        texts={{
+          player: t('admin.boxScore.player'),
+          played: t('admin.boxScore.played'),
+          ...(sheet.minutes
+            ? {
+                minutes: {
+                  short: t('admin.boxScore.minutes.short'),
+                  full: t('admin.boxScore.minutes'),
+                },
+              }
+            : {}),
+          columns: sheet.statKeys.map((key) => {
+            const label = statLabel(key);
+            return { key, short: label.short, full: label.full };
+          }),
+          noPlayers: t('admin.boxScore.noPlayers'),
+          scoreHelp: t('admin.boxScore.scoreHelp'),
+          save: t('admin.boxScore.save'),
+          wrongCell: t('admin.boxScore.refused.cell', { cell: '{cell}' }),
+          wrongMinutes: t('admin.boxScore.refused.minutes', { cell: '{cell}' }),
+          tie: t('admin.games.refused.tie', { result: result('{homeScore}', '{awayScore}') }),
+        }}
+        {...(editable && sheet.statKeys.includes('points')
+          ? {
+              check: {
+                teams: teams.map((team) => ({
+                  scoreField: team.score.field,
+                  personIds: team.rows.map((row) => row.personId),
+                  warning: t('admin.boxScore.scoreMismatch', {
+                    team: team.name,
+                    score: '{score}',
+                    points: '{points}',
+                  }),
+                })),
+              },
+            }
+          : {})}
+      />
     </main>
   );
 }

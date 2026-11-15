@@ -24,5 +24,15 @@ export * from './scoring-moves.ts';
 export * from './scoring-view.ts';
 export * from './tracker-address.ts';
 export { MyGamesPage } from './my-games-page.tsx';
-export { SignOutForm } from './sign-out-form.tsx';
+export { SignOutForm, SignOutLink } from './sign-out-form.tsx';
+export {
+  beforeSignOut,
+  holdSignOut,
+  trackerSignOutHold,
+  waitingQuestionOf,
+  waitingQuestionText,
+  type SignOutPlan,
+  type WaitingQuestion,
+  type TrackerSignOutHold,
+} from './tracker-sign-out.ts';
 export { TrackerPage } from './tracker-page.tsx';

@@ -20,6 +20,7 @@ import { savedBanner, savedBannerText, type SavedBanner } from './queue-banner.t
 import { ScoringScreen } from './scoring-screen.tsx';
 import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controller.ts';
 import { trackerNoticeText, trackerNotices } from './tracker-notice.ts';
+import { holdSignOut } from './tracker-sign-out.ts';
 
 export type TrackerOpeningProps = {
   readonly leagueId: string;
@@ -181,6 +182,22 @@ export function TrackerOpening({
       window.location.assign(to);
     }
   };
+  // The account button's "Sign out" (in the league's header, above this page) leaves the
+  // game this way too (tracker-sign-out.ts): it asks when plays are waiting, then the
+  // session is released before the device is signed out (T6 §5).
+  useEffect(
+    () =>
+      holdSignOut({
+        waitingPlays: () => opened.current?.controller.status().queue.waiting ?? 0,
+        leave: async () => {
+          leaving.current = true;
+          working.current = true;
+          setBusy(true);
+          await opened.current?.controller.leave();
+        },
+      }),
+    [],
+  );
   const leaveBy = (to: string) => (event: MouseEvent<HTMLAnchorElement>) => {
     // A link opened in a new tab or window leaves this page as it is.
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)

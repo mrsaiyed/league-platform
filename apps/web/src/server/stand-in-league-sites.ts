@@ -3,10 +3,18 @@ import { standInLeagues } from './stand-in-cast.ts';
 import type { LeagueSiteSource } from './league-site.ts';
 import { picturedDesign, type PicturedDesignKey } from './stand-in-designs.ts';
 
-/** The two made-up leagues with a look of their own; their names are the cast's. */
+/** The made-up leagues' looks; their names are the cast's. */
 const madeUp: Readonly<Record<string, { name: string; design: PicturedDesignKey }>> = {
   [standInLeagues.live.id]: { name: standInLeagues.live.name, design: 'crest' },
   [standInLeagues.other.id]: { name: standInLeagues.other.name, design: 'clean-court' },
+  // The leagues in the other states have a name too (step 2.127), so a list of a person's
+  // leagues and the sign-in screen name them as a league would, not by their short name.
+  // Their look is the neutral one a league with no design of its own gets.
+  [standInLeagues.draft.id]: { name: standInLeagues.draft.name, design: 'clean-court' },
+  [standInLeagues.archived.id]: { name: standInLeagues.archived.name, design: 'clean-court' },
+  [standInLeagues.suspended.id]: { name: standInLeagues.suspended.name, design: 'clean-court' },
+  [standInLeagues.inBin.id]: { name: standInLeagues.inBin.name, design: 'clean-court' },
+  [standInLeagues.otherDraft.id]: { name: standInLeagues.otherDraft.name, design: 'clean-court' },
 };
 
 /**

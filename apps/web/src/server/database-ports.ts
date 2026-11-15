@@ -4,7 +4,12 @@
 // every area has moved, on PostgreSQL in staging and production.
 //
 // Moved so far: finding a league by its short name or id, who the signed-in person
-// is (identify, below) and what they hold in a league (accessOf). Every other area
+// is (identify, below), what they hold in a league (accessOf) and the leagues they
+// belong to (leaguesOfAccount, step 2.127); and, in part 2, the public schedule
+// (database-public-schedule.ts) and the standings with the seasons a visitor may pick
+// (database-public-stats.ts), whose statistics reads, the ones that show people, still
+// refuse until part 3, and the members' start page the league home reads first
+// (database-public-teams.ts), whose rosters refuse likewise. Every other area
 // still runs on the stand-in only: here each one refuses with NotOnTheDatabaseYet
 // the first time it is used, so its page shows the error page rather than made-up
 // data that is not in the database. Each moves in a part of its own.
@@ -25,9 +30,15 @@ import type { SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
+import { databasePublicSchedule, type PublicScheduleQueries } from './database-public-schedule.ts';
+import { databasePublicStats, type PublicStatsQueries } from './database-public-stats.ts';
+import { databasePublicTeams, type PublicTeamsQueries } from './database-public-teams.ts';
+import { notMovedYet, NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
 import type { WebPorts } from './ports.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
+
+export { NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
 
 /** What these ports use of packages/database. */
 export type DatabaseQueries = Pick<
@@ -40,10 +51,14 @@ export type DatabaseQueries = Pick<
   | 'accountForSignIn'
   | 'isSignInLinkConflict'
   | 'isSignInRefusal'
+  | 'listMyLeagues'
   | 'accessStore'
   | 'activityLogStore'
   | 'jobsStore'
->;
+> &
+  PublicScheduleQueries &
+  PublicStatsQueries &
+  PublicTeamsQueries;
 
 export type DatabasePortsOptions = {
   readonly database: DatabaseQueries;
@@ -79,30 +94,6 @@ const plainAscii = /^[\x21-\x7e]+$/;
 /** Lower-cases A to Z only, so no other character is folded into ASCII. */
 const asciiLowerCase = (text: string) =>
   text.replace(/[A-Z]/g, (letter) => String.fromCharCode(letter.charCodeAt(0) + 32));
-
-/** An area used before it has moved onto the database (record 055). */
-export class NotOnTheDatabaseYet extends Error {
-  readonly area: string;
-  constructor(area: string) {
-    super(`The web app's ${area} does not run on the database yet (step 2.93).`);
-    this.name = 'NotOnTheDatabaseYet';
-    this.area = area;
-  }
-}
-
-/**
- * An area's ports that refuse the moment any of them is reached. `then` and symbols
- * answer nothing, so awaiting or printing the object itself does not refuse.
- */
-function notMovedYet<T extends object>(area: string): T {
-  const refuse = (): never => {
-    throw new NotOnTheDatabaseYet(area);
-  };
-  const handler: ProxyHandler<object> = {
-    get: (_target, name) => (typeof name === 'symbol' || name === 'then' ? undefined : refuse()),
-  };
-  return new Proxy({}, handler) as T;
-}
 
 export function databasePorts(options: DatabasePortsOptions): WebPorts {
   const { database, db, signIn } = options;
@@ -207,12 +198,16 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     signInMail: options.signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf: accessOfVia(deps),
-    publicStats: notMovedYet('public standings and statistics'),
+    // The one read across leagues (record 066): in a transaction set to the session's
+    // account and no league, through my_leagues(), which answers for that account only.
+    leaguesOfAccount: (accountId) =>
+      database.withTransaction(db, { accountId }, (scope) => database.listMyLeagues(scope)),
+    publicStats: databasePublicStats(database, db),
     games: notMovedYet('games area'),
     fixtureImport: notMovedYet('fixture import'),
-    publicSchedule: notMovedYet('public schedule'),
+    publicSchedule: databasePublicSchedule(database, db, now),
     scheduleAdmin: notMovedYet('schedule grid'),
-    publicTeams: notMovedYet('public teams pages'),
+    publicTeams: databasePublicTeams(database, db),
     adminTeams: notMovedYet('Admin → Teams'),
     adminSettings: notMovedYet('league settings'),
     tracker: notMovedYet('tracker'),

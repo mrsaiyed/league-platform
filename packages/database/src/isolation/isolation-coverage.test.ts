@@ -207,6 +207,11 @@ const narrowLookups = new Map<unknown, string>([
     databasePackage.createOwnProfile,
     "the own profile of the account set (create_own_profile): that account's personal rows only",
   ],
+  // Record 066: the product's one read across leagues for an ordinary person, by design.
+  [
+    databasePackage.listMyLeagues,
+    "the leagues of the account set (my_leagues): no argument, that account's own owner, role and roster rows only, the fewest columns, no league in the bin; tested in list-my-leagues.test.ts",
+  ],
   [
     databasePackage.eraseAccount,
     "erases the account set (erase_account): its personal rows and sign-in rows, and writes across leagues by design (T-52): that account's grants ended, its game assignments and scoring sessions removed, its accepted invitations' email emptied; tested in erase-account.test.ts",
