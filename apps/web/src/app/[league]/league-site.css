@@ -722,8 +722,10 @@ html {
   margin-block-start: var(--step-5);
 }
 /* The quiet line that says the lists go on from second place belongs to the lists under
-   it: it stands clear of the cards above and close to what it speaks of. */
-.stats-after {
+   it: it stands clear of the cards above and close to what it speaks of. (Named with the
+   shared piece's own class, so this wins over that piece's margins wherever its
+   stylesheet is loaded.) */
+.ui-section-note.stats-after {
   margin-block: var(--step-5) var(--step-3);
 }
 .stats-tables {
