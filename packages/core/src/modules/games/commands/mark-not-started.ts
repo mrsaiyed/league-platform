@@ -62,26 +62,29 @@ export type MarkNotStartedError = {
     | 'game-cancelled'
     | 'not-tracked'
     | 'session-held'
+    | 'plays-recorded'
     | 'reason-needed';
 };
 
+/** May this account correct the game (S-40's second case)? At the game's program. */
+async function mayCorrectGame(context: CommandContext, tx: TrackerTx, gameId: string) {
+  return mayChangeGames(context, tx, 'games.correct', await gameScope(tx, gameId));
+}
+
 /**
- * May this account mark the game not started? It takes the game's lock and reads its
- * plays first, so the line of S-40 is judged on the state the command clears. A game
- * that is not here is checked as scoring is, league-wide.
+ * May this account ask to mark the game not started at all: whoever may score it, or
+ * correct it. Which of the two the game's plays need is S-40's line, judged in the run
+ * once the game is locked, so the plays judged are the plays cleared; a scorekeeper on
+ * the wrong side of it is told so in its own words (`plays-recorded`: undo them first),
+ * not as someone who may not score the game. A game that is not here is checked as
+ * scoring is, league-wide.
  */
 async function mayMarkNotStarted(
   context: CommandContext,
   tx: TrackerTx,
   gameId: string,
 ): Promise<boolean> {
-  if (await tx.scoringSessions.lockGame(gameId)) {
-    const saved = await tx.liveGames.findState(gameId);
-    if (saved !== undefined && holdsRecordedPlays(readState(saved.state))) {
-      return mayChangeGames(context, tx, 'games.correct', await gameScope(tx, gameId));
-    }
-  }
-  return mayScoreGame(context, tx, gameId);
+  return (await mayScoreGame(context, tx, gameId)) || mayCorrectGame(context, tx, gameId);
 }
 
 /** Why a game that is not live cannot be marked not started. */
@@ -135,8 +138,9 @@ export const markNotStarted = defineCommand({
       return fail({ code: 'session-held' });
     }
     const before = readState(saved.state);
-    if (holdsRecordedPlays(before) && input.reason === undefined) {
-      return fail({ code: 'reason-needed' });
+    if (holdsRecordedPlays(before)) {
+      if (!(await mayCorrectGame(context, tx, game.id))) return fail({ code: 'plays-recorded' });
+      if (input.reason === undefined) return fail({ code: 'reason-needed' });
     }
 
     // The engine's own reset, then the season's rules as they stand (S-1 does not

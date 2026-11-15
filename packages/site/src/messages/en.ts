@@ -1232,6 +1232,8 @@ export const en = {
   'tracker.notStarted.no': 'Keep scoring',
   'tracker.notStarted.done': 'The game is scheduled again. Nothing recorded in it counts.',
   'tracker.notStarted.refused.not-allowed':
+    'You do not have access to score this game, so you cannot mark it not started.',
+  'tracker.notStarted.refused.plays-recorded':
     'A basket, foul or turnover is recorded. Undo them first, then mark the game not started; or a league admin can clear it with a reason.',
   'tracker.notStarted.refused.unknown-game': 'This game could not be found.',
   'tracker.notStarted.refused.changed-since-read':

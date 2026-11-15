@@ -272,9 +272,10 @@ describe('marking a game not started once something is recorded (S-40)', () => {
     const t = setUp();
     await tap(t, [...tipOff, basket]);
     const before = structuredClone(t.db.state);
+    // Told in its own words: the scorekeeper may score the game, and Undo is the way out.
     expect(await mark(t, scorekeeperId, { reason: 'wrongGame' })).toEqual({
       ok: false,
-      error: { code: 'not-allowed' },
+      error: { code: 'plays-recorded' },
     });
     expect(t.db.state).toEqual(before);
   });
@@ -291,7 +292,7 @@ describe('marking a game not started once something is recorded (S-40)', () => {
       await tap(t, [...tipOff, play]);
       expect(await mark(t, scorekeeperId), play.type).toMatchObject({
         ok: false,
-        error: { code: 'not-allowed' },
+        error: { code: 'plays-recorded' },
       });
       await tap(t, [{ type: 'undo' }]);
       expect(await mark(t, scorekeeperId), play.type).toMatchObject({ ok: true });

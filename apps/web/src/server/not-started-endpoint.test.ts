@@ -151,10 +151,10 @@ describe('POST …/games/{game}/not-started', () => {
       tap({ type: 'score', side: 'home', playerId: hawks[0], points: 2 }),
     ]);
     const refused = await mark(world, { sequence: 4, reason: 'wrongGame' });
-    expect(refused.answer.status).toBe(403);
+    expect(refused.answer.status).toBe(409);
     expect(NotStartedReply.parse(refused.answer.body)).toMatchObject({
       status: 'refused',
-      code: 'not-allowed',
+      code: 'plays-recorded',
     });
     expect(refused.afterwards).toBeNull();
 
@@ -236,8 +236,14 @@ describe('the words for marking a game not started (T-187)', () => {
   });
 
   it('tells a scorekeeper refused for a play that stands that Undo is the way out', () => {
-    const words = en['tracker.notStarted.refused.not-allowed'];
+    const words = en['tracker.notStarted.refused.plays-recorded'];
     expect(words).toContain('Undo them first');
     expect(words).toContain('a league admin can clear it with a reason');
+  });
+
+  it('tells someone who may not score the game just that, never to undo plays', () => {
+    const words = en['tracker.notStarted.refused.not-allowed'];
+    expect(words).toContain('do not have access to score this game');
+    expect(words).not.toContain('Undo');
   });
 });

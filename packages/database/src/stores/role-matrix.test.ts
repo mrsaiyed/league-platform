@@ -1175,7 +1175,16 @@ const gameCommandRows: readonly Row[] = [
       sequence: 2,
       reason: 'startedByMistake',
     }),
-    (c, i) => markNotStarted(c, i, trackerDeps),
+    // Someone who may score the game but not correct it is refused here by S-40's line,
+    // in its own words (plays-recorded: undo them first); for this row that is the
+    // refusal of a permission not held, so it is read as not-allowed. Any other code
+    // still fails the row.
+    async (c, i) => {
+      const result = await markNotStarted(c, i, trackerDeps);
+      return !result.ok && result.error.code === 'plays-recorded'
+        ? { ok: false, error: { code: 'not-allowed' } }
+        : result;
+    },
   ),
 ];
 

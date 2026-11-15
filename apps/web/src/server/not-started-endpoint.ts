@@ -5,13 +5,13 @@
 // contract's `NotStartedReply` at `notStartedStatus`:
 //
 // - 200 not-started: the game is scheduled again, with the marker's sequence number.
-// - 403 refused not-allowed: may not score this game, or a basket, foul or turnover
-//   stands and the person may not correct games.
+// - 403 refused not-allowed: may neither score nor correct this game.
 // - 404 refused unknown-game: no such game in this league, one of another league asked
 //   for through this one's address included.
 // - 409 refused, with its code: not started yet, final, entered by hand, postponed,
 //   cancelled, no tracker plays, moved on since it was seen, held by another device,
-//   or a reason needed.
+//   a basket, foul or turnover standing for someone who may not correct games
+//   (plays-recorded: undo them first), or a reason needed.
 // - 401 signed-out and 400 invalid-input carry the tracker's `TrackerRefusal`.
 //
 // Once it is done, the game's message goes out for the people watching (T-117), as for

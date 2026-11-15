@@ -349,7 +349,7 @@ describe('marking a game not started on the database (S-40)', () => {
     const before = await rowsOf(g);
     expect(await mark(g, g.scorer, 'wrongGame')).toEqual({
       ok: false,
-      error: { code: 'not-allowed' },
+      error: { code: 'plays-recorded' },
     });
     expect(await rowsOf(g)).toEqual(before);
 

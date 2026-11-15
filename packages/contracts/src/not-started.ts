@@ -38,7 +38,7 @@ export type NotStartedRequest = z.infer<typeof NotStartedRequest>;
 
 /** Why marking a game not started was refused, as fixed codes: the screen picks the words. */
 export const notStartedRefusals = [
-  /** May not score this game; or a basket, foul or turnover stands and may not correct games. */
+  /** May neither score nor correct this game. */
   'not-allowed',
   /** No such game in this league. */
   'unknown-game',
@@ -61,6 +61,11 @@ export const notStartedRefusals = [
    * device may be scoring with no signal. Taking it over, which asks, is the way through.
    */
   'session-held',
+  /**
+   * A basket, foul or turnover stands and the asker may score the game but not correct
+   * it (S-40): undoing them first is the way out, or a league admin clears it.
+   */
+  'plays-recorded',
   /** A basket, foul or turnover stands: a reason is needed. */
   'reason-needed',
 ] as const;
