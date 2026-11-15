@@ -352,6 +352,7 @@ All dated November 12, 2026.
 | T-264                 | A started game's rules stay fixed even if it goes back to scheduled (T-237)  | Agreed (delegated): a game marked not started has no rules of its own again; it takes its season's when it next starts (rec. 061)               | Step 2.121: record 025 kept a started game's rules even after it went back to scheduled            |
 | T-265                 | New                                                                          | Agreed (delegated): the engine gets the foul limit, mercy lead and last-minutes clock; taps take the platform shape, protocol 2 (rec. 062)      | Step 2.122: the clock switch was refused and the three rules dropped (2.107 audit, M7)             |
 | T-267                 | New                                                                          | Agreed (delegated): the scoring screen is styled by the product, not by the league's design values: one dark courtside look (rec. 064)          | Before step 2.35: nobody had decided how the tracker looks (2.107 audit, M10)                      |
+| T-270                 | New (refines T-9)                                                            | Agreed (delegated): the first online test copy runs on Render at Render's own address with the Supabase test project; Vercel rejected           | The founder asked where to test online for free (2026-11-15); the chat lead decided                |
 
 ## The full list
 
@@ -883,6 +884,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-166 | Saif Ghori is the trusted second person who can reach the vendor accounts and the written procedures in an emergency                                   | Agreed             |         |
 | T-167 | Which paid tier of each vendor to start on (decided from prices at build time)                                                                         | Open               |         |
 | T-168 | Whether to pay for a second database region (not until an association contract requires it)                                                            | Open               |         |
+| T-270 | The first online test copy: web on Render's free instance, worker on its smallest paid one, the Supabase test project; no Cloudflare or domain yet     | Agreed (delegated) |         |
 
 ### [T9 — Quality and maintainability](technical/T9-quality-and-maintainability.md)
 
