@@ -1219,10 +1219,11 @@ if (browser) {
       const c = await openCourt(page);
       await c.saved();
       const cdp = await context.newCDPSession(page);
+      // Each finger is `[x, y]` or `[x, y, id]`: a finger left out of a move has lifted.
       const touch = (type, points) =>
         cdp.send('Input.dispatchTouchEvent', {
           type,
-          touchPoints: points.map(([x, y], id) => ({ x, y, id })),
+          touchPoints: points.map(([x, y, id], place) => ({ x, y, id: id ?? place })),
         });
       const middle = async (locator) => {
         const box = await locator.boundingBox();
@@ -1245,36 +1246,72 @@ if (browser) {
         );
       });
       const plays = await c.root.getAttribute('data-plays');
-      // One finger rests on a bench player; a second comes down on a floor player of the
-      // same team, slides a little and lifts; then the first lifts. Nobody dragged anyone.
-      await touch('touchStart', [a]);
-      await touch('touchStart', [a, b]);
-      for (let i = 1; i <= 4; i += 1) await touch('touchMove', [a, [b[0] + i * 4, b[1] + i * 3]]);
-      await touch('touchMove', [a]);
-      await touch('touchEnd', []);
-      // A play made wrongly would be stored and shown a moment later: a moment is given
-      // here, and the count after the one drag below (exactly one play more) settles it
-      // however slow the machine.
-      await page.waitForTimeout(600);
-      const presses = await page.evaluate(() => window.pressesSeen);
-      note(
-        'the page was touched by two fingers at once',
-        presses.length === 2 &&
-          presses.every((press) => press.type === 'touch') &&
-          presses.filter((press) => press.first).length === 1,
-        JSON.stringify(presses),
-      );
-      note(
-        'two fingers on two tiles record no substitution and no play (finding H1)',
-        (await c.root.getAttribute('data-plays')) === plays &&
-          (await c.onCourtById(benchId)) === false &&
-          (await c.onCourtById(floorId)) === true &&
-          (await c.root.locator('[data-drop]').count()) === 0,
-      );
-      // Whatever the fingers left open is closed, then one finger drags the bench player
-      // onto the floor player: that is a substitution.
-      await page.keyboard.press('Escape');
-      await c.pad.locator('[data-rest]').waitFor();
+      // Two ways two fingers rest on two tiles of one team. Nobody dragged anyone in
+      // either, so neither may record anything.
+      const cases = [
+        {
+          // The fault itself (the second look, M1): finger A rests on a FLOOR player;
+          // finger B lands on a BENCH player of the same team; A moves a pixel and lifts,
+          // then B lifts. A screen that followed the newest finger and took any finger's
+          // moves as its own would see the bench player dragged onto the floor player.
+          name: 'a finger on a floor player, then one on a bench player; the first moves and lifts',
+          async fingers() {
+            await touch('touchStart', [[...b, 0]]);
+            await touch('touchStart', [
+              [...b, 0],
+              [...a, 1],
+            ]);
+            await touch('touchMove', [
+              [b[0] + 1, b[1], 0],
+              [...a, 1],
+            ]);
+            await touch('touchMove', [[...a, 1]]);
+            await touch('touchEnd', []);
+          },
+        },
+        {
+          // And the other way round: A rests on a bench player; B comes down on a floor
+          // player of the same team, slides a little and lifts; then A lifts.
+          name: 'a finger on a bench player, then one on a floor player; the second slides and lifts',
+          async fingers() {
+            await touch('touchStart', [a]);
+            await touch('touchStart', [a, b]);
+            for (let i = 1; i <= 4; i += 1) {
+              await touch('touchMove', [a, [b[0] + i * 4, b[1] + i * 3]]);
+            }
+            await touch('touchMove', [a]);
+            await touch('touchEnd', []);
+          },
+        },
+      ];
+      for (const fingers of cases) {
+        await page.evaluate(() => (window.pressesSeen = []));
+        await fingers.fingers();
+        // A play made wrongly would be stored and shown a moment later: a moment is given
+        // here, and the count after the one drag below (exactly one play more) settles it
+        // however slow the machine.
+        await page.waitForTimeout(600);
+        const presses = await page.evaluate(() => window.pressesSeen);
+        note(
+          `the page was touched by two fingers at once (${fingers.name})`,
+          presses.length === 2 &&
+            presses.every((press) => press.type === 'touch') &&
+            presses.filter((press) => press.first).length === 1,
+          JSON.stringify(presses),
+        );
+        note(
+          `two fingers on two tiles record no substitution and no play (finding H1; ${fingers.name})`,
+          (await c.root.getAttribute('data-plays')) === plays &&
+            (await c.onCourtById(benchId)) === false &&
+            (await c.onCourtById(floorId)) === true &&
+            (await c.root.locator('[data-drop]').count()) === 0,
+          `plays ${plays} then ${await c.root.getAttribute('data-plays')}; bench player on: ${await c.onCourtById(benchId)}; floor player on: ${await c.onCourtById(floorId)}`,
+        );
+        // Whatever the fingers left open is closed.
+        await page.keyboard.press('Escape');
+        await c.pad.locator('[data-rest]').waitFor();
+      }
+      // Then one finger drags the bench player onto the floor player: a substitution.
       await c.recorded(async () => {
         await touch('touchStart', [a]);
         for (let i = 1; i <= 8; i += 1) {
