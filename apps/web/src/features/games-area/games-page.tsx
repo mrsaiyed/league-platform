@@ -339,7 +339,7 @@ export async function GamesPage({
       ) : rows.length === 0 ? (
         <p>{t('admin.games.empty')}</p>
       ) : (
-        <ul className="admin-game-list ui-stack">
+        <ul className="admin-game-list ui-list">
           {rows.map((game) => (
             <li key={game.id} id={gameAnchor(game.id)} className="ui-stack">
               <div className="ui-stack">
