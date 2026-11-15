@@ -252,6 +252,12 @@ body {
   font-size: var(--text-14);
   font-weight: 600;
 }
+/* A field a refusal is about (aria-invalid): edged in the danger color, at a control's
+   outline strength (DESIGN.md section 4, line 17), so the wrong box is seen among the rest. */
+.ui-root [aria-invalid='true'] {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .ui-root *,
