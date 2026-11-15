@@ -38,6 +38,30 @@ export const placeId = (place: SettingPlace, leagueId: string): string =>
       ? place.seasonId
       : leagueId;
 
+/** The row stored at exactly this place, if there is one. */
+async function storedAt(tx: LeaguesTx, key: string, place: SettingPlace) {
+  const rows = await tx.leagues.settingRows(
+    key,
+    place.level === 'program'
+      ? { programId: place.programId }
+      : place.level === 'season'
+        ? { seasonId: place.seasonId }
+        : {},
+  );
+  return rows.find((row) => row.level === place.level);
+}
+
+/**
+ * Whether a stored document holds this document's value at its version. Compared part by
+ * part: the database may keep a document's keys in another order. A value that cannot be
+ * told the same simply counts as a change, and is written.
+ */
+function sameDocument(stored: unknown, wanted: { version: number; value: unknown }): boolean {
+  if (typeof stored !== 'object' || stored === null) return false;
+  const { version, value } = stored as { version?: unknown; value?: unknown };
+  return version === wanted.version && JSON.stringify(value) === JSON.stringify(wanted.value);
+}
+
 /** The command over a list of declarations (tests give their own; the product's is below). */
 export function setSettingFor(registry: SettingRegistry) {
   return defineCommand({
@@ -66,6 +90,16 @@ export function setSettingFor(registry: SettingRegistry) {
       if (confirming && input.confirmed !== true) return fail({ code: 'confirmation-needed' });
       const place = await findPlace(tx, input);
       if (place === undefined) return fail({ code: 'place-not-found' });
+      // The same value saved again, from the version read, changes nothing: nothing is
+      // written and nothing goes into the activity log (record 065).
+      const kept = await storedAt(tx, setting.key, place);
+      if (
+        kept !== undefined &&
+        kept.version === input.version &&
+        sameDocument(kept.document, settingDocument(setting, parsed.data))
+      ) {
+        return ok({ key: setting.key, version: kept.version });
+      }
       const version = await tx.leagues.writeSetting(
         place,
         setting.key,

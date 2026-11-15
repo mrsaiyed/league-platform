@@ -5,6 +5,7 @@
 // surface, is names-through-ports.test.ts; across every surface and every person's
 // request, core's modules/name-policy-scan.test.ts.
 import {
+  defaultNamePolicy,
   findPrivateFields,
   privateValuesOf,
   publicViewer,
@@ -15,7 +16,12 @@ import {
 import { describe, expect, it } from 'vitest';
 import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
-import { standInPublicStats, youthTeams } from './stand-in-public-stats.ts';
+import {
+  adultTeams,
+  standInAudienceOf,
+  standInPublicStats,
+  youthTeams,
+} from './stand-in-public-stats.ts';
 import { standInPublicTeams } from './stand-in-public-teams.ts';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -46,8 +52,13 @@ const as = (accountId: string, leagueId = youth): CommandContext => ({
 });
 
 function made() {
-  const settings = standInAdminSettings({ accessOf: () => access, log: () => undefined });
   const ids = { adultLeagueId: adult, youthLeagueId: youth };
+  const settings = standInAdminSettings({
+    accessOf: () => access,
+    log: () => undefined,
+    audienceOf: standInAudienceOf(ids),
+    hasRecordedChild: () => false,
+  });
   const stats = standInPublicStats(ids, namePolicyOf(settings.deps));
   const teams = standInPublicTeams(ids, ownerId);
   const rockets = youthTeams.find((t) => t.slug === 'rockets')?.id ?? '';
@@ -56,9 +67,19 @@ function made() {
     const roster = await teams.rosterOf(youth, rockets, { viewer: publicViewer(youth), policy });
     return roster.lines;
   };
-  const set = (key: string, value: unknown, extra: Record<string, unknown> = {}, who = ownerId) =>
-    setSetting(as(who), { level: 'league', key, value, version: null, ...extra }, settings.deps);
-  return { stats, rosterNames, set };
+  const set = (
+    key: string,
+    value: unknown,
+    extra: Record<string, unknown> = {},
+    who = ownerId,
+    leagueId = youth,
+  ) =>
+    setSetting(
+      as(who, leagueId),
+      { level: 'league', key, value, version: null, ...extra },
+      settings.deps,
+    );
+  return { stats, rosterNames, set, teams };
 }
 
 const texts = (lines: readonly { readonly name: { shown: boolean } }[]) =>
@@ -68,27 +89,67 @@ describe("the league's privacy settings on its public pages (T-81)", () => {
   it('shows children by first name and last initial until the admin confirms full names', async () => {
     const { stats, rosterNames, set } = made();
     expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Tess M.']);
-    expect(await set('privacy.publicNames', 'fullName')).toEqual({
+    // Full names without the confirmation: saved, children still with care (R-14, R-29).
+    expect(await set('privacy.publicNames', 'fullName')).toMatchObject({ ok: true });
+    expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Tess M.']);
+    // The confirmation is its own act, and asks for the box to be ticked.
+    expect(await set('privacy.childrenInFullConfirmed', true)).toEqual({
       ok: false,
       error: { code: 'confirmation-needed' },
     });
-    expect(await set('privacy.publicNames', 'fullName', { confirmed: true })).toMatchObject({
+    expect(await set('privacy.childrenInFullConfirmed', true, { confirmed: true })).toMatchObject({
       ok: true,
     });
     expect(texts(await rosterNames())).toEqual(['Noor Haddad', 'Jay Whitaker', 'Tess Moreno']);
-    // Each league has its own settings: the adult league is untouched.
-    expect((await stats.settingsOf(adult)).namePolicy.children).toBe('first_name_last_initial');
+    // Taken back: children with care again.
+    expect(await set('privacy.childrenInFullConfirmed', false, { version: 1 })).toMatchObject({
+      ok: true,
+    });
+    expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Tess M.']);
+    // Each league has its own settings: the adult league is untouched, on its start.
+    expect((await stats.settingsOf(adult)).namePolicy).toEqual(defaultNamePolicy);
+  });
+
+  it("follows an adult league's choice of less for its adults, and full names again (R-29)", async () => {
+    const { stats, set, teams } = made();
+    const falcons = adultTeams.find((t) => t.slug === 'falcons')?.id ?? '';
+    const adultRoster = async () => {
+      const policy = (await stats.settingsOf(adult)).namePolicy;
+      const roster = await teams.rosterOf(adult, falcons, { viewer: publicViewer(adult), policy });
+      return texts(roster.lines);
+    };
+    const names = (value: string, version: number | null) =>
+      set('privacy.publicNames', value, { version }, ownerId, adult);
+    // Rosa Delgado is the coach, with no number.
+    expect(await adultRoster()).toEqual([
+      'Dana Whitfield',
+      'Marcus Oyelaran',
+      null,
+      'Rosa Delgado',
+      'Pat Gorski',
+    ]);
+    expect(await names('hidden', null)).toMatchObject({ ok: true });
+    expect(await adultRoster()).toEqual([null, null, null, null, null]);
+    expect(await names('firstNameLastInitial', 1)).toMatchObject({ ok: true });
+    expect(await adultRoster()).toEqual(['Dana W.', 'Marcus O.', null, 'Rosa D.', 'Pat G.']);
+    // Full names again: no confirmation asked, adults in full as at the start.
+    expect(await names('fullName', 2)).toEqual({
+      ok: true,
+      value: { key: 'privacy.publicNames', version: 3 },
+    });
+    expect((await adultRoster())[0]).toBe('Dana Whitfield');
+    expect((await stats.settingsOf(adult)).namePolicy).toEqual(defaultNamePolicy);
   });
 
   it('lets no scorekeeper change either setting', async () => {
     const { rosterNames, set } = made();
-    const refused = await set(
-      'privacy.publicNames',
-      'fullName',
-      { confirmed: true },
-      scorekeeperId,
-    );
-    expect(refused).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+    for (const [key, value] of [
+      ['privacy.publicNames', 'hidden'],
+      ['privacy.childrenInFullConfirmed', true],
+    ] as const) {
+      const refused = await set(key, value, { confirmed: true }, scorekeeperId);
+      expect(refused, key).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+    }
     expect(await set('privacy.playersMayAskForInitials', true, {}, scorekeeperId)).toMatchObject({
       ok: false,
       error: { code: 'not-allowed' },
@@ -110,7 +171,8 @@ describe("the league's privacy settings on its public pages (T-81)", () => {
     for (const names of ['fullName', 'firstNameLastInitial', 'hidden'] as const) {
       for (const initials of [false, true]) {
         const { rosterNames, set } = made();
-        await set('privacy.publicNames', names, { confirmed: true });
+        await set('privacy.publicNames', names);
+        await set('privacy.childrenInFullConfirmed', true, { confirmed: true });
         await set('privacy.playersMayAskForInitials', initials);
         const lines = await rosterNames();
         // Built from what the settings say is shown, not from the lines themselves.
@@ -133,15 +195,18 @@ describe("the league's privacy settings on its public pages (T-81)", () => {
 
 describe('namesShownOf', () => {
   it("gives the league's audience and policy, and reads a league it does not know as youth", async () => {
-    const settings = standInAdminSettings({ accessOf: () => access, log: () => undefined });
-    const names = namesShownOf(namePolicyOf(settings.deps), (leagueId) =>
-      leagueId === adult ? 'adult' : undefined,
-    );
+    const audienceOf = (leagueId: string) => (leagueId === adult ? 'adult' : undefined);
+    const settings = standInAdminSettings({
+      accessOf: () => access,
+      log: () => undefined,
+      audienceOf,
+      hasRecordedChild: () => false,
+    });
+    const names = namesShownOf(namePolicyOf(settings.deps), audienceOf);
     expect((await names(adult)).audience).toBe('adult');
     expect((await names(youth)).audience).toBe('youth');
-    expect((await names(youth)).policy).toEqual({
-      children: 'first_name_last_initial',
-      playersMayAskForInitials: false,
-    });
+    // Every league starts the same (record 065).
+    expect((await names(youth)).policy).toEqual(defaultNamePolicy);
+    expect((await names(adult)).policy).toEqual(defaultNamePolicy);
   });
 });

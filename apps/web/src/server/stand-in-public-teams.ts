@@ -21,6 +21,12 @@ type Spec = {
   role?: 'player' | 'captain' | 'coach';
   left?: string;
   request?: 'none' | 'initials' | 'removed';
+  /**
+   * Whether the record says this person is a child. Left out, it is not recorded, which a
+   * youth league reads as a child (R-15). The made-up coaches are recorded as adults, so
+   * the youth league shows what a coach looks like beside its players (record 065).
+   */
+  minor?: boolean;
 };
 
 const rosterSpecs: Record<string, Spec[]> = {
@@ -29,12 +35,12 @@ const rosterSpecs: Record<string, Spec[]> = {
     { first: 'Marcus', last: 'Oyelaran', number: '11' },
     { first: 'Lee', last: 'Fontaine', number: '23', request: 'removed' },
     { first: 'Pat', last: 'Gorski', number: '8', left: '2026-10-02' },
-    { first: 'Rosa', last: 'Delgado', number: null, role: 'coach' },
+    { first: 'Rosa', last: 'Delgado', number: null, role: 'coach', minor: false },
   ],
   herons: [
     { first: 'Priya', last: 'Raman', number: '7', role: 'captain' },
     { first: 'Theo', last: 'Lindqvist', number: '12' },
-    { first: 'Amal', last: 'Nasser', number: null, role: 'coach' },
+    { first: 'Amal', last: 'Nasser', number: null, role: 'coach', minor: false },
   ],
   owls: [
     { first: 'Jordan', last: 'Castellanos', number: '3', role: 'captain' },
@@ -51,7 +57,7 @@ const rosterSpecs: Record<string, Spec[]> = {
   comets: [
     { first: 'Sam', last: 'Rivera', number: '2' },
     { first: 'Maya', last: 'Cho', number: '10' },
-    { first: 'Dev', last: 'Anand', number: null, role: 'coach' },
+    { first: 'Dev', last: 'Anand', number: null, role: 'coach', minor: false },
   ],
   rockets: [
     { first: 'Noor', last: 'Haddad', number: '6', role: 'captain' },
@@ -69,7 +75,7 @@ function lineOf(spec: Spec, index: number, teamId: string): RosterLineSource {
     leftOn: spec.left ?? null,
     firstName: spec.first,
     lastName: spec.last,
-    isMinor: null,
+    isMinor: spec.minor ?? null,
     nameRequest: spec.request ?? 'none',
     personBinned: false,
   };
