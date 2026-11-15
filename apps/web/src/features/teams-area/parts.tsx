@@ -12,15 +12,20 @@ export type SearchProps = {
   readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
 };
 
-/** What went well or why a change was refused, from the address. */
+/**
+ * What went well or why a change was refused, from the address. A refusal said beside
+ * the field it is about (`saidBeside`) is not said again here.
+ */
 export function Notice({
   query,
+  saidBeside = false,
 }: {
   readonly query: Readonly<Record<string, string | string[] | undefined>>;
+  readonly saidBeside?: boolean;
 }) {
   const problem = problemKey(query);
   const good = doneKey(query);
-  if (problem !== undefined) return <p role="alert">{t(problem)}</p>;
+  if (problem !== undefined) return saidBeside ? null : <p role="alert">{t(problem)}</p>;
   if (good !== undefined) return <p role="status">{t(good)}</p>;
   return null;
 }

@@ -1,6 +1,7 @@
 // One team's page in Admin → Teams (step 2.51): its details, who sees its numbers, and
 // its roster: people added with a jersey number and a role, put in order, and marked
-// as having left (R-17: they stay in the team's history). Every change is a plain form.
+// as having left (R-17: they stay in the team's history), and put back when that was a
+// mistake (step 2.161). Every change is a plain form.
 import {
   leagueUrl,
   listPeople,
@@ -14,6 +15,7 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
+import { entryAnchor, leavingAtOf, problemKey } from './answer.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
 import {
   addNewPersonAction,
@@ -21,6 +23,7 @@ import {
   changeEntryAction,
   markLeftAction,
   moveEntryAction,
+  putBackAction,
   removePersonAction,
   removeTeamAction,
   saveTeamAction,
@@ -85,6 +88,10 @@ export async function TeamPage({
   const onRoster = new Set(open.map((line) => line.personId));
   const available = everyone.filter((person) => !onRoster.has(person.id));
   const listUrl = leagueUrl(here, 'admin-area', { area: 'teams' });
+  // A refused leaving date is said beside the line it was typed in, with the date kept.
+  const leaving = leavingAtOf(query);
+  const besideEntry = open.some((line) => line.id === leaving?.entry) ? leaving : undefined;
+  const leavingProblem = besideEntry === undefined ? undefined : problemKey(query);
 
   return (
     <main>
@@ -95,7 +102,7 @@ export async function TeamPage({
         <Swatch team={team} />
         {team.name}
       </h1>
-      <Notice query={query} />
+      <Notice query={query} saidBeside={leavingProblem !== undefined} />
 
       <Section title={t('adminTeams.edit.title')}>
         <form action={saveTeamAction}>
@@ -147,7 +154,7 @@ export async function TeamPage({
         ) : (
           <ol>
             {open.map((line, place) => (
-              <li key={line.id}>
+              <li key={line.id} id={entryAnchor(line.id)}>
                 <strong>{nameOf(line)}</strong>
                 {line.needsReview === true ? <> {t('adminTeams.roster.toReview')}</> : null}
                 {line.jerseyNumber !== null && wornTwice.has(line.jerseyNumber) ? (
@@ -181,13 +188,15 @@ export async function TeamPage({
                   <input type="hidden" name="team" value={team.id} />
                   <input type="hidden" name="entry" value={line.id} />
                   <input type="hidden" name="version" value={line.version} />
-                  <p>
-                    <label>
-                      {t('adminTeams.roster.leftOn')}
-                      <input name="leftOn" type="date" required />
-                    </label>{' '}
-                    <button type="submit">{t('adminTeams.roster.markLeft')}</button>
-                  </p>
+                  <LeavingDate
+                    entryId={line.id}
+                    typed={besideEntry?.entry === line.id ? besideEntry.leftOn : undefined}
+                    problem={
+                      besideEntry?.entry === line.id && leavingProblem !== undefined
+                        ? t(leavingProblem)
+                        : undefined
+                    }
+                  />
                 </form>
                 <MoveForm
                   league={here.slug}
@@ -206,11 +215,22 @@ export async function TeamPage({
             <h3>{t('adminTeams.roster.leftTitle')}</h3>
             <ul>
               {left.map((line) => (
-                <li key={line.id}>
+                <li key={line.id} data-left-entry={line.id}>
                   {t('adminTeams.roster.leftLine', {
                     name: nameOf(line),
                     date: line.leftOn ?? '',
                   })}
+                  <form action={putBackAction}>
+                    <LeagueField league={here.slug} />
+                    <input type="hidden" name="team" value={team.id} />
+                    <input type="hidden" name="entry" value={line.id} />
+                    <input type="hidden" name="version" value={line.version} />
+                    <p>
+                      <button type="submit" className="ui-button">
+                        {t('adminTeams.roster.putBack')}
+                      </button>
+                    </p>
+                  </form>
                 </li>
               ))}
             </ul>
@@ -285,7 +305,9 @@ export async function TeamPage({
                 <input type="hidden" name="team" value={team.id} />
                 <input type="hidden" name="personId" value={person.id} />
                 <ConfirmBox />
-                <button type="submit">{t('adminTeams.people.remove')}</button>
+                <button type="submit" className="ui-button" data-kind="danger">
+                  {t('adminTeams.people.remove')}
+                </button>
               </form>
             </li>
           ))}
@@ -294,14 +316,71 @@ export async function TeamPage({
 
       <Section title={t('adminTeams.remove.title')}>
         <p>{t('adminTeams.remove.body')}</p>
+        {/* How many people the bin would take with the team, said before it is confirmed. */}
+        <p data-remove-roster-count={open.length}>
+          {!roster.ok
+            ? t('adminTeams.remove.rosterUnknown')
+            : open.length === 0
+              ? t('adminTeams.remove.rosterNone')
+              : t.plural('adminTeams.remove.roster', open.length)}
+        </p>
         <form action={removeTeamAction}>
           <LeagueField league={here.slug} />
           <input type="hidden" name="team" value={team.id} />
           <ConfirmBox />
-          <button type="submit">{t('adminTeams.remove.submit')}</button>
+          <button type="submit" className="ui-button" data-kind="danger">
+            {t('adminTeams.remove.submit')}
+          </button>
         </form>
       </Section>
     </main>
+  );
+}
+
+/**
+ * The leaving date and "Mark as left": after a refusal the date typed is kept in the
+ * field and the reason is said beside it (step 2.161).
+ */
+function LeavingDate({
+  entryId,
+  typed,
+  problem,
+}: {
+  readonly entryId: string;
+  readonly typed: string | undefined;
+  readonly problem: string | undefined;
+}) {
+  const helpId = `left-on-help-${entryId}`;
+  const errorId = `left-on-error-${entryId}`;
+  return (
+    <>
+      <p>
+        <label>
+          {t('adminTeams.roster.leftOn')}
+          <input
+            name="leftOn"
+            type="date"
+            required
+            defaultValue={typed ?? ''}
+            aria-describedby={problem === undefined ? helpId : `${errorId} ${helpId}`}
+            aria-invalid={problem === undefined ? undefined : true}
+          />
+        </label>
+      </p>
+      {problem === undefined ? null : (
+        <p id={errorId} className="ui-field-error" role="alert" data-left-on-problem={entryId}>
+          {problem}
+        </p>
+      )}
+      <p id={helpId} className="ui-field-help">
+        {t('adminTeams.roster.leftOnHelp')}
+      </p>
+      <p>
+        <button type="submit" className="ui-button">
+          {t('adminTeams.roster.markLeft')}
+        </button>
+      </p>
+    </>
   );
 }
 
