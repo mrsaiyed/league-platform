@@ -361,6 +361,7 @@ All dated November 12, 2026.
 | T-269                 | New                                                                          | Agreed (delegated): the leagues of the signed-in account: one owner-run function, no argument, that account only (rec. 066)                     | Step 2.127: no fenced query can list an account's leagues (2.105 audit, H3)                        |
 | T-270                 | New (refines T-9)                                                            | Agreed (delegated): the first online test copy runs on Render at Render's own address with the Supabase test project; Vercel rejected           | The founder asked where to test online for free (2026-11-15); the chat lead decided                |
 | T-271                 | Each form answered with the answer in the address                            | Agreed (delegated): refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)           | Step 2.155: a refusal emptied a box score; "Saved" off screen; a reload said it again (H6, M2, M8) |
+| T-272                 | T-41: ids sort by creation time (0002: in order on one connection)           | Agreed (delegated): on one connection each id sorts after every id it made before (a memory of the session); none across connections (rec. 068) | Step 2.151: PGlite ticks in whole ms, so ids of one ms sorted either way; tests failed by chance   |
 | T-273                 | New                                                                          | On the database, the public schedule and standings move first; statistics refuse until part 3; local seasons under way (rec. 069)               | Step 2.93 part 2: one port serves both the standings and the statistics, and the seed had no games |
 
 ## The full list
@@ -675,6 +676,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-260 | A script makes a league: owner's account ahead by email; league and first season by staff in one transaction, under the app's login; migration login for accounts only (rec. 057)              | Agreed (delegated) |         |
 | T-264 | A game marked not started goes back to scheduled with its format and the time it was fixed cleared together, in that one update only; a marker event bounds the cleared plays (rec. 061)       | Agreed (delegated) |         |
 | T-266 | A draft league made by mistake is removed by a script: the migration login runs remove_draft_league (lock, checks, platform log, delete) for the set league only (rec. 063)                    | Agreed (delegated) |         |
+| T-272 | On one connection each id public.uuid_v7() makes sorts after every id it made before (it remembers the last in a setting of the session); nothing is promised across connections (rec. 068)    | Agreed (delegated) |         |
 
 ### [T4 — Keeping leagues apart, sign-in, security](technical/T4-tenancy-auth-security.md)
 
