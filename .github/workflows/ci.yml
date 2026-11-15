@@ -14,7 +14,16 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm run verify
+      # The output also goes to a file, so the next step can say what failed.
+      - name: npm run verify
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run verify 2>&1 | tee "$RUNNER_TEMP/verify-output.txt"
+      - name: Say what failed in verify
+        if: failure()
+        shell: bash
+        run: node scripts/verify-failure-notes.mjs "$RUNNER_TEMP/verify-output.txt"
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - run: npm run test:varsity:browser

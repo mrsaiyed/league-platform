@@ -13,6 +13,7 @@ import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkStructure, formatViolation } from './structure/index.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = path.join(root, 'apps/web');
@@ -636,7 +637,9 @@ const code = await new Promise((resolve) => {
 if (code === 0 || code === 'still running') {
   failures.push(`staging with an unreachable database did not refuse to start (${code})`);
 } else if (!staging.output().includes('the database could not be reached')) {
-  failures.push(`staging refused to start without saying why:\n${staging.output()}`);
+  failures.push(
+    `staging refused to start without saying why:\n${staging.output()}${whichFileNodeRefused(staging.output())}`,
+  );
 } else if (staging.output().includes('made-up-password')) {
   failures.push('the refusal printed the database address');
 } else if (staging.output().includes('made-up-supabase-secret-key')) {
@@ -650,6 +653,18 @@ if (failures.length > 0) {
 console.log(
   `Web shell check passed: ${cases.length + spoofs.length + 5} checks against the built server.`,
 );
+
+// When Node refused a TypeScript file it was to run itself, the server prints only
+// "… is not supported in strip-only mode", naming no file (step 2.149). Then the
+// structure rule that puts the same files through Node's own stripper names it.
+function whichFileNodeRefused(output) {
+  if (!/strip-only mode|ERR_(?:UNSUPPORTED|INVALID)_TYPESCRIPT_SYNTAX/.test(output)) return '';
+  const { violations } = checkStructure(root, { only: ['NODE-TS'] });
+  if (violations.length === 0) {
+    return '\n  Node refused a TypeScript file, but the NODE-TS structure rule finds none: the file is reached some other way.';
+  }
+  return `\n  The file Node refused:\n${violations.map((v) => `    ${formatViolation(v)}`).join('\n')}`;
+}
 
 function serverEnvironment(env) {
   const clean = {};
@@ -684,7 +699,11 @@ function run(args, env) {
 async function waitFor(url, server) {
   const until = Date.now() + 60_000;
   while (Date.now() < until) {
-    if (server.child.exitCode !== null) throw new Error(`the server stopped:\n${server.output()}`);
+    if (server.child.exitCode !== null) {
+      throw new Error(
+        `the server stopped:\n${server.output()}${whichFileNodeRefused(server.output())}`,
+      );
+    }
     try {
       await fetch(url);
       return;

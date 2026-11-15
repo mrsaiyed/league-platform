@@ -58,6 +58,7 @@ try {
     actorEmail: values.as,
     dryRun: !values.run,
     withOpponents: values['with-opponents'],
+    onWorkLeftBehind: (folder) => console.error(words.workLeftBehind(folder)),
   });
 } catch (error) {
   if (error instanceof TrackerBackupError) {
