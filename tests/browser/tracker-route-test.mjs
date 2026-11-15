@@ -290,6 +290,12 @@ if (browser) {
             .count()) === 1,
       );
       await accessible(owner.page, 'asked to confirm the takeover');
+      for (const name of ['Yes, take over', 'Not now']) {
+        const height = await tapHeight(owner.page.getByRole('button', { name }));
+        note(`"${name}" is a tap at least 44px high`, height >= 44, String(height));
+      }
+      const back = await tapHeight(owner.page.getByRole('link', { name: 'Back to your games' }));
+      note('"Back to your games" is a tap at least 44px high', back >= 44, String(back));
       await owner.page.getByRole('button', { name: 'Not now' }).click();
       await owner.page.getByRole('button', { name: 'Take over scoring' }).click();
       await owner.page.getByRole('button', { name: 'Yes, take over' }).click();
@@ -437,6 +443,32 @@ if (browser) {
           .locator(`li[data-game="${liveGame}"]`)
           .getByRole('link', { name: 'Score this game' })
           .count()) === 1 && order[0] === liveGame,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('in an archived league the scorekeeper is told so, with the way back', async () => {
+    const { context, page } = await signedInAs('local-scorekeeper-token');
+    try {
+      const archived = 'This league is archived, so its games cannot be scored or changed.';
+      await page.goto(`${origin}/old-meadow/score/${liveGame}`);
+      await page.getByText(archived).waitFor();
+      note(
+        'archived league, tracker: says so, nothing of the game, "Back to your games"',
+        (await page.getByText('Bears at Hawks').count()) === 0 &&
+          (await page.getByRole('link', { name: 'Back to your games' }).getAttribute('href')) ===
+            '/old-meadow/admin' &&
+          (await page.getByRole('heading', { level: 1 }).filter({ hasText: noAccess }).count()) ===
+            0,
+      );
+      await accessible(page, 'archived league, tracker');
+      await page.goto(`${origin}/old-meadow/admin`);
+      await page.getByRole('heading', { level: 1, name: 'Your games' }).waitFor();
+      note(
+        'archived league, "Your games": says so',
+        (await page.getByText(archived).count()) === 1,
       );
     } finally {
       await context.close();

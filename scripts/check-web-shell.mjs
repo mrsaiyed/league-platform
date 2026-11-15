@@ -476,6 +476,23 @@ const cases = [
   ['owner', '/closed-gate/admin', 200, ['This league has been taken down.']],
   ['scheduler', '/closed-gate', 404, [notFound]],
   ['visitor', '/old-meadow/standings', 200, ['This league is archived.']],
+  // A scorekeeper who still holds the role in the archived league is told so, with a way
+  // back, not "no access" (step 2.33); someone with no role there still gets "no access".
+  [
+    'scorekeeper',
+    `/old-meadow/score/${liveGame}`,
+    200,
+    ['This league is archived, so its games cannot be scored or changed.', 'Back to your games'],
+    [noAccess, 'Bears at Hawks'],
+  ],
+  [
+    'scorekeeper',
+    '/old-meadow/admin',
+    200,
+    ['Your games', 'This league is archived, so its games cannot be scored or changed.'],
+    [noAccess],
+  ],
+  ['coach', `/old-meadow/score/${liveGame}`, 403, [noAccess]],
   ['visitor', '/nobody-has-this', 404, [notFound]],
   ['visitor', '/binned-league', 404, [notFound]],
   ['visitor', '/north-vale/schedule', 308, [], [], '/north-valley/schedule'],
