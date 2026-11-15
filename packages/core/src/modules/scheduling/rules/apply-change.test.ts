@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyDraftChange } from './apply-change.ts';
+import { applyDraftChange, maxRounds } from './apply-change.ts';
 import { baseState, game } from './schedule-test-data.ts';
 import type { ScheduleState } from './schedule-types.ts';
 
@@ -264,5 +264,102 @@ describe('applyDraftChange (P7 §4.3)', () => {
     }
     expect(code({ kind: 'move-game', gameId: 'g1', to: { ...toSlot, time: '00:00' } })).toBe('ok');
     expect(code({ kind: 'change-round-date', roundId: 'r1', date: '2028-02-29' })).toBe('ok');
+  });
+});
+
+describe('adding and removing a round (step 2.160)', () => {
+  const refusal = (s: ScheduleState, change: Parameters<typeof applyDraftChange>[1]) => {
+    const result = applyDraftChange(s, change, []);
+    return result.ok ? 'ok' : result.error;
+  };
+
+  it('adds a round after the others, its name trimmed, without touching a game', () => {
+    const s = baseState();
+    const added = ok(
+      applyDraftChange(
+        s,
+        { kind: 'add-round', round: { id: 'r3', label: '  Week 3 ', date: '2026-10-18' } },
+        [],
+      ),
+    );
+    expect(added.state.rounds.map((r) => r.id)).toEqual(['r1', 'r2', 'r3']);
+    expect(added.state.rounds[2]).toEqual({ id: 'r3', label: 'Week 3', date: '2026-10-18' });
+    expect(added.state.games).toEqual(s.games);
+    expect(s.rounds).toHaveLength(2);
+  });
+
+  it('adds a round to a season that has none, and a game can then be put in it', () => {
+    const empty: ScheduleState = { rounds: [], games: [] };
+    const first = ok(
+      applyDraftChange(
+        empty,
+        { kind: 'add-round', round: { id: 'r1', label: 'Week 1', date: '2026-10-04' } },
+        [],
+      ),
+    );
+    const withGame = ok(applyDraftChange(first.state, { kind: 'add-game', game: game('g1') }, []));
+    expect(withGame.state.games.map((g) => g.roundId)).toEqual(['r1']);
+  });
+
+  it('refuses a round whose id is taken, with no name, or with a date that is not one', () => {
+    const s = baseState();
+    expect(
+      refusal(s, { kind: 'add-round', round: { id: 'r1', label: 'Again', date: '2026-10-18' } }),
+    ).toEqual({ code: 'round-exists', roundId: 'r1' });
+    expect(
+      refusal(s, { kind: 'add-round', round: { id: 'r3', label: '   ', date: '2026-10-18' } }),
+    ).toEqual({ code: 'empty-round-label', roundId: 'r3' });
+    expect(
+      refusal(s, { kind: 'add-round', round: { id: 'r3', label: 'Week 3', date: '2026-02-30' } }),
+    ).toEqual({ code: 'invalid-date', value: '2026-02-30' });
+    expect(
+      refusal(s, { kind: 'add-round', round: { id: 'r3', label: 'Week 3', date: null } }),
+    ).toBe('ok');
+  });
+
+  it('refuses a round past the most a season holds', () => {
+    const full: ScheduleState = {
+      rounds: Array.from({ length: maxRounds }, (_, i) => ({
+        id: `r${i}`,
+        label: `Round ${i}`,
+        date: null,
+      })),
+      games: [],
+    };
+    expect(
+      refusal(full, { kind: 'add-round', round: { id: 'new', label: 'One more', date: null } }),
+    ).toEqual({ code: 'too-many-rounds', roundId: 'new' });
+  });
+
+  it('removes a round with no games and refuses one with games or that is not there', () => {
+    const s = ok(
+      applyDraftChange(
+        baseState(),
+        { kind: 'add-round', round: { id: 'r3', label: 'Week 3', date: '2026-10-18' } },
+        [],
+      ),
+    ).state;
+    const removed = ok(applyDraftChange(s, { kind: 'remove-round', roundId: 'r3' }, []));
+    expect(removed.state.rounds.map((r) => r.id)).toEqual(['r1', 'r2']);
+    expect(refusal(s, { kind: 'remove-round', roundId: 'r2' })).toEqual({
+      code: 'round-has-games',
+      roundId: 'r2',
+    });
+    expect(refusal(s, { kind: 'remove-round', roundId: 'r9' })).toEqual({
+      code: 'unknown-round',
+      roundId: 'r9',
+    });
+    // Once its one game has moved out, Week 2 can go; a game cannot then be put in it.
+    const moved = ok(
+      applyDraftChange(
+        s,
+        { kind: 'move-game', gameId: 'g3', to: { ...game('g3'), roundId: 'r3' } },
+        [],
+      ),
+    ).state;
+    const gone = ok(applyDraftChange(moved, { kind: 'remove-round', roundId: 'r2' }, [])).state;
+    expect(
+      refusal(gone, { kind: 'move-game', gameId: 'g3', to: { ...game('g3'), roundId: 'r2' } }),
+    ).toEqual({ code: 'unknown-round', roundId: 'r2' });
   });
 });

@@ -42,7 +42,11 @@ export type DraftChange =
   | { kind: 'remove-game'; gameId: string }
   | { kind: 'set-recording'; gameId: string; recording: GameRecording }
   | { kind: 'rename-round'; roundId: string; label: string }
-  | { kind: 'change-round-date'; roundId: string; date: string };
+  | { kind: 'change-round-date'; roundId: string; date: string }
+  /** A new round, placed after the season's others; its id is the caller's (step 2.160). */
+  | { kind: 'add-round'; round: ScheduleRound }
+  /** Removes a round no game of the schedule is in. */
+  | { kind: 'remove-round'; roundId: string };
 
 export type ChangeError =
   | { code: 'unknown-game'; gameId: string }
@@ -51,6 +55,11 @@ export type ChangeError =
   | { code: 'team-plays-itself'; gameId: string }
   | { code: 'swap-with-itself'; gameId: string }
   | { code: 'empty-round-label'; roundId: string }
+  | { code: 'round-exists'; roundId: string }
+  /** A round with games is never removed: its games are moved or removed first. */
+  | { code: 'round-has-games'; roundId: string }
+  /** A season holds at most maxRounds rounds (the database numbers them 1 to 1000). */
+  | { code: 'too-many-rounds'; roundId: string }
   | { code: 'invalid-date'; value: string }
   | { code: 'invalid-time'; value: string };
 

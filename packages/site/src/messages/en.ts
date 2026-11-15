@@ -1018,6 +1018,30 @@ export const en = {
     'The schedule draft has grown too large. Publish it or discard it before adding more.',
   'error.scheduling.change_draft_round_date.change-refused':
     'That change cannot be made to the schedule as it stands.',
+  'error.scheduling.add_draft_round.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.add_draft_round.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.add_draft_round.season-not-found': 'That season is not there.',
+  'error.scheduling.add_draft_round.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.add_draft_round.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.add_draft_round.change-refused':
+    'That round cannot be added to the schedule as it stands.',
+  'error.scheduling.remove_draft_round.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.remove_draft_round.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.remove_draft_round.season-not-found': 'That season is not there.',
+  'error.scheduling.remove_draft_round.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.remove_draft_round.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.remove_draft_round.change-refused':
+    'That round cannot be removed from the schedule as it stands.',
+  'error.scheduling.remove_draft_round.round-in-use':
+    'A game that is in the bin, has no date yet or was removed in this draft is still in this round, so it cannot be removed.',
   'error.scheduling.set_draft_recording.season-not-found': 'That season is not there.',
   'error.scheduling.set_draft_recording.draft-unreadable':
     'The saved schedule draft cannot be read. Discard it and start again.',
@@ -1177,6 +1201,8 @@ export const en = {
   'activity.scheduling.remove_draft_game': 'Removed a game in the schedule draft',
   'activity.scheduling.rename_draft_round': 'Renamed a round in the schedule draft',
   'activity.scheduling.change_draft_round_date': "Changed a round's date in the schedule draft",
+  'activity.scheduling.add_draft_round': 'Added a round to the schedule draft',
+  'activity.scheduling.remove_draft_round': 'Removed a round in the schedule draft',
   'activity.scheduling.set_draft_recording': 'Changed how a game is recorded in the schedule draft',
   'activity.scheduling.discard_schedule_draft': 'Discarded the schedule draft',
   'activity.imports.start_fixture_import': 'Uploaded a fixtures file to import',

@@ -31,10 +31,14 @@ const isTime = (v: string): boolean => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 
 const fail = (error: ChangeError): ApplyChangeResult => ({ ok: false, error });
 
+/** The most rounds a season holds: the database numbers a season's rounds 1 to 1000. */
+export const maxRounds = 1000;
+
 /**
  * Applies one draft change to a schedule (P7 §4.3) and returns the new schedule with the
  * clashes that involve the games the change touched, flagged at once. The input is never
  * changed. Changing a round's date moves the games of that round that were on its old date.
+ * A round is added after the others and removed only while no game is in it (step 2.160).
  */
 export function applyDraftChange(
   state: ScheduleState,
@@ -121,6 +125,28 @@ export function applyDraftChange(
       });
       const rounds = state.rounds.map((r) => (r.id === round.id ? { ...r, date: change.date } : r));
       return done({ rounds, games }, touched);
+    }
+    case 'add-round': {
+      const round = change.round;
+      if (hasRound(round.id)) return fail({ code: 'round-exists', roundId: round.id });
+      if (state.rounds.length >= maxRounds) {
+        return fail({ code: 'too-many-rounds', roundId: round.id });
+      }
+      const label = round.label.trim();
+      if (label === '') return fail({ code: 'empty-round-label', roundId: round.id });
+      if (round.date !== null && !isDate(round.date)) {
+        return fail({ code: 'invalid-date', value: round.date });
+      }
+      return done({ ...state, rounds: [...state.rounds, { ...round, label }] }, []);
+    }
+    case 'remove-round': {
+      if (!hasRound(change.roundId)) {
+        return fail({ code: 'unknown-round', roundId: change.roundId });
+      }
+      if (state.games.some((g) => g.roundId === change.roundId)) {
+        return fail({ code: 'round-has-games', roundId: change.roundId });
+      }
+      return done({ ...state, rounds: state.rounds.filter((r) => r.id !== change.roundId) }, []);
     }
   }
 }
