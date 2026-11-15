@@ -890,6 +890,15 @@ async function checkStylesheets(origin) {
   return problems;
 }
 
+/**
+ * The page's own forms: those after the league's header. Since step 2.127 the header holds
+ * the account button's "Sign out" form (twice: the phone menu and the laptop's button),
+ * so forms are counted from the page's own content, as they were before it.
+ */
+function pageForms(html) {
+  return html.slice(Math.max(0, html.indexOf('</header>')));
+}
+
 async function checkTeams(origin) {
   const problems = [];
   const as = (who) => ({ cookie: `srl_session=${tokens[who]}` });
@@ -897,7 +906,7 @@ async function checkTeams(origin) {
   /** Posts the `index`th form of `page` with the fields given. */
   async function post(who, page, index, fields, formPage = page) {
     const html = await pageOf('owner', formPage);
-    const id = [...html.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
+    const id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
     if (id === undefined) {
       problems.push(`${page}: no form ${index}`);
       return undefined;
@@ -947,7 +956,7 @@ async function checkTeams(origin) {
   }
   const entry = /name="entry" value="([^"]+)"/.exec(withPlayer)?.[1];
   const version = /name="version" value="([^"]+)"[^>]*\/><p><label>Number/.exec(withPlayer)?.[1];
-  const forms = [...withPlayer.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].length;
+  const forms = [...pageForms(withPlayer).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].length;
   // Forms in order: details, who sees, [number and role, mark as left] for the player, ...
   const gone = await post('owner', page, 3, {
     league: 'harbor-city',
@@ -1039,7 +1048,7 @@ async function checkSettings(origin) {
   const pageOf = async (who) => (await fetch(origin + page, { headers: as(who) })).text();
   async function post(who, index, fields) {
     const html = await pageOf('owner');
-    const id = [...html.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
+    const id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
     if (id === undefined) {
       problems.push(`settings: no form ${index}`);
       return undefined;
