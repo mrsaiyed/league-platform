@@ -76,13 +76,35 @@ describe('readNamePolicy', () => {
     );
   });
 
-  it('ignores a stored value its setting refuses, and one stored anywhere but the league', async () => {
+  it('reads a stored value it cannot read as the least, never the default (record 065)', async () => {
     const refused = stored({
       'privacy.publicNames': 'everything',
       [confirmedKey]: 'yes',
       'privacy.playersMayAskForInitials': 'yes',
     }).settings;
-    expect(await readNamePolicy(refused)).toEqual(defaultNamePolicy);
+    expect(await readNamePolicy(refused)).toEqual({
+      names: 'hidden',
+      childrenInFull: false,
+      playersMayAskForInitials: false,
+    });
+    // A row with no usable document, or of a format newer than this code, is the same.
+    for (const document of [null, { version: 2, value: 'fullName' }, { value: 'fullName' }]) {
+      const rows = async (key: string): Promise<readonly StoredSettingRow[]> =>
+        key === 'privacy.publicNames' || key === confirmedKey
+          ? [{ level: 'league', document, version: 1 }]
+          : [];
+      expect(await readNamePolicy({ settingRows: rows }), JSON.stringify(document)).toEqual({
+        names: 'hidden',
+        childrenInFull: false,
+        playersMayAskForInitials: false,
+      });
+    }
+    // An unreadable confirmation beside full names: children stay with care.
+    const brokenYes = stored({ 'privacy.publicNames': 'fullName', [confirmedKey]: 'yes' });
+    expect((await readNamePolicy(brokenYes.settings)).childrenInFull).toBe(false);
+  });
+
+  it('ignores a value stored anywhere but the league: that is nothing saved', async () => {
     const atSeason = stored({ 'privacy.publicNames': 'hidden', [confirmedKey]: true }, 'season');
     expect(await readNamePolicy(atSeason.settings)).toEqual(defaultNamePolicy);
   });

@@ -33,11 +33,16 @@ const formOf: Readonly<Record<(typeof publicNames)['default'], NameForm>> = {
 
 export async function readNamePolicy(settings: NamePolicySettings): Promise<NamePolicy> {
   const leagueValue = async <Value>(setting: Setting<Value>): Promise<Value> => {
-    const rows = await settings.settingRows(setting.key, {});
-    return lookupSetting(
-      setting,
-      rows.filter((row) => row.level === 'league'),
-    ).value;
+    const rows = (await settings.settingRows(setting.key, {})).filter(
+      (row) => row.level === 'league',
+    );
+    const found = lookupSetting(setting, rows);
+    // A stored value that cannot be read (a damaged row, a format with no upgrade) is not
+    // "nothing saved": it shows the least its setting allows, never the default (record
+    // 065). A missing row takes the default.
+    const least = setting.protectiveOrder.at(-1);
+    if (rows.length > 0 && found.source === 'default' && least !== undefined) return least;
+    return found.value;
   };
   return {
     names: formOf[await leagueValue(publicNames)],
