@@ -618,7 +618,9 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
                   <span className="court-opt-number">
                     {other.number ?? t('tracker.tile.noNumber')}
                   </span>
-                  <span className="court-opt-name">{other.shortName}</span>
+                  <span className="court-opt-name">
+                    {other.unlisted ? t('tracker.player.unlistedShort') : other.shortName}
+                  </span>
                 </button>
               );
             })

@@ -453,6 +453,35 @@ describe('substitutions (checklist E1 to E5)', () => {
     );
   });
 
+  it('names a player missing from this device’s rosters "Not listed" in "Sub in" and "In for"', async () => {
+    const device = await scoringDevice();
+    await device.tipOff();
+    // The bench player has a line in the game (a point scored from the bench), so the
+    // screen draws them even where the device's rosters do not know them.
+    await device.option(hawkBench, 'p1');
+    // The device does not have the Hawks' bench player, nor the third on the floor.
+    const missing = {
+      ...rosters,
+      home: {
+        ...rosters.home,
+        players: rosters.home.players.filter((p) => p.personId !== hawkBench && p.personId !== h3),
+      },
+    };
+    const view = scoringView(device.shown(), missing, noLineupPicks);
+    const optionName = (pad: string, other: string) =>
+      new RegExp(
+        `data-other="${other}"[^>]*>.*?<span class="court-opt-name">([^<]*)</span>`,
+        's',
+      ).exec(pad)?.[1];
+    // The tile and the bench in the pad say "Not listed"; so do the pad's rows.
+    expect(tileDrawn(drawn(view), hawkBench)).toContain('Not listed');
+    const subIn = padDrawn(drawn(view, { pad: { kind: 'player', playerId: h1 } }));
+    expect(optionName(subIn, hawkBench)).toBe('Not listed');
+    const inFor = padDrawn(drawn(view, { pad: { kind: 'player', playerId: hawkBench } }));
+    expect(optionName(inFor, h3)).toBe('Not listed');
+    expect(optionName(inFor, h1)).toBe('Max');
+  });
+
   it('says so when everyone is on the court (E5)', async () => {
     const device = await scoringDevice();
     const five = {
