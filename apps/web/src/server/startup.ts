@@ -65,6 +65,7 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
     if (config.LOCAL_DATA === 'made-up-database') return onMadeUpDatabase(options, deps);
     const ports = standInPorts(options);
     await ports.signUpMadeUpMember();
+    await ports.signUpMadeUpStaff();
     return ports;
   }
   // loadConfig requires it here; checked again so the type says so.

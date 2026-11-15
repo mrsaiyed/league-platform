@@ -1315,6 +1315,31 @@ export const en = {
   'account.signOut': 'Sign out',
   'account.signOutEverywhere': 'Sign out everywhere',
   'account.signOutEverywhereHelp': 'Signs out every device that uses your account, this one too.',
+  // Finding one's way when signed in (step 2.127): the account button at the top right of
+  // every league page (U-8), the account page's leagues, the front page.
+  'account.signedInAs': 'Signed in as {email}',
+  'account.signInOrCreate': 'Sign in or create an account',
+  'account.menu': 'Your account menu',
+  'account.menu.admin': 'Admin',
+  'account.menu.myGames': 'My games to score',
+  'account.menu.account': 'Your account',
+  'account.leagues': 'Your leagues',
+  'account.leaguesEmpty':
+    'The leagues you belong to will be listed here, with your role in each, once a league adds you.',
+  'account.role.on-a-team': 'On a team',
+  'front.title': 'SR Leagues',
+  'front.about':
+    'SR Leagues runs the websites of sports leagues: their schedules, scores, standings and statistics, kept by the people who run each league.',
+  'front.signIn': 'Sign in',
+  'signIn.fromLeague': 'Sign in to carry on at {league}.',
+  'signIn.backTo': 'Back to {league}',
+  'access.noAccess.signedInAs': 'You are signed in as {email}.',
+  'access.noAccess.switch': 'Use another account',
+  // Signing out with a game open on the device and plays not yet sent (step 2.127).
+  'account.signOutWaiting_one':
+    '{count} play is not sent yet. It stays on this device and is sent when you sign in again. Sign out?',
+  'account.signOutWaiting_other':
+    '{count} plays are not sent yet. They stay on this device and are sent when you sign in again. Sign out?',
   'account.problem.title': 'We cannot open your account',
   'account.problem.notConfirmed':
     'You are signed in, but your email address has not been confirmed yet, so we cannot open your account. Sign out, then sign in again. If this keeps happening, please contact us.',

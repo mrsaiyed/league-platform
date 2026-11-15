@@ -12,7 +12,9 @@
 // capture instead of sent (T-140). Beside it, the made-up people below are
 // "signed in" when the browser's session cookie holds their made-up token, so the
 // shell's checks can be someone who holds roles in the made-up leagues; nothing
-// about that works outside this file.
+// about that works outside this file. Since step 2.127 the made-up owner, scheduler,
+// scorekeeper and coach, and the made-up member, also sign in through the form with a
+// made-up password (stand-in-sign-ins.ts), so the product can be walked by tapping.
 //
 // Who holds what is read through the access module's own query (myAccess) on an
 // in-memory transaction that cannot change it. Everything else a league holds is the
@@ -55,6 +57,12 @@ import { standInPublicSchedule } from './stand-in-public-schedule.ts';
 import { standInPublicStats } from './stand-in-public-stats.ts';
 import { standInSchedule } from './stand-in-schedule.ts';
 import { standInPublicTeams } from './stand-in-public-teams.ts';
+import { standInMyLeagues } from './stand-in-my-leagues.ts';
+import {
+  madeUpAccountOf,
+  standInMemberAccountId,
+  standInStaffSignIns,
+} from './stand-in-sign-ins.ts';
 import { madeUpLeagues } from './stand-in-world-seed.ts';
 import { madeUpWorld } from './stand-in-world.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
@@ -194,10 +202,18 @@ export const standInMember = {
 export type StandInPorts = WebPorts & {
   /** Gives standInMember an account, through the sign-in service's own steps. */
   readonly signUpMadeUpMember: () => Promise<void>;
+  /**
+   * Gives the made-up staff who sign in with a password (stand-in-sign-ins.ts) their
+   * accounts on the sign-in stand-in, through the same steps. The stand-in only.
+   */
+  readonly signUpMadeUpStaff: () => Promise<void>;
 };
 
 /** The sign-in stand-in and its emails, for the stand-in and for the made-up database. */
-export type StandInSignIn = Pick<StandInPorts, 'signIn' | 'signInMail' | 'signUpMadeUpMember'>;
+export type StandInSignIn = Pick<StandInPorts, 'signIn' | 'signInMail' | 'signUpMadeUpMember'> & {
+  /** Gives one made-up address an account with this password, through the service's steps. */
+  readonly signUpMadeUp: (email: string, password: string) => Promise<void>;
+};
 
 /**
  * The sign-in screens' stand-in (record 031), with the same refusals as the stand-in
@@ -236,33 +252,34 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
     returnOrigins: [options.publicBaseUrl],
     now,
   });
+  const signUpMadeUp = async (email: string, password: string) => {
+    const here = '127.0.0.1';
+    const asked = await signIn.startSignUp({ email, networkAddress: here });
+    // The code email is handed over without waiting: let it reach the capture.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const sent = outbox.messages().findLast((m) => m.to === email);
+    const code = /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
+    if (!asked.ok || code === undefined) throw new Error('A made-up person got no code.');
+    const proved = await signIn.verifyCode({ email, code, networkAddress: here });
+    if (!proved.ok) throw new Error('A made-up person could not be proved.');
+    const set = await signIn.setPassword({
+      proof: proved.value.proof,
+      password,
+      device: { deviceId: 'made-up-person-device', label: 'made-up', networkAddress: here },
+    });
+    if (!set.ok) throw new Error('A made-up person could not choose a password.');
+    await signIn.signOut({ accessToken: set.value.session.accessToken });
+  };
   return {
     signIn,
     signInMail,
-    signUpMadeUpMember: async () => {
-      const here = '127.0.0.1';
-      const { email, password } = standInMember;
-      const asked = await signIn.startSignUp({ email, networkAddress: here });
-      // The code email is handed over without waiting: let it reach the capture.
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      const sent = outbox.messages().findLast((m) => m.to === email);
-      const code = /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
-      if (!asked.ok || code === undefined) throw new Error('The made-up member got no code.');
-      const proved = await signIn.verifyCode({ email, code, networkAddress: here });
-      if (!proved.ok) throw new Error('The made-up member could not be proved.');
-      const set = await signIn.setPassword({
-        proof: proved.value.proof,
-        password,
-        device: { deviceId: 'made-up-member-device', label: 'made-up', networkAddress: here },
-      });
-      if (!set.ok) throw new Error('The made-up member could not choose a password.');
-      await signIn.signOut({ accessToken: set.value.session.accessToken });
-    },
+    signUpMadeUp,
+    signUpMadeUpMember: () => signUpMadeUp(standInMember.email, standInMember.password),
   };
 }
 
 export function standInPorts(options: StandInOptions): StandInPorts {
-  const { signIn, signInMail, signUpMadeUpMember } = standInSignIn(options);
+  const { signIn, signInMail, signUpMadeUpMember, signUpMadeUp } = standInSignIn(options);
   const people: readonly MadeUpPerson[] = Object.values(standInPeople);
   const now = () => new Date();
   const deps: CommandDeps<AccessTx> = {
@@ -279,7 +296,13 @@ export function standInPorts(options: StandInOptions): StandInPorts {
   };
   const identify: WebPorts['identify'] = async (accessToken) => {
     const person = people.find((p) => p.token === accessToken);
-    return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
+    if (person !== undefined) return ok(identityOf(person));
+    const who = await signIn.identify({ accessToken });
+    if (!who.ok) return who;
+    // A made-up person who signed in through the form is their made-up account, by the
+    // address the sign-in stand-in proved (stand-in-sign-ins.ts).
+    const madeUp = madeUpAccountOf(who.value.email, standInMember.email, standInPeople);
+    return madeUp === undefined ? who : ok({ ...who.value, accountId: madeUp });
   };
   const accessOf = accessOfVia(deps);
   // The one made-up world: every area below reads and writes the same rows (step 2.152).
@@ -335,6 +358,23 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf,
+    leaguesOfAccount: standInMyLeagues({
+      leagues,
+      accessOf: (leagueId) => accessTx(leagueId).access,
+      // Roster places are the world's rows: the made-up coach is the person on a team of
+      // each seeded league there (standInSeedCast.memberAccountId).
+      world,
+      // The made-up member who signs in with a password is no person in the world's rows.
+      // They play in both public leagues, and in the draft league, which they may not see
+      // before it is published (U-9).
+      placesBeyondTheWorld: {
+        [standInMemberAccountId]: [
+          standInLeagues.live.id,
+          standInLeagues.other.id,
+          standInLeagues.draft.id,
+        ],
+      },
+    }),
     games,
     tracker,
     publishPlays: createPlayPublisher({
@@ -356,6 +396,11 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     scheduleAdmin: standInSchedule(world),
     publicTeams: standInPublicTeams(world),
     signUpMadeUpMember,
+    signUpMadeUpStaff: async () => {
+      for (const person of Object.values(standInStaffSignIns)) {
+        await signUpMadeUp(person.email, person.password);
+      }
+    },
   };
 }
 

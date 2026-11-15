@@ -168,6 +168,13 @@ export {
   maySeeDraftLeague,
   maySeeSuspendedLeague,
 } from './rules/league-visibility.ts';
+export {
+  myLeagues,
+  type AccountLeagueRow,
+  type LeagueMembership,
+  type MyLeague,
+  type MyLeaguesReader,
+} from './queries/my-leagues.ts';
 export { isBlockedShortName, isShortNameFormat, isSystemShortName } from './short-names.ts';
 export {
   binCutoff,

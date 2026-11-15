@@ -4,6 +4,7 @@
 import type { ReactNode } from 'react';
 import { t, type TextKey } from '../../server/messages.ts';
 import { problemOf, problems } from '../../server/sign-in/problems.ts';
+import { StandalonePage } from '../shell/index.ts';
 
 /** What Next.js gives a page: the address's query. */
 export type SearchProps = {
@@ -17,24 +18,28 @@ export function SignInScreen({
   children,
 }: {
   readonly title: TextKey;
-  readonly intro?: string;
+  readonly intro?: string | undefined;
   readonly search: Readonly<Record<string, string | string[] | undefined>>;
   readonly children: ReactNode;
 }) {
   const problem = problemOf(search);
+  // In the frame of our own pages, on the neutral design, so every field and button is 44
+  // high (step 2.127). Their real look is step 2.102's.
   return (
-    <main className="sign-in">
-      <h1>{t(title)}</h1>
-      {intro === undefined ? null : <p>{intro}</p>}
-      {problem === undefined ? null : (
-        <p role="alert">
-          {problem.name === 'tooManyAttempts'
-            ? t.plural('problem.tooManyAttempts', problem.wait, { count: problem.wait })
-            : t(problems[problem.name])}
-        </p>
-      )}
-      {children}
-    </main>
+    <StandalonePage>
+      <main className="ui-message sign-in">
+        <h1>{t(title)}</h1>
+        {intro === undefined ? null : <p>{intro}</p>}
+        {problem === undefined ? null : (
+          <p role="alert">
+            {problem.name === 'tooManyAttempts'
+              ? t.plural('problem.tooManyAttempts', problem.wait, { count: problem.wait })
+              : t(problems[problem.name])}
+          </p>
+        )}
+        {children}
+      </main>
+    </StandalonePage>
   );
 }
 

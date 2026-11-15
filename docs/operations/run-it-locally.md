@@ -96,19 +96,37 @@ To try it as a league's admin:
 
 1. With `PUBLIC_BASE_URL=http://127.0.0.1:3000` in `.env`, start it with `npm run dev:web`
    and open `http://127.0.0.1:3000/north-valley`.
-2. Be the made-up owner: in the browser's developer tools, add a cookie `srl_session` with
-   the value `local-owner-token` for `127.0.0.1` (the made-up people are given only by this
-   cookie, see `stand-in-cast.ts`), then open `http://127.0.0.1:3000/north-valley/admin`
-   (nothing links to the admin from the public pages yet). Step 2.127 replaces these two
-   steps: it gives the made-up owner a password, so you sign in by tapping.
+2. Be the made-up owner: tap "Sign in or create an account" and sign in as
+   `owner@example.test` with the made-up owner's password (the list is below). You come
+   back to North Valley; tap the account button (your initial at the top right, or the menu
+   button on a phone) and choose the admin.
 3. Teams: under "Add a team" type a name and tap "Add team". On the team's page, under
    "Someone not in the list yet", type a first and last name and a number and tap "Add the
    person and put them on the roster"; do it again for a second player.
 4. Schedule: in this week's round open "Add a game", choose the new team and another, a time
    and a court, and tap "Add game"; then tap "Publish this schedule".
 5. Games: under the new game type both scores and tap "Save final score" (or tap "Box score",
-   type each player's points and tap "Save box score and make it final"). Then remove the
-   cookie and look at the home page, the team, the game, the standings and the statistics.
+   type each player's points and tap "Save box score and make it final"). Then sign out
+   (account button, "Sign out") and look at the home page, the team, the game, the
+   standings and the statistics.
+
+### Signing in as the made-up people
+
+To walk the product by tapping, open `http://127.0.0.1:3000/north-valley` (as above), tap "Sign in or create an account" and sign in as one of these. They exist only in the made-up world on this computer, in the app's memory: the made-up stand-in refuses to start anywhere but on this computer or a test address (`APP_ENV` must be `local` or `test`, and `PUBLIC_BASE_URL` must be this computer's own address or a `.test` name).
+
+| Who                                                                                            | Email                      | Password                       |
+| ---------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------ |
+| The owner of every made-up league                                                              | `owner@example.test`       | `made-up owner password`       |
+| A scheduler of North Valley                                                                    | `scheduler@example.test`   | `made-up scheduler password`   |
+| A scorekeeper of North Valley                                                                  | `scorekeeper@example.test` | `made-up scorekeeper password` |
+| A coach of North Valley, who also plays on a team of Harbor City                               | `coach@example.test`       | `made-up coach password`       |
+| A member who plays in North Valley and Harbor City (and in a draft league they cannot see yet) | `member@example.test`      | `made-up member password`      |
+
+The list is in `apps/web/src/server/stand-in-sign-ins.ts`. The account button at the top right of every league page then leads to the admin, the games to score, the account page and signing out. The session cookies of `apps/web/src/server/stand-in-cast.ts` still work too, for the made-up people with no password.
+
+To switch from one made-up person to another, tap the account button, tap "Sign out", then "Sign in or create an account" and sign in as the next person. Signing in again on the same device also ends the session it had before.
+
+These passwords work on the made-up stand-in only. With `LOCAL_DATA=made-up-database` (below) only the made-up member (`member@example.test`) has a password; the made-up database's own people can be given one through "Create an account" with their address.
 
 To run it on the made-up database instead, put `LOCAL_DATA=made-up-database` in `.env` (local and test only). The app then builds a database in memory when it starts, with every migration and the two seed leagues (below), and reads leagues, signed-in people and what they hold from it. Each seed league's season is already under way: in each division one game was played a week ago, with its final score, and one is a week from today, so `/lakeside` and `/maple-street` show a home page, a schedule and standings, read from that database (step 2.93 part 2, record 069). Sign-in still uses the stand-in's screens; the stand-in's made-up people do not exist there. The areas not yet moved onto the database (step 2.93, records 055 and 069), the statistics and the team pages among them, show an error page; the home page leaves out its leaders until the statistics move. It too opens no address and is gone when the app stops.
 
