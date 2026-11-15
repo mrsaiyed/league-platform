@@ -297,7 +297,9 @@ type GameSpec = {
   /**
    * Minutes from the moment the world is made, in place of `day` and `time`: a game played
    * earlier today, or under way now, is in the past whatever the time of day (it may then
-   * fall on yesterday, a little after midnight).
+   * fall on yesterday, a little after midnight, and is then in the round before). It is
+   * moved earlier, five minutes at a time, off any time another made-up game holds on its
+   * court or for one of its teams, and off the whole and half hours (startsFromNow).
    */
   readonly fromNow?: number;
   readonly home: string;
@@ -815,14 +817,19 @@ const draftLeagueSeason = (programId: string): SeasonSpec => {
     teams: adultTeams.filter((t) => own.includes(t.id)).map((t) => ({ ...t, division: null })),
     rosters: adultRosters,
     divisions: [],
-    rounds: [{ id: big(0xb5, 1), days: 0, label: null }],
+    // Last week's round holds a game played last night, when the world is made a little
+    // after midnight (step 2.179); this week's is the tracked games' round.
+    rounds: [
+      { id: big(0xb5, 2), days: -7, label: null },
+      { id: big(0xb5, 1), days: 0, label: null },
+    ],
     games: [
       // At the draft league's own gym, on its own courts.
       ...fall.games
         .filter((g) => g.id.includes('-8000-006a'))
         .map((g) => ({
           ...g,
-          round: 0,
+          round: 1,
           venue: pines,
           court: g.court === court(1) ? court(21) : court(22),
         })),
@@ -918,6 +925,67 @@ const draftVenues: readonly VenueSpec[] = [
     ],
   },
 ];
+
+const fiveMinutes = 300_000;
+
+/**
+ * When each of a season's games set from now starts (step 2.179). It starts on a whole five
+ * minutes, `fromNow` minutes from now, then moves earlier, five minutes at a time, while it
+ * would clash, by core's clash rule (the same day and time in the league's zone), with a
+ * game already placed on its court or with one of its teams, and while it is on a whole or
+ * half hour, where the season's own games are, and the games a test or a person adds by
+ * hand. Moving earlier keeps a finished game finished and the game under way started; the
+ * latest are placed first, so the others move round them. The game under way never starts
+ * before the league's midnight: the scorekeeper's list starts there (list-games-in-window.ts),
+ * so a world made just after midnight still lists it (the database's list has the same edge
+ * for a real game live across midnight: step 2.156); no other game is there at midnight.
+ */
+function startsFromNow(
+  spec: SeasonSpec,
+  today: string,
+  now: Date,
+  timeZone: string,
+): ReadonlyMap<string, Date> {
+  type Held = { date: string; time: string; court: string | null; teams: readonly string[] };
+  const held: Held[] = spec.games.flatMap((g) => {
+    if (g.fromNow !== undefined || g.time === null) return [];
+    const days = g.day ?? (g.round === null ? undefined : spec.rounds[g.round]?.days);
+    if (days === undefined) return [];
+    return [{ date: addDays(today, days), time: g.time, court: g.court, teams: [g.home, g.away] }];
+  });
+  const midnight = Date.parse(momentIn(today, '00:00', timeZone));
+  const starts = new Map<string, Date>();
+  const later = spec.games
+    .filter((g) => g.fromNow !== undefined)
+    .sort((a, b) => (b.fromNow ?? 0) - (a.fromNow ?? 0));
+  for (const g of later) {
+    const live = g.status === 'live';
+    let at = Math.floor((now.getTime() + (g.fromNow ?? 0) * 60_000) / fiveMinutes) * fiveMinutes;
+    if (live) at = Math.max(at, midnight);
+    const slot = (t: number) => ({
+      date: dayIn(new Date(t), timeZone),
+      time: timeIn(new Date(t), timeZone),
+    });
+    const taken = (t: number) => {
+      const { date, time } = slot(t);
+      return (
+        Number(time.slice(3)) % 30 === 0 ||
+        held.some(
+          (h) =>
+            h.date === date &&
+            h.time === time &&
+            ((g.court !== null && h.court === g.court) ||
+              h.teams.includes(g.home) ||
+              h.teams.includes(g.away)),
+        )
+      );
+    };
+    while (taken(at) && !(live && at <= midnight)) at -= fiveMinutes;
+    starts.set(g.id, new Date(at));
+    held.push({ ...slot(at), court: g.court, teams: [g.home, g.away] });
+  }
+  return starts;
+}
 
 function leagueOf(
   facts: LeagueFacts,
@@ -1015,29 +1083,24 @@ function leagueOf(
         date: addDays(today, r.days),
       });
     }
+    const fromNowAt = startsFromNow(spec, today, now, facts.timeZone);
     for (const g of spec.games) {
-      const round = g.round === null ? undefined : spec.rounds[g.round];
+      const fromNow = fromNowAt.get(g.id);
+      const own = g.round === null ? undefined : spec.rounds[g.round];
+      // A game set from now that fell on an earlier day than its round's (last night, a
+      // little after midnight) is in the round whose days hold it, so no game is ever
+      // outside its round's days.
+      const fromDay = fromNow === undefined ? undefined : dayIn(fromNow, facts.timeZone);
+      const round =
+        own === undefined || fromDay === undefined || addDays(today, own.days) <= fromDay
+          ? own
+          : (spec.rounds.filter((r) => addDays(today, r.days) <= fromDay).at(-1) ?? own);
       const day =
         g.day !== undefined
           ? addDays(today, g.day)
           : round === undefined
             ? null
             : addDays(today, round.days);
-      // A game set from now starts on a whole five minutes, `fromNow` minutes from now. A
-      // game under way never starts before the league's midnight: the scorekeeper's list
-      // starts there (list-games-in-window.ts), so a world made just after midnight still
-      // lists its live game. A game played earlier may fall on last night. (The database's
-      // list has the same edge for a real game live across midnight: step 2.156.)
-      const midnight = Date.parse(momentIn(today, '00:00', facts.timeZone));
-      const fromNow =
-        g.fromNow === undefined
-          ? undefined
-          : new Date(
-              Math.max(
-                Math.floor((now.getTime() + g.fromNow * 60_000) / 300_000) * 300_000,
-                g.status === 'live' ? midnight : -Infinity,
-              ),
-            );
       const startsAt =
         fromNow !== undefined
           ? fromNow.toISOString()

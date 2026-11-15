@@ -16,18 +16,28 @@ export function dayIn(moment: Date, timeZone: string): string {
   return leagueDayIn(timeZone, moment.getTime());
 }
 
+/** One reader of the wall clock for each zone: making one is the slow part. */
+const wallClocks = new Map<string, Intl.DateTimeFormat>();
+const wallClockOf = (timeZone: string): Intl.DateTimeFormat => {
+  const known = wallClocks.get(timeZone);
+  if (known !== undefined) return known;
+  const made = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+  });
+  wallClocks.set(timeZone, made);
+  return made;
+};
+
 /** The wall clock at `moment` in the zone, as if it were UTC: milliseconds. */
 function wallClockIn(moment: Date, timeZone: string): number {
   const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hourCycle: 'h23',
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-    })
+    wallClockOf(timeZone)
       .formatToParts(moment)
       .map((p) => [p.type, Number(p.value)]),
   ) as Record<string, number>;
