@@ -10,7 +10,15 @@
 // - 404 refused unknown-game: no such game in this league (one of another league asked
 //   for through this one's address included).
 // - 409 refused game-not-live: decided, cancelled or postponed; it cannot be scored now.
-import { SessionRequest, type SessionReply } from '@srleagues/contracts';
+//
+// 401 and 400 carry the contract's `TrackerRefusal`, the rest a `SessionReply`: the
+// tracker takes nothing else as the server's word.
+import {
+  SessionRequest,
+  trackerRefusalStatus,
+  type SessionReply,
+  type TrackerRefusal,
+} from '@srleagues/contracts';
 import {
   openScoringSession,
   releaseScoringSession,
@@ -36,6 +44,12 @@ const refusedStatus: Readonly<Record<Refusal, number>> = {
 const refused = (code: Refusal, sentAt: number): ApiAnswer => ({
   status: refusedStatus[code],
   body: { status: 'refused', code, sentAt } satisfies SessionReply,
+});
+
+/** Signed out, or not a session request: the contract's refusal at its own status. */
+const turnedAway = (body: TrackerRefusal): ApiAnswer => ({
+  status: trackerRefusalStatus[body.error],
+  body,
 });
 
 /** Every error the four commands may answer, from their own types. */
@@ -93,7 +107,7 @@ export async function scoringSessionRequest(
   body: unknown,
   ports: SessionPorts,
 ): Promise<ApiAnswer> {
-  if (context.account === null) return { status: 401, body: { error: 'signed-out' } };
+  if (context.account === null) return turnedAway({ error: 'signed-out' });
   if (!isGameIdFormat(game)) return refused('unknown-game', ports.clock.now());
   const request = SessionRequest.safeParse(body);
   if (!request.success) {
@@ -101,12 +115,12 @@ export async function scoringSessionRequest(
       path: issue.path.map(String).join('.'),
       problem: issue.code,
     }));
-    return { status: 400, body: { error: 'invalid-input', issues } };
+    return turnedAway({ error: 'invalid-input', issues });
   }
   const result = await run(commandContextOf(context), game, request.data, ports);
   if (!result.ok) {
     if (result.error.code === 'invalid-input') {
-      return { status: 400, body: { error: 'invalid-input', issues: result.error.issues } };
+      return turnedAway({ error: 'invalid-input', issues: [...result.error.issues] });
     }
     return refused(refusalOf(result.error.code), ports.clock.now());
   }

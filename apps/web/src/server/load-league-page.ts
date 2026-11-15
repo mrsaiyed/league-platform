@@ -3,7 +3,8 @@
 // layout and page gets its own answer.
 //
 // Pages call loadLeaguePage, which turns a refusal into Next.js's own: "not found"
-// (404), a permanent forward (308) or "you do not have access" (403, forbidden.tsx).
+// (404), a permanent forward (308) or "you do not have access" (403, forbidden.tsx);
+// a session that is none of our accounts' goes to the account page (record 055).
 // Every page calls it, not only the layouts: Next.js does not draw a layout again
 // when moving between pages under it, so a check in a layout alone could be passed by.
 //
@@ -15,8 +16,8 @@
 // Both are given the route's `[league]` value. When it is not the league of the
 // address the proxy wrote down, the proxy did not run for this request, and the
 // answer is "not found" (league-gate.ts, addressMatchesRoute).
-import type { AdminArea } from '@srleagues/core';
-import { forbidden, notFound, permanentRedirect } from 'next/navigation';
+import { platformUrl, type AdminArea } from '@srleagues/core';
+import { forbidden, notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { getConfig } from './config.ts';
 import { webPorts } from './container.ts';
@@ -71,6 +72,8 @@ export async function loadLeaguePage(
       return forbidden();
     case 'not-found':
       return notFound();
+    case 'account-problem':
+      return redirect(platformUrl('account'));
   }
 }
 

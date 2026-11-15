@@ -11,6 +11,10 @@
 // - A session cookie that no longer works is "signed out" (401): the proxy renews a
 //   session before any endpoint sees it, so one still failing here has ended. A public
 //   read (the snapshot) treats it as a visitor instead, as pages do.
+// - A live session that is none of our accounts' (an AccountRefusal, record 055) is
+//   "account problem" (403), or a visitor for a public read; signing in again would
+//   not help, and the account page says why.
+import { trackerRefusalStatus, type TrackerRefusal } from '@srleagues/contracts';
 import { leagueApiUrl, type AccessHolder } from '@srleagues/core';
 import {
   requestContext,
@@ -26,12 +30,21 @@ export type ApiAnswer = {
   readonly headers?: Readonly<Record<string, string>>;
 };
 
-export type ApiRefusal = { readonly status: 401 | 404; readonly error: 'signed-out' | 'not-found' };
+/** Why there is no league request: each error with its own status, never another pairing. */
+export type ApiRefusal =
+  | { readonly status: 401; readonly error: 'signed-out' }
+  | { readonly status: 403; readonly error: 'account-problem' }
+  | { readonly status: 404; readonly error: 'not-found' };
 
-export const refusalAnswer = (refusal: ApiRefusal): ApiAnswer => ({
-  status: refusal.status,
-  body: { error: refusal.error },
-});
+/**
+ * The refusal as the endpoint answers it: the same body the tracker's endpoints give,
+ * the contract's `TrackerRefusal` at the contract's status for it (a tracker takes
+ * nothing else as the server's word, so a wrong pairing would be no answer for ever).
+ */
+export const refusalAnswer = (refusal: ApiRefusal): ApiAnswer => {
+  const body = { error: refusal.error } satisfies TrackerRefusal;
+  return { status: trackerRefusalStatus[body.error], body };
+};
 
 const notFound: ApiRefusal = { status: 404, error: 'not-found' };
 
@@ -58,12 +71,14 @@ export async function resolveLeagueApi(
   const built = await requestContext(facts, deps);
   if (!built.ok) {
     const code = built.error.code;
-    if (code !== 'renew-session' && code !== 'session-ended') {
+    const accountProblem = code === 'account-problem';
+    if (code !== 'renew-session' && code !== 'session-ended' && !accountProblem) {
       return { ok: false, refusal: notFound };
     }
     if (signedOut === 'visitor' && facts.session !== null) {
       return resolveLeagueApi({ ...facts, session: null }, parts, deps, signedOut);
     }
+    if (accountProblem) return { ok: false, refusal: { status: 403, error: 'account-problem' } };
     return { ok: false, refusal: { status: 401, error: 'signed-out' } };
   }
   const context = built.value;

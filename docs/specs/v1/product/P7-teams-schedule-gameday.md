@@ -24,6 +24,8 @@ Set in **Admin → Season settings**. This is the first thing an organizer settl
 
 **S-1 (agreed, changed November 12): the admin can change the rules at any time, and is shown what a change will do before it applies.** The league is the admin's to run. Before the first game, changes simply save. After it, a change that would move anything (a tiebreaker that reorders the standings, a forfeit score that alters point difference) shows what will move, asks for confirmation, and is logged. Game rules (clock, fouls, period length) apply to games that have not started; a game already played keeps the rules it was played under.
 
+**S-42 (decided for you, November 14): a game under way is never handed to another scorekeeper without a question.** If the first scorekeeper's device has gone quiet (no signal in the gym), the next person who opens the game is told who was scoring and when that device was last heard from, and takes over only by saying yes. **S-43 (decided for you, November 14): plays that were not saved can be sent after all,** by the scorekeeper's own tap, when nobody has recorded anything in that game since; otherwise they are entered again. No play is ever counted twice.
+
 **S-41 (decided for you, November 14): what the roster rules do.** A team's roster cannot grow past the season's largest size. After the lock date only the owner and admins change rosters. A roster under the smallest size is a warning, never a refusal. A player added at the scorer's table (S-6) is refused by neither rule, so a game is never stopped by them, and is marked for the admin to review.
 
 ## 2. Teams

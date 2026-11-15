@@ -2,7 +2,13 @@
 // commands endpoint (T6 §3), addressed by the league's id so a queue held across a
 // change of short name still arrives (T-229). The answer is sorted into the five
 // outcomes the queue knows; nothing here throws.
-import { CommandReply, VersionRefusal } from '@srleagues/contracts';
+//
+// Only an answer in the contract's shapes is the server's word: the reply, the version
+// refusal, or the server's own refusal at its own status (`ownTrackerRefusal`). Anything
+// else is no answer and is sent again later, whatever its status: a gym Wi-Fi sign-in
+// page, a filter or a host's error page answering 404, 403 or 400 must never halt the
+// queue or have taps refused.
+import { CommandReply, VersionRefusal, ownTrackerRefusal } from '@srleagues/contracts';
 import { leagueApiUrl } from '@srleagues/core';
 import type { CommandTransport, TransportOutcome } from './command-transport.ts';
 
@@ -12,12 +18,7 @@ export type FetchCommandTransportOptions = {
   readonly fetch?: typeof globalThis.fetch;
 };
 
-/** Statuses where the same request may well work later: a timeout, too many, the server's fault. */
-const tryAgainLater = (status: number): boolean =>
-  status === 408 || status === 425 || status === 429 || status >= 500;
-
-/** Statuses about who is asking or what for, not about the taps: the queue halts. */
-const turnedAway = (status: number): boolean => status === 401 || status === 403 || status === 404;
+const unanswered: TransportOutcome = { kind: 'unanswered' };
 
 export function createFetchCommandTransport(
   options: FetchCommandTransportOptions,
@@ -38,7 +39,7 @@ export function createFetchCommandTransport(
           signal,
         });
       } catch {
-        return { kind: 'unanswered' };
+        return unanswered;
       }
       let body: unknown;
       try {
@@ -49,13 +50,17 @@ export function createFetchCommandTransport(
       const version = VersionRefusal.safeParse(body);
       if (version.success) return { kind: 'version-refused', refusal: version.data };
       if (response.ok) {
-        // A page that is not our answer (a gym Wi-Fi sign-in page, say) is no answer.
         const reply = CommandReply.safeParse(body);
-        return reply.success ? { kind: 'reply', reply: reply.data } : { kind: 'unanswered' };
+        return reply.success ? { kind: 'reply', reply: reply.data } : unanswered;
       }
-      if (tryAgainLater(response.status) || response.status < 400) return { kind: 'unanswered' };
-      if (turnedAway(response.status)) return { kind: 'rejected', httpStatus: response.status };
-      return { kind: 'batch-refused', httpStatus: response.status };
+      const refusal = ownTrackerRefusal(response.status, body);
+      if (refusal === null) return unanswered;
+      // Not a batch: the queue sends one tap at a time to find the bad one.
+      if (refusal.error === 'invalid-input') {
+        return { kind: 'batch-refused', httpStatus: response.status };
+      }
+      // Signed out, not allowed, no such game: the queue halts.
+      return { kind: 'rejected', httpStatus: response.status };
     },
   };
 }

@@ -657,7 +657,7 @@ function drawVillage() {
           TOP,
           'Leo · The lead',
           busy
-            ? lanes.length + ' of ' + (D.laneCount || lanes.length) + ' desks busy'
+            ? lanes.length + ' of ' + (D.laneCount || lanes.length) + ' desks have work open'
             : working
               ? 'handing out work'
               : 'resting',
@@ -942,7 +942,10 @@ function showLead() {
   const open = D.needs.filter((n) => !n.done);
   cols.append(
     column2(
-      'At work now (' + lanes.length + (D.laneCount ? ' of ' + D.laneCount + ' desks' : '') + ')',
+      'Work that is open now (' +
+        lanes.length +
+        (D.laneCount ? ' of ' + D.laneCount + ' desks' : '') +
+        '). Open means started and not yet finished: some are being built this minute, others wait for a check or a review.',
       busy
         ? lanes
             .map((l) => stepOf(l.id))
@@ -1152,7 +1155,9 @@ if (!$('needs').children.length) $('needs').append(el('li', 'muted', 'Nothing ri
 $('foot').textContent =
   'Page written ' +
   clock(D.generatedAt) +
-  '. It is rewritten every ten minutes and each time a step is saved, and reloads itself every minute. ' +
+  (location.protocol === 'file:'
+    ? '. Opened as a file, it shows what the last ten-minute check wrote. For a page that is fresh every time it loads, and costs nothing, double-click "Open build progress.cmd" in the project folder. '
+    : '. It is written fresh each time it loads, and reloads itself every minute. Nothing about this page uses the usage allowance. ') +
   'Each character stands for a kind of work: every step is built by a fresh AI builder, and the character shows which kind of work it is. ';
 const toggle = el(
   'button',

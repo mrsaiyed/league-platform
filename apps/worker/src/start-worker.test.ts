@@ -210,7 +210,7 @@ describe('startWorker on a hosted database (staging and production)', () => {
       APP_ENV: appEnv,
       PUBLIC_BASE_URL: 'https://leagues.example.test',
       EMAIL_FROM: 'leagues@mail.example.test',
-      DATABASE_URL: address,
+      PLATFORM_DATABASE_URL: address,
       RESEND_API_KEY: 're_made_up_key',
       WORKER_HEALTH_PORT: '3001',
     });

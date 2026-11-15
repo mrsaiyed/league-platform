@@ -10,8 +10,10 @@
 // The connection is let go when another tab opens a newer version (versionchange) or
 // the browser closes it (close), and opened again on the next use (record 024).
 //
-// The stored shape is QueuedCommand. Its `sessionId` came later and is optional, so
-// rows stored before it are read as they are, with no step. If a later release changes
+// The stored shape is QueuedCommand. Its `sessionId`, the `not-saved` state and the
+// `moment` (period and game clock) came later; rows stored before them are read as they
+// are, with no step (a row with no `moment` lists its tap with none), and an older build
+// sends only `waiting` rows, so it never sends a `not-saved` one; it reads past `moment`. If a later release changes
 // the shape in a way older rows do not fit, add a step to
 // `upgradeSteps`, converting the old rows through the upgrade's transaction: a queue
 // left on a device before the release must still be read (T-127). A device may skip
@@ -112,14 +114,22 @@ export async function openIndexedDbQueueStorage(
   await connection();
 
   return {
-    add(gameId, { protocolVersion, command, sessionId }) {
+    add(gameId, { protocolVersion, command, sessionId, moment }) {
       return write<'added' | 'held'>('added', (commands, outcome, tx) => {
         const known = commands.index(byCommand).get(command.commandId);
         known.onsuccess = () => {
           const row = known.result as Row | undefined;
           if (row === undefined) {
             const madeUnder = sessionId === undefined ? {} : { sessionId };
-            const fresh: Row = { gameId, protocolVersion, command, ...madeUnder, state: 'waiting' };
+            const madeAt = moment === undefined ? {} : { moment };
+            const fresh: Row = {
+              gameId,
+              protocolVersion,
+              command,
+              ...madeUnder,
+              ...madeAt,
+              state: 'waiting',
+            };
             commands.add(fresh);
           } else if (row.gameId === gameId) {
             outcome.value = 'held';
@@ -152,10 +162,11 @@ export async function openIndexedDbQueueStorage(
       });
     },
 
-    async settle(gameId, { remove = [], refuse = [] }: QueueSettlement) {
+    async settle(gameId, { remove = [], refuse = [], notSaved = [] }: QueueSettlement) {
       const dropped = new Set(remove);
       const refusals = new Map(refuse.map((r) => [r.commandId, r.refusal]));
-      if (dropped.size === 0 && refusals.size === 0) return;
+      const setAside = new Set(notSaved);
+      if (dropped.size === 0 && refusals.size === 0 && setAside.size === 0) return;
       await write(undefined, (commands) => {
         const walk = commands.index(byGame).openCursor(gameId);
         walk.onsuccess = () => {
@@ -166,6 +177,10 @@ export async function openIndexedDbQueueStorage(
           const refusal = refusals.get(id);
           if (dropped.has(id)) cursor.delete();
           else if (refusal !== undefined) cursor.update({ ...row, state: 'refused', refusal });
+          else if (setAside.has(id)) {
+            const { refusal: _refusal, ...kept } = row as Row & { refusal?: unknown };
+            cursor.update({ ...kept, state: 'not-saved' });
+          }
           cursor.continue();
         };
       });
