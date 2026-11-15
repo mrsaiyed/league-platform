@@ -336,6 +336,13 @@ describe('header, menu and footer', () => {
     expect(phone).toMatch(
       /\.site-menu > summary \{\s*position: absolute;\s*inset-block-start: calc\(var\(--step-3\) \/ 2\);/,
     );
+    // An open menu's button is a cross, and the panel's line runs to the screen's edges.
+    expect(phone).toMatch(
+      /\.site-menu\[open\] \.site-menu-icon \{\s*border-block-color: transparent;\s*\}\s*\.site-menu\[open\] \.site-menu-icon::before \{\s*transform: rotate\(45deg\);\s*\}\s*\.site-menu\[open\] \.site-menu-icon::after \{\s*opacity: 1;\s*transform: rotate\(-45deg\);/,
+    );
+    expect(phone).toMatch(
+      /\.site-menu-panel \{[^}]*margin-inline: calc\(-1 \* var\(--gutter\)\);[^}]*padding-inline: var\(--gutter\);\s*border-block-start: 1px solid var\(--header-rule\);/,
+    );
     // From a tablet up the name is one line and the row keeps its own height.
     const wide = css.slice(phone.length);
     expect(wide).toMatch(/\.site-header-top \{[^}]*min-block-size: 0;\s*padding-block: 0;/);
@@ -382,6 +389,7 @@ describe('header, menu and footer', () => {
       // Not the column: the phone's home page puts its later matchups away (a browser
       // that does not know `:has()` shows them all).
       ".home-next .ui-card-grid > li:nth-child(n + 3):has(> .ui-game-card[data-status='scheduled'])",
+      // (The open menu's button and line are checked in the test of the phone header below.)
       // And one fewer while a game is being played (its board already heads the page).
       ".home-next[data-live='true'] .ui-card-grid > li:nth-child(n + 2):has(> .ui-game-card[data-status='scheduled'])",
     ]);

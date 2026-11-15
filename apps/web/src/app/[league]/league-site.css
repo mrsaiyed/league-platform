@@ -210,12 +210,28 @@ html {
   block-size: var(--step-3);
   border-block: 2px solid currentColor;
 }
-.site-menu-icon::before {
+.site-menu-icon::before,
+.site-menu-icon::after {
   content: '';
   position: absolute;
   inset-inline: 0;
   inset-block-start: calc(50% - 1px);
   border-block-start: 2px solid currentColor;
+}
+/* The second middle line is there only for the cross. */
+.site-menu-icon::after {
+  opacity: 0;
+}
+/* An open menu's button is a cross: the outer lines go, the two middle ones turn. */
+.site-menu[open] .site-menu-icon {
+  border-block-color: transparent;
+}
+.site-menu[open] .site-menu-icon::before {
+  transform: rotate(45deg);
+}
+.site-menu[open] .site-menu-icon::after {
+  opacity: 1;
+  transform: rotate(-45deg);
 }
 /* An open menu never grows past the screen: the header scrolls inside itself. */
 .site-header-top:has(.site-menu[open]) {
@@ -223,9 +239,12 @@ html {
   overflow-y: auto;
 }
 .site-menu-panel {
-  /* Its line stands under the whole first row, the menu button included. */
+  /* Its line stands under the whole first row, the menu button included, and runs to the
+     edges of the screen: the panel is as wide as the header, its links in the column. */
   margin-block-start: calc(var(--step-3) / 2);
+  margin-inline: calc(-1 * var(--gutter));
   padding-block: var(--step-2) var(--step-4);
+  padding-inline: var(--gutter);
   border-block-start: 1px solid var(--header-rule);
 }
 .site-menu-panel ul,
