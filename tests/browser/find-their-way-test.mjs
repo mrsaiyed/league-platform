@@ -52,10 +52,13 @@ const people = {
 const phone = { width: 390, height: 844 };
 const laptop = { width: 1280, height: 800 };
 const liveGame = '01900000-0000-7000-8000-006a00000002'; // Hawks v Bears, live, the scorekeeper's
+// The game is open on the device: the format to check, or (once checked, step 2.35) the
+// scoring screen itself.
 const gameOpen = (page) =>
   page
     .getByText('This device is scoring the game.')
-    .or(page.getByRole('heading', { level: 2, name: 'Check the game format' }));
+    .or(page.getByRole('heading', { level: 2, name: 'Check the game format' }))
+    .or(page.locator('[data-scoring]'));
 /** What the device keeps in its browser database: the opened games and the queue's rows. */
 const keptOnDevice = (page) =>
   page.evaluate(async () => {
@@ -186,6 +189,13 @@ async function tallEnough(page, within, label) {
 }
 /** The phone menu's button, which also holds the account button's entries (one tap). */
 const openMenu = (page) => page.locator('.site-header .site-menu > summary').click();
+/**
+ * The account button on the scoring page: the tracker has a frame of its own, with no
+ * league header (step 2.35; DESIGN.md section 7, line 11), and the button is in its first
+ * row, on the format check and on the scoring screen alike.
+ */
+const openAccountOnTracker = (page) =>
+  page.locator('[data-tracker] [data-account] > summary').click();
 const link = (page, name) => page.getByRole('link', { name, exact: true });
 /** Signs in on the sign-in screen the page is on, and waits to leave it. */
 async function signIn(page, who) {
@@ -518,7 +528,7 @@ if (browser) {
       await link(page, 'My games to score').click();
       await page.locator(`li[data-game="${liveGame}"] a[href*="/score/"]`).click();
       await gameOpen(page).waitFor();
-      await openMenu(page);
+      await openAccountOnTracker(page);
       const signOut = page.getByRole('link', { name: 'Sign out', exact: true });
       note(
         'on the scoring page "Sign out" is a link to the account page with scripts off',
@@ -542,6 +552,10 @@ if (browser) {
       // server, as the context is torn down depends on the browser (it did on this
       // computer's Edge; on GitHub's Chromium the next check met the owner still holding
       // the game, "Olive Owner is scoring this game on another device", and waited out).
+      // On the scoring screen (the format already checked) the way out is behind More.
+      const scoring = page.locator('[data-scoring]');
+      if (await scoring.isVisible())
+        await scoring.getByRole('button', { name: 'More', exact: true }).click();
       await Promise.all([
         page.waitForURL((url) => !url.pathname.includes('/score/')),
         page.getByRole('link', { name: 'Back to your games', exact: true }).click(),
@@ -571,7 +585,7 @@ if (browser) {
         asked.push(dialog.message());
         void (answer ? dialog.accept() : dialog.dismiss());
       });
-      await openMenu(page);
+      await openAccountOnTracker(page);
       await page.getByRole('link', { name: 'Sign out', exact: true }).click();
       await page.waitForTimeout(1500);
       note(
