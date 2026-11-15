@@ -259,7 +259,12 @@ if (built) {
       const cells = (
         await table.locator('tbody tr', { hasText: name }).first().locator('th, td').allInnerTexts()
       ).map((c) => c.trim());
-      const pts = cells[heads.findIndex((h) => /^PTS\b/.test(h))];
+      // A heading reads "Sort by PTS points" to a screen reader; PTS is the points column.
+      const ptsAt = heads.findIndex((h) => /\bPTS\b/i.test(h));
+      if (heads.filter((h) => /\bPTS\b/i.test(h)).length !== 1) {
+        throw new Error(`no one points column among ${heads.join(' | ')}`);
+      }
+      const pts = cells[ptsAt];
       note(
         `the statistics give ${name} the box score's ${p.points} points`,
         pts === `${p.points}.0`,
