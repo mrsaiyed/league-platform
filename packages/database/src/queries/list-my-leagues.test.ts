@@ -136,6 +136,43 @@ describe('listMyLeagues (record 066)', () => {
     expect(await leaguesAs(left)).toEqual([]);
   });
 
+  it("counts a guardian's link to a child's profile as the child's own; not a person or team in the bin", async () => {
+    const child = await newAccount(pglite);
+    const guardian = await newAccount(pglite);
+    const profile = await profileOf(child);
+    await pglite.query(
+      "insert into profile_access (account_id, profile_id, relation) values ($1, $2, 'guardian')",
+      [guardian, profile],
+    );
+    const plays = await newLeague(pglite);
+    const binnedPerson = await newLeague(pglite);
+    const binnedTeam = await newLeague(pglite);
+    await rosterPlace(plays, profile);
+    const personGone = await rosterPlace(binnedPerson, profile);
+    await pglite.query(
+      'update people set deleted_at = now() where id = (select person_id from roster_entries where id = $1)',
+      [personGone],
+    );
+    const teamGone = await rosterPlace(binnedTeam, profile);
+    await pglite.query(
+      'update teams set deleted_at = now() where id = (select team_id from roster_entries where id = $1)',
+      [teamGone],
+    );
+    for (const who of [child, guardian]) {
+      expect((await leaguesAs(who)).map((l) => [l.leagueId, l.onRoster])).toEqual([
+        [plays.leagueId, true],
+      ]);
+    }
+  });
+
+  it('counts a place on a team of an earlier season while it has not been left', async () => {
+    const someone = await newAccount(pglite);
+    const league = await newLeague(pglite);
+    // A season that is not the current one: the place still counts until it is left.
+    await rosterPlace(league, await profileOf(someone));
+    expect((await leaguesAs(someone)).map((l) => l.leagueId)).toEqual([league.leagueId]);
+  });
+
   it('never lists a league in the bin, whoever holds a role in it', async () => {
     for (const who of [accountA, binned.ownerId]) {
       expect((await leaguesAs(who)).some((l) => l.leagueId === binned.leagueId)).toBe(false);

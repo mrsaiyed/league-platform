@@ -15,7 +15,10 @@
 --   its id, short name, name and state, whether the account owns it, the roles it holds
 --   there (any scope), the roles it holds for the whole league, and whether it is on a
 --   roster there. Nothing about anyone else, no counts, and no league the account has
---   no part in.
+--   no part in. A roster place is reached through any profile_access link of the
+--   account: its own profile ('self') or a child's ('guardian'), so a parent's account
+--   lists the leagues their child plays in. "Current" means not left (no left_on): a
+--   place on a team of an earlier season still counts until the person leaves it.
 --
 -- It takes no argument: there is no way to ask it about another account. With no
 -- account set, or a setting that is not an account id, it returns nothing. Which of

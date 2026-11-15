@@ -102,11 +102,17 @@ const cases = [
     'owner',
     '/',
     200,
-    ['Your leagues', 'North Valley League', 'Harbor City League', 'quiet-pines', 'Owner'],
-    ['binned-league'],
+    ['Your leagues', 'North Valley League', 'Harbor City League', 'Quiet Pines League', 'Owner'],
+    ['Binned League', 'binned-league'],
   ],
-  ['scheduler', '/', 200, ['North Valley League', 'Scheduler', 'quiet-pines'], ['Harbor City']],
-  ['coach', '/', 200, ['North Valley League', 'Coach'], ['quiet-pines']],
+  [
+    'scheduler',
+    '/',
+    200,
+    ['North Valley League', 'Scheduler', 'Quiet Pines League'],
+    ['Harbor City'],
+  ],
+  ['coach', '/', 200, ['North Valley League', 'Coach'], ['Quiet Pines']],
   ['stranger', '/', 200, ['The leagues you belong to will be listed here'], ['North Valley']],
   [
     'owner',
@@ -114,6 +120,26 @@ const cases = [
     200,
     ['Signed in as local-owner-token@example.test', 'Your leagues', 'North Valley League'],
   ],
+  // The sign-in screen names only a league this person may see (return-league.ts, U-9):
+  // never a draft or a suspended league to a visitor or the coach, nor a league that does
+  // not exist; a live league to anyone.
+  [
+    'visitor',
+    '/signin?next=%2Fnorth-valley',
+    200,
+    ['Sign in to carry on at North Valley League.', 'Back to North Valley League'],
+  ],
+  ...['visitor', 'coach'].flatMap((who) =>
+    ['%2Fquiet-pines', '%2Fquiet-pines%2Fadmin', '%2Fclosed-gate', '%2Fno-such-league'].map(
+      (next) => [
+        who,
+        `/signin?next=${next}`,
+        200,
+        ['Sign in'],
+        ['carry on at', 'Back to', 'Quiet Pines', 'Closed Gate'],
+      ],
+    ),
+  ),
   // The account button (U-8): a signed-in person's own, never in a visitor's page.
   [
     'owner',
