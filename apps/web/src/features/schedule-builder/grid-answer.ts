@@ -4,7 +4,12 @@
 // takes the phone there; and, for a refused round form, which form it was and what was
 // typed in it, so the form opens again with it kept and the reason beside it. Ids must be
 // ids, and typed text is only ever put back into its own field, never shown as text (T-187).
-import type { RefusedAt, SavedDetail, ScheduleActionOutcome } from './run-schedule-action.ts';
+import type {
+  RefusedAt,
+  RemovedGame,
+  SavedDetail,
+  ScheduleActionOutcome,
+} from './run-schedule-action.ts';
 
 type Search = Readonly<Record<string, string | readonly string[] | undefined>>;
 
@@ -66,19 +71,64 @@ export function answerParams(outcome: ScheduleActionOutcome): {
         },
         hash,
       };
-    case 'game-removed':
+    case 'game-removed': {
+      const game = detail.game;
       return {
         query: {
           ...query,
           saved: detail.what,
           ...(detail.roundId === null ? {} : { round: detail.roundId }),
+          // The game as it was, so "Put it back" can add it again (step 2.161).
+          ...(game === undefined
+            ? {}
+            : {
+                game: game.gameId,
+                home: game.homeTeamId,
+                away: game.awayTeamId,
+                date: game.date.slice(0, 10),
+                ...(game.time === null ? {} : { time: game.time.slice(0, 5) }),
+                ...(game.place === '' ? {} : { place: game.place.slice(0, 200) }),
+                ...(game.recording === null ? {} : { recording: game.recording.slice(0, 20) }),
+              }),
         },
         hash,
       };
+    }
     case 'game-saved':
     case 'game-round':
+    case 'game-put-back':
       return { query: { ...query, saved: detail.what, game: detail.gameId }, hash };
   }
+}
+
+const timeShape = /^\d{2}:\d{2}$/;
+const recordingShape = /^[a-z-]{1,20}$/;
+
+/** The removed game the address carries, if every part of it is the shape it must be. */
+function removedGameOf(search: Search, roundId: string | null): RemovedGame | undefined {
+  const gameId = idOf(first(search['game']));
+  const homeTeamId = idOf(first(search['home']));
+  const awayTeamId = idOf(first(search['away']));
+  const date = first(search['date']) ?? '';
+  const time = first(search['time']);
+  const recording = first(search['recording']);
+  if (gameId === undefined || homeTeamId === undefined || awayTeamId === undefined) {
+    return undefined;
+  }
+  if (!dateShape.test(date)) return undefined;
+  if (time !== undefined && !timeShape.test(time)) return undefined;
+  if (recording !== undefined && !recordingShape.test(recording)) return undefined;
+  return {
+    gameId,
+    homeTeamId,
+    awayTeamId,
+    roundId,
+    date,
+    time: time ?? null,
+    // A venue's id and a court's name, put back only into the form's own hidden field.
+    place: (first(search['place']) ?? '').slice(0, 200),
+    recording: recording ?? null,
+  };
 }
 
 /** What a save the address names did, if it names one we know. */
@@ -94,10 +144,14 @@ export function savedDetailOf(search: Search): SavedDetail | undefined {
     }
     case 'round-removed':
       return { what, afterRoundId: idOf(first(search['after'])) ?? null };
-    case 'game-removed':
-      return { what, roundId: idOf(round) ?? null };
+    case 'game-removed': {
+      const roundId = idOf(round) ?? null;
+      const game = removedGameOf(search, roundId);
+      return game === undefined ? { what, roundId } : { what, roundId, game };
+    }
     case 'game-saved':
-    case 'game-round': {
+    case 'game-round':
+    case 'game-put-back': {
       const gameId = idOf(first(search['game']));
       return gameId === undefined ? undefined : { what, gameId };
     }

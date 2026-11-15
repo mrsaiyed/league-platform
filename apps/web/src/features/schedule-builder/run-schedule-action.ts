@@ -43,8 +43,26 @@ export type SavedDetail =
   | { readonly what: 'game-saved'; readonly gameId: string }
   /** A game went to another round and its date was left as it was: the grid offers the round's. */
   | { readonly what: 'game-round'; readonly gameId: string }
-  /** A game was removed from this round (null: from the games with no round). */
-  | { readonly what: 'game-removed'; readonly roundId: string | null };
+  /**
+   * A game was removed from this round (null: from the games with no round), with what it
+   * was, so the grid can offer to put it back exactly as it was (step 2.161).
+   */
+  | { readonly what: 'game-removed'; readonly roundId: string | null; readonly game?: RemovedGame }
+  /** A removed game was put back in the draft as it was. */
+  | { readonly what: 'game-put-back'; readonly gameId: string };
+
+/** A game as it was before it was removed from the draft: all "Put it back" needs. */
+export type RemovedGame = {
+  readonly gameId: string;
+  readonly homeTeamId: string;
+  readonly awayTeamId: string;
+  readonly roundId: string | null;
+  readonly date: string;
+  readonly time: string | null;
+  /** The venue and court as one form value (build-grid.ts, placeValue). */
+  readonly place: string;
+  readonly recording: string | null;
+};
 
 /** Which form a refusal belongs beside: the new round's, or one round's own. */
 export type RefusedAt =
@@ -136,7 +154,10 @@ export async function runScheduleAction(
         },
         deps,
       );
-      return done.ok ? { kind: 'saved', detail: { what: 'game-saved', gameId } } : refusal(done);
+      if (!done.ok) return refusal(done);
+      // "Put it back" adds the removed game again, with its own id and everything it had.
+      const what = text(form, 'putBack') === '' ? 'game-saved' : 'game-put-back';
+      return { kind: 'saved', detail: { what, gameId } };
     }
     case 'save-game': {
       // Only what changed is sent, so a game that was not touched adds nothing to the draft.
@@ -191,11 +212,28 @@ export async function runScheduleAction(
     }
     case 'remove-game': {
       const done = await removeDraftGame(context, { ...basis, gameId }, deps);
-      // Said in the round the game was in when the form was drawn.
-      const [wasRound] = text(form, 'wasSlot').split('~');
-      return done.ok
-        ? { kind: 'saved', detail: { what: 'game-removed', roundId: orNull(wasRound ?? '') } }
-        : refusal(done);
+      if (!done.ok) return refusal(done);
+      // Said in the round the game was in when the form was drawn, with the game as it was
+      // drawn (not as the fields were edited before "Remove game" was tapped).
+      const [wasRound = '', date = '', time = '', ...place] = text(form, 'wasSlot').split('~');
+      const roundId = orNull(wasRound);
+      return {
+        kind: 'saved',
+        detail: {
+          what: 'game-removed',
+          roundId,
+          game: {
+            gameId,
+            homeTeamId: text(form, 'homeTeamId'),
+            awayTeamId: text(form, 'awayTeamId'),
+            roundId,
+            date,
+            time: orNull(time),
+            place: place.join('~'),
+            recording: orNull(text(form, 'wasRecording')),
+          },
+        },
+      };
     }
     case 'swap-games': {
       const otherGameId = text(form, 'otherGameId');

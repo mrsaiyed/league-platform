@@ -1565,6 +1565,14 @@ export const en = {
     'Saved to the draft: the round was removed. It is not public until you publish.',
   'schedule.admin.savedGame': 'Saved to the draft: {game}.',
   'schedule.admin.savedGameRemoved': 'Saved to the draft: a game was removed here.',
+  // Removing a game from the draft, and putting it back in one tap (step 2.161).
+  'schedule.admin.savedGameRemovedNamed': 'Removed: {game}.',
+  'schedule.admin.removedDraftOnly':
+    'It was only in the draft, so nothing public has changed. Put it back and it is exactly as it was.',
+  'schedule.admin.removedPublished':
+    'Nothing public changes until you publish. Put it back now and it is exactly as it was. Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
+  'schedule.admin.putBack': 'Put it back',
+  'schedule.admin.savedGamePutBack': 'Put back in the draft: {game}, as it was.',
   'schedule.admin.savedGameRound': 'Saved to the draft: {game} is now in {round}.',
   'schedule.admin.followRoundDate': 'Move it to {date} too?',
   'schedule.admin.followRoundDateYes': 'Yes, move it to {date}',
