@@ -152,6 +152,23 @@ describe('standings table', () => {
     expect(marked).not.toBeNull();
     // Nothing of a mark stands outside a name's element.
     expect(html).not.toMatch(/<\/span><sup class="ui-note-mark">/);
+    // The name keeps room for the mark at its end and the mark hangs in that room, taking
+    // none in the line: under a long name it cannot be left on a line of its own.
+    expect(displayCss).toMatch(
+      /\.ui-team-cell > \[dir\]:has\(> \.ui-note-mark\) \{\s*padding-inline-end: var\(--step-5\);/,
+    );
+    // The room is added to the name's limit, so its words wrap where they did without it.
+    expect(displayCss).toMatch(
+      /\.ui-team-cell > \[dir\]:has\(> \.ui-note-mark\) \{[^}]*max-inline-size: calc\(45cqi - var\(--step-6\) \+ var\(--step-5\)\);/,
+    );
+    expect(displayCss).toMatch(
+      /\.ui-standings\[data-emblems='true'\] \.ui-team-cell > \[dir\]:has\(> \.ui-note-mark\) \{\s*max-inline-size: calc\(45cqi - var\(--step-6\) - var\(--step-3\) \+ var\(--step-5\)\);/,
+    );
+    expect(displayCss).toMatch(
+      /\.ui-team-cell > \[dir\] > \.ui-note-mark:last-child a \{\s*margin-inline-end: calc\(-1 \* var\(--step-5\)\);/,
+    );
+    // The room is the mark's own width: what a finger needs (1.5rem is step-5).
+    expect(displayCss).toMatch(/\.ui-note-mark a \{[^}]*min-inline-size: 1\.5rem;/);
   });
 });
 

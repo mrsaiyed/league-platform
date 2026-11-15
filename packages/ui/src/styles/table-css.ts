@@ -328,6 +328,23 @@ export const tableCss = String.raw`
   font-weight: 400;
   text-decoration: underline;
 }
+/* In a team's cell the mark is part of the name's own flow, after its last word. The name
+   keeps room for it at its end, and the mark hangs in that room: it takes none in the line
+   itself, so under a long name whose last line is full it still stands beside the last
+   word, never on a line of its own. (Of two marks it is the last that hangs.) */
+.ui-team-cell > [dir]:has(> .ui-note-mark) {
+  padding-inline-end: var(--step-5);
+  /* The room is added to the name's limit, not taken from its words: a name with a mark
+     wraps exactly where the same name without one does. */
+  max-inline-size: calc(45vw - var(--step-6) + var(--step-5));
+  max-inline-size: calc(45cqi - var(--step-6) + var(--step-5));
+}
+.ui-standings[data-emblems='true'] .ui-team-cell > [dir]:has(> .ui-note-mark) {
+  max-inline-size: calc(45cqi - var(--step-6) - var(--step-3) + var(--step-5));
+}
+.ui-team-cell > [dir] > .ui-note-mark:last-child a {
+  margin-inline-end: calc(-1 * var(--step-5));
+}
 /* Notes under a table stay put while it scrolls, and are never faded by the sign above. */
 .ui-footnotes,
 .ui-table-notice {
