@@ -72,6 +72,10 @@ function rowsOf(sheet: BoxScoreSheet, players: readonly GameRosterPlayer[]): She
             minutes: {
               field: boxScoreField.minutes(player.personId),
               label: t('admin.boxScore.cellLabel', { stat: t('admin.boxScore.minutes'), name }),
+              named: t('admin.boxScore.cellLabel', {
+                stat: t('admin.boxScore.minutes'),
+                name: `${jersey}${name}`,
+              }),
               saved: minutes,
             },
           }
@@ -79,6 +83,10 @@ function rowsOf(sheet: BoxScoreSheet, players: readonly GameRosterPlayer[]): She
       stats: sheet.statKeys.map((key) => ({
         field: boxScoreField.stat(player.personId, key),
         label: t('admin.boxScore.cellLabel', { stat: statLabel(key).full, name }),
+        named: t('admin.boxScore.cellLabel', {
+          stat: statLabel(key).full,
+          name: `${jersey}${name}`,
+        }),
         saved: savedText(line, key),
       })),
     };

@@ -6,7 +6,7 @@
 // above the save button, naming the box (or the score, for a tie). With scripts off the
 // browser lands there (the form's permalink). It goes quiet once sent. Words come from
 // the server, from the message files (T-187).
-import { useActionState, useId } from 'react';
+import { useActionState, useEffect, useId, useRef } from 'react';
 import { fillScores, sheetScoresId, untouched, type BoxScoreState } from './form-state.ts';
 import { ScoreCheck, type ScoreCheckProps } from './score-check.tsx';
 import { SavedLine } from './saved-line.tsx';
@@ -14,7 +14,13 @@ import type { ScoreField } from './score-fields.ts';
 import { useOneSubmit } from './use-one-submit.ts';
 
 /** One box of the grid: its field, the label it is read by, and what is saved in it. */
-export type SheetBox = { readonly field: string; readonly label: string; readonly saved: string };
+export type SheetBox = {
+  readonly field: string;
+  readonly label: string;
+  readonly saved: string;
+  /** The box as a refusal names it: the column and the player with their number. */
+  readonly named?: string;
+};
 
 export type SheetRow = {
   readonly personId: string;
@@ -75,6 +81,15 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
   const [state, dispatch, pending] = useActionState(props.action, untouched, props.permalink);
   const onSubmit = useOneSubmit(pending, state);
   const problemId = `${useId()}-problem`;
+  // After a refusal (scripts on), the first wrong box takes the focus, which brings it into
+  // view inside the grid: the sentence beside the scores names it.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (state.kind !== 'refused') return;
+    const first = state.wrong[0];
+    const box = first === undefined ? null : formRef.current?.elements.namedItem(first);
+    if (box instanceof HTMLInputElement) box.focus();
+  }, [state]);
   const refused = state.kind === 'refused' ? state : undefined;
   const wrong = new Set(refused?.wrong ?? []);
   const text = (box: SheetBox) =>
@@ -93,17 +108,19 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
       if (team.score.field === firstWrong) return team.wrongScore;
       for (const row of team.rows) {
         if (row.minutes?.field === firstWrong) {
-          return texts.wrongMinutes.replaceAll('{cell}', row.minutes.label);
+          return texts.wrongMinutes.replaceAll('{cell}', row.minutes.named ?? row.minutes.label);
         }
         const box = row.stats.find((s) => s.field === firstWrong);
-        if (box !== undefined) return texts.wrongCell.replaceAll('{cell}', box.label);
+        if (box !== undefined) {
+          return texts.wrongCell.replaceAll('{cell}', box.named ?? box.label);
+        }
       }
     }
     return refused.said;
   })();
 
   return (
-    <form action={dispatch} onSubmit={onSubmit}>
+    <form ref={formRef} action={dispatch} onSubmit={onSubmit}>
       {Object.entries(props.hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
