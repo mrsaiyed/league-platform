@@ -129,6 +129,11 @@ describe('removeLeague: the done test', () => {
       },
       ownerKept: [],
     });
+    // The season as the maker leaves it, which is all the removal lets through:
+    // made, then made the current one.
+    expect(
+      await one(pglite, 'select version, is_current from seasons where id = $1', [first.seasonId]),
+    ).toEqual({ version: 2, is_current: true });
     const before = await everything();
     // The maker wrote, for the first league: the league, its program, its season and
     // two activity-log entries, and the owner's account.
@@ -313,6 +318,12 @@ const uses: [string, (league: Made) => Promise<unknown>, string][] = [
     'its season published',
     (league) =>
       pglite.query("update seasons set status = 'active' where id = $1", [league.seasonId]),
+    'season-changed',
+  ],
+  [
+    'its season made not current',
+    (league) =>
+      pglite.query('update seasons set is_current = false where id = $1', [league.seasonId]),
     'season-changed',
   ],
   [

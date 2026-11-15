@@ -4,8 +4,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { PGlite, Transaction } from '@electric-sql/pglite';
+import { PGlite, type Transaction } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { applyMigrations, pgliteDriver } from '../migrations/index.ts';
 import { asApp, freshSchema, newAccount, newLeague, one, refused } from './schema.test-helper.ts';
 
 let db: PGlite;
@@ -310,6 +311,75 @@ describe('the platform log (0017)', () => {
                   'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER') as tbl`,
       ),
     ).toEqual({ schema: false, tbl: false });
+  });
+});
+
+describe('league_removal_problems: a season exactly as the maker leaves it', () => {
+  it('passes the maker’s season (made, then made current: version 2) and nothing else', async () => {
+    const league = await makerShaped();
+    expect(
+      await one(db, 'select version, is_current from seasons where id = $1', [league.seasonId]),
+    ).toEqual({ version: 2, is_current: true });
+    expect(
+      await one(db, 'select public.league_removal_problems($1) as problems', [league.leagueId]),
+    ).toEqual({ problems: [] });
+  });
+
+  it('refuses a season that is not current, even one changed only once', async () => {
+    // Made, never made current, renamed once: version 2 but not the maker's.
+    const league = await newLeague(db);
+    const staff = await newAccount(db);
+    const season = await one<{ id: string }>(
+      db,
+      `insert into seasons (league_id, program_id, slug, name) values ($1, $2, 'fall', 'Fall')
+       returning id`,
+      [league.leagueId, league.defaultProgramId],
+    );
+    await db.query("update seasons set name = 'Renamed' where id = $1", [season.id]);
+    await db.query(
+      `insert into activity_log (league_id, actor_account_id, action, summary)
+       values ($1, $2, 'leagues.create', 'activity.leagues.create')`,
+      [league.leagueId, staff],
+    );
+    expect(
+      await one(db, 'select version, is_current from seasons where id = $1', [season.id]),
+    ).toEqual({ version: 2, is_current: false });
+    expect(
+      await one(db, 'select public.league_removal_problems($1) as problems', [league.leagueId]),
+    ).toEqual({ problems: ['season-changed'] });
+  });
+});
+
+describe("Supabase's API roles get nothing in the platform schema (T-64)", () => {
+  it('even with default privileges granted everywhere, not only in public', async () => {
+    const hosted = new PGlite();
+    try {
+      await hosted.exec(`
+        create role anon nologin;
+        create role authenticated nologin;
+        create role service_role nologin bypassrls;
+        grant usage on schema public to anon, authenticated, service_role;
+        alter default privileges grant all on tables to anon, authenticated, service_role;
+      `);
+      const run = await applyMigrations(pgliteDriver(hosted));
+      expect(run.ok).toBe(true);
+      const { rows } = await hosted.query<{ role: string; what: string }>(
+        `select r.rolname as role, t.relname as what
+         from pg_roles r cross join pg_class t
+         where r.rolname in ('anon', 'authenticated', 'service_role')
+           and t.relnamespace = 'platform'::regnamespace and t.relkind in ('r', 'p')
+           and has_table_privilege(r.oid, t.oid,
+                 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+         union all
+         select r.rolname, 'schema platform'
+         from pg_roles r
+         where r.rolname in ('anon', 'authenticated', 'service_role')
+           and has_schema_privilege(r.oid, 'platform', 'USAGE')`,
+      );
+      expect(rows).toEqual([]);
+    } finally {
+      await hosted.close();
+    }
   });
 });
 

@@ -71,6 +71,9 @@ create index if not exists platform_activity_log_league
 comment on table platform.activity_log is
   'Who of our staff changed the platform itself, and when (step 2.150): today only a draft league removed. History: rows are only ever added (T-45). Ids only, no personal details (T-220).';
 
+comment on column platform.activity_log.details is
+  'Ids only, never joined to anything: ownerAccountId names the removed league''s owner, whose account may since have been removed too (it was never used), so the id may name no account at all.';
+
 revoke all on table platform.activity_log from public;
 
 alter table platform.activity_log enable row level security;
@@ -84,7 +87,7 @@ create or replace trigger platform_activity_log_is_history
 
 -- Every table with a league_id column, by name. No dynamic SQL (T-183's check reads
 -- the text): instead a test walks the catalog and fails when a table with a league_id
--- column is missing here (league-rows.test.ts), so a league table added later cannot
+-- column is missing here (schema/league-removal.test.ts), so a league table added later cannot
 -- be forgotten; the migration that adds one adds it here too.
 create or replace function public.league_rows(wanted uuid)
 returns table (table_name text, row_count bigint)
@@ -133,7 +136,7 @@ $$;
 revoke all on function public.league_rows(uuid) from public;
 
 comment on function public.league_rows(uuid) is
-  'How many rows each table with a league_id column holds for one league, found from the catalog when it runs (step 2.150). Table owner only.';
+  'How many rows each table with a league_id column holds for one league (step 2.150): a written list of the tables, which a test checks against the catalog. Table owner only.';
 
 -- 3. Why a league is not exactly what the maker writes -------------------------------------
 
@@ -178,12 +181,14 @@ begin
   end if;
 
   -- At most one season: in draft, not in the bin, with the rules and statistics it
-  -- was made with, and changed only by being made the current one (version 2).
+  -- was made with, and exactly as the maker leaves it: made, then made the current one
+  -- (version 2 and current). A season changed in any other way, even once, is refused.
   if (select count(*) from public.seasons s where s.league_id = wanted) > 1
      or exists (
        select 1 from public.seasons s
        where s.league_id = wanted
-         and (s.status <> 'draft' or s.deleted_at is not null or s.version > 2
+         and (s.status <> 'draft' or s.deleted_at is not null
+              or not (s.version = 2 and s.is_current)
               or s.rules <> '{"version": 1}'::jsonb or s.stat_keys <> '{}')
      ) then
     problems := problems || 'season-changed'::text;
@@ -299,5 +304,24 @@ revoke all on function public.remove_draft_league(uuid, text, uuid) from public;
 
 comment on function public.remove_draft_league(uuid, text, uuid) is
   'Removes a draft league that is exactly what the internal tool makes, for the league and staff account this transaction is set to (step 2.150, record 063). Table owner only.';
+
+-- Supabase's API roles get nothing in the new schema either (T-64), where they exist:
+-- revoke_hosted_api_roles below covers schema public only, as 0012 did for sign_in.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on all tables in schema platform from anon;
+    revoke all on schema platform from anon;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on all tables in schema platform from authenticated;
+    revoke all on schema platform from authenticated;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    revoke all on all tables in schema platform from service_role;
+    revoke all on schema platform from service_role;
+  end if;
+end
+$$;
 
 select migration_log.revoke_hosted_api_roles();
