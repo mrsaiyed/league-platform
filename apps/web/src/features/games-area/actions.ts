@@ -142,7 +142,7 @@ export async function finalScoreAction(
     return { kind: 'ask', ...scores, version };
   }
   const { games } = await webPorts();
-  const result = await requests().once(requestKeyOf(context.accountId, fields), () =>
+  const result = await requests().once(requestKeyOf(context, fields), () =>
     runGameAction('final', fields, context, games.deps),
   );
   if (result.ok) {
@@ -164,7 +164,7 @@ async function act(action: GameAction, form: FormData): Promise<FormState> {
   const { context, list } = await gamesOf(fields);
   const gameId = gameIdOf(fields['gameId']);
   const { games } = await webPorts();
-  const result = await requests().once(requestKeyOf(context.accountId, fields), () =>
+  const result = await requests().once(requestKeyOf(context, fields), () =>
     runGameAction(action, fields, context, games.deps),
   );
   if (result.ok && gameId !== undefined) {
@@ -190,7 +190,7 @@ export async function cancelGameAction(_state: FormState, form: FormData): Promi
 async function onBoxScore(action: BoxScoreAction, fields: TypedFields) {
   const { context, ...rest } = await gamesOf(fields);
   const { games } = await webPorts();
-  const result = await requests().once(requestKeyOf(context.accountId, fields), () =>
+  const result = await requests().once(requestKeyOf(context, fields), () =>
     runBoxScoreAction(action, fields, context, games.deps),
   );
   return { result, context, gameId: gameIdOf(fields['gameId']), ...rest };

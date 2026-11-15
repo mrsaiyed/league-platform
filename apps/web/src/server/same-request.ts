@@ -19,12 +19,12 @@ export const requestTokenField = 'requestToken';
 const tokenShape = /^[0-9a-f-]{16,64}$/i;
 
 /**
- * The key a form's post is known by: who sent it, its token and what it held (the
- * framework's own `$ACTION…` fields left out). Undefined when it carries no token, so it
- * is not kept.
+ * The key a form's post is known by: who sent it and in which league, as the session says
+ * (not the form), its token and what it held (the framework's own `$ACTION…` fields left
+ * out). Undefined when it carries no token, so it is not kept.
  */
 export function requestKeyOf(
-  accountId: string | null,
+  context: { readonly leagueId: string; readonly accountId: string | null },
   fields: Readonly<Record<string, string | undefined>>,
 ): string | undefined {
   const token = (fields[requestTokenField] ?? '').trim();
@@ -33,7 +33,7 @@ export function requestKeyOf(
     .filter(([name, value]) => !name.startsWith('$ACTION') && value !== undefined)
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   return createHash('sha256')
-    .update(JSON.stringify([accountId ?? '', held]))
+    .update(JSON.stringify([context.leagueId, context.accountId ?? '', held]))
     .digest('hex');
 }
 
@@ -45,31 +45,44 @@ export type SameRequests<T> = {
 export function sameRequests<T>(options: {
   /** How long an answer is kept (ms). */
   readonly keepMs: number;
-  /** The most answers kept; the oldest go first. */
+  /** The most answers kept; the oldest that have come go first, never one still running. */
   readonly most: number;
   readonly now?: () => number;
 }): SameRequests<T> {
   const now = options.now ?? Date.now;
-  const kept = new Map<string, { readonly at: number; readonly answer: Promise<T> }>();
+  type Entry = { readonly at: number; readonly answer: Promise<T>; running: boolean };
+  const kept = new Map<string, Entry>();
   const prune = () => {
     const oldest = now() - options.keepMs;
     for (const [key, entry] of kept) {
-      if (entry.at < oldest || kept.size >= options.most) kept.delete(key);
-      else break;
+      if (kept.size < options.most && entry.at >= oldest) break;
+      // A request still running keeps its place: its repeat must wait for it.
+      if (!entry.running) kept.delete(key);
     }
   };
   return {
     once: (key, run) => {
       if (key === undefined) return run();
       const found = kept.get(key);
-      if (found !== undefined && found.at >= now() - options.keepMs) return found.answer;
+      if (found !== undefined && (found.running || found.at >= now() - options.keepMs)) {
+        return found.answer;
+      }
       kept.delete(key);
       prune();
-      const answer = run();
-      kept.set(key, { at: now(), answer });
-      // A request that failed outright (it threw) is not an answer: the next try runs.
-      answer.catch(() => kept.delete(key));
-      return answer;
+      const entry: Entry = { at: now(), answer: run(), running: true };
+      kept.set(key, entry);
+      entry.answer.then(
+        () => {
+          entry.running = false;
+        },
+        () => {
+          entry.running = false;
+          // A request that failed outright (it threw) is not an answer: the next try runs.
+          // Only this entry goes; a newer one under the same key stays.
+          if (kept.get(key) === entry) kept.delete(key);
+        },
+      );
+      return entry.answer;
     },
   };
 }
