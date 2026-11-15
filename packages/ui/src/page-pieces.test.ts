@@ -455,6 +455,57 @@ describe('tables', () => {
       );
     }
   });
+  it('give the column that stays put an edge while the table is scrolled under it', () => {
+    // A hairline and a soft shadow on its far side, there only while scrolled: a number half
+    // under the column is then plainly covered, not read as another number.
+    expect(displayCss).toMatch(
+      /\.ui-team-cell::after \{[^}]*inset-inline-start: 100%;[^}]*border-inline-start: 1px solid var\(--color-line-strong\);[^}]*opacity: 0;[^}]*animation: ui-table-stuck linear both;\s*animation-timeline: --ui-table-scroll;/,
+    );
+    expect(displayCss).toMatch(/@keyframes ui-table-stuck \{\s*0% \{\s*opacity: 0;/);
+    // Mirrored for right-to-left, and a plain hairline where the scroll cannot be followed.
+    expect(displayCss).toMatch(/\[dir='rtl'\] \.ui-team-cell::after \{[^}]*to left/);
+    expect(displayCss).toMatch(
+      /@supports not \(timeline-scope: --ui-table-scroll\) \{\s*\.ui-team-cell \{\s*border-inline-end: 1px solid/,
+    );
+  });
+  it('keep "Total" exactly as wide as the names above it, so it covers no more when scrolled', () => {
+    const html = render(
+      createElement(BoxScoreTable, {
+        teamName: 'Owls',
+        columns: [{ key: 'pts', label: 'PTS' }],
+        players: [{ id: 'p', jersey: '7', name: 'Max', cells: { pts: 1 } }],
+        totals: { pts: 1 },
+        labels: { jersey: 'No.', player: 'Player', total: 'Total' },
+      }),
+    );
+    // One cell under the numbers worn, then "Total" under the names: no cell spans two.
+    expect(html).toContain(
+      '<tfoot><tr><td></td><th scope="row" class="ui-team-cell">Total</th><td class="ui-num">1</td></tr></tfoot>',
+    );
+    expect(html).not.toContain('colSpan');
+    expect(html).not.toContain('colspan');
+    const hidden = render(
+      createElement(BoxScoreTable, {
+        teamName: 'Owls',
+        columns: [{ key: 'pts', label: 'PTS' }],
+        players: null,
+        totals: { pts: 1 },
+        labels: { jersey: 'No.', player: 'Player', total: 'Total' },
+      }),
+    );
+    expect(hidden).toContain('<tfoot><tr><th scope="row" class="ui-team-cell">Total</th>');
+  });
+  it('never put the scroll arrow on a column heading: a table with no name in view gets a band for it', () => {
+    expect(displayCss).toMatch(
+      /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \{\s*--ui-table-arrow: var\(--step-1\);/,
+    );
+    expect(displayCss).toMatch(
+      /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \.ui-table-wrap \{\s*padding-block-start: var\(--step-4\);/,
+    );
+    expect(displayCss).toMatch(
+      /\.ui-table-frame:has\(caption\.ui-visually-hidden\)::after \{\s*inset-block-start: var\(--step-1\);/,
+    );
+  });
   it('keep the ring of a heading button whole, and what the keyboard reaches clear of the name column', () => {
     expect(displayCss).toMatch(
       /\.ui-table \.ui-sort-button:focus-visible \{\s*outline-offset: -3px;/,

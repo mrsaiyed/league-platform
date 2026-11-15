@@ -7,6 +7,8 @@ export const tableCss = String.raw`
 /* The box a table sits in. The table scrolls inside it; the box itself stays still, so it
    can show at its far edge that the table goes on. */
 .ui-table-frame {
+  /* How far down the box the arrow sits: on the line of the table's name. */
+  --ui-table-arrow: var(--step-4);
   position: relative;
   isolation: isolate;
   max-inline-size: 100%;
@@ -14,6 +16,15 @@ export const tableCss = String.raw`
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   timeline-scope: --ui-table-scroll;
+}
+/* A table whose name is kept for screen readers only (a heading above it says the same) has
+   no line of its own for the arrow, which then sat on a column heading. It gets a short
+   band above its headings, and the arrow sits there. */
+.ui-table-frame:has(caption.ui-visually-hidden) {
+  --ui-table-arrow: var(--step-1);
+}
+.ui-table-frame:has(caption.ui-visually-hidden) .ui-table-wrap {
+  padding-block-start: var(--step-4);
 }
 .ui-table-wrap {
   /* Words kept only for screen readers are placed out of the flow; this keeps the ones in
@@ -66,7 +77,7 @@ export const tableCss = String.raw`
     border-end-end-radius: inherit;
     background:
       radial-gradient(
-        circle at 50% calc(var(--step-4) + var(--step-1)),
+        circle at 50% calc(var(--ui-table-arrow) + var(--step-1)),
         var(--color-panel) var(--step-3),
         transparent var(--step-4)
       ),
@@ -75,11 +86,14 @@ export const tableCss = String.raw`
   [dir='rtl'] .ui-table-frame::before {
     background:
       radial-gradient(
-        circle at 50% calc(var(--step-4) + var(--step-1)),
+        circle at 50% calc(var(--ui-table-arrow) + var(--step-1)),
         var(--color-panel) var(--step-3),
         transparent var(--step-4)
       ),
       linear-gradient(to left, transparent, var(--color-panel) 75%);
+  }
+  .ui-table-frame:has(caption.ui-visually-hidden)::after {
+    inset-block-start: var(--step-1);
   }
   .ui-table-frame::after {
     inset-block-start: var(--step-4);
@@ -93,6 +107,31 @@ export const tableCss = String.raw`
   [dir='rtl'] .ui-table-frame::after {
     transform: rotate(45deg);
   }
+  /* The column that stays put has an edge while the table is scrolled under it: a hairline
+     and a soft shadow on its far side. A number half under it is then plainly covered, not
+     read as a different number. A table that is not scrolled shows no edge. */
+  .ui-team-cell::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 100%;
+    inline-size: var(--step-2);
+    border-inline-start: 1px solid var(--color-line-strong);
+    background: linear-gradient(to right, var(--scroll-shadow), transparent);
+    opacity: 0;
+    pointer-events: none;
+    animation: ui-table-stuck linear both;
+    animation-timeline: --ui-table-scroll;
+  }
+  [dir='rtl'] .ui-team-cell::after {
+    background: linear-gradient(to left, var(--scroll-shadow), transparent);
+  }
+}
+/* A browser that cannot follow the scroll gives that column a hairline at all times. */
+@supports not (timeline-scope: --ui-table-scroll) {
+  .ui-team-cell {
+    border-inline-end: 1px solid var(--color-line);
+  }
 }
 @keyframes ui-table-more {
   0%,
@@ -101,6 +140,15 @@ export const tableCss = String.raw`
   }
   100% {
     opacity: 0;
+  }
+}
+@keyframes ui-table-stuck {
+  0% {
+    opacity: 0;
+  }
+  3%,
+  100% {
+    opacity: 1;
   }
 }
 .ui-table {
@@ -206,12 +254,6 @@ export const tableCss = String.raw`
 }
 .ui-team-cell > .ui-team-chip {
   vertical-align: middle;
-}
-/* The word "Total" stays put with the names above it. */
-.ui-table tfoot th {
-  position: sticky;
-  inset-inline-start: 0;
-  background-color: var(--color-panel);
 }
 /* A team's color beside its name, wherever a table names a team; the two never part. */
 .ui-table .ui-team-chip {

@@ -111,7 +111,10 @@ export function BoxScoreTable({
           ) : null}
           <tfoot>
             <tr>
-              <th scope="row" colSpan={players ? 2 : 1}>
+              {/* "Total" sits under the names and is exactly as wide as they are, so when the
+                  table is scrolled it covers no more of the numbers than a name does. */}
+              {players ? <td /> : null}
+              <th scope="row" className="ui-team-cell">
                 {labels.total}
               </th>
               {columns.map((c) => (
