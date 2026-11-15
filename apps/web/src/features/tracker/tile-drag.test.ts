@@ -69,3 +69,61 @@ describe('dragging a player’s tile', () => {
     expect(drag.down(press(3, 'other', 5, 5))).toBe(true);
   });
 });
+
+describe('a press whose lift never comes (the code look, L1)', () => {
+  it('a new press by the same pointer ends the old one and is followed itself', () => {
+    const drag = createTileDrag();
+    // The mouse pressed a bench player, dragged, and was let go outside the window.
+    drag.down(press(1, 'bench', 0, 0));
+    expect(drag.move(finger(1, 40, 0))).toBe('started');
+    // Back in the window, it presses a floor player: that press is followed, from where
+    // it went down, and lifting there is a tap on the floor player, not a drop.
+    expect(drag.down(press(1, 'floor', 200, 200))).toBe(true);
+    expect(drag.current()).toMatchObject({ playerId: 'floor', moved: false });
+    expect(drag.move(finger(1, 201, 200))).toBe('still');
+    expect(drag.up(finger(1, 201, 200))).toMatchObject({ playerId: 'floor', moved: false });
+    // Another pointer still cannot take over a press that is followed.
+    drag.down(press(1, 'bench', 0, 0));
+    expect(drag.down(press(2, 'floor', 200, 200))).toBe(false);
+  });
+
+  it('a mouse or pen that moves with no button held ends the press, recording nothing', () => {
+    for (const pointerType of ['mouse', 'pen']) {
+      const drag = createTileDrag();
+      drag.down(press(1, 'bench', 0, 0));
+      expect(drag.move({ ...finger(1, 40, 0), pointerType, buttons: 1 })).toBe('started');
+      expect(drag.move({ ...finger(1, 200, 200), pointerType, buttons: 0 })).toBe('ended');
+      expect(drag.current()).toBeNull();
+      // The lift that comes later, over a floor player, is no drop.
+      expect(drag.up(finger(1, 200, 200))).toBeNull();
+    }
+    // A finger's moves always hold it down: a touch is never ended this way.
+    const drag = createTileDrag();
+    drag.down(press(1, 'bench', 0, 0));
+    expect(drag.move({ ...finger(1, 40, 0), pointerType: 'touch', buttons: 0 })).toBe('started');
+    expect(drag.current()?.playerId).toBe('bench');
+  });
+
+  it('the window losing the focus ends the press, recording nothing', () => {
+    const drag = createTileDrag();
+    drag.down(press(1, 'bench', 0, 0));
+    drag.move(finger(1, 40, 0));
+    expect(drag.release()).toBe(true);
+    expect(drag.current()).toBeNull();
+    expect(drag.move(finger(1, 200, 200))).toBe('ignored');
+    expect(drag.up(finger(1, 200, 200))).toBeNull();
+    expect(drag.release()).toBe(false);
+    // And the next press is followed.
+    expect(drag.down(press(4, 'floor', 5, 5))).toBe(true);
+  });
+
+  it('the pointer losing its capture, or cancelled, ends the press', () => {
+    const drag = createTileDrag();
+    drag.down(press(7, 'bench', 0, 0));
+    drag.move(finger(7, 40, 0));
+    // A `lostpointercapture` or `pointercancel` of another pointer changes nothing.
+    expect(drag.cancel(8)).toBe(false);
+    expect(drag.cancel(7)).toBe(true);
+    expect(drag.up(finger(7, 200, 200))).toBeNull();
+  });
+});

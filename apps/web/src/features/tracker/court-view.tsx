@@ -108,6 +108,7 @@ export type CourtViewProps = {
     readonly onPointerMove: (event: PointerEvent<HTMLElement>) => void;
     readonly onPointerUp: (event: PointerEvent<HTMLElement>) => void;
     readonly onPointerCancel: (event: PointerEvent<HTMLElement>) => void;
+    readonly onLostPointerCapture: (event: PointerEvent<HTMLElement>) => void;
     readonly onClickCapture: (event: MouseEvent<HTMLElement>) => void;
     readonly onClick: (event: MouseEvent<HTMLElement>) => void;
   };
@@ -135,6 +136,7 @@ export function CourtView(props: CourtViewProps) {
       onPointerMove={props.drag?.onPointerMove}
       onPointerUp={props.drag?.onPointerUp}
       onPointerCancel={props.drag?.onPointerCancel}
+      onLostPointerCapture={props.drag?.onLostPointerCapture}
       onClickCapture={props.drag?.onClickCapture}
       onClick={props.drag?.onClick}
     >

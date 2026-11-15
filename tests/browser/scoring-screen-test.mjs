@@ -1342,6 +1342,80 @@ if (browser) {
     }
   });
 
+  await step('a press whose lift never comes records nothing (the code look, L1)', async () => {
+    const { context, page, errors } = await scorekeeperAt(phone);
+    try {
+      await page.goto(`${origin}${trackerPath()}`);
+      const c = await openCourt(page);
+      await c.saved();
+      const benchTile = c.root.locator('[data-bench="home"] > [data-player]').first();
+      const floorTile = c.root.locator('[data-floor="home"] > [data-player]').first();
+      const [benchId, floorId] = [
+        await benchTile.getAttribute('data-player'),
+        await floorTile.getAttribute('data-player'),
+      ];
+      const plays = await c.root.getAttribute('data-plays');
+      // The mouse presses a bench player and drags it; the button is let go outside the
+      // window, so the page never hears the lift. The press and the moves are sent as the
+      // browser sends them, and no lift.
+      const pressAndDrag = () =>
+        benchTile.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          const [x, y] = [r.x + r.width / 2, r.y + r.height / 2];
+          const send = (type, dy) =>
+            el.dispatchEvent(
+              new PointerEvent(type, {
+                bubbles: true,
+                cancelable: true,
+                composed: true,
+                pointerId: 1,
+                pointerType: 'mouse',
+                isPrimary: true,
+                button: type === 'pointerdown' ? 0 : -1,
+                buttons: 1,
+                clientX: x,
+                clientY: y - dy,
+              }),
+            );
+          send('pointerdown', 0);
+          for (let i = 1; i <= 6; i += 1) send('pointermove', i * 6);
+        });
+      await pressAndDrag();
+      await c.root.locator('.court-ghost').waitFor();
+      note('a mouse press on a bench player that moves is a drag', true);
+      // Back in the window, the mouse comes to a floor player of the same team and clicks.
+      const box = await floorTile.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await c.pad.locator(`[data-options="${floorId}"]`).waitFor();
+      await page.waitForTimeout(600);
+      note(
+        'the mouse let go outside the window: the click on a floor player selects them, and records nothing',
+        (await c.root.getAttribute('data-plays')) === plays &&
+          (await c.onCourtById(benchId)) === false &&
+          (await c.onCourtById(floorId)) === true &&
+          (await c.root.locator('.court-ghost').count()) === 0 &&
+          (await c.root.locator('[data-drop]').count()) === 0,
+        `plays ${plays} then ${await c.root.getAttribute('data-plays')}`,
+      );
+      await page.keyboard.press('Escape');
+      await c.pad.locator('[data-rest]').waitFor();
+      // The window losing the focus in the middle of a drag ends it too.
+      await pressAndDrag();
+      await c.root.locator('.court-ghost').waitFor();
+      await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+      await c.root.locator('.court-ghost').waitFor({ state: 'detached' });
+      note(
+        'the window losing the focus ends a drag, recording nothing',
+        (await c.root.getAttribute('data-plays')) === plays &&
+          (await c.root.locator('[data-drop]').count()) === 0,
+      );
+      note('nothing broke on the page', errors.length === 0, errors.join('; '));
+    } finally {
+      await letGo(page, context);
+    }
+  });
+
   await step('the five sizes: targets, the two teams’ places, less motion', async () => {
     for (const size of sizes) {
       const { context, page } = await scorekeeperAt(size);

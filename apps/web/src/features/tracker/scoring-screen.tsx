@@ -473,6 +473,18 @@ export function ScoringScreen(props: ScoringScreenProps) {
     over.current = null;
     setDragging(null);
   };
+  // The window losing the focus (another app, a call) may swallow the lift: the press
+  // ends there, recording nothing (the code look, L1).
+  useEffect(() => {
+    const onBlur = () => {
+      if (!pressed.release()) return;
+      over.current?.removeAttribute('data-drop');
+      over.current = null;
+      setDragging(null);
+    };
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, [pressed]);
   const dragHandlers = {
     ref: root,
     onPointerDown(event: PointerEvent<HTMLElement>) {
@@ -483,6 +495,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
       const found = findTile(view, playerId);
       // Only once the lineup is set: while picking, a tile is tapped, never dragged.
       if (found === undefined || view.teams[found.side].stage !== 'set') return;
+      // The same pointer pressing again: its lift never came. That press ends here.
+      if (pressed.current()?.pointerId === event.pointerId) endDrag();
       pressed.down({
         pointerId: event.pointerId,
         isPrimary: event.isPrimary,
@@ -494,7 +508,12 @@ export function ScoringScreen(props: ScoringScreenProps) {
     },
     onPointerMove(event: PointerEvent<HTMLElement>) {
       const at = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-      const moved = pressed.move(at);
+      const moved = pressed.move({ ...at, pointerType: event.pointerType, buttons: event.buttons });
+      if (moved === 'ended') {
+        // A mouse or pen with no button held: its lift never came. Nothing is recorded.
+        endDrag();
+        return;
+      }
       if (moved === 'ignored' || moved === 'still') return;
       const dragged = pressed.current()?.playerId ?? null;
       if (moved === 'started') setDragging(dragged);
@@ -532,6 +551,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
       void send(dropped.input).then((taken) => answerMarks(marks, taken));
     },
     onPointerCancel(event: PointerEvent<HTMLElement>) {
+      if (pressed.cancel(event.pointerId)) endDrag();
+    },
+    /** The press no longer comes to this page (a finger's capture let go without a lift). */
+    onLostPointerCapture(event: PointerEvent<HTMLElement>) {
       if (pressed.cancel(event.pointerId)) endDrag();
     },
     onClickCapture(event: MouseEvent<HTMLElement>) {
