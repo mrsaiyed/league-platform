@@ -79,7 +79,10 @@ export type PeopleStore = {
   ) => Promise<number | undefined>;
   /** Moves a person to the bin or brings them back: false if they are not there. */
   readonly setBinned: (personId: string, binned: boolean) => Promise<boolean>;
-  /** Whether the person is on a team's roster now (an entry with no leaving date). */
+  /**
+   * Whether the person is on a team's roster now: an entry with no leaving date, on a
+   * team not in the bin (A-16: a place on a team in the bin does not hold them).
+   */
   readonly isOnRoster: (personId: string) => Promise<boolean>;
   /**
    * Who plays in the league (adult, youth or mixed), which decides who counts as a child

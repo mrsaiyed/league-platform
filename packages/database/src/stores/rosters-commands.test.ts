@@ -299,6 +299,42 @@ describe('rosters', () => {
     expect(again).toEqual({ ok: false, error: { code: 'person-not-found' } });
   });
 
+  it('does not hold a person by a place on a team in the bin (A-16)', async () => {
+    const l = await league();
+    const [first, second, elsewhere] = [
+      await newPerson(pglite, l.leagueId),
+      await newPerson(pglite, l.leagueId),
+      await newPerson(pglite, l.leagueId),
+    ];
+    const otherTeamId = await newTeam(pglite, l.leagueId, l.seasonId);
+    for (const personId of [first, second]) {
+      value(await addToRoster(l.as, { teamId: l.teamId, personId }, deps));
+    }
+    // The third is on both teams: the place on the team still there holds them.
+    value(await addToRoster(l.as, { teamId: l.teamId, personId: elsewhere }, deps));
+    value(await addToRoster(l.as, { teamId: otherTeamId, personId: elsewhere }, deps));
+    expect(await removePerson(l.as, { personId: first }, peopleDeps)).toEqual({
+      ok: false,
+      error: { code: 'person-on-a-roster' },
+    });
+    value(await removeTeam(l.as, { teamId: l.teamId }, deps));
+    value(await removePerson(l.as, { personId: first }, peopleDeps));
+    expect(await removePerson(l.as, { personId: elsewhere }, peopleDeps)).toEqual({
+      ok: false,
+      error: { code: 'person-on-a-roster' },
+    });
+    // The binned team's roster is kept as it was, with no leaving dates.
+    const rows = await pglite.query<{ person_id: string; left_on: string | null }>(
+      'select person_id, left_on from roster_entries where team_id = $1 order by sort',
+      [l.teamId],
+    );
+    expect(rows.rows.map((r) => [r.person_id, r.left_on])).toEqual([
+      [first, null],
+      [second, null],
+      [elsewhere, null],
+    ]);
+  });
+
   it('refuses people in the bin or merged into another, and teams in the bin', async () => {
     const l = await league();
     const binned = await newPerson(pglite, l.leagueId);

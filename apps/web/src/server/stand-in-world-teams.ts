@@ -220,8 +220,14 @@ export function worldPeopleStore(s: LeagueWorld): PeopleStore {
       s.people = replacedAt(s.people, at, { ...found, binned, version: found.version + 1 });
       return true;
     },
+    // As queries/is-person-on-roster.ts: a place on a team in the bin does not count (A-16).
     isOnRoster: async (personId) =>
-      s.roster.some((r) => r.personId === personId && r.leftOn === null),
+      s.roster.some(
+        (r) =>
+          r.personId === personId &&
+          r.leftOn === null &&
+          s.teams.some((t) => t.id === r.teamId && !t.binned),
+      ),
     leagueAudience: async () => s.audience,
     leagueSettingRows: async (key) =>
       s.settings

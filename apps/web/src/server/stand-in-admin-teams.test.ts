@@ -8,6 +8,7 @@ import {
   listRoster,
   markLeft,
   removePerson,
+  removeTeam,
   reorderRoster,
   setTeamStatsVisibility,
   updateTeam,
@@ -146,6 +147,16 @@ describe('the admin Teams screens over the stand-in', () => {
     );
     const removed = await removePerson(m.owner, { personId: people[0] }, m.ports.deps);
     expect(removed.ok).toBe(true);
+  });
+
+  it('lets a player of a team in the bin be taken off the league list (A-16)', async () => {
+    const m = made();
+    const { teamId, people } = await teamOfTen(m);
+    value(await removeTeam(m.owner, { teamId }, m.ports.deps));
+    value(await removePerson(m.owner, { personId: people[0] }, m.ports.deps));
+    // Their place on the binned team is kept as it was, with no leaving date.
+    const roster = await m.ports.deps.transaction(m.owner, (tx) => tx.teams.listRoster(teamId));
+    expect(roster.filter((line) => line.leftOn === null)).toHaveLength(10);
   });
 
   it('puts the roster in a new order, one place at a time', async () => {
@@ -349,6 +360,11 @@ describe('the admin Teams screens over the stand-in', () => {
     expect(await listPeopleCount(m)).toBe(before + 1);
   });
 });
+
+function value<T>(result: { ok: true; value: T } | { ok: false; error: { code: string } }): T {
+  if (!result.ok) throw new Error(`refused: ${result.error.code}`);
+  return result.value;
+}
 
 async function listPeopleCount(m: ReturnType<typeof made>): Promise<number> {
   const people = await listPeople(m.owner, { limit: 200 }, m.ports.deps);
