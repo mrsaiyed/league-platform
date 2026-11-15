@@ -15,6 +15,17 @@
 import type { SeasonRules } from '@srleagues/contracts';
 import type { basketball } from '@srleagues/sports';
 
+/**
+ * The rules with the mercy lead and the last-minutes stop clock off, everything else
+ * kept, the foul limit included (it only marks a player). For a game played on a
+ * tracker that had neither, brought over later (the transfer, step 2.58): it was
+ * played without them, so it is replayed and kept without them (record 062).
+ */
+export function withoutMercyOrLastMinutes(rules: SeasonRules): SeasonRules {
+  const { stopClockScope: _scope, ...clock } = rules.clock;
+  return { ...rules, clock: { ...clock, stopClockLastSeconds: null, mercyLead: null } };
+}
+
 export function engineRulesOf(rules: SeasonRules): basketball.Rules {
   const { stopClockLastSeconds, stopClockScope, mercyLead } = rules.clock;
   const { playerFoulLimit } = rules.fouls;

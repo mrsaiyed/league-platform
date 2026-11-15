@@ -1,7 +1,7 @@
-import { seasonRulesPreset } from '@srleagues/contracts';
+import { SeasonRules, seasonRulesPreset } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
-import { engineRulesOf } from './engine-rules.ts';
+import { engineRulesOf, withoutMercyOrLastMinutes } from './engine-rules.ts';
 
 describe("a season's rules as the engine reads them (T-128, S-1)", () => {
   it('the high-school preset is the engine’s quarters format, with a stop clock', () => {
@@ -96,6 +96,35 @@ describe("a season's rules as the engine reads them (T-128, S-1)", () => {
       { id: 'r', now: 0 },
     );
     expect(set.rules).toEqual(engine);
+  });
+
+  it('without the mercy rule and the last-minutes stop clock, for a game played without them (record 062)', () => {
+    const stop = seasonRulesPreset('high-school');
+    stop.clock = { mode: 'stop', stopClockLastSeconds: null, mercyLead: 20 };
+    stop.fouls = { ...stop.fouls, playerFoulLimit: 4 };
+    const played = withoutMercyOrLastMinutes(stop);
+    expect(SeasonRules.safeParse(played).success).toBe(true);
+    expect(played).toEqual({ ...stop, clock: { ...stop.clock, mercyLead: null } });
+    expect(engineRulesOf(played)).toEqual({
+      ...basketball.QUARTERS,
+      clockMode: 'stop',
+      playerFoulLimit: 4,
+    });
+
+    const running = seasonRulesPreset('rec-league');
+    running.clock = {
+      mode: 'running',
+      stopClockLastSeconds: 120,
+      stopClockScope: 'game',
+      mercyLead: null,
+    };
+    expect(withoutMercyOrLastMinutes(running).clock).toEqual({
+      mode: 'running',
+      stopClockLastSeconds: null,
+      mercyLead: null,
+    });
+    // The season's own rules are left as they were.
+    expect(running.clock.stopClockLastSeconds).toBe(120);
   });
 
   it('a new game under them starts with the first period on the clock', () => {

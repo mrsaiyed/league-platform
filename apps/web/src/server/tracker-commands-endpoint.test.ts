@@ -234,3 +234,24 @@ describe('POST …/games/{game}/commands', () => {
     expect(late.afterwards).toBeNull();
   });
 });
+
+describe('a game played without the mercy rule is the transfer’s to say (record 062)', () => {
+  it('turns away a body that says so, whoever sends it, and saves nothing', async () => {
+    const world = trackerWorld();
+    const sessionId = await openSession(world, games.hawksBears);
+    const body = {
+      protocolVersion: 2,
+      sessionId,
+      commands: tipOff(),
+      withoutMercyOrLastMinutes: true,
+    };
+    for (const as of ['scorekeeper', 'owner'] as const) {
+      const sent = await send(world, body, { as });
+      expect(sent.answer).toEqual({ status: 400, body: { error: 'invalid-input', issues: [] } });
+      expect(sent.afterwards).toBeNull();
+    }
+    // Without it the same batch is taken.
+    const { withoutMercyOrLastMinutes: _off, ...plain } = body;
+    expect((await send(world, plain)).answer.status).toBe(200);
+  });
+});

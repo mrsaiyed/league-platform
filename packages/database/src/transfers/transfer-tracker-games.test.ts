@@ -621,4 +621,38 @@ describe('the tracker transfer (step 2.58)', () => {
     const noAccount = await transferTrackerGames(optionsFor(nobody, 'made-up-no-season'));
     expect(noAccount).toEqual({ ok: false, problem: { kind: 'account-not-found' } });
   });
+
+  it('plays the games without a mercy rule the season has here, as the tracker did, and keeps them so (record 062)', async () => {
+    const league = await makeLeague(pglite, 'made-up-mercy');
+    // A lead of three is reached in every game: under it a foul would not stop the clock,
+    // and the tracker's next start would be refused.
+    await pglite.query(
+      `update seasons set rules = jsonb_set(rules, '{clock,mercyLead}', '3') where id = $1`,
+      [league.seasonId],
+    );
+    const outcome = await run(optionsFor(league, 'made-up-mercy'));
+    expect(outcome.plan.ready, outcome.planText).toBe(true);
+    expect(outcome.report?.stopped, outcome.reportText).toBeNull();
+    expect(outcome.report?.transferred).toHaveLength(10);
+    const kept = await pglite.query<{ format: { clock: { mercyLead: unknown } }; rules: object }>(
+      `select g.format, s.state -> 'rules' as rules from games g
+       join game_states s on s.league_id = g.league_id and s.game_id = g.id
+       where g.league_id = $1`,
+      [league.leagueId],
+    );
+    expect(kept.rows).toHaveLength(10);
+    for (const row of kept.rows) {
+      // The rules kept with the game say how it was played: no mercy rule.
+      expect(row.format.clock.mercyLead).toBeNull();
+      expect(Object.hasOwn(row.rules, 'mercyLead')).toBe(false);
+      // The foul limit only marks a player, and is kept.
+      expect(row.rules).toMatchObject({ playerFoulLimit: 5 });
+    }
+    // The season keeps its rule for the games scored here.
+    const season = await pglite.query<{ mercy: number }>(
+      `select (rules -> 'clock' ->> 'mercyLead')::int as mercy from seasons where id = $1`,
+      [league.seasonId],
+    );
+    expect(season.rows).toEqual([{ mercy: 3 }]);
+  });
 });

@@ -12,6 +12,8 @@ import {
   game,
   gameUuid,
   homeTeamId,
+  schedulerGrant,
+  schedulerId,
   scorekeeperGrant,
   scorekeeperId,
   seasonId,
@@ -387,5 +389,68 @@ describe('the platform’s command shape at the door (T-128, record 062)', () =>
         ],
       },
     });
+  });
+});
+
+describe('a game brought over from a tracker without those rules (the transfer; record 062)', () => {
+  const mercy = seasonRules((r) => {
+    r.clock = { mode: 'stop', stopClockLastSeconds: null, mercyLead: 3 };
+  });
+  const three: Input = { type: 'score', side: 'home', playerId: scorer, points: 3 };
+  /** A stop-clock game's start: a foul stops the clock, and the scorer starts it again. */
+  const replayed = () => ({
+    gameId,
+    protocolVersion: 2,
+    sessionId,
+    withoutMercyOrLastMinutes: true as const,
+    commands: taps([...tipOff, { type: 'start' }, three, foul, { type: 'start' }]),
+  });
+  const heldBy = (accountId: string) => ({
+    grants: [scorekeeperGrant, schedulerGrant],
+    sessions: [
+      {
+        id: sessionId,
+        gameId,
+        accountId,
+        deviceId: 'tracker-transfer',
+        since: startOfTest,
+        heldUntil: startOfTest + leaseMs,
+      },
+    ],
+  });
+
+  it('is played and kept without the mercy rule, with the foul limit', async () => {
+    const t = setUp(mercy, heldBy(schedulerId));
+    t.clock.advance(1);
+    const result = await applyTrackerCommands(t.as(schedulerId), replayed(), t.deps);
+    expect(result.ok && result.value.results.map((r) => r.status)).toEqual(
+      Array(6).fill('accepted'),
+    );
+    const state = savedState(t);
+    expect(state.rules.mercyLead).toBeUndefined();
+    expect(state.rules.playerFoulLimit).toBe(5);
+    expect(t.db.state.games[0]?.format).toEqual(
+      seasonRules((r) => {
+        r.clock = { mode: 'stop', stopClockLastSeconds: null, mercyLead: null };
+      }),
+    );
+    // The season keeps its rule for the games scored here.
+    expect(t.db.state.seasons[0]?.rules).toEqual(mercy);
+  });
+
+  it('the same batch without it meets the mercy rule, and the second start is refused', async () => {
+    const t = setUp(mercy, heldBy(schedulerId));
+    t.clock.advance(1);
+    const { withoutMercyOrLastMinutes: _off, ...plain } = replayed();
+    const result = await applyTrackerCommands(t.as(schedulerId), plain, t.deps);
+    expect(result.ok && result.value.results.at(-1)?.status).toBe('refused');
+  });
+
+  it('is only for whoever may also correct the game: a scorekeeper is refused', async () => {
+    const t = setUp(mercy);
+    t.clock.advance(1);
+    const result = await applyTrackerCommands(t.as(scorekeeperId), replayed(), t.deps);
+    expect(result).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+    expect(t.db.state.events).toEqual([]);
   });
 });

@@ -198,6 +198,8 @@ async function sendPart<Tx extends TrackerTransferTx>(
       {
         gameId,
         protocolVersion: trackerProtocolVersion,
+        // The tracker had neither rule: the game is played and kept without them (record 062).
+        withoutMercyOrLastMinutes: true,
         sessionId,
         commands: batch.map((step) => ({
           commandId: step.commandId,
