@@ -2,7 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyMigrations, pgliteDriver } from '../migrations/index.ts';
 import { asApp } from '../schema/schema.test-helper.ts';
-import { seedLeagues } from './seed-data.ts';
+import { seedLeagues, seedStaff } from './seed-data.ts';
 import { seedLeaguesInto } from './seed-leagues.ts';
 
 let pglite: PGlite;
@@ -101,11 +101,24 @@ describe('what each seeded league holds', () => {
       expect(await count('select count(*)::int as n from seasons where league_id = $1', [id])).toBe(
         1,
       );
-      const season = await pglite.query<{ slug: string; name: string }>(
-        'select slug, name from seasons where league_id = $1',
+      const season = await pglite.query<{ slug: string; name: string; is_current: boolean }>(
+        'select slug, name, is_current from seasons where league_id = $1',
         [id],
       );
-      expect(season.rows).toEqual([{ slug: league.season.slug, name: league.season.name }]);
+      expect(season.rows).toEqual([
+        { slug: league.season.slug, name: league.season.name, is_current: true },
+      ]);
+      // Made with the league, in one step, by our staff (T-260), not by its owner.
+      const madeBy = await pglite.query<{ action: string; email: string }>(
+        `select a.action, ac.email from activity_log a join accounts ac on ac.id = a.actor_account_id
+         where a.league_id = $1 and a.action in ('leagues.create', 'leagues.create_season')
+         order by a.at, a.id`,
+        [id],
+      );
+      expect(madeBy.rows).toEqual([
+        { action: 'leagues.create', email: seedStaff.email },
+        { action: 'leagues.create_season', email: seedStaff.email },
+      ]);
       const grants = await pglite.query<{ email: string; role: string }>(
         `select a.email, g.role from role_grants g join accounts a on a.id = g.account_id
          where g.league_id = $1 and g.revoked_at is null order by a.email`,

@@ -1727,6 +1727,7 @@ const rows: readonly Row[] = [
         audience: 'adult',
         ownerAccountId: league.ownerId,
         sportKey: 'basketball',
+        firstSeason: { slug: 'first', name: 'First season' },
       },
     }),
     run: (c, i) => createLeague(c, i, leaguesDeps),

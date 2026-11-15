@@ -170,6 +170,71 @@ describe('createLeague on the database', () => {
   });
 });
 
+describe('createLeague with its first season on the database (T-260)', () => {
+  const firstSeason = {
+    slug: 'fall-2026',
+    name: 'Fall 2026',
+    startsOn: '2026-09-01',
+    endsOn: '2027-02-28',
+  };
+
+  it('makes the league and its current season in one step, both by our staff', async () => {
+    const { result, leagueId, ownerAccountId } = await create(unique('hoops'), { firstSeason });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(
+      await one(
+        pglite,
+        `select s.id, s.slug, s.name, s.status, s.is_current, s.starts_on::text as starts_on,
+                s.ends_on::text as ends_on, p.is_default
+         from seasons s join programs p on p.id = s.program_id where s.league_id = $1`,
+        [leagueId],
+      ),
+    ).toEqual({
+      id: result.value.firstSeasonId,
+      slug: 'fall-2026',
+      name: 'Fall 2026',
+      status: 'draft',
+      is_current: true,
+      starts_on: '2026-09-01',
+      ends_on: '2027-02-28',
+      is_default: true,
+    });
+    const { rows } = await pglite.query(
+      `select action, actor_account_id, details from activity_log where league_id = $1
+       order by at, id`,
+      [leagueId],
+    );
+    expect(rows).toEqual([
+      {
+        action: 'leagues.create',
+        actor_account_id: staffId,
+        details: { forOwnerAccountId: ownerAccountId },
+      },
+      {
+        action: 'leagues.create_season',
+        actor_account_id: staffId,
+        details: { forOwnerAccountId: ownerAccountId, current: true },
+      },
+    ]);
+  });
+
+  it('makes nothing, neither league nor season, when the league is refused', async () => {
+    const stranger = await newId();
+    const { result, leagueId } = await create(unique('hoops'), {
+      firstSeason,
+      ownerAccountId: stranger,
+    });
+    expect(result).toMatchObject({ ok: false, error: { code: 'owner-not-found' } });
+    for (const table of ['leagues', 'programs', 'seasons', 'activity_log']) {
+      const column = table === 'leagues' ? 'id' : 'league_id';
+      expect(
+        await countOf(`select count(*)::int as n from ${table} where ${column} = $1`, [leagueId]),
+      ).toBe(0);
+    }
+  });
+});
+
 describe('renameShortName on the database', () => {
   it('renames, keeps the old name forwarding for 12 months, and bumps the version', async () => {
     const owner = await create(unique('hoops'));

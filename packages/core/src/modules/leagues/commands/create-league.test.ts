@@ -63,13 +63,118 @@ describe('createLeague', () => {
       { slug: 'Upper-Case' },
       { slug: 'has_underscore' },
       { timeZone: 'Mars/Base' },
+      // An offset is read with the opposite sign by PostgreSQL; an abbreviation is ambiguous.
+      { timeZone: '+05:00' },
+      { timeZone: 'Etc/GMT+5' },
+      { timeZone: 'EST' },
       { audience: 'everyone' },
       { ownerAccountId: 'not-an-id' },
+      { contactEmail: 'not-an-email' },
+      { city: '   ' },
+      { city: 'x'.repeat(101) },
     ];
     for (const change of bad) {
       expect(await createLeague(as(staffId), { ...input, ...change }, deps)).toMatchObject({
         error: { code: 'invalid-input' },
       });
     }
+  });
+
+  it('passes the contact email and city on, trimmed, and empty when left out', async () => {
+    const given = memoryLeagues(none);
+    await createLeague(
+      given.as(staffId),
+      { ...input, contactEmail: 'hello@example.test', city: '  Springfield ' },
+      given.deps,
+    );
+    expect(given.db.state.made).toMatchObject({
+      contactEmail: 'hello@example.test',
+      city: 'Springfield',
+    });
+    const left = memoryLeagues(none);
+    await createLeague(left.as(staffId), input, left.deps);
+    expect(left.db.state.made).toMatchObject({ contactEmail: null, city: null });
+  });
+
+  it('keeps a named time zone by its canonical name', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    await createLeague(as(staffId), { ...input, timeZone: ' america/chicago ' }, deps);
+    expect(db.state.made).toMatchObject({ timeZone: 'America/Chicago' });
+  });
+});
+
+describe('createLeague with its first season', () => {
+  const season = { slug: 'fall-2026', name: ' Fall 2026 ', startsOn: '2026-09-01' };
+
+  it('makes the season, as the current one, in the same step, by our staff for the owner', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    const result = await createLeague(as(staffId), { ...input, firstSeason: season }, deps);
+    expect(result).toMatchObject({ ok: true, value: { id: leagueId, firstSeasonId: 'season-1' } });
+    // One transaction for the league and its season.
+    expect(db.opened).toHaveLength(1);
+    expect(db.state.seasons).toEqual([
+      {
+        id: 'season-1',
+        programId: 'program-new',
+        slug: 'fall-2026',
+        name: 'Fall 2026',
+        startsOn: '2026-09-01',
+        endsOn: null,
+        isCurrent: true,
+      },
+    ]);
+    // Our staff is named for both, set up for the owner; nothing is under the owner.
+    expect(db.state.activity).toEqual([
+      expect.objectContaining({
+        actorAccountId: staffId,
+        action: 'leagues.create',
+        targetId: leagueId,
+        details: { forOwnerAccountId: ownerId },
+      }),
+      expect.objectContaining({
+        actorAccountId: staffId,
+        action: 'leagues.create_season',
+        targetId: 'season-1',
+        details: { forOwnerAccountId: ownerId, current: true },
+      }),
+    ]);
+  });
+
+  it('makes no season when none is given', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    expect(await createLeague(as(staffId), input, deps)).toMatchObject({
+      value: { firstSeasonId: null },
+    });
+    expect(db.state.seasons).toEqual([]);
+  });
+
+  it('refuses a season with dates that are not real, or that end before they start', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    for (const change of [
+      { startsOn: '2026-02-30' },
+      { startsOn: '2026/09/01' },
+      { startsOn: '2026-09-01', endsOn: '2026-08-31' },
+      { slug: 'x'.repeat(61) },
+      { slug: 'Fall 2026' },
+      { name: '  ' },
+    ]) {
+      expect(
+        await createLeague(as(staffId), { ...input, firstSeason: { ...season, ...change } }, deps),
+      ).toMatchObject({ ok: false, error: { code: 'invalid-input' } });
+    }
+    expect(db.state.league).toBeUndefined();
+  });
+
+  it('makes nothing at all when the season cannot be made', async () => {
+    // A season the store already holds in the new program: the season step throws.
+    const { db, deps, as } = memoryLeagues({
+      ...none,
+      seasons: [{ id: 'season-0', programId: 'program-new', slug: 'fall-2026', isCurrent: false }],
+    });
+    await expect(
+      createLeague(as(staffId), { ...input, firstSeason: season }, deps),
+    ).rejects.toThrow(/season with that short name/);
+    expect(db.state.league).toBeUndefined();
+    expect(db.state.activity).toEqual([]);
   });
 });
