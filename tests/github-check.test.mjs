@@ -1,7 +1,12 @@
 // How scripts/github-check.mjs reads GitHub's list of runs (scripts/github-check-rules.mjs).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { describe, failureNoteLines, newestChecks } from '../scripts/github-check-rules.mjs';
+import {
+  describe,
+  failedStepWords,
+  failureNoteLines,
+  newestChecks,
+} from '../scripts/github-check-rules.mjs';
 
 const run = (id, branch, commit, status, conclusion, name = 'Verify') => ({
   id,
@@ -111,6 +116,15 @@ test("a failed job's annotations are shown line by line under the failed step", 
     '  - packages/core/src/made-up.ts:12 Type error',
   ]);
   assert.deepEqual(failureNoteLines(null), []);
+  assert.equal(
+    failedStepWords({
+      name: 'npm run test:web:browser',
+      started_at: '2026-11-15T11:40:02Z',
+      completed_at: '2026-11-15T11:40:19Z',
+    }),
+    'npm run test:web:browser (11:40:02 to 11:40:19 UTC, 17 s)',
+  );
+  assert.equal(failedStepWords({ name: 'Run npm ci', started_at: null }), 'npm ci');
   const many = failureNoteLines(answer, 4);
   assert.equal(many.length, 4);
   assert.equal(many[3], '  (5 more lines on GitHub)');

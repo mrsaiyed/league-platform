@@ -69,7 +69,8 @@ export function failureNotes(output) {
   return notes;
 }
 
-function annotation(title, message) {
+/** One GitHub error annotation; each line of the message cut at 300 characters. */
+export function annotation(title, message) {
   const cut = message
     .split('\n')
     .map((line) => (line.length > LONGEST ? `${line.slice(0, LONGEST)}…` : line))
