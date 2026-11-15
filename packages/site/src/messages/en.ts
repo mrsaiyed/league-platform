@@ -605,6 +605,15 @@ export const en = {
   'admin.games.confirm.yes': 'Yes, make it final',
   'admin.games.confirm.no': 'No, change the score',
   'admin.games.saved.final': 'Saved: {result} is final.',
+  // A save said beside the game it saved, naming it (step 2.155; A-4).
+  'admin.games.game': '{away} at {home}',
+  'admin.games.saved.forfeit': 'Saved: {game} is recorded as a forfeit.',
+  'admin.games.saved.postpone': 'Saved: {game} is postponed.',
+  'admin.games.saved.cancel': 'Saved: {game} is cancelled.',
+  // A refused score said beside the boxes, naming the box or the score (step 2.155; A-4).
+  'admin.games.refused.score': 'Enter the score for {team} as a whole number from 0 to 999.',
+  'admin.games.refused.tie':
+    '{result} is a tie, and this season does not allow ties. Change a score so one team wins.',
   // A game the live tracker has recorded plays of is ended there (S-46).
   'admin.games.tracked':
     'Plays are being recorded for this game in the tracker, so it is ended there, not by typing a score.',
@@ -678,6 +687,13 @@ export const en = {
   'admin.boxScore.reopen': 'Reopen to correct',
   'admin.boxScore.notFound': 'That game is not there, or you may not score it.',
   'admin.boxScore.done.save': 'The box score is saved and the game is final.',
+  'admin.boxScore.saved': 'Saved: {result} is final, with its box score.',
+  // A refused box beside the scores, naming it (step 2.155; A-4).
+  'admin.boxScore.refused.cell': '{cell}: enter a whole number from 0 to 999, or leave it empty.',
+  'admin.boxScore.refused.minutes':
+    '{cell}: enter whole minutes from 0 to 1440, or leave it empty.',
+  'admin.boxScore.refused.score':
+    'Enter the score for {team} as a whole number from 0 to 999, or leave it empty to use the total of its players’ points.',
   'admin.boxScore.done.reopen': 'The game is reopened. Fix the grid and save it again.',
   'admin.boxScore.error.invalid-input':
     'Enter every number as a whole number from 0 to 999 (minutes up to 1440).',

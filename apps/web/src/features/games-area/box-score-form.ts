@@ -45,6 +45,32 @@ type Row = {
   readonly stats: Readonly<Record<string, number | undefined>>;
 };
 
+/**
+ * The boxes that hold something that is not a count, in the order they are on the screen:
+ * each team's rows (away team first), minutes then the stats; then the two scores (away
+ * first). Empty when readBoxScoreForm reads the form.
+ */
+export function wrongBoxScoreFields(
+  sheet: Pick<BoxScoreSheet, 'game' | 'players' | 'statKeys' | 'minutes'>,
+  fields: BoxScoreFields,
+): readonly string[] {
+  const wrong: string[] = [];
+  for (const teamId of [sheet.game.awayTeamId, sheet.game.homeTeamId]) {
+    for (const player of sheet.players.filter((p) => p.teamId === teamId)) {
+      const minutes = boxScoreField.minutes(player.personId);
+      if (sheet.minutes && cell(fields[minutes], 1440) === 'bad') wrong.push(minutes);
+      for (const key of sheet.statKeys) {
+        const name = boxScoreField.stat(player.personId, key);
+        if (cell(fields[name], 999) === 'bad') wrong.push(name);
+      }
+    }
+  }
+  for (const name of ['awayScore', 'homeScore']) {
+    if (cell(fields[name], 999) === 'bad') wrong.push(name);
+  }
+  return wrong;
+}
+
 /** The command's input, or undefined when a box holds something that is not a count. */
 export function readBoxScoreForm(
   sheet: Pick<BoxScoreSheet, 'game' | 'players' | 'statKeys' | 'minutes'>,
