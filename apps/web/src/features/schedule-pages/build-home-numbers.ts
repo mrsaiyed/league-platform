@@ -19,9 +19,13 @@ export function buildHomeNumbers(
   const written = new Intl.NumberFormat(locale);
   const left = count(toPlay);
   // A finished season has no games to play, and "0" is no number to open a page with: its
-  // third number is the points scored in it (every decided game's two scores).
+  // third number is the points scored in it: the two scores of every game that was played
+  // to its end. A forfeit counts as a game played, but its score is one the league fixed,
+  // not points anybody scored, so it adds nothing here. (The word "points" is one sport's:
+  // it sits in the message file beside the same sport's other words, "PTS" and "points
+  // scored" among them, because a sport has no words of its own to take it from yet.)
   const scored = games
-    .filter((game) => played.includes(game.status))
+    .filter((game) => game.status === 'final')
     .reduce((sum, game) => sum + (game.homeScore ?? 0) + (game.awayScore ?? 0), 0);
   return [
     { key: 'teams', label: t('home.number.teams'), value: written.format(teamCount) },

@@ -57,6 +57,51 @@ describe('the home page in numbers', () => {
     expect(numbers.every((n) => n.label.trim() !== '' && n.value !== '0')).toBe(true);
   });
 
+  it('does not count a forfeit’s fixed score as points scored', async () => {
+    const season = (await stats.seasonsOf(adult))[0];
+    if (season === undefined) throw new Error('no season');
+    const clock = await schedules.clockOf(adult);
+    const schedule = await schedules.scheduleOf(adult, season.id, clock.today);
+    if (schedule === undefined) throw new Error('no schedule');
+    // Every game decided 50 to 40, but the first of each round was a forfeit, which the
+    // league records as 20 to 0: a game played, with no points scored in it.
+    const finished = {
+      ...schedule,
+      rounds: schedule.rounds.map((round) => ({
+        ...round,
+        games: round.games.map((g, n) =>
+          n === 0
+            ? { ...g, status: 'forfeit', homeScore: 20, awayScore: 0 }
+            : { ...g, status: 'final', homeScore: 50, awayScore: 40 },
+        ),
+      })),
+      unplacedGames: [],
+    };
+    const games = finished.rounds.flatMap((r) => r.games);
+    const forfeits = games.filter((g) => g.status === 'forfeit').length;
+    expect(forfeits).toBeGreaterThan(0);
+    const numbers = buildHomeNumbers(finished, 9);
+    const value = (key: string) => numbers.find((n) => n.key === key)?.value;
+    expect(value('played')).toBe(String(games.length));
+    expect(value('scored')).toBe(
+      new Intl.NumberFormat('en').format((games.length - forfeits) * 90),
+    );
+    // A season decided by forfeits alone has no points to show: it keeps "Games to play".
+    const allForfeits = {
+      ...finished,
+      rounds: finished.rounds.map((round) => ({
+        ...round,
+        games: round.games.map((g) => ({ ...g, status: 'forfeit', homeScore: 20, awayScore: 0 })),
+      })),
+    };
+    expect(buildHomeNumbers(allForfeits, 9).map((n) => n.key)).toEqual([
+      'teams',
+      'played',
+      'toPlay',
+      'rounds',
+    ]);
+  });
+
   it('keeps "games to play" on a season nobody has scored in yet', async () => {
     const season = (await stats.seasonsOf(adult))[0];
     if (season === undefined) throw new Error('no season');
