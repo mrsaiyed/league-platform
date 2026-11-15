@@ -39,7 +39,7 @@ function where(
 
 const named = (text: string): ShownName => ({ shown: true, text });
 
-/** An adult league on its start: full names, never confirmed for children (record 065). */
+/** Every league's start: full names, the confirmation not given (record 065). */
 const adultStart: Partial<NamePolicy> = { names: 'full_name', childrenInFull: false };
 /** Full names chosen and confirmed (R-14). */
 const confirmedFull: Partial<NamePolicy> = { names: 'full_name', childrenInFull: true };
@@ -54,11 +54,11 @@ describe('showName: the league display policy (R-14, R-15, R-24, R-29)', () => {
     expect(showName(person(), where('mixed'))).toEqual(named('Amina Y.'));
   });
 
-  it("follows a youth league's first name and last initial for a known adult too (R-29)", () => {
-    expect(showName(person({ isMinor: false }), where('youth'))).toEqual(named('Amina Y.'));
-    expect(showName(person({ isMinor: false }), where('youth', confirmedFull))).toEqual(
-      named('Amina Yusuf'),
-    );
+  it('shows a known adult in a youth league by full name to start with, and less once chosen (R-15, R-29)', () => {
+    expect(showName(person({ isMinor: false }), where('youth'))).toEqual(named('Amina Yusuf'));
+    expect(
+      showName(person({ isMinor: false }), where('youth', { names: 'first_name_last_initial' })),
+    ).toEqual(named('Amina Y.'));
   });
 
   it('shows children by full name once the admin switches to it and confirms (R-14)', () => {

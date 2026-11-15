@@ -4,14 +4,12 @@ import { describe, expect, it } from 'vitest';
 import { isPermission, roleHasPermission, roles } from '../../access/index.ts';
 import { declaredSettings } from './declarations.ts';
 import {
-  confirmedValuesFor,
   defineSetting,
   hasLimits,
   needsConfirming,
   settingRegistry,
   SettingDeclarationError,
   showsLess,
-  startingValue,
 } from './define-setting.ts';
 
 const good = {
@@ -130,19 +128,6 @@ describe('defineSetting', () => {
     expect(() => declare({ confirm: 72 })).toThrow(/confirm/);
   });
 
-  it('keeps starting values by audience, and refuses ones that are not (record 065)', () => {
-    expect(defineSetting(good).startsAs).toEqual({});
-    expect(startingValue(defineSetting(good), 'adult')).toBe(24);
-    const byAudience = declare({ startsAs: { adult: 48 } });
-    expect(startingValue(byAudience, 'adult')).toBe(48);
-    expect(startingValue(byAudience, 'youth')).toBe(24);
-    expect(startingValue(byAudience)).toBe(24);
-    expect(() => declare({ startsAs: { adult: 100 } })).toThrow(/starting values/);
-    expect(() => declare({ startsAs: { seniors: 48 } })).toThrow(/starting values/);
-    expect(() => declare({ startsAs: [48] })).toThrow(/starting values/);
-    expect(() => declare({ startsAs: 48 })).toThrow(/starting values/);
-  });
-
   it('refuses the same key twice in one list', () => {
     const one = defineSetting(good);
     expect(() => settingRegistry([one, one])).toThrow(/twice/);
@@ -215,35 +200,40 @@ describe('the settings stage 2 declares', () => {
     expect(may?.type.safeParse('no').success).toBe(false);
   });
 
-  it('show children by first name and last initial until the admin confirms full names (R-14)', () => {
+  it('start every league on full names, which asks for no confirmation (R-29, record 065)', () => {
     const names = declaredSettings.get('privacy.publicNames');
-    expect(names?.default).toBe('firstNameLastInitial');
+    expect(names?.default).toBe('fullName');
     expect(names?.levels).toEqual(['league']);
     expect(names?.permission).toBe('league.settings');
-    expect(names !== undefined && needsConfirming(names, 'fullName')).toBe(true);
-    expect(names !== undefined && needsConfirming(names, 'firstNameLastInitial')).toBe(false);
-    expect(names !== undefined && needsConfirming(names, 'hidden')).toBe(false);
+    for (const value of ['fullName', 'firstNameLastInitial', 'hidden']) {
+      expect(names !== undefined && needsConfirming(names, value), value).toBe(false);
+    }
     expect(names?.type.safeParse('everything').success).toBe(false);
   });
 
-  it('start an adult league on full names and any other on first name and last initial (R-29)', () => {
-    const names = declaredSettings.get('privacy.publicNames');
-    if (names === undefined) throw new Error('expected the setting');
-    expect(startingValue(names, 'adult')).toBe('fullName');
-    expect(startingValue(names, 'youth')).toBe('firstNameLastInitial');
-    expect(startingValue(names, 'mixed')).toBe('firstNameLastInitial');
-    expect(startingValue(names)).toBe('firstNameLastInitial');
-    // Only a league that does not start on full names is asked to confirm them (record 065).
-    expect(confirmedValuesFor(names, 'adult')).toEqual([]);
-    expect(confirmedValuesFor(names, 'youth')).toEqual(['fullName']);
-    expect(confirmedValuesFor(names, 'mixed')).toEqual(['fullName']);
-    // Every other setting starts at its default, whoever plays.
-    for (const setting of declaredSettings.all()) {
-      if (setting.key === names.key) continue;
-      for (const audience of ['adult', 'youth', 'mixed'] as const) {
-        expect(startingValue(setting, audience), setting.key).toEqual(setting.default);
-      }
-    }
+  it("keep the parents' confirmation as a setting of its own: no to start, a tick to give it, always takeable back (R-14, R-26)", () => {
+    const given = declaredSettings.get('privacy.childrenInFullConfirmed');
+    if (given === undefined) throw new Error('expected the setting');
+    expect(given.default).toBe(false);
+    expect(given.levels).toEqual(['league']);
+    expect(given.permission).toBe('league.settings');
+    expect(needsConfirming(given, true)).toBe(true);
+    expect(needsConfirming(given, false)).toBe(false);
+    expect(showsLess(given, true, false)).toBe(true);
+    expect(showsLess(given, false, true)).toBe(false);
+    expect(given.type.safeParse('yes').success).toBe(false);
+    // It sits between the names setting and the initials switch on the Privacy screen.
+    expect(declaredSettings.all().map((s) => s.key)).toEqual(
+      expect.arrayContaining([
+        'privacy.publicNames',
+        'privacy.childrenInFullConfirmed',
+        'privacy.playersMayAskForInitials',
+      ]),
+    );
+    const keys = declaredSettings.all().map((s) => s.key);
+    expect(keys.indexOf('privacy.childrenInFullConfirmed')).toBe(
+      keys.indexOf('privacy.publicNames') + 1,
+    );
   });
 
   it('offer three choices for names, and know which way shows less (R-24, R-26)', () => {

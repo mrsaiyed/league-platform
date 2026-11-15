@@ -1,9 +1,7 @@
 // The League settings form, drawn from the settings' own declarations (step 2.48, T-98).
 // Each row is a LeagueSettingRow (core's listLeagueSettings): nothing about any setting
 // is written here. The words come from the message files by the setting's label key and,
-// for a list of choices, `setting.<key>.option.<choice>` (T-187); a setting whose start
-// depends on who plays in the league opens with `setting.<key>.start.<audience>`, and
-// asks to confirm only the values its league does not start on (record 065). The words are given as
+// for a list of choices, `setting.<key>.option.<choice>` (T-187). The words are given as
 // a function so a test can draw a setting that has no words of its own.
 import type { LeagueSettingRow } from '@srleagues/core';
 import { saveSettingAction } from './actions.ts';
@@ -176,7 +174,6 @@ export function SettingForms({
           <h2>{say(`adminSettings.area.${group.area}`)}</h2>
           {group.rows.map((row) => (
             <section key={row.key} data-setting={row.key}>
-              {row.audience === null ? null : <p>{say(`${wordsOf(row)}.start.${row.audience}`)}</p>}
               <form action={saveSettingAction}>
                 <input type="hidden" name="league" value={league} />
                 <input type="hidden" name="key" value={row.key} />

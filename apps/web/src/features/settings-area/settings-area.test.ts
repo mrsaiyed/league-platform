@@ -9,6 +9,7 @@ import {
   setSetting,
   settingRegistry,
   type AccessReader,
+  type Audience,
   type CommandContext,
 } from '@srleagues/core';
 import { createTranslator, en } from '@srleagues/site';
@@ -62,10 +63,18 @@ const as = (accountId: string | null): CommandContext => ({
   accountId,
   requestId: 'request-1',
 });
+/** The settings stand-in for a league of this audience, with or without a recorded child. */
+const settingsStandIn = (audience: Audience = 'youth', hasRecordedChild = false) =>
+  standInAdminSettings({
+    accessOf: () => access,
+    log: () => undefined,
+    audienceOf: () => audience,
+    hasRecordedChild: () => hasRecordedChild,
+  });
 
 describe('the settings form', () => {
   it('shows a setting declared in a test with its label, default and limits', async () => {
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx, testRegistry));
     const html = renderToStaticMarkup(
       createElement(SettingForms, { rows, league: 'north-valley', say }),
@@ -87,7 +96,7 @@ describe('the settings form', () => {
     for (const setting of declaredSettings.all()) {
       expect(Object.hasOwn(en, setting.label), setting.label).toBe(true);
     }
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
     expect(rows.map((r) => r.key)).toEqual(declaredSettings.all().map((s) => s.key));
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
@@ -100,18 +109,11 @@ describe('the settings form', () => {
         const confirm = setting.label.replace(/\.label$/, '.confirm');
         expect(Object.hasOwn(en, confirm), confirm).toBe(true);
       }
-      // A setting whose start depends on who plays says why, for each audience (record 065).
-      if (Object.keys(setting.startsAs).length > 0) {
-        for (const audience of ['adult', 'youth', 'mixed']) {
-          const start = setting.label.replace(/\.label$/, `.start.${audience}`);
-          expect(Object.hasOwn(en, start), start).toBe(true);
-        }
-      }
     }
   });
 
   it('shows under Scoring how long a scorekeeper may reopen a game they ended (S-36)', async () => {
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
     const scoring = html.slice(html.indexOf('data-area="games"'));
@@ -128,7 +130,7 @@ describe('the settings form', () => {
   });
 
   it('saves the minutes a scorekeeper may reopen a game, 0 included, and refuses more than a day', async () => {
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = settingsStandIn();
     const key = 'games.scorekeeperReopenMinutes';
     const set = (value: unknown, version: number | null) =>
       setSetting(as(ownerId), { level: 'league', key, value, version }, deps);
@@ -138,23 +140,25 @@ describe('the settings form', () => {
     expect(rows.find((r) => r.key === key)).toMatchObject({ value: 0, source: 'league' });
   });
 
-  it('puts the names settings under Privacy, with a box to confirm full names (R-14)', async () => {
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+  it("puts the names settings under Privacy, with the parents' confirmation as its own (R-14, R-29)", async () => {
+    const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
     const privacy = html.slice(html.indexOf('data-area="privacy"'));
     expect(privacy).toMatch(/^data-area="privacy"><h2>Privacy<\/h2>/);
-    // Three choices, from the most shown to the least (R-24).
-    // Three choices, from the most shown to the least (R-24), each with a made-up example.
+    // Three choices, from the most shown to the least (R-24), each saying what it does to
+    // adults and to children (R-29), with a made-up example.
     const quote = (text: string) => `&quot;${text}&quot;`;
-    const full = privacy.indexOf(`Full names, like ${quote('Jordan Ellis')}`);
+    const full = privacy.indexOf(`Full names for adults, like ${quote('Jordan Ellis')}.`);
     const initial = privacy.indexOf(
-      `First name and last initial, like ${quote('Jordan E.')} (the default)`,
+      `First name and last initial for everyone, adults and children, like ${quote('Jordan E.')}`,
     );
-    const hidden = privacy.indexOf('Hidden: no names. A player appears by jersey number');
+    const hidden = privacy.indexOf('Hidden for everyone, adults and children: no names.');
     expect(full).toBeGreaterThan(0);
     expect(initial).toBeGreaterThan(full);
     expect(hidden).toBeGreaterThan(initial);
+    // Every league starts on full names (record 065).
+    expect(privacy).toContain('unless their full names are confirmed below. (the default)');
     expect(privacy).toContain(`as ${quote('A player (name not shown)')} in the statistics`);
     expect(privacy).toContain('People who know the team can still tell who a number is.');
     expect(privacy.match(/value="(fullName|firstNameLastInitial|hidden)"/g)).toEqual([
@@ -162,20 +166,16 @@ describe('the settings form', () => {
       'value="firstNameLastInitial"',
       'value="hidden"',
     ]);
-    // The box to tick says when to tick it, and what is confirmed (R-14).
-    expect(privacy).toContain('Tick this only if you are choosing Full names');
-    expect(privacy).toContain('name="confirmed" value="yes"');
-    expect(privacy).toContain(
+    // The box to tick says what is confirmed (R-14), on the confirmation's own form.
+    const confirmation = privacy.slice(
+      privacy.indexOf('data-setting="privacy.childrenInFullConfirmed"'),
+    );
+    expect(confirmation).toContain('name="confirmed" value="yes"');
+    expect(confirmation).toContain(
       'I confirm that the parents or guardians of the children in this league have agreed to their full names being shown publicly',
     );
-    // The words say who the setting changes (everyone, R-29), and that a request wins.
-    expect(privacy).toContain('how every player is shown on the team pages');
-    expect(privacy).toContain('always wins over this setting');
-    // A league whose audience is not known is read as youth, and says why it starts there.
-    expect(privacy).toContain(
-      'Your league is for young players, so it starts with first name and last initial.',
-    );
-    // No sentence promises what no screen does (2.106 audit, H13).
+    // A request always wins; no sentence promises what no screen does (2.106 audit, H13).
+    expect(privacy).toContain('it always wins over this setting');
     expect(privacy).not.toContain('until you mark them as adults');
     expect(privacy).not.toContain('next part of this work');
     expect(privacy).toContain('Adults may ask to appear as initials on public pages.');
@@ -183,44 +183,9 @@ describe('the settings form', () => {
     // R-27: switching it off takes no one's initials away.
     expect(privacy).toContain('Switching this off only stops new requests');
     expect(privacy).toContain('stays that way until their own record is changed');
-    // Only the names setting asks to confirm.
+    // Only the parents' confirmation asks to confirm; the names setting no longer does.
     expect(html.match(/name="confirmed"/g)).toHaveLength(1);
-  });
-
-  it('opens Privacy with a sentence that fits who plays, and asks to confirm only where there are children (R-29)', async () => {
-    const privacyOf = async (audience: 'adult' | 'youth' | 'mixed') => {
-      const { deps } = standInAdminSettings({
-        accessOf: () => access,
-        log: () => undefined,
-        audienceOf: () => audience,
-      });
-      const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
-      const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
-      return html.slice(html.indexOf('data-area="privacy"'));
-    };
-    const quote = (text: string) => `&quot;${text}&quot;`;
-    const adult = await privacyOf('adult');
-    expect(adult).toContain(
-      'Your league is for adults, so it starts with full names. Choose less here at any time.',
-    );
-    // The sentence comes first, right under the heading.
-    expect(adult).toMatch(
-      /^data-area="privacy"><h2>Privacy<\/h2><section[^>]*><p>Your league is for adults/,
-    );
-    expect(adult).toContain(`Full names, like ${quote('Jordan Ellis')} (the default)`);
-    expect(adult).toContain('Default: Full names');
-    expect(adult).not.toContain('name="confirmed"');
-    expect(adult).not.toContain('Tick this only if');
-    for (const audience of ['youth', 'mixed'] as const) {
-      const html = await privacyOf(audience);
-      expect(html, audience).toContain('so it starts with first name and last initial');
-      expect(html, audience).toContain('which you confirm below.');
-      expect(html, audience).toContain(
-        `First name and last initial, like ${quote('Jordan E.')} (the default)`,
-      );
-      expect(html.match(/name="confirmed"/g), audience).toHaveLength(1);
-    }
-    expect(await privacyOf('mixed')).toContain('Your league has both adults and young players');
+    expect(confirmation.indexOf('name="confirmed"')).toBeGreaterThan(0);
   });
 });
 
@@ -263,7 +228,7 @@ describe('answers', () => {
 
 describe('saving on the stand-in', () => {
   const key = declaredSettings.get('members.startPage')?.key ?? '';
-  const made = () => standInAdminSettings({ accessOf: () => access, log: () => undefined });
+  const made = () => settingsStandIn();
   const read = (ports: ReturnType<typeof made>) =>
     ports.deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
 

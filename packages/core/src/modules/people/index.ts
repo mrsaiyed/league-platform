@@ -1,6 +1,5 @@
 // The people module (T2 §3). Other modules and packages use only what is here.
 export {
-  adultStartNamePolicy,
   defaultNamePolicy,
   nameForms,
   nameRequests,

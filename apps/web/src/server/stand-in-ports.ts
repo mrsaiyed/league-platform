@@ -331,7 +331,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     youthLeagueId: standInLeagues.other.id,
   };
   // Who plays in each made-up league, read by every page that shows a name (R-15) and by
-  // the settings whose start depends on it (record 065).
+  // the Privacy settings, which say what they do there (record 065).
   const audienceOf = standInAudienceOf(scheduled);
   // The League settings screen's settings: the public pages read how names show from them.
   // There is exactly one: a second copy would keep the admin's saved setting from the pages.
@@ -339,6 +339,8 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
     audienceOf,
+    // The adult league has one player recorded as a child, Pia Hawkins (stand-in-games.ts).
+    hasRecordedChild: (leagueId) => leagueId === standInLeagues.live.id,
   });
   const namePolicy = namePolicyOf(adminSettings.deps);
   const games = standInGames({

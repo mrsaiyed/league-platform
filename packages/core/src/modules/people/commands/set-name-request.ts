@@ -85,11 +85,10 @@ export const setNameRequest = defineCommand({
     if (person.version !== input.version) return fail({ code: 'changed-since-read' });
     if (person.visibility === input.showAs) return ok({ version: person.version });
     if (input.showAs === 'initials') {
-      const audience = await tx.people.leagueAudience();
-      const policy = await readNamePolicy(
-        { settingRows: (key) => tx.people.leagueSettingRows(key) },
-        audience,
-      );
+      const [audience, policy] = await Promise.all([
+        tx.people.leagueAudience(),
+        readNamePolicy({ settingRows: (key) => tx.people.leagueSettingRows(key) }),
+      ]);
       const isMinor = person.sensitive?.isMinor ?? null;
       if (!mayRecordNameRequest('initials', { isMinor }, audience, policy)) {
         return fail({ code: 'initials-not-offered' });

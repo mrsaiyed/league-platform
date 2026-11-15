@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adultStartNamePolicy, defaultNamePolicy, type NameRequest } from './name-policy.ts';
+import { defaultNamePolicy, type NameRequest } from './name-policy.ts';
 import {
   findPrivateFields,
   privateValuesOf,
@@ -241,7 +241,7 @@ describe('findPrivateFields (T-81, T4 §12)', () => {
   it('does not treat a full name as private where the policy shows it', () => {
     const adult = showName(
       { ...amina, isMinor: false },
-      { audience: 'adult', policy: adultStartNamePolicy, viewer, statsOf: null },
+      { audience: 'adult', policy: defaultNamePolicy, viewer, statsOf: null },
     );
     expect(privateValuesOf(amina, adult)).toEqual([
       '2011-04-09',

@@ -54,6 +54,8 @@ export type MemoryLeagues = {
   }[];
   /** Who plays in the league (record 065); youth unless a test says otherwise. */
   audience: Audience;
+  /** Whether anyone in the league is recorded as a child (record 065). */
+  recordedChild: boolean;
   activity: ActivityEntry[];
   /** The season's teams, results, adjustments and saved standings (the standings module's). */
   standing: Omit<StandingsData, 'seasons'>;
@@ -101,6 +103,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
     grants: [],
     settings: [],
     audience: 'youth',
+    recordedChild: false,
     activity: [],
     standing: {
       teams: [],
@@ -193,6 +196,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           return next;
         },
         leagueAudience: async () => s.audience,
+        hasRecordedChild: async () => s.recordedChild,
         isPlatformStaff: async () => accountId !== null && s.staff.includes(accountId),
         createLeague: async (league) => {
           if (s.league !== undefined) return 'league-exists';

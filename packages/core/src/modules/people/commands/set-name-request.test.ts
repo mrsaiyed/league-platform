@@ -9,7 +9,7 @@ import {
   scorekeeperGrant,
   scorekeeperId,
 } from '../memory-people.test-helper.ts';
-import type { NameRequest } from '../rules/name-policy.ts';
+import { defaultNamePolicy, type NameRequest } from '../rules/name-policy.ts';
 import { showName } from '../rules/show-name.ts';
 import { publicViewer } from '../rules/viewer.ts';
 import { setNameRequest } from './set-name-request.ts';
@@ -216,8 +216,7 @@ describe('a recorded request keeps taking effect (R-27)', () => {
       },
       {
         audience,
-        // An adult league on its start: full names, not confirmed for children (record 065).
-        policy: { names: 'full_name', childrenInFull: false, playersMayAskForInitials },
+        policy: { ...defaultNamePolicy, playersMayAskForInitials },
         viewer: publicViewer('L1'),
         statsOf: null,
       },

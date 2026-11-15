@@ -26,6 +26,7 @@ type Row = {
   readonly key: string;
   document: { readonly version: number; readonly value: unknown };
   version: number;
+  savedAt: string;
 };
 type LeagueState = { settings: Row[]; activity: ActivityEntry[] };
 
@@ -35,10 +36,15 @@ export type StandInAdminSettingsOptions = {
   /** Where the commands' T-196 lines go. */
   readonly log: CommandDeps<LeaguesTx>['log'];
   /**
-   * Who plays in each made-up league (standInAudienceOf), for a setting whose start
-   * depends on it (record 065). A league it does not know is youth: the careful reading.
+   * Who plays in each made-up league (standInAudienceOf), so the Privacy settings say
+   * what they do there (record 065). Required, so no second copy of this store can read
+   * a league differently from the public pages. A league it does not know is youth.
    */
-  readonly audienceOf?: (leagueId: string) => Audience | undefined;
+  readonly audienceOf: (leagueId: string) => Audience | undefined;
+  /** Whether each made-up league has anyone recorded as a child (record 065). */
+  readonly hasRecordedChild: (leagueId: string) => boolean;
+  /** The time a save is stamped with; the clock unless a test gives one. */
+  readonly now?: () => Date;
 };
 
 /** A store of which only the named parts are made up; any other part is a mistake to call. */
@@ -53,14 +59,21 @@ function partial<Store extends object>(name: string, made: Partial<Store>): Stor
 
 const samePlace = (a: SettingPlace, b: SettingPlace) => JSON.stringify(a) === JSON.stringify(b);
 
+type LeagueFacts = {
+  readonly audience: Audience;
+  readonly hasRecordedChild: boolean;
+  readonly now: () => Date;
+};
+
 function txOver(
   leagueId: string,
   s: LeagueState,
   access: AccessReader,
-  audience: Audience,
+  facts: LeagueFacts,
 ): LeaguesTx {
   const leagues = partial<LeaguesStore>('leagues', {
-    leagueAudience: async () => audience,
+    leagueAudience: async () => facts.audience,
+    hasRecordedChild: async () => facts.hasRecordedChild,
     // The permission check asks who the league is and whether it may be changed.
     currentLeague: async () => {
       const status = await access.leagueStatus();
@@ -80,17 +93,24 @@ function txOver(
               (r.place.level === 'program' && r.place.programId === places.programId) ||
               (r.place.level === 'season' && r.place.seasonId === places.seasonId)),
         )
-        .map((r) => ({ level: r.place.level, document: r.document, version: r.version })),
+        .map((r) => ({
+          level: r.place.level,
+          document: r.document,
+          version: r.version,
+          savedAt: r.savedAt,
+        })),
     writeSetting: async (place, key, document, version) => {
+      const savedAt = facts.now().toISOString();
       const row = s.settings.find((r) => r.key === key && samePlace(r.place, place));
       if (row === undefined) {
         if (version !== null) return undefined;
-        s.settings.push({ place, key, document, version: 1 });
+        s.settings.push({ place, key, document, version: 1, savedAt });
         return 1;
       }
       if (row.version !== version) return undefined;
       row.document = document;
       row.version += 1;
+      row.savedAt = savedAt;
       return row.version;
     },
     clearSetting: async (place, key, version) => {
@@ -138,12 +158,11 @@ export function standInAdminSettings(options: StandInAdminSettingsOptions): Admi
       serially(async () => {
         const draft = structuredClone(stateOf(context.leagueId));
         const result = await work(
-          txOver(
-            context.leagueId,
-            draft,
-            options.accessOf(context.leagueId),
-            options.audienceOf?.(context.leagueId) ?? 'youth',
-          ),
+          txOver(context.leagueId, draft, options.accessOf(context.leagueId), {
+            audience: options.audienceOf(context.leagueId) ?? 'youth',
+            hasRecordedChild: options.hasRecordedChild(context.leagueId),
+            now: options.now ?? (() => new Date()),
+          }),
         );
         states.set(context.leagueId, draft);
         return result;

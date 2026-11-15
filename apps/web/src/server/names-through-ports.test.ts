@@ -6,7 +6,7 @@
 // settings store, say) fails here.
 import { CommandReply } from '@srleagues/contracts';
 import {
-  adultStartNamePolicy,
+  defaultNamePolicy,
   findPrivateFields,
   privateValuesOf,
   publicViewer,
@@ -46,7 +46,22 @@ function world() {
   const saveNames = async (leagueId: string, value: string, version: number | null) => {
     const saved = await setSetting(
       as(owner, leagueId),
-      { level: 'league', key: 'privacy.publicNames', value, version, confirmed: true },
+      { level: 'league', key: 'privacy.publicNames', value, version },
+      w.ports.adminSettings.deps,
+    );
+    if (!saved.ok) throw new Error(`not saved: ${saved.error.code}`);
+  };
+  /** Gives the parents' confirmation as the league's owner, ticking the box (R-14). */
+  const confirmChildren = async (leagueId: string) => {
+    const saved = await setSetting(
+      as(owner, leagueId),
+      {
+        level: 'league',
+        key: 'privacy.childrenInFullConfirmed',
+        value: true,
+        version: null,
+        confirmed: true,
+      },
       w.ports.adminSettings.deps,
     );
     if (!saved.ok) throw new Error(`not saved: ${saved.error.code}`);
@@ -130,7 +145,7 @@ function world() {
       responses: [roster, table.value],
     };
   };
-  return { ...w, saveNames, scoreByPia, gameNames, youthNames };
+  return { ...w, saveNames, confirmChildren, scoreByPia, gameNames, youthNames };
 }
 
 describe("the admin's names setting reaches every public surface through standInPorts", () => {
@@ -140,11 +155,12 @@ describe("the admin's names setting reaches every public surface through standIn
     expect(first.latestPlay).toMatchObject({ playerName: 'Pia H.', jersey: '9' });
     expect(await w.gameNames()).toMatchObject({ snapshot: 'Pia H.', page: 'Pia H.' });
 
-    await w.saveNames(adult, 'fullName', null);
+    // Full names is the start; with the parents' confirmation, Pia is in full too.
+    await w.confirmChildren(adult);
     expect((await w.scoreByPia()).latestPlay).toMatchObject({ playerName: 'Pia Hawkins' });
     expect(await w.gameNames()).toMatchObject({ snapshot: 'Pia Hawkins', page: 'Pia Hawkins' });
 
-    await w.saveNames(adult, 'hidden', 1);
+    await w.saveNames(adult, 'hidden', null);
     const hidden = await w.scoreByPia();
     // Hidden: by her number only (R-24).
     expect(hidden.latestPlay).toMatchObject({ playerName: null, jersey: '9' });
@@ -200,7 +216,7 @@ describe("the admin's names setting reaches every public surface through standIn
     const initial = await adultNames();
     expect(initial.adult).toMatch(/^[A-Z][a-z]+ [A-Z]\.$/);
     expect(initial.pia).toBe('Pia H.');
-    // Full names again, no box ticked: saved, back on the start, Pia still with care.
+    // Full names again, no box ticked: saved, adults in full as at the start, Pia with care.
     expect(await choose('fullName', 2)).toMatchObject({ ok: true });
     expect(await adultNames()).toEqual(start);
   });
@@ -211,13 +227,19 @@ describe("the admin's names setting reaches every public surface through standIn
       roster: ['Noor H.', 'Jay W.', 'Tess M.'],
       statistics: ['Eli O.', 'Noor H.', 'Sam R.'],
     });
+    // Full names saved without the tick: the young players are still with care.
     await w.saveNames(youth, 'fullName', null);
+    expect(await w.youthNames()).toMatchObject({
+      roster: ['Noor H.', 'Jay W.', 'Tess M.'],
+      statistics: ['Eli O.', 'Noor H.', 'Sam R.'],
+    });
+    await w.confirmChildren(youth);
     expect(await w.youthNames()).toMatchObject({
       roster: ['Noor Haddad', 'Jay Whitaker', 'Tess Moreno'],
       statistics: ['Eli Okafor', 'Noor Haddad', 'Sam Rivera'],
     });
     // The adult league is untouched, on its start (record 065).
-    expect((await w.tracker.namesShownOf(adult)).policy).toEqual(adultStartNamePolicy);
+    expect((await w.tracker.namesShownOf(adult)).policy).toEqual(defaultNamePolicy);
     expect((await w.gameNames()).snapshot).toBe(null);
 
     await w.saveNames(youth, 'hidden', 1);

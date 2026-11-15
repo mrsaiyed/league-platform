@@ -4,15 +4,8 @@ import { z } from 'zod';
 import type { CommandContext } from '../../../command/index.ts';
 import { leagueScope, scopeDetails, type Scope } from '../../access/index.ts';
 import { mayChangeLeagueSettings, mayEditLeague, programScope } from '../policy.ts';
-import type { Audience } from '../league-values.ts';
 import type { LeaguesTx, SettingPlace } from '../ports.ts';
-import {
-  showsLess,
-  startingValue,
-  startsByAudience,
-  type Setting,
-  type SettingRegistry,
-} from './define-setting.ts';
+import { showsLess, type Setting, type SettingRegistry } from './define-setting.ts';
 import { lookupSetting } from './lookup-setting.ts';
 
 /** The fields that name a place: the level, and its program or season. */
@@ -40,7 +33,7 @@ export async function findPlace(
   return programId === undefined ? undefined : { level: 'season', seasonId: input.seasonId };
 }
 
-/** The value a change leaves at the place: one given, or the league's start (cleared). */
+/** The value a change leaves at the place: one given, or the setting's default (cleared). */
 export type SettingTarget = { readonly value: unknown } | 'default';
 
 /**
@@ -84,23 +77,13 @@ async function protectsPeople(
   if (setting.protectiveOrder.length === 0) return false;
   const parsed = target === 'default' ? undefined : setting.type.safeParse(target.value);
   if (parsed !== undefined && !parsed.success) return false;
-  const audience = await audienceFor(tx, setting);
-  const to = parsed === undefined ? startingValue(setting, audience) : parsed.data;
+  const to = parsed === undefined ? setting.default : parsed.data;
   const rows = await tx.leagues.settingRows(setting.key, {});
   const from = lookupSetting(
     setting,
     rows.filter((row) => row.level === 'league'),
-    audience,
   ).value;
   return showsLess(setting, from, to);
-}
-
-/**
- * Who plays in the league, read only for a setting whose start depends on it (record
- * 065); undefined for every other setting, whose start is its default.
- */
-export async function audienceFor(tx: LeaguesTx, setting: Setting): Promise<Audience | undefined> {
-  return startsByAudience(setting) ? tx.leagues.leagueAudience() : undefined;
 }
 
 /**

@@ -5,8 +5,7 @@ import type { Audience } from '../../leagues/index.ts';
 /**
  * R-24, R-29: how the league shows its players, every one of them, from the most shown
  * to the least: full names, first name and last initial, or hidden (by jersey number
- * only). The admin chooses; an adult league starts on full names and a youth or mixed
- * league on first name and last initial (record 065).
+ * only). The admin chooses; every league starts on full names (record 065).
  */
 export const nameForms = ['full_name', 'first_name_last_initial', 'hidden'] as const;
 export type NameForm = (typeof nameForms)[number];
@@ -24,10 +23,10 @@ export interface NamePolicy {
   /** How every player is shown: the admin's choice, or the league's start. */
   readonly names: NameForm;
   /**
-   * R-14: whether a child may be shown by full name. True only where the admin chose
-   * full names and confirmed the league has the permission it needs; otherwise a child
-   * is shown by first name and last initial at most, whatever `names` says. An adult
-   * league's starting full names were never confirmed, so this is false there.
+   * R-14: whether the admin has confirmed the parents' agreement to children's full
+   * names (the setting `privacy.childrenInFullConfirmed`). A child is shown by full name
+   * only where this is true AND `names` is full names; otherwise by first name and last
+   * initial at most.
    */
   readonly childrenInFull: boolean;
   /** R-15: whether an adult may ask to appear as initials. A child always may (R-25). */
@@ -35,23 +34,13 @@ export interface NamePolicy {
 }
 
 /**
- * The starting policy of a youth or mixed league, and of one whose audience is not
- * known: first name and last initial for everyone (R-14, R-29). An adult league starts
- * on full names instead (R-15; readNamePolicy). Asking for initials starts switched
- * off: the league decides whether to allow it (R-15).
+ * The starting policy of every league (R-14, R-15, R-29, record 065): full names, the
+ * parents' confirmation not given, so adults are shown by full name and children by
+ * first name and last initial, as every league showed before step 2.162. Asking for
+ * initials starts switched off: the league decides whether to allow it (R-15).
+ * readNamePolicy gives the same from the declared settings (its test holds them equal).
  */
 export const defaultNamePolicy: NamePolicy = Object.freeze({
-  names: 'first_name_last_initial',
-  childrenInFull: false,
-  playersMayAskForInitials: false,
-});
-
-/**
- * The starting policy of an adult league (R-15, R-29, record 065): full names, never
- * confirmed for a child, so a child in it is shown by first name and last initial.
- * readNamePolicy gives the same from the declared setting (its test holds them equal).
- */
-export const adultStartNamePolicy: NamePolicy = Object.freeze({
   names: 'full_name',
   childrenInFull: false,
   playersMayAskForInitials: false,

@@ -5,7 +5,6 @@
 // screens (generated from the declarations) never show one.
 import { z } from 'zod';
 import { isPermission, type Permission } from '../../access/index.ts';
-import { audiences, type Audience } from '../league-values.ts';
 
 export const settingLevels = ['league', 'program', 'season'] as const;
 export type SettingLevel = (typeof settingLevels)[number];
@@ -19,14 +18,6 @@ export type SettingDeclaration<Schema extends z.ZodType> = {
   /** What a value may be. Must carry limits (a number's range, a text's length, a list's size). */
   readonly type: Schema;
   readonly default: z.output<Schema>;
-  /**
-   * A starting value that depends on who plays in the league (record 065, T-268): a
-   * league of a listed audience starts there instead of at `default`, which stays the
-   * start of every other league and of a place whose league is not known. Read each
-   * time, so a league that changes who plays and has saved nothing starts again from
-   * its new audience's value.
-   */
-  readonly startsAs?: Readonly<Partial<Record<Audience, z.output<Schema>>>>;
   /** Where it can be set. Most specific wins when read: season, program, league. */
   readonly levels: readonly SettingLevel[];
   /** Who may change it (T4 §4). */
@@ -41,9 +32,6 @@ export type SettingDeclaration<Schema extends z.ZodType> = {
    * Values the admin must confirm before saving (R-14: full names, confirming the league
    * has the permission it needs). The words of what they confirm are the message
    * `setting.<key>.confirm`; the command refuses such a value unless it is confirmed.
-   * Where such a value is the league's own starting value (`startsAs`), it is not asked
-   * to be confirmed: saved unconfirmed, it puts the league back on its start, so a
-   * stored value of this kind is always a confirmed one (record 065).
    */
   readonly confirm?: readonly z.output<Schema>[];
   /**
@@ -59,8 +47,6 @@ export type Setting<Value = unknown> = {
   readonly key: string;
   readonly type: z.ZodType<Value>;
   readonly default: Value;
-  /** Starting values by who plays in the league; empty for most settings (record 065). */
-  readonly startsAs: Readonly<Partial<Record<Audience, Value>>>;
   readonly levels: readonly SettingLevel[];
   readonly permission: Permission;
   readonly label: string;
@@ -162,21 +148,8 @@ function check(declaration: Record<string, unknown>): void {
   if (!declaration.type.safeParse(declaration.default).success) {
     throw refuse('its default does not pass its own schema');
   }
-  const schema = declaration.type;
-  const { startsAs } = declaration;
-  if (
-    startsAs !== undefined &&
-    (typeof startsAs !== 'object' ||
-      startsAs === null ||
-      Array.isArray(startsAs) ||
-      Object.entries(startsAs).some(
-        ([audience, value]) =>
-          !audiences.includes(audience as Audience) || !schema.safeParse(value).success,
-      ))
-  ) {
-    throw refuse('its starting values must be given by audience, each passing its schema');
-  }
   const { confirm } = declaration;
+  const schema = declaration.type;
   if (
     confirm !== undefined &&
     (!Array.isArray(confirm) || confirm.some((value) => !schema.safeParse(value).success))
@@ -197,36 +170,10 @@ function check(declaration: Record<string, unknown>): void {
 
 const sameValue = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-/** Whether the setting's starting value depends on who plays in the league (record 065). */
-export function startsByAudience(setting: Setting): boolean {
-  return Object.keys(setting.startsAs).length > 0;
-}
-
-/**
- * Where a league of this audience starts: its own starting value, or the default. An
- * audience that is not known starts at the default.
- */
-export function startingValue<Value>(setting: Setting<Value>, audience?: Audience): Value {
-  if (audience === undefined || !Object.hasOwn(setting.startsAs, audience)) return setting.default;
-  return setting.startsAs[audience] as Value;
-}
-
 /** Whether saving this value asks the admin to confirm first (R-14). */
 export function needsConfirming(setting: Setting, value: unknown): boolean {
   return setting.confirm.some((candidate) => sameValue(candidate, value));
 }
-
-/**
- * The values that ask to be confirmed in a league of this audience: all of them but
- * the league's own starting value, which never needed a confirmation (record 065).
- */
-export function confirmedValuesFor(setting: Setting, audience?: Audience): readonly unknown[] {
-  const start = startingValue(setting, audience);
-  return setting.confirm.filter((value) => !sameValue(value, start));
-}
-
-/** Whether two setting values are the same. */
-export const sameSettingValue = sameValue;
 
 /**
  * Whether moving from `from` to `to` shows less of people (R-26): both are in the
@@ -247,7 +194,6 @@ export function defineSetting<Schema extends z.ZodType>(
     key: declaration.key,
     type: declaration.type as z.ZodType<z.output<Schema>>,
     default: declaration.default,
-    startsAs: Object.freeze({ ...(declaration.startsAs ?? {}) }),
     levels: Object.freeze([...declaration.levels]),
     permission: declaration.permission,
     label: declaration.label,

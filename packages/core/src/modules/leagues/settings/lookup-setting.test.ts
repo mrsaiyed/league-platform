@@ -23,26 +23,6 @@ describe('lookupSetting', () => {
     expect(lookupSetting(setting, [])).toEqual({ value: 24, source: 'default' });
   });
 
-  it("gives the league's own start where it depends on who plays (record 065)", () => {
-    const byAudience = defineSetting({
-      key: 'notifications.reminderLeadHours',
-      type: z.number().int().min(1).max(72),
-      default: 24,
-      startsAs: { adult: 48 },
-      levels: ['league'],
-      permission: 'league.settings',
-      label: 'setting.notifications.reminderLeadHours.label',
-    });
-    expect(lookupSetting(byAudience, [], 'adult')).toEqual({ value: 48, source: 'default' });
-    expect(lookupSetting(byAudience, [], 'youth')).toEqual({ value: 24, source: 'default' });
-    expect(lookupSetting(byAudience, [])).toEqual({ value: 24, source: 'default' });
-    // A stored value still wins over any start.
-    expect(lookupSetting(byAudience, [row('league', 6)], 'adult')).toEqual({
-      value: 6,
-      source: 'league',
-    });
-  });
-
   it('prefers the season, then the program, then the league', () => {
     const all = [row('league', 10), row('program', 20), row('season', 30)];
     expect(lookupSetting(setting, all)).toEqual({ value: 30, source: 'season' });

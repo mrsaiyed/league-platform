@@ -3,7 +3,7 @@
 // table or a game's page; the team's staff and an admin do get them. The league's other
 // team, which shows everyone, is always there. The two-league cases are in ../isolation.
 import {
-  adultStartNamePolicy,
+  defaultNamePolicy,
   publicViewer,
   readGamePage,
   readStandings,
@@ -153,8 +153,7 @@ const viewing = (viewer: Viewer) => ({
   leagueId: leagues.a.leagueId,
   viewer,
   audience: 'adult' as const,
-  // An adult league on its start (record 065).
-  policy: adultStartNamePolicy,
+  policy: defaultNamePolicy,
 });
 
 /** Every public read of league A, as one text, for this viewer. */

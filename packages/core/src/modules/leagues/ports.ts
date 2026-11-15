@@ -18,6 +18,11 @@ export type StoredSettingRow = {
   readonly level: SettingLevel;
   readonly document: unknown;
   readonly version: number;
+  /**
+   * When the value was last saved (an ISO time), where the store keeps it, so a screen
+   * can say since when a confirmation is in force (record 065).
+   */
+  readonly savedAt?: string;
 };
 
 export type LeagueRecord = {
@@ -87,11 +92,17 @@ export type LeaguesStore = {
   /** Sets its name if it is still at `version` (T-46): the new version, or undefined. */
   readonly setName: (name: string, version: number) => Promise<number | undefined>;
   /**
-   * Who plays in the league (adult, youth or mixed), for a setting whose starting value
-   * depends on it (record 065). A league whose audience cannot be read is youth: the
+   * Who plays in the league (adult, youth or mixed), so the Privacy settings can say what
+   * they do in it (record 065). A league whose audience cannot be read is youth: the
    * careful reading, as the people module's own (PeopleStore.leagueAudience).
    */
   readonly leagueAudience: () => Promise<Audience>;
+  /**
+   * Whether anyone in the league, not in the bin, is recorded as a child, so an adult
+   * league's Privacy settings offer the confirmation for children only where it has
+   * some (record 065). It says yes or no and nothing about who.
+   */
+  readonly hasRecordedChild: () => Promise<boolean>;
   /** Whether the acting account is one of our own staff (named in the app settings; not a league role). */
   readonly isPlatformStaff: () => Promise<boolean>;
   /** Creates the transaction's league and its default program together. */

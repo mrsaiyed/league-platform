@@ -1,7 +1,7 @@
 // The T-81 scan across every public surface the one name function feeds (steps 2.126
-// and 2.162): under each value of the league's names setting and under its start, which
-// depends on who plays (R-24, R-29, record 065), with and without adults allowed to ask
-// for initials (R-15), with people who asked for initials and to be removed (R-17,
+// and 2.162): under each value of the league's names setting and under its start, with
+// and without the parents' confirmation (R-14, R-24, R-29, record 065), with and without
+// adults allowed to ask for initials (R-15), with people who asked for initials and to be removed (R-17,
 // R-25), in a youth, an adult and a mixed league. Each surface is built by the product's
 // own code over made-up stores: a team's roster line, the season statistics table, a
 // game's page (box score and plays), its snapshot and the live message cut from it.
@@ -77,17 +77,22 @@ const jerseyOf = (p: MadeUp) => String(people.indexOf(p) + 4);
  * The rules in plain words, written apart from the function (R-14, R-15, R-17, R-24,
  * R-25, R-29): the league's choice for everyone, a child in full only once confirmed.
  */
-function expectedName(p: MadeUp, audience: Audience, stored: Stored): ShownName {
+function expectedName(
+  p: MadeUp,
+  audience: Audience,
+  stored: Stored,
+  confirmed: boolean,
+): ShownName {
   if (p.nameRequest === 'removed') return { shown: false, why: 'removed' };
   const initials = `${p.firstName[0]}. ${p.lastName[0]}.`;
   const child = p.isMinor === true || (p.isMinor === null && audience !== 'adult');
-  // Nothing stored: an adult league starts on full names, any other on initial (record 065).
-  const choice = stored ?? (audience === 'adult' ? 'fullName' : 'firstNameLastInitial');
+  // Nothing stored: every league starts on full names (record 065).
+  const choice = stored ?? 'fullName';
   if (choice === 'hidden') return { shown: false, why: 'hidden' };
   // A recorded request holds whatever the switch or the age now say (R-25, R-27).
   if (p.nameRequest === 'initials') return { shown: true, text: initials };
-  // Only a stored full names was confirmed, so only it shows a child in full (R-14).
-  const full = choice === 'fullName' && (!child || stored === 'fullName');
+  // A child in full only with full names AND the confirmation (R-14).
+  const full = choice === 'fullName' && (!child || confirmed);
   return full
     ? { shown: true, text: `${p.firstName} ${p.lastName}` }
     : { shown: true, text: `${p.firstName} ${p.lastName[0]}.` };
@@ -98,20 +103,18 @@ const storedValues = [undefined, 'fullName', 'firstNameLastInitial', 'hidden'] a
 type Stored = (typeof storedValues)[number];
 
 /** The policy as the league's stored settings give it (readNamePolicy). */
-function policyOf(stored: Stored, playersMayAskForInitials: boolean, audience: Audience) {
+function policyOf(stored: Stored, confirmed: boolean, playersMayAskForInitials: boolean) {
   const values: Record<string, unknown> = {
     'privacy.publicNames': stored,
+    'privacy.childrenInFullConfirmed': confirmed ? true : undefined,
     'privacy.playersMayAskForInitials': playersMayAskForInitials,
   };
-  return readNamePolicy(
-    {
-      settingRows: async (key): Promise<readonly StoredSettingRow[]> =>
-        values[key] === undefined
-          ? []
-          : [{ level: 'league', document: { version: 1, value: values[key] }, version: 1 }],
-    },
-    audience,
-  );
+  return readNamePolicy({
+    settingRows: async (key): Promise<readonly StoredSettingRow[]> =>
+      values[key] === undefined
+        ? []
+        : [{ level: 'league', document: { version: 1, value: values[key] }, version: 1 }],
+  });
 }
 
 const statsStore: StandingsReadStore = {
@@ -223,28 +226,32 @@ function gameStore(status: 'live' | 'final'): GameSnapshotStore {
 
 const cases = audiences.flatMap((audience) =>
   storedValues.flatMap((stored) =>
-    [false, true].map((playersMayAskForInitials) => ({
-      audience,
-      stored: stored ?? ('nothing' as const),
-      playersMayAskForInitials,
-    })),
+    [false, true].flatMap((confirmed) =>
+      [false, true].map((playersMayAskForInitials) => ({
+        audience,
+        stored: stored ?? ('nothing' as const),
+        confirmed,
+        playersMayAskForInitials,
+      })),
+    ),
   ),
 );
 
 describe('every public surface under each name setting (T-81, R-24, R-25, R-29)', () => {
-  it('covers each value of both settings and the start, in a youth, an adult and a mixed league', () => {
-    expect(cases).toHaveLength(3 * 4 * 2);
+  it('covers each value of the three settings and the start, in a youth, an adult and a mixed league', () => {
+    expect(cases).toHaveLength(3 * 4 * 2 * 2);
   });
 
   it.each(cases)(
-    'shows only what the settings allow, and nothing private: $audience, $stored, adults may ask $playersMayAskForInitials',
-    async ({ audience, stored: named, playersMayAskForInitials }) => {
+    'shows only what the settings allow, and nothing private: $audience, $stored, confirmed $confirmed, adults may ask $playersMayAskForInitials',
+    async ({ audience, stored: named, confirmed, playersMayAskForInitials }) => {
       const stored = named === 'nothing' ? undefined : named;
-      const policy = await policyOf(stored, playersMayAskForInitials, audience);
+      const policy = await policyOf(stored, confirmed, playersMayAskForInitials);
       expect(policy.playersMayAskForInitials).toBe(playersMayAskForInitials);
+      expect(policy.childrenInFull).toBe(confirmed);
       const viewer = publicViewer(leagueId);
       const viewing = { leagueId, viewer, audience, policy };
-      const expected = people.map((p) => expectedName(p, audience, stored));
+      const expected = people.map((p) => expectedName(p, audience, stored, confirmed));
       const privateValues = people.flatMap((p, i) => [
         ...privateValuesOf(p, expected[i] ?? { shown: false, why: 'no_name' }),
         p.birthDate,

@@ -120,6 +120,28 @@ describe('setSetting', () => {
     expect(db.state.activity[1]?.details).not.toHaveProperty('confirmed');
   });
 
+  it('writes nothing and logs nothing when the same value is saved again (record 065)', async () => {
+    const { db, deps, context } = setUp();
+    expect(await set(context, input({ value: 12 }), deps)).toEqual({
+      ok: true,
+      value: { key: hours.key, version: 1 },
+    });
+    expect(await set(context, input({ value: 12, version: 1 }), deps)).toEqual({
+      ok: true,
+      value: { key: hours.key, version: 1 },
+    });
+    expect(db.state.activity).toHaveLength(1);
+    expect(db.state.settings.map((s) => s.version)).toEqual([1]);
+    // Saved from a version that is gone, it is refused, as any stale save is.
+    expect(await set(context, input({ value: 12, version: null }), deps)).toEqual({
+      ok: false,
+      error: { code: 'changed-since-read' },
+    });
+    // A different value is a change: written and logged.
+    expect(await set(context, input({ value: 6, version: 1 }), deps)).toMatchObject({ ok: true });
+    expect(db.state.activity).toHaveLength(2);
+  });
+
   it('refuses a level the declaration does not allow', async () => {
     const { deps, context } = setUp();
     const r = await set(
@@ -222,19 +244,29 @@ describe('the names setting in an archived or suspended league (R-26)', () => {
     version,
     ...(confirmed === undefined ? {} : { confirmed }),
   });
-  /** A league whose names setting is `start`, then put in `status`. */
-  async function readOnly(status: 'archived' | 'suspended', start?: string) {
+  const confirmedKey = 'privacy.childrenInFullConfirmed';
+  /** A league whose names setting is `start` (and the confirmation given), then put in `status`. */
+  async function readOnly(status: 'archived' | 'suspended', start?: string, confirmation = false) {
     const m = setUp();
     if (start !== undefined) {
-      const saved = await setSetting(m.as(ownerId), at(start, null, true), m.deps);
+      const saved = await setSetting(m.as(ownerId), at(start, null), m.deps);
       if (!saved.ok) throw new Error('expected the starting value to save');
+    }
+    if (confirmation) {
+      const given = await setSetting(
+        m.as(ownerId),
+        { level: 'league', key: confirmedKey, value: true, version: null, confirmed: true },
+        m.deps,
+      );
+      if (!given.ok) throw new Error('expected the confirmation to save');
     }
     if (m.db.state.league !== undefined) m.db.state.league = { ...m.db.state.league, status };
     m.db.state.activity = [];
     return m;
   }
-  const valueOf = (m: Awaited<ReturnType<typeof readOnly>>) =>
-    m.db.state.settings.find((s) => s.key === key)?.document.value ?? 'firstNameLastInitial';
+  const valueOf = (m: Awaited<ReturnType<typeof readOnly>>, of = key) =>
+    m.db.state.settings.find((s) => s.key === of)?.document.value ??
+    (of === key ? 'fullName' : false);
 
   it.each(['archived', 'suspended'] as const)(
     'lets the owner move it toward less shown while %s, one step at a time',
@@ -247,17 +279,37 @@ describe('the names setting in an archived or suspended league (R-26)', () => {
       expect(await setSetting(m.as(ownerId), at('hidden', 2), m.deps)).toMatchObject({ ok: true });
       expect(valueOf(m)).toBe('hidden');
       expect(m.db.state.activity).toHaveLength(2);
-      // From the start (no value saved), straight to hidden.
+      // From the start (no value saved, full names), straight to hidden.
       const fresh = await readOnly(status);
       expect(await setSetting(fresh.as(ownerId), at('hidden', null), fresh.deps)).toMatchObject({
         ok: true,
       });
-      // Going back to the default from full names shows less too.
-      const full = await readOnly(status, 'fullName');
+    },
+  );
+
+  it.each(['archived', 'suspended'] as const)(
+    "lets the owner take the parents' confirmation back while %s, whichever way it is done",
+    async (status) => {
+      // Saying no.
+      const saidNo = await readOnly(status, undefined, true);
       expect(
-        await clearSetting(full.as(ownerId), { level: 'league', key, version: 1 }, full.deps),
+        await setSetting(
+          saidNo.as(ownerId),
+          { level: 'league', key: confirmedKey, value: false, version: 1 },
+          saidNo.deps,
+        ),
       ).toMatchObject({ ok: true });
-      expect(valueOf(full)).toBe('firstNameLastInitial');
+      expect(valueOf(saidNo, confirmedKey)).toBe(false);
+      // Going back to the default, which is no.
+      const cleared = await readOnly(status, undefined, true);
+      expect(
+        await clearSetting(
+          cleared.as(ownerId),
+          { level: 'league', key: confirmedKey, version: 1 },
+          cleared.deps,
+        ),
+      ).toMatchObject({ ok: true });
+      expect(valueOf(cleared, confirmedKey)).toBe(false);
     },
   );
 
@@ -265,27 +317,31 @@ describe('the names setting in an archived or suspended league (R-26)', () => {
     'refuses any move toward more shown while %s',
     async (status) => {
       const hidden = await readOnly(status, 'hidden');
-      for (const [value, confirmed] of [
-        ['firstNameLastInitial', undefined],
-        ['fullName', true],
-      ] as const) {
-        expect(
-          await setSetting(hidden.as(ownerId), at(value, 1, confirmed), hidden.deps),
-        ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+      for (const value of ['firstNameLastInitial', 'fullName']) {
+        expect(await setSetting(hidden.as(ownerId), at(value, 1), hidden.deps)).toMatchObject({
+          ok: false,
+          error: { code: 'not-allowed' },
+        });
       }
-      // Going back to the default from hidden would show more.
+      // Going back to the default (full names) from hidden would show more.
       expect(
         await clearSetting(hidden.as(ownerId), { level: 'league', key, version: 1 }, hidden.deps),
       ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
       expect(valueOf(hidden)).toBe('hidden');
+      // Giving the confirmation would show children more.
       const fresh = await readOnly(status);
       expect(
-        await setSetting(fresh.as(ownerId), at('fullName', null, true), fresh.deps),
+        await setSetting(
+          fresh.as(ownerId),
+          { level: 'league', key: confirmedKey, value: true, version: null, confirmed: true },
+          fresh.deps,
+        ),
       ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
-      // Saving the same value again is not a move toward less.
-      expect(
-        await setSetting(fresh.as(ownerId), at('firstNameLastInitial', null), fresh.deps),
-      ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+      // Saving the start again is not a move toward less.
+      expect(await setSetting(fresh.as(ownerId), at('fullName', null), fresh.deps)).toMatchObject({
+        ok: false,
+        error: { code: 'not-allowed' },
+      });
       expect(hidden.db.state.activity).toEqual([]);
       expect(fresh.db.state.settings).toEqual([]);
     },
@@ -312,89 +368,6 @@ describe('the names setting in an archived or suspended league (R-26)', () => {
       expect(m.db.state.settings).toEqual([]);
     },
   );
-});
-
-describe('a setting whose start depends on who plays in the league (record 065)', () => {
-  const key = 'privacy.publicNames';
-  const at = (value: unknown, version: number | null, confirmed?: boolean) => ({
-    level: 'league',
-    key,
-    value,
-    version,
-    ...(confirmed === undefined ? {} : { confirmed }),
-  });
-  const stored = (m: ReturnType<typeof setUp>) =>
-    m.db.state.settings.filter((s) => s.key === key).map((s) => s.document.value);
-
-  it("saves an adult league's full names with no confirmation, as its start, kept as no value", async () => {
-    const m = setUp();
-    m.db.state.audience = 'adult';
-    m.db.state.league = { ...m.db.state.league!, status: 'live' };
-    const owner = m.as(ownerId);
-    // Hidden, then first name and last initial: stored, no confirmation asked.
-    expect(await setSetting(owner, at('hidden', null), m.deps)).toEqual({
-      ok: true,
-      value: { key, version: 1 },
-    });
-    expect(await setSetting(owner, at('firstNameLastInitial', 1), m.deps)).toMatchObject({
-      ok: true,
-    });
-    // Full names again, not confirmed: the league is back on its start, nothing stored.
-    expect(await setSetting(owner, at('fullName', 2), m.deps)).toEqual({
-      ok: true,
-      value: { key, version: null },
-    });
-    expect(stored(m)).toEqual([]);
-    expect(m.db.state.activity.map((a) => a.action)).toEqual([
-      'leagues.set_setting',
-      'leagues.set_setting',
-      'leagues.set_setting',
-    ]);
-    expect(m.db.state.activity[2]?.details).not.toHaveProperty('confirmed');
-    // Saving the start again while on it changes nothing and still answers saved.
-    expect(await setSetting(owner, at('fullName', null), m.deps)).toMatchObject({ ok: true });
-    // Saving it from a version that is no longer there is refused, as any stale save is.
-    expect(await setSetting(owner, at('fullName', 1), m.deps)).toEqual({
-      ok: false,
-      error: { code: 'changed-since-read' },
-    });
-    // A confirmed full names is stored, as anywhere: it lets a child be shown in full.
-    expect(await setSetting(owner, at('fullName', null, true), m.deps)).toEqual({
-      ok: true,
-      value: { key, version: 1 },
-    });
-    expect(stored(m)).toEqual(['fullName']);
-    expect(m.db.state.activity.at(-1)?.details).toMatchObject({ confirmed: true });
-  });
-
-  it('still asks a youth or mixed league to confirm full names (R-14)', async () => {
-    for (const audience of ['youth', 'mixed'] as const) {
-      const m = setUp();
-      m.db.state.audience = audience;
-      expect(await setSetting(m.as(ownerId), at('fullName', null), m.deps), audience).toEqual({
-        ok: false,
-        error: { code: 'confirmation-needed' },
-      });
-      expect(stored(m)).toEqual([]);
-    }
-  });
-
-  it('refuses the way back to an adult start that would show more while archived (R-26)', async () => {
-    const m = setUp();
-    m.db.state.audience = 'adult';
-    expect(await setSetting(m.as(ownerId), at('hidden', null), m.deps)).toMatchObject({
-      ok: true,
-    });
-    m.db.state.league = { ...m.db.state.league!, status: 'archived' };
-    expect(await setSetting(m.as(ownerId), at('fullName', 1), m.deps)).toMatchObject({
-      ok: false,
-      error: { code: 'not-allowed' },
-    });
-    expect(
-      await clearSetting(m.as(ownerId), { level: 'league', key, version: 1 }, m.deps),
-    ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
-    expect(stored(m)).toEqual(['hidden']);
-  });
 });
 
 describe('program admins and the activity log', () => {

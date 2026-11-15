@@ -1126,21 +1126,18 @@ export const en = {
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
   'setting.privacy.publicNames.label':
-    'Names on public pages: how every player is shown on the team pages, game pages and statistics. Anyone recorded as a child is shown by full name only where the league has confirmed that their parents or guardians agreed. A request for less that was recorded for one person (initials, or their name taken off) always wins over this setting.',
-  // The sentence the setting opens with, by who plays in the league (record 065):
-  // `setting.<key>.start.<audience>`.
-  'setting.privacy.publicNames.start.adult':
-    'Your league is for adults, so it starts with full names. Choose less here at any time.',
-  'setting.privacy.publicNames.start.youth':
-    "Your league is for young players, so it starts with first name and last initial. Full names need their parents' or guardians' agreement, which you confirm below.",
-  'setting.privacy.publicNames.start.mixed':
-    "Your league has both adults and young players, so it starts with first name and last initial for everyone. Full names need the young players' parents' or guardians' agreement, which you confirm below.",
-  'setting.privacy.publicNames.option.fullName': 'Full names, like "Jordan Ellis"',
+    "Names on public pages: how players are shown on the team pages, game pages and statistics. If a person's own request for less is recorded (initials, or their name taken off), it always wins over this setting.",
+  // Each choice says what it does to adults and to children (R-29, record 065).
+  'setting.privacy.publicNames.option.fullName':
+    'Full names for adults, like "Jordan Ellis". Children are shown by first name and last initial, like "Jordan E.", unless their full names are confirmed below.',
   'setting.privacy.publicNames.option.firstNameLastInitial':
-    'First name and last initial, like "Jordan E."',
+    'First name and last initial for everyone, adults and children, like "Jordan E."',
   'setting.privacy.publicNames.option.hidden':
-    'Hidden: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
-  'setting.privacy.publicNames.confirm':
+    'Hidden for everyone, adults and children: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
+  // The parents' confirmation, a setting of its own (R-14, R-29, record 065).
+  'setting.privacy.childrenInFullConfirmed.label':
+    "Children's full names: shown only while names are on full names, and only with their parents' or guardians' agreement. In a youth or mixed league this also covers anyone whose age is not recorded.",
+  'setting.privacy.childrenInFullConfirmed.confirm':
     'I confirm that the parents or guardians of the children in this league have agreed to their full names being shown publicly, for example on the registration form.',
   'setting.privacy.playersMayAskForInitials.label':
     'Adults may ask to appear as initials on public pages. Children always can, whatever this says: a request from a parent is always followed. Anyone can ask to have their name taken off. Switching this off only stops new requests: anyone already shown as initials stays that way until their own record is changed.',
