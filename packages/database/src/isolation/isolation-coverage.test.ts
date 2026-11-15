@@ -22,6 +22,7 @@ import { currentLeague } from '../queries/find-current-league.ts';
 import { leagueStatusOf } from '../queries/league-status-of.ts';
 import { divisionSummary } from '../queries/division-summary.ts';
 import { gameSummary } from '../queries/game-summary.ts';
+import { gameInList, gamesForLists, inReachOf } from '../queries/games-for-lists.ts';
 import { statCounts } from '../queries/list-decided-game-lines.ts';
 import { personSummary, personSummaryWithSensitive } from '../queries/person-summary.ts';
 import { rosterEntrySummary } from '../queries/roster-entry-summary.ts';
@@ -50,6 +51,15 @@ const coreScanned = ['../core/index.ts', '../core/src'];
 const reachNoLeagueData = new Map<unknown, string>([
   [programSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [gameSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  [gameInList, 'turns a row already read into the returned shape; runs no SQL'],
+  [
+    gamesForLists,
+    "builds the scope's fenced select that the list queries (own cases) narrow and run; runs no SQL itself",
+  ],
+  [
+    inReachOf,
+    "builds a condition, its assignments fenced to the scope's league, that the list queries (own cases) run; runs no SQL itself",
+  ],
   [statCounts, 'turns a stats document already read into counts; runs no SQL'],
   [personSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [personSummaryWithSensitive, 'turns a row already read into the returned shape; runs no SQL'],

@@ -13,7 +13,11 @@
 // (Pia), and a player asked for their name not to be shown. The youth league: one season
 // ranked by points, named rounds, a make-up game with no round and no time yet, and its
 // members start on their team's page (a setting, as League settings saves it). The draft
-// league has the adult league's tracked games, scored by assigned scorekeepers only.
+// league has the adult league's tracked games, scored by assigned scorekeepers only, and a
+// game two days ago whose score nobody entered, assigned to its scorekeeper. The
+// archived league has one long season behind it, 300 games all played, and no current
+// season (step 2.156: a league with many past games still opens quickly). The adult
+// league also has a game played three days ago whose score was never entered.
 // Standings and player totals are not here: core works them out from these results when
 // the world is made (stand-in-world.ts).
 import { defaultSeasonRules, SeasonRules } from '@srleagues/contracts';
@@ -49,6 +53,8 @@ export const standInSeasonIds = {
   adultNext: madeUp('005e', 2),
   /** The draft league's season. */
   draftLeague: madeUp('005e', 1),
+  /** The archived league's one long season, all played (step 2.156: 300 past games). */
+  history: madeUp('005e', 3),
 } as const;
 
 /** A tracked game's id: game 1 to 6 of the adult league (and the draft league's same games). */
@@ -555,6 +561,21 @@ const adultFall = (programId: string): SeasonSpec => ({
         number: 19 + i,
       }),
     ),
+    // A game played three days ago whose score nobody has entered yet: the first game
+    // under the games list's "Needs a result" (step 2.156).
+    {
+      id: listedGameId(13, 20),
+      round: 2,
+      day: -3,
+      time: '19:00',
+      home: herons,
+      away: badgers,
+      status: 'scheduled',
+      capture: 'final',
+      venue: gym,
+      court: court(2),
+      number: 30,
+    },
     // The games the tracker and the games area grew up with, all in this week's round.
     ...(
       [
@@ -838,7 +859,117 @@ const draftLeagueSeason = (programId: string): SeasonSpec => {
         court: null,
         number: null,
       },
+      // Played two days ago, its score never entered, and assigned to the league's
+      // scorekeeper: the one game under their "Needs a result" (step 2.156).
+      draftUnscoredGame(),
     ],
+  };
+};
+
+/** The draft league's game nobody scored, two days ago (step 2.156). */
+const draftUnscoredGameId = listedGameId(1, 0);
+const draftUnscoredGame = (): GameSpec => ({
+  id: draftUnscoredGameId,
+  round: null,
+  day: -2,
+  time: '19:00',
+  home: hawks,
+  away: bears,
+  status: 'scheduled',
+  capture: 'final',
+  venue: pines,
+  court: court(21),
+  number: null,
+});
+
+/** The archived league's one long season: twenty teams, thirty weekly rounds, all played. */
+const historyTeamNames = [
+  'Aspens',
+  'Birches',
+  'Cedars',
+  'Dunes',
+  'Elms',
+  'Ferns',
+  'Glens',
+  'Hollows',
+  'Isles',
+  'Junipers',
+  'Knolls',
+  'Larches',
+  'Maples',
+  'Nettles',
+  'Oaks',
+  'Pines',
+  'Quarries',
+  'Reeds',
+  'Spruces',
+  'Thistles',
+] as const;
+export const historyRounds = 30;
+const historyHall = venue(5);
+const historyVenues: readonly VenueSpec[] = [
+  {
+    id: historyHall,
+    name: 'Meadow Hall',
+    address: '1 Meadow Lane',
+    courts: [{ id: court(31), name: 'Court 1' }],
+  },
+];
+
+const historySeason = (programId: string): SeasonSpec => {
+  const teams = historyTeamNames.map(
+    (name, i): TeamSpec => ({
+      id: team(200 + i),
+      name,
+      slug: name.toLowerCase(),
+      color: null,
+      division: null,
+      statsVisibility: 'everyone',
+    }),
+  );
+  const ids = teams.map((t) => t.id);
+  const count = historyTeamNames.length;
+  return {
+    season: {
+      id: standInSeasonIds.history,
+      programId,
+      programSlug: 'basketball',
+      name: '2025–26',
+      slug: '2025-26',
+      startsOn: null,
+      endsOn: null,
+      status: 'completed',
+      rules: win,
+    },
+    teams,
+    rosters: {},
+    divisions: [],
+    // Weekly, the last one a week before today.
+    rounds: Array.from({ length: historyRounds }, (_, i) => ({
+      id: big(0xb6, i + 1),
+      days: -7 * (historyRounds - i),
+      label: null,
+    })),
+    // Ten games a round, every team once, a score that is never a tie.
+    games: Array.from({ length: historyRounds * (count / 2) }, (_, n): GameSpec => {
+      const round = Math.floor(n / (count / 2));
+      const k = n % (count / 2);
+      const home = 40 + ((round * 7 + k * 3) % 30);
+      const away = 38 + ((round * 5 + k * 11) % 30);
+      return {
+        id: listedGameId(300, n),
+        round,
+        time: `${String(9 + k).padStart(2, '0')}:00`,
+        home: ids[(2 * k + round) % count] ?? '',
+        away: ids[(2 * k + 1 + round) % count] ?? '',
+        status: 'final',
+        score: [home, away === home ? away + 1 : away],
+        capture: 'final',
+        venue: historyHall,
+        court: court(31),
+        number: n + 1,
+      };
+    }),
   };
 };
 
@@ -853,6 +984,8 @@ export type SeedCast = {
   readonly draftLeague: CastLeague;
   /** The draft league's one program, which a made-up scheduler holds a grant for. */
   readonly draftProgramId: string;
+  /** The archived league: one long season, 300 games, all played long ago (step 2.156). */
+  readonly historyLeague: CastLeague;
   /** Every other made-up league: no seasons yet. */
   readonly otherLeagues: readonly CastLeague[];
   /** The account that has a roster place in each league (a made-up member). */
@@ -1023,21 +1156,13 @@ function leagueOf(
           : round === undefined
             ? null
             : addDays(today, round.days);
-      // A game set from now starts on a whole five minutes, `fromNow` minutes from now. A
-      // game under way never starts before the league's midnight: the scorekeeper's list
-      // starts there (list-games-in-window.ts), so a world made just after midnight still
-      // lists its live game. A game played earlier may fall on last night. (The database's
-      // list has the same edge for a real game live across midnight: step 2.156.)
-      const midnight = Date.parse(momentIn(today, '00:00', facts.timeZone));
+      // A game set from now starts on a whole five minutes, `fromNow` minutes from now, so
+      // it may fall on last night in a world made just after midnight: a game under way
+      // is listed whenever it started (step 2.156, list-games-in-window.ts).
       const fromNow =
         g.fromNow === undefined
           ? undefined
-          : new Date(
-              Math.max(
-                Math.floor((now.getTime() + g.fromNow * 60_000) / 300_000) * 300_000,
-                g.status === 'live' ? midnight : -Infinity,
-              ),
-            );
+          : new Date(Math.floor((now.getTime() + g.fromNow * 60_000) / 300_000) * 300_000);
       const startsAt =
         fromNow !== undefined
           ? fromNow.toISOString()
@@ -1206,10 +1331,29 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
     { gameId: standInGameId(1), accountId: draftFirst },
     { gameId: standInGameId(2), accountId: draftFirst },
     { gameId: standInGameId(4), accountId: draftSecond },
+    { gameId: draftUnscoredGameId, accountId: draftSecond },
   ];
+
+  // The archived league's season is over: it has no current season, so no round today.
+  const historyProgram = madeUp('009a', 3);
+  const history = leagueOf(
+    {
+      league: cast.historyLeague,
+      audience: 'youth',
+      timeZone: 'UTC',
+      minimumGames: 0,
+      programId: historyProgram,
+      venues: historyVenues,
+    },
+    [historySeason(historyProgram)],
+    standInSeasonIds.history,
+    cast.memberAccountId,
+    now,
+  );
+  history.currentSeasonId = null;
 
   const others = cast.otherLeagues.map((league) =>
     emptyLeagueWorld(league, { audience: 'youth', timeZone: 'UTC', minimumGames: 0 }),
   );
-  return [adult, youth, draft, ...others];
+  return [adult, youth, draft, history, ...others];
 }

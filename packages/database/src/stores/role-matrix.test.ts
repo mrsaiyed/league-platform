@@ -27,6 +27,8 @@ import {
   assignScorekeeper,
   cancelInvitation,
   commands,
+  listEarlierGames,
+  listGamesNeedingResult,
   listMyGames,
   unassignScorekeeper,
   createCourt,
@@ -943,6 +945,24 @@ const gameCommandRows: readonly Row[] = [
     scope: 'program',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listMyGames(c, i, gamesDeps),
+  },
+  // Step 2.156: the top of the games list, and its earlier games by round.
+  {
+    command: 'games.list_games_needing_result',
+    name: 'see the games that still need a result',
+    needs: 'games.score',
+    // Anyone who scores somewhere may look; the list itself holds what they may score.
+    scope: 'program',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listGamesNeedingResult(c, i, gamesDeps),
+  },
+  {
+    command: 'games.list_earlier_games',
+    name: 'see the earlier games, a round at a time',
+    needs: 'games.score',
+    scope: 'program',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listEarlierGames(c, i, gamesDeps),
   },
   {
     command: 'games.list_postponed_games',

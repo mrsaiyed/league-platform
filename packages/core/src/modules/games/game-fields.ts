@@ -23,5 +23,12 @@ export const isDecided = (status: string) => status === 'final' || status === 'f
 /** A game no one will play or score any more: decided, or called off. */
 export const isClosed = (status: string) => isDecided(status) || status === 'cancelled';
 
+/**
+ * A game that waits for no result: decided, or postponed or cancelled. Before the league's
+ * today, these are the games list's "Earlier games" (step 2.156); every other game there
+ * still needs its result (needs-result.ts).
+ */
+export const isOverOrCalledOff = (status: string) => isClosed(status) || status === 'postponed';
+
 /** The scorekeeper's list covers today and the six days after: the week ahead (P4 §4). */
 export const myGamesDays = 7;
