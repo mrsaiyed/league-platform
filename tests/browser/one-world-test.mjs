@@ -124,9 +124,9 @@ if (built) {
       .locator('section[data-round] details[data-add-game] input[name=date]')
       .evaluateAll((inputs) => inputs.map((input) => input.value));
     if (dates.length !== 6) throw new Error(`the season has ${dates.length} rounds, not six`);
-    const first = new Date(`${dates[0]}T12:00:00Z`);
-    first.setUTCDate(first.getUTCDate() + 21);
-    const today = first.toISOString().slice(0, 10);
+    const firstRound = new Date(`${dates[0]}T12:00:00Z`);
+    firstRound.setUTCDate(firstRound.getUTCDate() + 21);
+    const today = firstRound.toISOString().slice(0, 10);
     const round = page.locator(`section[data-round]`, {
       has: page.locator(`details[data-add-game] input[name=date][value="${today}"]`),
     });
