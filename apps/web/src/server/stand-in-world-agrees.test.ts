@@ -101,6 +101,8 @@ import { emptyLeagueWorld } from './stand-in-world-state.ts';
 import { madeUpWorld, type World, type WorldTx } from './stand-in-world.ts';
 
 const zone = 'America/Chicago';
+/** The league's today, worked out once, so a midnight in the middle of the test moves nothing. */
+const today = dayIn(new Date(), zone);
 
 /** What one side offers the scenario: the commands' deps and the public reads. */
 type Side = {
@@ -345,7 +347,6 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
   const of = (name: string) => players.get(name) ?? [];
 
   // The schedule: six games, drafted and published.
-  const today = dayIn(new Date(), zone);
   const games: readonly (readonly [
     string,
     string,
@@ -530,19 +531,29 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
   ok('tracked game', batch);
 }
 
-/** Reads every id as the name it was given, so the two sides can be set side by side. */
+/**
+ * Reads every id as the name it was given, so the two sides can be set side by side. An id
+ * the test did not name (a division's, the season's, a correction's) is read as its place
+ * among the unnamed ids in order of first appearance, `<made:1>`, `<made:2>`: so the same
+ * unnamed id must stand in the same places on both sides, and one swapped for another
+ * shows.
+ */
 function asNames(value: unknown, side: Side): unknown {
   const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
   const text = JSON.stringify(value, (key, v: unknown) =>
     // A roster entry's own id, and the moment a game was decided, are the store's own.
     key === 'entryId' || key === 'finalizedAt' ? undefined : v,
   );
+  const unnamed = new Map<string, string>();
   return JSON.parse(
-    text.replace(
-      uuid,
-      (id) =>
-        side.names.get(id) ?? ((Object.values(gameIds) as string[]).includes(id) ? id : '<made>'),
-    ),
+    text.replace(uuid, (id) => {
+      const named = side.names.get(id);
+      if (named !== undefined) return named;
+      if ((Object.values(gameIds) as string[]).includes(id)) return id;
+      const place = unnamed.get(id) ?? `<made:${unnamed.size + 1}>`;
+      unnamed.set(id, place);
+      return place;
+    }),
   );
 }
 
@@ -587,7 +598,6 @@ describe('the one world and the database, the same season by the same commands',
   });
 
   it('read the same published schedule', async () => {
-    const today = dayIn(new Date(), zone);
     const [a, b] = await both(async (side) => side.schedule(await seasonOfSide(side), today));
     expect(b).toEqual(a);
   });
