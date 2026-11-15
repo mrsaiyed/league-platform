@@ -34,7 +34,8 @@ const daysFrom = (first: string, days: number, why: string): Window[] =>
  * The stretches the world is made in, one test each so none comes near the time limit: the
  * hour GitHub failed in, every minute; a week with a month's end and the autumn clock change
  * (Chicago and Los Angeles fall back on 1 November), day by day, every ten minutes, and that
- * clock-change night every minute.
+ * clock-change night every minute; the spring clock change (14 March 2027) and a year's end,
+ * day by day, every ten minutes.
  */
 const windows: readonly Window[] = [
   {
@@ -50,6 +51,8 @@ const windows: readonly Window[] = [
     to: '2026-11-01T10:00:00Z',
     step: 1,
   },
+  ...daysFrom('2027-03-13', 3, 'the spring clock change'),
+  ...daysFrom('2026-12-30', 4, 'a year’s end'),
 ];
 
 const momentsOf = (w: Window): Date[] => {
