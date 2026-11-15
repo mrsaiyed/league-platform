@@ -1494,6 +1494,106 @@ if (browser) {
     }
   });
 
+  await step('a tap’s mark: taken, then stored or gone (the code look, L4)', async () => {
+    const { context, page, errors } = await scorekeeperAt(phone);
+    let other = null;
+    try {
+      await page.goto(`${origin}${trackerPath()}`);
+      const c = await openCourt(page);
+      await c.saved();
+      await watchMarks(c);
+      const floorTile = c.root.locator('[data-floor="home"] > [data-player]').first();
+      const floorId = await floorTile.getAttribute('data-player');
+
+      // An accepted tap: its mark is taken (hollow), then stored (solid).
+      await floorTile.click();
+      await c.pad.locator(`[data-options="${floorId}"]`).waitFor();
+      await c.recorded(() => c.option('p2').click());
+      note(
+        'an accepted tap marks the tile "taken", then "stored" (L4)',
+        await marksShown(page, floorId, ['taken', 'stored']),
+        await markLog(page),
+      );
+      await c.saved();
+
+      // A refused tap: the device cannot keep it (its store refuses every write). The mark
+      // is taken off at once and the refusal is said in a sentence (L4).
+      await page.evaluate(() => {
+        window.markLog.length = 0;
+        const transaction = IDBDatabase.prototype.transaction;
+        window.storeWorks = () => (IDBDatabase.prototype.transaction = transaction);
+        IDBDatabase.prototype.transaction = function refusing(names, mode, ...rest) {
+          if (mode === 'readwrite') throw new DOMException('made-up failure', 'UnknownError');
+          return transaction.call(this, names, mode, ...rest);
+        };
+      });
+      const playsBefore = await c.root.getAttribute('data-plays');
+      await floorTile.click();
+      await c.pad.locator(`[data-options="${floorId}"]`).waitFor();
+      await c.option('p3').click();
+      await c.said
+        .filter({ hasText: 'This device could not keep that tap, so it was not recorded.' })
+        .waitFor();
+      const refusedMark = await floorTile.evaluate((el) => ({
+        mark: el.getAttribute('data-mark'),
+        state: el.getAttribute('data-mark-state'),
+      }));
+      note(
+        'a refused tap: the mark was shown taken, is gone, and the sentence is shown (L4)',
+        (await marksShown(page, floorId, ['taken', null])) &&
+          refusedMark.mark === null &&
+          refusedMark.state === null &&
+          (await c.root.getAttribute('data-plays')) === playsBefore,
+        JSON.stringify({ refusedMark, log: await page.evaluate(() => window.markLog) }),
+      );
+      await page.evaluate(() => window.storeWorks());
+
+      // A tap made as this device stops scoring (another device takes the game over
+      // while the tap is being kept): the page that replaces the scoring screen says the
+      // last tap was not recorded (`data-last-tap-lost`, L4).
+      await page.evaluate((storeName) => {
+        let open;
+        window.writesHeld = new Promise((resolve) => (open = resolve));
+        window.letWritesGo = () => open();
+        const transaction = IDBDatabase.prototype.transaction;
+        IDBDatabase.prototype.transaction = function holding(names, mode, ...rest) {
+          const made = transaction.call(this, names, mode, ...rest);
+          if (this.name !== storeName || mode !== 'readwrite') return made;
+          // Its end is told only once the writes are let go.
+          Object.defineProperty(made, 'oncomplete', {
+            set(run) {
+              made.addEventListener('complete', (event) =>
+                window.writesHeld.then(() => run.call(made, event)),
+              );
+            },
+          });
+          return made;
+        };
+      }, queueDatabase);
+      await floorTile.click();
+      await c.pad.locator(`[data-options="${floorId}"]`).waitFor();
+      await c.option('p1').click();
+      other = await scorekeeperAt(phone);
+      await other.page.goto(`${origin}${trackerPath()}`);
+      const taken = await court(other.page).open();
+      note('another device takes the game over', taken.tookOver);
+      // This device asks the server again (as when the network is back), and is told.
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await c.root.waitFor({ state: 'detached' });
+      await page.evaluate(() => window.letWritesGo());
+      const lost = page.locator('[data-last-tap-lost]');
+      await lost.waitFor();
+      note(
+        'a tap made as the device stops scoring is said not recorded on the page that follows (L4)',
+        /Your last tap was made as this device stopped scoring/.test(await lost.innerText()),
+      );
+      note('nothing broke on the page', errors.length === 0, errors.join('; '));
+    } finally {
+      await letGo(page, context);
+      if (other !== null) await letGo(other.page, other.context);
+    }
+  });
+
   await step('the five sizes: targets, the two teams’ places, less motion', async () => {
     for (const size of sizes) {
       const { context, page } = await scorekeeperAt(size);
@@ -1629,10 +1729,20 @@ if (browser) {
         // two thirds of a second, which a slower machine could take to ask for it.
         await first.evaluate((el) => {
           window.markSeen = null;
+          window.markStored = null;
+          new MutationObserver(() => {
+            if (window.markStored === null && el.getAttribute('data-mark-state') === 'stored') {
+              window.markStored = {
+                state: 'stored',
+                animation: getComputedStyle(el, '::after').animationName,
+              };
+            }
+          }).observe(el, { attributes: true, attributeFilter: ['data-mark-state'] });
           new MutationObserver(() => {
             if (window.markSeen !== null || !el.hasAttribute('data-mark')) return;
             window.markSeen = {
               mark: el.getAttribute('data-mark'),
+              state: el.getAttribute('data-mark-state'),
               animation: getComputedStyle(el, '::after').animationName,
             };
           }).observe(el, { attributes: true, attributeFilter: ['data-mark'] });
@@ -1641,8 +1751,17 @@ if (browser) {
         const motion = await (await page.waitForFunction(() => window.markSeen)).jsonValue();
         note(
           `${label}: with less motion asked for, the tap shows and nothing moves (S5)`,
-          motion.mark === '+1' && motion.animation === 'none',
+          motion.mark === '+1' && motion.state === 'taken' && motion.animation === 'none',
           JSON.stringify(motion),
+        );
+        // And once stored, the mark is solid, still with nothing moving.
+        const storedMotion = await (
+          await page.waitForFunction(() => window.markStored)
+        ).jsonValue();
+        note(
+          `${label}: with less motion asked for, the stored mark is solid and nothing moves (S5)`,
+          storedMotion.state === 'stored' && storedMotion.animation === 'none',
+          JSON.stringify(storedMotion),
         );
         // Nothing is selected by a long press, and a double tap does not zoom (S1).
         const calm = await c.root.evaluate((el) => ({
