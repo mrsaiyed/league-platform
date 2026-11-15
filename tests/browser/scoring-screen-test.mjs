@@ -76,6 +76,14 @@ const [phone, phoneLying, , tabletLying, phoneInBrowser] = sizes;
 const folded = (size) => size.width < 700 && size.height < 760 && size.height > size.width;
 // The name the device's own store of waiting taps is kept under (indexeddb-queue-storage.ts).
 const queueDatabase = 'srleagues-tracker-queue';
+// And the name its opened games, with the starters picked so far, are kept under
+// (indexeddb-opened-game-storage.ts).
+const gamesDatabase = 'srleagues-tracker-games';
+// The screen asks for the device's own face, and devices differ: GitHub's Linux machines
+// draw wider letters than Windows does. `SCORING_TEST_FACE="Verdana"` (or any face this
+// computer has) runs every measure here with the screen drawn in that face instead, to
+// try the sizes with other letters before GitHub does. Off unless asked for.
+const otherFace = process.env.SCORING_TEST_FACE ?? '';
 
 let built = true;
 if (!process.argv.includes('--no-build')) {
@@ -108,6 +116,15 @@ async function scorekeeperAt(size, options = {}) {
     ...options,
   });
   await context.addCookies([{ ...scorekeeper, url: origin }]);
+  if (otherFace) {
+    await context.addInitScript((face) => {
+      document.addEventListener('DOMContentLoaded', () => {
+        const style = document.createElement('style');
+        style.textContent = `.court, .court * { font-family: ${face}, sans-serif !important; }`;
+        document.head.append(style);
+      });
+    }, otherFace);
+  }
   const page = await context.newPage();
   page.setDefaultTimeout(30_000);
   const errors = [];
@@ -116,6 +133,16 @@ async function scorekeeperAt(size, options = {}) {
 }
 async function accessible(page, label) {
   const problems = await accessibilityProblems(page);
+  // The kit reads a button's words wherever they are in the page; a screen reader is not
+  // given words that are taken out of it (`display: none`). So the browser itself is
+  // asked what it hands a screen reader: a button or link with no name there is a problem.
+  const tree = await page.locator('body').ariaSnapshot();
+  const nameless = tree
+    .split('\n')
+    .filter((line) => /^\s*- (button|link)(\s\[[^\]]*\])*:?\s*$/.test(line));
+  if (nameless.length > 0) {
+    problems.push(`${nameless.length} buttons or links have no name for a screen reader`);
+  }
   note(`accessibility: ${label}`, problems.length === 0, problems.join('; '));
 }
 async function noSidewaysScroll(page, label) {
@@ -125,6 +152,12 @@ async function noSidewaysScroll(page, label) {
   ]);
   note(`no sideways scrolling: ${label}`, width <= inner, `${width} > ${inner}`);
 }
+
+/** Lets the page draw twice: what it does just after drawing (its effects) is done by then. */
+const twoFrames = (page) =>
+  page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  );
 
 /**
  * Counts every scroll of the page or of anything in it from now on, so a test can say
@@ -148,7 +181,21 @@ const scrollsSeen = (page) =>
  * it is not wholly on the screen, or if something else is in front of it there.
  */
 async function tapWhereItIs(page, locator, what) {
-  const box = await locator.boundingBox();
+  // A hand taps a thing once it sees it, at rest: the thing is waited for (waiting
+  // scrolls nothing) and measured only when two frames running find it in one place. A
+  // measure taken in the frame the pad is drawn again finds nothing, on a slower machine.
+  await locator.waitFor();
+  let box = await locator.boundingBox();
+  for (let tries = 0; tries < 40; tries += 1) {
+    await twoFrames(page);
+    const again = await locator.boundingBox();
+    const still =
+      box !== null &&
+      again !== null &&
+      ['x', 'y', 'width', 'height'].every((side) => box[side] === again[side]);
+    box = again;
+    if (still) break;
+  }
   if (box === null) throw new Error(`${what} is not on the screen`);
   const view = page.viewportSize();
   if (box.x < 0 || box.y < 0 || box.x + box.width > view.width || box.y + box.height > view.height)
@@ -160,6 +207,75 @@ async function tapWhereItIs(page, locator, what) {
   );
   if (!onTop) throw new Error(`${what} is covered where it would be tapped`);
   await page.mouse.click(x, y);
+}
+
+/**
+ * Whether the keyboard comes to rest on this thing. The screen moves it there once it has
+ * been drawn again, a frame or two after what the test waited for; so it is looked for
+ * frame by frame for a few seconds, not asked once.
+ */
+const keyboardOn = (locator) =>
+  locator.evaluate(
+    (el) =>
+      new Promise((resolve) => {
+        const began = performance.now();
+        const look = () => {
+          if (el === document.activeElement) resolve(true);
+          else if (performance.now() - began > 5000) resolve(false);
+          else requestAnimationFrame(look);
+        };
+        look();
+      }),
+  );
+
+/**
+ * A play made as a hand makes it, every tap where the thing is: the player's tile, then,
+ * once the pad shows that player's options, one of them; then the play is waited for and
+ * the pad is at rest again before anything else is tapped.
+ */
+async function playWhereItIs(page, c, tile, act, what) {
+  const id = await tile.getAttribute('data-player');
+  await tapWhereItIs(page, tile, what);
+  await c.pad.locator(`[data-options="${id}"]`).waitFor();
+  await c.recorded(() => tapWhereItIs(page, c.option(act), `${act} for ${what}`));
+  await c.pad.locator('[data-rest]').waitFor();
+}
+
+/**
+ * The scoring screen of the game at this address, opened. Each step lets go of the game
+ * when it ends (`letGo`), so the next finds it free; a game still held is taken over, and
+ * that is a failure of its own unless a step before this one had already failed (it then
+ * left taps unsent, and a game with taps unsent is not let go of).
+ */
+async function openCourt(page) {
+  const c = court(page);
+  const hadFailed = failures.length > 0;
+  const { tookOver } = await c.open();
+  if (tookOver) {
+    note('the game was free to open, not held by a device that had left it', hadFailed);
+  }
+  return c;
+}
+
+/**
+ * Ends a step: the game is left by the screen's own way out, which lets go of it before
+ * the page goes, and the browser's window is closed. A step that broke has said so
+ * already; its game is taken over by the next.
+ */
+async function letGo(page, context) {
+  try {
+    const c = court(page);
+    // Not waited on for long: a screen that broke may have no way out.
+    page.setDefaultTimeout(8_000);
+    if (await c.root.isVisible()) {
+      await page.keyboard.press('Escape');
+      await c.leave();
+    }
+  } catch {
+    // Said by the step itself, or by the next step's `openCourt`.
+  } finally {
+    await context.close();
+  }
 }
 
 /**
@@ -213,6 +329,7 @@ const targets = (page) =>
 
 /** Checks the sizes of everything tappable now, and the room between them. */
 async function measureTargets(page, label) {
+  await twoFrames(page);
   const list = await targets(page);
   const small = list.filter((t) => t.w < 43.99 || t.h < 43.99);
   note(
@@ -286,6 +403,8 @@ const playerLines = (page) =>
  * end tile, that tile is whole, and the line has not been scrolled.
  */
 async function measureLines(page, label, expected) {
+  // The screen counts what fits in a line just after it has drawn it: two frames on.
+  await twoFrames(page);
   const lines = await playerLines(page);
   const wrong = lines.filter(
     (line) =>
@@ -312,8 +431,7 @@ if (browser) {
         .locator(`li[data-game="${otherGame}"]`)
         .getByRole('link', { name: 'Score this game' })
         .click();
-      const c = court(page);
-      await c.open();
+      const c = await openCourt(page);
       note('the address is the game’s tracker', page.url().endsWith(trackerPath(otherGame)));
 
       // The frame: the tracker's own, nothing of the public site (DESIGN.md section 7, line 11).
@@ -331,7 +449,11 @@ if (browser) {
         /Lions at Hawks/.test(frame.title) && /\d{1,2}:\d{2}/.test(frame.title),
         frame.title,
       );
-      note('a plain sans face the device already has', /^system-ui/.test(frame.font), frame.font);
+      note(
+        'a plain sans face the device already has',
+        /^system-ui/.test(frame.font) || otherFace !== '',
+        frame.font,
+      );
       await accessible(page, 'lineups, nobody picked');
       await noSidewaysScroll(page, 'lineups');
 
@@ -356,8 +478,34 @@ if (browser) {
       await c.tile('home', 7).click();
       await page.getByText('2 of 5 picked.').waitFor();
 
-      // A reload mid-pick keeps the picks (C3).
-      await page.waitForTimeout(300);
+      // A reload mid-pick keeps the picks (C3). The page is reloaded once the device's own
+      // store holds the two picks: looked for there, not guessed at by waiting a while,
+      // which a slower machine would lose.
+      const picked = [
+        await c.tile('home', 3).getAttribute('data-player'),
+        await c.tile('home', 5).getAttribute('data-player'),
+      ];
+      await page.waitForFunction(
+        async ([name, game, want]) => {
+          const db = await new Promise((resolve, reject) => {
+            const opening = indexedDB.open(name);
+            opening.onsuccess = () => resolve(opening.result);
+            opening.onerror = () => reject(opening.error);
+          });
+          try {
+            const row = await new Promise((resolve, reject) => {
+              const get = db.transaction('games', 'readonly').objectStore('games').get(game);
+              get.onsuccess = () => resolve(get.result);
+              get.onerror = () => reject(get.error);
+            });
+            const home = row?.lineupPicks?.home ?? [];
+            return home.length === want.length && want.every((id) => home.includes(id));
+          } finally {
+            db.close();
+          }
+        },
+        [gamesDatabase, otherGame, picked],
+      );
       await page.reload();
       await c.open();
       await page.getByText('2 of 5 picked.').waitFor();
@@ -415,7 +563,7 @@ if (browser) {
       ]);
       note('nothing broke on the page', errors.length === 0, errors.join('; '));
     } finally {
-      await context.close();
+      await letGo(page, context);
     }
   });
 
@@ -429,8 +577,7 @@ if (browser) {
           .locator(`li[data-game="${liveGame}"]`)
           .getByRole('link', { name: 'Score this game' })
           .click();
-        const c = court(page);
-        await c.open();
+        const c = await openCourt(page);
         await c.pick('home', starters);
         await c.pick('away', starters);
         await page.locator('[data-scoring][data-stage="play"]').waitFor();
@@ -510,22 +657,24 @@ if (browser) {
         // where the thing is on the screen.
         for (const side of ['home', 'away']) {
           for (const jersey of starters) {
-            await tapWhereItIs(page, c.tile(side, jersey), `${side} #${jersey}`);
-            await tapWhereItIs(page, c.option('p2'), '+2');
-            await tapWhereItIs(page, c.tile(side, jersey), `${side} #${jersey}`);
-            await tapWhereItIs(page, c.option('foul'), 'Foul');
+            await playWhereItIs(page, c, c.tile(side, jersey), 'p2', `${side} #${jersey}`);
+            await playWhereItIs(page, c, c.tile(side, jersey), 'foul', `${side} #${jersey}`);
           }
           // Each is substituted from their own options: who can come in is in the pad. A
           // fresh bench player comes in every time, so all five starters go off.
           for (const [i, jersey] of starters.entries()) {
             const coming = fresh[side][i];
+            const going = await c.tile(side, jersey).getAttribute('data-player');
             await tapWhereItIs(page, c.tile(side, jersey), `${side} #${jersey}`);
-            await tapWhereItIs(
-              page,
-              c.pad.locator('[data-act="sub"]').filter({
-                has: page.locator('.court-opt-number', { hasText: new RegExp(`^${coming}$`) }),
-              }),
-              `#${coming} of "Sub in"`,
+            await c.pad.locator(`[data-options="${going}"]`).waitFor();
+            await c.recorded(() =>
+              tapWhereItIs(
+                page,
+                c.pad.locator('[data-act="sub"]').filter({
+                  has: page.locator('.court-opt-number', { hasText: new RegExp(`^${coming}$`) }),
+                }),
+                `#${coming} of "Sub in"`,
+              ),
             );
             await c.root
               .locator(`[data-bench="${side}"] [data-player]`)
@@ -533,13 +682,15 @@ if (browser) {
                 has: page.locator('.court-tile-number', { hasText: new RegExp(`^${jersey}$`) }),
               })
               .waitFor();
+            await c.pad.locator('[data-rest]').waitFor();
           }
         }
         // And from the bench: "In for" shows all five on the court, with no scrolling (E1).
         const bench = { home: 30, away: 30 };
         for (const side of ['home', 'away']) {
+          const comingId = await c.tile(side, bench[side]).getAttribute('data-player');
           await tapWhereItIs(page, c.tile(side, bench[side]), `${side} bench #${bench[side]}`);
-          const inFor = c.pad.locator('[data-act="sub"]');
+          const inFor = c.pad.locator(`[data-options="${comingId}"] [data-act="sub"]`);
           await inFor.first().waitFor();
           note(`"In for" offers the five on the court (${side})`, (await inFor.count()) === 5);
           for (let i = 0; i < 5; i += 1) {
@@ -549,7 +700,8 @@ if (browser) {
               box !== null && box.x >= 0 && box.x + box.width <= phone.width,
             );
           }
-          await tapWhereItIs(page, inFor.nth(4), 'the fifth of "In for"');
+          await c.recorded(() => tapWhereItIs(page, inFor.nth(4), 'the fifth of "In for"'));
+          await c.pad.locator('[data-rest]').waitFor();
           await c.root
             .locator(`[data-floor="${side}"] [data-player]`)
             .filter({
@@ -615,7 +767,7 @@ if (browser) {
         );
         note('nothing broke on the page', errors.length === 0, errors.join('; '));
       } finally {
-        await context.close();
+        await letGo(page, context);
       }
     },
   );
@@ -624,8 +776,7 @@ if (browser) {
     const { context, page, errors } = await scorekeeperAt(phone);
     try {
       await page.goto(`${origin}${trackerPath()}`);
-      const c = court(page);
-      await c.open();
+      const c = await openCourt(page);
       // The game stands as the step before left it; the floors are these.
       const floor = async (side) =>
         c.root
@@ -653,6 +804,9 @@ if (browser) {
       await c.tile('home', h1).click();
       await c.pad.locator('[data-rest]').waitFor();
       await c.tile('home', h1).click();
+      // The options are seen open before the tap elsewhere, so "closed" after it is that
+      // tap's doing and not the pad not yet drawn.
+      await c.pad.locator('[data-options]').waitFor();
       await c.root.locator('.court-clock').click();
       await c.pad.locator('[data-rest]').waitFor();
       note(
@@ -744,7 +898,7 @@ if (browser) {
       await c.pad.locator('[data-rest]').waitFor();
       note(
         'Escape closes the list and the keyboard is back on its chip (S4)',
-        await chip.evaluate((el) => el === document.activeElement),
+        await keyboardOn(chip),
       );
 
       // Fouling out at the league's limit: marked, in words, and still tappable (D10).
@@ -792,7 +946,7 @@ if (browser) {
       await c.pad.locator('[data-options]').waitFor();
       note(
         'Enter on a tile opens the options and moves into them (S4)',
-        await c.option('p1').evaluate((el) => el === document.activeElement),
+        await keyboardOn(c.option('p1')),
       );
       const ring = await c
         .option('p1')
@@ -810,7 +964,7 @@ if (browser) {
       );
       note(
         'Enter on +2 records it and the keyboard is back on the tile (S4)',
-        await c.tile('away', a1).evaluate((el) => el === document.activeElement),
+        await keyboardOn(c.tile('away', a1)),
       );
       await page.keyboard.press('Space');
       await c.pad.locator('[data-options]').waitFor();
@@ -818,7 +972,7 @@ if (browser) {
       await c.pad.locator('[data-rest]').waitFor();
       note(
         'Escape closes the options and returns to the tile (S4)',
-        await c.tile('away', a1).evaluate((el) => el === document.activeElement),
+        await keyboardOn(c.tile('away', a1)),
       );
 
       // Swap colors (D3): behind More; saved with the game.
@@ -834,7 +988,7 @@ if (browser) {
       await c.sheet.waitFor({ state: 'detached' });
       note(
         'Escape closes More and the keyboard is back on its button (S4)',
-        await c.more.evaluate((el) => el === document.activeElement),
+        await keyboardOn(c.more),
       );
       await c.more.click();
       await c.sheet.getByRole('button', { name: 'Swap colors' }).click();
@@ -849,7 +1003,7 @@ if (browser) {
       );
       note('nothing broke on the page', errors.length === 0, errors.join('; '));
     } finally {
-      await context.close();
+      await letGo(page, context);
     }
   });
 
@@ -860,8 +1014,7 @@ if (browser) {
       const label = '390 x 664';
       try {
         await page.goto(`${origin}${trackerPath()}`);
-        const c = court(page);
-        await c.open();
+        const c = await openCourt(page);
         await page.locator('[data-scoring][data-stage="play"]').waitFor();
         await accessible(page, `${label}, in play`);
         await noSidewaysScroll(page, label);
@@ -912,10 +1065,8 @@ if (browser) {
           let counted = 0;
           for (const id of floor) {
             const was = await facts(id);
-            await tapWhereItIs(page, player(id), `a ${side} floor player`);
-            await c.recorded(() => tapWhereItIs(page, c.option('p2'), '+2'));
-            await tapWhereItIs(page, player(id), `a ${side} floor player`);
-            await c.recorded(() => tapWhereItIs(page, c.option('foul'), 'Foul'));
+            await playWhereItIs(page, c, player(id), 'p2', `a ${side} floor player`);
+            await playWhereItIs(page, c, player(id), 'foul', `a ${side} floor player`);
             const now = await facts(id);
             if (now.points === was.points + 2 && now.fouls === was.fouls + 1) counted += 1;
           }
@@ -927,11 +1078,12 @@ if (browser) {
 
           // A substitution from a floor player's own options: "Sub in" holds the bench.
           await tapWhereItIs(page, player(floor[0]), `a ${side} floor player`);
-          const subIn = c.pad.locator('[data-act="sub"]');
+          const subIn = c.pad.locator(`[data-options="${floor[0]}"] [data-act="sub"]`);
           await subIn.first().waitFor();
           await measureLines(page, `${label}, "Sub in" (${side})`, 1);
           const coming = await subIn.first().getAttribute('data-other');
           await c.recorded(() => tapWhereItIs(page, subIn.first(), 'the first of "Sub in"'));
+          await c.pad.locator('[data-rest]').waitFor();
           note(
             `${label}: "Sub in" brings a bench player on for the one tapped (${side})`,
             (await facts(coming)).court === '1' && (await facts(floor[0])).court === '0',
@@ -965,11 +1117,11 @@ if (browser) {
           }
           const fromBench = await picks.last().getAttribute('data-bench-pick');
           await tapWhereItIs(page, picks.last(), 'the last of the bench in the pad');
-          await c.pad.locator(`[data-options="${fromBench}"]`).waitFor();
-          const inFor = c.pad.locator('[data-act="sub"]');
-          await inFor.first().waitFor();
+          const inFor = c.pad.locator(`[data-options="${fromBench}"] [data-act="sub"]`);
+          await inFor.nth(4).waitFor();
           const going = await inFor.nth(1).getAttribute('data-other');
           await c.recorded(() => tapWhereItIs(page, inFor.nth(1), 'the second of "In for"'));
+          await c.pad.locator('[data-rest]').waitFor();
           note(
             `${label}: a player picked from the bench in the pad comes in by "In for" (${side})`,
             (await facts(fromBench)).court === '1' && (await facts(going)).court === '0',
@@ -990,7 +1142,7 @@ if (browser) {
         );
         note('nothing broke on the page', errors.length === 0, errors.join('; '));
       } finally {
-        await context.close();
+        await letGo(page, context);
       }
     },
   );
@@ -1000,8 +1152,7 @@ if (browser) {
     const { context, page, errors } = await scorekeeperAt(phone, { hasTouch: true });
     try {
       await page.goto(`${origin}${trackerPath()}`);
-      const c = court(page);
-      await c.open();
+      const c = await openCourt(page);
       await c.saved();
       const cdp = await context.newCDPSession(page);
       const touch = (type, points) =>
@@ -1037,6 +1188,9 @@ if (browser) {
       for (let i = 1; i <= 4; i += 1) await touch('touchMove', [a, [b[0] + i * 4, b[1] + i * 3]]);
       await touch('touchMove', [a]);
       await touch('touchEnd', []);
+      // A play made wrongly would be stored and shown a moment later: a moment is given
+      // here, and the count after the one drag below (exactly one play more) settles it
+      // however slow the machine.
       await page.waitForTimeout(600);
       const presses = await page.evaluate(() => window.pressesSeen);
       note(
@@ -1071,6 +1225,10 @@ if (browser) {
         'one finger dragging a bench player onto a floor player substitutes them',
         (await c.onCourtById(benchId)) === true && (await c.onCourtById(floorId)) === false,
       );
+      note(
+        'the game holds exactly one play more: the drag’s, and nothing from the two fingers',
+        Number(await c.root.getAttribute('data-plays')) === Number(plays) + 1,
+      );
       const moved = await scrollsSeen(page);
       note(
         'a finger’s drag scrolled nothing',
@@ -1079,7 +1237,7 @@ if (browser) {
       );
       note('nothing broke on the page', errors.length === 0, errors.join('; '));
     } finally {
-      await context.close();
+      await letGo(page, context);
     }
   });
 
@@ -1091,10 +1249,14 @@ if (browser) {
       try {
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await page.goto(`${origin}${trackerPath()}`);
-        const c = court(page);
-        await c.open();
+        const c = await openCourt(page);
         await noSidewaysScroll(page, label);
         await measureTargets(page, `${label}, the pad at rest`);
+        // Where only its three dots show, More is still named for a screen reader.
+        note(
+          `${label}: the More button is named "More" for a screen reader, word shown or not`,
+          await page.getByRole('button', { name: 'More', exact: true }).isVisible(),
+        );
         // The benches are lines of players, except where they are folded away.
         await measureLines(page, `${label}, the pad at rest`, fold ? 0 : 2);
         note(
@@ -1162,7 +1324,28 @@ if (browser) {
         }
         await c.pad.locator('[data-options] [data-act="sub"]').nth(4).waitFor();
         await measureTargets(page, `${label}, a bench player’s options`);
-        await measureLines(page, `${label}, a bench player’s options`, fold ? 1 : 3);
+        // "In for" is not a line that folds: all five on the court are in it, whole.
+        await measureLines(page, `${label}, a bench player’s options`, fold ? 0 : 2);
+        const inFor = await c.pad.locator('[data-all] > [data-act="sub"]').evaluateAll((els) => {
+          const pad = document.querySelector('[data-pad]').getBoundingClientRect();
+          return els.map((el) => {
+            const r = el.getBoundingClientRect();
+            return (
+              r.width >= 43.99 &&
+              r.height >= 43.99 &&
+              r.left >= pad.left &&
+              r.right <= pad.right &&
+              r.top >= pad.top &&
+              r.bottom <= pad.bottom &&
+              el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2))
+            );
+          });
+        });
+        note(
+          `${label}: "In for" shows all five on the court, each whole in the pad`,
+          inFor.length === 5 && inFor.every(Boolean),
+          JSON.stringify(inFor),
+        );
         await accessible(page, `${label}, a bench player’s options`);
         // Less motion: what was tapped still shows on the tile, with no movement (S5).
         await first.click();
@@ -1170,11 +1353,20 @@ if (browser) {
           .locator(`[data-options="${await first.getAttribute('data-player')}"]`)
           .waitFor();
         const playsBefore = await c.root.getAttribute('data-plays');
+        // The mark is read by the page itself the moment it is put on the tile: it stays
+        // two thirds of a second, which a slower machine could take to ask for it.
+        await first.evaluate((el) => {
+          window.markSeen = null;
+          new MutationObserver(() => {
+            if (window.markSeen !== null || !el.hasAttribute('data-mark')) return;
+            window.markSeen = {
+              mark: el.getAttribute('data-mark'),
+              animation: getComputedStyle(el, '::after').animationName,
+            };
+          }).observe(el, { attributes: true, attributeFilter: ['data-mark'] });
+        });
         await c.option('p1').click();
-        const motion = await first.evaluate((el) => ({
-          mark: el.getAttribute('data-mark'),
-          animation: getComputedStyle(el, '::after').animationName,
-        }));
+        const motion = await (await page.waitForFunction(() => window.markSeen)).jsonValue();
         note(
           `${label}: with less motion asked for, the tap shows and nothing moves (S5)`,
           motion.mark === '+1' && motion.animation === 'none',
@@ -1195,7 +1387,7 @@ if (browser) {
         );
         await c.saved();
       } finally {
-        await context.close();
+        await letGo(page, context);
       }
     }
   });
@@ -1206,8 +1398,7 @@ if (browser) {
       const { context, page } = await scorekeeperAt(phone);
       try {
         await page.goto(`${origin}${trackerPath()}`);
-        const c = court(page);
-        await c.open();
+        const c = await openCourt(page);
         await c.saved();
         // No connection: every tap from here waits on the device.
         await context.setOffline(true);
@@ -1411,7 +1602,7 @@ if (browser) {
         );
         note('with the network back, all 600 waiting taps are saved', true);
       } finally {
-        await context.close();
+        await letGo(page, context);
       }
     },
   );
@@ -1420,8 +1611,7 @@ if (browser) {
     const { context, page, errors } = await scorekeeperAt(phone);
     try {
       await page.goto(`${origin}${trackerPath()}`);
-      const c = court(page);
-      await c.open();
+      const c = await openCourt(page);
       await c.saved();
       // The game is let go of, three more a side are added at the table, and it is
       // opened again: fifteen a side, a bench of ten.
@@ -1505,7 +1695,7 @@ if (browser) {
       await measureLines(page, 'fifteen a side, after the substitution', 2);
       note('nothing broke on the page', errors.length === 0, errors.join('; '));
     } finally {
-      await context.close();
+      await letGo(page, context);
     }
   });
 }

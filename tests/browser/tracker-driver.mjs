@@ -145,12 +145,41 @@ export function court(page) {
     more: root.locator('.court-more-button'),
     sheet: root.locator('[data-more] [role="dialog"]'),
 
-    /** Waits for the scoring screen, confirming the game format on the way if it is asked. */
+    /**
+     * Waits for the scoring screen, confirming the game format on the way if it is asked.
+     * A game another device still holds (a run before this one left it with taps unsent)
+     * is taken over, as a second scorekeeper would; the answer says whether it was, so a
+     * test can say a game was held that should have been free.
+     */
     async open() {
       const confirm = page.getByRole('button', { name: 'Confirm and start scoring' });
-      await root.or(confirm).first().waitFor();
+      const takeOver = page.getByRole('button', { name: 'Take over scoring' });
+      await root.or(confirm).or(takeOver).first().waitFor();
+      const tookOver = await takeOver.isVisible();
+      if (tookOver) {
+        await takeOver.click();
+        await page.getByRole('button', { name: 'Yes, take over' }).click();
+        await root.or(confirm).first().waitFor();
+      }
       if (await confirm.isVisible()) await confirm.click();
       await root.waitFor();
+      return { tookOver };
+    },
+    /**
+     * Leaves the game by the screen's own way out (More, "Back to your games"), which
+     * lets go of the game before the page goes (T6 §5): the next to open it finds it free.
+     */
+    async leave() {
+      if (!(await root.locator('[data-more] [role="dialog"]').isVisible())) {
+        await root.locator('.court-more-button').click();
+      }
+      await Promise.all([
+        page.waitForURL((url) => !url.pathname.includes('/score/')),
+        root
+          .locator('[data-more] [role="dialog"]')
+          .getByRole('link', { name: 'Back to your games' })
+          .click(),
+      ]);
     },
     /** Taps each of a team's players by jersey number: its starters while they are picked. */
     async pick(side, jerseys) {
@@ -163,8 +192,13 @@ export function court(page) {
     recorded,
     /** Taps a player, then one of their options, and waits for the play to be shown. */
     async play(side, jersey, act) {
-      await tile(side, jersey).click();
-      await recorded(() => option(act).click());
+      // The option tapped is one of this player's own: the pad is waited for until it
+      // shows them, never an option still drawn from the tap before.
+      const options = pad.locator(
+        `[data-options="${await tile(side, jersey).getAttribute('data-player')}"]`,
+      );
+      if (!(await options.isVisible())) await tile(side, jersey).click();
+      await recorded(() => options.locator(`[data-act="${act}"]`).click());
     },
     /** Taps an option of the open pad (or any button of it) and waits for the play. */
     choose: (act) => recorded(() => option(act).click()),
@@ -179,12 +213,15 @@ export function court(page) {
     moreTile: (within) => within.locator('.court-more-tile'),
     /** A bench player comes in for a floor player, by "In for". */
     async substitute(side, coming, going) {
-      // Tapped already, their options are open: a second tap would close them.
-      if ((await tile(side, coming).getAttribute('data-open')) === null) {
-        await tile(side, coming).click();
-      }
+      // What the pad shows decides, not the tile: the options are that player's own, and
+      // if they are open already (tapped before), a second tap would close them.
+      const options = pad.locator(
+        `[data-options="${await tile(side, coming).getAttribute('data-player')}"]`,
+      );
+      if (!(await options.isVisible())) await tile(side, coming).click();
+      await options.waitFor();
       await recorded(() =>
-        pad
+        options
           .locator('[data-act="sub"]')
           .filter({
             has: page.locator('.court-opt-number', { hasText: new RegExp(`^${going}$`) }),
