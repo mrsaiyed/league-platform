@@ -9,6 +9,7 @@ import {
   changeRosterEntry,
   listRoster,
   markLeft,
+  putBackOnRoster,
   reorderRoster,
   removePerson,
   removeTeam,
@@ -297,6 +298,133 @@ describe('rosters', () => {
     // They can join again later, as a new entry.
     const again = await addToRoster(l.as, { teamId: l.teamId, personId }, deps);
     expect(again).toEqual({ ok: false, error: { code: 'person-not-found' } });
+  });
+
+  it("refuses a leaving date after the league's today, by its own time zone", async () => {
+    const l = await league();
+    const personId = await newPerson(pglite, l.leagueId);
+    const { rosterEntryId } = value(await addToRoster(l.as, { teamId: l.teamId, personId }, deps));
+    const { today, tomorrow } = await one<{ today: string; tomorrow: string }>(
+      pglite,
+      `select to_char(now() at time zone time_zone, 'YYYY-MM-DD') as today,
+              to_char(now() at time zone time_zone + interval '1 day', 'YYYY-MM-DD') as tomorrow
+       from leagues where id = $1`,
+      [l.leagueId],
+    );
+    for (const leftOn of [tomorrow, '2099-01-01']) {
+      expect(await markLeft(l.as, { rosterEntryId, version: 1, leftOn }, deps)).toEqual({
+        ok: false,
+        error: { code: 'left-after-today' },
+      });
+    }
+    expect((await entryRow(rosterEntryId)).left_on).toBeNull();
+    value(await markLeft(l.as, { rosterEntryId, version: 1, leftOn: today }, deps));
+    expect((await entryRow(rosterEntryId)).left_on).toBe(today);
+  });
+
+  it('puts a player marked as left by mistake back, keeping every game line (step 2.161)', async () => {
+    const l = await league(true);
+    const personId = await newPerson(pglite, l.leagueId);
+    const { rosterEntryId } = value(
+      await addToRoster(l.as, { teamId: l.teamId, personId, jerseyNumber: '5' }, deps),
+    );
+    const stageId = await newStage(pglite, l.leagueId, l.seasonId);
+    await newRound(pglite, l.leagueId, l.seasonId, 1);
+    const gameId = await newGame(pglite, {
+      leagueId: l.leagueId,
+      seasonId: l.seasonId,
+      stageId,
+      homeTeamId: l.teamId,
+      awayTeamId: await newTeam(pglite, l.leagueId, l.seasonId),
+    });
+    await pglite.query(
+      `insert into player_game_stats (league_id, game_id, team_id, person_id, played, stats)
+       values ($1, $2, $3, $4, true, '{"points": 9}'::jsonb)`,
+      [l.leagueId, gameId, l.teamId, personId],
+    );
+    value(await markLeft(l.as, { rosterEntryId, version: 1, leftOn: '2026-11-10' }, deps));
+    const put = (version: number, teamId = l.teamId) =>
+      putBackOnRoster(l.as, { teamId, rosterEntryId, version }, deps);
+    expect(await put(1)).toEqual({ ok: false, error: { code: 'changed-since-read' } });
+    // Another team's page cannot name it.
+    expect(await put(2, await newTeam(pglite, l.leagueId, l.seasonId))).toEqual({
+      ok: false,
+      error: { code: 'roster-entry-not-found' },
+    });
+    expect(await put(2)).toEqual({ ok: true, value: { version: 3 } });
+    expect(await entryRow(rosterEntryId)).toMatchObject({ left_on: null, jersey_number: '5' });
+    const listed = value(await listRoster(l.as, { teamId: l.teamId }, deps));
+    expect(listed.map((line) => [line.id, line.leftOn])).toEqual([[rosterEntryId, null]]);
+    expect(
+      (
+        await one<{ n: number }>(
+          pglite,
+          'select count(*)::int as n from player_game_stats where person_id = $1',
+          [personId],
+        )
+      ).n,
+    ).toBe(1);
+    expect(await put(3)).toEqual({ ok: false, error: { code: 'not-left' } });
+    const logged = await one<{ n: number }>(
+      pglite,
+      `select count(*)::int as n from activity_log where league_id = $1 and action = 'teams.put_back_on_roster'`,
+      [l.leagueId],
+    );
+    expect(logged.n).toBe(1);
+  });
+
+  it('refuses putting back a number worn since, a person on the team again, and a binned team', async () => {
+    const l = await league(true);
+    const [left, wearer, again] = [
+      await newPerson(pglite, l.leagueId),
+      await newPerson(pglite, l.leagueId),
+      await newPerson(pglite, l.leagueId),
+    ];
+    const first = value(
+      await addToRoster(l.as, { teamId: l.teamId, personId: left, jerseyNumber: '7' }, deps),
+    );
+    value(
+      await markLeft(
+        l.as,
+        { rosterEntryId: first.rosterEntryId, version: 1, leftOn: '2026-11-10' },
+        deps,
+      ),
+    );
+    value(await addToRoster(l.as, { teamId: l.teamId, personId: wearer, jerseyNumber: '7' }, deps));
+    expect(
+      await putBackOnRoster(
+        l.as,
+        { teamId: l.teamId, rosterEntryId: first.rosterEntryId, version: 2 },
+        deps,
+      ),
+    ).toEqual({ ok: false, error: { code: 'jersey-taken' } });
+    expect((await entryRow(first.rosterEntryId)).left_on).toBe('2026-11-10');
+
+    const old = value(await addToRoster(l.as, { teamId: l.teamId, personId: again }, deps));
+    value(
+      await markLeft(
+        l.as,
+        { rosterEntryId: old.rosterEntryId, version: 1, leftOn: '2026-11-10' },
+        deps,
+      ),
+    );
+    value(await addToRoster(l.as, { teamId: l.teamId, personId: again }, deps));
+    expect(
+      await putBackOnRoster(
+        l.as,
+        { teamId: l.teamId, rosterEntryId: old.rosterEntryId, version: 2 },
+        deps,
+      ),
+    ).toEqual({ ok: false, error: { code: 'already-on-team' } });
+
+    value(await removeTeam(l.as, { teamId: l.teamId }, deps));
+    expect(
+      await putBackOnRoster(
+        l.as,
+        { teamId: l.teamId, rosterEntryId: old.rosterEntryId, version: 2 },
+        deps,
+      ),
+    ).toEqual({ ok: false, error: { code: 'roster-entry-not-found' } });
   });
 
   it('does not hold a person by a place on a team in the bin (A-16)', async () => {

@@ -75,6 +75,7 @@ export { findPublicSeason, type FoundPublicSeason } from './find-public-season.t
 export { findPublicGameFacts, type PublicGameFactsRow } from './find-public-game-facts.ts';
 export { findPublicTeam } from './find-public-team.ts';
 export { findLeagueTimeZone } from './find-league-time-zone.ts';
+export { findLeagueToday } from './find-league-today.ts';
 export { listPublicGames, type PublicGameInRound } from './list-public-games.ts';
 export { listPublicRoster } from './list-public-roster.ts';
 export { listPublicSchedule } from './list-public-schedule.ts';

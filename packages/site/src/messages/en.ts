@@ -389,8 +389,16 @@ export const en = {
   'adminTeams.stats.everyone': 'Everyone',
   'adminTeams.stats.staff': "Only the team's staff and the league's admins",
   'adminTeams.remove.title': 'Remove this team',
+  // Until step 2.77 gives the bin a screen, nothing here promises a way back (step 2.161).
   'adminTeams.remove.body':
-    'The team is moved to the bin. Its games and numbers are kept and it can be brought back.',
+    'The team is moved to the bin. Its games and numbers are kept. It is kept for 30 days; the screen to bring it back is not ready yet.',
+  'adminTeams.remove.roster_one':
+    '{count} person is on its roster now. Once the team is removed, they can be taken off the league list.',
+  'adminTeams.remove.roster_other':
+    '{count} people are on its roster now. Once the team is removed, they can be taken off the league list.',
+  'adminTeams.remove.rosterNone': 'Nobody is on its roster now.',
+  'adminTeams.remove.rosterUnknown':
+    'The roster could not be read just now, so how many people are on it is not shown.',
   'adminTeams.remove.submit': 'Move the team to the bin',
   'adminTeams.roster.title': 'Roster',
   'adminTeams.roster.none': 'Nobody is on this roster yet.',
@@ -406,6 +414,8 @@ export const en = {
   'adminTeams.roster.saveEntry': 'Save number and role',
   'adminTeams.roster.leftOn': 'Left on',
   'adminTeams.roster.markLeft': 'Mark as left',
+  'adminTeams.roster.leftOnHelp': 'The day they left: today or a day before.',
+  'adminTeams.roster.putBack': 'Put back on the roster (marked by mistake)',
   'adminTeams.roster.leftTitle': 'Left the team',
   'adminTeams.roster.leftLine': '{name}, left on {date}',
   'adminTeams.roster.readFailed':
@@ -435,18 +445,22 @@ export const en = {
   'adminTeams.newPerson.submit': 'Add the person and put them on the roster',
   'adminTeams.people.title': 'The league list',
   'adminTeams.people.body':
-    'Taking someone off the list is refused while they are on a roster: mark them as having left first.',
+    'Taking someone off the list is refused while they are on a roster: mark them as having left first. A place on a team that was moved to the bin does not count.',
   'adminTeams.people.remove': 'Remove from the league list',
   'adminTeams.confirm': 'Yes, I am sure',
   'adminTeams.done.created': 'The team was added.',
   'adminTeams.done.updated': 'The team was saved.',
   'adminTeams.done.statsSaved': 'Who sees the numbers was saved.',
-  'adminTeams.done.removed': 'The team was moved to the bin.',
+  'adminTeams.done.removed':
+    'Removed. The team is kept for 30 days; the screen to bring it back is not ready yet.',
   'adminTeams.done.added': 'The player was added to the roster.',
   'adminTeams.done.entrySaved': 'The number and role were saved.',
   'adminTeams.done.moved': 'The roster order was saved.',
   'adminTeams.done.left': 'The player was marked as having left.',
-  'adminTeams.done.personRemoved': 'The person was taken off the league list.',
+  'adminTeams.done.putBack':
+    'The player was put back on the roster. Their games and numbers are as they were.',
+  'adminTeams.done.personRemoved':
+    'Removed from the league list. The person is kept for 30 days; the screen to bring them back is not ready yet.',
   // Why a teams or people change was refused (T-187): `error.`, the command's name, the code.
   'error.invalid-input': 'Something you entered is not valid. Check the fields and try again.',
   'error.not-allowed': 'You are not allowed to do that.',
@@ -904,6 +918,17 @@ export const en = {
     'This person has left the team, so their entry can no longer be changed.',
   'error.teams.mark_left.already-left': 'This person is already marked as having left.',
   'error.teams.mark_left.left-before-joined': 'The leaving date is before the day they joined.',
+  'error.teams.mark_left.left-after-today':
+    'The leaving date is after today. Choose today or a day before: nobody was marked as left.',
+  'error.teams.put_back_on_roster.roster-entry-not-found': 'That roster entry is not there.',
+  'error.teams.put_back_on_roster.not-left':
+    'This person is already on the roster, so there was nothing to put back.',
+  'error.teams.put_back_on_roster.person-not-found':
+    'This person has been taken off the league list, so they cannot be put back on the roster.',
+  'error.teams.put_back_on_roster.already-on-team':
+    'This person is on the team again already, so they were not put back a second time.',
+  'error.teams.put_back_on_roster.jersey-taken':
+    'Another player on this team now wears their number, and this season asks for a different number for each player. Give the other player a different number first, then put them back.',
   // Why assigning a scorekeeper was refused (T-187).
   'error.games.assign_scorekeeper.game-not-found': 'That game is not there.',
   'error.games.assign_scorekeeper.game-closed':
@@ -1212,6 +1237,7 @@ export const en = {
   'activity.teams.change_roster_entry': "Changed a player's number or role",
   'activity.teams.reorder_roster': 'Changed the order of a roster',
   'activity.teams.mark_left': 'Marked a person as having left a team',
+  'activity.teams.put_back_on_roster': 'Put a person marked as left by mistake back on a roster',
   'activity.scheduling.add_draft_game': 'Added a game to the schedule draft',
   'activity.scheduling.move_draft_game': 'Moved a game in the schedule draft',
   'activity.scheduling.swap_draft_games': 'Swapped two games in the schedule draft',

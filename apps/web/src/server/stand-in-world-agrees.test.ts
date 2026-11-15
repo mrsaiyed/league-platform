@@ -44,10 +44,14 @@ import {
   createVenue,
   eventHandlers,
   getScheduleDraft,
+  markLeft,
   openScoringSession,
   postponeGame,
   publicViewer,
   publishSchedule,
+  putBackOnRoster,
+  removePerson,
+  removeTeam,
   readGamePage,
   readStandings,
   readStatisticsTable,
@@ -648,6 +652,73 @@ describe('the one world and the database, the same season by the same commands',
       );
       expect(b, gameId).toEqual(a);
     }
+  });
+
+  it('agree on putting back a player marked as left, and on a team in the bin (step 2.161)', async () => {
+    const codes = (result: { ok: boolean; error?: { code: string } }) =>
+      result.ok ? 'ok' : (result.error?.code ?? '?');
+    const [a, b] = await both(async (side) => {
+      const { as, deps } = side;
+      const seasonId = await seasonOfSide(side);
+      const said: string[] = [];
+      const made = ok(
+        'team Wrens',
+        await createTeam(as, { seasonId, name: 'Wrens', shortName: 'wrens' }, deps),
+      );
+      side.names.set(made.teamId, 'team:Wrens');
+      const entries: string[] = [];
+      const people: string[] = [];
+      for (const n of [1, 2]) {
+        const person = ok(
+          'person',
+          await createPerson(
+            as,
+            { firstName: `Wren${n}`, lastName: 'Player', isMinor: false },
+            deps,
+          ),
+        );
+        side.names.set(person.personId, `person:Wren${n}`);
+        people.push(person.personId);
+        const added = ok(
+          'roster',
+          await addToRoster(
+            as,
+            { teamId: made.teamId, personId: person.personId, jerseyNumber: String(n) },
+            deps,
+          ),
+        );
+        entries.push(added.rosterEntryId);
+      }
+      const entry = entries[0] ?? '';
+      const leave = (leftOn: string, version: number) =>
+        markLeft(as, { rosterEntryId: entry, version, leftOn }, deps);
+      said.push(codes(await leave(addDays(today, 1), 1)));
+      said.push(codes(await leave(addDays(today, 365), 1)));
+      said.push(codes(await leave(today, 1)));
+      const back = (version: number) =>
+        putBackOnRoster(as, { teamId: made.teamId, rosterEntryId: entry, version }, deps);
+      said.push(codes(await back(1)));
+      said.push(codes(await back(2)));
+      said.push(codes(await back(3)));
+      said.push(codes(await removePerson(as, { personId: people[0] ?? '' }, deps)));
+      said.push(JSON.stringify(asNames(await side.roster(made.teamId), side)));
+      said.push(codes(await removeTeam(as, { teamId: made.teamId }, deps)));
+      said.push(codes(await removePerson(as, { personId: people[0] ?? '' }, deps)));
+      said.push(codes(await leave(today, 3)));
+      return said;
+    });
+    expect(b).toEqual(a);
+    const said = a as readonly string[];
+    expect(said.slice(0, 6)).toEqual([
+      'left-after-today',
+      'left-after-today',
+      'ok',
+      'changed-since-read',
+      'ok',
+      'not-left',
+    ]);
+    expect(said.slice(6, 7)).toEqual(['person-on-a-roster']);
+    expect(said.slice(8)).toEqual(['ok', 'ok', 'roster-entry-not-found']);
   });
 
   it("read the same team's roster", async () => {

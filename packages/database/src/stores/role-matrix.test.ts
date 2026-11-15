@@ -64,6 +64,7 @@ import {
   listBin,
   listRoster,
   markLeft,
+  putBackOnRoster,
   reorderRoster,
   restoreGame,
   restorePerson,
@@ -568,9 +569,33 @@ const rosterCommandRows: readonly Row[] = [
         await newPerson(pglite, league.leagueId),
       ),
       version: 1,
-      leftOn: '2026-12-01',
+      // Not after the league's today, whenever the matrix runs (step 2.161).
+      leftOn: '2026-11-01',
     }),
     (c, i) => markLeft(c, i, teamsDeps),
+  ),
+  ...rosterRows(
+    'teams.put_back_on_roster',
+    'put a player marked as left by mistake back on the roster',
+    async (teamId, league) => {
+      const rosterEntryId = await newRosterEntry(
+        pglite,
+        league.leagueId,
+        teamId,
+        await newPerson(pglite, league.leagueId),
+      );
+      await pglite.query(`update roster_entries set left_on = '2026-11-01' where id = $1`, [
+        rosterEntryId,
+      ]);
+      // Setting the date moved the entry's version on: the command names the one it is at.
+      const { version } = await one<{ version: number }>(
+        pglite,
+        'select version from roster_entries where id = $1',
+        [rosterEntryId],
+      );
+      return { teamId, rosterEntryId, version };
+    },
+    (c, i) => putBackOnRoster(c, i, teamsDeps),
   ),
   ...rosterRows(
     'teams.list_roster',

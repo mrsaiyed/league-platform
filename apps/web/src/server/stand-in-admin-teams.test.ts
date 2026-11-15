@@ -2,11 +2,13 @@
 // the screens' actions run them, over the made-up in-memory store (step 2.51).
 import {
   addToRoster,
+  changeRosterEntry,
   createPerson,
   createTeam,
   listPeople,
   listRoster,
   markLeft,
+  putBackOnRoster,
   removePerson,
   removeTeam,
   reorderRoster,
@@ -147,6 +149,65 @@ describe('the admin Teams screens over the stand-in', () => {
     );
     const removed = await removePerson(m.owner, { personId: people[0] }, m.ports.deps);
     expect(removed.ok).toBe(true);
+  });
+
+  it('refuses a leaving date of next year, and puts back one marked as left by mistake', async () => {
+    const m = made(true);
+    const { teamId, entries } = await teamOfTen(m);
+    const entry = entries[2] ?? '';
+    const nextYear = `${new Date().getUTCFullYear() + 1}-06-01`;
+    const early = await markLeft(
+      m.owner,
+      markLeftInput({ entry, version: '1', leftOn: nextYear }),
+      m.ports.deps,
+    );
+    expect(early).toEqual({ ok: false, error: { code: 'left-after-today' } });
+    value(
+      await markLeft(
+        m.owner,
+        markLeftInput({ entry, version: '1', leftOn: '2026-11-13' }),
+        m.ports.deps,
+      ),
+    );
+    expect(
+      await putBackOnRoster(m.owner, { teamId, rosterEntryId: entry, version: 1 }, m.ports.deps),
+    ).toEqual({ ok: false, error: { code: 'changed-since-read' } });
+    value(
+      await putBackOnRoster(m.owner, { teamId, rosterEntryId: entry, version: 2 }, m.ports.deps),
+    );
+    const roster = value(await listRoster(m.owner, { teamId }, m.ports.deps));
+    expect(roster.filter((line) => line.leftOn !== null)).toEqual([]);
+    expect(roster.map((line) => line.jerseyNumber)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      '10',
+    ]);
+    // In a season of unique numbers, a number worn since keeps them off, as the database does.
+    value(
+      await markLeft(
+        m.owner,
+        markLeftInput({ entry, version: '3', leftOn: '2026-11-13' }),
+        m.ports.deps,
+      ),
+    );
+    const other = roster.find((line) => line.jerseyNumber === '4');
+    value(
+      await changeRosterEntry(
+        m.owner,
+        { rosterEntryId: other?.id ?? '', version: other?.version ?? 0, jerseyNumber: '3' },
+        m.ports.deps,
+      ),
+    );
+    expect(
+      await putBackOnRoster(m.owner, { teamId, rosterEntryId: entry, version: 4 }, m.ports.deps),
+    ).toEqual({ ok: false, error: { code: 'jersey-taken' } });
   });
 
   it('lets a player of a team in the bin be taken off the league list (A-16)', async () => {

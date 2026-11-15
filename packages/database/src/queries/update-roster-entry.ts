@@ -2,14 +2,17 @@
 // place. With `version`, only if it is still at it (T-46; the database adds one to the
 // version itself, 0002). A number someone on the team wears, where the season asks for
 // unique numbers, comes back as 'jersey-taken' (0008), and the transaction is then
-// unusable: the caller rolls it back.
+// unusable: the caller rolls it back. A leaving date of null puts the entry back on the
+// roster (step 2.161): an open entry of the same person on the team comes back as
+// 'already-on-team' (roster_entries_once), and a number now worn as 'jersey-taken'.
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { constraintOf } from './constraint-of.ts';
 
 export type RosterEntryChangeRow = {
   jerseyNumber?: string | null;
   role?: string;
-  leftOn?: string;
+  /** null clears the leaving date: the entry is on the roster again. */
+  leftOn?: string | null;
   sort?: number;
 };
 

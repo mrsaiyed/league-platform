@@ -13,6 +13,7 @@ import type {
   TeamRecord,
   TeamsStore,
 } from '@srleagues/core';
+import { dayIn } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { uniqueJerseysOf } from './stand-in-world-games.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
@@ -137,9 +138,25 @@ export function worldTeamsStore(s: LeagueWorld): TeamsStore {
       if (change.jerseyNumber !== undefined && jerseyWorn(found.teamId, change.jerseyNumber, id)) {
         return 'jersey-taken';
       }
+      // Put back on the roster (leaving date cleared): as the database's roster_entries_once
+      // index and unique-number trigger refuse an entry opened again.
+      if (change.leftOn === null && found.leftOn !== null) {
+        const open = s.roster.some(
+          (r) =>
+            r.id !== id &&
+            r.teamId === found.teamId &&
+            r.personId === found.personId &&
+            r.leftOn === null,
+        );
+        if (open) return 'already-on-team';
+        const jersey = change.jerseyNumber === undefined ? found.jerseyNumber : change.jerseyNumber;
+        if (jerseyWorn(found.teamId, jersey, id)) return 'jersey-taken';
+      }
       s.roster = replacedAt(s.roster, at, { ...found, ...change, version: found.version + 1 });
       return found.version + 1;
     },
+    // The league's today in its own zone by the server's clock (the world's database clock).
+    leagueToday: async () => dayIn(new Date(), s.timeZone),
     seasonProgramId: async (id) => s.seasons.find((x) => x.id === id)?.programId,
     findDivision: async (id) => {
       const d = s.divisions.find((x) => x.id === id);

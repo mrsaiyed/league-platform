@@ -21,6 +21,8 @@ export type MemoryTeams = {
   roster: RosterEntryRecord[];
   /** The season asks for unique jersey numbers in a team (0008). */
   uniqueJerseys: boolean;
+  /** The league's today in its own time zone (yyyy-mm-dd). */
+  today: string;
   grants: Grant[];
   /** The league's stored setting rows by key, as setting_values keeps them. */
   settings: Record<string, StoredSetting[]>;
@@ -115,6 +117,7 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
     people: [],
     roster: [],
     uniqueJerseys: false,
+    today: '2026-11-15',
     grants: [],
     settings: {},
     activity: [],
@@ -227,23 +230,26 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
             return undefined;
           }
           const next = { ...found, ...change, version: found.version + 1 };
+          const others = s.roster.filter(
+            (r) => r.id !== id && r.teamId === found.teamId && r.leftOn === null,
+          );
+          // As the database: an open entry once a team per person, a number once where asked.
+          if (next.leftOn === null && others.some((r) => r.personId === found.personId)) {
+            return 'already-on-team';
+          }
           if (
             s.uniqueJerseys &&
-            change.jerseyNumber !== undefined &&
-            change.jerseyNumber !== null &&
-            s.roster.some(
-              (r) =>
-                r.id !== id &&
-                r.teamId === found.teamId &&
-                r.leftOn === null &&
-                r.jerseyNumber === change.jerseyNumber,
-            )
+            next.leftOn === null &&
+            next.jerseyNumber !== null &&
+            (change.jerseyNumber !== undefined || change.leftOn !== undefined) &&
+            others.some((r) => r.jerseyNumber === next.jerseyNumber)
           ) {
             return 'jersey-taken';
           }
           s.roster[at] = next;
           return next.version;
         },
+        leagueToday: async () => s.today,
         seasonProgramId: async (id) => s.seasons.find((x) => x.id === id)?.programId,
         findDivision: async (id) => s.divisions.find((d) => d.id === id),
       },
