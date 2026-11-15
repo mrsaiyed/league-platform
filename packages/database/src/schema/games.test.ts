@@ -447,6 +447,87 @@ describe('the rules a game is played under (S-1, S-21)', () => {
     expect(await fixedAt(decided)).not.toBeNull();
   });
 
+  it('are emptied, with the time they were fixed, only by the update that marks a live game not started (S-40)', async () => {
+    const s = await season();
+    const fixed = { ...refused.restrict, constraint: 'games_format_fixed_once_started' };
+    const row = (game: string) =>
+      one<{ format: unknown; format_fixed_at: Date | null; status: string }>(
+        db,
+        'select format, format_fixed_at, status from games where id = $1',
+        [game],
+      );
+    const live = { status: 'live', home_score: 2, away_score: 0, format: JSON.stringify(rules) };
+
+    // Live back to scheduled with the format emptied in the same update: both go.
+    const game = await newGame(db, { ...s.game, columns: live });
+    await set(game, { status: 'scheduled', home_score: null, away_score: null, format: null });
+    expect(await row(game)).toMatchObject({
+      status: 'scheduled',
+      format: null,
+      format_fixed_at: null,
+    });
+    // It is a game that never started: given rules of its own, or started again, as any.
+    await set(game, { format: JSON.stringify({ ...rules, periods: 4 }) });
+    await set(game, { format: null });
+    await set(game, { status: 'live', format: JSON.stringify(rules) });
+    expect((await row(game)).format_fixed_at).not.toBeNull();
+
+    // Back to scheduled keeping its format: both stay, and the format cannot be emptied after.
+    const kept = await newGame(db, { ...s.game, columns: live });
+    await set(kept, { status: 'scheduled', home_score: null, away_score: null });
+    expect((await row(kept)).format_fixed_at).not.toBeNull();
+    await expect(set(kept, { format: null })).rejects.toMatchObject(fixed);
+
+    // Emptied while live, or on the way to postponed or cancelled: refused as before.
+    const other = await newGame(db, { ...s.game, columns: live });
+    await expect(set(other, { format: null })).rejects.toMatchObject(fixed);
+    for (const status of ['postponed', 'cancelled']) {
+      await expect(
+        set(other, { status, home_score: null, away_score: null, format: null }),
+      ).rejects.toMatchObject(fixed);
+    }
+    // Back to scheduled with other rules in place of empty ones: refused.
+    await expect(
+      set(other, {
+        status: 'scheduled',
+        home_score: null,
+        away_score: null,
+        format: JSON.stringify({ ...rules, periods: 4 }),
+      }),
+    ).rejects.toMatchObject(fixed);
+
+    // A decided game is reopened, never marked not started: its rules stay.
+    const decided = await newGame(db, {
+      ...s.game,
+      columns: { ...final(50, 45), format: JSON.stringify(rules) },
+    });
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.query(
+          `insert into game_corrections (league_id, game_id, account_id, reason, before, after)
+           values ($1, $2, $3, 'Harness', '{"version": 1}', '{"version": 1}')`,
+          [s.leagueId, decided, s.ownerId],
+        );
+        await tx.query(
+          `update games set status = 'scheduled', home_score = null, away_score = null,
+             finalized_at = null, format = null where id = $1`,
+          [decided],
+        );
+      }),
+    ).rejects.toMatchObject(fixed);
+
+    // The app's fenced role marks a game not started the same way.
+    const byApp = await newGame(db, { ...s.game, columns: live });
+    await asApp(db, { league: s.leagueId }, (tx) =>
+      tx.query(
+        `update games set status = 'scheduled', home_score = null, away_score = null,
+           format = null where id = $1`,
+        [byApp],
+      ),
+    );
+    expect(await row(byApp)).toMatchObject({ format: null, format_fixed_at: null });
+  });
+
   it('cannot change for the app either', async () => {
     const s = await season();
     const game = await newGame(db, {

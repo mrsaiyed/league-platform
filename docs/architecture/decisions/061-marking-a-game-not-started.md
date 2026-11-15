@@ -1,0 +1,37 @@
+# 061 — Marking a game not started
+
+Date: 2026-11-15. Step 2.121, migration 0016; answers finding H3 (second half) of the 2.107 audit (`docs/build/audits/live-scoring.md`, checklist J5); serves P7 §5.2 and §5.5, T3 §8, T6 §8, S-40, S-7, S-1, A-5, A-6, T-111, T-116. Amends record 025. Decides T-264. Decided by the lead (technical), the migration's form and the details of S-40 given to the builder of step 2.121 (both details "decided for you" in DECISIONS.md), to be confirmed when the step lands.
+
+## Problem
+
+A scorekeeper who started the wrong game, or was only trying the tracker an hour early, could undo every play but not the start: the game stayed live, the public schedule said "Live, 0–0" before tip-off, and its rules were fixed for good. The server refused the tracker's `reset` and promised a command of its own (`live-game.ts`). Three things stood in the way or were open:
+
+1. **The database fixes a started game's rules forever.** Record 025: once a game first goes live, its `format` cannot change "even if it later goes back to scheduled or is postponed, so a game cannot be stepped back to change its rules and then restarted", and `format_fixed_at` is never cleared.
+2. **The event log is never edited** (T3: every tap, never edited), yet the game must start again from nothing, and the plays cleared must stay readable and never be replayed into the new start.
+3. **Where S-40's line falls**, which plays count as "something recorded", and what happens to another device's waiting taps and to the scoring session.
+
+## What
+
+- **Not stepping back to change the rules of a game that was played.** Marking a game not started clears a game that was never played: everything recorded in it is cleared and kept in its events, and who may do it is limited by S-40. So S-1 ("a game keeps the rules it was played under") does not apply to it: it has no rules of its own again and takes its season's, as they stand, when it next starts (decided for you, S-40's details).
+- **The database allows it in one update only** (migration 0016). `format` may be emptied, and `format_fixed_at` is then cleared with it, only in the one update that takes a game from `live` back to `scheduled`. Both together or neither: a live game sent back to scheduled that keeps its format keeps `format_fixed_at`, and every other change to a started game's rules is refused as before (a postponed or cancelled game that had started, a decided game, the format replaced rather than emptied). Only the two functions change; the triggers stay as 0009 made them, and the migration is safe to run again.
+- **One command, `games.mark_not_started`** (input: the game, the sequence number of the last play the asker has seen, and a reason, optional), behind `POST /api/v1/leagues/{leagueId}/games/{game}/not-started`. The tracker's own `reset` tap stays refused: a tap can carry neither the permission to correct games nor a reason.
+- **Where the line falls** (S-40, decided for you): lineups, substitutions, timeouts, jersey colors and every clock tap (start, pause, period, setting the clock, the clock mode) are "lineups and clock taps". A basket, a foul or a turnover (a team turnover too) is "something recorded" while it stands in the game's present state, read from the engine's own counts: one undone, or a foul or turnover taken back with its own button, is nothing recorded, because the scoreboard the scorekeeper sees shows nothing. With nothing recorded, whoever may score the game may (`games.score`, as `mayScoreGame` decides); with something recorded, only someone with `games.correct` at the game's program, and a reason.
+- **Judged on what it clears.** The command's permission check takes the game's lock (T-111) before it reads the plays, so a batch saved a moment earlier is judged and cleared with the rest, and one sent a moment later waits and then meets the ended session.
+- **The cleared plays stay in the log, behind a marker.** No event is edited or removed. A `reset` event, the engine's own command, is added after the cleared plays, by the account marking it, with `clearedThrough` (the sequence number of the last cleared play) as its payload. The saved state is replaced by a new game at the marker's sequence number: the engine's reset (the jersey colors are kept) with the season's rules put in, as the next batch would put them in anyway (`withCurrentRules`). Every read starts from the saved state, so nothing before the marker is ever replayed into the new start, and the sequence numbers run on with no gap. A tap the server took before the marker is still answered "duplicate" if it comes again, never taken as new.
+- **The game goes back to scheduled** with no score, no lines and no rules of its own, in the same transaction. Standings never counted a game that was only live, so nothing is announced and nothing else moves.
+- **The scoring session ends.** Another device's waiting taps then meet the server's own refusal (`session-not-held`, T-116) and are listed there as not saved (step 2.113's controller); the device that marked it opens the game again like any other and starts cleanly. While another account's device holds the game with its lease running, the command is refused (`session-held`), as ending is (record 038): that device may still be scoring. The holder's own account may mark it from any device.
+- **Refused, each with its own words** (in the message files): not live yet (`game-not-started`), ended on the tracker (`game-final`: that is reopening), a final score, box score or forfeit entered by hand (`entered-by-hand`), postponed, cancelled, live with no tracker plays (`not-tracked`), plays that moved on since the asker saw them (`changed-since-read`), held by another device (`session-held`), and something recorded with no reason (`reason-needed`).
+- **Written to the activity log** as `games.mark_not_started`, with who, `clearedThrough`, and the reason when one is given.
+- **The public side follows at once.** The endpoint publishes the game's message after answering, as a batch of taps does (T-117): the snapshot reads the game as scheduled, 0–0, with the marker's sequence number, so open pages redraw and the home and schedule pages, which read the game's row, follow.
+
+## Considered
+
+- **A generation number on events, or removing the cleared events.** Either needs a table change, and removing them breaks "never edited" (T3). The marker and the replaced saved state give the same boundary with what is there.
+- **A correction row (`game_corrections`) for the reason.** That table is for decided games, and the public page shows "corrected" for any game that has one, which would stay on a game played properly later. The reason goes to the activity log, with the words "kept in the log, never shown publicly" the reopen screen already uses.
+- **Keeping the game's rules.** A game started by mistake would keep a format nobody chose for it; the scorekeeper's reason for marking it not started is often the wrong format (finding H2).
+- **Counting plays in the log rather than the present state.** A basket recorded and undone would then need an admin, which no scorekeeper would expect.
+
+## Left for later steps
+
+- The tracker's button, its question and what it shows after (step 2.37).
+- A game given its own rules before it started (S-21, step 2.68 part B, not built) loses them too when it is marked not started; once that screen exists, keeping such a game's own rules would need the rules it had before it started kept somewhere.

@@ -117,6 +117,7 @@ Either all of that happens or none of it does.
 - Fixes are made with the tracker's own tools (undo, or adding and removing plays) or through an "edit box score" grid. **T-122:** the grid also produces commands, so the event log always explains the final numbers.
 - Finalizing again recalculates everything. Whether a notice is sent follows S-8.
 - **T-250 (record 038):** reopening a tracked game hands it back to its tracker: it is live again with the score its plays give, the engine's reopen is kept in the event log, and it counts for nothing until it is ended again. The tracker's own reopen tap is refused, since a tap carries no reason.
+- **T-264 (record 061):** marking a game not started (S-40) is its own command, `games.mark_not_started`, at `POST /api/v1/leagues/{leagueId}/games/{game}/not-started`, never a tap. In one transaction, with the game's lock taken before the plays are judged: a `reset` event naming the last cleared play is added after them (nothing in the log is edited), the saved state starts again from it with the season's rules, the game is scheduled with no score, no lines and no rules of its own (S-1 does not apply to a game never played), its scoring session ends, and the activity log keeps who and the reason. Another device's waiting taps are then refused as not held and listed as not saved there; while another account's device holds the game with its lease running, it is refused. The live message goes out, so open pages stop saying Live at once.
 
 ## 9. The simpler ways of recording
 
