@@ -282,6 +282,13 @@ async function measureBoards(page) {
         list: lists.indexOf(board.closest('ul')),
         // The card's own width: boards of one list in cards of one width are one shape.
         card: Math.round(rect(board.closest('.ui-game-card')).width),
+        // Where the card and its first shield begin: the cards of one row begin together,
+        // and their shields stand on one line.
+        cardTop: Math.round(rect(board.closest('.ui-game-card')).top),
+        // Side by side a shield stands at the top of its team; in two rows it stands in
+        // the middle of its row beside the name (which may take several lines), so there
+        // it is the row that is measured.
+        shieldTop: Math.round(stacked ? first.top : rect(board.querySelector('.ui-emblem')).top),
         split,
         fromTheStart:
           !stacked ||
@@ -382,6 +389,40 @@ async function checkHomeBoards(page, address, label) {
         [...shapes.values()].every((seen) => seen.size === 1),
         JSON.stringify(boards.map((b) => [b.list, b.card, b.stacked])),
       );
+      // The cards of one row share their top line's height, so their shields stand on one
+      // line across the row, whether or not a card's pill took a line of its own.
+      const rows = new Map();
+      for (const b of boards) {
+        const key = `${b.list}:${b.cardTop}`;
+        rows.set(key, [...(rows.get(key) ?? []), b.shieldTop]);
+      }
+      note(
+        `at ${width} the shields of each row of ${label}${planted ? ' with long names' : ''} stand on one line`,
+        [...rows.values()].every((tops) => Math.max(...tops) - Math.min(...tops) <= 1),
+        JSON.stringify([...rows.entries()].filter(([, tops]) => new Set(tops).size > 1)),
+      );
+      if (!planted && width === 1280) {
+        // The home page's two columns (the latest games, and the standings with any
+        // leaders under them) end about level, in every design: the reckoning that places
+        // the leaders (home-lists.ts) was measured on one.
+        const ends = await page.evaluate(() => {
+          const pair = document.querySelector('.home-pair[data-tables="few"]');
+          if (!pair || pair.children.length < 2) return null;
+          const end = (column) => {
+            const last = [
+              ...column.querySelectorAll('.ui-game-card, .ui-table-frame, .ui-spot'),
+            ].pop();
+            return last ? Math.round(last.getBoundingClientRect().bottom) : null;
+          };
+          return [end(pair.children[0]), end(pair.children[1])];
+        });
+        note(
+          `at 1280 the two columns of ${label} end within a row of each other`,
+          ends === null ||
+            (ends[0] !== null && ends[1] !== null && Math.abs(ends[0] - ends[1]) <= 64),
+          JSON.stringify(ends),
+        );
+      }
       if (planted && width === 320) {
         note(
           `at 320 the board of ${label} with a 36-letter name stands its teams in two rows`,

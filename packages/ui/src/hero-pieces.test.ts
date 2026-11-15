@@ -610,6 +610,11 @@ describe('a game as a scoreboard', () => {
         String.raw`^@supports \(grid-template-rows: subgrid\) \{\s*@media \(min-width: 48rem\) \{\s*${list} \{\s*row-gap: 0;\s*margin-block-end: calc\(-1 \* var\(--step-5\)\);\s*\}\s*${list} > li \{\s*grid-row: span 3;\s*grid-template-rows: subgrid;\s*margin-block-end: var\(--step-5\);\s*\}\s*${list}\s*> li\s*> \.ui-game-card \{\s*grid-row: 1 \/ -1;\s*grid-template-rows: subgrid;`,
       ),
     );
+    // Inside a board the two sides begin at its top, and a board taller than its teams
+    // (its row's tallest neighbor sets the height) keeps them at the top: so one card's
+    // two-line name never lowers its neighbors' shields.
+    expect(css).toMatch(/\.ui-game-board \{[^}]*align-items: center;\s*align-content: flex-start;/);
+    expect(css).toMatch(/\.ui-game-side \{[^}]*align-self: flex-start;\s*align-items: center;/);
     // A card has exactly the three parts the rows are for, and its link lies over them.
     const html = board();
     expect(html).toMatch(

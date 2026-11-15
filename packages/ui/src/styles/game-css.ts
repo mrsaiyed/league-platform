@@ -279,7 +279,11 @@ export const gameCss = String.raw`
   --board-room: calc((100cqi - var(--board-needs)) * 999);
   display: flex;
   flex-wrap: wrap;
+  /* What stands between the sides is level with their middle; the sides themselves begin
+     at the top (below), and in a board taller than its teams (a row of cards shares its
+     tallest board's height) the teams stay at the top, not spread down it. */
   align-items: center;
+  align-content: flex-start;
   justify-content: center;
   /* Between the two rows, and (the same step --board-gap names) between the sides. */
   gap: var(--step-2) var(--step-3);
@@ -302,6 +306,9 @@ export const gameCss = String.raw`
 .ui-game-side {
   display: flex;
   flex: 1 1 var(--board-short);
+  /* A side begins at the top of its board, so the shields of a row of cards stand on one
+     line even where one card's name takes two lines and its neighbors' one. */
+  align-self: flex-start;
   align-items: center;
   gap: var(--step-3);
   min-inline-size: 0;
