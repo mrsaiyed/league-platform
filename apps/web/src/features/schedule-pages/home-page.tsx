@@ -31,8 +31,9 @@ export function compactStandings(table: StandingsTableView): StandingsTableView 
 /**
  * `/{league}`: a hero with the league's name, the season and two ways on, and the game
  * being played now beside it when there is one; the season in four numbers; the next
- * games as scoreboards; then recent results beside the compact standings; and one call to
- * action near the foot. The season is picked in the header.
+ * games as scoreboards, when any are coming; then the latest games (decided ones first)
+ * beside the compact standings; and one call to action near the foot. The season is picked
+ * in the header.
  */
 export async function HomePage({
   league,
@@ -116,17 +117,17 @@ export async function HomePage({
             />
           </Section>
         ) : null}
-        <Section
-          title={t('home.upcoming')}
-          kicker={t('home.upcoming.kicker')}
-          more={{ href: scheduleHref, label: t('home.fullSchedule') }}
-        >
-          {next.length === 0 ? (
-            <EmptyPanel text={t('home.noUpcoming')} />
-          ) : (
+        {/* With nothing coming there is no section to say so: the page leads with its
+            latest games and the standings. */}
+        {next.length === 0 ? null : (
+          <Section
+            title={t('home.upcoming')}
+            kicker={t('home.upcoming.kicker')}
+            more={{ href: scheduleHref, label: t('home.fullSchedule') }}
+          >
             <GameList leagueId={addressee.id} games={next} layout="board" across="two" />
-          )}
-        </Section>
+          </Section>
+        )}
         <div className="home-pair" data-tables={manyTables ? 'many' : 'few'}>
           {empty ? null : (
             <Section title={t('home.recentResults')} kicker={t('home.results.kicker')}>

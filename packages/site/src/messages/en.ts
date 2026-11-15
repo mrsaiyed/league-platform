@@ -143,7 +143,6 @@ export const en = {
   'home.recentResults': 'Recent results',
   'home.noResults': 'No games have been played yet.',
   'home.upcoming': 'The next matchups',
-  'home.noUpcoming': 'There are no upcoming games scheduled.',
   'home.standings': 'The standings',
   'home.standingsEmpty': 'The standings appear here once games have been played.',
   'home.fullStandings': 'See the full standings',
@@ -163,9 +162,10 @@ export const en = {
   'home.hero.text': 'Scores, standings and the schedule for every team, all season long.',
   'home.hero.schedule': 'See the schedule',
   'home.hero.standings': 'View the standings',
-  'home.live.kicker': 'Happening now',
   'home.upcoming.kicker': 'On the schedule',
-  'home.results.kicker': 'Final scores',
+  // Over "Recent results": the list opens with decided games and may end with one whose
+  // result is still awaited, so its label is true of both.
+  'home.results.kicker': 'Latest games',
   'home.standings.kicker': 'The race for the top',
   'home.call.title': 'Every team has a story.',
   'home.call.text': 'Rosters, records and results for every team in the league.',

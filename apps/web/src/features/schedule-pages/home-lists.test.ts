@@ -1,7 +1,7 @@
 // What the home page lists (step 2.147), on the made-up stand-in schedule: a game whose
-// start has passed with no result is never among the games to come, the coming games are
-// an even number wherever one can give way, and the results follow the height of the
-// standings beside them.
+// start has passed with no result is never among the games to come, no coming game is
+// left out, and the latest games (decided ones first) follow the height of the standings
+// beside them.
 import { describe, expect, it } from 'vitest';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
@@ -156,20 +156,26 @@ describe('the home page’s coming games', () => {
     expect(homeNextGames([])).toEqual([]);
   });
 
-  it('are an even number wherever a coming game can give way, so no card has a hole beside it', () => {
-    // Four coming and one postponed: the fourth coming game gives way.
-    expect(ids(homeNextGames([...coming(4), ...off(1)]))).toEqual(['c1', 'c2', 'c3', 'p1']);
-    expect(ids(homeNextGames(coming(3)))).toEqual(['c1', 'c2']);
-    expect(ids(homeNextGames([...coming(3), ...off(2)]))).toEqual(['c1', 'c2', 'p1', 'p2']);
-    // Too few to give one up: shown whole, and the last card takes the row (the grid's rule).
+  it('never leave a coming game out to make the number even: a card left over takes the row', () => {
+    // The code review, L1: an odd number is shown as it is (the grid gives the last card
+    // the whole row), where a coming game used to give way.
+    expect(ids(homeNextGames([...coming(4), ...off(1)]))).toEqual(['c1', 'c2', 'c3', 'c4', 'p1']);
+    expect(ids(homeNextGames(coming(3)))).toEqual(['c1', 'c2', 'c3']);
+    expect(ids(homeNextGames([...coming(3), ...off(2)]))).toEqual(['c1', 'c2', 'c3', 'p1', 'p2']);
     expect(ids(homeNextGames(coming(1)))).toEqual(['c1']);
     expect(ids(homeNextGames([...coming(2), ...off(1)]))).toEqual(['c1', 'c2', 'p1']);
     for (let c = 0; c <= 6; c++) {
       for (let p = 0; p <= 3; p++) {
         const shown = homeNextGames([...coming(c), ...off(p)]);
-        if (Math.min(c, 4) >= 3) expect(shown.length % 2, `${c} and ${p}`).toBe(0);
-        // A postponed game is never dropped to make the number even.
-        expect(shown.filter((g) => g.status === 'postponed')).toHaveLength(Math.min(p, 2));
+        // Every one of the next four, and of the first two waiting for a new day.
+        expect(
+          shown.filter((g) => g.status === 'scheduled'),
+          `${c} and ${p}`,
+        ).toHaveLength(Math.min(c, 4));
+        expect(
+          shown.filter((g) => g.status === 'postponed'),
+          `${c} and ${p}`,
+        ).toHaveLength(Math.min(p, 2));
       }
     }
   });
@@ -202,10 +208,43 @@ describe('the home page’s results', () => {
     expect(homeResults(finals, [], [table(4), table(4), table(4)])).toHaveLength(4);
   });
 
-  it('open with a game waiting for its result, which takes no result’s place', () => {
+  it('open with decided games; a game waiting for its result comes after them, inside the number', () => {
     const late = [card('late', 'scheduled', true)];
-    expect(ids(homeResults(finals, late, [table(3, true)]))).toEqual(['late', 'f1', 'f2']);
     const two = [card('late', 'scheduled', true), card('later', 'scheduled', true)];
-    expect(ids(homeResults(finals, two, [table(3, true)]))).toEqual(['late', 'later', 'f1']);
+    // Room for two beside one short table: one result, then the game that is waiting. The
+    // column is as tall as it was with two results, so it still ends level with the table.
+    expect(ids(homeResults(finals, late, [table(3, true)]))).toEqual(['f1', 'late']);
+    // A waiting game never takes the last decided game's place.
+    expect(ids(homeResults(finals, two, [table(3, true)]))).toEqual(['f1', 'late']);
+    // Room for three, and for five.
+    expect(ids(homeResults(finals, two, [table(12)]))).toEqual(['f1', 'late', 'later']);
+    expect(ids(homeResults(finals, late, [table(10), table(10)]))).toEqual([
+      'f1',
+      'f2',
+      'f3',
+      'f4',
+      'late',
+    ]);
+    // Across the page, with more than two tables: four in all.
+    expect(ids(homeResults(finals, two, [table(4), table(4), table(4)]))).toEqual([
+      'f1',
+      'f2',
+      'late',
+      'later',
+    ]);
+    // Never more than the number without one, whatever is waiting.
+    for (const tables of [[], [table(3, true)], [table(12)], [table(10), table(10)]]) {
+      const without = homeResults(finals, [], tables).length;
+      for (const waiting of [late, two]) {
+        expect(homeResults(finals, waiting, tables)).toHaveLength(without);
+      }
+    }
+  });
+
+  it('with nothing decided yet are the games waiting for their results, and decided games fill what those leave', () => {
+    const two = [card('late', 'scheduled', true), card('later', 'scheduled', true)];
+    expect(ids(homeResults([], two, [table(3, true)]))).toEqual(['late', 'later']);
+    expect(ids(homeResults(finals.slice(0, 1), two, [table(12)]))).toEqual(['f1', 'late', 'later']);
+    expect(homeResults([], [], [table(12)])).toEqual([]);
   });
 });
