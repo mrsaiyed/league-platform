@@ -3,6 +3,7 @@
 import type { LiveGamesStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
+  findLastGameEnd,
   findSavedGameState,
   insertGameEvents,
   listGamePlayerLines,
@@ -36,5 +37,6 @@ export function liveGamesStore(scope: LeagueScope): LiveGamesStore {
         stats: countsOf(line.stats),
       })),
     saveLines: (gameId, lines, removed) => saveGameLines(scope, gameId, lines, removed),
+    findLastEnd: (gameId) => findLastGameEnd(scope, gameId),
   };
 }

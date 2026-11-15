@@ -816,6 +816,25 @@ export const en = {
   'error.games.renew_scoring_session.game-closed':
     'That game is now decided or cancelled, so scoring it has stopped.',
   'error.games.release_scoring_session.game-not-found': 'That game is not there.',
+  // Why the scorekeeper's reopening of a game they ended was refused (step 2.120, S-36).
+  // The tracker shows them by the code its endpoint answers.
+  'error.games.reopen_tracked_game.game-not-found': 'That game is not there.',
+  'error.games.reopen_tracked_game.changed-since-read':
+    'This game changed since your device last read it. Open the game again, then reopen it if it still needs it.',
+  'error.games.reopen_tracked_game.game-not-decided':
+    'This game is not over, so there is nothing to reopen.',
+  'error.games.reopen_tracked_game.not-ended-by-tracker':
+    'This game was not ended from the tracker, so it cannot be reopened here. A league admin can reopen it from the games area.',
+  'error.games.reopen_tracked_game.scorekeepers-may-not-reopen':
+    'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.not-ended-by-you':
+    'Only the scorekeeper who ended this game can reopen it here. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.reopen-time-over':
+    'It is too long since this game ended for a scorekeeper to reopen it. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.reason-needed':
+    'Say in a few words why the game is being reopened (up to 1000 characters). It is kept in the game’s corrections, never shown publicly.',
+  'error.games.reopen_tracked_game.not-allowed':
+    'You cannot score this game, so you cannot reopen it. A league admin can reopen it.',
   // Why a schedule draft edit was refused (T-187).
   'error.scheduling.add_draft_game.changed-since-read':
     'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
@@ -1021,6 +1040,7 @@ export const en = {
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
   'activity.games.end_tracked_game': 'Ended a tracked game',
+  'activity.games.reopen_tracked_game': 'Reopened a game ended from the tracker',
   'activity.standings.add_adjustment': 'Added a standings adjustment',
   'activity.standings.remove_adjustment': 'Removed a standings adjustment',
   'activity.games.assign_scorekeeper': 'Assigned a scorekeeper to a game',

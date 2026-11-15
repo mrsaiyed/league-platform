@@ -17,6 +17,7 @@ import {
   releaseScoringSession,
   renewScoringSession,
   reopenGame,
+  reopenTrackedGame,
   setBoxScore,
   takeOverScoring,
   unassignScorekeeper,
@@ -29,6 +30,7 @@ import {
   extendScoringSession,
   findScoringSession,
   insertScoringSession,
+  findLastGameEnd,
   findSavedGameState,
   insertGameEvents,
   listGamePlayers,
@@ -153,6 +155,15 @@ registerCommandCase(cancelGame, harnessTx, {
 
 registerCommandCase(reopenGame, harnessTx, {
   name: "reopen the target's final game",
+  input: (target) => ({ gameId: target.gameId, version: 1, reason: 'Harness reopening' }),
+});
+
+// The scorekeeper's way back from End game (step 2.120): the target's final game was
+// ended by its tracker, so in the target's own league its owner reopens it, handing it
+// back to the tracker with a correction and the standings rebuilt; anywhere else it is
+// refused or finds no game.
+registerCommandCase(reopenTrackedGame, harnessTx, {
+  name: "reopen the target's final game from its tracker",
   input: (target) => ({ gameId: target.gameId, version: 1, reason: 'Harness reopening' }),
 });
 
@@ -433,6 +444,14 @@ registerIsolationCase({
   name: "write over the saved state of the target's final game",
   run: (scope, target) =>
     saveGameState(scope, target.gameId, 3, { version: 1, status: 'final', plays: [] }),
+});
+
+// Who ended the target's final game (step 2.120): its seeded end event, sent by the
+// target's member.
+registerIsolationCase({
+  subject: findLastGameEnd,
+  name: "read who ended the target's final game",
+  run: (scope, target) => findLastGameEnd(scope, target.gameId),
 });
 
 registerIsolationCase({

@@ -90,6 +90,10 @@ export function liveGamesOf(s: MemoryTracker): LiveGamesStore {
         ...structuredClone(lines),
       ];
     },
+    findLastEnd: async (gameId) => {
+      const end = s.events.filter((e) => e.gameId === gameId && e.type === 'end').at(-1);
+      return end === undefined ? undefined : { accountId: end.accountId };
+    },
   };
 }
 

@@ -272,6 +272,13 @@ export type LiveGamesStore = {
     lines: readonly LiveGameLine[],
     removed: readonly string[],
   ) => Promise<void>;
+  /**
+   * Who sent the game's latest end (its last `end` event): the account, null for an
+   * event with none, or undefined if the game was never ended by its tracker.
+   */
+  readonly findLastEnd: (
+    gameId: string,
+  ) => Promise<{ readonly accountId: string | null } | undefined>;
 };
 
 /** The tracker's commands' transaction (step 2.29): the scoring one and the live game. */
