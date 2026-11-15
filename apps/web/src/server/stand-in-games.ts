@@ -375,6 +375,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
     liveGames: liveGamesOf(
       s.tracker,
       (gameId) => teamsOf(s, gameId),
+      (gameId) => s.games.find((g) => g.id === gameId)?.finalizedAt,
       (teamId) => uniqueJerseysOf(s, teamId),
     ),
   });

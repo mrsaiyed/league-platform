@@ -17,6 +17,8 @@ import {
   releaseScoringSession,
   renewScoringSession,
   reopenGame,
+  readReopenOffer,
+  reopenTrackedGame,
   setBoxScore,
   takeOverScoring,
   unassignScorekeeper,
@@ -29,6 +31,9 @@ import {
   extendScoringSession,
   findScoringSession,
   insertScoringSession,
+  findGameEndedAgo,
+  findGameEvent,
+  findLastGameEnd,
   findSavedGameState,
   insertGameEvents,
   listGamePlayers,
@@ -160,6 +165,28 @@ registerCommandCase(cancelGame, harnessTx, {
 registerCommandCase(reopenGame, harnessTx, {
   name: "reopen the target's final game",
   input: (target) => ({ gameId: target.gameId, version: 1, reason: 'Harness reopening' }),
+});
+
+// The scorekeeper's way back from End game (step 2.120): the target's final game was
+// ended by its tracker, so in the target's own league its owner reopens it, handing it
+// back to the tracker with a correction and the standings rebuilt; anywhere else it is
+// refused or finds no game.
+registerCommandCase(reopenTrackedGame, harnessTx, {
+  name: "reopen the target's final game from its tracker",
+  // A set id, so every run sends the same request. Its seeded events are a basket and
+  // the end: the end is the second.
+  input: (target) => ({
+    gameId: target.gameId,
+    requestId: '01900000-0000-7000-8000-00000000c2a1',
+    sequence: 2,
+    reason: 'Harness reopening',
+  }),
+});
+
+// Whether Reopen is offered on the target's final game, and who ended it (its member).
+registerCommandCase(readReopenOffer, harnessTx, {
+  name: "read whether the target's final game can be reopened from its tracker",
+  input: (target) => ({ gameId: target.gameId }),
 });
 
 // Box scores entered afterwards (step 2.64) -------------------------------------------
@@ -445,6 +472,26 @@ registerIsolationCase({
   name: "write over the saved state of the target's final game",
   run: (scope, target) =>
     saveGameState(scope, target.gameId, 3, { version: 1, status: 'final', plays: [] }),
+});
+
+// Who ended the target's final game (step 2.120): its seeded end event, sent by the
+// target's member.
+registerIsolationCase({
+  subject: findLastGameEnd,
+  name: "read who ended the target's final game",
+  run: (scope, target) => findLastGameEnd(scope, target.gameId),
+});
+
+registerIsolationCase({
+  subject: findGameEndedAgo,
+  name: "read how long ago the target's final game was decided",
+  run: (scope, target) => findGameEndedAgo(scope, target.gameId),
+});
+
+registerIsolationCase({
+  subject: findGameEvent,
+  name: "find the target's final game's first event by its command id",
+  run: (scope, target) => findGameEvent(scope, target.gameId, target.gameCommandIds[0] ?? ''),
 });
 
 registerIsolationCase({

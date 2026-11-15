@@ -820,6 +820,43 @@ export const en = {
   'error.games.renew_scoring_session.game-closed':
     'That game is now decided or cancelled, so scoring it has stopped.',
   'error.games.release_scoring_session.game-not-found': 'That game is not there.',
+  // Why the scorekeeper's reopening of a game they ended was refused (step 2.120, S-36).
+  // The tracker shows them by the code its endpoint answers.
+  'error.games.reopen_tracked_game.game-not-found': 'That game is not there.',
+  'error.games.reopen_tracked_game.changed-since-read':
+    'This game changed since your device last read it. Open the game again, then reopen it if it still needs it.',
+  'error.games.reopen_tracked_game.game-not-decided':
+    'This game is not over, so there is nothing to reopen.',
+  'error.games.reopen_tracked_game.not-ended-by-tracker':
+    'This game was not ended from the tracker, so it cannot be reopened here. A league admin can reopen it from the games area.',
+  'error.games.reopen_tracked_game.scorekeepers-may-not-reopen':
+    'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.not-ended-by-you':
+    '{name} ended this game, so only they can reopen it here. A league admin can reopen it.',
+  // When the server knows no account for the end (a game brought over from elsewhere).
+  'error.games.reopen_tracked_game.not-ended-by-you.unknown':
+    'Only the scorekeeper who ended this game can reopen it here. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.reopen-time-over':
+    'It is too long since this game ended for a scorekeeper to reopen it. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.reason-needed':
+    'Say in a few words why the game is being reopened (up to 1000 characters). It is kept in the game’s corrections, never shown publicly.',
+  'error.games.reopen_tracked_game.not-allowed':
+    'You cannot score this game, so you cannot reopen it. A league admin can reopen it.',
+  // Reopen game on the tracker's final panel (step 2.37 draws it), from the server's
+  // answer to GET …/games/{game}/reopen before the tap (step 2.120, S-36).
+  'tracker.reopen.button': 'Reopen game',
+  'tracker.reopen.until': 'You can reopen this game until {time}.',
+  'tracker.reopen.adminCan': 'A league admin can reopen this game.',
+  'tracker.reopen.question':
+    'Reopen this game? It goes back to live with every play as it was, and it stops counting in the standings until you end it again.',
+  'tracker.reopen.reasonLabel':
+    'Why it is being reopened (kept in the game’s corrections, never shown publicly)',
+  'tracker.reopen.reasonReady': 'End game tapped by mistake',
+  'tracker.reopen.confirm': 'Reopen the game',
+  'tracker.reopen.cancel': 'Keep it final',
+  'tracker.reopen.noConnection':
+    'No connection. The game reopens as soon as the connection is back.',
+  'tracker.reopen.done': 'The game is live again. Carry on scoring.',
   // Why a schedule draft edit was refused (T-187).
   'error.scheduling.add_draft_game.changed-since-read':
     'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
@@ -1025,6 +1062,7 @@ export const en = {
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
   'activity.games.end_tracked_game': 'Ended a tracked game',
+  'activity.games.reopen_tracked_game': 'Reopened a game ended from the tracker',
   'activity.games.apply_tracker_commands': "Changed a team's players at the scorer's table",
   'activity.standings.add_adjustment': 'Added a standings adjustment',
   'activity.standings.remove_adjustment': 'Removed a standings adjustment',
@@ -1079,6 +1117,8 @@ export const en = {
     'Which games a scorekeeper may score: any game, or only the games they are assigned to',
   'setting.games.whoMayScore.option.anyScorekeeper': 'Any game',
   'setting.games.whoMayScore.option.assignedOnly': 'Only games they are assigned to',
+  'setting.games.scorekeeperReopenMinutes.label':
+    'Minutes after a game ends during which the scorekeeper who ended it may reopen it from the tracker, with a reason, if they tapped End game too soon. 0 means never. After that, only an admin can reopen it.',
   'setting.teams.startingStatsLevel.label':
     "Who sees a new team's players' statistics until the team chooses",
   'setting.teams.startingStatsLevel.option.everyone': 'Everyone',

@@ -214,8 +214,11 @@ const teamsOf = (s: MemoryGames, gameId: string) => {
   return game === undefined ? [] : [game.homeTeamId, game.awayTeamId];
 };
 
-/** The live game over one state. */
-export function liveGamesOf(s: MemoryTracker): LiveGamesStore {
+/**
+ * The live game over one state. `databaseNow` stands in for the database's own clock,
+ * which measures how long ago a game was decided.
+ */
+export function liveGamesOf(s: MemoryTracker, databaseNow: () => number): LiveGamesStore {
   return {
     findState: async (gameId) => {
       const found = s.states.find((x) => x.gameId === gameId);
@@ -255,6 +258,22 @@ export function liveGamesOf(s: MemoryTracker): LiveGamesStore {
         ...structuredClone(lines),
       ];
     },
+    findLastEnd: async (gameId) => {
+      const end = s.events.filter((e) => e.gameId === gameId && e.type === 'end').at(-1);
+      return end === undefined ? undefined : { accountId: end.accountId };
+    },
+    endedAgo: async (gameId) => {
+      const decided = s.games.find((g) => g.id === gameId)?.finalizedAt;
+      return decided === null || decided === undefined
+        ? undefined
+        : Math.max(0, databaseNow() - Date.parse(decided));
+    },
+    findEvent: async (gameId, commandId) => {
+      const found = s.events.find((e) => e.gameId === gameId && e.commandId === commandId);
+      return found === undefined
+        ? undefined
+        : { seq: found.seq, type: found.type, accountId: found.accountId };
+    },
     ...tablePlayersOf(s),
   };
 }
@@ -270,7 +289,8 @@ const trackerTxOf = (
     clock,
     // The session commands take the same lock, so a takeover and a batch race for real.
     scoringSessions: sessionsOf(s, lock === undefined ? {} : { lockGame: lock }),
-    liveGames: liveGamesOf(s),
+    // The stand-in's database keeps the test's clock.
+    liveGames: liveGamesOf(s, clock.now),
   });
 
 /**

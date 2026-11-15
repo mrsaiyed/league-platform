@@ -337,6 +337,27 @@ export type LiveGamesStore = {
     lines: readonly LiveGameLine[],
     removed: readonly string[],
   ) => Promise<void>;
+  /**
+   * Who sent the game's latest end (its last `end` event): the account, null for an
+   * event with none, or undefined if the game was never ended by its tracker.
+   */
+  readonly findLastEnd: (
+    gameId: string,
+  ) => Promise<{ readonly accountId: string | null } | undefined>;
+  /**
+   * How long ago the game was decided, in milliseconds, measured inside the database
+   * (the start of the asking statement less the game's `finalized_at`, both its own
+   * clock, so a wait for the game's lock counts), or undefined if
+   * it is not decided. Never below 0.
+   */
+  readonly endedAgo: (gameId: string) => Promise<number | undefined>;
+  /** The game's event made by this command id: its number, type and sender, or undefined. */
+  readonly findEvent: (
+    gameId: string,
+    commandId: string,
+  ) => Promise<
+    { readonly seq: number; readonly type: string; readonly accountId: string | null } | undefined
+  >;
   /** The person's current entry (not left) on the team, or undefined (record 058). */
   readonly findTablePlayer: (teamId: string, personId: string) => Promise<TablePlayer | undefined>;
   /** Adds a new person and their roster entry, marked as added at the game (S-6). */
