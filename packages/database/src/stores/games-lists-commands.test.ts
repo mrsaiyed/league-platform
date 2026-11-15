@@ -137,8 +137,13 @@ describe('the games that still need a result, on the database', () => {
 });
 
 /** A role in the league for a new made-up account: its id. */
-async function grant(leagueId: string, role: string, programId: string | null = null) {
-  const accountId = await newAccount(pglite);
+async function grant(
+  leagueId: string,
+  role: string,
+  programId: string | null = null,
+  existing?: string,
+) {
+  const accountId = existing ?? (await newAccount(pglite));
   await pglite.query(
     `insert into role_grants (league_id, account_id, role, scope_type, scope_id)
      values ($1, $2, $3, $4, $5)`,
@@ -206,6 +211,89 @@ describe('the games that need a result, for a person who scores only some, on th
     expect(mine.ok && mine.value.games.map((g) => g.id)).toEqual([assignedGame]);
     expect(mine.ok && mine.value.games[0]?.assignedToMe).toBe(true);
     expect(mine.ok && mine.value.more).toBe(false);
+  });
+});
+
+// Every branch of the filter (inReachOf) on the database: the assigned games of one
+// program only, and two branches joined (one person with two roles), for both lists.
+describe('the lists for people who score only some games, every branch, on the database', () => {
+  it("keeps a program's assigned games only, and joins a person's two roles", async () => {
+    const l = await league();
+    const other = await newProgram(pglite, l.leagueId);
+    const otherSeason = await newSeason(pglite, l.leagueId, other);
+    const otherStage = await newStage(pglite, l.leagueId, otherSeason);
+    const otherHome = await newTeam(pglite, l.leagueId, otherSeason);
+    const otherAway = await newTeam(pglite, l.leagueId, otherSeason);
+    const otherGame = (columns: Record<string, unknown>) =>
+      newGame(pglite, {
+        leagueId: l.leagueId,
+        seasonId: otherSeason,
+        stageId: otherStage,
+        homeTeamId: otherHome,
+        awayTeamId: otherAway,
+        columns,
+      });
+    const firstRound = await newRound(pglite, l.leagueId, l.seasonId, 1);
+    const otherRound = await newRound(pglite, l.leagueId, otherSeason, 1);
+    // Waiting for a result: one assigned and one not in the first program, and one of the
+    // other program assigned to the same people (not their program, for the first).
+    const assigned = await l.gameAt({ starts_at: l.at(-3 * day) });
+    const unassigned = await l.gameAt({ starts_at: l.at(-2 * day) });
+    const elsewhere = await otherGame({ starts_at: l.at(-day) });
+    // Earlier games, the same three ways, each program's in its own round.
+    const assignedFinal = await l.gameAt({ ...final(l.at(-10 * day)), round_id: firstRound });
+    await l.gameAt({ ...final(l.at(-10 * day + 60)), round_id: firstRound });
+    const elsewhereFinal = await otherGame({ ...final(l.at(-9 * day)), round_id: otherRound });
+
+    // A scorekeeper of the first program; and a scorekeeper there who schedules the other.
+    const keeper = await grant(l.leagueId, 'scorekeeper', l.programId);
+    const both = await grant(l.leagueId, 'scorekeeper', l.programId);
+    await grant(l.leagueId, 'scheduler', other, both);
+    for (const [account, games] of [
+      [keeper, [assigned, assignedFinal, elsewhere, elsewhereFinal]],
+      [both, [assigned, assignedFinal]],
+    ] as const) {
+      for (const game of games) {
+        await pglite.query(
+          'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
+          [l.leagueId, game, account],
+        );
+      }
+    }
+    const chosen = await setSetting(
+      l.as(),
+      { level: 'league', key: 'games.whoMayScore', value: 'assignedOnly', version: null },
+      deps,
+    );
+    expect(chosen.ok).toBe(true);
+
+    const needs = async (account: string) => {
+      const r = await listGamesNeedingResult(asAccount(l.leagueId, account), {}, deps);
+      return r.ok ? r.value.games.map((g) => g.id) : r.error.code;
+    };
+    const rounds = async (account: string) => {
+      const r = await listEarlierGames(asAccount(l.leagueId, account), {}, deps);
+      if (!r.ok) throw new Error(r.error.code);
+      return r.value.rounds.map((round) => [round.roundId, round.games]);
+    };
+    const shown = async (account: string) => {
+      const all = await listEarlierGames(asAccount(l.leagueId, account), {}, deps);
+      const key = all.ok ? all.value.rounds.find((r) => r.roundId === firstRound)?.key : '';
+      const r = await listEarlierGames(asAccount(l.leagueId, account), { round: key ?? '' }, deps);
+      return r.ok ? r.value.shown?.games.map((g) => g.id) : r.error.code;
+    };
+
+    // Only their program's assigned games: never the unassigned one, nor the other program's.
+    expect(await needs(keeper)).toEqual([assigned]);
+    expect(await rounds(keeper)).toEqual([[firstRound, 1]]);
+    expect(await shown(keeper)).toEqual([assignedFinal]);
+    // Their assigned games of the first program, or every game of the one they schedule.
+    expect(await needs(both)).toEqual([assigned, elsewhere]);
+    expect(await rounds(both)).toEqual([
+      [otherRound, 1],
+      [firstRound, 1],
+    ]);
+    expect(await shown(both)).toEqual([assignedFinal]);
   });
 });
 
