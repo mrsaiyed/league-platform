@@ -5,6 +5,7 @@
 import { defaultNamePolicy, publicViewer, type PublicDisplay } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
+  findLeagueName,
   findLeagueTimeZone,
   findPublicGameFacts,
   findPublicSeason,
@@ -14,6 +15,7 @@ import {
   listPublicSchedule,
   listPublicSeasons,
   listPublicTeams,
+  listTeamsOfAccount,
 } from '../queries/index.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
@@ -107,6 +109,34 @@ registerIsolationCase({
       .where('id', '=', target.teamId)
       .executeTakeFirst();
     return findPublicTeam(scope, target.seasonId, row?.slug ?? 'nobody', displayFor(scope));
+  },
+});
+
+registerIsolationCase({
+  subject: findLeagueName,
+  name: "read the league's own name (the target's, in its scope)",
+  run: (scope) => findLeagueName(scope),
+});
+
+registerIsolationCase({
+  subject: listTeamsOfAccount,
+  name: "list the target team as the scope's account's own, after linking the target's player to it",
+  run: async (scope, target) => {
+    // The scope's account becomes the target's player (in its own league only, inside the
+    // run's rolled-back transaction), so in the target's own league the team comes back.
+    const own = await transactionOf(scope)
+      .selectFrom('profile_access')
+      .select('profile_id')
+      .where('account_id', '=', scope.accountId ?? '')
+      .where('relation', '=', 'self')
+      .executeTakeFirst();
+    await transactionOf(scope)
+      .updateTable('people')
+      .set({ profile_id: own?.profile_id ?? null })
+      .where('league_id', '=', scope.leagueId)
+      .where('id', '=', target.personId)
+      .execute();
+    return listTeamsOfAccount(scope, target.seasonId);
   },
 });
 
