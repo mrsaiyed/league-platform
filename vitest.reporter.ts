@@ -6,16 +6,20 @@
 // can come a minute late although every test went on to pass, and vitest then exits 1.
 //
 // Such a timeout is held back while the run goes on. At the end it is forgiven only when the
-// run proves that every result arrived: every scheduled test file reported, every file and
-// every test in it finished as passed or skipped, and no test was ever reported failed on the
-// way. Otherwise the run fails (exit code 1) and the held errors and every unproven result are
-// printed by name. A failed result that arrives after the end also fails the run.
+// run proves that every result arrived: every test file vitest ran, and every test in it,
+// finished as passed or skipped, and no test was ever reported failed on the way. Otherwise
+// the run fails (exit code 1) and the held errors and every unproven result are printed by
+// name. A failed result that arrives after the end also fails the run.
 //
 // Why the proof is needed: vitest counts a file whose results never arrived as "not failed",
 // so a lost report of a failed test leaves nothing failed in vitest's own count, and the held
 // timeout was the only thing that would have failed the run. Before 2.145 the reporter "put
 // back" the held error in onTestRunEnd, after vitest had already counted errors and chosen the
 // exit code, so putting it back did nothing and such a run exited 0.
+//
+// A file whose worker never reported still appears at the end (vitest registers a stand-in
+// for each file before running it) and is caught as pending. Files are not counted against
+// the run's start: with --shard the start lists every file, the end only the shard's.
 //
 // Even with no timeout, the same proof is applied: a run vitest calls passed that holds a
 // failed or unfinished test still fails. Every other unhandled error fails the run at once,
@@ -32,7 +36,7 @@ type Held = { error: unknown; type: string };
 export type TestView = {
   fullName: string;
   module: { moduleId: string };
-  result: () => { state: string; errors?: ReadonlyArray<{ message?: string }> };
+  result: () => { state: string };
 };
 
 /** What the reporter reads of a test file (vitest's TestModule). */
@@ -46,9 +50,7 @@ export type ModuleView = {
 /** The facts the end-of-run check rests on, read from vitest and from the run's events. */
 export type RunFacts = {
   reason: string;
-  /** How many test files the run set out to run (onTestRunStart). */
-  scheduled: number;
-  /** Each scheduled file vitest knows at the end, with its tests. */
+  /** Each test file vitest knows at the end of the run, with its tests. */
   modules: ReadonlyArray<{ name: string; state: string; errors: number; tests: TestFacts[] }>;
   /** Tests that some event during the run reported as failed, as "file > test". */
   seenFailing: ReadonlyArray<string>;
@@ -62,16 +64,13 @@ export function isProgressReportTimeout(error: unknown): boolean {
 
 /**
  * Every result the run cannot prove passed, one plain line each. Empty only when the run
- * ended as passed, every scheduled file reported, every file and test in it finished as
- * passed or skipped, and no test was reported failed along the way.
+ * ended as passed with at least one file, every file and test in it finished as passed or
+ * skipped, and no test was reported failed along the way.
  */
 export function unprovenResults(facts: RunFacts): string[] {
   const problems: string[] = [];
   if (facts.reason !== 'passed') problems.push(`the run ended as "${facts.reason}"`);
-  if (facts.modules.length < facts.scheduled) {
-    const missing = facts.scheduled - facts.modules.length;
-    problems.push(`${missing} of ${facts.scheduled} test files never reported at all`);
-  }
+  if (facts.modules.length === 0) problems.push('no test file reported at all');
   for (const module of facts.modules) {
     if (!finishedWell.has(module.state)) {
       problems.push(`${module.name}: ${describeState(module.state)}`);
@@ -107,13 +106,11 @@ export function everyFileFinishedWell(states: ReadonlyArray<string>, reason: str
 export function factsOf(
   modules: ReadonlyArray<ModuleView>,
   reason: string,
-  scheduled: number,
   seenFailing: ReadonlyArray<string>,
   root: string,
 ): RunFacts {
   return {
     reason,
-    scheduled,
     seenFailing,
     modules: modules.map((module) => ({
       name: shortName(module.moduleId, root),
@@ -141,22 +138,46 @@ function shortName(moduleId: string, root: string): string {
   return id.startsWith(base) ? id.slice(base.length) : id;
 }
 
+/**
+ * What this reporter relies on in vitest, checked when vitest starts it. Checked against
+ * vitest 3.2.7: an upgrade that drops any of it must fail loudly, never pass quietly.
+ */
+export function missingFromVitest(vitest: unknown): string[] {
+  const v = vitest as {
+    version?: unknown;
+    state?: { catchError?: unknown };
+    config?: { root?: unknown };
+    _testRun?: { end?: unknown };
+  } | null;
+  const missing: string[] = [];
+  const major = typeof v?.version === 'string' ? v.version.split('.')[0] : undefined;
+  if (major !== '3') {
+    missing.push(
+      `vitest 3 (this is ${String(v?.version)}): its reporter hooks were checked on 3.2.7`,
+    );
+  }
+  if (typeof v?.state?.catchError !== 'function') missing.push('vitest.state.catchError');
+  if (typeof v?.config?.root !== 'string') missing.push('vitest.config.root');
+  // Its end() calls onTestRunEnd after choosing the exit code (see the comment above).
+  if (typeof v?._testRun?.end !== 'function') missing.push('vitest._testRun.end');
+  return missing;
+}
+
 export default class ProveEveryResult {
   private held: Held[] = [];
   private seenFailing = new Set<string>();
-  private scheduled = 0;
   private ended = false;
-  private verdict: { problems: string[]; held: Held[]; tests: number; files: number } | undefined;
   private vitest: Vitest | undefined;
 
   onInit(vitest: Vitest): void {
-    this.vitest = vitest;
-    const state = vitest.state as unknown as Partial<ErrorState>;
-    if (typeof state.catchError !== 'function') {
+    const missing = missingFromVitest(vitest);
+    if (missing.length > 0) {
       throw new Error(
-        'vitest.reporter.ts: this vitest has no state.catchError; update the reporter before upgrading vitest.',
+        `vitest.reporter.ts: this vitest lacks what the reporter relies on (${missing.join('; ')}). Update the reporter before upgrading vitest.`,
       );
     }
+    this.vitest = vitest;
+    const state = vitest.state as unknown as ErrorState;
     const record = state.catchError.bind(state);
     state.catchError = (error, type) => {
       if (isProgressReportTimeout(error) && !this.ended) {
@@ -170,12 +191,10 @@ export default class ProveEveryResult {
     };
   }
 
-  onTestRunStart(specifications: ReadonlyArray<unknown>): void {
+  onTestRunStart(): void {
     this.held = [];
     this.seenFailing.clear();
-    this.scheduled = specifications.length;
     this.ended = false;
-    this.verdict = undefined;
   }
 
   onTestCaseResult(test: TestView): void {
@@ -198,38 +217,26 @@ export default class ProveEveryResult {
     _unhandledErrors: unknown,
     reason: string,
   ): void {
-    const facts = factsOf(testModules, reason, this.scheduled, [...this.seenFailing], this.root());
+    const facts = factsOf(testModules, reason, [...this.seenFailing], this.root());
     const problems = unprovenResults(facts);
     const held = this.held;
     this.held = [];
     this.ended = true;
+    const files = facts.modules.length;
+    const tests = facts.modules.reduce((sum, module) => sum + module.tests.length, 0);
+    const timeouts = `${held.length} progress report${held.length === 1 ? '' : 's'} from a test worker timed out`;
     // vitest has already chosen its exit code, so a run this check refuses fails here. A run
     // vitest itself failed, with nothing held back, is left to vitest's own report.
     const refuse = problems.length > 0 && (held.length > 0 || reason === 'passed');
-    if (refuse) process.exitCode = 1;
-    this.verdict = {
-      problems: refuse ? problems : [],
-      held,
-      files: facts.modules.length,
-      tests: facts.modules.reduce((sum, module) => sum + module.tests.length, 0),
-    };
-  }
-
-  // Printed after vitest's own summary (this reporter is listed after the default one).
-  onFinished(): void {
-    const verdict = this.verdict;
-    this.verdict = undefined;
-    if (!verdict) return;
-    const { problems, held, files, tests } = verdict;
-    const timeouts = `${held.length} progress report${held.length === 1 ? '' : 's'} from a test worker timed out`;
-    if (problems.length === 0) {
-      if (held.length > 0 && process.exitCode !== 1) {
+    if (!refuse) {
+      if (held.length > 0) {
         console.warn(
           `vitest.reporter.ts: ${timeouts}, but all ${tests} tests in ${files} files reported a pass or a skip, so the run stands.`,
         );
       }
       return;
     }
+    process.exitCode = 1;
     const lines = [
       held.length > 0
         ? `vitest.reporter.ts: this run FAILS. ${timeouts}, and these results were not seen to pass:`

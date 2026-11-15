@@ -3,10 +3,11 @@ import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import ProveEveryResult, {
   everyFileFinishedWell,
   isProgressReportTimeout,
+  missingFromVitest,
   unprovenResults,
   type ModuleView,
   type RunFacts,
@@ -42,7 +43,6 @@ describe('what the run must prove before it passes', () => {
   const passing = (name: string) => ({ name, state: 'passed' });
   const facts = (over: Partial<RunFacts> = {}): RunFacts => ({
     reason: 'passed',
-    scheduled: 1,
     seenFailing: [],
     modules: [{ name: 'a.test.ts', state: 'passed', errors: 0, tests: [passing('one')] }],
     ...over,
@@ -51,9 +51,7 @@ describe('what the run must prove before it passes', () => {
   it('proves a run whose every file and test passed or was skipped', () => {
     expect(unprovenResults(facts())).toEqual([]);
     const skipped = { name: 'b.test.ts', state: 'skipped', errors: 0, tests: [] };
-    expect(
-      unprovenResults(facts({ scheduled: 2, modules: [...facts().modules, skipped] })),
-    ).toEqual([]);
+    expect(unprovenResults(facts({ modules: [...facts().modules, skipped] }))).toEqual([]);
   });
 
   it('names a failed test even when its file and the run say passed', () => {
@@ -78,10 +76,8 @@ describe('what the run must prove before it passes', () => {
     ]);
   });
 
-  it('counts the files the run set out to run against the files that reported', () => {
-    expect(unprovenResults(facts({ scheduled: 3 }))).toEqual([
-      '2 of 3 test files never reported at all',
-    ]);
+  it('does not prove a run in which no test file reported', () => {
+    expect(unprovenResults(facts({ modules: [] }))).toEqual(['no test file reported at all']);
   });
 
   it('remembers a test reported failed on the way, even if a later report says otherwise', () => {
@@ -99,11 +95,42 @@ describe('what the run must prove before it passes', () => {
   });
 });
 
+describe('what the reporter needs from vitest', () => {
+  const whole = () => ({
+    version: '3.2.7',
+    state: { catchError: () => {} },
+    config: { root },
+    _testRun: { end: async () => {} },
+  });
+
+  it('finds everything in the vitest it runs under', () => {
+    expect(missingFromVitest(whole())).toEqual([]);
+  });
+
+  it('names each piece an upgrade took away, and refuses to start', () => {
+    const noEnd = { ...whole(), _testRun: {} };
+    expect(missingFromVitest({ ...noEnd, version: '4.0.0', state: {} })).toEqual([
+      'vitest 3 (this is 4.0.0): its reporter hooks were checked on 3.2.7',
+      'vitest.state.catchError',
+      'vitest._testRun.end',
+    ]);
+    const reporter = new ProveEveryResult();
+    expect(() => reporter.onInit(noEnd as never)).toThrow(/vitest\._testRun\.end/);
+  });
+});
+
 describe('the reporter at the end of a run', () => {
   const exitCode = process.exitCode;
+  // The reporter prints "this run FAILS"; caught here so a passing gate never shows it.
+  const printed = vi.spyOn(console, 'error').mockImplementation(() => {});
   afterEach(() => {
     process.exitCode = exitCode;
+    printed.mockClear();
   });
+  afterAll(() => {
+    printed.mockRestore();
+  });
+  const said = () => printed.mock.calls.map((call) => String(call[0])).join('\n');
 
   const test = (state: string): TestView => ({
     fullName: 'one',
@@ -117,29 +144,36 @@ describe('the reporter at the end of a run', () => {
     children: { allTests: () => tests },
   });
 
-  it('fails a run vitest called passed when a test in it did not pass', () => {
+  it('fails a run vitest called passed when a test in it did not pass, and names it at once', () => {
     const reporter = new ProveEveryResult();
-    reporter.onTestRunStart([{}]);
+    reporter.onTestRunStart();
     process.exitCode = 0;
     reporter.onTestRunEnd([module('passed', [test('pending')])], [], 'passed');
     expect(process.exitCode).toBe(1);
+    // Printed by onTestRunEnd itself, not left to a later hook.
+    expect(said()).toContain('this run FAILS');
+    expect(said()).toContain('a.test.ts > one: its result never arrived');
   });
 
   it('fails the run when a failed result arrives after the end', () => {
     const reporter = new ProveEveryResult();
-    reporter.onTestRunStart([{}]);
+    reporter.onTestRunStart();
     reporter.onTestRunEnd([module('passed', [test('passed')])], [], 'passed');
     process.exitCode = 0;
     reporter.onTestCaseResult(test('failed'));
     expect(process.exitCode).toBe(1);
+    expect(said()).toContain(
+      "this run FAILS. a.test.ts > one: failed, reported after the run's end",
+    );
   });
 
   it('leaves a proven run alone', () => {
     const reporter = new ProveEveryResult();
-    reporter.onTestRunStart([{}]);
+    reporter.onTestRunStart();
     process.exitCode = 0;
     reporter.onTestRunEnd([module('passed', [test('passed')])], [], 'passed');
     expect(process.exitCode).toBe(0);
+    expect(printed).not.toHaveBeenCalled();
   });
 });
 
@@ -157,6 +191,9 @@ it('passes after', () => expect(1).toBe(1));
   'passes.test.ts': `import { expect, it } from 'vitest';
 it('just passes', () => expect(1).toBe(1));
 it('passes too', () => expect(2).toBe(2));
+`,
+  'also-passes.test.ts': `import { expect, it } from 'vitest';
+it('also passes', () => expect(3).toBe(3));
 `,
   'report-timeout.setup.ts': `type Pack = [string, { state?: string } | undefined, unknown];
 type Rpc = { onTaskUpdate: (packs: Pack[], events: unknown[]) => Promise<void> };
@@ -196,6 +233,7 @@ async function runChild(
   files: ReadonlyArray<keyof typeof children>,
   mode: string,
   slow: string,
+  extra: ReadonlyArray<string> = [],
 ): Promise<Child> {
   const dir = join(scratch, name);
   await mkdir(dir, { recursive: true });
@@ -227,7 +265,7 @@ export default defineConfig({
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      [vitestBin, 'run', '--root', dir, '--config', join(dir, 'vitest.config.ts')],
+      [vitestBin, 'run', '--root', dir, '--config', join(dir, 'vitest.config.ts'), ...extra],
       // Started from the repository root, so no process keeps the folder busy on Windows.
       { cwd: root, env },
     );
@@ -245,13 +283,15 @@ describe('a run with a test that fails on purpose (vitest as a child)', () => {
     expect(existsSync(scratch)).toBe(false);
   });
 
-  it('fails and names the test when nothing times out', async () => {
+  // vitest alone already fails this run; it guards that the reporter never hides a failure.
+  it('fails and names the test when nothing times out (the reporter hides nothing)', async () => {
     const run = await runChild('plain', ['fails.test.ts', 'passes.test.ts'], 'none', '');
     expect(run.code, run.output).toBe(1);
     expect(run.output).toContain('fails.test.ts > deliberately fails');
   });
 
-  it('fails and names the test when its progress report times out and arrives late', async () => {
+  // The old reporter also exited 1 here: this guards the message naming the held timeout.
+  it('names the held timeout when a failing test is answered late (wording; exit was always 1)', async () => {
     const run = await runChild('late', ['fails.test.ts', 'passes.test.ts'], 'late', 'failed');
     expect(run.code, run.output).toBe(1);
     expect(run.output).toContain('Timeout calling "onTaskUpdate"');
@@ -267,9 +307,33 @@ describe('a run with a test that fails on purpose (vitest as a child)', () => {
     );
   });
 
-  it('still passes a run whose reports time out but every result arrives as a pass', async () => {
+  // The old reporter also exited 0 here: this guards the forgiving and the line that says why.
+  it('says why it forgives timeouts in a run whose every result passed (wording; exit was always 0)', async () => {
     const run = await runChild('late-all', ['passes.test.ts'], 'late-all', 'all');
     expect(run.code, run.output).toBe(0);
     expect(run.output).toContain('but all 2 tests in 1 files reported a pass or a skip');
+  });
+
+  // With --shard vitest starts with every file but ends with the shard's only.
+  it('passes a sharded run whose own files pass', async () => {
+    const files = ['passes.test.ts', 'also-passes.test.ts'] as const;
+    const run = await runChild('shard-pass', files, 'none', '', ['--shard=1/2']);
+    expect(run.code, run.output).toBe(0);
+    expect(run.output).not.toContain('this run FAILS');
+  });
+
+  it('fails the shard that holds the failing file, and only that one', async () => {
+    const files = ['fails.test.ts', 'passes.test.ts'] as const;
+    const runs = await Promise.all(
+      ['1/2', '2/2'].map((shard, i) =>
+        runChild(`shard-${i + 1}`, files, 'none', '', [`--shard=${shard}`]),
+      ),
+    );
+    const failing = runs.filter((run) => run.output.includes('fails.test.ts > deliberately fails'));
+    expect(failing, runs.map((run) => run.output).join('\n')).toHaveLength(1);
+    expect(failing[0]?.code).toBe(1);
+    const other = runs.find((run) => run !== failing[0]);
+    expect(other?.code, other?.output).toBe(0);
+    expect(other?.output).not.toContain('this run FAILS');
   });
 });
