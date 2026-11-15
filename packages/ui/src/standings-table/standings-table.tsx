@@ -100,14 +100,18 @@ export function StandingsTable({
                     ) : (
                       <span className="ui-team-chip" aria-hidden="true" />
                     )}
-                    <span dir="auto">{row.team}</span>
-                    {marks.map((m) => (
-                      <sup key={m.id} className="ui-note-mark">
-                        <a href={`#${idPrefix}-note-${m.id}`}>
-                          <span className="ui-visually-hidden">{labels.note}</span> {m.n}
-                        </a>
-                      </sup>
-                    ))}
+                    {/* A note's mark is part of the name's own flow, so on a name long enough
+                        to wrap it follows the last word, not the first line. */}
+                    <span dir="auto">
+                      {row.team}
+                      {marks.map((m) => (
+                        <sup key={m.id} className="ui-note-mark">
+                          <a href={`#${idPrefix}-note-${m.id}`}>
+                            <span className="ui-visually-hidden">{labels.note}</span> {m.n}
+                          </a>
+                        </sup>
+                      ))}
+                    </span>
                   </th>
                   {columns.map((c) => (
                     <td key={c.key} className="ui-num">

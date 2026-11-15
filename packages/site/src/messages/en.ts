@@ -157,6 +157,8 @@ export const en = {
   'home.number.teams': 'Teams',
   'home.number.played': 'Games played',
   'home.number.toPlay': 'Games to play',
+  // In place of "Games to play" once a season has none left.
+  'home.number.scored': 'Points scored',
   'home.number.rounds': 'Rounds',
   // The first starting design's home page (step 2.147, C-16): a hero with one sentence and
   // two ways on, a tiny label (a kicker) over each section's title, and one call to action

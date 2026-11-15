@@ -140,7 +140,18 @@ describe('standings table', () => {
     expect(html).toContain('Ahead on head-to-head');
   });
   it('shows an Arabic team name with its own direction', () => {
-    expect(html).toContain(`<span dir="auto">${arabicName}</span>`);
+    // Since step 2.147 part 2 a note's mark is inside the name's own element, after the
+    // name, so that on a long name it follows the last word: the element still opens with
+    // the name and takes its direction from it.
+    expect(html).toMatch(
+      new RegExp(`<span dir="auto">${arabicName}(?:<sup class="ui-note-mark">|</span>)`),
+    );
+  });
+  it('puts a note’s mark after the last word of the name, inside the name’s own flow', () => {
+    const marked = /<span dir="auto">([^<]+)<sup class="ui-note-mark"><a href="#[^"]+">/.exec(html);
+    expect(marked).not.toBeNull();
+    // Nothing of a mark stands outside a name's element.
+    expect(html).not.toMatch(/<\/span><sup class="ui-note-mark">/);
   });
 });
 
