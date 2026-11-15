@@ -162,6 +162,40 @@ describe('the scoring screen’s view of a game', () => {
     expect(view.periods).toBe(4);
   });
 
+  it('draws every player the engine has, on this device’s rosters or not (review M5)', () => {
+    // Another table added a player a minute ago: the engine has them on the court and
+    // with a basket; this device's rosters do not know them yet.
+    const game = played(
+      [
+        { type: 'sub', side: 'home', inId: 'walk-on', outId: 'h7' },
+        { type: 'score', side: 'home', playerId: 'walk-on', points: 3 },
+        { type: 'foul', side: 'away', playerId: 'late-bear' },
+      ],
+      tippedOff(),
+    );
+    const view = scoringView(game, testRosters, noLineupPicks);
+    const derived = basketball.derive(game);
+    // Five on the court in the engine, five tiles, in the engine's order.
+    expect(ids(view.teams.home.floor)).toEqual(derived.teams.home.onCourt);
+    expect(view.teams.home.floor).toHaveLength(5);
+    expect(findTile(view, 'walk-on')).toMatchObject({
+      side: 'home',
+      onCourt: true,
+      points: 3,
+      number: null,
+      unlisted: true,
+    });
+    // The tiles' points add up to the team's score.
+    const tiles = [...view.teams.home.floor, ...view.teams.home.bench];
+    expect(tiles.reduce((sum, p) => sum + p.points, 0)).toBe(view.teams.home.score);
+    // A bench player with a line the rosters lack is on the bench, last (no number).
+    expect(view.teams.away.bench.at(-1)).toMatchObject({ id: 'late-bear', fouls: 1 });
+    expect(findTile(view, 'h3')?.unlisted).toBe(false);
+    // They can be substituted off: the tile is there to tap, and stays the same object.
+    const again = scoringView(game, testRosters, noLineupPicks);
+    expect(findTile(again, 'walk-on')?.player).toBe(findTile(view, 'walk-on')?.player);
+  });
+
   it('says a team has no players, and does not wait for its lineup', () => {
     const rosters = { ...testRosters, away: { ...testRosters.away, players: [] } };
     const game = played([{ type: 'lineup', side: 'home', playerIds: homeFive }]);

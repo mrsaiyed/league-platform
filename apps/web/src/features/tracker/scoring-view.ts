@@ -22,6 +22,11 @@ export type PlayerTile = {
   readonly number: string | null;
   /** The name under the number on a small tile: the first name, else the last. */
   readonly shortName: string;
+  /**
+   * The engine has this player in the game and this device's rosters do not (yet): no
+   * name and no number are known here, and the tile says so.
+   */
+  readonly unlisted: boolean;
   readonly onCourt: boolean;
   readonly points: number;
   readonly fouls: number;
@@ -72,6 +77,24 @@ export type ScoringView = {
   readonly teams: Readonly<Record<Side, TeamPanel>>;
 };
 
+/** A player the engine has and the device's rosters lack: one object for each, kept. */
+const unlistedPlayers = new Map<string, DevicePlayer>();
+function unlistedPlayer(personId: string): DevicePlayer {
+  const known = unlistedPlayers.get(personId);
+  if (known !== undefined) return known;
+  const player: DevicePlayer = {
+    personId,
+    firstName: '',
+    lastName: '',
+    jerseyNumber: null,
+    left: false,
+    addedAtGameId: null,
+    toReview: false,
+  };
+  unlistedPlayers.set(personId, player);
+  return player;
+}
+
 /** Jersey order: by number (00 before 0), players with no number last, then by name. */
 export function inJerseyOrder(players: readonly DevicePlayer[]): DevicePlayer[] {
   const key = (p: DevicePlayer): readonly [number, number, number] =>
@@ -119,7 +142,20 @@ export function scoringView(
   const panel = (side: Side): TeamPanel => {
     const team = rosters[side];
     const view = derived.teams[side];
-    const shown = shownPlayers(team, derived.players, view.onCourt);
+    // Everyone the engine has on this team's court or with a line in this game is drawn,
+    // whether or not this device's rosters know them (a player added at another table a
+    // minute ago): the screen never shows fewer on the court than the engine has, and
+    // such a player can still be scored and substituted.
+    const listed = new Set(team.players.map((p) => p.personId));
+    const unlisted = [
+      ...new Set([
+        ...view.onCourt,
+        ...Object.keys(derived.players).filter((id) => derived.players[id]?.side === side),
+      ]),
+    ]
+      .filter((id) => !listed.has(id))
+      .map(unlistedPlayer);
+    const shown = [...shownPlayers(team, derived.players, view.onCourt), ...unlisted];
     const stage: TeamPanel['stage'] =
       view.onCourt.length > 0 ? 'set' : shown.length === 0 ? 'no-players' : 'picking';
     // Picks kept from before a reload: only players still shown, and none once the
@@ -136,6 +172,7 @@ export function scoringView(
         player,
         number,
         shortName: player.firstName !== '' ? player.firstName : player.lastName,
+        unlisted: !listed.has(player.personId),
         onCourt: view.onCourt.includes(player.personId),
         points: line?.points ?? 0,
         fouls: line?.fouls ?? 0,

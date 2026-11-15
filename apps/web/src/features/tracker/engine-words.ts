@@ -114,8 +114,13 @@ export function findPlayer(rosters: DeviceRosters, playerId: string): DevicePlay
   );
 }
 
-const fullName = (player: DevicePlayer): string =>
-  [player.firstName, player.lastName].filter((part) => part !== '').join(' ');
+/** A player's name: both parts in the order the language's message gives, or the one there is. */
+const fullName = (player: DevicePlayer, t: Translate): string =>
+  player.firstName !== '' && player.lastName !== ''
+    ? t('tracker.player.fullName', { first: player.firstName, last: player.lastName })
+    : player.firstName !== ''
+      ? player.firstName
+      : player.lastName;
 
 const hasNumber = (player: DevicePlayer): player is DevicePlayer & { jerseyNumber: string } =>
   player.jerseyNumber !== null && player.jerseyNumber !== '';
@@ -123,7 +128,7 @@ const hasNumber = (player: DevicePlayer): player is DevicePlayer & { jerseyNumbe
 /** "#4 Jordan Ellis", "Jordan Ellis" with no number, "#12" with no name (S-34). */
 export function playerLabel(player: DevicePlayer | undefined, t: Translate): string {
   if (player === undefined) return t('tracker.player.unknown');
-  const name = fullName(player);
+  const name = fullName(player, t);
   if (hasNumber(player)) {
     return name === ''
       ? t('tracker.player.number', { jersey: player.jerseyNumber })

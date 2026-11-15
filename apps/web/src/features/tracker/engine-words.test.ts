@@ -237,8 +237,10 @@ describe('the engine’s plays in the tracker’s words', () => {
     expect(playerShortLabel(hawkins, t)).toBe('Max Hawkins');
     expect(playerLabel(twelve, t)).toBe('#12');
     expect(playerShortLabel(twelve, t)).toBe('#12');
-    expect(playerLabel(undefined, t)).toBe('A player not on this device');
-    expect(playerLabel(player('x', null, '', ''), t)).toBe('A player not on this device');
+    expect(playerLabel(undefined, t)).toBe('Player not on this device’s list');
+    expect(playerLabel(player('x', null, '', ''), t)).toBe('Player not on this device’s list');
+    // One part of a name alone is that part.
+    expect(playerLabel(player('y', '8', '', 'Solo'), t)).toBe('#8 Solo');
   });
 
   it('names periods as the format has them', () => {

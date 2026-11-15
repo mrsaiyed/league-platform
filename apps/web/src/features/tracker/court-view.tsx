@@ -358,6 +358,7 @@ const sameTile = (a: PlayerTile, b: PlayerTile): boolean =>
     a.fouls === b.fouls &&
     a.ms === b.ms &&
     a.fouledOut === b.fouledOut &&
+    a.unlisted === b.unlisted &&
     a.picked === b.picked);
 
 /**
@@ -378,10 +379,11 @@ const Tile = memo(
 function TileButton({ t, tile, open, picking = false, onTap }: TileProps) {
   const name = playerLabel(tile.player, t);
   const where = t(tile.onCourt ? 'tracker.where.floor' : 'tracker.where.bench');
-  const label = t.plural('tracker.tile.label', tile.fouls, {
+  const label = t('tracker.tile.label', {
     player: name,
     where,
-    points: tile.points,
+    points: t.plural('tracker.tile.pointsCount', tile.points),
+    fouls: t.plural('tracker.tile.foulsCount', tile.fouls),
   });
   return (
     <button
@@ -391,6 +393,7 @@ function TileButton({ t, tile, open, picking = false, onTap }: TileProps) {
       data-side={tile.side}
       data-oncourt={tile.onCourt ? '1' : '0'}
       data-out={tile.fouledOut ? '' : undefined}
+      data-unlisted={tile.unlisted ? '' : undefined}
       data-open={open ? '' : undefined}
       {...(picking
         ? { 'aria-pressed': tile.picked, 'aria-label': name }
@@ -404,7 +407,9 @@ function TileButton({ t, tile, open, picking = false, onTap }: TileProps) {
       <span className="court-tile-number" data-none={tile.number === null ? '' : undefined}>
         {tile.number ?? t('tracker.tile.noNumber')}
       </span>
-      <span className="court-tile-name">{tile.shortName}</span>
+      <span className="court-tile-name">
+        {tile.unlisted ? t('tracker.player.unlistedShort') : tile.shortName}
+      </span>
       {picking ? null : (
         <span className="court-tile-stats">
           {tile.fouledOut ? <span className="court-tile-out">{t('tracker.tile.out')}</span> : null}
