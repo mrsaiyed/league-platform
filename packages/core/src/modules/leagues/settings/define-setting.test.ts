@@ -6,8 +6,10 @@ import { declaredSettings } from './declarations.ts';
 import {
   defineSetting,
   hasLimits,
+  needsConfirming,
   settingRegistry,
   SettingDeclarationError,
+  showsLess,
 } from './define-setting.ts';
 
 const good = {
@@ -115,6 +117,17 @@ describe('defineSetting', () => {
     expect(() => declare({ type: z.custom<number>(() => true), default: 1 })).toThrow();
   });
 
+  it('keeps the values to confirm, and refuses ones its schema refuses', () => {
+    expect(defineSetting(good).confirm).toEqual([]);
+    const asked = defineSetting({ ...good, confirm: [72] });
+    expect(asked.confirm).toEqual([72]);
+    expect(needsConfirming(asked, 72)).toBe(true);
+    expect(needsConfirming(asked, 24)).toBe(false);
+    expect(() => declare({ confirm: [100] })).toThrow(/confirm/);
+    expect(declare({ confirm: [] }).confirm).toEqual([]);
+    expect(() => declare({ confirm: 72 })).toThrow(/confirm/);
+  });
+
   it('refuses the same key twice in one list', () => {
     const one = defineSetting(good);
     expect(() => settingRegistry([one, one])).toThrow(/twice/);
@@ -172,5 +185,61 @@ describe('the settings stage 2 declares', () => {
     expect(may?.default).toBe(true);
     expect(may?.type.safeParse(false).success).toBe(true);
     expect(may?.type.safeParse('no').success).toBe(false);
+  });
+
+  it('show children by first name and last initial until the admin confirms full names (R-14)', () => {
+    const names = declaredSettings.get('privacy.publicNames');
+    expect(names?.default).toBe('firstNameLastInitial');
+    expect(names?.levels).toEqual(['league']);
+    expect(names?.permission).toBe('league.settings');
+    expect(names !== undefined && needsConfirming(names, 'fullName')).toBe(true);
+    expect(names !== undefined && needsConfirming(names, 'firstNameLastInitial')).toBe(false);
+    expect(names !== undefined && needsConfirming(names, 'hidden')).toBe(false);
+    expect(names?.type.safeParse('everything').success).toBe(false);
+  });
+
+  it('offer three choices for names, and know which way shows less (R-24, R-26)', () => {
+    const names = declaredSettings.get('privacy.publicNames');
+    if (names === undefined) throw new Error('expected the setting');
+    for (const choice of ['fullName', 'firstNameLastInitial', 'hidden']) {
+      expect(names.type.safeParse(choice).success, choice).toBe(true);
+    }
+    const less = (from: string, to: string) => showsLess(names, from, to);
+    expect(less('fullName', 'firstNameLastInitial')).toBe(true);
+    expect(less('fullName', 'hidden')).toBe(true);
+    expect(less('firstNameLastInitial', 'hidden')).toBe(true);
+    expect(less('hidden', 'firstNameLastInitial')).toBe(false);
+    expect(less('firstNameLastInitial', 'fullName')).toBe(false);
+    expect(less('hidden', 'hidden')).toBe(false);
+    expect(less('everything', 'hidden')).toBe(false);
+    // A setting with no order never counts as showing less.
+    const initials = declaredSettings.get('privacy.playersMayAskForInitials');
+    expect(initials !== undefined && showsLess(initials, true, false)).toBe(false);
+  });
+
+  it('refuse a protective order of one value, a repeated value or one its schema refuses', () => {
+    const declare = (protectiveOrder: unknown[]) => () =>
+      defineSetting({
+        key: 'privacy.example',
+        type: z.enum(['a', 'b', 'c']),
+        default: 'a',
+        levels: ['league'],
+        permission: 'league.settings',
+        label: 'setting.privacy.example.label',
+        protectiveOrder: protectiveOrder as ('a' | 'b' | 'c')[],
+      });
+    expect(declare(['a'])).toThrow(/protective order/);
+    expect(declare(['a', 'a'])).toThrow(/protective order/);
+    expect(declare(['a', 'z'])).toThrow(/protective order/);
+    expect(declare([])).not.toThrow();
+    expect(declare(['a', 'c'])).not.toThrow();
+  });
+
+  it('let no player ask to appear as initials until the league switches it on (R-15)', () => {
+    const initials = declaredSettings.get('privacy.playersMayAskForInitials');
+    expect(initials?.default).toBe(false);
+    expect(initials?.levels).toEqual(['league']);
+    expect(initials?.permission).toBe('league.settings');
+    expect(initials?.confirm).toEqual([]);
   });
 });

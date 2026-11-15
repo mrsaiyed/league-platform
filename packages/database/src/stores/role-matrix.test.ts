@@ -89,6 +89,7 @@ import {
   updateCourt,
   updateDivision,
   updatePerson,
+  setNameRequest,
   setTeamStatsVisibility,
   updateTeam,
   updateVenue,
@@ -1327,6 +1328,36 @@ const peopleRows: readonly Row[] = [
       },
     }),
     run: (c, i) => updatePerson(c, i, peopleDeps),
+  },
+  {
+    command: 'people.set_name_request',
+    name: "take a person's name off the public pages (R-23)",
+    needs: 'people.manage',
+    prepare: async (league) => ({
+      input: {
+        personId: await newPerson(pglite, league.leagueId),
+        version: 1,
+        showAs: 'removed',
+        reason: 'personAsked',
+      },
+    }),
+    run: (c, i) => setNameRequest(c, i, peopleDeps),
+  },
+  {
+    command: 'people.set_name_request',
+    name: "show a child's name as initials, as a guardian asked (R-25)",
+    needs: 'people.manage',
+    prepare: async (league) => {
+      const personId = await newPerson(pglite, league.leagueId);
+      // The database counts the change itself (0002), so the version is read back.
+      const changed = await pglite.query<{ version: number }>(
+        'update people set is_minor = true where id = $1 returning version',
+        [personId],
+      );
+      const version = changed.rows[0]?.version ?? 1;
+      return { input: { personId, version, showAs: 'initials', reason: 'guardianAsked' } };
+    },
+    run: (c, i) => setNameRequest(c, i, peopleDeps),
   },
   {
     command: 'people.remove_person',

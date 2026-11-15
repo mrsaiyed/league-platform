@@ -184,6 +184,8 @@ export const en = {
   'team.role.captain': 'Captain',
   'team.role.coach': 'Coach',
   'team.nameNotShown': 'Name not shown',
+  // A child the league shows by number only (R-24).
+  'team.byNumber': '#{number}',
   'team.nameLeft': '{name} (left {date})',
   'team.schedule': 'Schedule',
   'team.noSchedule': 'No games are coming up for this team.',
@@ -410,6 +412,15 @@ export const en = {
   'adminSettings.clear': 'Go back to the default',
   'adminSettings.done.saved': 'The setting was saved.',
   'adminSettings.done.cleared': 'The setting is back to its default.',
+  // A heading for each group of settings, by the first part of their keys.
+  'adminSettings.area.members': 'Start page for members',
+  'adminSettings.area.games': 'Scoring',
+  'adminSettings.area.teams': 'Team statistics',
+  'adminSettings.area.privacy': 'Privacy',
+  // Beside a setting whose value asks to be confirmed (its `setting.<key>.confirm`).
+  'adminSettings.confirmNote': 'Tick this only if you are choosing {choice}:',
+  'error.leagues.set_setting.confirmation-needed':
+    'This choice needs you to tick the box to confirm before it is saved. Nothing was changed.',
   'error.leagues.set_setting.invalid-value':
     'That value is not allowed for this setting. Check what it accepts and try again.',
   'error.leagues.set_setting.changed-since-read':
@@ -461,6 +472,9 @@ export const en = {
   'error.people.create_person.sensitive-fields-not-allowed':
     'You are not allowed to enter those details.',
   'error.people.remove_person.person-not-found': 'That person is not in the league list.',
+  'error.people.set_name_request.person-not-found': 'That person is not in the league list.',
+  'error.people.set_name_request.initials-not-offered':
+    'This league does not offer initials for adults, so nothing was changed. You can still choose "removed" to take their name off the public pages.',
   'error.people.remove_person.person-on-a-roster':
     'That person is still on a roster. Mark them as having left their team first, then take them off the list.',
   // The games area (step 2.55).
@@ -923,6 +937,7 @@ export const en = {
   'activity.people.create_person': 'Added a person',
   'activity.people.update_person': 'Changed a person',
   'activity.people.remove_person': 'Moved a person to the bin',
+  'activity.people.set_name_request': "Changed how a person's name shows on public pages",
   'activity.teams.create_team': 'Added a team',
   'activity.teams.update_team': 'Changed a team',
   'activity.teams.remove_team': 'Moved a team to the bin',
@@ -972,6 +987,17 @@ export const en = {
   'setting.teams.startingStatsLevel.option.staff': "Only the team's staff and the league's admins",
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
+  'setting.privacy.publicNames.label':
+    "Names on public pages. This decides how children are shown, and, in a youth or mixed league, anyone whose record does not say whether they are a child or an adult (coaches too, until you mark them as adults). Adults are shown by their full name unless they ask for less. If a parent asks for less for their child (initials, or the name taken off), that always wins over this setting. Recording it on the child's own record arrives with the next part of this work.",
+  'setting.privacy.publicNames.option.fullName': 'Full names, like "Jordan Ellis"',
+  'setting.privacy.publicNames.option.firstNameLastInitial':
+    'First name and last initial, like "Jordan E."',
+  'setting.privacy.publicNames.option.hidden':
+    'Hidden: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
+  'setting.privacy.publicNames.confirm':
+    'I confirm that the parents or guardians of the children in this league have agreed to their full names being shown publicly, for example on the registration form.',
+  'setting.privacy.playersMayAskForInitials.label':
+    'Adults may ask to appear as initials on public pages. Children always can, whatever this says: a request from a parent is always followed. Anyone can ask to have their name taken off. Switching this off only stops new requests: anyone already shown as initials stays that way until their own record is changed.',
   // The invitation email (P4 §4, T-226), built by packages/emails. {league} is the
   // league's name, {role} a role's name from above, {days} how long a link works.
   'email.invitation.subject': 'You are invited to help run {league}',

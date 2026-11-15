@@ -43,10 +43,14 @@ export {
   startingStatsLevel,
   statsLevelChoices,
   teamsMayChooseStatsLevel,
+  publicNames,
+  publicNamesChoices,
+  playersMayAskForInitials,
 } from './settings/declarations.ts';
 export {
   defineSetting,
   hasLimits,
+  needsConfirming,
   settingLevels,
   settingRegistry,
   SettingDeclarationError,
