@@ -311,7 +311,9 @@ describe('applying the tracker’s commands (T-111, T6 §1)', () => {
     );
     expect(
       result.ok && result.value.results.map((r) => r.status === 'refused' && r.reason),
-    ).toEqual([{ code: 'rule', message: 'Resetting a game is not taken here yet.' }]);
+    ).toEqual([
+      { code: 'rule', message: 'A game is marked not started with its own button, not a tap.' },
+    ]);
     expect(t.db.state).toEqual(before);
   });
 

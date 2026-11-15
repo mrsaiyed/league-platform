@@ -185,7 +185,6 @@ async function readsOf(
         const game = await store.find(gameId);
         if (game === undefined || game.binned) return undefined;
         const live = liveGamesStore(scope);
-        const state = await live.findState(gameId);
         const taken = commandIds.length === 0 ? [] : await live.takenCommands(gameId, commandIds);
         const season = await store.findSeason(game.seasonId);
         return {
@@ -193,7 +192,8 @@ async function readsOf(
           version: game.version,
           homeScore: game.homeScore,
           awayScore: game.awayScore,
-          tracked: state !== undefined,
+          // A game tried here and marked not started counts only what came after (record 061).
+          tracked: await store.hasPlays(gameId),
           taken: new Set(taken.map((id) => id.toLowerCase())),
           rules: rulesOfGame(game.format, season?.rules),
         };

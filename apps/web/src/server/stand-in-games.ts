@@ -10,8 +10,9 @@
 // endpoints (step 2.32) run on the same games, with made-up rosters (stand-in-tracker.ts).
 // A game's page also reads the games of the public schedule's stand-in (`listedGames`),
 // so every card on the home and schedule pages opens the game it shows.
-import { defaultSeasonRules, tablePlayerEventTypes } from '@srleagues/contracts';
+import { defaultSeasonRules } from '@srleagues/contracts';
 import {
+  hasPlaysPastMarker,
   systemClock,
   type AccessReader,
   type ActivityEntry,
@@ -281,6 +282,23 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
         };
         return found.version + 1;
       },
+      // As the database does it: only a live game, its format emptied with it.
+      markNotStarted: async (gameId, version) => {
+        const index = s.games.findIndex((g) => g.id === gameId);
+        const found = s.games[index];
+        if (found === undefined || found.binned || found.version !== version) return undefined;
+        if (found.status !== 'live') return undefined;
+        s.games[index] = {
+          ...found,
+          status: 'scheduled',
+          homeScore: null,
+          awayScore: null,
+          finalizedAt: null,
+          format: null,
+          version: found.version + 1,
+        };
+        return found.version + 1;
+      },
       addCorrection: async (correction) => void s.corrections.push(correction),
       listPostponed: async (seasonId) =>
         s.games.filter(
@@ -329,11 +347,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
         ),
       // The players the scorer's table changed are events too, but not plays (record 058).
       hasPlays: async (gameId) =>
-        s.tracked.includes(gameId) ||
-        s.tracker.events.some(
-          (e) =>
-            e.gameId === gameId && !(tablePlayerEventTypes as readonly string[]).includes(e.type),
-        ),
+        s.tracked.includes(gameId) || hasPlaysPastMarker(s.tracker.events, gameId),
       findSeason: async (seasonId) => s.seasons.find((x) => x.id === seasonId),
       leagueSettingRows: async (key) => s.settings[key] ?? [],
       isAssigned: async (gameId, accountId) => isAssigned(s, gameId, accountId),
@@ -377,6 +391,7 @@ export function standInGames(options: StandInGamesOptions): StandInGames {
       (gameId) => teamsOf(s, gameId),
       (gameId) => s.games.find((g) => g.id === gameId)?.finalizedAt,
       (teamId) => uniqueJerseysOf(s, teamId),
+      (gameId) => s.corrections.some((c) => c.gameId === gameId),
     ),
   });
 

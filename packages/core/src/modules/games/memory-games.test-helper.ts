@@ -194,6 +194,23 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
         };
         return found.version + 1;
       },
+      // As the database does it: only a live game, its format and when it was fixed emptied.
+      markNotStarted: async (id, version) => {
+        const at = s.games.findIndex((g) => g.id === id);
+        const found = s.games[at];
+        if (found === undefined || found.binned || found.version !== version) return undefined;
+        if (found.status !== 'live') return undefined;
+        s.games[at] = {
+          ...found,
+          status: 'scheduled',
+          homeScore: null,
+          awayScore: null,
+          finalizedAt: null,
+          format: null,
+          version: found.version + 1,
+        };
+        return found.version + 1;
+      },
       addCorrection: async (correction) => void s.corrections.push(correction),
       ...boxScoreStores(s),
       listPostponed: async (season) =>

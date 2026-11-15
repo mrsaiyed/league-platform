@@ -62,7 +62,10 @@ export type GameFacts = {
   readonly id: string;
   readonly status: string;
   readonly binned: boolean;
-  /** Whether the tracker has recorded anything for it: such a game never goes to the bin. */
+  /**
+   * Whether its events keep it out of the bin: a play since it was last marked not started,
+   * or events in a game that was ever decided (record 061). Such a game is never removed.
+   */
   readonly hasEvents: boolean;
 };
 

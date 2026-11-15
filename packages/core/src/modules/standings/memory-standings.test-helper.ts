@@ -170,6 +170,7 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     saveState: async () => {
       throw new Error('No game is tracked in the standings tests.');
     },
+    wasDecided: async () => false,
     players: async () => [],
     lines: async () => [],
     saveLines: async () => {
@@ -224,6 +225,8 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
         };
         return found.version + 1;
       },
+      // Standings never meet a game marked not started: it was only live (S-40).
+      markNotStarted: async () => undefined,
       addCorrection: async (correction) => void s.corrections.push(correction),
       listPostponed: async () => [],
       ...boxScoreStores(s),
