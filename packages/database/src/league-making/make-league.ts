@@ -21,7 +21,11 @@
 // commands run as the app's role. So when the league is not made, the accounts THIS
 // run made are removed again, never one that was there before; one that cannot be
 // removed is named in the outcome. It never throws: anything unexpected comes back
-// as an outcome that says what was and was not made.
+// as an outcome that says what was and was not made, and never more than is known.
+// After a failure whose outcome is uncertain (the league's commit, or an account's,
+// may have landed with its reply lost) the database is read again on a NEW
+// connection; when that read cannot be made, the league is "not known" and nothing
+// is removed. On success it reads back what it made, for the person to see.
 import {
   createLeague,
   type CommandDeps,
@@ -40,9 +44,12 @@ import {
   accountByEmail,
   accountForEmail,
   leagueHoldingShortName,
+  madeLeagueFacts,
   newLeagueId,
   removeUnusedAccount,
+  type MadeLeagueFacts,
 } from './login-queries.ts';
+import type { MigrationDriver } from '../migrations/index.ts';
 import { migrationState, type MigrationState } from './migration-state.ts';
 import { probeLogins, type LoginProblem } from './probe-logins.ts';
 
@@ -100,10 +107,15 @@ export type MadeLeague = {
   readonly ownerAccountId: string;
   /** Where the owner's account stood: 'none' means it was made by this run. */
   readonly owner: AccountState;
+  /** What the database holds now, read back; undefined when it could not be read. */
+  readonly readBack: MadeLeagueFacts | undefined;
 };
 
-/** An account this run made, by its email. */
-export type MadeAccount = { readonly email: string; readonly accountId: string };
+/**
+ * An account this run made, by its email. `accountId` is null when it may have been
+ * made but could not be looked up again (its own reply, and the read after, were lost).
+ */
+export type MadeAccount = { readonly email: string; readonly accountId: string | null };
 
 /** The accounts this run made, when no league was: removed again, or left. */
 export type AccountsLeft = {
@@ -146,17 +158,22 @@ const nothingLeft: AccountsLeft = { removed: [], left: [] };
 
 /** Removes the accounts this run made, each in its own transaction; any refusal leaves it. */
 async function removeMadeAccounts(
-  target: LeagueMakingTarget,
+  login: MigrationDriver,
   made: readonly MadeAccount[],
 ): Promise<AccountsLeft> {
   const removed: MadeAccount[] = [];
   const left: MadeAccount[] = [];
   for (const account of made) {
+    const { accountId } = account;
     let gone = false;
-    try {
-      gone = await target.login.transaction((tx) => removeUnusedAccount(tx, account));
-    } catch {
-      gone = false;
+    if (accountId !== null) {
+      try {
+        gone = await login.transaction((tx) =>
+          removeUnusedAccount(tx, { accountId, email: account.email }),
+        );
+      } catch {
+        gone = false;
+      }
     }
     (gone ? removed : left).push(account);
   }
@@ -169,7 +186,8 @@ export async function makeLeague(
   plan: NewLeaguePlan,
   { now = () => Date.now() }: MakeLeagueOptions = {},
 ): Promise<MakeLeagueOutcome> {
-  const madeNow: MadeAccount[] = [];
+  const run: RunSoFar = { madeNow: [], hadNoAccount: [], commandRan: false };
+  const { madeNow } = run;
   let leagueId: string | undefined;
   try {
     // Asked again here, not only in the preview: the logins and the database may have
@@ -188,6 +206,14 @@ export async function makeLeague(
     // How the owner's address stood before this run made anything (the staff member's
     // account, made first, may be the owner's own).
     const ownerBefore = stateOf(await accountByEmail(target.login, plan.ownerEmail));
+    const staffBefore = stateOf(await accountByEmail(target.login, plan.staffEmail));
+    for (const [email, before] of [
+      [plan.staffEmail, staffBefore],
+      [plan.ownerEmail, ownerBefore],
+    ] as const) {
+      const seen = run.hadNoAccount.some((e) => e.toLowerCase() === email.toLowerCase());
+      if (before === 'none' && !seen) run.hadNoAccount.push(email);
+    }
     const staff = await accountFor(plan.staffEmail);
     const owner = await accountFor(plan.ownerEmail);
     leagueId = await newLeagueId(target.login);
@@ -205,6 +231,8 @@ export async function makeLeague(
       log: () => {},
       now,
     };
+    // From here the league's own commit may land even if its reply is lost.
+    run.commandRan = true;
     const league = await createLeague(
       { leagueId, accountId: staff.accountId, requestId: `make-league-${plan.slug}` },
       {
@@ -230,11 +258,17 @@ export async function makeLeague(
       return {
         ok: false,
         problem: { kind: 'refused', code: league.error.code },
-        accounts: await removeMadeAccounts(target, madeNow),
+        accounts: await removeMadeAccounts(target.login, madeNow),
       };
     }
     const seasonId = league.value.firstSeasonId;
     if (seasonId === null) throw new Error('makeLeague: the league came back with no season.');
+    let readBack: MadeLeagueFacts | undefined;
+    try {
+      readBack = await madeLeagueFacts(target.login, leagueId, staff.accountId);
+    } catch {
+      readBack = undefined;
+    }
     return {
       ok: true,
       made: {
@@ -243,42 +277,86 @@ export async function makeLeague(
         seasonId,
         ownerAccountId: owner.accountId,
         owner: ownerBefore,
+        readBack,
       },
     };
   } catch (error) {
-    return failed(target, plan, leagueId, madeNow, reasonOf(error));
+    return failed(target, plan, leagueId, run, reasonOf(error));
   }
 }
 
-/** After something unexpected: whether the league is there, and the accounts made. */
+/** What a run had done when it stopped: what failed() needs to tell the truth. */
+type RunSoFar = {
+  /** The accounts whose making this run saw commit. */
+  readonly madeNow: MadeAccount[];
+  /** The emails that had no account before this run (one of them may have been made). */
+  readonly hadNoAccount: string[];
+  /** Whether createLeague was called: its commit may have landed with its reply lost. */
+  commandRan: boolean;
+};
+
+/**
+ * After something unexpected: whether the league is there, and which accounts this
+ * run made, read again on a new connection. "not-made" only when that read shows it,
+ * or when no command ran; "unknown" (and nothing removed) when it cannot be read.
+ */
 async function failed(
   target: LeagueMakingTarget,
   plan: NewLeaguePlan,
   leagueId: string | undefined,
-  madeNow: readonly MadeAccount[],
+  run: RunSoFar,
   reason: string | undefined,
 ): Promise<MakeLeagueOutcome> {
   const because = reason === undefined ? {} : { reason };
-  let league: 'not-made' | 'made' | 'unknown' = 'not-made';
-  if (leagueId !== undefined) {
-    try {
-      const holder = await leagueHoldingShortName(target.login, plan.slug);
-      league = holder === leagueId ? 'made' : 'not-made';
-    } catch {
-      league = 'unknown';
+  let fresh: MigrationDriver | undefined;
+  try {
+    fresh = await target.freshLogin();
+  } catch {
+    fresh = undefined;
+  }
+  try {
+    let league: 'not-made' | 'made' | 'unknown';
+    if (!run.commandRan || leagueId === undefined) league = 'not-made';
+    else if (fresh === undefined) league = 'unknown';
+    else {
+      try {
+        const holder = await leagueHoldingShortName(fresh, plan.slug);
+        league = holder === leagueId ? 'made' : 'not-made';
+      } catch {
+        league = 'unknown';
+      }
     }
+    if (league === 'made' && leagueId !== undefined) {
+      return {
+        ok: false,
+        problem: { kind: 'failed', league, leagueId, ...because },
+        accounts: nothingLeft,
+      };
+    }
+    // The accounts this run made, with any whose own reply was lost: an email that had
+    // no account before and has one now that nobody has signed in with.
+    const made: MadeAccount[] = [...run.madeNow];
+    for (const email of run.hadNoAccount) {
+      if (made.some((m) => m.email.toLowerCase() === email.toLowerCase())) continue;
+      let found: { accountId: string; signedUp: boolean } | undefined | null = null;
+      if (fresh !== undefined) {
+        try {
+          found = await accountByEmail(fresh, email);
+        } catch {
+          found = null;
+        }
+      }
+      if (found === null) made.push({ email, accountId: null });
+      else if (found !== undefined && !found.signedUp)
+        made.push({ email, accountId: found.accountId });
+    }
+    // Only when the league is surely not there are its accounts taken away again.
+    const accounts =
+      league === 'not-made' && fresh !== undefined
+        ? await removeMadeAccounts(fresh, made)
+        : { removed: [], left: made };
+    return { ok: false, problem: { kind: 'failed', league, ...because }, accounts };
+  } finally {
+    if (fresh !== undefined) await fresh.close().catch(() => {});
   }
-  if (league === 'made' && leagueId !== undefined) {
-    return {
-      ok: false,
-      problem: { kind: 'failed', league, leagueId, ...because },
-      accounts: nothingLeft,
-    };
-  }
-  // Only when the league is surely not there are its accounts taken away again.
-  const accounts =
-    league === 'not-made'
-      ? await removeMadeAccounts(target, madeNow)
-      : { removed: [], left: [...madeNow] };
-  return { ok: false, problem: { kind: 'failed', league, ...because }, accounts };
 }

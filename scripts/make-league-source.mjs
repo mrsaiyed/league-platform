@@ -84,8 +84,9 @@ export function sourceFor({
   if (!terminal) return { problems: [words.hostedNeedsTerminal] };
 
   const problems = [];
-  const inEnvFile = namesIn(envFileText).filter(
-    (name) => name === migrationSetting || name === appSetting,
+  // Whatever its capitals: Windows reads environment names without regard to them.
+  const inEnvFile = namesIn(envFileText).filter((name) =>
+    [migrationSetting, appSetting].includes(name.toUpperCase()),
   );
   if (inEnvFile.length > 0) problems.push(words.addressesInEnvFile(inEnvFile));
 
@@ -107,6 +108,11 @@ export function sourceFor({
     const guarded = platformDatabaseProblem(name, value, facts);
     if (guarded !== undefined) {
       problems.push(guarded);
+      continue;
+    }
+    // Nothing at all after "?" (or "#"): no setting may ride in the address.
+    if (/[?#]/.test(value)) {
+      problems.push(words.queryStringRefused(name));
       continue;
     }
     addresses[name] = value;

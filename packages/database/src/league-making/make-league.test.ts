@@ -75,6 +75,17 @@ describe('makeLeague', () => {
     if (!outcome.ok) return;
     const { leagueId, seasonId, ownerAccountId } = outcome.made;
     expect(outcome.made.owner).toBe('none');
+    // What it made, read back for the person to see: nothing for them to query.
+    expect(outcome.made.readBack).toEqual({
+      league: { slug: plan.slug, status: 'draft' },
+      seasons: [{ name: 'Fall 2026', status: 'draft', isCurrent: true }],
+      log: [
+        { action: 'leagues.create', actorEmail: staffEmail },
+        { action: 'leagues.create_season', actorEmail: staffEmail },
+      ],
+      owner: { email: 'new.owner@example.test', signedUp: false },
+      staffGrants: 0,
+    });
 
     expect(
       await one(
@@ -303,6 +314,69 @@ describe('makeLeague', () => {
       ok: false,
       problem: { kind: 'failed', league: 'not-made' },
       accounts: { removed: [{ email: 'broken.run@example.test' }], left: [] },
+    });
+    expect(await accountCount()).toBe(accounts);
+  });
+
+  it('never says "not made" when the league may have landed and a fresh read cannot be made', async () => {
+    // The command fails with its outcome uncertain, and no new connection can be
+    // opened to look: the league is "not known", and no account is removed.
+    const gone = new PGlite();
+    const dead = createDatabase({ kind: 'pglite', pglite: gone });
+    await gone.close();
+    const blind: LeagueMakingTarget = {
+      ...target,
+      db: dead,
+      freshLogin: async () => {
+        throw Object.assign(new Error('made-up: no new connection'), { code: 'ECONNRESET' });
+      },
+    };
+    const plan = planFor({
+      ownerEmail: 'unknown.owner@example.test',
+      staffEmail: 'unknown.staff@example.test',
+    });
+    const outcome = await makeLeague(blind, plan);
+    await dead.close().catch(() => {});
+    expect(outcome).toMatchObject({
+      ok: false,
+      problem: { kind: 'failed', league: 'unknown' },
+      accounts: {
+        removed: [],
+        left: [{ email: 'unknown.staff@example.test' }, { email: 'unknown.owner@example.test' }],
+      },
+    });
+    expect(
+      await countOf('select count(*)::int as n from accounts where email like $1', [
+        'unknown.%@example.test',
+      ]),
+    ).toBe(2);
+  });
+
+  it('finds an account whose own commit landed with its reply lost, and removes it', async () => {
+    // The owner's account is made and committed, then the reply is lost: the run never
+    // learned it was made. Nothing else ran, so the league is surely not made.
+    let calls = 0;
+    const lossy: LeagueMakingTarget = {
+      ...target,
+      login: {
+        ...target.login,
+        transaction: async (work) => {
+          const result = await target.login.transaction(work);
+          calls += 1;
+          // The first is the staff member's account (already there), the second the owner's.
+          if (calls === 2)
+            throw Object.assign(new Error('made-up: reply lost'), { code: 'ECONNRESET' });
+          return result;
+        },
+      },
+    };
+    const plan = planFor({ ownerEmail: 'lost.reply@example.test' });
+    const accounts = await accountCount();
+    const outcome = await makeLeague(lossy, plan);
+    expect(outcome).toMatchObject({
+      ok: false,
+      problem: { kind: 'failed', league: 'not-made', reason: 'ECONNRESET' },
+      accounts: { removed: [{ email: 'lost.reply@example.test' }], left: [] },
     });
     expect(await accountCount()).toBe(accounts);
   });

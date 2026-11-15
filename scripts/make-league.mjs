@@ -124,12 +124,15 @@ async function ask(question) {
  * The one place the tool asks whether to make it, only at a terminal: "yes" (any
  * capitals) on this computer, the league's exact short name on a hosted database.
  */
-async function askToMake(plan, hosted) {
+async function askToMake(plan, hosted, place) {
   if (prompt === null) {
     console.log(words.needsTerminal);
     return false;
   }
-  const answer = await ask(hosted ? words.confirmHosted(plan.slug) : words.confirm);
+  // On a hosted database the person checks where it is, then types the short name
+  // from the plan: the question does not print the answer.
+  if (hosted) for (const line of words.checkBeforeAnswering(place)) console.log(line);
+  const answer = await ask(hosted ? words.confirmHosted : words.confirm);
   return answerGoesAhead(answer, { hosted, slug: plan.slug });
 }
 
@@ -208,7 +211,7 @@ async function run(stage) {
     return 1;
   }
   for (const line of words.planLines(plan, preview, target.place, address)) console.log(line);
-  if (!(await askToMake(plan, source.kind === 'hosted'))) {
+  if (!(await askToMake(plan, source.kind === 'hosted', target.place))) {
     console.log(words.notMade);
     return 1;
   }

@@ -76,6 +76,13 @@ export type LeagueMakingTarget = {
   /** 'own' when the commands run under the app's own login (hosted); 'shared' on PGlite. */
   readonly appLogin: 'own' | 'shared';
   readonly place: LeagueMakingPlace;
+  /**
+   * A migration login on a NEW connection, for the reads after a failure whose outcome
+   * is uncertain (a commit whose reply was lost): what it sees is what the database
+   * holds, not what a dying connection last said. The same session on PGlite, where
+   * nothing is ever in flight. Close it when done.
+   */
+  readonly freshLogin: () => Promise<MigrationDriver>;
   readonly close: () => Promise<void>;
 };
 
@@ -87,12 +94,16 @@ export type ConnectCause =
   | 'network'
   | 'certificate'
   | 'ssl'
+  /** Nothing answered within the time limit. */
+  | 'timeout'
   | 'unknown';
 
 export type OpenTargetProblem =
   | { readonly kind: 'no-database' }
   /** A database not on this computer whose certificate would not be checked. */
   | { readonly kind: 'certificate-not-checked'; readonly login: Login }
+  /** A hosted address with anything after "?": nothing may come from a query string. */
+  | { readonly kind: 'query-string'; readonly login: Login }
   | { readonly kind: 'cannot-connect'; readonly login: Login; readonly cause: ConnectCause }
   /** The database holds the tracker's own schema, live_stats. */
   | { readonly kind: 'tracker-database'; readonly login: Login }
@@ -138,17 +149,14 @@ async function handleFacts(db: DatabaseHandle): Promise<ServerFacts> {
   return factsOf(rows[0]);
 }
 
-/** Whether a host the connection went to is this computer: localhost, loopback, a socket. */
+/**
+ * Whether a host the connection went to counts as this computer: only the bare name
+ * localhost, 127.0.0.1 or ::1, never another name, another loopback address or a
+ * socket folder. A tunnel that brings a hosted database to localhost defeats this.
+ */
 export function hostOnThisComputer(host: string): boolean {
   const bare = host.replace(/^\[(.*)\]$/, '$1').toLowerCase();
-  return (
-    bare === '' ||
-    bare.startsWith('/') ||
-    bare === 'localhost' ||
-    bare.endsWith('.localhost') ||
-    /^127(?:\.\d{1,3}){3}$/.test(bare) ||
-    bare === '::1'
-  );
+  return bare === 'localhost' || bare === '127.0.0.1' || bare === '::1';
 }
 
 /**
@@ -184,8 +192,12 @@ export function connectCauseOf(error: unknown): ConnectCause {
     return 'certificate';
   }
   if (message.includes('ssl')) return 'ssl';
+  if (message.includes('timeout') || message.includes('timed out')) return 'timeout';
   return 'unknown';
 }
+
+/** How long connecting may take before the tool gives up and says so, in ms. */
+export const connectionTimeLimit = 15_000;
 
 /** Whether an address's certificate would be checked: SSL "verify" with the certificate given. */
 const checksCertificate = (address: PostgresAddress) =>
@@ -221,6 +233,7 @@ async function pgliteTarget(
       db,
       appLogin: 'shared',
       place,
+      freshLogin: async () => ({ ...driver, close: async () => {} }),
       close: async () => {
         await db.close();
         await closeOwn();
@@ -233,9 +246,12 @@ async function hostedTarget(
   source: Extract<LeagueMakingSource, { kind: 'hosted' }>,
 ): Promise<OpenTargetResult> {
   const refuse = (problem: OpenTargetProblem): OpenTargetResult => ({ ok: false, problem });
-  // A database anywhere else has its certificate checked, or nothing is opened.
   for (const login of ['migration', 'app'] as const) {
     const address = source[login];
+    // Nothing may come from a query string: the guard refuses the keys it knows, and
+    // a hosted address carries none at all.
+    if (/[?#]/.test(address.url)) return refuse({ kind: 'query-string', login });
+    // A database anywhere else has its certificate checked, or nothing is opened.
     if (!hostOnThisComputer(addressHost(address.url)) && !checksCertificate(address)) {
       return refuse({ kind: 'certificate-not-checked', login });
     }
@@ -243,6 +259,8 @@ async function hostedTarget(
   const options = (address: PostgresAddress): PostgresDriverOptions => {
     const chosen: PostgresDriverOptions = { ca: address.ca };
     if (address.ssl !== undefined) chosen.ssl = address.ssl;
+    // Connecting gives up after a time limit, with a plain message, rather than wait.
+    chosen.connectionTimeoutMillis = address.connectionTimeoutMillis ?? connectionTimeLimit;
     return chosen;
   };
 
@@ -310,6 +328,7 @@ async function hostedTarget(
         project: supabaseProjectOf(host, user),
         onThisComputer: hostOnThisComputer(host),
       },
+      freshLogin: () => connectPostgresDriver(source.migration.url, options(source.migration)),
       close: closeBoth,
     },
   };

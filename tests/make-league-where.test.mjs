@@ -77,6 +77,21 @@ test('says plainly when the database is not on this computer, with its Supabase 
   );
   assert.equal(
     placeWords({ kind: 'folder', folder: '/made-up/seed-db' }),
-    'the local database in /made-up/seed-db, on this computer',
+    'a folder: /made-up/seed-db',
+  );
+  // A folder may be a network share; another name may lead anywhere: never "on this
+  // computer" for those.
+  assert.ok(
+    !placeWords({ kind: 'folder', folder: '\\\\share\\seed-db' }).includes('this computer'),
+  );
+  assert.ok(
+    placeWords({
+      kind: 'postgres',
+      host: '127.0.0.1',
+      port: 5432,
+      database: 'postgres',
+      project: null,
+      onThisComputer: true,
+    }).includes('on this computer (localhost)'),
   );
 });

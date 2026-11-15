@@ -15,6 +15,9 @@
 //   as the direct host (db.{ref}.supabase.co) and the pooler's user (postgres.{ref}) do;
 // - a host, port, user, password, options or database name taken from the query
 //   string, where they would win over the address itself;
+// - any query string key that changes whether the connection is encrypted or which
+//   certificate is trusted (ssl, sslmode, sslnegotiation and the rest, sslKeys): pg
+//   lets the address win over its ssl option, so ssl=0 would turn encryption off;
 // - a host or user that is not plain ASCII, which could stand for another spelling;
 // - in staging and production, a host that is an IP address, which no name check can
 //   tell from the tracker's;
@@ -35,7 +38,8 @@ export type TrackerGuardFacts = {
   /**
    * True when the address is about to be opened on a hosted database whatever APP_ENV
    * says: the tool that makes a league from this computer (record 057) has no APP_ENV
-   * and is as strict as staging and production. Left out, APP_ENV decides.
+   * and is as strict as staging and production. Left out, APP_ENV decides. It can
+   * only make the guard stricter: false never undoes staging or production.
    */
   readonly hosted?: boolean | undefined;
   /**
@@ -60,8 +64,21 @@ const placeKeys = new Set([
   'service',
 ]);
 
-/** What packages/database takes out of the address before `pg` reads it (create-database.ts). */
-const sslKeys = ['sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat'];
+/**
+ * Every query string key pg-connection-string reads that changes whether the
+ * connection is encrypted or which certificate is trusted: the same list packages/
+ * database takes out of an address before `pg` reads it (sslAddressKeys). An address
+ * carrying one is refused by name; the SSL setting decides, never the address.
+ */
+const sslKeys = [
+  'ssl',
+  'sslmode',
+  'sslcert',
+  'sslkey',
+  'sslrootcert',
+  'sslnegotiation',
+  'uselibpqcompat',
+];
 
 /** The PG variables `pg` reads for a part the address leaves empty. */
 const fromEnvironment = [
@@ -78,6 +95,8 @@ type Target = {
   readonly database: string;
   readonly options: string;
   readonly queryKeys: readonly string[];
+  /** The SSL keys the address carries (sslKeys), lower-cased, as written in it. */
+  readonly sslKeysGiven: readonly string[];
 };
 
 const asciiOnly = /^[\x20-\x7e]*$/;
@@ -113,6 +132,12 @@ export function platformDatabaseProblem(
       return refuse("must not name the tracker's Supabase project (supabase/site.json)");
     }
   }
+  const sslKey = target.sslKeysGiven[0];
+  if (sslKey !== undefined) {
+    return refuse(
+      `must not set ${sslKey} in its query string: whether and how the connection is encrypted is never taken from the address`,
+    );
+  }
   if (target.queryKeys.some((key) => placeKeys.has(key.toLowerCase()))) {
     return refuse(
       'must not take its host, port, user, password, options or database name from its query string',
@@ -122,7 +147,7 @@ export function platformDatabaseProblem(
     return refuse('must have a host and user of plain ASCII characters');
   }
   const byAppEnv = facts.appEnv === 'staging' || facts.appEnv === 'production';
-  const hosted = facts.hosted ?? byAppEnv;
+  const hosted = facts.hosted === true || byAppEnv;
   if (hosted && isIpLiteral(target.host)) {
     return refuse(
       byAppEnv
@@ -175,38 +200,41 @@ export function trackerProjectProblem(
   facts: Pick<TrackerGuardFacts, 'appEnv' | 'trackerProject' | 'hosted'>,
 ): string | undefined {
   if (facts.trackerProject !== null) return undefined;
-  const hosted = facts.hosted ?? (facts.appEnv === 'staging' || facts.appEnv === 'production');
+  const hosted =
+    facts.hosted === true || facts.appEnv === 'staging' || facts.appEnv === 'production';
   if (!hosted) return undefined;
   return `supabase/site.json: could not be read, so ${names.join(' and ')} cannot be checked against the tracker's project`;
 }
 
-/** The host names that mean this computer, beside any loopback address. */
-const thisComputer = new Set(['localhost', 'localhost.localdomain']);
+/** The only hosts that count as this computer: no other name, no socket, no tunnel. */
+const thisComputer = new Set(['localhost', '127.0.0.1', '::1']);
 
 /**
- * Whether a postgres:// address connects to this computer (localhost, a loopback
- * address, or a local socket folder), read the way `pg` reads it: true, false, or
- * undefined when it cannot be read. A database anywhere else must have its
- * certificate checked.
+ * Whether a postgres:// address names this computer, read the way `pg` reads it:
+ * only the bare name localhost, 127.0.0.1 or ::1 counts, never another name that may
+ * resolve there (*.localhost), another loopback address or a socket folder. True,
+ * false, or undefined when it cannot be read. A database anywhere else must have its
+ * certificate checked. A tunnel that brings a hosted database to localhost defeats
+ * this check: the operations page says not to use one.
  */
 export function addressOnThisComputer(given: string): boolean | undefined {
   const value = given.trim();
   if (!/^postgres(?:ql)?:\/\//.test(value)) return undefined;
   const target = targetOf(value);
   if (target === undefined) return undefined;
-  const host = target.host.replace(/^\[(.*)\]$/, '$1').toLowerCase();
-  if (host === '' || host.startsWith('/')) return true;
-  if (thisComputer.has(host) || host.endsWith('.localhost')) return true;
-  if (isIP(host) === 4) return host.startsWith('127.');
-  if (isIP(host) === 6) return host === '::1';
-  return false;
+  return thisComputer.has(target.host.replace(/^\[(.*)\]$/, '$1').toLowerCase());
 }
 
 /** The parts of the address `pg` would use, decoded as `pg` decodes them; undefined if unreadable. */
 function targetOf(value: string): Target | undefined {
   try {
     const url = new URL(value);
-    for (const key of sslKeys) url.searchParams.delete(key);
+    const sslKeysGiven = [...url.searchParams.keys()]
+      .map((key) => key.toLowerCase())
+      .filter((key) => sslKeys.includes(key));
+    for (const key of [...url.searchParams.keys()]) {
+      if (sslKeys.includes(key.toLowerCase())) url.searchParams.delete(key);
+    }
     const final = url.toString();
     const config = parse(final);
     return {
@@ -218,6 +246,7 @@ function targetOf(value: string): Target | undefined {
       database: config.database ?? '',
       options: typeof config.options === 'string' ? config.options : '',
       queryKeys: [...new URL(final).searchParams.keys()],
+      sslKeysGiven,
     };
   } catch {
     return undefined;

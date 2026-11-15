@@ -26,3 +26,4 @@ export {
   type TargetProblem,
 } from './make-league.ts';
 export { type MigrationState } from './migration-state.ts';
+export { type MadeLeagueFacts } from './login-queries.ts';

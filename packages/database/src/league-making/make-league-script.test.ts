@@ -153,7 +153,8 @@ describe('npm run league:make: local unless told otherwise', () => {
     expect(ran.stdout).toContain(
       'MIGRATION_DATABASE_URL and PLATFORM_DATABASE_URL are set, and not used: this run is on this computer.',
     );
-    expect(ran.stdout).toContain(`the local database in ${folder}, on this computer`);
+    expect(ran.stdout).toContain(`a folder: ${folder}`);
+    expect(ran.stdout).not.toContain('on this computer:');
     expect(ran.stdout + ran.stderr).not.toContain('made-up-secret');
     expect(await rowsIn('leagues')).toBe(0);
   });

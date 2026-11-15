@@ -167,6 +167,47 @@ test('refuses addresses kept in .env: they are given for one command only', () =
   assertNothingPrivate(result.problems);
 });
 
+test('refuses addresses named in .env in any capitals, as Windows reads them', () => {
+  const { result } = choose({ envFileText: `migration_database_url=${elsewhere}\n` });
+  assert.equal(result.problems.length, 1);
+  assert.match(result.problems[0], /^\.env names migration_database_url\./);
+});
+
+test('refuses an SSL key in the address by name, and anything at all after "?" on --hosted', () => {
+  const { result: ssl } = choose({ env: { MIGRATION_DATABASE_URL: `${elsewhere}?ssl=0` } });
+  assert.deepEqual(ssl.problems, [
+    'MIGRATION_DATABASE_URL: invalid, must not set ssl in its query string: whether and how the connection is encrypted is never taken from the address',
+  ]);
+  for (const tail of ['?application_name=web', '?', '#fragment']) {
+    const { result } = choose({ env: { PLATFORM_DATABASE_URL: `${app}${tail}` } });
+    assert.deepEqual(
+      result.problems,
+      [
+        'PLATFORM_DATABASE_URL: invalid, a hosted address must have nothing after "?": take the query string off. Nothing was opened.',
+      ],
+      tail,
+    );
+  }
+});
+
+test('counts only localhost, 127.0.0.1 and ::1 as this computer for the certificate rule', () => {
+  // 127.0.0.2 is refused before this, as an IP address on a hosted database.
+  for (const host of ['db.localhost', 'localhost.example.test']) {
+    const address = `postgres://made-up:${secret}@${host}:5432/league`;
+    const { result } = choose({
+      env: {
+        MIGRATION_DATABASE_URL: address,
+        PLATFORM_DATABASE_URL: address,
+        MIGRATION_DATABASE_SSL: 'off',
+      },
+    });
+    assert.ok(
+      result.problems?.some((line) => line.includes('not on this computer')),
+      host,
+    );
+  }
+});
+
 test('needs both logins', () => {
   const { result } = choose({ env: { PLATFORM_DATABASE_URL: '' } });
   assert.equal(result.problems.length, 1);

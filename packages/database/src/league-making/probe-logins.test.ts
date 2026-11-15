@@ -35,6 +35,7 @@ const target = (appLogin: 'own' | 'shared'): LeagueMakingTarget => ({
   db,
   appLogin,
   place: { kind: 'memory' },
+  freshLogin: async () => ({ ...pgliteDriver(pglite), close: async () => {} }),
   close: async () => {},
 });
 const actAs = (role: string) => pglite.exec(`set session authorization ${role}`);

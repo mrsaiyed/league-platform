@@ -147,11 +147,12 @@ const accountWords = {
  * and whether it is this computer. Never a user name or a password.
  */
 export const placeWords = (place) => {
-  if (place.kind === 'folder') return `the local database in ${place.folder}, on this computer`;
-  if (place.kind === 'memory') return 'a database in memory, on this computer';
+  // A folder may be on a network share: it is named, not said to be on this computer.
+  if (place.kind === 'folder') return `a folder: ${place.folder}`;
+  if (place.kind === 'memory') return 'a database in memory, in this program';
   const project = place.project === null ? '' : `, Supabase project ${place.project}`;
   const where = place.onThisComputer
-    ? 'on this computer'
+    ? 'on this computer (localhost)'
     : 'NOT on this computer: a hosted database';
   return `the database ${place.database} on ${place.host}:${place.port}${project}, ${where}; the commands run under the app’s own login, which reaches the same database`;
 };
@@ -181,8 +182,20 @@ export const planLines = (plan, preview, place, address) => [
 
 export const confirm = 'Make it? Type yes to go ahead: ';
 /** On a hosted database the question is answered by typing the league's short name. */
-export const confirmHosted = (slug) =>
-  `This is a hosted database. To make it there, type the league’s short name (${slug}): `;
+export const confirmHosted =
+  'This is a hosted database. To make it there, type the league’s short name: ';
+
+/** Shown right above the hosted question: what to check before answering it. */
+export const checkBeforeAnswering = (place) =>
+  place.kind === 'postgres' && place.project !== null
+    ? [
+        `Supabase project: ${place.project}`,
+        'Check that reference against the test copy’s project in the Supabase dashboard, and that it is not the one in supabase/site.json, before you answer.',
+      ]
+    : [
+        `Database: ${placeWords(place)}`,
+        'Check that this is the database you mean before you answer.',
+      ];
 export const notMade = 'Nothing was made.';
 export const stopped = 'Stopped. Nothing was made.';
 export const needsTerminal =
@@ -194,6 +207,8 @@ export const notInteractive =
 export const hostedSettingsIgnored = (names) =>
   `Note: ${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} set, and not used: this run is on this computer. A hosted database needs --hosted.`;
 export const hostedAndFolder = '--hosted and --db cannot be given together: choose one.';
+export const queryStringRefused = (name) =>
+  `${name}: invalid, a hosted address must have nothing after "?": take the query string off. Nothing was opened.`;
 export const hostedNeedsTerminal =
   '--hosted is used only at a terminal, where a person reads the plan and answers. Nothing was opened.';
 export const addressesInEnvFile = (names) =>
@@ -221,6 +236,7 @@ const causeWords = {
   certificate:
     'the server’s certificate could not be checked (the file in MIGRATION_DATABASE_CA, or the host name)',
   ssl: 'the connection’s SSL setting (MIGRATION_DATABASE_SSL) does not suit that server',
+  timeout: 'nothing answered within 15 seconds (the host, the port, or a firewall)',
   unknown: 'no particular cause could be told',
 };
 const usualCauses =
@@ -236,6 +252,13 @@ export const targetProblemLines = (problem) => {
   if (problem.kind === 'certificate-not-checked') {
     return [
       certificateNotChecked(
+        problem.login === 'app' ? 'PLATFORM_DATABASE_URL' : 'MIGRATION_DATABASE_URL',
+      ),
+    ];
+  }
+  if (problem.kind === 'query-string') {
+    return [
+      queryStringRefused(
         problem.login === 'app' ? 'PLATFORM_DATABASE_URL' : 'MIGRATION_DATABASE_URL',
       ),
     ];
@@ -296,16 +319,25 @@ export const shortNameHeld =
 
 const withCode = (code) => (code === undefined ? '' : ` (${code})`);
 
-/** The accounts a run made when no league was made: removed again, or left. */
+/** The accounts a run made when surely no league was made: removed again, or left. */
 const leftAccountLines = (accounts) => [
   ...accounts.removed.map(
     (account) => `The account this run made for ${account.email} was removed again.`,
   ),
-  ...accounts.left.map(
-    (account) =>
-      `An account was made for ${account.email} (account id ${account.accountId}) and is still there. Nobody has signed in with it and no league uses it, so it does no harm, and a later run with the same email uses it. To remove it, the migration login can delete that one row from the accounts table.`,
+  ...accounts.left.map((account) =>
+    account.accountId === null
+      ? `An account may have been made for ${account.email}, and it could not be looked up again. Do not remove anything: run this again with the same answers and it will say what exists.`
+      : `An account was made for ${account.email} (account id ${account.accountId}) and is still there. Nobody has signed in with it and no league uses it, so it does no harm, and a later run with the same email uses it. To remove it, the migration login can delete that one row from the accounts table.`,
   ),
 ];
+
+/** The accounts a run made when it is not known whether a league was made. */
+const unknownAccountLines = (accounts) =>
+  accounts.left.length === 0
+    ? []
+    : [
+        `The accounts this run made are still there: ${accounts.left.map((a) => a.email).join(', ')}. Whether a league uses them is not known: if the league was made, one of them is its owner. Do not remove anything.`,
+      ];
 
 /** What a run that made no league says (makeLeague's problem). */
 export const makeProblemLines = (problem, accounts) => {
@@ -324,8 +356,9 @@ export const makeProblemLines = (problem, accounts) => {
   }
   if (problem.league === 'unknown') {
     return [
-      `Something went wrong${withCode(problem.reason)}, and whether the league was made could not be checked. Run this again with the same answers: it will say if the short name is now held.`,
-      ...leftAccountLines(accounts),
+      `Something went wrong${withCode(problem.reason)}, and whether the league was made is not known: it could not be checked.`,
+      ...unknownAccountLines(accounts),
+      'Run this again with the same answers: it will say what exists (whether the short name is now held, and the accounts).',
     ];
   }
   return [
@@ -349,8 +382,35 @@ const ownerMadeWords = {
   'signed-up': (email) => `The owner, ${email}, has signed up and owns it now.`,
 };
 
+/** What the database holds now, read back after making it, so nobody has to query it. */
+const readBackLines = (facts, plan) => {
+  if (facts === undefined) {
+    return [
+      'It could not be read back: look in the database for one league in draft and its one current season.',
+    ];
+  }
+  const yesNo = (ok) => (ok ? 'as it should be' : 'NOT as it should be: look into it');
+  const season = facts.seasons[0];
+  const logWho = facts.log
+    .map((e) => `${e.action} by ${e.actorEmail ?? 'nobody named'}`)
+    .join('; ');
+  const logRight =
+    facts.log.length === 2 &&
+    facts.log.every((e) => (e.actorEmail ?? '').toLowerCase() === plan.staffEmail.toLowerCase());
+  return [
+    'Read back from the database:',
+    `  League          ${facts.league === undefined ? 'not found' : `${facts.league.slug}, ${facts.league.status}`} (${yesNo(facts.league?.status === 'draft')})`,
+    `  Season          ${season === undefined ? 'none' : `${season.name}, ${season.status}, ${season.isCurrent ? 'the current one' : 'not current'}`}${facts.seasons.length > 1 ? `, and ${facts.seasons.length - 1} more` : ''} (${yesNo(facts.seasons.length === 1 && season?.isCurrent === true)})`,
+    `  Activity log    ${logWho} (${yesNo(logRight)})`,
+    `  Owner’s account ${facts.owner === undefined ? 'not found' : `${facts.owner.email}, ${facts.owner.signedUp ? 'someone has signed in with it' : 'no sign-in link yet'}`} (${yesNo(facts.owner !== undefined)})`,
+    `  Our staff       ${facts.staffGrants} role grants in the league (${yesNo(facts.staffGrants === 0)})`,
+  ];
+};
+
 export const made = (outcome, plan, address) => [
   `Made: ${plan.name}, at ${address}, in draft, with ${plan.season.name} as its current season.`,
   ownerMadeWords[outcome.owner](plan.ownerEmail),
   `League id: ${outcome.leagueId}`,
+  ...readBackLines(outcome.readBack, plan),
+  'Nothing was sent to anyone: tell the owner yourself to sign up with exactly that email address. Nothing can publish the league yet (part 2 of step 2.125).',
 ];

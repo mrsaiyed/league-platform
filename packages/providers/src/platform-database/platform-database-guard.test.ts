@@ -44,7 +44,7 @@ describe('platformDatabaseProblem', () => {
   it('lets a platform address of its own through', () => {
     for (const value of [
       `postgres://app:${secret}@db.example.test:5432/league`,
-      `postgresql://app.otherprojectref1234:${secret}@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=verify-full`,
+      `postgresql://app.otherprojectref1234:${secret}@aws-0-us-east-1.pooler.supabase.com:6543/postgres`,
       `postgres://app:${secret}@localhost:5432/league?application_name=web`,
     ]) {
       expect(problem(value)).toBeUndefined();
@@ -227,6 +227,18 @@ describe('platformDatabaseProblem for a tool with no APP_ENV that opens a hosted
     expect(hosted(`postgres://app:${secret}@db.example.test:5432/league`)).toBeUndefined();
   });
 
+  it('cannot be loosened by hosted: false in staging or production', () => {
+    const ip = `postgres://app:${secret}@192.0.2.10:5432/league`;
+    for (const appEnv of ['staging', 'production']) {
+      expect(platformDatabaseProblem(name, ip, facts({ appEnv, hosted: false })), appEnv).toBe(
+        ipHost(appEnv),
+      );
+      expect(
+        trackerProjectProblem(['A'], { appEnv, hosted: false, trackerProject: null }),
+      ).toBeDefined();
+    }
+  });
+
   it('refuses it when the tracker’s project could not be read', () => {
     expect(
       trackerProjectProblem(['MIGRATION_DATABASE_URL'], {
@@ -240,15 +252,44 @@ describe('platformDatabaseProblem for a tool with no APP_ENV that opens a hosted
   });
 });
 
+describe('the address cannot change how the connection is encrypted', () => {
+  it('refuses, by name, every query string key the parser reads for SSL, in any spelling', () => {
+    const base = `postgres://app:${secret}@db.example.test:5432/league`;
+    for (const [query, key] of [
+      ['ssl=0', 'ssl'],
+      ['ssl=no-verify', 'ssl'],
+      ['ssl=true', 'ssl'],
+      ['ssl=1', 'ssl'],
+      ['SSL=0', 'ssl'],
+      ['s%73l=0', 'ssl'],
+      ['sslnegotiation=direct', 'sslnegotiation'],
+      ['sslmode=disable', 'sslmode'],
+      ['sslmode=verify-full', 'sslmode'],
+      ['sslrootcert=made-up.crt', 'sslrootcert'],
+      ['sslcert=made-up.crt', 'sslcert'],
+      ['sslkey=made-up.key', 'sslkey'],
+      ['uselibpqcompat=true', 'uselibpqcompat'],
+      ['application_name=web&ssl=0', 'ssl'],
+    ]) {
+      const value = `${base}?${query}`;
+      for (const appEnv of ['local', 'production']) {
+        expect(problem(value, { appEnv }), `${query} ${appEnv}`).toBe(
+          `${name}: invalid, must not set ${key} in its query string: whether and how the connection is encrypted is never taken from the address`,
+        );
+      }
+      expectNoValueIn(problem(value), value);
+    }
+    expect(problem(`${base}?application_name=web`)).toBeUndefined();
+  });
+});
+
 describe('addressOnThisComputer', () => {
-  it('knows this computer from anywhere else, read the way pg reads the address', () => {
+  it('counts only localhost, 127.0.0.1 and ::1 as this computer', () => {
     for (const value of [
       'postgres://app@localhost:5432/league',
       'postgres://app@LOCALHOST/league',
       'postgres://app@127.0.0.1:5432/league',
-      'postgres://app@127.0.0.2/league',
       'postgres://app@[::1]:5432/league',
-      'postgres://app@db.localhost/league',
     ]) {
       expect(addressOnThisComputer(value), value).toBe(true);
     }
@@ -258,6 +299,11 @@ describe('addressOnThisComputer', () => {
       'postgres://app@192.0.2.10/league',
       'postgres://app@localhost.example.test/league',
       'postgres://app@%6Cocalhost.example.test/league',
+      // A name that may lead here, another loopback address, a socket, or no host at all.
+      'postgres://app@db.localhost/league',
+      'postgres://app@127.0.0.2/league',
+      'postgres://app@%2Fvar%2Frun%2Fpostgresql/league',
+      'postgres:///league',
     ]) {
       expect(addressOnThisComputer(value), value).toBe(false);
     }

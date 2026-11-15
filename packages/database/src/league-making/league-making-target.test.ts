@@ -3,6 +3,7 @@
 // other address is made up and is refused before anything connects, or answers nobody.
 // What the script prints from the place is tested in tests/make-league-where.test.mjs.
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
@@ -85,6 +86,40 @@ describe('openLeagueMakingTarget on a hosted database', () => {
         app: { url: elsewhere, ssl: 'verify' },
       }),
     ).toEqual({ ok: false, problem: { kind: 'certificate-not-checked', login: 'app' } });
+  });
+
+  it('refuses a hosted address with anything after "?", before connecting', async () => {
+    const local = 'postgres://made-up:made-up@127.0.0.1:1/none';
+    for (const tail of ['?application_name=web', '?ssl=0', '?', '#x']) {
+      expect(await openLeagueMakingTarget(hosted(`${local}${tail}`, local)), tail).toEqual({
+        ok: false,
+        problem: { kind: 'query-string', login: 'migration' },
+      });
+    }
+  });
+
+  it('gives up connecting after its time limit, and says so', async () => {
+    // A made-up server on this computer that takes the connection and never answers.
+    const silent = createServer(() => {});
+    await new Promise<void>((resolve) => silent.listen(0, '127.0.0.1', () => resolve()));
+    const port = (silent.address() as AddressInfo).port;
+    try {
+      const url = `postgres://made-up:made-up@localhost:${port}/league`;
+      const started = Date.now();
+      expect(
+        await openLeagueMakingTarget({
+          kind: 'hosted',
+          migration: { url, ssl: 'off', connectionTimeoutMillis: 300 },
+          app: { url, ssl: 'off', connectionTimeoutMillis: 300 },
+        }),
+      ).toEqual({
+        ok: false,
+        problem: { kind: 'cannot-connect', login: 'migration', cause: 'timeout' },
+      });
+      expect(Date.now() - started).toBeLessThan(10_000);
+    } finally {
+      silent.close();
+    }
   });
 
   it('says which login could not connect and the likely cause, never the address', async () => {
@@ -175,10 +210,19 @@ describe('what a connection says about itself', () => {
   });
 
   it('knows this computer', () => {
-    for (const host of ['localhost', '127.0.0.1', '::1', '[::1]', '/var/run/postgresql']) {
+    for (const host of ['localhost', 'LOCALHOST', '127.0.0.1', '::1', '[::1]']) {
       expect(hostOnThisComputer(host), host).toBe(true);
     }
-    for (const host of ['db.example.test', '192.0.2.1', 'localhost.example.test']) {
+    for (const host of [
+      'db.example.test',
+      '192.0.2.1',
+      'localhost.example.test',
+      // Another name that may lead here, another loopback address, a socket folder.
+      'db.localhost',
+      '127.0.0.2',
+      '/var/run/postgresql',
+      '',
+    ]) {
       expect(hostOnThisComputer(host), host).toBe(false);
     }
   });

@@ -94,6 +94,64 @@ export async function newLeagueId(session: SqlSession): Promise<string> {
   return id;
 }
 
+/** What a league just made holds, read back for the person to see (make-a-league.md). */
+export type MadeLeagueFacts = {
+  readonly league: { readonly slug: string; readonly status: string } | undefined;
+  readonly seasons: readonly {
+    readonly name: string;
+    readonly status: string;
+    readonly isCurrent: boolean;
+  }[];
+  /** The activity log, oldest first: each entry's action and who it names. */
+  readonly log: readonly { readonly action: string; readonly actorEmail: string | null }[];
+  readonly owner: { readonly email: string; readonly signedUp: boolean } | undefined;
+  /** The role grants the staff member holds in the league, not ended. */
+  readonly staffGrants: number;
+};
+
+/** Reads back the league, its seasons, its log, its owner and our staff's grants in it. */
+export async function madeLeagueFacts(
+  session: SqlSession,
+  leagueId: string,
+  staffAccountId: string,
+): Promise<MadeLeagueFacts> {
+  const league = await session.query<{
+    slug: string;
+    status: string;
+    owner_email: string;
+    owner_signed_up: boolean;
+  }>(
+    `select l.slug, l.status, a.email as owner_email, a.sign_in_id is not null as owner_signed_up
+     from public.leagues l join public.accounts a on a.id = l.owner_account_id
+     where l.id = $1`,
+    [leagueId],
+  );
+  const seasons = await session.query<{ name: string; status: string; is_current: boolean }>(
+    'select name, status, is_current from public.seasons where league_id = $1 order by name',
+    [leagueId],
+  );
+  const log = await session.query<{ action: string; email: string | null }>(
+    `select g.action, a.email from public.activity_log g
+     left join public.accounts a on a.id = g.actor_account_id
+     where g.league_id = $1 order by g.at, g.id`,
+    [leagueId],
+  );
+  const grants = await session.query<{ n: number }>(
+    `select count(*)::int as n from public.role_grants
+     where league_id = $1 and account_id = $2 and revoked_at is null`,
+    [leagueId, staffAccountId],
+  );
+  const row = league.rows[0];
+  return {
+    league: row === undefined ? undefined : { slug: row.slug, status: row.status },
+    seasons: seasons.rows.map((s) => ({ name: s.name, status: s.status, isCurrent: s.is_current })),
+    log: log.rows.map((entry) => ({ action: entry.action, actorEmail: entry.email })),
+    owner:
+      row === undefined ? undefined : { email: row.owner_email, signedUp: row.owner_signed_up },
+    staffGrants: Number(grants.rows[0]?.n ?? 0),
+  };
+}
+
 /** One file the migration runner recorded as applied (T-48). */
 export type AppliedMigration = {
   readonly version: number;
