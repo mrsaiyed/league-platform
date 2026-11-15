@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { describe, newestChecks } from './github-check-rules.mjs';
+import { describe, failureNoteLines, newestChecks } from './github-check-rules.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wanted = process.argv[2] ?? '';
@@ -101,18 +101,9 @@ if (check && check.state === 'failed') {
         .filter((step) => step.conclusion !== 'success' && step.conclusion !== 'skipped')
         .map((step) => step.name.replace(/^Run /, ''));
       console.log(`  Failed step: ${steps.join(', ') || job.name}`);
-      const notes = await ask(`${api}/check-runs/${job.id}/annotations`);
-      const failures = (Array.isArray(notes) ? notes : []).filter(
-        (note) =>
-          note.annotation_level === 'failure' && !/^Process completed/.test(note.message ?? ''),
-      );
-      for (const note of failures.slice(0, 6)) {
-        const text = `${note.title ? `${note.title}: ` : ''}${note.message ?? ''}`;
-        console.log(
-          `  - ${note.path}:${note.start_line} ${text.replace(/\s+/g, ' ').slice(0, 500)}`,
-        );
-      }
-      if (failures.length === 0) {
+      const lines = failureNoteLines(await ask(`${api}/check-runs/${job.id}/annotations`));
+      for (const line of lines) console.log(line);
+      if (lines.length === 0) {
         console.log(
           '  GitHub gave no test names for this one. Run that step here, by itself, in the lane to see it.',
         );
