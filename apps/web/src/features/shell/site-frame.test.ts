@@ -159,6 +159,23 @@ describe('header, menu and footer', () => {
     );
   });
 
+  it('leaves the season picker’s arrow to the shared picker, so high contrast gets the browser’s back', () => {
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    // The shared picker's stylesheet draws the arrow and, where colors are forced, hands
+    // it back to the browser (packages/ui, hero-pieces.test.ts). No rule of the header
+    // sets the arrow, its room or the field's whole background, so that holds there too.
+    const season = [...css.matchAll(/([^{}]*\.site-season[^{}]*select[^{}]*)\{([^}]*)\}/g)];
+    expect(season.length).toBeGreaterThan(2);
+    for (const [, , body] of season) {
+      expect(body).not.toMatch(
+        /appearance|padding-inline-end|padding-inline:|padding:|background-image|background:/,
+      );
+    }
+  });
+
   it('takes every gap of the frame from the spacing scale, and keeps what a thumb taps 44 high', () => {
     const css = readFileSync(
       new URL('../../app/[league]/league-site.css', import.meta.url),

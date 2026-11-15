@@ -110,6 +110,25 @@ describe('a picker’s arrow', () => {
     const after = css.slice(css.indexOf("[dir='rtl'] .ui-picker select"));
     expect(after).not.toMatch(/\.ui-picker[^{]*select[^{]*\{[^}]*background:/);
   });
+  it('gives the browser’s own arrow back where colors are forced (high contrast)', () => {
+    // A forced-colors page draws no background picture that is not a file: the drawn arrow
+    // would be gone, and with the browser's arrow switched off the field would be a bare
+    // box. The rule comes after the arrow's own, with the same strength, so it wins there.
+    const forced = /@media \(forced-colors: active\) \{\s*\.ui-picker select \{([^}]*)\}\s*\}/.exec(
+      css,
+    );
+    expect(forced).not.toBeNull();
+    expect(forced?.[1]).toMatch(/appearance: auto;/);
+    expect(forced?.[1]).toMatch(/padding-inline-end: var\(--step-3\);/);
+    expect(forced?.[1]).toMatch(/background-image: none;/);
+    expect(css.indexOf('@media (forced-colors: active)')).toBeGreaterThan(
+      css.indexOf("[dir='rtl'] .ui-picker select"),
+    );
+    // The field's ordinary padding is that same step.
+    expect(css).toMatch(
+      /\.ui-picker select,\s*\.ui-picker button \{[^}]*padding-inline: var\(--step-3\);/,
+    );
+  });
 });
 
 describe('the heavier line', () => {

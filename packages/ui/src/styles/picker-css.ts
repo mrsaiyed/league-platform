@@ -85,6 +85,17 @@ export const pickerCss = String.raw`
     var(--step-3) 50%,
     calc(var(--step-3) + var(--step-3) / 2) 50%;
 }
+/* Where the reader's own colors are forced on the page (a high-contrast setting), a
+   browser draws no background picture that is not a file, so the drawn arrow would be
+   gone and the field would look like a plain box. There the browser's own arrow comes
+   back, with the field's ordinary padding. The header's season picker is a picker too. */
+@media (forced-colors: active) {
+  .ui-picker select {
+    appearance: auto;
+    padding-inline-end: var(--step-3);
+    background-image: none;
+  }
+}
 .ui-picker option {
   background: var(--color-panel);
   color: var(--color-text);
