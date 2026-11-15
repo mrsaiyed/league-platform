@@ -200,15 +200,40 @@ describe('the settings stage 2 declares', () => {
     expect(may?.type.safeParse('no').success).toBe(false);
   });
 
-  it('show children by first name and last initial until the admin confirms full names (R-14)', () => {
+  it('start every league on full names, which asks for no confirmation (R-29, record 065)', () => {
     const names = declaredSettings.get('privacy.publicNames');
-    expect(names?.default).toBe('firstNameLastInitial');
+    expect(names?.default).toBe('fullName');
     expect(names?.levels).toEqual(['league']);
     expect(names?.permission).toBe('league.settings');
-    expect(names !== undefined && needsConfirming(names, 'fullName')).toBe(true);
-    expect(names !== undefined && needsConfirming(names, 'firstNameLastInitial')).toBe(false);
-    expect(names !== undefined && needsConfirming(names, 'hidden')).toBe(false);
+    for (const value of ['fullName', 'firstNameLastInitial', 'hidden']) {
+      expect(names !== undefined && needsConfirming(names, value), value).toBe(false);
+    }
     expect(names?.type.safeParse('everything').success).toBe(false);
+  });
+
+  it("keep the parents' confirmation as a setting of its own: no to start, a tick to give it, always takeable back (R-14, R-26)", () => {
+    const given = declaredSettings.get('privacy.childrenInFullConfirmed');
+    if (given === undefined) throw new Error('expected the setting');
+    expect(given.default).toBe(false);
+    expect(given.levels).toEqual(['league']);
+    expect(given.permission).toBe('league.settings');
+    expect(needsConfirming(given, true)).toBe(true);
+    expect(needsConfirming(given, false)).toBe(false);
+    expect(showsLess(given, true, false)).toBe(true);
+    expect(showsLess(given, false, true)).toBe(false);
+    expect(given.type.safeParse('yes').success).toBe(false);
+    // It sits between the names setting and the initials switch on the Privacy screen.
+    expect(declaredSettings.all().map((s) => s.key)).toEqual(
+      expect.arrayContaining([
+        'privacy.publicNames',
+        'privacy.childrenInFullConfirmed',
+        'privacy.playersMayAskForInitials',
+      ]),
+    );
+    const keys = declaredSettings.all().map((s) => s.key);
+    expect(keys.indexOf('privacy.childrenInFullConfirmed')).toBe(
+      keys.indexOf('privacy.publicNames') + 1,
+    );
   });
 
   it('offer three choices for names, and know which way shows less (R-24, R-26)', () => {

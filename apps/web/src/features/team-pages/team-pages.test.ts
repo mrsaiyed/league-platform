@@ -149,7 +149,7 @@ describe('a team page', () => {
   it('shows a youth team by number only where the league hides names (R-24)', async () => {
     const s = await season(youth);
     const head = await loadTeamHead(stats.readStoreOf(youth), youth, s.id, 'rockets');
-    const policy = { ...(await stats.settingsOf(youth)).namePolicy, children: 'hidden' as const };
+    const policy = { ...(await stats.settingsOf(youth)).namePolicy, names: 'hidden' as const };
     const roster = buildRoster(
       await teams.rosterOf(youth, head?.teamId ?? '', { viewer: publicViewer(youth), policy }),
     );

@@ -1,11 +1,13 @@
 // The League settings form, drawn from the settings' own declarations (step 2.48, T-98).
 // Each row is a LeagueSettingRow (core's listLeagueSettings): nothing about any setting
 // is written here. The words come from the message files by the setting's label key and,
-// for a list of choices, `setting.<key>.option.<choice>` (T-187). The words are given as
+// for a list of choices, `setting.<key>.option.<choice>` (T-187); the page may add
+// sentences around them (privacy-notes.ts, record 065). The words are given as
 // a function so a test can draw a setting that has no words of its own.
 import type { LeagueSettingRow } from '@srleagues/core';
 import { saveSettingAction } from './actions.ts';
-import { clearIntent } from './form-input.ts';
+import { clearIntent, tickValue } from './form-input.ts';
+import type { Line, SettingNotes } from './privacy-notes.ts';
 
 export type Say = (key: string, params?: Readonly<Record<string, string | number>>) => string;
 
@@ -29,7 +31,7 @@ function byArea(rows: readonly LeagueSettingRow[]) {
 
 /** The box to tick before a value that asks to be confirmed is saved (R-14). */
 function Confirm({ row, say }: { readonly row: LeagueSettingRow; readonly say: Say }) {
-  if (row.confirm.length === 0) return null;
+  if (row.confirm.length === 0 || drawnAsTick(row)) return null;
   const choices = row.confirm.map((value) => valueText(row, value, say)).join(', ');
   return (
     <>
@@ -76,7 +78,35 @@ export function limitsText(row: LeagueSettingRow, say: Say): string {
   }
 }
 
+/**
+ * A yes-or-no setting whose "yes" asks to be confirmed (R-14, the parents' confirmation)
+ * is drawn as one box to tick, worded by its confirm message: ticking it is saying yes
+ * and confirming at once, and an unticked save says no (record 065).
+ */
+export function drawnAsTick(row: LeagueSettingRow): boolean {
+  return row.field.kind === 'toggle' && row.confirm.includes(true);
+}
+
 function Control({ row, say }: { readonly row: LeagueSettingRow; readonly say: Say }) {
+  if (drawnAsTick(row)) {
+    return (
+      <fieldset aria-describedby={`${row.key}-about`}>
+        <legend>{say(row.label)}</legend>
+        <input type="hidden" name="value" value={tickValue} />
+        <p>
+          <label>
+            <input
+              type="checkbox"
+              name="confirmed"
+              value="yes"
+              defaultChecked={row.value === true}
+            />{' '}
+            {say(`${wordsOf(row)}.confirm`)}
+          </label>
+        </p>
+      </fieldset>
+    );
+  }
   const { field } = row;
   const describedBy = `${row.key}-about`;
   const radios = (options: readonly { value: string; text: string }[], current: string) => (
@@ -161,50 +191,59 @@ export function SettingForms({
   rows,
   league,
   say,
+  notes = {},
 }: {
   readonly rows: readonly LeagueSettingRow[];
   /** The route's `[league]` value, so the server can find the page again. */
   readonly league: string;
   readonly say: Say;
+  /** Sentences the page adds around the settings, and settings it does not offer here. */
+  readonly notes?: SettingNotes;
 }) {
+  const lines = (said: readonly Line[] | undefined) =>
+    (said ?? []).map((line) => <p key={line.key}>{say(line.key, line.params)}</p>);
   return (
     <>
       {byArea(rows).map((group) => (
         <section key={group.area} data-area={group.area}>
           <h2>{say(`adminSettings.area.${group.area}`)}</h2>
+          {lines(notes.area?.[group.area])}
           {group.rows.map((row) => (
             <section key={row.key} data-setting={row.key}>
-              <form action={saveSettingAction}>
-                <input type="hidden" name="league" value={league} />
-                <input type="hidden" name="key" value={row.key} />
-                <input type="hidden" name="version" value={row.version ?? ''} />
-                <Control row={row} say={say} />
-                <Confirm row={row} say={say} />
-                <p id={`${row.key}-about`}>
-                  <small>
-                    {say('adminSettings.default', { value: valueText(row, row.default, say) })}{' '}
-                    {limitsText(row, say)}{' '}
-                    {say(
-                      row.source === 'league'
-                        ? 'adminSettings.usingOwn'
-                        : 'adminSettings.usingDefault',
-                    )}
-                  </small>
-                </p>
-                {row.field.kind === 'other' ? null : (
-                  <p>
-                    <button type="submit">{say('adminSettings.save')}</button>
-                    {row.version === null ? null : (
-                      <>
-                        {' '}
-                        <button type="submit" name="intent" value={clearIntent} formNoValidate>
-                          {say('adminSettings.clear')}
-                        </button>
-                      </>
-                    )}
+              {lines(notes.rows?.[row.key]?.before)}
+              {notes.rows?.[row.key]?.offered === false ? null : (
+                <form action={saveSettingAction}>
+                  <input type="hidden" name="league" value={league} />
+                  <input type="hidden" name="key" value={row.key} />
+                  <input type="hidden" name="version" value={row.version ?? ''} />
+                  <Control row={row} say={say} />
+                  <Confirm row={row} say={say} />
+                  <p id={`${row.key}-about`}>
+                    <small>
+                      {say('adminSettings.default', { value: valueText(row, row.default, say) })}{' '}
+                      {limitsText(row, say)}{' '}
+                      {say(
+                        row.source === 'league'
+                          ? 'adminSettings.usingOwn'
+                          : 'adminSettings.usingDefault',
+                      )}
+                    </small>
                   </p>
-                )}
-              </form>
+                  {row.field.kind === 'other' ? null : (
+                    <p>
+                      <button type="submit">{say('adminSettings.save')}</button>
+                      {row.version === null ? null : (
+                        <>
+                          {' '}
+                          <button type="submit" name="intent" value={clearIntent} formNoValidate>
+                            {say('adminSettings.clear')}
+                          </button>
+                        </>
+                      )}
+                    </p>
+                  )}
+                </form>
+              )}
             </section>
           ))}
         </section>

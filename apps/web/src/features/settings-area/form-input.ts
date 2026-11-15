@@ -7,6 +7,12 @@ import type { SettingKind } from '@srleagues/core';
 /** The button that puts a setting back to its default, as the form names it. */
 export const clearIntent = 'clear';
 
+/**
+ * What a yes-or-no setting drawn as one box to tick sends as its value (record 065): the
+ * box itself says yes and confirms, so the action reads the tick, not this word.
+ */
+export const tickValue = 'tick';
+
 export type Fields = Readonly<Record<string, string>>;
 
 /** The value a field of this kind sent; undefined when it sent nothing usable (the command refuses). */
