@@ -55,7 +55,7 @@ describe('adding a round to the schedule draft (step 2.160)', () => {
     const view = await getScheduleDraft(as(ownerId), { seasonId }, deps);
     if (!view.ok) throw new Error('could not read the draft');
     expect(view.value.result.rounds).toEqual(
-      weeks.map((w) => ({ id: w.roundId, label: w.label, date: w.date })),
+      weeks.map((w, i) => ({ id: w.roundId, number: i + 1, label: w.label, date: w.date })),
     );
     // Nothing published: the public schedule is the store's, and it has no rounds (A-9).
     expect(view.value.published.rounds).toEqual([]);
@@ -143,7 +143,7 @@ describe('adding a round to the schedule draft (step 2.160)', () => {
     );
     expect(published).toMatchObject({ ok: true, value: { revision: 1 } });
     expect(db.state.roundsAdded).toEqual(
-      weeks.map((w) => ({ id: w.roundId, label: w.label, date: w.date })),
+      weeks.map((w, i) => ({ id: w.roundId, number: i + 1, label: w.label, date: w.date })),
     );
     expect(db.state.inserted.map((g) => g.roundId)).toEqual([roundUuid(3)]);
     expect(db.state.revisions[0]?.summary).toMatchObject({ roundsAdded: 3, roundsRemoved: 0 });
@@ -153,7 +153,7 @@ describe('adding a round to the schedule draft (step 2.160)', () => {
     const { db, deps, as } = newSeason();
     await addDraftRound(as(ownerId), { ...basis(null), ...weeks[0] }, deps);
     // Another season took the id meanwhile: the store adds nothing.
-    db.state.roundsAdded.push({ id: roundUuid(1), label: 'Elsewhere', date: null });
+    db.state.roundsAdded.push({ id: roundUuid(1), number: 7, label: 'Elsewhere', date: null });
     const result = await publishSchedule(
       as(ownerId),
       { seasonId, basedOnRevision: null, draftId: draftUuid(1), version: 1 },

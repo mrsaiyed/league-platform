@@ -54,7 +54,12 @@ export async function loadSchedule(scope: LeagueScope, seasonId: string): Promis
     .orderBy('g.id')
     .execute();
   return {
-    rounds: rounds.map((r) => ({ id: r.id, label: r.label ?? `Round ${r.number}`, date: r.day })),
+    rounds: rounds.map((r) => ({
+      id: r.id,
+      number: r.number,
+      label: r.label ?? `Round ${r.number}`,
+      date: r.day,
+    })),
     games: games.map((g) => ({
       id: g.id,
       roundId: g.round_id,

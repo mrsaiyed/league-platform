@@ -25,14 +25,34 @@ export type ScheduleGame = ScheduleSlot & {
 
 export type ScheduleRound = {
   id: string;
+  /**
+   * Its number in the season, as stored (rounds_number_key) and as the public `?round=`
+   * filter names it. A round added in a draft is numbered after every round the season
+   * has had in it, so publishing never meets a number in use (step 2.160). Every round
+   * the store loads or a draft adds has one; the generator's rounds (place-schedule.ts)
+   * are not stored rounds and have none.
+   */
+  number?: number;
   label: string;
   /** The round's date, or null when it has none. */
+  date: string | null;
+};
+
+/** A round as a draft adds it: the rules number it. */
+export type NewScheduleRound = {
+  id: string;
+  label: string;
   date: string | null;
 };
 
 export type ScheduleState = {
   rounds: readonly ScheduleRound[];
   games: readonly ScheduleGame[];
+  /**
+   * Rounds the draft has removed (step 2.160): until publishing ends they still hold their
+   * number and id, so neither is given to a round added after.
+   */
+  removedRounds?: readonly ScheduleRound[];
 };
 
 export type DraftChange =
@@ -44,7 +64,7 @@ export type DraftChange =
   | { kind: 'rename-round'; roundId: string; label: string }
   | { kind: 'change-round-date'; roundId: string; date: string }
   /** A new round, placed after the season's others; its id is the caller's (step 2.160). */
-  | { kind: 'add-round'; round: ScheduleRound }
+  | { kind: 'add-round'; round: NewScheduleRound }
   /** Removes a round no game of the schedule is in. */
   | { kind: 'remove-round'; roundId: string };
 
@@ -58,9 +78,11 @@ export type ChangeError =
   | { code: 'round-exists'; roundId: string }
   /** A round with games is never removed: its games are moved or removed first. */
   | { code: 'round-has-games'; roundId: string }
-  /** A season holds at most maxRounds rounds (the database numbers them 1 to 1000). */
+  /** No number is left for a new round: a season numbers its rounds 1 to maxRounds. */
   | { code: 'too-many-rounds'; roundId: string }
   | { code: 'invalid-date'; value: string }
+  /** A round's date the database would refuse (rounds_date_plausible: 1900 to 2999). */
+  | { code: 'date-out-of-range'; value: string }
   | { code: 'invalid-time'; value: string };
 
 export type Clash =

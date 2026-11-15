@@ -1,9 +1,8 @@
 // Adds rounds to a season of the scope's league, as a publication creates them (step
-// 2.160): each is numbered after the season's highest, in the order given. How many were
-// added: a round whose id is taken (here or in any league) is left out, and so is one for
-// which no number is left (a season numbers its rounds 1 to 1000, migration 0009).
+// 2.160), each with the number the draft gave it. How many were added: a round whose id
+// (here or in any league) or number in the season is taken is left out, and so is one
+// whose number is past what a season holds (1 to 1000, migration 0009).
 import { maxRounds, type NewRound } from '@srleagues/core';
-import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
 export async function insertRounds(
@@ -14,25 +13,19 @@ export async function insertRounds(
   const trx = transactionOf(scope);
   let added = 0;
   for (const round of rounds) {
-    const top = await trx
-      .selectFrom('rounds')
-      .select(sql<number | null>`max(number)`.as('top'))
-      .where('league_id', '=', scope.leagueId)
-      .where('season_id', '=', seasonId)
-      .executeTakeFirst();
-    const number = (top?.top ?? 0) + 1;
-    if (number > maxRounds) return added;
+    if (!Number.isInteger(round.number) || round.number < 1 || round.number > maxRounds) continue;
     const row = await trx
       .insertInto('rounds')
       .values({
         id: round.id,
         league_id: scope.leagueId,
         season_id: seasonId,
-        number,
+        number: round.number,
         label: round.label,
         date: round.date,
       })
-      .onConflict((conflict) => conflict.column('id').doNothing())
+      // Any unique key: the id (rounds_pkey) or the number in the season (rounds_number_key).
+      .onConflict((conflict) => conflict.doNothing())
       .returning('id')
       .executeTakeFirst();
     if (row !== undefined) added += 1;

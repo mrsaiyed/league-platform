@@ -85,7 +85,8 @@ export const publishSchedule = defineCommand({
     const added = plan.result.rounds.filter((r) => summary.roundsAdded.includes(r.id));
     const insertedRounds = await store.insertRounds(
       input.seasonId,
-      added.map((r) => ({ id: r.id, label: r.label, date: r.date })),
+      // A round the draft added always has its number (apply-change.ts); 0 is refused.
+      added.map((r) => ({ id: r.id, number: r.number ?? 0, label: r.label, date: r.date })),
     );
     if (insertedRounds !== added.length) return fail({ code: 'round-cannot-be-added' });
     for (const round of plan.result.rounds) {

@@ -90,9 +90,10 @@ export type PublishedGameChange = {
   readonly captureMode?: NewPublishedGame['captureMode'];
 };
 
-/** A round a publication creates (step 2.160); the store gives it the season's next number. */
+/** A round a publication creates (step 2.160), with the number the draft gave it. */
 export type NewRound = {
   readonly id: string;
+  readonly number: number;
   readonly label: string;
   /** YYYY-MM-DD, or null for none. */
   readonly date: string | null;
@@ -170,9 +171,8 @@ export type SchedulingStore = {
     change: { readonly label?: string; readonly date?: string },
   ) => Promise<boolean>;
   /**
-   * Adds rounds to the season after its others, numbered on from its highest, in this
-   * order (step 2.160): how many were added. One whose id is taken anywhere, or for which
-   * no number is left, is not added.
+   * Adds rounds to the season with their numbers (step 2.160): how many were added. One
+   * whose id or number is taken is not added.
    */
   readonly insertRounds: (seasonId: string, rounds: readonly NewRound[]) => Promise<number>;
   /** Removes these rounds of the season that no game names, in the bin or not: how many went. */

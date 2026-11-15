@@ -283,7 +283,12 @@ describe('adding and removing a round (step 2.160)', () => {
       ),
     );
     expect(added.state.rounds.map((r) => r.id)).toEqual(['r1', 'r2', 'r3']);
-    expect(added.state.rounds[2]).toEqual({ id: 'r3', label: 'Week 3', date: '2026-10-18' });
+    expect(added.state.rounds[2]).toEqual({
+      id: 'r3',
+      number: 3,
+      label: 'Week 3',
+      date: '2026-10-18',
+    });
     expect(added.state.games).toEqual(s.games);
     expect(s.rounds).toHaveLength(2);
   });
@@ -321,6 +326,7 @@ describe('adding and removing a round (step 2.160)', () => {
     const full: ScheduleState = {
       rounds: Array.from({ length: maxRounds }, (_, i) => ({
         id: `r${i}`,
+        number: i + 1,
         label: `Round ${i}`,
         date: null,
       })),
@@ -329,6 +335,45 @@ describe('adding and removing a round (step 2.160)', () => {
     expect(
       refusal(full, { kind: 'add-round', round: { id: 'new', label: 'One more', date: null } }),
     ).toEqual({ code: 'too-many-rounds', roundId: 'new' });
+  });
+
+  it('numbers a round after every number the season has had, removed ones too', () => {
+    // Two rounds, the second numbered 1000 (an earlier round was removed long ago).
+    const s: ScheduleState = {
+      rounds: [
+        { id: 'r1', number: 1, label: 'Week 1', date: null },
+        { id: 'r9', number: 999, label: 'Late', date: null },
+      ],
+      games: [],
+    };
+    const added = ok(
+      applyDraftChange(s, { kind: 'add-round', round: { id: 'n1', label: 'A', date: null } }, []),
+    ).state;
+    expect(added.rounds.at(-1)?.number).toBe(1000);
+    // Removing the last does not free its number until publishing has removed it.
+    const removed = ok(applyDraftChange(added, { kind: 'remove-round', roundId: 'n1' }, [])).state;
+    expect(
+      refusal(removed, { kind: 'add-round', round: { id: 'n2', label: 'B', date: null } }),
+    ).toEqual({ code: 'too-many-rounds', roundId: 'n2' });
+    // Nor its id: a removed round cannot be added again under the same id.
+    const fewer = ok(applyDraftChange(s, { kind: 'remove-round', roundId: 'r1' }, [])).state;
+    expect(
+      refusal(fewer, { kind: 'add-round', round: { id: 'r1', label: 'Again', date: null } }),
+    ).toEqual({ code: 'round-exists', roundId: 'r1' });
+  });
+
+  it('refuses a round date the database would not take, added or changed', () => {
+    const s = baseState();
+    for (const date of ['1899-12-31', '3000-01-01']) {
+      expect(refusal(s, { kind: 'add-round', round: { id: 'r3', label: 'Week 3', date } })).toEqual(
+        { code: 'date-out-of-range', value: date },
+      );
+      expect(refusal(s, { kind: 'change-round-date', roundId: 'r1', date })).toEqual({
+        code: 'date-out-of-range',
+        value: date,
+      });
+    }
+    expect(refusal(s, { kind: 'change-round-date', roundId: 'r1', date: '2999-12-31' })).toBe('ok');
   });
 
   it('removes a round with no games and refuses one with games or that is not there', () => {

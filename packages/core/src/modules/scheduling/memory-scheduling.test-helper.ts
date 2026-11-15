@@ -211,11 +211,11 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           return true;
         },
         insertRounds: async (_season, rounds) => {
-          const taken = new Set([
-            ...s.schedule.rounds.map((r) => r.id),
-            ...s.roundsAdded.map((r) => r.id),
-          ]);
-          const fresh = rounds.filter((r) => !taken.has(r.id));
+          // As the database: a taken id or number is not added.
+          const taken = [...s.schedule.rounds, ...s.roundsAdded];
+          const fresh = rounds.filter(
+            (r) => !taken.some((x) => x.id === r.id || x.number === r.number),
+          );
           s.roundsAdded.push(...fresh);
           return fresh.length;
         },

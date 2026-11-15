@@ -86,7 +86,12 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       rounds: s.rounds
         .filter((r) => r.seasonId === seasonId)
         .sort((a, b) => a.number - b.number)
-        .map((r) => ({ id: r.id, label: r.label ?? `Round ${r.number}`, date: r.date })),
+        .map((r) => ({
+          id: r.id,
+          number: r.number,
+          label: r.label ?? `Round ${r.number}`,
+          date: r.date,
+        })),
       games: s.games
         .filter((g) => g.seasonId === seasonId && !g.binned && g.startsAt !== null)
         .sort(
@@ -196,13 +201,13 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       return true;
     },
     insertRounds: async (seasonId, rounds) => {
-      // As insert-rounds.ts: numbered after the season's highest; a taken id is left out.
+      // As insert-rounds.ts: with the draft's number; a taken id or number is left out.
       let added = 0;
       for (const round of rounds) {
+        const { number } = round;
+        if (!Number.isInteger(number) || number < 1 || number > maxRounds) continue;
         if (s.rounds.some((r) => r.id === round.id)) continue;
-        const numbers = s.rounds.filter((r) => r.seasonId === seasonId).map((r) => r.number);
-        const number = Math.max(0, ...numbers) + 1;
-        if (number > maxRounds) return added;
+        if (s.rounds.some((r) => r.seasonId === seasonId && r.number === number)) continue;
         s.rounds = [
           ...s.rounds,
           { id: round.id, seasonId, number, label: round.label, date: round.date },

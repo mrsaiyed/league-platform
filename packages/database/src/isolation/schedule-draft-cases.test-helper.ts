@@ -291,7 +291,7 @@ registerIsolationCase({
   name: "add a round to the target's season",
   run: (scope, target) =>
     insertRounds(scope, target.seasonId, [
-      { id: randomUUID(), label: 'Week 9', date: '2026-12-27' },
+      { id: randomUUID(), number: 9, label: 'Week 9', date: '2026-12-27' },
     ]),
 });
 
