@@ -12,6 +12,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { seasonRulesPreset } from '@srleagues/contracts';
 import {
   applyTrackerCommands,
+  endTrackedGame,
   eventHandlers,
   openScoringSession,
   readReopenOffer,
@@ -369,5 +370,38 @@ describe('a scorekeeper reopening a game they ended, on the database (S-36)', ()
     });
     expect(await reopenAs(g, g.scorer)).toBe('not-ended-by-you');
     expect(await reopenAs(g, g.ownerId)).toBe('ok');
+  });
+
+  it('the last end counts: its time, and who sent it', async () => {
+    // (a) Ended long ago, reopened by the owner, ended again: the time runs from the second end.
+    const g = await trackedGame();
+    await endedOnTablet(g);
+    await endedMinutesAgo(g, 40);
+    expect(await reopenAs(g, g.scorer)).toBe('reopen-time-over');
+    expect(await reopenAs(g, g.ownerId)).toBe('ok');
+    expect(await tap(g, [{ type: 'end' }])).toEqual(['accepted']);
+    expect((await offerTo(g, g.scorer)).reopen.when).toBe('until');
+    await endedMinutesAgo(g, 31);
+    expect(await reopenAs(g, g.scorer)).toBe('reopen-time-over');
+    await endedMinutesAgo(g, 29);
+    expect(await reopenAs(g, g.scorer)).toBe('ok');
+
+    // (b) Ended by the scorekeeper, reopened, then ended by another scorekeeper once the
+    // tablet's lease has run out: the first is refused, the second may.
+    const h = await trackedGame();
+    await endedOnTablet(h);
+    expect(await reopenAs(h, h.scorer)).toBe('ok');
+    clock.at += 120_000;
+    const version = (
+      await one<{ version: number }>(pglite, 'select version from games where id = $1', [h.gameId])
+    ).version;
+    const ended = await endTrackedGame(h.as(h.otherScorer), { gameId: h.gameId, version }, deps);
+    expect(ended.ok).toBe(true);
+    expect(await offerTo(h, h.scorer)).toEqual({
+      reopen: { when: 'no', code: 'not-ended-by-you' },
+      endedBy: h.otherScorer,
+    });
+    expect(await reopenAs(h, h.scorer)).toBe('not-ended-by-you');
+    expect(await reopenAs(h, h.otherScorer)).toBe('ok');
   });
 });
