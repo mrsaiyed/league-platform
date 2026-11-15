@@ -14,6 +14,7 @@
 // - A live session that is none of our accounts' (an AccountRefusal, record 055) is
 //   "account problem" (403), or a visitor for a public read; signing in again would
 //   not help, and the account page says why.
+import { trackerRefusalStatus, type TrackerRefusal } from '@srleagues/contracts';
 import { leagueApiUrl, type AccessHolder } from '@srleagues/core';
 import {
   requestContext,
@@ -29,15 +30,21 @@ export type ApiAnswer = {
   readonly headers?: Readonly<Record<string, string>>;
 };
 
+/** Why there is no league request: each error with its own status, never another pairing. */
 export type ApiRefusal =
   | { readonly status: 401; readonly error: 'signed-out' }
   | { readonly status: 403; readonly error: 'account-problem' }
   | { readonly status: 404; readonly error: 'not-found' };
 
-export const refusalAnswer = (refusal: ApiRefusal): ApiAnswer => ({
-  status: refusal.status,
-  body: { error: refusal.error },
-});
+/**
+ * The refusal as the endpoint answers it: the same body the tracker's endpoints give,
+ * the contract's `TrackerRefusal` at the contract's status for it (a tracker takes
+ * nothing else as the server's word, so a wrong pairing would be no answer for ever).
+ */
+export const refusalAnswer = (refusal: ApiRefusal): ApiAnswer => {
+  const body = { error: refusal.error } satisfies TrackerRefusal;
+  return { status: trackerRefusalStatus[body.error], body };
+};
 
 const notFound: ApiRefusal = { status: 404, error: 'not-found' };
 

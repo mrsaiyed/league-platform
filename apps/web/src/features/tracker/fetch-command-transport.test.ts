@@ -67,9 +67,14 @@ describe('fetch command transport', () => {
     });
   });
 
-  it('reports a request turned away whole (signed out, not allowed, no such game) with its status', async () => {
-    for (const status of [401, 403, 404]) {
-      const { transport } = transportAnswering(() => json(status, { error: 'no' }));
+  it("reports the server's own refusal of the whole request (signed out, not allowed, no such game) with its status", async () => {
+    const own = [
+      [401, 'signed-out'],
+      [403, 'not-allowed'],
+      [404, 'not-found'],
+    ] as const;
+    for (const [status, error] of own) {
+      const { transport } = transportAnswering(() => json(status, { error }));
       expect(await transport.send(batch, new AbortController().signal)).toEqual({
         kind: 'rejected',
         httpStatus: status,
@@ -77,12 +82,42 @@ describe('fetch command transport', () => {
     }
   });
 
-  it('reports a batch the server could not take as sent, so the queue can find the bad tap', async () => {
-    for (const status of [400, 413, 422, 409]) {
-      const { transport } = transportAnswering(() => json(status, { error: 'bad' }));
+  it("reports the server's own 400 for a batch it could not take, so the queue can find the bad tap", async () => {
+    const { transport } = transportAnswering(() =>
+      json(400, { error: 'invalid-input', issues: [] }),
+    );
+    expect(await transport.send(batch, new AbortController().signal)).toEqual({
+      kind: 'batch-refused',
+      httpStatus: 400,
+    });
+  });
+
+  it('counts a refusal that is not the server’s own as no answer, whatever its status (finding G)', async () => {
+    const page = (status: number) => () =>
+      Promise.resolve(
+        new Response('<html>Blocked by the network</html>', {
+          status,
+          headers: { 'content-type': 'text/html' },
+        }),
+      );
+    const answers = [
+      page(404),
+      page(403),
+      page(401),
+      page(400),
+      page(413),
+      () => json(404, { error: 'no' }),
+      () => json(403, { message: 'Forbidden' }),
+      // The server's words at the wrong status are not its answer either.
+      () => json(403, { error: 'not-found' }),
+      () => json(404, { error: 'signed-out' }),
+      () => json(422, { error: 'invalid-input', issues: [] }),
+      () => json(409, { error: 'bad' }),
+    ];
+    for (const answer of answers) {
+      const { transport } = transportAnswering(answer);
       expect(await transport.send(batch, new AbortController().signal)).toEqual({
-        kind: 'batch-refused',
-        httpStatus: status,
+        kind: 'unanswered',
       });
     }
   });

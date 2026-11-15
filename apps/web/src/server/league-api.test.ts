@@ -1,7 +1,8 @@
+import { ownTrackerRefusal } from '@srleagues/contracts';
 import { leagueApiUrl, ok } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import type { ContextDeps, RequestFacts } from './context.ts';
-import { resolveLeagueApi } from './league-api.ts';
+import { refusalAnswer, resolveLeagueApi } from './league-api.ts';
 
 const leagueA = '01900000-0000-7000-8000-00000000000a';
 const leagueB = '01900000-0000-7000-8000-00000000000b';
@@ -139,5 +140,40 @@ describe('resolveLeagueApi', () => {
       'visitor',
     );
     expect(resolved).toEqual({ ok: false, refusal: { status: 404, error: 'not-found' } });
+  });
+
+  it("answers each refusal as the tracker's own refusal, at its own status (T-251)", async () => {
+    const refusals = [
+      await resolveLeagueApi(facts(''), parts, deps),
+      await resolveLeagueApi(
+        facts(leagueApiUrl({ id: leagueA }, parts), {
+          ok: false,
+          error: { code: 'session-ended' },
+        }),
+        parts,
+        deps,
+      ),
+      await resolveLeagueApi(
+        facts(leagueApiUrl({ id: leagueA }, parts), {
+          ok: false,
+          error: { code: 'account-problem', problem: 'sign-in-link-conflict' },
+        }),
+        parts,
+        deps,
+      ),
+    ];
+    const answers = refusals.map((resolved) => {
+      if (resolved.ok) throw new Error('expected a refusal');
+      return refusalAnswer(resolved.refusal);
+    });
+    expect(answers).toEqual([
+      { status: 404, body: { error: 'not-found' } },
+      { status: 401, body: { error: 'signed-out' } },
+      { status: 403, body: { error: 'account-problem' } },
+    ]);
+    // A tracker takes each as the server's word, not as a page in between.
+    for (const answer of answers) {
+      expect(ownTrackerRefusal(answer.status, answer.body)).not.toBeNull();
+    }
   });
 });

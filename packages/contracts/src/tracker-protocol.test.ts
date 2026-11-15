@@ -9,11 +9,14 @@ import {
   SessionReply,
   SessionRequest,
   TrackerGameState,
+  TrackerRefusal,
   VersionRefusal,
   buildVersionRefusal,
   isAcceptedProtocolVersion,
   maxCommandsPerBatch,
+  ownTrackerRefusal,
   trackerProtocolVersion,
+  trackerRefusalStatus,
 } from '../index.ts';
 
 const id = (n: number) => `0192f000-0000-7000-8000-${String(n).padStart(12, '0')}`;
@@ -65,6 +68,38 @@ describe('protocol version (T-127)', () => {
   it('has a shape for turning a whole batch away', () => {
     const refusal = { error: 'unsupported-protocol-version', accepted: [2, 3] };
     expect(VersionRefusal.safeParse(refusal).success).toBe(true);
+  });
+});
+
+describe("the server's own refusals (T-251)", () => {
+  it('reads each one only with its body at its own status', () => {
+    const own: [number, object][] = [
+      [401, { error: 'signed-out' }],
+      [403, { error: 'not-allowed' }],
+      [403, { error: 'account-problem' }],
+      [404, { error: 'not-found' }],
+      [400, { error: 'invalid-input', issues: [{ path: 'commands', problem: 'too_small' }] }],
+    ];
+    for (const [status, body] of own) {
+      expect(ownTrackerRefusal(status, body)).toEqual(body);
+      expect(TrackerRefusal.safeParse(body).success).toBe(true);
+    }
+  });
+
+  it('is not ours: a page, another body, or our body at another status', () => {
+    const foreign: [number, unknown][] = [
+      [404, undefined],
+      [404, '<html>Not Found</html>'],
+      [403, { error: 'forbidden' }],
+      [404, { error: 'not-found', message: 'Not Found' }],
+      [403, { error: 'not-found' }],
+      [404, { error: 'not-allowed' }],
+      [400, { error: 'invalid-input' }],
+      [401, { error: 'signed-out', redirect: '/wifi-login' }],
+      [401, { error: 'account-problem' }],
+    ];
+    for (const [status, body] of foreign) expect(ownTrackerRefusal(status, body)).toBeNull();
+    expect(Object.values(trackerRefusalStatus).sort()).toEqual([400, 401, 403, 403, 404]);
   });
 });
 

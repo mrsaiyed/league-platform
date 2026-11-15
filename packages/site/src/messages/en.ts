@@ -1096,9 +1096,24 @@ export const en = {
     'This device could not read what it has saved, so it is read-only. Open the game again to try once more.',
   'tracker.readOnly.signed-out':
     'You are signed out. Sign in again to keep scoring. What you entered on this device is kept and sent once you are back, so do not enter it again.',
+  'tracker.readOnly.signed-in-as-other':
+    'You signed in again, but this game is no longer being scored on this device: someone else is signed in here now, or another device took the game over while you were signed out. This one is now read-only.',
   'tracker.readOnly.update-needed':
     'This tracker needs an update. Reload the page to keep scoring.',
   'tracker.heldByOther': '{name} is scoring this game on another device.',
+  // Signed out while scoring (finding M2): scoring goes on, and nothing is sent until
+  // the scorekeeper signs in again, so these never say "waiting to send".
+  'tracker.signedOut':
+    'You are signed out. Keep scoring: what you enter is kept on this device and sent once you sign in again.',
+  'tracker.signedOutKept_one':
+    'You are signed out. {count} play is being kept on this device and is sent once you sign in again.',
+  'tracker.signedOutKept_other':
+    'You are signed out. {count} plays are being kept on this device and are sent once you sign in again.',
+  // No longer allowed to score, with plays still on the device (finding M2).
+  'tracker.notAllowedKept_one':
+    'You are no longer allowed to score this game. {count} play is still on this device and is not saved. If an admin gives the game back to you, open it again here and it is sent.',
+  'tracker.notAllowedKept_other':
+    'You are no longer allowed to score this game. {count} plays are still on this device and are not saved. If an admin gives the game back to you, open it again here and they are sent.',
   'tracker.notApplied_one': '{count} action was not applied. The game now shows what was saved.',
   'tracker.notApplied_other':
     '{count} actions were not applied. The game now shows what was saved.',

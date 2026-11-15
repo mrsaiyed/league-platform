@@ -41,6 +41,48 @@ describe('IndexedDB storage: the connection', () => {
     expect((await storage.list(game)).map((e) => e.command.commandId)).toEqual([commandId(2)]);
   });
 
+  it('reads a row stored before sessions and moments were kept as it is, with no upgrade step', async () => {
+    const factory = new IDBFactory();
+    const storage = await openIndexedDbQueueStorage(factory);
+    // A row as the first build wrote it: no session, no period or game clock.
+    const raw = await openRaw(factory, 1);
+    await new Promise<void>((resolve, reject) => {
+      const tx = raw.transaction('commands', 'readwrite');
+      tx.objectStore('commands').add({
+        gameId: game,
+        protocolVersion: 1,
+        command: tap(1),
+        state: 'waiting',
+      });
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error);
+    });
+    raw.close();
+    await storage.add(game, {
+      protocolVersion: 1,
+      command: tap(2),
+      moment: { period: 1, clockMs: 60_000 },
+    });
+    const list = await storage.list(game);
+    expect(list).toEqual([
+      { gameId: game, protocolVersion: 1, command: tap(1), state: 'waiting' },
+      {
+        gameId: game,
+        protocolVersion: 1,
+        command: tap(2),
+        moment: { period: 1, clockMs: 60_000 },
+        state: 'waiting',
+      },
+    ]);
+    await storage.settle(game, { notSaved: [commandId(1)] });
+    expect((await storage.list(game))[0]).toEqual({
+      gameId: game,
+      protocolVersion: 1,
+      command: tap(1),
+      state: 'not-saved',
+    });
+  });
+
   it('says an older build cannot open a database a newer one upgraded', async () => {
     const factory = new IDBFactory();
     const storage = await openIndexedDbQueueStorage(factory);

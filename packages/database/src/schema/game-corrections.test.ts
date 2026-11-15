@@ -234,6 +234,59 @@ describe("a decided game's result changes only with a correction (S-7)", () => {
     expect(row.status).toBe('final');
   });
 
+  it('with a correction written in a savepoint of the transaction (migration 0011)', async () => {
+    // The savepoint has a transaction id of its own; the correction records the
+    // top-level one, which is what the check at the end of the transaction asks for.
+    const released = await game();
+    await db.transaction(async (tx) => {
+      await tx.exec('savepoint correcting');
+      await correct(tx, released);
+      await tx.exec('release savepoint correcting');
+      await reopen(tx, released);
+    });
+    const inside = await game();
+    await db.transaction(async (tx) => {
+      await tx.exec('savepoint correcting');
+      await correct(tx, inside);
+      await reopen(tx, inside);
+    });
+    // A correction rolled back with its savepoint is not there to count.
+    const undone = await game();
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.exec('savepoint correcting');
+        await correct(tx, undone);
+        await tx.exec('rollback to savepoint correcting');
+        await reopen(tx, undone);
+      }),
+    ).rejects.toMatchObject(needsCorrection);
+    const { n } = await one<{ n: number }>(
+      db,
+      'select count(*)::int as n from game_corrections where game_id = $1',
+      [undone.gameId],
+    );
+    expect(n).toBe(0);
+  });
+
+  it("not with this transaction's correction once it is dated otherwise (migration 0013)", async () => {
+    // The transaction id alone could match an old correction in a database restored
+    // into another cluster; the time is asked for too. Here the tables' owner dates
+    // this transaction's own correction a day back on purpose: it no longer counts.
+    const g = await game();
+    await expect(
+      db.transaction(async (tx) => {
+        await correct(tx, g);
+        await tx.exec('alter table game_corrections disable trigger game_corrections_is_history');
+        await tx.query(
+          "update game_corrections set at = now() - interval '1 day' where game_id = $1",
+          [g.gameId],
+        );
+        await tx.exec('alter table game_corrections enable trigger game_corrections_is_history');
+        await reopen(tx, g);
+      }),
+    ).rejects.toMatchObject(needsCorrection);
+  });
+
   it('covers a changed score, a change of status, a forfeit and putting it in the bin', async () => {
     const changes: [Record<string, unknown>, string][] = [
       [{}, 'update games set home_score = 49 where id = $1'],
