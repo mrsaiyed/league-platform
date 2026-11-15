@@ -181,6 +181,10 @@ export async function ScheduleBuilderPage({
   ) : null;
   const savedAt = (place: SavedPlace) =>
     here !== undefined && samePlace(here.place, place) ? here.node : null;
+  const savedGame = (gameId: string): SavedGame =>
+    here !== undefined && samePlace(here.place, { game: gameId })
+      ? { node: here.node, asks: here.asks === true }
+      : undefined;
 
   return (
     <main>
@@ -224,7 +228,7 @@ export async function ScheduleBuilderPage({
             rounds={grid.rounds}
             problem={besideRound === round.id ? roundProblem : undefined}
             saved={savedAt({ round: round.id })}
-            savedGame={(gameId) => savedAt({ game: gameId })}
+            savedGame={savedGame}
             previousRoundId={grid.rounds[grid.rounds.indexOf(round) - 1]?.id ?? null}
           />
           {savedAt({ afterRound: round.id })}
@@ -239,7 +243,7 @@ export async function ScheduleBuilderPage({
         venues={venues}
         basis={basis}
         saved={savedAt({ round: null })}
-        savedGame={(gameId) => savedAt({ game: gameId })}
+        savedGame={savedGame}
       />
       {draft.draft === null || !(basis.canEdit || basis.canPublish) ? null : (
         <section aria-labelledby="publish-heading">
@@ -374,7 +378,7 @@ function RoundSection({
   readonly problem: string | undefined;
   /** "Saved", when the last save was this round's. */
   readonly saved: ReactNode;
-  readonly savedGame: (gameId: string) => ReactNode;
+  readonly savedGame: (gameId: string) => SavedGame;
   /** Where "the round was removed" is said if this one is: after the round before it. */
   readonly previousRoundId: string | null;
 }) {
@@ -473,7 +477,7 @@ function LooseGames({
   readonly venues: readonly VenueWithCourts[];
   readonly basis: Basis;
   readonly saved: ReactNode;
-  readonly savedGame: (gameId: string) => ReactNode;
+  readonly savedGame: (gameId: string) => SavedGame;
 }) {
   return (
     <section aria-labelledby="loose-heading">
@@ -508,7 +512,7 @@ function GameList({
   readonly venues: readonly VenueWithCourts[];
   readonly basis: Basis;
   readonly rounds: readonly GridRound[];
-  readonly savedGame: (gameId: string) => ReactNode;
+  readonly savedGame: (gameId: string) => SavedGame;
 }) {
   if (games.length === 0) return null;
   return (
@@ -544,9 +548,11 @@ function GameItem({
   readonly basis: Basis;
   readonly rounds: readonly GridRound[];
   /** "Saved", when the last save was this game's. */
-  readonly saved: ReactNode;
+  readonly saved: SavedGame;
 }) {
   const others = grid.allGames.filter((o) => o.id !== game.id && o.editable);
+  // While "Move it to … too?" is asked beside the game, its flag waits for the answer.
+  const flagged = game.outsideRound && saved?.asks !== true;
   const round = rounds.find((r) => r.id === game.roundId);
   const when = t('schedule.admin.gameWhen', {
     date: game.date === '' ? t('schedule.admin.noDate') : game.date,
@@ -566,13 +572,13 @@ function GameItem({
               recording: t(`schedule.admin.recording.${game.recording}`),
             })}
       </p>
-      {saved}
+      {saved?.node}
       {game.clashed ? (
         <p role="status">
           <strong>{t('schedule.admin.clashFlag')}</strong>
         </p>
       ) : null}
-      {!game.outsideRound || game.offRoundDate === null || round === undefined ? null : (
+      {!flagged || game.offRoundDate === null || round === undefined ? null : (
         <div data-off-round-date={game.id}>
           <p role="status">
             <strong>
@@ -823,6 +829,9 @@ function AddRound(props: {
   );
 }
 
+/** "Saved" at a game, and whether it asks about the round's date. */
+type SavedGame = { readonly node: ReactNode; readonly asks: boolean } | undefined;
+
 /** Where "Saved" is said: in a round, at a game, after a round (null: before the first). */
 type SavedPlace =
   | { readonly round: string | null }
@@ -846,7 +855,7 @@ function savedHere(
   roundName: (round: GridRound) => string,
   basis: Basis,
   gridAddress: string,
-): { readonly place: SavedPlace; readonly node: ReactNode } | undefined {
+): { readonly place: SavedPlace; readonly node: ReactNode; readonly asks?: true } | undefined {
   if (saved === undefined) return undefined;
   const said = (text: string, more?: ReactNode) => (
     <div id={savedAnchor} className="ui-notice" role="status" data-notice="done">
@@ -898,6 +907,8 @@ function savedHere(
       const keep = `${gridAddress}?${query}#${gameAnchor(game.id)}`;
       return {
         place: { game: game.id },
+        // The question offers the round's date: the game's own flag waits until it is answered.
+        asks: true,
         node: said(
           text,
           <div data-follow-round-date={game.id}>
