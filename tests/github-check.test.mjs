@@ -1,7 +1,7 @@
 // How scripts/github-check.mjs reads GitHub's list of runs (scripts/github-check-rules.mjs).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { describe, newestChecks } from '../scripts/github-check-rules.mjs';
+import { describe, failureNoteLines, newestChecks } from '../scripts/github-check-rules.mjs';
 
 const run = (id, branch, commit, status, conclusion, name = 'Verify') => ({
   id,
@@ -60,4 +60,58 @@ test('the line says when this computer is ahead of what GitHub checked', () => {
   assert.match(describe('lane/2.20', undefined, b), /no recent check.*bbbbbbb/);
   assert.match(describe('lane/2.20', { ...passed, state: 'running' }, a), /still being checked/);
   assert.match(describe('lane/2.20', { ...passed, state: 'failed' }, a), /FAILED on aaaaaaa/);
+});
+
+test("a failed job's annotations are shown line by line under the failed step", () => {
+  // A made-up answer from GitHub's annotations address, shaped like its real ones.
+  const answer = [
+    {
+      path: '.github',
+      start_line: 1,
+      annotation_level: 'failure',
+      title: 'verify stopped during test:units',
+      message: '> league-platform@0.1.0 test:units',
+    },
+    {
+      path: '.github',
+      start_line: 1,
+      annotation_level: 'failure',
+      title: 'failed',
+      message: 'FAIL packages/database/src/made-up.test.ts > reads a made-up backup',
+    },
+    {
+      path: '.github',
+      start_line: 1,
+      annotation_level: 'failure',
+      title: 'the last 2 lines',
+      message: 'Test Files  1 failed | 3 passed (4)\n     Tests  1 failed | 9 passed (10)',
+    },
+    { path: '.github', start_line: 1, annotation_level: 'warning', message: 'a warning' },
+    {
+      path: '.github',
+      start_line: 1,
+      annotation_level: 'failure',
+      message: 'Process completed with exit code 1.',
+    },
+    {
+      path: 'packages/core/src/made-up.ts',
+      start_line: 12,
+      annotation_level: 'failure',
+      message: 'Type error',
+    },
+  ];
+  assert.deepEqual(failureNoteLines(answer), [
+    '  - verify stopped during test:units:',
+    '      > league-platform@0.1.0 test:units',
+    '  - failed:',
+    '      FAIL packages/database/src/made-up.test.ts > reads a made-up backup',
+    '  - the last 2 lines:',
+    '      Test Files  1 failed | 3 passed (4)',
+    '           Tests  1 failed | 9 passed (10)',
+    '  - packages/core/src/made-up.ts:12 Type error',
+  ]);
+  assert.deepEqual(failureNoteLines(null), []);
+  const many = failureNoteLines(answer, 4);
+  assert.equal(many.length, 4);
+  assert.equal(many[3], '  (5 more lines on GitHub)');
 });

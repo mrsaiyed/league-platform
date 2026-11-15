@@ -13,6 +13,7 @@ import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkStructure, formatViolation } from './structure/index.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = path.join(root, 'apps/web');
@@ -67,6 +68,9 @@ const tokens = {
 // The made-up leagues' ids (stand-in-ports.ts), which name the cookie of a device's "my team".
 const northValley = '01900000-0000-7000-8000-000000000001';
 const harborCity = '01900000-0000-7000-8000-000000000002';
+// Two of the made-up games of the first league (stand-in-games.ts).
+const liveGame = '01900000-0000-7000-8000-006a00000002';
+const unassignedGame = '01900000-0000-7000-8000-006a00000003';
 
 /** A made-up game of North Valley (apps/web/src/server/stand-in-games.ts): 1 scheduled,
  * 2 live (Hawks v Bears), 5 final (Bears v Lions), 6 in a season still being set up. */
@@ -276,7 +280,17 @@ const cases = [
   ['visitor', '/harbor-city/stats', 200, ['Sam R.', 'Noor H.'], ['Rivera', 'Haddad']],
   ['visitor', '/harbor-city/standings', 200, ['Level with another team', 'PTS']],
   ['scheduler', '/north-valley/admin', 200, ['Powered by SR Leagues', '--color-primary: #c8a84b']],
-  ['visitor', '/north-valley/admin', 403, [noAccess], ['Admin areas']],
+  // Someone not signed in at the admin's home (a scorekeeper's games) is sent to sign in
+  // and brought back (step 2.33); at an admin area they are still refused (U-6).
+  [
+    'visitor',
+    '/north-valley/admin',
+    307,
+    [],
+    ['Admin areas'],
+    '/signin?next=%2Fnorth-valley%2Fadmin',
+  ],
+  ['visitor', '/north-valley/admin/teams', 403, [noAccess], ['Admin areas']],
   ['stranger', '/north-valley/admin', 403, [noAccess]],
   ['coach', '/north-valley/admin/teams', 403, [noAccess]],
   [
@@ -323,6 +337,49 @@ const cases = [
   ],
   ['scheduler', '/north-valley/admin/settings', 403, [noAccess]],
   ['coach', '/north-valley/admin/settings', 403, [noAccess]],
+  // The tracker (step 2.33): a signed-in account allowed to score that game, and nobody
+  // else, another league's admin included (U-6). Hawks v Bears is live; Lions v Tigers is
+  // the scorekeeper's; game 3 is assigned to nobody (any scorekeeper may score it).
+  ['scheduler', `/north-valley/score/${liveGame}`, 200, ['Score a game', 'Bears at Hawks']],
+  ['scorekeeper', `/north-valley/score/${liveGame}`, 200, ['Bears at Hawks', 'Opening the game']],
+  ['scorekeeper', `/north-valley/score/${unassignedGame}`, 200, ['Lions at Hawks']],
+  ['owner', `/north-valley/score/${liveGame}`, 200, ['Bears at Hawks']],
+  ['coach', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
+  // Someone not signed in is sent to sign in, told why, and brought back to the game.
+  [
+    'visitor',
+    `/north-valley/score/${liveGame}`,
+    307,
+    [],
+    ['Bears at Hawks'],
+    `/signin?problem=signInToScore&next=%2Fnorth-valley%2Fscore%2F${liveGame}`,
+  ],
+  ['visitor', '/signin?problem=signInToScore', 200, ['Sign in to score this game.']],
+  ['otherAdmin', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
+  // No such game: the tracker's own refusal, with the way back (step 2.33).
+  [
+    'owner',
+    '/north-valley/score/game-1',
+    200,
+    ['We could not find that game.', 'Back to your games'],
+    [notFound],
+  ],
+  // Another league's game asked for through this league's address is not there.
+  [
+    'owner',
+    `/harbor-city/score/${liveGame}`,
+    200,
+    ['We could not find that game.'],
+    ['Bears at Hawks'],
+  ],
+  // A scorekeeper's admin: their games, each with a button to the tracker (P4 §4).
+  [
+    'scorekeeper',
+    '/north-valley/admin',
+    200,
+    ['Your games', 'Score this game', `href="/north-valley/score/${liveGame}"`],
+    ['Nothing here yet.'],
+  ],
   // A game's page (step 2.45): drawn with how the game stands, its live part ready to
   // follow it; a finished game's result; a game not started; a game that is not this
   // league's, not public yet, or not an id is not found. The Bears show their players'
@@ -389,7 +446,23 @@ const cases = [
     [adminLink('quiet-pines', 'site')],
     [adminLink('quiet-pines', 'schedule')],
   ],
-  ['scorekeeper', '/quiet-pines/score/game-1', 200, ['Score a game']],
+  // The draft league has the same games, scores assigned games only and gives the live
+  // one to its admin (stand-in-ports.ts): its scorekeeper is refused it (P7 §5.1), with the
+  // tracker's own words and the way back, not the league's "no access" (step 2.33).
+  [
+    'scorekeeper',
+    `/quiet-pines/score/${liveGame}`,
+    200,
+    ['You are not assigned to score this game.', 'href="/quiet-pines/admin"'],
+    ['Bears at Hawks', noAccess],
+  ],
+  [
+    'scorekeeper',
+    `/quiet-pines/score/${unassignedGame}`,
+    200,
+    ['You are not assigned to score this game.'],
+    ['Lions at Hawks', noAccess],
+  ],
   [
     'clubAdmin',
     '/quiet-pines/admin/teams',
@@ -404,6 +477,23 @@ const cases = [
   ['owner', '/closed-gate/admin', 200, ['This league has been taken down.']],
   ['scheduler', '/closed-gate', 404, [notFound]],
   ['visitor', '/old-meadow/standings', 200, ['This league is archived.']],
+  // A scorekeeper who still holds the role in the archived league is told so, with a way
+  // back, not "no access" (step 2.33); someone with no role there still gets "no access".
+  [
+    'scorekeeper',
+    `/old-meadow/score/${liveGame}`,
+    200,
+    ['This league is archived, so its games cannot be scored or changed.', 'Back to your games'],
+    [noAccess, 'Bears at Hawks'],
+  ],
+  [
+    'scorekeeper',
+    '/old-meadow/admin',
+    200,
+    ['Your games', 'This league is archived, so its games cannot be scored or changed.'],
+    [noAccess],
+  ],
+  ['coach', `/old-meadow/score/${liveGame}`, 403, [noAccess]],
   ['visitor', '/nobody-has-this', 404, [notFound]],
   ['visitor', '/binned-league', 404, [notFound]],
   ['visitor', '/north-vale/schedule', 308, [], [], '/north-valley/schedule'],
@@ -547,7 +637,9 @@ const code = await new Promise((resolve) => {
 if (code === 0 || code === 'still running') {
   failures.push(`staging with an unreachable database did not refuse to start (${code})`);
 } else if (!staging.output().includes('the database could not be reached')) {
-  failures.push(`staging refused to start without saying why:\n${staging.output()}`);
+  failures.push(
+    `staging refused to start without saying why:\n${staging.output()}${whichFileNodeRefused(staging.output())}`,
+  );
 } else if (staging.output().includes('made-up-password')) {
   failures.push('the refusal printed the database address');
 } else if (staging.output().includes('made-up-supabase-secret-key')) {
@@ -561,6 +653,18 @@ if (failures.length > 0) {
 console.log(
   `Web shell check passed: ${cases.length + spoofs.length + 5} checks against the built server.`,
 );
+
+// When Node refused a TypeScript file it was to run itself, the server prints only
+// "… is not supported in strip-only mode", naming no file (step 2.149). Then the
+// structure rule that puts the same files through Node's own stripper names it.
+function whichFileNodeRefused(output) {
+  if (!/strip-only mode|ERR_(?:UNSUPPORTED|INVALID)_TYPESCRIPT_SYNTAX/.test(output)) return '';
+  const { violations } = checkStructure(root, { only: ['NODE-TS'] });
+  if (violations.length === 0) {
+    return '\n  Node refused a TypeScript file, but the NODE-TS structure rule finds none: the file is reached some other way.';
+  }
+  return `\n  The file Node refused:\n${violations.map((v) => `    ${formatViolation(v)}`).join('\n')}`;
+}
 
 function serverEnvironment(env) {
   const clean = {};
@@ -595,7 +699,11 @@ function run(args, env) {
 async function waitFor(url, server) {
   const until = Date.now() + 60_000;
   while (Date.now() < until) {
-    if (server.child.exitCode !== null) throw new Error(`the server stopped:\n${server.output()}`);
+    if (server.child.exitCode !== null) {
+      throw new Error(
+        `the server stopped:\n${server.output()}${whichFileNodeRefused(server.output())}`,
+      );
+    }
     try {
       await fetch(url);
       return;

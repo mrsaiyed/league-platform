@@ -98,7 +98,8 @@ export type TrackerBackup = {
  * Why a backup could not be read. The runner words these for people from its own
  * message file; `message` is only for logs.
  *  - missing: there is no such folder.
- *  - unreadable: the folder could not be copied (a file in it cannot be read).
+ *  - unreadable: the folder could not be copied (a file in it cannot be read, or it holds
+ *    something that is not a plain file or folder, such as a link).
  *  - not-a-database: the folder holds no database, or one that will not open.
  *  - not-a-tracker-backup: the database is missing the live tracker's tables or columns,
  *    or reading them failed.

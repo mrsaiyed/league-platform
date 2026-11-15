@@ -23,6 +23,7 @@ import { readTrackerRosters } from '@srleagues/core';
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { isGameIdFormat, type ApiAnswer } from './league-api.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
+import { trackerRostersReply } from './tracker-rosters-reply.ts';
 
 const refuse = (body: TrackerRefusal): ApiAnswer => ({
   status: trackerRefusalStatus[body.error],
@@ -40,20 +41,7 @@ export async function trackerRostersRequest(
   if (!result.ok) {
     return refuse({ error: result.error.code === 'not-allowed' ? 'not-allowed' : 'not-found' });
   }
-  const { recording, players, ...rest } = result.value;
-  const body: TrackerRosters = {
-    ...rest,
-    ...(recording === undefined ? {} : { recording }),
-    players: players.map((p) => ({
-      teamId: p.teamId,
-      personId: p.personId,
-      firstName: p.firstName,
-      lastName: p.lastName,
-      jerseyNumber: p.jerseyNumber,
-      left: p.left,
-      addedAtGameId: p.addedAtGameId ?? null,
-      toReview: p.needsReview ?? false,
-    })),
-  };
+  // The same shape the tracker's page hands the device (tracker-rosters-reply.ts).
+  const body: TrackerRosters = trackerRostersReply(result.value);
   return { status: 200, body, headers: { 'Cache-Control': 'private, no-store' } };
 }

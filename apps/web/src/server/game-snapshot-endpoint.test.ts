@@ -14,6 +14,8 @@ import {
   type Person,
 } from './tracker-endpoints.test-helper.ts';
 
+const gameId = (n: number) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0')}`;
+
 async function read(
   world: ReturnType<typeof trackerWorld>,
   {
@@ -131,10 +133,20 @@ describe('GET …/games/{game}/snapshot', () => {
     const world = trackerWorld();
     const hidden = await read(world, { league: 'draft' });
     expect(hidden.status).toBe(404);
-    // Its staff may open the draft league; it has no such game, and nothing is cached.
-    const staff = await read(world, { as: 'owner', league: 'draft' });
-    expect(staff.status).toBe(404);
-    expect(staff.headers).toEqual({ 'Cache-Control': 'no-store' });
+    // Its staff may open the draft league, which has the same made-up games
+    // (stand-in-ports.ts): they get the game, never cached, even with no sign-in cookie.
+    for (const carriesSignIn of [true, false]) {
+      const staff = await read(world, { as: 'owner', league: 'draft', carriesSignIn });
+      expect(staff.status).toBe(200);
+      expect(staff.headers).toEqual({ 'Cache-Control': 'private, no-store' });
+    }
+    // A game it does not have is "not found", and nothing is cached.
+    const missing = await read(world, { as: 'owner', league: 'draft', game: gameId(0x99) });
+    expect(missing).toEqual({
+      status: 404,
+      body: { error: 'not-found' },
+      headers: { 'Cache-Control': 'no-store' },
+    });
     expect((await read(world, { game: 'not-a-game' })).status).toBe(404);
   });
 

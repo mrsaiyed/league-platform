@@ -232,6 +232,7 @@ export function registerHandlerCase(
 ): void {
   registerIsolationCase({
     subject: handler.handle,
+    subjectName: `the ${handler.type} handler`,
     name,
     compareWrites: true,
     run: (scope, target) => runHandler(handler, harnessTx, scope, event(scope, target)),

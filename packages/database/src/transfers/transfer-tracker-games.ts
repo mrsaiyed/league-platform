@@ -66,6 +66,8 @@ export type TransferTrackerGamesOptions = {
   readonly withOpponents: boolean;
   /** The server's clock; the system's by default. */
   readonly clock?: Clock;
+  /** Told the reader's working copy when it could not be removed (readTrackerBackup). */
+  readonly onWorkLeftBehind?: (folder: string, error: unknown) => void;
 };
 
 /** Why the transfer could not start: what it was told to find is not there. */
@@ -249,7 +251,10 @@ export async function transferTrackerGames(
         mayTransferTrackerGames(context, { jobs: jobsStore(scope), access: accessStore(scope) }),
     );
     if (!allowed) return { ok: false, problem: { kind: 'not-allowed' } };
-    const backup = await readTrackerBackup(options.backupFolder, { workDir: options.workDir });
+    const backup = await readTrackerBackup(options.backupFolder, {
+      workDir: options.workDir,
+      ...(options.onWorkLeftBehind ? { onWorkLeftBehind: options.onWorkLeftBehind } : {}),
+    });
     const reads = await readsOf(db, context, season.id, league.time_zone);
     const planOptions = { withOpponents: options.withOpponents, now: clock.now() };
     const plan = await planTrackerTransfer(backup, reads, planOptions);
