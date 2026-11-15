@@ -59,6 +59,9 @@ export const cardsCss = String.raw`
   letter-spacing: var(--heading-tracking);
   line-height: 1.2;
   text-transform: var(--heading-case);
+  /* A word too long for the card is broken at a syllable, with a hyphen, where the
+     browser knows the language. */
+  hyphens: auto;
 }
 .ui-team-card-name a {
   color: var(--color-text);

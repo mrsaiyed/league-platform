@@ -245,16 +245,24 @@ export const gameCss = String.raw`
   gap: var(--step-2);
   max-inline-size: 100%;
   font-family: var(--font-heading);
-  font-size: var(--text-18);
+  /* One step smaller on a phone, where a team has half the board for its name. */
+  font-size: var(--text-16);
   font-weight: 700;
   letter-spacing: var(--heading-tracking);
   line-height: 1.2;
   text-transform: var(--heading-case);
 }
-/* A long name wraps under itself beside its chip, whole words first. */
+@media (min-width: 40rem) {
+  .ui-scoreboard-name {
+    font-size: var(--text-18);
+  }
+}
+/* A long name wraps under itself beside its chip, whole words first; a word too long for
+   its half is broken at a syllable, with a hyphen, where the browser knows the language. */
 .ui-scoreboard-name > [dir] {
   min-inline-size: 0;
   overflow-wrap: break-word;
+  hyphens: auto;
   text-wrap: balance;
 }
 /* The winner of a decided game is the name in bold, as on a game's card; the other is not. */
