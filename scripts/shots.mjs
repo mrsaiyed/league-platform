@@ -35,6 +35,11 @@
 // (.local/shots/320 and /390, `…-long-name.jpg` and `…-long-name-scrolled.jpg`).
 //
 // `--only=menu` takes the phone menu, open, at 390 in each league's look (`…-menu-open.jpg`).
+//
+// Signed in as the made-up owner (step 2.127): the front page and the account page with
+// their leagues (`platform-home-signed-in`, `platform-account`), and the account button's
+// menu, open, on the first league's home (`north-valley-account-menu-open`): in the phone
+// menu's panel at 390, under the account button at 1280; the screen as it is held.
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -121,6 +126,13 @@ const scorekeeperPages = [
   { name: 'scorekeeper-games', at: '/admin' },
   { name: 'scorekeeper-tracker', at: '/admin', first: '/score/' },
 ];
+// SR Leagues' own pages, signed in as the made-up owner (step 2.127).
+const signedInPlatformPages = [
+  { name: 'platform-home-signed-in', at: '/' },
+  { name: 'platform-account', at: '/account' },
+];
+// The account button's menu, open, on the first league's home (step 2.127).
+const accountMenuPages = [{ name: 'account-menu-open', at: '', opens: true }];
 // SR Leagues' own pages, which belong to no league.
 const platformPages = [
   { name: 'platform-home', at: '/' },
@@ -380,6 +392,17 @@ try {
           base: `/${league}`,
         })),
       ]),
+      ...(design === '' ? signedInPlatformPages : []).map((page) => ({
+        ...page,
+        context: staff,
+        base: '',
+      })),
+      ...(design === '' ? accountMenuPages : []).map((page) => ({
+        ...page,
+        name: `${leagues[0]}-${page.name}`,
+        context: staff,
+        base: `/${leagues[0]}`,
+      })),
       ...scorekeeperPages.map((page) => ({
         ...page,
         name: `${leagues[0]}-${page.name}`,
@@ -421,8 +444,17 @@ try {
         // The faces a page draws are fetched as it is laid out: wait for them, so no
         // picture shows the stand-in face a reader sees for the first moment.
         await page.evaluate(() => document.fonts.ready.then(() => undefined));
+        if (job.opens) {
+          // The account button: in the phone menu's panel on a phone, its own from a tablet up.
+          const phone = width.viewport.width < 768;
+          await page.locator(phone ? '.site-menu > summary' : '.site-account > summary').click();
+          await page
+            .locator(phone ? '.site-menu-account' : '.site-account-panel')
+            .waitFor({ state: 'visible' });
+          await page.waitForTimeout(300);
+        }
         const file = path.join(out, width.name, `${fileName(job.name)}.jpg`);
-        await page.screenshot({ path: file, fullPage: true, type: 'jpeg', quality: 80 });
+        await page.screenshot({ path: file, fullPage: !job.opens, type: 'jpeg', quality: 80 });
         taken.push(
           `${label}.jpg${(answer?.status() ?? 200) >= 400 ? ` (the page answered ${answer.status()})` : ''}`,
         );

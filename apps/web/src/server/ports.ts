@@ -1,7 +1,7 @@
 // What the web app's pages need from outside, as one object (T-21: the app wires
 // adapters to core). container.ts chooses which adapters fill it: the made-up
 // stand-ins for local work and tests, or the database for staging and production.
-import type { AccessHolder, CommandContext, Result } from '@srleagues/core';
+import type { AccessHolder, AccountLeagueRow, CommandContext, Result } from '@srleagues/core';
 import type { SessionIdentity, SignInService } from '@srleagues/providers';
 import type { Renew } from './sign-in/renew-session.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
@@ -36,6 +36,13 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * league is in the bin.
    */
   readonly accessOf: (context: CommandContext) => Promise<AccessHolder | undefined>;
+  /**
+   * The leagues the signed-in account belongs to (record 066): the product's one read across
+   * leagues for an ordinary person, by the account the server's session gives, never one
+   * from the request. Rows before the rule of what the person may see: only core's
+   * myLeagues may turn them into a list (my-leagues-list.ts).
+   */
+  readonly leaguesOfAccount: (accountId: string) => Promise<readonly AccountLeagueRow[]>;
   /** What the public standings and statistics pages read (step 2.43). */
   readonly publicStats: PublicStatsPorts;
   /** What the admin's games area runs on (step 2.55). */

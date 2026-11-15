@@ -282,6 +282,47 @@ html {
   border-inline-start-color: var(--tab-current-line);
 }
 
+/* The account button of a signed-in person (U-8, step 2.127): on a phone its entries are at
+   the foot of the menu's panel, apart from the menu's links, laid out as those links are;
+   from a tablet up it is a small disclosure at the end of the first row. Built from the
+   frame's own pieces until the design lead gives it its look. */
+.site-menu-account {
+  margin-block-start: var(--step-3);
+  padding-block-start: var(--step-2);
+  border-block-start: 1px solid var(--header-rule);
+}
+.site-header .site-account-who {
+  margin: 0;
+  padding-block: var(--step-2);
+  padding-inline: var(--step-4);
+  overflow-wrap: anywhere;
+  color: var(--header-muted);
+  font-size: var(--text-14);
+}
+.site-header .site-account-sign-out {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  min-block-size: var(--tap);
+  margin-block-start: var(--step-3);
+  padding-inline: var(--step-3);
+  border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--header-text);
+  font: inherit;
+  font-size: var(--text-14);
+  font-weight: 600;
+  cursor: pointer;
+}
+.site-header .site-account-sign-out:hover {
+  border-color: var(--header-text);
+}
+.site-account {
+  display: none;
+}
+
 /* The season picker, in the header's own colors. On a phone it is the last thing in the
    open menu: put away with the menu, and there, with its label and its "Show" button,
    whenever the menu is open. Nothing in the frame is moved out of the page's own order. */
@@ -462,6 +503,79 @@ html {
   .site-header .site-sign-in:hover {
     border-color: transparent;
     color: var(--header-text);
+  }
+  /* The account button: the person's initial in a round mark, opening a small panel under
+     it, in the header's own colors. A plain disclosure: it works with scripts switched off. */
+  .site-account {
+    position: relative;
+    display: block;
+    flex: none;
+  }
+  .site-account > summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: var(--tap);
+    min-block-size: var(--tap);
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+  }
+  .site-account > summary::-webkit-details-marker {
+    display: none;
+  }
+  .site-account-initial {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--step-6);
+    block-size: var(--step-6);
+    border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+    border-radius: 50%;
+    color: var(--header-text);
+    font-size: var(--text-14);
+    font-weight: 600;
+  }
+  .site-account > summary:hover .site-account-initial,
+  .site-account[open] .site-account-initial {
+    border-color: var(--header-text);
+  }
+  .site-account-panel {
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-end: 0;
+    z-index: 30;
+    inline-size: max-content;
+    min-inline-size: calc(5 * var(--step-7));
+    max-inline-size: calc(8 * var(--step-7));
+    padding: var(--step-2);
+    border: 1px solid var(--header-line);
+    border-radius: var(--radius-small);
+    background: var(--header-background);
+    color: var(--header-text);
+  }
+  .site-account-panel ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--step-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .site-header .site-account-panel li a {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--tap);
+    padding-inline: var(--step-4);
+    border-radius: var(--radius-small);
+    color: var(--header-text);
+    font-size: var(--text-14);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .site-header .site-account-panel li a:hover {
+    background: var(--tab-hover-background);
+    color: var(--tab-hover-text);
   }
   .site-tabs {
     display: block;

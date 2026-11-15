@@ -47,6 +47,20 @@ This starts Next.js in development mode, with the address in `PUBLIC_BASE_URL` (
 
 With `APP_ENV=local`, the web app holds made-up leagues and made-up people in memory, in the process. It opens **no database and no sign-in service**: the sign-in screens and the made-up people are described in record 031 and in the header of `apps/web/src/server/stand-in-ports.ts`. Restarting the app puts the made-up data back to its starting state.
 
+### Signing in as the made-up people
+
+To walk the product by tapping, open `http://localhost:3000/north-valley`, tap "Sign in or create an account" and sign in as one of these. They exist only in the made-up world on this computer, in the app's memory: the made-up stand-in refuses to start anywhere but on this computer or a test address (`APP_ENV` must be `local` or `test`, and `PUBLIC_BASE_URL` must be on localhost or a `.test` name).
+
+| Who                                                                                            | Email                      | Password                       |
+| ---------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------ |
+| The owner of every made-up league                                                              | `owner@example.test`       | `made-up owner password`       |
+| A scheduler of North Valley                                                                    | `scheduler@example.test`   | `made-up scheduler password`   |
+| A scorekeeper of North Valley                                                                  | `scorekeeper@example.test` | `made-up scorekeeper password` |
+| A coach of North Valley                                                                        | `coach@example.test`       | `made-up coach password`       |
+| A member who plays in North Valley and Harbor City (and in a draft league they cannot see yet) | `member@example.test`      | `made-up member password`      |
+
+The list is in `apps/web/src/server/stand-in-sign-ins.ts`. The account button at the top right of every league page then leads to the admin, the games to score, the account page and signing out.
+
 To run it on the made-up database instead, put `LOCAL_DATA=made-up-database` in `.env` (local and test only). The app then builds a database in memory when it starts, with every migration and the two seed leagues (below), and reads leagues, signed-in people and what they hold from it. Sign-in still uses the stand-in's screens; the stand-in's made-up people do not exist there. The areas not yet moved onto the database (step 2.93, record 055) show an error page. It too opens no address and is gone when the app stops.
 
 To see the first made-up league (`/north-valley`) under another design, put `LOCAL_DESIGN=<name>` in `.env` (local and test only; the app refuses to start with it anywhere else, and with a name it does not know). The names are the starting designs (`crest`, `crest-light`, `midnight-gold`, `clean-court`) and `pine`, a made-up green league's design kept for pictures and tests. `node scripts/shots.mjs --design=<name>` takes pictures of that league's pages under a design this way (the script's own first lines say how).

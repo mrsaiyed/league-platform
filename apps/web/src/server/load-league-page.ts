@@ -36,14 +36,22 @@ import { requestFacts } from './request-facts.ts';
 
 /** This request, worked out once however many layouts and pages ask (React cache). */
 const resolvedRequest = cache(
-  async (): Promise<{ readonly path: string; readonly resolved: ResolvedLeagueRequest }> => {
+  async (): Promise<{
+    readonly path: string;
+    readonly resolved: ResolvedLeagueRequest;
+    readonly email: string | null;
+  }> => {
     const ports = await webPorts();
     const facts = await requestFacts(ports);
     const resolved = await resolveLeagueRequest(facts, {
       ...ports,
       siteOrigin: getConfig().PUBLIC_BASE_URL,
     });
-    return { path: facts.path, resolved };
+    // The address the sign-in service holds for the session, only when the request was
+    // worked out as that person's (a session that ran out is drawn as a visitor's).
+    const signedIn = resolved.kind === 'league' && resolved.context.account !== null;
+    const email = signedIn && facts.session?.ok === true ? facts.session.value.email : null;
+    return { path: facts.path, resolved, email };
   },
 );
 
@@ -104,6 +112,20 @@ export async function leagueViewOfAddress(): Promise<LeagueView | null> {
   const { resolved } = await resolvedRequest();
   const outcome = leaguePageOutcome(resolved, { page: 'site' });
   return outcome.kind === 'show' ? outcome.view : null;
+}
+
+/**
+ * For the account button (U-8) and the refusal page: the address the signed-in person is
+ * signed in with, as the sign-in service holds it; null for a visitor. Drawn for this
+ * request only: the pages it appears on are drawn per request (record 066).
+ */
+export async function signedInEmail(): Promise<string | null> {
+  return (await resolvedRequest()).email;
+}
+
+/** The address of this request as it arrived, for a way back to it after signing in. */
+export async function requestPath(): Promise<string> {
+  return (await resolvedRequest()).path;
 }
 
 /** For a layout: the view when the page may be shown, else null (the page refuses). */

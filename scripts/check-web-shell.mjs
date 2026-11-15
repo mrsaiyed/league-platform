@@ -88,7 +88,47 @@ const adminLink = (league, area) => `href="/${league}/admin/${area}"`;
 
 /** [who, path, status, words that must be there, words that must not, forward to, extra cookies] */
 const cases = [
-  ['visitor', '/', 200, ['Find your league, or start one']],
+  // Step 2.127: the front page says what SR Leagues is and offers "Sign in" to a visitor
+  // (the words it is found by changed from the placeholder's "Find your league, or start
+  // one"); a signed-in person sees their leagues first, and only those they may see.
+  [
+    'visitor',
+    '/',
+    200,
+    ['SR Leagues runs the websites of sports leagues', 'Sign in'],
+    ['This page is not built yet.', 'Your leagues', 'Signed in as'],
+  ],
+  [
+    'owner',
+    '/',
+    200,
+    ['Your leagues', 'North Valley League', 'Harbor City League', 'quiet-pines', 'Owner'],
+    ['binned-league'],
+  ],
+  ['scheduler', '/', 200, ['North Valley League', 'Scheduler', 'quiet-pines'], ['Harbor City']],
+  ['coach', '/', 200, ['North Valley League', 'Coach'], ['quiet-pines']],
+  ['stranger', '/', 200, ['The leagues you belong to will be listed here'], ['North Valley']],
+  [
+    'owner',
+    '/account',
+    200,
+    ['Signed in as local-owner-token@example.test', 'Your leagues', 'North Valley League'],
+  ],
+  // The account button (U-8): a signed-in person's own, never in a visitor's page.
+  [
+    'owner',
+    '/north-valley',
+    200,
+    ['Signed in as local-owner-token@example.test', 'My games to score', 'Your account'],
+    ['Sign in or create an account'],
+  ],
+  [
+    'visitor',
+    '/north-valley',
+    200,
+    ['Sign in or create an account', 'href="/signin?next=%2Fnorth-valley"'],
+    ['Signed in as', 'site-account', 'My games to score', 'local-owner-token'],
+  ],
   // The sign-in screens (step 1.14).
   ['visitor', '/account', 307, [], [], '/signin?next=%2Faccount'],
   ['owner', '/account', 200, ['Your account', 'Signed-in devices', 'Sign out everywhere']],
