@@ -29,9 +29,10 @@
 import {
   maxCommandsPerBatch,
   trackerProtocolVersion,
+  type BatchCommand,
   type CommandBatch,
   type RefusalCode,
-  type TrackerCommand,
+  type TableNotice,
 } from '@srleagues/contracts';
 import type { CommandTransport, TransportOutcome } from './command-transport.ts';
 import {
@@ -75,8 +76,18 @@ export type QueueHalt =
   /** The server turned the request away whole: signed out (401), not allowed (403), no such game (404). */
   | { readonly kind: 'rejected'; readonly httpStatus: number };
 
+/**
+ * A change of players the server took with something to say (record 058, S-44): a
+ * number someone on the team already wears. Kept in memory only, never stored, as it
+ * names the wearer; the screen shows it until `dismissNotices`.
+ */
+export type QueueNotice = {
+  readonly command: BatchCommand;
+  readonly notice: TableNotice;
+};
+
 export type RefusedCommand = {
-  readonly command: TrackerCommand;
+  readonly command: BatchCommand;
   readonly refusal: CommandRefusal;
 };
 
@@ -91,6 +102,8 @@ export type QueueStatus = {
   readonly waitingTaps: readonly KeptTap[];
   /** Taps the server refused, oldest first, until `forget` drops them. */
   readonly refused: readonly RefusedCommand[];
+  /** Changes of players taken with a notice, oldest first, until `dismissNotices`. */
+  readonly notices: readonly QueueNotice[];
   /** True while the queue is sending or about to. */
   readonly sending: boolean;
   readonly halted: QueueHalt | null;
@@ -143,7 +156,7 @@ export type TrackerQueue = {
    * then (T-114). Rejects if it could not be stored, or if its command ID is already
    * held for another game (`command-id-in-other-game`).
    */
-  enqueue(command: TrackerCommand, moment?: GameMoment): Promise<void>;
+  enqueue(command: BatchCommand, moment?: GameMoment): Promise<void>;
   /** Sends now instead of waiting: the network is back, or a scoring session was taken. */
   wake(): void;
   /**
@@ -162,6 +175,8 @@ export type TrackerQueue = {
    * list survives a reload (T6 §5). A halt is cleared as `forget` clears it.
    */
   setAside(commandIds: readonly string[]): Promise<void>;
+  /** The scorekeeper has seen these notices (record 058): they are dropped. */
+  dismissNotices(commandIds: readonly string[]): void;
   status(): QueueStatus;
   /** Called with the new status after every change. Returns the unsubscribe. */
   subscribe(listener: (status: QueueStatus) => void): () => void;
@@ -194,6 +209,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     waiting: 0,
     waitingTaps: [],
     refused: [],
+    notices: [],
     sending: false,
     halted: null,
     unansweredSince: null,
@@ -311,7 +327,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     if (first === undefined) return null;
     // A batch carries one version: taps stored before a release go out as they were made.
     const most = singlesLeft > 0 ? 1 : size;
-    const commands: TrackerCommand[] = [];
+    const commands: BatchCommand[] = [];
     for (const entry of waiting) {
       if (entry.protocolVersion !== first.protocolVersion || commands.length === most) break;
       commands.push(entry.command);
@@ -373,18 +389,33 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     const sent = new Set(batch.commands.map((command) => command.commandId));
     const remove: string[] = [];
     const refuse: RefusedEntry[] = [];
+    const notices: QueueNotice[] = [];
     let halt: QueueHalt | null = null;
     for (const result of outcome.reply.results) {
       if (!sent.delete(result.commandId)) continue;
       if (result.status !== 'refused') {
         remove.push(result.commandId);
+        // A change of players taken with something to say (S-44): kept for the screen.
+        const notice = result.status === 'accepted' ? result.notice : undefined;
+        const command = batch.commands.find((c) => c.commandId === result.commandId);
+        if (notice !== undefined && command !== undefined) notices.push({ command, notice });
         continue;
       }
-      const { code, message } = result.reason;
+      const { code, message, problem, wornBy, playerId, follows } = result.reason;
       // Only a game rule is about the tap. Any other reason is about the request (the
-      // session, the game, the person): the tap stays waiting for `resume`.
-      if (code === 'rule') refuse.push({ commandId: result.commandId, refusal: { code, message } });
-      else halt ??= { kind: 'refused', code };
+      // session, the game, the person): the tap stays waiting for `resume`. A play or a
+      // change of players keeps why (record 058); a wearer's name is never stored.
+      const why = {
+        ...(problem === undefined ? {} : { problem }),
+        ...(wornBy === undefined
+          ? {}
+          : { wornBy: { playerId: wornBy.playerId, jersey: wornBy.jersey } }),
+        ...(playerId === undefined ? {} : { playerId }),
+        ...(follows === undefined ? {} : { follows }),
+      };
+      if (code === 'rule') {
+        refuse.push({ commandId: result.commandId, refusal: { code, message, ...why } });
+      } else halt ??= { kind: 'refused', code };
     }
     if (remove.length === 0 && refuse.length === 0 && halt === null) {
       // An answer about none of what was sent is no answer.
@@ -392,6 +423,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       return false;
     }
     if (remove.length > 0 || refuse.length > 0) await settle(remove, refuse);
+    if (notices.length > 0) update({ notices: [...current.notices, ...notices] });
     if (singlesLeft > 0) singlesLeft = Math.max(singlesLeft - batch.commands.length, 0);
     answered({
       sequence: Math.max(current.sequence ?? 0, outcome.reply.sequence),
@@ -487,6 +519,11 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     forget: (commandIds) => putAway(commandIds, []),
 
     setAside: (commandIds) => putAway([], commandIds),
+
+    dismissNotices(commandIds) {
+      const seen = new Set(commandIds);
+      update({ notices: current.notices.filter((n) => !seen.has(n.command.commandId)) });
+    },
 
     status: () => current,
 

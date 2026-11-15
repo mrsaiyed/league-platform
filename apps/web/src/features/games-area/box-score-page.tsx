@@ -16,6 +16,7 @@ import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
 import { statLabel } from '../stats-pages/index.ts';
+import { hasName, rosterName } from '../teams-area/index.ts';
 import { reopenBoxScoreAction, saveBoxScoreAction } from './actions.ts';
 import { boxScoreField } from './box-score-form.ts';
 import { boxScoreNotice } from './box-score-notice.ts';
@@ -24,8 +25,8 @@ import { ScoreCheck } from './score-check.tsx';
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const nameOf = (player: GameRosterPlayer) =>
-  t('adminTeams.personName', { firstName: player.firstName, lastName: player.lastName }).trim();
+/** A player's name; one added at the scorer's table by number only is "#12" (S-34). */
+const nameOf = rosterName;
 
 /** What a box shows to start with: the saved number, or empty. */
 function savedText(line: GameLine | undefined, key: string): string {
@@ -83,7 +84,7 @@ function TeamGrid({
                 return (
                   <tr key={player.personId}>
                     <th scope="row">
-                      {player.jerseyNumber === null
+                      {player.jerseyNumber === null || !hasName(player)
                         ? null
                         : `${t('admin.boxScore.jersey', { number: player.jerseyNumber })} `}
                       {name}

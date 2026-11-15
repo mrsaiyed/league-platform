@@ -29,9 +29,6 @@ const reads = new Set([
   'games.open_scoring_session',
   'games.renew_scoring_session',
   'games.release_scoring_session',
-  // The tracker's taps (step 2.29): every one is already kept as a game event with who
-  // sent it, and a game sends hundreds, so they are not copied into the activity log.
-  'games.apply_tracker_commands',
   // The engine's state for the tracker to load (T-253): a read.
   'games.read_tracker_state',
   // The rosters stored on the scorekeeper's device when it opens a game (T-258): a read.
@@ -39,6 +36,10 @@ const reads = new Set([
   // Whether the device may offer Reopen, before the tap (step 2.120): a read.
   'games.read_reopen_offer',
 ]);
+// The tracker's taps (step 2.29) are not copied into the activity log: every one is
+// already kept as a game event with who sent it, and a game sends hundreds. The players
+// its batch adds, changes or takes off at the scorer's table are (record 058), under the
+// batch's own command, so `games.apply_tracker_commands` has words.
 
 /** Entries the nightly worker writes itself, not through a registered command (T-51). */
 const workerActions = ['leagues.empty_bin'];

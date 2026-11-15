@@ -7,7 +7,7 @@
 // When the game starts or ends, the page is drawn again from the server, so a page opened
 // before tip-off gets its play-by-play and one kept open to the end its box scores
 // (record 051). Subscribing only; this page can never publish (T-120).
-import { GameSnapshot } from '@srleagues/contracts';
+import { GameSnapshotReading, type GameSnapshot } from '@srleagues/contracts';
 import {
   BoxScoreTable,
   Scoreboard,
@@ -21,6 +21,7 @@ import { serverSentEventsSubscriber } from '../live-updates/index.ts';
 import { clockIsRunning, clockRemainingMs, serverOffsetMs } from './clock.ts';
 import { followGame, type FollowedGame } from './follow-game.ts';
 import {
+  boxScoreName,
   fill,
   periodClockText,
   periodName,
@@ -46,6 +47,8 @@ export type LiveGameLabels = {
   readonly latestPlay: string;
   readonly playersHidden: string;
   readonly nameNotShown: string;
+  /** A player known by number only (S-34), with {jersey}: "#12". */
+  readonly jerseyOnly: string;
   /** The heading over the two teams' players while the game is under way. */
   readonly playersTitle: string;
   readonly columns: readonly BoxScoreColumn[];
@@ -87,7 +90,7 @@ async function fetchSnapshot(address: string): Promise<GameSnapshot | null> {
   try {
     const answer = await fetch(address, { headers: { accept: 'application/json' } });
     if (!answer.ok) return null;
-    const parsed = GameSnapshot.safeParse(await answer.json());
+    const parsed = GameSnapshotReading.safeParse(await answer.json());
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
@@ -147,7 +150,7 @@ function PlayersTable({
     ? own.map((p) => ({
         id: p.playerId,
         jersey: p.jersey,
-        name: p.name ?? labels.nameNotShown,
+        name: boxScoreName(labels.jerseyOnly, labels.nameNotShown, p),
         cells: { points: p.points ?? '', fouls: p.fouls ?? '' },
       }))
     : null;

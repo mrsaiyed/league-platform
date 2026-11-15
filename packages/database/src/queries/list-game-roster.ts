@@ -35,6 +35,8 @@ export async function listGameRoster(
       'r.person_id',
       'r.jersey_number',
       'r.left_on',
+      'r.added_at_game_id',
+      'r.needs_review',
       'p.first_name',
       'p.last_name',
       'g.home_team_id',
@@ -64,6 +66,9 @@ export async function listGameRoster(
       lastName: row.last_name,
       jerseyNumber: row.jersey_number,
       left: row.left_on !== null,
+      // Added at a scorer's table, and waiting for review (S-6, S-45; record 058).
+      addedAtGameId: row.added_at_game_id,
+      needsReview: row.needs_review,
     });
   }
   // Home team first, each team's players in roster order (open entries first).

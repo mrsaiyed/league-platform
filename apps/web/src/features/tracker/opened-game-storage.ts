@@ -23,6 +23,10 @@ export type DevicePlayer = {
   readonly jerseyNumber: string | null;
   /** The player has left the team since (R-17). */
   readonly left: boolean;
+  /** The game at whose scorer's table they were added (S-6), or null (record 058). */
+  readonly addedAtGameId: string | null;
+  /** Added at a table and not yet reviewed: only then renamed or taken off there (S-45). */
+  readonly toReview: boolean;
 };
 
 export type DeviceTeam = {
@@ -31,8 +35,16 @@ export type DeviceTeam = {
   readonly players: readonly DevicePlayer[];
 };
 
-/** The game's two teams as the device keeps them. */
-export type DeviceRosters = { readonly home: DeviceTeam; readonly away: DeviceTeam };
+/**
+ * The game's two teams as the device keeps them, and whether the season wants unique
+ * numbers (S-37): what the page hands the device and what the rosters address gives
+ * it again (record 058), with the teams' names.
+ */
+export type DeviceRosters = {
+  readonly home: DeviceTeam;
+  readonly away: DeviceTeam;
+  readonly uniqueJerseys: boolean;
+};
 
 /** The game format the scorekeeper is asked to confirm (P7 §1, §5.1). */
 export type GameFormat = {

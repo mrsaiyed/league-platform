@@ -3,7 +3,8 @@
 // a game_corrections row in the same transaction (S-7): the database refuses to change
 // a decided game's result without one. The row holds the result before and after as
 // numbers only (T-220). A game entered by hand goes back to scheduled with no score,
-// to be entered again. A tracked game (one with a saved state) is handed back to its
+// to be entered again. A tracked game (one with a saved state and plays: the players
+// added at its scorer's table are events but not plays, record 058) is handed back to its
 // tracker (step 2.30, T6 §8): live again with the score its plays give, to be fixed
 // with the tracker's own tools and ended again (finish-tracked-game.ts). It takes the
 // game's lock first, as every command that writes a live game does (T-111). Announces
@@ -42,7 +43,11 @@ export const reopenGame = defineCommand({
     if (!isDecided(game.status)) return fail({ code: 'game-not-decided' });
     // The result before is kept in the correction. By hand: back to scheduled with the
     // scores cleared. Tracked: back to the tracker, live with its plays' score.
-    const saved = await tx.liveGames.findState(game.id);
+    // A game whose only events are players added at its table, then entered from paper,
+    // is a game entered by hand: handing it to the tracker would rebuild its lines from
+    // a state with no plays and lose the box score (record 058).
+    const found = await tx.liveGames.findState(game.id);
+    const saved = found !== undefined && (await tx.games.hasPlays(game.id)) ? found : undefined;
     const after =
       saved === undefined
         ? { status: 'scheduled', homeScore: null, awayScore: null }
