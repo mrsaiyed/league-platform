@@ -104,17 +104,8 @@ const gamePages = {
     { name: 'game-undated', at: `/games/${listedGame(5, 4)}` },
   ],
 };
-// What the league's owner sees.
-const adminPages = [
-  { name: 'admin-home', at: '/admin' },
-  { name: 'admin-games', at: '/admin/games' },
-  // The states of the games list (steps 2.154 and 2.155), reached by tapping, as none of
-  // them rides in the address (record 067): one game's score boxes open, the question
-  // before a final score is saved (for a game whose time has not come), a tie refused
-  // beside the boxes, "Saved" beside a final game (this morning's game reopened and its
-  // score entered again as it was), and the reopen form a final game leads to. The live
-  // game, with plays, is on `admin-games` itself, with no score boxes. Then the box score
-  // grid, and a tie refused there with twelve players' points kept.
+// The games area's states, reached by tapping (steps 2.154 and 2.155); see adminPages.
+const gamesStates = [
   { name: 'admin-games-boxes-open', at: '/admin/games', onlyIn: leagues[0], tap: openBoxes(1) },
   {
     name: 'admin-games-question',
@@ -128,6 +119,7 @@ const adminPages = [
     name: 'admin-games-refused',
     at: '/admin/games',
     onlyIn: leagues[0],
+    light: true,
     tap: async (page) => {
       const game = await askFinal(page, 1, 40, 40);
       await game.getByRole('button', { name: 'Yes, make it final' }).click();
@@ -139,6 +131,7 @@ const adminPages = [
     // From the game's reopen form, which "Correct this result" leads to.
     at: `/admin/games/${trackedGame(5)}`,
     onlyIn: leagues[0],
+    light: true,
     tap: async (page) => {
       await page.locator('[data-reopen-form] input[name="reason"]').fill('Pictures');
       await Promise.all([
@@ -150,7 +143,20 @@ const adminPages = [
       await gameRow(page, 5).getByRole('status').filter({ hasText: 'Saved' }).waitFor();
     },
   },
-  { name: 'admin-games-correct-form', at: `/admin/games/${trackedGame(5)}` },
+  {
+    // The reopen form of the league's first game that has one ("Correct this result").
+    // The second league has no final game this week, so its grid is taken instead (below).
+    name: 'admin-games-correct-form',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const correct = page.locator('main').getByRole('link', { name: 'Correct this result' });
+      await Promise.all([
+        page.waitForURL(/\/admin\/games\/[0-9a-f-]{36}$/),
+        correct.first().click(),
+      ]);
+    },
+  },
   {
     name: 'admin-games-box',
     at: '/admin/games',
@@ -158,10 +164,21 @@ const adminPages = [
     first: `/admin/games/${trackedGame(1)}`,
   },
   {
+    // The second league's grid: its first game with "Box score" this week.
+    name: 'admin-games-box',
+    at: '/admin/games',
+    onlyIn: leagues[1],
+    tap: async (page) => {
+      const grid = page.locator('main').getByRole('link', { name: 'Box score' });
+      await Promise.all([page.waitForURL(/\/admin\/games\/[0-9a-f-]{36}$/), grid.first().click()]);
+    },
+  },
+  {
     name: 'admin-games-box-refused',
     at: '/admin/games',
     onlyIn: leagues[0],
     first: `/admin/games/${trackedGame(1)}`,
+    light: true,
     tap: async (page) => {
       const points = page.locator('main input[name^="stat.points."]');
       const typed = [3, 4, 5, 6, 7, 5, 10, 4, 4, 4, 4, 4];
@@ -172,6 +189,42 @@ const adminPages = [
       await page.locator('#box-score-scores [role="alert"]').waitFor();
     },
   },
+  {
+    name: 'admin-games-box-wrong-box',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    first: `/admin/games/${trackedGame(1)}`,
+    tap: async (page) => {
+      // A count the phone's own check would stop: the form is sent as a browser that does
+      // not check would send it, so the server's refusal is what is pictured.
+      const points = page.locator('main input[name^="stat.points."]');
+      await points.nth(3).fill('1000');
+      await page.locator('main form:has(#box-score-scores)').evaluate((form) => {
+        form.noValidate = true;
+      });
+      await page.locator('main form button[type="submit"]').last().click();
+      await page.locator('#box-score-scores [role="alert"]').waitFor();
+    },
+  },
+];
+
+// What the league's owner sees.
+const adminPages = [
+  { name: 'admin-home', at: '/admin' },
+  { name: 'admin-games', at: '/admin/games' },
+  // The states of the games list (steps 2.154 and 2.155), reached by tapping, as none of
+  // them rides in the address (record 067): one game's score boxes open, the question
+  // before a final score is saved (for a game whose time has not come), a tie refused
+  // beside the boxes, "Saved" beside a final game (this morning's game reopened and its
+  // score entered again as it was), and the reopen form a final game leads to. The live
+  // game, with plays, is on `admin-games` itself, with no score boxes. Then the box score
+  // grid, a tie refused there with twelve players' points kept, and a player's box refused
+  // (the sentence names the player and the column; the box has the focus). The refusals
+  // and "Saved" are taken again in the second league's light design (`…-light`).
+  ...gamesStates.flatMap((job) => [
+    job,
+    ...(job.light ? [{ ...job, name: `${job.name}-light`, lookOf: leagues[1] }] : []),
+  ]),
   { name: 'admin-teams', at: '/admin/teams' },
   { name: 'admin-team', at: '/admin/teams', first: '/admin/teams/' },
   { name: 'admin-schedule', at: '/admin/schedule' },
@@ -519,6 +572,10 @@ try {
         // The faces a page draws are fetched as it is laid out: wait for them, so no
         // picture shows the stand-in face a reader sees for the first moment.
         await page.evaluate(() => document.fonts.ready.then(() => undefined));
+        // Nothing of the tool on the screen: Next.js's dev indicator hidden, and the pointer
+        // away from every card (step 2.155's design review).
+        await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
+        await page.mouse.move(0, 0);
         const file = path.join(out, width.name, `${fileName(job.name)}.jpg`);
         await page.screenshot({ path: file, fullPage: true, type: 'jpeg', quality: 80 });
         taken.push(
