@@ -583,10 +583,11 @@ html {
 .league-site .home-live-title {
   font-family: var(--font-body);
 }
-/* On a phone the home page shows the next two matchups and leaves the rest to "See the
-   full schedule", so a reader reaches the standings after a few boards, not seven. */
+/* On a phone the home page shows the next two matchups and leaves the later ones to "See
+   the full schedule", so a reader reaches the standings after a few boards, not seven. A
+   game waiting for a new day is news, and is always shown. */
 @media (max-width: 47.99rem) {
-  .home-next .ui-card-grid > li:nth-child(n + 3) {
+  .home-next .ui-card-grid > li:nth-child(n + 3):has(> .ui-game-card[data-status='scheduled']) {
     display: none;
   }
 }
