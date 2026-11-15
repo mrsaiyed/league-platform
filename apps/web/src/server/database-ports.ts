@@ -7,7 +7,8 @@
 // is (identify, below) and what they hold in a league (accessOf); and, in part 2, the
 // public schedule (database-public-schedule.ts) and the standings with the seasons a
 // visitor may pick (database-public-stats.ts), whose statistics reads, the ones that
-// show people, still refuse until part 3. Every other area
+// show people, still refuse until part 3, and the members' start page the league home
+// reads first (database-public-teams.ts), whose rosters refuse likewise. Every other area
 // still runs on the stand-in only: here each one refuses with NotOnTheDatabaseYet
 // the first time it is used, so its page shows the error page rather than made-up
 // data that is not in the database. Each moves in a part of its own.
@@ -30,6 +31,7 @@ import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
 import { databasePublicSchedule, type PublicScheduleQueries } from './database-public-schedule.ts';
 import { databasePublicStats, type PublicStatsQueries } from './database-public-stats.ts';
+import { databasePublicTeams, type PublicTeamsQueries } from './database-public-teams.ts';
 import { notMovedYet, NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
 import type { WebPorts } from './ports.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
@@ -53,7 +55,8 @@ export type DatabaseQueries = Pick<
   | 'jobsStore'
 > &
   PublicScheduleQueries &
-  PublicStatsQueries;
+  PublicStatsQueries &
+  PublicTeamsQueries;
 
 export type DatabasePortsOptions = {
   readonly database: DatabaseQueries;
@@ -198,7 +201,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     fixtureImport: notMovedYet('fixture import'),
     publicSchedule: databasePublicSchedule(database, db, now),
     scheduleAdmin: notMovedYet('schedule grid'),
-    publicTeams: notMovedYet('public teams pages'),
+    publicTeams: databasePublicTeams(database, db),
     adminTeams: notMovedYet('Admin → Teams'),
     adminSettings: notMovedYet('league settings'),
     tracker: notMovedYet('tracker'),

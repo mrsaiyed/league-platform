@@ -363,7 +363,6 @@ describe('databasePorts (record 055)', () => {
       ports.games,
       ports.fixtureImport,
       ports.scheduleAdmin,
-      ports.publicTeams,
       ports.adminTeams,
       ports.adminSettings,
       ports.tracker,
@@ -376,10 +375,13 @@ describe('databasePorts (record 055)', () => {
       NotOnTheDatabaseYet,
     );
     expect(ports.liveFeed).toBeNull();
-    // The statistics (part 3) refuse within the standings' ports, which have moved.
+    // The statistics and the rosters (part 3) refuse within the ports that have moved.
     await expect(ports.publicStats.settingsOf(lakeside().leagueId)).rejects.toThrow(
       NotOnTheDatabaseYet,
     );
+    await expect(
+      ports.publicTeams.teamIdsOfAccount(lakeside().leagueId, randomUUID(), randomUUID()),
+    ).rejects.toThrow(NotOnTheDatabaseYet);
   });
 
   it('reads the public schedule and standings from the database (part 2)', async () => {
@@ -389,5 +391,6 @@ describe('databasePorts (record 055)', () => {
     expect((await ports.publicSchedule.clockOf(lakeside().leagueId)).timeZone).toBe(
       'America/Chicago',
     );
+    expect(await ports.publicTeams.startPageOf(lakeside().leagueId)).toBe('leagueHome');
   });
 });
