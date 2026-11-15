@@ -105,6 +105,7 @@ import {
   renewScoringSession,
   takeOverScoring,
   applyTrackerCommands,
+  readTrackerRosters,
   readTrackerState,
   endTrackedGame,
   engineRulesOf,
@@ -989,6 +990,37 @@ const gameCommandRows: readonly Row[] = [
     }),
     (c, i) => applyTrackerCommands(c, i, trackerDeps),
   ),
+  // The players at the scorer's table (record 058) travel in the same batch: whoever may
+  // score the game. With no session held, each is answered refused and nothing changes.
+  ...gameRows(
+    'games.apply_tracker_commands',
+    'add and renumber players at the scorer’s table',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      protocolVersion: 2,
+      sessionId: randomUUID(),
+      commands: [
+        {
+          commandId: randomUUID(),
+          at: matrixNow,
+          input: {
+            type: 'add-player',
+            side: 'away',
+            playerId: randomUUID(),
+            jersey: '12',
+            name: '',
+          },
+        },
+        {
+          commandId: randomUUID(),
+          at: matrixNow,
+          input: { type: 'change-player', side: 'away', playerId: randomUUID(), jersey: '5' },
+        },
+      ],
+    }),
+    (c, i) => applyTrackerCommands(c, i, trackerDeps),
+  ),
   // The engine's state for the scorekeeper's device (T-113, T-253): whoever may score
   // the game. A game with no taps yet is read as a new one; nothing changes.
   ...gameRows(
@@ -997,6 +1029,15 @@ const gameCommandRows: readonly Row[] = [
     'games.score',
     async (league, program) => ({ gameId: (await gameIn(league, program)).gameId }),
     (c, i) => readTrackerState(c, i, trackerDeps),
+  ),
+  // The rosters stored on the scorekeeper's device (T-115, T-258): whoever may score
+  // the game. Nothing changes.
+  ...gameRows(
+    'games.read_tracker_rosters',
+    'read the rosters for the tracker',
+    'games.score',
+    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId }),
+    (c, i) => readTrackerRosters(c, i, gamesDeps),
   ),
   // Ending a tracked game (T6 §7): whoever may score it. The game is live with one
   // basket recorded by its tracker, so it can be ended.

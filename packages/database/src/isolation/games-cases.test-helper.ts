@@ -10,6 +10,7 @@ import {
   listPostponedGames as listPostponedGamesCommand,
   openScoringSession,
   postponeGame,
+  readTrackerRosters,
   readTrackerState,
   recordFinalScore,
   recordForfeit,
@@ -48,6 +49,11 @@ import {
   listPostponedGames,
   replaceGameLines,
   updateGameResult,
+  findTablePlayer,
+  insertTablePlayer,
+  removeTablePlayer,
+  renameTablePlayer,
+  setTablePlayerNumber,
 } from '../queries/index.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
@@ -512,6 +518,116 @@ registerIsolationCase({
   run: scoreTargetUpcomingGame,
 });
 
+// The players at the scorer's table (record 058, T-261), in the same batch: after taking
+// the target's upcoming game over, a player is added to its away team (the target's
+// team) and the target's player is given a new number. In the target's own league both
+// are taken; anywhere else the takeover is refused and nothing of the target changes.
+registerIsolationCase({
+  subject: applyTrackerCommands,
+  name: "add a player to the target's team and renumber the target's player at its table",
+  run: async (scope, target) => {
+    const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      deviceId: 'harness-device',
+      confirmed: true,
+      expectedHolderSince: target.scoringSessionSince,
+    }).catch((thrown: unknown) => {
+      if (thrown instanceof CommandRefused) return undefined;
+      throw thrown;
+    });
+    const reply = taken?.value as { status?: string; sessionId?: string } | undefined;
+    return runAsApp(applyTrackerCommands, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      protocolVersion: 2,
+      sessionId:
+        reply?.status === 'held-by-you' && reply.sessionId !== undefined
+          ? reply.sessionId
+          : target.scoringSessionId,
+      commands: [
+        {
+          commandId: harnessCommandIds[0],
+          at: harnessNow - 2000,
+          input: {
+            type: 'add-player',
+            side: 'away',
+            playerId: randomUUID(),
+            jersey: '55',
+            name: '',
+          },
+        },
+        {
+          commandId: harnessCommandIds[1],
+          at: harnessNow - 1000,
+          input: { type: 'change-player', side: 'away', playerId: target.personId, jersey: '56' },
+        },
+      ],
+    });
+  },
+});
+
+// The table players' queries (record 058). A write that makes a new row uses a game
+// and its home team of the scope's own league, so a refusal never names the target's
+// ids; with none in sight it uses ids that are nowhere.
+async function ownGameAndTeam(scope: LeagueScope) {
+  const row = await transactionOf(scope)
+    .selectFrom('games')
+    .select(['id', 'home_team_id'])
+    .where('league_id', '=', scope.leagueId)
+    .limit(1)
+    .executeTakeFirst();
+  return { gameId: row?.id ?? randomUUID(), teamId: row?.home_team_id ?? randomUUID() };
+}
+
+registerIsolationCase({
+  subject: findTablePlayer,
+  name: "find the target's player on the target's team for the scorer's table",
+  run: (scope, target) => findTablePlayer(scope, target.teamId, target.personId),
+});
+
+registerIsolationCase({
+  subject: insertTablePlayer,
+  name: "add a number-only player at a game's table in the scope's league",
+  run: async (scope) => {
+    const own = await ownGameAndTeam(scope);
+    return insertTablePlayer(scope, {
+      personId: randomUUID(),
+      teamId: own.teamId,
+      gameId: own.gameId,
+      jerseyNumber: '88',
+      firstName: '',
+      lastName: '',
+      needsReview: true,
+    });
+  },
+});
+
+registerIsolationCase({
+  subject: setTablePlayerNumber,
+  name: "renumber the target's walk-up player",
+  run: (scope, target) => setTablePlayerNumber(scope, target.walkUpRosterEntryId, '77'),
+});
+
+registerIsolationCase({
+  subject: renameTablePlayer,
+  name: "rename the target's player",
+  run: (scope, target) => renameTablePlayer(scope, target.personId, 'Renamed', 'Elsewhere'),
+});
+
+registerIsolationCase({
+  subject: removeTablePlayer,
+  name: "take the target's walk-up player off its team",
+  run: async (scope, target) => {
+    // The walk-up's person, as the scope's fence lets it be read: in another league, none.
+    const entry = await transactionOf(scope)
+      .selectFrom('roster_entries')
+      .select('person_id')
+      .where('league_id', '=', scope.leagueId)
+      .where('id', '=', target.walkUpRosterEntryId)
+      .executeTakeFirst();
+    return removeTablePlayer(scope, target.walkUpRosterEntryId, entry?.person_id ?? randomUUID());
+  },
+});
+
 // The engine's state for the scorekeeper's device (record 049, T-253): the target's
 // final game has a saved state; the target's upcoming game is read once it is scored
 // (in the run's own rolled-back transaction), so both a saved state and its sequence
@@ -519,6 +635,14 @@ registerIsolationCase({
 registerCommandCase(readTrackerState, harnessTx, {
   name: "load the tracker's state of the target's final game",
   input: (target) => ({ gameId: target.gameId }),
+});
+
+// The rosters for the scorekeeper's device (record 054, T-258): the target's upcoming
+// game has a player on a roster, with a name and a number to leak. Anywhere else the
+// read is refused or finds no game.
+registerCommandCase(readTrackerRosters, harnessTx, {
+  name: "read the rosters of the target's upcoming game for the tracker",
+  input: (target) => ({ gameId: target.upcomingGameId }),
 });
 
 registerIsolationCase({

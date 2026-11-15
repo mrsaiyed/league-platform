@@ -17,6 +17,7 @@ import {
   scopeColumns,
 } from '../queries/access-rows.ts';
 import { constraintOf } from '../queries/constraint-of.ts';
+import { inSavepoint } from '../queries/in-savepoint.ts';
 import { currentLeague } from '../queries/find-current-league.ts';
 import { leagueStatusOf } from '../queries/league-status-of.ts';
 import { divisionSummary } from '../queries/division-summary.ts';
@@ -73,6 +74,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     'binds the scoring session queries (own cases) to a scope',
   ],
   [databasePackage.liveGamesStore, 'binds the live game queries (own cases) to a scope'],
+  [
+    inSavepoint,
+    "wraps a write (own cases) in a savepoint of the scope's own transaction; reads and writes no rows itself",
+  ],
   [scoringSessionSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [databasePackage.standingsStore, 'binds the standings queries (own cases) to a scope'],
   [
