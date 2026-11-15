@@ -54,6 +54,18 @@ export type GameFormat = {
   readonly clockMode: basketball.ClockMode;
 };
 
+/**
+ * The starters being picked for each team before its lineup is set (checklist C3, finding
+ * L2): player ids, in the order tapped. Kept on the device so a reload mid-pick keeps the
+ * taps; the lineup itself is a play, saved like any other once it is set.
+ */
+export type LineupPicks = {
+  readonly home: readonly string[];
+  readonly away: readonly string[];
+};
+
+export const noLineupPicks: LineupPicks = { home: [], away: [] };
+
 /** Whose a kept game is: the game, its league and the signed-in account that opened it. */
 export type OpenedGameOwner = {
   readonly gameId: string;
@@ -77,6 +89,8 @@ export type OpenedGame = OpenedGameOwner & {
   readonly state: ServerState | null;
   /** The format the scorekeeper confirmed on this device; null until they have. */
   readonly confirmedFormat: GameFormat | null;
+  /** The starters being picked; absent while nobody is picked (and on rows from before). */
+  readonly lineupPicks?: LineupPicks;
 };
 
 export interface OpenedGameStorage {
@@ -99,6 +113,11 @@ export interface OpenedGameStorage {
   saveState(gameId: string, state: ServerState): Promise<void>;
   /** Stores the format confirmed; ignored for a game whose rosters are not stored. */
   confirmFormat(gameId: string, format: GameFormat): Promise<void>;
+  /**
+   * Stores the starters being picked, or forgets them when nobody is picked; ignored for
+   * a game whose rosters are not stored.
+   */
+  saveLineupPicks(gameId: string, picks: LineupPicks): Promise<void>;
   /** This device's own id, made with `make` the first time and kept from then on. */
   deviceId(make: () => string): Promise<string>;
 }
@@ -113,6 +132,14 @@ export function stillKept(game: OpenedGame, owner: OpenedGameOwner, olderThan: n
   if (game.accountId !== owner.accountId || game.leagueId !== owner.leagueId) return false;
   if (game.gameId === owner.gameId) return true;
   return game.state?.state.status !== 'final' && game.rostersSavedAt >= olderThan;
+}
+
+/** `game` with the starters being picked, or without any when nobody is picked. */
+export function withLineupPicks(game: OpenedGame, picks: LineupPicks): OpenedGame {
+  const { lineupPicks: _before, ...rest } = game;
+  return picks.home.length === 0 && picks.away.length === 0
+    ? rest
+    : { ...rest, lineupPicks: { home: [...picks.home], away: [...picks.away] } };
 }
 
 /** The format of a game's rules, as it is shown and confirmed. */
