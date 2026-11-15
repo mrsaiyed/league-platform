@@ -53,8 +53,9 @@ describe('the home page’s leaders section', () => {
 
   it('under the standings: a small heading, and the names one level further down', () => {
     const html = render(three.slice(0, 1), 'beside');
+    // A kicker and a title (a phone draws both; a laptop draws the title as a small label).
     expect(html).toContain(
-      '<div class="home-leaders-head"><h3 class="ui-kicker">Leading the way</h3><a class="ui-more" href="/x/stats?season=fall">All player stats</a></div>',
+      '<div class="home-leaders-head"><div class="home-leaders-title"><p class="ui-kicker">The players to watch</p><h3>Leading the way</h3></div><a class="ui-more" href="/x/stats?season=fall">All player stats</a></div>',
     );
     expect(html).toContain('<h4 class="ui-spot-name" dir="auto">Sam R.</h4>');
     expect(html).not.toContain('<h2');

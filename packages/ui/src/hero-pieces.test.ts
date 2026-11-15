@@ -743,11 +743,13 @@ describe('a game as a scoreboard', () => {
 
   it('makes the winner’s score the heavier one in every design, on a card and on the big board', () => {
     const flat = css.replace(/\s+/g, ' ');
+    // The weight a rule sets: the rule whose selector is exactly this one.
     const weightOf = (selector: string) => {
-      const at = flat.indexOf(`${selector} {`);
-      expect(at, selector).toBeGreaterThan(-1);
-      const body = flat.slice(at, flat.indexOf('}', at));
-      return /font-weight: ([^;]+);/.exec(body)?.[1];
+      const rule = [...flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(
+        (m) => (m[1] ?? '').trim() === selector && /font-weight:/.test(m[2] ?? ''),
+      );
+      expect(rule, selector).toBeDefined();
+      return /font-weight: ([^;]+);/.exec(rule?.[2] ?? '')?.[1];
     };
     // The big board: plain numbers of the score face, not the heading face's display
     // weight (700 in the plain faces, which would have left a winner at 600 the lighter).
@@ -923,29 +925,33 @@ describe('a leader, picked out', () => {
   it('carries the league’s main color on the first of a row, in a band’s own fitted colors', () => {
     expect(spot({ first: true })).toContain('<article class="ui-spot" data-first="true">');
     expect(spot()).not.toContain('data-first');
-    expect(css).toMatch(
-      /\.ui-spot\[data-first='true'\] \{\s*background-color: var\(--color-band\);\s*background-image: linear-gradient\(120deg, var\(--color-band-glow\), var\(--color-band\)\);[^}]*color: var\(--color-on-band\);/,
+    // Unless a design says otherwise (the --spot values, which a light design sets to
+    // soften the card) it is a small band: the band's ground, words, quiet words and the
+    // color the eye lands on there.
+    const flat = css.replace(/\s+/g, ' ');
+    expect(flat).toContain(
+      ".ui-spot[data-first='true'] { background-color: var(--spot-ground, var(--color-band)); background-image: linear-gradient( 120deg, var(--spot-glow, var(--color-band-glow)), var(--spot-ground, var(--color-band)) ); border-color: var(--spot-edge, color-mix(in srgb, var(--color-band-pop) 28%, transparent)); color: var(--spot-words, var(--color-on-band)); }",
+    );
+    expect(flat).toContain(
+      ".ui-spot[data-first='true'] :is(.ui-spot-label, .ui-spot-unit, .ui-spot-detail) { color: var(--spot-muted, var(--color-band-muted)); }",
+    );
+    expect(flat).toContain(
+      ".ui-spot[data-first='true'] .ui-spot-value { color: var(--spot-pop, var(--color-band-pop)); }",
     );
     expect(css).toMatch(
-      /\.ui-spot\[data-first='true'\] :is\(\.ui-spot-label, \.ui-spot-unit, \.ui-spot-detail\) \{\s*color: var\(--color-band-muted\);/,
-    );
-    expect(css).toMatch(
-      /\.ui-spot\[data-first='true'\] \.ui-emblem-letter \{\s*color: var\(--color-on-band\);/,
+      /\.ui-spot\[data-first='true'\] \.ui-emblem-letter \{\s*color: var\(--spot-letter, var\(--color-on-band\)\);/,
     );
     // On the filled card a shield keeps its team's own color: it is filled with it (most
     // of it, a little deepened), not laid thinly over the card's color, which turned a
     // green team grey on a maroon card.
     const fill =
-      /\.ui-spot\[data-first='true'\] \.ui-emblem-shield \{\s*fill: color-mix\(in srgb, var\(--emblem-color\) (\d+)%, var\(--color-band-deep\)\);/.exec(
-        css,
+      /\.ui-spot\[data-first='true'\] \.ui-emblem-shield \{ fill: color-mix\( in srgb, var\(--emblem-color\) var\(--spot-shield-share, (\d+)%\), var\(--spot-shield-under, var\(--color-band-deep\)\) \);/.exec(
+        flat,
       );
     expect(Number(fill?.[1])).toBeGreaterThanOrEqual(75);
-    expect(css).not.toMatch(
-      /\.ui-spot\[data-first='true'\][^{]*\.ui-emblem-shield \{[^}]*transparent/,
-    );
     // Mirrored for a right-to-left page.
     expect(css).toMatch(
-      /\[dir='rtl'\] \.ui-spot\[data-first='true'\] \{\s*background-image: linear-gradient\(240deg,/,
+      /\[dir='rtl'\] \.ui-spot\[data-first='true'\] \{\s*background-image: linear-gradient\(\s*240deg,/,
     );
   });
 
@@ -963,6 +969,37 @@ describe('a leader, picked out', () => {
     );
     expect(css).toMatch(
       /\.ui-spot-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\);/,
+    );
+  });
+});
+
+describe('the second landing’s smaller rules', () => {
+  it('uses the big board’s width on a laptop: a team at each end, the two scores between', () => {
+    const laptop = css.slice(css.indexOf('@media (min-width: 64rem) {\n  .ui-scoreboard-teams'));
+    expect(laptop.startsWith('@media')).toBe(true);
+    expect(laptop).toMatch(
+      /\.ui-scoreboard-teams \{\s*grid-template-columns: minmax\(0, 1fr\) auto auto auto minmax\(0, 1fr\);/,
+    );
+    // A team's box is dissolved, never removed: its parts are placed on the board's grid.
+    expect(laptop).toMatch(/\.ui-scoreboard-side \{\s*display: contents;/);
+    expect(laptop).toMatch(
+      /\.ui-scoreboard-side:first-child > \.ui-scoreboard-score \{\s*grid-column: 2;\s*\}\s*\.ui-scoreboard-side:last-child > \.ui-scoreboard-score \{\s*grid-column: 4;\s*\}\s*\.ui-scoreboard-middle \{\s*grid-column: 3;/,
+    );
+  });
+
+  it('keeps a left-over board of a narrow list the size of the others', () => {
+    expect(css).toMatch(
+      /\.ui-card-grid\[data-layout='board'\]\[data-across='pair'\] > li:only-child \{\s*grid-column: 1 \/ -1;/,
+    );
+    expect(css).not.toMatch(/\[data-across='pair'\] > li:last-child:nth-child\(odd\)/);
+  });
+
+  it('gives a table’s shield a little more than a line, and a round’s count its own line on a phone', () => {
+    expect(css).toMatch(
+      /\.ui-emblem\[data-size='small'\] \{\s*block-size: calc\(var\(--step-5\) \+ var\(--step-1\)\);/,
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 29\.99rem\) \{\s*\.ui-group-summary \{\s*flex: 1 1 100%;\s*margin-inline-start: var\(--step-5\);/,
     );
   });
 });

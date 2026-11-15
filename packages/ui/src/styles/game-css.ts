@@ -528,13 +528,15 @@ export const gameCss = String.raw`
   }
 }
 /* A list in a column narrower than the page (a team's games beside its roster): two
-   across from a tablet up, and a board left over takes the row. */
+   across from a tablet up. */
 @media (min-width: 48rem) {
   .ui-card-grid[data-layout='board'][data-across='pair'] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--step-5);
   }
-  .ui-card-grid[data-layout='board'][data-across='pair'] > li:last-child:nth-child(odd) {
+  /* A board left over keeps the size of the others, so the oldest game of a list is never
+     its biggest; only a board that is the whole list has the row. */
+  .ui-card-grid[data-layout='board'][data-across='pair'] > li:only-child {
     grid-column: 1 / -1;
   }
 }
@@ -638,6 +640,52 @@ export const gameCss = String.raw`
     max-inline-size: 12rem;
     margin-block-end: 0;
     text-wrap: balance;
+  }
+}
+/* On a laptop the board is a game's card made large and uses its width: each team's
+   shield and name at an end, and between them the two scores with the state of the game
+   in the middle, as "49 : 56" stands between the teams on a card. A team's own box is
+   dissolved for this (its parts are placed on the board's own grid); nothing in the page
+   changes, and a screen reader still hears each team with its score. */
+@media (min-width: 64rem) {
+  .ui-scoreboard-teams {
+    grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    justify-items: center;
+    column-gap: var(--step-6);
+    max-inline-size: 60rem;
+  }
+  .ui-scoreboard-side {
+    display: contents;
+  }
+  .ui-scoreboard-side > .ui-scoreboard-role {
+    grid-row: 1;
+    align-self: end;
+  }
+  .ui-scoreboard-side > .ui-scoreboard-name {
+    grid-row: 2;
+    align-self: start;
+  }
+  .ui-scoreboard-side:first-child > :is(.ui-scoreboard-role, .ui-scoreboard-name) {
+    grid-column: 1;
+  }
+  .ui-scoreboard-side:last-child > :is(.ui-scoreboard-role, .ui-scoreboard-name) {
+    grid-column: 5;
+  }
+  .ui-scoreboard-side > .ui-scoreboard-score {
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+  .ui-scoreboard-side:first-child > .ui-scoreboard-score {
+    grid-column: 2;
+  }
+  .ui-scoreboard-side:last-child > .ui-scoreboard-score {
+    grid-column: 4;
+  }
+  .ui-scoreboard-middle {
+    grid-column: 3;
+    grid-row: 1 / span 2;
   }
 }
 .ui-scoreboard-role {

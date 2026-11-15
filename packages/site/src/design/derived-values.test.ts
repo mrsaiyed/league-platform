@@ -591,6 +591,40 @@ describe('the frame of a dark design and of a light one', () => {
     }
   });
 
+  it('softens the first leader card in a light design, and leaves it a small band in a dark one', () => {
+    const spot = (vars: Record<string, string>) =>
+      Object.keys(vars).filter((name) => name.startsWith('--spot-'));
+    // A dark design says nothing: the shared pieces' own default is the band's colors.
+    for (const vars of [crest, dark]) expect(spot(vars)).toEqual([]);
+    for (const vars of [crestLight, light]) {
+      // The panel, with no more of the main color than every text is fitted to, an edge
+      // of the main color no stronger than a picked-out card's, and the page's own words
+      // and color for the eye: nothing here is a band's.
+      expect(vars['--spot-ground']).toBe('var(--color-panel)');
+      const share =
+        /color-mix\(in srgb, var\(--color-primary\) (\d+)%, var\(--color-panel\)\)/.exec(
+          vars['--spot-glow'] ?? '',
+        )?.[1];
+      expect(Number(share) / 100).toBeLessThanOrEqual(hoverTintShare);
+      const edge = /color-mix\(in srgb, var\(--color-primary\) (\d+)%, transparent\)/.exec(
+        vars['--spot-edge'] ?? '',
+      )?.[1];
+      expect(Number(edge)).toBeLessThanOrEqual(50);
+      expect(vars).toMatchObject({
+        '--spot-words': 'var(--color-text)',
+        '--spot-muted': 'var(--color-muted)',
+        '--spot-pop': 'var(--color-pop)',
+        '--spot-letter': 'var(--color-text)',
+        '--spot-shield-under': 'transparent',
+      });
+      // A shield on it is drawn as on any panel of the design.
+      expect(vars['--spot-shield-share']).toBe(vars['--emblem-strength']);
+      // No value names a variable that only a piece of the page has (a value is worked
+      // out where it is written, at the top of the page).
+      for (const name of spot(vars)) expect(vars[name], name).not.toMatch(/--emblem-|--team-/);
+    }
+  });
+
   it('sets a score only in a face with lining, even-width figures', () => {
     expect(scoreFont({ heading: 'gelasio', body: 'source-sans' })).toBe('gelasio');
     // Cinzel and Playfair Display have no even-width figures: the body face is used.

@@ -610,27 +610,88 @@ html {
 /* The season's leaders under a short column of standings: a small heading with the way to
    every player's numbers, then each leader as one short row. */
 .home-leaders-beside {
-  margin-block-start: var(--step-5);
+  margin-block-start: var(--space-section);
 }
 .home-leaders-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--step-1) var(--step-4);
   min-block-size: var(--tap);
+  margin-block-end: var(--step-4);
 }
-.league-site .home-leaders-head .ui-kicker {
+/* On a phone the leaders are a section of their own, under the standings: a kicker and a
+   title, as every section of the page has. */
+.home-leaders-title {
+  display: grid;
+  gap: var(--step-2);
+  min-inline-size: 0;
+}
+.league-site .home-leaders-title > * {
   margin: 0;
-  font-family: var(--font-body);
+}
+.league-site .home-leaders-title h3 {
+  font-size: var(--text-22);
+}
+/* On a laptop they stand under the standings as a part of that column: the title is drawn
+   as a small label with its short rule, the kicker's own words are put away, and the
+   cards take the rest of the column's height, so the two columns end level. */
+@media (min-width: 64rem) {
+  .home-leaders-beside {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    margin-block-start: var(--step-5);
+  }
+  .home-leaders-head {
+    align-items: center;
+    margin-block-end: 0;
+  }
+  .home-leaders-title .ui-kicker {
+    display: none;
+  }
+  .league-site .home-leaders-title h3 {
+    display: flex;
+    align-items: center;
+    gap: var(--step-3);
+    color: var(--color-accent-text);
+    font-family: var(--font-body);
+    font-size: var(--text-12);
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    line-height: 1.5;
+    text-transform: uppercase;
+  }
+  .home-leaders-title h3::before {
+    content: '';
+    flex: none;
+    inline-size: var(--step-5);
+    block-size: 1px;
+    background: var(--color-ornament);
+  }
+  .home-leaders-beside > .ui-spot-row {
+    flex: 1 1 auto;
+    grid-auto-rows: 1fr;
+  }
+  .home-leaders-beside .ui-spot {
+    align-content: center;
+  }
 }
 .home-tables > * {
   min-inline-size: 0;
 }
 @media (min-width: 64rem) {
+  /* The two columns are one height, and each is a column of its own parts, so what
+     stands last in the shorter one (the leaders under the standings) can take up the
+     difference. */
   .home-pair[data-tables='few'] {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
+    align-items: stretch;
+  }
+  .home-pair[data-tables='few'] > .ui-section {
+    display: flex;
+    flex-direction: column;
   }
   .home-pair[data-tables='many'] .home-tables {
     grid-template-columns: repeat(2, minmax(0, 1fr));
