@@ -184,12 +184,11 @@ describe('the home page’s leaders', () => {
       },
     };
     await expect(loadHomeLeaders(broken, settings, input)).resolves.toEqual([]);
-    // The same when it is the league's settings that cannot be read.
+    // The same when it is the league's settings, read with them, that cannot be read.
     await expect(
       homeLeadersOf(
         {
-          readStoreOf: () => store,
-          settingsOf: async () => {
+          statisticsOf: async () => {
             throw new Error('database unreachable');
           },
         },

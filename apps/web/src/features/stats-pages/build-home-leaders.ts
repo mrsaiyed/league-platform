@@ -73,18 +73,17 @@ export async function loadHomeLeaders(
 }
 
 /**
- * The same for a page that holds the league's statistics ports: the league's settings are
- * read here too, so that neither read can take the page down.
+ * The same for a page that holds the league's statistics ports: the statistics and the
+ * league's name settings are read together, as one snapshot (statisticsOf, T-81), and
+ * neither read can take the page down.
  */
 export async function homeLeadersOf(
-  ports: Pick<PublicStatsPorts, 'readStoreOf' | 'settingsOf'>,
+  ports: Pick<PublicStatsPorts, 'statisticsOf'>,
   input: { readonly leagueId: string; readonly seasonId: string },
 ): Promise<readonly HomeLeader[]> {
   try {
-    return await loadHomeLeaders(
-      ports.readStoreOf(input.leagueId),
-      await ports.settingsOf(input.leagueId),
-      input,
+    return await ports.statisticsOf(input.leagueId, ({ store, settings }) =>
+      loadHomeLeaders(store, settings, input),
     );
   } catch {
     return [];

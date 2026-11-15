@@ -51,11 +51,10 @@ function made() {
   const world = testWorld(() => access);
   const settings = standInAdminSettings(world);
   const stats = standInPublicStats(world, namePolicyOf(settings.deps));
-  const teams = standInPublicTeams(world);
+  const teams = standInPublicTeams(world, namePolicyOf(settings.deps));
   const rockets = youthTeams.find((t) => t.slug === 'rockets')?.id ?? '';
   const rosterNames = async () => {
-    const policy = (await stats.settingsOf(youth)).namePolicy;
-    const roster = await teams.rosterOf(youth, rockets, { viewer: publicViewer(youth), policy });
+    const roster = await teams.rosterOf(youth, rockets, publicViewer(youth));
     return roster.lines;
   };
   const set = (
@@ -111,8 +110,7 @@ describe("the league's privacy settings on its public pages (T-81)", () => {
     const { stats, set, teams } = made();
     const falcons = adultTeams.find((t) => t.slug === 'falcons')?.id ?? '';
     const adultRoster = async () => {
-      const policy = (await stats.settingsOf(adult)).namePolicy;
-      const roster = await teams.rosterOf(adult, falcons, { viewer: publicViewer(adult), policy });
+      const roster = await teams.rosterOf(adult, falcons, publicViewer(adult));
       return texts(roster.lines);
     };
     const names = (value: string, version: number | null) =>

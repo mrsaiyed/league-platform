@@ -18,18 +18,25 @@ export function standInPublicStats(
   /** How each league shows names: its own privacy settings (T-81). */
   namePolicyOf: NamePolicyOf,
 ): PublicStatsPorts {
+  const settingsOf = async (leagueId: string): Promise<PublicStatsSettings> => {
+    const s = await world.read(leagueId);
+    return {
+      // A league whose audience is not known counts as youth: the careful reading (R-15).
+      audience: s?.audience ?? 'youth',
+      namePolicy: await namePolicyOf(leagueId),
+      minimumGames: s?.minimumGames ?? 0,
+    };
+  };
   return {
     seasonsOf: async (leagueId) => worldPublicSeasons(await world.read(leagueId)),
-    settingsOf: async (leagueId): Promise<PublicStatsSettings> => {
-      const s = await world.read(leagueId);
-      return {
-        // A league whose audience is not known counts as youth: the careful reading (R-15).
-        audience: s?.audience ?? 'youth',
-        namePolicy: await namePolicyOf(leagueId),
-        minimumGames: s?.minimumGames ?? 0,
-      };
-    },
+    settingsOf,
     readStoreOf: (leagueId) => worldStandingsRead(() => world.read(leagueId)),
+    // The world runs one transaction at a time: its reads and its settings agree already.
+    statisticsOf: async (leagueId, work) =>
+      work({
+        store: worldStandingsRead(() => world.read(leagueId)),
+        settings: await settingsOf(leagueId),
+      }),
     standingsOf: (leagueId, seasonId) =>
       readStandings(
         worldStandingsRead(() => world.read(leagueId)),

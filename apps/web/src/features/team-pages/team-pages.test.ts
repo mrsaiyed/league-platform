@@ -37,7 +37,7 @@ const now = () => new Date('2026-11-13T15:00:00Z');
 const world = testWorld(undefined, now);
 const stats = standInPublicStats(world, startingNamePolicy);
 const schedules = standInPublicSchedule(world);
-const teams = standInPublicTeams(world);
+const teams = standInPublicTeams(world, startingNamePolicy);
 const addressee = { id: adult, slug: 'north-valley', customDomain: null } as never;
 
 async function season(leagueId: string, index = 0) {
@@ -161,10 +161,7 @@ describe('a team page', () => {
     // Beat the Herons and the Badgers, lost to the Owls: its three results.
     expect(head?.recordText).toBe('2-1');
     const roster = buildRoster(
-      await teams.rosterOf(adult, head?.teamId ?? '', {
-        viewer: publicViewer(adult),
-        policy: (await stats.settingsOf(adult)).namePolicy,
-      }),
+      await teams.rosterOf(adult, head?.teamId ?? '', publicViewer(adult)),
     );
     expect(roster.current.map((r) => r.name)).toContain('Dana Whitfield');
     // A person who asked to be taken off the public pages is a nameless entry (R-17).
@@ -177,9 +174,13 @@ describe('a team page', () => {
   it('shows a youth team by number only where the league hides names (R-24)', async () => {
     const s = await season(youth);
     const head = await loadTeamHead(stats.readStoreOf(youth), youth, s.id, 'rockets');
+    // The youth league's own setting says hidden: the roster reads it itself.
     const policy = { ...(await stats.settingsOf(youth)).namePolicy, names: 'hidden' as const };
+    const hiding = standInPublicTeams(world, async (leagueId) =>
+      leagueId === youth ? policy : startingNamePolicy(leagueId),
+    );
     const roster = buildRoster(
-      await teams.rosterOf(youth, head?.teamId ?? '', { viewer: publicViewer(youth), policy }),
+      await hiding.rosterOf(youth, head?.teamId ?? '', publicViewer(youth)),
     );
     // The players by number; since step 2.162 hidden is followed for adults too (R-29), so
     // their coach, a grown-up with no number, is a nameless entry.

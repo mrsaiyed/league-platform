@@ -27,12 +27,31 @@ export type PublicStatsSettings = {
   readonly minimumGames: number;
 };
 
+/** A page's statistics reads and the league's name settings, taken together. */
+export type StatisticsRead = {
+  readonly store: StandingsReadStore;
+  readonly settings: PublicStatsSettings;
+};
+
 export type PublicStatsPorts = {
   /** The league's seasons that the public may see, newest first. */
   readonly seasonsOf: (leagueId: string) => Promise<readonly PublicSeason[]>;
   readonly settingsOf: (leagueId: string) => Promise<PublicStatsSettings>;
-  /** The standings and statistics reads, bound to this league. */
+  /**
+   * The standings and statistics reads, bound to this league. On the database a person's
+   * name is not read here (T-81, record 070): every page that shows one reads it through
+   * statisticsOf, with the league's own settings.
+   */
   readonly readStoreOf: (leagueId: string) => StandingsReadStore;
+  /**
+   * `work` over one snapshot of the league (T-81, record 070): the statistics reads and the
+   * league's own name settings and audience, read in the same transaction on the database,
+   * so a name is always shown by the setting that was saved when it was read.
+   */
+  readonly statisticsOf: <T>(
+    leagueId: string,
+    work: (read: StatisticsRead) => Promise<T>,
+  ) => Promise<T>;
   /** A season's standings (core's readStandings), its reads taken as one snapshot. */
   readonly standingsOf: (
     leagueId: string,
