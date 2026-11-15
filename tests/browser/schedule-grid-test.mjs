@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sayOnFailure } from './web-browser-kit.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const app = path.join(root, 'apps/web');
@@ -34,6 +35,7 @@ function start(args, env) {
   });
   child.stdout.on('data', (c) => (output += c));
   child.stderr.on('data', (c) => (output += c));
+  sayOnFailure(`next ${args[0]}`, child, () => output);
   return { child, output: () => output };
 }
 function freePort() {
