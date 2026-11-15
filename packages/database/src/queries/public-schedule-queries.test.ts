@@ -270,7 +270,9 @@ describe('teams and rosters', () => {
     const names = roster.lines.map((line) => [line.jerseyNumber, line.name, line.former]);
     expect(names).toEqual([
       ['4', { shown: true, text: 'Zuri M.' }, false],
-      ['5', { shown: true, text: 'Layla Hassan' }, false],
+      // An adult whose request for initials was recorded: it keeps taking effect though
+      // this league does not let adults ask now (R-27).
+      ['5', { shown: true, text: 'L. H.' }, false],
       ['6', { shown: false, why: 'removed' }, false],
       ['7', { shown: true, text: 'Nadia P.' }, true],
     ]);
@@ -286,6 +288,14 @@ describe('teams and rosters', () => {
           contactEmail: people.child.email,
         },
         shown(0),
+      ),
+      ...privateValuesOf(
+        {
+          firstName: people.initials.first,
+          lastName: people.initials.last,
+          nameRequest: 'initials',
+        },
+        { shown: true, text: 'L. H.' },
       ),
       ...privateValuesOf(
         { firstName: people.removed.first, lastName: people.removed.last, nameRequest: 'removed' },

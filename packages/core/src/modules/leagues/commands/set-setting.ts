@@ -1,12 +1,15 @@
 // Sets a declared setting's value at the league, a program or a season (T5 §6,
 // T-98). The key must be declared, the level one the declaration allows and the
-// value must pass its schema; the save names the version it started from (A-8).
+// value must pass its schema; the save names the version it started from (A-8). A value
+// the declaration asks to confirm (R-14: full names) is saved only when the admin has
+// confirmed it, and the activity entry says so. In an archived or suspended league only
+// a change that shows less of people works (R-26, `protectiveOrder`).
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import type { LeaguesTx, SettingPlace } from '../ports.ts';
 import { declaredSettings } from '../settings/declarations.ts';
-import type { SettingRegistry } from '../settings/define-setting.ts';
+import { needsConfirming, type SettingRegistry } from '../settings/define-setting.ts';
 import { settingDocument } from '../settings/lookup-setting.ts';
 import {
   findPlace,
@@ -22,7 +25,8 @@ export type SetSettingError = {
     | 'level-not-allowed'
     | 'invalid-value'
     | 'place-not-found'
-    | 'changed-since-read';
+    | 'changed-since-read'
+    | 'confirmation-needed';
 };
 
 export type SettingSaved = { readonly key: string; readonly version: number };
@@ -46,15 +50,20 @@ export function setSettingFor(registry: SettingRegistry) {
         value: z.unknown(),
         /** The version of the stored value when it was read, or null if there was none. */
         version: z.number().int().positive().nullable(),
+        /** The admin confirmed what the setting asks for this value (R-14). */
+        confirmed: z.boolean().optional(),
       }),
     ),
-    allowed: (context, input, tx: LeaguesTx) => mayChangeSetting(context, tx, registry, input),
+    allowed: (context, input, tx: LeaguesTx) =>
+      mayChangeSetting(context, tx, registry, input, { value: input.value }),
     run: async ({ context, input, tx }): Promise<Result<SettingSaved, SetSettingError>> => {
       const setting = registry.get(input.key);
       if (setting === undefined) return fail({ code: 'unknown-setting' });
       if (!setting.levels.includes(input.level)) return fail({ code: 'level-not-allowed' });
       const parsed = setting.type.safeParse(input.value);
       if (!parsed.success || parsed.data === undefined) return fail({ code: 'invalid-value' });
+      const confirming = needsConfirming(setting, parsed.data);
+      if (confirming && input.confirmed !== true) return fail({ code: 'confirmation-needed' });
       const place = await findPlace(tx, input);
       if (place === undefined) return fail({ code: 'place-not-found' });
       const version = await tx.leagues.writeSetting(
@@ -71,6 +80,7 @@ export function setSettingFor(registry: SettingRegistry) {
           key: setting.key,
           level: place.level,
           label: setting.label,
+          ...(confirming ? { confirmed: true } : {}),
           ...(await placeScopeDetails(tx, place)),
         },
       });

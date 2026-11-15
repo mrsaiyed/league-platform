@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { standInAdminSettings } from '../../server/stand-in-admin-settings.ts';
 import { answerQuery, doneKey, problemKey, refused } from './answer.ts';
 import { valueOf, versionOf } from './form-input.ts';
-import { SettingForms, type Say } from './setting-fields.tsx';
+import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
 
 const t = createTranslator('en');
 const words: Readonly<Record<string, string>> = {
@@ -27,6 +27,7 @@ const words: Readonly<Record<string, string>> = {
   'setting.test.theme.label': 'Look of the pages',
   'setting.test.theme.option.plain': 'Plain',
   'setting.test.theme.option.bold': 'Bold',
+  'adminSettings.area.test': 'Made-up settings',
 };
 const say: Say = (key, params) =>
   Object.hasOwn(words, key) ? (words[key] ?? '') : t(key as Parameters<typeof t>[0], params);
@@ -92,6 +93,59 @@ describe('the settings form', () => {
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
     expect(html).toContain('The league home');
     expect(html).toContain('Any game');
+    for (const setting of declaredSettings.all()) {
+      const area = `adminSettings.area.${areaOf(setting.key)}`;
+      expect(Object.hasOwn(en, area), area).toBe(true);
+      if (setting.confirm.length > 0) {
+        const confirm = setting.label.replace(/\.label$/, '.confirm');
+        expect(Object.hasOwn(en, confirm), confirm).toBe(true);
+      }
+    }
+  });
+
+  it('puts the names settings under Privacy, with a box to confirm full names (R-14)', async () => {
+    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
+    const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
+    const privacy = html.slice(html.indexOf('data-area="privacy"'));
+    expect(privacy).toMatch(/^data-area="privacy"><h2>Privacy<\/h2>/);
+    // Three choices, from the most shown to the least (R-24).
+    // Three choices, from the most shown to the least (R-24), each with a made-up example.
+    const quote = (text: string) => `&quot;${text}&quot;`;
+    const full = privacy.indexOf(`Full names, like ${quote('Jordan Ellis')}`);
+    const initial = privacy.indexOf(
+      `First name and last initial, like ${quote('Jordan E.')} (the default)`,
+    );
+    const hidden = privacy.indexOf('Hidden: no names. A player appears by jersey number');
+    expect(full).toBeGreaterThan(0);
+    expect(initial).toBeGreaterThan(full);
+    expect(hidden).toBeGreaterThan(initial);
+    expect(privacy).toContain(`as ${quote('A player (name not shown)')} in the statistics`);
+    expect(privacy).toContain('People who know the team can still tell who a number is.');
+    expect(privacy.match(/value="(fullName|firstNameLastInitial|hidden)"/g)).toEqual([
+      'value="fullName"',
+      'value="firstNameLastInitial"',
+      'value="hidden"',
+    ]);
+    // The box to tick says when to tick it, and what is confirmed (R-14).
+    expect(privacy).toContain('Tick this only if you are choosing Full names');
+    expect(privacy).toContain('name="confirmed" value="yes"');
+    expect(privacy).toContain(
+      'I confirm that the parents or guardians of the children in this league have agreed to their full names being shown publicly',
+    );
+    // The words say who each setting changes, and that a parent's request always wins.
+    expect(privacy).toContain('This decides how children are shown');
+    expect(privacy).toContain('coaches too, until you mark them as adults');
+    expect(privacy).toContain('Adults are shown by their full name unless they ask for less.');
+    expect(privacy).toContain('that always wins over this setting');
+    expect(privacy).toContain('arrives with the next part of this work.');
+    expect(privacy).toContain('Adults may ask to appear as initials on public pages.');
+    expect(privacy).toContain('Children always can, whatever this says');
+    // R-27: switching it off takes no one's initials away.
+    expect(privacy).toContain('Switching this off only stops new requests');
+    expect(privacy).toContain('stays that way until their own record is changed');
+    // Only the names setting asks to confirm.
+    expect(html.match(/name="confirmed"/g)).toHaveLength(1);
   });
 });
 

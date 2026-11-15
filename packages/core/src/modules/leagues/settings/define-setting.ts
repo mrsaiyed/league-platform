@@ -28,6 +28,19 @@ export type SettingDeclaration<Schema extends z.ZodType> = {
   readonly version?: number;
   /** Brings a value stored at an older version to the current one. */
   readonly upgrade?: (fromVersion: number, value: unknown) => unknown;
+  /**
+   * Values the admin must confirm before saving (R-14: full names, confirming the league
+   * has the permission it needs). The words of what they confirm are the message
+   * `setting.<key>.confirm`; the command refuses such a value unless it is confirmed.
+   */
+  readonly confirm?: readonly z.output<Schema>[];
+  /**
+   * For a setting that decides how much of people is public (R-26): its values from the
+   * one that shows the most to the one that shows the least, each once. Moving the
+   * league's value to a later one protects people, so it works even while the league is
+   * archived or suspended; every other change is refused there (U-9).
+   */
+  readonly protectiveOrder?: readonly z.output<Schema>[];
 };
 
 export type Setting<Value = unknown> = {
@@ -39,6 +52,10 @@ export type Setting<Value = unknown> = {
   readonly label: string;
   readonly version: number;
   readonly upgrade: ((fromVersion: number, value: unknown) => unknown) | undefined;
+  /** Values that need confirming before they are saved; empty for most settings. */
+  readonly confirm: readonly Value[];
+  /** From the most shown to the least (R-26); empty for most settings. */
+  readonly protectiveOrder: readonly Value[];
 };
 
 export class SettingDeclarationError extends Error {
@@ -131,6 +148,42 @@ function check(declaration: Record<string, unknown>): void {
   if (!declaration.type.safeParse(declaration.default).success) {
     throw refuse('its default does not pass its own schema');
   }
+  const { confirm } = declaration;
+  const schema = declaration.type;
+  if (
+    confirm !== undefined &&
+    (!Array.isArray(confirm) || confirm.some((value) => !schema.safeParse(value).success))
+  ) {
+    throw refuse('the values it asks to confirm must be a list of values that pass its schema');
+  }
+  const order = declaration.protectiveOrder;
+  if (
+    order !== undefined &&
+    (!Array.isArray(order) ||
+      order.length === 1 ||
+      order.some((value) => !schema.safeParse(value).success) ||
+      new Set(order.map((value) => JSON.stringify(value))).size !== order.length)
+  ) {
+    throw refuse('its protective order must list none, or two or more of its values, each once');
+  }
+}
+
+const sameValue = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/** Whether saving this value asks the admin to confirm first (R-14). */
+export function needsConfirming(setting: Setting, value: unknown): boolean {
+  return setting.confirm.some((candidate) => sameValue(candidate, value));
+}
+
+/**
+ * Whether moving from `from` to `to` shows less of people (R-26): both are in the
+ * setting's protective order and `to` comes later. A setting with no order, or a value
+ * not in it, never counts.
+ */
+export function showsLess(setting: Setting, from: unknown, to: unknown): boolean {
+  const before = setting.protectiveOrder.findIndex((value) => sameValue(value, from));
+  const after = setting.protectiveOrder.findIndex((value) => sameValue(value, to));
+  return before >= 0 && after > before;
 }
 
 export function defineSetting<Schema extends z.ZodType>(
@@ -146,6 +199,8 @@ export function defineSetting<Schema extends z.ZodType>(
     label: declaration.label,
     version: declaration.version ?? 1,
     upgrade: declaration.upgrade,
+    confirm: Object.freeze([...(declaration.confirm ?? [])]),
+    protectiveOrder: Object.freeze([...(declaration.protectiveOrder ?? [])]),
   });
 }
 

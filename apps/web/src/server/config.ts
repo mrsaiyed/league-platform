@@ -1,13 +1,19 @@
 // T-30: the only file in the web app that reads process.env: the settings, once,
 // and whether this is Next.js's build (isBuildPhase). Everything else calls these;
 // the structure check fails the build on a read of process.env anywhere else.
+import { trackerProjectFor } from '@srleagues/providers';
 import { loadConfig, type Config } from './config-schema.ts';
 
 let cached: Config | undefined;
 
-/** Reads and checks the environment on first use; later calls return the same object. */
+/**
+ * Reads and checks the environment on first use, against the tracker's Supabase
+ * project too, read from the repository's supabase/site.json found from this file's
+ * own location, never the working folder (trackerProjectFor, record 055); later
+ * calls return the same object.
+ */
 export function getConfig(): Config {
-  cached ??= loadConfig(process.env);
+  cached ??= loadConfig(process.env, { trackerProject: trackerProjectFor(import.meta.url) });
   return cached;
 }
 

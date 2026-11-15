@@ -44,4 +44,23 @@ describe('madeUpDatabase', () => {
     expect(seen?.id).toBe(first.leagueId);
     expect(seen?.id).not.toBe(second.leagueId);
   });
+
+  it('puts the seed leagues asked for in the bin, and refuses a name it does not hold', async () => {
+    const [first, second] = made.leagues;
+    if (first === undefined || second === undefined) throw new Error('two seed leagues expected');
+    const binned = await madeUpDatabase({ inBin: [first.slug] });
+    const binnedDb = createDatabase(binned.source);
+    try {
+      const current = (leagueId: string) =>
+        withTransaction(binnedDb, { leagueId }, (scope) => leaguesStore(scope).currentLeague());
+      const ids = new Map(binned.leagues.map((league) => [league.slug, league.leagueId]));
+      expect(await current(ids.get(first.slug) ?? '')).toBeUndefined();
+      expect((await current(ids.get(second.slug) ?? ''))?.slug).toBe(second.slug);
+      expect(await checkLoginRole(binnedDb)).toEqual([]);
+    } finally {
+      await binnedDb.close();
+      await binned.close();
+    }
+    await expect(madeUpDatabase({ inBin: ['no-such-league'] })).rejects.toThrow(/no seed league/);
+  }, 60_000);
 });

@@ -45,7 +45,12 @@ export type MadeUpTeam = {
   /** The team's own color, #rrggbb; left out for a team with none. */
   readonly color?: string;
   readonly statsVisibility: 'everyone' | 'staff';
-  readonly players: readonly { readonly firstName: string; readonly lastName: string }[];
+  readonly players: readonly {
+    readonly firstName: string;
+    readonly lastName: string;
+    /** A child (R-14); an adult where not given. */
+    readonly isMinor?: boolean;
+  }[];
 };
 
 /** The made-up rosters: each player a person with a number on one team. */
@@ -64,7 +69,13 @@ export function seedTracker(
     });
     team.players.forEach((player, n) => {
       const id = personId(t + 1, n + 1);
-      state.people.push({ id, ...player, isMinor: false, visibility: 'none' });
+      state.people.push({
+        id,
+        firstName: player.firstName,
+        lastName: player.lastName,
+        isMinor: player.isMinor ?? false,
+        visibility: 'none',
+      });
       state.players.push({
         personId: id,
         teamId: team.id,

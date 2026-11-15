@@ -93,6 +93,49 @@ export function queueStorageContract(name: string, make: () => Promise<QueueStor
       expect('sessionId' in (list[2] ?? {})).toBe(false);
     });
 
+    it('keeps taps set aside as not saved, in their place, until they are removed', async () => {
+      const storage = await make();
+      const session = '00000000-0000-4000-8000-0000000000c1';
+      await storage.add(game, { protocolVersion: 1, command: tap(1), sessionId: session });
+      await storage.add(game, { protocolVersion: 1, command: tap(2) });
+      await storage.add(game, { protocolVersion: 1, command: tap(3) });
+      const refusal = { code: 'rule', message: 'Player is not on the court.' } as const;
+      await storage.settle(game, { refuse: [{ commandId: commandId(3), refusal }] });
+      await storage.settle(game, { notSaved: [commandId(1), commandId(3), commandId(77)] });
+      const list = await storage.list(game);
+      expect(ids(list)).toEqual([commandId(1), commandId(2), commandId(3)]);
+      expect(list.map((e) => e.state)).toEqual(['not-saved', 'waiting', 'not-saved']);
+      expect(list[0]?.sessionId).toBe(session);
+      expect(list[0]?.command).toEqual(tap(1));
+      expect('refusal' in (list[2] ?? {})).toBe(false);
+      await storage.settle(game, { remove: [commandId(1)] });
+      expect(ids(await storage.list(game))).toEqual([commandId(2), commandId(3)]);
+    });
+
+    it('keeps where in the game each tap was made, refused or set aside (finding I)', async () => {
+      const storage = await make();
+      const q2 = { period: 2, clockMs: 390_000 };
+      const ot = { period: 5, clockMs: 12_500 };
+      await storage.add(game, { protocolVersion: 1, command: tap(1), moment: q2 });
+      await storage.add(game, { protocolVersion: 1, command: tap(2), moment: ot });
+      await storage.add(game, { protocolVersion: 1, command: tap(3) });
+      await storage.add(game, { protocolVersion: 1, command: tap(4), moment: q2 });
+      const refusal = { code: 'rule', message: 'Player is not on the court.' } as const;
+      await storage.settle(game, {
+        refuse: [{ commandId: commandId(2), refusal }],
+        notSaved: [commandId(4)],
+      });
+      const list = await storage.list(game);
+      expect(list.map((e) => [e.state, e.moment])).toEqual([
+        ['waiting', q2],
+        ['refused', ot],
+        ['waiting', undefined],
+        ['not-saved', q2],
+      ]);
+      // A tap stored without one (as every tap was before) has none, not a made-up one.
+      expect('moment' in (list[2] ?? {})).toBe(false);
+    });
+
     it('settles only the game it is told', async () => {
       const storage = await make();
       await storage.add(other, { protocolVersion: 1, command: tap(5) });

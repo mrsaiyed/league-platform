@@ -7,6 +7,7 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
+import type { Audience } from '../leagues/index.ts';
 import type { PeopleTx, PersonRecord, PersonSensitiveFields } from './ports.ts';
 
 /** A stored person: the record, and the sensitive fields kept beside it. */
@@ -17,6 +18,10 @@ export type StoredPerson = Omit<PersonRecord, 'sensitive'> & {
 
 export type MemoryPeople = {
   status: string;
+  /** Who plays in the league (R-25); youth unless a test says otherwise. */
+  audience: Audience;
+  /** The league's own stored setting values, by key (the name policy's, R-25). */
+  settings: Record<string, unknown>;
   people: StoredPerson[];
   grants: Grant[];
   activity: ActivityEntry[];
@@ -61,6 +66,8 @@ export const scorekeeperGrant = grantOf('2', scorekeeperId, 'scorekeeper');
 export function memoryPeople(state: Partial<MemoryPeople> = {}) {
   const db = memoryDatabase<MemoryPeople>({
     status: 'draft',
+    audience: 'youth',
+    settings: {},
     people: [],
     grants: [],
     activity: [],
@@ -162,6 +169,11 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
           return true;
         },
         isOnRoster: async (id) => s.people.find((p) => p.id === id)?.onRoster === true,
+        leagueAudience: async () => s.audience,
+        leagueSettingRows: async (key) =>
+          Object.hasOwn(s.settings, key)
+            ? [{ level: 'league', document: { version: 1, value: s.settings[key] }, version: 1 }]
+            : [],
       },
     };
   });

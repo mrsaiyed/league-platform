@@ -29,6 +29,8 @@ const realTimer: StartTimer = (ms, fire) => {
 export type GoTrueUser = {
   readonly id: string;
   readonly email: string;
+  /** `email_confirmed_at`: when Supabase took the address as proved; null if it never has. */
+  readonly emailConfirmedAt: Date | null;
 };
 
 export type GoTrueSession = {
@@ -125,7 +127,17 @@ function userOf(value: unknown, what: string): GoTrueUser {
   const id = text(value['id']);
   const email = text(value['email']);
   if (id === undefined || email === undefined) throw new SupabaseAuthUnexpected(what);
-  return { id, email: email.toLowerCase() };
+  // Missing, null or not a time all mean "not confirmed": the safe answer.
+  const confirmed = text(value['email_confirmed_at']);
+  const confirmedAt = confirmed === undefined ? null : new Date(confirmed);
+  return {
+    id,
+    // A to Z only: toLowerCase() folds some other characters into ASCII (the Kelvin
+    // sign into k), which would turn one mailbox's address into another's (record 055).
+    email: email.replace(/[A-Z]/g, (letter) => String.fromCharCode(letter.charCodeAt(0) + 32)),
+    emailConfirmedAt:
+      confirmedAt === null || Number.isNaN(confirmedAt.getTime()) ? null : confirmedAt,
+  };
 }
 
 function sessionOf(body: unknown, what: string): GoTrueSession {

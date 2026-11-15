@@ -153,8 +153,8 @@ const MIN_SUBSTRING_LENGTH = 3;
  * The raw values of one person that must not appear in a public response: birth date,
  * contact email and phone, home address, the full name whenever the name shown is
  * anything else, the surname whenever the shown name leaves it out, and the first name
- * whenever the person asked for initials or to be taken off and the shown name leaves
- * it out.
+ * whenever the person asked for initials or to be taken off, or the league hides the
+ * name (R-24), and the shown name leaves it out.
  */
 export interface PrivatePersonFields {
   readonly firstName: string;
@@ -179,9 +179,8 @@ export function privateValuesOf(person: PrivatePersonFields, shown: ShownName): 
     values.push(fullName, `${last}, ${first}`, `${last} ${first}`);
   }
   if (last && !shownText.includes(normalizedText(last))) values.push(last);
-  if (first && person.nameRequest !== 'none' && !shownText.includes(normalizedText(first))) {
-    values.push(first);
-  }
+  const withheld = person.nameRequest !== 'none' || (!shown.shown && shown.why === 'hidden');
+  if (first && withheld && !shownText.includes(normalizedText(first))) values.push(first);
   return values;
 }
 
