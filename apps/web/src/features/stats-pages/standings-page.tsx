@@ -66,9 +66,7 @@ export async function StandingsPage({
   const season = chooseSeason(seasons, asked);
   if (season === undefined && asked !== undefined && asked !== '') return notFound();
   const result =
-    season === undefined
-      ? undefined
-      : await publicStats.standingsOf(addressee.id, season.id);
+    season === undefined ? undefined : await publicStats.standingsOf(addressee.id, season.id);
   if (result !== undefined && !result.ok) return notFound();
   return (
     <main>
