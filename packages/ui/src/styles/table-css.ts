@@ -239,6 +239,13 @@ export const tableCss = String.raw`
   background-color: var(--color-panel);
   white-space: nowrap;
 }
+/* The divisions of a league are separate tables on one page, and their numbers are read
+   down the page as well as across: the team column has one width in all of them (room
+   for a name of about ten letters and a footnote's mark), so GP sits under GP. A division
+   with a longer name than that has a wider column, up to the limit below. */
+.ui-standings .ui-team-cell {
+  min-inline-size: 7.5rem;
+}
 /* The column that stays put never takes more than about 45% of its box, or on a phone a
    long name would leave no room to bring the numbers into view. A name longer than that
    wraps under itself, whole, beside its color chip; only a single word wider than the

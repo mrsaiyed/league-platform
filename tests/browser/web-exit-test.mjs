@@ -738,6 +738,25 @@ if (browser) {
         );
         note('a long team name wraps whole, with nothing cut off', measured.whole);
         note('a long team name does not make the page scroll sideways', !measured.pageScrolls);
+        // The divisions' tables on one page: each number column starts at the same place in
+        // all of them, on a phone (390) as on this narrowest one, so GP sits under GP.
+        for (const width of [320, 390]) {
+          await page.setViewportSize({ width, height: 800 });
+          await open(page, '/north-valley/standings');
+          const columns = await page.evaluate(() =>
+            [...document.querySelectorAll('table.ui-standings')].map((table) =>
+              [...table.querySelectorAll('thead th')].map((th) =>
+                Math.round(th.getBoundingClientRect().left),
+              ),
+            ),
+          );
+          note(
+            `at ${width} the divisions' tables have their columns in the same places`,
+            columns.length >= 2 && columns.every((c) => c.join() === columns[0].join()),
+            JSON.stringify(columns),
+          );
+        }
+        await page.setViewportSize({ width: 320, height: 700 });
         // The sign that a table goes on (the fade and the arrow at its far edge) is there
         // only while columns are out of sight; and the column that stays put shows its
         // edge only while the table is scrolled under it.

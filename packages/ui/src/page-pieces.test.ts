@@ -495,6 +495,21 @@ describe('tables', () => {
     );
     expect(hidden).toContain('<tfoot><tr><th scope="row" class="ui-team-cell">Total</th>');
   });
+  it("give the team column one width in every division's table, so the numbers line up down the page", () => {
+    expect(displayCss).toMatch(/\.ui-standings \.ui-team-cell \{\s*min-inline-size: 7\.5rem;/);
+    // Both the heading and the rows carry it, so it holds for a table of any number of rows.
+    const html = render(
+      createElement(StandingsTable, {
+        caption: 'East',
+        idPrefix: 'east',
+        columns: [{ key: 'w', label: 'W' }],
+        rows: [{ id: 'a', team: 'Owls', cells: { w: 5 } }],
+        labels: { seed: 'Seed', team: 'Team', note: 'Note', notes: 'Notes' },
+      }),
+    );
+    expect(html).toContain('<table class="ui-table ui-standings">');
+    expect(html.match(/class="ui-team-cell"/g)).toHaveLength(2);
+  });
   it('fade the far edge lightly: a column wholly in view under it keeps its digits', () => {
     // Narrow, and reaching the panel's color only at the very edge: never a solid band.
     expect(displayCss).toMatch(
