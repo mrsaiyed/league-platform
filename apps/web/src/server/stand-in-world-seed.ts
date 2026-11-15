@@ -510,6 +510,31 @@ const adultFall = (programId: string): SeasonSpec => ({
         number: index + 1,
       }),
     ),
+    // The tracked teams' own past results, scores only, so every West team but two has
+    // played: no team is unbeaten, the adjusted Badgers are level with nobody, and a row
+    // carries one footnote mark at most, as the divisions' tables are laid out for.
+    ...(
+      [
+        { round: 0, home: tigers, away: hawks, score: [55, 48], court: 1 },
+        { round: 1, home: bears, away: badgers, score: [60, 52], court: 1 },
+        { round: 1, home: hawks, away: tigers, score: [51, 47], court: 2 },
+        { round: 2, home: otters, away: lions, score: [58, 49], court: 1 },
+      ] as const
+    ).map(
+      (g, i): GameSpec => ({
+        id: listedGameId(13, 13 + i),
+        round: g.round,
+        time: '20:00',
+        home: g.home,
+        away: g.away,
+        status: 'final',
+        score: g.score,
+        capture: 'final',
+        venue: gym,
+        court: court(g.court),
+        number: 19 + i,
+      }),
+    ),
     // The games the tracker and the games area grew up with, all in this week's round.
     ...(
       [

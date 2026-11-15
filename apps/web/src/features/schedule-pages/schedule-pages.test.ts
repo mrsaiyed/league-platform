@@ -46,7 +46,7 @@ describe('schedule', () => {
     const { clock, schedule } = await load(adult);
     const view = buildScheduleView(schedule, clock, addressee, {});
     const held = view.rounds.filter((r) => r.games.some((g) => g.status === 'postponed'));
-    // The made-up season has one: round 2, two weeks ago, with one of its two games off.
+    // The made-up season has one: round 2, two weeks ago, with one of its four games off.
     expect(held.map((r) => [r.number, r.phase, r.note, r.open])).toEqual([
       [2, 'past', '1 game postponed', true],
     ]);
@@ -54,7 +54,7 @@ describe('schedule', () => {
     const others = view.rounds.filter((r) => r.phase === 'past' && r.number !== 2);
     expect(others.length).toBeGreaterThan(0);
     expect(others.every((r) => !r.open && r.note === undefined)).toBe(true);
-    // Two of them: the words count.
+    // All four of them: the words count.
     const both = {
       ...schedule,
       rounds: schedule.rounds.map((r) =>
@@ -63,7 +63,7 @@ describe('schedule', () => {
     };
     expect(
       buildScheduleView(both, clock, addressee, {}).rounds.find((r) => r.number === 2)?.note,
-    ).toBe('2 games postponed');
+    ).toBe('4 games postponed');
     // A round that is not finished says nothing beside its mark: its cards are in view.
     const coming = {
       ...schedule,

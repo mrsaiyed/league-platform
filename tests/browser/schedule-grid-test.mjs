@@ -124,6 +124,8 @@ if (built) {
     );
     note(teams.length >= 4, `only ${teams.length} teams to choose from`);
     const hour = (i) => `${String(9 + i).padStart(2, '0')}:00`;
+    // The season's games already published (one made-up world, step 2.152).
+    const published = await page.locator('li[data-game]').count();
     for (let i = 0; i < 6; i += 1) {
       await addGame(
         1,
@@ -142,7 +144,10 @@ if (built) {
         'Court 1',
       );
     }
-    note((await page.locator('li[data-game]').count()) === 10, 'ten games are in the grid');
+    note(
+      (await page.locator('li[data-game]').count()) === published + 10,
+      'ten games are added to the grid',
+    );
     note((await page.locator('[data-clashes] li').count()) === 0, 'no clash yet');
 
     // A game on top of the 09:00 game of round 1: flagged at once.

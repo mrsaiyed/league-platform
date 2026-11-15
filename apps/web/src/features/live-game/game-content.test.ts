@@ -165,8 +165,8 @@ describe('a game page', () => {
         opened += 1;
       }
     }
-    // Fall 2026's 18 (the tracked games among them), Spring 2026's 2 and the youth league's 5.
-    expect(opened).toBe(25);
+    // Fall 2026's 22 (the tracked games among them), Spring 2026's 2 and the youth league's 5.
+    expect(opened).toBe(29);
   });
 
   it('says a game has not started yet', async () => {

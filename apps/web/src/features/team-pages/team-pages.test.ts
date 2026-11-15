@@ -55,12 +55,12 @@ describe('the teams list', () => {
       'Owls',
       'Falcons',
       'Herons',
-      'Lions',
       'Otters',
+      'Lions',
       'Tigers',
       'Hawks',
-      'Badgers',
       'Bears',
+      'Badgers',
     ]);
     const owls = cards?.[0];
     // Two wins and a loss, ahead of the Falcons (also 2-1) by the game between them.
