@@ -898,16 +898,25 @@
   -webkit-user-select: text;
   user-select: text;
 }
+/* At rest the pad's words fit their place at every size, with room to spare for a
+   device whose letters are wider: nothing is cut and nothing scrolls. So the words are
+   few, set close, and before the first play (when what to do next is said above them)
+   the hint is its first two sentences: how to score and how to substitute. The other
+   two, turnovers and saving, come with the first play. */
 .court-pregame,
 .court-hint {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   padding-inline: 4px;
 }
 .court-hint p {
   color: var(--court-muted);
   font-size: 13px;
+  line-height: 1.25;
+}
+.court-pregame ~ .court-hint p:nth-of-type(n + 3) {
+  display: none;
 }
 .court[data-stage='lineups'] .court-hint {
   display: none;
@@ -1334,9 +1343,6 @@
   .court-team-head {
     min-block-size: 44px;
   }
-  .court-hint p {
-    font-size: 12px;
-  }
 }
 
 /* ---- The phone a scorekeeper really holds: a 390 x 844 phone shows about 390 x 664 in
@@ -1491,9 +1497,6 @@
   .court-who-number {
     block-size: 40px;
     font-size: 20px;
-  }
-  .court-hint p {
-    font-size: 12px;
   }
 }
 
@@ -1666,6 +1669,7 @@
   }
   .court-hint p {
     font-size: 15px;
+    line-height: 1.3;
   }
   .court-rest {
     display: grid;
@@ -1717,6 +1721,10 @@
   }
   .court-rest {
     display: flex;
+  }
+  /* The pad is a narrow column here: the hint in the size that fits it. */
+  .court-hint p {
+    font-size: 13px;
   }
   .court[data-stage='lineups'] .court-pad {
     block-size: auto;

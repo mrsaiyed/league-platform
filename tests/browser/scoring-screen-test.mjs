@@ -210,6 +210,34 @@ async function tapWhereItIs(page, locator, what) {
 }
 
 /**
+ * At rest the pad's words fit their place (the second look's L3): nothing of them is cut
+ * and there is nothing to scroll to, with `sentences` of the hint's four showing (two
+ * before the first play, under what to do next; all four once the game is in play).
+ */
+async function restFits(page, label, sentences) {
+  await twoFrames(page);
+  const rest = await page.evaluate(() => {
+    const el = document.querySelector('[data-pad] [data-rest]');
+    if (el === null) return null;
+    const shown = [...el.querySelectorAll('[data-hint] p')].filter(
+      (p) => p.getClientRects().length > 0,
+    );
+    const edge = el.getBoundingClientRect();
+    return {
+      place: el.clientHeight,
+      over: el.scrollHeight - el.clientHeight,
+      sentences: shown.length,
+      cut: shown.filter((p) => p.getBoundingClientRect().bottom > edge.bottom + 0.5).length,
+    };
+  });
+  note(
+    `${label}: at rest the pad’s words fit their place, nothing cut and nothing to scroll`,
+    rest !== null && rest.over <= 0 && rest.cut === 0 && rest.sentences === sentences,
+    JSON.stringify(rest),
+  );
+}
+
+/**
  * Whether the keyboard comes to rest on this thing. The screen moves it there once it has
  * been drawn again, a frame or two after what the test waited for; so it is looked for
  * frame by frame for a few seconds, not asked once.
@@ -564,6 +592,16 @@ if (browser) {
         'lineups alone score nothing',
         (await c.score()).home === 0 && (await c.score()).away === 0,
       );
+
+      // Before the first play the pad at rest says what to do next and, under it, how to
+      // score and how to substitute; at each of the five sizes it all fits (L3).
+      for (const size of sizes) {
+        await page.setViewportSize({ width: size.width, height: size.height });
+        await c.pad.locator('[data-pregame]').waitFor();
+        await restFits(page, `${size.width} x ${size.height}, before the first play`, 2);
+      }
+      await page.setViewportSize({ width: phone.width, height: phone.height });
+      await twoFrames(page);
 
       // One way out, behind More, with the public page beside it (A4).
       note(
@@ -1292,9 +1330,11 @@ if (browser) {
         const hint = await c.pad.locator('[data-hint]').innerText();
         note(
           `${label}: the hint offers ${fold ? 'the bench’s button, and no drag' : 'the drag from the bench'}`,
-          fold ? !/drag/i.test(hint) && /“Bench”/.test(hint) : /dragged/.test(hint),
+          fold ? !/drag/i.test(hint) && /“Bench”/.test(hint) : /drag a bench player/.test(hint),
           hint,
         );
+        // And it fits (L3): all four sentences, the game being in play.
+        await restFits(page, `${label}, in play`, 4);
         // Where only its three dots show, More is still named for a screen reader.
         note(
           `${label}: the More button is named "More" for a screen reader, word shown or not`,

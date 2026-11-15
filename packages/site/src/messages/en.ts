@@ -928,14 +928,14 @@ export const en = {
   'tracker.hint.players':
     'Tap a player, then +1, +2, +3, Foul or Turnover. −Foul takes back that player’s latest foul.',
   'tracker.hint.subs':
-    'To substitute, tap the player coming off and then who comes in, or tap a bench player and who they come in for. A bench player can also be dragged onto a player on the court.',
+    'To substitute, tap one player and then the other, or drag a bench player onto the one coming off.',
   // Where the bench is not on the screen (a short phone): nothing to tap or drag there.
   'tracker.hint.subsFolded':
-    'To substitute, tap the player coming off, then who comes in. “Bench” beside a team’s name opens its whole bench.',
+    'To substitute, tap the player coming off, then who comes in. “Bench” opens a team’s whole bench.',
   'tracker.hint.turnovers':
     'Tap a team’s turnovers to see each player’s, take one back, or add a team turnover.',
   'tracker.hint.saved':
-    'Every tap is kept on this device and sent to the league; the line at the top says when all of it is saved.',
+    'Every tap is kept on this device and sent to the league. The top line says when all is saved.',
   'tracker.turnovers.chip_one': '{count} turnover',
   'tracker.turnovers.chip_other': '{count} turnovers',
   'tracker.turnovers.title': '{team} turnovers',
