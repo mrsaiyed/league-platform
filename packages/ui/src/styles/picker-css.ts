@@ -44,6 +44,10 @@ export const pickerCss = String.raw`
   font-size: var(--text-14);
 }
 .ui-picker select {
+  /* A picker sets its own gap between label and field: the plain rule that a field after
+     its label stands a step away (base-css.ts) would add to it, and on a phone, where the
+     field fills its column, pushed it 8 past the page's edge. */
+  margin: 0;
   max-inline-size: 100%;
   font-weight: 600;
   cursor: pointer;

@@ -65,6 +65,20 @@ describe('the head of an inner page', () => {
   });
 });
 
+describe('a picker’s field on a phone', () => {
+  it('stays inside the page: it carries no margin of its own beside its label', () => {
+    // The plain rule gives a field after its label a step's margin; a picker has its own
+    // gap, and on a phone its field fills its column, so the margin pushed it 8 past the
+    // page's edge (the schedule and statistics pages at 390).
+    expect(css).toMatch(
+      /\.ui-root :where\(label \+ input, label \+ select, label \+ textarea\) \{\s*margin-inline-start: var\(--step-2\);/,
+    );
+    expect(css).toMatch(/\.ui-picker select \{\s*margin: 0;\s*max-inline-size: 100%;/);
+    const phone = css.slice(css.indexOf('@media (max-width: 39.99rem) {\n  .ui-toolbar'));
+    expect(phone).toMatch(/\.ui-toolbar \.ui-picker select \{\s*inline-size: 100%;/);
+  });
+});
+
 describe('a kicker over a title', () => {
   it('is a tiny label before the level-two title, which then has no rule of its own', () => {
     const html = render(
