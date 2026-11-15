@@ -4,7 +4,8 @@
 // scheduling module's own commands run on its rows, so a published schedule is the
 // season's games everywhere: the public schedule and home page, a game's own page, the
 // games area's list and the tracker. The draft is the same one a fixture import fills.
-import type { ScheduleAdminPorts } from './schedule-admin.ts';
+import { mayListSeason } from '@srleagues/core';
+import type { ScheduleAdminPorts, ScheduleSeason } from './schedule-admin.ts';
 import { worldPublicSeasons } from './stand-in-world-reads.ts';
 import type { World } from './stand-in-world.ts';
 
@@ -16,7 +17,7 @@ export function standInSchedule(world: World): ScheduleAdminPorts {
         .filter((t) => t.seasonId === seasonId && !t.binned)
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(({ id, name }) => ({ id, name })),
-    seasonsOf: async (leagueId) => {
+    seasonsOf: async (leagueId, holder) => {
       const s = await world.read(leagueId);
       const all = s?.seasons ?? [];
       const programOf = (id: string) => all.find((x) => x.id === id)?.programId ?? '';
@@ -32,10 +33,12 @@ export function standInSchedule(world: World): ScheduleAdminPorts {
           isPublic: false,
           programId: x.programId,
         }));
-      return [
+      const listed: readonly ScheduleSeason[] = [
         ...shown.map((x) => ({ ...x, isPublic: true, programId: programOf(x.id) })),
         ...hidden,
       ];
+      // Only what this holder may be told of: the scheduling module's one rule (P4 §4).
+      return listed.filter((x) => mayListSeason(holder, x));
     },
   };
 }

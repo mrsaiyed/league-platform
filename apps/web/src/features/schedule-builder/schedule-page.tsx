@@ -46,7 +46,6 @@ import { importLinkOf } from './import-link.ts';
 import { addRoundProblemOf, noticeOf, whyNotSaved } from './notice.ts';
 import { ScheduleHeading } from './schedule-heading.tsx';
 import { seasonControls } from './season-controls.ts';
-import { visibleSeasons } from './visible-seasons.ts';
 
 type Basis = {
   readonly league: string;
@@ -76,9 +75,9 @@ export async function ScheduleBuilderPage({
   const ports = await webPorts();
   const context = commandContextOf(view.context);
   const holder = await ports.accessOf(context);
-  // Every season, the ones not public yet too (a season is scheduled before it is shown),
-  // but one not public only to someone who may read its program's schedule (P4 §4).
-  const seasons = visibleSeasons(holder, await ports.scheduleAdmin.seasonsOf(addressee.id));
+  // Every season the holder may be told of, the ones not public yet among them (a season is
+  // scheduled before it is shown): the port lists only those (P4 §4).
+  const seasons = await ports.scheduleAdmin.seasonsOf(addressee.id, holder);
   const asked = firstValue(search['season']);
   const chosen = chooseSeason(seasons, asked);
   const season = seasons.find((s) => s.id === chosen?.id);

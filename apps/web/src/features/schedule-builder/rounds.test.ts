@@ -55,7 +55,8 @@ function setup() {
 describe('rounds an owner can make (step 2.160)', () => {
   it('offers the season that is not public yet, which has no rounds', async () => {
     const { ports, read } = setup();
-    const seasons = await ports.seasonsOf(leagueId);
+    const owner = { accountId: standInPeople.owner.accountId, isOwner: true, grants: [] };
+    const seasons = await ports.seasonsOf(leagueId, owner);
     expect(seasons.find((s) => s.id === seasonId)).toMatchObject({
       name: 'Winter 2027',
       isPublic: false,

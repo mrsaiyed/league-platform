@@ -1,7 +1,8 @@
 // The top of Admin → Schedule: the title, the season picker, the season's name and the
 // page's intro, then what the page puts under the intro (step 2.160). The picker names
-// only the seasons it is given: the page gives it visibleSeasons(...), so a season not
-// public yet is never named to someone who may not read its program's schedule.
+// only the seasons it is given: the page gives it what `scheduleAdmin.seasonsOf` lists for
+// the holder, so a season not public yet is never named to someone who may not read its
+// program's schedule.
 import { displayLabels } from '@srleagues/site';
 import { OptionPicker } from '@srleagues/ui';
 import type { ReactNode } from 'react';
