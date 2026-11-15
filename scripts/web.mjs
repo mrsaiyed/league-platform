@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withLoopback } from './web-listen.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = path.join(root, 'apps/web');
@@ -16,9 +17,11 @@ if (!['dev', 'build', 'start'].includes(command ?? '')) {
   process.exit(2);
 }
 const nextBin = createRequire(path.join(app, 'package.json')).resolve('next/dist/bin/next');
-const child = spawn(process.execPath, [nextBin, command, ...rest], {
+const env = { ...process.env, NEXT_TELEMETRY_DISABLED: '1' };
+// On the made-up stand-in it listens on this computer's loopback address only (web-listen.mjs).
+const child = spawn(process.execPath, [nextBin, ...withLoopback([command, ...rest], env)], {
   cwd: app,
   stdio: 'inherit',
-  env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
+  env,
 });
 child.on('exit', (code, signal) => process.exit(signal ? 1 : (code ?? 1)));

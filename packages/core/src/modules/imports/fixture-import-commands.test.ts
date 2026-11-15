@@ -344,4 +344,23 @@ describe('recording the scores of an applied import', () => {
     });
     expect(world.db.state.games[0]).toMatchObject({ homeScore: 1, awayScore: 0 });
   });
+
+  it('leaves a game alone that the live tracker has recorded plays of (S-46)', async () => {
+    const world = memoryImports();
+    const { importId, view } = await uploaded(world, fixturesCsv(2, { scoreEvery: 1 }));
+    await applyFixtureImport(world.as(ownerId), { importId, version: view.version }, world.deps);
+    const created = parseCreatedFixtures(world.db.state.imports[0]?.created);
+    const first = created?.scores[0];
+    if (first === undefined) throw new Error('no score');
+    world.db.state.games.push(game(first.gameId, { status: 'live', captureMode: 'live' }));
+    world.db.state.tracked.push(first.gameId);
+    const result = await recordImportedScores(world.as(ownerId), { importId }, world.deps);
+    expect(result).toEqual({
+      ok: true,
+      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 1 },
+    });
+    // The game stays live, for the tracker to end; nothing was announced.
+    expect(world.db.state.games[0]).toMatchObject({ status: 'live', homeScore: null });
+    expect(world.events).toEqual([]);
+  });
 });

@@ -1,8 +1,14 @@
 // One change to a game from the games area's forms: the form's words become a games
 // command's input, and the command runs with the context the server worked out from the
 // session (T-23). Nothing here reads who is asking from the form.
+//
+// A final score sent twice (a double tap on "Yes, make it final": the first saves it, the
+// second is refused as changed or already decided) is answered as saved when the game is
+// now final with exactly the score that was asked (step 2.154), so the person reads
+// "Saved", not that someone changed the game.
 import {
   cancelGame,
+  getBoxScoreSheet,
   postponeGame,
   recordFinalScore,
   recordForfeit,
@@ -62,5 +68,31 @@ export async function runGameAction(
         return cancelGame(context, base, deps);
     }
   })();
-  return result.ok ? { ok: true } : { ok: false, code: result.error.code };
+  if (result.ok) return { ok: true };
+  const code = result.error.code;
+  if (
+    action === 'final' &&
+    (code === 'changed-since-read' || code === 'game-already-decided') &&
+    (await isFinalWith(fields, context, deps))
+  ) {
+    return { ok: true };
+  }
+  return { ok: false, code };
+}
+
+/** Whether the game is final now with exactly the score these fields asked for. */
+async function isFinalWith(
+  fields: GameFields,
+  context: CommandContext,
+  deps: CommandDeps<TrackerTx>,
+): Promise<boolean> {
+  const [homeScore, awayScore] = [numberOf(fields['homeScore']), numberOf(fields['awayScore'])];
+  if (homeScore === undefined || awayScore === undefined) return false;
+  const read = await getBoxScoreSheet(context, { gameId: fields['gameId'] }, deps);
+  return (
+    read.ok &&
+    read.value.game.status === 'final' &&
+    read.value.game.homeScore === homeScore &&
+    read.value.game.awayScore === awayScore
+  );
 }

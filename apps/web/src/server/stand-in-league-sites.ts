@@ -1,11 +1,12 @@
 // The made-up names and designs of the stand-in leagues. FOR LOCAL WORK AND TESTS ONLY.
-import { standInLeagues } from './stand-in-ports.ts';
+import { standInLeagues } from './stand-in-cast.ts';
 import type { LeagueSiteSource } from './league-site.ts';
 import { picturedDesign, type PicturedDesignKey } from './stand-in-designs.ts';
 
+/** The two made-up leagues with a look of their own; their names are the cast's. */
 const madeUp: Readonly<Record<string, { name: string; design: PicturedDesignKey }>> = {
-  [standInLeagues.live.id]: { name: 'North Valley League', design: 'crest' },
-  [standInLeagues.other.id]: { name: 'Harbor City League', design: 'clean-court' },
+  [standInLeagues.live.id]: { name: standInLeagues.live.name, design: 'crest' },
+  [standInLeagues.other.id]: { name: standInLeagues.other.name, design: 'clean-court' },
 };
 
 /**

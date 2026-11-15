@@ -578,6 +578,11 @@ html {
   font-size: var(--text-12);
   letter-spacing: 0.04em;
 }
+/* The made-up world's one quiet line (step 2.152): a line of its own, under the rest. */
+.site-footer-made-up {
+  flex: 1 1 100%;
+  font-size: var(--text-12);
+}
 @media (min-width: 48rem) {
   .site-footer-name {
     flex: 1 1 auto;

@@ -223,20 +223,21 @@ describe("the admin's names setting reaches every public surface through standIn
 
   it("changes the youth league's roster and statistics, and only that league's", async () => {
     const w = world();
+    // The Rockets' coach is a grown-up, shown in full under every setting for children.
     expect(await w.youthNames()).toMatchObject({
-      roster: ['Noor H.', 'Jay W.', 'Tess M.'],
-      statistics: ['Eli O.', 'Noor H.', 'Sam R.'],
+      roster: ['Noor H.', 'Jay W.', 'Lena Ortiz', 'Tess M.'],
+      statistics: ['Eli O.', 'Jay W.', 'Maya C.', 'Noor H.', 'Sam R.'],
     });
     // Full names saved without the tick: the young players are still with care.
     await w.saveNames(youth, 'fullName', null);
     expect(await w.youthNames()).toMatchObject({
-      roster: ['Noor H.', 'Jay W.', 'Tess M.'],
-      statistics: ['Eli O.', 'Noor H.', 'Sam R.'],
+      roster: ['Noor H.', 'Jay W.', 'Lena Ortiz', 'Tess M.'],
+      statistics: ['Eli O.', 'Jay W.', 'Maya C.', 'Noor H.', 'Sam R.'],
     });
     await w.confirmChildren(youth);
     expect(await w.youthNames()).toMatchObject({
-      roster: ['Noor Haddad', 'Jay Whitaker', 'Tess Moreno'],
-      statistics: ['Eli Okafor', 'Noor Haddad', 'Sam Rivera'],
+      roster: ['Noor Haddad', 'Jay Whitaker', 'Lena Ortiz', 'Tess Moreno'],
+      statistics: ['Eli Okafor', 'Jay Whitaker', 'Maya Cho', 'Noor Haddad', 'Sam Rivera'],
     });
     // The adult league is untouched, on its start (record 065).
     expect((await w.tracker.namesShownOf(adult)).policy).toEqual(defaultNamePolicy);
@@ -244,12 +245,18 @@ describe("the admin's names setting reaches every public surface through standIn
 
     await w.saveNames(youth, 'hidden', 1);
     const hidden = await w.youthNames();
-    expect(hidden).toMatchObject({ roster: [null, null, null], statistics: [null, null, null] });
+    // Hidden is followed for adults too since step 2.162 (R-29): the coach as well.
+    expect(hidden).toMatchObject({
+      roster: [null, null, null, null],
+      statistics: [null, null, null, null, null],
+    });
     const privateValues = [
       ['Noor', 'Haddad'],
       ['Jay', 'Whitaker'],
+      ['Lena', 'Ortiz'],
       ['Tess', 'Moreno'],
       ['Sam', 'Rivera'],
+      ['Maya', 'Cho'],
       ['Eli', 'Okafor'],
     ].flatMap(([firstName = '', lastName = '']) =>
       privateValuesOf(

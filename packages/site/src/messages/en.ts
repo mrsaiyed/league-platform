@@ -11,6 +11,11 @@ export const en = {
   'footer.label': 'Footer',
   'footer.terms': 'Terms',
   'footer.privacy': 'Privacy',
+  // Only on the app's made-up world on a computer (step 2.152), never on a real league.
+  'footer.madeUp': 'A made-up league on this computer. It starts over when the app restarts.',
+  'standIn.otherHost.title': 'Not here',
+  'standIn.otherHost.body':
+    'This copy of SR Leagues holds only made-up leagues. It answers only requests made on the computer it runs on, to that computer’s own address, and not requests passed on by another server.',
   'common.loading': 'Loading',
   'common.notFound': 'We could not find that page.',
   'common.notFoundTitle': 'Page not found',
@@ -615,6 +620,40 @@ export const en = {
   'admin.games.noScorekeeper': 'No scorekeeper yet',
   'admin.games.scoreOf': 'Score for {team}',
   'admin.games.saveScore': 'Save final score',
+  // One wrong tap does no harm (step 2.154; A-5): the boxes open on the one game, and
+  // saving asks once, naming both teams and the score, away team first as on the card.
+  'admin.games.enterFinal': 'Enter the final score',
+  'admin.games.result': '{away} {awayScore}, {home} {homeScore}',
+  'admin.games.confirm.ask': '{result}. Make this final?',
+  'admin.games.confirm.early': '{result}. This game is set for {when}. Make it final now?',
+  'admin.games.confirm.yes': 'Yes, make it final',
+  'admin.games.confirm.no': 'No, change the score',
+  'admin.games.saved.final': 'Saved: {result} is final.',
+  // A save said beside the game it saved, naming it (step 2.155; A-4).
+  'admin.games.game': '{away} at {home}',
+  'admin.games.saved.forfeit': 'Saved: {game} is recorded as a forfeit.',
+  'admin.games.saved.postpone': 'Saved: {game} is postponed.',
+  'admin.games.saved.cancel': 'Saved: {game} is cancelled.',
+  // A refused score said beside the boxes, naming the box or the score (step 2.155; A-4).
+  'admin.games.refused.score': 'Enter the score for {team} as a whole number from 0 to 999.',
+  'admin.games.refusedAbout': '{game}: {problem}',
+  'admin.games.refused.tie':
+    '{result} is a tie, and this season does not allow ties. Change a score so one team wins.',
+  // A game the live tracker has recorded plays of is ended there (S-46).
+  'admin.games.tracked':
+    'Plays are being recorded for this game in the tracker, so it is ended there, not by typing a score.',
+  'admin.games.scoreGame': 'Score this game',
+  // Putting a wrong result right (P7 §5.5, S-36): for whoever may reopen the game, and
+  // who can for everyone else.
+  'admin.games.correct': 'Correct this result',
+  'admin.games.reopenUntil':
+    'You ended this game in the tracker, so you can reopen it until {time}.',
+  'admin.games.reopenWho.admins': 'Only a league admin or a scheduler can reopen this game.',
+  'admin.games.reopenWho.time-over':
+    'Your time to reopen this game is over. Only a league admin or a scheduler can reopen it now.',
+  'admin.games.done.reopen': 'The game is reopened. Enter the right result.',
+  'admin.games.done.reopenTracked':
+    'The game is live again. Correct it in the tracker, then end it again.',
   'admin.games.forfeitBy': 'Team that forfeits',
   'admin.games.recordForfeit': 'Record forfeit',
   'admin.games.postpone': 'Postpone',
@@ -639,6 +678,8 @@ export const en = {
   'admin.games.error.game-cancelled': 'That game was cancelled, so it cannot be scored.',
   'admin.games.error.tie-not-allowed': 'This season does not allow ties. Enter a winner.',
   'admin.games.error.team-not-in-game': 'That team is not in this game.',
+  'admin.games.error.game-is-tracked':
+    'Plays are being recorded for this game in the tracker, so it cannot be ended here. End it in the tracker.',
   'admin.games.error.game-not-postponable': 'Only a game that has not started can be postponed.',
   'admin.games.error.game-not-cancellable': 'Only a game that has not started can be cancelled.',
   'admin.games.error.unknown': 'That did not work. Nothing was changed.',
@@ -663,7 +704,7 @@ export const en = {
   'admin.boxScore.noPlayers': 'This team has no players on its roster yet. Add them in Teams.',
   'admin.boxScore.save': 'Save box score and make it final',
   'admin.boxScore.locked.decided':
-    'This game is final. To correct it, reopen it with a reason; then fix the grid and save again.',
+    'This game is final. To correct it, reopen it with a reason; then enter its result again.',
   'admin.boxScore.locked.cancelled': 'This game was cancelled, so it has no box score.',
   'admin.boxScore.locked.tracked':
     'This game was scored with the live tracker. Correct it in the tracker, so its list of plays still explains the numbers.',
@@ -671,6 +712,13 @@ export const en = {
   'admin.boxScore.reopen': 'Reopen to correct',
   'admin.boxScore.notFound': 'That game is not there, or you may not score it.',
   'admin.boxScore.done.save': 'The box score is saved and the game is final.',
+  'admin.boxScore.saved': 'Saved: {result} is final, with its box score.',
+  // A refused box beside the scores, naming it (step 2.155; A-4).
+  'admin.boxScore.refused.cell': '{cell}: enter a whole number from 0 to 999, or leave it empty.',
+  'admin.boxScore.refused.minutes':
+    '{cell}: enter whole minutes from 0 to 1440, or leave it empty.',
+  'admin.boxScore.refused.score':
+    'Enter the score for {team} as a whole number from 0 to 999, or leave it empty to use the total of its players’ points.',
   'admin.boxScore.done.reopen': 'The game is reopened. Fix the grid and save it again.',
   'admin.boxScore.error.invalid-input':
     'Enter every number as a whole number from 0 to 999 (minutes up to 1440).',
@@ -684,6 +732,8 @@ export const en = {
   'admin.boxScore.error.did-not-play-has-stats':
     'A player marked as not playing has numbers. Tick “Played” or clear the numbers.',
   'admin.boxScore.error.game-not-decided': 'That game is not final, so there is nothing to reopen.',
+  'admin.boxScore.error.reopen-time-over':
+    'Your time to reopen this game is over. Ask a league admin or a scheduler.',
   'stat.fg3': '3-pointers made',
   'stat.fg3.short': '3PM',
   'stat.fg1': 'Free throws made',

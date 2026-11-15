@@ -209,6 +209,7 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     },
     games: {
       find: async (id) => s.games.find((g) => g.id === id),
+      lockGame: async (id) => s.games.some((g) => g.id === id),
       setResult: async (id, change, version) => {
         const at = s.games.findIndex((g) => g.id === id);
         const found = s.games[at];

@@ -9,11 +9,14 @@
 // Then it starts the app as staging with a database address that answers nobody,
 // and checks that it refuses to start (T-60). Nothing leaves this computer.
 import { spawn, spawnSync } from 'node:child_process';
+import http from 'node:http';
 import { createRequire } from 'node:module';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkStructure, formatViolation } from './structure/index.mjs';
+import { withLoopback } from './web-listen.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = path.join(root, 'apps/web');
@@ -136,7 +139,8 @@ const cases = [
     'visitor',
     '/north-valley/teams',
     200,
-    ['Owls', 'Falcons', '5-1', 'East', 'Seed', 'Record'],
+    // The records are worked out from the season's results (step 2.152): the Owls are 2-1.
+    ['Owls', 'Falcons', '2-1', 'East', 'Seed', 'Record'],
     ['This page is not built yet.'],
   ],
   // A league with no divisions says nothing about divisions on its team cards.
@@ -162,10 +166,12 @@ const cases = [
     'visitor',
     '/north-valley/teams/owls',
     200,
+    // 87: Jordan Castellanos's points this season, which a staff-only team never shows.
     ['Owls', 'Team totals', 'Roster', 'Jordan Castellanos'],
-    ['Players', '>150<'],
+    ['Players', '>87<'],
   ],
-  ['visitor', '/north-valley/teams/lions', 404, [notFound]],
+  // Another league's team is no team of this one (the league fence, step 2.152).
+  ['visitor', '/north-valley/teams/comets', 404, [notFound]],
   ['visitor', '/north-valley/teams/falcons?season=nope', 404, [notFound]],
   // Any address under a league that is no page of it is refused by the league's own gate
   // (step 2.85): "not found" for a league the visitor may see and for one they may not.
@@ -284,7 +290,13 @@ const cases = [
     'visitor',
     '/north-valley/stats',
     200,
-    ['Leaders', 'Dana Whitfield', 'Owls', 'Only team totals are shown for Owls.', 'ui-stats'],
+    [
+      'Leaders',
+      'Dana Whitfield',
+      'Owls',
+      'Only team totals are shown for Bears, Owls.',
+      'ui-stats',
+    ],
     ['This page is not built yet.', 'Jordan', 'Castellanos', 'Imani', 'Brooks'],
   ],
   ['coach', '/north-valley/stats', 200, ['Dana Whitfield'], ['Jordan', 'Castellanos', 'Brooks']],
@@ -325,10 +337,11 @@ const cases = [
     'owner',
     '/north-valley/admin/teams',
     200,
-    ['Teams of Winter 2026', 'Lions', 'Owls', 'Add a team', 'Short name'],
+    ['Teams of Fall 2026', 'Lions', 'Owls', 'Add a team', 'Short name'],
     ['Nothing here yet.'],
   ],
-  ['owner', '/harbor-city/admin/teams', 200, ['No teams yet.', 'Add a team'], ['Lions']],
+  // Each league's own teams: the youth league's, none of the first league's.
+  ['owner', '/harbor-city/admin/teams', 200, ['Comets', 'Add a team'], ['Lions']],
   ['owner', '/north-valley/admin/teams/not-a-team', 404, [notFound]],
   ['scheduler', '/harbor-city/admin', 403, [noAccess]],
   [
@@ -439,7 +452,8 @@ const cases = [
     'programScheduler',
     '/quiet-pines/admin/schedule',
     200,
-    [adminLink('quiet-pines', 'schedule'), 'There is no season to schedule yet.'],
+    // The draft league's season is of the program this scheduler holds (step 2.152).
+    [adminLink('quiet-pines', 'schedule'), 'Build the schedule here, round by round.'],
     ['Nothing here yet.'],
   ],
   [
@@ -479,7 +493,7 @@ const cases = [
     'clubAdmin',
     '/quiet-pines/admin/teams',
     200,
-    [adminLink('quiet-pines', 'teams'), adminLink('quiet-pines', 'registration'), 'No teams yet.'],
+    [adminLink('quiet-pines', 'teams'), adminLink('quiet-pines', 'registration'), 'Lions'],
     [adminLink('quiet-pines', 'people')],
   ],
   ['otherAdmin', '/still-waters/admin', 200, [adminLink('still-waters', 'settings')]],
@@ -620,6 +634,7 @@ try {
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
   failures.push(...(await checkSettings(origin)));
+  failures.push(...(await checkOtherHosts(port)));
 } finally {
   server.child.kill();
 }
@@ -663,7 +678,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Web shell check passed: ${cases.length + spoofs.length + 5} checks against the built server.`,
+  `Web shell check passed: ${cases.length + spoofs.length + 6} checks against the built server.`,
 );
 
 // When Node refused a TypeScript file it was to run itself, the server prints only
@@ -688,10 +703,12 @@ function serverEnvironment(env) {
 
 function start(args, env) {
   let output = '';
-  // Next.js itself, not scripts/web.mjs, so stopping it stops the server.
-  const child = spawn(process.execPath, [nextBin, ...args], {
+  // Next.js itself, not scripts/web.mjs, so stopping it stops the server. On the made-up
+  // stand-in, on this computer's loopback address only (web-listen.mjs).
+  const environment = serverEnvironment(env);
+  const child = spawn(process.execPath, [nextBin, ...withLoopback(args, environment)], {
     cwd: app,
-    env: serverEnvironment(env),
+    env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (chunk) => (output += chunk));
@@ -889,7 +906,9 @@ async function checkTeams(origin) {
     return problems;
   }
   const page = `${list}/${team}`;
-  const player = await post('owner', page, 2, {
+  // Forms of a team with no one on it yet: details, who sees, putting one of the league's
+  // people on the roster (the league has people, step 2.152), then someone new.
+  const player = await post('owner', page, 3, {
     league: 'harbor-city',
     team,
     firstName: 'Casey',
@@ -1075,6 +1094,117 @@ async function checkSettings(origin) {
     problems.push('the scheduler changed a setting');
   }
   return problems;
+}
+
+/**
+ * The made-up world answers only this computer (step 2.152; review 1 M4, review 2 M1).
+ * Another computer cannot connect at all: the server listens on the loopback address
+ * only, so this computer's own network address is refused. A request addressed to another
+ * host (a `.test` name included, unless it is PUBLIC_BASE_URL's), or carrying a sign of
+ * having been passed on by another server (Forwarded, Via, an X-Forwarded-For from
+ * elsewhere, an X-Forwarded-Host of another name), gets the plain page and nothing of any
+ * league, with the made-up owner's cookie or without it, a page, an admin page or the API;
+ * the same address on this computer's name is answered as usual. Sent with node:http,
+ * since fetch keeps the Host header to itself.
+ */
+async function checkOtherHosts(port) {
+  const problems = [];
+  const ask = (host, address, cookie, more = {}) =>
+    new Promise((resolve, reject) => {
+      const request = http.request(
+        {
+          host: '127.0.0.1',
+          port,
+          path: address,
+          headers: { host, ...(cookie === undefined ? {} : { cookie }), ...more },
+        },
+        (response) => {
+          let body = '';
+          response.setEncoding('utf8');
+          response.on('data', (chunk) => (body += chunk));
+          response.on('end', () => resolve({ status: response.statusCode, body }));
+        },
+      );
+      request.on('error', reject);
+      request.end();
+    });
+  const owner = `srl_session=${tokens.owner}`;
+  const local = `localhost:${port}`;
+  const refused = [
+    ...['example.com', 'srleagues.example.com:443', 'localhost.evil.example', 'other.test'].map(
+      (host) => [`Host ${host}`, host, {}],
+    ),
+    ['Forwarded', local, { forwarded: 'for=10.0.0.5' }],
+    ['Via', local, { via: '1.1 a-proxy' }],
+    ['X-Forwarded-For from elsewhere', local, { 'x-forwarded-for': '10.0.0.5' }],
+    ['X-Forwarded-For passed on', local, { 'x-forwarded-for': '127.0.0.1, 10.0.0.5' }],
+    ['X-Forwarded-Host of another name', local, { 'x-forwarded-host': 'example.com' }],
+  ];
+  for (const [what, host, more] of refused) {
+    for (const address of [
+      '/north-valley',
+      '/north-valley/admin/teams',
+      `/api/v1/leagues/${northValley}/games/${liveGame}/snapshot`,
+    ]) {
+      for (const cookie of [undefined, owner]) {
+        const { status, body } = await ask(host, address, cookie, more);
+        const label = `${what} ${address}${cookie === undefined ? '' : ' (owner)'}`;
+        if (status !== 421) problems.push(`${label}: status ${status}, not 421`);
+        if (!body.includes('not requests passed on by another server')) {
+          problems.push(`${label}: not the plain page`);
+        }
+        if (/North Valley|Falcons|Add a team/.test(body)) {
+          problems.push(`${label}: shows the league`);
+        }
+      }
+    }
+  }
+  const here = await ask(local, '/north-valley', owner);
+  if (here.status !== 200 || !here.body.includes('North Valley League')) {
+    problems.push(`this computer's own name is not answered (${here.status})`);
+  }
+  // What Next.js itself writes for a request from this computer is no sign of passing on.
+  const asNextWrites = await ask(local, '/north-valley', owner, {
+    'x-forwarded-for': '127.0.0.1',
+    'x-forwarded-host': local,
+  });
+  if (asNextWrites.status !== 200) {
+    problems.push(
+      `a request with Next.js's own forwarding headers is refused (${asNextWrites.status})`,
+    );
+  }
+  // This computer's own network addresses are not listened on: no other computer can connect.
+  for (const address of networkAddresses()) {
+    if (await connects(address, port)) {
+      problems.push(`the made-up world can be reached at ${address}, not only at 127.0.0.1`);
+    }
+  }
+  if (!here.body.includes('A made-up league on this computer.')) {
+    problems.push('a made-up league page does not say it is made up');
+  }
+  return problems;
+}
+
+/** This computer's addresses on its networks (not loopback), as other computers reach it. */
+function networkAddresses() {
+  return Object.values(os.networkInterfaces())
+    .flat()
+    .filter((entry) => entry !== undefined && !entry.internal)
+    .map((entry) => entry.address);
+}
+
+/** Whether a connection to `address` on `port` is taken, within two seconds. */
+function connects(address, port) {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host: address, port });
+    const done = (answer) => {
+      socket.destroy();
+      resolve(answer);
+    };
+    socket.setTimeout(2000, () => done(false));
+    socket.once('connect', () => done(true));
+    socket.once('error', () => done(false));
+  });
 }
 
 /**

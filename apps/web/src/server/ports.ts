@@ -61,4 +61,15 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * only lets a page listen; null where pages listen to the live service itself (T-8).
    */
   readonly liveFeed: ((request: Request) => Promise<Response>) | null;
+  /**
+   * The made-up world in this process's memory (stand-in-world.ts), not a database: its
+   * pages say so, and it answers only requests made on this computer (step 2.152).
+   */
+  readonly madeUpWorld: boolean;
+  /**
+   * Whether a request with these headers may be answered at all. The made-up world answers
+   * only one addressed to this computer's names (or its own `.test` name) and not passed
+   * on by another server (stand-in-ports.ts, answersOnlyHere); a database always answers.
+   */
+  readonly answers: (headers: Headers) => boolean;
 };

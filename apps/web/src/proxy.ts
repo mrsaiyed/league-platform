@@ -3,11 +3,19 @@
 // any header of that name the browser sent, because the pages are given only the
 // decoded parts and context.ts must see the address as it came (T-34, U-7).
 //
+// First of all, on the made-up world (local work and tests), a request gets a plain page
+// and nothing else unless it is addressed to this computer's own names (or the app's own
+// `.test` name) and carries no sign of having been passed on by another server (step
+// 2.152; stand-in-ports.ts, answersOnlyHere). The made-up people's cookies are in the code.
+// What keeps other computers out is that the made-up world listens on the loopback address
+// only (scripts/web-listen.mjs); this check keeps out what can still arrive here.
+//
 // It also keeps a session going (T-69, T-70): when the browser sends the renewing
 // token and no session cookie (it ran out), the session is renewed here, the page
 // sees the new token, and the browser is given the new cookies (renew-session.ts).
 import { NextResponse, type NextRequest } from 'next/server';
 import { webPorts } from './server/container.ts';
+import { t } from './server/messages.ts';
 import { pathHeader } from './server/request-facts-header.ts';
 import { cookieNames, type CookieJar, type CookieOptions } from './server/sign-in/cookies.ts';
 import { secureCookies } from './server/sign-in/next-visit.ts';
@@ -17,7 +25,37 @@ type Change =
   | { readonly name: string; readonly value: string; readonly options: CookieOptions }
   | { readonly name: string; readonly value: null };
 
+/**
+ * The plain page a request gets when the app does not answer it: the made-up world
+ * answers only requests made on this computer, to its own names (step 2.152). No session
+ * is read first.
+ */
+function notAnswered(): NextResponse {
+  const escape = (text: string) =>
+    text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const title = escape(t('standIn.otherHost.title'));
+  const body = escape(t('standIn.otherHost.body'));
+  return new NextResponse(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title></head><body><main><h1>${title}</h1><p>${body}</p></main></body></html>`,
+    {
+      status: 421,
+      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+    },
+  );
+}
+
+/** The app's ports, or undefined while it cannot start: the pages and /health say so. */
+async function portsIfStarted() {
+  try {
+    return await webPorts();
+  } catch {
+    return undefined;
+  }
+}
+
 export async function proxy(request: NextRequest): Promise<NextResponse> {
+  const ports = await portsIfStarted();
+  if (ports?.answers(request.headers) === false) return notAnswered();
   const url = new URL(request.url);
   const changes: Change[] = [];
   if (
@@ -35,8 +73,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         changes.push({ name, value: null });
       },
     };
-    const ports = await webPorts();
-    await renewIfDue(jar, ports.renewSession, secureCookies(), () => new Date());
+    // As before: a renewal needs the app, and its start-up failing is the page's to say.
+    const started = ports ?? (await webPorts());
+    await renewIfDue(jar, started.renewSession, secureCookies(), () => new Date());
   }
 
   const headers = new Headers(request.headers);

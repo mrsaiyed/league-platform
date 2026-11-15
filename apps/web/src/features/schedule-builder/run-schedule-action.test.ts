@@ -9,28 +9,27 @@ import {
 } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { standInSchedule } from '../../server/stand-in-schedule.ts';
+import { adultTeams } from '../../server/stand-in-world-seed.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildGrid, parsePlace, placeValue } from './build-grid.ts';
 import { runScheduleAction, type ScheduleActionKind } from './run-schedule-action.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
 const owner = '01900000-0000-7000-8000-0000000000a1';
 const seasonId = '01900000-0000-7000-8000-0000c1000001';
-const team = (n: number) =>
-  `01900000-0000-7000-8000-${(0xa1 * 0x1000000 + n).toString(16).padStart(12, '0')}`;
-const teams = Array.from({ length: 8 }, (_, i) => ({ id: team(i + 1), name: `Team ${i + 1}` }));
+// Eight of the made-up season's own teams.
+const teams = adultTeams.slice(0, 8).map((t) => ({ id: t.id, name: t.name }));
+const team = (n: number) => teams[n - 1]?.id ?? '';
 const context: CommandContext = { leagueId, accountId: owner, requestId: 'request-1' };
 
 function setup() {
-  const ports = standInSchedule({
-    leagues: [{ leagueId, seasonId, teams, rounds: 3 }],
-    accessFor: () => ({
+  const ports = standInSchedule(
+    testWorld(() => ({
       ownerAccountId: async () => owner,
       leagueStatus: async () => 'live',
       activeGrantsOf: async () => [],
-    }),
-    log: () => undefined,
-    today: () => '2026-11-13',
-  });
+    })),
+  );
   const read = async (): Promise<ScheduleDraftView> => {
     const got = await getScheduleDraft(context, { seasonId }, ports.deps);
     if (!got.ok) throw new Error('could not read the draft');
@@ -70,7 +69,10 @@ describe('schedule grid', () => {
     const place = placeValue(gym.id, court1.name);
     expect(parsePlace(place)).toEqual({ venueId: gym.id, court: court1.name });
 
-    // Ten games, one pair at a time at 18:00 and 19:00 on Court 1.
+    // The season's games already published (the first round's are at 18:00 and 19:00).
+    const publishedBefore = first.published.games.length;
+    expect(publishedBefore).toBeGreaterThan(0);
+    // Ten games, one an hour from 08:00 to 17:00 on Court 1.
     for (let n = 1; n <= 10; n += 1) {
       const home = teams[(n * 2 - 2) % 8];
       const away = teams[(n * 2 - 1) % 8];
@@ -80,17 +82,17 @@ describe('schedule grid', () => {
         awayTeamId: away?.id ?? '',
         roundId: round.id,
         date: round.date,
-        time: `${String(8 + n).padStart(2, '0')}:00`,
+        time: `${String(7 + n).padStart(2, '0')}:00`,
         place,
         recording: n === 1 ? 'live' : '',
       });
       expect(done).toEqual({ kind: 'saved' });
     }
     let view = await read();
-    expect(view.result.games).toHaveLength(10);
+    expect(view.result.games).toHaveLength(publishedBefore + 10);
     expect(view.clashes).toEqual([]);
-    // Nothing is public yet: the published schedule is still empty.
-    expect(view.published.games).toHaveLength(0);
+    // Nothing is public yet: the published schedule is still what it was.
+    expect(view.published.games).toHaveLength(publishedBefore);
 
     // A game booked on top of game 2 (same court, same time) is flagged at once.
     const dup = await press('add-game', {
@@ -99,7 +101,7 @@ describe('schedule grid', () => {
       awayTeamId: team(6),
       roundId: round.id,
       date: round.date,
-      time: '10:00',
+      time: '09:00',
       place,
     });
     expect(dup).toEqual({ kind: 'saved' });
@@ -115,9 +117,9 @@ describe('schedule grid', () => {
       gameId: gameId(11),
       roundId: round.id,
       date: round.date,
-      time: '10:00',
+      time: '09:00',
       place: placeValue(gym.id, court2?.name ?? null),
-      wasSlot: [round.id, round.date, '10:00', place].join('~'),
+      wasSlot: [round.id, round.date, '09:00', place].join('~'),
       recording: '',
       wasRecording: '',
     });
@@ -131,9 +133,9 @@ describe('schedule grid', () => {
         gameId: gameId(2),
         roundId: round.id,
         date: round.date,
-        time: '10:00',
+        time: '09:00',
         place,
-        wasSlot: [round.id, round.date, '10:00', place].join('~'),
+        wasSlot: [round.id, round.date, '09:00', place].join('~'),
         recording: 'box-score',
         wasRecording: '',
       }),
@@ -146,7 +148,7 @@ describe('schedule grid', () => {
       await press('rename-round', { roundId: round.id, label: 'Week 5, Rivalry Week' }),
     ).toEqual({ kind: 'saved' });
     view = await read();
-    expect(view.result.games).toHaveLength(10);
+    expect(view.result.games).toHaveLength(publishedBefore + 10);
     expect(view.result.games.find((g) => g.id === gameId(2))?.recording).toBe('box-score');
     expect(view.result.rounds[0]?.label).toBe('Week 5, Rivalry Week');
     expect(view.published.rounds[0]?.label).toBe('Round 1');
@@ -155,7 +157,7 @@ describe('schedule grid', () => {
     expect(await press('publish', {})).toEqual({ kind: 'published' });
     view = await read();
     expect(view.draft).toBeNull();
-    expect(view.published.games).toHaveLength(10);
+    expect(view.published.games).toHaveLength(publishedBefore + 10);
     expect(view.published.rounds[0]?.label).toBe('Week 5, Rivalry Week');
   });
 

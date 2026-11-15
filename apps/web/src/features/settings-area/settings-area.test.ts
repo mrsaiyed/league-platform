@@ -20,6 +20,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { standInAdminSettings } from '../../server/stand-in-admin-settings.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { answerQuery, doneKey, problemKey, refused } from './answer.ts';
 import { valueOf, versionOf } from './form-input.ts';
 import { privacyNotes } from './privacy-notes.ts';
@@ -66,14 +67,43 @@ const as = (accountId: string | null): CommandContext => ({
   accountId,
   requestId: 'request-1',
 });
-/** The settings stand-in for a league of this audience, with or without a recorded child. */
-const settingsStandIn = (audience: Audience = 'youth', hasRecordedChild = false) =>
-  standInAdminSettings({
-    accessOf: () => access,
-    log: () => undefined,
-    audienceOf: () => audience,
-    hasRecordedChild: () => hasRecordedChild,
-  });
+/**
+ * The settings stand-in on the one made-up world, its league made of this audience, with
+ * or without someone recorded as a child: the Privacy settings read both from its rows.
+ */
+const settingsStandIn = (
+  audience: Audience = 'youth',
+  hasRecordedChild = false,
+  now?: () => Date,
+) =>
+  standInAdminSettings(
+    testWorld(
+      () => access,
+      now,
+      (leagues) => {
+        const at = leagues.findIndex((l) => l.leagueId === leagueId);
+        const league = leagues[at];
+        if (league === undefined) throw new Error('The test league is not in the seed.');
+        leagues[at] = {
+          ...league,
+          audience,
+          // Only the first person is recorded as a child, and only when asked for.
+          people: league.people.map((p, i) => ({
+            ...p,
+            sensitive: {
+              ...p.sensitive,
+              isMinor:
+                hasRecordedChild && i === 0
+                  ? true
+                  : p.sensitive.isMinor === true
+                    ? null
+                    : p.sensitive.isMinor,
+            },
+          })),
+        };
+      },
+    ),
+  );
 
 describe('the settings form', () => {
   it('shows a setting declared in a test with its label, default and limits', async () => {
@@ -236,13 +266,7 @@ describe('the settings form', () => {
   });
 
   it('says the confirmation is in force and since when, once it is given (record 065)', async () => {
-    const { deps } = standInAdminSettings({
-      accessOf: () => access,
-      log: () => undefined,
-      audienceOf: () => 'youth',
-      hasRecordedChild: () => false,
-      now: () => new Date('2026-11-15T12:00:00Z'),
-    });
+    const { deps } = settingsStandIn('youth', false, () => new Date('2026-11-15T12:00:00Z'));
     const given = await setSetting(
       as(ownerId),
       {

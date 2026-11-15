@@ -2,13 +2,15 @@
 import { describe, expect, it } from 'vitest';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
+import { startingNamePolicy } from '../../server/name-policy-of.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildHomeNumbers } from './build-home-numbers.ts';
 
 const adult = '01900000-0000-7000-8000-000000000001';
-const youth = '01900000-0000-7000-8000-000000000002';
 const now = () => new Date('2026-11-13T15:00:00Z');
-const schedules = standInPublicSchedule({ adultLeagueId: adult, youthLeagueId: youth }, now);
-const stats = standInPublicStats({ adultLeagueId: adult, youthLeagueId: youth });
+const world = testWorld(undefined, now);
+const schedules = standInPublicSchedule(world);
+const stats = standInPublicStats(world, startingNamePolicy);
 
 describe('the home page in numbers', () => {
   it('counts teams, games played, games to play and rounds', async () => {
@@ -18,10 +20,10 @@ describe('the home page in numbers', () => {
     const schedule = await schedules.scheduleOf(adult, season.id, clock.today);
     if (schedule === undefined) throw new Error('no schedule');
     const games = [...schedule.rounds.flatMap((r) => r.games), ...schedule.unplacedGames];
-    const numbers = buildHomeNumbers(schedule, 5);
+    const numbers = buildHomeNumbers(schedule, 9);
     expect(numbers.map((n) => n.key)).toEqual(['teams', 'played', 'toPlay', 'rounds']);
     const value = (key: string) => Number(numbers.find((n) => n.key === key)?.value);
-    expect(value('teams')).toBe(5);
+    expect(value('teams')).toBe(9);
     expect(value('rounds')).toBe(schedule.rounds.length);
     expect(value('played')).toBeGreaterThan(0);
     expect(value('toPlay')).toBeGreaterThan(0);
