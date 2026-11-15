@@ -14,8 +14,13 @@
 // - The live game, which the tracker has recorded plays of, has no score boxes and offers
 //   "Score this game" (S-46).
 // - A scheduler saves a wrong final score, taps "Correct this result", gives a reason and
-//   saves the right one. A scorekeeper reads who can reopen that game, on their games and
-//   on the games list.
+//   saves the right one, with a real double tap on "Reopen to correct" and on "Yes, make it
+//   final": each is done once and read as done. A scorekeeper reads who can reopen that
+//   game, on their games and on the games list.
+// - A game its tracker ended (played to its end through the tracker's own endpoints, as a
+//   tablet would): the scorekeeper who ended it reads until when they may reopen it and
+//   does, inside the league's minutes; ended again, an admin reopens it. Each time it is
+//   live again, scored in the tracker, with no score boxes.
 // - With scripts off, a game set to live tracking with no plays yet is finished by score
 //   through the same two steps; by keyboard, the boxes open and the score is saved.
 // - Every control on the games list is at least 44 high; accessibility checks (T-186) and
@@ -90,6 +95,42 @@ async function openGames(page) {
     page.locator('a[href="/north-valley/admin/games"]').first().click(),
   ]);
   await page.getByRole('heading', { level: 1, name: 'Games' }).waitFor();
+}
+
+/** Lets every answer of a double tap arrive before the page is read. */
+async function settle(page) {
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.waitForTimeout(1500);
+}
+
+/**
+ * A scorekeeper's tablet scoring the live game through the tracker's own endpoints (step
+ * 2.32), as tests/browser and scripts/shots.mjs do: nothing typed in the browser.
+ */
+const leagueApi = '/api/v1/leagues/01900000-0000-7000-8000-000000000001';
+const trackedPlayer = (team, n) =>
+  `01900000-0000-7000-8000-${(0x70 + team).toString(16).padStart(4, '0')}${n.toString(16).padStart(8, '0')}`;
+async function tablet(game, token) {
+  const post = async (at, body) => {
+    const answer = await fetch(`${origin}${leagueApi}/games/${game}${at}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `srl_session=${token}`, origin },
+      body: JSON.stringify(body),
+    });
+    const text = await answer.text();
+    if (!answer.ok) throw new Error(`${at} answered ${answer.status}: ${text.slice(0, 200)}`);
+    return JSON.parse(text);
+  };
+  const { sessionId } = await post('/session', { type: 'open', deviceId: 'games-area-tablet' });
+  return async (...inputs) => {
+    const reply = await post('/commands', {
+      protocolVersion: 1,
+      sessionId,
+      commands: inputs.map((input) => ({ commandId: crypto.randomUUID(), at: Date.now(), input })),
+    });
+    const refused = reply.results.filter((r) => r.status !== 'accepted');
+    if (refused.length > 0) throw new Error(`refused: ${JSON.stringify(refused)}`);
+  };
 }
 
 /** Whether the element is on the screen without scrolling and not under the header. */
@@ -279,23 +320,37 @@ if (browser) {
       await page
         .getByLabel('Why it needs correcting (kept in the log, never shown publicly)')
         .fill('Typed 47 for the Tigers; the sheet says 49');
+      // A real double tap on "Reopen to correct": reopened once, and the person lands on
+      // the list with the boxes open, not on a notice that someone changed the game.
       await Promise.all([
         page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
-        page.getByRole('button', { name: 'Reopen to correct' }).click(),
+        page.getByRole('button', { name: 'Reopen to correct' }).dblclick(),
       ]);
+      await settle(page);
       const reopened = gameOn(page, finalScoreGame);
       note(
-        'after reopening, the game says so beside it with its boxes open',
-        (await reopened.getByRole('status').textContent()) ===
-          'The game is reopened. Enter the right result.' &&
+        'after reopening (with a double tap), the game says so beside it with its boxes open',
+        new URL(page.url()).pathname === '/north-valley/admin/games' &&
+          (await reopened.getByRole('status').textContent()) ===
+            'The game is reopened. Enter the right result.' &&
           (await reopened.locator('input[type=number]:visible').count()) === 2,
+        `${page.url()} ${await reopened
+          .getByRole('status')
+          .textContent()
+          .catch(() => '')}`,
       );
       await typeAndSave(page, finalScoreGame, { Tigers: 49, Lions: 51 });
-      await sayYes(page, finalScoreGame);
+      // A real double tap on "Yes, make it final": saved once, and "Saved" is what is read.
+      await Promise.all([
+        page.waitForURL((url) => url.searchParams.get('done') === 'final'),
+        gameOn(page, finalScoreGame).getByRole('button', { name: 'Yes, make it final' }).dblclick(),
+      ]);
+      await settle(page);
       note(
-        'the right score is saved and named',
+        'the right score is saved and named, after a double tap on "Yes"',
         (await gameOn(page, finalScoreGame).getByRole('status').textContent()) ===
           'Saved: Tigers 49, Lions 51 is final.',
+        (await gameOn(page, finalScoreGame).getByRole('status').textContent()) ?? '',
       );
     } finally {
       await context.close();
@@ -326,6 +381,88 @@ if (browser) {
       await context.close();
     }
   });
+
+  await step(
+    'a game its tracker ended is corrected by its scorekeeper, then by an admin',
+    async () => {
+      // The scorekeeper's tablet plays the live game (Bears at Hawks) to its end.
+      const send = await tablet(liveGame, 'local-scorekeeper-token');
+      const five = (team) => [1, 2, 3, 4, 5].map((n) => trackedPlayer(team, n));
+      await send(
+        { type: 'lineup', side: 'home', playerIds: five(3) },
+        { type: 'lineup', side: 'away', playerIds: five(4) },
+        { type: 'start' },
+        { type: 'score', side: 'home', playerId: trackedPlayer(3, 1), points: 2 },
+        { type: 'end' },
+      );
+      const keeper = await signedInAs('local-scorekeeper-token');
+      try {
+        const { page } = keeper;
+        await openGames(page);
+        const game = gameOn(page, liveGame);
+        note(
+          'the scorekeeper who ended it reads until when they may reopen it, with the way to',
+          /^You ended this game in the tracker, so you can reopen it until .+\. Correct this result$/.test(
+            ((await game.locator('[data-reopen]').textContent()) ?? '').trim(),
+          ),
+          (await game.locator('[data-reopen]').textContent()) ?? '',
+        );
+        await Promise.all([
+          page.waitForURL((url) => url.pathname === `/north-valley/admin/games/${liveGame}`),
+          game.getByRole('link', { name: 'Correct this result' }).click(),
+        ]);
+        await accessible(page, "the scorekeeper's reopen form");
+        await page
+          .getByLabel('Why it needs correcting (kept in the log, never shown publicly)')
+          .fill('End game tapped by mistake');
+        await Promise.all([
+          page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
+          page.getByRole('button', { name: 'Reopen to correct' }).dblclick(),
+        ]);
+        await settle(page);
+        const live = gameOn(page, liveGame);
+        note(
+          'the scorekeeper reopens it inside the league’s minutes: live again, scored in the tracker',
+          (await live.getByRole('status').textContent()) ===
+            'The game is live again. Correct it in the tracker, then end it again.' &&
+            (await live.getByRole('link', { name: 'Score this game' }).count()) === 1 &&
+            (await live.locator('input[type=number]').count()) === 0,
+          (await live
+            .getByRole('status')
+            .textContent()
+            .catch(() => '')) ?? '',
+        );
+      } finally {
+        await keeper.context.close();
+      }
+
+      // Ended again; an admin corrects it at any time, through the tracker's door.
+      await send({ type: 'end' });
+      const admin = await signedInAs('local-owner-token');
+      try {
+        const { page } = admin;
+        await openGames(page);
+        await Promise.all([
+          page.waitForURL((url) => url.pathname === `/north-valley/admin/games/${liveGame}`),
+          gameOn(page, liveGame).getByRole('link', { name: 'Correct this result' }).click(),
+        ]);
+        await page
+          .getByLabel('Why it needs correcting (kept in the log, never shown publicly)')
+          .fill('A basket went to the wrong player');
+        await Promise.all([
+          page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
+          page.getByRole('button', { name: 'Reopen to correct' }).click(),
+        ]);
+        note(
+          'an admin reopens a game its tracker ended, and it goes back to the tracker',
+          (await gameOn(page, liveGame).getByRole('status').textContent()) ===
+            'The game is live again. Correct it in the tracker, then end it again.',
+        );
+      } finally {
+        await admin.context.close();
+      }
+    },
+  );
 
   await step('with scripts off, a live-set game with no plays is finished by score', async () => {
     const { context, page } = await signedInAs('local-scheduler-token', {
