@@ -997,6 +997,13 @@
   block-size: var(--court-subs-height);
   min-inline-size: 0;
 }
+/* "In for" is never more than the five on the court, and never folds: they share the one
+   line, each as wide as the others, however narrow the pad. */
+.court-subs-row[data-all] {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 88px);
+}
 /* A team's whole bench, in the pad: every player, wrapping, the pad scrolling down only
    for a very long bench. */
 .court-bench-rows {
@@ -1282,11 +1289,19 @@
     min-inline-size: 0;
   }
   .court-more-button {
+    position: relative;
     align-self: stretch;
     padding-inline: 6px;
   }
+  /* Only the three dots show, but the word stays the button's name for a screen reader:
+     it is taken out of sight, never out of the page. */
   .court-more-word {
-    display: none;
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .court-score {
     padding-block: 2px 4px;
@@ -1389,8 +1404,17 @@
     font-size: var(--court-size-small);
     line-height: 1.2;
   }
+  /* The dots alone, the word still the button's name (as on a short upright phone). */
+  .court-more-button {
+    position: relative;
+  }
   .court-more-word {
-    display: none;
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .court-controls {
     min-block-size: 48px;

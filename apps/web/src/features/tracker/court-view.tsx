@@ -569,7 +569,13 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
         <span className="court-label">
           {t(tile.onCourt ? 'tracker.pad.subIn' : 'tracker.pad.inFor')}
         </span>
-        <div className="court-subs-row" data-fit="">
+        {/* "Sub in" is the bench, as many as fit and a way to the rest; "In for" is the
+            five on the court, all of them always. */}
+        <div
+          className="court-subs-row"
+          data-fit={tile.onCourt ? '' : undefined}
+          data-all={tile.onCourt ? undefined : ''}
+        >
           {/* Where the bench does not all fit in this row: how many more, and the way
               to all of them, to come in for this player. */}
           {tile.onCourt ? (
