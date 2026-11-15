@@ -310,7 +310,8 @@ if (browser) {
         (await page.locator('select[name=season]').count()) === 0,
       );
 
-      for (const address of ['/north-valley/teams/lions', '/north-valley/no-such-page/at-all']) {
+      // Comets is a team of another league, never of this one (step 2.152).
+      for (const address of ['/north-valley/teams/comets', '/north-valley/no-such-page/at-all']) {
         const response = await open(page, address);
         note(`${address} is not found`, response?.status() === 404);
         note(

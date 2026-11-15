@@ -14,10 +14,12 @@
 // shell's checks can be someone who holds roles in the made-up leagues; nothing
 // about that works outside this file.
 //
-// Reads go through the access module's own query (myAccess) on an in-memory
-// transaction; this stand-in cannot change anything.
+// Who holds what is read through the access module's own query (myAccess) on an
+// in-memory transaction that cannot change it. Everything else a league holds is the
+// one made-up world (stand-in-world.ts, seeded by stand-in-world-seed.ts), which every
+// area reads and writes through the product's own commands; it is made again each time
+// the server starts.
 import {
-  fail,
   ok,
   type AccessTx,
   type CommandDeps,
@@ -25,7 +27,6 @@ import {
   type LeagueStatus,
   type Role,
   type Scope,
-  whoMayScore,
 } from '@srleagues/core';
 import {
   captureEmail,
@@ -44,16 +45,12 @@ import { createPlayPublisher } from './publish-plays.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import { standInFixtureImport } from './stand-in-fixture-import.ts';
 import { standInGames } from './stand-in-games.ts';
-import { standInListedGames, standInPublicSchedule } from './stand-in-public-schedule.ts';
-import {
-  adultTeams,
-  standInAudienceOf,
-  standInPublicStats,
-  standInSeasonIds,
-  youthTeams,
-} from './stand-in-public-stats.ts';
+import { standInPublicSchedule } from './stand-in-public-schedule.ts';
+import { standInPublicStats } from './stand-in-public-stats.ts';
 import { standInSchedule } from './stand-in-schedule.ts';
 import { standInPublicTeams } from './stand-in-public-teams.ts';
+import { madeUpLeagues } from './stand-in-world-seed.ts';
+import { madeUpWorld } from './stand-in-world.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
@@ -116,6 +113,9 @@ function league(
   return { id: id(n), slug, status, inBin: false, ownerAccountId: owner.accountId, formerSlugs };
 }
 
+/** The draft league's one program: a made-up scheduler is given that program only. */
+export const standInDraftProgramId = id(0xc1);
+
 const grantOf = (
   n: number,
   accountId: string,
@@ -148,7 +148,7 @@ const grants = [
   grantOf(10, standInPeople.clubAdmin.accountId, 'club_admin', standInLeagues.draft.id),
   grantOf(11, standInPeople.programScheduler.accountId, 'scheduler', standInLeagues.draft.id, {
     type: 'program',
-    id: id(0xc1),
+    id: standInDraftProgramId,
   }),
   grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.otherDraft.id),
   // A scorekeeper still holding the role in an archived league is told it is archived,
@@ -326,46 +326,47 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     return person === undefined ? signIn.identify({ accessToken }) : ok(identityOf(person));
   };
   const accessOf = accessOfVia(deps);
-  // The League settings screen's settings: the public pages read how names show from them.
-  // There is exactly one: a second copy would keep the admin's saved setting from the pages.
-  const adminSettings = standInAdminSettings({
+  // The one made-up world: every area below reads and writes the same rows (step 2.152).
+  const world = madeUpWorld({
+    leagues: madeUpLeagues(
+      {
+        adultLeagueId: standInLeagues.live.id,
+        youthLeagueId: standInLeagues.other.id,
+        // The draft league has the same tracked games, but scores assigned games only, and
+        // its admin is given the live ones: its scorekeeper is refused those (P7 §5.1).
+        draftLeagueId: standInLeagues.draft.id,
+        draftProgramId: standInDraftProgramId,
+        otherLeagueIds: [
+          standInLeagues.archived.id,
+          standInLeagues.suspended.id,
+          standInLeagues.inBin.id,
+          standInLeagues.otherDraft.id,
+        ],
+        // The made-up coach has a roster place on a team of each league.
+        memberAccountId: coach.accountId,
+        assignees: [scorekeeper.accountId, owner.accountId],
+        draftAssignees: [standInPeople.admin.accountId, scorekeeper.accountId],
+      },
+      now(),
+    ),
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
+    now,
   });
+  // The League settings screen's settings: every area reads them from the same world.
+  const adminSettings = standInAdminSettings(world);
   const namePolicy = namePolicyOf(adminSettings.deps);
-  const scheduled = {
-    adultLeagueId: standInLeagues.live.id,
-    youthLeagueId: standInLeagues.other.id,
-  };
-  // Who plays in each made-up league, read by every page that shows a name (R-15).
-  const audienceOf = standInAudienceOf(scheduled);
-  const games = standInGames({
-    namesShownOf: namesShownOf(namePolicy, audienceOf),
-    leagueId: standInLeagues.live.id,
+  // Who plays in each made-up league and how it shows names, read by every page that
+  // shows a name (R-15).
+  const namesShown = namesShownOf(namePolicy, world.audienceOf);
+  const games = standInGames(world, {
+    namesShownOf: namesShown,
     people: {
       [owner.accountId]: 'Olive Owner',
       [scheduler.accountId]: 'Sky Scheduler',
       [scorekeeper.accountId]: 'Sam Scorekeeper',
       [standInPeople.admin.accountId]: 'Avery Admin',
     },
-    assignees: [scorekeeper.accountId, owner.accountId],
-    // The draft league has the same games, but scores assigned games only, and its
-    // admin is given the live ones: its scorekeeper is refused those (P7 §5.1).
-    moreLeagues: [
-      {
-        leagueId: standInLeagues.draft.id,
-        assignees: [standInPeople.admin.accountId, scorekeeper.accountId],
-        settings: {
-          [whoMayScore.key]: [
-            { level: 'league', document: { version: whoMayScore.version, value: 'assignedOnly' } },
-          ],
-        },
-      },
-    ],
-    accessOf: (leagueId) => accessTx(leagueId).access,
-    log: options.log,
-    // The home and schedule pages' games, so each card opens its game's page.
-    listedGames: standInListedGames(scheduled, now),
   });
   // One live hub for this process (record 021): the tracker's endpoints publish to it,
   // and GET /api/v1/live lets a page listen, only to a league it may open.
@@ -404,46 +405,13 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       warn: (message, fields) => options.warn?.(message, { kind: fields.reason }),
     }),
     liveFeed: (request) => hub.serve(request),
-    fixtureImport: standInFixtureImport({
-      leagueId: standInLeagues.live.id,
-      accessOf: (leagueId) => accessTx(leagueId).access,
-      log: options.log,
-    }),
-    publicStats: standInPublicStats(scheduled, namePolicy),
-    adminTeams: standInAdminTeams({
-      accessOf: (leagueId) => accessTx(leagueId).access,
-      log: options.log,
-      seededLeagueId: standInLeagues.live.id,
-      audienceOf: (leagueId) => audienceOf(leagueId) ?? 'youth',
-      // A person's name request reads the settings the admin saves (R-25).
-      settingRowsOf: (leagueId, key) =>
-        adminSettings.deps.transaction(
-          { leagueId, accountId: null, requestId: 'name-settings' },
-          (tx) => tx.leagues.settingRows(key, {}),
-        ),
-    }),
+    fixtureImport: standInFixtureImport(world),
+    publicStats: standInPublicStats(world, namePolicy),
+    adminTeams: standInAdminTeams(world),
     adminSettings,
-    publicSchedule: standInPublicSchedule(scheduled, now),
-    scheduleAdmin: standInSchedule({
-      leagues: [
-        {
-          leagueId: standInLeagues.live.id,
-          seasonId: standInSeasonIds.adultFall,
-          teams: adultTeams.map((t) => ({ id: t.id, name: t.name })),
-          rounds: 6,
-        },
-        {
-          leagueId: standInLeagues.other.id,
-          seasonId: standInSeasonIds.youthWinter,
-          teams: youthTeams.map((t) => ({ id: t.id, name: t.name })),
-          rounds: 4,
-        },
-      ],
-      accessFor: (leagueId) => accessTx(leagueId).access,
-      log: options.log,
-      today: () => new Date().toISOString().slice(0, 10),
-    }),
-    publicTeams: standInPublicTeams(scheduled, coach.accountId),
+    publicSchedule: standInPublicSchedule(world),
+    scheduleAdmin: standInSchedule(world),
+    publicTeams: standInPublicTeams(world),
     signUpMadeUpMember,
   };
 }

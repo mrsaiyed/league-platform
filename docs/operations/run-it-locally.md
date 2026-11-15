@@ -47,6 +47,42 @@ This starts Next.js in development mode, with the address in `PUBLIC_BASE_URL` (
 
 With `APP_ENV=local`, the web app holds made-up leagues and made-up people in memory, in the process. It opens **no database and no sign-in service**: the sign-in screens and the made-up people are described in record 031 and in the header of `apps/web/src/server/stand-in-ports.ts`. Restarting the app puts the made-up data back to its starting state.
 
+### One made-up world you can walk through
+
+Everything the made-up leagues hold is one set of rows in the app's memory, per league
+(step 2.152, `apps/web/src/server/stand-in-world.ts`, seeded from
+`apps/web/src/server/stand-in-world-seed.ts`). Every screen reads and writes the same rows
+through the product's own commands, so what the admin does is what a visitor sees:
+
+- a team added in Admin → Teams, and the players put on it, are on the public Teams page and
+  the team's own page, in the schedule grid, the fixture import and the tracker;
+- a schedule built and published in Admin → Schedule (or filled from a fixture file) is the
+  public schedule, the home page's games and the games area's list;
+- a final score, a forfeit or a box score typed in Admin → Games, or a game the tracker ends,
+  changes the game's page, the home page, the standings and the statistics at once: core
+  works the standings out again from the results, as on the database;
+- a postponed or cancelled game says so everywhere, and a reopened one is open again;
+- League settings take effect: who may score, the start page for members, how names show and
+  the statistics settings for teams.
+
+The two made-up leagues are apart: North Valley (adults, nine teams, `/north-valley`) and
+Harbor City (children, three teams, `/harbor-city`), each with its own look. **The world is made
+again every time the server starts**: whatever you added is gone after a restart, and the
+games' days move with today's date, so this week's round is always this week.
+
+To try it as a league's admin:
+
+1. Start it with `npm run dev:web` and open `http://localhost:3000/north-valley`.
+2. Be the made-up owner: in the browser's developer tools, add a cookie `srl_session` with
+   the value `local-owner-token` for `localhost` (the made-up people are given only by this
+   cookie, see `stand-in-ports.ts`), then open `http://localhost:3000/north-valley/admin`
+   (nothing links to the admin from the public pages yet).
+3. Teams: add a team, then add two players to it under "Add someone new".
+4. Schedule: in this week's round add a game for the new team, then "Publish this schedule".
+5. Games: type the game's final score (or open "Box score" and type the players' points), then
+   remove the cookie and look at the home page, the team, the game, the standings and the
+   statistics.
+
 To run it on the made-up database instead, put `LOCAL_DATA=made-up-database` in `.env` (local and test only). The app then builds a database in memory when it starts, with every migration and the two seed leagues (below), and reads leagues, signed-in people and what they hold from it. Sign-in still uses the stand-in's screens; the stand-in's made-up people do not exist there. The areas not yet moved onto the database (step 2.93, record 055) show an error page. It too opens no address and is gone when the app stops.
 
 To build and run the production build locally:

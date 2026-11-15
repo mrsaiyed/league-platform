@@ -124,7 +124,8 @@ const cases = [
     'visitor',
     '/north-valley/teams',
     200,
-    ['Owls', 'Falcons', '5-1', 'East', 'Seed', 'Record'],
+    // The records are worked out from the season's results (step 2.152): the Owls are 2-1.
+    ['Owls', 'Falcons', '2-1', 'East', 'Seed', 'Record'],
     ['This page is not built yet.'],
   ],
   // A league with no divisions says nothing about divisions on its team cards.
@@ -150,10 +151,12 @@ const cases = [
     'visitor',
     '/north-valley/teams/owls',
     200,
+    // 87: Jordan Castellanos's points this season, which a staff-only team never shows.
     ['Owls', 'Team totals', 'Roster', 'Jordan Castellanos'],
-    ['Players', '>150<'],
+    ['Players', '>87<'],
   ],
-  ['visitor', '/north-valley/teams/lions', 404, [notFound]],
+  // Another league's team is no team of this one (the league fence, step 2.152).
+  ['visitor', '/north-valley/teams/comets', 404, [notFound]],
   ['visitor', '/north-valley/teams/falcons?season=nope', 404, [notFound]],
   // Any address under a league that is no page of it is refused by the league's own gate
   // (step 2.85): "not found" for a league the visitor may see and for one they may not.
@@ -272,7 +275,7 @@ const cases = [
     'visitor',
     '/north-valley/stats',
     200,
-    ['Leaders', 'Dana Whitfield', 'Owls', 'Only team totals are shown for Owls.', 'ui-stats'],
+    ['Leaders', 'Dana Whitfield', 'Owls', 'Only team totals are shown for Bears, Owls.', 'ui-stats'],
     ['This page is not built yet.', 'Jordan', 'Castellanos', 'Imani', 'Brooks'],
   ],
   ['coach', '/north-valley/stats', 200, ['Dana Whitfield'], ['Jordan', 'Castellanos', 'Brooks']],
@@ -313,10 +316,11 @@ const cases = [
     'owner',
     '/north-valley/admin/teams',
     200,
-    ['Teams of Winter 2026', 'Lions', 'Owls', 'Add a team', 'Short name'],
+    ['Teams of Fall 2026', 'Lions', 'Owls', 'Add a team', 'Short name'],
     ['Nothing here yet.'],
   ],
-  ['owner', '/harbor-city/admin/teams', 200, ['No teams yet.', 'Add a team'], ['Lions']],
+  // Each league's own teams: the youth league's, none of the first league's.
+  ['owner', '/harbor-city/admin/teams', 200, ['Comets', 'Add a team'], ['Lions']],
   ['owner', '/north-valley/admin/teams/not-a-team', 404, [notFound]],
   ['scheduler', '/harbor-city/admin', 403, [noAccess]],
   [
@@ -427,7 +431,8 @@ const cases = [
     'programScheduler',
     '/quiet-pines/admin/schedule',
     200,
-    [adminLink('quiet-pines', 'schedule'), 'There is no season to schedule yet.'],
+    // The draft league's season is of the program this scheduler holds (step 2.152).
+    [adminLink('quiet-pines', 'schedule'), 'Build the schedule here, round by round.'],
     ['Nothing here yet.'],
   ],
   [
@@ -467,7 +472,7 @@ const cases = [
     'clubAdmin',
     '/quiet-pines/admin/teams',
     200,
-    [adminLink('quiet-pines', 'teams'), adminLink('quiet-pines', 'registration'), 'No teams yet.'],
+    [adminLink('quiet-pines', 'teams'), adminLink('quiet-pines', 'registration'), 'Lions'],
     [adminLink('quiet-pines', 'people')],
   ],
   ['otherAdmin', '/still-waters/admin', 200, [adminLink('still-waters', 'settings')]],

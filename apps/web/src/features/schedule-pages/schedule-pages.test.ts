@@ -6,6 +6,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
+import { startingNamePolicy } from '../../server/name-policy-of.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildHomeGames, buildScheduleView, comingOrder, parseRound } from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
 import { applyUpdate } from './live-game-list.tsx';
@@ -14,8 +16,9 @@ import { RoundSections, gameLinkWords } from './schedule-views.tsx';
 const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
 const now = () => new Date('2026-11-13T15:00:00Z');
-const schedules = standInPublicSchedule({ adultLeagueId: adult, youthLeagueId: youth }, now);
-const stats = standInPublicStats({ adultLeagueId: adult, youthLeagueId: youth });
+const world = testWorld(undefined, now);
+const schedules = standInPublicSchedule(world);
+const stats = standInPublicStats(world, startingNamePolicy);
 const addressee = { id: adult, slug: 'north', customDomain: null } as never;
 
 async function load(leagueId: string, index = 0) {
@@ -149,23 +152,31 @@ describe('schedule', () => {
       if (game === undefined) throw new Error(`no ${status} game`);
       return gameLinkText(game, words);
     };
-    expect(said('live')).toBe('Herons against Falcons, live, 38 to 41');
+    // The tracked game under way has no score yet: no play of it is kept in the world.
+    expect(said('live')).toBe('Bears against Hawks, live');
     expect(said('final')).toBe('Herons against Falcons, final, 47 to 52');
     expect(said('forfeit')).toBe('Otters against Badgers, forfeit, 0 to 20');
     expect(said('postponed')).toBe('Herons against Otters, postponed');
-    expect(said('scheduled')).toMatch(/^Owls against Badgers, [A-Z][a-z]{2}, [A-Z][a-z]{2} \d/);
-    // A game with no day yet, a cancelled one, and a live one whose score is not kept.
+    expect(said('scheduled')).toMatch(/^Herons against Falcons, [A-Z][a-z]{2}, [A-Z][a-z]{2} \d/);
+    // A live one with a score, a game with no day yet, a cancelled one, and a live one
+    // whose score is not kept.
     const live = views.find((g) => g.status === 'live');
     if (live === undefined) throw new Error('no live game');
+    const scored = {
+      ...live,
+      home: { ...live.home, score: 41 },
+      away: { ...live.away, score: 38 },
+    };
+    expect(gameLinkText(scored, words)).toBe('Bears against Hawks, live, 38 to 41');
     expect(gameLinkText({ ...live, status: 'cancelled' }, words)).toBe(
-      'Herons against Falcons, cancelled',
+      'Bears against Hawks, cancelled',
     );
-    expect(gameLinkText({ ...live, home: { ...live.home, score: null } }, words)).toBe(
-      'Herons against Falcons, live',
+    expect(gameLinkText({ ...scored, home: { ...scored.home, score: null } }, words)).toBe(
+      'Bears against Hawks, live',
     );
     expect(
       gameLinkText({ ...live, status: 'scheduled', whenText: 'Date to be announced' }, words),
-    ).toBe('Herons against Falcons, Date to be announced');
+    ).toBe('Bears against Hawks, Date to be announced');
     // The words are on the card's link, and move with the score on the device.
     const html = renderToStaticMarkup(
       createElement(RoundSections, {
@@ -173,9 +184,9 @@ describe('schedule', () => {
         rounds: buildScheduleView(schedule, clock, addressee, {}).rounds,
       }),
     );
-    expect(html).toContain('<span dir="auto">Herons against Falcons, live, 38 to 41</span></a>');
+    expect(html).toContain('<span dir="auto">Bears against Hawks, live</span></a>');
     const moved = applyUpdate(live, { sequence: 5, status: 'live', home: 45, away: 40 });
-    expect(gameLinkText(moved, words)).toBe('Herons against Falcons, live, 40 to 45');
+    expect(gameLinkText(moved, words)).toBe('Bears against Hawks, live, 40 to 45');
   });
 
   it('says when on one line and where on the next, and no place for a game without one', async () => {

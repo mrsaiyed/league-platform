@@ -53,6 +53,9 @@ const finalScoreGame = '01900000-0000-7000-8000-006a00000001'; // Lions v Tigers
 const laterGame = '01900000-0000-7000-8000-006a00000004'; // Tigers v Bears, in two days
 const finishedGame = '01900000-0000-7000-8000-006a00000005'; // Bears v Lions, final, this morning
 const unknownGame = '01900000-0000-7000-8000-006a000000ff';
+/** Game `index` of the first league's current season's 13 listed games (stand-in-world-seed.ts). */
+const listedGame = (index) =>
+  `01900000-0000-7000-8000-0000${(0xb2000000 + 13 * 1000 + index).toString(16)}`;
 // The made-up member who signs in with a password (stand-in-ports.ts): scores nowhere.
 const member = { email: 'member@example.test', password: 'made-up member password' };
 const tracker = (game) => `/north-valley/score/${game}`;
@@ -423,11 +426,23 @@ if (browser) {
       const order = await page
         .locator('[data-my-games] > li')
         .evaluateAll((items) => items.map((li) => li.getAttribute('data-game')));
-      // Live now, today still to play, the days ahead (by day), and the finished game.
+      // Live now, today still to play (by time), the days ahead (by day), and the finished
+      // games. The week's games of the one made-up world (step 2.152): this round's
+      // listed games are among them, Falcons v Herons at noon, Badgers v Owls at eight in
+      // the evening and Owls v Otters, finished this morning after Bears v Lions.
       note(
         'live first, then today, then the days ahead, finished last',
         JSON.stringify(order) ===
-          JSON.stringify([liveGame, finalScoreGame, otherGame, laterGame, finishedGame]),
+          JSON.stringify([
+            liveGame,
+            listedGame(7),
+            finalScoreGame,
+            listedGame(8),
+            otherGame,
+            laterGame,
+            finishedGame,
+            listedGame(6),
+          ]),
         JSON.stringify(order),
       );
       const first = page.getByRole('link', { name: 'Score this game' }).first();

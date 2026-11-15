@@ -1,6 +1,7 @@
 import { getFixtureImport, type AccessReader, type Grant } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { standInFixtureImport } from '../../server/stand-in-fixture-import.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { importNotice } from './import-notice.ts';
 import { runImportAction } from './run-import-action.ts';
 
@@ -38,7 +39,7 @@ const file = {
 };
 
 function setup() {
-  const ports = standInFixtureImport({ leagueId, accessOf: () => access, log: () => {} });
+  const ports = standInFixtureImport(testWorld(() => access));
   const as = (accountId: string, league = leagueId) => ({
     leagueId: league,
     accountId,
@@ -105,8 +106,8 @@ describe('the fixture import screen actions', () => {
     expect(await upload(coach)).toEqual({ ok: false, code: 'not-allowed' });
     const started = await upload(owner);
     const importId = started.ok ? started.importId : '';
-    // Another league's context never finds this league's import or season.
-    expect(await seasonOf(otherLeagueId)).toBeUndefined();
+    // Another league's context never finds this league's import or season: it has its own.
+    expect(await seasonOf(otherLeagueId)).not.toBe(await seasonOf());
     const elsewhere = await getFixtureImport(as(owner, otherLeagueId), { importId }, ports.deps);
     expect(elsewhere.ok).toBe(false);
     expect(

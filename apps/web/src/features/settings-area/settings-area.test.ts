@@ -17,6 +17,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { standInAdminSettings } from '../../server/stand-in-admin-settings.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { answerQuery, doneKey, problemKey, refused } from './answer.ts';
 import { valueOf, versionOf } from './form-input.ts';
 import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
@@ -65,7 +66,7 @@ const as = (accountId: string | null): CommandContext => ({
 
 describe('the settings form', () => {
   it('shows a setting declared in a test with its label, default and limits', async () => {
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = standInAdminSettings(testWorld(() => access));
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx, testRegistry));
     const html = renderToStaticMarkup(
       createElement(SettingForms, { rows, league: 'north-valley', say }),
@@ -87,7 +88,7 @@ describe('the settings form', () => {
     for (const setting of declaredSettings.all()) {
       expect(Object.hasOwn(en, setting.label), setting.label).toBe(true);
     }
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = standInAdminSettings(testWorld(() => access));
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
     expect(rows.map((r) => r.key)).toEqual(declaredSettings.all().map((s) => s.key));
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
@@ -104,7 +105,7 @@ describe('the settings form', () => {
   });
 
   it('puts the names settings under Privacy, with a box to confirm full names (R-14)', async () => {
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = standInAdminSettings(testWorld(() => access));
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
     const privacy = html.slice(html.indexOf('data-area="privacy"'));
@@ -188,7 +189,7 @@ describe('answers', () => {
 
 describe('saving on the stand-in', () => {
   const key = declaredSettings.get('members.startPage')?.key ?? '';
-  const made = () => standInAdminSettings({ accessOf: () => access, log: () => undefined });
+  const made = () => standInAdminSettings(testWorld(() => access));
   const read = (ports: ReturnType<typeof made>) =>
     ports.deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
 

@@ -165,7 +165,8 @@ describe('a game page', () => {
         opened += 1;
       }
     }
-    expect(opened).toBe(20);
+    // Fall 2026's 18 (the tracked games among them), Spring 2026's 2 and the youth league's 5.
+    expect(opened).toBe(25);
   });
 
   it('says a game has not started yet', async () => {
@@ -249,9 +250,10 @@ describe('a game page', () => {
     expect(
       (await publicSchedule.gameFactsOf(liveLeagueId, earlier, old?.id ?? ''))?.season,
     ).toEqual({ slug: 'spring-2026', isCurrent: false });
-    // A game the schedule does not list, or another league's, has none.
+    // A game the schedule does not list (one of a season still being set up), or another
+    // league's, has none.
     expect(
-      await publicSchedule.gameFactsOf(liveLeagueId, season, games.hawksBears),
+      await publicSchedule.gameFactsOf(liveLeagueId, season, games.draftSeason),
     ).toBeUndefined();
     expect(
       await publicSchedule.gameFactsOf(standInLeagues.other.id, season, listed.id),
