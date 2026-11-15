@@ -871,8 +871,35 @@ test('NODE-TS leaves alone what Node never runs itself, and what strips', (t) =>
 });
 
 test('every file NODE-TS starts from is still there', async () => {
-  const { nodeEntries } = await import('../scripts/structure/config.mjs');
+  const { nodeEntries, nodeEntryFolders } = await import('../scripts/structure/config.mjs');
   for (const rel of nodeEntries) {
     assert.ok(fs.existsSync(path.join(repoRoot, rel)), `${rel} is gone: update nodeEntries`);
   }
+  for (const rel of nodeEntryFolders) {
+    assert.ok(fs.existsSync(path.join(repoRoot, rel)), `${rel} is gone: update nodeEntryFolders`);
+  }
+});
+
+test('NODE-TS follows a script outside the scanned folders into what it loads', (t) => {
+  assertExactly(
+    found(t, {
+      // scripts/ is not scanned by the other checks; Node runs every file in it.
+      'scripts/make-something.mjs': [
+        "import { made } from '@srleagues/providers';",
+        "import { helper } from './make-something-helper.ts';",
+        'export const both = [made, helper];',
+        '',
+      ].join('\n'),
+      'scripts/make-something-helper.ts':
+        'export enum Helper {\n  A,\n}\nexport const helper = 1;\n',
+      'packages/providers/index.ts': "export * from './src/made.ts';\n",
+      'packages/providers/src/made.ts':
+        'export class Made {\n  constructor(protected m: string) {}\n}\nexport const made = 1;\n',
+    }),
+    [
+      // An entry itself: every file in scripts/ is one.
+      ['scripts/make-something-helper.ts:1 [NODE-TS]', 'enum is not supported'],
+      ['packages/providers/src/made.ts:2 [NODE-TS]', 'loaded by packages/providers/index.ts'],
+    ],
+  );
 });

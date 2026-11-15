@@ -4,13 +4,18 @@
 // with code, `import =` or `export =`, and the web server then dies at start with
 // only "… is not supported in strip-only mode", naming no file (step 2.149).
 //
-// Each entry in config.nodeEntries, and every file it loads (static imports,
-// re-exports and dynamic imports of a written name), is put through Node's own
-// stripper, so what is refused here is exactly what Node would refuse. Imports are
-// read from the stripped code: `import { type A } from './a'` still loads './a'. A
-// test file reached this way is refused too: Node would run it in the app.
+// Each entry in config.nodeEntries and every code file directly in a folder of
+// config.nodeEntryFolders, and every file they load (static imports, re-exports and
+// dynamic imports of a written name), is put through Node's own stripper, so what is
+// refused here is exactly what Node would refuse. Imports are read from the stripped
+// code: `import { type A } from './a'` still loads './a'. A test file reached this way
+// is refused too: Node would run it in the app. Entries and what they load may lie
+// outside the folders the other checks scan (scripts/, the tracker): those files are
+// read from disk for this rule only.
+import fs from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
-import { isCodeFile, isTestFile, lex, violation } from './source.mjs';
+import path from 'node:path';
+import { isCodeFile, isTestFile, lex, makeFile, toRel, violation } from './source.mjs';
 
 export const rule = 'NODE-TS';
 export const title = 'code Node runs itself uses only TypeScript Node can strip';
@@ -66,16 +71,40 @@ export function stripAsNode(text) {
   }
 }
 
+/** The file at `rel`: one the checks scan, or else read from disk. */
+function fileAt(repo, rel) {
+  const scanned = repo.file(rel);
+  if (scanned) return scanned;
+  const abs = path.join(repo.root, rel);
+  if (rel.startsWith('..') || !fs.existsSync(abs) || !fs.statSync(abs).isFile()) return undefined;
+  return makeFile(abs, rel);
+}
+
+/** The entries: each listed file, and every code file directly in each listed folder. */
+function entriesOf(repo) {
+  const inFolders = repo.config.nodeEntryFolders.flatMap((folder) => {
+    let names = [];
+    try {
+      names = fs.readdirSync(path.join(repo.root, folder));
+    } catch {
+      return [];
+    }
+    return names.map((name) => toRel(repo.root, path.join(repo.root, folder, name)));
+  });
+  return [...repo.config.nodeEntries, ...inFolders.sort()];
+}
+
 export function check(repo) {
   const out = [];
   const seen = new Set();
-  const queue = repo.config.nodeEntries.map((rel) => ({ rel, from: undefined }));
+  const queue = entriesOf(repo).map((rel) => ({ rel, from: undefined }));
   while (queue.length > 0) {
     const { rel, from } = queue.shift();
     if (seen.has(rel)) continue;
     seen.add(rel);
-    const file = repo.file(rel);
-    if (!file || !isCodeFile(rel)) continue;
+    if (!isCodeFile(rel)) continue;
+    const file = fileAt(repo, rel);
+    if (!file) continue;
     if (from && isTestFile(rel)) {
       out.push(
         violation(

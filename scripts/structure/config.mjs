@@ -206,4 +206,17 @@ export const nodeEntries = [
   'apps/worker/src/main.ts',
   'packages/database/scripts/seed-leagues.ts',
   'packages/database/scripts/generate-schema-types.ts',
+  // The tracker's own entries (npm run dev:stats, stats:db-check, stats:copy) and the
+  // varsity preview (npm run dev:varsity): read only, outside the scanned folders.
+  'apps/live-stats/server.ts',
+  'apps/live-stats/db-check.ts',
+  'apps/live-stats/copy.ts',
+  'apps/varsity-preview/server.ts',
 ];
+
+/**
+ * NODE-TS: folders whose every code file Node runs directly (npm run league:make,
+ * transfer:tracker, build:supabase and the rest), with everything those files load:
+ * scripts/make-league.mjs, for one, loads the core, database and providers packages.
+ */
+export const nodeEntryFolders = ['scripts'];
