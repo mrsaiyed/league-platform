@@ -89,9 +89,10 @@ export type WorldOptions = {
   readonly accessOf: (leagueId: string) => AccessReader;
   /** Where the commands' T-196 lines go. */
   readonly log: (line: CommandLogLine) => void;
-  /** The server's clock as a date: today, game times, stamps. */
-  readonly now?: () => Date;
-  /** The server's clock for leases (T-116). */
+  /**
+   * The server's clock (the system's where not given): the one clock of the world's
+   * leases (T-116), stamps, today and how long ago a game ended, so they never disagree.
+   */
   readonly clock?: Clock;
 };
 
@@ -130,8 +131,9 @@ function kept(before: LeagueWorld, draft: LeagueWorld): LeagueWorld {
 }
 
 export function madeUpWorld(options: WorldOptions): World {
-  const now = options.now ?? (() => new Date());
+  // One clock for everything the world does: leases, stamps, today, "how long ago".
   const clock = options.clock ?? systemClock;
+  const now = () => new Date(clock.now());
   const states = new Map<string, LeagueWorld>(
     options.leagues.map((league) => [league.leagueId, deepFreeze(structuredClone(league))]),
   );

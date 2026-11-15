@@ -139,6 +139,24 @@ describe('a transaction of the made-up world', () => {
     expect(after?.people).toBe(before?.people);
   });
 
+  it('keeps one clock: how long ago a game ended is by the clock its transaction is given', async () => {
+    let at = Date.UTC(2026, 10, 15, 18, 0);
+    const world = testWorld(access, () => new Date(at));
+    const game = (await world.read(adult))?.games.find((g) => g.id === tigersBears);
+    const saved = await recordFinalScore(
+      as(adult, owner),
+      { gameId: tigersBears, version: game?.version ?? 0, homeScore: 50, awayScore: 40 },
+      world.deps,
+    );
+    expect(saved.ok).toBe(true);
+    at += 5 * 60_000;
+    const seen = await world.deps.transaction(as(adult, owner), async (tx) => ({
+      ago: await tx.liveGames.endedAgo(tigersBears),
+      clock: tx.clock.now(),
+    }));
+    expect(seen).toEqual({ ago: 5 * 60_000, clock: at });
+  });
+
   it('refuses a league that has no world, keeping nothing', async () => {
     const world = testWorld(access);
     await expect(

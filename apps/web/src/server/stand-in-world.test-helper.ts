@@ -25,7 +25,12 @@ export function testWorld(
 ): World {
   const leagues = madeUpLeagues(standInSeedCast, now());
   change(leagues);
-  return madeUpWorld({ leagues, accessOf, log: () => undefined, now });
+  return madeUpWorld({
+    leagues,
+    accessOf,
+    log: () => undefined,
+    clock: { now: () => now().getTime() },
+  });
 }
 
 /** Has every season of the leagues ask for a different number for each player (0008). */

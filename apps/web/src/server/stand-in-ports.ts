@@ -285,7 +285,6 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     leagues: madeUpLeagues(standInSeedCast, now()),
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
-    now,
   });
   // The League settings screen's settings: every area reads them from the same world.
   const adminSettings = standInAdminSettings(world);
