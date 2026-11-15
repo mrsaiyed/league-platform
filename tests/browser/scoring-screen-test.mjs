@@ -11,26 +11,34 @@
 //   with fewer than five.
 // - On an upright phone (390 x 844) a basket, a foul and a substitution for EACH of both
 //   teams' floor players are recorded with real taps at the place each thing is on the
-//   screen, and nothing ever scrolls (checklist S6, finding H4).
-// - At 390 x 844, 844 x 390, 820 x 1180 and 1180 x 820 nothing tapped during play is under
-//   44 x 44, the point buttons and floor tiles are 56 or more on their short side, and
-//   targets are at least 8 apart.
+//   screen, and nothing ever scrolls (checklist S6, finding H4). With twelve a side all
+//   seven on each bench are whole in their line, and a drag scrolls nothing.
+// - The same on the phone a scorekeeper really holds (390 x 664, what its browser shows):
+//   a basket and a foul for each of the ten on the floor, and a substitution for each team
+//   by "Sub in" and by the bench opened in the pad, nothing scrolling.
+// - At 390 x 844, 844 x 390, 820 x 1180, 1180 x 820 and 390 x 664 nothing that can be
+//   tapped during play is under 44 x 44 where it shows, the point buttons and floor tiles
+//   are 56 or more on their short side, targets are at least 8 apart, and no player in a
+//   line of players is cut: each is whole, or counted on the line's end tile.
 // - The keyboard does what a tap does (S4); a wrong drag is explained; turnovers, team
 //   turnovers, swap colors and the fouled-out mark; a refusal is said in a sentence.
+// - Two fingers (two real touch points) on two tiles record nothing; one finger dragging a
+//   bench player onto a floor player substitutes them.
 // - With 500 taps waiting to send and the processor slowed four times, a tap is painted
 //   within 100 ms 95 times in 100 (finding M6): a tapped player's tile is ringed, and an
 //   option tapped marks the tile with what was tapped, before anything is saved. Each tap
 //   is timed from the click (the finger lifting) to the frame that shows it, lasts as long
-//   as a finger's (60 ms), and nothing is asked of the page between taps. The figures are
-//   printed, with how long the options and the count take to follow. A run that misses is
-//   measured once more, since other work on the computer can spoil one.
+//   as a finger's (60 ms), and nothing is asked of the page between taps. One run of a
+//   hundred plays is measured and judged; the figures are printed, with how long the
+//   options and the count take to follow. And the tile counts a play only after the
+//   device's own store has finished writing it (T-114): the store's writes are timed.
 // Accessibility checks on each state (T-186), and no sideways scrolling.
 import {
   addPlayers,
   court,
+  evenMorePlayers,
   league,
   liveGame,
-  playStretch,
   scorekeeper,
   sizes,
   starters,
@@ -62,7 +70,11 @@ const step = async (name, run) => {
 // Hawks v Lions tomorrow, recorded live, assigned to nobody (stand-in-games.ts): each
 // team has its six players, for the lineups that are picked short-handed.
 const otherGame = '01900000-0000-7000-8000-006a00000003';
-const [phone, phoneLying, tabletUpright, tabletLying] = sizes;
+const [phone, phoneLying, , tabletLying, phoneInBrowser] = sizes;
+/** Where the bench strips are folded away and the bench is opened in the pad (court.css). */
+const folded = (size) => size.width < 700 && size.height < 760 && size.height > size.width;
+// The name the device's own store of waiting taps is kept under (indexeddb-queue-storage.ts).
+const queueDatabase = 'srleagues-tracker-queue';
 
 let built = true;
 if (!process.argv.includes('--no-build')) {
@@ -89,9 +101,10 @@ if (built) {
   });
 }
 
-async function scorekeeperAt(size) {
+async function scorekeeperAt(size, options = {}) {
   const context = await browser.newContext({
     viewport: { width: size.width, height: size.height },
+    ...options,
   });
   await context.addCookies([{ ...scorekeeper, url: origin }]);
   const page = await context.newPage();
@@ -150,9 +163,9 @@ async function tapWhereItIs(page, locator, what) {
 
 /**
  * Everything a scorekeeper can tap on the scoring screen now: the part of each button
- * and link that is on the screen (what a strip that scrolls sideways cuts off is left
- * out), and only where a finger would reach it (not under an open sheet). `whole` says
- * the thing is all there, not cut by the strip it scrolls in.
+ * and link that shows (what the screen's edge or a panel cuts off is left out), and only
+ * where a finger would reach it (not under an open sheet). A thing that is cut is judged
+ * by the part that shows: that is all a finger has.
  */
 const targets = (page) =>
   page.evaluate(() =>
@@ -188,7 +201,6 @@ const targets = (page) =>
                 ? 'text-link'
                 : 'other',
           reached,
-          whole: w >= r.width - 0.5 && h >= r.height - 0.5,
           x: left,
           y: top,
           w,
@@ -201,7 +213,7 @@ const targets = (page) =>
 /** Checks the sizes of everything tappable now, and the room between them. */
 async function measureTargets(page, label) {
   const list = await targets(page);
-  const small = list.filter((t) => t.whole && (t.w < 43.99 || t.h < 43.99));
+  const small = list.filter((t) => t.w < 43.99 || t.h < 43.99);
   note(
     `${label}: nothing tapped is under 44 x 44 (${list.length} targets)`,
     list.length > 0 && small.length === 0,
@@ -226,6 +238,67 @@ async function measureTargets(page, label) {
     }
   }
   note(`${label}: targets are at least 8 apart`, close.length === 0, close.slice(0, 4).join('; '));
+}
+
+/**
+ * Every line of players on the screen now (a team's bench, the pad's "Sub in" and "In
+ * for"): how many players it has, how many show whole, how many are cut by the line's or
+ * the screen's edge, and what its end tile ("+5") says.
+ */
+const playerLines = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('[data-scoring] [data-fit]')]
+      .filter((row) => row.getClientRects().length > 0)
+      .map((row) => {
+        const clips = getComputedStyle(row).overflowX !== 'visible';
+        const edge = row.getBoundingClientRect();
+        const seen = (el) => {
+          const r = el.getBoundingClientRect();
+          const [left, right, top, bottom] = clips
+            ? [edge.left, edge.right, edge.top, edge.bottom]
+            : [0, window.innerWidth, 0, window.innerHeight];
+          const w = Math.min(r.right, right, window.innerWidth) - Math.max(r.left, left, 0);
+          const h = Math.min(r.bottom, bottom, window.innerHeight) - Math.max(r.top, top, 0);
+          if (w <= 0.5 || h <= 0.5 || getComputedStyle(el).visibility === 'hidden') return 'hidden';
+          return w >= r.width - 0.5 && h >= r.height - 0.5 ? 'whole' : 'cut';
+        };
+        const players = [
+          ...row.querySelectorAll(':scope > [data-player], :scope > [data-other]'),
+        ].map(seen);
+        const end = row.querySelector(':scope > .court-more-tile');
+        const endShown = end !== null && getComputedStyle(end).display !== 'none';
+        return {
+          line: row.getAttribute('data-bench') ?? 'pad',
+          players: players.length,
+          whole: players.filter((state) => state === 'whole').length,
+          cut: players.filter((state) => state === 'cut').length,
+          end: endShown ? seen(end) : 'none',
+          more: endShown ? Number(end.getAttribute('data-count')) : 0,
+          scrolled: row.scrollLeft !== 0 || row.scrollTop !== 0,
+        };
+      }),
+  );
+
+/**
+ * No bench player is hidden without a sign (finding M2): in every line of players each
+ * one shows whole or not at all, the ones that do not show are counted on the line's
+ * end tile, that tile is whole, and the line has not been scrolled.
+ */
+async function measureLines(page, label, expected) {
+  const lines = await playerLines(page);
+  const wrong = lines.filter(
+    (line) =>
+      line.cut > 0 ||
+      line.scrolled ||
+      line.whole + line.more !== line.players ||
+      (line.more > 0 ? line.end !== 'whole' : line.end !== 'none'),
+  );
+  note(
+    `${label}: every player in a line is whole or counted on its end tile (${lines.length} lines)`,
+    lines.length === expected && wrong.length === 0,
+    `${lines.length} lines, ${expected} expected; ${JSON.stringify(wrong)}`,
+  );
+  return lines;
 }
 
 if (browser) {
@@ -406,7 +479,30 @@ if (browser) {
           layout.controls !== null && layout.controls.height >= 44,
         );
 
+        // Twelve a side (finding M2): all seven of each bench show whole in their line,
+        // so the line needs no end tile.
+        const benches = await measureLines(page, 'twelve a side, in play', 2);
+        note(
+          'twelve a side: all seven of each bench show whole in their line, with no "+" tile',
+          benches.every((line) => line.players === 7 && line.whole === 7 && line.more === 0),
+          JSON.stringify(benches),
+        );
+
         await watchScrolling(page);
+        // And all seven show whole in a floor player's "Sub in".
+        await tapWhereItIs(page, c.tile('home', 3), 'home #3');
+        await c.pad.locator('[data-act="sub"]').first().waitFor();
+        const subIn = (await measureLines(page, 'twelve a side, "Sub in"', 3)).filter(
+          (line) => line.line === 'pad',
+        );
+        note(
+          'twelve a side: all seven who can come in show whole in "Sub in"',
+          subIn.length === 1 && subIn[0].players === 7 && subIn[0].whole === 7,
+          JSON.stringify(subIn),
+        );
+        await tapWhereItIs(page, c.tile('home', 3), 'home #3');
+        await c.pad.locator('[data-rest]').waitFor();
+
         // Who comes in for each of the five starters: the first five of each bench.
         const fresh = { home: [13, 20, 21, 22, 23], away: [13, 20, 21, 22, 24] };
         // A basket and a foul for each of the ten, then each is substituted: every tap made
@@ -458,6 +554,22 @@ if (browser) {
             .filter({
               has: page.locator('.court-tile-number', { hasText: new RegExp(`^${bench[side]}$`) }),
             })
+            .waitFor();
+        }
+        // A drag scrolls nothing (M2): the one of the five who went off again is dragged
+        // from the bench back onto the player who replaced them, then a bench player is
+        // dragged along the bench, which is explained and moves nothing.
+        for (const side of ['home', 'away']) {
+          let off = null;
+          for (const jersey of fresh[side]) if (!(await c.onCourt(side, jersey))) off = jersey;
+          await c.recorded(() => c.drag(c.tile(side, off), c.tile(side, bench[side])));
+          note(
+            `a bench player dragged onto a floor player comes on, with nothing scrolling (${side})`,
+            (await c.onCourt(side, off)) && !(await c.onCourt(side, bench[side])),
+          );
+          await c.drag(c.tile(side, bench[side]), c.tile(side, 3));
+          await c.said
+            .filter({ hasText: 'Drag a bench player onto someone on the court.' })
             .waitFor();
         }
         await c.saved();
@@ -740,10 +852,241 @@ if (browser) {
     }
   });
 
-  await step('the four sizes: targets, the two teams’ places, less motion', async () => {
+  await step(
+    'the phone in its browser (390 x 664): every floor player scored and fouled, a substitution each way, never scrolling',
+    async () => {
+      const { context, page, errors } = await scorekeeperAt(phoneInBrowser);
+      const label = '390 x 664';
+      try {
+        await page.goto(`${origin}${trackerPath()}`);
+        const c = court(page);
+        await c.open();
+        await page.locator('[data-scoring][data-stage="play"]').waitFor();
+        await accessible(page, `${label}, in play`);
+        await noSidewaysScroll(page, label);
+        const layout = await page.evaluate(() => {
+          const whole = (el) => {
+            const r = el.getBoundingClientRect();
+            return (
+              r.height > 0 &&
+              r.top >= 0 &&
+              r.left >= 0 &&
+              r.bottom <= window.innerHeight &&
+              r.right <= window.innerWidth
+            );
+          };
+          const teams = document.querySelector('[data-teams]');
+          return {
+            floorTiles: [...document.querySelectorAll('[data-floor] .court-tile')].map(whole),
+            pad: whole(document.querySelector('[data-pad]')),
+            teamsOverflow: teams.scrollHeight - teams.clientHeight,
+            page: document.scrollingElement.scrollHeight - window.innerHeight,
+          };
+        });
+        note(
+          `${label}: both fives and the pad are whole on the screen (finding M1)`,
+          layout.floorTiles.length === 10 && layout.floorTiles.every(Boolean) && layout.pad,
+          JSON.stringify(layout),
+        );
+        note(
+          `${label}: the teams fit and the page is no longer than the screen: nothing to scroll`,
+          layout.teamsOverflow <= 0 && layout.page <= 0,
+          JSON.stringify(layout),
+        );
+
+        await watchScrolling(page);
+        const player = (id) => c.root.locator(`[data-teams] [data-player="${id}"]`);
+        const facts = (id) =>
+          player(id).evaluate((el) => ({
+            points: Number(el.querySelector('[data-points]').dataset.points),
+            fouls: Number(el.querySelector('[data-fouls]').dataset.fouls),
+            court: el.dataset.oncourt,
+          }));
+        const before = await c.score();
+        for (const side of ['home', 'away']) {
+          const floor = await c.root
+            .locator(`[data-floor="${side}"] > [data-player]`)
+            .evaluateAll((els) => els.map((el) => el.dataset.player));
+          // A basket and a foul for each of the five, tapped where they are.
+          let counted = 0;
+          for (const id of floor) {
+            const was = await facts(id);
+            await tapWhereItIs(page, player(id), `a ${side} floor player`);
+            await c.recorded(() => tapWhereItIs(page, c.option('p2'), '+2'));
+            await tapWhereItIs(page, player(id), `a ${side} floor player`);
+            await c.recorded(() => tapWhereItIs(page, c.option('foul'), 'Foul'));
+            const now = await facts(id);
+            if (now.points === was.points + 2 && now.fouls === was.fouls + 1) counted += 1;
+          }
+          note(
+            `${label}: a basket and a foul for each of the five ${side} floor players`,
+            floor.length === 5 && counted === 5,
+            `${counted} of ${floor.length}`,
+          );
+
+          // A substitution from a floor player's own options: "Sub in" holds the bench.
+          await tapWhereItIs(page, player(floor[0]), `a ${side} floor player`);
+          const subIn = c.pad.locator('[data-act="sub"]');
+          await subIn.first().waitFor();
+          await measureLines(page, `${label}, "Sub in" (${side})`, 1);
+          const coming = await subIn.first().getAttribute('data-other');
+          await c.recorded(() => tapWhereItIs(page, subIn.first(), 'the first of "Sub in"'));
+          note(
+            `${label}: "Sub in" brings a bench player on for the one tapped (${side})`,
+            (await facts(coming)).court === '1' && (await facts(floor[0])).court === '0',
+          );
+
+          // And from the bench, which is folded away here: its button beside the team's
+          // name opens the whole bench in the pad, and a bench player's "In for" is there.
+          await tapWhereItIs(page, c.benchButton(side), `the ${side} bench button`);
+          const picks = c.pad.locator(`[data-bench-list="${side}"] [data-bench-pick]`);
+          await picks.first().waitFor();
+          const shown = await picks.evaluateAll((els) =>
+            els.map((el) => {
+              const r = el.getBoundingClientRect();
+              return (
+                r.top >= 0 &&
+                r.left >= 0 &&
+                r.bottom <= window.innerHeight &&
+                r.right <= window.innerWidth &&
+                el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2))
+              );
+            }),
+          );
+          note(
+            `${label}: the bench button opens all seven of the bench in the pad, each on the screen (${side})`,
+            shown.length === 7 && shown.every(Boolean),
+            JSON.stringify(shown),
+          );
+          if (side === 'home') {
+            await accessible(page, `${label}, the bench in the pad`);
+            await measureTargets(page, `${label}, the bench in the pad`);
+          }
+          const fromBench = await picks.last().getAttribute('data-bench-pick');
+          await tapWhereItIs(page, picks.last(), 'the last of the bench in the pad');
+          await c.pad.locator(`[data-options="${fromBench}"]`).waitFor();
+          const inFor = c.pad.locator('[data-act="sub"]');
+          await inFor.first().waitFor();
+          const going = await inFor.nth(1).getAttribute('data-other');
+          await c.recorded(() => tapWhereItIs(page, inFor.nth(1), 'the second of "In for"'));
+          note(
+            `${label}: a player picked from the bench in the pad comes in by "In for" (${side})`,
+            (await facts(fromBench)).court === '1' && (await facts(going)).court === '0',
+          );
+        }
+        await c.saved();
+        const scrolled = await scrollsSeen(page);
+        note(
+          `${label}: nothing scrolled: not the page, not a panel, not a line of players`,
+          scrolled.events === 0 && scrolled.moved.length === 0,
+          JSON.stringify(scrolled),
+        );
+        const after = await c.score();
+        note(
+          `${label}: ten more baskets are on the scoreboard`,
+          after.home === before.home + 10 && after.away === before.away + 10,
+          `${JSON.stringify(before)} then ${JSON.stringify(after)}`,
+        );
+        note('nothing broke on the page', errors.length === 0, errors.join('; '));
+      } finally {
+        await context.close();
+      }
+    },
+  );
+
+  await step('two fingers on two tiles record nothing; one finger drags', async () => {
+    // A screen that is touched, with real touch points (finding H1).
+    const { context, page, errors } = await scorekeeperAt(phone, { hasTouch: true });
+    try {
+      await page.goto(`${origin}${trackerPath()}`);
+      const c = court(page);
+      await c.open();
+      await c.saved();
+      const cdp = await context.newCDPSession(page);
+      const touch = (type, points) =>
+        cdp.send('Input.dispatchTouchEvent', {
+          type,
+          touchPoints: points.map(([x, y], id) => ({ x, y, id })),
+        });
+      const middle = async (locator) => {
+        const box = await locator.boundingBox();
+        return [Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2)];
+      };
+      const benchTile = c.root.locator('[data-bench="home"] > [data-player]').first();
+      const floorTile = c.root.locator('[data-floor="home"] > [data-player]').first();
+      const [benchId, floorId] = [
+        await benchTile.getAttribute('data-player'),
+        await floorTile.getAttribute('data-player'),
+      ];
+      const [a, b] = [await middle(benchTile), await middle(floorTile)];
+      // What the page is told of the fingers, so the check can say it saw two.
+      await page.evaluate(() => {
+        window.pressesSeen = [];
+        document.addEventListener(
+          'pointerdown',
+          (event) => window.pressesSeen.push({ type: event.pointerType, first: event.isPrimary }),
+          true,
+        );
+      });
+      const plays = await c.root.getAttribute('data-plays');
+      // One finger rests on a bench player; a second comes down on a floor player of the
+      // same team, slides a little and lifts; then the first lifts. Nobody dragged anyone.
+      await touch('touchStart', [a]);
+      await touch('touchStart', [a, b]);
+      for (let i = 1; i <= 4; i += 1) await touch('touchMove', [a, [b[0] + i * 4, b[1] + i * 3]]);
+      await touch('touchMove', [a]);
+      await touch('touchEnd', []);
+      await page.waitForTimeout(600);
+      const presses = await page.evaluate(() => window.pressesSeen);
+      note(
+        'the page was touched by two fingers at once',
+        presses.length === 2 &&
+          presses.every((press) => press.type === 'touch') &&
+          presses.filter((press) => press.first).length === 1,
+        JSON.stringify(presses),
+      );
+      note(
+        'two fingers on two tiles record no substitution and no play (finding H1)',
+        (await c.root.getAttribute('data-plays')) === plays &&
+          (await c.onCourtById(benchId)) === false &&
+          (await c.onCourtById(floorId)) === true &&
+          (await c.root.locator('[data-drop]').count()) === 0,
+      );
+      // Whatever the fingers left open is closed, then one finger drags the bench player
+      // onto the floor player: that is a substitution.
+      await page.keyboard.press('Escape');
+      await c.pad.locator('[data-rest]').waitFor();
+      await c.recorded(async () => {
+        await touch('touchStart', [a]);
+        for (let i = 1; i <= 8; i += 1) {
+          await touch('touchMove', [
+            [a[0] + ((b[0] - a[0]) * i) / 8, a[1] + ((b[1] - a[1]) * i) / 8].map(Math.round),
+          ]);
+        }
+        await touch('touchEnd', []);
+      });
+      await c.saved();
+      note(
+        'one finger dragging a bench player onto a floor player substitutes them',
+        (await c.onCourtById(benchId)) === true && (await c.onCourtById(floorId)) === false,
+      );
+      const moved = await scrollsSeen(page);
+      note(
+        'a finger’s drag scrolled nothing',
+        moved.moved.length === 0,
+        JSON.stringify(moved.moved),
+      );
+      note('nothing broke on the page', errors.length === 0, errors.join('; '));
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('the five sizes: targets, the two teams’ places, less motion', async () => {
     for (const size of sizes) {
       const { context, page } = await scorekeeperAt(size);
       const label = `${size.width} x ${size.height}`;
+      const fold = folded(size);
       try {
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await page.goto(`${origin}${trackerPath()}`);
@@ -751,6 +1094,13 @@ if (browser) {
         await c.open();
         await noSidewaysScroll(page, label);
         await measureTargets(page, `${label}, the pad at rest`);
+        // The benches are lines of players, except where they are folded away.
+        await measureLines(page, `${label}, the pad at rest`, fold ? 0 : 2);
+        note(
+          `${label}: the bench is ${fold ? 'folded away, behind its button' : 'on the screen, with no button'}`,
+          (await c.benchButton('home').isVisible()) === fold &&
+            (await c.root.locator('[data-bench="home"]').isVisible()) === !fold,
+        );
         const places = await page.evaluate(() => {
           const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
           const [home, away, top, pad] = [
@@ -791,6 +1141,7 @@ if (browser) {
         await first.click();
         await c.pad.locator('[data-options]').waitFor();
         await measureTargets(page, `${label}, a floor player’s options`);
+        await measureLines(page, `${label}, a floor player’s options`, fold ? 1 : 3);
         note(
           `${label}: the options are on the screen`,
           await c.pad.locator('[data-act="turnover"]').evaluate((el) => {
@@ -798,20 +1149,31 @@ if (browser) {
             return r.bottom <= window.innerHeight && r.right <= window.innerWidth;
           }),
         );
-        await c.root.locator('[data-bench="away"] .court-tile').first().click();
-        await c.pad.locator('[data-options]').waitFor();
+        // A bench player is tapped in the bench's line, or, where the bench is folded
+        // away, in the bench its button opens in the pad.
+        if (fold) {
+          await c.benchButton('away').click();
+          await c.pad.locator('[data-bench-list="away"]').waitFor();
+          await measureTargets(page, `${label}, the bench in the pad`);
+          await c.pad.locator('[data-bench-pick]').first().click();
+        } else {
+          await c.root.locator('[data-bench="away"] > [data-player]').first().click();
+        }
+        await c.pad.locator('[data-options] [data-act="sub"]').nth(4).waitFor();
         await measureTargets(page, `${label}, a bench player’s options`);
+        await measureLines(page, `${label}, a bench player’s options`, fold ? 1 : 3);
         await accessible(page, `${label}, a bench player’s options`);
         // Less motion: what was tapped still shows on the tile, with no movement (S5).
+        await first.click();
+        await c.pad
+          .locator(`[data-options="${await first.getAttribute('data-player')}"]`)
+          .waitFor();
         const playsBefore = await c.root.getAttribute('data-plays');
         await c.option('p1').click();
-        const motion = await c.root
-          .locator('[data-bench="away"] .court-tile')
-          .first()
-          .evaluate((el) => ({
-            mark: el.getAttribute('data-mark'),
-            animation: getComputedStyle(el, '::after').animationName,
-          }));
+        const motion = await first.evaluate((el) => ({
+          mark: el.getAttribute('data-mark'),
+          animation: getComputedStyle(el, '::after').animationName,
+        }));
         note(
           `${label}: with less motion asked for, the tap shows and nothing moves (S5)`,
           motion.mark === '+1' && motion.animation === 'none',
@@ -835,7 +1197,6 @@ if (browser) {
         await context.close();
       }
     }
-    void tabletUpright;
   });
 
   await step(
@@ -877,57 +1238,84 @@ if (browser) {
         await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
         // Times each tap from the moment it is made (the finger lifts: the browser's own
         // time on the click) to the frame that shows it.
-        await page.evaluate((playerId) => {
-          const tile = document.querySelector(`[data-teams] [data-player="${playerId}"]`);
-          const pad = document.querySelector('[data-pad]');
-          const painted = (since, into) =>
-            requestAnimationFrame(() => {
-              const channel = new MessageChannel();
-              channel.port1.onmessage = () => into.push(performance.now() - since);
-              channel.port2.postMessage(0);
-            });
-          const times = { ringed: [], opened: [], marked: [], counted: [] };
-          window.tapTimes = times;
-          let touched = 0;
-          let waiting = null;
-          document.addEventListener(
-            'click',
-            (event) => {
-              touched = event.timeStamp;
-              waiting = event.target.closest('[data-act]') ? 'option' : 'tile';
-            },
-            true,
-          );
-          // The options are in the pad: drawn a frame after the tile's ring.
-          let opening = 0;
-          new MutationObserver(() => {
-            if (opening !== 0 && pad.querySelector('[data-options]') !== null) {
-              painted(opening, times.opened);
-              opening = 0;
-            }
-          }).observe(pad, { childList: true, subtree: true });
-          // The tile is ringed the moment it is tapped; an option tapped marks it with
-          // what was tapped, before that is saved; then the tile counts it.
-          let marked = 0;
-          new MutationObserver((changes) => {
-            for (const change of changes) {
-              const set = tile.hasAttribute(change.attributeName);
-              const ringed = tile.getAttribute('data-tapped') === 'on';
-              if (change.attributeName === 'data-tapped' && ringed && waiting === 'tile') {
-                waiting = null;
-                opening = touched;
-                painted(touched, times.ringed);
-              } else if (change.attributeName === 'data-mark' && set && waiting === 'option') {
-                waiting = null;
-                marked = touched;
-                painted(touched, times.marked);
-              } else if (change.attributeName === 'data-points' && marked !== 0) {
-                painted(marked, times.counted);
-                marked = 0;
+        await page.evaluate(
+          ([playerId, storeName]) => {
+            const tile = document.querySelector(`[data-teams] [data-player="${playerId}"]`);
+            const pad = document.querySelector('[data-pad]');
+            const painted = (since, into) =>
+              requestAnimationFrame(() => {
+                const channel = new MessageChannel();
+                channel.port1.onmessage = () => into.push(performance.now() - since);
+                channel.port2.postMessage(0);
+              });
+            const times = { ringed: [], opened: [], marked: [], counted: [], stored: [] };
+            window.tapTimes = times;
+            // When the device's own store of waiting taps finishes a write: every writing
+            // transaction on it is watched to its end, from outside the screen's code.
+            const writes = [];
+            times.writes = writes;
+            const transaction = IDBDatabase.prototype.transaction;
+            IDBDatabase.prototype.transaction = function watched(names, mode, ...rest) {
+              const made = transaction.call(this, names, mode, ...rest);
+              if (this.name === storeName && mode === 'readwrite') {
+                const began = performance.now();
+                made.addEventListener('complete', () =>
+                  writes.push({ began, done: performance.now() }),
+                );
               }
-            }
-          }).observe(tile, { attributes: true, subtree: true });
-        }, id);
+              return made;
+            };
+            let touched = 0;
+            let waiting = null;
+            document.addEventListener(
+              'click',
+              (event) => {
+                touched = event.timeStamp;
+                waiting = event.target.closest('[data-act]') ? 'option' : 'tile';
+              },
+              true,
+            );
+            // The options are in the pad: drawn a frame after the tile's ring.
+            let opening = 0;
+            new MutationObserver(() => {
+              if (opening !== 0 && pad.querySelector('[data-options]') !== null) {
+                painted(opening, times.opened);
+                opening = 0;
+              }
+            }).observe(pad, { childList: true, subtree: true });
+            // The tile is ringed the moment it is tapped; an option tapped marks it with
+            // what was tapped, before that is saved; then the tile counts it.
+            let marked = 0;
+            new MutationObserver((changes) => {
+              for (const change of changes) {
+                const set = tile.hasAttribute(change.attributeName);
+                const ringed = tile.getAttribute('data-tapped') === 'on';
+                if (change.attributeName === 'data-tapped' && ringed && waiting === 'tile') {
+                  waiting = null;
+                  opening = touched;
+                  painted(touched, times.ringed);
+                } else if (change.attributeName === 'data-mark' && set && waiting === 'option') {
+                  waiting = null;
+                  marked = touched;
+                  painted(touched, times.marked);
+                } else if (change.attributeName === 'data-points' && marked !== 0) {
+                  painted(marked, times.counted);
+                  // The tile counts the play now. The store's first write begun since the
+                  // tap, and when it finished: after now, if the count was shown first.
+                  const now = performance.now();
+                  const since = marked;
+                  const write = writes.find((one) => one.began >= since);
+                  times.stored.push({
+                    wrote: write === undefined ? null : write.done - since,
+                    counted: now - since,
+                  });
+                  marked = 0;
+                }
+              }
+            }).observe(tile, { attributes: true, subtree: true });
+          },
+          [id, queueDatabase],
+        );
         const center = async (locator) => {
           const box = await locator.boundingBox();
           return [box.x + box.width / 2, box.y + box.height / 2];
@@ -967,15 +1355,17 @@ if (browser) {
           console.log(`  ${line('…and its options drawn in the pad', measured.opened)}`);
           console.log(`  ${line('an option tapped, the tile marked with it', measured.marked)}`);
           console.log(`  ${line('…and the tile counting it, once stored', measured.counted)}`);
+          console.log(
+            `  ${line(
+              '…of which, the device’s store finishing its write',
+              measured.stored.map((play) => play.wrote ?? NaN),
+            )}`,
+          );
           return measured;
         };
-        let times = await hundredPlays();
-        if (!inTime(times.ringed) || !inTime(times.marked)) {
-          // Other work on this computer (another build, another lane) can spoil a run:
-          // the hundred plays are measured once more, and that second run is the answer.
-          console.log('That run missed 100 ms: measured once more, in case the computer was busy.');
-          times = await hundredPlays();
-        }
+        // One run, and it is the answer: a run that misses is a failure, not a reason
+        // to measure again.
+        const times = await hundredPlays();
         await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
         note(
           'a player’s tap is painted within 100 ms, 95 times in 100',
@@ -988,11 +1378,27 @@ if (browser) {
           line('marked', times.marked),
         );
         note(
-          'every tap opened its options and was counted once stored (write before show, T-114)',
-          times.opened.length === 100 &&
-            times.counted.length === 100 &&
-            times.counted.every((ms, i) => ms >= times.marked[i]),
+          'every tap opened its options and its play was counted on the tile',
+          times.opened.length === 100 && times.counted.length === 100,
           `${times.opened.length} opened, ${times.counted.length} counted`,
+        );
+        // Write before show (T-114): for every play, the device's store had finished a
+        // write after the tap and before the tile counted it. A screen that counted
+        // first would show `wrote` missing or later than `counted`.
+        const shownFirst = times.stored.filter(
+          (play) => play.wrote === null || play.wrote > play.counted,
+        );
+        note(
+          'every play was written to the device’s store before the tile counted it (T-114)',
+          times.stored.length === 100 && shownFirst.length === 0,
+          `${times.stored.length} plays timed; counted before written: ${JSON.stringify(shownFirst.slice(0, 3))}`,
+        );
+        // And the store wrote once for each play, no more: a write found after a tap is
+        // that tap's own, not some other work of the store's.
+        note(
+          'the device’s store wrote once for each of the hundred plays',
+          times.writes.length === 100,
+          `${times.writes.length} writes`,
         );
         // Back on the network, everything waiting is sent and nothing is lost.
         await context.setOffline(false);
@@ -1008,12 +1414,103 @@ if (browser) {
       }
     },
   );
+
+  await step('fifteen a side: a long bench ends in a tile that says how many more', async () => {
+    const { context, page, errors } = await scorekeeperAt(phone);
+    try {
+      await page.goto(`${origin}${trackerPath()}`);
+      const c = court(page);
+      await c.open();
+      await c.saved();
+      // The game is let go of, three more a side are added at the table, and it is
+      // opened again: fifteen a side, a bench of ten.
+      await c.more.click();
+      await Promise.all([
+        page.waitForURL((url) => !url.pathname.includes('/score/')),
+        c.sheet.getByRole('link', { name: 'Back to your games' }).click(),
+      ]);
+      await addPlayers(origin, evenMorePlayers);
+      await page.goto(`${origin}${trackerPath()}`);
+      await c.open();
+      await c.root.locator('[data-bench="home"][data-more]').waitFor();
+      await c.root.locator('[data-bench="away"][data-more]').waitFor();
+      const lines = await measureLines(page, 'fifteen a side, in play', 2);
+      note(
+        'fifteen a side: each bench shows as many as fit whole and its end tile says how many more',
+        lines.every((line) => line.players === 10 && line.more >= 2 && line.end === 'whole'),
+        JSON.stringify(lines),
+      );
+      await measureTargets(page, 'fifteen a side, in play');
+      await accessible(page, 'fifteen a side, in play');
+      await noSidewaysScroll(page, 'fifteen a side');
+
+      // The keyboard goes through the bench without landing on a player who is not
+      // shown, and without scrolling the line to one.
+      await c.root.locator('[data-bench="home"] > [data-player]').first().focus();
+      let lost = 0;
+      for (let i = 0; i < 12; i += 1) {
+        await page.keyboard.press('Tab');
+        lost += await page.evaluate(() => {
+          const el = document.activeElement;
+          const r = el.getBoundingClientRect();
+          return el.hasAttribute('data-folded') || r.width === 0 || r.height === 0 ? 1 : 0;
+        });
+      }
+      const afterKeys = await playerLines(page);
+      note(
+        'fifteen a side: the keyboard never lands on a hidden player or scrolls a line',
+        lost === 0 && afterKeys.every((line) => !line.scrolled),
+        `${lost} hidden; ${JSON.stringify(afterKeys)}`,
+      );
+
+      // The end tile opens the whole bench in the pad.
+      await c.moreTile(c.root.locator('[data-bench="home"]')).click();
+      const list = c.pad.locator('[data-bench-list="home"]');
+      await list.waitFor();
+      note(
+        'fifteen a side: the end tile opens all ten of the bench in the pad',
+        (await list.locator('[data-bench-pick]').count()) === 10,
+      );
+      await accessible(page, 'fifteen a side, the bench in the pad');
+      await measureTargets(page, 'fifteen a side, the bench in the pad');
+      await c.pad.locator('.court-close').click();
+      await c.pad.locator('[data-rest]').waitFor();
+
+      // A floor player's "Sub in" ends in the tile too; it opens the bench to come in
+      // for that player, and the last of the bench (not shown in the line) comes on.
+      const going = c.root.locator('[data-floor="home"] > [data-player]').first();
+      const goingId = await going.getAttribute('data-player');
+      await going.click();
+      await c.pad.locator('[data-subs] [data-more]').waitFor();
+      const subIn = (await measureLines(page, 'fifteen a side, "Sub in"', 3)).filter(
+        (line) => line.line === 'pad',
+      );
+      note(
+        'fifteen a side: "Sub in" shows as many as fit whole and says how many more',
+        subIn.length === 1 && subIn[0].players === 10 && subIn[0].more >= 2,
+        JSON.stringify(subIn),
+      );
+      await measureTargets(page, 'fifteen a side, "Sub in"');
+      await c.moreTile(c.pad).click();
+      await list.waitFor();
+      const last = list.locator('[data-bench-pick]').last();
+      const comingId = await last.getAttribute('data-bench-pick');
+      await c.recorded(() => last.click());
+      await c.saved();
+      note(
+        'fifteen a side: a bench player the line does not show comes on through the end tile',
+        (await c.onCourtById(comingId)) && !(await c.onCourtById(goingId)),
+      );
+      await measureLines(page, 'fifteen a side, after the substitution', 2);
+      note('nothing broke on the page', errors.length === 0, errors.join('; '));
+    } finally {
+      await context.close();
+    }
+  });
 }
 
 await browser?.close();
 server?.child.kill();
-void playStretch;
-void phoneLying;
 
 if (failures.length > 0) {
   console.error(`Scoring screen browser test: ${failures.length} problem(s)`);

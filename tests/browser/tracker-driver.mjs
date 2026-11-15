@@ -14,7 +14,7 @@ export const liveGame = '01900000-0000-7000-8000-006a00000002';
 export const scorekeeper = { name: 'srl_session', value: 'local-scorekeeper-token' };
 export const trackerPath = (game = liveGame) => `/${league}/score/${game}`;
 
-/** The four sizes every scoring screen is designed and photographed at (DESIGN.md section 7, line 8). */
+/** The five sizes every scoring screen is designed and photographed at (DESIGN.md section 7, line 8). */
 export const sizes = [
   { name: 'phone-upright', width: 390, height: 844 },
   { name: 'phone-lying', width: 844, height: 390 },
@@ -116,6 +116,9 @@ export function court(page) {
     Number(await tile(side, jersey).locator('[data-fouls]').getAttribute('data-fouls'));
   const onCourt = async (side, jersey) =>
     (await tile(side, jersey).getAttribute('data-oncourt')) === '1';
+  /** Whether a player is on the court, by their id: wherever their tile is drawn. */
+  const onCourtById = async (id) =>
+    (await root.locator(`[data-teams] [data-player="${id}"]`).getAttribute('data-oncourt')) === '1';
   const plays = async () => Number(await root.getAttribute('data-plays'));
   const recorded = async (tap) => {
     const before = await plays();
@@ -135,6 +138,7 @@ export function court(page) {
     points,
     fouls,
     onCourt,
+    onCourtById,
     banner: root.locator('[data-saved-banner]'),
     said: root.locator('[data-say]'),
     turnoversChip: (side) => root.locator(`[data-turnovers="${side}"]`),

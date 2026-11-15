@@ -779,14 +779,15 @@
   background: var(--court-team-bench);
   touch-action: none;
 }
-/* "+5": the last place of the line, only where the line does not hold everyone. */
-.court-more-tile {
+/* "+5": the last place of the line, only where the line does not hold everyone. (Said
+   with the line's own name, so no button's own `display` further down outweighs it.) */
+[data-fit] > .court-more-tile {
   display: none;
   grid-row: 1;
   grid-column: -2 / -1;
   border-style: dashed;
 }
-[data-more] > .court-more-tile {
+[data-fit][data-more] > .court-more-tile {
   display: flex;
 }
 /* The players the line does not hold are out of the keyboard's way as well as out of
@@ -1238,12 +1239,12 @@
 }
 
 /* ---- A short upright phone: the same phone with a browser's bars showing, or opened
-   from the home screen with the phone's own bars above and below (about 745 to 800 high).
+   from the home screen with the phone's own bars above and below: anything lower than
+   the 844 the taller arrangement is drawn for, which does not fit in less.
    The same arrangement, lower: the title is one thin line, More moves beside the
-   scoreboard, and every target keeps its least size (44; 56 for tiles and points). Both
-   teams and the pad fit from about 740 high; below that the teams' panels scroll under
-   the pad, and the phone is better turned on its side. --------------------------------- */
-@media (max-width: 699px) and (max-height: 800px) and (orientation: portrait) {
+   scoreboard, and every target keeps its least size (44; 56 for tiles and points) and
+   its 8 from the next. Below 760 high the benches fold away as well (the next block). -- */
+@media (max-width: 699px) and (max-height: 843px) and (orientation: portrait) {
   .court {
     --court-size-clock: 34px;
     --court-size-score: 30px;
@@ -1252,8 +1253,6 @@
     --court-points-height: 56px;
     --court-acts-height: 44px;
     --court-subs-height: 44px;
-    /* The pad's own gaps are 6 here, not 8: three of them, taken off its edge. */
-    --court-pad-edge: 8px;
   }
   .court-play {
     gap: 4px;
@@ -1308,12 +1307,6 @@
   .court-team-head {
     min-block-size: 44px;
   }
-  .court-pad {
-    gap: 6px;
-  }
-  .court-options {
-    gap: 6px;
-  }
   .court-hint p {
     font-size: 12px;
   }
@@ -1330,9 +1323,6 @@
   }
   .court-bench-open {
     display: inline-flex;
-  }
-  .court-team-chips {
-    gap: 6px;
   }
   .court-chip {
     padding-inline: 8px;
