@@ -124,9 +124,14 @@ describe('a game whose start has passed with no result', () => {
     ).toEqual(['earlier-today', 'last-week', 'yesterday'].sort());
   });
 
-  it('is none of the made-up league’s games at the hour these tests are set to', async () => {
+  it('is, of the made-up league’s games at the hour these tests are set to, only the one nobody scored three days ago', async () => {
     const { clock, schedule } = await load();
-    expect(buildHomeGames(schedule, clock, addressee).awaiting).toEqual([]);
+    const home = buildHomeGames(schedule, clock, addressee);
+    // The game the games list's "Needs a result" opens on (step 2.156).
+    expect(home.awaiting.map((g) => gameLinkText(g, gameLinkWords()))).toEqual([
+      'Badgers against Herons, Tue, Nov 10, 7:00 PM, awaiting the result',
+    ]);
+    expect(homeNextGames(home.upcoming).some((g) => g.awaiting === true)).toBe(false);
   });
 });
 

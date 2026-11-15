@@ -198,11 +198,20 @@ export const gameCss = String.raw`
      are one tint (packages/site, frame-look.ts). */
   background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   /* A fine line at the card's top in the league's color of decoration. */
-  border-block-start: 2px solid var(--color-ornament-line);
-  container: card / inline-size;
+  border-block-start: var(--line-heavy) solid var(--color-ornament-line);
   transition:
     border-color 0.15s,
     transform 0.15s;
+}
+/* The card's top line and its middle part are the measures its pieces size themselves by
+   (both named "card", each as wide as the card's inside): where a piece is too narrow or
+   has room, it is by one of these. The card itself is no measure, so that it can share
+   the heights of its three parts with the cards beside it (the list's rule, below): a
+   browser does not let a box that is a measure lend its rows to its neighbors. */
+.ui-game-card[data-layout='board'] .ui-game-meta,
+.ui-game-body {
+  min-inline-size: 0;
+  container: card / inline-size;
 }
 .ui-game-card[data-layout='board']:has(.ui-game-link):hover {
   border-color: color-mix(in srgb, var(--color-pop) 55%, transparent);
@@ -404,7 +413,7 @@ export const gameCss = String.raw`
 }
 .ui-game-score > span {
   padding-block-end: var(--step-1);
-  border-block-end: 2px solid transparent;
+  border-block-end: var(--line-heavy) solid transparent;
 }
 .ui-game-score-colon {
   color: var(--color-muted);
@@ -417,7 +426,7 @@ export const gameCss = String.raw`
 }
 .ui-game-side[data-winner='true'] .ui-game-side-score {
   font-weight: 600;
-  text-decoration: underline 2px var(--color-ornament);
+  text-decoration: underline var(--line-heavy) var(--color-ornament);
   text-underline-offset: 0.2em;
 }
 /* Once a game is decided only the winner's score keeps the color the eye lands on, and
@@ -528,13 +537,15 @@ export const gameCss = String.raw`
   }
 }
 /* A list in a column narrower than the page (a team's games beside its roster): two
-   across from a tablet up, and a board left over takes the row. */
+   across from a tablet up. */
 @media (min-width: 48rem) {
   .ui-card-grid[data-layout='board'][data-across='pair'] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--step-5);
   }
-  .ui-card-grid[data-layout='board'][data-across='pair'] > li:last-child:nth-child(odd) {
+  /* A board left over keeps the size of the others, so the oldest game of a list is never
+     its biggest; only a board that is the whole list has the row. */
+  .ui-card-grid[data-layout='board'][data-across='pair'] > li:only-child {
     grid-column: 1 / -1;
   }
 }
@@ -556,14 +567,33 @@ export const gameCss = String.raw`
     grid-column: 1 / -1;
   }
 }
-/* The cards of one row are one height (the list's grid stretches them), each card's top
-   line takes what it needs and its board the rest, and inside a board the teams begin at
-   the top: so across a row the shields and names stand on one line wherever the cards'
-   top lines are one line each, which the rule for the pill above sees to at every width
-   but a small phone's (where cards are one to a row). The cards cannot share their top
-   line's height with each other through the list's grid (subgrid): a card is a measure of
-   its own, by which its parts size themselves, and a browser does not let such a box lend
-   its rows to its neighbors. */
+/* The cards of one row share the heights of their three parts (the top line, the middle,
+   the place): a row that holds a card whose pill took a second line gives every card of
+   that row the same top line, so shields, names and scores stand on one line across the
+   row; a row with no such card stays as short as it was. Each card lends its three rows
+   to the list (a card is three rows of the list's grid), so the space between the rows
+   of cards is the card's own margin, taken back after the last row. Where a browser does
+   not know how, a card's top line takes what it needs and its middle the rest, as on a
+   phone. */
+@supports (grid-template-rows: subgrid) {
+  @media (min-width: 48rem) {
+    .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair']) {
+      row-gap: 0;
+      margin-block-end: calc(-1 * var(--step-5));
+    }
+    .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair']) > li {
+      grid-row: span 3;
+      grid-template-rows: subgrid;
+      margin-block-end: var(--step-5);
+    }
+    .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair'])
+      > li
+      > .ui-game-card {
+      grid-row: 1 / -1;
+      grid-template-rows: subgrid;
+    }
+  }
+}
 
 /* The big board of a game's page. The teams and what stands between them are held to a
    width the eye takes in at once, however wide the panel is. */
@@ -576,7 +606,7 @@ export const gameCss = String.raw`
   background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   color: var(--color-text);
   border: var(--card-border-width) solid var(--color-line);
-  border-block-start: 2px solid var(--color-ornament-line);
+  border-block-start: var(--line-heavy) solid var(--color-ornament-line);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   text-align: center;
@@ -640,6 +670,52 @@ export const gameCss = String.raw`
     text-wrap: balance;
   }
 }
+/* On a laptop the board is a game's card made large and uses its width: each team's
+   shield and name at an end, and between them the two scores with the state of the game
+   in the middle, as "49 : 56" stands between the teams on a card. A team's own box is
+   dissolved for this (its parts are placed on the board's own grid); nothing in the page
+   changes, and a screen reader still hears each team with its score. */
+@media (min-width: 64rem) {
+  .ui-scoreboard-teams {
+    grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    justify-items: center;
+    column-gap: var(--step-6);
+    max-inline-size: 60rem;
+  }
+  .ui-scoreboard-side {
+    display: contents;
+  }
+  .ui-scoreboard-side > .ui-scoreboard-role {
+    grid-row: 1;
+    align-self: end;
+  }
+  .ui-scoreboard-side > .ui-scoreboard-name {
+    grid-row: 2;
+    align-self: start;
+  }
+  .ui-scoreboard-side:first-child > :is(.ui-scoreboard-role, .ui-scoreboard-name) {
+    grid-column: 1;
+  }
+  .ui-scoreboard-side:last-child > :is(.ui-scoreboard-role, .ui-scoreboard-name) {
+    grid-column: 5;
+  }
+  .ui-scoreboard-side > .ui-scoreboard-score {
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+  .ui-scoreboard-side:first-child > .ui-scoreboard-score {
+    grid-column: 2;
+  }
+  .ui-scoreboard-side:last-child > .ui-scoreboard-score {
+    grid-column: 4;
+  }
+  .ui-scoreboard-middle {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}
 .ui-scoreboard-role {
   color: var(--color-muted);
   font-size: var(--text-12);
@@ -696,7 +772,7 @@ export const gameCss = String.raw`
 .ui-scoreboard-score {
   justify-self: center;
   padding-block-end: var(--step-1);
-  border-block-end: 2px solid transparent;
+  border-block-end: var(--line-heavy) solid transparent;
   font-family: var(--font-score);
   font-size: var(--text-48);
   font-weight: 600;

@@ -223,6 +223,9 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
         assign: async () => false,
         unassign: async () => false,
         listWindow: async () => ({ today: '2026-12-20', games: [] }),
+        listNeedingResult: async () => ({ today: '2026-12-20', games: [] }),
+        listEarlierRounds: async () => [],
+        listEarlierRound: async () => ({ today: '2026-12-20', games: [] }),
         find: async (id) => s.games.find((g) => g.id === id),
         lockGame: async (id) => s.games.some((g) => g.id === id),
         setResult: async (id, change, version) => {

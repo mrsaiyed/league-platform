@@ -44,9 +44,57 @@ export const pickerCss = String.raw`
   font-size: var(--text-14);
 }
 .ui-picker select {
+  /* A picker sets its own gap between label and field: the plain rule that a field after
+     its label stands a step away (base-css.ts) would add to it, and on a phone, where the
+     field fills its column, pushed it 8 past the page's edge. */
+  margin: 0;
   max-inline-size: 100%;
   font-weight: 600;
   cursor: pointer;
+  /* Its arrow is the product's own, not the browser's: a fine open arrow in the field's
+     own text color, drawn as two short strokes that meet (no picture file, so it takes
+     any design's color, the header's too). Each stroke fills a square half a step-3 wide,
+     so the arrow is one step-3 across; the field keeps room for it at its end: the
+     field's own padding, the arrow, and a small step before the words. */
+  appearance: none;
+  padding-inline-end: calc(var(--step-3) + var(--step-3) + var(--step-2));
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% + var(--line-heavy) / 2),
+      transparent calc(50% + var(--line-heavy) / 2)
+    ),
+    linear-gradient(
+      135deg,
+      transparent calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% + var(--line-heavy) / 2),
+      transparent calc(50% + var(--line-heavy) / 2)
+    );
+  background-repeat: no-repeat;
+  background-size: calc(var(--step-3) / 2) calc(var(--step-3) / 2);
+  background-position:
+    calc(100% - var(--step-3) - var(--step-3) / 2) 50%,
+    calc(100% - var(--step-3)) 50%;
+}
+/* Read from the right, the arrow stands at the field's other end. */
+[dir='rtl'] .ui-picker select {
+  background-position:
+    var(--step-3) 50%,
+    calc(var(--step-3) + var(--step-3) / 2) 50%;
+}
+/* Where the reader's own colors are forced on the page (a high-contrast setting), a
+   browser draws no background picture that is not a file, so the drawn arrow would be
+   gone and the field would look like a plain box. There the browser's own arrow comes
+   back, with the field's ordinary padding. The header's season picker is a picker too. */
+@media (forced-colors: active) {
+  .ui-picker select {
+    appearance: auto;
+    padding-inline-end: var(--step-3);
+    background-image: none;
+  }
 }
 .ui-picker option {
   background: var(--color-panel);
