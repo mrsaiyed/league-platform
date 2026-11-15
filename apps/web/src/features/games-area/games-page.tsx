@@ -11,6 +11,7 @@ import { commandContextOf } from '../../server/context.ts';
 import { gameWhenText, type LeagueTimes } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
+import type { LeagueClock } from '../../server/public-schedule.ts';
 import { noticeHolderOf, savedNoticesHere, type SavedNotice } from '../../server/saved-notice.ts';
 import { ActionForm } from './action-form.tsx';
 import {
@@ -20,6 +21,7 @@ import {
   recordForfeitAction,
 } from './actions.ts';
 import { buildGameRows, type GameRowView } from './build-games-view.ts';
+import { earlyWhen } from './early-when.ts';
 import { FinalScoreBoxes, type FinalScoreTexts } from './final-score-boxes.tsx';
 import { readReopenViews } from './read-reopen-views.ts';
 import { ReopenLine } from './reopen-line.tsx';
@@ -114,7 +116,7 @@ function Controls({
   game,
   reopened,
   times,
-  now,
+  clock,
 }: {
   readonly league: string;
   readonly here: LeagueAddressee;
@@ -122,18 +124,15 @@ function Controls({
   /** The game was just reopened to correct it: its boxes start open. */
   readonly reopened: boolean;
   readonly times: LeagueTimes;
-  /** The server's time now (ms), to say when a game's time has not come. */
-  readonly now: number;
+  /** The ports' clock, the one the games were read on: to say when a game's time has not come. */
+  readonly clock: Pick<LeagueClock, 'now'>;
 }) {
   const trackerHref = leagueUrl(here, 'score', { game: game.id });
   const gameHref = leagueUrl(here, 'admin-area', { area: 'games', subpath: [game.id] });
   const permalink = `${leagueUrl(here, 'admin-area', { area: 'games' })}#${gameAnchor(game.id)}`;
   // A refusal names the game ("Tigers at Lions: …").
   const refusal = t('admin.games.refusedAbout', { game: gameText(game), problem: '{problem}' });
-  const early =
-    game.startsAt !== null && Date.parse(game.startsAt) > now
-      ? gameWhenText(game.startsAt, times)
-      : undefined;
+  const early = earlyWhen(game.startsAt, clock, times);
   return (
     <div className="admin-game-controls ui-stack">
       {game.hasPlays ? (
@@ -236,8 +235,10 @@ export async function GamesPage({
   const holder = await ports.accessOf(context);
   const reopens = await readReopenViews(games, context, holder, ports.games.deps);
   const rows = buildGameRows(games, await ports.games.namesOf(addressee.id), holder, reopens);
-  const { timeZone } = await ports.publicSchedule.clockOf(addressee.id);
-  const times: LeagueTimes = { locale, timeZone };
+  // The ports' one clock (step 2.179): the made-up world's own on the stand-in, so a game's
+  // time is never measured against another clock than the one it was read on.
+  const clock = await ports.publicSchedule.clockOf(addressee.id);
+  const times: LeagueTimes = { locale, timeZone: clock.timeZone };
   const labels = displayLabels(t).game;
   // What was just saved, taken (so a reload does not say it again): said beside its game;
   // at the top only when the game is not listed.
@@ -246,7 +247,6 @@ export async function GamesPage({
     noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'games');
   const aboutRow = rows.find((row) => row.id === notice?.thing);
   const saved = notice === undefined ? undefined : noticeText(notice, aboutRow);
-  const now = Date.now();
   return (
     <main className="admin-games">
       <h1>{t('admin.area.games')}</h1>
@@ -284,7 +284,7 @@ export async function GamesPage({
                   game={game}
                   reopened={game === aboutRow && notice?.said === 'reopen'}
                   times={times}
-                  now={now}
+                  clock={clock}
                 />
               </div>
             </li>
