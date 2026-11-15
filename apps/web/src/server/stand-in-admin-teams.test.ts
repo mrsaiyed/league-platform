@@ -24,6 +24,7 @@ import {
 } from '../features/teams-area/form-input.ts';
 import { addNewPerson, moveEntry } from '../features/teams-area/roster-changes.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
+import { testWorld, withUniqueJerseys } from './stand-in-world.test-helper.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
 const ownerId = '01900000-0000-7000-8000-0000000000a1';
@@ -36,11 +37,9 @@ const access: AccessReader = {
 };
 
 function made(uniqueJerseys = false) {
-  const ports = standInAdminTeams({
-    accessOf: () => access,
-    log: () => undefined,
-    uniqueJerseys,
-  });
+  const ports = standInAdminTeams(
+    testWorld(() => access, undefined, uniqueJerseys ? withUniqueJerseys : undefined),
+  );
   const as = (accountId: string | null): CommandContext => ({
     leagueId,
     accountId,
@@ -167,10 +166,14 @@ describe('the admin Teams screens over the stand-in', () => {
     const m = made();
     const { teamId } = await teamOfTen(m);
     const seasonId = await seasonOf(m.ports);
+    // Beside the season's own made-up teams, by name.
     const teams = await m.ports.teams(leagueId, seasonId);
-    expect(teams.map((team) => [team.name, team.slug, team.color])).toEqual([
-      ['Blue Jays', 'blue-jays', null],
+    expect(teams.map((team) => [team.name, team.slug, team.color])).toContainEqual([
+      'Blue Jays',
+      'blue-jays',
+      null,
     ]);
+    expect(teams.map((team) => team.name)).toEqual(teams.map((t) => t.name).sort());
     const renamed = await updateTeam(
       m.owner,
       { teamId, version: 1, name: 'Jays', color: '#112233' },
@@ -178,7 +181,9 @@ describe('the admin Teams screens over the stand-in', () => {
     );
     expect(renamed.ok).toBe(true);
     const after = await m.ports.teams(leagueId, seasonId);
-    expect(after.map((team) => [team.name, team.color])).toEqual([['Jays', '#112233']]);
+    expect(after.map((team) => [team.name, team.color])).toContainEqual(['Jays', '#112233']);
+    expect(after.map((team) => team.name)).not.toContain('Blue Jays');
+    expect(after).toHaveLength(teams.length);
   });
 
   it('sets who sees the numbers, and refuses a stale page', async () => {
@@ -201,13 +206,14 @@ describe('the admin Teams screens over the stand-in', () => {
   it('refuses a person who holds no role in the league', async () => {
     const m = made();
     const seasonId = await seasonOf(m.ports);
+    const before = await m.ports.teams(leagueId, seasonId);
     const result = await createTeam(
       m.stranger,
       newTeamInput({ name: 'Nope' }, seasonId),
       m.ports.deps,
     );
     expect(!result.ok && result.error.code).toBe('not-allowed');
-    expect(await m.ports.teams(leagueId, seasonId)).toEqual([]);
+    expect(await m.ports.teams(leagueId, seasonId)).toEqual(before);
   });
 
   it('keeps one league apart from another', async () => {
@@ -216,7 +222,10 @@ describe('the admin Teams screens over the stand-in', () => {
     const otherLeague = '01900000-0000-7000-8000-000000000002';
     const season = await m.ports.currentSeason(otherLeague);
     expect(season).toBeDefined();
-    expect(await m.ports.teams(otherLeague, season?.id ?? '')).toEqual([]);
+    // The other league has its own teams, and none of this one's.
+    const theirs = (await m.ports.teams(otherLeague, season?.id ?? '')).map((t) => t.name);
+    expect(theirs).toEqual(['Comets', 'Meteors', 'Rockets']);
+    expect(await m.ports.teams(otherLeague, await seasonOf(m.ports))).toEqual([]);
   });
 
   it('adds a new person to the roster, and leaves no orphan when the number is worn', async () => {

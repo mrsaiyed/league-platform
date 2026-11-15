@@ -5,6 +5,8 @@
 import { describe, expect, it } from 'vitest';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
+import { startingNamePolicy } from '../../server/name-policy-of.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildHomeGames, buildScheduleView, gameView, type GameView } from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
 import { homeLeadersPlace, homeNextGames, homeResults } from './home-lists.ts';
@@ -13,8 +15,9 @@ import { gameLinkWords } from './schedule-views.tsx';
 const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
 const now = () => new Date('2026-11-13T15:00:00Z');
-const schedules = standInPublicSchedule({ adultLeagueId: adult, youthLeagueId: youth }, now);
-const stats = standInPublicStats({ adultLeagueId: adult, youthLeagueId: youth });
+const world = testWorld(undefined, now);
+const schedules = standInPublicSchedule(world);
+const stats = standInPublicStats(world, startingNamePolicy);
 const addressee = { id: adult, slug: 'north', customDomain: null } as never;
 
 async function load() {

@@ -3,7 +3,9 @@
 // a scorekeeper, and nothing read for a game still to be played.
 import { listMyGames, type AccessReader, type Grant } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
+import { namesShownOf, startingNamePolicy } from '../../server/name-policy-of.ts';
 import { standInGames } from '../../server/stand-in-games.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { mayCorrectAt, readReopenViews } from './read-reopen-views.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -24,13 +26,13 @@ const access: AccessReader = {
 };
 
 async function viewsFor(accountId: string) {
-  const ports = standInGames({
-    leagueId,
-    people: {},
-    assignees: [keeper, owner],
-    accessOf: () => access,
-    log: () => {},
-  });
+  const ports = standInGames(
+    testWorld(() => access),
+    {
+      people: {},
+      namesShownOf: namesShownOf(startingNamePolicy, () => 'adult'),
+    },
+  );
   const context = { leagueId, accountId, requestId: 'r1' };
   const listed = await listMyGames(context, {}, ports.deps);
   const games = listed.ok ? listed.value.games : [];
