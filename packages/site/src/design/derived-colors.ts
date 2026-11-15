@@ -106,6 +106,19 @@ export type DerivedColors = {
   /** In the header: quiet words (the menu) and the color of the current page and the way in. */
   readonly headerMuted: string;
   readonly headerPop: string;
+  /**
+   * The color of fine decoration that need not be read: the short rule of a kicker, the
+   * bar under a winner's score. It is the league's own color that the eye lands on on a
+   * band, as the league chose it, never moved (in a light design whose main color fills
+   * its bands this is where its gold shows on the white page).
+   */
+  readonly ornament: string;
+  /**
+   * The same color as a fine line on the page (the lines of the number strip, the hairline
+   * at a card's top): laid on the page only as strongly as it takes to be seen, from
+   * about a third on a dark page to nearly all of it on a white one.
+   */
+  readonly ornamentLine: string;
 };
 
 type ChosenColors = {
@@ -149,8 +162,23 @@ export const textSurfaces = (colors: ChosenColors): readonly string[] => [
  * laid on thinly: more of it would turn the panel to mud.
  */
 const bandShares = { deep: { band: 0.2, glow: 0.3 }, bright: { band: 0.06, glow: 0.1 } } as const;
-/** A light design's band is the main color deepened this far where it starts and ends. */
-const lightBandShares = { band: 0.2, deep: 0.5 } as const;
+/**
+ * A light design's band starts from the main color deepened this far, deepens by `step`
+ * until its words read with room to spare, and ends `deeper` than it starts.
+ */
+const lightBandShares = { band: 0.2, step: 0.05, deeper: 0.3 } as const;
+/**
+ * How well white must read on a light design's band (7 to 1): well enough that a color
+ * with some color left in it, not only white, still reads there (4.5 to 1), so the band's
+ * eye-catching color never has to collapse into the color of its words.
+ */
+const bandWordContrast = 7;
+/**
+ * A light design whose main color is too bright to carry white words (a sky blue, a gold)
+ * makes its band from its text color instead, with this much of the main color in it: a
+ * dark ground the main color itself can shine on.
+ */
+const brightBandTint = 0.2;
 
 /** A design is dark when its page is: said by the design, or read from the page's color. */
 function isDark(colors: ChosenColors, base: 'light' | 'dark' | undefined): boolean {
@@ -164,31 +192,75 @@ const firstThatReads = (
   surfaces: readonly string[],
 ): string | undefined => candidates.find((color) => readsOn(color, surfaces));
 
-/** The surfaces of a band: where it starts, where it ends and its glow. */
-export function bandSurfaces(
+type BandSurfaces = {
+  readonly band: string;
+  readonly bandDeep: string;
+  readonly bandGlow: string;
+};
+
+/**
+ * A band's surfaces and the color of the words on it, worked out together so that the
+ * words always read on all three, whatever main color a league chooses.
+ */
+function bandWithWords(
   colors: ChosenColors,
-  base?: 'light' | 'dark',
-): { readonly band: string; readonly bandDeep: string; readonly bandGlow: string } {
+  base: 'light' | 'dark' | undefined,
+): BandSurfaces & { readonly onBand: string } {
   if (isDark(colors, base)) {
-    const shares = readsOn(colors.primary, textSurfaces(colors))
+    // The main color laid over a panel, fading into the page. A main color so bright that
+    // the page's text would not read on it is laid on more thinly until it does.
+    let shares: { band: number; glow: number } = readsOn(colors.primary, textSurfaces(colors))
       ? bandShares.bright
       : bandShares.deep;
-    const band = mixColors(colors.panel, colors.primary, shares.band);
-    return {
-      band,
-      bandDeep: colors.background,
-      bandGlow: mixColors(band, colors.primary, shares.glow),
-    };
+    for (let round = 0; ; round++) {
+      const band = mixColors(colors.panel, colors.primary, shares.band);
+      const bandGlow = mixColors(band, colors.primary, shares.glow);
+      const all = [band, colors.background, bandGlow];
+      if (readsOn(colors.text, all) || round === 8) {
+        const onBand = readsOn(colors.text, all) ? colors.text : readableOn(colors.text, all);
+        return { band, bandDeep: colors.background, bandGlow, onBand };
+      }
+      shares = { band: shares.band / 2, glow: shares.glow / 2 };
+    }
   }
-  // A light design's band is the main color a step deeper than its header's bar, and only
-  // ever deepens from there: it has no lighter glow, so the color the eye lands on can stay
-  // strong on it.
-  const band = mixColors(colors.primary, '#000000', lightBandShares.band);
-  return {
-    band,
-    bandDeep: mixColors(colors.primary, '#000000', lightBandShares.deep),
-    bandGlow: band,
-  };
+  // A light design's band is its main color, a step deeper than its header's bar, where
+  // white words read on that color (a maroon, a royal blue). A main color too bright for
+  // white words gives the band a dark ground of the text color instead, tinted with it.
+  // Either ground is deepened until white reads on it with room to spare, and only ever
+  // deepens from there: it has no lighter glow.
+  const carriesWhite = contrastRatio('#ffffff', colors.primary) >= MINIMUM;
+  const ground = carriesWhite
+    ? colors.primary
+    : mixColors(colors.text, colors.primary, brightBandTint);
+  let share = carriesWhite ? lightBandShares.band : 0;
+  while (
+    share < 0.95 &&
+    contrastRatio('#ffffff', mixColors(ground, '#000000', share)) < bandWordContrast
+  ) {
+    share += lightBandShares.step;
+  }
+  if (!carriesWhite) {
+    // A little deeper still, where that lets the bright main color itself read on the
+    // band: then the eye lands on the league's own color there. No deeper than half.
+    for (let deeper = share; deeper <= 0.5; deeper += lightBandShares.step) {
+      if (contrastRatio(colors.primary, mixColors(ground, '#000000', deeper)) >= MINIMUM) {
+        share = deeper;
+        break;
+      }
+    }
+  }
+  const band = mixColors(ground, '#000000', share);
+  const bandDeep = mixColors(ground, '#000000', Math.min(0.97, share + lightBandShares.deeper));
+  const all = [band, bandDeep];
+  // The page's own light color where it reads there, which it does on any light page.
+  const onBand = firstThatReads([colors.background, colors.panel], all) ?? '#ffffff';
+  return { band, bandDeep, bandGlow: band, onBand };
+}
+
+/** The surfaces of a band: where it starts, where it ends and its glow. */
+export function bandSurfaces(colors: ChosenColors, base?: 'light' | 'dark'): BandSurfaces {
+  const { band, bandDeep, bandGlow } = bandWithWords(colors, base);
+  return { band, bandDeep, bandGlow };
 }
 
 /**
@@ -214,14 +286,41 @@ function popOn(
   candidates: readonly string[],
   colors: ChosenColors,
   surfaces: readonly string[],
-): string {
-  const asItIs = firstThatReads(candidates, surfaces);
-  if (asItIs !== undefined) return asItIs;
+  /** The color of the words there: the eye-catching color must not be the same one. */
+  words?: string,
+): { readonly color: string; readonly source: string } {
+  const differs = (color: string) => words === undefined || !sameColor(color, words);
+  const asItIs = candidates.find((color) => readsOn(color, surfaces) && differs(color));
+  if (asItIs !== undefined) return { color: asItIs, source: asItIs };
+  // Nearest to reading first; then every other color of the league, so that one of them,
+  // fitted, is still a color of its own beside the words.
   const nearer =
     weakestOn(colors.accent, surfaces) > weakestOn(colors.highlight, surfaces)
-      ? colors.accent
-      : colors.highlight;
-  return readableOn(nearer, surfaces);
+      ? [colors.accent, colors.highlight]
+      : [colors.highlight, colors.accent];
+  const fitted = [...nearer, colors.primary].map((source) => ({
+    color: readableOn(source, surfaces),
+    source,
+  }));
+  return fitted.find((found) => differs(found.color)) ?? fitted[0] ?? { color: '', source: '' };
+}
+
+const sameColor = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+
+/** A fine line must stand out from the page by at least this much to be seen (1.6 to 1). */
+const lineContrast = 1.6;
+
+/**
+ * `color` laid on the page as a fine line: as little of it as shows on the page and on a
+ * panel, starting from about a third (docs/build/DESIGN.md, section 4, line 17).
+ */
+function lineOf(color: string, colors: ChosenColors): string {
+  const grounds = [colors.background, colors.panel];
+  for (let share = 0.3; share < 1; share += 0.1) {
+    const line = mixColors(colors.background, color, share);
+    if (weakestOn(line, grounds) >= lineContrast) return line;
+  }
+  return color;
 }
 
 export function derivedColors(colors: ChosenColors, base?: 'light' | 'dark'): DerivedColors {
@@ -236,17 +335,25 @@ export function derivedColors(colors: ChosenColors, base?: 'light' | 'dark'): De
       : '#ffffff';
   const primaryHover = mixColors(colors.primary, awayFromWords, primaryHoverShare);
   const muted = readableOn(mixColors(colors.text, colors.background, 0.35), surfaces);
-  const pop =
-    firstThatReads([colors.primary, colors.highlight, colors.accent], surfaces) ??
-    readableOn(colors.highlight, surfaces);
+  // The league's own color the eye lands on, and that color as it reads on the page: the
+  // same, unless none of the league's three reads there and the highlight has to be moved.
+  const popSource =
+    firstThatReads([colors.primary, colors.highlight, colors.accent], surfaces) ?? colors.highlight;
+  const pop = readableOn(popSource, surfaces);
   const dark = isDark(colors, base);
-  const { band, bandDeep, bandGlow } = bandSurfaces(colors, base);
+  const { band, bandDeep, bandGlow, onBand } = bandWithWords(colors, base);
   const bandAll = [band, bandDeep, bandGlow];
-  // Words on a band: the design's own text or surface color where one reads on all of it.
-  const onBand =
-    firstThatReads(dark ? [colors.text] : [onPrimary, colors.background, colors.panel], bandAll) ??
-    readableOn(dark ? colors.text : onPrimary, bandAll);
-  const bandPop = popOn([pop, colors.highlight, colors.accent], colors, bandAll);
+  // On a band the eye lands on the same color as on the page where that reads there; then
+  // on the main color itself (a bright one shines on a dark band), the highlight, the
+  // accent. Never on the color of the band's own words.
+  const { color: bandPop, source: bandPopSource } = popOn(
+    [pop, colors.primary, colors.highlight, colors.accent],
+    colors,
+    bandAll,
+    onBand,
+  );
+  // Fine decoration is in that color as the league chose it, before any moving.
+  const ornament = bandPopSource === pop ? popSource : bandPopSource;
   const onBandPop = textOn(bandPop, [bandDeep, band, ...inks]);
   const headerAll = headerSurfaces(colors, base);
   const headerText = dark ? colors.text : onPrimary;
@@ -280,7 +387,9 @@ export function derivedColors(colors: ChosenColors, base?: 'light' | 'dark'): De
       mixColors(headerText, headerAll[0] ?? colors.background, 0.3),
       headerAll,
     ),
-    headerPop: popOn([pop, colors.highlight, colors.accent], colors, headerAll),
+    headerPop: popOn([pop, colors.highlight, colors.accent], colors, headerAll).color,
+    ornament,
+    ornamentLine: lineOf(ornament, colors),
   };
 }
 

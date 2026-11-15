@@ -26,6 +26,12 @@ const bases = {
     '--header-text': 'var(--color-text)',
     '--header-name': 'var(--color-text)',
     '--header-line': 'var(--color-line)',
+    // A card of a dark design has a little of the main color at one corner, never more
+    // than the texts are fitted to (hoverTintShare): where the page gets its warmth.
+    '--card-wash': 'color-mix(in srgb, var(--color-primary) 9%, var(--color-panel))',
+    // How much of a team's color fills its shield: on a dark panel a third shows as a
+    // deep tone of it.
+    '--emblem-strength': '30%',
     '--label-tracking': '0.14em',
     '--hero-align': 'center',
     '--overlay-shadow': '0 16px 32px rgba(0, 0, 0, 0.45)',
@@ -38,6 +44,12 @@ const bases = {
     '--header-text': 'var(--color-on-primary)',
     '--header-name': 'var(--color-on-primary)',
     '--header-line': 'transparent',
+    // A card of a light design is its panel's color and nothing else: cards and tables
+    // are one tint, and a main color laid over white would turn it dusty.
+    '--card-wash': 'var(--color-panel)',
+    // On a white panel a team's color needs more than half to have the strength it has on
+    // a dark one.
+    '--emblem-strength': '55%',
     '--label-tracking': '0.08em',
     '--hero-align': 'start',
     '--overlay-shadow': '0 16px 32px rgba(0, 0, 0, 0.18)',

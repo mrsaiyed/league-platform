@@ -22,16 +22,18 @@ const definitions = {
     cards: 'outlined',
     spacing: 'roomy',
   },
-  // Its light sibling: a white page with cream panels, the same maroon for the header, the
-  // bands and the numbers, and the same gold as the accent on them. Gold cannot be read on
-  // white, so here it is the accent (small labels are a darker shade of it, worked out) and
-  // the maroon is also the highlight.
+  // Its light sibling: maroon, white and gold. A warm white page, white panels with a fine
+  // line around them, the same maroon for the header, the bands and the numbers, and the
+  // same gold. Gold cannot be read on white, so here it is the accent: small labels are a
+  // darker shade of it, worked out, and the gold itself is spent where it need not be read
+  // (a short rule, a fine line, the bar under a winner's score) and on the maroon, where
+  // it can. The maroon is also the highlight.
   'crest-light': {
     version: 1,
     base: 'light',
     colors: {
       background: '#fffefa',
-      panel: '#eee7e8',
+      panel: '#ffffff',
       text: '#211c20',
       primary: '#96062d',
       accent: '#d3b780',
@@ -39,7 +41,7 @@ const definitions = {
     },
     fonts: { heading: 'gelasio', body: 'source-sans' },
     corners: 'sharp',
-    cards: 'flat',
+    cards: 'outlined',
     spacing: 'roomy',
   },
   'midnight-gold': {

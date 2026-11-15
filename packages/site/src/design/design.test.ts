@@ -21,13 +21,15 @@ describe('design document', () => {
     // The first one is the design a league opens with (C-16), then its light sibling.
     expect(startingDesignKeys).toEqual(['crest', 'crest-light', 'midnight-gold', 'clean-court']);
     const designs = startingDesignKeys.map(startingDesign);
-    // No two share a page: every pair differs in its background, its panel and its text
-    // or main color.
+    // No two share a page: every pair differs in its background, and in its text or main
+    // color. (Two light designs may both have white panels: paper is paper.)
     for (const [i, a] of designs.entries()) {
       for (const b of designs.slice(i + 1)) {
         expect(a.colors.background).not.toBe(b.colors.background);
-        expect(a.colors.panel).not.toBe(b.colors.panel);
         expect([a.colors.text, a.colors.primary]).not.toEqual([b.colors.text, b.colors.primary]);
+        if (a.base === 'dark' || b.base === 'dark') {
+          expect(a.colors.panel).not.toBe(b.colors.panel);
+        }
       }
     }
     // The first design and its light sibling are one look on two pages: the same main
@@ -58,9 +60,12 @@ describe('design document', () => {
       accent: '#b77d8c',
       highlight: '#d3b780',
     });
-    const light = startingDesign('crest-light').colors;
-    expect([light.background, light.panel]).toEqual(['#fffefa', '#eee7e8']);
-    expect([light.primary, light.accent]).toEqual(['#96062d', '#d3b780']);
+    // Its light sibling is maroon, white and gold: a warm white page, white panels with a
+    // fine line (not a tinted panel, which a maroon nearby turns dusty pink).
+    const light = startingDesign('crest-light');
+    expect([light.colors.background, light.colors.panel]).toEqual(['#fffefa', '#ffffff']);
+    expect([light.colors.primary, light.colors.accent]).toEqual(['#96062d', '#d3b780']);
+    expect(light.cards).toBe('outlined');
     // A serif for titles, names and numbers; a plain sans for reading.
     expect(startingDesign('crest').fonts).toEqual({ heading: 'gelasio', body: 'source-sans' });
   });

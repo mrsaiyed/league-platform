@@ -93,6 +93,8 @@ export function designToCssVariables(design: DesignDocument): Record<string, str
     '--color-band-pop-hover': derived.bandPopHover,
     '--header-muted': derived.headerMuted,
     '--header-pop': derived.headerPop,
+    '--color-ornament': derived.ornament,
+    '--color-ornament-line': derived.ornamentLine,
     ...fonts,
     ...shape,
     ...stepVariables,
