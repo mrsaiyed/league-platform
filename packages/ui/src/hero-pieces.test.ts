@@ -575,9 +575,11 @@ describe('a game as a scoreboard', () => {
     expect(board({ status: 'scheduled' })).toContain(
       '<div class="ui-game-middle"><p class="ui-game-versus">vs</p></div>',
     );
-    // Where a card is wide its figures and gaps are larger, and the sum knows it.
-    expect(css).toMatch(
-      /\.ui-game-card\[data-layout='board'\] \{[^}]*container: card \/ inline-size;/,
+    // Where a card is wide its figures and gaps are larger, and the sum knows it. The
+    // measure named "card" is the card's top line and its middle part, each as wide as
+    // the card's inside (the next test says why the card itself is not one).
+    expect(css.replace(/\s+/g, ' ')).toContain(
+      ".ui-game-card[data-layout='board'] .ui-game-meta, .ui-game-body { min-inline-size: 0; container: card / inline-size; }",
     );
     expect(css).toMatch(
       /@container card \(min-width: 26rem\) \{\s*\.ui-game-board \{\s*--board-gap: var\(--step-5\);\s*--board-figure: var\(--text-36\);\s*gap: var\(--step-2\) var\(--step-5\);/,
@@ -641,30 +643,40 @@ describe('a game as a scoreboard', () => {
   });
 
   it('stands the shields and names of a row of cards on one line', () => {
-    // A card's top line takes what it needs and its board the rest of the card's height
-    // (the cards of a row are one height).
+    // By itself a card's top line takes what it needs and its middle the rest.
     expect(css).toMatch(
       /\.ui-game-card\[data-layout='board'\] \{\s*grid-template-rows: auto 1fr auto;/,
     );
-    // A card is a measure of its own (its parts size themselves by it), and a browser
-    // does not let such a box share its rows with its neighbors: the card must never be
-    // told to (a rule that tried made the cards of a row unlevel).
-    expect(css).toMatch(
-      /\.ui-game-card\[data-layout='board'\] \{[^}]*container: card \/ inline-size;/,
+    // Side by side, the cards of a row share the heights of their three parts through the
+    // list's grid: each card lends the list its three rows (a card is three rows of it),
+    // so a card whose pill took a second line gives its whole row that top line and no
+    // board in the row stands lower than its neighbors.
+    const shared = css.slice(css.indexOf('@supports (grid-template-rows: subgrid) {'));
+    expect(shared.startsWith('@supports')).toBe(true);
+    const list = String.raw`\.ui-card-grid\[data-layout='board'\]:is\(\[data-across='two'\], \[data-across='pair'\]\)`;
+    expect(shared).toMatch(
+      new RegExp(
+        String.raw`^@supports \(grid-template-rows: subgrid\) \{\s*@media \(min-width: 48rem\) \{\s*${list} \{\s*row-gap: 0;\s*margin-block-end: calc\(-1 \* var\(--step-5\)\);\s*\}\s*${list} > li \{\s*grid-row: span 3;\s*grid-template-rows: subgrid;\s*margin-block-end: var\(--step-5\);\s*\}\s*${list}\s*> li\s*> \.ui-game-card \{\s*grid-row: 1 \/ -1;\s*grid-template-rows: subgrid;`,
+      ),
     );
+    // A browser does not let a box that is a measure (a container for its pieces' sizes)
+    // share rows: so neither the card nor the list's item is ever one. An earlier rule
+    // that left the card a measure was ignored by the browser and left a row unlevel.
     for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      if (!/\.ui-game-card|\.ui-card-grid/.test(rule[1] ?? '')) continue;
-      expect(rule[2], rule[1]).not.toContain('subgrid');
+      const selectors = (rule[1] ?? '').split(',').map((s) => s.trim());
+      const onCard = selectors.some((s) => /(?:\.ui-game-card(?:\[[^\]]*\])*|> li)$/.test(s));
+      if (onCard) expect(rule[2], rule[1]).not.toMatch(/container(?:-type)?:/);
     }
     // Inside a board the two sides begin at its top, and a board taller than its teams
     // (its row's tallest neighbor sets the height) keeps them at the top: so one card's
     // two-line name never lowers its neighbors' shields.
     expect(css).toMatch(/\.ui-game-board \{[^}]*align-items: center;\s*align-content: flex-start;/);
     expect(css).toMatch(/\.ui-game-side \{[^}]*align-self: flex-start;\s*align-items: center;/);
-    // A card has exactly the three parts the rows are for, and its link lies over them.
+    // A card has exactly the three parts the rows are for (its top line, its middle, which
+    // holds the board, and its place), and its link lies over them.
     const html = board();
     expect(html).toMatch(
-      /^<article[^>]*><header class="ui-game-meta">.*<\/header><div class="ui-game-board".*<\/div><footer class="ui-game-foot">.*<\/footer><a class="ui-game-link"/,
+      /^<article[^>]*><header class="ui-game-meta">.*<\/header><div class="ui-game-body"><div class="ui-game-board".*<\/div><\/div><footer class="ui-game-foot">.*<\/footer><a class="ui-game-link"/,
     );
     expect(css).toMatch(/\.ui-game-link \{\s*position: absolute;/);
   });

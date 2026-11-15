@@ -199,10 +199,19 @@ export const gameCss = String.raw`
   background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   /* A fine line at the card's top in the league's color of decoration. */
   border-block-start: 2px solid var(--color-ornament-line);
-  container: card / inline-size;
   transition:
     border-color 0.15s,
     transform 0.15s;
+}
+/* The card's top line and its middle part are the measures its pieces size themselves by
+   (both named "card", each as wide as the card's inside): where a piece is too narrow or
+   has room, it is by one of these. The card itself is no measure, so that it can share
+   the heights of its three parts with the cards beside it (the list's rule, below): a
+   browser does not let a box that is a measure lend its rows to its neighbors. */
+.ui-game-card[data-layout='board'] .ui-game-meta,
+.ui-game-body {
+  min-inline-size: 0;
+  container: card / inline-size;
 }
 .ui-game-card[data-layout='board']:has(.ui-game-link):hover {
   border-color: color-mix(in srgb, var(--color-pop) 55%, transparent);
@@ -558,14 +567,33 @@ export const gameCss = String.raw`
     grid-column: 1 / -1;
   }
 }
-/* The cards of one row are one height (the list's grid stretches them), each card's top
-   line takes what it needs and its board the rest, and inside a board the teams begin at
-   the top: so across a row the shields and names stand on one line wherever the cards'
-   top lines are one line each, which the rule for the pill above sees to at every width
-   but a small phone's (where cards are one to a row). The cards cannot share their top
-   line's height with each other through the list's grid (subgrid): a card is a measure of
-   its own, by which its parts size themselves, and a browser does not let such a box lend
-   its rows to its neighbors. */
+/* The cards of one row share the heights of their three parts (the top line, the middle,
+   the place): a row that holds a card whose pill took a second line gives every card of
+   that row the same top line, so shields, names and scores stand on one line across the
+   row; a row with no such card stays as short as it was. Each card lends its three rows
+   to the list (a card is three rows of the list's grid), so the space between the rows
+   of cards is the card's own margin, taken back after the last row. Where a browser does
+   not know how, a card's top line takes what it needs and its middle the rest, as on a
+   phone. */
+@supports (grid-template-rows: subgrid) {
+  @media (min-width: 48rem) {
+    .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair']) {
+      row-gap: 0;
+      margin-block-end: calc(-1 * var(--step-5));
+    }
+    .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair']) > li {
+      grid-row: span 3;
+      grid-template-rows: subgrid;
+      margin-block-end: var(--step-5);
+    }
+    .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair'])
+      > li
+      > .ui-game-card {
+      grid-row: 1 / -1;
+      grid-template-rows: subgrid;
+    }
+  }
+}
 
 /* The big board of a game's page. The teams and what stands between them are held to a
    width the eye takes in at once, however wide the panel is. */

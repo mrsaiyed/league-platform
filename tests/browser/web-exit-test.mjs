@@ -1378,6 +1378,52 @@ if (browser) {
           );
         }
       }
+      // A pill too long for a card's top line takes a line of its own. The cards of its row
+      // share the height of their top lines, so that card's board is not a line lower than
+      // its neighbors': the shields of the row still stand on one line. (Sizes are only
+      // compared with each other, so the fonts of the machine do not matter.)
+      for (const width of [768, 1280]) {
+        await page.setViewportSize({ width, height: 900 });
+        await open(page, '/north-valley');
+        await page.evaluate(() => document.fonts.ready);
+        const grown = await page.evaluate(() => {
+          const list = document.querySelector(
+            '.ui-card-grid[data-layout="board"][data-across="two"]',
+          );
+          const metas = [...list.querySelectorAll('.ui-game-meta')];
+          const before = metas.map((meta) => meta.getBoundingClientRect().height);
+          const pill = document.createElement('span');
+          pill.className = 'ui-game-state';
+          pill.dataset.kind = 'quiet';
+          pill.textContent = 'Awaiting the official result of this game';
+          metas[0].append(pill);
+          const tops = (selector) =>
+            [...list.querySelectorAll(selector)].map((el) =>
+              Math.round(el.getBoundingClientRect().top),
+            );
+          const cards = tops('.ui-game-card');
+          const inRow = cards
+            .map((top, index) => (top === cards[0] ? index : -1))
+            .filter((i) => i >= 0);
+          const after = metas.map((meta) => meta.getBoundingClientRect().height);
+          const boards = tops('.ui-game-board');
+          return {
+            row: inRow.length,
+            taller: after[0] > before[0] + 8,
+            metas: inRow.map((i) => Math.round(after[i])),
+            boards: inRow.map((i) => boards[i]),
+          };
+        });
+        note(
+          `at ${width} a pill that takes its own line does not lower its card's board in the row`,
+          grown.row >= 2 &&
+            grown.taller &&
+            new Set(grown.metas).size === 1 &&
+            new Set(grown.boards).size === 1,
+          JSON.stringify(grown),
+        );
+      }
+      await page.setViewportSize({ width: 1280, height: 900 });
       // On a laptop the two rows of the home page share one gap, so their edges meet: the
       // second column of the lower row starts where the second board of the upper row does.
       await open(page, '/north-valley');
