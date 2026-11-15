@@ -29,24 +29,7 @@ jobs:
       - run: npm run test:varsity:browser
       - run: npm run test:stats:browser
       - run: npm run test:pages:browser
-      # The web app's browser tests, one at a time in package.json's order, each under its
-      # own heading, the output also kept in a file: so when one fails, the next step can
-      # name its test file and give the failing check's lines.
-      - name: npm run test:web:browser
-        id: web-browser
-        shell: bash
-        run: |
-          set -o pipefail
-          node scripts/verify-failure-notes.mjs --steps test:web:browser > "$RUNNER_TEMP/web-browser-tests.txt"
-          while IFS= read -r test; do
-            echo "::group::$test"
-            bash -c "$test" < /dev/null || exit 1
-            echo "::endgroup::"
-          done < "$RUNNER_TEMP/web-browser-tests.txt" 2>&1 | tee "$RUNNER_TEMP/web-browser-output.txt"
-      - name: Say what failed in the web app's browser tests
-        if: failure() && steps.web-browser.outcome == 'failure'
-        shell: bash
-        run: node scripts/verify-failure-notes.mjs --web-browser "$RUNNER_TEMP/web-browser-output.txt"
+      - run: npm run test:web:browser
   hosted-build:
     runs-on: ubuntu-latest
     steps:
