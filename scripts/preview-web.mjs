@@ -17,6 +17,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { withLoopback } from './web-listen.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const copy = path.join(root, '.local', 'preview');
@@ -88,10 +89,10 @@ if (process.argv.includes('--prepare')) {
 
 // 4. Serve it, to this computer only.
 say(`The product as of ${commit.slice(0, 7)}: http://${host}:${port}/north-valley`);
-const server = spawn(process.execPath, [nextBin, 'start', '--hostname', host, '--port', port], {
-  cwd: app,
-  env,
-  stdio: 'inherit',
-});
+const server = spawn(
+  process.execPath,
+  [nextBin, ...withLoopback(['start', '--hostname', host, '--port', port], env)],
+  { cwd: app, env, stdio: 'inherit' },
+);
 server.on('exit', (status, signal) => process.exit(signal ? 1 : (status ?? 1)));
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.kill(signal));

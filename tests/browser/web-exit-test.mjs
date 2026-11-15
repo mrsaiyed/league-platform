@@ -37,6 +37,7 @@ import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withLoopback } from '../../scripts/web-listen.mjs';
 import { sayOnFailure, whatWentWrong } from './web-browser-kit.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -54,9 +55,11 @@ const launch = () => (process.env.CI ? chromium.launch() : chromium.launch({ cha
 
 function start(args, env) {
   let output = '';
-  const child = spawn(process.execPath, [nextBin, ...args], {
+  // On the made-up stand-in, on this computer's loopback address only (web-listen.mjs).
+  const environment = { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env };
+  const child = spawn(process.execPath, [nextBin, ...withLoopback(args, environment)], {
     cwd: app,
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env },
+    env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (c) => (output += c));
@@ -637,7 +640,8 @@ if (browser) {
         (await page.locator('select[name=season]').count()) === 0,
       );
 
-      for (const address of ['/north-valley/teams/lions', '/north-valley/no-such-page/at-all']) {
+      // Comets is a team of another league, never of this one (step 2.152).
+      for (const address of ['/north-valley/teams/comets', '/north-valley/no-such-page/at-all']) {
         const response = await open(page, address);
         note(`${address} is not found`, response?.status() === 404);
         note(

@@ -353,16 +353,17 @@ if (browser) {
           await page.locator('main .ui-scoreboard').waitFor();
           return said;
         };
-        // The league's own live game (Herons at Falcons), under "Live now" on the home page.
+        // The league's own live game, the one scored above (Bears at Hawks), under "Live now"
+        // on the home page: one made-up world (step 2.152).
         const live = await tap('live');
         note(
           "the live card's link says what the game is and how it stands",
-          /^Herons against Falcons, live, \d+ to \d+$/.test(live),
+          /^Bears against Hawks, live, \d+ to \d+$/.test(live),
           live,
         );
         note(
           "a tap on the live game's card lands on its page",
-          ((await page.locator('h1').first().textContent()) ?? '') === 'Herons at Falcons',
+          ((await page.locator('h1').first().textContent()) ?? '') === 'Bears at Hawks',
         );
         note(
           'the page it lands on shows the live board',

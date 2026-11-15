@@ -2,13 +2,15 @@
 // their name is written, and who is never named.
 import type { StandingsReadStore } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
+import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { homeLeaderLimit, homeLeadersOf, loadHomeLeaders } from './build-home-leaders.ts';
 import { loadStatsPage } from './build-stats.ts';
 
 const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
-const stats = standInPublicStats({ adultLeagueId: adult, youthLeagueId: youth });
+const stats = standInPublicStats(testWorld(), startingNamePolicy);
 
 async function leadersOf(leagueId: string) {
   const season = (await stats.seasonsOf(leagueId))[0];

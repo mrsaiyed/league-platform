@@ -670,3 +670,11 @@ describe('the stylesheet of the page pieces', () => {
     for (const raw of ['0.375rem', '0.3125rem', '1.25rem']) expect(css).not.toContain(raw);
   });
 });
+
+describe('the plain list (step 2.154)', () => {
+  it('lays things one under another with no bullets or indent, each as tall as its content', () => {
+    expect(displayCss).toMatch(
+      /\.ui-list \{[^}]*align-content: start;[^}]*gap: var\(--step-4\);[^}]*padding: 0;[^}]*list-style: none;/,
+    );
+  });
+});

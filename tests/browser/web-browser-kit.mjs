@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withLoopback } from '../../scripts/web-listen.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const app = path.join(root, 'apps/web');
@@ -24,9 +25,11 @@ export const launch = () =>
 /** Runs Next.js in the web app with the made-up settings; its output is kept for errors. */
 export function startNext(args, env) {
   let output = '';
-  const child = spawn(process.execPath, [nextBin, ...args], {
+  // On the made-up stand-in, on this computer's loopback address only (web-listen.mjs).
+  const environment = { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env };
+  const child = spawn(process.execPath, [nextBin, ...withLoopback(args, environment)], {
     cwd: app,
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env },
+    env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (c) => (output += c));

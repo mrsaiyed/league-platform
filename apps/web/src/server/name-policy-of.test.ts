@@ -16,13 +16,9 @@ import {
 import { describe, expect, it } from 'vitest';
 import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
-import {
-  adultTeams,
-  standInAudienceOf,
-  standInPublicStats,
-  youthTeams,
-} from './stand-in-public-stats.ts';
+import { adultTeams, standInPublicStats, youthTeams } from './stand-in-public-stats.ts';
 import { standInPublicTeams } from './stand-in-public-teams.ts';
+import { testWorld } from './stand-in-world.test-helper.ts';
 
 const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
@@ -52,15 +48,10 @@ const as = (accountId: string, leagueId = youth): CommandContext => ({
 });
 
 function made() {
-  const ids = { adultLeagueId: adult, youthLeagueId: youth };
-  const settings = standInAdminSettings({
-    accessOf: () => access,
-    log: () => undefined,
-    audienceOf: standInAudienceOf(ids),
-    hasRecordedChild: () => false,
-  });
-  const stats = standInPublicStats(ids, namePolicyOf(settings.deps));
-  const teams = standInPublicTeams(ids, ownerId);
+  const world = testWorld(() => access);
+  const settings = standInAdminSettings(world);
+  const stats = standInPublicStats(world, namePolicyOf(settings.deps));
+  const teams = standInPublicTeams(world);
   const rockets = youthTeams.find((t) => t.slug === 'rockets')?.id ?? '';
   const rosterNames = async () => {
     const policy = (await stats.settingsOf(youth)).namePolicy;
@@ -88,10 +79,11 @@ const texts = (lines: readonly { readonly name: { shown: boolean } }[]) =>
 describe("the league's privacy settings on its public pages (T-81)", () => {
   it('shows children by first name and last initial until the admin confirms full names', async () => {
     const { stats, rosterNames, set } = made();
-    expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Tess M.']);
+    // The team's coach is a grown-up, shown in full under every setting for children.
+    expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Lena Ortiz', 'Tess M.']);
     // Full names without the confirmation: saved, children still with care (R-14, R-29).
     expect(await set('privacy.publicNames', 'fullName')).toMatchObject({ ok: true });
-    expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Tess M.']);
+    expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Lena Ortiz', 'Tess M.']);
     // The confirmation is its own act, and asks for the box to be ticked.
     expect(await set('privacy.childrenInFullConfirmed', true)).toEqual({
       ok: false,
@@ -100,12 +92,17 @@ describe("the league's privacy settings on its public pages (T-81)", () => {
     expect(await set('privacy.childrenInFullConfirmed', true, { confirmed: true })).toMatchObject({
       ok: true,
     });
-    expect(texts(await rosterNames())).toEqual(['Noor Haddad', 'Jay Whitaker', 'Tess Moreno']);
+    expect(texts(await rosterNames())).toEqual([
+      'Noor Haddad',
+      'Jay Whitaker',
+      'Lena Ortiz',
+      'Tess Moreno',
+    ]);
     // Taken back: children with care again.
     expect(await set('privacy.childrenInFullConfirmed', false, { version: 1 })).toMatchObject({
       ok: true,
     });
-    expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Tess M.']);
+    expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Lena Ortiz', 'Tess M.']);
     // Each league has its own settings: the adult league is untouched, on its start.
     expect((await stats.settingsOf(adult)).namePolicy).toEqual(defaultNamePolicy);
   });
@@ -154,7 +151,7 @@ describe("the league's privacy settings on its public pages (T-81)", () => {
       ok: false,
       error: { code: 'not-allowed' },
     });
-    expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Tess M.']);
+    expect(texts(await rosterNames())).toEqual(['Noor H.', 'Jay W.', 'Lena Ortiz', 'Tess M.']);
   });
 
   it('finds no private field or value on the roster under each setting', async () => {
@@ -196,12 +193,7 @@ describe("the league's privacy settings on its public pages (T-81)", () => {
 describe('namesShownOf', () => {
   it("gives the league's audience and policy, and reads a league it does not know as youth", async () => {
     const audienceOf = (leagueId: string) => (leagueId === adult ? 'adult' : undefined);
-    const settings = standInAdminSettings({
-      accessOf: () => access,
-      log: () => undefined,
-      audienceOf,
-      hasRecordedChild: () => false,
-    });
+    const settings = standInAdminSettings(testWorld(() => access));
     const names = namesShownOf(namePolicyOf(settings.deps), audienceOf);
     expect((await names(adult)).audience).toBe('adult');
     expect((await names(youth)).audience).toBe('youth');

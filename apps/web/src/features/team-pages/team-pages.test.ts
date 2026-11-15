@@ -2,6 +2,7 @@
 // stand-in leagues: records and seeds, rosters through the one name function, statistics
 // following each team's setting, and who lands where.
 import {
+  createTeam,
   defaultNamePolicy,
   publicRosterLine,
   publicViewer,
@@ -14,6 +15,10 @@ import { describe, expect, it } from 'vitest';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
 import { standInPublicTeams } from '../../server/stand-in-public-teams.ts';
+import { startingNamePolicy } from '../../server/name-policy-of.ts';
+import { standInPeople } from '../../server/stand-in-ports.ts';
+import { newTeamInput } from '../teams-area/form-input.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { myTeamSlugOf } from '../../server/my-team-cookie.ts';
 import {
   buildRoster,
@@ -29,10 +34,10 @@ const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
 const member = '01900000-0000-7000-8000-0000000000a3';
 const now = () => new Date('2026-11-13T15:00:00Z');
-const ids = { adultLeagueId: adult, youthLeagueId: youth };
-const stats = standInPublicStats(ids);
-const schedules = standInPublicSchedule(ids, now);
-const teams = standInPublicTeams(ids, member);
+const world = testWorld(undefined, now);
+const stats = standInPublicStats(world, startingNamePolicy);
+const schedules = standInPublicSchedule(world);
+const teams = standInPublicTeams(world);
 const addressee = { id: adult, slug: 'north-valley', customDomain: null } as never;
 
 async function season(leagueId: string, index = 0) {
@@ -45,9 +50,21 @@ describe('the teams list', () => {
   it('lists every team with its record and seed, by division', async () => {
     const s = await season(adult);
     const cards = await loadTeamCards(stats.readStoreOf(adult), addressee, s, s.isCurrent);
-    expect(cards?.map((c) => c.name)).toEqual(['Owls', 'Falcons', 'Herons', 'Badgers', 'Otters']);
+    // East, then West, each in its standings order.
+    expect(cards?.map((c) => c.name)).toEqual([
+      'Owls',
+      'Falcons',
+      'Herons',
+      'Otters',
+      'Lions',
+      'Tigers',
+      'Hawks',
+      'Bears',
+      'Badgers',
+    ]);
     const owls = cards?.[0];
-    expect(owls?.recordText).toBe('5-1');
+    // Two wins and a loss, ahead of the Falcons (also 2-1) by the game between them.
+    expect(owls?.recordText).toBe('2-1');
     expect(owls?.seedText).toBe('1');
     expect(owls?.divisionName).toBe('East');
     expect(owls?.href).toBe('/north-valley/teams/owls');
@@ -55,7 +72,17 @@ describe('the teams list', () => {
 
   it('a past season keeps its season in the address, and a team with no place has no seed', async () => {
     const past = await season(adult, 1);
-    const cards = await loadTeamCards(stats.readStoreOf(adult), addressee, past, past.isCurrent);
+    // A team added to the season after its last result has no place in its standings yet
+    // (in a world of its own, so the other cases keep theirs as seeded).
+    const own = testWorld(undefined, now);
+    const added = await createTeam(
+      { leagueId: adult, accountId: standInPeople.owner.accountId, requestId: 'r1' },
+      newTeamInput({ name: 'Owls', useOwnColors: 'on' }, past.id),
+      own.deps,
+    );
+    expect(added.ok).toBe(true);
+    const store = standInPublicStats(own, startingNamePolicy).readStoreOf(adult);
+    const cards = await loadTeamCards(store, addressee, past, past.isCurrent);
     expect(cards?.every((c) => c.href.endsWith('?season=spring-2026'))).toBe(true);
     expect(cards?.find((c) => c.slug === 'owls')?.seedText).toBe('Not seeded yet');
   });
@@ -131,7 +158,8 @@ describe('a team page', () => {
     // The seed alone, for the row of facts under the team's name.
     expect(head?.seedValue).toBe('2');
     expect(head?.team.divisionName).toBe('East');
-    expect(head?.recordText).toBe('5-1');
+    // Beat the Herons and the Badgers, lost to the Owls: its three results.
+    expect(head?.recordText).toBe('2-1');
     const roster = buildRoster(
       await teams.rosterOf(adult, head?.teamId ?? '', {
         viewer: publicViewer(adult),
@@ -153,12 +181,15 @@ describe('a team page', () => {
     const roster = buildRoster(
       await teams.rosterOf(youth, head?.teamId ?? '', { viewer: publicViewer(youth), policy }),
     );
+    // The players by number; since step 2.162 hidden is followed for adults too (R-29), so
+    // their coach, a grown-up with no number, is a nameless entry.
     expect(roster.current.map((r) => [r.number, r.name])).toEqual([
       ['6', '#6'],
       ['13', '#13'],
+      ['', 'Name not shown'],
     ]);
     expect(roster.former.map((r) => r.name)).toEqual([expect.stringMatching(/^#1 \(left /)]);
-    expect(JSON.stringify(roster)).not.toMatch(/Noor|Haddad|Jay|Whitaker|Tess|Moreno/);
+    expect(JSON.stringify(roster)).not.toMatch(/Noor|Haddad|Jay|Whitaker|Tess|Moreno|Lena|Ortiz/);
   });
 
   it('shows a player added at the scorer’s table by number only as "#12" (S-34)', () => {
