@@ -488,14 +488,23 @@ try {
             // The first game card gets the long name, and the next card one long word. A
             // scoreboard is told how many letters its longer name needs room for, exactly
             // as the card works it out when it is drawn with that name (packages/ui,
-            // nameMeasure: the longest word, or half the name): its teams then stand one
-            // over the other where the card is too narrow for them side by side.
+            // nameMeasure: the longer line of the name's best break into two): its teams
+            // then stand one over the other where the card is too narrow for them side by
+            // side. These made-up names are in Latin letters, one letter wide each.
             const measure = (text) => {
-              const words = text.trim().split(/\s+/).filter(Boolean);
-              return Math.max(
-                ...words.map((w) => [...w].length),
-                Math.ceil([...words.join(' ')].length / 2),
-              );
+              const words = text
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .map((w) => [...w].length);
+              const whole = words.reduce((sum, w) => sum + w, 0) + words.length - 1;
+              let best = whole;
+              let first = -1;
+              for (const word of words.slice(0, -1)) {
+                first += word + 1;
+                best = Math.min(best, Math.max(first, whole - first - 1));
+              }
+              return Math.max(0, best);
             };
             const cards = [...document.querySelectorAll('.ui-game-card')];
             for (const [card, text] of [

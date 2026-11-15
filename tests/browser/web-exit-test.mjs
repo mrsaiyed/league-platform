@@ -225,6 +225,54 @@ async function accessible(page, label) {
   const problems = await accessibilityProblems(page);
   note(`accessibility: ${label}`, problems.length === 0, problems.join('; '));
 }
+/**
+ * Every game drawn as a board on the page, measured as it is drawn: whether its two teams
+ * stand one over the other or side by side, and whether what is drawn agrees with that.
+ * Side by side, the score or "VS" stands between the teams and no team carries a score of
+ * its own; one over the other, each team's score is at the end of its own row and nothing
+ * stands between the rows.
+ */
+async function measureBoards(page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('.ui-game-board')].map((board) => {
+      const rect = (el) => el.getBoundingClientRect();
+      const drawn = (r) => r.width > 1 && r.height > 1;
+      const box = rect(board);
+      const sides = [...board.querySelectorAll('.ui-game-side')];
+      const [first, second] = sides.map(rect);
+      const middle = rect(board.querySelector('.ui-game-middle > *'));
+      const stacked = second.top >= first.bottom - 1;
+      const own = sides.map((side) => side.querySelector('.ui-game-side-score')).filter(Boolean);
+      const names = [...board.querySelectorAll('.ui-game-team-name')];
+      return {
+        stacked,
+        // Side by side: the first team ends before what stands between them begins, and
+        // that ends before the second team. One over the other: a team's emblem and name
+        // end before its own score begins.
+        apart: stacked
+          ? sides.every((side) => {
+              const score = side.querySelector('.ui-game-side-score');
+              return (
+                !score ||
+                rect(side.querySelector('.ui-game-side-team')).right <= rect(score).left + 1
+              );
+            })
+          : first.right <= middle.left + 1 && middle.right <= second.left + 1,
+        inside: [first, second].every((r) => r.left >= box.left - 1 && r.right <= box.right + 1),
+        // No name is cut off, and none takes more lines than two.
+        whole: names.every((name) => name.scrollWidth <= name.clientWidth + 1),
+        lines: Math.max(
+          ...names.map((name) =>
+            Math.round(rect(name).height / parseFloat(getComputedStyle(name).lineHeight)),
+          ),
+        ),
+        drawnAsDecided: stacked
+          ? !drawn(middle) && own.every((el) => drawn(rect(el)))
+          : drawn(middle) && own.every((el) => !drawn(rect(el))),
+      };
+    }),
+  );
+}
 const pathOf = (page) => new URL(page.url()).pathname;
 const week = 7 * 24 * 3600;
 
@@ -681,10 +729,30 @@ if (browser) {
           `at ${width} with scripts off the menu opens, and only then shows the season picker`,
           shut === null && picker !== null,
         );
+        // The room the name's words have: the link's width less the room it keeps for the
+        // league's mark, which is not room for the name (the code review of step 2.147,
+        // M2). The words' own element is only as wide as the words, so a short name would
+        // say nothing about the room.
+        const room = await page.locator('.site-header .site-name').evaluate((el) => {
+          const style = getComputedStyle(el);
+          return (
+            el.getBoundingClientRect().width -
+            parseFloat(style.paddingInlineStart) -
+            parseFloat(style.paddingInlineEnd)
+          );
+        });
+        const words = await box('.site-name > span');
         note(
           `at ${width} with scripts off the league's name has most of the header's width`,
-          (name?.width ?? 0) >= width * 0.6,
-          `${name?.width} of ${width}`,
+          room >= width * 0.6 && (words?.width ?? 0) <= room + 1,
+          `${room} of ${width}`,
+        );
+        // And it keeps clear of the top of its row, however many lines it takes.
+        const row = await box('.site-header-top');
+        note(
+          `at ${width} with scripts off the league's name keeps clear of the top of its row`,
+          words !== null && row !== null && words.y - row.y >= 7.5,
+          `${(words?.y ?? 0) - (row?.y ?? 0)}`,
         );
         note(
           `at ${width} with scripts off the name is shown whole`,
@@ -900,7 +968,15 @@ if (browser) {
           .locator('main article.ui-game-card[data-status="postponed"] a.ui-game-link')
           .first()
           .getAttribute('href');
-        for (const address of ['/north-valley', '/north-valley/teams', postponed ?? '']) {
+        // What each address must hold for the check of the two teams to be a check at all
+        // (the code review of step 2.147, L10: on the home page it used to find nothing and
+        // pass): a game's page holds the big board, the home page holds games as boards,
+        // the teams page holds neither.
+        for (const [address, holds] of [
+          ['/north-valley', 'boards'],
+          ['/north-valley/teams', 'none'],
+          [postponed ?? '', 'scoreboard'],
+        ]) {
           await open(page, address);
           const fits = await page.evaluate(() => {
             const team = 'The Northside Community Thunderbolts';
@@ -912,25 +988,63 @@ if (browser) {
               'The Greater Northside Community Basketball Association',
             );
             put(document.querySelector('.ui-scoreboard-name > [dir]'), team);
-            put(document.querySelector('.ui-game-card .ui-game-team-name'), team);
+            const planted = document.querySelector('.ui-game-card .ui-game-team-name');
+            put(planted, team);
+            // The page's own code tells a board how many letters its longer name needs
+            // (packages/ui, nameMeasure): for this name, the longer line of its best break
+            // into two ("Community Thunderbolts"), 22.
+            planted?.closest('.ui-game-board')?.style.setProperty('--letters', '22');
             put(document.querySelector('.ui-team-card-name a'), team);
             const names = [...document.querySelectorAll('.ui-scoreboard-name')].map((el) =>
               el.getBoundingClientRect(),
             );
             const board = document.querySelector('.ui-scoreboard')?.getBoundingClientRect();
+            const header = document.querySelector('.site-header-top').getBoundingClientRect();
+            const held = document.querySelector('.site-header .site-name > span');
+            const words = held.getBoundingClientRect();
             return {
               pageScrolls: document.documentElement.scrollWidth > window.innerWidth,
-              // On a board: the first team's name ends before the second's begins, and both
-              // are inside the board.
+              // On a game's big board: the first team's name ends before the second's
+              // begins, and both are inside the board.
+              scoreboards: names.length,
               apart:
                 names.length < 2 ||
                 (names[0].right <= names[1].left + 1 &&
                   names[0].left >= board.left &&
                   names[1].right <= board.right),
+              // A long league name keeps clear of its row's top and foot.
+              nameClear: words.top - header.top >= 7.5 && header.bottom - words.bottom >= 7.5,
+              nameLines: Math.round(words.height / parseFloat(getComputedStyle(held).lineHeight)),
             };
           });
           note(`long names on ${address} do not make the page scroll sideways`, !fits.pageScrolls);
-          note(`long names on ${address} keep each team of a board in its own half`, fits.apart);
+          note(
+            `a long league name on ${address} takes two lines and keeps clear of its row's edges`,
+            fits.nameClear && fits.nameLines === 2,
+            JSON.stringify({ clear: fits.nameClear, lines: fits.nameLines }),
+          );
+          if (holds !== 'boards') {
+            note(
+              `long names on ${address} keep each team of a board in its own half`,
+              fits.apart && (holds === 'none' || fits.scoreboards === 2),
+              `${fits.scoreboards} names found`,
+            );
+            continue;
+          }
+          // The home page's games are boards, and the first of them now has a name of 36
+          // letters: on the narrowest phone that board stands its teams one over the
+          // other, and every board keeps each team in its own part of it.
+          const boards = await measureBoards(page);
+          note(
+            `long names on ${address} keep each team of a board in its own half`,
+            boards.length >= 3 && boards.every((b) => b.apart && b.inside && b.whole),
+            JSON.stringify(boards.filter((b) => !(b.apart && b.inside && b.whole))),
+          );
+          note(
+            'at 320 a board whose names cannot sit side by side stands its teams one over the other',
+            boards[0]?.stacked === true && boards.every((b) => b.drawnAsDecided),
+            JSON.stringify(boards.map((b) => ({ stacked: b.stacked, ok: b.drawnAsDecided }))),
+          );
         }
         // The divisions' tables on one page: each number column starts at the same place in
         // all of them, on a phone (390) as on this narrowest one, so GP sits under GP.
@@ -1029,6 +1143,110 @@ if (browser) {
       }
     },
   );
+
+  await step('the home page: its boards at every width, and what leads it', async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    try {
+      const page = await context.newPage();
+      for (const width of [320, 390, 768, 1280]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const league of ['north-valley', 'harbor-city']) {
+          await open(page, `/${league}`);
+          await page.evaluate(() => document.fonts.ready);
+          // A board decides between its two drawings by a sum (packages/ui, the board's
+          // styles). Whatever it decides, what is drawn must agree with it and nothing may
+          // overlap or be cut off (the code review of step 2.147, L10).
+          const boards = await measureBoards(page);
+          const sound = (b) =>
+            b.apart && b.inside && b.whole && b.drawnAsDecided && (b.stacked || b.lines <= 2);
+          note(
+            `at ${width} every board of /${league} is drawn one way or the other, whole`,
+            boards.length >= 3 && boards.every(sound),
+            JSON.stringify(boards.filter((b) => !sound(b))),
+          );
+          if (width === 1280) {
+            note(
+              `at 1280 the boards of /${league} have their teams side by side`,
+              boards.filter((b) => !b.stacked).length >= 3,
+              `${boards.filter((b) => !b.stacked).length} of ${boards.length}`,
+            );
+          }
+          // A card's top line never breaks inside the date and time: a line that cannot
+          // hold them and the state's pill gives the pill a line of its own.
+          const broken = await page.evaluate(() =>
+            [...document.querySelectorAll('.ui-game-card[data-layout="board"] .ui-game-when')]
+              .filter(
+                (when) =>
+                  when.getBoundingClientRect().height >
+                  1.5 * parseFloat(getComputedStyle(when).lineHeight),
+              )
+              .map((when) => when.textContent),
+          );
+          note(
+            `at ${width} no board of /${league} breaks its date and time`,
+            broken.length === 0,
+            broken.join('; '),
+          );
+          // The hero's mark is drawn only where the words leave it room: on a phone
+          // nothing of it passes under the words or a button.
+          const art = await page
+            .locator('.ui-hero-art')
+            .first()
+            .evaluate((el) => getComputedStyle(el).display);
+          note(
+            `at ${width} the hero's mark on /${league} is ${width >= 1024 ? 'drawn' : 'put away'}`,
+            width >= 1024 ? art !== 'none' : art === 'none',
+            art,
+          );
+        }
+      }
+      // On a laptop the two rows of the home page share one gap, so their edges meet: the
+      // second column of the lower row starts where the second board of the upper row does.
+      await open(page, '/north-valley');
+      const edges = await page.evaluate(() => {
+        const left = (el) => (el ? Math.round(el.getBoundingClientRect().left) : null);
+        const right = (el) => (el ? Math.round(el.getBoundingClientRect().right) : null);
+        const cards = document.querySelectorAll(
+          '.ui-card-grid[data-layout="board"][data-across="two"] > li',
+        );
+        const pair = document.querySelector('.home-pair[data-tables="few"]');
+        return {
+          cards: [right(cards[0]), left(cards[1])],
+          columns: [right(pair?.children[0]), left(pair?.children[1])],
+        };
+      });
+      note(
+        'on a laptop the edges of the home page’s two rows meet',
+        edges.cards.every((x) => x !== null) &&
+          Math.abs(edges.cards[0] - edges.columns[0]) <= 1 &&
+          Math.abs(edges.cards[1] - edges.columns[1]) <= 1,
+        JSON.stringify(edges),
+      );
+      // A season with nothing coming has no section to say so: the page leads with its
+      // latest games, decided ones first, and the standings.
+      await open(page, '/north-valley?season=spring-2026');
+      const led = await page.evaluate(() => ({
+        titles: [...document.querySelectorAll('main h2')].map((h) => h.textContent),
+        first: document.querySelector('.home-pair .ui-game-card')?.getAttribute('data-status'),
+        empties: document.querySelectorAll('main .ui-empty').length,
+      }));
+      note(
+        'a season with nothing coming leads with its latest games and the standings',
+        !led.titles.includes('The next matchups') &&
+          led.titles[0] === 'Recent results' &&
+          led.titles.includes('The standings') &&
+          led.empties === 0,
+        JSON.stringify(led),
+      );
+      note(
+        'the latest games open with a decided game',
+        led.first === 'final' || led.first === 'forfeit',
+        `${led.first}`,
+      );
+    } finally {
+      await context.close();
+    }
+  });
 
   await step('sign in, close the browser, come back', async () => {
     const first = await launch();
