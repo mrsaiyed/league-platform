@@ -157,7 +157,7 @@ How the grid works (built in step 2.64):
 
 ### 5.5 Corrections
 
-- An admin (or the scorekeeper, within a time the league sets) can **reopen** a final game with a reason, fix it, and finalize again. Everything recalculates. The scorekeeper's time is a league setting, 30 minutes after the end to begin with (**S-36**, decided for you); after it, only an admin reopens the game.
+- An admin (or the scorekeeper, within a time the league sets) can **reopen** a final game with a reason, fix it, and finalize again. Everything recalculates. The scorekeeper's time is a league setting, 30 minutes after the end to begin with, 0 for never and at most a day (**S-36**, decided for you); after it, only an admin reopens the game. Only the account that ended the game reopens it this way; someone who may correct games (an admin, a scheduler) can reopen it at any time. Before the tap the tracker is told whether Reopen is offered and until when, so no one gives a reason and is then told it is too late.
 - **S-7:** every correction is logged with who, when and why. The public page shows "corrected" with the date, not the reason.
 - **S-8:** if a correction changes the winner or the score, people who got the recap get a short correction notice. Other fixes (a foul moved to the right player) send nothing.
 
