@@ -21,7 +21,12 @@ import type { LeagueMakingTarget } from './league-making-target.ts';
 /** What the migration login lacks. */
 export type MigrationLoginGap =
   /** It cannot see past the accounts' fence: neither a superuser nor bypassing it. */
-  'sees-past-fence' | 'accounts' | 'migration-log' | 'functions';
+  | 'sees-past-fence'
+  | 'accounts'
+  | 'migration-log'
+  | 'functions'
+  /** Removing a league only (probe-removal-login.ts): the removal functions, the platform log. */
+  | 'removal';
 
 export type LoginProblem =
   /** The app's login breaks T-60 (checkLoginRole's words), or cannot become app_user. */

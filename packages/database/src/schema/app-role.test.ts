@@ -660,13 +660,14 @@ describe("Supabase's API roles get nothing (T-64)", () => {
          select r.rolname, t.relname
          from pg_roles r cross join pg_class t
          where r.rolname in ('anon', 'authenticated', 'service_role')
-           and t.relnamespace = 'sign_in'::regnamespace and t.relkind in ('r', 'p')
+           and t.relnamespace in ('sign_in'::regnamespace, 'platform'::regnamespace)
+           and t.relkind in ('r', 'p')
            and (has_table_privilege(r.oid, t.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'))
          union all
          select r.rolname, 'schema ' || s.nspname
          from pg_roles r cross join pg_namespace s
          where r.rolname in ('anon', 'authenticated', 'service_role')
-           and s.nspname in ('public', 'sign_in')
+           and s.nspname in ('public', 'sign_in', 'platform')
            and has_schema_privilege(r.oid, s.oid, 'USAGE')
          union all
          select r.rolname, 'default privileges'
