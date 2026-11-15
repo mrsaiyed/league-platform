@@ -1,5 +1,5 @@
 import { leagueUrl, readStandings } from '@srleagues/core';
-import { EmptyPanel, PageHead, Section, StandingsTable, StatStrip } from '@srleagues/ui';
+import { CallBand, EmptyPanel, Hero, Section, StandingsTable, StatStrip } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -16,6 +16,7 @@ import {
 } from '../stats-pages/index.ts';
 import { buildHomeNumbers } from './build-home-numbers.ts';
 import { buildHomeGames } from './build-schedule.ts';
+import { homeNextGames, homeResults } from './home-lists.ts';
 import { GameList } from './schedule-views.tsx';
 
 /** The columns the home page's compact standings keep. */
@@ -28,10 +29,10 @@ export function compactStandings(table: StandingsTableView): StandingsTableView 
 }
 
 /**
- * `/{league}`: the league's name and season (the season is picked in the header), the season
- * in four numbers, then the games: a live game first under its own heading, recent results
- * and upcoming games, with the compact standings beside them on a laptop and beneath them on
- * a phone.
+ * `/{league}`: a hero with the league's name, the season and two ways on, and the game
+ * being played now beside it when there is one; the season in four numbers; the next
+ * games as scoreboards; then recent results beside the compact standings; and one call to
+ * action near the foot. The season is picked in the header.
  */
 export async function HomePage({
   league,
@@ -51,9 +52,11 @@ export async function HomePage({
   if (season === undefined && asked !== undefined && asked !== '') return notFound();
   if (season === undefined) {
     return (
-      <main>
-        <PageHead size="hero" title={name} />
-        <EmptyPanel text={t('home.noSeason')} />
+      <main className="site-wide">
+        <Hero title={name} columnClass="site-column" />
+        <div className="site-column home-alone">
+          <EmptyPanel text={t('home.noSeason')} />
+        </div>
       </main>
     );
   }
@@ -69,97 +72,115 @@ export async function HomePage({
   const askedSeason = asked === undefined || asked === '' ? undefined : asked;
   const hasStandings = tables.some((table) => table.rows.length > 0);
   const empty = games.recent.length === 0 && games.upcoming.length === 0;
-  // A game being played now comes first, under its own heading.
+  // A game being played now comes first: in the hero, under its own heading.
   const live = games.upcoming.filter((game) => game.status === 'live');
-  const coming = games.upcoming.filter((game) => game.status !== 'live');
+  const next = homeNextGames(games.upcoming);
+  const results = homeResults(
+    games.recent,
+    games.awaiting,
+    tables.map((table) => ({ rows: table.rows.length, hasNotes: table.footnotes.length > 0 })),
+  );
   const teamCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
+  const scheduleHref = leagueUrl(addressee, 'schedule', { season: askedSeason });
+  const standingsHref = leagueUrl(addressee, 'standings', { season: askedSeason });
+  const teamsHref = leagueUrl(addressee, 'teams', { season: askedSeason });
+  const manyTables = tables.length > 2;
   return (
-    <main>
-      <PageHead size="hero" title={name} eyebrow={season.name} />
-      <div className="home-numbers">
-        <StatStrip label={t('home.numbers')} items={buildHomeNumbers(schedule, teamCount)} />
-      </div>
-      {empty ? (
-        <Section title={t('home.recentResults')}>
-          <EmptyPanel
-            text={t('home.noGames')}
-            action={{
-              href: leagueUrl(addressee, 'teams', { season: askedSeason }),
-              label: t('home.seeTeams'),
-            }}
-          />
+    <main className="site-wide">
+      <Hero
+        title={name}
+        kicker={season.name}
+        text={t('home.hero.text')}
+        columnClass="site-column"
+        actions={[
+          { href: scheduleHref, label: t('home.hero.schedule'), kind: 'main' },
+          { href: standingsHref, label: t('home.hero.standings'), kind: 'second' },
+        ]}
+      >
+        {live.length > 0 ? (
+          <section className="home-live">
+            <h2 className="ui-kicker home-live-title">{t('home.liveNow')}</h2>
+            <GameList leagueId={addressee.id} games={live} layout="board" across="one" featured />
+          </section>
+        ) : null}
+      </Hero>
+      <div className="site-column">
+        <div className="home-numbers">
+          <StatStrip label={t('home.numbers')} items={buildHomeNumbers(schedule, teamCount)} />
+        </div>
+        {empty ? (
+          <Section title={t('home.recentResults')} kicker={t('home.results.kicker')}>
+            <EmptyPanel
+              text={t('home.noGames')}
+              action={{ href: teamsHref, label: t('home.seeTeams') }}
+            />
+          </Section>
+        ) : null}
+        <Section
+          title={t('home.upcoming')}
+          kicker={t('home.upcoming.kicker')}
+          more={{ href: scheduleHref, label: t('home.fullSchedule') }}
+        >
+          {next.length === 0 ? (
+            <EmptyPanel text={t('home.noUpcoming')} />
+          ) : (
+            <GameList leagueId={addressee.id} games={next} layout="board" across="two" />
+          )}
         </Section>
-      ) : null}
-      <div className="home-layout">
-        <div>
-          {live.length > 0 ? (
-            <Section title={t('home.liveNow')}>
-              <GameList leagueId={addressee.id} games={live} />
-            </Section>
-          ) : null}
+        <div className="home-pair" data-tables={manyTables ? 'many' : 'few'}>
           {empty ? null : (
-            <Section title={t('home.recentResults')}>
-              {games.recent.length === 0 ? (
+            <Section title={t('home.recentResults')} kicker={t('home.results.kicker')}>
+              {results.length === 0 ? (
                 <EmptyPanel
                   text={t('home.noResults')}
-                  action={{
-                    href: leagueUrl(addressee, 'schedule', { season: askedSeason }),
-                    label: t('home.fullSchedule'),
-                  }}
+                  action={{ href: scheduleHref, label: t('home.fullSchedule') }}
                 />
               ) : (
-                <GameList leagueId={addressee.id} games={games.recent} />
+                <GameList
+                  leagueId={addressee.id}
+                  games={results}
+                  layout="board"
+                  across={manyTables ? 'two' : 'one'}
+                />
               )}
             </Section>
           )}
           <Section
-            title={t('home.upcoming')}
-            more={{
-              href: leagueUrl(addressee, 'schedule', { season: askedSeason }),
-              label: t('home.fullSchedule'),
-            }}
+            title={t('home.standings')}
+            kicker={t('home.standings.kicker')}
+            more={{ href: standingsHref, label: t('home.fullStandings') }}
           >
-            {coming.length === 0 ? (
-              <EmptyPanel text={t('home.noUpcoming')} />
+            {hasStandings ? (
+              <div className="home-tables">
+                {tables.map((raw) => {
+                  const table = compactStandings(raw);
+                  return (
+                    <StandingsTable
+                      key={table.key}
+                      caption={table.caption}
+                      idPrefix={`home-${table.key}`}
+                      columns={table.columns}
+                      rows={table.rows}
+                      footnotes={table.footnotes}
+                      labels={labels.standings}
+                      emblems
+                    />
+                  );
+                })}
+              </div>
             ) : (
-              <GameList leagueId={addressee.id} games={coming} />
+              <EmptyPanel
+                text={t('home.standingsEmpty')}
+                action={{ href: scheduleHref, label: t('home.fullSchedule') }}
+              />
             )}
           </Section>
         </div>
-        <Section
-          title={t('home.standings')}
-          more={{
-            href: leagueUrl(addressee, 'standings', { season: askedSeason }),
-            label: t('home.fullStandings'),
-          }}
-        >
-          {hasStandings ? (
-            <div className="ui-stack">
-              {tables.map((raw) => {
-                const table = compactStandings(raw);
-                return (
-                  <StandingsTable
-                    key={table.key}
-                    caption={table.caption}
-                    idPrefix={`home-${table.key}`}
-                    columns={table.columns}
-                    rows={table.rows}
-                    footnotes={table.footnotes}
-                    labels={labels.standings}
-                  />
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyPanel
-              text={t('home.standingsEmpty')}
-              action={{
-                href: leagueUrl(addressee, 'schedule', { season: askedSeason }),
-                label: t('home.fullSchedule'),
-              }}
-            />
-          )}
-        </Section>
+        <CallBand
+          title={t('home.call.title')}
+          text={t('home.call.text')}
+          action={{ href: teamsHref, label: t('home.call.action') }}
+        />
       </div>
     </main>
   );

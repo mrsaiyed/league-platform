@@ -22,6 +22,9 @@ export const en = {
   'shell.notBuilt': 'This page is not built yet.',
   'shell.backToLeague': 'Back to the league home',
   'shell.skipToContent': 'Skip to the content',
+  // The small line under a league's name in the header, the same for every league until a
+  // league can write its own.
+  'shell.tagline': 'Official league site',
   'shell.draftNotice': 'This league is not published. Only the people who run it can see it.',
   'shell.suspendedNotice':
     'This league has been taken down. Only the people who run it can see it, to export their data.',
@@ -139,9 +142,9 @@ export const en = {
   'home.noGames': 'No games have been scheduled for this season yet.',
   'home.recentResults': 'Recent results',
   'home.noResults': 'No games have been played yet.',
-  'home.upcoming': 'Upcoming games',
+  'home.upcoming': 'The next matchups',
   'home.noUpcoming': 'There are no upcoming games scheduled.',
-  'home.standings': 'Standings',
+  'home.standings': 'The standings',
   'home.standingsEmpty': 'The standings appear here once games have been played.',
   'home.fullStandings': 'See the full standings',
   'home.fullSchedule': 'See the full schedule',
@@ -154,6 +157,22 @@ export const en = {
   'home.number.played': 'Games played',
   'home.number.toPlay': 'Games to play',
   'home.number.rounds': 'Rounds',
+  // The first starting design's home page (step 2.147, C-16): a hero with one sentence and
+  // two ways on, a tiny label (a kicker) over each section's title, and one call to action
+  // near the foot. Every phrase is written to read well for any league and any sport.
+  'home.hero.text': 'Scores, standings and the schedule for every team, all season long.',
+  'home.hero.schedule': 'See the schedule',
+  'home.hero.standings': 'View the standings',
+  'home.live.kicker': 'Happening now',
+  'home.upcoming.kicker': 'On the schedule',
+  'home.results.kicker': 'Final scores',
+  'home.standings.kicker': 'The race for the top',
+  'home.call.title': 'Every team has a story.',
+  'home.call.text': 'Rosters, records and results for every team in the league.',
+  'home.call.action': 'Meet the teams',
+  // A game whose start has passed with no result yet: not still to come, and not decided.
+  'schedule.awaitingResult': 'Awaiting result',
+  'schedule.link.awaiting': '{away} against {home}, {when}, awaiting the result',
   'schedule.title': 'Schedule',
   'schedule.noSeason': 'There is no season to show yet.',
   'schedule.empty': 'No games have been scheduled for this season yet.',

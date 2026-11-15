@@ -19,7 +19,10 @@
 // the league's name, a tab, the season picker, Sign in and the phone menu button, in both
 // looks; an arrow key in a picker never reads the page again, and Enter or the Show
 // button applies the choice; with scripts off at 320, 360 and 390 wide the league's name
-// keeps its room and the season picker sits under it.
+// keeps its room and the season picker sits under it. Since step 2.147 the picker is in the
+// menu's panel on a phone: it is put away with the menu, shown as the last thing in the
+// open one (reached by the keyboard after the links and sign-in), and with scripts off the
+// menu still opens and the picker's Show button still applies the season chosen.
 // A part that throws (a wait that times out, a build that fails) is recorded by name and
 // the other parts still run and print.
 // Not covered: (1) the invitation email being captured and its link followed: the
@@ -263,9 +266,74 @@ if (browser) {
       }
       note(
         'the two leagues have different looks',
-        looks['north-valley'] === '#c8a84b' && looks['harbor-city'] === '#1f5fbf',
+        looks['north-valley'] === '#96062d' && looks['harbor-city'] === '#1f5fbf',
         JSON.stringify(looks),
       );
+    } finally {
+      await context.close();
+    }
+  });
+
+  // Step 2.147 (T-262, record 059): the faces of a league's design are served from our own
+  // address and drawn on the page; nothing is asked of any other site.
+  await step('the faces of a design come from our own address', async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    try {
+      const page = await context.newPage();
+      const asked = [];
+      page.on('request', (request) => asked.push(request.url()));
+      for (const [league, faces] of [
+        ['north-valley', ['Gelasio Variable', 'Source Sans 3 Variable']],
+        ['harbor-city', ['Source Sans 3 Variable', 'Inter Variable']],
+      ]) {
+        asked.length = 0;
+        await open(page, `/${league}`);
+        await page.evaluate(() => document.fonts.ready.then(() => undefined));
+        const drawn = await page.evaluate(
+          (names) =>
+            names.map((name) => ({
+              name,
+              // The face the design names first for its titles or its text is the one in use.
+              named: [
+                getComputedStyle(document.querySelector('.ui-root')).fontFamily,
+                getComputedStyle(document.querySelector('main h1')).fontFamily,
+              ].some((list) => list.replace(/["']/g, '').startsWith(name)),
+              loaded: [...document.fonts].some(
+                (face) => face.family.replace(/["']/g, '') === name && face.status === 'loaded',
+              ),
+            })),
+          faces,
+        );
+        note(
+          `${league} draws the faces its design names, from files that arrived`,
+          drawn.every((face) => face.named && face.loaded),
+          JSON.stringify(drawn),
+        );
+        const fonts = asked.filter((url) => /\.(woff2?|ttf|otf)(\?|$)/.test(url));
+        note(
+          `${league} takes every font file from our own address`,
+          fonts.length >= 2 && fonts.every((url) => url.startsWith(`${origin}/_next/static/`)),
+          fonts.join(', '),
+        );
+        note(
+          `${league} asks no other site for anything`,
+          asked.every((url) => url.startsWith(origin) || url.startsWith('data:')),
+          asked.filter((url) => !url.startsWith(origin)).join(', '),
+        );
+        const kept = fonts[0] === undefined ? undefined : await fetch(fonts[0]);
+        note(
+          `${league}'s font files may be kept by the browser for good`,
+          kept?.status === 200 &&
+            /immutable/.test(kept.headers.get('cache-control') ?? '') &&
+            /^font\/woff2/.test(kept.headers.get('content-type') ?? ''),
+          `${kept?.status} ${kept?.headers.get('cache-control')} ${kept?.headers.get('content-type')}`,
+        );
+      }
+      // No rule holds up the page: every face may be swapped in after the text is drawn.
+      const waits = await page.evaluate(() =>
+        [...document.fonts].filter((face) => face.display !== 'swap').map((face) => face.family),
+      );
+      note('no face holds up the page (font-display: swap)', waits.length === 0, waits.join());
     } finally {
       await context.close();
     }
@@ -287,6 +355,49 @@ if (browser) {
       note(
         'no page repeats the season picker',
         (await page.locator('select[name=season]').count()) === 1,
+      );
+      // On a phone the picker is in the menu's panel (step 2.147): put away until the menu
+      // is opened, and then the last thing in it, under the menu's links and sign-in.
+      note('on a phone the season picker is put away with the menu', !(await picker.isVisible()));
+      const menuButton = page.locator('.site-header .site-menu > summary');
+      await menuButton.click();
+      await picker.waitFor({ state: 'visible' });
+      const [nameBox, panelBox, pickerBox] = await Promise.all([
+        page.locator('.site-header .site-name').boundingBox(),
+        page.locator('.site-header .site-menu-panel').boundingBox(),
+        picker.boundingBox(),
+      ]);
+      note(
+        'the open menu holds the season picker under its links, under the name',
+        nameBox !== null &&
+          panelBox !== null &&
+          pickerBox !== null &&
+          panelBox.y >= nameBox.y + nameBox.height - 1 &&
+          pickerBox.y >= panelBox.y + panelBox.height - 1 &&
+          pickerBox.x + pickerBox.width <= 390 &&
+          pickerBox.height >= 44,
+        JSON.stringify({ nameBox, panelBox, pickerBox }),
+      );
+      // The keyboard goes through the open menu as the eye does: the button, the links,
+      // sign-in, then the picker.
+      await menuButton.focus();
+      const stops = [];
+      for (let i = 0; i < 12 && stops.at(-1) !== 'season'; i++) {
+        await page.keyboard.press('Tab');
+        stops.push(
+          await page.evaluate(() => {
+            const el = document.activeElement;
+            if (el?.matches('select[name=season]')) return 'season';
+            if (el?.matches('.site-menu-sign-in')) return 'sign-in';
+            return el?.closest('.site-menu-panel') ? 'link' : 'other';
+          }),
+        );
+      }
+      note(
+        'the keyboard reaches the links, then sign-in, then the season picker',
+        stops.join() === [...Array(stops.length - 2).fill('link'), 'sign-in', 'season'].join() &&
+          stops.length >= 3,
+        stops.join(),
       );
       await picker.selectOption({ label: 'Spring 2026' });
       await page.waitForURL(/season=spring-2026/);
@@ -559,8 +670,17 @@ if (browser) {
         await open(page, '/north-valley/schedule');
         const box = (selector) => page.locator(`.site-header ${selector}`).boundingBox();
         const name = await box('.site-name');
+        // The picker is in the menu's panel on a phone (step 2.147). The menu is a plain
+        // disclosure, so it opens with scripts off: the picker and its Show button are
+        // then measured where a visitor finds them.
+        const shut = await box('select[name=season]');
+        await page.locator('.site-header .site-menu > summary').click();
         const picker = await box('select[name=season]');
         const show = await box('.site-season button[type=submit]');
+        note(
+          `at ${width} with scripts off the menu opens, and only then shows the season picker`,
+          shut === null && picker !== null,
+        );
         note(
           `at ${width} with scripts off the league's name has most of the header's width`,
           (name?.width ?? 0) >= width * 0.6,
@@ -569,15 +689,25 @@ if (browser) {
         note(
           `at ${width} with scripts off the name is shown whole`,
           // Its words take no more than the two lines the header shows, and none runs
-          // past the name's own box: nothing is cut off.
+          // past the name's own box: nothing is cut off. The lines measured are those of
+          // the words themselves (the text inside the name's own element): since step
+          // 2.147 the name shares its row with the league's mark and the menu button, so
+          // on the narrowest phones it does take two lines, and the box of the element
+          // around the words is not a third.
           await page.locator('.site-header .site-name').evaluate((el) => {
+            const text = el.querySelector('span')?.firstChild;
+            if (!text || text.nodeType !== Node.TEXT_NODE) return false;
             const words = document.createRange();
-            words.selectNodeContents(el);
+            words.selectNodeContents(text);
             const lines = [...words.getClientRects()];
             const box = el.getBoundingClientRect();
+            const held = el.querySelector('span');
             return (
+              lines.length > 0 &&
               new Set(lines.map((line) => Math.round(line.top))).size <= 2 &&
-              lines.every((line) => line.right <= box.right + 1 && line.left >= box.left - 1)
+              lines.every((line) => line.right <= box.right + 1 && line.left >= box.left - 1) &&
+              // And the element that holds the words to two lines is not cutting any off.
+              held.scrollHeight <= held.clientHeight + 1
             );
           }),
         );
@@ -587,9 +717,18 @@ if (browser) {
             show !== null &&
             picker.y >= (name?.y ?? 0) + (name?.height ?? 0) - 1 &&
             show.x + show.width <= width &&
-            show.height >= 44,
+            show.height >= 44 &&
+            // Side by side in one row of the open menu, the button after its picker.
+            picker.height >= 44 &&
+            show.x >= picker.x + picker.width - 1 &&
+            Math.abs(show.y - picker.y) <= 1,
           JSON.stringify({ name, picker, show }),
         );
+        // And it works: choosing a season and pressing Show reads that season's page.
+        await page.locator('.site-header select[name=season]').selectOption('spring-2026');
+        await page.locator('.site-header .site-season button[type=submit]').click();
+        await page.waitForURL(/season=spring-2026/);
+        note(`at ${width} with scripts off the Show button applies the season chosen`, true);
         note(
           `at ${width} with scripts off the page does not scroll sideways`,
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),

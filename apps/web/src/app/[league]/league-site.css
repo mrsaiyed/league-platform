@@ -51,9 +51,13 @@ html {
   transform: none;
 }
 
-/* The header: the league's name, the season picker and sign-in on the first row, the menu on
-   the second. On a phone it is one row: the name, the season and the menu button. */
+/* The header. First row: the league's mark and name with a small line under it, the
+   season picker and the way in. Second row: the menu. On a phone it is one row (the mark,
+   the name and the menu button), and the button opens a panel in the header itself that
+   holds the menu, sign-in and the season picker. */
 .site-header {
+  /* A fine line inside the header, in the header's own text color. */
+  --header-rule: color-mix(in srgb, var(--header-text) 14%, transparent);
   position: sticky;
   inset-block-start: 0;
   z-index: 20;
@@ -68,29 +72,62 @@ html {
   outline-color: var(--header-text);
 }
 .site-header-top {
+  position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--step-3);
-  min-block-size: calc(var(--tap) + var(--step-2));
-  padding-block: var(--step-1);
+  column-gap: var(--step-4);
+  min-block-size: calc(var(--tap) + var(--step-3));
 }
-/* The name never makes the header taller: on a phone it is small, and a long one takes two
-   tight lines beside the buttons and is cut short after that. */
-.site-header .site-name {
-  display: flex;
-  flex: 1 1 auto;
+/* The league's mark, its name and the small line under the name. The whole of it is the
+   way home: the name's link covers it. The mark stands over the start of the link and the
+   small line over its foot, so the link is as tall as a thumb needs while the three read
+   as one. */
+.site-brand {
+  position: relative;
+  display: grid;
+  flex: 1 1 0;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   min-inline-size: 0;
-  /* The name is the way home: as tall as anything a thumb taps, its words in the middle. */
+  /* Room for the menu button (44) and the gap before it, at the end of the row. */
+  margin-inline-end: calc(var(--step-7) + var(--step-2));
+}
+.site-header .site-brand .ui-emblem {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 0;
+  block-size: var(--step-6);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+/* The name never makes the header taller than one row: on a phone it is small, and a long
+   one takes two tight lines beside the button and is cut short after that. */
+.site-header .site-name {
+  display: flex;
+  grid-area: 1 / 1;
+  align-items: center;
+  min-inline-size: 0;
+  /* The name is the way home: as tall as anything a thumb taps, its words over the small
+     line. */
   min-block-size: var(--tap);
+  padding-block-end: var(--step-4);
+  /* The width of the mark (a shield 32 high) and the gap after it. */
+  padding-inline-start: calc(var(--step-6) + var(--step-2));
   color: var(--header-name);
   font-family: var(--font-heading);
   font-size: var(--text-16);
-  font-weight: 700;
-  letter-spacing: var(--heading-tracking);
-  line-height: 1.15;
+  font-weight: var(--heading-weight);
+  /* Half as far apart as on a laptop, so a name of ordinary length keeps to one line. */
+  letter-spacing: calc(var(--brand-tracking) / 2);
+  line-height: 1.1;
   text-decoration: none;
-  text-transform: var(--heading-case);
+  text-transform: var(--brand-case);
+}
+.site-header .site-name::after {
+  content: '';
+  position: absolute;
+  inset: 0;
 }
 .site-header .site-name > span {
   display: -webkit-box;
@@ -99,6 +136,21 @@ html {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+}
+.site-tagline {
+  grid-area: 1 / 1;
+  align-self: end;
+  block-size: var(--step-4);
+  padding-inline-start: calc(var(--step-6) + var(--step-2));
+  overflow: hidden;
+  color: var(--header-muted);
+  font-size: var(--text-12);
+  letter-spacing: 0.16em;
+  line-height: var(--step-4);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .site-header .site-sign-in,
 .site-menu > summary {
@@ -127,91 +179,18 @@ html {
   display: none;
 }
 
-/* The season picker, in the header's own colors. On a phone its label is kept for screen
-   readers only, so the picker is no wider than the season's name. */
-.site-season {
-  flex: none;
+/* The menu on a phone: one button, at the end of the first row, that opens a panel under
+   the row. The panel is part of the header (it does not float over it), so what comes
+   after it in the page, the season picker, comes after it on the screen too. A plain
+   disclosure: it works with scripts switched off. */
+.site-menu {
+  flex: 1 1 100%;
+  min-inline-size: 0;
 }
-/* In the header the picker is always one compact row, at any width: the label (hidden on a
-   phone), the field as wide as its season's name, and its button. */
-.site-header .site-season .ui-toolbar,
-.site-header .site-season .ui-picker {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: var(--step-2);
-  margin: 0;
-}
-.site-header .site-season .ui-picker select {
-  inline-size: auto;
-}
-.site-header .site-season label {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  color: var(--header-text);
-}
-.site-header .site-season select,
-.site-header .site-season button {
-  border-color: color-mix(in srgb, var(--header-text) 40%, transparent);
-  background-color: transparent;
-  color: var(--header-text);
-}
-.site-header .site-season select {
-  max-inline-size: calc(3 * var(--step-7));
-  text-overflow: ellipsis;
-}
-/* Hovered, both stay in the header's text color: the shared picker's own hover color is the
-   page's, which on a bar of the main color would not read. */
-.site-header .site-season select:hover,
-.site-header .site-season button:hover {
-  border-color: var(--header-text);
-  color: var(--header-text);
-}
-/* The league's name leads (U-8). On a phone, a header that holds the season picker gives
-   the name the whole first row wherever scripts are off or the browser cannot say (the
-   picker then has its "Show" button beside it), and always on the narrowest phones (under
-   360): the picker and the menu button share the row under it, in the order they are in
-   the page, so the keyboard goes as the eye does. Where scripts run the button is put away
-   and everything sits in one row; a button brought back by the keyboard hangs under it. */
-@media (max-width: 47.99rem) {
-  .site-header-top:has(.site-season) {
-    flex-wrap: wrap;
-    padding-block-end: var(--step-2);
-  }
-  .site-header-top:has(.site-season) .site-name {
-    flex-basis: 100%;
-  }
-  .site-header-top:has(.site-season) .site-season {
-    flex: 1 1 0;
-  }
-}
-@media (min-width: 22.5rem) and (max-width: 47.99rem) and (scripting: enabled) {
-  .site-header-top:has(.site-season) {
-    flex-wrap: nowrap;
-    padding-block-end: var(--step-1);
-  }
-  .site-header-top:has(.site-season) .site-name {
-    flex-basis: auto;
-  }
-  .site-header-top:has(.site-season) .site-season {
-    flex: none;
-  }
-}
-/* Where scripts can run the "Show" button hangs under its picker (the shared pieces place
-   it): in the header it is filled with the header's own color, so it reads over the page. */
-@media (scripting: enabled) {
-  .site-header .site-season .ui-picker button {
-    background-color: var(--header-background);
-  }
-}
-
-/* The menu on a phone: one button that opens a panel. A plain disclosure, so it works
-   with scripts switched off. */
 .site-menu > summary {
+  position: absolute;
+  inset-block-start: calc(var(--step-3) / 2);
+  inset-inline-end: var(--gutter);
   inline-size: var(--tap);
   padding-inline: 0;
   list-style: none;
@@ -233,16 +212,14 @@ html {
   inset-block-start: calc(50% - 1px);
   border-block-start: 2px solid currentColor;
 }
-.site-menu-panel {
-  position: absolute;
-  inset-inline: 0;
-  inset-block-start: 100%;
-  max-block-size: calc(100vh - var(--step-8));
+/* An open menu never grows past the screen: the header scrolls inside itself. */
+.site-header-top:has(.site-menu[open]) {
+  max-block-size: 100vh;
   overflow-y: auto;
+}
+.site-menu-panel {
   padding-block: var(--step-2) var(--step-4);
-  background: var(--header-background);
-  border-block: 1px solid var(--header-line);
-  box-shadow: var(--overlay-shadow);
+  border-block-start: 1px solid var(--header-rule);
 }
 .site-menu-panel ul,
 .site-tabs ul {
@@ -254,13 +231,12 @@ html {
 .site-menu-panel ul {
   flex-direction: column;
   gap: var(--step-1);
-  padding-inline: var(--gutter);
 }
 .site-header .site-menu-panel li a,
 .site-header .site-tabs a {
   display: flex;
   align-items: center;
-  color: var(--header-text);
+  color: var(--tab-text);
   font-size: var(--text-14);
   font-weight: 600;
   letter-spacing: var(--tab-tracking);
@@ -273,14 +249,16 @@ html {
   padding-inline: var(--step-4);
   border-inline-start: 2px solid transparent;
 }
-/* Sign-in, apart at the foot of the panel. */
+.site-header .site-menu-panel li a:hover {
+  color: var(--tab-hover-text);
+}
+/* Sign-in, apart at the foot of the menu. */
 .site-header .site-menu-sign-in {
   display: flex;
   align-items: center;
   justify-content: center;
   min-block-size: var(--tap);
   margin-block-start: var(--step-3);
-  margin-inline: var(--gutter);
   border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
   border-radius: var(--radius-small);
   color: var(--header-text);
@@ -297,20 +275,82 @@ html {
   border-inline-start-color: var(--tab-current-line);
 }
 
-/* The menu on a laptop: tabs. The current page has a line under it in a dark design and
-   is a filled pill in a light one. */
+/* The season picker, in the header's own colors. On a phone it is the last thing in the
+   open menu: put away with the menu, and there, with its label and its "Show" button,
+   whenever the menu is open. Nothing in the frame is moved out of the page's own order. */
+.site-season {
+  display: none;
+  flex: 1 1 100%;
+  min-inline-size: 0;
+  padding-block: var(--step-3) var(--step-4);
+  border-block-start: 1px solid var(--header-rule);
+}
+.site-menu[open] ~ .site-season {
+  display: block;
+}
+/* In the header the picker is always one row, at any width: the label, the field and its
+   button. */
+.site-header .site-season .ui-toolbar,
+.site-header .site-season .ui-picker {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--step-3);
+  margin: 0;
+}
+.site-header .site-season .ui-picker {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+.site-header .site-season .ui-picker select {
+  flex: 1 1 auto;
+  inline-size: auto;
+  min-inline-size: 0;
+  text-overflow: ellipsis;
+}
+.site-header .site-season label {
+  color: var(--header-muted);
+}
+.site-header .site-season select,
+.site-header .site-season button {
+  border-color: color-mix(in srgb, var(--header-text) 40%, transparent);
+  background-color: transparent;
+  color: var(--header-text);
+}
+/* Hovered, both stay in the header's text color: the shared picker's own hover color is the
+   page's, which on a bar of the main color would not read. */
+.site-header .site-season select:hover,
+.site-header .site-season button:hover {
+  border-color: var(--header-text);
+  color: var(--header-text);
+}
+/* Where scripts can run the "Show" button hangs under its picker (the shared pieces place
+   it): in the header it is filled with the header's own color, so it reads over the page. */
+@media (scripting: enabled) {
+  .site-header .site-season .ui-picker button {
+    background-color: var(--header-background);
+  }
+}
+
+/* The menu from a tablet up: a row of its own under the first. Small widely spaced
+   capitals with a line under the current page, or, in a design with round corners,
+   rounded links with the current one filled (packages/site, frame-look.ts). */
 .site-tabs {
   display: none;
   padding-block-end: var(--tabs-pad);
+  border-block-start: 1px solid var(--header-rule);
 }
 .site-tabs ul {
   flex-wrap: wrap;
+  justify-content: var(--tabs-justify);
   gap: var(--step-1);
+  padding-block-start: var(--tabs-pad);
 }
 .site-header .site-tabs a {
   min-block-size: var(--tap);
   padding-inline: var(--step-4);
   border-block-end: 2px solid transparent;
+  font-size: var(--tab-size);
   transition:
     background-color 0.15s,
     color 0.15s;
@@ -325,11 +365,34 @@ html {
   border-block-end-color: var(--tab-current-line);
 }
 @media (min-width: 48rem) {
+  /* Only the menu's row stays on top while the page scrolls: the first row, with the name,
+     goes with the page, and comes back whenever the keyboard is in the header. */
+  .site-header {
+    inset-block-start: calc(-1 * (var(--step-8) + var(--step-4)));
+  }
+  .site-header:focus-within {
+    inset-block-start: 0;
+  }
   .site-header-top {
-    min-block-size: calc(var(--tap) + var(--step-3));
+    flex-wrap: nowrap;
+    column-gap: var(--step-5);
+    /* The same 80 the header is moved up by, above. */
+    block-size: calc(var(--step-8) + var(--step-4));
+    min-block-size: 0;
+  }
+  .site-brand {
+    margin-inline-end: 0;
+  }
+  .site-header .site-brand .ui-emblem {
+    block-size: var(--step-7);
   }
   .site-header .site-name {
+    min-block-size: calc(var(--tap) + var(--step-3));
+    padding-block-end: var(--step-5);
+    /* The mark is a shield 48 high here. */
+    padding-inline-start: calc(var(--step-7) + var(--step-4));
     font-size: var(--text-22);
+    letter-spacing: var(--brand-tracking);
     line-height: 1.2;
   }
   .site-header .site-name > span {
@@ -337,25 +400,61 @@ html {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .site-header .site-sign-in {
-    display: inline-flex;
-  }
-  .site-header .site-season label {
-    position: static;
-    inline-size: auto;
-    block-size: auto;
-    overflow: visible;
-    clip-path: none;
+  .site-tagline {
+    padding-inline-start: calc(var(--step-7) + var(--step-4));
+    letter-spacing: 0.22em;
   }
   .site-menu {
     display: none;
   }
+  /* The season picker as an outlined box of small capitals, its label kept for screen
+     readers. */
+  .site-season,
+  .site-menu[open] ~ .site-season {
+    display: block;
+    flex: none;
+    padding-block: 0;
+    border-block-start: 0;
+  }
+  .site-header .site-season label {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .site-header .site-season .ui-picker select {
+    max-inline-size: calc(4 * var(--step-7));
+    font-size: var(--text-12);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  /* The way in: words and an arrow in the header's eye-catching color, no box. */
+  .site-header .site-sign-in {
+    display: inline-flex;
+    padding-inline: var(--step-1);
+    border-color: transparent;
+    color: var(--header-pop);
+  }
+  .site-header .site-sign-in::after {
+    content: '';
+    flex: none;
+    inline-size: var(--step-4);
+    block-size: var(--step-4);
+    background: currentColor;
+    -webkit-mask: var(--ui-arrow) center / contain no-repeat;
+    mask: var(--ui-arrow) center / contain no-repeat;
+  }
+  [dir='rtl'] .site-header .site-sign-in::after {
+    transform: scaleX(-1);
+  }
+  .site-header .site-sign-in:hover {
+    border-color: transparent;
+    color: var(--header-text);
+  }
   .site-tabs {
     display: block;
-  }
-  /* The first tab's words line up with the league's name above them. */
-  .site-tabs ul {
-    margin-inline-start: calc(-1 * var(--step-4));
   }
 }
 
@@ -370,9 +469,21 @@ html {
   text-align: center;
 }
 
+/* The body of a page sits in the centered column. A page that opens with a band the width
+   of the screen (a hero) says so on its main area (`site-wide`): it then has the whole
+   width, and puts everything under its band in the column itself. */
 .site-body {
   flex: 1;
   padding-block: var(--step-5) var(--step-8);
+}
+.site-body:not(:has(> .site-wide)) {
+  inline-size: 100%;
+  max-inline-size: calc(70rem + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+.site-body:has(> .site-wide) {
+  padding-block-start: 0;
 }
 .site-body:focus {
   outline: none;
@@ -383,6 +494,7 @@ html {
   margin-block: var(--step-6);
 }
 
+/* The footer: the league's name, the footer's links and our small mark (U-8). */
 .site-footer {
   border-block-start: 1px solid var(--color-line);
   color: var(--color-muted);
@@ -394,7 +506,17 @@ html {
   align-items: center;
   justify-content: space-between;
   gap: var(--step-2) var(--step-5);
-  padding-block: var(--step-4);
+  padding-block: var(--step-5);
+}
+.site-footer-name {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-size: var(--text-16);
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--brand-tracking);
+  text-transform: var(--brand-case);
 }
 .site-footer nav {
   display: flex;
@@ -416,24 +538,59 @@ html {
   font-size: var(--text-12);
   letter-spacing: 0.04em;
 }
-
-/* The home page: on a laptop the games use two thirds of the width, in cards two across,
-   and the standings sit beside them in their own panel. */
-.home-layout {
-  display: grid;
-  gap: 0 var(--step-6);
+@media (min-width: 48rem) {
+  .site-footer-name {
+    flex: 1 1 auto;
+  }
 }
-.home-layout > * {
+
+/* The home page. Its hero is the width of the screen; the strip of numbers stands right
+   under it, sharing the hero's own bottom line. */
+.home-numbers .ui-stat-strip {
+  border-block-start: 0;
+}
+/* A league with no season yet: one calm panel under the hero. */
+.home-alone {
+  margin-block-start: var(--space-section);
+}
+/* The game being played now stands in the hero: beside the title on a laptop, under it on
+   a phone. Its heading is a kicker with the Live mark's own pulse. */
+.home-live {
+  display: grid;
+  gap: var(--step-3);
+}
+.league-site .home-live-title {
+  font-family: var(--font-body);
+}
+/* Results and standings share a row on a laptop, each with half of it, so neither column
+   is left empty beside the other. A league with three divisions or more has too many
+   tables for half a row: its results and its tables each take the width, two across. */
+.home-pair {
+  display: grid;
+  gap: 0 var(--step-7);
+}
+.home-pair > * {
+  min-inline-size: 0;
+}
+.home-tables {
+  display: grid;
+  gap: var(--step-5);
+}
+.home-tables > * {
   min-inline-size: 0;
 }
 @media (min-width: 64rem) {
-  .home-layout {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  .home-pair[data-tables='few'] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: start;
   }
-}
-.home-numbers {
-  margin-block-start: var(--step-5);
+  .home-pair[data-tables='many'] .home-tables {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .home-pair[data-tables='many'] .home-tables > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 
 /* A team's page: the games take the width, the roster sits beside them. */

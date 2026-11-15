@@ -209,24 +209,60 @@ describe('header, menu and footer', () => {
     expect(weight(ring ?? '')).toBeGreaterThan(weight('.ui-root :focus-visible'));
   });
 
-  it('keeps the name its room on a phone: it has the first row, the picker the one under it', () => {
+  // Changed by step 2.147: the season picker used to share the phone header's first row
+  // with the name, or to take the row under it where scripts were off. The header now
+  // makes room for the league's mark, so on a phone the picker is in the menu's panel:
+  // the name has the first row to itself, with scripts on or off, at every phone width.
+  it('keeps the name its room on a phone: it has the first row, the picker is in the open menu', () => {
     const css = readFileSync(
       new URL('../../app/[league]/league-site.css', import.meta.url),
       'utf8',
     ).replace(/\/\*[\s\S]*?\*\//g, '');
-    // Scripts off, or a browser that cannot say: a header with the season picker gives the
-    // name the whole first row.
-    expect(css).toMatch(
-      /@media \(max-width: 47\.99rem\) \{\s*\.site-header-top:has\(\.site-season\) \{\s*flex-wrap: wrap;[^}]*\}\s*\.site-header-top:has\(\.site-season\) \.site-name \{\s*flex-basis: 100%;/,
+    const phone = css.slice(0, css.indexOf('@media (min-width: 48rem)'));
+    // On a phone the picker is put away, and takes a row of its own under the menu's
+    // links whenever the menu is open. No rule there depends on scripts: the menu is a
+    // plain disclosure and the picker keeps its own button.
+    expect(phone).toMatch(/\.site-season \{\s*display: none;\s*flex: 1 1 100%;/);
+    expect(phone).toMatch(/\.site-menu\[open\] ~ \.site-season \{\s*display: block;/);
+    expect(phone).not.toMatch(/\.site-header-top:has\(\.site-season\)/);
+    // The menu's panel is part of the header's own flow, a whole row under the first, so
+    // the picker that follows it in the page follows it on the screen.
+    expect(phone).toMatch(/\.site-menu \{\s*flex: 1 1 100%;/);
+    expect(phone).not.toMatch(/\.site-menu-panel \{[^}]*position: absolute;/);
+    // The name's row holds the league's mark, the name and the menu button, and nothing
+    // else: the button stands at the end of the row, and the name keeps clear of it.
+    expect(phone).toMatch(
+      /\.site-menu > summary \{\s*position: absolute;[^}]*inset-inline-end: var\(--gutter\);/,
     );
-    // Scripts on: the button is put away by the shared styles, so one row is enough, but
-    // for the narrowest phones (under 360), where the name needs the whole first row.
-    expect(css).toMatch(
-      /@media \(min-width: 22\.5rem\) and \(max-width: 47\.99rem\) and \(scripting: enabled\) \{\s*\.site-header-top:has\(\.site-season\) \{\s*flex-wrap: nowrap;/,
+    expect(phone).toMatch(
+      /\.site-brand \{[^}]*margin-inline-end: calc\(var\(--step-7\) \+ var\(--step-2\)\);/,
+    );
+    // An open menu never grows past the screen.
+    expect(phone).toMatch(
+      /\.site-header-top:has\(\.site-menu\[open\]\) \{\s*max-block-size: 100vh;\s*overflow-y: auto;/,
+    );
+    // From a tablet up the picker is back in the first row, whether the menu was left open
+    // or not.
+    expect(css.slice(phone.length)).toMatch(
+      /\.site-season,\s*\.site-menu\[open\] ~ \.site-season \{\s*display: block;\s*flex: none;/,
     );
     // Nothing in the frame is moved out of the page's own order, so the keyboard goes
-    // through the header as the eye does.
+    // through the header as the eye does: the name, the menu, the season, on a phone; the
+    // name, the season, the way in, the menu, from a tablet up.
     expect(css).not.toMatch(/(^|[\s;{])order:/m);
+    const html = renderToStaticMarkup(
+      createElement(SiteHeader, {
+        league,
+        name: 'North Valley League',
+        signedIn: false,
+        season: { action: '/north-valley', value: 'a', options: [], keep: {} },
+      }),
+    );
+    const at = (text: string) => html.indexOf(text);
+    expect(at('class="site-name"')).toBeLessThan(at('class="site-menu"'));
+    expect(at('class="site-menu"')).toBeLessThan(at('class="site-season"'));
+    expect(at('class="site-season"')).toBeLessThan(at('class="site-sign-in"'));
+    expect(at('class="site-sign-in"')).toBeLessThan(at('class="site-tabs"'));
     // Hovered, the header's picker and button stay in the header's own text color.
     expect(css).toMatch(
       /\.site-header \.site-season button:hover \{[^}]*color: var\(--header-text\);/,
@@ -238,6 +274,68 @@ describe('header, menu and footer', () => {
     expect(html).toContain('Powered by SR Leagues');
     expect(html).toContain(en['footer.terms']);
     expect(html).toContain(en['footer.privacy']);
+    // With the league's name before them, in its own direction, when the page gives it.
+    const named = renderToStaticMarkup(createElement(SiteFooter, { name: 'دوري الوادي' }));
+    expect(named).toContain('<p class="site-footer-name" dir="auto">دوري الوادي</p>');
+    expect(named.indexOf('site-footer-name')).toBeLessThan(named.indexOf(en['footer.terms']));
+    expect(html).not.toContain('site-footer-name');
+  });
+
+  // Step 2.147: the header with presence.
+  it("shows the league's mark, its name and a small line under it; the name alone is the link's words", () => {
+    const html = renderToStaticMarkup(
+      createElement(SiteHeader, { league, name: 'North Valley League', signedIn: true }),
+    );
+    // The mark: the league's first letter in a shield, drawn as part of the page and
+    // silent to a screen reader. It stands beside the link, not in it, so the link says
+    // the league's name and nothing else.
+    expect(html).toMatch(
+      /<div class="site-brand"><svg class="ui-emblem" data-size="card" data-kind="league"[^>]*aria-hidden="true"[^>]*>.*?>N<\/text><\/svg><a class="site-name" href="[^"]+" dir="auto"><span>North Valley League<\/span><\/a><span class="site-tagline">/,
+    );
+    expect(html).toContain(`<span class="site-tagline">${en['shell.tagline']}</span>`);
+    expect(html).not.toMatch(/<svg[^>]*>(?:(?!<\/svg>).)*<image/);
+    // The whole of it is the way home: the link covers the mark and the small line.
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).toMatch(/\.site-brand \{\s*position: relative;/);
+    expect(css).toMatch(
+      /\.site-header \.site-name::after \{\s*content: '';\s*position: absolute;\s*inset: 0;/,
+    );
+    expect(css).toMatch(/\.site-tagline \{[^}]*pointer-events: none;/);
+    expect(css).toMatch(/\.site-header \.site-brand \.ui-emblem \{[^}]*pointer-events: none;/);
+  });
+
+  it('keeps the menu on top while the page scrolls, and brings the name back for the keyboard', () => {
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).toMatch(/\.site-header \{[^}]*position: sticky;\s*inset-block-start: 0;/);
+    const wide = css.slice(css.indexOf('@media (min-width: 48rem)'));
+    // From a tablet up the first row is exactly as tall as the header is moved up by, so
+    // only the menu's row stays; with the keyboard in the header, all of it shows.
+    const rise = 'calc(var(--step-8) + var(--step-4))';
+    expect(wide).toContain(
+      `.site-header {\n    inset-block-start: calc(-1 * (${rise.slice(5, -1)}));`,
+    );
+    expect(wide).toMatch(/\.site-header:focus-within \{\s*inset-block-start: 0;/);
+    expect(wide).toContain(`block-size: ${rise};`);
+  });
+
+  it('lets a page open with a band the width of the screen, and keeps every other page in the column', () => {
+    const css = readFileSync(
+      new URL('../../app/[league]/league-site.css', import.meta.url),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).toMatch(
+      /\.site-body:not\(:has\(> \.site-wide\)\) \{\s*inline-size: 100%;\s*max-inline-size: calc\(70rem \+ 2 \* var\(--gutter\)\);\s*margin-inline: auto;\s*padding-inline: var\(--gutter\);/,
+    );
+    // The same column a wide page puts its own content in.
+    expect(css).toMatch(
+      /\.site-column \{\s*inline-size: 100%;\s*max-inline-size: calc\(70rem \+ 2 \* var\(--gutter\)\);\s*margin-inline: auto;\s*padding-inline: var\(--gutter\);/,
+    );
   });
 });
 

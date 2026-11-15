@@ -49,6 +49,8 @@ With `APP_ENV=local`, the web app holds made-up leagues and made-up people in me
 
 To run it on the made-up database instead, put `LOCAL_DATA=made-up-database` in `.env` (local and test only). The app then builds a database in memory when it starts, with every migration and the two seed leagues (below), and reads leagues, signed-in people and what they hold from it. Sign-in still uses the stand-in's screens; the stand-in's made-up people do not exist there. The areas not yet moved onto the database (step 2.93, record 055) show an error page. It too opens no address and is gone when the app stops.
 
+To see the first made-up league (`/north-valley`) under another design, put `LOCAL_DESIGN=<name>` in `.env` (local and test only; the app refuses to start with it anywhere else, and with a name it does not know). The names are the starting designs (`crest`, `crest-light`, `midnight-gold`, `clean-court`) and `pine`, a made-up green league's design kept for pictures and tests. `node scripts/shots.mjs --design=<name>` takes pictures of that league's pages under a design this way (the script's own first lines say how).
+
 To build and run the production build locally:
 
 ```sh

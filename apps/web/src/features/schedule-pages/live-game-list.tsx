@@ -45,9 +45,20 @@ export function LiveGameList({
   labels,
   linkWords,
   announcement,
+  layout = 'rows',
+  across = 'two',
+  featured = false,
+  awaitingLabel,
 }: {
   readonly leagueId: string;
   readonly games: readonly GameView[];
+  /** Compact cards, or scoreboards: one across in a column of their own, or two. */
+  readonly layout?: 'rows' | 'board';
+  readonly across?: 'one' | 'two';
+  /** The game being played now, picked out from the others. */
+  readonly featured?: boolean;
+  /** The quiet word on a game whose start has passed with no result: "Awaiting result". */
+  readonly awaitingLabel?: string;
   readonly labels: GameCardLabels;
   /** What each card's link says to a screen reader, to be filled for each game as it stands. */
   readonly linkWords: GameLinkWords;
@@ -95,7 +106,11 @@ export function LiveGameList({
       <p className="ui-visually-hidden" role="status" aria-live="polite">
         {spoken}
       </p>
-      <ul className="ui-card-grid">
+      <ul
+        className="ui-card-grid"
+        data-layout={layout === 'board' ? 'board' : undefined}
+        data-across={layout === 'board' ? across : undefined}
+      >
         {games.map((raw) => {
           const g = applyUpdate(raw, updates[raw.id]);
           return (
@@ -110,6 +125,11 @@ export function LiveGameList({
                 detailsHref={g.detailsHref}
                 linkText={gameLinkText(g, linkWords)}
                 labels={labels}
+                layout={layout}
+                featured={featured}
+                {...(g.awaiting === true && awaitingLabel !== undefined
+                  ? { note: awaitingLabel }
+                  : {})}
               />
             </li>
           );

@@ -87,7 +87,7 @@ A screen is finished when every line below is true for it, at 390 and at 1280, f
 
 **Type**
 
-5. One scale of sizes (12, 14, 16, 18, 22, 28, 36) and nothing between. One page title per page, 28 to 36. Section titles 18 to 22 with a short rule in the main color. Small labels are 12 to 13, uppercase, letter-spaced.
+5. One scale of sizes (12, 14, 16, 18, 22, 28, 36) and nothing between, with three display sizes above it (48, 64, 88) kept for a hero's title, a big number and a score that is picked out. One page title per page, 28 to 36, or a hero's title in a display size (one step smaller where a line of it is long, down to 22 on the narrowest phone). Section titles 18 to 22 with a short rule in the main color; or, under a kicker (a short rule and a tiny letter-spaced label), 22 to 28 with no rule of their own. Small labels are 12 to 13, uppercase, letter-spaced.
 6. Numbers line up (tabular figures). A score is the largest thing in its card.
 
 **No browser defaults, anywhere**
@@ -101,8 +101,8 @@ A screen is finished when every line below is true for it, at 390 and at 1280, f
 
 **Games**
 
-10. A game is a compact card: a quiet top line (date, time, place) with the state as a small pill (Final, Live, Postponed, Forfeit); then each team on its own row, color chip and name on the left, score on the right in large figures. The winner is bold and its score takes the highlight. No "vs" floating in the middle of an empty row.
-11. The whole card is one link to the game. There is no separate "View box score" line, and no repeated team names shown under it (text for screen readers stays, hidden).
+10. A game is a scoreboard card (line 27). A quiet top line says which game and when, with the state as a small pill (Final, Live, Postponed, Forfeit; or a quiet "Awaiting result" on a game whose start has passed with no result, which is never listed among the games to come). Then an emblem and a name on each side, away team first, and between them the score in large lining, even-width figures, or "VS" while there is no score. Then a quiet line beneath for the place. Once a game is decided only the winner's score keeps the color the eye lands on, and the winner is marked by more than color: its name and its score are heavier, a bar stands under its score, and "winner" is said to screen readers. Where two names cannot sit side by side (a card too narrow for any two names, or a long name in a narrow card) the teams stand one over the other with the score between them; a word too long even for that is broken at a syllable, never cut off. In a list, boards are one across on a phone and two across where the list has the page's width, and a board left over takes the whole row. Step 2.147 builds this in parts: until its part 2 lands, the lists of the schedule and of a team's page still use the compact card of step 2.85 (each team on its own row, a color chip and the name at the start, the score at the end).
+11. The whole card is one link to the game, in every state. There is no separate "View box score" line and no team names repeated under it: the words the link says (who plays, the state, the score) are kept for screen readers and not drawn.
 12. A live game is shown first on the home page, under its own heading, with the Live pill in the highlight color.
 
 **Tables**
