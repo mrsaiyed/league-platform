@@ -86,7 +86,11 @@ async function openGames(page, league) {
   await page.goto(`${origin}/${league}/admin`);
   await Promise.all([
     page.waitForURL((url) => url.pathname === `/${league}/admin/games`),
-    page.locator(`a[href="/${league}/admin/games"]`).first().click(),
+    // The admin's own navigation: the account button holds a hidden link to the same place.
+    page
+      .getByRole('navigation', { name: 'Admin areas' })
+      .locator(`a[href="/${league}/admin/games"]`)
+      .click(),
   ]);
   await page.getByRole('heading', { level: 1, name: 'Games' }).waitFor();
 }
@@ -245,7 +249,10 @@ if (browser) {
       const started = Date.now();
       await Promise.all([
         page.waitForURL((url) => url.pathname === '/old-meadow/admin/games'),
-        page.locator('a[href="/old-meadow/admin/games"]').first().click(),
+        page
+          .getByRole('navigation', { name: 'Admin areas' })
+          .locator('a[href="/old-meadow/admin/games"]')
+          .click(),
       ]);
       await page.getByRole('heading', { level: 1, name: 'Games' }).waitFor();
       const took = Date.now() - started;
