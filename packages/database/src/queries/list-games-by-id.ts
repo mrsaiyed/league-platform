@@ -1,7 +1,7 @@
 // The season's games with these ids in the scope's league, in the bin or not and dated
-// or not, with what publishing must know: whether each has been scored (it then never
-// goes to the bin, record 030); a game marked not started counts only what came after
-// its marker (record 061).
+// or not, with what publishing must know: whether each one's events keep it out of the
+// bin (record 030), read by the same function as the bin's own rule, so a publication
+// is never told it may remove a game the bin then refuses (record 061).
 import type { GameFacts } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -18,8 +18,9 @@ export async function listGamesById(
       'id',
       'status',
       'deleted_at',
-      // Past its last "not started" marker (record 061), as the bin's own rule reads it.
-      sql<boolean>`public.game_tracked_past_marker(games.league_id, games.id)`.as('has_events'),
+      // As the bin's own rule reads it (record 061, migration 0016): a play since its last
+      // "not started" marker, or events in a game that was ever decided.
+      sql<boolean>`public.game_scored_for_bin(games.league_id, games.id)`.as('has_events'),
     ])
     .where('league_id', '=', scope.leagueId)
     .where('season_id', '=', seasonId)

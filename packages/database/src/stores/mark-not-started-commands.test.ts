@@ -512,4 +512,51 @@ describe('marking a game not started on the database (S-40)', () => {
     );
     expect(binned).toBe(1);
   });
+
+  it('tells a publication what the bin will do for a game decided once with no play since its marker', async () => {
+    const facts = (g: Game) =>
+      withTransaction(db, { leagueId: g.leagueId, accountId: g.ownerId }, (scope) =>
+        listGamesById(scope, g.seasonId, [g.gameId]),
+      );
+    const bin = (g: Game) =>
+      withTransaction(db, { leagueId: g.leagueId, accountId: g.ownerId }, (scope) =>
+        binPublishedGames(scope, g.seasonId, [g.gameId]),
+      );
+    const decideAndReopen = async (g: Game) => {
+      const decided = await recordFinalScore(
+        g.as(g.ownerId),
+        { gameId: g.gameId, version: await versionOf(g), homeScore: 40, awayScore: 30 },
+        deps,
+      );
+      expect(decided).toMatchObject({ ok: true });
+      const reopened = await reopenGame(
+        g.as(g.ownerId),
+        { gameId: g.gameId, version: await versionOf(g), reason: 'Wrong score' },
+        deps,
+      );
+      expect(reopened).toMatchObject({ ok: true });
+      expect((await rowsOf(g)).game?.status).toBe('scheduled');
+    };
+
+    // Marked not started, then a final score typed by hand, then reopened.
+    const marked = await trackedGame();
+    await tap(marked, tipOff(marked));
+    expect(await mark(marked, marked.scorer)).toMatchObject({ ok: true });
+    await decideAndReopen(marked);
+    // Only players changed at the scorer's table (record 058), then decided by hand and reopened.
+    const tableOnly = await trackedGame();
+    await pglite.query(
+      `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at)
+       values ($1, $2, 1, $3, 'add-player', '{}', now())`,
+      [tableOnly.leagueId, tableOnly.gameId, randomUUID()],
+    );
+    await decideAndReopen(tableOnly);
+
+    // Both have events and were decided: the preview says they cannot be removed, and
+    // the bin agrees.
+    for (const g of [marked, tableOnly]) {
+      expect(await facts(g)).toMatchObject([{ hasEvents: true }]);
+      expect(await bin(g)).toBe(0);
+    }
+  });
 });
