@@ -371,6 +371,50 @@ registerIsolationCase({
   },
 });
 
+// The same three with a narrowed reach, so the filter's own program list and assignment
+// check (inReachOf) run with the other league's programs and assignments present.
+const narrowedReaches = [
+  ["the target's program", (t: LeagueRecords) => ({ every: [t.programId], assigned: [] })],
+  [
+    "the member's assigned games of the target's program",
+    (t: LeagueRecords) => ({ every: [], assigned: [t.programId] }),
+  ],
+  ["the member's assigned games anywhere", () => ({ every: [], assigned: 'all' as const })],
+] as const;
+
+for (const [reachName, reachOf] of narrowedReaches) {
+  registerIsolationCase({
+    subject: listGamesNeedingResult,
+    name: `list the games needing a result, of ${reachName}, after the target's upcoming game's start has passed`,
+    run: async (scope, target) => {
+      await startTargetGameAnHourAgo(scope, target);
+      return listGamesNeedingResult(scope, target.memberId, reachOf(target), 100);
+    },
+  });
+  registerIsolationCase({
+    subject: listEarlierRounds,
+    name: `count the earlier rounds, of ${reachName}, after the target's upcoming game was postponed days ago`,
+    run: async (scope, target) => {
+      await postponeTargetGameDaysAgo(scope, target);
+      return listEarlierRounds(scope, target.memberId, reachOf(target), 100);
+    },
+  });
+  registerIsolationCase({
+    subject: listEarlierRound,
+    name: `list the target's round's earlier games, of ${reachName}, after its upcoming game was postponed days ago`,
+    run: async (scope, target) => {
+      await postponeTargetGameDaysAgo(scope, target);
+      return listEarlierRound(
+        scope,
+        target.memberId,
+        reachOf(target),
+        { roundId: target.roundId },
+        100,
+      );
+    },
+  });
+}
+
 registerIsolationCase({
   subject: listGamesNeedingResultCommand,
   name: "list the scope's account's games needing a result after the target's start has passed",
