@@ -262,7 +262,7 @@ describe('a game page', () => {
     expect(page).not.toContain('scheduleOf(');
   });
 
-  it('is drawn again from the server when its game starts, ends or is reopened, and only then', () => {
+  it('is drawn again from the server when its game starts, ends, is reopened or is marked not started, and only then', () => {
     const at = (status: 'scheduled' | 'live' | 'final', sequence: number) => ({
       status,
       sequence,
@@ -278,6 +278,8 @@ describe('a game page', () => {
     expect(redrawsFor(at('final', 9), at('final', 10))).toBe(false);
     // A final game the scorekeeper reopens is drawn again as live.
     expect(redrawsFor(at('final', 9), at('live', 10))).toBe(true);
+    // A live game marked not started (S-40) is drawn again as scheduled, its plays gone.
+    expect(redrawsFor(at('live', 4), at('scheduled', 5))).toBe(true);
   });
 
   it('shows no latest play after a clock tap, an undo or a lineup', () => {
