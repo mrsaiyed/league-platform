@@ -3,7 +3,12 @@
 // stored on the device (T-115), and the format is confirmed once per device (P7 §5.1).
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
-import { games, liveLeagueId, type Person } from '../../server/tracker-endpoints.test-helper.ts';
+import {
+  games,
+  hawks,
+  liveLeagueId,
+  type Person,
+} from '../../server/tracker-endpoints.test-helper.ts';
 import { endpointNetwork, type EndpointNetwork } from './endpoint-network.test-helper.ts';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
@@ -186,6 +191,43 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     await new Promise((settle) => setTimeout(settle, 0));
     expect(await device.games.find(gameId)).toBeUndefined();
     expect(await device.games.find(other)).toBeUndefined();
+  });
+
+  it('keeps the rosters, names and state when the sign-in runs out mid-game (record 054)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    let who: Person = 'scorekeeper';
+    // The scorekeeper's sign-in runs out once the game is open: the server answers as
+    // for a visitor (401).
+    const fetch = ((input: string | URL | Request, init?: RequestInit) =>
+      network.fetchAs(who)(input, init)) as typeof globalThis.fetch;
+    const opened = await openTrackerGame({
+      gameId,
+      leagueId: liveLeagueId,
+      accountId: accountOf('scorekeeper'),
+      rosters: madeUpRosters,
+      openStorage: async () => device,
+      transport: createFetchCommandTransport({ leagueId: liveLeagueId, gameId, fetch }),
+      server: createFetchTrackerServer({ leagueId: liveLeagueId, gameId, fetch }),
+      newDeviceId: () => `device-${(deviceNumber += 1)}`,
+      now: () => 1_000,
+      controller: { random: () => 1 },
+    });
+    if (!opened.ok) throw new Error(opened.code);
+    const { controller } = opened.game;
+    await controller.start();
+    await controller.idle();
+    who = 'visitor';
+    // The next tap's send is turned away: scoring goes on, signed out.
+    const tapped = await controller.tap({ type: 'lineup', side: 'home', playerIds: hawks });
+    expect(tapped.ok).toBe(true);
+    await controller.idle();
+    await new Promise((settle) => setTimeout(settle, 0));
+    expect(controller.status().signedOut).toBe(true);
+    expect(controller.status().mode).toEqual({ kind: 'scoring' });
+    const kept = await device.games.find(gameId);
+    expect(kept?.rosters).toEqual(madeUpRosters);
+    expect(kept?.state).not.toBeNull();
   });
 
   it('keeps the names on the device when refused for another reason', async () => {

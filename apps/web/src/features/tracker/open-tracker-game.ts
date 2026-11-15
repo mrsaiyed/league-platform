@@ -152,6 +152,9 @@ export async function openTrackerGame(
       ...(options.onStoreFailed === undefined ? {} : { onStoreFailed: options.onStoreFailed }),
     }),
   });
+  // Turned away as signed out before the game was open (read-only, `signed-out`): the
+  // names kept on the device go. Signed out once scoring, the game stays open on the
+  // device (`signedOut`, record 054): its rosters, names and state stay with it.
   let forgotten = false;
   controller.subscribe(({ mode }) => {
     if (forgotten || mode.kind !== 'read-only' || mode.reason !== 'signed-out') return;
