@@ -47,21 +47,84 @@ This starts Next.js in development mode, with the address in `PUBLIC_BASE_URL` (
 
 With `APP_ENV=local`, the web app holds made-up leagues and made-up people in memory, in the process. It opens **no database and no sign-in service**: the sign-in screens and the made-up people are described in record 031 and in the header of `apps/web/src/server/stand-in-ports.ts`. Restarting the app puts the made-up data back to its starting state.
 
+### One made-up world you can walk through
+
+Everything the made-up leagues hold is one set of rows in the app's memory, per league
+(step 2.152, `apps/web/src/server/stand-in-world.ts`, seeded from
+`apps/web/src/server/stand-in-world-seed.ts`). Every screen reads and writes the same rows
+through the product's own commands, so what the admin does is what a visitor sees:
+
+- a team added in Admin → Teams, and the players put on it, are on the public Teams page and
+  the team's own page, in the schedule grid, the fixture import and the tracker;
+- a schedule built and published in Admin → Schedule (or filled from a fixture file) is the
+  public schedule, the home page's games and the games area's list;
+- a final score, a forfeit or a box score typed in Admin → Games, or a game the tracker ends,
+  changes the game's page, the home page, the standings and the statistics at once: core
+  works the standings out again from the results, as on the database;
+- a postponed or cancelled game says so everywhere, and a reopened one is open again;
+- League settings take effect: who may score, the start page for members, how names show and
+  the statistics settings for teams.
+
+The two made-up leagues are apart: North Valley (adults, nine teams, `/north-valley`) and
+Harbor City (children, three teams, `/harbor-city`), each with its own look and its own
+venues. **The world is made again every time the server starts**: whatever you added is gone
+after a restart, and the games' days move with the time it starts, so this week's round is
+always this week, the games already played are in the past and the live game is under way.
+Every league page says so in one quiet line at the foot of the page: "A made-up league on
+this computer. It starts over when the app restarts."
+
+**Open it at the `127.0.0.1` address.** The made-up world listens on this computer's
+loopback address only (`127.0.0.1`), so no other computer can reach it at all, and a league
+page answers only for the exact address `PUBLIC_BASE_URL` names. So:
+
+- put `PUBLIC_BASE_URL=http://127.0.0.1:3000` in `.env` and open
+  `http://127.0.0.1:3000/north-valley`;
+- the preview (`node scripts/preview-web.mjs`) sets this itself: open
+  `http://127.0.0.1:3210/north-valley`. There `http://localhost:3210` answers "not found"
+  (404), because `localhost` is not the address `PUBLIC_BASE_URL` names;
+- `http://[::1]:<port>` reaches nothing at all: the server does not listen on that address.
+
+Before any page is looked at, the server answers only a request addressed to `localhost`,
+`127.0.0.1`, `[::1]`, a name ending in `.localhost`, or the `.test` name `PUBLIC_BASE_URL`
+gives, and only one not passed on by another server (no `Forwarded` or `Via` header, no
+`X-Forwarded-For` or `X-Forwarded-Host` from elsewhere). Anything else gets a plain page and
+nothing more. On the made-up database (`LOCAL_DATA=made-up-database`)
+it listens on `127.0.0.1` only too, as everything does with `APP_ENV` local or test: the
+made-up member's password is written in the code there as well.
+
+To try it as a league's admin:
+
+1. With `PUBLIC_BASE_URL=http://127.0.0.1:3000` in `.env`, start it with `npm run dev:web`
+   and open `http://127.0.0.1:3000/north-valley`.
+2. Be the made-up owner: tap "Sign in or create an account" and sign in as
+   `owner@example.test` with the made-up owner's password (the list is below). You come
+   back to North Valley; tap the account button (your initial at the top right, or the menu
+   button on a phone) and choose the admin.
+3. Teams: under "Add a team" type a name and tap "Add team". On the team's page, under
+   "Someone not in the list yet", type a first and last name and a number and tap "Add the
+   person and put them on the roster"; do it again for a second player.
+4. Schedule: in this week's round open "Add a game", choose the new team and another, a time
+   and a court, and tap "Add game"; then tap "Publish this schedule".
+5. Games: under the new game type both scores and tap "Save final score" (or tap "Box score",
+   type each player's points and tap "Save box score and make it final"). Then sign out
+   (account button, "Sign out") and look at the home page, the team, the game, the
+   standings and the statistics.
+
 ### Signing in as the made-up people
 
-To walk the product by tapping, open `http://localhost:3000/north-valley`, tap "Sign in or create an account" and sign in as one of these. They exist only in the made-up world on this computer, in the app's memory: the made-up stand-in refuses to start anywhere but on this computer or a test address (`APP_ENV` must be `local` or `test`, and `PUBLIC_BASE_URL` must be on localhost or a `.test` name).
+To walk the product by tapping, open `http://127.0.0.1:3000/north-valley` (as above), tap "Sign in or create an account" and sign in as one of these. They exist only in the made-up world on this computer, in the app's memory: the made-up stand-in refuses to start anywhere but on this computer or a test address (`APP_ENV` must be `local` or `test`, and `PUBLIC_BASE_URL` must be this computer's own address or a `.test` name).
 
 | Who                                                                                            | Email                      | Password                       |
 | ---------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------ |
 | The owner of every made-up league                                                              | `owner@example.test`       | `made-up owner password`       |
 | A scheduler of North Valley                                                                    | `scheduler@example.test`   | `made-up scheduler password`   |
 | A scorekeeper of North Valley                                                                  | `scorekeeper@example.test` | `made-up scorekeeper password` |
-| A coach of North Valley                                                                        | `coach@example.test`       | `made-up coach password`       |
+| A coach of North Valley, who also plays on a team of Harbor City                               | `coach@example.test`       | `made-up coach password`       |
 | A member who plays in North Valley and Harbor City (and in a draft league they cannot see yet) | `member@example.test`      | `made-up member password`      |
 
-The list is in `apps/web/src/server/stand-in-sign-ins.ts`. The account button at the top right of every league page then leads to the admin, the games to score, the account page and signing out.
+The list is in `apps/web/src/server/stand-in-sign-ins.ts`. The account button at the top right of every league page then leads to the admin, the games to score, the account page and signing out. The session cookies of `apps/web/src/server/stand-in-cast.ts` still work too, for the made-up people with no password.
 
-To switch from one made-up person to another, tap the account button (your initial at the top right, or the menu button on a phone), tap "Sign out", then "Sign in or create an account" and sign in as the next person. Signing in again on the same device also ends the session it had before.
+To switch from one made-up person to another, tap the account button, tap "Sign out", then "Sign in or create an account" and sign in as the next person. Signing in again on the same device also ends the session it had before.
 
 These passwords work on the made-up stand-in only. With `LOCAL_DATA=made-up-database` (below) only the made-up member (`member@example.test`) has a password; the made-up database's own people can be given one through "Create an account" with their address.
 
@@ -185,7 +248,7 @@ Open `http://127.0.0.1:4180`. Without `DATABASE_URL`, it saves to embedded Postg
 ## If something does not start
 
 - A `ConfigError` names each missing or invalid setting. Fix that line in `.env`; the message never shows a value.
-- If `npm run dev:web` fails with a stand-in refusal, check that `PUBLIC_BASE_URL` uses `localhost` and that `APP_ENV` is `local`.
+- If `npm run dev:web` fails with a stand-in refusal, check that `PUBLIC_BASE_URL` uses `127.0.0.1` (or `localhost`) and that `APP_ENV` is `local`. If a league page answers "not found", check that the address in the browser is exactly the one `PUBLIC_BASE_URL` names.
 - If a test fails only on one run, run `npm run test:units` again on its own. Database tests can be slow on a busy machine; they use long timeouts on purpose.
 
 Related: [applying migrations](apply-migrations.md), [verification](verification.md), and the decisions in `docs/architecture/decisions/` (records 041 to 048 cover the stack this guide uses).

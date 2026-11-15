@@ -89,6 +89,7 @@ export function StatsTables({
           rows={data.playerRows}
           locale={locale}
           labels={labels.stats}
+          emblems
         />
       </Section>
       <Section
@@ -108,6 +109,7 @@ export function StatsTables({
           rows={data.teamRows}
           locale={locale}
           labels={labels.stats}
+          emblems
         />
       </Section>
     </>

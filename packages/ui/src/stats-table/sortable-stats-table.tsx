@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type CSSProperties, type ReactNode } from 'react';
+import { Emblem } from '../emblem/emblem.tsx';
 import { safeColor } from '../team-color.ts';
 import { nextSort, sortStatRows, type Sort, type StatRow } from './sort-stat-rows.ts';
 
@@ -30,15 +31,26 @@ export type SortableStatsTableProps = {
   /** The language the names are sorted in. */
   readonly locale?: string;
   readonly labels: StatsTableLabels;
+  /**
+   * Draws a team's small shield, with its first letter, where a row names a team, in
+   * place of the plain chip of its color (docs/build/DESIGN.md, section 4, line 14).
+   */
+  readonly emblems?: boolean;
 };
 
 /**
- * A team's chip, when the row says this column names a team: in the team's own color, or the
- * plain chip for a team with no color, so the names of a column stay in line.
+ * A team's mark, when the row says this column names a team: its small shield in the
+ * team's own color (`emblems`), or a chip of that color; plain for a team with no color,
+ * so the names of a column stay in line.
  */
-function chipOf(row: StatRow, key: string): ReactNode {
+function chipOf(row: StatRow, key: string, emblems: boolean): ReactNode {
   if (row.chips === undefined || !Object.hasOwn(row.chips, key)) return null;
   const color = safeColor(row.chips[key]);
+  if (emblems) {
+    // A cell that names several teams gets a plain shield with no letter.
+    const name = row.severalTeams?.[key] === true ? '' : String(row.cells[key] ?? '');
+    return <Emblem name={name} color={color} size="small" />;
+  }
   return (
     <span
       className="ui-team-chip"
@@ -58,6 +70,7 @@ export function SortableStatsTable({
   initialSort = null,
   locale,
   labels,
+  emblems = false,
 }: SortableStatsTableProps) {
   const [sort, setSort] = useState<Sort | null>(initialSort);
   const sorted = sortStatRows(rows, sort, locale);
@@ -103,7 +116,7 @@ export function SortableStatsTable({
                 {columns.map((c, i) =>
                   i === 0 ? (
                     <th key={c.key} scope="row" className="ui-team-cell">
-                      {chipOf(row, c.key)}
+                      {chipOf(row, c.key, emblems)}
                       <span dir="auto">{row.cells[c.key] ?? ''}</span>
                     </th>
                   ) : (
@@ -112,7 +125,7 @@ export function SortableStatsTable({
                         (row.cells[c.key] ?? '')
                       ) : (
                         <>
-                          {chipOf(row, c.key)}
+                          {chipOf(row, c.key, emblems)}
                           <span dir="auto">{row.cells[c.key] ?? ''}</span>
                         </>
                       )}

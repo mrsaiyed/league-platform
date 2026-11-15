@@ -56,6 +56,7 @@ export {
   teamsMayChooseStatsLevel,
   publicNames,
   publicNamesChoices,
+  childrenInFullConfirmed,
   playersMayAskForInitials,
 } from './settings/declarations.ts';
 export {
@@ -78,6 +79,7 @@ export {
   type SettingKind,
 } from './settings/describe-setting.ts';
 export { listLeagueSettings, type LeagueSettingRow } from './settings/list-league-settings.ts';
+export { readPrivacyFacts, type PrivacyFacts } from './settings/read-privacy-facts.ts';
 export { lookupSetting, type SettingValue, type StoredSetting } from './settings/lookup-setting.ts';
 export {
   leagueCreated,

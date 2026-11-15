@@ -10,11 +10,13 @@
 //   - the statistics level a new team starts with (S-22; S-23, the founder: everyone
 //     can see its players' statistics), and whether teams may choose their own (S-24:
 //     yes, the league can switch it off);
-//   - how names show on public pages (R-14, R-24: full names, first name and last
-//     initial, which every league starts with, or hidden; switching to full names asks
-//     the admin to confirm the league has the permission it needs), and whether an
-//     adult may ask to appear as initials (R-15: off to start; R-25: a child always
-//     may). The people module reads both (readNamePolicy, T-81).
+//   - how names show on public pages (R-24, R-29: full names, first name and last
+//     initial, or hidden, followed for every player; every league starts on full
+//     names), whether the admin has confirmed the parents' agreement to children's
+//     full names (R-14, R-29: a setting of its own, no to start; giving it asks the
+//     admin to tick the confirmation, record 065), and whether an adult may ask to
+//     appear as initials (R-15: off to start; R-25: a child always may). The people
+//     module reads all three (readNamePolicy, T-81).
 import { z } from 'zod';
 import { defineSetting, settingRegistry } from './define-setting.ts';
 
@@ -93,26 +95,46 @@ export const teamsMayChooseStatsLevel = defineSetting({
 });
 
 /**
- * How children's names show on public pages (R-14, R-24, T-81): full names, first name
- * and last initial (the start), or hidden (by jersey number only). Adults are shown by
- * full name unless they ask otherwise (R-15). A person whose age the league does not
- * know counts as a child in a youth or mixed league. A child's own request for less
- * (initials, or removed) always wins over this (R-25).
+ * How every player's name shows on public pages (R-24, R-29, T-81): full names, first
+ * name and last initial, or hidden (by jersey number only). Every league starts on full
+ * names. Full names show a child (and, in a youth or mixed league, a person whose age is
+ * not known) by first name and last initial unless the confirmation below is given too
+ * (R-14), so the start is what every league showed before step 2.162: adults in full,
+ * children by first name and last initial (record 065). A person's own recorded request
+ * for less always wins (R-25, R-27).
  */
 export const publicNamesChoices = ['fullName', 'firstNameLastInitial', 'hidden'] as const;
 
 export const publicNames = defineSetting({
   key: 'privacy.publicNames',
   type: z.enum(publicNamesChoices),
-  default: 'firstNameLastInitial',
+  default: 'fullName',
   levels: ['league'],
   permission: 'league.settings',
   label: 'setting.privacy.publicNames.label',
-  // R-14: the admin confirms the league has the permission it needs for full names.
-  confirm: ['fullName'],
   // R-26: from the most shown to the least; a move down the list works even while the
   // league is archived or suspended.
   protectiveOrder: ['fullName', 'firstNameLastInitial', 'hidden'],
+});
+
+/**
+ * R-14, R-29: the admin's confirmation that the parents or guardians of the children in
+ * the league agreed to their full names being shown. A setting of its own (record 065),
+ * no to start, so that "full names" can be chosen without it and a second writer of the
+ * names setting can never show a child in full. Children are in full only where names
+ * are full names AND this is yes. Saying yes asks the admin to tick the confirmation
+ * (`setting.privacy.childrenInFullConfirmed.confirm`), and the activity entry says so;
+ * taking it back shows less, so it works even in an archived or suspended league (R-26).
+ */
+export const childrenInFullConfirmed = defineSetting({
+  key: 'privacy.childrenInFullConfirmed',
+  type: z.boolean(),
+  default: false,
+  levels: ['league'],
+  permission: 'league.settings',
+  label: 'setting.privacy.childrenInFullConfirmed.label',
+  confirm: [true],
+  protectiveOrder: [true, false],
 });
 
 /**
@@ -137,5 +159,6 @@ export const declaredSettings = settingRegistry([
   startingStatsLevel,
   teamsMayChooseStatsLevel,
   publicNames,
+  childrenInFullConfirmed,
   playersMayAskForInitials,
 ]);

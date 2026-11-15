@@ -27,6 +27,8 @@ export type MemoryImports = {
   draftsStarted: number;
   schedule: ScheduleState;
   games: GameRecord[];
+  /** Games the live tracker has recorded plays of, by id. */
+  tracked: string[];
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -108,6 +110,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
     draftsStarted: 0,
     schedule: { rounds: [], games: [] },
     games: [],
+    tracked: [],
     ...state,
   });
   const transaction = memoryTransaction(
@@ -221,6 +224,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
         unassign: async () => false,
         listWindow: async () => ({ today: '2026-12-20', games: [] }),
         find: async (id) => s.games.find((g) => g.id === id),
+        lockGame: async (id) => s.games.some((g) => g.id === id),
         setResult: async (id, change, version) => {
           const at = s.games.findIndex((g) => g.id === id);
           const found = s.games[at];
@@ -245,7 +249,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
         listLines: async () => [],
         replaceLines: async () => undefined,
         listRoster: async () => [],
-        hasPlays: async () => false,
+        hasPlays: async (gameId) => s.tracked.includes(gameId),
         findSeason: async (id) => {
           const season = s.seasons.find((x) => x.id === id);
           return season === undefined ? undefined : { programId: season.programId, rules: null };

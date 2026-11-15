@@ -17,7 +17,7 @@
 export type MadeUpSignIn = {
   readonly email: string;
   readonly password: string;
-  /** Who they are among the stand-in's made-up people (standInPeople, stand-in-ports.ts). */
+  /** Who they are among the stand-in's made-up people (standInPeople, stand-in-cast.ts). */
   readonly person: StaffPerson;
 };
 

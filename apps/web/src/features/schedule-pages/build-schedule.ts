@@ -26,6 +26,12 @@ export type GameView = {
   };
   readonly status: GameStatus;
   readonly whenText: string;
+  /**
+   * The same line as it reads beside the state's pill, where that is shorter: a scoreboard
+   * card of a postponed game says "Postponed" in its pill, so its date line says only
+   * "From Nov 1". Left out when the line is the same.
+   */
+  readonly whenBesidePill?: string;
   /** Where the game is played; left out for a game with no place yet. */
   readonly placeText?: string;
   readonly numberText?: string;
@@ -153,6 +159,10 @@ export function gameView(
     away: { name: game.awayTeam.name, score: game.awayScore, color: game.awayTeam.color },
     status,
     whenText: whenOf(game, clock),
+    // Beside a pill that says "Postponed" the old day is still never written bare.
+    ...(status === 'postponed' && day !== null
+      ? { whenBesidePill: t('schedule.postponedFromDay', { date: shortDayText(day) }) }
+      : {}),
     ...(place === undefined ? {} : { placeText: place }),
     ...(game.number === null
       ? {}

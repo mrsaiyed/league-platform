@@ -22,6 +22,7 @@ import { withTransaction } from '../db/with-transaction.ts';
 import {
   freshSchema,
   newLeague,
+  newPerson,
   newProgram,
   newSeason,
   one,
@@ -170,5 +171,50 @@ describe('settings against the database', () => {
         deps,
       ),
     ).toMatchObject({ error: { code: 'unknown-setting' } });
+  });
+});
+
+describe('what the Privacy settings read from the database (record 065)', () => {
+  const inA = <T>(work: (tx: ReturnType<typeof transaction>) => Promise<T>) =>
+    withTransaction(db, { leagueId: a.leagueId, accountId: a.ownerId }, (scope) =>
+      work(transaction(scope)),
+    );
+
+  it('gives the time a value was saved, and writes nothing for the same value saved again', async () => {
+    const [before] = await inA((tx) => tx.leagues.settingRows(hours.key, {}));
+    expect(before?.savedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    const logged = async () =>
+      Number(
+        (
+          await one<{ n: string }>(
+            pglite,
+            `select count(*) as n from activity_log where league_id = $1 and action = 'leagues.set_setting'`,
+            [a.leagueId],
+          )
+        ).n,
+      );
+    const entries = await logged();
+    const version = before?.version ?? null;
+    // The database keeps the document's keys in its own order; the same value is still seen.
+    expect(
+      await set(ctx(a), { level: 'league', key: hours.key, value: 11, version }, deps),
+    ).toEqual({ ok: true, value: { key: hours.key, version } });
+    expect(await logged()).toBe(entries);
+    const [after] = await inA((tx) => tx.leagues.settingRows(hours.key, {}));
+    expect(after).toEqual(before);
+  });
+
+  it('says who plays and whether anyone is recorded as a child, never another league', async () => {
+    expect(await inA((tx) => tx.leagues.leagueAudience())).toBe('adult');
+    expect(await inA((tx) => tx.leagues.hasRecordedChild())).toBe(false);
+    const childInB = await newPerson(pglite, b.leagueId);
+    await pglite.query('update people set is_minor = true where id = $1', [childInB]);
+    expect(await inA((tx) => tx.leagues.hasRecordedChild())).toBe(false);
+    const child = await newPerson(pglite, a.leagueId);
+    await pglite.query('update people set is_minor = true where id = $1', [child]);
+    expect(await inA((tx) => tx.leagues.hasRecordedChild())).toBe(true);
+    // Someone in the bin does not count.
+    await pglite.query('update people set deleted_at = now() where id = $1', [child]);
+    expect(await inA((tx) => tx.leagues.hasRecordedChild())).toBe(false);
   });
 });

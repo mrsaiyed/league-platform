@@ -16,6 +16,7 @@ import {
   listGamesInWindow,
   listPostponedGames,
   listSettingValues,
+  lockLiveGame,
   replaceGameLines,
   updateGameNotStarted,
   updateGameResult,
@@ -24,6 +25,8 @@ import {
 export function gamesStore(scope: LeagueScope): GamesStore {
   return {
     find: (gameId) => findGame(scope, gameId),
+    // The tracker's own lock (scoring-sessions-store.ts), so the two never pass each other.
+    lockGame: (gameId) => lockLiveGame(scope, gameId),
     setResult: (gameId, change, version) => updateGameResult(scope, gameId, change, version),
     markNotStarted: (gameId, version) => updateGameNotStarted(scope, gameId, version),
     addCorrection: (correction) => insertGameCorrection(scope, correction),

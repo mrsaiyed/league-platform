@@ -5,7 +5,9 @@ import { readStandings } from '@srleagues/core';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildStandingsViews } from './build-standings.ts';
 import { loadStatsPage, parseBy, statLabel, type StatsPageData } from './build-stats.ts';
 import { chooseSeason } from './choose-season.ts';
@@ -14,7 +16,7 @@ import { StatsTables } from './stats-page.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
-const stats = standInPublicStats({ adultLeagueId: adult, youthLeagueId: youth });
+const stats = standInPublicStats(testWorld(), startingNamePolicy);
 
 async function seasonsOf(leagueId: string) {
   return stats.seasonsOf(leagueId);
@@ -75,15 +77,18 @@ describe('statistics page', () => {
     const data = await statsFor(adult);
     const text = html(data);
     // The team's totals are there...
-    expect(data.teamRows.find((r) => r.cells['team'] === 'Owls')?.cells['points']).toBe('39.7');
+    // (56 + 58 + 41) / 3, from the Owls' box score lines.
+    expect(data.teamRows.find((r) => r.cells['team'] === 'Owls')?.cells['points']).toBe('51.7');
     expect(text).toContain('Owls');
-    expect(text).toContain('Only team totals are shown for Owls.');
+    // The Bears keep their players' numbers for their staff too.
+    expect(text).toContain('Only team totals are shown for Bears, Owls.');
     // ...and none of its players, in the table or among the leaders.
     for (const hidden of ['Jordan', 'Castellanos', 'Imani', 'Brooks']) {
       expect(text).not.toContain(hidden);
     }
     expect(text).toContain('Dana Whitfield');
-    // Nothing of the hidden numbers in the leaders either: the top scorer is not the hidden 150.
+    // Nothing of the hidden numbers in the leaders either: the top scorer is not the hidden
+    // one (29 a game over three games, more than anyone shown).
     expect(data.leaders[0]?.rows[0]?.cells['player']).toBe('1. Dana Whitfield');
   });
 
@@ -97,8 +102,12 @@ describe('statistics page', () => {
     expect(dana?.chips?.['team']).toBe(colorOfTeam.get('Falcons'));
     const text = html(data);
     expect(text).toContain(`--team-color:${colorOfTeam.get('Falcons')}`);
-    // One chip for each team in the teams table and one beside each player's team.
-    expect(text.match(/ui-team-chip/g)).toHaveLength(data.teamRows.length + data.playerRows.length);
+    // One mark for each team in the teams table and one beside each player's team. Since
+    // step 2.147 part 2 the mark is the team's small shield, where a chip used to be.
+    expect(text.match(/<svg class="ui-emblem" data-size="small"/g)).toHaveLength(
+      data.teamRows.length + data.playerRows.length,
+    );
+    expect(text).not.toContain('ui-team-chip');
   });
 
   it('gives an empty page a next step when it is told where the schedule is', async () => {
@@ -135,7 +144,7 @@ describe('statistics page', () => {
     const data = await statsFor(adult, 'total');
     expect(
       data.playerRows.find((r) => r.cells['player'] === 'Dana Whitfield')?.cells['points'],
-    ).toBe('138');
+    ).toBe('73');
     expect(parseBy('total')).toBe('total');
     expect(parseBy('anything')).toBe('average');
   });

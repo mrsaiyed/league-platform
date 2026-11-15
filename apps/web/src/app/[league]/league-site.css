@@ -674,6 +674,11 @@ html {
   font-size: var(--text-12);
   letter-spacing: 0.04em;
 }
+/* The made-up world's one quiet line (step 2.152): a line of its own, under the rest. */
+.site-footer-made-up {
+  flex: 1 1 100%;
+  font-size: var(--text-12);
+}
 @media (min-width: 48rem) {
   .site-footer-name {
     flex: 1 1 auto;
@@ -698,6 +703,14 @@ html {
 .league-site .home-live-title {
   font-family: var(--font-body);
 }
+/* On a phone the home page shows the next two matchups and leaves the later ones to "See
+   the full schedule", so a reader reaches the standings after a few boards, not seven. A
+   game waiting for a new day is news, and is always shown. */
+@media (max-width: 47.99rem) {
+  .home-next .ui-card-grid > li:nth-child(n + 3):has(> .ui-game-card[data-status='scheduled']) {
+    display: none;
+  }
+}
 /* Results and standings share a row on a laptop, each with half of it, so neither column
    is left empty beside the other. A league with three divisions or more has too many
    tables for half a row: its results and its tables each take the width, two across.
@@ -713,6 +726,23 @@ html {
 .home-tables {
   display: grid;
   gap: var(--step-5);
+}
+/* The season's leaders under a short column of standings: a small heading with the way to
+   every player's numbers, then each leader as one short row. */
+.home-leaders-beside {
+  margin-block-start: var(--step-5);
+}
+.home-leaders-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-1) var(--step-4);
+  min-block-size: var(--tap);
+}
+.league-site .home-leaders-head .ui-kicker {
+  margin: 0;
+  font-family: var(--font-body);
 }
 .home-tables > * {
   min-inline-size: 0;
@@ -761,6 +791,20 @@ html {
   font-size: var(--text-14);
 }
 
+/* A game's page opens with its board: the two teams, their shields and the score. The
+   page's title says the same two names, so it is kept for screen readers and for the
+   browser's tab and not drawn; the game's number and its day stand over the board as one
+   quiet line. */
+.game-page > .ui-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--step-1) var(--step-3);
+  margin-block-end: var(--step-3);
+}
+.game-page > .ui-page-head > .game-corrected {
+  flex: 1 1 100%;
+}
 /* A game's page: its tables (the two teams' box scores, the periods of the play-by-play)
    sit two across on a laptop, so a row's numbers stay near the name they belong to and no
    line of words runs the width of the screen. */

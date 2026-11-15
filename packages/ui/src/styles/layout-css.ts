@@ -176,6 +176,20 @@ export const layoutCss = String.raw`
   min-inline-size: 0;
 }
 
+/* A list of things one under another, each as tall as its own content (a game with its
+   controls in the admin's list): no bullets, no indent, the card grid's gap between. */
+.ui-list {
+  display: grid;
+  align-content: start;
+  gap: var(--step-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-list > li {
+  min-inline-size: 0;
+}
+
 /* The strip of big numbers under a home page's hero: four across, open to the page,
    between two fine lines in the league's color of decoration (laid on only as strongly as
    it takes to be seen). The four stand in one row and are read against each other, so

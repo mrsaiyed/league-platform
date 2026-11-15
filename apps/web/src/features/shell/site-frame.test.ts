@@ -398,6 +398,9 @@ describe('header, menu and footer', () => {
       '.site-header-top:has(.site-menu[open])',
       '.site-body:has(> .site-wide)',
       '@supports not selector(:has(*))',
+      // Not the column: the phone's home page puts its later matchups away (a browser
+      // that does not know `:has()` shows them all).
+      ".home-next .ui-card-grid > li:nth-child(n + 3):has(> .ui-game-card[data-status='scheduled'])",
     ]);
     expect(css).toMatch(
       /@supports not selector\(:has\(\*\)\) \{\s*\.site-wide \.site-column \{\s*padding-inline: 0;/,

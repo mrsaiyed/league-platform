@@ -6,9 +6,12 @@ import {
   declaredSettings,
   defineSetting,
   listLeagueSettings,
+  readNamePolicy,
+  readPrivacyFacts,
   setSetting,
   settingRegistry,
   type AccessReader,
+  type Audience,
   type CommandContext,
 } from '@srleagues/core';
 import { createTranslator, en } from '@srleagues/site';
@@ -17,8 +20,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { standInAdminSettings } from '../../server/stand-in-admin-settings.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { answerQuery, doneKey, problemKey, refused } from './answer.ts';
 import { valueOf, versionOf } from './form-input.ts';
+import { privacyNotes } from './privacy-notes.ts';
 import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
 
 const t = createTranslator('en');
@@ -62,10 +67,47 @@ const as = (accountId: string | null): CommandContext => ({
   accountId,
   requestId: 'request-1',
 });
+/**
+ * The settings stand-in on the one made-up world, its league made of this audience, with
+ * or without someone recorded as a child: the Privacy settings read both from its rows.
+ */
+const settingsStandIn = (
+  audience: Audience = 'youth',
+  hasRecordedChild = false,
+  now?: () => Date,
+) =>
+  standInAdminSettings(
+    testWorld(
+      () => access,
+      now,
+      (leagues) => {
+        const at = leagues.findIndex((l) => l.leagueId === leagueId);
+        const league = leagues[at];
+        if (league === undefined) throw new Error('The test league is not in the seed.');
+        leagues[at] = {
+          ...league,
+          audience,
+          // Only the first person is recorded as a child, and only when asked for.
+          people: league.people.map((p, i) => ({
+            ...p,
+            sensitive: {
+              ...p.sensitive,
+              isMinor:
+                hasRecordedChild && i === 0
+                  ? true
+                  : p.sensitive.isMinor === true
+                    ? null
+                    : p.sensitive.isMinor,
+            },
+          })),
+        };
+      },
+    ),
+  );
 
 describe('the settings form', () => {
   it('shows a setting declared in a test with its label, default and limits', async () => {
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx, testRegistry));
     const html = renderToStaticMarkup(
       createElement(SettingForms, { rows, league: 'north-valley', say }),
@@ -87,7 +129,7 @@ describe('the settings form', () => {
     for (const setting of declaredSettings.all()) {
       expect(Object.hasOwn(en, setting.label), setting.label).toBe(true);
     }
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
     expect(rows.map((r) => r.key)).toEqual(declaredSettings.all().map((s) => s.key));
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
@@ -104,7 +146,7 @@ describe('the settings form', () => {
   });
 
   it('shows under Scoring how long a scorekeeper may reopen a game they ended (S-36)', async () => {
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
     const scoring = html.slice(html.indexOf('data-area="games"'));
@@ -121,7 +163,7 @@ describe('the settings form', () => {
   });
 
   it('saves the minutes a scorekeeper may reopen a game, 0 included, and refuses more than a day', async () => {
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+    const { deps } = settingsStandIn();
     const key = 'games.scorekeeperReopenMinutes';
     const set = (value: unknown, version: number | null) =>
       setSetting(as(ownerId), { level: 'league', key, value, version }, deps);
@@ -131,23 +173,25 @@ describe('the settings form', () => {
     expect(rows.find((r) => r.key === key)).toMatchObject({ value: 0, source: 'league' });
   });
 
-  it('puts the names settings under Privacy, with a box to confirm full names (R-14)', async () => {
-    const { deps } = standInAdminSettings({ accessOf: () => access, log: () => undefined });
+  it("puts the names settings under Privacy, with the parents' confirmation as its own (R-14, R-29)", async () => {
+    const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
     const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
     const privacy = html.slice(html.indexOf('data-area="privacy"'));
     expect(privacy).toMatch(/^data-area="privacy"><h2>Privacy<\/h2>/);
-    // Three choices, from the most shown to the least (R-24).
-    // Three choices, from the most shown to the least (R-24), each with a made-up example.
+    // Three choices, from the most shown to the least (R-24), each saying what it does to
+    // adults and to children (R-29), with a made-up example.
     const quote = (text: string) => `&quot;${text}&quot;`;
-    const full = privacy.indexOf(`Full names, like ${quote('Jordan Ellis')}`);
+    const full = privacy.indexOf(`Full names for adults, like ${quote('Jordan Ellis')}.`);
     const initial = privacy.indexOf(
-      `First name and last initial, like ${quote('Jordan E.')} (the default)`,
+      `First name and last initial for everyone, adults and children, like ${quote('Jordan E.')}`,
     );
-    const hidden = privacy.indexOf('Hidden: no names. A player appears by jersey number');
+    const hidden = privacy.indexOf('Hidden for everyone, adults and children: no names.');
     expect(full).toBeGreaterThan(0);
     expect(initial).toBeGreaterThan(full);
     expect(hidden).toBeGreaterThan(initial);
+    // Every league starts on full names (record 065).
+    expect(privacy).toContain('unless their full names are confirmed below. (the default)');
     expect(privacy).toContain(`as ${quote('A player (name not shown)')} in the statistics`);
     expect(privacy).toContain('People who know the team can still tell who a number is.');
     expect(privacy.match(/value="(fullName|firstNameLastInitial|hidden)"/g)).toEqual([
@@ -155,25 +199,111 @@ describe('the settings form', () => {
       'value="firstNameLastInitial"',
       'value="hidden"',
     ]);
-    // The box to tick says when to tick it, and what is confirmed (R-14).
-    expect(privacy).toContain('Tick this only if you are choosing Full names');
-    expect(privacy).toContain('name="confirmed" value="yes"');
-    expect(privacy).toContain(
+    // The box to tick says what is confirmed (R-14), on the confirmation's own form.
+    const confirmation = privacy.slice(
+      privacy.indexOf('data-setting="privacy.childrenInFullConfirmed"'),
+      privacy.indexOf('data-setting="privacy.playersMayAskForInitials"'),
+    );
+    // Drawn as one box to tick: ticking it says yes and confirms (record 065).
+    expect(confirmation).toContain('type="checkbox" name="confirmed" value="yes"');
+    expect(confirmation).toContain('name="value" value="tick"');
+    expect(confirmation).not.toContain('type="radio"');
+    expect(privacy).not.toContain('Tick this only if');
+    expect(confirmation).toContain(
       'I confirm that the parents or guardians of the children in this league have agreed to their full names being shown publicly',
     );
-    // The words say who each setting changes, and that a parent's request always wins.
-    expect(privacy).toContain('This decides how children are shown');
-    expect(privacy).toContain('coaches too, until you mark them as adults');
-    expect(privacy).toContain('Adults are shown by their full name unless they ask for less.');
-    expect(privacy).toContain('that always wins over this setting');
-    expect(privacy).toContain('arrives with the next part of this work.');
+    // A request always wins; no sentence promises what no screen does (2.106 audit, H13).
+    expect(privacy).toContain('it always wins over this setting');
+    expect(privacy).not.toContain('until you mark them as adults');
+    expect(privacy).not.toContain('next part of this work');
     expect(privacy).toContain('Adults may ask to appear as initials on public pages.');
     expect(privacy).toContain('Children always can, whatever this says');
     // R-27: switching it off takes no one's initials away.
     expect(privacy).toContain('Switching this off only stops new requests');
     expect(privacy).toContain('stays that way until their own record is changed');
-    // Only the names setting asks to confirm.
+    // Only the parents' confirmation asks to confirm; the names setting no longer does.
     expect(html.match(/name="confirmed"/g)).toHaveLength(1);
+    expect(confirmation.indexOf('name="confirmed"')).toBeGreaterThan(0);
+  });
+
+  it('opens Privacy with what fits who plays, says what is in force, and offers the tick only where it covers someone (R-29)', async () => {
+    const privacyOf = async (audience: Audience, hasRecordedChild = false) => {
+      const { deps } = settingsStandIn(audience, hasRecordedChild);
+      const { rows, facts, policy } = await deps.transaction(as(ownerId), async (tx) => ({
+        rows: await listLeagueSettings(tx),
+        facts: await readPrivacyFacts(tx),
+        policy: await readNamePolicy(tx.leagues),
+      }));
+      const notes = privacyNotes({ facts, policy, rows, timeZone: 'UTC', locale: 'en' });
+      const html = renderToStaticMarkup(
+        createElement(SettingForms, { rows, league: 'x', say, notes }),
+      );
+      return html.slice(html.indexOf('data-area="privacy"'));
+    };
+    const confirmationOf = (html: string) =>
+      html.slice(html.indexOf('data-setting="privacy.childrenInFullConfirmed"'));
+    const adult = await privacyOf('adult');
+    // The sentence comes first, right under the heading, then what is in force.
+    expect(adult).toMatch(
+      /^data-area="privacy"><h2>Privacy<\/h2><p>Your league is for adults, so it starts with full names\. Choose less here at any time\.<\/p><p>Now: adults are shown by full name, and children by first name and last initial\.<\/p>/,
+    );
+    // No one recorded as a child: one sentence, no tick.
+    expect(confirmationOf(adult)).toContain(
+      'A player recorded as a child is shown by first name and last initial.',
+    );
+    expect(adult).not.toContain('name="confirmed"');
+    const adultWithChild = confirmationOf(await privacyOf('adult', true));
+    expect(adultWithChild).toContain('This league has players recorded as children.');
+    expect(adultWithChild).toContain('type="checkbox" name="confirmed" value="yes"');
+    for (const audience of ['youth', 'mixed'] as const) {
+      const html = await privacyOf(audience);
+      expect(html, audience).toContain('young players by first name and last initial');
+      expect(confirmationOf(html), audience).toContain(
+        'Tick to show the young players&#x27; full names too',
+      );
+      expect(html.match(/name="confirmed"/g), audience).toHaveLength(1);
+    }
+  });
+
+  it('says the confirmation is in force and since when, once it is given (record 065)', async () => {
+    const { deps } = settingsStandIn('youth', false, () => new Date('2026-11-15T12:00:00Z'));
+    const given = await setSetting(
+      as(ownerId),
+      {
+        level: 'league',
+        key: 'privacy.childrenInFullConfirmed',
+        value: true,
+        version: null,
+        confirmed: true,
+      },
+      deps,
+    );
+    expect(given).toMatchObject({ ok: true });
+    const render = async () => {
+      const { rows, facts, policy } = await deps.transaction(as(ownerId), async (tx) => ({
+        rows: await listLeagueSettings(tx),
+        facts: await readPrivacyFacts(tx),
+        policy: await readNamePolicy(tx.leagues),
+      }));
+      const notes = privacyNotes({ facts, policy, rows, timeZone: 'UTC', locale: 'en' });
+      return renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say, notes }));
+    };
+    const html = await render();
+    expect(html).toContain('Now: everyone is shown by full name, children too.');
+    expect(html).toContain('Confirmed on November 15, 2026.');
+    // The tick is drawn ticked.
+    expect(html).toContain('type="checkbox" name="confirmed" checked="" value="yes"');
+    // Names moved off full names: the confirmation is kept and has no effect.
+    await setSetting(
+      as(ownerId),
+      { level: 'league', key: 'privacy.publicNames', value: 'hidden', version: null },
+      deps,
+    );
+    const hidden = await render();
+    expect(hidden).toContain('Now: nobody is shown by name; players appear by jersey number.');
+    expect(hidden).toContain(
+      'The parents&#x27; confirmation is kept, but it has no effect while names are not on full names.',
+    );
   });
 });
 
@@ -216,7 +346,7 @@ describe('answers', () => {
 
 describe('saving on the stand-in', () => {
   const key = declaredSettings.get('members.startPage')?.key ?? '';
-  const made = () => standInAdminSettings({ accessOf: () => access, log: () => undefined });
+  const made = () => settingsStandIn();
   const read = (ports: ReturnType<typeof made>) =>
     ports.deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
 

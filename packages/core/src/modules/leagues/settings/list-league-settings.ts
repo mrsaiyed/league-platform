@@ -16,6 +16,8 @@ export type LeagueSettingRow = SettingField & {
   readonly source: 'league' | 'default';
   /** The version of the league's stored value when read, or null when there is none (A-8). */
   readonly version: number | null;
+  /** When the league's own value was saved (ISO), or null when none is stored or not known. */
+  readonly savedAt: string | null;
 };
 
 export async function listLeagueSettings(
@@ -35,6 +37,7 @@ export async function listLeagueSettings(
       // A stored value that no longer passes its limits is not shown, but a save must still
       // start from its row's version, or the write would be refused.
       version: own[0]?.version ?? null,
+      savedAt: found.source === 'league' ? (own[0]?.savedAt ?? null) : null,
     });
   }
   return rows;

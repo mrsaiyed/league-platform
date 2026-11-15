@@ -21,6 +21,7 @@ export * from './src/emblem/emblem.tsx';
 export * from './src/facts/facts.tsx';
 export * from './src/team-card/team-card.tsx';
 export * from './src/leader-card/leader-card.tsx';
+export * from './src/leader-spot/leader-spot.tsx';
 export * from './src/group/group.tsx';
 export * from './src/hero/hero.tsx';
 export * from './src/call-band/call-band.tsx';

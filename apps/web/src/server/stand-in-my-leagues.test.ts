@@ -34,9 +34,22 @@ describe('the stand-in leagues of an account', () => {
       standInLeagues.otherDraft.slug,
     ]);
     expect(await slugsOf(standInPeople.stranger.accountId)).toEqual([]);
+    // The coach holds a role in two leagues, and is the person on a team of each seeded
+    // league in the one world's rows (step 2.152): Harbor City by that roster place alone.
     expect(await slugsOf(standInPeople.coach.accountId)).toEqual(
-      [standInLeagues.live.slug, standInLeagues.draft.slug].sort(),
+      [standInLeagues.live.slug, standInLeagues.other.slug, standInLeagues.draft.slug].sort(),
     );
+  });
+
+  it('reads roster places from the one world’s rows', async () => {
+    const harbor = (await ports.leaguesOfAccount(standInPeople.coach.accountId)).find(
+      (row) => row.slug === standInLeagues.other.slug,
+    );
+    expect(harbor).toEqual(expect.objectContaining({ isOwner: false, roles: [], onRoster: true }));
+    const live = (await ports.leaguesOfAccount(standInPeople.coach.accountId)).find(
+      (row) => row.slug === standInLeagues.live.slug,
+    );
+    expect(live).toEqual(expect.objectContaining({ roles: ['coach'], onRoster: true }));
   });
 
   it('gives the roles held, and the whole-league ones apart', async () => {
@@ -58,6 +71,8 @@ describe('the stand-in leagues of an account', () => {
     expect(await shownTo(standInMemberAccountId)).toEqual(
       [standInLeagues.live.slug, standInLeagues.other.slug].sort(),
     );
-    expect(await shownTo(standInPeople.coach.accountId)).toEqual([standInLeagues.live.slug]);
+    expect(await shownTo(standInPeople.coach.accountId)).toEqual(
+      [standInLeagues.live.slug, standInLeagues.other.slug].sort(),
+    );
   });
 });

@@ -3,7 +3,9 @@
 // games only can be opened beside the one that does not.
 import { listMyGames, readTrackerRosters, type AccessReader, type Grant } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
+import { namesShownOf, startingNamePolicy } from './name-policy-of.ts';
 import { standInGames } from './stand-in-games.ts';
+import { testWorld } from './stand-in-world.test-helper.ts';
 
 const first = '01900000-0000-7000-8000-000000000001';
 const second = '01900000-0000-7000-8000-000000000003';
@@ -27,21 +29,11 @@ const accessOf = (leagueId: string): AccessReader => ({
     grants.filter((g) => g.leagueId === leagueId && g.accountId === account),
 });
 
-const ports = standInGames({
-  leagueId: first,
-  people: { [keeper]: 'Sam' },
-  assignees: [keeper, owner],
-  moreLeagues: [
-    {
-      leagueId: second,
-      assignees: [admin, keeper],
-      settings: {
-        'games.whoMayScore': [{ level: 'league', document: { version: 1, value: 'assignedOnly' } }],
-      },
-    },
-  ],
-  accessOf,
-  log: () => {},
+// The seed gives the draft league the first league's tracked games, the live one to its
+// admin (a6), and its setting "assigned games only" (stand-in-world-seed.ts).
+const ports = standInGames(testWorld(accessOf), {
+  people: { [keeper]: 'Sam', [admin]: 'Avery' },
+  namesShownOf: namesShownOf(startingNamePolicy, () => 'adult'),
 });
 const as = (leagueId: string) => ({ leagueId, accountId: keeper, requestId: 'r1' });
 const gameIds = async (leagueId: string) => {
@@ -64,6 +56,10 @@ describe('the games stand-in’s other leagues', () => {
       ok: false,
       error: { code: 'not-allowed' },
     });
-    expect((await ports.namesOf(second)).teams).toEqual((await ports.namesOf(first)).teams);
+    // Its teams are its own copies of the first league's tracked ones.
+    const own = (await ports.namesOf(second)).teams;
+    const firsts = (await ports.namesOf(first)).teams;
+    expect(Object.keys(own).length).toBeGreaterThan(0);
+    for (const [id, name] of Object.entries(own)) expect(firsts[id]).toBe(name);
   });
 });

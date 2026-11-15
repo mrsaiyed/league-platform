@@ -118,7 +118,8 @@ function pageData(
 ): StatsPageData {
   const teamName = new Map(table.teams.map((team) => [team.teamId, team.name]));
   const teamColor = new Map(table.teams.map((team) => [team.teamId, team.color]));
-  // A player of one team carries that team's color; one who played for several gets the plain chip.
+  // A player of one team carries that team's color and letter on their mark; one who
+  // played for several gets a plain mark with no letter.
   const colorOf = (ids: readonly string[]): string | null =>
     ids.length === 1 ? (teamColor.get(ids[0] ?? '') ?? null) : null;
   const teamsOf = (ids: readonly string[]) =>
@@ -185,6 +186,7 @@ function pageData(
       ...Object.fromEntries(table.statKeys.map((key) => [key, valueOf(player.stats[key])])),
     },
     chips: { team: colorOf(player.teamIds) },
+    ...(player.teamIds.length > 1 ? { severalTeams: { team: true } } : {}),
   }));
   const teamColumns: StatsColumn[] = [{ key: 'team', label: t('stats.col.team') }, ...statColumns];
   const teamRows: StatRow[] = table.teams.map((team) => ({

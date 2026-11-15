@@ -37,6 +37,7 @@ describe('listLeagueSettings', () => {
         value: 24,
         source: 'default',
         version: null,
+        savedAt: null,
       },
     ]);
   });
@@ -48,5 +49,41 @@ describe('listLeagueSettings', () => {
     await set(context, { level: 'league', key: hours.key, value: 6, version: null }, m.deps);
     const [row] = await m.deps.transaction(context, (tx) => listLeagueSettings(tx, registry));
     expect(row).toMatchObject({ value: 6, source: 'league', version: 1 });
+  });
+
+  it('says when the league saved its value, where the store keeps it (record 065)', async () => {
+    const m = memoryLeagues();
+    const savedAt = '2026-11-15T10:00:00.000Z';
+    const rows = await m.deps.transaction(m.as(ownerId), (tx) =>
+      listLeagueSettings(
+        {
+          ...tx,
+          leagues: {
+            ...tx.leagues,
+            settingRows: async () => [
+              { level: 'league', document: { version: 1, value: 6 }, version: 2, savedAt },
+            ],
+          },
+        },
+        registry,
+      ),
+    );
+    expect(rows[0]).toMatchObject({ value: 6, source: 'league', version: 2, savedAt });
+    // A stored value its setting no longer accepts is not in force, so no date is given.
+    const refused = await m.deps.transaction(m.as(ownerId), (tx) =>
+      listLeagueSettings(
+        {
+          ...tx,
+          leagues: {
+            ...tx.leagues,
+            settingRows: async () => [
+              { level: 'league', document: { version: 1, value: 500 }, version: 2, savedAt },
+            ],
+          },
+        },
+        registry,
+      ),
+    );
+    expect(refused[0]).toMatchObject({ source: 'default', version: 2, savedAt: null });
   });
 });

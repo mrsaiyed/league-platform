@@ -3,10 +3,13 @@
 // takes the rules it is played under (S-1). Announces `games.finalized` (T-24), so
 // standings can follow. A game already decided is changed only by reopening it, with
 // a reason (S-7). A game that was a box score and is saved now with two numbers only
-// loses its old lines in the same transaction (S-27), so they no longer count.
+// loses its old lines in the same transaction (S-27), so they no longer count. A game
+// the live tracker has recorded plays of is refused (`game-is-tracked`, S-46): it is
+// ended in the tracker, so its plays still explain its numbers; one set to live tracking
+// with no plays yet can still be finished with two numbers.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
-import { decideGame, openGame, type DecideGameError } from '../decide-game.ts';
+import { decideGame, openGameByHand, type DecideGameError } from '../decide-game.ts';
 import { gameScore, gameVersion } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
@@ -31,7 +34,7 @@ export const recordFinalScore = defineCommand({
     tx,
     emit,
   }): Promise<Result<{ version: number }, RecordFinalScoreError>> => {
-    const open = openGame(await tx.games.find(input.gameId), input.version);
+    const open = await openGameByHand(tx, input.gameId, input.version);
     if (!open.ok) return open;
     const game = open.value;
     if (input.homeScore === input.awayScore) {

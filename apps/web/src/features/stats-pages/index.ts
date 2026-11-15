@@ -4,3 +4,9 @@ export { StatsPage, StatsTables } from './stats-page.tsx';
 export { chooseSeason, firstValue } from './choose-season.ts';
 export { buildStandingsViews, type StandingsTableView } from './build-standings.ts';
 export { hasStatLabel, statLabel } from './build-stats.ts';
+export {
+  homeLeaderLimit,
+  homeLeadersOf,
+  loadHomeLeaders,
+  type HomeLeader,
+} from './build-home-leaders.ts';

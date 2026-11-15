@@ -1,29 +1,34 @@
-import { getBoxScoreSheet, listMyGames, type AccessReader } from '@srleagues/core';
+import { getBoxScoreSheet, listMyGames, readReopenOffer, type AccessReader } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
-import { standInGames } from '../../server/stand-in-games.ts';
+import { namesShownOf, startingNamePolicy } from '../../server/name-policy-of.ts';
+import { standInGameId, standInGames } from '../../server/stand-in-games.ts';
+import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { boxScoreField, readBoxScoreForm } from './box-score-form.ts';
 import { boxScoreNotice } from './box-score-notice.ts';
 import { buildGameRows } from './build-games-view.ts';
 import { runBoxScoreAction } from './run-box-score-action.ts';
+import { sheetReopenViewOf } from './reopen-view.ts';
 import { scoreMismatch } from './score-mismatch.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
 const owner = '01900000-0000-7000-8000-0000000000a1';
-const other = '01900000-0000-7000-8000-0000000000a9';
 const access: AccessReader = {
   ownerAccountId: async () => owner,
   leagueStatus: async () => 'live',
   activeGrantsOf: async () => [],
 };
 
+/** Lions v Tigers, still to play today: six players a team in the made-up world. */
+const lionsTigers = standInGameId(1);
+
 function setup() {
-  const ports = standInGames({
-    leagueId,
-    people: {},
-    assignees: [owner, other],
-    accessOf: () => access,
-    log: () => {},
-  });
+  const ports = standInGames(
+    testWorld(() => access),
+    {
+      people: {},
+      namesShownOf: namesShownOf(startingNamePolicy, () => 'adult'),
+    },
+  );
   const ctx = { leagueId, accountId: owner, requestId: 'r1' };
   const games = async () => {
     const listed = await listMyGames(ctx, {}, ports.deps);
@@ -40,7 +45,7 @@ function setup() {
 describe('the box score grid', () => {
   it('reads a paper sheet: empty columns are not recorded, empty boxes in kept ones are 0', async () => {
     const { games, sheetOf } = setup();
-    const target = (await games()).find((g) => g.status === 'scheduled');
+    const target = (await games()).find((g) => g.id === lionsTigers);
     const sheet = await sheetOf(target?.id ?? '');
     const [h1, h2, h3] = sheet.players.filter((p) => p.teamId === sheet.game.homeTeamId);
     const [a1] = sheet.players.filter((p) => p.teamId === sheet.game.awayTeamId);
@@ -100,7 +105,7 @@ describe('the box score grid', () => {
 
   it('refuses a box that is not a count; an empty score with no points to add up is 0', async () => {
     const { games, sheetOf } = setup();
-    const target = (await games()).find((g) => g.status === 'scheduled');
+    const target = (await games()).find((g) => g.id === lionsTigers);
     const sheet = await sheetOf(target?.id ?? '');
     const someone = sheet.players[0]?.personId ?? '';
     for (const bad of ['-1', '2.5', 'x', '1000']) {
@@ -121,7 +126,7 @@ describe('the box score grid', () => {
 
   it('saves the sheet so the game is final, then reopens it to correct it', async () => {
     const { ports, ctx, games, sheetOf } = setup();
-    const target = (await games()).find((g) => g.status === 'scheduled');
+    const target = (await games()).find((g) => g.id === lionsTigers);
     const sheet = await sheetOf(target?.id ?? '');
     const someone = sheet.players[0]?.personId ?? '';
     const fields = {
@@ -164,7 +169,7 @@ describe('the box score grid', () => {
 
   it('warns, but saves the typed score, when it differs from the players’ points', async () => {
     const { ports, ctx, games, sheetOf } = setup();
-    const target = (await games()).find((g) => g.status === 'scheduled');
+    const target = (await games()).find((g) => g.id === lionsTigers);
     const sheet = await sheetOf(target?.id ?? '');
     const home = sheet.players.filter((p) => p.teamId === sheet.game.homeTeamId);
     const [h1, h2] = home;
@@ -204,6 +209,95 @@ describe('the box score grid', () => {
         ports.deps,
       ),
     ).toEqual({ ok: false, code: 'game-is-tracked' });
+  });
+
+  it('a game made final by hand while it had plays is reopened by an admin, not by a scorekeeper', async () => {
+    // Before step 2.154 a typed score could end a game with plays: such a game is locked
+    // as tracked, and only its admin's door reopens it, back to its tracker (S-46).
+    const keeper = '01900000-0000-7000-8000-0000000000a5';
+    const withKeeper: AccessReader = {
+      ...access,
+      activeGrantsOf: async (account) =>
+        account === keeper
+          ? [
+              {
+                id: '01900000-0000-7000-8000-0000000000d5',
+                accountId: keeper,
+                role: 'scorekeeper',
+                scope: { type: 'league' },
+                grantedByAccountId: owner,
+                revokedAt: null,
+              },
+            ]
+          : [],
+    };
+    const ports = standInGames(
+      testWorld(() => withKeeper),
+      {
+        people: {},
+        namesShownOf: namesShownOf(startingNamePolicy, () => 'adult'),
+      },
+    );
+    const as = (accountId: string) => ({ leagueId, accountId, requestId: 'r1' });
+    // Hawks v Bears, under way: the tracker recorded its plays (the seed's playsBefore).
+    const liveGame = standInGameId(2);
+    const ended = await ports.deps.transaction(as(owner), async (tx) => {
+      const game = await tx.games.find(liveGame);
+      const change = { status: 'final', homeScore: 40, awayScore: 38, decided: true };
+      return tx.games.setResult(liveGame, change, game?.version ?? 0);
+    });
+    expect(ended).toBeDefined();
+    const viewOf = async (accountId: string) => {
+      const sheet = await getBoxScoreSheet(as(accountId), { gameId: liveGame }, ports.deps);
+      if (!sheet.ok) throw new Error(sheet.error.code);
+      const offer = await readReopenOffer(as(accountId), { gameId: liveGame }, ports.deps);
+      return {
+        sheet: sheet.value,
+        view: sheetReopenViewOf(sheet.value, offer.ok ? offer.value : undefined),
+      };
+    };
+    // The scorekeeper reads who can.
+    expect((await viewOf(keeper)).view).toEqual({ kind: 'who', because: 'admins' });
+    // The admin is offered the admin's door, and it reopens the game to its tracker.
+    const { sheet, view } = await viewOf(owner);
+    expect(sheet.locked).toBe('tracked');
+    expect(view).toEqual({ kind: 'correct', door: 'by-hand', until: null });
+    expect(
+      await runBoxScoreAction(
+        'reopen',
+        {
+          gameId: liveGame,
+          version: String(sheet.game.version),
+          door: 'by-hand',
+          reason: 'Ended by a typed score while it was being tracked',
+        },
+        as(owner),
+        ports.deps,
+      ),
+    ).toEqual({ ok: true });
+    const after = await getBoxScoreSheet(as(owner), { gameId: liveGame }, ports.deps);
+    expect(after.ok && after.value.game.status).not.toBe('final');
+  });
+
+  it('a double tap on the reopen form reopens once and answers both as done', async () => {
+    const { ports, ctx, games } = setup();
+    const target = (await games()).find((g) => g.status === 'final');
+    const fields = {
+      gameId: target?.id,
+      version: String(target?.version),
+      door: 'by-hand',
+      reason: 'Typed the wrong score',
+    };
+    const [first, second] = [
+      await runBoxScoreAction('reopen', fields, ctx, ports.deps),
+      await runBoxScoreAction('reopen', fields, ctx, ports.deps),
+    ];
+    expect([first, second]).toEqual([{ ok: true }, { ok: true }]);
+    expect((await games()).find((g) => g.id === target?.id)?.status).toBe('scheduled');
+    // A form from before a different change is still refused.
+    expect(
+      await runBoxScoreAction('reopen', { ...fields, version: '0' }, ctx, ports.deps),
+    ).toMatchObject({ ok: false });
   });
 
   it('words every notice from the message files', () => {

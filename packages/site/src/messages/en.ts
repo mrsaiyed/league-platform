@@ -11,6 +11,11 @@ export const en = {
   'footer.label': 'Footer',
   'footer.terms': 'Terms',
   'footer.privacy': 'Privacy',
+  // Only on the app's made-up world on a computer (step 2.152), never on a real league.
+  'footer.madeUp': 'A made-up league on this computer. It starts over when the app restarts.',
+  'standIn.otherHost.title': 'Not here',
+  'standIn.otherHost.body':
+    'This copy of SR Leagues holds only made-up leagues. It answers only requests made on the computer it runs on, to that computer’s own address, and not requests passed on by another server.',
   'common.loading': 'Loading',
   'common.notFound': 'We could not find that page.',
   'common.notFoundTitle': 'Page not found',
@@ -167,6 +172,13 @@ export const en = {
   // result is still awaited, so its label is true of both.
   'home.results.kicker': 'Latest games',
   'home.standings.kicker': 'The race for the top',
+  // The season's leaders on the home page (step 2.147 part 2): a tiny label on each card
+  // (the leader's place and what is led), and what the number is.
+  'home.leaders': 'Leading the way',
+  'home.leaders.kicker': 'The players to watch',
+  'home.leaders.all': 'All player stats',
+  'home.leaders.label': '{place} / {stat}',
+  'home.leaders.perGame': 'per game',
   'home.call.title': 'Every team has a story.',
   'home.call.text': 'Rosters, records and results for every team in the league.',
   'home.call.action': 'Meet the teams',
@@ -206,6 +218,9 @@ export const en = {
   'schedule.postponedCount_other': '{count} games postponed',
   // A postponed game has no day to come: its old day is never written bare.
   'schedule.postponedFrom': 'Postponed from {date}',
+  // The same on a scoreboard card, whose pill already says "Postponed": the word is not
+  // said twice, and the day still has "From" before it.
+  'schedule.postponedFromDay': 'From {date}',
   'schedule.postponedNoDate': 'New date to be announced',
   'schedule.venueCourt': '{venue}, {court}',
   // The teams list and a team's page (step 2.44).
@@ -479,6 +494,32 @@ export const en = {
   'adminSettings.area.games': 'Scoring',
   'adminSettings.area.teams': 'Team statistics',
   'adminSettings.area.privacy': 'Privacy',
+  // What the Privacy part says around its settings (step 2.162, R-29, record 065): one
+  // opening sentence by who plays, what is in force now, and where the parents'
+  // confirmation is offered.
+  'adminSettings.privacy.intro.adult':
+    'Your league is for adults, so it starts with full names. Choose less here at any time.',
+  'adminSettings.privacy.intro.youth':
+    'Your league is for young players. It starts with adults by full name and young players by first name and last initial. Choose less here at any time.',
+  'adminSettings.privacy.intro.mixed':
+    'Your league has both adults and young players. It starts with adults by full name and young players by first name and last initial. Choose less here at any time.',
+  'adminSettings.privacy.now.full':
+    'Now: adults are shown by full name, and children by first name and last initial.',
+  'adminSettings.privacy.now.fullConfirmed': 'Now: everyone is shown by full name, children too.',
+  'adminSettings.privacy.now.initial': 'Now: everyone is shown by first name and last initial.',
+  'adminSettings.privacy.now.hidden':
+    'Now: nobody is shown by name; players appear by jersey number.',
+  'adminSettings.privacy.unknownAge':
+    'In this league, anyone whose record does not say whether they are a child or an adult is shown as a child, coaches too.',
+  'adminSettings.privacy.keptNoEffect':
+    "The parents' confirmation is kept, but it has no effect while names are not on full names.",
+  'adminSettings.privacy.confirmedOn': 'Confirmed on {date}.',
+  'adminSettings.privacy.confirm.youthOrMixed':
+    "Tick to show the young players' full names too, while names are on full names.",
+  'adminSettings.privacy.confirm.adultWithChildren':
+    'This league has players recorded as children. Tick to show their full names too, while names are on full names.',
+  'adminSettings.privacy.confirm.adultNoChildren':
+    'A player recorded as a child is shown by first name and last initial.',
   // Beside a setting whose value asks to be confirmed (its `setting.<key>.confirm`).
   'adminSettings.confirmNote': 'Tick this only if you are choosing {choice}:',
   'error.leagues.set_setting.confirmation-needed':
@@ -560,6 +601,30 @@ export const en = {
   'admin.games.noScorekeeper': 'No scorekeeper yet',
   'admin.games.scoreOf': 'Score for {team}',
   'admin.games.saveScore': 'Save final score',
+  // One wrong tap does no harm (step 2.154; A-5): the boxes open on the one game, and
+  // saving asks once, naming both teams and the score, away team first as on the card.
+  'admin.games.enterFinal': 'Enter the final score',
+  'admin.games.result': '{away} {awayScore}, {home} {homeScore}',
+  'admin.games.confirm.ask': '{result}. Make this final?',
+  'admin.games.confirm.early': '{result}. This game is set for {when}. Make it final now?',
+  'admin.games.confirm.yes': 'Yes, make it final',
+  'admin.games.confirm.no': 'No, change the score',
+  'admin.games.saved.final': 'Saved: {result} is final.',
+  // A game the live tracker has recorded plays of is ended there (S-46).
+  'admin.games.tracked':
+    'Plays are being recorded for this game in the tracker, so it is ended there, not by typing a score.',
+  'admin.games.scoreGame': 'Score this game',
+  // Putting a wrong result right (P7 §5.5, S-36): for whoever may reopen the game, and
+  // who can for everyone else.
+  'admin.games.correct': 'Correct this result',
+  'admin.games.reopenUntil':
+    'You ended this game in the tracker, so you can reopen it until {time}.',
+  'admin.games.reopenWho.admins': 'Only a league admin or a scheduler can reopen this game.',
+  'admin.games.reopenWho.time-over':
+    'Your time to reopen this game is over. Only a league admin or a scheduler can reopen it now.',
+  'admin.games.done.reopen': 'The game is reopened. Enter the right result.',
+  'admin.games.done.reopenTracked':
+    'The game is live again. Correct it in the tracker, then end it again.',
   'admin.games.forfeitBy': 'Team that forfeits',
   'admin.games.recordForfeit': 'Record forfeit',
   'admin.games.postpone': 'Postpone',
@@ -584,6 +649,8 @@ export const en = {
   'admin.games.error.game-cancelled': 'That game was cancelled, so it cannot be scored.',
   'admin.games.error.tie-not-allowed': 'This season does not allow ties. Enter a winner.',
   'admin.games.error.team-not-in-game': 'That team is not in this game.',
+  'admin.games.error.game-is-tracked':
+    'Plays are being recorded for this game in the tracker, so it cannot be ended here. End it in the tracker.',
   'admin.games.error.game-not-postponable': 'Only a game that has not started can be postponed.',
   'admin.games.error.game-not-cancellable': 'Only a game that has not started can be cancelled.',
   'admin.games.error.unknown': 'That did not work. Nothing was changed.',
@@ -608,7 +675,7 @@ export const en = {
   'admin.boxScore.noPlayers': 'This team has no players on its roster yet. Add them in Teams.',
   'admin.boxScore.save': 'Save box score and make it final',
   'admin.boxScore.locked.decided':
-    'This game is final. To correct it, reopen it with a reason; then fix the grid and save again.',
+    'This game is final. To correct it, reopen it with a reason; then enter its result again.',
   'admin.boxScore.locked.cancelled': 'This game was cancelled, so it has no box score.',
   'admin.boxScore.locked.tracked':
     'This game was scored with the live tracker. Correct it in the tracker, so its list of plays still explains the numbers.',
@@ -629,6 +696,8 @@ export const en = {
   'admin.boxScore.error.did-not-play-has-stats':
     'A player marked as not playing has numbers. Tick “Played” or clear the numbers.',
   'admin.boxScore.error.game-not-decided': 'That game is not final, so there is nothing to reopen.',
+  'admin.boxScore.error.reopen-time-over':
+    'Your time to reopen this game is over. Ask a league admin or a scheduler.',
   'stat.fg3': '3-pointers made',
   'stat.fg3.short': '3PM',
   'stat.fg1': 'Free throws made',
@@ -1146,13 +1215,18 @@ export const en = {
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
   'setting.privacy.publicNames.label':
-    "Names on public pages. This decides how children are shown, and, in a youth or mixed league, anyone whose record does not say whether they are a child or an adult (coaches too, until you mark them as adults). Adults are shown by their full name unless they ask for less. If a parent asks for less for their child (initials, or the name taken off), that always wins over this setting. Recording it on the child's own record arrives with the next part of this work.",
-  'setting.privacy.publicNames.option.fullName': 'Full names, like "Jordan Ellis"',
+    "Names on public pages: how players are shown on the team pages, game pages and statistics. If a person's own request for less is recorded (initials, or their name taken off), it always wins over this setting.",
+  // Each choice says what it does to adults and to children (R-29, record 065).
+  'setting.privacy.publicNames.option.fullName':
+    'Full names for adults, like "Jordan Ellis". Children are shown by first name and last initial, like "Jordan E.", unless their full names are confirmed below.',
   'setting.privacy.publicNames.option.firstNameLastInitial':
-    'First name and last initial, like "Jordan E."',
+    'First name and last initial for everyone, adults and children, like "Jordan E."',
   'setting.privacy.publicNames.option.hidden':
-    'Hidden: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
-  'setting.privacy.publicNames.confirm':
+    'Hidden for everyone, adults and children: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
+  // The parents' confirmation, a setting of its own (R-14, R-29, record 065).
+  'setting.privacy.childrenInFullConfirmed.label':
+    "Children's full names: shown only while names are on full names, and only with their parents' or guardians' agreement. In a youth or mixed league this also covers anyone whose age is not recorded.",
+  'setting.privacy.childrenInFullConfirmed.confirm':
     'I confirm that the parents or guardians of the children in this league have agreed to their full names being shown publicly, for example on the registration form.',
   'setting.privacy.playersMayAskForInitials.label':
     'Adults may ask to appear as initials on public pages. Children always can, whatever this says: a request from a parent is always followed. Anyone can ask to have their name taken off. Switching this off only stops new requests: anyone already shown as initials stays that way until their own record is changed.',
