@@ -2,7 +2,14 @@
 // league's seasons, how it shows names, its minimum-games rule, and the read store the
 // core queries (step 2.40) run on. Bound to one league by the caller, so nothing here
 // takes a league from the request (T-28).
-import type { Audience, NamePolicy, StandingsReadStore } from '@srleagues/core';
+import type {
+  Audience,
+  NamePolicy,
+  ReadStandingsError,
+  Result,
+  Standings,
+  StandingsReadStore,
+} from '@srleagues/core';
 
 /** A season the public may pick: its address name (`?season=`) and whether it is the current one. */
 export type PublicSeason = {
@@ -26,4 +33,9 @@ export type PublicStatsPorts = {
   readonly settingsOf: (leagueId: string) => Promise<PublicStatsSettings>;
   /** The standings and statistics reads, bound to this league. */
   readonly readStoreOf: (leagueId: string) => StandingsReadStore;
+  /** A season's standings (core's readStandings), its reads taken as one snapshot. */
+  readonly standingsOf: (
+    leagueId: string,
+    seasonId: string,
+  ) => Promise<Result<Standings, ReadStandingsError>>;
 };

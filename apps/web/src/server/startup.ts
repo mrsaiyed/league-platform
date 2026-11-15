@@ -5,10 +5,10 @@
 // 1. Every setting is read and checked (config.ts); a missing one stops it.
 // 2. Local work and tests (APP_ENV local or test) never open a database address
 //    (T-201). They run on the made-up stand-in, or with LOCAL_DATA=made-up-database
-//    on the made-up database in memory, every migration and the seed leagues
-//    (record 055): its login role is checked as a hosted one is, people sign in on
-//    the sign-in stand-in, and the areas not yet moved onto the database refuse
-//    (database-ports.ts).
+//    on the made-up database in memory, every migration and the seed leagues with
+//    their seasons under way (record 055, step 2.93 part 2): its login role is checked
+//    as a hosted one is, people sign in on the sign-in stand-in, and the areas not yet
+//    moved onto the database refuse (database-ports.ts).
 // 3. Staging and production open PLATFORM_DATABASE_URL (never the tracker's
 //    DATABASE_URL, R8) and check the login role it uses
 //    (checkLoginRole, T-60): a superuser, a role that bypasses row-level security,
@@ -101,7 +101,8 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
   // The sign-in stand-in first: it refuses a site address that is not local or a test name.
   const signIn = standInSignIn(options);
   const database = await deps.database();
-  const made = await database.madeUpDatabase();
+  // Each seed league's season under way, so the public pages have something to show.
+  const made = await database.madeUpDatabase({ underWay: true });
   const db = database.createDatabase(made.source);
   try {
     const problems = await database.checkLoginRole(db);
