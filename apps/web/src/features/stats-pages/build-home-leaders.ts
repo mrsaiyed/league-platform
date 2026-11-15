@@ -7,13 +7,7 @@ import { publicViewer, readStatLeaders, readStatisticsTable } from '@srleagues/c
 import type { StandingsReadStore } from '@srleagues/core';
 import { locale, t } from '../../server/messages.ts';
 import type { PublicStatsPorts, PublicStatsSettings } from '../../server/public-stats.ts';
-import { statLabel } from './build-stats.ts';
-
-/**
- * Statistics nobody is glad to lead: they stay in the tables and get no leader card
- * (decision S-48, in any league, until a league's setting says otherwise).
- */
-const noLeaderCard: ReadonlySet<string> = new Set(['fouls', 'turnovers']);
+import { noLeaderCard, statLabel } from './build-stats.ts';
 
 /** How many leaders the home page can show at most. */
 export const homeLeaderLimit = 3;

@@ -111,7 +111,9 @@ if (browser) {
       const tables = await page.evaluate(() =>
         [...document.querySelectorAll('table.ui-standings')].map((table) =>
           [...table.querySelectorAll('tbody tr')].map((row) => ({
-            team: row.querySelector('.ui-team-cell > [dir]')?.textContent?.trim() ?? '',
+            // The name's own element: a row with a note also carries the note's mark
+            // ("Note 1") in the same cell, which is no part of the team's name.
+            team: row.querySelector('.ui-team-cell .ui-team-name')?.textContent?.trim() ?? '',
             cells: [...row.querySelectorAll('td')].map((cell) => cell.textContent.trim()),
           })),
         ),

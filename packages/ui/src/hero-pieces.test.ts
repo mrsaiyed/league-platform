@@ -11,11 +11,13 @@ import {
   GameCard,
   Hero,
   LeaderSpot,
+  PageHead,
   Scoreboard,
   Section,
   SortableStatsTable,
   StandingsTable,
   StatStrip,
+  TeamCard,
   displayCss,
   initialOf,
   lettersWide,
@@ -37,6 +39,107 @@ const labels = {
   winner: 'Winner',
   viewBoxScore: 'View box score',
 };
+
+describe('the head of an inner page', () => {
+  it('is a kicker, a phrased title and one sentence, like a section of the home page', () => {
+    const html = render(
+      createElement(PageHead, {
+        title: 'The standings.',
+        kicker: 'Fall 2026',
+        sub: 'Where every team stands after each game.',
+      }),
+    );
+    expect(html).toContain('<header class="ui-page-head" data-phrased="true">');
+    expect(html).toContain(
+      '<p class="ui-kicker">Fall 2026</p><h1 dir="auto">The standings.</h1><p class="ui-page-sub">Where every team stands after each game.</p>',
+    );
+    expect(html).not.toContain('ui-eyebrow');
+    expect(html.match(/<h1/g)).toHaveLength(1);
+    // Without a kicker the head is as it was: the small label is an eyebrow.
+    const plain = render(createElement(PageHead, { title: 'Owls', eyebrow: 'Fall 2026' }));
+    expect(plain).toContain('<header class="ui-page-head">');
+    expect(plain).toContain('<p class="ui-eyebrow">Fall 2026</p>');
+    expect(css).toMatch(
+      /\.ui-page-head\[data-phrased='true'\] \{\s*gap: var\(--step-3\);\s*margin-block: var\(--step-4\) var\(--step-6\);/,
+    );
+  });
+});
+
+describe('a picker’s field on a phone', () => {
+  it('stays inside the page: it carries no margin of its own beside its label', () => {
+    // The plain rule gives a field after its label a step's margin; a picker has its own
+    // gap, and on a phone its field fills its column, so the margin pushed it 8 past the
+    // page's edge (the schedule and statistics pages at 390).
+    expect(css).toMatch(
+      /\.ui-root :where\(label \+ input, label \+ select, label \+ textarea\) \{\s*margin-inline-start: var\(--step-2\);/,
+    );
+    expect(css).toMatch(/\.ui-picker select \{\s*margin: 0;\s*max-inline-size: 100%;/);
+    const phone = css.slice(css.indexOf('@media (max-width: 39.99rem) {\n  .ui-toolbar'));
+    expect(phone).toMatch(/\.ui-toolbar \.ui-picker select \{\s*inline-size: 100%;/);
+  });
+});
+
+describe('a picker’s arrow', () => {
+  const rule = /\.ui-picker select \{([^}]*)\}/.exec(css)?.[1] ?? '';
+  it('is the product’s own fine arrow, not the browser’s, in the field’s own text color', () => {
+    expect(rule).toMatch(/appearance: none;/);
+    // Two strokes that meet, each as heavy as the product's heavier line; no picture file,
+    // so the arrow takes the color of any design, and of the header.
+    expect(rule).toMatch(
+      /background-image:\s*linear-gradient\(\s*45deg,[\s\S]*linear-gradient\(\s*135deg,/,
+    );
+    expect(rule.match(/currentColor calc\(50% - var\(--line-heavy\) \/ 2\)/g)).toHaveLength(2);
+    expect(rule.match(/currentColor calc\(50% \+ var\(--line-heavy\) \/ 2\)/g)).toHaveLength(2);
+    expect(rule).not.toMatch(/url\(|#[0-9a-f]{3,8}\b/i);
+    expect(rule).toMatch(/background-repeat: no-repeat;/);
+    expect(rule).toMatch(
+      /background-size: calc\(var\(--step-3\) \/ 2\) calc\(var\(--step-3\) \/ 2\);/,
+    );
+  });
+  it('has room kept for it at the field’s end, and stands at the other end read from the right', () => {
+    expect(rule).toMatch(
+      /padding-inline-end: calc\(var\(--step-3\) \+ var\(--step-3\) \+ var\(--step-2\)\);/,
+    );
+    expect(rule).toMatch(
+      /background-position:\s*calc\(100% - var\(--step-3\) - var\(--step-3\) \/ 2\) 50%,\s*calc\(100% - var\(--step-3\)\) 50%;/,
+    );
+    expect(css).toMatch(
+      /\[dir='rtl'\] \.ui-picker select \{\s*background-position:\s*var\(--step-3\) 50%,\s*calc\(var\(--step-3\) \+ var\(--step-3\) \/ 2\) 50%;/,
+    );
+    // Nothing after it paints the field's whole background again and wipes the arrow out.
+    const after = css.slice(css.indexOf("[dir='rtl'] .ui-picker select"));
+    expect(after).not.toMatch(/\.ui-picker[^{]*select[^{]*\{[^}]*background:/);
+  });
+  it('gives the browser’s own arrow back where colors are forced (high contrast)', () => {
+    // A forced-colors page draws no background picture that is not a file: the drawn arrow
+    // would be gone, and with the browser's arrow switched off the field would be a bare
+    // box. The rule comes after the arrow's own, with the same strength, so it wins there.
+    const forced = /@media \(forced-colors: active\) \{\s*\.ui-picker select \{([^}]*)\}\s*\}/.exec(
+      css,
+    );
+    expect(forced).not.toBeNull();
+    expect(forced?.[1]).toMatch(/appearance: auto;/);
+    expect(forced?.[1]).toMatch(/padding-inline-end: var\(--step-3\);/);
+    expect(forced?.[1]).toMatch(/background-image: none;/);
+    expect(css.indexOf('@media (forced-colors: active)')).toBeGreaterThan(
+      css.indexOf("[dir='rtl'] .ui-picker select"),
+    );
+    // The field's ordinary padding is that same step.
+    expect(css).toMatch(
+      /\.ui-picker select,\s*\.ui-picker button \{[^}]*padding-inline: var\(--step-3\);/,
+    );
+  });
+});
+
+describe('the heavier line', () => {
+  it('is named once: no stylesheet of the pieces writes a line of 2 pixels itself', () => {
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(bare).not.toMatch(/\b2px solid/);
+    expect(bare).not.toMatch(/(?:block-size|inline-size|thickness): 2px/);
+    expect(bare).not.toMatch(/underline 2px/);
+    expect(bare.match(/var\(--line-heavy\)/g)?.length ?? 0).toBeGreaterThan(12);
+  });
+});
 
 describe('a kicker over a title', () => {
   it('is a tiny label before the level-two title, which then has no rule of its own', () => {
@@ -275,7 +378,7 @@ describe('a team emblem', () => {
       );
     expect(table(true)).toMatch(
       new RegExp(
-        `<th scope="row" class="ui-team-cell"><svg class="ui-emblem" data-size="small"[^>]*style="--team-color:#663399">.*?</svg><span dir="auto">${arabicName}</span>`,
+        `<th scope="row" class="ui-team-cell"><svg class="ui-emblem" data-size="small"[^>]*style="--team-color:#663399">.*?</svg><span dir="auto"><span class="ui-team-name">${arabicName}</span></span>`,
       ),
     );
     expect(table(true)).not.toContain('ui-team-chip');
@@ -377,7 +480,7 @@ describe('a game as a scoreboard', () => {
       ".ui-game-score > [data-winner='true'] { border-block-end-color: var(--color-ornament); font-weight: 600; }",
     );
     expect(flat).toContain(
-      ".ui-game-side[data-winner='true'] .ui-game-side-score { font-weight: 600; text-decoration: underline 2px var(--color-ornament); text-underline-offset: 0.2em; }",
+      ".ui-game-side[data-winner='true'] .ui-game-side-score { font-weight: 600; text-decoration: underline var(--line-heavy) var(--color-ornament); text-underline-offset: 0.2em; }",
     );
     // Once decided, the other score is in the page's own text color, wherever it stands.
     expect(flat).toMatch(
@@ -534,9 +637,11 @@ describe('a game as a scoreboard', () => {
     expect(board({ status: 'scheduled' })).toContain(
       '<div class="ui-game-middle"><p class="ui-game-versus">vs</p></div>',
     );
-    // Where a card is wide its figures and gaps are larger, and the sum knows it.
-    expect(css).toMatch(
-      /\.ui-game-card\[data-layout='board'\] \{[^}]*container: card \/ inline-size;/,
+    // Where a card is wide its figures and gaps are larger, and the sum knows it. The
+    // measure named "card" is the card's top line and its middle part, each as wide as
+    // the card's inside (the next test says why the card itself is not one).
+    expect(css.replace(/\s+/g, ' ')).toContain(
+      ".ui-game-card[data-layout='board'] .ui-game-meta, .ui-game-body { min-inline-size: 0; container: card / inline-size; }",
     );
     expect(css).toMatch(
       /@container card \(min-width: 26rem\) \{\s*\.ui-game-board \{\s*--board-gap: var\(--step-5\);\s*--board-figure: var\(--text-36\);\s*gap: var\(--step-2\) var\(--step-5\);/,
@@ -600,30 +705,40 @@ describe('a game as a scoreboard', () => {
   });
 
   it('stands the shields and names of a row of cards on one line', () => {
-    // A card's top line takes what it needs and its board the rest of the card's height
-    // (the cards of a row are one height).
+    // By itself a card's top line takes what it needs and its middle the rest.
     expect(css).toMatch(
       /\.ui-game-card\[data-layout='board'\] \{\s*grid-template-rows: auto 1fr auto;/,
     );
-    // A card is a measure of its own (its parts size themselves by it), and a browser
-    // does not let such a box share its rows with its neighbors: the card must never be
-    // told to (a rule that tried made the cards of a row unlevel).
-    expect(css).toMatch(
-      /\.ui-game-card\[data-layout='board'\] \{[^}]*container: card \/ inline-size;/,
+    // Side by side, the cards of a row share the heights of their three parts through the
+    // list's grid: each card lends the list its three rows (a card is three rows of it),
+    // so a card whose pill took a second line gives its whole row that top line and no
+    // board in the row stands lower than its neighbors.
+    const shared = css.slice(css.indexOf('@supports (grid-template-rows: subgrid) {'));
+    expect(shared.startsWith('@supports')).toBe(true);
+    const list = String.raw`\.ui-card-grid\[data-layout='board'\]:is\(\[data-across='two'\], \[data-across='pair'\]\)`;
+    expect(shared).toMatch(
+      new RegExp(
+        String.raw`^@supports \(grid-template-rows: subgrid\) \{\s*@media \(min-width: 48rem\) \{\s*${list} \{\s*row-gap: 0;\s*margin-block-end: calc\(-1 \* var\(--step-5\)\);\s*\}\s*${list} > li \{\s*grid-row: span 3;\s*grid-template-rows: subgrid;\s*margin-block-end: var\(--step-5\);\s*\}\s*${list}\s*> li\s*> \.ui-game-card \{\s*grid-row: 1 \/ -1;\s*grid-template-rows: subgrid;`,
+      ),
     );
+    // A browser does not let a box that is a measure (a container for its pieces' sizes)
+    // share rows: so neither the card nor the list's item is ever one. An earlier rule
+    // that left the card a measure was ignored by the browser and left a row unlevel.
     for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      if (!/\.ui-game-card|\.ui-card-grid/.test(rule[1] ?? '')) continue;
-      expect(rule[2], rule[1]).not.toContain('subgrid');
+      const selectors = (rule[1] ?? '').split(',').map((s) => s.trim());
+      const onCard = selectors.some((s) => /(?:\.ui-game-card(?:\[[^\]]*\])*|> li)$/.test(s));
+      if (onCard) expect(rule[2], rule[1]).not.toMatch(/container(?:-type)?:/);
     }
     // Inside a board the two sides begin at its top, and a board taller than its teams
     // (its row's tallest neighbor sets the height) keeps them at the top: so one card's
     // two-line name never lowers its neighbors' shields.
     expect(css).toMatch(/\.ui-game-board \{[^}]*align-items: center;\s*align-content: flex-start;/);
     expect(css).toMatch(/\.ui-game-side \{[^}]*align-self: flex-start;\s*align-items: center;/);
-    // A card has exactly the three parts the rows are for, and its link lies over them.
+    // A card has exactly the three parts the rows are for (its top line, its middle, which
+    // holds the board, and its place), and its link lies over them.
     const html = board();
     expect(html).toMatch(
-      /^<article[^>]*><header class="ui-game-meta">.*<\/header><div class="ui-game-board".*<\/div><footer class="ui-game-foot">.*<\/footer><a class="ui-game-link"/,
+      /^<article[^>]*><header class="ui-game-meta">.*<\/header><div class="ui-game-body"><div class="ui-game-board".*<\/div><\/div><footer class="ui-game-foot">.*<\/footer><a class="ui-game-link"/,
     );
     expect(css).toMatch(/\.ui-game-link \{\s*position: absolute;/);
   });
@@ -716,11 +831,13 @@ describe('a game as a scoreboard', () => {
 
   it('makes the winner’s score the heavier one in every design, on a card and on the big board', () => {
     const flat = css.replace(/\s+/g, ' ');
+    // The weight a rule sets: the rule whose selector is exactly this one.
     const weightOf = (selector: string) => {
-      const at = flat.indexOf(`${selector} {`);
-      expect(at, selector).toBeGreaterThan(-1);
-      const body = flat.slice(at, flat.indexOf('}', at));
-      return /font-weight: ([^;]+);/.exec(body)?.[1];
+      const rule = [...flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(
+        (m) => (m[1] ?? '').trim() === selector && /font-weight:/.test(m[2] ?? ''),
+      );
+      expect(rule, selector).toBeDefined();
+      return /font-weight: ([^;]+);/.exec(rule?.[2] ?? '')?.[1];
     };
     // The big board: plain numbers of the score face, not the heading face's display
     // weight (700 in the plain faces, which would have left a winner at 600 the lighter).
@@ -790,7 +907,7 @@ describe('a game as a scoreboard', () => {
 
   it('wears the league’s color of decoration as a fine line at its top, over one tint', () => {
     expect(css).toMatch(
-      /\.ui-game-card\[data-layout='board'\] \{[^}]*background-image: linear-gradient\(120deg, var\(--card-wash\), var\(--color-panel\) 70%\);\s*border-block-start: 2px solid var\(--color-ornament-line\);/,
+      /\.ui-game-card\[data-layout='board'\] \{[^}]*background-image: linear-gradient\(120deg, var\(--card-wash\), var\(--color-panel\) 70%\);\s*border-block-start: var\(--line-heavy\) solid var\(--color-ornament-line\);/,
     );
   });
 });
@@ -896,29 +1013,44 @@ describe('a leader, picked out', () => {
   it('carries the league’s main color on the first of a row, in a band’s own fitted colors', () => {
     expect(spot({ first: true })).toContain('<article class="ui-spot" data-first="true">');
     expect(spot()).not.toContain('data-first');
-    expect(css).toMatch(
-      /\.ui-spot\[data-first='true'\] \{\s*background-color: var\(--color-band\);\s*background-image: linear-gradient\(120deg, var\(--color-band-glow\), var\(--color-band\)\);[^}]*color: var\(--color-on-band\);/,
+    // Unless a design says otherwise (the --spot values, which a light design sets to
+    // soften the card) it is a small band: the band's ground, words, quiet words and the
+    // color the eye lands on there.
+    const flat = css.replace(/\s+/g, ' ');
+    expect(flat).toContain(
+      ".ui-spot[data-first='true'] { background-color: var(--spot-ground, var(--color-band)); background-image: linear-gradient( 120deg, var(--spot-glow, var(--color-band-glow)), var(--spot-ground, var(--color-band)) ); border-color: var(--spot-edge, color-mix(in srgb, var(--color-band-pop) 28%, transparent)); color: var(--spot-words, var(--color-on-band)); }",
+    );
+    expect(flat).toContain(
+      ".ui-spot[data-first='true'] :is(.ui-spot-label, .ui-spot-unit, .ui-spot-detail) { color: var(--spot-muted, var(--color-band-muted)); }",
+    );
+    expect(flat).toContain(
+      ".ui-spot[data-first='true'] .ui-spot-value { color: var(--spot-pop, var(--color-band-pop)); }",
     );
     expect(css).toMatch(
-      /\.ui-spot\[data-first='true'\] :is\(\.ui-spot-label, \.ui-spot-unit, \.ui-spot-detail\) \{\s*color: var\(--color-band-muted\);/,
-    );
-    expect(css).toMatch(
-      /\.ui-spot\[data-first='true'\] \.ui-emblem-letter \{\s*color: var\(--color-on-band\);/,
+      /\.ui-spot\[data-first='true'\] \.ui-emblem-letter \{\s*color: var\(--spot-letter, var\(--color-on-band\)\);/,
     );
     // On the filled card a shield keeps its team's own color: it is filled with it (most
     // of it, a little deepened), not laid thinly over the card's color, which turned a
     // green team grey on a maroon card.
     const fill =
-      /\.ui-spot\[data-first='true'\] \.ui-emblem-shield \{\s*fill: color-mix\(in srgb, var\(--emblem-color\) (\d+)%, var\(--color-band-deep\)\);/.exec(
-        css,
+      /\.ui-spot\[data-first='true'\] \.ui-emblem-shield \{ fill: color-mix\( in srgb, var\(--emblem-color\) var\(--spot-shield-share, (\d+)%\), var\(--spot-shield-under, var\(--color-band-deep\)\) \);/.exec(
+        flat,
       );
     expect(Number(fill?.[1])).toBeGreaterThanOrEqual(75);
-    expect(css).not.toMatch(
-      /\.ui-spot\[data-first='true'\][^{]*\.ui-emblem-shield \{[^}]*transparent/,
-    );
+    // The check that the shield is never laid thinly over the card's own color, in the
+    // form that holds for every design: the stylesheet itself never mixes the shield with
+    // nothing on the filled card (what stands under it is a named value whose default is
+    // the band's deep color). A design that names "transparent" there has also made the
+    // card a panel, where a thin fill is how every shield is drawn (packages/site,
+    // derived-values.test.ts checks that the two always go together).
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\.ui-spot\[data-first='true'\][^{]*\.ui-emblem-shield/.test(rule[1] ?? '')) continue;
+      expect(rule[2]).not.toMatch(/,\s*transparent\s*\)/);
+      expect(rule[2]).toContain('var(--spot-shield-under, var(--color-band-deep))');
+    }
     // Mirrored for a right-to-left page.
     expect(css).toMatch(
-      /\[dir='rtl'\] \.ui-spot\[data-first='true'\] \{\s*background-image: linear-gradient\(240deg,/,
+      /\[dir='rtl'\] \.ui-spot\[data-first='true'\] \{\s*background-image: linear-gradient\(\s*240deg,/,
     );
   });
 
@@ -937,6 +1069,70 @@ describe('a leader, picked out', () => {
     expect(css).toMatch(
       /\.ui-spot-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\);/,
     );
+  });
+});
+
+describe('the second landing’s smaller rules', () => {
+  it('uses the big board’s width on a laptop: a team at each end, the two scores between', () => {
+    const laptop = css.slice(css.indexOf('@media (min-width: 64rem) {\n  .ui-scoreboard-teams'));
+    expect(laptop.startsWith('@media')).toBe(true);
+    expect(laptop).toMatch(
+      /\.ui-scoreboard-teams \{\s*grid-template-columns: minmax\(0, 1fr\) auto auto auto minmax\(0, 1fr\);/,
+    );
+    // A team's box is dissolved, never removed: its parts are placed on the board's grid.
+    expect(laptop).toMatch(/\.ui-scoreboard-side \{\s*display: contents;/);
+    expect(laptop).toMatch(
+      /\.ui-scoreboard-side:first-child > \.ui-scoreboard-score \{\s*grid-column: 2;\s*\}\s*\.ui-scoreboard-side:last-child > \.ui-scoreboard-score \{\s*grid-column: 4;\s*\}\s*\.ui-scoreboard-middle \{\s*grid-column: 3;/,
+    );
+  });
+
+  it('keeps a left-over board of a narrow list the size of the others', () => {
+    expect(css).toMatch(
+      /\.ui-card-grid\[data-layout='board'\]\[data-across='pair'\] > li:only-child \{\s*grid-column: 1 \/ -1;/,
+    );
+    expect(css).not.toMatch(/\[data-across='pair'\] > li:last-child:nth-child\(odd\)/);
+  });
+
+  it('gives a table’s shield a little more than a line, and a round’s count its own line on a phone', () => {
+    expect(css).toMatch(
+      /\.ui-emblem\[data-size='small'\] \{\s*block-size: calc\(var\(--step-5\) \+ var\(--step-1\)\);/,
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 29\.99rem\) \{\s*\.ui-group-summary \{\s*flex: 1 1 100%;\s*margin-inline-start: var\(--step-5\);/,
+    );
+  });
+});
+
+describe('a team’s card', () => {
+  it('has the team’s large shield, a fine line of its color at the top, and its record as its one figure', () => {
+    const html = render(
+      createElement(TeamCard, {
+        name: arabicName,
+        href: '/x/teams/a',
+        color: '#2f7fb8',
+        figure: { label: 'Record', value: '5-1' },
+        facts: [],
+      }),
+    );
+    expect(html).toContain('<article class="ui-team-card" style="--team-color:#2f7fb8">');
+    expect(html.match(/<svg class="ui-emblem"/g)).toHaveLength(1);
+    // Anything that is not a color never reaches the page; the line is then the accent.
+    const plain = render(
+      createElement(TeamCard, {
+        name: 'Owls',
+        href: '/x/teams/o',
+        color: 'red;x',
+        figure: { label: 'Record', value: '0-0' },
+        facts: [],
+      }),
+    );
+    expect(plain).toContain('<article class="ui-team-card">');
+    expect(plain).not.toContain('red;x');
+    expect(css).toMatch(
+      /\.ui-team-card \{[^}]*border-block-start: var\(--line-heavy\) solid\s*color-mix\(in srgb, var\(--team-color, var\(--color-accent\)\) 50%, transparent\);/,
+    );
+    expect(css).toMatch(/\.ui-team-card > \.ui-emblem \{\s*block-size: var\(--step-8\);/);
+    expect(css).toMatch(/\.ui-team-card-figure \{[^}]*font-size: var\(--text-28\);/);
   });
 });
 
@@ -1000,6 +1196,8 @@ describe('color where the eye should land (C-16)', () => {
         ".ui-game-card[data-featured='true']",
         ".ui-standings[data-emblems='true'] tbody td.ui-num:first-child",
         '.ui-team-card-figure',
+        // A team's card under the pointer: its edge, as a game's card.
+        '.ui-team-card:hover',
         '.ui-leader:first-child .ui-leader-value',
         // A leader's one big number.
         '.ui-spot-value',

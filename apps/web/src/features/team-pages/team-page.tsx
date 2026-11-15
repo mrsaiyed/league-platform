@@ -101,6 +101,7 @@ export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
           rows={stats.totalsRows}
           locale={locale}
           labels={labels.stats}
+          emblems
         />
       ) : null}
       {stats.playerLinesShown ? (
@@ -111,6 +112,7 @@ export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
             rows={stats.playerRows}
             locale={locale}
             labels={labels.stats}
+            emblems
           />
         ) : null
       ) : (
