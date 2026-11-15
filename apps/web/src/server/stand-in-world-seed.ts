@@ -1011,11 +1011,21 @@ function leagueOf(
           : round === undefined
             ? null
             : addDays(today, round.days);
-      // A game set from now starts on a whole five minutes, `fromNow` minutes from now.
+      // A game set from now starts on a whole five minutes, `fromNow` minutes from now. A
+      // game under way never starts before the league's midnight: the scorekeeper's list
+      // starts there (list-games-in-window.ts), so a world made just after midnight still
+      // lists its live game. A game played earlier may fall on last night. (The database's
+      // list has the same edge for a real game live across midnight: step 2.156.)
+      const midnight = Date.parse(momentIn(today, '00:00', facts.timeZone));
       const fromNow =
         g.fromNow === undefined
           ? undefined
-          : new Date(Math.floor((now.getTime() + g.fromNow * 60_000) / 300_000) * 300_000);
+          : new Date(
+              Math.max(
+                Math.floor((now.getTime() + g.fromNow * 60_000) / 300_000) * 300_000,
+                g.status === 'live' ? midnight : -Infinity,
+              ),
+            );
       const startsAt =
         fromNow !== undefined
           ? fromNow.toISOString()
