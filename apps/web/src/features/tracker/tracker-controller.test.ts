@@ -263,7 +263,9 @@ describe('tracker controller: a refused tap (T-113)', () => {
     expect(server.sequence).toBe(2);
     // Loaded on opening, and again after the refusal; and, while the game had not
     // started, after each batch the server took (the line-up, then the basket), since
-    // until then the server plays it under its rules as they stand (record 062).
+    // until then the server plays it under its rules as they stand (record 062). Four
+    // only because the wrong line-up and the basket go in separate batches here: in one
+    // batch, the refusal's reload would be the only load after it.
     expect(network.reached.filter((r) => r === 'GET state')).toHaveLength(4);
     expect(status.serverSequence).toBeGreaterThanOrEqual(1);
     expect(status.game?.plays).toEqual(server.state.plays);

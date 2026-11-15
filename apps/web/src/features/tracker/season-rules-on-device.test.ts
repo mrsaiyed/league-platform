@@ -53,16 +53,18 @@ function networkWith(rulesNow: () => SeasonRules): EndpointNetwork {
   });
 }
 
+/** How a load of the state is answered: as asked, or held back, late or lost in a test. */
+type StateAnswer = (answer: () => Promise<Response>) => Promise<Response>;
+
 function device(
   network: EndpointNetwork,
   deviceId = 'tablet-1',
-  /** Waited for before each load of the state is answered, to hold one back in a test. */
-  beforeState: () => Promise<void> = async () => {},
+  stateAnswer: StateAnswer = (answer) => answer(),
+  clock = createManualClock(),
 ) {
-  const clock = createManualClock();
   const fetch: typeof globalThis.fetch = async (input, init) => {
-    if (String(input).endsWith('/state')) await beforeState();
-    return network.fetchAs('scorekeeper')(input, init);
+    const answer = () => network.fetchAs('scorekeeper')(input, init);
+    return String(input).endsWith('/state') ? stateAnswer(answer) : answer();
   };
   return createTrackerController({
     gameId,
@@ -222,9 +224,11 @@ describe('the season changed after the device loaded the game, before tip-off (r
     const network = networkWith(() => rules);
     let release: () => void = () => {};
     let holding = false;
-    const beforeState = () =>
-      holding ? new Promise<void>((resolve) => (release = resolve)) : Promise.resolve();
-    const controller = await opened(device(network, 'tablet-1', beforeState));
+    const held: StateAnswer = async (answer) => {
+      if (holding) await new Promise<void>((resolve) => (release = resolve));
+      return answer();
+    };
+    const controller = await opened(device(network, 'tablet-1', held));
     rules = withLimit(4);
     holding = true;
     await tapAll(controller, tipOff);
@@ -267,6 +271,94 @@ describe('the season changed after the device loaded the game, before tip-off (r
     expect(network.reached.filter((r) => r === 'GET state')).toHaveLength(loads);
     const server = await sameAsServer(controller, network);
     expect(server.rules.playerFoulLimit).toBe(4);
+    await controller.leave();
+  });
+
+  it('a load for the start that gets no answer is asked again later, though no batch follows', async () => {
+    let rules = withLimit(6);
+    const network = networkWith(() => rules);
+    let lose = false;
+    const lossy: StateAnswer = async (answer) => {
+      if (!lose) return answer();
+      lose = false;
+      throw new TypeError('Failed to fetch');
+    };
+    const clock = createManualClock();
+    const controller = await opened(device(network, 'tablet-1', lossy, clock));
+    // Every tap goes in one batch, the last one: the load after it is lost.
+    network.mode = 'down';
+    rules = withLimit(4);
+    await tapAll(controller, [...tipOff, foul, foul, foul, foul]);
+    lose = true;
+    network.mode = 'up';
+    controller.online();
+    await controller.idle();
+    expect(lose).toBe(false);
+    expect(controller.status().waiting).toEqual([]);
+    expect(lineOf(shown(controller), fouler)?.fouledOut).toBeUndefined();
+    // Asked again after a wait, by itself.
+    await clock.advance(60_000);
+    await sameAsServer(controller, network);
+    expect(lineOf(shown(controller), fouler)?.fouledOut).toBe(true);
+    await controller.leave();
+  });
+});
+
+/** Waits, a few milliseconds at a time, until `done` holds. */
+async function until(done: () => boolean) {
+  for (let i = 0; i < 200 && !done(); i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  expect(done()).toBe(true);
+}
+
+describe('two loads answered out of order', () => {
+  it('the older answer, arriving last, is left: no tap the server took leaves the screen', async () => {
+    const network = networkWith(() => withLimit(4));
+    let holdNext = false;
+    let release: () => void = () => {};
+    const late: StateAnswer = async (answer) => {
+      const answered = await answer();
+      if (holdNext) {
+        holdNext = false;
+        await new Promise<void>((resolve) => (release = resolve));
+      }
+      return answered;
+    };
+    const controller = await opened(device(network, 'tablet-1', late));
+    const basket = (points: 1 | 2 | 3): TapInput => ({
+      type: 'score',
+      side: 'home',
+      playerId: fouler,
+      points,
+    });
+    // Someone on neither team: the device's engine takes it, the server refuses it.
+    const stranger: TapInput = {
+      type: 'score',
+      side: 'home',
+      playerId: '01900000-0000-7000-8000-00000000dead',
+      points: 2,
+    };
+    await tapAll(controller, [...tipOff, basket(2)]);
+    await controller.idle();
+    const before = controller.status().serverSequence ?? 0;
+
+    // The reload after this refusal is answered by the server, then held on its way.
+    holdNext = true;
+    await tapAll(controller, [stranger]);
+    await until(() => !holdNext);
+    // A basket the server takes, and another refusal, whose reload arrives at once.
+    await tapAll(controller, [basket(3), stranger]);
+    await until(() => (controller.status().serverSequence ?? 0) > before);
+    const newer = controller.status().serverSequence;
+    expect(basketball.derive(shown(controller)).teams.home.score).toBe(5);
+
+    // The older answer lands last: it is left.
+    release();
+    await controller.idle();
+    expect(controller.status().serverSequence).toBe(newer);
+    expect(basketball.derive(shown(controller)).teams.home.score).toBe(5);
+    expect(basketball.derive(await serverGame(network)).teams.home.score).toBe(5);
     await controller.leave();
   });
 });

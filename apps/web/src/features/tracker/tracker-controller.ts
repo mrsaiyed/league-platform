@@ -591,6 +591,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     sessionId = null;
     cancelRenew?.();
     cancelRenew = null;
+    cancelSettle?.();
+    cancelSettle = null;
     clearTimer();
     if (current.reloading) update({ reloading: false });
   };
@@ -749,6 +751,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       return true;
     }
     await serially(() => {
+      // Two loads can be under way at once (one after a refusal, one for a game not
+      // started) and be answered out of order: an answer older than the state the game
+      // is built on now is left, or the taps the server took since would vanish from the
+      // screen until the next load.
+      if (base !== null && loaded.value.sequence < base.sequence) return;
       const taken = new Set(loaded.value.state.recent.map((id) => id.toLowerCase()));
       made = made.filter(
         (c) =>
@@ -905,24 +912,50 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   let settling = false;
   /** The server took another batch while that load was under way. */
   let settleAgain = false;
+  /** Asking for that load again, after one that got no answer. */
+  let cancelSettle: (() => void) | null = null;
+  let settleFailures = 0;
+
   /**
    * The server took a batch while the state this device works from has not started
    * (record 062): until then the server takes the game's rules as they stand at each
    * batch, so the state is loaded again and the game rebuilt on it, with the taps the
-   * server does not have yet on top (`load`). A load that gets no answer is left: the
-   * next batch taken asks again. Once the state has started, nothing happens here.
+   * server does not have yet on top (`load`). A load that gets no answer is asked
+   * again after a wait that grows, as opening does, on a timer of its own, so the
+   * batch that started the game is followed by a load even if it was the last one.
+   * Once the state has started, nothing happens here.
    */
   const settle = async (): Promise<void> => {
     settling = true;
+    let unanswered = false;
     try {
       do {
         settleAgain = false;
         if (current.mode.kind !== 'scoring') return;
-        if (!(await load())) return;
+        if (!(await load())) {
+          unanswered = true;
+          break;
+        }
+        settleFailures = 0;
       } while (settleAgain && base?.state.status === 'scheduled');
     } finally {
       settling = false;
     }
+    if (unanswered) settleLater();
+  };
+
+  const settleLater = (): void => {
+    cancelSettle?.();
+    cancelSettle = null;
+    if (stopped || sessionId === null) return;
+    settleFailures += 1;
+    cancelSettle = clock.after(retryDelayMs(settleFailures, random(), retry), () => {
+      cancelSettle = null;
+      // Another load may have brought the game as started meanwhile: nothing to do then.
+      if (base?.state.status !== 'scheduled') return;
+      if (settling) settleAgain = true;
+      else void track(settle());
+    });
   };
 
   queue.subscribe((status) => {

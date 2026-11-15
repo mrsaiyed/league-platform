@@ -833,6 +833,45 @@ registerIsolationCase({
   run: switchClockAtTargetUpcomingGame,
 });
 
+// The transfer's flag (record 062): whoever may correct games starts the target's
+// upcoming game without the mercy rule and the last-minutes stop clock. In the target's
+// league it is taken; anywhere else the takeover and the batch are refused, and the
+// target's game keeps no rules of the run.
+registerIsolationCase({
+  subject: applyTrackerCommands,
+  name: "start the target's upcoming game without the mercy rule, as the transfer does",
+  run: async (scope, target) => {
+    const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      deviceId: 'tracker-transfer',
+      confirmed: true,
+      expectedHolderSince: target.scoringSessionSince,
+    }).catch((thrown: unknown) => {
+      if (thrown instanceof CommandRefused) return undefined;
+      throw thrown;
+    });
+    const reply = taken?.value as { status?: string; sessionId?: string } | undefined;
+    return runAsApp(applyTrackerCommands, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      protocolVersion: 2,
+      withoutMercyOrLastMinutes: true,
+      sessionId: reply?.sessionId ?? target.scoringSessionId,
+      commands: [
+        {
+          commandId: rulesCommandIds[0],
+          at: harnessNow - 2000,
+          input: { type: 'lineup', side: 'away', playerIds: [target.personId] },
+        },
+        {
+          commandId: rulesCommandIds[2],
+          at: harnessNow - 1000,
+          input: { type: 'score', side: 'away', playerId: target.personId, points: 3 },
+        },
+      ],
+    });
+  },
+});
+
 registerIsolationCase({
   subject: readTrackerState,
   name: "load the target's season's foul limit with the state of its upcoming game",
