@@ -10,8 +10,25 @@
 // Each screen is taken whole, at two widths: 390 (a phone) and 1280 (a laptop). The files go
 // to .local/shots/<width>/<name>.jpg, which git ignores. Open them with the Read tool. A
 // lane runs this in its own folder, so the pictures show that lane's work.
+//
+// A game's page is taken in each state it has (`--only=game`): `game-live` and `game-final`
+// are the two made-up games a tracker scores (this script taps a short game into each
+// first, through the tracker's own endpoints), with their play-by-play and players;
+// `game-result`, `game-forfeit`, `game-postponed`, `game-scheduled` and `game-undated` are
+// games of the made-up schedules. Only the first made-up league has tracked games, so
+// `game-live-light` and `game-final-light` are those two pages drawn with the second
+// league's design values, which is all that differs between two leagues' looks (T-90).
+//
+// `--only=long-name` takes the public pages at 320 and 390 wide with long made-up names put
+// in: a team's of 36 letters in the first row of every table, on a scoreboard, a game card
+// and a team card and in a team page's heading, and a league's of 54 letters in the header.
+// Pages with tables are taken as they open and with the tables scrolled to their far end
+// (.local/shots/320 and /390, `…-long-name.jpg` and `…-long-name-scrolled.jpg`).
+//
+// `--only=menu` takes the phone menu, open, at 390 in each league's look (`…-menu-open.jpg`).
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import net from 'node:net';
@@ -26,14 +43,7 @@ const madeUp = {
   NEXT_TELEMETRY_DISABLED: '1',
   APP_ENV: 'test',
   LOG_LEVEL: 'warn',
-  DATABASE_URL: 'postgres://made-up:made-up-password@127.0.0.1:1/nowhere',
-  SESSION_SECRET: 'made-up-session-secret-0123456789abcdef',
-  SUPABASE_URL: 'http://localhost:54321',
-  SUPABASE_SECRET_KEY: 'made-up-supabase-key',
-  RESEND_API_KEY: 'made-up-resend-key',
   EMAIL_FROM: 'hello@example.test',
-  STRIPE_SECRET_KEY: 'made-up-stripe-key',
-  STRIPE_WEBHOOK_SECRET: 'made-up-webhook-key',
 };
 // The stand-in's two live leagues, and its made-up owner, who is known by this cookie alone
 // (apps/web/src/server/stand-in-ports.ts).
@@ -53,8 +63,34 @@ const publicPages = [
   { name: 'stats', at: '/stats' },
   { name: 'teams', at: '/teams' },
   { name: 'team', at: '/teams', first: '/teams/' },
-  { name: 'game', at: '', first: '/games/' },
 ];
+// A game's page in each of its states. The ids are the stand-in's own
+// (apps/web/src/server/stand-in-games.ts and stand-in-public-schedule.ts): a tracked game
+// is number n of the games area, a listed one is game `index` of a season of `count` games.
+const hexId = (head, n) => `01900000-0000-7000-8000-${head}${n.toString(16).padStart(8, '0')}`;
+const trackedGame = (n) => hexId('006a', n);
+const trackedPlayer = (team, n) => hexId((0x70 + team).toString(16).padStart(4, '0'), n);
+const listedGame = (count, index) => hexId('0000', 0xb2000000 + index + count * 1000);
+const trackedLeagueId = hexId('0000', 1);
+const liveGame = trackedGame(2);
+const finalGame = trackedGame(3);
+const gamePages = {
+  'north-valley': [
+    { name: 'game-live', at: `/games/${liveGame}` },
+    { name: 'game-live-light', at: `/games/${liveGame}`, lookOf: 'harbor-city' },
+    { name: 'game-final', at: `/games/${finalGame}` },
+    { name: 'game-final-light', at: `/games/${finalGame}`, lookOf: 'harbor-city' },
+    { name: 'game-result', at: `/games/${listedGame(13, 0)}` },
+    { name: 'game-forfeit', at: `/games/${listedGame(13, 1)}` },
+    { name: 'game-postponed', at: `/games/${listedGame(13, 3)}` },
+    { name: 'game-scheduled', at: `/games/${listedGame(13, 8)}` },
+  ],
+  'harbor-city': [
+    { name: 'game-result', at: `/games/${listedGame(5, 0)}` },
+    { name: 'game-scheduled', at: `/games/${listedGame(5, 3)}` },
+    { name: 'game-undated', at: `/games/${listedGame(5, 4)}` },
+  ],
+};
 // What the league's owner sees.
 const adminPages = [
   { name: 'admin-home', at: '/admin' },
@@ -82,6 +118,38 @@ const platformPages = [
   { name: 'platform-start', at: '/start' },
   { name: 'platform-help', at: '/help' },
 ];
+
+// Long names, at the two narrowest phones: a team's wherever a team is named (the column of
+// a table that stays put, a scoreboard, a game card, a team card, a team page's heading)
+// and a league's in the header.
+const longName = 'The Northside Community Thunderbolts';
+const longLeagueName = 'The Greater Northside Community Basketball Association';
+const longNameWidths = [
+  { name: '320', viewport: { width: 320, height: 700 } },
+  { name: '390', viewport: { width: 390, height: 844 } },
+];
+const longNamePages = [
+  { name: 'north-valley-home-long-name', at: '/north-valley' },
+  { name: 'north-valley-schedule-long-name', at: '/north-valley/schedule' },
+  { name: 'north-valley-standings-long-name', at: '/north-valley/standings' },
+  { name: 'north-valley-stats-long-name', at: '/north-valley/stats' },
+  { name: 'north-valley-teams-long-name', at: '/north-valley/teams' },
+  { name: 'north-valley-team-long-name', at: '/north-valley/teams/owls', heading: true },
+  { name: 'north-valley-game-final-long-name', at: `/north-valley/games/${finalGame}` },
+  { name: 'north-valley-game-live-long-name', at: `/north-valley/games/${liveGame}` },
+  {
+    name: 'north-valley-game-postponed-long-name',
+    at: `/north-valley/games/${listedGame(13, 3)}`,
+  },
+  {
+    name: 'north-valley-game-scheduled-long-name',
+    at: `/north-valley/games/${listedGame(13, 8)}`,
+  },
+  { name: 'harbor-city-home-long-name', at: '/harbor-city' },
+  { name: 'harbor-city-game-undated-long-name', at: `/harbor-city/games/${listedGame(5, 4)}` },
+];
+// The phone menu, open, at 390 only (`--only=menu`): one picture a league.
+const menuWidth = { name: '390', viewport: { width: 390, height: 844 } };
 
 const flag = (name) => process.argv.includes(name);
 const only = (process.argv.find((arg) => arg.startsWith('--only=')) ?? '')
@@ -128,6 +196,98 @@ async function waitFor(url, server) {
   throw new Error(`the server did not answer within two minutes:\n${server.output()}`);
 }
 
+/**
+ * Taps a short made-up game into each of the two tracked games, as a scorekeeper's tablet
+ * would (the tracker's endpoints, step 2.32), so their pages have plays and players to
+ * show. The Hawks (team 3) are at home in both: to the Bears (team 4), left under way, and
+ * to the Lions (team 1), played to the end.
+ */
+async function scoreTrackedGames(origin) {
+  const five = (team) => [1, 2, 3, 4, 5].map((n) => trackedPlayer(team, n));
+  const [hawks, bears, lions] = [five(3), five(4), five(1)];
+  const tablet = async (game, token) => {
+    const post = async (at, body) => {
+      const answer = await fetch(`${origin}/api/v1/leagues/${trackedLeagueId}/games/${game}${at}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie: `srl_session=${token}`, origin },
+        body: JSON.stringify(body),
+      });
+      const text = await answer.text();
+      if (!answer.ok) throw new Error(`${at} answered ${answer.status}: ${text.slice(0, 200)}`);
+      return JSON.parse(text);
+    };
+    const { sessionId } = await post('/session', { type: 'open', deviceId: 'pictures-tablet' });
+    return async (...inputs) => {
+      // A tablet sends at most 50 taps at once (maxCommandsPerBatch); 25 keeps well inside it.
+      for (let from = 0; from < inputs.length; from += 25) {
+        const reply = await post('/commands', {
+          protocolVersion: 1,
+          sessionId,
+          commands: inputs
+            .slice(from, from + 25)
+            .map((input) => ({ commandId: randomUUID(), at: Date.now(), input })),
+        });
+        const refused = reply.results.filter((r) => r.status !== 'accepted');
+        if (refused.length > 0) throw new Error(`refused: ${JSON.stringify(refused)}`);
+      }
+    };
+  };
+  const score = (side, playerId, points) => ({ type: 'score', side, playerId, points });
+  const clock = (minutes, seconds) => [
+    { type: 'pause' },
+    { type: 'set-clock', ms: (minutes * 60 + seconds) * 1000 },
+    { type: 'start' },
+  ];
+  /** A first half, the break, and the opening of the second. */
+  const plays = (away) => [
+    { type: 'lineup', side: 'home', playerIds: hawks },
+    { type: 'lineup', side: 'away', playerIds: away },
+    { type: 'start' },
+    ...clock(18, 42),
+    score('home', hawks[0], 3),
+    ...clock(17, 5),
+    score('away', away[0], 2),
+    { type: 'foul', side: 'away', playerId: away[1] },
+    ...clock(15, 30),
+    score('home', hawks[1], 2),
+    score('home', hawks[1], 1),
+    ...clock(12, 8),
+    { type: 'turnover', side: 'home', playerId: hawks[2] },
+    score('away', away[2], 3),
+    ...clock(9, 51),
+    { type: 'timeout', side: 'home', seconds: 60 },
+    { type: 'sub', side: 'home', inId: trackedPlayer(3, 6), outId: hawks[4] },
+    ...clock(6, 14),
+    score('home', hawks[3], 2),
+    { type: 'foul', side: 'home', playerId: hawks[3] },
+    score('away', away[3], 1),
+    ...clock(2, 40),
+    score('away', away[0], 2),
+    score('home', hawks[0], 2),
+    { type: 'pause' },
+    { type: 'period', period: 2 },
+    { type: 'start' },
+    ...clock(19, 12),
+    score('away', away[4], 2),
+    { type: 'team-turnover', side: 'away' },
+    ...clock(16, 3),
+    score('home', hawks[1], 3),
+    { type: 'foul', side: 'away', playerId: away[2] },
+  ];
+  const live = await tablet(liveGame, 'local-scorekeeper-token');
+  await live(...plays(bears));
+  const done = await tablet(finalGame, 'local-owner-token');
+  await done(...plays(lions), ...clock(0, 4), score('home', hawks[2], 2), { type: 'end' });
+}
+
+/** A league's design values as its pages carry them: the one `:root` block (T-90). */
+async function designValuesOf(origin, league) {
+  const html = await (await fetch(`${origin}/${league}`)).text();
+  const found = /:root \{[^}]*\}/.exec(html);
+  if (!found) throw new Error(`no design values on /${league}`);
+  return found[0];
+}
+
 const dev = flag('--dev');
 if (!dev && !flag('--no-build')) {
   console.log('Building the web app (a few minutes when the computer is busy).');
@@ -150,6 +310,19 @@ let browser;
 try {
   await waitFor(`${origin}/`, server);
   browser = await launch();
+  const looks = {};
+  const tracked = gamePages['north-valley'].filter((page) => /game-(live|final)/.test(page.name));
+  if (
+    tracked.some((page) => wanted(`north-valley-${page.name}`)) ||
+    wanted('north-valley-game-final-long-name') ||
+    wanted('north-valley-game-live-long-name')
+  ) {
+    try {
+      await scoreTrackedGames(origin);
+    } catch (error) {
+      missed.push(`the tracked games were not scored: ${String(error.message ?? error)}`);
+    }
+  }
   for (const width of widths) {
     fs.mkdirSync(path.join(out, width.name), { recursive: true });
     const visitor = await browser.newContext({ viewport: width.viewport });
@@ -160,7 +333,7 @@ try {
     const jobs = [
       ...platformPages.map((page) => ({ ...page, context: visitor, base: '' })),
       ...leagues.flatMap((league) => [
-        ...publicPages.map((page) => ({
+        ...[...publicPages, ...(gamePages[league] ?? [])].map((page) => ({
           ...page,
           name: `${league}-${page.name}`,
           context: visitor,
@@ -198,6 +371,19 @@ try {
           }
           answer = await page.goto(new URL(link, origin).href, { waitUntil: 'networkidle' });
         }
+        if (job.lookOf) {
+          // The same page under another league's design values: only the `:root` block changes.
+          looks[job.lookOf] ??= await designValuesOf(origin, job.lookOf);
+          await page.evaluate((values) => {
+            for (const style of document.querySelectorAll('style')) {
+              if (/:root \{[^}]*--color-background/.test(style.textContent ?? '')) {
+                style.textContent = style.textContent.replace(/:root \{[^}]*\}/, values);
+              }
+            }
+            return document.fonts.ready.then(() => undefined);
+          }, looks[job.lookOf]);
+          await page.waitForTimeout(500);
+        }
         const file = path.join(out, width.name, `${job.name}.jpg`);
         await page.screenshot({ path: file, fullPage: true, type: 'jpeg', quality: 80 });
         taken.push(
@@ -212,6 +398,99 @@ try {
     await visitor.close();
     await staff.close();
     await keeper.close();
+  }
+  // The phone menu, open (`--only=menu`), at 390 in each league's own look.
+  {
+    const jobs = leagues
+      .map((league) => ({ name: `${league}-menu-open`, at: `/${league}` }))
+      .filter((job) => wanted(job.name));
+    if (jobs.length > 0) {
+      fs.mkdirSync(path.join(out, menuWidth.name), { recursive: true });
+      const visitor = await browser.newContext({ viewport: menuWidth.viewport });
+      for (const job of jobs) {
+        const page = await visitor.newPage();
+        page.setDefaultTimeout(90_000);
+        try {
+          await page.goto(`${origin}${job.at}`, { waitUntil: 'networkidle' });
+          await page.locator('.site-header .site-menu > summary').click();
+          await page.locator('.site-header .site-menu-panel').waitFor({ state: 'visible' });
+          await page.waitForTimeout(300);
+          // The screen as a visitor holds it: the open panel over the top of the page.
+          await page.screenshot({
+            path: path.join(out, menuWidth.name, `${job.name}.jpg`),
+            type: 'jpeg',
+            quality: 80,
+          });
+          taken.push(`${menuWidth.name}/${job.name}.jpg`);
+        } catch (error) {
+          missed.push(
+            `${menuWidth.name}/${job.name}: ${String(error.message ?? error).split('\n')[0]}`,
+          );
+        } finally {
+          await page.close();
+        }
+      }
+      await visitor.close();
+    }
+  }
+  // Long names (`--only=long-name`), at the two narrowest phones. In the picture only, the
+  // league's name in the header is rewritten to a made-up one of 54 letters, and a made-up
+  // team name of 36 letters is put wherever the page names a team first: the first row of
+  // every table, the first team of a scoreboard, of the first game card and of the first
+  // team card, and a team page's own heading. Each page is taken as it opens and again
+  // with its tables scrolled to their far end, which shows the numbers can still be reached.
+  for (const width of longNameWidths) {
+    const jobs = longNamePages.filter((job) => wanted(job.name));
+    if (jobs.length === 0) continue;
+    fs.mkdirSync(path.join(out, width.name), { recursive: true });
+    const visitor = await browser.newContext({ viewport: width.viewport });
+    for (const job of jobs) {
+      const page = await visitor.newPage();
+      page.setDefaultTimeout(90_000);
+      try {
+        await page.goto(`${origin}${job.at}`, { waitUntil: 'networkidle' });
+        await page.evaluate(
+          ({ name, league, heading }) => {
+            const put = (el, text) => {
+              if (el) el.textContent = text;
+            };
+            put(document.querySelector('.site-header .site-name > span'), league);
+            for (const table of document.querySelectorAll('table.ui-table')) {
+              put(table.querySelector('tbody .ui-team-cell > [dir]'), name);
+            }
+            put(document.querySelector('.ui-scoreboard-name > [dir]'), name);
+            put(document.querySelector('.ui-game-card .ui-game-team-name'), name);
+            put(document.querySelector('.ui-team-card-name a'), name);
+            if (heading) put(document.querySelector('.ui-page-head h1'), name);
+          },
+          { name: longName, league: longLeagueName, heading: job.heading === true },
+        );
+        const hasTables = (await page.locator('.ui-table-wrap').count()) > 0;
+        for (const scrolled of hasTables ? [false, true] : [false]) {
+          if (scrolled) {
+            await page.evaluate(() => {
+              for (const box of document.querySelectorAll('.ui-table-wrap')) {
+                box.scrollLeft = box.scrollWidth;
+              }
+            });
+            await page.waitForTimeout(300);
+          }
+          const name = `${job.name}${scrolled ? '-scrolled' : ''}`;
+          await page.screenshot({
+            path: path.join(out, width.name, `${name}.jpg`),
+            fullPage: true,
+            type: 'jpeg',
+            quality: 80,
+          });
+          taken.push(`${width.name}/${name}.jpg`);
+        }
+      } catch (error) {
+        missed.push(`${width.name}/${job.name}: ${String(error.message ?? error).split('\n')[0]}`);
+      } finally {
+        await page.close();
+      }
+    }
+    await visitor.close();
   }
 } finally {
   await browser?.close();

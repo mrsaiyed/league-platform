@@ -26,6 +26,9 @@ export type EventSourceLike = {
   close(): void;
 };
 
+/** The web app's own live address (T-14; `app/api/v1/live/route.ts`), for every page. */
+export const webLiveAddress = '/api/v1/live';
+
 export type ServerSentEventsSubscriberOptions = {
   /** The web app's live address, such as `/api/v1/live`. The channel is added to it. */
   readonly address: string;

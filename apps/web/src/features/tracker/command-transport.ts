@@ -11,15 +11,18 @@ export type TransportOutcome =
   /**
    * The server turned the request away whole, and sending the same again will not
    * help until something changes: signed out (401), not allowed (403), no such game (404).
+   * Only the server's own refusal (`TrackerRefusal`, at its own status) is this.
    */
   | { readonly kind: 'rejected'; readonly httpStatus: number }
   /**
-   * The server could not take the batch as sent (400, 413, 422 and the other 4xx): one
-   * of its taps is bad or the batch too big. The queue finds the tap by sending one at
-   * a time (record 024).
+   * The server could not take the batch as sent (its own 400 invalid-input): one of its
+   * taps is bad. The queue finds the tap by sending one at a time (record 024).
    */
   | { readonly kind: 'batch-refused'; readonly httpStatus: number }
-  /** No usable answer: no network, a timeout, a server error. Send again later. */
+  /**
+   * No usable answer: no network, a timeout, a server error, or a page that is not the
+   * server's (a gym Wi-Fi sign-in page, a filter's 403, a host's 404). Send again later.
+   */
   | { readonly kind: 'unanswered' };
 
 export interface CommandTransport {

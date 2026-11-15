@@ -8,7 +8,7 @@
 // the security headers on every answer.
 // Then it starts the app as staging with a database address that answers nobody,
 // and checks that it refuses to start (T-60). Nothing leaves this computer.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
@@ -18,16 +18,35 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = path.join(root, 'apps/web');
 const nextBin = createRequire(path.join(app, 'package.json')).resolve('next/dist/bin/next');
 
+/**
+ * The environment the servers start from (T-201): only what Node.js and Next.js need
+ * to run on this computer, never this shell's own settings, so no real address, key
+ * or secret this shell holds (DATABASE_URL, RESEND_API_KEY, STRIPE_*, SESSION_SECRET,
+ * PG*, anything else) can ride along. Every setting the app reads is made up below.
+ */
+const runOnly = [
+  'PATH',
+  'PATHEXT',
+  'SYSTEMROOT',
+  'WINDIR',
+  'COMSPEC',
+  'TEMP',
+  'TMP',
+  'TMPDIR',
+  'HOME',
+  'USERPROFILE',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'PROGRAMDATA',
+  'NUMBER_OF_PROCESSORS',
+  'PROCESSOR_ARCHITECTURE',
+  'OS',
+  'LANG',
+];
+
 const madeUp = {
   LOG_LEVEL: 'warn',
-  DATABASE_URL: 'postgres://made-up:made-up-password@127.0.0.1:1/nowhere',
-  SESSION_SECRET: 'made-up-session-secret-0123456789abcdef',
-  SUPABASE_URL: 'http://localhost:54321',
-  SUPABASE_SECRET_KEY: 'made-up-supabase-key',
-  RESEND_API_KEY: 'made-up-resend-key',
   EMAIL_FROM: 'hello@example.test',
-  STRIPE_SECRET_KEY: 'made-up-stripe-key',
-  STRIPE_WEBHOOK_SECRET: 'made-up-webhook-key',
 };
 
 // The made-up people's session cookies (apps/web/src/server/stand-in-ports.ts).
@@ -51,6 +70,10 @@ const harborCity = '01900000-0000-7000-8000-000000000002';
 // Two of the made-up games of the first league (stand-in-games.ts).
 const liveGame = '01900000-0000-7000-8000-006a00000002';
 const unassignedGame = '01900000-0000-7000-8000-006a00000003';
+
+/** A made-up game of North Valley (apps/web/src/server/stand-in-games.ts): 1 scheduled,
+ * 2 live (Hawks v Bears), 5 final (Bears v Lions), 6 in a season still being set up. */
+const game = (n) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0')}`;
 
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
 // browser's script fills with the not-found or forbidden screen (record 020), so
@@ -103,7 +126,8 @@ const cases = [
     ['Owls', 'Falcons', '5-1', 'East', 'Seed', 'Record'],
     ['This page is not built yet.'],
   ],
-  ['visitor', '/harbor-city/teams', 200, ['Comets', 'Rockets', 'Meteors']],
+  // A league with no divisions says nothing about divisions on its team cards.
+  ['visitor', '/harbor-city/teams', 200, ['Comets', 'Rockets', 'Meteors'], ['No division']],
   [
     'visitor',
     '/north-valley/teams/falcons',
@@ -130,6 +154,27 @@ const cases = [
   ],
   ['visitor', '/north-valley/teams/lions', 404, [notFound]],
   ['visitor', '/north-valley/teams/falcons?season=nope', 404, [notFound]],
+  // Any address under a league that is no page of it is refused by the league's own gate
+  // (step 2.85): "not found" for a league the visitor may see and for one they may not.
+  ['visitor', '/north-valley/no-such-page/at-all', 404, [notFound]],
+  [
+    'visitor',
+    '/quiet-pines/no-such-page/at-all',
+    404,
+    [notFound],
+    ['This league is not published.', 'site-header'],
+  ],
+  ['owner', '/north-valley/admin/no-such-area/at-all', 404, [notFound]],
+  // The season picker is in the header of the menu's pages, once, and carries the page's
+  // other choices; a league with one season has none (step 2.85).
+  [
+    'visitor',
+    '/north-valley/schedule?team=owls',
+    200,
+    ['id="site-season"', 'name="team" value="owls"', 'Spring 2026'],
+  ],
+  ['visitor', '/harbor-city/schedule', 200, ['Opening day'], ['id="site-season"']],
+  ['owner', '/north-valley/admin/teams', 200, ['Add a team'], ['id="site-season"']],
   // The start page for members (step 2.44, U-5, R-10). North Valley keeps the league home;
   // Harbor City starts members on their team: a member with a roster place, or the team a
   // device remembers. The league home is always one tap away (start=league).
@@ -334,6 +379,32 @@ const cases = [
     ['Your games', 'Score this game', `href="/north-valley/score/${liveGame}"`],
     ['Nothing here yet.'],
   ],
+  // A game's page (step 2.45): drawn with how the game stands, its live part ready to
+  // follow it; a finished game's result; a game not started; a game that is not this
+  // league's, not public yet, or not an id is not found. The Bears show their players'
+  // numbers to their staff only, so none of their names is on the page (S-22).
+  [
+    'visitor',
+    `/north-valley/games/${game(2)}`,
+    200,
+    ['Bears at Hawks', 'The game, live', 'data-live-status="live"', 'Live', 'Play by play'],
+    ['This page is not built yet.', 'Bearsley'],
+  ],
+  [
+    'visitor',
+    `/north-valley/games/${game(5)}`,
+    200,
+    ['Lions at Bears', 'Final', 'Box scores', 'Only the final score was recorded for this game.'],
+    ['Corrected on'],
+  ],
+  ['visitor', `/north-valley/games/${game(1)}`, 200, ['This game has not started yet.']],
+  ['visitor', `/north-valley/games/${game(6)}`, 404, [notFound]],
+  ['visitor', `/north-valley/games/${game(99)}`, 404, [notFound]],
+  ['visitor', '/north-valley/games/not-a-game', 404, [notFound]],
+  ['visitor', `/harbor-city/games/${game(2)}`, 404, [notFound]],
+  ['visitor', `/quiet-pines/games/${game(2)}`, 404, [notFound]],
+  ['scheduler', '/north-valley/score/game-1', 200, ['Score a game']],
+  ['coach', '/north-valley/score/game-1', 403, [noAccess]],
   ['visitor', '/quiet-pines', 404, [notFound]],
   ['coach', '/quiet-pines', 404, [notFound]],
   ['stranger', '/quiet-pines/admin', 404, [notFound], [noAccess]],
@@ -434,6 +505,31 @@ const spoofs = [
 
 const failures = [];
 
+// The shell's own settings never reach the servers (T-201): made-up stand-ins for real
+// ones are put in this script's own environment, and none of them may arrive.
+const shellOnly = {
+  DATABASE_URL: 'postgres://shell-made-up:shell-made-up@localhost:1/nowhere',
+  RESEND_API_KEY: 're_shell_made_up',
+  STRIPE_SECRET_KEY: 'sk_shell_made_up',
+  STRIPE_WEBHOOK_SECRET: 'whsec_shell_made_up',
+  SESSION_SECRET: 'shell-made-up-session-secret-0123456789',
+  PGHOST: 'shell-made-up.example.test',
+};
+Object.assign(process.env, shellOnly);
+const arrived = spawnSync(
+  process.execPath,
+  ['-e', 'process.stdout.write(JSON.stringify(Object.keys(process.env)))'],
+  { env: serverEnvironment({}), encoding: 'utf8' },
+);
+const arrivedNames = arrived.status === 0 ? JSON.parse(arrived.stdout) : null;
+if (arrivedNames === null) {
+  failures.push('could not read the environment the servers start with');
+} else {
+  for (const name of Object.keys(shellOnly)) {
+    if (arrivedNames.includes(name)) failures.push(`the shell's ${name} reaches the servers`);
+  }
+}
+
 if (!process.argv.includes('--no-build')) await run(['build'], { APP_ENV: 'test' });
 
 const port = await freePort();
@@ -490,6 +586,7 @@ try {
     );
   }
   failures.push(...(await sameAsNoLeague(origin)));
+  failures.push(...(await checkStylesheets(origin)));
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
   failures.push(...(await checkSettings(origin)));
@@ -501,8 +598,13 @@ try {
 const staging = start(['start', '--port', String(await freePort())], {
   APP_ENV: 'staging',
   PUBLIC_BASE_URL: 'https://staging.example.test',
-  // Required outside local and test (config-schema.ts), so the database is reached.
+  // Required in staging (config-schema.ts), so the settings check passes and the
+  // database is reached. All made up: the address answers nobody on this computer. A
+  // host name, as staging refuses an IP address as the host (record 055).
   TRUSTED_PROXY: 'one',
+  PLATFORM_DATABASE_URL: 'postgres://made-up:made-up-password@localhost:1/nowhere',
+  SUPABASE_URL: 'http://localhost:54321',
+  SUPABASE_SECRET_KEY: 'made-up-supabase-secret-key',
 });
 const code = await new Promise((resolve) => {
   const timer = setTimeout(() => {
@@ -520,6 +622,8 @@ if (code === 0 || code === 'still running') {
   failures.push(`staging refused to start without saying why:\n${staging.output()}`);
 } else if (staging.output().includes('made-up-password')) {
   failures.push('the refusal printed the database address');
+} else if (staging.output().includes('made-up-supabase-secret-key')) {
+  failures.push('the refusal printed SUPABASE_SECRET_KEY');
 }
 
 if (failures.length > 0) {
@@ -527,15 +631,23 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Web shell check passed: ${cases.length + spoofs.length + 4} checks against the built server.`,
+  `Web shell check passed: ${cases.length + spoofs.length + 5} checks against the built server.`,
 );
+
+function serverEnvironment(env) {
+  const clean = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value !== undefined && runOnly.includes(name.toUpperCase())) clean[name] = value;
+  }
+  return { ...clean, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env };
+}
 
 function start(args, env) {
   let output = '';
   // Next.js itself, not scripts/web.mjs, so stopping it stops the server.
   const child = spawn(process.execPath, [nextBin, ...args], {
     cwd: app,
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...madeUp, ...env },
+    env: serverEnvironment(env),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (chunk) => (output += chunk));
@@ -651,6 +763,45 @@ async function sameAsNoLeague(origin) {
  * having left; someone who may not open the Teams area changes nothing. The commands'
  * own rules are tested beside the code (apps/web/src/server/stand-in-admin-teams.test.ts).
  */
+/**
+ * The two stylesheets we serve ourselves are public and kept by browsers and shared
+ * caches, so nothing of a person's session may ride on their answers: no cookie is ever
+ * set, whatever cookies the request carries. A request with a renewing token and no
+ * session is the one the proxy would act on (it clears an ended one, as checkSignIn
+ * shows on a page), so the stylesheets must not pass through the proxy at all.
+ */
+async function checkStylesheets(origin) {
+  const problems = [];
+  const home = await (await fetch(`${origin}/north-valley`)).text();
+  const linked = /href="(\/display\.css\?v=[0-9a-f]+)"/.exec(home)?.[1];
+  if (linked === undefined)
+    problems.push('a league page does not link to /display.css with its mark');
+  const carried = [
+    ['no cookies', ''],
+    ['an ended renewing token', 'srl_renew=made-up-ended-token'],
+    ['a session and a renewing token', `srl_session=${tokens.owner}; srl_renew=made-up-token`],
+  ];
+  for (const address of [linked ?? '/display.css', '/display.css', '/standalone.css']) {
+    for (const [label, cookie] of carried) {
+      const answer = await fetch(origin + address, {
+        headers: cookie === '' ? {} : { cookie },
+        redirect: 'manual',
+      });
+      const kept = answer.headers.get('cache-control') ?? '';
+      if (answer.status !== 200 || !(answer.headers.get('content-type') ?? '').includes('css')) {
+        problems.push(`${address} with ${label} answers ${answer.status}`);
+      }
+      if (answer.headers.getSetCookie().length > 0) {
+        problems.push(`${address} with ${label} sets a cookie on an answer caches may keep`);
+      }
+      if (!kept.startsWith('public') || kept.includes('private') || kept.includes('no-store')) {
+        problems.push(`${address} with ${label} is sent with cache-control "${kept}"`);
+      }
+    }
+  }
+  return problems;
+}
+
 async function checkTeams(origin) {
   const problems = [];
   const as = (who) => ({ cookie: `srl_session=${tokens[who]}` });

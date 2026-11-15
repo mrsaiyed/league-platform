@@ -2,13 +2,18 @@
 // them. It takes the environment as an argument and never reads process.env itself,
 // so tests can hand it any set of values; config.ts reads the real environment once.
 // Names shared with the web app mean the same thing in both (.env.example).
+import {
+  platformDatabaseProblem,
+  trackerProjectProblem,
+  type TrackerGuardFacts,
+} from '@srleagues/providers';
 import { z } from 'zod';
 
 /** Every variable, with whether it is secret. `.env.example` lists the same names. */
 export const workerFields = {
   APP_ENV: { secret: false },
   LOG_LEVEL: { secret: false },
-  DATABASE_URL: { secret: true },
+  PLATFORM_DATABASE_URL: { secret: true },
   PUBLIC_BASE_URL: { secret: false },
   EMAIL_FROM: { secret: false },
   RESEND_API_KEY: { secret: true },
@@ -24,9 +29,11 @@ export const defaultHealthPort = 3001;
 const schema = z.object({
   APP_ENV: z.enum(['local', 'test', 'staging', 'production']),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  // Local work and tests never open an address: they run on a made-up database in
-  // memory (T-201), so DATABASE_URL is needed only in staging and production.
-  DATABASE_URL: z
+  // The platform's database (R8), named apart from the Al-Hadi tracker's DATABASE_URL
+  // so a settings file made for the tracker can never point the worker at it. Local
+  // work and tests never open an address: they run on a made-up database in memory
+  // (T-201), so it is needed only in staging and production.
+  PLATFORM_DATABASE_URL: z
     .string()
     .trim()
     .regex(/^postgres(?:ql)?:\/\//, 'must be a postgres:// address')
@@ -70,7 +77,7 @@ export type WorkerConfig = Readonly<z.infer<typeof schema>>;
 /** Variables that may be left out: absent or blank means "use the default" or "none". */
 const optional: readonly WorkerConfigName[] = [
   'LOG_LEVEL',
-  'DATABASE_URL',
+  'PLATFORM_DATABASE_URL',
   'RESEND_API_KEY',
   'EMAIL_CAPTURE_DIR',
   'WORKER_HEALTH_PORT',
@@ -78,7 +85,7 @@ const optional: readonly WorkerConfigName[] = [
 
 /** Optional elsewhere, but required in these environments. */
 const requiredIn: Readonly<Partial<Record<WorkerConfigName, readonly string[]>>> = {
-  DATABASE_URL: ['staging', 'production'],
+  PLATFORM_DATABASE_URL: ['staging', 'production'],
   RESEND_API_KEY: ['production'],
 };
 
@@ -103,12 +110,31 @@ export class WorkerConfigError extends Error {
   }
 }
 
+/** What loadWorkerConfig checks PLATFORM_DATABASE_URL against, beside the environment. */
+export type WorkerConfigGuard = {
+  /**
+   * The tracker's Supabase project reference, from supabase/site.json (config.ts reads
+   * it, trackerProjectFor), or null when that file could not be read: then staging and
+   * production refuse to start. That project holds real games; the worker never uses it.
+   */
+  readonly trackerProject: string | null;
+};
+
 /**
  * Checks `env` against the schema. Returns the settings, or throws one
  * WorkerConfigError naming every missing or invalid variable. Only names and fixed
  * reasons are put in the error, never the value that was given.
+ *
+ * PLATFORM_DATABASE_URL goes through the tracker's database guard (packages/providers,
+ * the same as the web app's, record 055): never the tracker's DATABASE_URL, nor an
+ * address naming the tracker's Supabase project however it is spelled, so the worker
+ * refuses before anything connects. Without a guard (tests of other rules) the project
+ * is not compared.
  */
-export function loadWorkerConfig(env: Readonly<Record<string, string | undefined>>): WorkerConfig {
+export function loadWorkerConfig(
+  env: Readonly<Record<string, string | undefined>>,
+  guard?: WorkerConfigGuard,
+): WorkerConfig {
   const given: Record<string, string | undefined> = {};
   for (const name of Object.keys(workerFields)) {
     const value = env[name];
@@ -122,6 +148,15 @@ export function loadWorkerConfig(env: Readonly<Record<string, string | undefined
       invalid.set(name, `${name}: missing, must be set when APP_ENV is ${appEnv}`);
     }
   }
+  const facts: TrackerGuardFacts = { env, appEnv, trackerProject: guard?.trackerProject };
+  const database = given['PLATFORM_DATABASE_URL'];
+  const databaseProblem =
+    database === undefined
+      ? undefined
+      : platformDatabaseProblem('PLATFORM_DATABASE_URL', database, facts);
+  if (databaseProblem !== undefined) invalid.set('PLATFORM_DATABASE_URL', databaseProblem);
+  const fileProblem = trackerProjectProblem(['PLATFORM_DATABASE_URL'], facts);
+  if (fileProblem !== undefined) invalid.set('supabase/site.json', fileProblem);
   const result = schema.safeParse(given);
   if (
     result.success &&

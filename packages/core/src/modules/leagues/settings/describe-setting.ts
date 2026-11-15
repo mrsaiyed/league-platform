@@ -32,6 +32,11 @@ export type SettingField = {
   readonly label: string;
   readonly default: unknown;
   readonly field: SettingKind;
+  /**
+   * The values saving which asks the admin to confirm first (R-14), worded by the
+   * message `setting.<key>.confirm`. Empty for most settings.
+   */
+  readonly confirm: readonly unknown[];
 };
 
 const strings = (v: unknown): readonly string[] | undefined =>
@@ -68,5 +73,6 @@ export function describeSetting(setting: Setting): SettingField {
     label: setting.label,
     default: setting.default,
     field: kindOf(z.toJSONSchema(setting.type, { io: 'input' })),
+    confirm: setting.confirm,
   };
 }

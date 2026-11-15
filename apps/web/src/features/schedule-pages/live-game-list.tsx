@@ -5,11 +5,9 @@
 // simply shows what it was given.
 import { useEffect, useState } from 'react';
 import { GameCard, type GameCardLabels, type GameStatus } from '@srleagues/ui';
-import { serverSentEventsSubscriber } from '../live-updates/index.ts';
 import type { GameView } from './build-schedule.ts';
-
-/** The web app's own live address (T-14). */
-const liveAddress = '/api/v1/live';
+import { gameLinkText, type GameLinkWords } from './game-link-text.ts';
+import { pageLeagueScores } from './shared-league-scores.ts';
 
 export type Update = {
   readonly sequence: number;
@@ -27,13 +25,14 @@ const known: readonly GameStatus[] = [
   'cancelled',
 ];
 
-/** The game as the newest live message says it is; the game itself when there is none. */
+/**
+ * The game as the newest live message says it is; the game itself when there is none. Its
+ * card leads to its page whatever its state, so that does not change.
+ */
 export function applyUpdate(game: GameView, update: Update | undefined): GameView {
   if (update === undefined) return game;
-  const decided = update.status === 'final' || update.status === 'forfeit';
   return {
     ...game,
-    ...(decided ? { detailsHref: game.gameHref } : {}),
     status: update.status,
     home: { ...game.home, score: update.home },
     away: { ...game.away, score: update.away },
@@ -44,11 +43,14 @@ export function LiveGameList({
   leagueId,
   games,
   labels,
+  linkWords,
   announcement,
 }: {
   readonly leagueId: string;
   readonly games: readonly GameView[];
   readonly labels: GameCardLabels;
+  /** What each card's link says to a screen reader, to be filled for each game as it stands. */
+  readonly linkWords: GameLinkWords;
   /** The sentence read out when a score changes, with {away} {awayScore} {home} {homeScore} {status}. */
   readonly announcement: string;
 }) {
@@ -60,45 +62,40 @@ export function LiveGameList({
   useEffect(() => {
     if (!watched) return undefined;
     const ids = new Set(games.map((g) => g.id));
-    const subscription = serverSentEventsSubscriber({ address: liveAddress }).subscribeLeagueScores(
-      leagueId,
-      {
-        onMessage: (m) => {
-          if (!ids.has(m.gameId)) return;
-          const status = known.find((s) => s === m.status);
-          if (status === undefined) return;
-          setUpdates((prev) => {
-            const before = prev[m.gameId];
-            if (before !== undefined && before.sequence >= m.sequence) return prev;
-            const game = games.find((g) => g.id === m.gameId);
-            if (game !== undefined) {
-              const word =
-                status === 'live' ? labels.live : status === 'scheduled' ? '' : labels[status];
-              setSpoken(
-                announcement
-                  .replace('{away}', game.away.name)
-                  .replace('{awayScore}', String(m.score.away))
-                  .replace('{home}', game.home.name)
-                  .replace('{homeScore}', String(m.score.home))
-                  .replace('{status}', word),
-              );
-            }
-            return {
-              ...prev,
-              [m.gameId]: { sequence: m.sequence, status, home: m.score.home, away: m.score.away },
-            };
-          });
-        },
-      },
-    );
-    return () => subscription.close();
+    // One connection for the whole page: every list on it listens through the same one.
+    return pageLeagueScores.listen(leagueId, (m) => {
+      if (!ids.has(m.gameId)) return;
+      const status = known.find((s) => s === m.status);
+      if (status === undefined) return;
+      setUpdates((prev) => {
+        const before = prev[m.gameId];
+        if (before !== undefined && before.sequence >= m.sequence) return prev;
+        const game = games.find((g) => g.id === m.gameId);
+        if (game !== undefined) {
+          const word =
+            status === 'live' ? labels.live : status === 'scheduled' ? '' : labels[status];
+          setSpoken(
+            announcement
+              .replace('{away}', game.away.name)
+              .replace('{awayScore}', String(m.score.away))
+              .replace('{home}', game.home.name)
+              .replace('{homeScore}', String(m.score.home))
+              .replace('{status}', word),
+          );
+        }
+        return {
+          ...prev,
+          [m.gameId]: { sequence: m.sequence, status, home: m.score.home, away: m.score.away },
+        };
+      });
+    });
   }, [leagueId, games, watched, labels, announcement]);
   return (
     <>
       <p className="ui-visually-hidden" role="status" aria-live="polite">
         {spoken}
       </p>
-      <ul>
+      <ul className="ui-card-grid">
         {games.map((raw) => {
           const g = applyUpdate(raw, updates[raw.id]);
           return (
@@ -108,8 +105,10 @@ export function LiveGameList({
                 away={g.away}
                 status={g.status}
                 whenText={g.whenText}
+                {...(g.placeText === undefined ? {} : { placeText: g.placeText })}
                 {...(g.numberText === undefined ? {} : { numberText: g.numberText })}
-                {...(g.detailsHref === undefined ? {} : { detailsHref: g.detailsHref })}
+                detailsHref={g.detailsHref}
+                linkText={gameLinkText(g, linkWords)}
                 labels={labels}
               />
             </li>

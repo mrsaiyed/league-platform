@@ -6,6 +6,26 @@ import type { RefusalCode, TrackerCommand } from '@srleagues/contracts';
 /** Why the server would not apply a command (T-113), as its reply said. */
 export type CommandRefusal = { readonly code: RefusalCode; readonly message: string };
 
+/**
+ * Where in the game a tap was made (finding I): the period and the game clock left in
+ * it, as the device's game stood when the tap was made. Kept beside the tap, never sent,
+ * so a screen can say "Q2 6:30, +2 #4" for a tap that was not saved, even after the game
+ * shown has been rebuilt on the server's state, which no longer holds it.
+ */
+export type GameMoment = {
+  /** 1 for the first period; past the regulation periods, overtime. */
+  readonly period: number;
+  /** The game clock left in the period, in milliseconds. */
+  readonly clockMs: number;
+};
+
+/** A tap as the screens list it: the command, and where in the game it was made if known. */
+export type KeptTap = {
+  readonly command: TrackerCommand;
+  /** Null for a tap stored before this was kept. */
+  readonly moment: GameMoment | null;
+};
+
 /** One tap held on the device until the server has answered for it. */
 export type QueuedCommand = {
   readonly gameId: string;
@@ -21,10 +41,17 @@ export type QueuedCommand = {
    * stored with no session, or before this was kept.
    */
   readonly sessionId?: string;
+  /** Where in the game the tap was made (finding I). Absent on a tap stored before this was kept. */
+  readonly moment?: GameMoment;
 } & (
   | { readonly state: 'waiting' }
   /** Refused: kept so the scorekeeper can be told, never sent again. */
   | { readonly state: 'refused'; readonly refusal: CommandRefusal }
+  /**
+   * Not saved: made under a session that lost the game, so never sent (T6 §5). Kept
+   * until the scorekeeper has seen the list, so a reload does not lose it.
+   */
+  | { readonly state: 'not-saved' }
 );
 
 /** What one answer from the server changes, written together or not at all. */
@@ -32,6 +59,8 @@ export type QueueSettlement = {
   /** Commands to drop: the server has them (accepted or duplicate), or they are given up. */
   readonly remove?: readonly string[];
   readonly refuse?: readonly { readonly commandId: string; readonly refusal: CommandRefusal }[];
+  /** Commands to keep as not saved: never sent again, kept until they are removed. */
+  readonly notSaved?: readonly string[];
 };
 
 /**
@@ -63,6 +92,12 @@ export class QueueError extends Error {
   }
 }
 
+/** A stored tap as the screens list it. */
+export const keptTap = (entry: QueuedCommand): KeptTap => ({
+  command: entry.command,
+  moment: entry.moment ?? null,
+});
+
 /** `added` when the tap is newly stored, `held` when the device already had it. */
 export type AddResult = 'added' | 'held';
 
@@ -79,6 +114,7 @@ export interface QueueStorage {
       readonly protocolVersion: number;
       readonly command: TrackerCommand;
       readonly sessionId?: string;
+      readonly moment?: GameMoment;
     },
   ): Promise<AddResult>;
   /** The game's queue, oldest tap first. */
