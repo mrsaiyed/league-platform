@@ -634,7 +634,7 @@ export const en = {
   'admin.boxScore.noPlayers': 'This team has no players on its roster yet. Add them in Teams.',
   'admin.boxScore.save': 'Save box score and make it final',
   'admin.boxScore.locked.decided':
-    'This game is final. To correct it, reopen it with a reason; then fix the grid and save again.',
+    'This game is final. To correct it, reopen it with a reason; then enter its result again.',
   'admin.boxScore.locked.cancelled': 'This game was cancelled, so it has no box score.',
   'admin.boxScore.locked.tracked':
     'This game was scored with the live tracker. Correct it in the tracker, so its list of plays still explains the numbers.',

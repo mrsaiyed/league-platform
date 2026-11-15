@@ -339,9 +339,9 @@ export async function GamesPage({
       ) : rows.length === 0 ? (
         <p>{t('admin.games.empty')}</p>
       ) : (
-        <ul className="admin-game-list ui-card-grid">
+        <ul className="admin-game-list ui-stack">
           {rows.map((game) => (
-            <li key={game.id} id={gameAnchor(game.id)}>
+            <li key={game.id} id={gameAnchor(game.id)} className="ui-stack">
               <div className="ui-stack">
                 {notice !== undefined && game === aboutRow ? <NoticeLine notice={notice} /> : null}
                 <GameCard
