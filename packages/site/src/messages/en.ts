@@ -167,6 +167,13 @@ export const en = {
   // result is still awaited, so its label is true of both.
   'home.results.kicker': 'Latest games',
   'home.standings.kicker': 'The race for the top',
+  // The season's leaders on the home page (step 2.147 part 2): a tiny label on each card
+  // (the leader's place and what is led), and what the number is.
+  'home.leaders': 'Leading the way',
+  'home.leaders.kicker': 'The players to watch',
+  'home.leaders.all': 'All player stats',
+  'home.leaders.label': '{place} / {stat}',
+  'home.leaders.perGame': 'per game',
   'home.call.title': 'Every team has a story.',
   'home.call.text': 'Rosters, records and results for every team in the league.',
   'home.call.action': 'Meet the teams',

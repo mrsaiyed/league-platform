@@ -10,6 +10,7 @@ import {
   Emblem,
   GameCard,
   Hero,
+  LeaderSpot,
   Section,
   StandingsTable,
   StatStrip,
@@ -676,6 +677,77 @@ describe('the band near the foot of a page', () => {
   });
 });
 
+describe('a leader, picked out', () => {
+  const spot = (extra: Partial<Parameters<typeof LeaderSpot>[0]> = {}) =>
+    render(
+      createElement(LeaderSpot, {
+        label: '01 / Points',
+        value: '17.0',
+        unit: 'per game',
+        name: arabicName,
+        detail: 'Hawks · 6 games',
+        team: { name: 'Hawks', color: '#ff0000' },
+        ...extra,
+      }),
+    );
+
+  it('is a label, one big number, the player’s name as its title, a quiet line and the team’s shield', () => {
+    const html = spot();
+    expect(html).toContain('<article class="ui-spot">');
+    expect(html).toContain('<p class="ui-spot-label">01 / Points</p>');
+    expect(html).toContain(
+      '<p class="ui-spot-figure"><span class="ui-spot-value">17.0</span><span class="ui-spot-unit">per game</span></p>',
+    );
+    // The name keeps its own direction, in any script, and is the card's title.
+    expect(html).toContain(`<h3 class="ui-spot-name" dir="auto">${arabicName}</h3>`);
+    expect(html).toContain('<p class="ui-spot-detail" dir="auto">Hawks · 6 games</p>');
+    expect(html).toMatch(/<svg class="ui-emblem"[^>]*style="--team-color:#ff0000">.*>H<\/text>/);
+    // A player of several teams has no one shield; a number may stand without a unit.
+    expect(spot({ team: undefined })).not.toContain('ui-emblem');
+    expect(spot({ unit: undefined })).not.toContain('ui-spot-unit');
+    // The number is the largest thing on the card, in the color the eye lands on.
+    expect(css).toMatch(
+      /\.ui-spot-value \{\s*color: var\(--color-pop\);\s*font-family: var\(--font-heading\);\s*font-size: var\(--text-48\);/,
+    );
+    expect(css).toMatch(/\.ui-root \.ui-spot-name \{\s*font-size: var\(--text-22\);/);
+  });
+
+  it('carries the league’s main color on the first of a row, in a band’s own fitted colors', () => {
+    expect(spot({ first: true })).toContain('<article class="ui-spot" data-first="true">');
+    expect(spot()).not.toContain('data-first');
+    expect(css).toMatch(
+      /\.ui-spot\[data-first='true'\] \{\s*background-color: var\(--color-band\);\s*background-image: linear-gradient\(120deg, var\(--color-band-glow\), var\(--color-band\)\);[^}]*color: var\(--color-on-band\);/,
+    );
+    expect(css).toMatch(
+      /\.ui-spot\[data-first='true'\] :is\(\.ui-spot-label, \.ui-spot-unit, \.ui-spot-detail\) \{\s*color: var\(--color-band-muted\);/,
+    );
+    expect(css).toMatch(
+      /\.ui-spot\[data-first='true'\] \.ui-emblem-letter \{\s*color: var\(--color-on-band\);/,
+    );
+    // Mirrored for a right-to-left page.
+    expect(css).toMatch(
+      /\[dir='rtl'\] \.ui-spot\[data-first='true'\] \{\s*background-image: linear-gradient\(240deg,/,
+    );
+  });
+
+  it('is one short row where it has a column to itself, and stands three across on a laptop', () => {
+    expect(css).toMatch(/\.ui-spot \{[^}]*container: spot \/ inline-size;/);
+    expect(css).toMatch(
+      /@container spot \(min-width: 28rem\) \{\s*\.ui-spot-figure \{\s*grid-column: 1;[^}]*\}\s*\.ui-spot-who \{\s*grid-column: 2;/,
+    );
+    const wide = css.slice(
+      css.indexOf("@media (min-width: 48rem) {\n  .ui-spot-row[data-across='two']"),
+    );
+    expect(wide.startsWith('@media')).toBe(true);
+    expect(wide).toMatch(
+      /\.ui-spot-row\[data-across='three'\] \{\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/,
+    );
+    expect(css).toMatch(
+      /\.ui-spot-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\);/,
+    );
+  });
+});
+
 describe('color where the eye should land (C-16)', () => {
   // The highlight itself is still spent only on the Live marker and the winner's score
   // (display.test.ts). The color the eye lands on is worked out from the league's design
@@ -702,6 +774,8 @@ describe('color where the eye should land (C-16)', () => {
         ".ui-standings[data-emblems='true'] tbody td.ui-num:first-child",
         '.ui-team-card-figure',
         '.ui-leader:first-child .ui-leader-value',
+        // A leader's one big number.
+        '.ui-spot-value',
       ].sort(),
     );
   });
@@ -743,6 +817,9 @@ describe('color where the eye should land (C-16)', () => {
         '.ui-hero-title-pop',
         ".ui-root .ui-button[data-kind='pop']",
         '.ui-call-band',
+        // The first leader's card is a small band: its edge and its number.
+        ".ui-spot[data-first='true']",
+        ".ui-spot[data-first='true'] .ui-spot-value",
       ].sort(),
     );
   });

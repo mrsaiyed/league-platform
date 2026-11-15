@@ -599,6 +599,23 @@ html {
   display: grid;
   gap: var(--step-5);
 }
+/* The season's leaders under a short column of standings: a small heading with the way to
+   every player's numbers, then each leader as one short row. */
+.home-leaders-beside {
+  margin-block-start: var(--step-5);
+}
+.home-leaders-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-1) var(--step-4);
+  min-block-size: var(--tap);
+}
+.league-site .home-leaders-head .ui-kicker {
+  margin: 0;
+  font-family: var(--font-body);
+}
 .home-tables > * {
   min-inline-size: 0;
 }

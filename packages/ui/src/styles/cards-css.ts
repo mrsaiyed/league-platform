@@ -225,6 +225,147 @@ export const cardsCss = String.raw`
   font-size: var(--text-36);
 }
 
+/* One leader, picked out: a tiny label, one very large number, the player's name, a quiet
+   line, and the team's shield in the corner. The card is its own measure: narrow, its
+   parts stand one over the other; wide (a card with a column to itself), the number
+   stands at the start and the name beside it, so the card is one short row. */
+.ui-spot {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  gap: var(--step-2) var(--step-5);
+  inline-size: 100%;
+  padding: var(--step-5);
+  background-color: var(--color-panel);
+  background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
+  color: var(--color-text);
+  border: var(--card-border-width) solid var(--color-line);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  container: spot / inline-size;
+}
+/* Each part takes the card's width, one over the other, unless the card is wide (below). */
+.ui-spot > * {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.ui-spot-label {
+  /* Clear of the shield in the corner. */
+  padding-inline-end: var(--step-7);
+  color: var(--color-accent-text);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+.ui-spot > .ui-emblem {
+  position: absolute;
+  inset-block-start: var(--step-4);
+  inset-inline-end: var(--step-4);
+  block-size: var(--step-7);
+}
+.ui-spot-figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--step-2);
+}
+/* A big number that stands alone may wear the display face's own figures. */
+.ui-spot-value {
+  color: var(--color-pop);
+  font-family: var(--font-heading);
+  font-size: var(--text-48);
+  font-weight: var(--display-weight);
+  line-height: 1.1;
+}
+.ui-spot-unit {
+  color: var(--color-muted);
+  font-size: var(--text-12);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ui-spot-who {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-1);
+  min-inline-size: 0;
+}
+.ui-spot-who > * {
+  margin: 0;
+}
+.ui-root .ui-spot-name {
+  font-size: var(--text-22);
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+.ui-spot-detail {
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+/* The first of a row is a small band: the league's main color, with a band's own colors
+   for its words and its number, which are fitted to it whatever the league chose. */
+.ui-spot[data-first='true'] {
+  background-color: var(--color-band);
+  background-image: linear-gradient(120deg, var(--color-band-glow), var(--color-band));
+  border-color: color-mix(in srgb, var(--color-band-pop) 28%, transparent);
+  color: var(--color-on-band);
+}
+[dir='rtl'] .ui-spot[data-first='true'] {
+  background-image: linear-gradient(240deg, var(--color-band-glow), var(--color-band));
+}
+.ui-spot[data-first='true'] :is(.ui-spot-label, .ui-spot-unit, .ui-spot-detail) {
+  color: var(--color-band-muted);
+}
+.ui-spot[data-first='true'] .ui-spot-value {
+  color: var(--color-band-pop);
+}
+.ui-spot[data-first='true'] > .ui-emblem {
+  color: color-mix(in srgb, var(--emblem-color) 60%, var(--color-on-band));
+}
+.ui-spot[data-first='true'] .ui-emblem-letter {
+  color: var(--color-on-band);
+}
+/* Wide: the number in a first column of its own, the name beside it, clear of the shield. */
+@container spot (min-width: 28rem) {
+  .ui-spot-figure {
+    grid-column: 1;
+    align-self: center;
+    min-inline-size: calc(2 * var(--step-8) + var(--step-5));
+  }
+  .ui-spot-who {
+    grid-column: 2;
+    align-self: center;
+    padding-inline-end: var(--step-7);
+  }
+}
+/* Leaders in a row: three across on a laptop, one under the other on a phone; in a column
+   of their own (beside a list of games), one under the other at any width. */
+.ui-spot-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-spot-row > li {
+  display: grid;
+  min-inline-size: 0;
+}
+@media (min-width: 48rem) {
+  .ui-spot-row[data-across='two'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--step-5);
+  }
+  .ui-spot-row[data-across='three'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--step-5);
+  }
+}
+
 /* A group that opens and closes without any script: a round of the schedule. */
 .ui-group {
   border-block-start: 1px solid var(--color-line);
