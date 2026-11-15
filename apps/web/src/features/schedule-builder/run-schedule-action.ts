@@ -4,11 +4,13 @@
 // Every edit goes to the draft; only `publish` reaches the public schedule.
 import {
   addDraftGame,
+  addDraftRound,
   changeDraftRoundDate,
   discardScheduleDraft,
   moveDraftGame,
   publishSchedule,
   removeDraftGame,
+  removeDraftRound,
   renameDraftRound,
   setDraftRecording,
   swapDraftGames,
@@ -26,11 +28,26 @@ export type ScheduleActionKind =
   | 'swap-games'
   | 'rename-round'
   | 'change-round-date'
+  | 'add-round'
+  | 'remove-round'
   | 'publish'
   | 'discard';
 
+/** What a save did, when the grid names it (step 2.160). */
+export type SavedDetail =
+  | { readonly what: 'round-added'; readonly roundId: string }
+  | { readonly what: 'round-removed' }
+  /** A game went to another round and its date was left as it was: the grid offers the round's. */
+  | { readonly what: 'game-round'; readonly gameId: string };
+
+/** Which form a refusal belongs beside: the new round's, or one round's own. */
+export type RefusedAt =
+  | { readonly form: 'add-round'; readonly label: string; readonly date: string }
+  | { readonly form: 'round'; readonly roundId: string };
+
 export type ScheduleActionOutcome =
-  | { readonly kind: 'saved' | 'published' | 'discarded' }
+  | { readonly kind: 'saved'; readonly detail?: SavedDetail }
+  | { readonly kind: 'published' | 'discarded' }
   | {
       readonly kind: 'refused';
       /** The command's error code, or `invalid-input`. */
@@ -39,6 +56,8 @@ export type ScheduleActionOutcome =
       readonly reason?: string;
       /** The move was saved to the draft but the recording change after it was refused. */
       readonly partial?: true;
+      /** Where to say it, with what was typed, so the form keeps it. */
+      readonly at?: RefusedAt;
     };
 
 type Basis = {
@@ -133,7 +152,33 @@ export async function runScheduleAction(
         // The move above is already in the draft: say so rather than a plain "not saved".
         if (!set.ok) return movedSlot ? { ...refusal(set), partial: true } : refusal(set);
       }
+      // Into another round with the date left as it was: the grid offers the round's date.
+      const [wasRound, wasDate] = wasSlot.split('~');
+      if (
+        movedSlot &&
+        slot.roundId !== null &&
+        slot.roundId !== wasRound &&
+        slot.date === wasDate
+      ) {
+        return { kind: 'saved', detail: { what: 'game-round', gameId } };
+      }
       return { kind: 'saved' };
+    }
+    case 'add-round': {
+      const roundId = text(form, 'roundId');
+      const label = text(form, 'label');
+      const date = text(form, 'date');
+      const done = await addDraftRound(context, { ...basis, roundId, label, date }, deps);
+      return done.ok
+        ? { kind: 'saved', detail: { what: 'round-added', roundId } }
+        : { ...refusal(done), at: { form: 'add-round', label, date } };
+    }
+    case 'remove-round': {
+      const roundId = text(form, 'roundId');
+      const done = await removeDraftRound(context, { ...basis, roundId }, deps);
+      return done.ok
+        ? { kind: 'saved', detail: { what: 'round-removed' } }
+        : { ...refusal(done), at: { form: 'round', roundId } };
     }
     case 'remove-game': {
       const done = await removeDraftGame(context, { ...basis, gameId }, deps);

@@ -3,7 +3,7 @@
 // games are in a clash, and the clashes in words. No page code here, so it is tested
 // without a server.
 import type { Clash, ScheduleDraftView, ScheduleGame, VenueWithCourts } from '@srleagues/core';
-import { t } from '../../server/messages.ts';
+import { locale, t } from '../../server/messages.ts';
 
 export type GridTeam = { readonly id: string; readonly name: string };
 
@@ -24,6 +24,16 @@ export type GridGame = {
   /** Only a game that is still just scheduled can be edited here. */
   readonly editable: boolean;
   readonly clashed: boolean;
+  /**
+   * Its round's date while the game is on another day (step 2.160), so the grid can offer
+   * it; null when the game is on it, or its round has no date.
+   */
+  readonly offRoundDate: string | null;
+  /**
+   * The game is outside its round's days (step 2.160): before the round's date, or on or
+   * after the next round's (a week on, for the last round). Flagged until it is moved.
+   */
+  readonly outsideRound: boolean;
 };
 
 export type GridRound = {
@@ -57,6 +67,29 @@ export function parsePlace(value: string): { venueId: string | null; court: stri
   return { venueId: value.slice(0, cut), court: court === '' ? null : court };
 }
 
+const dayFormat = new Intl.DateTimeFormat(locale, {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+
+/** A calendar day in words, "Sun, Nov 29"; a value that is not a day is given back as it is. */
+export function dayText(date: string): string {
+  const day = new Date(`${date}T00:00:00.000Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(day.getTime())
+    ? dayFormat.format(day)
+    : date;
+}
+
+/** The day after `date` by `days`, as YYYY-MM-DD; undefined for a value that is not a day. */
+export function daysAfter(date: string, days: number): string | undefined {
+  const day = new Date(`${date}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(day.getTime())) return undefined;
+  day.setUTCDate(day.getUTCDate() + days);
+  return day.toISOString().slice(0, 10);
+}
+
 const byWhen = (a: GridGame, b: GridGame) =>
   a.date.localeCompare(b.date) ||
   (a.time ?? '99:99').localeCompare(b.time ?? '99:99') ||
@@ -80,6 +113,21 @@ export function buildGrid(
       : t('schedule.admin.gameWhere', { venue: venue.name, court });
   };
   const clashed = new Set(view.clashes.flatMap(gamesOf));
+  const roundDates = new Map(view.result.rounds.map((r) => [r.id, r.date]));
+  const dated = view.result.rounds.flatMap((r) => (r.date === null ? [] : [r.date])).sort();
+  const roundDateOf = (roundId: string | null): string | null =>
+    roundId === null ? null : (roundDates.get(roundId) ?? null);
+  const offRoundDate = (roundId: string | null, date: string): string | null => {
+    const roundDate = roundDateOf(roundId);
+    return roundDate !== null && roundDate !== date ? roundDate : null;
+  };
+  /** A round's days run from its date to the day before the next later round's, or a week. */
+  const outsideRound = (roundId: string | null, date: string): boolean => {
+    const roundDate = roundDateOf(roundId);
+    if (roundDate === null) return false;
+    const end = dated.find((d) => d > roundDate) ?? daysAfter(roundDate, 7) ?? roundDate;
+    return date < roundDate || date >= end;
+  };
   const all: GridGame[] = view.result.games
     .map((g) => ({
       id: g.id,
@@ -96,6 +144,8 @@ export function buildGrid(
       status: g.status,
       editable: g.status === 'scheduled',
       clashed: clashed.has(g.id),
+      offRoundDate: offRoundDate(g.roundId, g.date),
+      outsideRound: outsideRound(g.roundId, g.date),
     }))
     .sort(byWhen);
   const roundIds = new Set(view.result.rounds.map((r) => r.id));

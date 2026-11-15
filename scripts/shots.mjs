@@ -128,6 +128,19 @@ const adminPages = [
   { name: 'admin-teams', at: '/admin/teams' },
   { name: 'admin-team', at: '/admin/teams', first: '/admin/teams/' },
   { name: 'admin-schedule', at: '/admin/schedule' },
+  // Step 2.160: a season not public yet with no rounds, "Add a round" open at the foot,
+  // and the same form refused, with what was typed kept and the reason beside it. Only the
+  // first made-up league has that season.
+  {
+    name: 'admin-schedule-no-rounds',
+    at: '/admin/schedule?season=winter-2027',
+    league: 'north-valley',
+  },
+  {
+    name: 'admin-schedule-round-refused',
+    league: 'north-valley',
+    at: '/admin/schedule?season=winter-2027&problem=change-refused&reason=invalid-date&at=add-round&label=Week%201&date=#add-round',
+  },
   { name: 'admin-import', at: '/admin/schedule/import' },
   { name: 'admin-season', at: '/admin/season' },
   { name: 'admin-settings', at: '/admin/settings' },
@@ -395,12 +408,15 @@ try {
             context: visitor,
             base: `/${league}`,
           })),
-        ...(design === '' ? adminPages : []).map((page) => ({
-          ...page,
-          name: `${league}-${page.name}`,
-          context: staff,
-          base: `/${league}`,
-        })),
+        ...(design === '' ? adminPages : [])
+          // A page of one league's own season is taken in that league only.
+          .filter((page) => page.league === undefined || page.league === league)
+          .map((page) => ({
+            ...page,
+            name: `${league}-${page.name}`,
+            context: staff,
+            base: `/${league}`,
+          })),
       ]),
       ...scorekeeperPages.map((page) => ({
         ...page,

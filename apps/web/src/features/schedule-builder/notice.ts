@@ -1,6 +1,7 @@
 // How the grid says what just happened. The address carries only fixed words
 // (`?done=saved`, `?problem=changed-since-read`); the words themselves are looked up
 // here, so nothing a visitor types into an address can become text on the page.
+import { maxRounds } from '@srleagues/core';
 import { t } from '../../server/messages.ts';
 
 type Search = Readonly<Record<string, string | readonly string[] | undefined>>;
@@ -36,6 +37,8 @@ const problems = {
   'game-without-time': () => t('schedule.admin.error.game-without-time'),
   'change-no-longer-fits': () => t('schedule.admin.error.change-no-longer-fits'),
   'nothing-to-publish': () => t('schedule.admin.error.nothing-to-publish'),
+  'round-in-use': () => t('schedule.admin.error.round-in-use'),
+  'round-cannot-be-added': () => t('schedule.admin.error.round-cannot-be-added'),
 } as const;
 
 const reasons = {
@@ -47,6 +50,9 @@ const reasons = {
   'empty-round-label': () => t('schedule.admin.refused.empty-round-label'),
   'invalid-date': () => t('schedule.admin.refused.invalid-date'),
   'invalid-time': () => t('schedule.admin.refused.invalid-time'),
+  'round-exists': () => t('schedule.admin.refused.round-exists'),
+  'round-has-games': () => t('schedule.admin.refused.round-has-games'),
+  'too-many-rounds': () => t('schedule.admin.refused.too-many-rounds', { max: maxRounds }),
 } as const;
 
 const blockers = {
@@ -61,6 +67,7 @@ const blockers = {
   'unknown-venue': () => t('schedule.admin.blocker.unknown-venue'),
   'unknown-court': () => t('schedule.admin.blocker.unknown-court'),
   'draft-unreadable': () => t('schedule.admin.blocker.draft-unreadable'),
+  'round-in-use': () => t('schedule.admin.blocker.round-in-use'),
 } as const;
 
 function pick<T extends Record<string, () => string>>(

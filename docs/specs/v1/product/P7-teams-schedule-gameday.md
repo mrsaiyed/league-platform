@@ -68,7 +68,7 @@ The builder produces a full schedule and a **fairness report**: for each team, h
 
 ### 4.3 Adjust by hand
 
-A grid of rounds and slots (Faraj's "Edit Full Schedule" view). Drag a game to another slot, swap two games, add or remove a game, rename a round ("Week 5 — Rivalry Week"), change a round's date. Clashes are flagged the moment they happen: a team in two places, a court double-booked, a game on a skipped date.
+A grid of rounds and slots (Faraj's "Edit Full Schedule" view). Drag a game to another slot, swap two games, add or remove a game, add a round (a name and a date), remove a round that has no games, rename a round ("Week 5 — Rivalry Week"), change a round's date. A game moved to another round is offered that round's date. Clashes are flagged the moment they happen: a team in two places, a court double-booked, a game on a skipped date.
 
 ### 4.4 Publish
 

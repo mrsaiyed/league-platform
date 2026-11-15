@@ -5,6 +5,7 @@
 // season's games everywhere: the public schedule and home page, a game's own page, the
 // games area's list and the tracker. The draft is the same one a fixture import fills.
 import type { ScheduleAdminPorts } from './schedule-admin.ts';
+import { worldPublicSeasons } from './stand-in-world-reads.ts';
 import type { World } from './stand-in-world.ts';
 
 export function standInSchedule(world: World): ScheduleAdminPorts {
@@ -15,5 +16,20 @@ export function standInSchedule(world: World): ScheduleAdminPorts {
         .filter((t) => t.seasonId === seasonId && !t.binned)
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(({ id, name }) => ({ id, name })),
+    seasonsOf: async (leagueId) => {
+      const s = await world.read(leagueId);
+      const shown = worldPublicSeasons(s);
+      const hidden = (s?.seasons ?? [])
+        .filter((x) => !shown.some((p) => p.id === x.id))
+        .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+        .map((x) => ({
+          id: x.id,
+          name: x.name,
+          slug: x.slug,
+          isCurrent: s?.currentSeasonId === x.id,
+          isPublic: false,
+        }));
+      return [...shown.map((x) => ({ ...x, isPublic: true })), ...hidden];
+    },
   };
 }
