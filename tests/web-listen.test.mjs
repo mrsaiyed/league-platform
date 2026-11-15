@@ -1,15 +1,16 @@
-// Where the web app listens (scripts/web-listen.mjs, step 2.152, review 2 M1). On the
-// made-up stand-in it listens on this computer's loopback address only, so no other
-// computer can reach it; on a database it listens as before. And no place in this
-// repository starts the web app's server without passing its arguments through
-// withLoopback: a new starter that forgets fails here.
+// Where the web app listens (scripts/web-listen.mjs, step 2.152, review 2 M1 and review 3
+// L2). In local work and tests, on the made-up stand-in or the made-up database, it
+// listens on this computer's loopback address only, so no other computer can reach it; a
+// deployed server listens as it is told. And no place in this repository starts the web
+// app's server without passing its arguments through withLoopback: a new starter that
+// forgets fails here.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { loopback, runsOnStandIn, withLoopback } from '../scripts/web-listen.mjs';
+import { listensOnLoopbackOnly, loopback, withLoopback } from '../scripts/web-listen.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const standIn = { APP_ENV: 'test' };
@@ -40,19 +41,31 @@ test('the stand-in listens on the loopback address only, whatever else was asked
   }
 });
 
-test('settings that do not plainly name a database run on the stand-in', () => {
-  assert.equal(runsOnStandIn({}), true);
-  assert.equal(runsOnStandIn({ APP_ENV: 'local', LOCAL_DATA: 'stand-in' }), true);
-  assert.equal(runsOnStandIn({ APP_ENV: 'something-else' }), true);
-  assert.equal(runsOnStandIn({ APP_ENV: 'test', LOCAL_DATA: 'made-up-database' }), false);
-  assert.equal(runsOnStandIn({ APP_ENV: 'staging' }), false);
-  assert.equal(runsOnStandIn({ APP_ENV: 'production' }), false);
+test('local work and tests listen on loopback only, whatever LOCAL_DATA says', () => {
+  assert.equal(listensOnLoopbackOnly({}), true);
+  assert.equal(listensOnLoopbackOnly({ APP_ENV: 'local', LOCAL_DATA: 'stand-in' }), true);
+  assert.equal(listensOnLoopbackOnly({ APP_ENV: 'something-else' }), true);
+  // The made-up database's made-up member signs in with a password written in the code.
+  for (const APP_ENV of ['local', 'test']) {
+    const env = { APP_ENV, LOCAL_DATA: 'made-up-database' };
+    assert.equal(listensOnLoopbackOnly(env), true, APP_ENV);
+    assert.deepEqual(
+      withLoopback(['start', '--hostname', '0.0.0.0', '--port', '1'], env),
+      ['start', '--port', '1', '--hostname', '127.0.0.1'],
+      APP_ENV,
+    );
+    assert.deepEqual(withLoopback(['dev'], env), ['dev', '--hostname', '127.0.0.1'], APP_ENV);
+  }
+  assert.equal(listensOnLoopbackOnly({ APP_ENV: 'staging' }), false);
+  assert.equal(listensOnLoopbackOnly({ APP_ENV: 'production' }), false);
 });
 
-test('on a database, and when building, the arguments are as given', () => {
+test('on a deployed server, and when building, the arguments are as given', () => {
   const asked = ['start', '--hostname', '0.0.0.0', '--port', '1'];
-  assert.deepEqual(withLoopback(asked, { APP_ENV: 'staging' }), asked);
-  assert.deepEqual(withLoopback(asked, { APP_ENV: 'test', LOCAL_DATA: 'made-up-database' }), asked);
+  for (const APP_ENV of ['staging', 'production']) {
+    assert.deepEqual(withLoopback(asked, { APP_ENV }), asked, APP_ENV);
+    assert.deepEqual(withLoopback(asked, { APP_ENV, LOCAL_DATA: 'made-up-database' }), asked);
+  }
   assert.deepEqual(withLoopback(['build'], standIn), ['build']);
 });
 

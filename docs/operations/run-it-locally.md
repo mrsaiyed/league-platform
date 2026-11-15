@@ -78,7 +78,8 @@ addressed to `localhost`, `127.0.0.1`, `[::1]`, a name ending in `.localhost`, o
 name `PUBLIC_BASE_URL` gives, and only one not passed on by another server (no `Forwarded`
 or `Via` header, no `X-Forwarded-For` or `X-Forwarded-Host` from elsewhere). Anything else
 gets a plain page and nothing more. On the made-up database (`LOCAL_DATA=made-up-database`)
-the app listens as before.
+it listens on `127.0.0.1` only too, as everything does with `APP_ENV` local or test: the
+made-up member's password is written in the code there as well.
 
 To try it as a league's admin:
 

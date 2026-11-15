@@ -182,7 +182,9 @@ export type StandInOptions = {
 /**
  * A made-up member who signs in with a password on the sign-in stand-in, made when
  * the app starts (signUpMadeUpMember), so checks can compare an address that has an
- * account with one that has none (T-68).
+ * account with one that has none (T-68). Its password is written here, on the stand-in and
+ * on the made-up database alike, so in local work and tests the server listens on this
+ * computer's loopback address only, whatever LOCAL_DATA says (scripts/web-listen.mjs).
  */
 export const standInMember = {
   email: 'member@example.test',
