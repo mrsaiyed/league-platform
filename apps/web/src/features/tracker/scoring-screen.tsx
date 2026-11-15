@@ -38,6 +38,7 @@ import {
   type PadMode,
 } from './scoring-moves.ts';
 import { findTile, scoringView, type PlayerTile } from './scoring-view.ts';
+import { createTileDrag, type TileDrag } from './tile-drag.ts';
 import type { TapInput, TrackerControllerStatus } from './tracker-controller.ts';
 
 export type ScoringScreenProps = {
@@ -60,8 +61,6 @@ export type ScoringScreenProps = {
 const saidForMs = 3200;
 /** How long a tile shows what was tapped on it. */
 const markForMs = 650;
-/** A press that moves less than this is a tap, not a drag (checklist E2). */
-const dragStartsAtPx = 8;
 
 type Mark = 'points' | 'foul' | 'plain';
 
@@ -411,15 +410,13 @@ export function ScoringScreen(props: ScoringScreenProps) {
   }, [moreOpen, padMode]);
 
   // --- Dragging a bench player onto a floor player (checklist E2, E3). ---
-  const drag = useRef<{
-    readonly id: string;
-    readonly x: number;
-    readonly y: number;
-    lastX: number;
-    lastY: number;
-    moved: boolean;
-    over: HTMLElement | null;
-  } | null>(null);
+  // One press is followed at a time (tile-drag.ts): a second finger on another tile is
+  // not, so two fingers can never make a substitution nobody made.
+  const drag = useRef<TileDrag | null>(null);
+  drag.current ??= createTileDrag();
+  const pressed = drag.current;
+  /** The tile the dragged player is over now. */
+  const over = useRef<HTMLElement | null>(null);
   const ghost = useRef<HTMLDivElement | null>(null);
   /** The click that ends a drag is not a tap. */
   const swallowClick = useRef(false);
@@ -427,56 +424,57 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const tileAt = (x: number, y: number): HTMLElement | null =>
     document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-teams] [data-player]') ?? null;
   const endDrag = () => {
-    drag.current?.over?.removeAttribute('data-drop');
-    drag.current = null;
+    over.current?.removeAttribute('data-drop');
+    over.current = null;
     setDragging(null);
   };
   const dragHandlers = {
     ref: root,
     onPointerDown(event: PointerEvent<HTMLElement>) {
-      if (event.button !== 0 || !(event.target instanceof Element)) return;
+      if (!(event.target instanceof Element)) return;
       const tile = event.target.closest<HTMLElement>('[data-teams] [data-player]');
-      const id = tile?.dataset.player;
-      if (id === undefined) return;
-      const found = findTile(view, id);
+      const playerId = tile?.dataset.player;
+      if (playerId === undefined) return;
+      const found = findTile(view, playerId);
       // Only once the lineup is set: while picking, a tile is tapped, never dragged.
       if (found === undefined || view.teams[found.side].stage !== 'set') return;
-      const { clientX: x, clientY: y } = event;
-      drag.current = { id, x, y, lastX: x, lastY: y, moved: false, over: null };
+      pressed.down({
+        pointerId: event.pointerId,
+        isPrimary: event.isPrimary,
+        button: event.button,
+        playerId,
+        x: event.clientX,
+        y: event.clientY,
+      });
     },
     onPointerMove(event: PointerEvent<HTMLElement>) {
-      const now = drag.current;
-      if (now === null) return;
-      const far = Math.hypot(event.clientX - now.x, event.clientY - now.y) >= dragStartsAtPx;
-      if (!now.moved && !far) return;
-      now.lastX = event.clientX;
-      now.lastY = event.clientY;
-      if (!now.moved) {
-        now.moved = true;
-        setDragging(now.id);
-      }
+      const at = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+      const moved = pressed.move(at);
+      if (moved === 'ignored' || moved === 'still') return;
+      const dragged = pressed.current()?.playerId ?? null;
+      if (moved === 'started') setDragging(dragged);
       if (ghost.current !== null) {
-        ghost.current.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`;
+        ghost.current.style.transform = `translate(${at.x}px, ${at.y}px)`;
       }
-      const over = tileAt(event.clientX, event.clientY);
-      if (over !== now.over) {
-        now.over?.removeAttribute('data-drop');
-        if (over !== null && over.dataset.player !== now.id) over.setAttribute('data-drop', '');
-        now.over = over;
+      const under = tileAt(at.x, at.y);
+      if (under !== over.current) {
+        over.current?.removeAttribute('data-drop');
+        if (under !== null && under.dataset.player !== dragged) under.setAttribute('data-drop', '');
+        over.current = under;
       }
     },
     onPointerUp(event: PointerEvent<HTMLElement>) {
-      const now = drag.current;
+      const now = pressed.up({
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+      });
       if (now === null) return;
       endDrag();
       if (!now.moved) return;
       swallowClick.current = true;
       window.setTimeout(() => (swallowClick.current = false), 0);
-      const dropped = dropOn(
-        view,
-        now.id,
-        tileAt(event.clientX, event.clientY)?.dataset.player ?? null,
-      );
+      const dropped = dropOn(view, now.playerId, tileAt(now.x, now.y)?.dataset.player ?? null);
       if (dropped === null) return;
       if (dropped.kind === 'say') {
         say(t(dropped.key));
@@ -488,7 +486,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
       showPad(padAtRest);
       void send(dropped.input);
     },
-    onPointerCancel: endDrag,
+    onPointerCancel(event: PointerEvent<HTMLElement>) {
+      if (pressed.cancel(event.pointerId)) endDrag();
+    },
     onClickCapture(event: MouseEvent<HTMLElement>) {
       if (!swallowClick.current) return;
       swallowClick.current = false;
@@ -554,9 +554,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
           data-color={view.teams[draggedTile.side].color}
           ref={(element) => {
             ghost.current = element;
-            const at = drag.current;
+            const at = pressed.current();
             if (element !== null && at !== null) {
-              element.style.transform = `translate(${at.lastX}px, ${at.lastY}px)`;
+              element.style.transform = `translate(${at.x}px, ${at.y}px)`;
             }
           }}
         >
