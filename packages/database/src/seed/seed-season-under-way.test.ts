@@ -1,7 +1,14 @@
 // The seed leagues' seasons put under way (step 2.93): each league's season open, its
 // schedule published with a game a week ago (final) and one a week on in each division,
-// and the standings rebuilt from the result, all read back as a visitor reads them.
-import { dayIn, readStandings } from '@srleagues/core';
+// the standings rebuilt from the result, and (part 3) the played games recorded from box
+// scores for the league's people on the teams' rosters, all read back as a visitor reads them.
+import {
+  dayIn,
+  defaultNamePolicy,
+  publicViewer,
+  readStandings,
+  readStatisticsTable,
+} from '@srleagues/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
@@ -68,6 +75,38 @@ describe('putSeedSeasonsUnderWay', () => {
       );
       const lines = standings.value.tables.flatMap((t) => t.lines);
       expect(lines.reduce((sum, line) => sum + line.wins, 0)).toBe(divisions);
+    });
+
+    it(`records ${seed.slug}'s played games from box scores: every person on a team, with numbers`, async () => {
+      const league = made.leagues.find((l) => l.slug === seed.slug);
+      if (league === undefined) throw new Error(`no ${seed.slug} league`);
+      const read = <T>(work: (scope: LeagueScope) => Promise<T>) =>
+        withTransaction(db, { leagueId: league.leagueId }, work);
+      const [season] = await read((scope) => listPublicSeasons(scope));
+      const table = await read((scope) =>
+        readStatisticsTable(standingsReadStore(scope), {
+          seasonId: season?.id ?? '',
+          viewing: {
+            leagueId: league.leagueId,
+            viewer: publicViewer(league.leagueId),
+            audience: seed.audience,
+            // Full names to check the seed's own: what each league shows is the web app's.
+            policy: { ...defaultNamePolicy, childrenInFull: true },
+          },
+        }),
+      );
+      if (!table.ok) throw new Error(`no statistics: ${table.error.code}`);
+      // The statistics the season's starting rules keep (P7 §1).
+      expect(table.value.statKeys).toEqual(['points', 'fg3', 'fg1', 'fouls']);
+      const points = Object.fromEntries(
+        table.value.players.map((p) => [p.name.text, p.stats['points']?.total]),
+      );
+      expect(points).toEqual(
+        Object.fromEntries(
+          seed.people.map((p, place) => [`${p.firstName} ${p.lastName}`, 10 + 4 * place]),
+        ),
+      );
+      for (const player of table.value.players) expect(player.gamesPlayed).toBe(1);
     });
   }
 

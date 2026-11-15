@@ -3,26 +3,33 @@
 // results and standings to show. Made-up data only: it takes a PGlite, never an address.
 //
 // For every seed league, through the product's own commands as its owner, each in its
-// own scoped transaction: the current season is opened (made active), and in each
-// division the first two teams played a week ago, a final score recorded, and the second
-// and third play a week from now, published as the season's schedule. The standings are
-// rebuilt by the standings module's own event handler, as for any result. The same for
-// every league: no league is named here, and the dates follow the league's own today.
+// own scoped transaction: the current season is opened (made active); the league's
+// people are put on the rosters of the teams that played, one after another, each with a
+// number; in each division the first two teams played a week ago and the second and
+// third play a week from now, published as the season's schedule; and each game played
+// is recorded from its box score sheet, a line for every player on the two teams, so the
+// season has statistics as well as results (step 2.93 part 3). The standings and the
+// players' season totals are rebuilt by the standings module's own event handler, as for
+// any result. The same for every league: no league is named here, and the dates follow
+// the league's own today.
 import type { PGlite } from '@electric-sql/pglite';
 import {
   addDraftGame,
+  addToRoster,
   dayIn,
   eventHandlers,
   getScheduleDraft,
   publishSchedule,
-  recordFinalScore,
+  setBoxScore,
   updateSeason,
+  type BoxScoreLineInput,
   type CommandContext,
   type CommandDeps,
   type GamesTx,
   type LeaguesTx,
   type SchedulingTx,
   type StandingsTx,
+  type TeamsTx,
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
 import { commandTransaction } from '../db/command-transaction.ts';
@@ -37,9 +44,10 @@ import {
   leaguesStore,
   schedulingStore,
   standingsStore,
+  teamsStore,
 } from '../stores/index.ts';
 
-type SeasonTx = LeaguesTx & SchedulingTx & GamesTx & StandingsTx;
+type SeasonTx = LeaguesTx & SchedulingTx & GamesTx & StandingsTx & TeamsTx;
 
 /** How long ago the played games were, and how far ahead the next ones are: days. */
 const playedDaysAgo = 7;
@@ -116,6 +124,62 @@ async function plannedGames(pglite: PGlite, league: LeagueRow, today: string): P
   return planned;
 }
 
+/** A player put on a team, by their place in the league's list (0 first). */
+type Rostered = { readonly personId: string; readonly teamId: string; readonly place: number };
+
+/**
+ * The league's people, in the order they were added (their ids sort so), each put on the
+ * next team that played a week ago, round and round, with the number 4 and on.
+ */
+async function putPeopleOnTeams(
+  pglite: PGlite,
+  as: CommandContext,
+  games: readonly Planned[],
+  deps: CommandDeps<SeasonTx>,
+): Promise<Rostered[]> {
+  const teams = games
+    .filter((game) => game.score !== null)
+    .flatMap((game) => [game.homeTeamId, game.awayTeamId]);
+  const { rows } = await pglite.query<{ id: string }>(
+    'select id from people where league_id = $1 and deleted_at is null order by id',
+    [as.leagueId],
+  );
+  const rostered: Rostered[] = [];
+  for (const [place, person] of rows.entries()) {
+    const teamId = teams[place % teams.length];
+    if (teamId === undefined) break;
+    must(
+      'a roster place',
+      await addToRoster(
+        as,
+        { teamId, personId: person.id, jerseyNumber: String(4 + place), role: 'player' },
+        deps,
+      ),
+    );
+    rostered.push({ personId: person.id, teamId, place });
+  }
+  return rostered;
+}
+
+/**
+ * A player's line on the box score sheet, from their place in the league's list: points
+ * 10, 14, 18 and on (4 more each), one 3-pointer, 2, 3, 4 free throws, 1, 2, 3 fouls.
+ */
+function boxScoreLine(player: Rostered): BoxScoreLineInput {
+  return {
+    teamId: player.teamId,
+    personId: player.personId,
+    played: true,
+    secondsPlayed: null,
+    stats: {
+      points: 10 + 4 * player.place,
+      fg3: 1,
+      fg1: 2 + player.place,
+      fouls: 1 + player.place,
+    },
+  };
+}
+
 /** Opens every seed league's current season and plays the start of it (above). */
 export async function putSeedSeasonsUnderWay(
   pglite: PGlite,
@@ -140,6 +204,7 @@ export async function putSeedSeasonsUnderWay(
         scheduling: schedulingStore(scope),
         games: gamesStore(scope),
         standings: standingsStore(scope),
+        teams: teamsStore(scope),
       })),
       events: eventHandlers,
       log: () => {},
@@ -161,6 +226,7 @@ export async function putSeedSeasonsUnderWay(
         ),
       );
       const games = await plannedGames(pglite, league, dayIn(league.time_zone, now.getTime()));
+      const players = await putPeopleOnTeams(pglite, as, games, deps);
       for (const game of games) {
         const draft = must('the schedule draft', await getScheduleDraft(as, { seasonId }, deps));
         must(
@@ -180,7 +246,7 @@ export async function putSeedSeasonsUnderWay(
               time: startTime,
               venueId: null,
               court: null,
-              recording: 'final-score',
+              recording: game.score === null ? 'final-score' : 'box-score',
             },
             deps,
           ),
@@ -206,15 +272,19 @@ export async function putSeedSeasonsUnderWay(
           as,
           async (tx) => (await tx.games.find(game.gameId))?.version ?? 0,
         );
+        const lines = players
+          .filter((p) => p.teamId === game.homeTeamId || p.teamId === game.awayTeamId)
+          .map(boxScoreLine);
         must(
-          'a final score',
-          await recordFinalScore(
+          'a box score',
+          await setBoxScore(
             as,
             {
               gameId: game.gameId,
               version,
               homeScore: game.score.home,
               awayScore: game.score.away,
+              lines,
             },
             deps,
           ),

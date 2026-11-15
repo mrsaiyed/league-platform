@@ -26,9 +26,17 @@ describe('seed data', () => {
     expect(new Set(seedLeagues.map((l) => l.design)).size).toBe(2);
   });
 
+  it('has an adult league and a youth league, so names are seen shown both ways', () => {
+    expect(seedLeagues.map((l) => l.audience).sort()).toEqual(['adult', 'youth']);
+  });
+
   it('uses only addresses that cannot be real mailboxes', () => {
     for (const league of seedLeagues) {
-      const emails = [league.owner.email, ...league.members.map((m) => m.email)];
+      const emails = [
+        league.owner.email,
+        ...league.members.map((m) => m.email),
+        ...league.people.flatMap((p) => (p.contactEmail === undefined ? [] : [p.contactEmail])),
+      ];
       for (const email of emails) expect(email).toMatch(/@[a-z.]*example\.test$/);
     }
   });
@@ -47,13 +55,24 @@ describe('seedLeaguesInto', () => {
     expect(loaded.map((l) => l.created)).toEqual([true, true]);
     for (const league of seedLeagues) {
       const row = (
-        await pglite.query<{ id: string; name: string; status: string; owner: string }>(
-          `select l.id, l.name, l.status, a.email as owner from leagues l
+        await pglite.query<{
+          id: string;
+          name: string;
+          status: string;
+          audience: string;
+          owner: string;
+        }>(
+          `select l.id, l.name, l.status, l.audience, a.email as owner from leagues l
            join accounts a on a.id = l.owner_account_id where l.slug = $1`,
           [league.slug],
         )
       ).rows[0]!;
-      expect(row).toMatchObject({ name: league.name, status: 'live', owner: league.owner.email });
+      expect(row).toMatchObject({
+        name: league.name,
+        status: 'live',
+        audience: league.audience,
+        owner: league.owner.email,
+      });
       const teams = league.divisions.reduce((n, d) => n + d.teams.length, 0);
       expect(
         await count('select count(*)::int as n from teams where league_id = $1', [row.id]),
