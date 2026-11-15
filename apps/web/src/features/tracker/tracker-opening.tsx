@@ -193,10 +193,25 @@ export function TrackerOpening({
   );
   // Signed out, before the game was open (read-only) or while scoring (record 054): the
   // way to sign in, coming back to this game.
-  const signedOut =
+  // Right under the notice that says so. Before the game was open it is the one thing to
+  // do (the main button); while still scoring it sits beside the scoring, outlined.
+  const readOnlySignedOut =
     phase.kind === 'open' &&
-    (phase.status.signedOut ||
-      (phase.status.mode.kind === 'read-only' && phase.status.mode.reason === 'signed-out'));
+    phase.status.mode.kind === 'read-only' &&
+    phase.status.mode.reason === 'signed-out';
+  const signIn =
+    phase.kind === 'open' && (phase.status.signedOut || readOnlySignedOut) ? (
+      <p>
+        <a
+          className="ui-button"
+          {...(readOnlySignedOut ? { 'data-kind': 'main' } : {})}
+          href={signInHref}
+          onClick={leaveBy(signInHref)}
+        >
+          {t('tracker.signIn')}
+        </a>
+      </p>
+    ) : null;
 
   const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
   return (
@@ -217,22 +232,11 @@ export function TrackerOpening({
             rosters={rosters}
             busy={busy}
             openingText={openingText}
+            signIn={signIn}
             onTakeOver={act((game) => game.controller.takeOver())}
             onOpenAgain={act((game) => game.controller.openAgain())}
             onConfirm={(format) => act((game) => game.confirmFormat(format))()}
           />
-        ) : null}
-        {signedOut ? (
-          <p>
-            <a
-              className="ui-button"
-              data-kind="main"
-              href={signInHref}
-              onClick={leaveBy(signInHref)}
-            >
-              {t('tracker.signIn')}
-            </a>
-          </p>
         ) : null}
         {storeFailed ? (
           <p className="ui-notice" data-kind="error" role="alert">
@@ -289,6 +293,7 @@ function OpenGame({
   rosters,
   busy,
   openingText,
+  signIn,
   onTakeOver,
   onOpenAgain,
   onConfirm,
@@ -300,6 +305,8 @@ function OpenGame({
   readonly busy: boolean;
   /** "Opening the game…", and after a while a word about the connection. */
   readonly openingText: ReactNode;
+  /** The way to sign in, shown under the notices when the device is signed out. */
+  readonly signIn: ReactNode;
   readonly onTakeOver: () => void;
   readonly onOpenAgain: () => void;
   readonly onConfirm: (format: GameFormat) => void;
@@ -334,6 +341,7 @@ function OpenGame({
           ))}
         </div>
       )}
+      {signIn}
       {screen.kind === 'opening' ? openingText : null}
       {screen.kind === 'held-by-other' && !askingTakeOver ? (
         <p>
@@ -351,7 +359,7 @@ function OpenGame({
       {screen.kind === 'held-by-other' && askingTakeOver ? (
         <section aria-labelledby="tracker-take-over" data-take-over="">
           <p id="tracker-take-over">{t('tracker.takeOverQuestion', { name: screen.name })}</p>
-          <p className="ui-toolbar">
+          <p>
             <button
               type="button"
               className="ui-button"
@@ -363,7 +371,7 @@ function OpenGame({
               disabled={busy}
             >
               {t('tracker.takeOverYes')}
-            </button>
+            </button>{' '}
             <button
               type="button"
               className="ui-button"

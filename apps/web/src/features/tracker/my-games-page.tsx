@@ -51,8 +51,8 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
         ? leagueUrl(here, 'admin-area', { area: 'games', subpath: [game.id] })
         : leagueUrl(here, 'admin-area', { area: 'games' });
     return (
-      <p className="ui-toolbar" data-recording={recording}>
-        <span>{t(`admin.myGames.recording.${recording}`)}</span>
+      <p data-recording={recording}>
+        {t(`admin.myGames.recording.${recording}`)}{' '}
         <a className="ui-button" href={href}>
           {t('admin.myGames.enterScore')}
         </a>

@@ -124,20 +124,23 @@ function TrackerRefusal({
   readonly backHref: string;
   readonly enter?: { readonly href: string };
 }) {
-  const back = { href: backHref, label: t('tracker.back') };
+  if (enter === undefined) {
+    return (
+      <MessagePage title={t('tracker.title')} action={{ href: backHref, label: t('tracker.back') }}>
+        <p role="alert">{t(message)}</p>
+      </MessagePage>
+    );
+  }
+  // Two ways on: where the score is entered first (the main one), then the way back.
   return (
-    <MessagePage
-      title={t('tracker.title')}
-      action={
-        enter === undefined ? back : { href: enter.href, label: t('admin.myGames.enterScore') }
-      }
-    >
+    <MessagePage title={t('tracker.title')}>
       <p role="alert">{t(message)}</p>
-      {enter === undefined ? null : (
-        <a className="ui-button" href={backHref}>
-          {back.label}
-        </a>
-      )}
+      <a className="ui-button" data-kind="main" href={enter.href}>
+        {t('admin.myGames.enterScore')}
+      </a>
+      <a className="ui-button" href={backHref}>
+        {t('tracker.back')}
+      </a>
     </MessagePage>
   );
 }
