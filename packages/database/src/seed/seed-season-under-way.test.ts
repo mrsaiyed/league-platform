@@ -14,7 +14,11 @@ import { seedLeagues } from './seed-data.ts';
 
 let made: MadeUpDatabase;
 let db: DatabaseHandle;
+// The moment the seed is made, worked out once: every league's today is read from it, so
+// a run that crosses midnight checks every league against the same day.
+let startedAt = 0;
 beforeAll(async () => {
+  startedAt = Date.now();
   made = await madeUpDatabase({ underWay: true });
   db = createDatabase(made.source);
 }, 120_000);
@@ -28,7 +32,7 @@ describe('putSeedSeasonsUnderWay', () => {
     it(`opens ${seed.slug}'s season with a published schedule and standings`, async () => {
       const league = made.leagues.find((l) => l.slug === seed.slug);
       if (league === undefined) throw new Error(`no ${seed.slug} league`);
-      const today = dayIn(seed.timeZone, Date.now());
+      const today = dayIn(seed.timeZone, startedAt);
       const read = <T>(work: (scope: LeagueScope) => Promise<T>) =>
         withTransaction(db, { leagueId: league.leagueId }, work);
       const seasons = await read((scope) => listPublicSeasons(scope));
