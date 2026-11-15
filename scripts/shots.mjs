@@ -19,9 +19,13 @@
 // `game-live-light` and `game-final-light` are those two pages drawn with the second
 // league's design values, which is all that differs between two leagues' looks (T-90).
 //
-// `--only=long-name` takes the pages with tables at 320 and 390 wide with a made-up name of
-// 36 letters in the column that stays put, as they open and with the tables scrolled to
-// their far end (.local/shots/320 and /390, `…-long-name.jpg` and `…-long-name-scrolled.jpg`).
+// `--only=long-name` takes the public pages at 320 and 390 wide with long made-up names put
+// in: a team's of 36 letters in the first row of every table, on a scoreboard, a game card
+// and a team card and in a team page's heading, and a league's of 54 letters in the header.
+// Pages with tables are taken as they open and with the tables scrolled to their far end
+// (.local/shots/320 and /390, `…-long-name.jpg` and `…-long-name-scrolled.jpg`).
+//
+// `--only=menu` takes the phone menu, open, at 390 in each league's look (`…-menu-open.jpg`).
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -115,19 +119,37 @@ const platformPages = [
   { name: 'platform-help', at: '/help' },
 ];
 
-// A long name where a table's first column stays put, at the two narrowest phones.
+// Long names, at the two narrowest phones: a team's wherever a team is named (the column of
+// a table that stays put, a scoreboard, a game card, a team card, a team page's heading)
+// and a league's in the header.
 const longName = 'The Northside Community Thunderbolts';
+const longLeagueName = 'The Greater Northside Community Basketball Association';
 const longNameWidths = [
   { name: '320', viewport: { width: 320, height: 700 } },
   { name: '390', viewport: { width: 390, height: 844 } },
 ];
 const longNamePages = [
   { name: 'north-valley-home-long-name', at: '/north-valley' },
+  { name: 'north-valley-schedule-long-name', at: '/north-valley/schedule' },
   { name: 'north-valley-standings-long-name', at: '/north-valley/standings' },
   { name: 'north-valley-stats-long-name', at: '/north-valley/stats' },
-  { name: 'north-valley-team-long-name', at: '/north-valley/teams/owls' },
+  { name: 'north-valley-teams-long-name', at: '/north-valley/teams' },
+  { name: 'north-valley-team-long-name', at: '/north-valley/teams/owls', heading: true },
   { name: 'north-valley-game-final-long-name', at: `/north-valley/games/${finalGame}` },
+  { name: 'north-valley-game-live-long-name', at: `/north-valley/games/${liveGame}` },
+  {
+    name: 'north-valley-game-postponed-long-name',
+    at: `/north-valley/games/${listedGame(13, 3)}`,
+  },
+  {
+    name: 'north-valley-game-scheduled-long-name',
+    at: `/north-valley/games/${listedGame(13, 8)}`,
+  },
+  { name: 'harbor-city-home-long-name', at: '/harbor-city' },
+  { name: 'harbor-city-game-undated-long-name', at: `/harbor-city/games/${listedGame(5, 4)}` },
 ];
+// The phone menu, open, at 390 only (`--only=menu`): one picture a league.
+const menuWidth = { name: '390', viewport: { width: 390, height: 844 } };
 
 const flag = (name) => process.argv.includes(name);
 const only = (process.argv.find((arg) => arg.startsWith('--only=')) ?? '')
@@ -292,7 +314,8 @@ try {
   const tracked = gamePages['north-valley'].filter((page) => /game-(live|final)/.test(page.name));
   if (
     tracked.some((page) => wanted(`north-valley-${page.name}`)) ||
-    wanted('north-valley-game-final-long-name')
+    wanted('north-valley-game-final-long-name') ||
+    wanted('north-valley-game-live-long-name')
   ) {
     try {
       await scoreTrackedGames(origin);
@@ -367,10 +390,46 @@ try {
     await visitor.close();
     await staff.close();
   }
-  // A long name in the column of a table that stays put (`--only=long-name`): the first
-  // name of every table on the page is rewritten, in the picture only, to a made-up one of
-  // 36 letters, at the two narrowest phones. Each page is taken as it opens and again with
-  // its tables scrolled to their far end, which shows the numbers can still be reached.
+  // The phone menu, open (`--only=menu`), at 390 in each league's own look.
+  {
+    const jobs = leagues
+      .map((league) => ({ name: `${league}-menu-open`, at: `/${league}` }))
+      .filter((job) => wanted(job.name));
+    if (jobs.length > 0) {
+      fs.mkdirSync(path.join(out, menuWidth.name), { recursive: true });
+      const visitor = await browser.newContext({ viewport: menuWidth.viewport });
+      for (const job of jobs) {
+        const page = await visitor.newPage();
+        page.setDefaultTimeout(90_000);
+        try {
+          await page.goto(`${origin}${job.at}`, { waitUntil: 'networkidle' });
+          await page.locator('.site-header .site-menu > summary').click();
+          await page.locator('.site-header .site-menu-panel').waitFor({ state: 'visible' });
+          await page.waitForTimeout(300);
+          // The screen as a visitor holds it: the open panel over the top of the page.
+          await page.screenshot({
+            path: path.join(out, menuWidth.name, `${job.name}.jpg`),
+            type: 'jpeg',
+            quality: 80,
+          });
+          taken.push(`${menuWidth.name}/${job.name}.jpg`);
+        } catch (error) {
+          missed.push(
+            `${menuWidth.name}/${job.name}: ${String(error.message ?? error).split('\n')[0]}`,
+          );
+        } finally {
+          await page.close();
+        }
+      }
+      await visitor.close();
+    }
+  }
+  // Long names (`--only=long-name`), at the two narrowest phones. In the picture only, the
+  // league's name in the header is rewritten to a made-up one of 54 letters, and a made-up
+  // team name of 36 letters is put wherever the page names a team first: the first row of
+  // every table, the first team of a scoreboard, of the first game card and of the first
+  // team card, and a team page's own heading. Each page is taken as it opens and again
+  // with its tables scrolled to their far end, which shows the numbers can still be reached.
   for (const width of longNameWidths) {
     const jobs = longNamePages.filter((job) => wanted(job.name));
     if (jobs.length === 0) continue;
@@ -381,13 +440,24 @@ try {
       page.setDefaultTimeout(90_000);
       try {
         await page.goto(`${origin}${job.at}`, { waitUntil: 'networkidle' });
-        await page.evaluate((name) => {
-          for (const table of document.querySelectorAll('table.ui-table')) {
-            const first = table.querySelector('tbody .ui-team-cell > [dir]');
-            if (first) first.textContent = name;
-          }
-        }, longName);
-        for (const scrolled of [false, true]) {
+        await page.evaluate(
+          ({ name, league, heading }) => {
+            const put = (el, text) => {
+              if (el) el.textContent = text;
+            };
+            put(document.querySelector('.site-header .site-name > span'), league);
+            for (const table of document.querySelectorAll('table.ui-table')) {
+              put(table.querySelector('tbody .ui-team-cell > [dir]'), name);
+            }
+            put(document.querySelector('.ui-scoreboard-name > [dir]'), name);
+            put(document.querySelector('.ui-game-card .ui-game-team-name'), name);
+            put(document.querySelector('.ui-team-card-name a'), name);
+            if (heading) put(document.querySelector('.ui-page-head h1'), name);
+          },
+          { name: longName, league: longLeagueName, heading: job.heading === true },
+        );
+        const hasTables = (await page.locator('.ui-table-wrap').count()) > 0;
+        for (const scrolled of hasTables ? [false, true] : [false]) {
           if (scrolled) {
             await page.evaluate(() => {
               for (const box of document.querySelectorAll('.ui-table-wrap')) {
