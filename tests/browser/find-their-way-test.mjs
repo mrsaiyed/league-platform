@@ -536,6 +536,16 @@ if (browser) {
         'the scoring session was released: the next person is not told it is held elsewhere',
         (await page.getByText('is scoring this game on another device').count()) === 0,
       );
+      // The owner leaves the game as a person does, so the next check finds it free.
+      // Closing the browser context is no way out: the page's release on "pagehide" is
+      // all that would free the game then, and whether it is sent, or reaches the
+      // server, as the context is torn down depends on the browser (it did on this
+      // computer's Edge; on GitHub's Chromium the next check met the owner still holding
+      // the game, "Olive Owner is scoring this game on another device", and waited out).
+      await Promise.all([
+        page.waitForURL((url) => !url.pathname.includes('/score/')),
+        page.getByRole('link', { name: 'Back to your games', exact: true }).click(),
+      ]);
     } finally {
       await context.close();
     }
