@@ -1,6 +1,7 @@
 // readNamePolicy over made-up stored settings, and the T-81 scan of a youth league's
-// roster under each value of the two privacy settings (step 2.126). The scan of every
-// other public surface under each value is modules/name-policy-scan.test.ts.
+// roster under each value of the two privacy settings (steps 2.126 and 2.162). The scan
+// of every other public surface under each value is modules/name-policy-scan.test.ts;
+// the comparison with the behaviour before step 2.162 is people/no-more-than-before.test.ts.
 import { describe, expect, it } from 'vitest';
 import type { StoredSettingRow } from '../../leagues/index.ts';
 import { publicRosterLine, type RosterLineSource } from '../../teams/index.ts';
@@ -23,38 +24,89 @@ function stored(values: Record<string, unknown>, level: 'league' | 'season' = 'l
   return { settings, asked };
 }
 
+const confirmedKey = 'privacy.childrenInFullConfirmed';
+
 describe('readNamePolicy', () => {
-  it('is our starting policy when the league has set nothing (R-14, R-15)', async () => {
+  it('is our starting policy when the league has set nothing (R-14, R-15, R-29)', async () => {
     const { settings, asked } = stored({});
     expect(await readNamePolicy(settings)).toEqual(defaultNamePolicy);
-    expect(asked.sort()).toEqual(['privacy.playersMayAskForInitials', 'privacy.publicNames']);
+    // Every league starts on full names with the confirmation not given (record 065).
+    expect(defaultNamePolicy).toEqual({
+      names: 'full_name',
+      childrenInFull: false,
+      playersMayAskForInitials: false,
+    });
+    expect(asked.sort()).toEqual([
+      confirmedKey,
+      'privacy.playersMayAskForInitials',
+      'privacy.publicNames',
+    ]);
   });
 
-  it("reads the league's own values", async () => {
-    const { settings } = stored({
-      'privacy.publicNames': 'fullName',
-      'privacy.playersMayAskForInitials': true,
-    });
-    expect(await readNamePolicy(settings)).toEqual({
-      children: 'full_name',
-      playersMayAskForInitials: true,
-    });
+  it("reads the league's own values; children in full only with the confirmation", async () => {
+    expect(
+      await readNamePolicy(
+        stored({
+          'privacy.publicNames': 'fullName',
+          [confirmedKey]: true,
+          'privacy.playersMayAskForInitials': true,
+        }).settings,
+      ),
+    ).toEqual({ names: 'full_name', childrenInFull: true, playersMayAskForInitials: true });
     expect(await readNamePolicy(stored({ 'privacy.publicNames': 'hidden' }).settings)).toEqual({
-      children: 'hidden',
+      names: 'hidden',
+      childrenInFull: false,
+      playersMayAskForInitials: false,
+    });
+    // The confirmation is read whatever the names value; showName uses it only under full names.
+    expect(
+      await readNamePolicy(
+        stored({ 'privacy.publicNames': 'firstNameLastInitial', [confirmedKey]: true }).settings,
+      ),
+    ).toEqual({
+      names: 'first_name_last_initial',
+      childrenInFull: true,
       playersMayAskForInitials: false,
     });
   });
 
-  it('ignores a stored value its setting refuses, and one stored anywhere but the league', async () => {
-    expect(
-      await readNamePolicy(
-        stored({ 'privacy.publicNames': 'everything', 'privacy.playersMayAskForInitials': 'yes' })
-          .settings,
-      ),
-    ).toEqual(defaultNamePolicy);
-    expect(
-      await readNamePolicy(stored({ 'privacy.publicNames': 'fullName' }, 'season').settings),
-    ).toEqual(defaultNamePolicy);
+  it('reads a full names stored before step 2.162, with no confirmation, as not confirmed (record 065)', async () => {
+    expect(await readNamePolicy(stored({ 'privacy.publicNames': 'fullName' }).settings)).toEqual(
+      defaultNamePolicy,
+    );
+  });
+
+  it('reads a stored value it cannot read as the least, never the default (record 065)', async () => {
+    const refused = stored({
+      'privacy.publicNames': 'everything',
+      [confirmedKey]: 'yes',
+      'privacy.playersMayAskForInitials': 'yes',
+    }).settings;
+    expect(await readNamePolicy(refused)).toEqual({
+      names: 'hidden',
+      childrenInFull: false,
+      playersMayAskForInitials: false,
+    });
+    // A row with no usable document, or of a format newer than this code, is the same.
+    for (const document of [null, { version: 2, value: 'fullName' }, { value: 'fullName' }]) {
+      const rows = async (key: string): Promise<readonly StoredSettingRow[]> =>
+        key === 'privacy.publicNames' || key === confirmedKey
+          ? [{ level: 'league', document, version: 1 }]
+          : [];
+      expect(await readNamePolicy({ settingRows: rows }), JSON.stringify(document)).toEqual({
+        names: 'hidden',
+        childrenInFull: false,
+        playersMayAskForInitials: false,
+      });
+    }
+    // An unreadable confirmation beside full names: children stay with care.
+    const brokenYes = stored({ 'privacy.publicNames': 'fullName', [confirmedKey]: 'yes' });
+    expect((await readNamePolicy(brokenYes.settings)).childrenInFull).toBe(false);
+  });
+
+  it('ignores a value stored anywhere but the league: that is nothing saved', async () => {
+    const atSeason = stored({ 'privacy.publicNames': 'hidden', [confirmedKey]: true }, 'season');
+    expect(await readNamePolicy(atSeason.settings)).toEqual(defaultNamePolicy);
   });
 });
 
@@ -81,7 +133,9 @@ describe('a youth roster under each name setting (T-81)', () => {
   }));
 
   // Yusuf is a child who asked for initials: that always takes effect (R-25), and never
-  // shows more than "hidden". Lena is an adult, shown by full name whatever the setting.
+  // shows more than "hidden". Lena is an adult: in full to start with (R-15), and shown
+  // less only once the league chooses less (R-29). Children are in full only with the
+  // confirmation (R-14).
   const cases = [
     {
       values: {},
@@ -89,23 +143,31 @@ describe('a youth roster under each name setting (T-81)', () => {
     },
     {
       values: { 'privacy.publicNames': 'fullName' },
+      shown: ['Mariam O.', 'Y. H.', 'Lena Fischer', null],
+    },
+    {
+      values: { 'privacy.publicNames': 'fullName', [confirmedKey]: true },
       shown: ['Mariam Okafor', 'Y. H.', 'Lena Fischer', null],
     },
     {
+      values: { 'privacy.publicNames': 'firstNameLastInitial', [confirmedKey]: true },
+      shown: ['Mariam O.', 'Y. H.', 'Lena F.', null],
+    },
+    {
       values: { 'privacy.publicNames': 'hidden' },
-      shown: [null, null, 'Lena Fischer', null],
+      shown: [null, null, null, null],
     },
     {
       values: { 'privacy.playersMayAskForInitials': true },
       shown: ['Mariam O.', 'Y. H.', 'Lena Fischer', null],
     },
     {
-      values: { 'privacy.publicNames': 'fullName', 'privacy.playersMayAskForInitials': true },
+      values: { [confirmedKey]: true, 'privacy.playersMayAskForInitials': true },
       shown: ['Mariam Okafor', 'Y. H.', 'Lena Fischer', null],
     },
     {
-      values: { 'privacy.publicNames': 'hidden', 'privacy.playersMayAskForInitials': true },
-      shown: [null, null, 'Lena Fischer', null],
+      values: { 'privacy.publicNames': 'hidden', [confirmedKey]: true },
+      shown: [null, null, null, null],
     },
   ];
 

@@ -197,14 +197,25 @@ const tracked = (teamNumber: number, last: string, firsts: readonly string[], mi
     }),
   );
 
-/** Each team's roster, by slug, in roster order. */
+/**
+ * Each team's roster, by slug, in roster order. The made-up coaches are recorded as adults,
+ * so the youth league shows what a coach looks like beside its players (record 065); a
+ * player with nothing recorded is read as a child there (R-15).
+ */
 const adultRosters: Readonly<Record<string, readonly PlayerSpec[]>> = {
   falcons: [
     { id: person(1), first: 'Dana', last: 'Whitfield', number: '4', role: 'captain' },
     { id: person(2), first: 'Marcus', last: 'Oyelaran', number: '11' },
     { id: person(9), first: 'Lee', last: 'Fontaine', number: '23', request: 'removed' },
     { id: person(10), first: 'Pat', last: 'Gorski', number: '8', left: '2026-10-02' },
-    { id: person(11), first: 'Rosa', last: 'Delgado', number: null, role: 'coach' },
+    {
+      id: person(11),
+      first: 'Rosa',
+      last: 'Delgado',
+      number: null,
+      role: 'coach',
+      isMinor: false,
+    },
   ],
   herons: [
     { id: person(3), first: 'Priya', last: 'Raman', number: '7', role: 'captain' },
@@ -216,6 +227,7 @@ const adultRosters: Readonly<Record<string, readonly PlayerSpec[]>> = {
       last: 'Nasser',
       number: null,
       role: 'coach',
+      isMinor: false,
       account: 'member',
     },
   ],
@@ -243,7 +255,7 @@ const youthRosters: Readonly<Record<string, readonly PlayerSpec[]>> = {
   comets: [
     { id: person(21), first: 'Sam', last: 'Rivera', number: '2' },
     { id: person(24), first: 'Maya', last: 'Cho', number: '10' },
-    { id: person(25), first: 'Dev', last: 'Anand', number: null, role: 'coach' },
+    { id: person(25), first: 'Dev', last: 'Anand', number: null, role: 'coach', isMinor: false },
   ],
   rockets: [
     { id: person(22), first: 'Noor', last: 'Haddad', number: '6', role: 'captain' },
@@ -1159,6 +1171,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
       key: membersStartPage.key,
       document: { version: membersStartPage.version, value: 'myTeam' },
       version: 1,
+      savedAt: now.toISOString(),
     },
   ];
 
@@ -1185,6 +1198,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
       key: whoMayScore.key,
       document: { version: whoMayScore.version, value: 'assignedOnly' },
       version: 1,
+      savedAt: now.toISOString(),
     },
   ];
   const [draftFirst, draftSecond] = cast.draftAssignees;

@@ -95,6 +95,8 @@ export type WorldSetting = {
   readonly key: string;
   readonly document: { readonly version: number; readonly value: unknown };
   readonly version: number;
+  /** When the value was last saved (an ISO time), so a screen can say since when (record 065). */
+  readonly savedAt: string;
 };
 
 export type LeagueWorld = {

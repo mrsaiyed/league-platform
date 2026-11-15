@@ -294,3 +294,83 @@ describe('the games commands on the database', () => {
     ).toMatchObject({ error: { code: 'not-allowed' } });
   });
 });
+
+describe('a result typed by hand over a game the live tracker scores (S-46, step 2.154)', () => {
+  /** Inserts the game's events, numbered from 1, as the tracker would have saved them. */
+  const tap = async (g: Awaited<ReturnType<typeof leagueWithGame>>, types: readonly string[]) => {
+    for (const [i, type] of types.entries()) {
+      await pglite.query(
+        `insert into game_events (league_id, game_id, seq, command_id, type, payload, tapped_at)
+         values ($1, $2, $3, public.uuid_v7(), $4, '{}', now())`,
+        [g.l.leagueId, g.gameId, i + 1, type],
+      );
+    }
+  };
+  const eventCount = async (gameId: string) =>
+    (
+      await one<{ n: string }>(
+        pglite,
+        'select count(*)::text as n from game_events where game_id = $1',
+        [gameId],
+      )
+    ).n;
+
+  it('refuses a final score and a forfeit from every role that may send them; the game stays live with its plays', async () => {
+    const g = await leagueWithGame({ status: 'live', capture_mode: 'live' });
+    await tap(g, ['lineup', 'start', 'score']);
+    const accounts: Record<string, string> = { owner: g.l.ownerId };
+    for (const role of ['admin', 'scheduler', 'scorekeeper']) {
+      accounts[role] = await newAccount(pglite);
+      await pglite.query(
+        'insert into role_grants (league_id, account_id, role) values ($1, $2, $3)',
+        [g.l.leagueId, accounts[role], role],
+      );
+    }
+    const before = await rowOf(g.gameId);
+    for (const [role, accountId] of Object.entries(accounts)) {
+      const as = { ...g.ctx, accountId };
+      expect(
+        await recordFinalScore(
+          as,
+          { gameId: g.gameId, version: before.version, homeScore: 40, awayScore: 38 },
+          deps,
+        ),
+        role,
+      ).toEqual({ ok: false, error: { code: 'game-is-tracked' } });
+      // A scorekeeper may not record a forfeit at all; everyone else is refused for the plays.
+      const forfeit = await recordForfeit(
+        as,
+        { gameId: g.gameId, version: before.version, forfeitingTeamId: g.home },
+        deps,
+      );
+      expect(forfeit, role).toEqual({
+        ok: false,
+        error: { code: role === 'scorekeeper' ? 'not-allowed' : 'game-is-tracked' },
+      });
+    }
+    expect(await rowOf(g.gameId)).toEqual(before);
+    expect(before.status).toBe('live');
+    expect(await eventCount(g.gameId)).toBe('3');
+  });
+
+  it('finishes a game set to live tracking by hand while it has no plays since its last marker', async () => {
+    const marked = await leagueWithGame({ capture_mode: 'live' });
+    // Started by mistake and marked not started (record 061): nothing after the marker.
+    await tap(marked, ['lineup', 'score', 'reset']);
+    expect(
+      await recordFinalScore(
+        marked.ctx,
+        { gameId: marked.gameId, version: 1, homeScore: 40, awayScore: 38 },
+        deps,
+      ),
+    ).toMatchObject({ ok: true });
+    const unplayed = await leagueWithGame({ capture_mode: 'live' });
+    expect(
+      await recordFinalScore(
+        unplayed.ctx,
+        { gameId: unplayed.gameId, version: 1, homeScore: 40, awayScore: 38 },
+        deps,
+      ),
+    ).toMatchObject({ ok: true });
+  });
+});

@@ -10,12 +10,16 @@ import {
   Emblem,
   GameCard,
   Hero,
+  LeaderSpot,
+  Scoreboard,
   Section,
+  SortableStatsTable,
   StandingsTable,
   StatStrip,
   displayCss,
   initialOf,
   lettersWide,
+  listRoom,
   nameMeasure,
   titleLines,
 } from '../index.ts';
@@ -486,7 +490,7 @@ describe('a game as a scoreboard', () => {
       /\.ui-game-board \{[^}]*--board-name: var\(--text-18\);\s*--board-side: calc\(var\(--letters, 8\) \* var\(--heading-letter, 0\.6\) \* var\(--board-name\)\);[^}]*--board-needs: calc\(2 \* var\(--board-side\) \+ var\(--board-middle\) \+ 2 \* var\(--board-gap\)\);\s*--board-short: calc\(\(var\(--board-needs\) - 100cqi\) \* 999\);\s*--board-room: calc\(\(100cqi - var\(--board-needs\)\) \* 999\);[^}]*flex-wrap: wrap;[^}]*container: board \/ inline-size;/,
     );
     expect(css).toMatch(
-      /\.ui-game-board\[data-scored='true'\] \{\s*--board-middle: calc\(var\(--figures, 4\) \* 0\.65 \* var\(--board-figure\) \+ var\(--step-5\)\);/,
+      /\.ui-game-board:is\(\[data-scored='true'\], \[data-room='scored'\]\) \{\s*--board-middle: calc\(var\(--figures, 4\) \* 0\.65 \* var\(--board-figure\) \+ var\(--step-5\)\);/,
     );
     // Narrower than that, each team takes a row of its own; wide enough, the sides share
     // what the middle leaves.
@@ -567,6 +571,178 @@ describe('a game as a scoreboard', () => {
     expect(css).toMatch(
       /\.ui-card-grid\[data-layout='board'\] \{\s*grid-template-columns: minmax\(0, 1fr\);/,
     );
+  });
+
+  it('on a laptop ends an odd list with three boards in a row, never one stretched across the page', () => {
+    const laptop = css.slice(
+      css.indexOf("@media (min-width: 64rem) {\n  .ui-card-grid[data-layout='board']"),
+    );
+    expect(laptop.startsWith('@media')).toBe(true);
+    const grid = String.raw`\.ui-card-grid\[data-layout='board'\]\[data-across='two'\]`;
+    // Six narrow columns: a board of a pair takes three, a board of the last three two.
+    expect(laptop).toMatch(
+      new RegExp(String.raw`${grid} \{\s*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);`),
+    );
+    expect(laptop).toMatch(new RegExp(String.raw`${grid} > li \{\s*grid-column: span 3;`));
+    expect(laptop).toMatch(
+      new RegExp(
+        String.raw`${grid} > li:nth-last-child\(3\):nth-child\(odd\),\s*${grid} > li:nth-last-child\(3\):nth-child\(odd\) ~ li \{\s*grid-column: span 2;`,
+      ),
+    );
+    // Only a board that is the whole list has the row to itself, and there its two teams
+    // are kept within reach of each other in the middle of the card.
+    expect(laptop).toMatch(
+      new RegExp(String.raw`${grid} > li:only-child \{\s*grid-column: 1 \/ -1;`),
+    );
+    expect(css).toMatch(
+      /\.ui-game-board \{[^}]*inline-size: 100%;\s*max-inline-size: calc\(10 \* var\(--step-8\)\);\s*margin-inline: auto;/,
+    );
+  });
+
+  it('stands the shields and names of a row of cards on one line', () => {
+    // A card's top line takes what it needs and its board the rest of the card's height
+    // (the cards of a row are one height).
+    expect(css).toMatch(
+      /\.ui-game-card\[data-layout='board'\] \{\s*grid-template-rows: auto 1fr auto;/,
+    );
+    // A card is a measure of its own (its parts size themselves by it), and a browser
+    // does not let such a box share its rows with its neighbors: the card must never be
+    // told to (a rule that tried made the cards of a row unlevel).
+    expect(css).toMatch(
+      /\.ui-game-card\[data-layout='board'\] \{[^}]*container: card \/ inline-size;/,
+    );
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\.ui-game-card|\.ui-card-grid/.test(rule[1] ?? '')) continue;
+      expect(rule[2], rule[1]).not.toContain('subgrid');
+    }
+    // Inside a board the two sides begin at its top, and a board taller than its teams
+    // (its row's tallest neighbor sets the height) keeps them at the top: so one card's
+    // two-line name never lowers its neighbors' shields.
+    expect(css).toMatch(/\.ui-game-board \{[^}]*align-items: center;\s*align-content: flex-start;/);
+    expect(css).toMatch(/\.ui-game-side \{[^}]*align-self: flex-start;\s*align-items: center;/);
+    // A card has exactly the three parts the rows are for, and its link lies over them.
+    const html = board();
+    expect(html).toMatch(
+      /^<article[^>]*><header class="ui-game-meta">.*<\/header><div class="ui-game-board".*<\/div><footer class="ui-game-foot">.*<\/footer><a class="ui-game-link"/,
+    );
+    expect(css).toMatch(/\.ui-game-link \{\s*position: absolute;/);
+  });
+
+  it('draws every board of a list the same way: the list tells each the room all of them need', () => {
+    const games = [
+      {
+        status: 'final' as const,
+        home: { name: 'Owls', score: 101 },
+        away: { name: 'Hawks', score: 98 },
+      },
+      {
+        status: 'scheduled' as const,
+        home: { name: 'North Side Hawks', score: null },
+        away: { name: 'Owls', score: null },
+      },
+    ];
+    // The longest name of the list (its better break is 10 letters), the longest score.
+    expect(listRoom(games)).toEqual({ letters: 10, figures: 5 });
+    expect(listRoom(games.slice(1))).toEqual({ letters: 10 });
+    expect(listRoom([])).toEqual({ letters: 0 });
+    // A board with no score of its own still reckons with the list's score, and says so.
+    expect(board({ status: 'scheduled', room: { letters: 10, figures: 5 } })).toContain(
+      '<div class="ui-game-board" data-room="scored" style="--letters:10;--figures:5">',
+    );
+    expect(board({ room: { letters: 10, figures: 5 } })).toContain(
+      '<div class="ui-game-board" data-scored="true" style="--letters:10;--figures:5">',
+    );
+    // In a list with no score anywhere, a board reckons with "VS" alone.
+    expect(board({ status: 'scheduled', room: { letters: 10 } })).toContain(
+      '<div class="ui-game-board" style="--letters:10">',
+    );
+    expect(css).toMatch(
+      /\.ui-game-board:is\(\[data-scored='true'\], \[data-room='scored'\]\) \{\s*--board-middle: calc\(var\(--figures, 4\) \* 0\.65 \* var\(--board-figure\) \+ var\(--step-5\)\);/,
+    );
+  });
+
+  it('keeps a state’s pill quiet or soft, and in one place on a phone', () => {
+    const flat = css.replace(/\s+/g, ' ');
+    // "Final" is as quiet as "Awaiting result": on a card and on a game's big board.
+    expect(flat).toContain(
+      ".ui-game-state[data-kind='quiet'], .ui-game-card[data-status='final'] .ui-game-state, .ui-scoreboard[data-pill='quiet'] .ui-game-state { border-color: var(--color-line); background: transparent; color: var(--color-muted); font-weight: 600; }",
+    );
+    // Put off, called off, forfeited: a soft tint of the main color, no stronger than the
+    // tint every text is fitted to, the accent for its words, and an edge at a line's
+    // strength (DESIGN.md line 17: 12 to 25 percent). The same look on the big board and
+    // on a round's "1 game postponed".
+    expect(flat).toContain(
+      ".ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit']) .ui-game-state, .ui-scoreboard:not([data-pill='quiet']) .ui-game-state, .ui-group .ui-group-mark[data-kind='note'] { border-color: color-mix(in srgb, var(--color-accent) 25%, transparent); background: var(--color-tint); color: var(--color-accent-text); }",
+    );
+    // No pill anywhere has a full-strength edge or the page's text color for its words.
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\.ui-game-state|ui-group-mark\[data-kind='note'\]/.test(rule[1] ?? '')) continue;
+      expect(rule[2], rule[1]).not.toMatch(/border-color: var\(--color-line-strong\)/);
+      for (const mix of (rule[2] ?? '').matchAll(/border-color: color-mix\([^)]* (\d+)%/g)) {
+        expect(Number(mix[1]), rule[1]).toBeLessThanOrEqual(25);
+      }
+    }
+    // The big board marks a plain "Final" for the quiet look; a state named in other
+    // words keeps the soft one.
+    const labels = {
+      scoreboard: 'Scoreboard',
+      home: 'Home',
+      away: 'Away',
+      live: 'Live',
+      final: 'Final',
+      winner: 'Winner',
+    };
+    const big = (extra: Partial<Parameters<typeof Scoreboard>[0]>) =>
+      render(
+        createElement(Scoreboard, {
+          home: { name: 'Hawks', score: 61 },
+          away: { name: 'Owls', score: 55 },
+          state: 'final',
+          labels,
+          ...extra,
+        }),
+      );
+    expect(big({})).toContain('data-state="final" data-pill="quiet"');
+    expect(big({})).toContain('<span class="ui-game-state">Final</span>');
+    expect(big({ stateText: 'Forfeit' })).not.toContain('data-pill');
+    expect(big({ state: 'other', stateText: 'Postponed' })).not.toContain('data-pill');
+    expect(big({ state: 'live' })).not.toContain('data-pill');
+    // Only in a card as narrow as a small phone's does the pill always take its own line
+    // under the date; a phone of 390 and three across on a laptop hold both on one line.
+    expect(css).toMatch(
+      /@container card \(max-width: 16\.99rem\) \{\s*\.ui-game-card\[data-layout='board'\] \.ui-game-about \{\s*flex-basis: 100%;/,
+    );
+  });
+
+  it('makes the winner’s score the heavier one in every design, on a card and on the big board', () => {
+    const flat = css.replace(/\s+/g, ' ');
+    const weightOf = (selector: string) => {
+      const at = flat.indexOf(`${selector} {`);
+      expect(at, selector).toBeGreaterThan(-1);
+      const body = flat.slice(at, flat.indexOf('}', at));
+      return /font-weight: ([^;]+);/.exec(body)?.[1];
+    };
+    // The big board: plain numbers of the score face, not the heading face's display
+    // weight (700 in the plain faces, which would have left a winner at 600 the lighter).
+    const playing = weightOf('.ui-scoreboard-score');
+    const winner = weightOf(".ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score");
+    const other = weightOf(
+      ".ui-scoreboard[data-state='final'] .ui-scoreboard-side:not([data-winner='true']) .ui-scoreboard-score",
+    );
+    expect([playing, winner, other]).toEqual(['600', '700', '400']);
+    // A card: the winner's 600 against the other's 400, in both of its drawings. A score
+    // still being played is set in the display weight, which no decided score keeps.
+    expect(weightOf(".ui-game-score > [data-winner='true']")).toBe('600');
+    expect(weightOf(".ui-game-side[data-winner='true'] .ui-game-side-score")).toBe('600');
+    expect(flat).toMatch(
+      /\.ui-game-card:is\(\[data-status='final'\], \[data-status='forfeit'\]\) \.ui-game-score > span:not\(\[data-winner\], \.ui-game-score-colon\), \.ui-game-card:is\(\[data-status='final'\], \[data-status='forfeit'\]\) \.ui-game-side:not\(\[data-winner\]\) \.ui-game-side-score \{ color: var\(--color-text\); font-weight: 400; \}/,
+    );
+    // No rule of the big board's score takes its weight from a design value, so no face's
+    // traits (packages/site, fonts.ts) can turn the order around.
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!(rule[1] ?? '').includes('.ui-scoreboard-score')) continue;
+      expect(rule[2], rule[1]).not.toMatch(/font-weight: var\(/);
+    }
   });
 
   it('picks out the game being played now', () => {
@@ -676,6 +852,129 @@ describe('the band near the foot of a page', () => {
   });
 });
 
+describe('a leader, picked out', () => {
+  const spot = (extra: Partial<Parameters<typeof LeaderSpot>[0]> = {}) =>
+    render(
+      createElement(LeaderSpot, {
+        label: '01 / Points',
+        value: '17.0',
+        unit: 'per game',
+        name: arabicName,
+        detail: 'Hawks · 6 games',
+        team: { name: 'Hawks', color: '#ff0000' },
+        ...extra,
+      }),
+    );
+
+  it('is a label, one big number, the player’s name as its title, a quiet line and the team’s shield', () => {
+    const html = spot();
+    expect(html).toContain('<article class="ui-spot">');
+    expect(html).toContain('<p class="ui-spot-label">01 / Points</p>');
+    expect(html).toContain(
+      '<p class="ui-spot-figure"><span class="ui-spot-value">17.0</span><span class="ui-spot-unit">per game</span></p>',
+    );
+    // The name keeps its own direction, in any script, and is the card's title.
+    expect(html).toContain(`<h3 class="ui-spot-name" dir="auto">${arabicName}</h3>`);
+    expect(html).toContain('<p class="ui-spot-detail" dir="auto">Hawks · 6 games</p>');
+    expect(html).toMatch(/<svg class="ui-emblem"[^>]*style="--team-color:#ff0000">.*>H<\/text>/);
+    // A player of several teams has no one shield; a number may stand without a unit.
+    expect(spot({ team: undefined })).not.toContain('ui-emblem');
+    expect(spot({ unit: undefined })).not.toContain('ui-spot-unit');
+    // Under a small heading inside another section the name is one level further down.
+    expect(spot({ headingLevel: 4 })).toContain(
+      `<h4 class="ui-spot-name" dir="auto">${arabicName}</h4>`,
+    );
+    // The unit is a small label, spaced as the design spaces its labels.
+    expect(css).toMatch(/\.ui-spot-unit \{[^}]*letter-spacing: var\(--label-tracking\);/);
+    // The number is the largest thing on the card, in the color the eye lands on.
+    expect(css).toMatch(
+      /\.ui-spot-value \{\s*color: var\(--color-pop\);\s*font-family: var\(--font-heading\);\s*font-size: var\(--text-48\);/,
+    );
+    expect(css).toMatch(/\.ui-root \.ui-spot-name \{\s*font-size: var\(--text-22\);/);
+  });
+
+  it('carries the league’s main color on the first of a row, in a band’s own fitted colors', () => {
+    expect(spot({ first: true })).toContain('<article class="ui-spot" data-first="true">');
+    expect(spot()).not.toContain('data-first');
+    expect(css).toMatch(
+      /\.ui-spot\[data-first='true'\] \{\s*background-color: var\(--color-band\);\s*background-image: linear-gradient\(120deg, var\(--color-band-glow\), var\(--color-band\)\);[^}]*color: var\(--color-on-band\);/,
+    );
+    expect(css).toMatch(
+      /\.ui-spot\[data-first='true'\] :is\(\.ui-spot-label, \.ui-spot-unit, \.ui-spot-detail\) \{\s*color: var\(--color-band-muted\);/,
+    );
+    expect(css).toMatch(
+      /\.ui-spot\[data-first='true'\] \.ui-emblem-letter \{\s*color: var\(--color-on-band\);/,
+    );
+    // On the filled card a shield keeps its team's own color: it is filled with it (most
+    // of it, a little deepened), not laid thinly over the card's color, which turned a
+    // green team grey on a maroon card.
+    const fill =
+      /\.ui-spot\[data-first='true'\] \.ui-emblem-shield \{\s*fill: color-mix\(in srgb, var\(--emblem-color\) (\d+)%, var\(--color-band-deep\)\);/.exec(
+        css,
+      );
+    expect(Number(fill?.[1])).toBeGreaterThanOrEqual(75);
+    expect(css).not.toMatch(
+      /\.ui-spot\[data-first='true'\][^{]*\.ui-emblem-shield \{[^}]*transparent/,
+    );
+    // Mirrored for a right-to-left page.
+    expect(css).toMatch(
+      /\[dir='rtl'\] \.ui-spot\[data-first='true'\] \{\s*background-image: linear-gradient\(240deg,/,
+    );
+  });
+
+  it('is one short row where it has a column to itself, and stands three across on a laptop', () => {
+    expect(css).toMatch(/\.ui-spot \{[^}]*container: spot \/ inline-size;/);
+    expect(css).toMatch(
+      /@container spot \(min-width: 28rem\) \{\s*\.ui-spot-figure \{\s*grid-column: 1;[^}]*\}\s*\.ui-spot-who \{\s*grid-column: 2;/,
+    );
+    const wide = css.slice(
+      css.indexOf("@media (min-width: 48rem) {\n  .ui-spot-row[data-across='two']"),
+    );
+    expect(wide.startsWith('@media')).toBe(true);
+    expect(wide).toMatch(
+      /\.ui-spot-row\[data-across='three'\] \{\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/,
+    );
+    expect(css).toMatch(
+      /\.ui-spot-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\);/,
+    );
+  });
+});
+
+describe('a team’s shield in a table of statistics', () => {
+  const table = (rows: Parameters<typeof SortableStatsTable>[0]['rows']) =>
+    render(
+      createElement(SortableStatsTable, {
+        caption: 'Players',
+        columns: [
+          { key: 'player', label: 'Player' },
+          { key: 'team', label: 'Team' },
+        ],
+        rows,
+        labels: { sortBy: 'Sort by' },
+        emblems: true,
+      }),
+    );
+
+  it('carries the team’s letter for one team, and no letter for a player of several', () => {
+    const html = table([
+      { id: 'a', cells: { player: 'Dana', team: 'Owls' }, chips: { team: '#663399' } },
+      {
+        id: 'b',
+        cells: { player: 'Lee', team: 'Owls, Falcons' },
+        chips: { team: null },
+        severalTeams: { team: true },
+      },
+    ]);
+    const letters = [...html.matchAll(/<text class="ui-emblem-letter"[^>]*>([^<]*)<\/text>/g)].map(
+      (m) => m[1],
+    );
+    // "Owls, Falcons" does not show an "O": that would say the player is the Owls' alone.
+    expect(letters).toEqual(['O', '']);
+    expect(html.match(/<svg class="ui-emblem" data-size="small"/g)).toHaveLength(2);
+    expect(html).toContain('<span dir="auto">Owls, Falcons</span>');
+  });
+});
+
 describe('color where the eye should land (C-16)', () => {
   // The highlight itself is still spent only on the Live marker and the winner's score
   // (display.test.ts). The color the eye lands on is worked out from the league's design
@@ -702,7 +1001,14 @@ describe('color where the eye should land (C-16)', () => {
         ".ui-standings[data-emblems='true'] tbody td.ui-num:first-child",
         '.ui-team-card-figure',
         '.ui-leader:first-child .ui-leader-value',
+        // A leader's one big number.
+        '.ui-spot-value',
+        // The scores of a game's big board (the loser's is set back to the text color).
+        '.ui-scoreboard-score',
       ].sort(),
+    );
+    expect(css.replace(/\s+/g, ' ')).toContain(
+      ".ui-scoreboard[data-state='final'] .ui-scoreboard-side:not([data-winner='true']) .ui-scoreboard-score { color: var(--color-text); font-weight: 400; }",
     );
   });
 
@@ -713,6 +1019,7 @@ describe('color where the eye should land (C-16)', () => {
         '.ui-kicker::before',
         ".ui-game-score > [data-winner='true']",
         ".ui-game-side[data-winner='true'] .ui-game-side-score",
+        ".ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score",
       ].sort(),
     );
     // Laid on the page only as strongly as it takes to be seen: the lines that frame.
@@ -720,6 +1027,7 @@ describe('color where the eye should land (C-16)', () => {
       [
         '.ui-stat-strip',
         ".ui-game-card[data-layout='board']",
+        '.ui-scoreboard',
         ".ui-table-frame:has(.ui-standings[data-emblems='true'])",
       ].sort(),
     );
@@ -743,6 +1051,9 @@ describe('color where the eye should land (C-16)', () => {
         '.ui-hero-title-pop',
         ".ui-root .ui-button[data-kind='pop']",
         '.ui-call-band',
+        // The first leader's card is a small band: its edge and its number.
+        ".ui-spot[data-first='true']",
+        ".ui-spot[data-first='true'] .ui-spot-value",
       ].sort(),
     );
   });

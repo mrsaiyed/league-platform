@@ -9,7 +9,7 @@ import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildHomeGames, buildScheduleView, gameView, type GameView } from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
-import { homeNextGames, homeResults } from './home-lists.ts';
+import { homeLeadersPlace, homeNextGames, homeResults } from './home-lists.ts';
 import { gameLinkWords } from './schedule-views.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -249,5 +249,50 @@ describe('the home page’s results', () => {
     expect(ids(homeResults([], two, [table(3, true)]))).toEqual(['late', 'later']);
     expect(ids(homeResults(finals.slice(0, 1), two, [table(12)]))).toEqual(['f1', 'late', 'later']);
     expect(homeResults([], [], [table(12)])).toEqual([]);
+  });
+});
+
+describe('where the home page’s leaders stand', () => {
+  const table = (rows: number, hasNotes = false) => ({ rows, hasNotes });
+
+  it('under a column of standings that is shorter than the games beside it, as many as close the hole', () => {
+    // One table of three teams with a note beside two boards (the second made-up league):
+    // the hole is about one leader's card high.
+    expect(homeLeadersPlace(2, [table(3, true)], 3)).toEqual({ beside: 1, across: 0 });
+    // The same table beside three boards: room for two; beside five, for all three.
+    expect(homeLeadersPlace(3, [table(3, true)], 3)).toEqual({ beside: 2, across: 0 });
+    expect(homeLeadersPlace(5, [table(3, true)], 3)).toEqual({ beside: 3, across: 0 });
+    // Never more than there are.
+    expect(homeLeadersPlace(5, [table(3, true)], 1)).toEqual({ beside: 1, across: 0 });
+  });
+
+  it('across the page, in a section of their own, when the two columns already end level', () => {
+    // Two divisions of three and two with notes beside two boards (the first league).
+    expect(homeLeadersPlace(2, [table(3, true), table(2, true)], 3)).toEqual({
+      beside: 0,
+      across: 3,
+    });
+    expect(homeLeadersPlace(3, [table(12)], 2)).toEqual({ beside: 0, across: 2 });
+    // No games beside the standings, no standings, or tables that lie across the page.
+    expect(homeLeadersPlace(0, [table(3)], 3)).toEqual({ beside: 0, across: 3 });
+    expect(homeLeadersPlace(2, [], 3)).toEqual({ beside: 0, across: 3 });
+    expect(homeLeadersPlace(4, [table(4), table(4), table(4)], 3)).toEqual({
+      beside: 0,
+      across: 3,
+    });
+  });
+
+  it('names each leader once, and nobody when there are none', () => {
+    expect(homeLeadersPlace(2, [table(3, true)], 0)).toEqual({ beside: 0, across: 0 });
+    for (let boards = 0; boards <= 5; boards++) {
+      for (let rows = 1; rows <= 14; rows++) {
+        for (let leaders = 0; leaders <= 3; leaders++) {
+          const place = homeLeadersPlace(boards, [table(rows)], leaders);
+          expect(Math.min(place.beside, place.across)).toBe(0);
+          expect(place.beside + place.across).toBeLessThanOrEqual(leaders);
+          if (place.beside === 0) expect(place.across).toBe(leaders);
+        }
+      }
+    }
   });
 });

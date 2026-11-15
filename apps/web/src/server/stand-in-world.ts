@@ -163,7 +163,7 @@ export function madeUpWorld(options: WorldOptions): World {
       people: worldPeopleStore(s),
       scheduling: worldSchedulingStore(s),
       imports: worldImportsStore(s, now),
-      ...worldLeaguesStores(s, access),
+      ...worldLeaguesStores(s, access, now),
     };
     opened.set(activity, tx);
     return tx;

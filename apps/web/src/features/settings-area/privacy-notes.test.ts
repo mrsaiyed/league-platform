@@ -1,0 +1,129 @@
+// The words the Privacy part of League settings adds around its settings (step 2.162,
+// R-29, record 065), chosen from who plays, what is in force and the confirmation.
+import {
+  defaultNamePolicy,
+  type Audience,
+  type LeagueSettingRow,
+  type NamePolicy,
+} from '@srleagues/core';
+import { en } from '@srleagues/site';
+import { describe, expect, it } from 'vitest';
+import { confirmationKey, privacyNotes, type SettingNotes } from './privacy-notes.ts';
+
+const confirmationRow = (value: boolean, savedAt: string | null = null): LeagueSettingRow => ({
+  key: confirmationKey,
+  label: `setting.${confirmationKey}.label`,
+  default: false,
+  field: { kind: 'toggle' },
+  confirm: [true],
+  value,
+  source: value ? 'league' : 'default',
+  version: value ? 1 : null,
+  savedAt,
+});
+
+function notes(
+  audience: Audience,
+  options: {
+    readonly hasRecordedChild?: boolean;
+    readonly policy?: Partial<NamePolicy>;
+    readonly given?: boolean;
+    readonly savedAt?: string;
+  } = {},
+): SettingNotes {
+  return privacyNotes({
+    facts: { audience, hasRecordedChild: options.hasRecordedChild ?? false },
+    policy: { ...defaultNamePolicy, ...options.policy },
+    rows: [confirmationRow(options.given ?? false, options.savedAt ?? null)],
+    timeZone: 'America/Chicago',
+    locale: 'en',
+  });
+}
+const keys = (n: SettingNotes) => (n.area?.['privacy'] ?? []).map((line) => line.key);
+
+describe('privacyNotes', () => {
+  it('opens with a sentence for who plays and says what is in force now', () => {
+    expect(keys(notes('adult'))).toEqual([
+      'adminSettings.privacy.intro.adult',
+      'adminSettings.privacy.now.full',
+    ]);
+    // In a youth or mixed league, why someone with no age recorded shows by initial comes
+    // right under "Now".
+    for (const audience of ['youth', 'mixed'] as const) {
+      expect(keys(notes(audience))).toEqual([
+        `adminSettings.privacy.intro.${audience}`,
+        'adminSettings.privacy.now.full',
+        'adminSettings.privacy.unknownAge',
+      ]);
+    }
+    const now = (policy: Partial<NamePolicy>) => keys(notes('youth', { policy }))[1];
+    expect(now({ names: 'first_name_last_initial' })).toBe('adminSettings.privacy.now.initial');
+    expect(now({ names: 'hidden' })).toBe('adminSettings.privacy.now.hidden');
+    expect(now({ childrenInFull: true })).toBe('adminSettings.privacy.now.fullConfirmed');
+  });
+
+  it("says since when the parents' confirmation is in force, in the league's own date", () => {
+    // 03:00 on 16 November in UTC is still 15 November in Chicago.
+    const given = notes('youth', {
+      given: true,
+      policy: { childrenInFull: true },
+      savedAt: '2026-11-16T03:00:00.000Z',
+    });
+    expect(given.area?.['privacy']?.at(-1)).toEqual({
+      key: 'adminSettings.privacy.confirmedOn',
+      params: { date: 'November 15, 2026' },
+    });
+  });
+
+  it('says a kept confirmation has no effect while names are not on full names', () => {
+    const kept = notes('youth', {
+      given: true,
+      policy: { names: 'hidden', childrenInFull: true },
+      savedAt: '2026-11-15T12:00:00.000Z',
+    });
+    expect(keys(kept)).toEqual([
+      'adminSettings.privacy.intro.youth',
+      'adminSettings.privacy.now.hidden',
+      'adminSettings.privacy.unknownAge',
+      'adminSettings.privacy.keptNoEffect',
+      'adminSettings.privacy.confirmedOn',
+    ]);
+  });
+
+  it('offers the confirmation in youth and mixed leagues, and in an adult league only with a recorded child', () => {
+    const row = (n: SettingNotes) => n.rows?.[confirmationKey];
+    for (const audience of ['youth', 'mixed'] as const) {
+      expect(row(notes(audience))).toEqual({
+        before: [{ key: 'adminSettings.privacy.confirm.youthOrMixed' }],
+        offered: true,
+      });
+    }
+    expect(row(notes('adult', { hasRecordedChild: true }))).toEqual({
+      before: [{ key: 'adminSettings.privacy.confirm.adultWithChildren' }],
+      offered: true,
+    });
+    expect(row(notes('adult'))).toEqual({
+      before: [{ key: 'adminSettings.privacy.confirm.adultNoChildren' }],
+      offered: false,
+    });
+    // A confirmation already stored stays on screen, so it can be taken back.
+    expect(row(notes('adult', { given: true }))?.offered).toBe(true);
+  });
+
+  it('uses only words the message file has', () => {
+    const all = (['adult', 'youth', 'mixed'] as const).flatMap((audience) =>
+      [false, true].flatMap((hasRecordedChild) => {
+        const n = notes(audience, {
+          hasRecordedChild,
+          given: true,
+          policy: { names: 'hidden' },
+          savedAt: '2026-11-15T12:00:00.000Z',
+        });
+        return [...(n.area?.['privacy'] ?? []), ...(n.rows?.[confirmationKey]?.before ?? [])].map(
+          (line) => line.key,
+        );
+      }),
+    );
+    for (const key of all) expect(Object.hasOwn(en, key), key).toBe(true);
+  });
+});

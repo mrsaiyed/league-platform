@@ -37,7 +37,7 @@ T10 line 31 promises "leagues created by an internal tool" and P3 §8 says we ma
 
 ## Not done here
 
-- **A way to remove a wrong league.** None exists anywhere: no command, script or written procedure. Until there is one, the tool is not used on a real league (make-a-league.md).
+- **A way to remove a wrong league.** Done in step 2.150: `npm run league:remove`, [record 063](063-removing-a-league-made-by-mistake.md), for a draft league that is exactly what this tool makes. A published or used league is step 2.133's.
 
 - A whole run through two real logins. The tests stand a PGlite on this computer in for a hosted database, and one PGlite session cannot be two logins at once, so the probes are tested role by role and a run under the app's own login is not. The supervised session proves it on the test copy (make-a-league.md).
 - Part 2 of step 2.125: League settings → Profile, and Publish, Archive and Un-archive. Until then nothing changes a league's listing or "who plays" after it is made; the plan says how each is decided.

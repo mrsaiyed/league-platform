@@ -1,6 +1,6 @@
 // Records the final scores an applied fixtures import carried, for the games that have been
 // published since (O-4). Games not yet published stay waiting; a game already decided or
-// cancelled is left as it is; a tie the rules of the game refuse is left waiting and counted.
+// cancelled, or one the live tracker has recorded plays of (S-46), is left as it is; a tie the rules of the game refuse is left waiting and counted.
 // Running it again records nothing twice: a score is marked once it is done.
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../command/index.ts';
@@ -19,7 +19,7 @@ export type ImportedScoresRecorded = {
   readonly waiting: number;
   /** Scores the rules of the game refuse (a tie in a season without ties). */
   readonly refused: number;
-  /** Games already decided or cancelled by other means, left as they are. */
+  /** Games already decided or cancelled by other means, or scored in the live tracker, left as they are. */
   readonly leftAlone: number;
 };
 
@@ -84,9 +84,11 @@ export const recordImportedScores = defineCommand({
         scores.push(score);
       } else if (
         result.error.code === 'game-already-decided' ||
-        result.error.code === 'game-cancelled'
+        result.error.code === 'game-cancelled' ||
+        result.error.code === 'game-is-tracked'
       ) {
-        // Decided by hand or cancelled since: nothing more for this import to do.
+        // Decided by hand, cancelled, or being scored in the live tracker since (whose
+        // plays decide it, S-46): nothing more for this import to do.
         leftAlone += 1;
         scores.push({ ...score, recorded: true });
       } else {

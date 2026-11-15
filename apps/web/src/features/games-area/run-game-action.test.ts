@@ -60,11 +60,15 @@ describe('the games area actions', () => {
     expect(await runGameAction('final', fields, as(owner), ports.deps)).toEqual({ ok: true });
     const after = (await games(owner)).find((g) => g.id === target?.id);
     expect(after).toMatchObject({ status: 'final', homeScore: 61, awayScore: 58 });
-    // Saving it again from the same page is refused: the game moved on.
-    expect(await runGameAction('final', fields, as(owner), ports.deps)).toEqual({
-      ok: false,
-      code: 'changed-since-read',
+    // The same score sent again (a double tap on "Yes", step 2.154) is answered as saved,
+    // and changes nothing; another score from the same page is refused: the game moved on.
+    expect(await runGameAction('final', fields, as(owner), ports.deps)).toEqual({ ok: true });
+    expect((await games(owner)).find((g) => g.id === target?.id)).toMatchObject({
+      version: after?.version,
     });
+    expect(
+      await runGameAction('final', { ...fields, homeScore: '60' }, as(owner), ports.deps),
+    ).toEqual({ ok: false, code: 'changed-since-read' });
   });
 
   it('refuses a score that is not two whole numbers', async () => {
@@ -158,13 +162,16 @@ describe('the games area actions', () => {
       ports.deps,
     );
     expect(result).toEqual({ ok: false, code: 'not-allowed' });
-    // And a scorekeeper is offered the score form only, with the names beside each game.
+    // And a scorekeeper is offered the score form only, with the names beside each game;
+    // a game the tracker has recorded plays of offers no form at all (S-46, step 2.154).
     const rows = buildGameRows(mine, await ports.namesOf(assignedOnlyLeagueId), {
       accountId: keeper,
       isOwner: false,
       grants,
     });
-    expect(rows.every((r) => r.canScore || r.status === 'final')).toBe(true);
+    expect(rows.every((r) => (r.hasPlays ? !r.canScore : r.canScore || r.status === 'final'))).toBe(
+      true,
+    );
     expect(rows.some((r) => r.canForfeit || r.canCallOff)).toBe(false);
     expect(rows[0]?.homeName).not.toBe('');
   });

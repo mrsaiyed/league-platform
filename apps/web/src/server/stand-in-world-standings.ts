@@ -266,8 +266,15 @@ const samePlace = (a: SettingPlace, b: SettingPlace) => JSON.stringify(a) === JS
 export function worldLeaguesStores(
   s: LeagueWorld,
   access: AccessReader,
+  /** The server's clock: the time a saved setting is stamped with. */
+  now: () => Date,
 ): { readonly leagues: LeaguesStore; readonly divisions: DivisionsStore } {
   const leagues: LeaguesStore = {
+    // Who plays in the league and whether anyone in it, not in the bin, is recorded as a
+    // child, read from its own rows, so the Privacy settings say what the public pages do
+    // (record 065; has-recorded-child.ts reads the people table the same way).
+    leagueAudience: async () => s.audience,
+    hasRecordedChild: async () => s.people.some((p) => !p.binned && p.sensitive.isMinor === true),
     // The permission check asks who the league is and whether it may be changed.
     currentLeague: async () => {
       const status = await access.leagueStatus();
@@ -296,17 +303,28 @@ export function worldLeaguesStores(
               (r.place.level === 'program' && r.place.programId === places.programId) ||
               (r.place.level === 'season' && r.place.seasonId === places.seasonId)),
         )
-        .map((r) => ({ level: r.place.level, document: r.document, version: r.version })),
+        .map((r) => ({
+          level: r.place.level,
+          document: r.document,
+          version: r.version,
+          savedAt: r.savedAt,
+        })),
     writeSetting: async (place, key, document, version) => {
+      const savedAt = now().toISOString();
       const at = s.settings.findIndex((r) => r.key === key && samePlace(r.place, place));
       const row = s.settings[at];
       if (row === undefined) {
         if (version !== null) return undefined;
-        s.settings = [...s.settings, { place, key, document, version: 1 }];
+        s.settings = [...s.settings, { place, key, document, version: 1, savedAt }];
         return 1;
       }
       if (row.version !== version) return undefined;
-      s.settings = replacedAt(s.settings, at, { ...row, document, version: row.version + 1 });
+      s.settings = replacedAt(s.settings, at, {
+        ...row,
+        document,
+        version: row.version + 1,
+        savedAt,
+      });
       return row.version + 1;
     },
     clearSetting: async (place, key, version) => {

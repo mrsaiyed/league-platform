@@ -83,6 +83,9 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       const game = s.games.find((g) => g.id === gameId);
       return game === undefined ? undefined : gameRecordOf(game);
     },
+    // Step 2.154: the world runs one transaction at a time (stand-in-world.ts), which holds
+    // every game, so the lock is whether the game is in this league.
+    lockGame: async (gameId) => s.games.some((g) => g.id === gameId),
     setResult: async (gameId, change, version) => {
       const at = s.games.findIndex((g) => g.id === gameId);
       const found = s.games[at];

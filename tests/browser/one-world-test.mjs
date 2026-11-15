@@ -157,9 +157,12 @@ if (built) {
     const gameRow = (away) =>
       page.locator('li', { hasText: team }).filter({ hasText: away }).first();
     const first = gameRow('Tigers');
+    // Step 2.154: the boxes open only after "Enter the final score", and saving asks first.
+    await first.getByText('Enter the final score').click();
     await first.locator('input[name=awayScore]').fill('48');
     await first.locator('input[name=homeScore]').fill('55');
-    await tap(first.getByRole('button', { name: 'Save final score' }), /done=/);
+    await tap(first.getByRole('button', { name: 'Save final score' }), /[?&]ask=/);
+    await tap(gameRow('Tigers').getByRole('button', { name: 'Yes, make it final' }), /done=final/);
     note(
       'the games area says the first game is final',
       /final/i.test(await gameRow('Tigers').innerText()),

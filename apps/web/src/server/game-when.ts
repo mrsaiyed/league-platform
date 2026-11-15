@@ -11,6 +11,15 @@ export type LeagueTimes = {
   readonly timeZone: string;
 };
 
+/** A time of day in the league's own zone: "7:42 PM", for a moment given in milliseconds. */
+export function clockTimeText(at: number, times: LeagueTimes): string {
+  return new Intl.DateTimeFormat(times.locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: times.timeZone,
+  }).format(new Date(at));
+}
+
 /** "Sat, 5 Dec, 7:00 PM"; "Today, 7:00 PM" for a game the caller says is today. */
 export function gameWhenText(
   startsAt: string | null,

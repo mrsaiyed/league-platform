@@ -4,6 +4,11 @@ export {
   type CreatedLeague,
   type CreateLeagueError,
 } from './commands/create-league.ts';
+export {
+  removeDraftLeague,
+  type RemovedDraftLeague,
+  type RemoveDraftLeagueError,
+} from './commands/remove-draft-league.ts';
 export { namedTimeZone } from './time-zone.ts';
 export { createDivision, type CreateDivisionError } from './commands/create-division.ts';
 export { listDivisions } from './commands/list-divisions.ts';
@@ -51,6 +56,7 @@ export {
   teamsMayChooseStatsLevel,
   publicNames,
   publicNamesChoices,
+  childrenInFullConfirmed,
   playersMayAskForInitials,
 } from './settings/declarations.ts';
 export {
@@ -73,6 +79,7 @@ export {
   type SettingKind,
 } from './settings/describe-setting.ts';
 export { listLeagueSettings, type LeagueSettingRow } from './settings/list-league-settings.ts';
+export { readPrivacyFacts, type PrivacyFacts } from './settings/read-privacy-facts.ts';
 export { lookupSetting, type SettingValue, type StoredSetting } from './settings/lookup-setting.ts';
 export {
   leagueCreated,
@@ -117,7 +124,12 @@ export type {
   DivisionChange,
   DivisionRecord,
   DivisionsStore,
+  DraftLeagueRemoval,
+  DraftLeagueRemovalAsked,
   LeagueRecord,
+  LeagueRemovalFinding,
+  LeagueRemovalStore,
+  LeagueRemovalTx,
   LeaguesStore,
   LeaguesTx,
   NewDivision,

@@ -254,6 +254,14 @@ describe('upcoming games', () => {
     const card = home.upcoming.find((g) => g.status === 'postponed');
     // Short enough for a card's first line: the month and the day, no weekday.
     expect(card?.whenText).toMatch(/^Postponed from [A-Z][a-z]{2} \d{1,2}$/);
+    // Beside a pill that already says "Postponed" (a scoreboard card) the word is not said
+    // twice; the day is still never bare.
+    expect(card?.whenBesidePill).toMatch(/^From [A-Z][a-z]{2} \d{1,2}$/);
+    expect(card?.whenText.endsWith((card.whenBesidePill ?? '').slice('From '.length))).toBe(true);
+    // A game that is not postponed has no second wording.
+    for (const game of home.upcoming.filter((g) => g.status !== 'postponed')) {
+      expect(game.whenBesidePill).toBeUndefined();
+    }
     // The same card on the schedule page, in the round it was to be played in.
     const { clock, schedule } = await load(adult);
     const listed = buildScheduleView(schedule, clock, addressee, {})

@@ -178,6 +178,8 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
     },
     games: {
       find: async (id) => s.games.find((g) => g.id === id),
+      // One transaction at a time here: the lock is only whether the game is here.
+      lockGame: async (id) => s.games.some((g) => g.id === id),
       setResult: async (id, change, version) => {
         const at = s.games.findIndex((g) => g.id === id);
         const found = s.games[at];

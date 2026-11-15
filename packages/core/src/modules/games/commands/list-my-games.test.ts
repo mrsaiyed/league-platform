@@ -72,6 +72,7 @@ describe('listMyGames', () => {
       recording: 'final-score',
       assignedToMe: true,
       scorable: true,
+      hasPlays: false,
       version: 1,
     });
     expect(result.ok && result.value.games[3]).toMatchObject({
@@ -80,6 +81,22 @@ describe('listMyGames', () => {
       status: 'postponed',
       assignedToMe: false,
     });
+  });
+
+  it('says which games still to be decided the live tracker has recorded plays of (S-46)', async () => {
+    const { deps, as } = memoryGames({
+      games,
+      grants,
+      // Game 1 is to be played and has plays; game 8 is final; game 2 is postponed.
+      tracked: [gameUuid(1), gameUuid(8), gameUuid(2)],
+    });
+    const result = await listMyGames(as(ownerId), {}, deps);
+    expect(result.ok && result.value.games.map((g) => [g.id.slice(-1), g.hasPlays])).toEqual([
+      ['8', false],
+      ['1', true],
+      ['7', false],
+      ['2', false],
+    ]);
   });
 
   it('shows a scorekeeper every game in reach while any scorekeeper may score', async () => {

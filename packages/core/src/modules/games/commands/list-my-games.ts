@@ -37,6 +37,13 @@ export type MyGame = {
   readonly assignedToMe: boolean;
   /** False while the league is archived or suspended: the game is shown, not scorable (U-9). */
   readonly scorable: boolean;
+  /**
+   * Whether the live tracker has recorded plays of a game still to be decided (scheduled
+   * or live), by the store's own rule (plays since its last "not started" marker): such a
+   * game is ended in the tracker, never by a score typed by hand (S-46). False for a game
+   * that is decided, postponed or cancelled: it is not asked.
+   */
+  readonly hasPlays: boolean;
   readonly version: number;
 };
 
@@ -51,6 +58,7 @@ const view = (
   { game, day, assigned, programId }: GameInWindow,
   today: string,
   scorable: boolean,
+  hasPlays: boolean,
 ): MyGame => ({
   id: game.id,
   seasonId: game.seasonId,
@@ -67,8 +75,12 @@ const view = (
   recording: recordingOf(game.captureMode),
   assignedToMe: assigned,
   scorable,
+  hasPlays,
   version: game.version,
 });
+
+/** Only a game still to be decided can be ended by hand, so only it is asked about. */
+const stillOpen = (status: string) => status === 'scheduled' || status === 'live';
 
 export const listMyGames = defineCommand({
   name: 'games.list_my_games',
@@ -88,9 +100,12 @@ export const listMyGames = defineCommand({
       const scope: Scope = { type: 'program', id: entry.programId };
       return mayScoreUnder(holder, scope, rule, entry.assigned);
     });
-    return ok({
-      today: window.today,
-      games: games.map((entry) => view(entry, window.today, scorable)),
-    });
+    // One after another: they share the transaction's one connection.
+    const listed: MyGame[] = [];
+    for (const entry of games) {
+      const plays = stillOpen(entry.game.status) && (await tx.games.hasPlays(entry.game.id));
+      listed.push(view(entry, window.today, scorable, plays));
+    }
+    return ok({ today: window.today, games: listed });
   },
 });

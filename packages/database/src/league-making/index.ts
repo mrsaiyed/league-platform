@@ -27,3 +27,18 @@ export {
 } from './make-league.ts';
 export { type MigrationState } from './migration-state.ts';
 export { type MadeLeagueFacts } from './login-queries.ts';
+// Removing a league made by mistake (step 2.150, record 063), for scripts/remove-league.mjs.
+export {
+  previewLeagueRemoval,
+  removeLeague,
+  type LeagueRemovalAnswer,
+  type LeagueRemovalPreview,
+  type LeagueRemovalRequest,
+  type RemovalReadBack,
+  type RemovedLeague,
+  type RemoveLeagueOptions,
+  type RemoveLeagueOutcome,
+  type RemoveLeagueProblem,
+} from './remove-league.ts';
+export { type AccountKept, type OwnerAccountOutcome } from './owner-account.ts';
+export { type LeagueToRemove, type PlatformLogEntry } from './removal-queries.ts';

@@ -391,12 +391,12 @@ describe('the stylesheet', () => {
       .filter((m) => (m[2] ?? '').includes('var(--color-highlight)'))
       .map((m) => (m[1] ?? '').trim().replace(/\s+/g, ' '))
       .sort();
+    // The big board's scores are no longer in this list: since step 2.147 part 2 they are
+    // in the one color the eye lands on (DESIGN.md, section 4, line 16; hero-pieces.test.ts
+    // lists everything drawn in it), which is the highlight only where the main color
+    // does not read.
     expect(used).toEqual(
-      [
-        '.ui-live',
-        ".ui-game-team[data-winner='true'] .ui-game-team-score",
-        ".ui-scoreboard-side[data-winner='true'] .ui-scoreboard-score",
-      ].sort(),
+      ['.ui-live', ".ui-game-team[data-winner='true'] .ui-game-team-score"].sort(),
     );
     // A picker's chosen value is in the text color it is given with its field.
     expect(css).toMatch(

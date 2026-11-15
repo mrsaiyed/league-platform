@@ -177,18 +177,19 @@ describe('a team page', () => {
   it('shows a youth team by number only where the league hides names (R-24)', async () => {
     const s = await season(youth);
     const head = await loadTeamHead(stats.readStoreOf(youth), youth, s.id, 'rockets');
-    const policy = { ...(await stats.settingsOf(youth)).namePolicy, children: 'hidden' as const };
+    const policy = { ...(await stats.settingsOf(youth)).namePolicy, names: 'hidden' as const };
     const roster = buildRoster(
       await teams.rosterOf(youth, head?.teamId ?? '', { viewer: publicViewer(youth), policy }),
     );
-    // The players by number; their coach, a grown-up, is not a child the setting hides.
+    // The players by number; since step 2.162 hidden is followed for adults too (R-29), so
+    // their coach, a grown-up with no number, is a nameless entry.
     expect(roster.current.map((r) => [r.number, r.name])).toEqual([
       ['6', '#6'],
       ['13', '#13'],
-      ['', 'Lena Ortiz'],
+      ['', 'Name not shown'],
     ]);
     expect(roster.former.map((r) => r.name)).toEqual([expect.stringMatching(/^#1 \(left /)]);
-    expect(JSON.stringify(roster)).not.toMatch(/Noor|Haddad|Jay|Whitaker|Tess|Moreno/);
+    expect(JSON.stringify(roster)).not.toMatch(/Noor|Haddad|Jay|Whitaker|Tess|Moreno|Lena|Ortiz/);
   });
 
   it('shows a player added at the scorer’s table by number only as "#12" (S-34)', () => {

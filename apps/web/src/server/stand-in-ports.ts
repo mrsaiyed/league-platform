@@ -286,7 +286,9 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
   });
-  // The League settings screen's settings: every area reads them from the same world.
+  // The League settings screen's settings: every area reads them from the same world, and
+  // the Privacy settings read who plays there and whether anyone is recorded as a child
+  // from its rows too (record 065), so they never say something the public pages do not.
   const adminSettings = standInAdminSettings(world);
   const namePolicy = namePolicyOf(adminSettings.deps);
   // Who plays in each made-up league and how it shows names, read by every page that
