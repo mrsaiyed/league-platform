@@ -9,6 +9,27 @@
 // the stores make (teams, people, venues) differ between the two, so each is read as its
 // name; ids the commands are given (games, sessions) are the same. Where they differ,
 // the world is wrong: the database is the product.
+//
+// What it reaches of the world's copies of the database's queries (the review's list):
+// games: find, setResult, addCorrection, listDecided, listDecidedLines, listLines,
+// replaceLines, listRoster, hasPlays, findSeason, leagueSettingRows; scoring sessions:
+// lockGame, findForGame, start; live games: findState, takenCommands, addEvents,
+// saveState, players, lines, saveLines; teams: create, find, findDivision,
+// seasonProgramId, leagueSettingRows, findPerson, addRosterEntry; people: create;
+// scheduling: findSeason, latestRevision, findDraft, insertDraft, updateDraft,
+// deleteDraft, loadSchedule, seasonRules, gamesById, countPeopleOnTeams,
+// insertPublishedGames, insertRevision, teamsOfSeason, findVenue, createVenue,
+// createCourt; standings: lockSeason, listTeams, listAdjustments, replaceRows,
+// replaceTotals; all eleven standings reads; the public schedule and its games, the
+// game page's reads (game, teams, state, lines, people, correction date) and the public
+// roster. What it does not: games' markNotStarted, listPostponed, assign, unassign,
+// listWindow; sessions' extend and end; live games' wasDecided, findLastEnd, endedAgo,
+// findEvent and the scorer's-table players; teams' update, setBinned, findRosterEntry,
+// listRoster, updateRosterEntry; people's find, list, update, setBinned, isOnRoster;
+// scheduling's updatePublishedGame, binPublishedGames, updateRound, listVenues and the
+// venue and court changes; every imports store method; standings adjustments; the
+// settings rows; the public seasons, a game's schedule facts, the start page and a
+// member's teams. Those are covered by the feature tests on the world alone.
 import {
   addDraftGame,
   addToRoster,
