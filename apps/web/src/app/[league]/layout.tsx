@@ -10,7 +10,7 @@ import {
   type LeagueRouteProps,
 } from '../../features/shell/index.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
-import { siteOfLeague } from '../../server/league-site.ts';
+import { leagueSites, siteOfLeague } from '../../server/league-site.ts';
 import { leagueView } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { pathHeader } from '../../server/request-facts-header.ts';
@@ -20,7 +20,9 @@ import './league-site.css';
  * Every page of one league. Each page refuses the league to those who may not see
  * it (U-9); this draws nothing of the league's own unless the page may be shown.
  * The league's design becomes CSS variables once here (T-90), and the header, menu
- * and footer with our small mark (U-8) frame every page. The menu marks the page the
+ * and footer with our small mark (U-8) frame every page. A page's body sits in the
+ * centered column unless the page opens with a band the width of the screen and says so
+ * on its main area (`site-wide`, league-site.css). The menu marks the page the
  * visitor is on, read from the address as it arrived (the proxy's header). On the menu's
  * pages the header also holds the season picker, so the seasons are read here; the page
  * under it reads the same ones without asking again (league-seasons.ts).
@@ -31,7 +33,7 @@ export default async function LeagueLayout({
 }: LeagueRouteProps & { readonly children: ReactNode }) {
   const view = await leagueView((await params).league, 'site');
   if (view === null) return children;
-  const site = siteOfLeague(view.context.league);
+  const site = siteOfLeague(view.context.league, leagueSites());
   const path = (await headers()).get(pathHeader) ?? '';
   const league = view.context.league;
   const current = currentMenuPage(league, path);
@@ -51,10 +53,10 @@ export default async function LeagueLayout({
         season={season}
       />
       <LeagueNotice status={view.context.league.status} />
-      <div className="site-body site-column" id="content">
+      <div className="site-body" id="content">
         {children}
       </div>
-      <SiteFooter />
+      <SiteFooter name={site.name} />
     </div>
   );
 }

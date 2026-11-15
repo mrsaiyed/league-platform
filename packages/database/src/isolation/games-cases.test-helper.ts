@@ -17,10 +17,14 @@ import {
   releaseScoringSession,
   renewScoringSession,
   reopenGame,
+  readReopenOffer,
+  reopenTrackedGame,
   setBoxScore,
   takeOverScoring,
   unassignScorekeeper,
 } from '@srleagues/core';
+import { seasonRulesPreset } from '@srleagues/contracts';
+import type { JsonObject } from '../db/schema-types.ts';
 import { sql } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import {
@@ -29,6 +33,9 @@ import {
   extendScoringSession,
   findScoringSession,
   insertScoringSession,
+  findGameEndedAgo,
+  findGameEvent,
+  findLastGameEnd,
   findSavedGameState,
   insertGameEvents,
   listGamePlayers,
@@ -160,6 +167,28 @@ registerCommandCase(cancelGame, harnessTx, {
 registerCommandCase(reopenGame, harnessTx, {
   name: "reopen the target's final game",
   input: (target) => ({ gameId: target.gameId, version: 1, reason: 'Harness reopening' }),
+});
+
+// The scorekeeper's way back from End game (step 2.120): the target's final game was
+// ended by its tracker, so in the target's own league its owner reopens it, handing it
+// back to the tracker with a correction and the standings rebuilt; anywhere else it is
+// refused or finds no game.
+registerCommandCase(reopenTrackedGame, harnessTx, {
+  name: "reopen the target's final game from its tracker",
+  // A set id, so every run sends the same request. Its seeded events are a basket and
+  // the end: the end is the second.
+  input: (target) => ({
+    gameId: target.gameId,
+    requestId: '01900000-0000-7000-8000-00000000c2a1',
+    sequence: 2,
+    reason: 'Harness reopening',
+  }),
+});
+
+// Whether Reopen is offered on the target's final game, and who ended it (its member).
+registerCommandCase(readReopenOffer, harnessTx, {
+  name: "read whether the target's final game can be reopened from its tracker",
+  input: (target) => ({ gameId: target.gameId }),
 });
 
 // Box scores entered afterwards (step 2.64) -------------------------------------------
@@ -447,6 +476,26 @@ registerIsolationCase({
     saveGameState(scope, target.gameId, 3, { version: 1, status: 'final', plays: [] }),
 });
 
+// Who ended the target's final game (step 2.120): its seeded end event, sent by the
+// target's member.
+registerIsolationCase({
+  subject: findLastGameEnd,
+  name: "read who ended the target's final game",
+  run: (scope, target) => findLastGameEnd(scope, target.gameId),
+});
+
+registerIsolationCase({
+  subject: findGameEndedAgo,
+  name: "read how long ago the target's final game was decided",
+  run: (scope, target) => findGameEndedAgo(scope, target.gameId),
+});
+
+registerIsolationCase({
+  subject: findGameEvent,
+  name: "find the target's final game's first event by its command id",
+  run: (scope, target) => findGameEvent(scope, target.gameId, target.gameCommandIds[0] ?? ''),
+});
+
 registerIsolationCase({
   subject: listGamePlayers,
   name: "list the players of the target's upcoming game",
@@ -485,7 +534,7 @@ registerIsolationCase({
 // that in the target's own league the batch is taken: a line-up and a basket for the
 // target's player (the away side). Anywhere else the takeover is refused, and the
 // batch is sent with the member's session, which must reach nothing.
-async function scoreTargetUpcomingGame(scope: LeagueScope, target: LeagueRecords) {
+export async function scoreTargetUpcomingGame(scope: LeagueScope, target: LeagueRecords) {
   const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
     gameId: target.upcomingGameId,
     deviceId: 'harness-device',
@@ -762,6 +811,119 @@ registerIsolationCase({
   name: "load the tracker's state of the target's upcoming game once it is scored",
   run: async (scope, target) => {
     await scoreTargetUpcomingGame(scope, target).catch((thrown: unknown) => {
+      if (thrown instanceof CommandRefused) return undefined;
+      throw thrown;
+    });
+    return runAsApp(readTrackerState, harnessTx, scope, { gameId: target.upcomingGameId });
+  },
+});
+
+// The season's rules reach the tracker (step 2.122, record 062): the target's season is
+// given a foul limit of four and a stop clock (in the scope's own league only, so
+// nowhere else does it change anything), its upcoming game is taken over, a line-up,
+// the clock-mode switch and a foul are sent in the platform's command shape, and the
+// state the device loads is read: in the target's league it carries the limit, the
+// switch and the target's player. Anywhere else the takeover and the read are refused.
+const rulesCommandIds = [
+  '01900000-0000-7000-8000-00000000c2a1',
+  '01900000-0000-7000-8000-00000000c2a2',
+  '01900000-0000-7000-8000-00000000c2a3',
+];
+
+async function switchClockAtTargetUpcomingGame(scope: LeagueScope, target: LeagueRecords) {
+  const rules = seasonRulesPreset('high-school');
+  rules.fouls.playerFoulLimit = 4;
+  await transactionOf(scope)
+    .updateTable('seasons')
+    .set({ rules: JSON.parse(JSON.stringify(rules)) as JsonObject })
+    .where('league_id', '=', scope.leagueId)
+    .where('id', '=', target.seasonId)
+    .execute();
+  const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
+    gameId: target.upcomingGameId,
+    deviceId: 'harness-device',
+    confirmed: true,
+    expectedHolderSince: target.scoringSessionSince,
+  }).catch((thrown: unknown) => {
+    if (thrown instanceof CommandRefused) return undefined;
+    throw thrown;
+  });
+  const reply = taken?.value as { status?: string; sessionId?: string } | undefined;
+  const at = (n: number) => harnessNow - 3000 + n * 1000;
+  return runAsApp(applyTrackerCommands, harnessTx, scope, {
+    gameId: target.upcomingGameId,
+    protocolVersion: 2,
+    sessionId: reply?.sessionId ?? target.scoringSessionId,
+    commands: [
+      {
+        commandId: rulesCommandIds[0],
+        at: at(0),
+        input: { type: 'lineup', side: 'away', playerIds: [target.personId] },
+      },
+      {
+        commandId: rulesCommandIds[1],
+        at: at(1),
+        input: { type: 'clock-mode', mode: 'running' },
+      },
+      {
+        commandId: rulesCommandIds[2],
+        at: at(2),
+        input: { type: 'foul', side: 'away', playerId: target.personId },
+      },
+    ],
+  });
+}
+
+registerIsolationCase({
+  subject: applyTrackerCommands,
+  name: "switch the clock mode at the target's upcoming game, under its season's foul limit",
+  run: switchClockAtTargetUpcomingGame,
+});
+
+// The transfer's flag (record 062): whoever may correct games starts the target's
+// upcoming game without the mercy rule and the last-minutes stop clock. In the target's
+// league it is taken; anywhere else the takeover and the batch are refused, and the
+// target's game keeps no rules of the run.
+registerIsolationCase({
+  subject: applyTrackerCommands,
+  name: "start the target's upcoming game without the mercy rule, as the transfer does",
+  run: async (scope, target) => {
+    const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      deviceId: 'tracker-transfer',
+      confirmed: true,
+      expectedHolderSince: target.scoringSessionSince,
+    }).catch((thrown: unknown) => {
+      if (thrown instanceof CommandRefused) return undefined;
+      throw thrown;
+    });
+    const reply = taken?.value as { status?: string; sessionId?: string } | undefined;
+    return runAsApp(applyTrackerCommands, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      protocolVersion: 2,
+      withoutMercyOrLastMinutes: true,
+      sessionId: reply?.sessionId ?? target.scoringSessionId,
+      commands: [
+        {
+          commandId: rulesCommandIds[0],
+          at: harnessNow - 2000,
+          input: { type: 'lineup', side: 'away', playerIds: [target.personId] },
+        },
+        {
+          commandId: rulesCommandIds[2],
+          at: harnessNow - 1000,
+          input: { type: 'score', side: 'away', playerId: target.personId, points: 3 },
+        },
+      ],
+    });
+  },
+});
+
+registerIsolationCase({
+  subject: readTrackerState,
+  name: "load the target's season's foul limit with the state of its upcoming game",
+  run: async (scope, target) => {
+    await switchClockAtTargetUpcomingGame(scope, target).catch((thrown: unknown) => {
       if (thrown instanceof CommandRefused) return undefined;
       throw thrown;
     });

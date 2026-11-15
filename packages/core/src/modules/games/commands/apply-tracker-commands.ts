@@ -53,7 +53,7 @@ import {
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
-import { engineRulesOf } from '../engine-rules.ts';
+import { engineRulesOf, withoutMercyOrLastMinutes } from '../engine-rules.ts';
 import {
   changedLines,
   linesOf,
@@ -70,7 +70,7 @@ import {
   type TrackerInput,
 } from '../live-game.ts';
 import { finishTrackedGame, liveResultOf } from '../finish-tracked-game.ts';
-import { mayScoreGame } from '../policy.ts';
+import { gameScope, mayChangeGames, mayScoreGame } from '../policy.ts';
 import type { GameRecord, NewGameEvent, TrackerTx } from '../ports.ts';
 import { lowerId, scorerOf, sessionStanding } from '../scoring-session.ts';
 import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
@@ -128,8 +128,21 @@ export const applyTrackerCommands = defineCommand({
   permission: 'games.score',
   // The version is read on its own first: a batch from another version may not match
   // the current shapes at all (ProtocolProbe).
-  input: z.looseObject({ gameId: lowerId, protocolVersion: z.number().int().min(1) }),
-  allowed: (context, input, tx: TrackerTx) => mayScoreGame(context, tx, input.gameId),
+  input: z.looseObject({
+    gameId: lowerId,
+    protocolVersion: z.number().int().min(1),
+    /**
+     * Not a tracker's (the endpoint refuses it): the game was played on a tracker with
+     * no mercy rule and no last-minutes stop clock, and is brought over here (the
+     * transfer, step 2.58), so it is played and kept without them (record 062). Only
+     * for whoever may also correct the game.
+     */
+    withoutMercyOrLastMinutes: z.literal(true).optional(),
+  }),
+  allowed: async (context, input, tx: TrackerTx) =>
+    (await mayScoreGame(context, tx, input.gameId)) &&
+    (input.withoutMercyOrLastMinutes !== true ||
+      (await mayChangeGames(context, tx, 'games.correct', await gameScope(tx, input.gameId)))),
   run: async ({
     context,
     input,
@@ -142,7 +155,7 @@ export const applyTrackerCommands = defineCommand({
       const refusal = buildVersionRefusal();
       return fail({ code: 'unsupported-protocol-version', accepted: refusal.accepted });
     }
-    const { gameId, ...body } = input;
+    const { gameId, withoutMercyOrLastMinutes: playedWithout, ...body } = input;
     const parsed = reader.safeParse(body);
     if (!parsed.success) {
       const issues = parsed.error.issues.map((issue) => ({
@@ -198,7 +211,10 @@ export const applyTrackerCommands = defineCommand({
     // S-1: until it starts, a game follows the rules it has now: its own, or its
     // season's as they stand. A state holding only line-ups takes them again
     // (withCurrentRules), so a season change before tip-off still reaches it.
-    const rules = await effectiveRulesOf(tx, game);
+    const asSet = await effectiveRulesOf(tx, game);
+    // A game brought over from a tracker that had neither rule is played without them,
+    // and fixed so when it goes live, so its rules say how it was played (record 062).
+    const rules = playedWithout === true ? withoutMercyOrLastMinutes(asSet) : asSet;
     // Made at time 0, as the Al-Hadi tracker makes its games, so taps queued offline
     // before this batch arrived still run the clock from when they happened.
     let state =

@@ -99,6 +99,9 @@ export type WorldSetting = {
 
 export type LeagueWorld = {
   readonly leagueId: string;
+  /** Its short name and its own name, as the leagues table keeps them. */
+  readonly slug: string;
+  readonly name: string;
   /** Who plays in the league (R-15). */
   readonly audience: Audience;
   /** The league's own time zone: its "today" and its game times. */
@@ -137,12 +140,16 @@ export type LeagueWorld = {
 
 /** A league that holds nothing yet. */
 export function emptyLeagueWorld(
-  leagueId: string,
+  league: { readonly id: string; readonly slug: string; readonly name: string },
   facts: Pick<LeagueWorld, 'audience' | 'timeZone' | 'minimumGames'>,
 ): LeagueWorld {
   return {
-    leagueId,
-    ...facts,
+    leagueId: league.id,
+    slug: league.slug,
+    name: league.name,
+    audience: facts.audience,
+    timeZone: facts.timeZone,
+    minimumGames: facts.minimumGames,
     currentSeasonId: null,
     seasons: [],
     divisions: [],

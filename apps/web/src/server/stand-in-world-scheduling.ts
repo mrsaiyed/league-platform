@@ -17,7 +17,8 @@ import type {
 import { recordingOf } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
 import { dayIn, momentIn, timeIn } from './stand-in-world-clock.ts';
-import type { LeagueWorld } from './stand-in-world-state.ts';
+import { replacedAt } from './stand-in-world-rows.ts';
+import type { LeagueWorld, WorldGame } from './stand-in-world-state.ts';
 
 const statuses = ['scheduled', 'live', 'final', 'postponed', 'cancelled', 'forfeit'] as const;
 const scheduleStatusOf = (status: string): ScheduleGame['status'] =>
@@ -62,7 +63,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       if (season(seasonId) === undefined) return 'no-season';
       if (s.drafts.some((d) => d.seasonId === seasonId)) return 'exists';
       const id = randomUUID();
-      s.drafts.push({ id, seasonId, changes, basedOnRevision, version: 1 });
+      s.drafts = [...s.drafts, { id, seasonId, changes, basedOnRevision, version: 1 }];
       return { id, version: 1 };
     },
     updateDraft: async (seasonId, draftId, changes, version) => {
@@ -71,7 +72,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       );
       const found = s.drafts[at];
       if (found === undefined) return undefined;
-      s.drafts[at] = { ...found, changes, version: version + 1 };
+      s.drafts = replacedAt(s.drafts, at, { ...found, changes, version: version + 1 });
       return version + 1;
     },
     deleteDraft: async (seasonId, draftId, version) => {
@@ -119,13 +120,14 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
           .map((r) => r.personId),
       ).size,
     insertPublishedGames: async (seasonId, games) => {
+      const added: WorldGame[] = [];
       for (const g of games) {
         const home = s.teams.find((t) => t.id === g.homeTeamId && t.seasonId === seasonId);
         const away = s.teams.find((t) => t.id === g.awayTeamId && t.seasonId === seasonId);
         if (home === undefined || away === undefined) {
           throw new Error('The database refuses a game for a team that is not of the season.');
         }
-        s.games.push({
+        added.push({
           id: g.id,
           seasonId,
           divisionId: home.divisionId === away.divisionId ? home.divisionId : null,
@@ -148,13 +150,14 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
           courtId: courtNamed(g.venueId, g.court)?.id ?? null,
         });
       }
+      s.games = [...s.games, ...added];
     },
     updatePublishedGame: async (seasonId, gameId, change) => {
       const at = s.games.findIndex((g) => g.id === gameId && g.seasonId === seasonId);
       const game = s.games[at];
       if (game === undefined || game.binned || started(game.status)) return false;
       const slot = change.slot;
-      s.games[at] = {
+      s.games = replacedAt(s.games, at, {
         ...game,
         ...(slot === undefined
           ? {}
@@ -168,7 +171,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
             }),
         ...(change.captureMode === undefined ? {} : { captureMode: change.captureMode }),
         version: game.version + 1,
-      };
+      });
       return true;
     },
     binPublishedGames: async (seasonId, ids) => {
@@ -185,18 +188,18 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       const at = s.rounds.findIndex((r) => r.id === roundId && r.seasonId === seasonId);
       const round = s.rounds[at];
       if (round === undefined) return false;
-      s.rounds[at] = {
+      s.rounds = replacedAt(s.rounds, at, {
         ...round,
         ...(change.label === undefined ? {} : { label: change.label }),
         ...(change.date === undefined ? {} : { date: change.date }),
-      };
+      });
       return true;
     },
     insertRevision: async (seasonId, revision) => {
       if (s.revisions.some((r) => r.seasonId === seasonId && r.number === revision.number)) {
         return false;
       }
-      s.revisions.push({ seasonId, number: revision.number });
+      s.revisions = [...s.revisions, { seasonId, number: revision.number }];
       return true;
     },
     teamsOfSeason: async (seasonId, teamIds) =>
@@ -215,7 +218,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
     createVenue: async (venue) => {
       if (venueNameTaken(venue.name)) return 'name-taken';
       const id = randomUUID();
-      s.venues.push({ id, ...venue, binned: false, version: 1 });
+      s.venues = [...s.venues, { id, ...venue, binned: false, version: 1 }];
       return id;
     },
     updateVenue: async (venueId, change, version) => {
@@ -224,7 +227,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       if (found === undefined || found.binned || found.version !== version) return undefined;
       if (change.name !== undefined && venueNameTaken(change.name, venueId)) return 'name-taken';
       const next: VenueRecord = { ...found, ...change, version: found.version + 1 };
-      s.venues[at] = next;
+      s.venues = replacedAt(s.venues, at, next);
       return next.version;
     },
     setVenueBinned: async (venueId, binned) => {
@@ -232,7 +235,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       const found = s.venues[at];
       if (found === undefined) return false;
       if (!binned && venueNameTaken(found.name, venueId)) return 'name-taken';
-      s.venues[at] = { ...found, binned, version: found.version + 1 };
+      s.venues = replacedAt(s.venues, at, { ...found, binned, version: found.version + 1 });
       return true;
     },
     hasLiveCourts: async (venueId) => s.courts.some((c) => c.venueId === venueId && !c.binned),
@@ -242,7 +245,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
     createCourt: async (court) => {
       if (courtNameTaken(court.venueId, court.name)) return 'name-taken';
       const id = randomUUID();
-      s.courts.push({ id, ...court, binned: false, version: 1 });
+      s.courts = [...s.courts, { id, ...court, binned: false, version: 1 }];
       return id;
     },
     updateCourt: async (courtId, change, version) => {
@@ -254,7 +257,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
         return 'name-taken';
       }
       const next: CourtRecord = { ...found, ...change, version: found.version + 1 };
-      s.courts[at] = next;
+      s.courts = replacedAt(s.courts, at, next);
       return next.version;
     },
     setCourtBinned: async (courtId, binned) => {
@@ -262,7 +265,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       const found = s.courts[at];
       if (found === undefined) return false;
       if (!binned && courtNameTaken(found.venueId, found.name, courtId)) return 'name-taken';
-      s.courts[at] = { ...found, binned, version: found.version + 1 };
+      s.courts = replacedAt(s.courts, at, { ...found, binned, version: found.version + 1 });
       return true;
     },
   };
@@ -295,19 +298,22 @@ export function worldImportsStore(s: LeagueWorld, now: () => Date): ImportsStore
     insert: async (value) => {
       if (season(value.seasonId) === undefined) return 'no-season';
       const id = randomUUID();
-      s.imports.push({
-        id,
-        seasonId: value.seasonId,
-        kind: 'fixtures',
-        status: 'reading',
-        accountId: value.accountId,
-        fileName: value.fileName,
-        report: value.report,
-        created: { version: 1 },
-        appliedAt: null,
-        undoneAt: null,
-        version: 1,
-      });
+      s.imports = [
+        ...s.imports,
+        {
+          id,
+          seasonId: value.seasonId,
+          kind: 'fixtures',
+          status: 'reading',
+          accountId: value.accountId,
+          fileName: value.fileName,
+          report: value.report,
+          created: { version: 1 },
+          appliedAt: null,
+          undoneAt: null,
+          version: 1,
+        },
+      ];
       return { id, version: 1 };
     },
     find: async (importId) => s.imports.find((x) => x.id === importId),
@@ -316,7 +322,7 @@ export function worldImportsStore(s: LeagueWorld, now: () => Date): ImportsStore
       const found = s.imports[at];
       if (found === undefined || found.version !== version) return undefined;
       const stamp = now().toISOString();
-      s.imports[at] = {
+      s.imports = replacedAt(s.imports, at, {
         ...found,
         status: change.status,
         report: change.report ?? found.report,
@@ -324,7 +330,7 @@ export function worldImportsStore(s: LeagueWorld, now: () => Date): ImportsStore
         appliedAt: change.status === 'applied' ? (found.appliedAt ?? stamp) : found.appliedAt,
         undoneAt: change.status === 'undone' ? stamp : found.undoneAt,
         version: version + 1,
-      };
+      });
       return version + 1;
     },
   };

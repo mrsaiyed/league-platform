@@ -59,6 +59,10 @@ export async function sendTrackerCommands(
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     return refuse({ error: 'invalid-input', issues: [] });
   }
+  // Not a tracker's to say: only the transfer plays a game without those rules (record 062).
+  if (Object.hasOwn(body, 'withoutMercyOrLastMinutes')) {
+    return refuse({ error: 'invalid-input', issues: [] });
+  }
   // The address names the game: anything the body says about it is put aside.
   const result = await applyTrackerCommands(
     commandContextOf(context),

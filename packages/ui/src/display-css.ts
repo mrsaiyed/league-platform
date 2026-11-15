@@ -10,8 +10,17 @@
 import { baseCss } from './styles/base-css.ts';
 import { cardsCss } from './styles/cards-css.ts';
 import { gameCss } from './styles/game-css.ts';
+import { heroCss } from './styles/hero-css.ts';
 import { layoutCss } from './styles/layout-css.ts';
 import { pickerCss } from './styles/picker-css.ts';
 import { tableCss } from './styles/table-css.ts';
 
-export const displayCss = [baseCss, layoutCss, gameCss, tableCss, pickerCss, cardsCss].join('');
+export const displayCss = [
+  baseCss,
+  layoutCss,
+  gameCss,
+  tableCss,
+  pickerCss,
+  cardsCss,
+  heroCss,
+].join('');

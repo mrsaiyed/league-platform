@@ -15,6 +15,7 @@ import type {
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
 import { uniqueJerseysOf } from './stand-in-world-games.ts';
+import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld, WorldPerson } from './stand-in-world-state.ts';
 
 const entryOf = ({
@@ -53,7 +54,7 @@ export function worldTeamsStore(s: LeagueWorld): TeamsStore {
       const taken = clash(t);
       if (taken !== undefined) return taken;
       const id = randomUUID();
-      s.teams.push({ id, ...t, lineageId: randomUUID(), binned: false, version: 1 });
+      s.teams = [...s.teams, { id, ...t, lineageId: randomUUID(), binned: false, version: 1 }];
       return id;
     },
     update: async (id, change, version) => {
@@ -63,7 +64,7 @@ export function worldTeamsStore(s: LeagueWorld): TeamsStore {
       const next: TeamRecord = { ...found, ...change, version: found.version + 1 };
       const taken = clash(next, id);
       if (taken !== undefined) return taken;
-      s.teams[at] = next;
+      s.teams = replacedAt(s.teams, at, next);
       return next.version;
     },
     setBinned: async (id, binned) => {
@@ -74,7 +75,7 @@ export function worldTeamsStore(s: LeagueWorld): TeamsStore {
         const taken = clash(found, id);
         if (taken !== undefined) return taken;
       }
-      s.teams[at] = { ...found, binned, version: found.version + 1 };
+      s.teams = replacedAt(s.teams, at, { ...found, binned, version: found.version + 1 });
       return true;
     },
     findPerson: async (id) => {
@@ -113,15 +114,18 @@ export function worldTeamsStore(s: LeagueWorld): TeamsStore {
       }
       if (jerseyWorn(e.teamId, e.jerseyNumber)) return 'jersey-taken';
       const id = randomUUID();
-      s.roster.push({
-        id,
-        ...e,
-        leftOn: null,
-        sort: Math.max(-1, ...mine.map((r) => r.sort)) + 1,
-        version: 1,
-        addedAtGameId: null,
-        needsReview: false,
-      });
+      s.roster = [
+        ...s.roster,
+        {
+          id,
+          ...e,
+          leftOn: null,
+          sort: Math.max(-1, ...mine.map((r) => r.sort)) + 1,
+          version: 1,
+          addedAtGameId: null,
+          needsReview: false,
+        },
+      ];
       return id;
     },
     updateRosterEntry: async (id, change, version) => {
@@ -133,7 +137,7 @@ export function worldTeamsStore(s: LeagueWorld): TeamsStore {
       if (change.jerseyNumber !== undefined && jerseyWorn(found.teamId, change.jerseyNumber, id)) {
         return 'jersey-taken';
       }
-      s.roster[at] = { ...found, ...change, version: found.version + 1 };
+      s.roster = replacedAt(s.roster, at, { ...found, ...change, version: found.version + 1 });
       return found.version + 1;
     },
     seasonProgramId: async (id) => s.seasons.find((x) => x.id === id)?.programId,
@@ -176,17 +180,20 @@ export function worldPeopleStore(s: LeagueWorld): PeopleStore {
     },
     create: async (p) => {
       const id = randomUUID();
-      s.people.push({
-        id,
-        firstName: p.firstName,
-        lastName: p.lastName,
-        publicName: p.publicName,
-        visibility: 'none',
-        binned: false,
-        version: 1,
-        sensitive: { contactEmail: p.contactEmail, birthDate: p.birthDate, isMinor: p.isMinor },
-        accountId: null,
-      });
+      s.people = [
+        ...s.people,
+        {
+          id,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          publicName: p.publicName,
+          visibility: 'none',
+          binned: false,
+          version: 1,
+          sensitive: { contactEmail: p.contactEmail, birthDate: p.birthDate, isMinor: p.isMinor },
+          accountId: null,
+        },
+      ];
       return id;
     },
     update: async (id, change, version) => {
@@ -194,7 +201,7 @@ export function worldPeopleStore(s: LeagueWorld): PeopleStore {
       const found = s.people[at];
       if (found === undefined || found.binned || found.version !== version) return undefined;
       const { contactEmail, birthDate, isMinor, ...plain } = change;
-      s.people[at] = {
+      s.people = replacedAt(s.people, at, {
         ...found,
         ...plain,
         sensitive: {
@@ -203,14 +210,14 @@ export function worldPeopleStore(s: LeagueWorld): PeopleStore {
           isMinor: isMinor === undefined ? found.sensitive.isMinor : isMinor,
         },
         version: found.version + 1,
-      };
+      });
       return found.version + 1;
     },
     setBinned: async (id, binned) => {
       const at = s.people.findIndex((x) => x.id === id);
       const found = s.people[at];
       if (found === undefined) return false;
-      s.people[at] = { ...found, binned, version: found.version + 1 };
+      s.people = replacedAt(s.people, at, { ...found, binned, version: found.version + 1 });
       return true;
     },
     isOnRoster: async (personId) =>

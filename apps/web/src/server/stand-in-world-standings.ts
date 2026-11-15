@@ -15,7 +15,9 @@ import {
   type StandingsStore,
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
+import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld, SavedPlayerTotals } from './stand-in-world-state.ts';
+import type { Frozen, ReadWorld } from './stand-in-world.ts';
 
 const decided = (status: string) => status === 'final' || status === 'forfeit';
 const byId = <T extends { readonly id: string }>(a: T, b: T) => a.id.localeCompare(b.id);
@@ -40,7 +42,7 @@ export function worldStandingsStore(s: LeagueWorld): StandingsStore {
       }
       const id = randomUUID();
       const { accountId: _account, ...fields } = adjustment;
-      s.adjustments.push({ id, seasonId, binned: false, ...fields });
+      s.adjustments = [...s.adjustments, { id, seasonId, binned: false, ...fields }];
       return id;
     },
     binAdjustment: async (seasonId, adjustmentId) => {
@@ -49,20 +51,20 @@ export function worldStandingsStore(s: LeagueWorld): StandingsStore {
       );
       const found = s.adjustments[at];
       if (found === undefined) return false;
-      s.adjustments[at] = { ...found, binned: true };
+      s.adjustments = replacedAt(s.adjustments, at, { ...found, binned: true });
       return true;
     },
     replaceRows: async (seasonId, rows) => {
-      s.standingsRows[seasonId] = [...rows];
+      s.standingsRows = { ...s.standingsRows, [seasonId]: [...rows] };
     },
     replaceTotals: async (seasonId, totals) => {
-      s.playerTotals[seasonId] = [...totals];
+      s.playerTotals = { ...s.playerTotals, [seasonId]: [...totals] };
     },
   };
 }
 
 /** The player totals as the database keeps them: a versioned document (migration 0010). */
-const statsDocument = (totals: SavedPlayerTotals) => ({
+const statsDocument = (totals: Frozen<SavedPlayerTotals>) => ({
   version: 1,
   teamIds: totals.teamIds,
   stats: Object.fromEntries(
@@ -77,9 +79,7 @@ const statsDocument = (totals: SavedPlayerTotals) => ({
  * The public standings and statistics reads of one league, each over its world as it
  * stands once the transactions before it have ended (standings-read-store.ts).
  */
-export function worldStandingsRead(
-  read: () => Promise<LeagueWorld | undefined>,
-): StandingsReadStore {
+export function worldStandingsRead(read: () => Promise<ReadWorld | undefined>): StandingsReadStore {
   const over = async () => standingsReadOver(await read());
   return {
     findSeason: async (seasonId) => (await over()).findSeason(seasonId),
@@ -98,7 +98,7 @@ export function worldStandingsRead(
 }
 
 /** The same reads over one fixed state of a league's world; undefined is a league with none. */
-function standingsReadOver(s: LeagueWorld | undefined): StandingsReadStore {
+function standingsReadOver(s: ReadWorld | undefined): StandingsReadStore {
   const at = () => s;
   const decidedGames = (seasonId: string) =>
     (at()?.games ?? [])
@@ -245,28 +245,29 @@ function standingsReadOver(s: LeagueWorld | undefined): StandingsReadStore {
   };
 }
 
-/** A store of which only the named parts are made up; any other part is a mistake to call. */
-function partial<Store extends object>(name: string, made: Partial<Store>): Store {
-  return new Proxy(made as Store, {
-    get(target, property, receiver) {
-      if (property in target) return Reflect.get(target, property, receiver) as unknown;
-      throw new Error(`The made-up world has no ${name}.${String(property)}.`);
-    },
-  });
-}
+/**
+ * A part of a store the world has no rows for yet: it fails at once, by name, so a command
+ * that reaches it fails loudly instead of being given a wrong answer.
+ */
+const notYet = (name: string) => async (): Promise<never> => {
+  throw new Error(`Not on the stand-in yet: ${name}.`);
+};
 
 const samePlace = (a: SettingPlace, b: SettingPlace) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
  * The leagues module's stores over one league's world, as far as League settings uses
  * them: who the league is, its seasons' programs, and its stored settings. Creating
- * leagues and seasons has no screen yet, so those parts are not made up.
+ * leagues, seasons and divisions and changing a league's name, address or state have no
+ * screen on the stand-in yet: those parts fail by name (createLeague, setLeagueName,
+ * renameShortName, setLeagueStatus, createSeason, updateSeason, setSeasonRules,
+ * setSeasonRosterSettings, setCurrentSeason, getSeason, and every division command).
  */
 export function worldLeaguesStores(
   s: LeagueWorld,
   access: AccessReader,
 ): { readonly leagues: LeaguesStore; readonly divisions: DivisionsStore } {
-  const leagues = partial<LeaguesStore>('leagues', {
+  const leagues: LeaguesStore = {
     // The permission check asks who the league is and whether it may be changed.
     currentLeague: async () => {
       const status = await access.leagueStatus();
@@ -274,8 +275,17 @@ export function worldLeaguesStores(
       const known = leagueStatuses.find((candidate) => candidate === status);
       return known === undefined || ownerAccountId === undefined
         ? undefined
-        : { id: s.leagueId, name: '', slug: '', status: known, ownerAccountId, version: 1 };
+        : { id: s.leagueId, name: s.name, slug: s.slug, status: known, ownerAccountId, version: 1 };
     },
+    setName: notYet('leagues.setName'),
+    createLeague: notYet('leagues.createLeague'),
+    renameShortName: notYet('leagues.renameShortName'),
+    setStatus: notYet('leagues.setStatus'),
+    createSeason: notYet('leagues.createSeason'),
+    findSeason: notYet('leagues.findSeason'),
+    programCount: notYet('leagues.programCount'),
+    updateSeason: notYet('leagues.updateSeason'),
+    setCurrentSeason: notYet('leagues.setCurrentSeason'),
     isPlatformStaff: async () => false,
     settingRows: async (key, places) =>
       s.settings
@@ -292,11 +302,11 @@ export function worldLeaguesStores(
       const row = s.settings[at];
       if (row === undefined) {
         if (version !== null) return undefined;
-        s.settings.push({ place, key, document, version: 1 });
+        s.settings = [...s.settings, { place, key, document, version: 1 }];
         return 1;
       }
       if (row.version !== version) return undefined;
-      s.settings[at] = { ...row, document, version: row.version + 1 };
+      s.settings = replacedAt(s.settings, at, { ...row, document, version: row.version + 1 });
       return row.version + 1;
     },
     clearSetting: async (place, key, version) => {
@@ -311,6 +321,15 @@ export function worldLeaguesStores(
       return known === undefined ? undefined : { id: known.programId };
     },
     seasonProgramId: async (seasonId) => s.seasons.find((x) => x.id === seasonId)?.programId,
-  });
-  return { leagues, divisions: partial<DivisionsStore>('divisions', {}) };
+  };
+  const divisions: DivisionsStore = {
+    find: notYet('divisions.find'),
+    list: notYet('divisions.list'),
+    create: notYet('divisions.create'),
+    update: notYet('divisions.update'),
+    setBinned: notYet('divisions.setBinned'),
+    hasLiveSubdivisions: notYet('divisions.hasLiveSubdivisions'),
+    hasLiveTeams: notYet('divisions.hasLiveTeams'),
+  };
+  return { leagues, divisions };
 }

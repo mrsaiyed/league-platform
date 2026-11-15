@@ -7,8 +7,10 @@
 // and roster entries. The database's own rules (each command id and number once per game,
 // numbers with no gaps, a number worn once where the season asks) are stood in for by the
 // checks made here. Only the storage is made up: every rule is the games commands' own.
-import { tablePlayerEventTypes, refusedAddEventType } from '@srleagues/contracts';
+// A table is never changed in place: each write gives it a new array (stand-in-world-rows.ts).
+import { refusedAddEventType } from '@srleagues/contracts';
 import {
+  hasPlaysPastMarker,
   rulesOfGame,
   type GameLine,
   type GamePlayer,
@@ -21,6 +23,7 @@ import {
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
 import { addDays, dayIn, momentIn } from './stand-in-world-clock.ts';
+import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld, WorldGame, WorldRosterEntry } from './stand-in-world-state.ts';
 
 /** The roles that play: a coach's entry is no player's (list-game-players.ts). */
@@ -84,7 +87,7 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       const at = s.games.findIndex((g) => g.id === gameId);
       const found = s.games[at];
       if (found === undefined || found.binned || found.version !== version) return undefined;
-      s.games[at] = {
+      s.games = replacedAt(s.games, at, {
         ...found,
         status: change.status,
         homeScore: change.homeScore,
@@ -93,11 +96,29 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
         format: found.format ?? change.format ?? null,
         captureMode: change.captureMode ?? found.captureMode,
         version: found.version + 1,
-      };
+      });
       return found.version + 1;
     },
-    addCorrection: async (correction) =>
-      void s.corrections.push({ ...correction, on: dayIn(now(), s.timeZone) }),
+    // As the database does it (record 061): only a live game, its rules emptied with it.
+    markNotStarted: async (gameId, version) => {
+      const at = s.games.findIndex((g) => g.id === gameId);
+      const found = s.games[at];
+      if (found === undefined || found.binned || found.version !== version) return undefined;
+      if (found.status !== 'live') return undefined;
+      s.games = replacedAt(s.games, at, {
+        ...found,
+        status: 'scheduled',
+        homeScore: null,
+        awayScore: null,
+        finalizedAt: null,
+        format: null,
+        version: found.version + 1,
+      });
+      return found.version + 1;
+    },
+    addCorrection: async (correction) => {
+      s.corrections = [...s.corrections, { ...correction, on: dayIn(now(), s.timeZone) }];
+    },
     listPostponed: async (seasonId) =>
       s.games
         .filter(
@@ -155,13 +176,10 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
           needsReview: e.needsReview,
         }));
     },
-    // The players the scorer's table changed are events too, but not plays (record 058).
+    // Plays past the last "not started" marker, by core's one rule; the players the
+    // scorer's table changed are events too, but not plays (records 058, 061).
     hasPlays: async (gameId) =>
-      s.playsBefore.includes(gameId) ||
-      s.events.some(
-        (e) =>
-          e.gameId === gameId && !(tablePlayerEventTypes as readonly string[]).includes(e.type),
-      ),
+      s.playsBefore.includes(gameId) || hasPlaysPastMarker(s.events, gameId),
     findSeason: async (seasonId) => {
       const season = s.seasons.find((x) => x.id === seasonId);
       return season === undefined
@@ -175,7 +193,7 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
     isAssigned: async (gameId, accountId) => assigned(gameId, accountId),
     assign: async (gameId, accountId) => {
       if (assigned(gameId, accountId)) return false;
-      s.assignments.push({ gameId, accountId });
+      s.assignments = [...s.assignments, { gameId, accountId }];
       return true;
     },
     unassign: async (gameId, accountId) => {
@@ -222,14 +240,14 @@ export function worldScoringSessions(s: LeagueWorld): ScoringSessionsStore {
     start: async (session) => {
       if (current(session.gameId) !== undefined) return undefined;
       const started: ScoringSession = { ...session, id: randomUUID() };
-      s.sessions.push(started);
+      s.sessions = [...s.sessions, started];
       return started;
     },
     extend: async (gameId, sessionId, heldUntil) => {
       const at = s.sessions.findIndex((x) => x.gameId === gameId && x.id === sessionId);
       const found = s.sessions[at];
       if (found === undefined) return false;
-      s.sessions[at] = { ...found, heldUntil };
+      s.sessions = replacedAt(s.sessions, at, { ...found, heldUntil });
       return true;
     },
     end: async (gameId, sessionId, lapsedBy) => {
@@ -265,46 +283,61 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
         !same(e.personId, personId),
     );
   return {
+    // A copy, as a database read is: the engine works on the state it is given.
     findState: async (gameId) => {
       const found = s.states.find((x) => x.gameId === gameId);
-      return found === undefined ? undefined : { seq: found.seq, state: found.state };
+      return found === undefined
+        ? undefined
+        : { seq: found.seq, state: structuredClone(found.state) };
     },
     takenCommands: async (gameId, commandIds) =>
       s.events
         .filter((e) => e.gameId === gameId && commandIds.includes(e.commandId))
         .map((e) => e.commandId),
     addEvents: async (events) => {
+      const kept = [...s.events];
       for (const event of events) {
-        const own = s.events.filter((e) => e.gameId === event.gameId);
+        const own = kept.filter((e) => e.gameId === event.gameId);
         if (own.some((e) => e.commandId === event.commandId)) {
           throw new Error('game_events_command_once');
         }
         if (event.seq !== own.length + 1) throw new Error('game_events_in_order');
-        s.events.push(event);
+        kept.push(event);
       }
+      s.events = kept;
     },
+    // Ever final or forfeited: a correction for it, or an end or reopen in its event log.
+    wasDecided: async (gameId) =>
+      s.corrections.some((c) => c.gameId === gameId) ||
+      s.events.some((e) => e.gameId === gameId && (e.type === 'end' || e.type === 'reopen')),
     saveState: async (gameId, seq, state) => {
       s.states = [...s.states.filter((x) => x.gameId !== gameId), { gameId, seq, state }];
     },
     players: async (gameId) => {
       const teams = teamsOfGame(s, gameId);
       const day = gameDayOf(s, gameId, now());
-      return s.roster
-        .filter((e) => teams.includes(e.teamId) && playing.includes(e.role))
-        .sort(
-          (a, b) =>
-            a.teamId.localeCompare(b.teamId) ||
-            a.personId.localeCompare(b.personId) ||
-            Number(onDay(b, day)) - Number(onDay(a, day)),
-        )
-        .map(
-          (e): GamePlayer => ({
-            personId: e.personId,
-            teamId: e.teamId,
-            jerseyNumber: e.jerseyNumber,
-            onGameDay: onDay(e, day),
-          }),
-        );
+      return (
+        s.roster
+          .filter((e) => teams.includes(e.teamId) && playing.includes(e.role))
+          // By team and person, the entry on the team on the game's day first, then by
+          // leaving date with no date first (list-game-players.ts).
+          .sort(
+            (a, b) =>
+              a.teamId.localeCompare(b.teamId) ||
+              a.personId.localeCompare(b.personId) ||
+              Number(onDay(b, day)) - Number(onDay(a, day)) ||
+              Number(a.leftOn !== null) - Number(b.leftOn !== null) ||
+              (a.leftOn ?? '').localeCompare(b.leftOn ?? ''),
+          )
+          .map(
+            (e): GamePlayer => ({
+              personId: e.personId,
+              teamId: e.teamId,
+              jerseyNumber: e.jerseyNumber,
+              onGameDay: onDay(e, day),
+            }),
+          )
+      );
     },
     lines: async (gameId) => s.lines.filter((l) => l.gameId === gameId),
     saveLines: async (gameId, lines, removed) => {
@@ -313,6 +346,21 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
         ...s.lines.filter((l) => !(l.gameId === gameId && replaced.has(l.personId))),
         ...lines,
       ];
+    },
+    findLastEnd: async (gameId) => {
+      const end = s.events.filter((e) => e.gameId === gameId && e.type === 'end').at(-1);
+      return end === undefined ? undefined : { accountId: end.accountId };
+    },
+    // The world's "database clock" is the server's own.
+    endedAgo: async (gameId) => {
+      const decidedAt = s.games.find((g) => g.id === gameId)?.finalizedAt ?? null;
+      return decidedAt === null ? undefined : Math.max(0, now().getTime() - Date.parse(decidedAt));
+    },
+    findEvent: async (gameId, commandId) => {
+      const found = s.events.find((e) => e.gameId === gameId && e.commandId === commandId);
+      return found === undefined
+        ? undefined
+        : { seq: found.seq, type: found.type, accountId: found.accountId };
     },
     findTablePlayer: async (teamId, personId) => {
       const entry = current(teamId, personId);
@@ -335,31 +383,37 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
         return 'jersey-taken';
       }
       const { personId, teamId, jerseyNumber, firstName, lastName } = player;
-      s.people.push({
-        id: personId,
-        firstName,
-        lastName,
-        publicName: null,
-        visibility: 'none',
-        binned: false,
-        version: 1,
-        sensitive: { contactEmail: null, birthDate: null, isMinor: null },
-        accountId: null,
-      });
+      s.people = [
+        ...s.people,
+        {
+          id: personId,
+          firstName,
+          lastName,
+          publicName: null,
+          visibility: 'none',
+          binned: false,
+          version: 1,
+          sensitive: { contactEmail: null, birthDate: null, isMinor: null },
+          accountId: null,
+        },
+      ];
       const mine = s.roster.filter((e) => e.teamId === teamId);
-      s.roster.push({
-        id: randomUUID(),
-        teamId,
-        personId,
-        jerseyNumber,
-        role: 'player',
-        joinedOn: null,
-        leftOn: null,
-        sort: Math.max(-1, ...mine.map((e) => e.sort)) + 1,
-        version: 1,
-        addedAtGameId: player.gameId,
-        needsReview: player.needsReview,
-      });
+      s.roster = [
+        ...s.roster,
+        {
+          id: randomUUID(),
+          teamId,
+          personId,
+          jerseyNumber,
+          role: 'player',
+          joinedOn: null,
+          leftOn: null,
+          sort: Math.max(-1, ...mine.map((e) => e.sort)) + 1,
+          version: 1,
+          addedAtGameId: player.gameId,
+          needsReview: player.needsReview,
+        },
+      ];
       return 'added';
     },
     changeTablePlayer: async (entryId, personId, change) => {
@@ -371,7 +425,7 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
         return 'jersey-taken';
       }
       if (jerseyNumber !== undefined) {
-        s.roster[at] = { ...entry, jerseyNumber, version: entry.version + 1 };
+        s.roster = replacedAt(s.roster, at, { ...entry, jerseyNumber, version: entry.version + 1 });
       }
       if (change.firstName !== undefined || change.lastName !== undefined) {
         s.people = s.people.map((p) =>

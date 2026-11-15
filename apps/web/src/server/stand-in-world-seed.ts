@@ -793,7 +793,15 @@ const draftLeagueSeason = (programId: string): SeasonSpec => {
     divisions: [],
     rounds: [{ id: big(0xb5, 1), days: 0, label: null }],
     games: [
-      ...fall.games.filter((g) => g.id.includes('-8000-006a')).map((g) => ({ ...g, round: 0 })),
+      // At the draft league's own gym, on its own courts.
+      ...fall.games
+        .filter((g) => g.id.includes('-8000-006a'))
+        .map((g) => ({
+          ...g,
+          round: 0,
+          venue: pines,
+          court: g.court === court(1) ? court(21) : court(22),
+        })),
       {
         id: standInGameId(6),
         round: null,
@@ -810,16 +818,19 @@ const draftLeagueSeason = (programId: string): SeasonSpec => {
   };
 };
 
-/** The ids and people the seed needs from the stand-in's cast (stand-in-ports.ts). */
+/** A made-up league of the cast: its id, short name and own name. */
+export type CastLeague = { readonly id: string; readonly slug: string; readonly name: string };
+
+/** The leagues and people the seed needs from the stand-in's cast (stand-in-cast.ts). */
 export type SeedCast = {
   /** The adult league, the youth league and the draft league scored by assigned scorekeepers. */
-  readonly adultLeagueId: string;
-  readonly youthLeagueId: string;
-  readonly draftLeagueId: string;
+  readonly adultLeague: CastLeague;
+  readonly youthLeague: CastLeague;
+  readonly draftLeague: CastLeague;
   /** The draft league's one program, which a made-up scheduler holds a grant for. */
   readonly draftProgramId: string;
   /** Every other made-up league: no seasons yet. */
-  readonly otherLeagueIds: readonly string[];
+  readonly otherLeagues: readonly CastLeague[];
   /** The account that has a roster place in each league (a made-up member). */
   readonly memberAccountId: string;
   /** Who is given games to score: in the adult league, the first two games to the first and
@@ -829,12 +840,60 @@ export type SeedCast = {
 };
 
 type LeagueFacts = {
-  readonly leagueId: string;
+  readonly league: CastLeague;
   readonly audience: Audience;
   readonly timeZone: string;
   readonly minimumGames: number;
   readonly programId: string;
+  /** The league's own venues, each with its courts. */
+  readonly venues: readonly VenueSpec[];
 };
+
+type VenueSpec = {
+  readonly id: string;
+  readonly name: string;
+  readonly address: string;
+  readonly courts: readonly { readonly id: string; readonly name: string }[];
+};
+
+/** Each league's venues are its own (a league never offers another's gym). */
+const adultVenues: readonly VenueSpec[] = [
+  {
+    id: gym,
+    name: 'Central Gym',
+    address: '12 Mill Road',
+    courts: [
+      { id: court(1), name: 'Court 1' },
+      { id: court(2), name: 'Court 2' },
+    ],
+  },
+  {
+    id: venue(3),
+    name: 'Riverside Hall',
+    address: '40 River Lane',
+    courts: [{ id: court(3), name: 'Court A' }],
+  },
+];
+const youthVenues: readonly VenueSpec[] = [
+  {
+    id: rec,
+    name: 'Harbor Rec Center',
+    address: '3 Pier Street',
+    courts: [{ id: court(11), name: 'Main court' }],
+  },
+];
+const pines = venue(4);
+const draftVenues: readonly VenueSpec[] = [
+  {
+    id: pines,
+    name: 'Pine Hollow Gym',
+    address: '8 Cedar Way',
+    courts: [
+      { id: court(21), name: 'Court 1' },
+      { id: court(22), name: 'Court 2' },
+    ],
+  },
+];
 
 function leagueOf(
   facts: LeagueFacts,
@@ -843,33 +902,27 @@ function leagueOf(
   memberAccountId: string,
   now: Date,
 ): LeagueWorld {
-  const s = emptyLeagueWorld(facts.leagueId, facts);
+  const s = emptyLeagueWorld(facts.league, facts);
   const today = dayIn(now, facts.timeZone);
   s.currentSeasonId = current;
-  s.venues = [
-    {
-      id: gym,
-      name: 'Central Gym',
-      address: '12 Mill Road',
-      mapLink: null,
+  s.venues = facts.venues.map((v) => ({
+    id: v.id,
+    name: v.name,
+    address: v.address,
+    mapLink: null,
+    binned: false,
+    version: 1,
+  }));
+  s.courts = facts.venues.flatMap((v) =>
+    v.courts.map((c, sort) => ({
+      id: c.id,
+      venueId: v.id,
+      name: c.name,
+      sort: sort + 1,
       binned: false,
       version: 1,
-    },
-    {
-      id: rec,
-      name: 'Harbor Rec Center',
-      address: '3 Pier Street',
-      mapLink: null,
-      binned: false,
-      version: 1,
-    },
-  ];
-  s.courts = [
-    { id: court(1), venueId: gym, name: 'Court 1', sort: 1, binned: false, version: 1 },
-    { id: court(2), venueId: gym, name: 'Court 2', sort: 2, binned: false, version: 1 },
-    { id: court(3), venueId: rec, name: 'Court A', sort: 1, binned: false, version: 1 },
-    { id: court(11), venueId: rec, name: 'Main court', sort: 0, binned: false, version: 1 },
-  ];
+    })),
+  );
   const people = new Map<string, WorldPerson>();
   const personOf = (spec: PlayerSpec): WorldPerson => ({
     id: spec.id,
@@ -1003,11 +1056,12 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   const adultProgram = madeUp('009a', 1);
   const adult = leagueOf(
     {
-      leagueId: cast.adultLeagueId,
+      league: cast.adultLeague,
       audience: 'adult',
       timeZone: 'America/Chicago',
       minimumGames: 3,
       programId: adultProgram,
+      venues: adultVenues,
     },
     [adultFall(adultProgram), adultSpring(adultProgram), adultNext(adultProgram)],
     standInSeasonIds.adultFall,
@@ -1053,11 +1107,12 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   const youthProgram = madeUp('009a', 2);
   const youth = leagueOf(
     {
-      leagueId: cast.youthLeagueId,
+      league: cast.youthLeague,
       audience: 'youth',
       timeZone: 'America/Los_Angeles',
       minimumGames: 2,
       programId: youthProgram,
+      venues: youthVenues,
     },
     [youthWinter(youthProgram)],
     standInSeasonIds.youthWinter,
@@ -1077,11 +1132,12 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   const draftProgram = cast.draftProgramId;
   const draft = leagueOf(
     {
-      leagueId: cast.draftLeagueId,
+      league: cast.draftLeague,
       audience: 'youth',
       timeZone: 'America/Chicago',
       minimumGames: 0,
       programId: draftProgram,
+      venues: draftVenues,
     },
     [draftLeagueSeason(draftProgram)],
     standInSeasonIds.draftLeague,
@@ -1105,8 +1161,8 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
     { gameId: standInGameId(4), accountId: draftSecond },
   ];
 
-  const others = cast.otherLeagueIds.map((leagueId) =>
-    emptyLeagueWorld(leagueId, { audience: 'youth', timeZone: 'UTC', minimumGames: 0 }),
+  const others = cast.otherLeagues.map((league) =>
+    emptyLeagueWorld(league, { audience: 'youth', timeZone: 'UTC', minimumGames: 0 }),
   );
   return [adult, youth, draft, ...others];
 }

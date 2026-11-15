@@ -106,8 +106,20 @@ const cases = [
     'visitor',
     '/north-valley',
     200,
-    ['Home', 'Recent results', 'Upcoming games', 'Standings'],
-    ['This page is not built yet.'],
+    // The sections' titles as step 2.147 phrased them, each under its kicker; the hero's
+    // sentence and its two ways on; the call to action near the foot.
+    [
+      'Home',
+      'Recent results',
+      'The next matchups',
+      'The standings',
+      'On the schedule',
+      'Scores, standings and the schedule for every team, all season long.',
+      'See the schedule',
+      'Meet the teams',
+      'Official league site',
+    ],
+    ['This page is not built yet.', 'Upcoming games'],
   ],
   [
     'visitor',
@@ -250,7 +262,7 @@ const cases = [
     'visitor',
     '/north-valley',
     200,
-    ['North Valley League', 'Powered by SR Leagues', '--color-primary: #c8a84b', 'Schedule'],
+    ['North Valley League', 'Powered by SR Leagues', '--color-primary: #96062d', 'Schedule'],
     ['#1f5fbf'],
   ],
   [
@@ -258,7 +270,7 @@ const cases = [
     '/harbor-city/standings',
     200,
     ['Harbor City League', 'Powered by SR Leagues', '--color-primary: #1f5fbf'],
-    ['#c8a84b'],
+    ['#96062d'],
   ],
   // The standings and statistics pages (step 2.43): real tables, not the placeholder; a
   // team set to staff only shows its totals and none of its players to a visitor (S-22).
@@ -288,7 +300,7 @@ const cases = [
   ['visitor', '/north-valley/stats?by=total', 200, ['Season totals']],
   ['visitor', '/harbor-city/stats', 200, ['Sam R.', 'Noor H.'], ['Rivera', 'Haddad']],
   ['visitor', '/harbor-city/standings', 200, ['Level with another team', 'PTS']],
-  ['scheduler', '/north-valley/admin', 200, ['Powered by SR Leagues', '--color-primary: #c8a84b']],
+  ['scheduler', '/north-valley/admin', 200, ['Powered by SR Leagues', '--color-primary: #96062d']],
   // Someone not signed in at the admin's home (a scorekeeper's games) is sent to sign in
   // and brought back (step 2.33); at an admin area they are still refused (U-6).
   [

@@ -7,13 +7,16 @@
 // commands run on it, and core's own event handlers with them: a result rebuilds the
 // season's standings and player totals in the same transaction, as on the database.
 //
-// Transactions: one at a time, for every league (a queue), each on a copy of its league's
-// rows. The copy is kept only if the work returns (a command throws to roll back, so a
-// refused or failed command leaves nothing behind); a page reading meanwhile sees the
-// rows as they were before, never half a change. A league's rows are only ever read and
-// written through its own id (T-28): one league's world never reaches another's pages.
-// The world lives in this process's memory: it is made again from the seed
-// (stand-in-world-seed.ts) every time the server starts.
+// Transactions: one at a time, for every league (a queue). Each starts from a shallow copy
+// of its league, sharing every table with the world as it stands; a store never changes a
+// table in place but gives it a new array (stand-in-world-rows.ts), so only the tables a
+// transaction writes are copied. The copy is kept only if the work returns (a command
+// throws to roll back, so a refused or failed command leaves nothing behind); the world's
+// own rows are frozen, so nothing but a kept transaction can change them, and a page reads
+// them once the transactions before it have ended, never half a change. A league's rows are
+// only ever read and written through its own id (T-28): one league's world never reaches
+// another's pages. The world lives in this process's memory: it is made again from the
+// seed (stand-in-world-seed.ts) every time the server starts.
 import {
   eventHandlers,
   importsRunJob,
@@ -38,9 +41,11 @@ import {
   type TrackerTx,
   type TransactionRunner,
 } from '@srleagues/core';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { worldGamesStore, worldLiveGames, worldScoringSessions } from './stand-in-world-games.ts';
+import { deepFreeze } from './stand-in-world-rows.ts';
 import { worldImportsStore, worldSchedulingStore } from './stand-in-world-scheduling.ts';
-import { emptyLeagueWorld, type LeagueWorld } from './stand-in-world-state.ts';
+import type { LeagueWorld } from './stand-in-world-state.ts';
 import { worldLeaguesStores, worldStandingsStore } from './stand-in-world-standings.ts';
 import { worldPeopleStore, worldTeamsStore } from './stand-in-world-teams.ts';
 
@@ -55,6 +60,16 @@ export type WorldTx = TrackerTx &
 
 /** What every area's transaction has: the core handlers find the rest of the world from it. */
 type AnyAreaTx = CommandTx & { readonly activity: ActivityLog };
+
+/** A value as a page is given it: read only, all the way down. */
+export type Frozen<T> = T extends readonly (infer Item)[]
+  ? readonly Frozen<Item>[]
+  : T extends object
+    ? { readonly [K in keyof T]: Frozen<T[K]> }
+    : T;
+
+/** A league's rows as a page reads them. */
+export type ReadWorld = Frozen<LeagueWorld>;
 
 /**
  * The commands' dependencies on the world, for any area: its transaction offers every
@@ -83,9 +98,9 @@ export type WorldOptions = {
 export type World = {
   /**
    * The league's rows once every transaction asked for before has ended, or undefined
-   * for a league with none: what a page reads. Read only.
+   * for a league with none: what a page reads. Frozen: a reader cannot change them.
    */
-  readonly read: (leagueId: string) => Promise<LeagueWorld | undefined>;
+  readonly read: (leagueId: string) => Promise<ReadWorld | undefined>;
   /** Who plays in the league, or undefined for a league with no world (it never changes). */
   readonly audienceOf: (leagueId: string) => Audience | undefined;
   readonly deps: WorldDeps;
@@ -93,31 +108,52 @@ export type World = {
   readonly clock: Clock;
 };
 
+/** Asked for inside a transaction, the world would wait for that transaction forever. */
+export class WorldReentered extends Error {
+  constructor(what: string) {
+    super(
+      `The made-up world was asked to ${what} inside one of its own transactions, which would never end.`,
+    );
+    this.name = 'WorldReentered';
+  }
+}
+
 const refused = (result: unknown) =>
   typeof result === 'object' && result !== null && 'ok' in result && result.ok === false;
+
+/** Keeps a transaction's copy as the world: the tables it wrote, frozen, and the league. */
+function kept(before: LeagueWorld, draft: LeagueWorld): LeagueWorld {
+  for (const key of Object.keys(draft) as (keyof LeagueWorld)[]) {
+    if (draft[key] !== before[key]) deepFreeze(draft[key]);
+  }
+  return Object.freeze(draft);
+}
 
 export function madeUpWorld(options: WorldOptions): World {
   const now = options.now ?? (() => new Date());
   const clock = options.clock ?? systemClock;
   const states = new Map<string, LeagueWorld>(
-    options.leagues.map((league) => [league.leagueId, structuredClone(league)]),
+    options.leagues.map((league) => [league.leagueId, deepFreeze(structuredClone(league))]),
   );
   // Which world transaction an area's transaction is: the handlers need every store.
   const opened = new WeakMap<ActivityLog, WorldTx>();
+  // Set while a transaction's work runs, so the world notices being asked for inside it.
+  const inside = new AsyncLocalStorage<true>();
 
   const txOf = (leagueId: string, s: LeagueWorld, jobs: Job[]): WorldTx => {
     const access = options.accessOf(leagueId);
     const activity: ActivityLog = {
-      record: async (entry) => void s.activity.push(entry),
+      record: async (entry) => {
+        s.activity = [...s.activity, entry];
+      },
       list: async () => [],
     };
-    const games = worldGamesStore(s, now);
     const tx: WorldTx = {
       jobs: { enqueue: async (job) => void jobs.push(job) },
       access,
       activity,
       clock,
-      games,
+      games: worldGamesStore(s, now),
       scoringSessions: worldScoringSessions(s),
       liveGames: worldLiveGames(s, now),
       standings: worldStandingsStore(s),
@@ -134,17 +170,18 @@ export function madeUpWorld(options: WorldOptions): World {
   // One transaction at a time, as the database's locks would hold the others.
   let queue: Promise<unknown> = Promise.resolve();
   const inTurn = <T>(leagueId: string, work: (tx: WorldTx) => Promise<T>) => {
+    if (inside.getStore() === true) throw new WorldReentered('run a transaction');
     const run = queue.then(async () => {
       const known = states.get(leagueId);
-      const draft = structuredClone(
-        known ??
-          emptyLeagueWorld(leagueId, { audience: 'youth', timeZone: 'UTC', minimumGames: 0 }),
-      );
+      if (known === undefined) {
+        throw new Error(`No made-up league has the id ${leagueId}: nothing would be kept.`);
+      }
+      const draft: LeagueWorld = { ...known };
       const jobs: Job[] = [];
-      const result = await work(txOf(leagueId, draft, jobs));
-      // Kept only when the work returned and did not refuse; a league with no world keeps nothing.
-      if (refused(result) || known === undefined) return { result, jobs: [] };
-      states.set(leagueId, draft);
+      const result = await inside.run(true, () => work(txOf(leagueId, draft, jobs)));
+      // Kept only when the work returned and did not refuse.
+      if (refused(result)) return { result, jobs: [] };
+      states.set(leagueId, kept(known, draft));
       return { result, jobs };
     });
     queue = run.catch(() => undefined);
@@ -159,11 +196,14 @@ export function madeUpWorld(options: WorldOptions): World {
     const { result, jobs } = await inTurn(leagueId, work);
     // The worker's turn: each kept `imports.run` job reads its file once, in its own
     // transaction for the job's league, acting for nobody (T-226), as the worker would
-    // moments later. Other jobs (emails) have no worker here and are dropped.
+    // moments later. The command is kept whatever happens next, so a read that fails
+    // leaves the file waiting to be read, as a failed job of the worker would; the page
+    // then shows it still reading, and it can be forgotten (discardFixtureImport). Other
+    // jobs (emails) have no worker here and are dropped.
     for (const job of jobs) {
       const importId = job.ids['importId'];
       if (job.type === importsRunJob && importId !== undefined && job.leagueId === leagueId) {
-        await inTurn(leagueId, (tx) => readFixtureImport(tx, importId));
+        await inTurn(leagueId, (tx) => readFixtureImport(tx, importId)).catch(() => undefined);
       }
     }
     return result;
@@ -192,9 +232,9 @@ export function madeUpWorld(options: WorldOptions): World {
 
   return {
     read: async (leagueId) => {
+      if (inside.getStore() === true) throw new WorldReentered('be read');
       await seeded;
-      const before = queue;
-      await before;
+      await queue;
       return states.get(leagueId.toLowerCase());
     },
     audienceOf: (leagueId) => states.get(leagueId.toLowerCase())?.audience,

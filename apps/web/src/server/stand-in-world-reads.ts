@@ -21,18 +21,25 @@ import type { PublicSeason } from './public-stats.ts';
 import type { StartPage } from './public-teams.ts';
 import { dayIn } from './stand-in-world-clock.ts';
 import { gameRecordOf } from './stand-in-world-games.ts';
-import type { LeagueWorld, WorldGame, WorldSeason } from './stand-in-world-state.ts';
+import type {
+  WorldGame as StoredGame,
+  WorldSeason as StoredSeason,
+} from './stand-in-world-state.ts';
+import type { Frozen, ReadWorld } from './stand-in-world.ts';
+
+type WorldGame = Frozen<StoredGame>;
+type WorldSeason = Frozen<StoredSeason>;
 
 /** The seasons whose games, teams and rosters the public may read. */
 const publicStatuses: readonly string[] = ['active', 'completed'];
 
-const publicSeason = (s: LeagueWorld | undefined, seasonId: string) => {
+const publicSeason = (s: ReadWorld | undefined, seasonId: string) => {
   const season = s?.seasons.find((x) => x.id === seasonId);
   return season === undefined || !publicStatuses.includes(season.status) ? undefined : season;
 };
 
 /** The seasons a visitor may pick, newest first (list-public-seasons.ts). */
-function publicSeasonsOf(s: LeagueWorld | undefined): WorldSeason[] {
+function publicSeasonsOf(s: ReadWorld | undefined): WorldSeason[] {
   return (s?.seasons ?? [])
     .filter((x) => publicStatuses.includes(x.status))
     .sort(
@@ -43,7 +50,7 @@ function publicSeasonsOf(s: LeagueWorld | undefined): WorldSeason[] {
     );
 }
 
-export function worldPublicSeasons(s: LeagueWorld | undefined): PublicSeason[] {
+export function worldPublicSeasons(s: ReadWorld | undefined): PublicSeason[] {
   return publicSeasonsOf(s).map((x) => ({
     id: x.id,
     name: x.name,
@@ -52,7 +59,7 @@ export function worldPublicSeasons(s: LeagueWorld | undefined): PublicSeason[] {
   }));
 }
 
-const choiceOf = (s: LeagueWorld, season: WorldSeason): PublicSeasonChoice => ({
+const choiceOf = (s: ReadWorld, season: WorldSeason): PublicSeasonChoice => ({
   slug: season.slug,
   name: season.name,
   programSlug: season.programSlug,
@@ -62,7 +69,7 @@ const choiceOf = (s: LeagueWorld, season: WorldSeason): PublicSeasonChoice => ({
   endsOn: season.endsOn,
 });
 
-function publicGameOf(s: LeagueWorld, game: WorldGame): PublicGame {
+function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
   const team = (id: string) => {
     const found = s.teams.find((t) => t.id === id);
     return {
@@ -93,7 +100,7 @@ function publicGameOf(s: LeagueWorld, game: WorldGame): PublicGame {
 }
 
 /** A season's published games in time order, those with no time last (list-public-games.ts). */
-const gamesOfSeason = (s: LeagueWorld, seasonId: string) =>
+const gamesOfSeason = (s: ReadWorld, seasonId: string) =>
   s.games
     .filter((g) => g.seasonId === seasonId && !g.binned)
     .sort(
@@ -103,14 +110,14 @@ const gamesOfSeason = (s: LeagueWorld, seasonId: string) =>
         a.id.localeCompare(b.id),
     );
 
-export function worldLeagueClock(s: LeagueWorld | undefined, now: Date): LeagueClock {
+export function worldLeagueClock(s: ReadWorld | undefined, now: Date): LeagueClock {
   const timeZone = s?.timeZone ?? 'UTC';
   return { today: dayIn(now, timeZone), now: now.toISOString(), timeZone };
 }
 
 /** A season's schedule and results by round (list-public-schedule.ts). */
 export function worldPublicSchedule(
-  s: LeagueWorld | undefined,
+  s: ReadWorld | undefined,
   seasonId: string,
   today: string,
 ): PublicSchedule | undefined {
@@ -138,7 +145,7 @@ export function worldPublicSchedule(
 
 /** One published game's number, place and season, from its one row. */
 export function worldGameFacts(
-  s: LeagueWorld | undefined,
+  s: ReadWorld | undefined,
   seasonId: string,
   gameId: string,
 ): PublicGameFacts | undefined {
@@ -158,7 +165,7 @@ export function worldGameFacts(
  * What a game's page and its snapshot read (games-read-store.ts), each over the world as
  * it stands once the transactions before it have ended.
  */
-export function worldGameSnapshot(read: () => Promise<LeagueWorld | undefined>): GameSnapshotStore {
+export function worldGameSnapshot(read: () => Promise<ReadWorld | undefined>): GameSnapshotStore {
   return {
     // A game of a season still being set up (or retired) is not there at all. Its rules
     // are its own once fixed, else its season's.
@@ -219,7 +226,7 @@ export function worldGameSnapshot(read: () => Promise<LeagueWorld | undefined>):
 
 /** One team's public roster: those on it now, then those who left (list-public-roster.ts). */
 export function worldPublicRoster(
-  s: LeagueWorld | undefined,
+  s: ReadWorld | undefined,
   teamId: string,
   display: Parameters<typeof publicRosterLine>[2],
 ): PublicRoster {
@@ -259,7 +266,7 @@ export function worldPublicRoster(
 }
 
 /** The league's "Start page for members" setting (U-5), as League settings saved it. */
-export function worldStartPage(s: LeagueWorld | undefined): StartPage {
+export function worldStartPage(s: ReadWorld | undefined): StartPage {
   const rows = (s?.settings ?? [])
     .filter((r) => r.key === membersStartPage.key && r.place.level === 'league')
     .map((r) => ({ level: r.place.level, document: r.document }));
@@ -268,7 +275,7 @@ export function worldStartPage(s: LeagueWorld | undefined): StartPage {
 
 /** The teams of the season the account has a roster place on now, through its person. */
 export function worldTeamsOfAccount(
-  s: LeagueWorld | undefined,
+  s: ReadWorld | undefined,
   seasonId: string,
   accountId: string,
 ): string[] {

@@ -2,7 +2,7 @@
 // (stand-in-world-seed.ts), with the access rules the test gives: so a test of one
 // area runs on the same rows every other area reads.
 import { rulesOfGame, type AccessReader } from '@srleagues/core';
-import { standInDraftProgramId, standInLeagues, standInPeople } from './stand-in-ports.ts';
+import { standInPeople, standInSeedCast } from './stand-in-cast.ts';
 import { madeUpLeagues } from './stand-in-world-seed.ts';
 import type { LeagueWorld } from './stand-in-world-state.ts';
 import { madeUpWorld, type World } from './stand-in-world.ts';
@@ -23,19 +23,7 @@ export function testWorld(
   now: () => Date = () => new Date(),
   change: (leagues: LeagueWorld[]) => void = () => undefined,
 ): World {
-  const leagues = madeUpLeagues(
-    {
-      adultLeagueId: standInLeagues.live.id,
-      youthLeagueId: standInLeagues.other.id,
-      draftLeagueId: standInLeagues.draft.id,
-      draftProgramId: standInDraftProgramId,
-      otherLeagueIds: [standInLeagues.otherDraft.id],
-      memberAccountId: standInPeople.coach.accountId,
-      assignees: [standInPeople.scorekeeper.accountId, standInPeople.owner.accountId],
-      draftAssignees: [standInPeople.admin.accountId, standInPeople.scorekeeper.accountId],
-    },
-    now(),
-  );
+  const leagues = madeUpLeagues(standInSeedCast, now());
   change(leagues);
   return madeUpWorld({ leagues, accessOf, log: () => undefined, now });
 }
