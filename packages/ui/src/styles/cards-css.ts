@@ -83,7 +83,7 @@ export const cardsCss = String.raw`
   background-color: var(--color-panel);
   background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   border: var(--card-border-width) solid var(--color-line);
-  border-block-start: 2px solid
+  border-block-start: var(--line-heavy) solid
     color-mix(in srgb, var(--team-color, var(--color-accent)) 50%, transparent);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
@@ -439,8 +439,8 @@ export const cardsCss = String.raw`
   inline-size: var(--step-2);
   block-size: var(--step-2);
   margin-inline: var(--step-1);
-  border-block-end: 2px solid var(--color-muted);
-  border-inline-end: 2px solid var(--color-muted);
+  border-block-end: var(--line-heavy) solid var(--color-muted);
+  border-inline-end: var(--line-heavy) solid var(--color-muted);
   transition: transform 0.15s;
   transform: rotate(-45deg);
 }

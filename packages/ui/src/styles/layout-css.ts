@@ -113,7 +113,7 @@ export const layoutCss = String.raw`
   content: '';
   display: block;
   inline-size: var(--step-7);
-  block-size: 2px;
+  block-size: var(--line-heavy);
   margin-block-start: var(--step-2);
   background: var(--color-pop);
 }
@@ -343,7 +343,7 @@ export const layoutCss = String.raw`
 }
 .ui-message-mark {
   inline-size: var(--step-7);
-  block-size: 2px;
+  block-size: var(--line-heavy);
   background: var(--color-pop);
 }
 `;

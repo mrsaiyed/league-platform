@@ -79,6 +79,49 @@ describe('a picker’s field on a phone', () => {
   });
 });
 
+describe('a picker’s arrow', () => {
+  const rule = /\.ui-picker select \{([^}]*)\}/.exec(css)?.[1] ?? '';
+  it('is the product’s own fine arrow, not the browser’s, in the field’s own text color', () => {
+    expect(rule).toMatch(/appearance: none;/);
+    // Two strokes that meet, each as heavy as the product's heavier line; no picture file,
+    // so the arrow takes the color of any design, and of the header.
+    expect(rule).toMatch(
+      /background-image:\s*linear-gradient\(\s*45deg,[\s\S]*linear-gradient\(\s*135deg,/,
+    );
+    expect(rule.match(/currentColor calc\(50% - var\(--line-heavy\) \/ 2\)/g)).toHaveLength(2);
+    expect(rule.match(/currentColor calc\(50% \+ var\(--line-heavy\) \/ 2\)/g)).toHaveLength(2);
+    expect(rule).not.toMatch(/url\(|#[0-9a-f]{3,8}\b/i);
+    expect(rule).toMatch(/background-repeat: no-repeat;/);
+    expect(rule).toMatch(
+      /background-size: calc\(var\(--step-3\) \/ 2\) calc\(var\(--step-3\) \/ 2\);/,
+    );
+  });
+  it('has room kept for it at the field’s end, and stands at the other end read from the right', () => {
+    expect(rule).toMatch(
+      /padding-inline-end: calc\(var\(--step-3\) \+ var\(--step-3\) \+ var\(--step-2\)\);/,
+    );
+    expect(rule).toMatch(
+      /background-position:\s*calc\(100% - var\(--step-3\) - var\(--step-3\) \/ 2\) 50%,\s*calc\(100% - var\(--step-3\)\) 50%;/,
+    );
+    expect(css).toMatch(
+      /\[dir='rtl'\] \.ui-picker select \{\s*background-position:\s*var\(--step-3\) 50%,\s*calc\(var\(--step-3\) \+ var\(--step-3\) \/ 2\) 50%;/,
+    );
+    // Nothing after it paints the field's whole background again and wipes the arrow out.
+    const after = css.slice(css.indexOf("[dir='rtl'] .ui-picker select"));
+    expect(after).not.toMatch(/\.ui-picker[^{]*select[^{]*\{[^}]*background:/);
+  });
+});
+
+describe('the heavier line', () => {
+  it('is named once: no stylesheet of the pieces writes a line of 2 pixels itself', () => {
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(bare).not.toMatch(/\b2px solid/);
+    expect(bare).not.toMatch(/(?:block-size|inline-size|thickness): 2px/);
+    expect(bare).not.toMatch(/underline 2px/);
+    expect(bare.match(/var\(--line-heavy\)/g)?.length ?? 0).toBeGreaterThan(12);
+  });
+});
+
 describe('a kicker over a title', () => {
   it('is a tiny label before the level-two title, which then has no rule of its own', () => {
     const html = render(
@@ -418,7 +461,7 @@ describe('a game as a scoreboard', () => {
       ".ui-game-score > [data-winner='true'] { border-block-end-color: var(--color-ornament); font-weight: 600; }",
     );
     expect(flat).toContain(
-      ".ui-game-side[data-winner='true'] .ui-game-side-score { font-weight: 600; text-decoration: underline 2px var(--color-ornament); text-underline-offset: 0.2em; }",
+      ".ui-game-side[data-winner='true'] .ui-game-side-score { font-weight: 600; text-decoration: underline var(--line-heavy) var(--color-ornament); text-underline-offset: 0.2em; }",
     );
     // Once decided, the other score is in the page's own text color, wherever it stands.
     expect(flat).toMatch(
@@ -845,7 +888,7 @@ describe('a game as a scoreboard', () => {
 
   it('wears the league’s color of decoration as a fine line at its top, over one tint', () => {
     expect(css).toMatch(
-      /\.ui-game-card\[data-layout='board'\] \{[^}]*background-image: linear-gradient\(120deg, var\(--card-wash\), var\(--color-panel\) 70%\);\s*border-block-start: 2px solid var\(--color-ornament-line\);/,
+      /\.ui-game-card\[data-layout='board'\] \{[^}]*background-image: linear-gradient\(120deg, var\(--card-wash\), var\(--color-panel\) 70%\);\s*border-block-start: var\(--line-heavy\) solid var\(--color-ornament-line\);/,
     );
   });
 });
@@ -1067,7 +1110,7 @@ describe('a team’s card', () => {
     expect(plain).toContain('<article class="ui-team-card">');
     expect(plain).not.toContain('red;x');
     expect(css).toMatch(
-      /\.ui-team-card \{[^}]*border-block-start: 2px solid\s*color-mix\(in srgb, var\(--team-color, var\(--color-accent\)\) 50%, transparent\);/,
+      /\.ui-team-card \{[^}]*border-block-start: var\(--line-heavy\) solid\s*color-mix\(in srgb, var\(--team-color, var\(--color-accent\)\) 50%, transparent\);/,
     );
     expect(css).toMatch(/\.ui-team-card > \.ui-emblem \{\s*block-size: var\(--step-8\);/);
     expect(css).toMatch(/\.ui-team-card-figure \{[^}]*font-size: var\(--text-28\);/);

@@ -138,6 +138,12 @@ describe('header, menu and footer', () => {
     for (const raw of ['2.75rem', '0.375rem', '0.3125rem', '1.25rem', 'font-size: 1rem']) {
       expect(css).not.toContain(raw);
     }
+    // Nor a line of 2 pixels: the heavier line has one name (the menu's bars and cross, the
+    // line under the page a visitor is on).
+    expect(css).not.toMatch(/\b2px\b/);
+    expect(css).toMatch(
+      /\.site-menu-icon \{[^}]*border-block: var\(--line-heavy\) solid currentColor;/,
+    );
   });
 
   it('takes every gap of the frame from the spacing scale, and keeps what a thumb taps 44 high', () => {

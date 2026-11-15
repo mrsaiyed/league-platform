@@ -191,7 +191,7 @@ html {
   position: relative;
   inline-size: var(--step-4);
   block-size: var(--step-3);
-  border-block: 2px solid currentColor;
+  border-block: var(--line-heavy) solid currentColor;
 }
 .site-menu-icon::before,
 .site-menu-icon::after {
@@ -199,7 +199,7 @@ html {
   position: absolute;
   inset-inline: 0;
   inset-block-start: calc(50% - 1px);
-  border-block-start: 2px solid currentColor;
+  border-block-start: var(--line-heavy) solid currentColor;
 }
 /* The second middle line is there only for the cross. */
 .site-menu-icon::after {
@@ -256,7 +256,7 @@ html {
 .site-header .site-menu-panel li a {
   min-block-size: var(--step-7);
   padding-inline: var(--step-4);
-  border-inline-start: 2px solid transparent;
+  border-inline-start: var(--line-heavy) solid transparent;
 }
 .site-header .site-menu-panel li a:hover {
   color: var(--tab-hover-text);
@@ -358,7 +358,7 @@ html {
 .site-header .site-tabs a {
   min-block-size: var(--tap);
   padding-inline: var(--step-4);
-  border-block-end: 2px solid transparent;
+  border-block-end: var(--line-heavy) solid transparent;
   font-size: var(--tab-size);
   transition:
     background-color 0.15s,

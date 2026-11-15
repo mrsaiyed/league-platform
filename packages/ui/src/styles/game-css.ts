@@ -198,7 +198,7 @@ export const gameCss = String.raw`
      are one tint (packages/site, frame-look.ts). */
   background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   /* A fine line at the card's top in the league's color of decoration. */
-  border-block-start: 2px solid var(--color-ornament-line);
+  border-block-start: var(--line-heavy) solid var(--color-ornament-line);
   transition:
     border-color 0.15s,
     transform 0.15s;
@@ -413,7 +413,7 @@ export const gameCss = String.raw`
 }
 .ui-game-score > span {
   padding-block-end: var(--step-1);
-  border-block-end: 2px solid transparent;
+  border-block-end: var(--line-heavy) solid transparent;
 }
 .ui-game-score-colon {
   color: var(--color-muted);
@@ -426,7 +426,7 @@ export const gameCss = String.raw`
 }
 .ui-game-side[data-winner='true'] .ui-game-side-score {
   font-weight: 600;
-  text-decoration: underline 2px var(--color-ornament);
+  text-decoration: underline var(--line-heavy) var(--color-ornament);
   text-underline-offset: 0.2em;
 }
 /* Once a game is decided only the winner's score keeps the color the eye lands on, and
@@ -606,7 +606,7 @@ export const gameCss = String.raw`
   background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   color: var(--color-text);
   border: var(--card-border-width) solid var(--color-line);
-  border-block-start: 2px solid var(--color-ornament-line);
+  border-block-start: var(--line-heavy) solid var(--color-ornament-line);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   text-align: center;
@@ -772,7 +772,7 @@ export const gameCss = String.raw`
 .ui-scoreboard-score {
   justify-self: center;
   padding-block-end: var(--step-1);
-  border-block-end: 2px solid transparent;
+  border-block-end: var(--line-heavy) solid transparent;
   font-family: var(--font-score);
   font-size: var(--text-48);
   font-weight: 600;

@@ -105,8 +105,8 @@ export const tableCss = String.raw`
     inset-inline-end: var(--step-2);
     inline-size: var(--step-2);
     block-size: var(--step-2);
-    border-block-end: 2px solid var(--color-text);
-    border-inline-end: 2px solid var(--color-text);
+    border-block-end: var(--line-heavy) solid var(--color-text);
+    border-inline-end: var(--line-heavy) solid var(--color-text);
     transform: rotate(-45deg);
   }
   [dir='rtl'] .ui-table-frame::after {
@@ -297,7 +297,7 @@ export const tableCss = String.raw`
 }
 /* A table with emblems stands among scoreboards, and has their fine line at its top. */
 .ui-table-frame:has(.ui-standings[data-emblems='true']) {
-  border-block-start: 2px solid var(--color-ornament-line);
+  border-block-start: var(--line-heavy) solid var(--color-ornament-line);
 }
 /* With emblems a team's place is set in the score face, in the color the eye lands on. */
 .ui-standings[data-emblems='true'] tbody td.ui-num:first-child {
