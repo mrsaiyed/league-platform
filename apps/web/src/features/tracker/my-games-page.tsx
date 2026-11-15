@@ -7,7 +7,7 @@
 // whose only area of the admin is Games; everyone else gets the admin's home as before.
 import { leagueUrl, listMyGames, platformUrl, type MyGame } from '@srleagues/core';
 import { displayLabels } from '@srleagues/site';
-import { GameCard, type GameStatus } from '@srleagues/ui';
+import { EmptyPanel, GameCard, PageHead, type GameStatus } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { gameWhenText, type LeagueTimes } from '../../server/game-when.ts';
@@ -51,46 +51,55 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
         ? leagueUrl(here, 'admin-area', { area: 'games', subpath: [game.id] })
         : leagueUrl(here, 'admin-area', { area: 'games' });
     return (
-      <p data-recording={recording}>
-        {t(`admin.myGames.recording.${recording}`)}{' '}
-        <a className="tap-button" href={href}>
+      <p className="ui-toolbar" data-recording={recording}>
+        <span>{t(`admin.myGames.recording.${recording}`)}</span>
+        <a className="ui-button" href={href}>
           {t('admin.myGames.enterScore')}
         </a>
       </p>
     );
   };
   return (
-    <main className="admin-games">
-      <h1>{t('admin.myGames.title')}</h1>
-      <p>{t('admin.myGames.intro')}</p>
+    <main className="ui-stack">
+      <PageHead title={t('admin.myGames.title')} sub={t('admin.myGames.intro')} />
       {stopped !== null ? (
-        <p>{t(`admin.myGames.${stopped}`)}</p>
+        <p className="ui-notice" role="status">
+          {t(`admin.myGames.${stopped}`)}
+        </p>
       ) : games.some((g) => !g.scorable) ? (
-        <p>{t('admin.games.notScorable')}</p>
+        <p className="ui-notice">{t('admin.games.notScorable')}</p>
       ) : null}
       {!listed.ok ? (
-        <p role="alert">{t('admin.games.listProblem')}</p>
+        <p className="ui-notice" data-kind="error" role="alert">
+          {t('admin.games.listProblem')}
+        </p>
       ) : games.length === 0 ? (
-        <p>{t('admin.myGames.empty')}</p>
+        <EmptyPanel text={t('admin.myGames.empty')} />
       ) : (
-        <ul className="admin-game-list" data-my-games="">
+        <ul className="ui-card-grid" data-my-games="">
           {games.map((game) => (
             <li key={game.id} data-game={game.id} data-today={game.isToday ? '' : undefined}>
-              <GameCard
-                home={{ name: names[game.homeTeamId] ?? '', score: game.homeScore }}
-                away={{ name: names[game.awayTeamId] ?? '', score: game.awayScore }}
-                status={statusOf(game.status)}
-                whenText={gameWhenText(game.startsAt, times, { today: game.isToday })}
-                labels={labels}
-              />
-              {opensInTracker(game) ? (
-                <p>
-                  <a className="tap-button" href={leagueUrl(here, 'score', { game: game.id })}>
-                    {t('admin.myGames.score')}
-                  </a>
-                </p>
-              ) : null}
-              {entersScoreIn(game)}
+              <div className="ui-stack">
+                <GameCard
+                  home={{ name: names[game.homeTeamId] ?? '', score: game.homeScore }}
+                  away={{ name: names[game.awayTeamId] ?? '', score: game.awayScore }}
+                  status={statusOf(game.status)}
+                  whenText={gameWhenText(game.startsAt, times, { today: game.isToday })}
+                  labels={labels}
+                />
+                {opensInTracker(game) ? (
+                  <p>
+                    <a
+                      className="ui-button"
+                      data-kind="main"
+                      href={leagueUrl(here, 'score', { game: game.id })}
+                    >
+                      {t('admin.myGames.score')}
+                    </a>
+                  </p>
+                ) : null}
+                {entersScoreIn(game)}
+              </div>
             </li>
           ))}
         </ul>

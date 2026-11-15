@@ -22,6 +22,7 @@
 // account, so the device can let go of another account's games (T-115); the device
 // then takes the scoring session and loads the state itself (tracker-opening.tsx).
 import { catalogs, en } from '@srleagues/site';
+import { MessagePage } from '@srleagues/ui';
 import { leagueUrl, platformUrl, readTrackerRosters } from '@srleagues/core';
 import { forbidden } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -110,8 +111,9 @@ export async function TrackerPage({
 }
 
 /**
- * The tracker's page when the game is not opened on the device: why, where its score is
- * entered when that is somewhere else, and the way back.
+ * The tracker's page when the game is not opened on the device: the frame's message page
+ * (DESIGN.md §4, line 19), saying why, with one clear way on. That is where its score is
+ * entered when that is somewhere else, with the way back beside it; otherwise the way back.
  */
 function TrackerRefusal({
   message,
@@ -122,20 +124,20 @@ function TrackerRefusal({
   readonly backHref: string;
   readonly enter?: { readonly href: string };
 }) {
+  const back = { href: backHref, label: t('tracker.back') };
   return (
-    <main className="score-root">
-      <h1>{t('tracker.title')}</h1>
+    <MessagePage
+      title={t('tracker.title')}
+      action={
+        enter === undefined ? back : { href: enter.href, label: t('admin.myGames.enterScore') }
+      }
+    >
       <p role="alert">{t(message)}</p>
       {enter === undefined ? null : (
-        <p>
-          <a className="tap-button" href={enter.href}>
-            {t('admin.myGames.enterScore')}
-          </a>
-        </p>
+        <a className="ui-button" href={backHref}>
+          {back.label}
+        </a>
       )}
-      <p>
-        <a href={backHref}>{t('tracker.back')}</a>
-      </p>
-    </main>
+    </MessagePage>
   );
 }

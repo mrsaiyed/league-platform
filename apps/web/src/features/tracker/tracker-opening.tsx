@@ -4,6 +4,7 @@
 // then holds the place where the scoring screens of steps 2.35 to 2.37 will draw. Plain
 // forms and messages only. The words come from the page, from the message files (T-187).
 import { createTranslator, type Catalog } from '@srleagues/site';
+import { PageHead } from '@srleagues/ui';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
@@ -83,8 +84,14 @@ export function TrackerOpening({
     const shown = (event: PageTransitionEvent) => {
       if (event.persisted) window.location.reload();
     };
+    // The page shown again (the phone woke, the tab came back): the device may have
+    // slept, so the controller measures the server's time again, renews and sends.
+    const visible = () => {
+      if (document.visibilityState === 'visible') opened.current?.controller.awake();
+    };
     window.addEventListener('pagehide', hidden);
     window.addEventListener('pageshow', shown);
+    document.addEventListener('visibilitychange', visible);
     void (async () => {
       const result = await openTrackerGame({
         gameId,
@@ -123,6 +130,7 @@ export function TrackerOpening({
       window.removeEventListener('online', online);
       window.removeEventListener('pagehide', hidden);
       window.removeEventListener('pageshow', shown);
+      document.removeEventListener('visibilitychange', visible);
       void opened.current?.controller.leave();
       opened.current = null;
     };
@@ -183,41 +191,57 @@ export function TrackerOpening({
       {slow ? ` ${t('tracker.openingSlow')}` : null}
     </p>
   );
+  // Signed out, before the game was open (read-only) or while scoring (record 054): the
+  // way to sign in, coming back to this game.
   const signedOut =
     phase.kind === 'open' &&
-    phase.status.mode.kind === 'read-only' &&
-    phase.status.mode.reason === 'signed-out';
+    (phase.status.signedOut ||
+      (phase.status.mode.kind === 'read-only' && phase.status.mode.reason === 'signed-out'));
 
   const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
   return (
-    <main className="score-root">
-      <h1>{t('tracker.title')}</h1>
-      <p>{matchup}</p>
-      {phase.kind === 'preparing' ? openingText : null}
-      {phase.kind === 'no-storage' ? <p role="alert">{t('tracker.noStorage')}</p> : null}
-      {phase.kind === 'open' ? (
-        <OpenGame
-          phase={phase}
-          t={t}
-          locale={locale}
-          rosters={rosters}
-          busy={busy}
-          openingText={openingText}
-          onTakeOver={act((game) => game.controller.takeOver())}
-          onOpenAgain={act((game) => game.controller.openAgain())}
-          onConfirm={(format) => act((game) => game.confirmFormat(format))()}
-        />
-      ) : null}
-      {signedOut ? (
-        <p>
-          <a className="tap-button" href={signInHref} onClick={leaveBy(signInHref)}>
-            {t('tracker.signIn')}
-          </a>
-        </p>
-      ) : null}
-      {storeFailed ? <p role="alert">{t('tracker.storeFailed')}</p> : null}
+    <main className="ui-stack" data-tracker="">
+      <PageHead title={t('tracker.title')} sub={matchup} />
+      <section className="ui-panel ui-stack" aria-label={matchup}>
+        {phase.kind === 'preparing' ? openingText : null}
+        {phase.kind === 'no-storage' ? (
+          <p className="ui-notice" data-kind="error" role="alert">
+            {t('tracker.noStorage')}
+          </p>
+        ) : null}
+        {phase.kind === 'open' ? (
+          <OpenGame
+            phase={phase}
+            t={t}
+            locale={locale}
+            rosters={rosters}
+            busy={busy}
+            openingText={openingText}
+            onTakeOver={act((game) => game.controller.takeOver())}
+            onOpenAgain={act((game) => game.controller.openAgain())}
+            onConfirm={(format) => act((game) => game.confirmFormat(format))()}
+          />
+        ) : null}
+        {signedOut ? (
+          <p>
+            <a
+              className="ui-button"
+              data-kind="main"
+              href={signInHref}
+              onClick={leaveBy(signInHref)}
+            >
+              {t('tracker.signIn')}
+            </a>
+          </p>
+        ) : null}
+        {storeFailed ? (
+          <p className="ui-notice" data-kind="error" role="alert">
+            {t('tracker.storeFailed')}
+          </p>
+        ) : null}
+      </section>
       <p>
-        <a href={backHref} onClick={leaveBy(backHref)}>
+        <a className="ui-button" href={backHref} onClick={leaveBy(backHref)}>
           {t('tracker.back')}
         </a>
       </p>
@@ -302,30 +326,36 @@ function OpenGame({
         </p>
       ) : null}
       {notices.length === 0 ? null : (
-        <ul role="alert" data-tracker-notices="">
+        <div role="alert" className="ui-stack" data-tracker-notices="">
           {notices.map((notice) => (
-            <li key={notice.key}>{trackerNoticeText(notice, t)}</li>
+            <p key={notice.key} className="ui-notice">
+              {trackerNoticeText(notice, t)}
+            </p>
           ))}
-        </ul>
+        </div>
       )}
       {screen.kind === 'opening' ? openingText : null}
       {screen.kind === 'held-by-other' && !askingTakeOver ? (
-        <button
-          type="button"
-          className="tap-button"
-          onClick={() => setAskingTakeOver(true)}
-          disabled={busy}
-        >
-          {t('tracker.takeOver')}
-        </button>
+        <p>
+          <button
+            type="button"
+            className="ui-button"
+            data-kind="main"
+            onClick={() => setAskingTakeOver(true)}
+            disabled={busy}
+          >
+            {t('tracker.takeOver')}
+          </button>
+        </p>
       ) : null}
       {screen.kind === 'held-by-other' && askingTakeOver ? (
         <section aria-labelledby="tracker-take-over" data-take-over="">
           <p id="tracker-take-over">{t('tracker.takeOverQuestion', { name: screen.name })}</p>
-          <p>
+          <p className="ui-toolbar">
             <button
               type="button"
-              className="tap-button"
+              className="ui-button"
+              data-kind="main"
               onClick={() => {
                 setAskingTakeOver(false);
                 onTakeOver();
@@ -333,18 +363,25 @@ function OpenGame({
               disabled={busy}
             >
               {t('tracker.takeOverYes')}
-            </button>{' '}
-            <button type="button" onClick={() => setAskingTakeOver(false)} disabled={busy}>
+            </button>
+            <button
+              type="button"
+              className="ui-button"
+              onClick={() => setAskingTakeOver(false)}
+              disabled={busy}
+            >
               {t('tracker.takeOverNo')}
             </button>
           </p>
         </section>
       ) : null}
       {screen.kind === 'read-only' && mayOpenAgain(screen.reason) ? (
-        <button type="button" onClick={onOpenAgain} disabled={busy}>
-          {/* Taken over: opening again shows who has the game, and offers it back. */}
-          {t(screen.reason === 'taken-over' ? 'tracker.seeWhoIsScoring' : 'tracker.openAgain')}
-        </button>
+        <p>
+          <button type="button" className="ui-button" onClick={onOpenAgain} disabled={busy}>
+            {/* Taken over: opening again shows who has the game, and offers it back. */}
+            {t(screen.reason === 'taken-over' ? 'tracker.seeWhoIsScoring' : 'tracker.openAgain')}
+          </button>
+        </p>
       ) : null}
       {screen.kind === 'confirm-format' ? (
         <section aria-labelledby="tracker-format-title" data-format="">
@@ -358,7 +395,8 @@ function OpenGame({
           <p>{t('tracker.format.wrong')}</p>
           <button
             type="button"
-            className="tap-button"
+            className="ui-button"
+            data-kind="main"
             onClick={() => onConfirm(screen.format)}
             disabled={busy}
           >
