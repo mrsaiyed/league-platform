@@ -102,6 +102,8 @@ Clearing by label is a Cloudflare feature, and which plans include it is checked
 
 **T-95:** personal additions (the bell, "my next game", my team highlighted) are loaded separately after the cached page, with the visitor's session. The cached page is identical for everyone.
 
+Not yet (step 2.127, [record 066](../../../architecture/decisions/066-the-leagues-a-person-belongs-to.md)): the account button's signed-in form and the "You are signed in as …" line of the refusal screen are drawn into the page, so every page is drawn per request and answers `private, no-store`, and no shared cache may keep a league page until a later step reads those two after the page.
+
 ## 5. Draft, preview, publish, restore
 
 - Edits change `sites.design_draft`, `sites.menu_draft` and `pages.draft`. They save automatically a moment after each change, with the version check of T-46.
