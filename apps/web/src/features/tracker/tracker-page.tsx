@@ -32,6 +32,7 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { signInFirstUrl } from '../../server/sign-in-first.ts';
 import { deviceRosters } from './device-rosters.ts';
+import { trackerRostersReply } from '../../server/tracker-rosters-reply.ts';
 import { notScoredBecause, scoresOnly } from './my-games.ts';
 import { trackerCatalog } from './tracker-catalog.ts';
 import { TrackerOpening } from './tracker-opening.tsx';
@@ -100,7 +101,7 @@ export async function TrackerPage({
       leagueId={here.id}
       accountId={context.accountId}
       gameId={read.value.gameId}
-      rosters={deviceRosters(read.value, names.teams)}
+      rosters={deviceRosters(trackerRostersReply(read.value), names.teams)}
       backHref={backHref}
       accountHref={platformUrl('account')}
       signInHref={signInFirstUrl(trackerHref, { problem: 'signInAgain' })}

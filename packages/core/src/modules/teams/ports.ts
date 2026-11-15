@@ -65,6 +65,8 @@ export type RosterLine = RosterEntryRecord & {
   readonly firstName: string;
   readonly lastName: string;
   readonly publicName: string | null;
+  /** Added at a scorer's table and waiting for an admin's review (S-6); absent where not read. */
+  readonly needsReview?: boolean;
 };
 
 export type NewRosterEntry = {

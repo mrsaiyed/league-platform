@@ -559,7 +559,7 @@ describe('protocol versions (T-127)', () => {
     const t = setUp();
     const result = await applyTrackerCommands(
       t.as(scorekeeperId),
-      { ...batchOf(taps(tipOff)), protocolVersion: 2, someNewField: true },
+      { ...batchOf(taps(tipOff)), protocolVersion: 3, someNewField: true },
       t.deps,
     );
     expect(result).toEqual({

@@ -7,7 +7,13 @@ import { displayLabels } from '@srleagues/site';
 import { locale, t } from '../../server/messages.ts';
 import { hasStatLabel, statLabel } from '../stats-pages/index.ts';
 import { formatClock } from './clock.ts';
-import { periodName, playSentence, playerText, type GameWords } from './game-words.ts';
+import {
+  boxScoreName,
+  periodName,
+  playSentence,
+  playerText,
+  type GameWords,
+} from './game-words.ts';
 import type { LiveGameLabels } from './live-game-view.tsx';
 
 /** The message-file texts the play and clock rules fill in, braces and all. */
@@ -85,6 +91,7 @@ export function liveGameLabels(status: string): LiveGameLabels {
     latestPlay: t('game.latestPlay'),
     playersHidden: t('game.playersHidden'),
     nameNotShown: t('game.nameNotShown'),
+    jerseyOnly: t('game.jerseyOnly'),
     playersTitle: t('game.liveStats'),
     columns: [column('points'), column('fouls')],
     scoreboard: labels.scoreboard,
@@ -197,7 +204,7 @@ export function buildBoxScores(page: GamePage): BoxScoresView {
         ? box.players.map((p) => ({
             id: p.personId,
             jersey: p.jersey,
-            name: p.name ?? t('game.nameNotShown'),
+            name: boxScoreName(t('game.jerseyOnly'), t('game.nameNotShown'), p),
             cells: p.stats,
           }))
         : null,

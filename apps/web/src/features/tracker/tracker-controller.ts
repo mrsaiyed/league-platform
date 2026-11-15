@@ -35,7 +35,9 @@
 //   carried over at once; `awake()` then measures again. Taps are timed by it, and the
 //   screens paint the clock from it.
 import {
+  isTablePlayerCommand,
   sessionRenewSeconds,
+  type BatchCommand,
   type SessionReply,
   type SessionRequest,
   type TrackerCommand,
@@ -237,9 +239,16 @@ export type TrackerController = {
   idle(): Promise<void>;
 };
 
-/** Whether a stored tap is one the device's engine applies (the rest are refused on the server). */
-const isTapInput = (input: TrackerCommand['input']): input is TapInput =>
-  input.type !== 'rules' && input.type !== 'reopen' && input.type !== 'reset';
+/**
+ * Whether a stored tap is one the device's engine applies: not a change of players at
+ * the scorer's table (record 058), which the engine never sees, and not one of those
+ * the server refuses.
+ */
+const isTap = (command: BatchCommand): command is TrackerCommand & { input: TapInput } =>
+  !isTablePlayerCommand(command) &&
+  command.input.type !== 'rules' &&
+  command.input.type !== 'reopen' &&
+  command.input.type !== 'reset';
 
 const reasonOfStatus = (httpStatus: number): ReadOnlyReason => {
   if (httpStatus === 401) return 'signed-out';
@@ -390,7 +399,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   let seenSavedAt: number | null = null;
   let base: ServerState | null = null;
   /** This device's taps since `base`, in order: the ones the server took and the waiting. */
-  let made: TrackerCommand[] = [];
+  let made: BatchCommand[] = [];
   /** Every tap the server refused: never replayed. */
   const refusedIds = new Set<string>();
   let stopped = false;
@@ -514,14 +523,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     });
   };
 
-  const waitingTaps = async (): Promise<TrackerCommand[]> =>
+  const waitingTaps = async (): Promise<BatchCommand[]> =>
     tapsIn(await storage.list(gameId), 'waiting');
 
   /** The base with every tap of `taps` the engine takes on it, in order. */
-  const replay = (from: ServerState, taps: readonly TrackerCommand[]): basketball.GameState => {
+  const replay = (from: ServerState, taps: readonly BatchCommand[]): basketball.GameState => {
     let state = from.state;
     for (const command of taps) {
-      if (!isTapInput(command.input)) continue;
+      if (!isTap(command)) continue;
       try {
         state = basketball.apply(state, command.input, {
           id: command.commandId.toLowerCase(),
