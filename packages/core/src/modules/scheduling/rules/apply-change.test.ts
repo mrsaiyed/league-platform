@@ -337,7 +337,23 @@ describe('adding and removing a round (step 2.160)', () => {
     ).toEqual({ code: 'too-many-rounds', roundId: 'new' });
   });
 
-  it('numbers a round after every number the season has had, removed ones too', () => {
+  it('gives a new round back a number an earlier publication freed (a known choice)', () => {
+    // Rounds 1 and 2 are left; round 3 was removed and that removal published, so no record
+    // of it is left: the new round is 3, and an old public link `?round=3` opens it.
+    const s: ScheduleState = {
+      rounds: [
+        { id: 'r1', number: 1, label: 'Week 1', date: null },
+        { id: 'r2', number: 2, label: 'Week 2', date: null },
+      ],
+      games: [],
+    };
+    const added = ok(
+      applyDraftChange(s, { kind: 'add-round', round: { id: 'n3', label: 'New', date: null } }, []),
+    ).state;
+    expect(added.rounds.at(-1)).toMatchObject({ id: 'n3', number: 3 });
+  });
+
+  it('numbers a round after every number its rounds hold, ones the draft removed too', () => {
     // Two rounds, the second numbered 1000 (an earlier round was removed long ago).
     const s: ScheduleState = {
       rounds: [

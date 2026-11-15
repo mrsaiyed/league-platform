@@ -27,8 +27,13 @@ export type ScheduleRound = {
   id: string;
   /**
    * Its number in the season, as stored (rounds_number_key) and as the public `?round=`
-   * filter names it. A round added in a draft is numbered after every round the season
-   * has had in it, so publishing never meets a number in use (step 2.160). Every round
+   * filter names it. A round added in a draft is numbered one more than the highest number
+   * the season's rounds hold now: the rounds still there and those the draft has removed
+   * (they keep theirs until publishing ends), so publishing never meets a number in use
+   * (step 2.160). A number freed by an earlier publication can come back, a known choice
+   * (no record of the highest number ever used is kept): with rounds 1 and 2 left after
+   * round 3 was removed and published, the new round is 3, and an old public link
+   * `?round=3` opens it. Every round
    * the store loads or a draft adds has one; the generator's rounds (place-schedule.ts)
    * are not stored rounds and have none.
    */
