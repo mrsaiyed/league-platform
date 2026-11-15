@@ -7,6 +7,7 @@ export type {
   Clash,
   DraftChange,
   GameRecording,
+  PlannedRound,
   ScheduleGame,
   ScheduleRound,
   ScheduleSlot,

@@ -141,12 +141,13 @@ export function applyDraftChange(
     case 'add-round': {
       const round = change.round;
       const removed = state.removedRounds ?? [];
-      // A removed round keeps its id and number until publishing ends: never reused.
+      // A round the draft removed keeps its id and number until publishing ends: neither is
+      // given to a new round in the meantime (a number freed by a publication can be, see
+      // ScheduleRound.number).
       if (hasRound(round.id) || removed.some((r) => r.id === round.id)) {
         return fail({ code: 'round-exists', roundId: round.id });
       }
-      const number =
-        Math.max(0, ...[...state.rounds, ...removed].map((r, i) => r.number ?? i + 1)) + 1;
+      const number = Math.max(0, ...[...state.rounds, ...removed].map((r) => r.number)) + 1;
       if (number > maxRounds) return fail({ code: 'too-many-rounds', roundId: round.id });
       const label = round.label.trim();
       if (label === '') return fail({ code: 'empty-round-label', roundId: round.id });

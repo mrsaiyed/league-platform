@@ -41,9 +41,9 @@ const world = (changes: DraftChange[] = [], state: Partial<MemoryScheduling> = {
     latestRevision: 1,
     schedule: {
       rounds: [
-        { id: roundUuid(1), label: 'Week 1', date: '2026-10-04' },
-        { id: roundUuid(2), label: 'Week 2', date: '2026-10-11' },
-        { id: roundUuid(3), label: 'Week 3', date: '2026-10-18' },
+        { id: roundUuid(1), number: 1, label: 'Week 1', date: '2026-10-04' },
+        { id: roundUuid(2), number: 2, label: 'Week 2', date: '2026-10-11' },
+        { id: roundUuid(3), number: 3, label: 'Week 3', date: '2026-10-18' },
       ],
       games: [game(1)],
     },

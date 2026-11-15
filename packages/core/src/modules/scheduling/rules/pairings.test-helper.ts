@@ -33,7 +33,7 @@ export function pairingsAsSchedule(rounds: readonly PairingRound[]): ScheduleSta
   rounds.forEach((round, i) => {
     const date = weekAfter('2026-10-04', i);
     const roundId = `r${i + 1}`;
-    scheduleRounds.push({ id: roundId, label: `Week ${i + 1}`, date });
+    scheduleRounds.push({ id: roundId, number: i + 1, label: `Week ${i + 1}`, date });
     round.games.forEach((pairing, j) => {
       games.push({
         id: `${roundId}-g${j + 1}`,

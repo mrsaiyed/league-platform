@@ -1,5 +1,5 @@
 // The shapes of the pairings and the fairness report (P7 §4.1, §4.2; S-3). Pure data.
-import type { ScheduleGame, ScheduleRound } from './schedule-types.ts';
+import type { PlannedRound, ScheduleGame } from './schedule-types.ts';
 
 /** A team as the pairings and the fairness report see it. `divisionId` is null when the season has no divisions. */
 export type PairingTeam = { id: string; divisionId: string | null };
@@ -52,7 +52,7 @@ export type FairnessInput = {
   /** The teams the report is about, in the order the report lists them. */
   teams: readonly PairingTeam[];
   /** The schedule's rounds. Games with no round are grouped by their date. */
-  rounds: readonly ScheduleRound[];
+  rounds: readonly PlannedRound[];
   games: readonly ScheduleGame[];
   rules: FairnessRules;
   /** When set, every pair that should meet (see `withinDivisions`) should meet exactly this many times. */

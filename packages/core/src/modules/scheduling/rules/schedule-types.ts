@@ -34,14 +34,20 @@ export type ScheduleRound = {
    * (no record of the highest number ever used is kept): with rounds 1 and 2 left after
    * round 3 was removed and published, the new round is 3, and an old public link
    * `?round=3` opens it. Every round
-   * the store loads or a draft adds has one; the generator's rounds (place-schedule.ts)
-   * are not stored rounds and have none.
+   * the store loads or a draft adds has one; the generator's rounds are not stored rounds
+   * (PlannedRound).
    */
-  number?: number;
+  number: number;
   label: string;
   /** The round's date, or null when it has none. */
   date: string | null;
 };
+
+/**
+ * A round the generator lays out (place-schedule.ts): a kept round of the schedule keeps
+ * its number; a new one is not stored yet and has none.
+ */
+export type PlannedRound = Omit<ScheduleRound, 'number'> & { number?: number };
 
 /** A round as a draft adds it: the rules number it. */
 export type NewScheduleRound = {
