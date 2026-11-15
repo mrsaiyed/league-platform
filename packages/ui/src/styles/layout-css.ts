@@ -71,6 +71,7 @@ export const layoutCss = String.raw`
   display: inline-flex;
   align-items: center;
   min-block-size: var(--tap);
+  color: var(--color-pop);
   font-weight: 600;
   text-decoration: none;
 }
@@ -78,7 +79,8 @@ export const layoutCss = String.raw`
   text-decoration: underline;
 }
 
-/* A section: its title with a short rule in the main color, and one way on beside it. */
+/* A section: its title with a short rule, and one way on beside it. The rule is in the
+   color the eye lands on, which is the main color wherever that shows on the page. */
 .ui-section {
   margin-block-start: var(--space-section);
 }
@@ -101,7 +103,7 @@ export const layoutCss = String.raw`
   inline-size: var(--step-7);
   block-size: 2px;
   margin-block-start: var(--step-2);
-  background: var(--color-primary);
+  background: var(--color-pop);
 }
 .ui-section-note {
   margin-block: 0 var(--step-4);
@@ -294,6 +296,6 @@ export const layoutCss = String.raw`
 .ui-message-mark {
   inline-size: var(--step-7);
   block-size: 2px;
-  background: var(--color-primary);
+  background: var(--color-pop);
 }
 `;

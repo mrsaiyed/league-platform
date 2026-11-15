@@ -218,7 +218,7 @@ export const cardsCss = String.raw`
   line-height: 1;
 }
 .ui-leader:first-child .ui-leader-value {
-  color: var(--color-primary-text);
+  color: var(--color-pop);
   font-size: var(--text-36);
 }
 

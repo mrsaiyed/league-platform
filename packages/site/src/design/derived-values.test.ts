@@ -416,13 +416,19 @@ describe('the frame of a dark design and of a light one', () => {
     });
     expect(dark['--heading-case']).toBe('uppercase');
     expect(light).toMatchObject({ '--heading-case': 'none', '--hero-case': 'none' });
-    // Every face of the list has its traits, each a plain value: a case, a weight, or a
-    // distance written as a length (so a stylesheet can halve it).
+    // Every face of the list has its traits, each a plain value: a case, a weight, a
+    // distance written as a length (so a stylesheet can halve it), or a letter's width as
+    // a share of its size.
     for (const key of fontKeys) {
       for (const value of Object.values(headingTraits[key])) {
-        expect(value, key).toMatch(/^(uppercase|none|\d{3}|0em|0\.\d+em)$/);
+        expect(value, key).toMatch(/^(uppercase|none|\d{3}|0em|0\.\d+em|0\.\d+)$/);
       }
+      const width = Number(headingTraits[key].letterWidth);
+      expect(width, key).toBeGreaterThanOrEqual(0.45);
+      expect(width, key).toBeLessThanOrEqual(0.9);
     }
+    // A face of capitals set wide needs more room for a name than a serif set close.
+    expect(Number(dark['--heading-letter'])).toBeGreaterThan(Number(crest['--heading-letter']));
   });
 
   it('sets a score only in a face with lining, even-width figures', () => {

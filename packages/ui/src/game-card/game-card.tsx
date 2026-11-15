@@ -104,13 +104,17 @@ function Team({
 }
 
 /**
- * A name too long for half of a narrow scoreboard: more than eighteen letters in all, or a
- * single word of more than ten. The two teams of such a game stand one over the other
- * where the card is narrow, each with the card's whole width for its name.
+ * How many letters wide a side of a scoreboard must be for a name to sit there: its
+ * longest word, which cannot wrap, or half the whole name, so that a name of several
+ * words takes two lines and no more. The board gives each side room for the longer of its
+ * two names and, where the card is too narrow for that, stands the teams one over the
+ * other (the stylesheet does the sum, from this number and the face's letter width).
  */
-export function isLongName(name: string): boolean {
+export function nameMeasure(name: string): number {
   const letters = (text: string) => Array.from(text).length;
-  return letters(name.trim()) > 18 || name.split(/\s+/).some((word) => letters(word) > 10);
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const longest = Math.max(0, ...words.map(letters));
+  return Math.max(longest, Math.ceil(letters(words.join(' ')) / 2));
 }
 
 /** One side of a scoreboard: the team's emblem over its name. */
@@ -192,7 +196,6 @@ export function GameCard({
         data-status={status}
         data-layout="board"
         data-featured={featured ? 'true' : undefined}
-        data-names={isLongName(home.name) || isLongName(away.name) ? 'long' : undefined}
       >
         <header className="ui-game-meta">
           <span className="ui-game-about">
@@ -201,7 +204,16 @@ export function GameCard({
           </span>
           {state}
         </header>
-        <div className="ui-game-board">
+        <div
+          className="ui-game-board"
+          data-scored={scored ? 'true' : undefined}
+          style={
+            {
+              '--letters': Math.max(nameMeasure(home.name), nameMeasure(away.name)),
+              ...(scored ? { '--figures': `${away.score}${home.score}`.length } : {}),
+            } as CSSProperties
+          }
+        >
           <Side team={away} isWinner={winner === 'away'} labels={labels} />
           {scored ? (
             <p className="ui-game-score">

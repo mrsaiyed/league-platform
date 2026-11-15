@@ -198,19 +198,43 @@ export const gameCss = String.raw`
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+/* The two teams sit side by side with what stands between them, or, when they cannot,
+   one over the other. The board works out the width they need: each side has room for
+   the longer of the two names (the card counts its letters, a name of several words
+   taking two lines: --letters), at the width of a letter in the design's heading face
+   (--heading-letter); the middle has room for "VS", or for the score's figures
+   (--figures). Narrower than that, every part of the board takes a row of its own: the
+   difference times a large number is either more than the board's width or nothing. */
 .ui-game-board {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  --board-gap: var(--step-3);
+  --board-figure: var(--text-28);
+  --board-side: calc(var(--letters, 8) * var(--heading-letter, 0.6) * var(--text-18));
+  --board-middle: var(--step-6);
+  --board-needs: calc(2 * var(--board-side) + var(--board-middle) + 2 * var(--board-gap));
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
+  /* The same step --board-gap names for the sum above. */
   gap: var(--step-3);
   padding-block: var(--step-5);
 }
+.ui-game-board[data-scored='true'] {
+  --board-middle: calc(var(--figures, 4) * 0.65 * var(--board-figure) + var(--step-5));
+}
 .ui-game-side {
   display: grid;
+  flex: 1 1 calc((var(--board-needs) - 100%) * 999);
   grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   gap: var(--step-2);
   min-inline-size: 0;
+  text-align: center;
+}
+.ui-game-board > .ui-game-versus,
+.ui-game-board > .ui-game-score {
+  flex: 0 1 calc((var(--board-needs) - 100%) * 999);
+  justify-content: center;
   text-align: center;
 }
 .ui-game-card[data-layout='board'] .ui-game-team-name {
@@ -297,6 +321,8 @@ export const gameCss = String.raw`
 /* Where the card has the room, everything on the board is a step larger. */
 @container (min-width: 26rem) {
   .ui-game-board {
+    --board-gap: var(--step-5);
+    --board-figure: var(--text-36);
     gap: var(--step-5);
     padding-inline: var(--step-3);
   }
@@ -305,23 +331,6 @@ export const gameCss = String.raw`
   }
   .ui-game-score {
     font-size: var(--text-36);
-  }
-}
-/* Two teams that cannot sit side by side stand one over the other: every board in a card
-   too narrow for any two names, and a board with a long name (the card says so) wherever
-   half the card is too narrow for it. */
-@container (max-width: 12.99rem) {
-  .ui-game-board {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: center;
-    gap: var(--step-4);
-  }
-}
-@container (max-width: 21.99rem) {
-  .ui-game-card[data-names='long'] .ui-game-board {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: center;
-    gap: var(--step-4);
   }
 }
 /* The board picked out from the others: the game being played now. */
@@ -334,6 +343,9 @@ export const gameCss = String.raw`
 }
 /* Its figures are a step larger wherever its card has the room for them and both names. */
 @container (min-width: 25rem) {
+  .ui-game-card[data-featured='true'] .ui-game-board {
+    --board-figure: var(--text-48);
+  }
   .ui-game-card[data-featured='true'] .ui-game-score {
     font-size: var(--text-48);
   }

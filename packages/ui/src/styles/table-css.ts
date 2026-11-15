@@ -191,6 +191,14 @@ export const tableCss = String.raw`
   text-align: start;
   vertical-align: middle;
 }
+/* In a narrow box (a phone) a standings table's cells stand a step closer to each other,
+   so a division's few columns on the home page show whole, with nothing to scroll to. */
+@container (max-width: 26rem) {
+  .ui-standings th,
+  .ui-standings td {
+    padding-inline: var(--step-2);
+  }
+}
 .ui-table tr > :first-child {
   padding-inline-start: var(--step-4);
 }

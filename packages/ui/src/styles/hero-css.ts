@@ -113,13 +113,14 @@ export const heroCss = String.raw`
   );
 }
 /* The pattern's mark: the shield, in fine lines, with the league's first letter. It sits
-   at the far side, behind whatever stands there. */
+   at the far side, behind whatever stands there. On a phone it is measured by the band's
+   width and runs off the far edge; from a tablet up, by the band's height. */
 .ui-hero-art {
   position: absolute;
   inset-block-start: 50%;
-  inset-inline-end: calc(-1 * var(--step-7));
+  inset-inline-end: calc(-1 * var(--step-8));
   z-index: -1;
-  block-size: 120%;
+  inline-size: 72%;
   aspect-ratio: 6 / 7;
   overflow: visible;
   fill: none;
@@ -229,6 +230,8 @@ export const heroCss = String.raw`
 @media (min-width: 40rem) {
   .ui-hero-art {
     inset-inline-end: 4%;
+    inline-size: auto;
+    block-size: 120%;
   }
   .ui-hero-inner {
     padding-block: var(--step-8);

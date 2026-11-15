@@ -13,7 +13,7 @@ import {
   Section,
   StandingsTable,
   displayCss,
-  isLongName,
+  nameMeasure,
   titleLines,
 } from '../index.ts';
 
@@ -254,6 +254,20 @@ describe('a team emblem', () => {
       /\.ui-standings\[data-emblems='true'\] \.ui-team-cell > \[dir\] \{\s*max-inline-size: calc\(45cqi - var\(--step-6\) - var\(--step-3\)\);/,
     );
   });
+
+  it('a standings table in a narrow box sets its cells a step closer, so a short one shows whole', () => {
+    // The faces are now the designs' own, some wider than a phone's: a division's few
+    // columns on the home page must still fit a phone with nothing to scroll to. Only a
+    // standings table: a statistics table's headings are buttons a thumb taps, and keep
+    // their room.
+    expect(css).toMatch(
+      /@container \(max-width: 26rem\) \{\s*\.ui-standings th,\s*\.ui-standings td \{\s*padding-inline: var\(--step-2\);/,
+    );
+    expect(css).not.toMatch(/@container[^{]*\{\s*\.ui-table th,/);
+    // The first and last cells keep their distance from the box's edges.
+    expect(css).toMatch(/\.ui-table tr > :first-child \{\s*padding-inline-start: var\(--step-4\);/);
+    expect(css).toMatch(/\.ui-table tr > :last-child \{\s*padding-inline-end: var\(--step-4\);/);
+  });
 });
 
 describe('a game as a scoreboard', () => {
@@ -388,22 +402,49 @@ describe('a game as a scoreboard', () => {
   });
 
   it('stands two teams one over the other where they cannot sit side by side', () => {
-    expect(isLongName('Owls')).toBe(false);
-    expect(isLongName('North Side Hawks')).toBe(false);
-    // A single long word, and a long name of short words.
-    expect(isLongName('Trailblazerettes')).toBe(true);
-    expect(isLongName('The Northside Community Thunderbolts')).toBe(true);
-    expect(board()).not.toContain('data-names');
-    expect(board({ home: { name: 'Trailblazerettes', score: 61 } })).toContain('data-names="long"');
-    // The card is the measure: narrower than any two names need, or than a long one needs.
+    // A side needs room for a name's longest word, which cannot wrap, or for half the
+    // name, so a name of several words takes two lines and no more.
+    expect(nameMeasure('Owls')).toBe(4);
+    expect(nameMeasure('  North   Side Hawks ')).toBe(8);
+    expect(nameMeasure('Trailblazerettes')).toBe(16);
+    expect(nameMeasure('The Northside Community Thunderbolts')).toBe(18);
+    expect(nameMeasure(arabicName)).toBe(7);
+    expect(nameMeasure('')).toBe(0);
+    // The board is told the longer of its two names, and how many figures its score has.
+    expect(board()).toContain(
+      '<div class="ui-game-board" data-scored="true" style="--letters:7;--figures:4">',
+    );
+    expect(
+      board({
+        home: { name: 'Trailblazerettes', score: 101 },
+        away: { name: 'Owls', score: 98 },
+      }),
+    ).toContain('style="--letters:16;--figures:5"');
+    expect(board({ status: 'scheduled' })).toContain(
+      '<div class="ui-game-board" style="--letters:7">',
+    );
+    // From those it works out the width the teams need side by side: two sides at the
+    // heading face's letter width, the middle ("VS", or the score's figures) and the gaps.
+    expect(css).toMatch(
+      /\.ui-game-board \{[^}]*--board-side: calc\(var\(--letters, 8\) \* var\(--heading-letter, 0\.6\) \* var\(--text-18\)\);[^}]*--board-needs: calc\(2 \* var\(--board-side\) \+ var\(--board-middle\) \+ 2 \* var\(--board-gap\)\);[^}]*flex-wrap: wrap;/,
+    );
+    expect(css).toMatch(
+      /\.ui-game-board\[data-scored='true'\] \{\s*--board-middle: calc\(var\(--figures, 4\) \* 0\.65 \* var\(--board-figure\) \+ var\(--step-5\)\);/,
+    );
+    // Narrower than that, each part of the board takes a row of its own; wide enough, the
+    // sides share what the middle leaves.
+    expect(css).toMatch(
+      /\.ui-game-side \{[^}]*flex: 1 1 calc\(\(var\(--board-needs\) - 100%\) \* 999\);/,
+    );
+    expect(css).toMatch(
+      /\.ui-game-board > \.ui-game-versus,\s*\.ui-game-board > \.ui-game-score \{\s*flex: 0 1 calc\(\(var\(--board-needs\) - 100%\) \* 999\);/,
+    );
+    // Where a card is wide its figures and gaps are larger, and the sum knows it.
     expect(css).toMatch(
       /\.ui-game-card\[data-layout='board'\] \{[^}]*container-type: inline-size;/,
     );
     expect(css).toMatch(
-      /@container \(max-width: 12\.99rem\) \{\s*\.ui-game-board \{\s*grid-template-columns: minmax\(0, 1fr\);/,
-    );
-    expect(css).toMatch(
-      /@container \(max-width: 21\.99rem\) \{\s*\.ui-game-card\[data-names='long'\] \.ui-game-board \{\s*grid-template-columns: minmax\(0, 1fr\);/,
+      /@container \(min-width: 26rem\) \{\s*\.ui-game-board \{\s*--board-gap: var\(--step-5\);\s*--board-figure: var\(--text-36\);\s*gap: var\(--step-5\);/,
     );
     // A word too long even for the whole card is broken at a syllable, not cut off.
     expect(css).toMatch(
@@ -430,9 +471,10 @@ describe('a game as a scoreboard', () => {
   it('picks out the game being played now', () => {
     expect(board({ status: 'live', featured: true })).toContain('data-featured="true"');
     expect(board()).not.toContain('data-featured');
-    // Larger figures only where its card has room for them and for both names.
+    // Larger figures only where its card has room for them, and the board's sum of what
+    // the teams need side by side is told the larger size.
     expect(css).toMatch(
-      /@container \(min-width: 25rem\) \{\s*\.ui-game-card\[data-featured='true'\] \.ui-game-score \{\s*font-size: var\(--text-48\);/,
+      /@container \(min-width: 25rem\) \{\s*\.ui-game-card\[data-featured='true'\] \.ui-game-board \{\s*--board-figure: var\(--text-48\);\s*\}\s*\.ui-game-card\[data-featured='true'\] \.ui-game-score \{\s*font-size: var\(--text-48\);/,
     );
   });
 });
@@ -471,6 +513,10 @@ describe('color where the eye should land (C-16)', () => {
     expect(usedBy('--color-pop')).toEqual(
       [
         '.ui-more',
+        '.ui-crumbs a',
+        // The short rule under a title, and the mark of a page that is only a message.
+        '.ui-section-head h2::after',
+        '.ui-message-mark',
         '.ui-stat-strip',
         '.ui-stat dd',
         '.ui-game-score',
@@ -478,6 +524,7 @@ describe('color where the eye should land (C-16)', () => {
         ".ui-game-card[data-featured='true']",
         ".ui-standings[data-emblems='true'] tbody td.ui-num:first-child",
         '.ui-team-card-figure',
+        '.ui-leader:first-child .ui-leader-value',
       ].sort(),
     );
   });

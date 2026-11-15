@@ -115,5 +115,6 @@ export function frameVariables(design: DesignDocument): Record<string, string> {
     '--hero-tracking': traits.heroTracking,
     '--brand-case': traits.brandCase,
     '--brand-tracking': traits.brandTracking,
+    '--heading-letter': traits.letterWidth,
   };
 }

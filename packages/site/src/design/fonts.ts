@@ -59,6 +59,12 @@ export type HeadingTraits = {
   /** The league's name in the header. */
   readonly brandCase: 'uppercase' | 'none';
   readonly brandTracking: string;
+  /**
+   * How wide a letter of a team's name is in this face, set as a title, as a share of its
+   * size: what a scoreboard reckons with to know whether two names fit side by side.
+   * Measured in a browser from the files we serve, on made-up team names, and rounded up.
+   */
+  readonly letterWidth: string;
 };
 
 // A distance of nothing is still written as a length, so a stylesheet can do sums with it.
@@ -71,6 +77,7 @@ const plain: HeadingTraits = {
   heroTracking: '0em',
   brandCase: 'none',
   brandTracking: '0em',
+  letterWidth: '0.56',
 };
 
 export const headingTraits: Readonly<Record<FontKey, HeadingTraits>> = {
@@ -83,6 +90,7 @@ export const headingTraits: Readonly<Record<FontKey, HeadingTraits>> = {
     heroTracking: '0.025em',
     brandCase: 'uppercase',
     brandTracking: '0.13em',
+    letterWidth: '0.56',
   },
   cinzel: {
     weight: '700',
@@ -93,12 +101,13 @@ export const headingTraits: Readonly<Record<FontKey, HeadingTraits>> = {
     heroTracking: '0.06em',
     brandCase: 'uppercase',
     brandTracking: '0.08em',
+    letterWidth: '0.8',
   },
   'playfair-display': { ...plain, weight: '600', displayWeight: '500', tracking: '0.01em' },
-  oswald: { ...plain, weight: '600', displayWeight: '600', tracking: '0.02em' },
+  oswald: { ...plain, weight: '600', displayWeight: '600', tracking: '0.02em', letterWidth: '0.5' },
   jost: { ...plain, weight: '600', displayWeight: '600' },
-  inter: plain,
-  'source-sans': plain,
+  inter: { ...plain, letterWidth: '0.6' },
+  'source-sans': { ...plain, letterWidth: '0.53' },
   'noto-naskh-arabic': plain,
 };
 
