@@ -80,23 +80,23 @@ async function Body({
           {teams.map((team) => {
             const division = divisionName(team.divisionId);
             return (
-              <li key={team.id}>
-                <a
-                  className="staff-row"
-                  href={leagueUrl(league, 'admin-area', { area: 'teams', subpath: [team.id] })}
-                >
-                  <Swatch team={team} size="small" />
-                  <span className="staff-row-words">
-                    <span className="staff-row-name" dir="auto">
-                      {team.name}
+              // The link is the team's name alone and covers the whole row (staff.css).
+              <li key={team.id} className="staff-row">
+                <Swatch team={team} size="small" />
+                <span className="staff-row-words">
+                  <a
+                    className="staff-row-link"
+                    href={leagueUrl(league, 'admin-area', { area: 'teams', subpath: [team.id] })}
+                    dir="auto"
+                  >
+                    {team.name}
+                  </a>
+                  {division === undefined ? null : (
+                    <span className="staff-row-facts" dir="auto">
+                      {division}
                     </span>
-                    {division === undefined ? null : (
-                      <span className="staff-row-facts" dir="auto">
-                        {division}
-                      </span>
-                    )}
-                  </span>
-                </a>
+                  )}
+                </span>
               </li>
             );
           })}

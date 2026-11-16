@@ -644,7 +644,47 @@ html:has(.staff) {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--step-4);
+  /* A field is never stretched across a laptop's workspace. */
+  max-inline-size: 36rem;
   margin: 0;
+}
+/* A plain list of choices shows the workspace's own arrow, never a browser's: two fine
+   strokes in the field's own text color, with room kept for them at the field's end. */
+.staff .staff-body select {
+  appearance: none;
+  padding-inline-end: calc(var(--step-3) + var(--step-3) + var(--step-2));
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% + var(--line-heavy) / 2),
+      transparent calc(50% + var(--line-heavy) / 2)
+    ),
+    linear-gradient(
+      -45deg,
+      transparent calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% + var(--line-heavy) / 2),
+      transparent calc(50% + var(--line-heavy) / 2)
+    );
+  background-repeat: no-repeat;
+  background-size: calc(var(--step-3) / 2) calc(var(--step-3) / 2);
+  background-position:
+    calc(100% - var(--step-3) - var(--step-3) / 2) 50%,
+    calc(100% - var(--step-3)) 50%;
+}
+[dir='rtl'] .staff .staff-body select {
+  background-position:
+    var(--step-3) 50%,
+    calc(var(--step-3) + var(--step-3) / 2) 50%;
+}
+@media (forced-colors: active) {
+  .staff .staff-body select {
+    appearance: auto;
+    padding-inline-end: var(--step-3);
+    background-image: none;
+  }
 }
 .staff-form > * {
   min-inline-size: 0;
@@ -868,6 +908,7 @@ html:has(.staff) {
   border-block-start: 1px solid var(--color-line);
 }
 .staff .staff-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--step-3);
@@ -877,7 +918,19 @@ html:has(.staff) {
   color: var(--color-text);
   text-decoration: none;
 }
-.staff a.staff-row:hover {
+/* The row's one way in is the link on its name, which covers the whole row: so the link
+   says the name alone, and the whole row is tapped. */
+.staff .staff-row-link {
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.staff-row-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.staff-row:has(.staff-row-link:hover) {
   background: var(--color-tint);
 }
 .staff-row > .ui-emblem {
@@ -895,8 +948,8 @@ html:has(.staff) {
   color: var(--color-muted);
   font-size: var(--text-14);
 }
-/* The way in: a chevron at the end of a row that is one link. */
-a.staff-row::after,
+/* The way in: a chevron at the end of a row or a card that is one link. */
+.staff-row:has(.staff-row-link)::after,
 .staff-tile::after {
   content: '';
   flex: none;
@@ -906,7 +959,7 @@ a.staff-row::after,
   -webkit-mask: var(--staff-chevron) center / contain no-repeat;
   mask: var(--staff-chevron) center / contain no-repeat;
 }
-[dir='rtl'] a.staff-row::after,
+[dir='rtl'] .staff-row:has(.staff-row-link)::after,
 [dir='rtl'] .staff-tile::after {
   transform: scaleX(-1);
 }
