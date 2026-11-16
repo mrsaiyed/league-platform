@@ -1545,15 +1545,69 @@ export async function clockSteps(kit) {
         await floorOptions.waitFor();
         await measure('a floor player’s options', floorOptions);
         // A picked player's second line is whole, to the end of the minutes (the area 4
-        // review, L6: it was cut on a tablet lying down).
-        const facts = await floorOptions.locator('.court-who-facts').evaluate((el) => ({
-          says: el.innerText,
-          needs: el.scrollWidth,
-          has: el.clientWidth,
-        }));
+        // review, L6: it was cut on a tablet lying down). Where a device's letters are
+        // too wide for all of it, the line leaves words off, never letters: "On court"
+        // first, then the word after the minutes. So it is read here as a scorekeeper
+        // reads it: each part of it either shows whole on the line or is not there at
+        // all, and a part is left off only where the line truly had no room for it.
+        const facts = await floorOptions.locator('.court-who-facts').evaluate((el) => {
+          const box = el.getBoundingClientRect();
+          const widthOf = (part) => part?.getBoundingClientRect().width ?? 0;
+          const parts = [];
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            const r = range.getBoundingClientRect();
+            // Not drawn at this size at all (a narrow pad begins at the fouls).
+            if (r.width === 0) continue;
+            const middle = (r.top + r.bottom) / 2;
+            const onTheLine = middle > box.top && middle < box.bottom;
+            const whole = onTheLine && r.left >= box.left - 0.5 && r.right <= box.right + 0.5;
+            parts.push({
+              says: node.textContent,
+              width: r.width,
+              shows: whole ? 'whole' : onTheLine ? 'cut' : 'left off',
+            });
+          }
+          const [where, core] = [
+            el.querySelector('.court-who-where'),
+            el.querySelector('.court-who-core'),
+          ];
+          const after = parts.at(-1);
+          return {
+            shows: parts
+              .filter((part) => part.shows === 'whole')
+              .map((part) => part.says)
+              .join(''),
+            cut: parts.filter((part) => part.shows === 'cut').map((part) => part.says),
+            leftOff: parts.filter((part) => part.shows === 'left off').map((part) => part.says),
+            all: el.textContent,
+            has: box.width,
+            // What the line needs with the word after the minutes, and with "On court" too.
+            withPlayed: widthOf(core) + after.width,
+            withWhere: widthOf(where) + widthOf(core) + after.width,
+            px: Number.parseFloat(getComputedStyle(el).fontSize),
+          };
+        });
+        // A space's width of doubt: a word that wraps away is measured without its space.
+        const noRoom = (needs) => needs > facts.has - 6;
+        const offWhere = facts.leftOff.some((part) => /^On court/.test(part));
+        const offPlayed = facts.leftOff.some((part) => /played/.test(part));
+        if (facts.leftOff.length > 0) {
+          console.log(`  ${label}: a picked player’s second line reads “${facts.shows}”`);
+        }
         note(
           `${label}: a picked player’s second line is whole, to the end of the minutes`,
-          facts.needs <= facts.has && /played$/.test(facts.says.trim()),
+          /^(On court · )?\d+ fouls? · \d+ pts · \d+:\d\d( played)?$/.test(facts.shows) &&
+            facts.cut.length === 0 &&
+            // The whole of it is still what a screen reader is given.
+            /^On court · \d+ fouls? · \d+ pts · \d+:\d\d played$/.test(facts.all) &&
+            // Words are left off only for want of room, "On court" before "played".
+            (!offWhere || noRoom(facts.withWhere)) &&
+            (!offPlayed || (noRoom(facts.withPlayed) && !/^On court/.test(facts.shows))) &&
+            // And never by setting it smaller than the pad's other second-rank words.
+            facts.px >= (size.width >= 700 && size.height >= 521 ? 15 : 13),
           JSON.stringify(facts),
         );
         await floorOptions.locator('.court-close').click();

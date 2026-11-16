@@ -331,6 +331,14 @@ describe('a player’s options (checklist D1 to D11)', () => {
     expect(foulsDrawn(html, h2)).toBe(1);
     expect(tagWith(padDrawn(html), 'data-act="unfoul"')).not.toContain('disabled');
     expect(wordsDrawn(padDrawn(html))).toContain('On court · 1 foul · 0 pts · 0:00 played');
+    // The line is drawn in the parts it can leave off where a device's letters are too
+    // wide for it: "On court" by itself, and the word after the minutes outside the part
+    // that always shows (which ends at the minutes, in their short form).
+    const line = padDrawn(html);
+    expect(line).toContain('<span class="court-who-where">On court · </span>');
+    expect(line).toMatch(
+      /<span class="court-who-core">.*<span data-minutes-of="[^"]+" data-minutes-played="">0:00<\/span><\/span> played<\/span>/,
+    );
   });
 
   it('marks a player at the league’s foul limit, and still scores them (D10)', async () => {

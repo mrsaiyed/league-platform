@@ -616,6 +616,12 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
         ? 'tracker.pad.who.floor'
         : 'tracker.pad.who.bench',
   );
+  // The minutes in their short form ("0:07"), and the words the long form adds after it
+  // (" played"), which the line leaves off where it has no room for them.
+  const minutes = { minutes: basketball.formatMinutes(tile.ms) };
+  const played = t('tracker.pad.who.minutes', minutes);
+  const playedShort = t('tracker.pad.who.minutesShort', minutes);
+  const playedMore = played.startsWith(playedShort) ? played.slice(playedShort.length) : '';
   return (
     <div
       className="court-options"
@@ -633,21 +639,31 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
               begins at the fouls: "On court" is what the ringed tile already shows. For a
               player who has fouled out it says "Fouled out" in place of the count, as the
               tile says "Out" in place of it. So the line is whole there, and the minutes
-              at its end are never cut (the area 4 review of step 2.36, L6). */}
+              at its end are never cut (the area 4 review of step 2.36, L6).
+              And on any device whose letters are too wide for the line, the stylesheet
+              leaves off what it can do without, in this order: "On court" first, then the
+              word after the minutes ("0:07 played" reads "0:07"). Nothing is set smaller
+              and nothing ends in "…". The whole line is still what a screen reader is
+              given. */}
           <span className="court-who-facts" data-out={tile.fouledOut ? '' : undefined}>
             <span className="court-who-where">
               {where}
               {separator}
             </span>
-            <span className="court-who-fouls">
-              {t.plural('tracker.pad.who.fouls', tile.fouls)}
-              {separator}
-            </span>
-            {t('tracker.pad.who.points', { count: tile.points })}
-            {separator}
-            {/* Ticks with the clock while it runs (the screen's ticker writes it). */}
-            <span data-minutes-of={tile.id} data-minutes-played="">
-              {t('tracker.pad.who.minutes', { minutes: basketball.formatMinutes(tile.ms) })}
+            <span className="court-who-rest">
+              <span className="court-who-core">
+                <span className="court-who-fouls">
+                  {t.plural('tracker.pad.who.fouls', tile.fouls)}
+                  {separator}
+                </span>
+                {t('tracker.pad.who.points', { count: tile.points })}
+                {separator}
+                {/* Ticks with the clock while it runs (the screen's ticker writes it). */}
+                <span data-minutes-of={tile.id} data-minutes-played="">
+                  {playedShort}
+                </span>
+              </span>
+              {playedMore}
             </span>
           </span>
         </span>

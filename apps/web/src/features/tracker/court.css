@@ -1432,14 +1432,43 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A picked player's second line is never cut and never set smaller. On a device whose
+   letters are too wide for it (the screen draws with the face the device has), it leaves
+   off what it can do without, in this order: where the player is ("On court": the ringed
+   tile shows it), then the word after the minutes ("0:07 played" reads "0:07"). No script
+   measures anything, so nothing is added to the turn of a tap: the line is one line high
+   and what does not fit wraps out of it. "Where" wraps onto a line of its own when it
+   does not fit beside the rest, and the LAST line is the one that shows; inside the rest,
+   the word after the minutes wraps under them, and the FIRST line shows. Only a line
+   that is still too wide after both ends in "…". */
 .court-who-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-end;
+  block-size: 1.3em;
   overflow: hidden;
   color: var(--court-muted);
   font-size: 13px;
+  line-height: 1.3;
+}
+.court-who-where {
+  flex: none;
+  white-space: pre;
+}
+.court-who-rest {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  block-size: 1.3em;
+  overflow: hidden;
   text-overflow: ellipsis;
+}
+.court-who-core {
   white-space: nowrap;
 }
+/* A player who has fouled out: "Fouled out" is what the line is for, so it stays, and
+   only the word after the minutes is left off. */
 .court-who-facts[data-out] {
+  flex-wrap: nowrap;
   color: var(--court-red-text);
 }
 .court-opt {

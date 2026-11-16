@@ -274,8 +274,9 @@ function useGameClock(
       const text = minutesNow(game, reading, held.ms, held.onCourt);
       writeText(
         place,
+        // In the pad the words after the minutes ("played") are drawn beside this place.
         place.hasAttribute('data-minutes-played')
-          ? t('tracker.pad.who.minutes', { minutes: text })
+          ? t('tracker.pad.who.minutesShort', { minutes: text })
           : text,
       );
     }

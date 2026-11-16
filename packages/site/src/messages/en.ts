@@ -1006,6 +1006,10 @@ export const en = {
   'tracker.pad.who.fouls_other': '{count} fouls',
   'tracker.pad.who.points': '{count} pts',
   'tracker.pad.who.minutes': '{minutes} played',
+  // The same where the line has no room for all of it (a narrow pad, a device whose
+  // letters are wide): the long form begins with this one, and what follows it is left
+  // off before anything is cut.
+  'tracker.pad.who.minutesShort': '{minutes}',
   'tracker.pad.points': '+{points}',
   'tracker.pad.pointsLabel.1': 'Free throw',
   'tracker.pad.pointsLabel.2': '2 points',
