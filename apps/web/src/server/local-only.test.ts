@@ -17,7 +17,12 @@ const settings = {
   TRUSTED_PROXY: 'one',
 };
 
-const state: { config: Config | undefined } = { config: undefined };
+/** A request made on this computer, as the proxy passes it on. */
+const madeHere = () => new Headers({ host: '127.0.0.1:3000', 'x-forwarded-for': '127.0.0.1' });
+const state: { config: Config | undefined; request: Headers } = {
+  config: undefined,
+  request: madeHere(),
+};
 const tools: LocalTools = {
   keptEmails: async () => [],
   madeUpPeople: async () => [],
@@ -35,7 +40,7 @@ vi.mock('./config.ts', () => ({
 vi.mock('./container.ts', () => ({ webPorts }));
 vi.mock('next/headers', () => ({
   cookies: async () => ({ get: () => undefined, set: () => undefined, delete: () => undefined }),
-  headers: async () => new Headers(),
+  headers: async () => state.request,
 }));
 
 /** What Next.js's notFound() throws: the not-found answer of an unknown address. */
@@ -60,6 +65,7 @@ const form = () => {
 
 beforeEach(() => {
   webPorts.mockClear();
+  state.request = madeHere();
 });
 
 describe.each(['staging', 'production'])('in %s', (appEnv) => {
@@ -109,5 +115,25 @@ describe.each(['local', 'test'])('in %s', (appEnv) => {
     webPorts.mockResolvedValueOnce({ localTools: null as unknown as LocalTools });
     const Page = await keptEmailsPage();
     expect(digestOf(await Page().catch((error: unknown) => error))).toBe(notFoundDigest);
+  });
+
+  // Review of step 2.96, M1: even with ports that carry the tools and would answer anyone,
+  // a request from another computer on the network, or one passed on by another server,
+  // gets "not found" from both pages and the action, and the app is not asked.
+  it('both pages and the action answer "not found" to a request not made on this computer', async () => {
+    for (const request of [
+      new Headers({ host: '192.168.1.20:3000' }),
+      new Headers({ host: '127.0.0.1:3000', 'x-forwarded-for': '192.168.1.30' }),
+      new Headers({ host: '127.0.0.1:3000', 'x-forwarded-host': 'leagues.example.com' }),
+    ]) {
+      state.request = request;
+      for (const Page of [await keptEmailsPage(), await madeUpPeoplePage()]) {
+        expect(digestOf(await Page().catch((error: unknown) => error))).toBe(notFoundDigest);
+      }
+      const beMadeUpPersonAction = await action();
+      const answer = await beMadeUpPersonAction(form()).catch((error: unknown) => error);
+      expect(digestOf(answer)).toBe(notFoundDigest);
+    }
+    expect(webPorts).not.toHaveBeenCalled();
   });
 });

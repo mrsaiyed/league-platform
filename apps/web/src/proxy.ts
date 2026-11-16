@@ -3,10 +3,11 @@
 // any header of that name the browser sent, because the pages are given only the
 // decoded parts and context.ts must see the address as it came (T-34, U-7).
 //
-// First of all, on the made-up world (local work and tests), a request gets a plain page
+// First of all, on made-up data (local work and tests: the made-up world, and the made-up
+// database, whose ports carry the local tools of step 2.96), a request gets a plain page
 // and nothing else unless it is addressed to this computer's own names (or the app's own
 // `.test` name) and carries no sign of having been passed on by another server (step
-// 2.152; stand-in-ports.ts, answersOnlyHere). The made-up people's cookies are in the code.
+// 2.152; this-computer.ts, answersOnlyHere). The made-up people's cookies are in the code.
 // What keeps other computers out is that the made-up world listens on the loopback address
 // only (scripts/web-listen.mjs); this check keeps out what can still arrive here.
 //

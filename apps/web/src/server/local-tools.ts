@@ -2,18 +2,26 @@
 // FOR LOCAL WORK AND TESTS ONLY. In staging and production both pages, and the form's
 // action, answer "not found", as an address that does not exist.
 //
-// Two locks, both on the server, neither from anything a request carries (no header,
-// cookie or address decides):
+// Three locks, all on the server. What a request carries can only take the tools away,
+// never give them: no header, cookie or address turns them on.
 // 1. The app's mode: APP_ENV local or test, by the same test that chooses the made-up
 //    stand-in at startup (runsOnMadeUpData, made-up-mode.ts). It is asked first, before
 //    the app's ports are even asked for, so in staging and production nothing else runs.
-// 2. The ports: only the ports made on made-up data carry the tools (the stand-in's, and
+// 2. The request: only one made on this computer, by the proxy's own test (answersOnlyHere,
+//    this-computer.ts: addressed to this computer's names, or the app's own `.test` name,
+//    and not passed on by another server). It is asked here, whatever the ports say, so the
+//    pages and the action refuse a request from another computer even if a later port
+//    forgets to.
+// 3. The ports: only the ports made on made-up data carry the tools (the stand-in's, and
 //    the made-up database's, both built on the sign-in stand-in, which refuses to be made
 //    outside local and test or for a site address that is not this computer or a test
-//    name). The ports of a real database carry none.
+//    name), and ports that carry them answer only requests made on this computer (the
+//    proxy refuses any other before a page is drawn). The ports of a real database carry
+//    none.
 import type { LeagueMembership } from '@srleagues/core';
 import type { KeptEmail } from './kept-emails.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
+import { answersOnlyHere } from './this-computer.ts';
 
 /** A league a made-up person belongs to, and what they are there. */
 export type MadeUpPlace = {
@@ -52,14 +60,23 @@ export type LocalTools = {
   readonly newestCodeFor: (email: string) => Promise<string | undefined>;
 };
 
+/** The app's own settings the gate reads: APP_ENV and PUBLIC_BASE_URL. */
+export type LocalToolsSettings = {
+  readonly appEnv: string;
+  readonly publicBaseUrl: string;
+};
+
 /**
  * The local tools, or undefined when they must answer "not found": in any mode but local
- * and test (decided before `ports` is called), or when the ports carry none.
+ * and test, for a request not made on this computer (both decided before `ports` is
+ * called), or when the ports carry none.
  */
 export async function localToolsOf(
-  appEnv: string,
+  settings: LocalToolsSettings,
+  request: Headers,
   ports: () => Promise<{ readonly localTools: LocalTools | null }>,
 ): Promise<LocalTools | undefined> {
-  if (!runsOnMadeUpData(appEnv)) return undefined;
+  if (!runsOnMadeUpData(settings.appEnv)) return undefined;
+  if (!answersOnlyHere(settings.publicBaseUrl)(request)) return undefined;
   return (await ports()).localTools ?? undefined;
 }

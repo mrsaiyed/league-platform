@@ -86,9 +86,10 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    */
   readonly madeUpWorld: boolean;
   /**
-   * Whether a request with these headers may be answered at all. The made-up world answers
-   * only one addressed to this computer's names (or its own `.test` name) and not passed
-   * on by another server (stand-in-ports.ts, answersOnlyHere); a database always answers.
+   * Whether a request with these headers may be answered at all. The made-up world, and any
+   * ports that carry the local tools (the made-up database's), answer only one addressed to
+   * this computer's names (or its own `.test` name) and not passed on by another server
+   * (this-computer.ts, answersOnlyHere); a real database always answers.
    */
   readonly answers: (headers: Headers) => boolean;
 };

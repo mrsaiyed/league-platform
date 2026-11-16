@@ -145,6 +145,10 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
     log: options.log,
     warn: (message, fields) => deps.warn?.(message, fields),
     // The kept emails, and the seed leagues' people to sign in as by a code (step 2.96).
-    localTools: madeUpDatabaseTools(database.seedLeagues, standInMember, signIn),
+    // With them the ports answer only requests made on this computer, as the stand-in's.
+    localTools: {
+      tools: madeUpDatabaseTools(database.seedLeagues, standInMember, signIn),
+      publicBaseUrl: options.publicBaseUrl,
+    },
   });
 }

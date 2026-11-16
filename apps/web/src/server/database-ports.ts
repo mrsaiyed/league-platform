@@ -39,6 +39,7 @@ import { notMovedYet, NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
 import type { WebPorts } from './ports.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
+import { answersOnlyHere } from './this-computer.ts';
 
 export { NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
 
@@ -79,9 +80,15 @@ export type DatabasePortsOptions = {
   readonly now?: () => Date;
   /**
    * The kept emails and "be this made-up person" (step 2.96): given only on the made-up
-   * database (startup.ts); a real database has none, so both pages answer "not found".
+   * database (startup.ts), with the site's address (PUBLIC_BASE_URL). Ports that carry them
+   * answer only requests made on this computer (answersOnlyHere, as the stand-in's do), so
+   * no other computer on the network can read a code or press "Be …". A real database has
+   * none, so both pages answer "not found" and its ports answer every request.
    */
-  readonly localTools?: LocalTools | null;
+  readonly localTools?: {
+    readonly tools: LocalTools;
+    readonly publicBaseUrl: string;
+  } | null;
 };
 
 /** How often one sign-in user's account problem is logged again: once an hour (T-86). */
@@ -211,7 +218,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     leaguesOfAccount: (accountId) =>
       database.withTransaction(db, { accountId }, (scope) => database.listMyLeagues(scope)),
     leagueSites: databaseLeagueSites(database, db),
-    localTools: options.localTools ?? null,
+    localTools: options.localTools?.tools ?? null,
     publicStats: databasePublicStats(database, db),
     games: notMovedYet('games area'),
     fixtureImport: notMovedYet('fixture import'),
@@ -228,6 +235,10 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // No live hub until the tracker moves: nothing would publish to it.
     liveFeed: null,
     madeUpWorld: false,
-    answers: () => true,
+    // Carrying the local tools, only requests made on this computer (step 2.96).
+    answers:
+      options.localTools === undefined || options.localTools === null
+        ? () => true
+        : answersOnlyHere(options.localTools.publicBaseUrl),
   };
 }
