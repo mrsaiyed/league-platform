@@ -11,7 +11,13 @@ import {
   testRosters,
   tippedOff,
 } from './scoring-test-game.test-helper.ts';
-import { findTile, inJerseyOrder, scoringView, teamColor } from './scoring-view.ts';
+import {
+  findTile,
+  inJerseyOrder,
+  scoringView,
+  teamColor,
+  timeoutTakenBack,
+} from './scoring-view.ts';
 
 const ids = (tiles: readonly { readonly id: string }[]) => tiles.map((t) => t.id);
 
@@ -298,6 +304,31 @@ describe('timeouts (step 2.36; checklist G3 to G7)', () => {
     );
     expect(timeouts(game, 'home')).toMatchObject({ full: 2, short: 2, left: 4 });
     expect(timeouts(game, 'home').taken.map((t) => t.seconds)).toEqual([60]);
+  });
+
+  it('knows which timeout a take-back took back, so the screen can say it (M2)', () => {
+    const at = (game: basketball.GameState, id: string, command: basketball.Command) =>
+      basketball.apply(game, command, { id, now: game.lastAt + 30_000 });
+    // Two by the home team with one by the visitors between them, in the second quarter;
+    // then the home team's latest is taken back.
+    const second = played([{ type: 'period', period: 2 }], tippedOff(basketball.QUARTERS));
+    const first = at(second, 'first', call('home', 60));
+    const other = at(first, 'other', call('away', 60));
+    const latest = at(other, 'latest', call('home', 30));
+    const back = at(latest, 'back', { type: 'untimeout', side: 'home' });
+    expect(timeoutTakenBack(back, 'back')).toEqual({
+      id: 'latest',
+      period: 2,
+      clockMs: 480_000,
+      seconds: 30,
+    });
+    // One more take-back finds the one before it, never the other team's.
+    const again = at(back, 'again', { type: 'untimeout', side: 'home' });
+    expect(timeoutTakenBack(again, 'again')?.id).toBe('first');
+    expect(timeoutTakenBack(again, 'back')?.id).toBe('latest');
+    // A play that is not a take-back, and a take-back with nothing to take.
+    expect(timeoutTakenBack(again, 'first')).toBeUndefined();
+    expect(timeoutTakenBack(again, 'nothing')).toBeUndefined();
   });
 
   it('never reads below none left when a team took more than it had', () => {

@@ -1065,6 +1065,8 @@ export const en = {
   'tracker.say.timeout.fullStopped': 'Full timeout: {team}. Clock stopped.',
   'tracker.say.timeout.shortStopped': '30-second timeout: {team}. Clock stopped.',
   'tracker.say.untimeout': 'Timeout taken back: {team}.',
+  // Which one came back: its period and the time it was taken at.
+  'tracker.say.untimeoutOf': 'Timeout taken back: {team}, {period} {clock}.',
   // Team fouls this period, in each team's box of the scoreboard, and the bonus badge
   // beside the team that shoots it.
   'tracker.fouls.count_one': '{count} foul',

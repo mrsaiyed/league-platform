@@ -1,0 +1,88 @@
+// A control that takes no tap for a moment (the fix round of step 2.36; the area 4 review,
+// M2 and M5, and the code review, M-a and M-c), with no drawing: when it rests, whether a
+// tap is taken, and when it shows ready again.
+//
+// A scorekeeper double-taps. The second tap lands a tenth to a third of a second after the
+// first, on whatever is under the finger by then: − again after the list has lost its
+// latest timeout, an answer where the timeout button was. None of those second taps was
+// meant, and each would change the game. So such a control RESTS for a third of a second
+// after it comes under the finger, and a pointer's tap in that time is not taken.
+//
+// A tap that is not taken must never look as if it were. So the rest is also something
+// the screen SHOWS: `ready()` is false while the control rests, the screen draws it not
+// yet ready (dimmed), and `drawn` is called when that changes, at the start of the rest
+// and at its end.
+import type { TapInput } from './tracker-controller.ts';
+
+/** How long a control rests: longer than a double tap, shorter than a second thought. */
+export const restMs = 350;
+
+/** The clock and the timer a rest runs on: the page's own, or a test's. */
+export type RestTimers = {
+  /** The steady clock a tap's own time is read on, in milliseconds. */
+  now(): number;
+  /** Runs `run` after `ms`; gives back what cancels it. */
+  after(ms: number, run: () => void): () => void;
+};
+
+export type TapRest = {
+  /** The control comes to rest at `at` (now, when left out): no tap is taken for `restMs`. */
+  begin(at?: number): void;
+  /** Whether a pointer's tap made at `at` is taken. */
+  takes(at: number): boolean;
+  /** Whether the control is drawn ready: false from `begin` until the rest is over. */
+  ready(): boolean;
+  /** The screen is gone: nothing more is drawn. */
+  stop(): void;
+};
+
+/** A rest for one control (or one group that rests together); `drawn` redraws it. */
+export function createTapRest(timers: RestTimers, drawn: () => void = () => undefined): TapRest {
+  let until = Number.NEGATIVE_INFINITY;
+  let resting = false;
+  let cancel: (() => void) | null = null;
+  return {
+    begin(at = timers.now()) {
+      until = at + restMs;
+      resting = true;
+      cancel?.();
+      cancel = timers.after(Math.max(0, until - timers.now()), () => {
+        cancel = null;
+        resting = false;
+        drawn();
+      });
+      drawn();
+    },
+    takes: (at) => at >= until,
+    ready: () => !resting,
+    stop() {
+      cancel?.();
+      cancel = null;
+      resting = false;
+    },
+  };
+}
+
+/** A tap as the guards read it: when it was made, and whether a key made it. */
+export type Tap = { readonly at: number; readonly keyboard: boolean };
+
+/**
+ * Whether a tap on a control is taken. Enter and Space are always taken: a key is pressed
+ * on the control that has the keyboard, never on one that moved under a finger.
+ */
+export const tapTaken = (rest: TapRest, tap: Tap): boolean => tap.keyboard || rest.takes(tap.at);
+
+/**
+ * − tapped on a team's timeouts (G7; M2): the tap that takes the latest one back, or null
+ * while − rests. It rests from each tap taken, so two timeouts come back only by two
+ * deliberate taps: a fast double tap takes one.
+ */
+export function takeBackTimeoutTap(
+  side: 'home' | 'away',
+  rest: TapRest,
+  tap: Tap,
+): TapInput | null {
+  if (!tapTaken(rest, tap)) return null;
+  rest.begin(tap.at);
+  return { type: 'untimeout', side };
+}

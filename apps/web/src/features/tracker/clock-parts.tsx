@@ -63,7 +63,8 @@ export type ClockHandlers = {
   readonly callTimeout: (call: TimeoutCall, event: MouseEvent<HTMLButtonElement>) => void;
   /** The answer to "Record it anyway?". */
   readonly answerTimeout: (record: boolean, event: MouseEvent<HTMLButtonElement>) => void;
-  readonly takeBackTimeout: (side: Side) => void;
+  /** − on a team's timeouts: the latest comes back. It rests after each tap taken. */
+  readonly takeBackTimeout: (side: Side, event: MouseEvent<HTMLButtonElement>) => void;
 };
 
 const sides = basketball.SIDES;
@@ -401,7 +402,7 @@ export function TimeoutsPad(props: {
               team: view.teams[asking.side].name,
             })}
           </p>
-          <div className="court-timeout-answers">
+          <div className="court-timeout-answers" data-timeout-answers="">
             <button
               type="button"
               className="court-opt"
@@ -519,7 +520,7 @@ function TeamTimeouts(props: {
               data-side={team.side}
               disabled={final}
               aria-label={t('tracker.timeouts.takeBack', { team: team.name })}
-              onClick={() => on.takeBackTimeout(team.side)}
+              onClick={(event) => on.takeBackTimeout(team.side, event)}
             >
               <span className="court-minus" aria-hidden="true" />
             </button>

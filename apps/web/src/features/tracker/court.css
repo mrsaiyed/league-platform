@@ -1383,6 +1383,14 @@
 .court-opt:disabled {
   opacity: 0.4;
 }
+/* A control that has only just come under the finger rests for a third of a second and
+   takes no tap (tap-rest.ts): the second tap of a double tap was meant for what was there
+   before. It is drawn not yet ready for exactly as long, so a tap that is not taken never
+   looks as if it were. A look, not a movement: nothing spins and nothing slides. */
+.court-opt[data-resting],
+[data-resting] > .court-opt {
+  opacity: 0.4;
+}
 /* Who can come in, or who to come in for: its label above the line on a phone, so
    seven fit across; one line that never scrolls (see the bench, above). */
 .court-subs {
@@ -1901,6 +1909,14 @@
   }
   .court-sheet {
     animation: court-sheet 160ms ease-out both;
+  }
+  /* A control that rested comes back to full in a moment; it goes dim at once. */
+  .court-opt {
+    transition: opacity 120ms ease-out;
+  }
+  .court-opt[data-resting],
+  [data-resting] > .court-opt {
+    transition: none;
   }
   /* The Start clock button's triangle breathes while the clock waits to be started, as
      the standard's button pulses: only its own faintness changes, which costs a slow

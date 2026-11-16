@@ -71,7 +71,21 @@ import {
   type PadMode,
   type TimeoutCall,
 } from './scoring-moves.ts';
-import { findTile, scoringView, type PlayerTile, type ScoringView } from './scoring-view.ts';
+import {
+  findTile,
+  scoringView,
+  timeoutTakenBack,
+  type PlayerTile,
+  type ScoringView,
+} from './scoring-view.ts';
+import {
+  createTapRest,
+  takeBackTimeoutTap,
+  tapTaken,
+  type RestTimers,
+  type Tap,
+  type TapRest,
+} from './tap-rest.ts';
 import { createTileDrag, type TileDrag } from './tile-drag.ts';
 import { createTileMarks, type MarkKind, type TileMark, type TileMarks } from './tile-marks.ts';
 import type { TapInput, TapResult, TrackerControllerStatus } from './tracker-controller.ts';
@@ -113,6 +127,29 @@ const markTimers = {
     return () => window.clearTimeout(timer);
   },
 };
+
+/** The browser's own steady clock and timers, for the controls that rest (tap-rest.ts). */
+const restTimers: RestTimers = {
+  now: () => performance.now(),
+  after: markTimers.after,
+};
+
+/**
+ * The controls that rest for a moment after they come under the finger (tap-rest.ts),
+ * and where each is on the screen: while one rests it is marked `data-resting`, and the
+ * stylesheet draws it not yet ready.
+ */
+const restingPlaces = {
+  /** − on a team's timeouts, after a take-back (the area 4 review, M2). */
+  minus: '[data-pad] [data-act="untimeout"]',
+  /** The answers to "Record it anyway?", after the question is asked. */
+  answers: '[data-pad] [data-timeout-answers]',
+} as const;
+type RestingPlace = keyof typeof restingPlaces;
+const restingNames = Object.keys(restingPlaces) as RestingPlace[];
+
+/** A click as the guards read it: when the finger made it, and whether a key did. */
+const tapOf = (event: MouseEvent): Tap => ({ at: event.timeStamp, keyboard: event.detail === 0 });
 
 /** Tells a tap's marks how the tap ended. */
 const answerMarks = (marks: readonly TileMark[], taken: boolean): void => {
@@ -307,6 +344,33 @@ export function ScoringScreen(props: ScoringScreenProps) {
     wanted.current = mode;
     setPadMode(mode);
   };
+
+  // The controls that rest for a moment (tap-rest.ts). Each is marked while it rests,
+  // straight onto its element, so nothing of the screen is drawn again for it.
+  const rests = useRef<Record<RestingPlace, TapRest> | null>(null);
+  const drawRests = useCallback(() => {
+    const [all, screen] = [rests.current, root.current];
+    if (all === null || screen === null) return;
+    for (const name of restingNames) {
+      const resting = !all[name].ready();
+      for (const place of screen.querySelectorAll(restingPlaces[name])) {
+        place.toggleAttribute('data-resting', resting);
+      }
+    }
+  }, []);
+  rests.current ??= {
+    minus: createTapRest(restTimers, drawRests),
+    answers: createTapRest(restTimers, drawRests),
+  };
+  const resting = rests.current;
+  // After every drawing: a control drawn anew while it rests is marked as well.
+  useLayoutEffect(drawRests);
+  useEffect(
+    () => () => {
+      for (const name of restingNames) resting[name].stop();
+    },
+    [resting],
+  );
 
   const sayTimer = useRef<number | null>(null);
   const say = useCallback((text: string) => {
@@ -713,9 +777,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
     callTimeout(call, event) {
       const now = wanted.current;
       if (now.kind !== 'timeouts' || now.asking !== null) return;
-      // A team with none of that length left is asked about first (G5).
+      // A team with none of that length left is asked about first (G5). The answers rest
+      // for a moment: the second of two fast taps on the timeout button is not an answer.
       if (timeoutTap(view, call).kind === 'ask') {
-        askedAt.current = event.timeStamp;
+        resting.answers.begin(event.timeStamp);
         showPad({ kind: 'timeouts', asking: call });
         if (byKeyboard(event)) focusNext.current = { selector: '[data-pad] [data-answer="no"]' };
         return;
@@ -725,22 +790,35 @@ export function ScoringScreen(props: ScoringScreenProps) {
     answerTimeout(record, event) {
       const now = wanted.current;
       if (now.kind !== 'timeouts' || now.asking === null) return;
-      // The second of two fast taps on a timeout button is not an answer.
-      if (event.detail !== 0 && event.timeStamp - askedAt.current < restGuardMs) return;
+      if (!tapTaken(resting.answers, tapOf(event))) return;
       if (record) recordTimeout(now.asking);
       else showPad({ kind: 'timeouts', asking: null });
     },
-    takeBackTimeout(side) {
-      void send(
-        { type: 'untimeout', side },
-        t('tracker.say.untimeout', { team: view.teams[side].name }),
-      );
+    takeBackTimeout(side, event) {
+      // One at a time (the area 4 review, M2): − rests from each tap taken, so a fast
+      // double tap takes one timeout back, never two.
+      const input = takeBackTimeoutTap(side, resting.minus, tapOf(event));
+      if (input === null) return;
+      const team = view.teams[side].name;
+      void tap(input).then((result) => {
+        if (!result.ok) return;
+        // The screen says which one came back: its period and its time.
+        const back =
+          result.game === null ? undefined : timeoutTakenBack(result.game, result.commandId);
+        say(
+          back === undefined
+            ? t('tracker.say.untimeout', { team })
+            : t('tracker.say.untimeoutOf', {
+                team,
+                period: periodText(back.period, view.periods, t),
+                clock: basketball.formatClock(back.clockMs),
+              }),
+        );
+      });
     },
     leave: props.leave,
   };
 
-  /** When "Record it anyway?" was asked: its answers wait a moment, as Start clock does. */
-  const askedAt = useRef(0);
   /** Records a timeout; the list closes and the screen says it, and that the clock stopped (G6). */
   function recordTimeout(call: TimeoutCall) {
     showPad(padAtRest);

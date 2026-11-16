@@ -819,9 +819,26 @@ export async function clockSteps(kit) {
           '− is named for what it takes back',
           (await minus.getAttribute('aria-label')) === 'Take back the latest Hawks timeout',
         );
+        // Two fast taps on −, 90 ms apart (the area 4 review, M2): one comes back, not
+        // two. − rests after the first, is drawn so, and the screen says which came back.
+        const minusAt = await minus.boundingBox();
+        const [mx, my] = [minusAt.x + minusAt.width / 2, minusAt.y + minusAt.height / 2];
+        await page.mouse.click(mx, my);
+        await page.waitForTimeout(90);
+        await page.mouse.click(mx, my);
+        const restingSeen = (await minus.getAttribute('data-resting')) !== null;
+        await said(c, /^Timeout taken back: Hawks, H2 \d+:\d\d\.$/);
+        await page.waitForTimeout(500);
+        await c.saved();
+        note(
+          'two fast taps on − take one timeout back, not two: − rests, is drawn resting, and the screen says which came back',
+          (await takenInAll()) === 2 &&
+            restingSeen &&
+            (await minus.getAttribute('data-resting')) === null,
+          `${await takenInAll()} taken; drawn resting: ${restingSeen}`,
+        );
+        // A second, deliberate tap takes the next one back.
         await c.recorded(() => tapWhereItIs(page, minus, '−'));
-        await said(c, /^Timeout taken back: Hawks\.$/);
-        await c.recorded(() => minus.click());
         note(
           'taking back the latest gives it back: one taken, one left, and the list stays open',
           (await taken.count()) === 1 &&

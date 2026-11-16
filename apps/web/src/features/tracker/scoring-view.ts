@@ -129,6 +129,32 @@ function takenTimeouts(game: basketball.GameState, side: Side): TakenTimeout[] {
   return taken;
 }
 
+/**
+ * The timeout a take-back took back (the area 4 review of step 2.36, M2: the screen says
+ * which one came back): `playId` is the take-back's own play. Undefined when that play is
+ * not a take-back, or the team had none standing.
+ */
+export function timeoutTakenBack(
+  game: basketball.GameState,
+  playId: string,
+): TakenTimeout | undefined {
+  const takeBack = game.plays.find((play) => play.id === playId);
+  if (takeBack?.type !== 'untimeout') return undefined;
+  const standing: TakenTimeout[] = [];
+  for (const play of game.plays) {
+    if (play.id === playId) return standing.pop();
+    if (play.type === 'timeout' && play.side === takeBack.side) {
+      standing.push({
+        id: play.id,
+        period: play.period,
+        clockMs: play.clockMs,
+        seconds: play.seconds,
+      });
+    } else if (play.type === 'untimeout' && play.side === takeBack.side) standing.pop();
+  }
+  return undefined;
+}
+
 /** A player the engine has and the device's rosters lack: one object for each, kept. */
 const unlistedPlayers = new Map<string, DevicePlayer>();
 function unlistedPlayer(personId: string): DevicePlayer {
