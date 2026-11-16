@@ -6,6 +6,8 @@ import { leagueApiUrl, scoringOffersLimit } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { offersAskedAtOnce } from '../features/schedule-pages/scoring-offers.ts';
 import { resolveLeagueApi } from './league-api.ts';
+import { notMovedYet } from './not-on-the-database-yet.ts';
+import type { WebPorts } from './ports.ts';
 import { standInLeagues, standInPeople } from './stand-in-ports.ts';
 import { askedGameIds, offerHref, scoringOffersRequest } from './scoring-offers-endpoint.ts';
 import { trackerWorld, type League, type Person } from './tracker-endpoints.test-helper.ts';
@@ -16,8 +18,16 @@ const firstFive = [1, 2, 3, 4, 5].map(gameId).join(',');
 /** A league id nobody has. */
 const noLeague = '01900000-0000-7000-8000-0000000fffff';
 
-/** The read as `person` through the address of `league` (by its id), as the route makes it. */
-async function askById(person: Person, leagueId: string, games: string | null = firstFive) {
+/**
+ * The read as `person` through the address of `league` (by its id), as the route makes it;
+ * with `notMoved`, its games area refuses as on the database before it has moved there.
+ */
+async function askById(
+  person: Person,
+  leagueId: string,
+  games: string | null = firstFive,
+  notMoved = false,
+) {
   const world = trackerWorld();
   const { ports } = world;
   const session = person === 'visitor' ? null : await ports.identify(standInPeople[person].token);
@@ -28,7 +38,8 @@ async function askById(person: Person, leagueId: string, games: string | null = 
     { ...ports, siteOrigin: 'http://localhost:3000' },
     'visitor',
   );
-  const read = { accessOf: ports.accessOf, games: () => ports.games.deps };
+  const area = notMoved ? notMovedYet<WebPorts['games']>('games area') : ports.games;
+  const read = { accessOf: ports.accessOf, games: () => area.deps };
   return scoringOffersRequest(resolved.ok ? { ...resolved, ports: read } : resolved, games);
 }
 const ask = (person: Person, league: League = 'live', games: string | null = firstFive) =>
@@ -84,6 +95,31 @@ describe('the scoring read of a public page', () => {
     expect(owner.status).toBe(200);
     expect(owner.headers).toEqual({ 'Cache-Control': 'private, no-store' });
     expect((await ask('scorekeeper', 'draft')).status).toBe(200);
+  });
+
+  it('answers no games, never an error, while the games area is not on the database', async () => {
+    const none = {
+      status: 200,
+      body: { games: [] },
+      headers: { 'Cache-Control': 'private, no-store' },
+    };
+    const leagueId = standInLeagues.live.id;
+    // A coach scores nowhere: answered before the games area is reached.
+    expect(await askById('coach', leagueId, firstFive, true)).toEqual(none);
+    // A scorekeeper's read reaches it, and its refusal is answered as no games.
+    expect(await askById('scorekeeper', leagueId, firstFive, true)).toEqual(none);
+    // Only that refusal: anything else the games area throws is still an error.
+    const world = trackerWorld();
+    const context = await world.contextAs('scorekeeper', 'live', ['scoring']);
+    const broken = {
+      accessOf: world.ports.accessOf,
+      games: () => {
+        throw new Error('the games area broke');
+      },
+    };
+    await expect(
+      scoringOffersRequest({ ok: true, context, ports: broken }, firstFive),
+    ).rejects.toThrow('the games area broke');
   });
 
   it('gives a scorekeeper only their assigned games where only assigned ones may score', async () => {

@@ -17,6 +17,7 @@ import {
   leagueUrl,
   listScoringOffers,
   mayOpenLeague,
+  mayOpenTracker,
   scoringOffersLimit,
   type AccessHolder,
   type CommandContext,
@@ -28,6 +29,7 @@ import type { ScoringOfferReply } from '../features/schedule-pages/index.ts';
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { isGameIdFormat, refusalAnswer, type ApiAnswer, type ApiRefusal } from './league-api.ts';
 import { t } from './messages.ts';
+import { NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
 
 const privately = { 'Cache-Control': 'private, no-store' } as const;
 const answer = (body: ScoringOfferReply): ApiAnswer => ({ status: 200, body, headers: privately });
@@ -94,19 +96,31 @@ export async function scoringOffersRequest(
     context.account === null ? undefined : await ports.accessOf(commandContextOf(context));
   // The league gate, as for the league's pages and the snapshot (U-9).
   if (!mayOpenLeague(context.league.status, holder)) return notFound;
-  return scoringOffers(context, games, ports.games);
+  const none = answer({ games: [] });
+  // Someone who holds no permission to score anywhere in the league (games.score, the one
+  // games.list_scoring_offers asks for) is told nothing, and the games area is not reached:
+  // every signed-in person's page asks, a coach's and a fan's too.
+  if (context.account === null || !mayOpenTracker(holder)) return none;
+  const gameIds = askedGameIds(games);
+  if (gameIds.length === 0) return none;
+  try {
+    return await scoringOffers(context, gameIds, ports.games);
+  } catch (error) {
+    // On the database the games area has not moved yet (database-ports.ts, notMovedYet):
+    // until it has, a scorer's page gets no buttons rather than an error. Only that one
+    // refusal is caught; this catch goes when the games area moves (step 2.93).
+    if (error instanceof NotOnTheDatabaseYet) return none;
+    throw error;
+  }
 }
 
-/** The read for a league this person may see. */
+/** The read for someone who may see the league and scores somewhere in it. */
 async function scoringOffers(
   context: LeagueRequestContext,
-  games: string | null,
+  gameIds: readonly string[],
   deps: () => CommandDeps<TrackerTx>,
 ): Promise<ApiAnswer> {
   const none = answer({ games: [] });
-  if (context.account === null) return none;
-  const gameIds = askedGameIds(games);
-  if (gameIds.length === 0) return none;
   const listed = await listScoringOffers(commandContextOf(context), { gameIds }, deps());
   if (!listed.ok || listed.value.games.length === 0) return none;
   const league = context.league;
