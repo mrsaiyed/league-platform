@@ -6,7 +6,7 @@ Everything between "registration closed" and "champion crowned".
 
 ## 1. Season settings
 
-Set in **Admin → Season settings**. This is the first thing an organizer settles, because brackets, standings and the live tracker all follow from it. Every setting has a preset, so it takes a minute, and the admin can change any of it later (S-1).
+Set in **Admin → Season settings**. This is the first thing an organizer settles, because brackets, standings and the live tracker all follow from it. Every setting has a preset, so it takes a minute, and the admin can change any of it later (S-1). Who can see a season is set here too: the league's owner or an admin shows a season to visitors, and can hide it again, each after one question; every new season, a new league's first one included, starts hidden (**A-18**, decided for you).
 
 | Setting                | Choices                                                                                                                                                                                                                                                                                      | Default (basketball)                                    |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -30,7 +30,7 @@ Set in **Admin → Season settings**. This is the first thing an organizer settl
 
 ## 2. Teams
 
-Teams come from three places: created by hand, registered by captains ([P6](P6-registration-and-accounts.md) section 3), or carried over from last season. Each has a name, color, optional logo, a division, and a captain or coach. A team's roster is built by dragging registered people onto it, or by the draft. Jersey numbers are set on the roster and can be changed at the scorer's table by whoever is scoring that game (**S-37**, decided for you); where the season wants unique numbers, a number already worn on the team is refused with a sentence naming who wears it. A player who leaves or is replaced mid-season stays in the team's history with every game they played (R-17).
+Teams come from three places: created by hand, registered by captains ([P6](P6-registration-and-accounts.md) section 3), or carried over from last season. Each has a name, color, optional logo, a division, and a captain or coach. A team's roster is built by dragging registered people onto it, or by the draft. Jersey numbers are set on the roster and can be changed at the scorer's table by whoever is scoring that game (**S-37**, decided for you); where the season wants unique numbers, a number already worn on the team is refused with a sentence naming who wears it. A player who leaves or is replaced mid-season stays in the team's history with every game they played (R-17). A player marked as left by mistake can be put back; if another player now wears their number, they come back without one and the screen says so with both names (**R-32**, decided for you).
 
 ## 3. Turning sign-ups into teams
 
@@ -68,7 +68,7 @@ The builder produces a full schedule and a **fairness report**: for each team, h
 
 ### 4.3 Adjust by hand
 
-A grid of rounds and slots (Faraj's "Edit Full Schedule" view). Drag a game to another slot, swap two games, add or remove a game, add a round (a name and a date), remove a round that has no games, rename a round ("Week 5 — Rivalry Week"), change a round's date. A new round is numbered after the others, whatever its date (S-55). A game moved to another round is asked whether it takes that round's date, never moved silently (S-54). A game is flagged as outside its round only when its date is before its round's date or on or after the next round's (for the last round: a week or more after its date), because a round often holds games on several days (S-53). Clashes are flagged the moment they happen: a team in two places, a court double-booked, a game on a skipped date.
+A grid of rounds and slots (Faraj's "Edit Full Schedule" view). Drag a game to another slot, swap two games, add or remove a game, add a round (a name and a date), remove a round that has no games, rename a round ("Week 5 — Rivalry Week"), change a round's date. A new round is numbered after the others, whatever its date (S-55). A game moved to another round is asked whether it takes that round's date, never moved silently (S-54). A game is flagged as outside its round only when its date is before its round's date or on or after the next round's (for the last round: a week or more after its date), because a round often holds games on several days (S-53). Clashes are flagged the moment they happen: a team in two places, a court double-booked, a game on a skipped date. A game in the bin does not hold its round: the round can still be removed, and the game comes back from the bin with no round (S-60). Rounds are listed by their dates everywhere, rounds with no date last and rounds of one date by number, and each is shown by its name (S-61). Games outside their round are named when the schedule is published and never stop it (S-62).
 
 ### 4.4 Publish
 
@@ -180,7 +180,7 @@ A cancelled game can be put back, with a reason, by whoever may cancel it; it is
 
 - **S-9: standings are always calculated from final games; nobody types them in.** Each division has its own table with seeds. When teams are level, the page can show why one is ahead ("head-to-head").
 - **S-10: an admin can add an adjustment** (a points deduction, a forfeit win awarded by ruling) with a reason. It shows as a footnote under the table.
-- **Statistics**: season totals and per-game averages for every stat the season keeps; leaders with a minimum-games rule the league sets; a full sortable table. Fouls and turnovers get no leaders card unless the league switches it on (**S-48**, decided for you); they stay in the tables.
+- **Statistics**: season totals and per-game averages for every stat the season keeps; leaders with a minimum-games rule the league sets, which starts at 3 games (**S-63**, decided for you); a full sortable table. Fouls and turnovers get no leaders card unless the league switches it on (**S-48**, decided for you); they stay in the tables.
 - **Player pages** (if the league shows them): this season, past seasons, and career totals within the league.
 - **S-11: only final games count.** A live game's numbers show on its own page but not in season totals until it ends.
 - **S-22 (new, the founder's direction, November 12): who can see players' statistics is a setting, and each team can choose for itself.**
