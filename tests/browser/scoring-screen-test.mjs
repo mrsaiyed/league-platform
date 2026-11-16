@@ -43,11 +43,14 @@ import {
   court,
   evenMorePlayers,
   league,
+  lettersHere,
   liveGame,
   scorekeeper,
   sizes,
   starters,
   trackerPath,
+  widerFace,
+  widthOnGitHub,
 } from './tracker-driver.mjs';
 import {
   accessibilityProblems,
@@ -89,6 +92,32 @@ const gamesDatabase = 'srleagues-tracker-games';
 // computer has) runs every measure here with the screen drawn in that face instead, to
 // try the sizes with other letters before GitHub does. Off unless asked for.
 const otherFace = process.env.SCORING_TEST_FACE ?? '';
+// Asked for or not, what step 2.36 measures of fit (a team's name whole on the scoreboard,
+// a picked player's second line whole, the hint fitting its place, nothing scrolling, the
+// sizes of the bonus) is measured twice on every run: in this device's own face, and in
+// one at least as wide as GitHub's Ubuntu machines draw (`widerFace`, tracker-driver.mjs).
+// `facesOf` names the two; a check made in the second ends ", in wider letters". Where
+// the device's own letters are already that wide (GitHub's own machines) the two are the
+// same letters, and the measure is made once.
+let faces = null;
+async function facesOf(page) {
+  if (faces !== null) return faces;
+  const { own, wider } = await lettersHere(page);
+  const same = wider < own * 1.02;
+  faces = [
+    { letters: '', family: '' },
+    ...(same ? [] : [{ letters: ', in wider letters', family: widerFace }]),
+  ];
+  console.log(
+    `  Letters: “${widthOnGitHub.says}” at ${widthOnGitHub.px} px is ${own.toFixed(0)} wide in ${otherFace || 'this device’s own face'} and ${wider.toFixed(0)} in the wider one (${widerFace}); GitHub’s Ubuntu machines drew it ${widthOnGitHub.width} wide. ${same ? 'They are the same letters here: the fit is measured once.' : 'The fit is measured in both.'}`,
+  );
+  note(
+    'the fit is measured in letters at least as wide as GitHub’s Ubuntu machines draw',
+    Math.max(own, wider) >= widthOnGitHub.width - 1,
+    `${own.toFixed(1)} and ${wider.toFixed(1)}, against ${widthOnGitHub.width}: this computer has no face as wide as ${widerFace}`,
+  );
+  return faces;
+}
 
 let built = true;
 if (!process.argv.includes('--no-build')) {
@@ -2311,6 +2340,7 @@ if (browser) {
     accessible,
     keyboardOn,
     restFits,
+    facesOf,
   });
 }
 

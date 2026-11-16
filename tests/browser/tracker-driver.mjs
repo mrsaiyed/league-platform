@@ -25,6 +25,68 @@ export const sizes = [
   { name: 'phone-in-browser', width: 390, height: 664 },
 ];
 
+// The scoring screen draws with the plain sans face the device already has (DESIGN.md
+// section 7, line 7), so its letters are as wide as that device's: GitHub's Ubuntu
+// machines draw DejaVu Sans, about a sixth wider than Windows' Segoe UI, and a phone whose
+// letters are that wide is a real phone. So the fit is measured, and the pictures can be
+// taken, in a wider face as well. Verdana is on Windows and macOS and is a little wider
+// than DejaVu Sans; a machine with neither falls back to its own sans.
+export const widerFace = 'Verdana, "DejaVu Sans", "Bitstream Vera Sans"';
+/**
+ * One line of the screen, and how wide GitHub's Ubuntu machines drew it (the failed run
+ * of commit 19dcaddf: "needs 263"). Segoe UI draws it 226 wide and Verdana 270.
+ */
+export const widthOnGitHub = {
+  says: 'On court · 3 fouls · 104 pts · 0:07 played',
+  px: 13,
+  width: 263,
+};
+
+/**
+ * Draws the scoring screen in another face from now on ('' puts its own back). The screen
+ * looks again at what fits when it is turned or resized, so it is told it was: a device
+ * has one face from the start, and this one changes under a screen already drawn.
+ */
+export async function drawIn(page, family) {
+  await page.evaluate((face) => {
+    document.querySelector('style[data-drawn-in]')?.remove();
+    if (face !== '') {
+      const style = document.createElement('style');
+      style.setAttribute('data-drawn-in', '');
+      style.textContent = `.court, .court * { font-family: ${face}, sans-serif !important; }`;
+      document.head.append(style);
+    }
+    window.dispatchEvent(new Event('resize'));
+  }, family);
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  );
+}
+
+/**
+ * How wide `widthOnGitHub`'s line is on the scoring screen that is open now: in the face
+ * the screen has, and in the wider one.
+ */
+export async function lettersHere(page) {
+  const own = await page.evaluate((line) => {
+    const probe = document.createElement('span');
+    probe.setAttribute('data-letters-probe', '');
+    probe.style.cssText = `position: absolute; visibility: hidden; white-space: nowrap; font-size: ${line.px}px; font-weight: 400; letter-spacing: normal;`;
+    probe.textContent = line.says;
+    document.querySelector('[data-scoring]').append(probe);
+    return probe.getBoundingClientRect().width;
+  }, widthOnGitHub);
+  await drawIn(page, widerFace);
+  const wider = await page.evaluate(() => {
+    const probe = document.querySelector('[data-letters-probe]');
+    const width = probe.getBoundingClientRect().width;
+    probe.remove();
+    return width;
+  });
+  await drawIn(page, '');
+  return { own, wider };
+}
+
 /** Three more a side on top of `morePlayers`: fifteen a side, a bench of ten. */
 export const evenMorePlayers = {
   home: [

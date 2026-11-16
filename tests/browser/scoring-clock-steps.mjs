@@ -23,7 +23,12 @@
 // - At the five sizes, in each state the clock adds, nothing tapped is under 44 x 44 or
 //   closer than 8 to the next, nothing scrolls, and each team's fouls and badge are whole
 //   in its box of the scoreboard.
-import { court, sizes, stopClockGame, trackerPath } from './tracker-driver.mjs';
+// - What is measured of fit (a team's name on the scoreboard at its fullest, a picked
+//   player's second line, the hint in its place, nothing scrolling, the sizes of the
+//   bonus) is measured in this device's own letters and again in wider ones: the screen
+//   draws with the face a device already has, and GitHub's Ubuntu machines, like some
+//   phones, draw letters a sixth wider than Windows does (`facesOf`, in the test).
+import { court, drawIn, sizes, stopClockGame, trackerPath } from './tracker-driver.mjs';
 
 const [phone, phoneLying, tabletUpright, , phoneInBrowser] = sizes;
 
@@ -69,7 +74,13 @@ const buttonsOf = (within) =>
 export async function clockSteps(kit) {
   const { step, note, origin, scorekeeperAt, openCourt, letGo } = kit;
   const { tapWhereItIs, measureTargets, watchScrolling, scrollsSeen, twoFrames } = kit;
-  const { accessible, keyboardOn, restFits } = kit;
+  const { accessible, keyboardOn, restFits, facesOf } = kit;
+  /**
+   * Each size in each face the fit is measured in (this device's own, then a wider one):
+   * a measure draws the screen in `family` first, and ends its name with `letters`.
+   */
+  const fits = async (page, among = sizes) =>
+    (await facesOf(page)).flatMap((face) => among.map((size) => ({ size, ...face })));
 
   /** The floor player of a team in place `nth`, whoever that is by now. */
   const floor = (c, side, nth = 0) => c.root.locator(`[data-floor="${side}"] .court-tile`).nth(nth);
@@ -808,7 +819,8 @@ export async function clockSteps(kit) {
       for (let i = 0; i < 10; i += 1) await foul(c, 'away', i % 5);
       await c.root.locator('[data-bonus="home"][data-level="2"]').waitFor();
       await c.saved();
-      for (const size of sizes) {
+      for (const { size, letters, family } of await fits(page)) {
+        await drawIn(page, family);
         await page.setViewportSize({ width: size.width, height: size.height });
         await twoFrames(page);
         const boxes = await page.evaluate(() =>
@@ -834,7 +846,7 @@ export async function clockSteps(kit) {
           }),
         );
         note(
-          `${size.width} x ${size.height}: both teams in the double bonus: each box holds its fouls and "Double bonus" whole`,
+          `${size.width} x ${size.height}${letters}: both teams in the double bonus: each box holds its fouls and "Double bonus" whole`,
           boxes.length === 2 &&
             boxes.every(
               (box) =>
@@ -864,10 +876,10 @@ export async function clockSteps(kit) {
         const tablet = size.width >= 700 && size.height >= 521;
         const least = tablet ? { count: 26, badge: 19 } : { count: 15, badge: 12 };
         console.log(
-          `  ${size.width} x ${size.height}: at the double bonus the count is ${drawn[0]?.count} px, the badge ${drawn[0]?.badge} px, the score ${drawn[0]?.score} px${drawn.some((box) => box.tight) ? ' (letters wider than the box: a step smaller)' : ''}`,
+          `  ${size.width} x ${size.height}${letters}: at the double bonus the count is ${drawn[0]?.count} px, the badge ${drawn[0]?.badge} px, the score ${drawn[0]?.score} px${drawn.some((box) => box.tight) ? ' (letters wider than the box: a step smaller)' : ''}`,
         );
         note(
-          `${size.width} x ${size.height}: at the double bonus the count and the badge are at their largest, and the score is larger still`,
+          `${size.width} x ${size.height}${letters}: at the double bonus the count and the badge are at their largest, and the score is larger still`,
           drawn.length === 2 &&
             drawn.every(
               (box) =>
@@ -877,6 +889,7 @@ export async function clockSteps(kit) {
           JSON.stringify(drawn),
         );
       }
+      await drawIn(page, '');
       // A team's name is never cut on the scoreboard at its fullest, lying down (the
       // pictures after the fix round: "HAWKS" read "HA W…"). Both teams in the double
       // bonus, three-figure scores made with no connection, so the banner is waiting,
@@ -922,50 +935,59 @@ export async function clockSteps(kit) {
             }
           }
         }, into);
-      await twoFrames(page);
-      const asTheyAre = await names();
-      const bannerNow = (await c.banner.textContent()) ?? '';
-      // The longest the banner says: all three of its lines at once (queue-banner.ts).
-      await written({
-        '[data-saved-banner]': `This device could not save to its storage · ${bannerNow} · 12 actions not saved`,
-      });
-      await twoFrames(page);
-      const longestBanner = await names();
-      // A name of fifteen letters, and a truly long one (made-up names, written in).
-      await written({
-        '[data-score="home"] .court-score-name': 'Riverside Bears',
-        '[data-score="away"] .court-score-name': 'Northside Academy Hawks of the Valley',
-      });
-      await twoFrames(page);
-      const longNames = await names();
-      await written({
-        '[data-saved-banner]': null,
-        '[data-score="home"] .court-score-name': null,
-        '[data-score="away"] .court-score-name': null,
-      });
-      note(
-        '844 x 390, both teams in the double bonus, three-figure scores and the banner waiting: neither team’s name is cut',
-        fullest.home >= 100 &&
-          fullest.away >= 100 &&
-          /waiting to send/.test(bannerNow) &&
-          asTheyAre.length === 2 &&
-          asTheyAre.every((name) => !name.cut),
-        JSON.stringify({ fullest, bannerNow, asTheyAre }),
-      );
-      note(
-        '…and with the longest the banner says, neither name is cut',
-        longestBanner.length === 2 && longestBanner.every((name) => !name.cut),
-        JSON.stringify(longestBanner),
-      );
-      note(
-        '…a name of fifteen letters is whole; only a truly long one is cut, ending in "…", with room for fifteen',
-        longNames.length === 2 &&
-          !longNames[0].cut &&
-          longNames[1].cut &&
-          longNames[1].ends === 'ellipsis' &&
-          longNames[1].width >= longNames[0].width - 1,
-        JSON.stringify(longNames),
-      );
+      for (const { size, letters, family } of await fits(page, [phoneLying])) {
+        await drawIn(page, family);
+        await page.setViewportSize({ width: size.width, height: size.height });
+        await twoFrames(page);
+        const at = `${size.width} x ${size.height}${letters}`;
+        // The three checks keep the names they had in this device's own letters.
+        const again = letters === '' ? '' : ` (${at})`;
+        const asTheyAre = await names();
+        const bannerNow = (await c.banner.textContent()) ?? '';
+        // The longest the banner says: all three of its lines at once (queue-banner.ts).
+        await written({
+          '[data-saved-banner]': `This device could not save to its storage · ${bannerNow} · 12 actions not saved`,
+        });
+        await twoFrames(page);
+        const longestBanner = await names();
+        // A name of fifteen letters, and a truly long one (made-up names, written in).
+        await written({
+          '[data-score="home"] .court-score-name': 'Riverside Bears',
+          '[data-score="away"] .court-score-name': 'Northside Academy Hawks of the Valley',
+        });
+        await twoFrames(page);
+        const longNames = await names();
+        await written({
+          '[data-saved-banner]': null,
+          '[data-score="home"] .court-score-name': null,
+          '[data-score="away"] .court-score-name': null,
+        });
+        note(
+          `${at}, both teams in the double bonus, three-figure scores and the banner waiting: neither team’s name is cut`,
+          fullest.home >= 100 &&
+            fullest.away >= 100 &&
+            /waiting to send/.test(bannerNow) &&
+            asTheyAre.length === 2 &&
+            asTheyAre.every((name) => !name.cut),
+          JSON.stringify({ fullest, bannerNow, asTheyAre }),
+        );
+        note(
+          `…and with the longest the banner says, neither name is cut${again}`,
+          longestBanner.length === 2 && longestBanner.every((name) => !name.cut),
+          JSON.stringify(longestBanner),
+        );
+        note(
+          `…a name of fifteen letters is whole; only a truly long one is cut, ending in "…", with room for fifteen${again}`,
+          longNames.length === 2 &&
+            !longNames[0].cut &&
+            longNames[1].cut &&
+            longNames[1].ends === 'ellipsis' &&
+            longNames[1].width >= longNames[0].width - 1,
+          JSON.stringify(longNames),
+        );
+      }
+      await drawIn(page, '');
+      await page.setViewportSize({ width: phoneLying.width, height: phoneLying.height });
       await context.setOffline(false);
       await page.evaluate(() => window.dispatchEvent(new Event('online')));
       await page.waitForFunction(
@@ -1367,11 +1389,15 @@ export async function clockSteps(kit) {
       if (await c.timeoutsPad.isVisible()) await c.pad.locator('.court-close').click();
       await c.pad.locator('[data-rest]').waitFor();
       await page.waitForTimeout(3400);
-      /** Measures the state the screen is in at each of the five sizes, then comes back. */
+      /**
+       * Measures the state the screen is in at each of the five sizes, in this device's
+       * own letters and in wider ones, then comes back.
+       */
       const atEverySize = async (state, more = async () => {}) => {
-        for (const size of sizes) {
+        for (const { size, letters, family } of await fits(page)) {
+          await drawIn(page, family);
           await page.setViewportSize({ width: size.width, height: size.height });
-          const label = `${size.width} x ${size.height}, ${state}`;
+          const label = `${size.width} x ${size.height}${letters}, ${state}`;
           await measureTargets(page, label);
           const still = await page.evaluate(() => ({
             page: document.scrollingElement.scrollHeight - window.innerHeight,
@@ -1405,6 +1431,7 @@ export async function clockSteps(kit) {
           );
           await more(size, label);
         }
+        await drawIn(page, '');
         await page.setViewportSize({ width: phone.width, height: phone.height });
         await twoFrames(page);
       };
@@ -1492,10 +1519,11 @@ export async function clockSteps(kit) {
       // size (the code review, M-c: it was measured at 390 x 664 only). The pad returns
       // to rest with each of these taps, so a second fast tap lands where the button is:
       // a floor player's options, a team's whole bench, and a bench player's options.
-      for (const size of sizes) {
+      for (const { size, letters, family } of await fits(page)) {
+        await drawIn(page, family);
         await page.setViewportSize({ width: size.width, height: size.height });
         await twoFrames(page);
-        const label = `${size.width} x ${size.height}`;
+        const label = `${size.width} x ${size.height}${letters}`;
         await c.startButton.waitFor();
         const [startAt, hideAt] = [await rectOf(c.startButton), await rectOf(c.hideStart)];
         const measured = {};
@@ -1556,6 +1584,7 @@ export async function clockSteps(kit) {
           JSON.stringify(measured),
         );
       }
+      await drawIn(page, '');
       await page.setViewportSize({ width: phone.width, height: phone.height });
       await twoFrames(page);
 
