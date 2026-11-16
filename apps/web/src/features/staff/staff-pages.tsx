@@ -7,7 +7,7 @@
 import { leagueUrl, type AdminArea as Area, type LeagueAddressee } from '@srleagues/core';
 import { EmptyPanel, MessagePage, PageHead } from '@srleagues/ui';
 import type { LeagueView } from '../../server/league-gate.ts';
-import { leagueSites, siteOfLeague } from '../../server/league-site.ts';
+import { leagueSites, siteOf } from '../../server/league-site.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
 import { isReadyArea } from './staff-area.ts';
@@ -37,9 +37,9 @@ const mainActions: readonly (readonly [Area, TextKey])[] = [
 ];
 
 /** The admin's home, for a page that has already checked the admin is open to this person. */
-export function StaffHome({ view }: { readonly view: LeagueView }) {
+export async function StaffHome({ view }: { readonly view: LeagueView }) {
   const league = view.context.league;
-  const site = siteOfLeague(league, leagueSites());
+  const site = await siteOf(league, await leagueSites());
   // The areas with a screen are the cards. The ones with no screen yet are not somewhere
   // to go: they are named quietly together under "Coming", and are no links here (the
   // menu still lists each one, marked "Not ready").
