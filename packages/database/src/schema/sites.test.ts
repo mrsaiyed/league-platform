@@ -362,4 +362,23 @@ describe('migration 0020 runs twice', () => {
     expect(policies.rows.map((r) => r.tablename)).toEqual(['site_releases', 'sites']);
     expect(await problemsOf((await makerShaped(true)).leagueId)).toEqual([]);
   });
+
+  it('writes again the comment of each function it replaces, so none describes 0017’s rules', async () => {
+    const comments = await db.query<{ name: string; comment: string | null }>(
+      `select p.proname as name, obj_description(p.oid, 'pg_proc') as comment
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and p.proname in ('league_rows', 'league_removal_problems', 'remove_draft_league',
+                           'purge_league_history')
+       order by 1`,
+    );
+    expect(comments.rows.map((r) => r.name)).toEqual([
+      'league_removal_problems',
+      'league_rows',
+      'purge_league_history',
+      'remove_draft_league',
+    ]);
+    for (const row of comments.rows) expect(row.comment, row.name).toContain('0020');
+    expect(comments.rows[0]?.comment).toContain('site-changed');
+  });
 });

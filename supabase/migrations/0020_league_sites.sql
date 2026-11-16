@@ -194,6 +194,11 @@ $$;
 
 revoke all on function public.league_rows(uuid) from public;
 
+-- Replacing a function keeps its old comment, so each replaced function's comment is
+-- written again here, saying what it now does (0020).
+comment on function public.league_rows(uuid) is
+  'How many rows each table with a league_id column holds for one league (step 2.150; sites and site_releases since 0020): a written list of the tables, which a test checks against the catalog. Table owner only.';
+
 -- 0017's league_removal_problems, which now lets the tool's first release through -------------
 
 create or replace function public.league_removal_problems(wanted uuid) returns text[]
@@ -312,6 +317,9 @@ $$;
 
 revoke all on function public.league_removal_problems(uuid) from public;
 
+comment on function public.league_removal_problems(uuid) is
+  'Why a league is not exactly what the internal tool makes (step 2.150; since 0020, step 2.187: no site, or the one site and first release the tool gives it, published by its maker and never changed, else site-changed): empty when it may be removed. Reads only. Table owner only.';
+
 -- 0017's remove_draft_league, which now takes the site and its first release with it ----------
 
 create or replace function public.remove_draft_league(
@@ -418,6 +426,9 @@ $$;
 revoke all on function public.remove_draft_league(uuid, text, uuid, integer, timestamptz, text)
   from public;
 
+comment on function public.remove_draft_league(uuid, text, uuid, integer, timestamptz, text) is
+  'Removes a draft league that is exactly what the internal tool makes, with its site and first release when it has them (0020, step 2.187), for the league and staff account this transaction is set to (step 2.150, record 063). Table owner only.';
+
 -- 0010's purge of a league 30 days in the bin, which now takes its site with its history ------
 
 create or replace function public.purge_league_history(purged_league uuid) returns void
@@ -450,6 +461,9 @@ end
 $$;
 
 revoke all on function public.purge_league_history(uuid) from public;
+
+comment on function public.purge_league_history(uuid) is
+  'Removes the history of a league that has been in the bin for 30 days, its site and site releases with it since 0020 (T-51, T-220). Table owner only.';
 
 -- Supabase's API roles get none of it.
 select migration_log.revoke_hosted_api_roles();
