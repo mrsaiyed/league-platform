@@ -663,7 +663,11 @@ function GameItem({
         <div className="ui-notice" data-off-round-date={game.id}>
           <p role="status">
             <strong>
-              {t('schedule.admin.offRoundDate', { round: round.label, date: game.offRoundDate })}
+              {/* The day in words, as everywhere else on this page (step 2.103). */}
+              {t('schedule.admin.offRoundDate', {
+                round: round.label,
+                date: dayText(game.offRoundDate),
+              })}
             </strong>
           </p>
           {basis.canEdit && game.editable ? (
@@ -671,7 +675,7 @@ function GameItem({
               game={game}
               date={game.offRoundDate}
               basis={basis}
-              label={t('schedule.admin.moveToRoundDate', { date: game.offRoundDate })}
+              label={t('schedule.admin.moveToRoundDate', { date: dayText(game.offRoundDate) })}
             />
           ) : null}
         </div>

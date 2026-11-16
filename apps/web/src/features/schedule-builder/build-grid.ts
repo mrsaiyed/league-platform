@@ -3,6 +3,7 @@
 // games are in a clash, and the clashes in words. No page code here, so it is tested
 // without a server.
 import type { Clash, ScheduleDraftView, ScheduleGame, VenueWithCourts } from '@srleagues/core';
+import { leagueDayText } from '../../server/game-when.ts';
 import { locale, t } from '../../server/messages.ts';
 
 export type GridTeam = { readonly id: string; readonly name: string };
@@ -67,19 +68,12 @@ export function parsePlace(value: string): { venueId: string | null; court: stri
   return { venueId: value.slice(0, cut), court: court === '' ? null : court };
 }
 
-const dayFormat = new Intl.DateTimeFormat(locale, {
-  weekday: 'short',
-  month: 'short',
-  day: 'numeric',
-  timeZone: 'UTC',
-});
-
-/** A calendar day in words, "Sun, Nov 29"; a value that is not a day is given back as it is. */
+/**
+ * A calendar day in words, "Sun, Nov 29"; a value that is not a day is given back as it is.
+ * Written by the admin's one helper for a day of the league's calendar (server/game-when.ts).
+ */
 export function dayText(date: string): string {
-  const day = new Date(`${date}T00:00:00.000Z`);
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(day.getTime())
-    ? dayFormat.format(day)
-    : date;
+  return leagueDayText(date, locale);
 }
 
 const clockFormat = new Intl.DateTimeFormat(locale, {

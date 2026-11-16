@@ -1032,7 +1032,8 @@ async function checkTeams(origin) {
     );
     return problems;
   }
-  if (!(await pageOf('owner', page)).includes('Casey Walker, left on 2026-11-13')) {
+  // The day is written in words, as the public pages write a day (step 2.103).
+  if (!(await pageOf('owner', page)).includes('Casey Walker, left on Fri, Nov 13')) {
     problems.push('the roster does not show the player who left');
   }
   // Forged posts change nothing: a league field that is not the page's league is "not

@@ -16,7 +16,8 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { StaffTrail } from '../staff/index.ts';
-import { t, type TextKey } from '../../server/messages.ts';
+import { leagueDayText } from '../../server/game-when.ts';
+import { locale, t, type TextKey } from '../../server/messages.ts';
 import { doneAtOf, entryAnchor, leavingAtOf, problemKey } from './answer.ts';
 import { putBackOffer } from './put-back-offer.ts';
 import { saidOnLine } from './said-on-line.ts';
@@ -257,9 +258,10 @@ export async function TeamPage({
               {left.map((line) => (
                 <li key={line.id} id={entryAnchor(line.id)} data-left-entry={line.id}>
                   <span className="admin-left-line">
+                    {/* The day in words, as the public pages write a day (step 2.103). */}
                     {t('adminTeams.roster.leftLine', {
                       name: nameOf(line),
-                      date: line.leftOn ?? '',
+                      date: leagueDayText(line.leftOn ?? '', locale),
                     })}
                   </span>
                   {saidHere(line.id)}
