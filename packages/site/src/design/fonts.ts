@@ -7,6 +7,14 @@
 //
 // Each face is the variable cut of its family (one file holds every weight), which the
 // packages name with "Variable" after the family's own name.
+//
+// The list of keys itself is the design's written shape's (packages/contracts,
+// site-design.ts), so a stored design can name only a face listed here: every key of it
+// must have a family below, and nothing else may.
+import { designFontKeys, type DesignFontKey } from '@srleagues/contracts';
+
+export type FontKey = DesignFontKey;
+
 export const fontFamilies = {
   gelasio: 'Gelasio Variable',
   cinzel: 'Cinzel Variable',
@@ -16,9 +24,7 @@ export const fontFamilies = {
   'source-sans': 'Source Sans 3 Variable',
   oswald: 'Oswald Variable',
   'noto-naskh-arabic': 'Noto Naskh Arabic Variable',
-} as const;
-
-export type FontKey = keyof typeof fontFamilies;
+} as const satisfies Record<FontKey, string>;
 
 /** What a reader sees until the face has arrived, and where it has no letter for a script. */
 const fallbacks = {
@@ -33,7 +39,7 @@ const fallbacks = {
   'noto-naskh-arabic': "'Noto Sans Arabic', serif",
 } as const satisfies Record<FontKey, string>;
 
-export const fontKeys = Object.keys(fontFamilies) as [FontKey, ...FontKey[]];
+export const fontKeys: readonly [FontKey, ...FontKey[]] = designFontKeys;
 
 export const fontStacks = Object.fromEntries(
   fontKeys.map((key) => [key, `'${fontFamilies[key]}', ${fallbacks[key]}`]),
