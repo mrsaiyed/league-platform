@@ -15,6 +15,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { adminPlaceholder } from './admin-placeholder.mjs';
 import { checkStructure, formatViolation } from './structure/index.mjs';
 import { withLoopback } from './web-listen.mjs';
 
@@ -396,16 +397,19 @@ const cases = [
     '/north-valley/admin/schedule',
     200,
     [adminLink('north-valley', 'schedule'), 'Build the schedule here, round by round.'],
-    ['Nothing here yet.'],
+    [adminPlaceholder],
   ],
   ['scheduler', '/north-valley/admin/teams', 403, [noAccess]],
+  // An area with no screen yet is the placeholder, in the words the checks around this
+  // one look for to prove a real screen has replaced it (scripts/admin-placeholder.mjs).
+  ['owner', '/north-valley/admin/people', 200, [adminPlaceholder, 'Back to the admin']],
   // Admin → Teams (step 2.51): the season's teams and the form to add one.
   [
     'owner',
     '/north-valley/admin/teams',
     200,
     ['Teams of Fall 2026', 'Lions', 'Owls', 'Add a team', 'Short name'],
-    ['Nothing here yet.'],
+    [adminPlaceholder],
   ],
   // Each league's own teams: the youth league's, none of the first league's.
   ['owner', '/harbor-city/admin/teams', 200, ['Comets', 'Add a team'], ['Lions']],
@@ -470,7 +474,7 @@ const cases = [
     '/north-valley/admin',
     200,
     ['Your games', 'Score this game', `href="/north-valley/score/${liveGame}"`],
-    ['Nothing here yet.'],
+    [adminPlaceholder],
   ],
   // A game's page (step 2.45): drawn with how the game stands, its live part ready to
   // follow it; a finished game's result; a game not started; a game that is not this
@@ -521,7 +525,7 @@ const cases = [
     200,
     // The draft league's season is of the program this scheduler holds (step 2.152).
     [adminLink('quiet-pines', 'schedule'), 'Build the schedule here, round by round.'],
-    ['Nothing here yet.'],
+    [adminPlaceholder],
   ],
   [
     'registrar',

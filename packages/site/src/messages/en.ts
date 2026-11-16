@@ -382,7 +382,6 @@ export const en = {
   'admin.area.messages': 'Messages',
   'admin.area.season': 'Season settings',
   'admin.area.settings': 'League settings',
-  'admin.emptyArea': 'Nothing here yet.',
   'admin.viewSite': 'View the site',
   // The admin's own frame and its home (step 2.103).
   'admin.trail': 'You are here',
