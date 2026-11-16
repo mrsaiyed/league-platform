@@ -88,8 +88,12 @@ export async function scoringOffersRequest(
     | { readonly ok: false; readonly refusal: ApiRefusal },
   games: string | null,
 ): Promise<ApiAnswer> {
+  // Every answer is private and never kept. "Not found" is the one exception: it says
+  // exactly what the snapshot's says for a hidden league (no-store), so the two public
+  // reads cannot be told apart.
   if (!resolved.ok) {
-    return resolved.refusal.status === 404 ? notFound : refusalAnswer(resolved.refusal);
+    if (resolved.refusal.status === 404) return notFound;
+    return { ...refusalAnswer(resolved.refusal), headers: privately };
   }
   const { context, ports } = resolved;
   const holder =

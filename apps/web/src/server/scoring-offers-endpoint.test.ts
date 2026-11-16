@@ -5,6 +5,7 @@
 import { leagueApiUrl, scoringOffersLimit } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { offersAskedAtOnce } from '../features/schedule-pages/index.ts';
+import { gameSnapshot } from './game-snapshot-endpoint.ts';
 import { resolveLeagueApi } from './league-api.ts';
 import { notMovedYet } from './not-on-the-database-yet.ts';
 import type { WebPorts } from './ports.ts';
@@ -78,6 +79,29 @@ describe('the scoring read of a public page', () => {
         headers: { 'Cache-Control': 'private, no-store' },
       });
     }
+  });
+
+  it("keeps every answer private, its 'not found' the snapshot's own for a hidden league", async () => {
+    for (const refusal of [
+      { status: 401, error: 'signed-out' },
+      { status: 403, error: 'account-problem' },
+    ] as const) {
+      expect(await scoringOffersRequest({ ok: false, refusal }, firstFive)).toEqual({
+        status: refusal.status,
+        body: { error: refusal.error },
+        headers: { 'Cache-Control': 'private, no-store' },
+      });
+    }
+    // The other public read, the snapshot, as a visitor of the draft league.
+    const world = trackerWorld();
+    const context = await world.contextAs('visitor', 'draft', ['games', gameId(1), 'snapshot']);
+    const snapshot = await gameSnapshot(
+      { context, holder: undefined, carriesSignIn: false },
+      gameId(1),
+      world.tracker,
+    );
+    expect(snapshot.status).toBe(404);
+    expect(await ask('visitor', 'draft')).toEqual(snapshot);
   });
 
   it('answers a hidden league exactly as one that is not there or is in the bin (U-9)', async () => {

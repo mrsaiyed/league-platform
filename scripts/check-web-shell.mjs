@@ -983,6 +983,25 @@ async function scoringSameAsNoLeague(origin) {
       }
     }
   }
+  // And exactly as the other public read, the snapshot, answers a visitor of a hidden league.
+  const snapshot = await fetch(
+    `${origin}/api/v1/leagues/${leagues.draft}/games/${liveGame}/snapshot`,
+    { redirect: 'manual' },
+  );
+  const snapshotAnswer = {
+    status: snapshot.status,
+    headers: [...snapshot.headers]
+      .filter(([header]) => !['date', 'content-length'].includes(header))
+      .map(([header, value]) => `${header}: ${value}`)
+      .join('\n'),
+    body: await snapshot.text(),
+  };
+  const scoringAnswer = await ask('visitor', leagues.draft);
+  if (JSON.stringify(scoringAnswer) !== JSON.stringify(snapshotAnswer)) {
+    found.push(
+      `a visitor's scoring read of a draft differs from its snapshot:\n${JSON.stringify(scoringAnswer)}\n---\n${JSON.stringify(snapshotAnswer)}`,
+    );
+  }
   const owner = await ask('owner', leagues.draft);
   if (owner.status !== 200 || !/private, no-store/.test(owner.headers)) {
     found.push(`the draft league's owner's scoring read is ${owner.status}: ${owner.headers}`);
