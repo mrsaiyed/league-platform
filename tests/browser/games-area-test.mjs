@@ -34,7 +34,10 @@ import {
   launch,
   openStaffMenu,
   startNext,
+  trackedPlayer,
+  trackerTablet,
   waitFor,
+  worldAtNoon,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -74,6 +77,11 @@ if (built) {
   server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
+    // At noon of the league's day (step 2.175): the game under way started half an hour
+    // before the world was made, so between the league's midnight and 00:35 it started
+    // last evening, and once ended it is under "Earlier games" (S-59), not on the first
+    // lists this test reads it on. `--now=<UTC time>` starts it elsewhere.
+    LOCAL_NOW: worldAtNoon(),
   });
   await step('starting the server and the browser', async () => {
     await waitFor(`${origin}/`, server);
@@ -111,35 +119,8 @@ async function settle(page) {
   await page.waitForTimeout(1500);
 }
 
-/**
- * A scorekeeper's tablet scoring the live game through the tracker's own endpoints (step
- * 2.32), as tests/browser and scripts/shots.mjs do: nothing typed in the browser.
- */
-const leagueApi = '/api/v1/leagues/01900000-0000-7000-8000-000000000001';
-const trackedPlayer = (team, n) =>
-  `01900000-0000-7000-8000-${(0x70 + team).toString(16).padStart(4, '0')}${n.toString(16).padStart(8, '0')}`;
-async function tablet(game, token) {
-  const post = async (at, body) => {
-    const answer = await fetch(`${origin}${leagueApi}/games/${game}${at}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: `srl_session=${token}`, origin },
-      body: JSON.stringify(body),
-    });
-    const text = await answer.text();
-    if (!answer.ok) throw new Error(`${at} answered ${answer.status}: ${text.slice(0, 200)}`);
-    return JSON.parse(text);
-  };
-  const { sessionId } = await post('/session', { type: 'open', deviceId: 'games-area-tablet' });
-  return async (...inputs) => {
-    const reply = await post('/commands', {
-      protocolVersion: 1,
-      sessionId,
-      commands: inputs.map((input) => ({ commandId: crypto.randomUUID(), at: Date.now(), input })),
-    });
-    const refused = reply.results.filter((r) => r.status !== 'accepted');
-    if (refused.length > 0) throw new Error(`refused: ${JSON.stringify(refused)}`);
-  };
-}
+/** A scorekeeper's tablet scoring a game through the tracker's own endpoints (the kit's). */
+const tablet = (game, token) => trackerTablet(origin, game, token, 'games-area-tablet');
 
 /** Whether the element is on the screen without scrolling and not under the header. */
 const seenWhole = (locator) =>

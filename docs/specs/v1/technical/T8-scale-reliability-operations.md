@@ -105,6 +105,8 @@ There are three different kinds of "undo", for three different mistakes.
 
 **T-161:** these are checked automatically on every change for a set of sample pages; a change that breaks a budget fails its checks.
 
+**T-275: a page's title and other metadata are never streamed** ([record 071](../../../architecture/decisions/071-page-titles-are-never-streamed.md)): every page sends them in the head of its first bytes, so a page's first byte waits for its metadata. Metadata therefore never reads slow data; a title that needs data reads it through the same cached read the page itself uses.
+
 ## 9. Load testing
 
 - **T-162:** a script generates a made-up league of size B in staging.
