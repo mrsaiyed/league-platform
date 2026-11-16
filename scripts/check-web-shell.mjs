@@ -683,13 +683,23 @@ const cases = [
   ],
   ['otherAdmin', '/still-waters/admin', 200, [adminLink('still-waters', 'settings')]],
   // Step 2.192: the empty league to start from. Its Teams and Schedule open on its one
-  // current season, which holds nothing yet.
-  ['owner', '/still-waters/admin/teams', 200, ['Teams of First Season', 'Add a team']],
+  // current season, which holds nothing yet, and each says what to do first.
+  [
+    'owner',
+    '/still-waters/admin/teams',
+    200,
+    ['Teams of First Season', 'No teams yet.', 'Add a team'],
+  ],
   [
     'owner',
     '/still-waters/admin/schedule',
     200,
-    [adminLink('still-waters', 'schedule'), 'Season: First Season'],
+    [
+      adminLink('still-waters', 'schedule'),
+      'Season: First Season',
+      'This season has no rounds yet.',
+      'Add the first one here, then add its games.',
+    ],
   ],
   ['scheduler', '/still-waters', 404, [notFound]],
   ['registrar', '/closed-gate', 404, [notFound]],
