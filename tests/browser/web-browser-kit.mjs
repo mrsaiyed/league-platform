@@ -200,9 +200,12 @@ export async function waitFor(url, server, firstPages = []) {
           `the server was not ready within 90 seconds: ${address} answered ${last}:\n${server.output()}`,
         );
       try {
+        // Each try has its own limit (10 seconds, never past the 90), so one request that
+        // hangs is given up and tried again and the overall limit always holds.
         const response = await fetch(origin + address, {
           redirect: 'manual',
           headers: cookie ? { cookie } : {},
+          signal: AbortSignal.timeout(Math.max(1, Math.min(10_000, until - Date.now()))),
         });
         await response.text();
         last = String(response.status);
