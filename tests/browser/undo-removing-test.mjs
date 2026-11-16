@@ -366,6 +366,10 @@ if (built) {
     );
     note('said on her row where the phone lands', await onScreen(noNumber));
     note(
+      'and not said a second time at the top',
+      (await page.locator('main [role=status]').count()) === 1,
+    );
+    note(
       'her number field is empty, ready for a new one',
       (await tess.locator('input[name=jerseyNumber]').inputValue()) === '',
     );

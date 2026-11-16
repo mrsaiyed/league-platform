@@ -14,7 +14,8 @@ export type SearchProps = {
 
 /**
  * What went well or why a change was refused, from the address. A refusal said beside
- * the field it is about (`saidBeside`) is not said again here.
+ * the field it is about, or what went well said on its own roster line (`saidBeside`), is
+ * not said again here.
  */
 export function Notice({
   query,
@@ -25,7 +26,8 @@ export function Notice({
 }) {
   const problem = problemKey(query);
   const good = doneKey(query);
-  if (problem !== undefined) return saidBeside ? null : <p role="alert">{t(problem)}</p>;
+  if (saidBeside) return null;
+  if (problem !== undefined) return <p role="alert">{t(problem)}</p>;
   if (good !== undefined) return <p role="status">{t(good)}</p>;
   return null;
 }
