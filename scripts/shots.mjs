@@ -7,13 +7,25 @@
 //   node scripts/shots.mjs --no-build           serves the build that is already here
 //   node scripts/shots.mjs --only=home,admin    only pictures whose name contains one of these
 //   node scripts/shots.mjs --design=pine        the first made-up league under a named design
+//   node scripts/shots.mjs --measure            also measures the contrast of every public page
+//
+// `--measure` sets every piece of text on each public page it pictures against what the
+// text stands on, and every control's edge against what is around it, and writes what it
+// found to `.local/shots/contrast.txt` (`contrast-in-<design>.txt` under a named design):
+// measured in the browser, from the colors as they are drawn (see measureContrast).
+//
+// `--only=states` takes what the pointer and the keyboard do to each kind of link, button,
+// card and picker (`…-states-….jpg`, the pointer over one and the keyboard on another in
+// the same picture), and `--only=header-scrolled` the laptop header while the page is
+// scrolled: both in the first league, and under a named design too.
 //
 // `--design=<name>` proves that every shared piece takes its colors from a league's design
 // (docs/build/DESIGN.md, section 4, line 28). It starts the web app with the first made-up
 // league drawn under that design (the LOCAL_DESIGN setting, which the app refuses outside
 // local work and tests, as it does the stand-in itself) and takes that league's public
 // pages only, named `…-in-<name>.jpg`. The names are the starting designs (crest,
-// crest-light, midnight-gold, clean-court) and the made-up ones kept for pictures (pine:
+// crest-light, midnight-gold, clean-court) and the made-up ones kept for pictures (pine, a
+// green league, and ember, a light one whose main color is a bright orange:
 // apps/web/src/server/stand-in-designs.ts); any other name stops the app as it starts.
 //
 // Each screen is taken whole, at two widths: 390 (a phone) and 1280 (a laptop). The files go
@@ -444,6 +456,283 @@ const longNamePages = [
 // The phone menu, open, at 390 only (`--only=menu`): one picture a league.
 const menuWidth = { name: '390', viewport: { width: 390, height: 844 } };
 
+// What a pointer and a keyboard do to each kind of link, button, card and picker
+// (`--only=states`; step 2.147 part 3). One picture a kind, in the first league, cut to the
+// part of the page that holds it: the pointer is over one of the kind (`hover`) and the
+// keyboard is on another (`focus`), so both states are in one picture. `nth` picks which
+// of the matches. Focus must always be seen (docs/build/DESIGN.md, section 4, line 25).
+const statePages = [
+  {
+    name: 'states-tabs',
+    at: '',
+    part: '.site-header',
+    hover: ['.site-tabs a', 1],
+    focus: ['.site-tabs a', 3],
+  },
+  {
+    name: 'states-header',
+    at: '',
+    part: '.site-header',
+    hover: ['.site-header select', 0],
+    focus: ['.site-header a.site-sign-in', 0],
+  },
+  {
+    name: 'states-hero-buttons',
+    at: '?season=spring-2026',
+    part: '.ui-hero',
+    hover: ['.ui-hero-actions .ui-button', 0],
+    focus: ['.ui-hero-actions .ui-button', 1],
+  },
+  {
+    name: 'states-boards',
+    at: '/schedule',
+    part: '.ui-group[open] .ui-card-grid',
+    hover: ['.ui-group[open] .ui-game-card', 0],
+    focus: ['.ui-group[open] .ui-game-link', 1],
+  },
+  {
+    name: 'states-way-on',
+    at: '',
+    part: '.site-column .ui-section',
+    hover: ['.site-column .ui-more', 0],
+    focus: ['.site-column .ui-game-link', 0],
+  },
+  {
+    name: 'states-way-on-focus',
+    at: '',
+    part: '.site-column .ui-section-head',
+    focus: ['.site-column .ui-more', 0],
+  },
+  {
+    name: 'states-team-cards',
+    at: '/teams',
+    part: 'main',
+    hover: ['.ui-team-card', 0],
+    focus: ['.ui-team-card-name a', 1],
+  },
+  {
+    name: 'states-band-button',
+    at: '/teams',
+    part: '.ui-call-band',
+    focus: ['.ui-call-band .ui-button', 0],
+  },
+  {
+    name: 'states-band-button-hover',
+    at: '/teams',
+    part: '.ui-call-band',
+    hover: ['.ui-call-band .ui-button', 0],
+  },
+  {
+    name: 'states-table',
+    at: '/stats',
+    part: '.stats-tables',
+    hover: ['.ui-stats tbody tr', 2],
+    focus: ['.ui-sort-button', 2],
+  },
+  {
+    name: 'states-pickers',
+    at: '/schedule',
+    part: 'main',
+    viewport: true,
+    hover: ['.ui-toolbar select', 0],
+    focus: ['.ui-toolbar select', 1],
+  },
+  {
+    name: 'states-rounds',
+    at: '/schedule',
+    part: 'main',
+    viewport: true,
+    hover: ['.ui-group > summary', 0],
+    focus: ['.ui-group > summary', 1],
+  },
+  {
+    name: 'states-crumbs',
+    at: '/teams/owls',
+    part: '.ui-crumbs',
+    hover: ['.ui-crumbs a', 0],
+    focus: ['.ui-crumbs a', 1],
+  },
+  {
+    name: 'states-standings-row',
+    at: '/standings',
+    part: '.ui-table-frame',
+    hover: ['.ui-standings tbody tr', 1],
+    focus: ['.ui-note-mark a', 0],
+  },
+  {
+    name: 'states-footer',
+    at: '',
+    part: '.site-footer',
+    hover: ['.site-footer a', 0],
+    focus: ['.site-footer a', 1],
+  },
+];
+const statesWidth = { name: '1280', viewport: { width: 1280, height: 800 } };
+// The phone's own: the menu button with the keyboard on it, and a link of the open menu.
+const phoneStatePages = [
+  {
+    name: 'states-menu-button',
+    at: '',
+    part: '.site-header',
+    focus: ['.site-menu > summary', 0],
+  },
+];
+
+/**
+ * Measured, not judged by eye (`--measure`; DESIGN.md, section 4, line 25): on each public
+ * page as it is pictured, every piece of text that is drawn is set against what it stands
+ * on, and every control's edge or fill against what is around it. Run in the page. A text
+ * needs 4.5 to 1, large text (24 and up, or 18.66 and up in bold) 3 to 1, and a control's
+ * edge or fill 3 to 1 (WCAG 2.1 AA, 1.4.3 and 1.4.11). What a text stands on is every
+ * solid color and every color of a gradient of the boxes it is inside, laid one over
+ * the other, and the worst of them counts. Not seen from here: what a box draws with
+ * `::before` or `::after` (the hero's glow, whose colors the design's own tests measure),
+ * and a picture. What is hidden from screen readers and drawn only as decoration (a team's
+ * letter in its shield, beside its written name) is left out.
+ */
+function measureContrast() {
+  const parse = (value) => {
+    let m = /^rgba?\(([^)]+)\)$/.exec(value.trim());
+    if (m) {
+      const p = m[1]
+        .split(/[,\s/]+/)
+        .filter(Boolean)
+        .map(Number);
+      return [p[0], p[1], p[2], p[3] ?? 1];
+    }
+    m = /^color\(srgb ([^)]+)\)$/.exec(value.trim());
+    if (m) {
+      const p = m[1]
+        .split(/[\s/]+/)
+        .filter(Boolean)
+        .map(Number);
+      return [p[0] * 255, p[1] * 255, p[2] * 255, p[3] ?? 1];
+    }
+    return null;
+  };
+  const over = (top, under) => {
+    const a = top[3];
+    return [0, 1, 2].map((i) => top[i] * a + under[i] * (1 - a)).concat(1);
+  };
+  const luminance = (c) => {
+    const [r, g, b] = [0, 1, 2].map((i) => {
+      const v = c[i] / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => {
+    const [x, y] = [luminance(a), luminance(b)];
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+  const hex = (c) =>
+    `#${[0, 1, 2].map((i) => Math.round(c[i]).toString(16).padStart(2, '0')).join('')}`;
+  const colorsIn = (text) =>
+    [...text.matchAll(/rgba?\([^)]+\)|color\(srgb [^)]+\)/g)]
+      .map((m) => parse(m[0]))
+      .filter(Boolean);
+  /** Every color a box may show behind what is in it, from the page up to the box. */
+  const groundsOf = (element) => {
+    const layers = [];
+    for (let node = element; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      // The box a table scrolls in draws a soft shadow at an edge it is scrolled from, 12
+      // wide, over its panel's color: no text stands on that at rest, so it is not a ground.
+      const image =
+        style.backgroundImage === 'none' || node.classList.contains('ui-table-wrap')
+          ? []
+          : colorsIn(style.backgroundImage);
+      const fill = parse(style.backgroundColor);
+      layers.push({ fill, image });
+      if (fill && fill[3] === 1 && image.every((c) => c[3] === 1)) break;
+    }
+    let grounds = [[255, 255, 255, 1]];
+    for (const layer of layers.reverse()) {
+      if (layer.fill && layer.fill[3] > 0) grounds = grounds.map((g) => over(layer.fill, g));
+      if (layer.image.length > 0) {
+        grounds = layer.image.flatMap((c) => grounds.map((g) => over(c, g)));
+      }
+    }
+    return grounds;
+  };
+  const drawn = (element) => {
+    if (element.closest('[aria-hidden="true"], nextjs-portal')) return false;
+    const box = element.getBoundingClientRect();
+    if (box.width <= 1 || box.height <= 1) return false;
+    for (let node = element; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden') return false;
+      if (Number(style.opacity) === 0 || style.clipPath !== 'none') return false;
+      // Words pushed out of sight and kept for screen readers (a card's whole link).
+      if (parseFloat(style.textIndent) > 100 && style.overflow !== 'visible') return false;
+    }
+    return true;
+  };
+  const nameOf = (element) => {
+    const parts = [];
+    for (let node = element; node && parts.length < 3; node = node.parentElement) {
+      const cls = typeof node.className === 'string' ? node.className.trim().split(/\s+/)[0] : '';
+      parts.unshift(cls ? `${node.tagName.toLowerCase()}.${cls}` : node.tagName.toLowerCase());
+    }
+    return parts.join(' > ');
+  };
+  const short = [];
+  let texts = 0;
+  let controls = 0;
+  let lowest = { ratio: 99, what: '' };
+  for (const element of document.querySelectorAll('body *')) {
+    const words = [...element.childNodes]
+      .filter((node) => node.nodeType === 3)
+      .map((node) => node.textContent.trim())
+      .join(' ')
+      .trim();
+    if (words === '' || !drawn(element)) continue;
+    const style = getComputedStyle(element);
+    const ink = parse(element instanceof SVGElement ? style.fill : style.color);
+    if (!ink) continue;
+    const grounds = groundsOf(element);
+    const worst = Math.min(...grounds.map((g) => ratio(over(ink, g), g)));
+    const size = parseFloat(style.fontSize);
+    const large = size >= 24 || (size >= 18.66 && Number(style.fontWeight) >= 700);
+    const needs = large ? 3 : 4.5;
+    texts += 1;
+    if (worst < lowest.ratio)
+      lowest = { ratio: worst, what: `${nameOf(element)} "${words.slice(0, 24)}"` };
+    if (worst < needs) {
+      const ground = grounds.reduce((a, b) =>
+        ratio(over(ink, a), a) < ratio(over(ink, b), b) ? a : b,
+      );
+      short.push(
+        `text ${worst.toFixed(2)} (needs ${needs}): ${nameOf(element)} "${words.slice(0, 30)}" ${hex(over(ink, ground))} on ${hex(ground)}, ${size}px`,
+      );
+    }
+  }
+  for (const element of document.querySelectorAll(
+    'main select, main input, main button, main a.ui-button, header select, header a.ui-button, header summary',
+  )) {
+    if (!drawn(element)) continue;
+    const style = getComputedStyle(element);
+    const around = element.parentElement ? groundsOf(element.parentElement) : [[255, 255, 255, 1]];
+    const edge = parse(style.borderTopColor);
+    const hasEdge = parseFloat(style.borderTopWidth) > 0 && edge && edge[3] > 0;
+    const fill = parse(style.backgroundColor);
+    const worst = Math.min(
+      ...around.map((g) =>
+        Math.max(
+          hasEdge ? ratio(over(edge, g), g) : 1,
+          fill && fill[3] > 0 ? ratio(over(fill, g), g) : 1,
+        ),
+      ),
+    );
+    // A control that is only its words (a quiet button, a heading that sorts) has no edge
+    // to measure: its words are measured above.
+    if (!hasEdge && !(fill && fill[3] > 0)) continue;
+    controls += 1;
+    if (worst < 3) short.push(`control ${worst.toFixed(2)} (needs 3): ${nameOf(element)}`);
+  }
+  return { texts, controls, lowest: `${lowest.ratio.toFixed(2)} ${lowest.what}`, short };
+}
+
 const flag = (name) => process.argv.includes(name);
 const only = (process.argv.find((arg) => arg.startsWith('--only=')) ?? '')
   .slice('--only='.length)
@@ -779,6 +1068,9 @@ const server = start(dev ? ['dev', '--port', String(port)] : ['start', '--port',
 });
 const taken = [];
 const missed = [];
+// What `--measure` found on each public page: see measureContrast.
+const measuring = flag('--measure');
+const measured = [];
 let browser;
 try {
   await waitFor(`${origin}/`, server);
@@ -825,6 +1117,8 @@ try {
             name: `${league}-${page.name}`,
             context: visitor,
             base: `/${league}`,
+            // A league's public page: its text is measured too, when that is asked for.
+            publicPage: true,
           })),
         ...(design === '' ? adminPages : [])
           // A page of one league's own season (`league`), or one state taken in one league
@@ -921,6 +1215,9 @@ try {
         await page.mouse.move(0, 0);
         const file = path.join(out, width.name, `${fileName(job.name)}.jpg`);
         await page.screenshot({ path: file, fullPage: !job.opens, type: 'jpeg', quality: 80 });
+        if (measuring && job.publicPage) {
+          measured.push({ label, ...(await page.evaluate(measureContrast)) });
+        }
         taken.push(
           `${label}.jpg${(answer?.status() ?? 200) >= 400 ? ` (the page answered ${answer.status()})` : ''}`,
         );
@@ -971,6 +1268,77 @@ try {
       }
       await visitor.close();
     }
+  }
+  // The states of links, buttons, cards and pickers (`--only=states`), and the laptop
+  // header while the page is scrolled (`--only=header-scrolled`): the first league only.
+  for (const [width, pages] of [
+    [statesWidth, statePages],
+    [menuWidth, phoneStatePages],
+  ]) {
+    const jobs = pages
+      .map((job) => ({ ...job, name: `${leagues[0]}-${job.name}` }))
+      .filter((job) => wanted(job.name));
+    const scrolled = `${leagues[0]}-header-scrolled`;
+    const wantsScrolled = width === statesWidth && wanted(scrolled);
+    if (jobs.length === 0 && !wantsScrolled) continue;
+    fs.mkdirSync(path.join(out, width.name), { recursive: true });
+    const visitor = await browser.newContext({ viewport: width.viewport });
+    const quiet = async (page) => {
+      await page.evaluate(() => {
+        const style = document.createElement('style');
+        style.textContent = 'nextjs-portal { display: none !important; }';
+        document.head.append(style);
+        return document.fonts.ready.then(() => undefined);
+      });
+    };
+    for (const job of jobs) {
+      const page = await visitor.newPage();
+      page.setDefaultTimeout(30_000);
+      const label = `${width.name}/${fileName(job.name)}`;
+      try {
+        await page.goto(`${origin}/${leagues[0]}${job.at}`, { waitUntil: 'networkidle' });
+        await quiet(page);
+        const part = page.locator(job.part).first();
+        await part.scrollIntoViewIfNeeded();
+        if (job.focus) {
+          // The keyboard first, so the browser shows focus as it does for a keyboard.
+          await page.keyboard.press('Tab');
+          await page.locator(job.focus[0]).nth(job.focus[1]).focus();
+        }
+        if (job.hover) await page.locator(job.hover[0]).nth(job.hover[1]).hover();
+        await page.waitForTimeout(400);
+        const file = path.join(out, width.name, `${fileName(job.name)}.jpg`);
+        if (job.viewport) await page.screenshot({ path: file, type: 'jpeg', quality: 85 });
+        else await part.screenshot({ path: file, type: 'jpeg', quality: 85 });
+        taken.push(`${label}.jpg`);
+      } catch (error) {
+        missed.push(`${label}: ${String(error.message ?? error).split('\n')[0]}`);
+      } finally {
+        await page.close();
+      }
+    }
+    if (wantsScrolled) {
+      // The home page a screen and a half down: only the menu's row stays on top (line 8).
+      const page = await visitor.newPage();
+      page.setDefaultTimeout(30_000);
+      try {
+        await page.goto(`${origin}/${leagues[0]}`, { waitUntil: 'networkidle' });
+        await quiet(page);
+        await page.mouse.wheel(0, 1200);
+        await page.waitForTimeout(600);
+        await page.screenshot({
+          path: path.join(out, width.name, `${fileName(scrolled)}.jpg`),
+          type: 'jpeg',
+          quality: 80,
+        });
+        taken.push(`${width.name}/${fileName(scrolled)}.jpg`);
+      } catch (error) {
+        missed.push(`${width.name}/${scrolled}: ${String(error.message ?? error).split('\n')[0]}`);
+      } finally {
+        await page.close();
+      }
+    }
+    await visitor.close();
   }
   // Long names (`--only=long-name`), at the two narrowest phones. In the picture only, the
   // league's name in the header is rewritten to a made-up one of 54 letters, and a made-up
@@ -1085,6 +1453,20 @@ try {
 
 console.log(`${taken.length} pictures in ${path.relative(root, out)}:`);
 for (const line of taken) console.log(`  ${line}`);
+if (measuring) {
+  // One line a page, then every text or control that falls short, in a file beside the
+  // pictures: `.local/shots/contrast.txt`, or `contrast-in-<design>.txt` under a named one.
+  const lines = measured.flatMap((page) => [
+    `${page.label}: ${page.texts} texts, ${page.controls} controls, lowest ${page.lowest}, ${page.short.length} short`,
+    ...page.short.map((line) => `    ${line}`),
+  ]);
+  const short = measured.reduce((sum, page) => sum + page.short.length, 0);
+  const file = path.join(out, `${fileName('contrast')}.txt`);
+  fs.writeFileSync(file, `${lines.join('\n')}\n`);
+  console.log(
+    `Contrast measured on ${measured.length} pages: ${short} short of AA. ${path.relative(root, file)}`,
+  );
+}
 if (missed.length) {
   console.log(`${missed.length} not taken:`);
   for (const line of missed) console.log(`  ${line}`);

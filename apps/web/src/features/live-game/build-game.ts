@@ -133,8 +133,8 @@ export function startText(
 /**
  * The line under the page's title. A game under way has none: the time it was set for is
  * not the time it started, which the page does not have, and the board shows its clock.
- * A game with no day yet has none either: the board says "Date to be announced", once.
- * Every other game says when it starts, was played, or was set for (startText).
+ * A game still to come has none either: the board says its day and time, or "Date to be
+ * announced", once. Every other game says when it was played or was set for (startText).
  */
 export function titleLine(
   startsAt: string | null,
@@ -142,8 +142,23 @@ export function titleLine(
   status: string,
 ): string | null {
   if (status === 'live') return null;
-  if (status === 'scheduled' && startsAt === null) return null;
+  // A game still to come says its day once: on the board, between the two teams
+  // (boardWhen), where it is the board's own middle. A line over the board said it twice.
+  if (status === 'scheduled') return null;
   return startText(startsAt, timeZone, status);
+}
+
+/**
+ * The sentence under a forfeited game's score. It names who forfeited: the team given the
+ * loser's score, as the season's rules write a forfeit. With the scores level it cannot
+ * be told, and the sentence only says the game was decided by forfeit.
+ */
+export function forfeitNote(
+  away: { readonly name: string; readonly score: number },
+  home: { readonly name: string; readonly score: number },
+): string {
+  if (away.score === home.score) return t('game.forfeit');
+  return t('game.forfeitBy', { team: away.score < home.score ? away.name : home.name });
 }
 
 /** "Corrected on 14 Nov 2026": the date only, never the reason (S-7); null if never corrected. */

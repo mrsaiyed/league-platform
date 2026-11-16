@@ -8,7 +8,7 @@ import { getConfig } from '../config.ts';
 import { webPorts } from '../container.ts';
 import type { RequestFacts } from '../context.ts';
 import { resolveLeagueRequest, type GateDeps } from '../league-gate.ts';
-import { leagueSites, siteOfLeague, type LeagueSiteSource } from '../league-site.ts';
+import { leagueSites, siteOf, type LeagueSiteLookup } from '../league-site.ts';
 import { thisRequestFacts } from '../this-request.ts';
 
 export type ReturnLeague = {
@@ -26,12 +26,12 @@ export async function returnLeagueFor(
   next: string | null,
   facts: RequestFacts,
   deps: GateDeps,
-  sites: LeagueSiteSource,
+  sites: LeagueSiteLookup,
 ): Promise<ReturnLeague | null> {
   if (next === null) return null;
   const resolved = await resolveLeagueRequest({ ...facts, path: next }, deps);
   if (resolved.kind !== 'league') return null;
-  return { name: siteOfLeague(resolved.context.league, sites).name, href: next };
+  return { name: (await siteOf(resolved.context.league, sites)).name, href: next };
 }
 
 /** The league of `next` for the person of this request. */
@@ -41,6 +41,6 @@ export async function returnLeagueOf(next: string | null): Promise<ReturnLeague 
     next,
     await thisRequestFacts(),
     { ...(await webPorts()), siteOrigin: getConfig().PUBLIC_BASE_URL },
-    leagueSites(),
+    await leagueSites(),
   );
 }

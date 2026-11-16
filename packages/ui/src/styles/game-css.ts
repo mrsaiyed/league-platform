@@ -180,8 +180,20 @@ export const gameCss = String.raw`
 .ui-scoreboard:not([data-pill='quiet']) .ui-game-state,
 .ui-group .ui-group-mark[data-kind='note'] {
   border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
-  background: var(--color-tint);
   color: var(--color-accent-text);
+}
+/* On a card and on the big board the tint is the panel's own color with the tint in it,
+   one solid ground: a see-through tint there lay over the card's own wash, twice the
+   main color the pill's words are fitted to. */
+.ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit'])
+  .ui-game-state,
+.ui-scoreboard:not([data-pill='quiet']) .ui-game-state {
+  background: var(--color-tint-panel);
+}
+/* Beside a round's name the mark stands on the page itself, with nothing washed under it:
+   there the tint is laid over the page, see-through. */
+.ui-group .ui-group-mark[data-kind='note'] {
+  background: var(--color-tint);
 }
 
 /* A game as a scoreboard: an emblem and a name on each side, the score or "VS" large
@@ -255,6 +267,14 @@ export const gameCss = String.raw`
    wider card (a phone of 390, three across on a laptop) holds the date and the pill on
    one line. */
 @container card (max-width: 16.99rem) {
+  .ui-game-card[data-layout='board'] .ui-game-about {
+    flex-basis: 100%;
+  }
+}
+/* And on a phone of any width, where boards stand one under the other: every state's pill
+   has a line of its own there, the long ones ("Awaiting result") and the short alike, so
+   it stands in one place down the whole list. */
+@media (max-width: 47.99rem) {
   .ui-game-card[data-layout='board'] .ui-game-about {
     flex-basis: 100%;
   }
@@ -376,12 +396,23 @@ export const gameCss = String.raw`
   letter-spacing: var(--heading-tracking);
   line-height: 1.2;
   /* A long name wraps under itself between its words, and only there: a word is never
-     split. A word too long even for a line of its own is cut short with "…". */
+     split. A word too long even for a line of its own is cut short with "…": by 'hidden'
+     in every browser we support (Safari 15 does not know 'clip'), and by 'clip', which
+     makes no scrolling box of the name, below where a browser knows it. Either cuts off
+     above and below as well, so the name keeps a little room there for the tails and
+     marks of its letters, taken back outside it: it stands where it stood. */
   overflow-wrap: normal;
   hyphens: manual;
-  overflow-x: clip;
+  overflow: hidden;
+  padding-block: var(--step-1);
+  margin-block: calc(-1 * var(--step-1));
   text-overflow: ellipsis;
   text-wrap: balance;
+}
+@supports (overflow: clip) {
+  .ui-game-card[data-layout='board'] .ui-game-team-name {
+    overflow: clip;
+  }
 }
 /* The winner is said in words (kept for screen readers), by the weight of its name and
    its score, and by a bar under its score: never by color alone. */
@@ -548,6 +579,12 @@ export const gameCss = String.raw`
   .ui-card-grid[data-layout='board'][data-across='pair'] > li:only-child {
     grid-column: 1 / -1;
   }
+  /* An odd list of three or more has no hole at its end either: its first board, the next
+     game to come or the newest result, takes the row, and the rest stand two across. */
+  .ui-card-grid[data-layout='board'][data-across='pair']
+    > li:first-child:nth-last-child(odd):not(:only-child) {
+    grid-column: 1 / -1;
+  }
 }
 /* On a laptop a board left over is not stretched across the page: an odd number of boards
    ends with three in a row, each a third of it (three boards are one row of three, five
@@ -565,6 +602,14 @@ export const gameCss = String.raw`
   }
   .ui-card-grid[data-layout='board'][data-across='two'] > li:only-child {
     grid-column: 1 / -1;
+  }
+}
+/* A board that is a list by itself is never stretched across the page: from a tablet up it
+   is held to about 560 wide, at the start of its row (three rounds of one game each were
+   three boards 1120 wide, mostly empty). */
+@media (min-width: 48rem) {
+  .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair']) > li:only-child {
+    max-inline-size: calc(8 * var(--step-8) + var(--step-7));
   }
 }
 /* The cards of one row share the heights of their three parts (the top line, the middle,
@@ -701,9 +746,18 @@ export const gameCss = String.raw`
   .ui-scoreboard-side:last-child > :is(.ui-scoreboard-role, .ui-scoreboard-name) {
     grid-column: 5;
   }
+  /* Each score has a place of the same width (three figures of the score face), with its
+     figures in the middle of it: so what stands between the two scores (the state's pill)
+     is in the middle of the board whether the scores are "0" and "20" or "58" and "44".
+     The width is reckoned from the size the figures are set in, as a card's is (0.65 of
+     it a figure), not from the width of a drawn "0": the winner's figures are heavier
+     and wider than the other's, and two places of "three figures" each then differed by
+     enough to stand a decided game's pill off the middle. */
   .ui-scoreboard-side > .ui-scoreboard-score {
     grid-row: 1 / span 2;
     align-self: center;
+    min-inline-size: calc(3 * 0.65em);
+    text-align: center;
   }
   .ui-scoreboard-side:first-child > .ui-scoreboard-score {
     grid-column: 2;

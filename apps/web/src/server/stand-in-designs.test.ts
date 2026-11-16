@@ -10,12 +10,13 @@ import {
   derivedColors,
   designToCssVariables,
   headerSurfaces,
+  mixColors,
   parseDesignDocument,
   startingDesignKeys,
   textSurfaces,
 } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
-import { siteOfLeague } from './league-site.ts';
+import { siteOf } from './league-site.ts';
 import {
   madeUpDesign,
   madeUpDesignKeys,
@@ -25,12 +26,15 @@ import {
 import { standInLeagueSites, standInLeagueSitesIn } from './stand-in-league-sites.ts';
 import { standInLeagues } from './stand-in-ports.ts';
 
-const proof = ['crest', 'crest-light', 'pine'] as const;
+// Since step 2.147 part 3 the proof is every design a league can be pictured under: the
+// four starting designs and the two made-up ones (the green `pine`, and `ember`, whose
+// bright orange main color cannot be read as text).
+const proof = picturedDesignKeys;
 
 describe('the designs a made-up league can be pictured under', () => {
   it('are every starting design and the made-up ones, each a whole design', () => {
     expect(picturedDesignKeys).toEqual([...startingDesignKeys, ...madeUpDesignKeys]);
-    expect(madeUpDesignKeys).toEqual(['pine']);
+    expect(madeUpDesignKeys).toEqual(['pine', 'ember']);
     for (const key of picturedDesignKeys) {
       expect(parseDesignDocument(picturedDesign(key)).ok, key).toBe(true);
     }
@@ -46,19 +50,19 @@ describe('the designs a made-up league can be pictured under', () => {
     }
   });
 
-  it('draws the first made-up league under the first starting design, or the one named', () => {
-    expect(siteOfLeague(standInLeagues.live, standInLeagueSites).design).toEqual(
+  it('draws the first made-up league under the first starting design, or the one named', async () => {
+    expect((await siteOf(standInLeagues.live, standInLeagueSites)).design).toEqual(
       picturedDesign('crest'),
     );
     for (const key of picturedDesignKeys) {
       const source = standInLeagueSitesIn(key);
-      expect(siteOfLeague(standInLeagues.live, source).design, key).toEqual(picturedDesign(key));
+      expect((await siteOf(standInLeagues.live, source)).design, key).toEqual(picturedDesign(key));
       // Only the first league: the other keeps its own look, and its name.
-      expect(siteOfLeague(standInLeagues.other, source)).toEqual(
-        siteOfLeague(standInLeagues.other, standInLeagueSites),
+      expect(await siteOf(standInLeagues.other, source)).toEqual(
+        await siteOf(standInLeagues.other, standInLeagueSites),
       );
     }
-    expect(siteOfLeague(standInLeagues.other, standInLeagueSites).design).toEqual(
+    expect((await siteOf(standInLeagues.other, standInLeagueSites)).design).toEqual(
       picturedDesign('clean-court'),
     );
   });
@@ -92,6 +96,17 @@ describe('contrast in the three color sets the pieces are proved in', () => {
         reads(colors.highlight, surface, "the winner's score");
       }
       reads(derived.onHighlight, colors.highlight, 'the Live pill');
+      // A soft pill on a card (Postponed, Forfeit): the accent as text on the panel with
+      // the tint in it, one solid ground, at the share the design's frame gives it.
+      const tinted = /var\(--color-primary\) (\d+)%, var\(--color-panel\)/.exec(
+        designToCssVariables(design)['--color-tint-panel'] ?? '',
+      );
+      expect(tinted, `${key}: a soft pill's ground`).not.toBeNull();
+      reads(
+        derived.accentText,
+        mixColors(colors.panel, colors.primary, Number(tinted?.[1] ?? 0) / 100),
+        'a soft pill',
+      );
       reads(derived.onPrimary, colors.primary, 'the main button');
       for (const surface of Object.values(bandSurfaces(colors, design.base))) {
         reads(derived.onBand, surface, "the hero's title");
@@ -103,9 +118,56 @@ describe('contrast in the three color sets the pieces are proved in', () => {
       for (const surface of headerSurfaces(colors, design.base)) {
         reads(derived.headerMuted, surface, 'the menu');
         reads(derived.headerPop, surface, 'the current page');
+        // The league's name and the words of the header's first row.
+        reads(design.base === 'dark' ? colors.text : derived.onPrimary, surface, 'the name');
+      }
+      // The parts of controls (3 to 1, WCAG 1.4.11): the edge of a field, a picker or an
+      // outlined button is the text color laid on the page or a panel at the strength
+      // the design's frame gives it, and must stand out from what it is drawn on.
+      const strong = /var\(--color-text\) (\d+)%/.exec(
+        designToCssVariables(design)['--color-line-strong'] ?? '',
+      );
+      expect(strong, `${key}: a control's edge`).not.toBeNull();
+      const share = Number(strong?.[1] ?? 0) / 100;
+      for (const surface of [colors.background, colors.panel]) {
+        const edge = mixColors(surface, colors.text, share);
+        expect(contrastRatio(edge, surface), `${key}: a control's edge`).toBeGreaterThanOrEqual(3);
+      }
+      // The same in the header (the menu's button, the season picker) and on a band (the
+      // outlined button): the edge is the color of the words there, laid on as the frame says.
+      const shareOf = (name: string, ink: string) =>
+        Number(
+          new RegExp(`var\\(${ink}\\) (\\d+)%`).exec(designToCssVariables(design)[name] ?? '')?.[1],
+        ) / 100;
+      const headerText = design.base === 'dark' ? colors.text : derived.onPrimary;
+      for (const surface of headerSurfaces(colors, design.base)) {
+        const edge = mixColors(surface, headerText, shareOf('--header-edge', '--header-text'));
+        expect(
+          contrastRatio(edge, surface),
+          `${key}: an edge in the header`,
+        ).toBeGreaterThanOrEqual(3);
+      }
+      for (const surface of Object.values(bandSurfaces(colors, design.base))) {
+        const edge = mixColors(surface, derived.onBand, shareOf('--band-edge', '--color-on-band'));
+        expect(contrastRatio(edge, surface), `${key}: an edge on a band`).toBeGreaterThanOrEqual(3);
       }
     });
   }
+
+  it('gives the eye the highlight where a bright main color cannot be read: the orange league', () => {
+    const design = madeUpDesign('ember');
+    const colors = { ...design.colors, highlight: design.colors.highlight ?? design.colors.accent };
+    const derived = derivedColors(colors, design.base);
+    // The orange reads neither as text on the page nor under white words...
+    expect(contrastRatio(colors.primary, colors.background)).toBeLessThan(3);
+    expect(contrastRatio('#ffffff', colors.primary)).toBeLessThan(3);
+    // ...so the eye lands on the highlight as the league gave it, the bar's words are the
+    // dark text color, and a band is a dark ground the orange itself shines on.
+    expect(derived.pop).toBe(colors.highlight);
+    expect(derived.onPrimary).toBe(colors.text);
+    expect(contrastRatio(derived.band, colors.text)).toBeLessThan(2);
+    expect(derived.bandPop).toBe(colors.primary);
+  });
 
   it('reaches the page as variables, the same for a made-up design as for a starting one', () => {
     for (const key of proof) {

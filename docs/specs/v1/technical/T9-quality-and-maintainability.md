@@ -71,6 +71,7 @@ Technical choices that are not obvious are written as a page each in `docs/archi
 
 - **T-186: the target is the WCAG 2.2 AA standard** for both league sites and the admin.
 - Automatic accessibility checks run inside the browser tests on every major screen.
+- Every page has its title from its first bytes, so a browser or screen reader never meets it untitled (T-275, T8 section 8); the browser tests read the raw HTML for it.
 - Each major screen also gets a manual pass by keyboard and with a screen reader before release.
 - League designs are checked for contrast when saved (T5 section 1).
 - The tracker has large touch targets and does not rely on color alone (bonus and foul trouble are also shown as text).

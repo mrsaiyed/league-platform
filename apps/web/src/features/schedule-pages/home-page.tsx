@@ -4,7 +4,7 @@ import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
-import { siteOfLeague } from '../../server/league-site.ts';
+import { leagueSites, siteOf } from '../../server/league-site.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import {
@@ -47,7 +47,7 @@ export async function HomePage({
 }) {
   const view = await loadLeaguePage(league, 'site');
   const addressee = view.context.league;
-  const name = siteOfLeague(addressee).name;
+  const name = (await siteOf(addressee, await leagueSites())).name;
   const { publicStats, publicSchedule } = await webPorts();
   const seasons = await seasonsOfLeague(addressee.id);
   const asked = firstValue(search['season']);

@@ -51,7 +51,14 @@ if (built) {
   let browser;
   let at = 'starting';
   try {
-    await waitFor(`${origin}/`, server);
+    // The pages its first taps reach, as the made-up owner: the admin's home, Schedule and
+    // the hidden season's schedule, each drawn once before the browser starts.
+    const owner = 'srl_session=local-owner-token';
+    await waitFor(`${origin}/`, server, [
+      { address: '/north-valley/admin', cookie: owner },
+      { address: '/north-valley/admin/schedule', cookie: owner },
+      { address: '/north-valley/admin/schedule?season=winter-2027', cookie: owner },
+    ]);
     browser = await launch();
     const signedIn = async (token) => {
       const context = await browser.newContext({ javaScriptEnabled: false, viewport: screen });

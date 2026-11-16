@@ -2,7 +2,8 @@
 // league's own clock, a season's published schedule by round, and one game's place on
 // it, read through packages/database as the stand-in reads its one world
 // (stand-in-public-schedule.ts). Each read is one transaction set to the league it is
-// for: the league id comes from the page's own league, never from the request (T-28).
+// for: the league id comes from the page's own league, never from the request (T-28),
+// and, as a page's read, one snapshot that writes nothing (record 070).
 //
 // packages/database is handed in, not imported: Node.js loads it when the app starts
 // (container.ts), so Next.js never bundles it.
@@ -24,7 +25,7 @@ export function databasePublicSchedule(
   now: () => Date,
 ): PublicSchedulePorts {
   const inLeague = <T>(leagueId: string, work: (scope: LeagueScope) => Promise<T>): Promise<T> =>
-    database.withTransaction(db, { leagueId }, work);
+    database.withTransaction(db, { leagueId }, work, { snapshot: 'page' });
   return {
     clockOf: async (leagueId) => {
       // A league that cannot be read keeps UTC, as on the stand-in.

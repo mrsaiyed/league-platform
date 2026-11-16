@@ -28,6 +28,7 @@ import {
   loadTeamStats,
 } from './build-team.ts';
 import { chooseMyTeam, leagueHomeStayUrl, teamIdsFromGrants } from './start-page.ts';
+import { resultsBesideRoster, RosterSections, TeamStatsSection } from './team-page.tsx';
 import { TeamCards } from './teams-page.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -121,6 +122,26 @@ describe('the team cards', () => {
     expect(text).not.toMatch(/<h[3-6]/);
   });
 
+  it('group the cards under each division’s small label, as the standings are, only where there are divisions', () => {
+    const text = html([card('owls', 'East'), card('herons', 'East'), card('otters', 'West')]);
+    // One list for each division, named by its label; the cards stand upright from a tablet up.
+    expect(text.match(/<ul class="ui-card-grid" data-layout="teams"/g)).toHaveLength(2);
+    expect(text).toContain('<p class="ui-eyebrow" id="teams-division-1" dir="auto">East</p>');
+    expect(text).toContain('aria-labelledby="teams-division-2"');
+    expect(text.indexOf('/x/teams/herons')).toBeLessThan(text.indexOf('>West</p>'));
+    expect(text.indexOf('>West</p>')).toBeLessThan(text.indexOf('/x/teams/otters'));
+    // Every card says what it leads to at its foot.
+    expect(
+      text.match(/<span class="ui-team-card-way" aria-hidden="true">Roster<\/span>/g),
+    ).toHaveLength(3);
+    // A league with no divisions is one list with no label.
+    const plain = html([card('comets', null), card('rockets', null)]);
+    expect(
+      plain.match(/<ul class="ui-card-grid" data-layout="teams" aria-label="Teams">/g),
+    ).toHaveLength(1);
+    expect(plain).not.toContain('ui-eyebrow');
+  });
+
   it("a team's page puts its games before its roster, in the page and on the screen", () => {
     const page = readFileSync(new URL('./team-page.tsx', import.meta.url), 'utf8');
     expect(page.indexOf('className="team-games"')).toBeGreaterThan(-1);
@@ -161,10 +182,9 @@ describe('a team page', () => {
     // Beat the Herons and the Badgers, lost to the Owls: its three results.
     expect(head?.recordText).toBe('2-1');
     const roster = buildRoster(
-      await teams.rosterOf(adult, head?.teamId ?? '', {
-        viewer: publicViewer(adult),
-        policy: (await stats.settingsOf(adult)).namePolicy,
-      }),
+      await stats.statisticsOf(adult, ({ rosterOf }) =>
+        rosterOf(head?.teamId ?? '', publicViewer(adult)),
+      ),
     );
     expect(roster.current.map((r) => r.name)).toContain('Dana Whitfield');
     // A person who asked to be taken off the public pages is a nameless entry (R-17).
@@ -177,9 +197,15 @@ describe('a team page', () => {
   it('shows a youth team by number only where the league hides names (R-24)', async () => {
     const s = await season(youth);
     const head = await loadTeamHead(stats.readStoreOf(youth), youth, s.id, 'rockets');
+    // The youth league's own setting says hidden: the roster reads it itself.
     const policy = { ...(await stats.settingsOf(youth)).namePolicy, names: 'hidden' as const };
+    const hiding = standInPublicStats(world, async (leagueId) =>
+      leagueId === youth ? policy : startingNamePolicy(leagueId),
+    );
     const roster = buildRoster(
-      await teams.rosterOf(youth, head?.teamId ?? '', { viewer: publicViewer(youth), policy }),
+      await hiding.statisticsOf(youth, ({ rosterOf }) =>
+        rosterOf(head?.teamId ?? '', publicViewer(youth)),
+      ),
     );
     // The players by number; since step 2.162 hidden is followed for adults too (R-29), so
     // their coach, a grown-up with no number, is a nameless entry.
@@ -218,6 +244,26 @@ describe('a team page', () => {
       // No name and no number cannot be added at the table; were it there, it is nameless.
       ['', 'Name not shown'],
     ]);
+    // Each row's key is its place in the page's roster, never the roster place's id.
+    expect(roster.current.map((r) => r.key)).toEqual(['roster-0', 'roster-1', 'roster-2']);
+  });
+
+  it('draws a dash with its word, the shared piece, for someone on the roster with no number', () => {
+    const text = renderToStaticMarkup(
+      createElement(RosterSections, {
+        roster: {
+          current: [
+            { key: 'a', number: '12', name: 'Dana', role: 'Player', former: false },
+            { key: 'b', number: '', name: 'Sam', role: 'Coach', former: false },
+          ],
+          former: [],
+        },
+      }),
+    );
+    expect(text).toContain('<td class="ui-num">12</td>');
+    expect(text).toContain(
+      '<td class="ui-num"><span class="ui-no-value" aria-hidden="true">–</span><span class="ui-visually-hidden">No number</span></td>',
+    );
   });
 
   it('is not there for a team of another season', async () => {
@@ -243,6 +289,8 @@ describe('a team page', () => {
     expect(hidden?.totalsColumns[0]?.label).toBe('Team');
     expect(hidden?.totalsRows[0]?.cells['team']).toBe('Owls');
     expect(hidden?.totalsRows[0]?.chips?.['team']).toBe(owls?.team.color);
+    // An opaque key, not the team's database id.
+    expect(hidden?.totalsRows[0]?.id).toBe('team-totals');
     expect(owls?.team.color).toMatch(/^#[0-9a-f]{6}$/i);
     expect(JSON.stringify(hidden)).not.toContain('Castellanos');
     const falcons = await loadTeamHead(store, adult, s.id, 'falcons');
@@ -254,6 +302,115 @@ describe('a team page', () => {
     expect(shown?.playerRows.map((r) => r.cells['player'])).toEqual(
       expect.arrayContaining(['Dana Whitfield', 'Marcus Oyelaran']),
     );
+    // On the page a few totals are a strip of big numbers under "Team totals", not a table
+    // of one row; a team whose players are hidden says so under the strip, and names none.
+    if (hidden === undefined || shown === undefined) throw new Error('no statistics');
+    const hiddenText = renderToStaticMarkup(createElement(TeamStatsSection, { stats: hidden }));
+    expect(hiddenText).toContain('<p class="ui-eyebrow">Team totals</p>');
+    expect(hiddenText).toMatch(/<dt>Points<\/dt><dd>155<\/dd>/);
+    expect(hiddenText).toContain('Only this team&#x27;s totals are shown');
+    expect(hiddenText).not.toContain('<table');
+    expect(hiddenText).not.toContain('Castellanos');
+    // Where the players are shown, their table stands beside the strip and opens sorted by
+    // points, biggest first.
+    const shownText = renderToStaticMarkup(createElement(TeamStatsSection, { stats: shown }));
+    expect(shownText).toContain('<div class="team-stats" data-layout="pair">');
+    expect(shownText).toContain('Team totals');
+    expect(shownText.match(/aria-sort="descending"/g)).toHaveLength(1);
+    expect(shownText.indexOf('Dana Whitfield')).toBeLessThan(shownText.indexOf('Marcus Oyelaran'));
+    expect(shownText).not.toContain('Only this team');
+    // Many statistics are the same strip, wrapping onto a second line: never a table of one
+    // row across the page, at any count (the code review of step 2.147 part 3).
+    const withTotals = (base: typeof hidden, keys: string) => {
+      const many = [...keys].map((key) => ({ key, label: key, numeric: true }));
+      return {
+        ...base,
+        totalsColumns: [{ key: 'team', label: 'Team' }, ...many],
+        totalsRows: [
+          {
+            id: 't',
+            cells: { team: 'Owls', ...Object.fromEntries(many.map((c) => [c.key, '1'])) },
+          },
+        ],
+      };
+    };
+    const wide = renderToStaticMarkup(
+      createElement(TeamStatsSection, { stats: withTotals(hidden, 'abcde') }),
+    );
+    expect(wide).not.toContain('<table');
+    expect(wide).toContain('<p class="ui-eyebrow">Team totals</p>');
+    expect(wide).toContain('<dl class="ui-stat-strip" data-wrap="true"');
+    expect(wide.match(/<dt>/g)).toHaveLength(5);
+    expect(wide).toContain('Only this team');
+  });
+
+  it('draws seven totals as one strip on two lines, over the players at the page’s width', async () => {
+    const s = await season(adult);
+    const store = stats.readStoreOf(adult);
+    const settings = await stats.settingsOf(adult);
+    const falcons = await loadTeamHead(store, adult, s.id, 'falcons');
+    const shown = await loadTeamStats(store, settings, {
+      leagueId: adult,
+      seasonId: s.id,
+      teamId: falcons?.teamId ?? '',
+    });
+    if (shown === undefined) throw new Error('no statistics');
+    const seven = [...'abcdefg'].map((key) => ({ key, label: key, numeric: true }));
+    const text = renderToStaticMarkup(
+      createElement(TeamStatsSection, {
+        stats: {
+          ...shown,
+          totalsColumns: [{ key: 'team', label: 'Team' }, ...seven],
+          totalsRows: [
+            {
+              id: 't',
+              cells: {
+                team: 'Falcons',
+                ...Object.fromEntries(seven.map((c, n) => [c.key, String(n + 1)])),
+              },
+            },
+          ],
+        },
+      }),
+    );
+    // Four and three on a phone and on a laptop: one strip, every number in it.
+    expect(text).toContain(
+      '<dl class="ui-stat-strip" data-wrap="true" style="--ui-stat-across:4;--ui-stat-across-wide:4">',
+    );
+    expect(text.match(/<dt>/g)).toHaveLength(7);
+    expect(text).toMatch(/<dt>g<\/dt><dd>7<\/dd>/);
+    // The only table left is the players', which has more than one row; with so many
+    // statistics it stands under the strip, each at the page's width.
+    expect(text.match(/<table/g)).toHaveLength(1);
+    expect(text).toContain('<div class="team-stats" data-layout="stack">');
+    expect(text.indexOf('ui-stat-strip')).toBeLessThan(text.indexOf('<table'));
+    expect(text).not.toContain('Only this team');
+    // A team with nothing recorded says so in a calm panel, and draws no row of dashes,
+    // whether or not its players' numbers are public.
+    for (const playerLinesShown of [true, false]) {
+      const none = renderToStaticMarkup(
+        createElement(TeamStatsSection, {
+          stats: {
+            ...shown,
+            playerLinesShown,
+            playerRows: [],
+            hasNumbers: false,
+            totalsRows: [{ id: 't', cells: { team: 'Falcons', a: null } }],
+          },
+        }),
+      );
+      expect(none).toContain('No statistics have been recorded for this team yet.');
+      expect(none).not.toContain('<table');
+    }
+  });
+
+  it('puts the results beside a long roster, and at the page’s width beside a short one', () => {
+    // Two roster lines beside two games to come: the results take the width under both.
+    expect(resultsBesideRoster({ upcoming: 2, rosterLines: 2 })).toBe(false);
+    expect(resultsBesideRoster({ upcoming: 0, rosterLines: 9 })).toBe(false);
+    // Twelve players beside one row of games: the results fill the games' column.
+    expect(resultsBesideRoster({ upcoming: 2, rosterLines: 12 })).toBe(true);
+    expect(resultsBesideRoster({ upcoming: 6, rosterLines: 12 })).toBe(false);
   });
 
   it('splits one teams games into the ones to play and the results', async () => {
