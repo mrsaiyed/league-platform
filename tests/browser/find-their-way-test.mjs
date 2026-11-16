@@ -25,6 +25,7 @@ import {
   buildNext,
   freePort,
   launch,
+  openStaffMenu,
   startNext,
   waitFor,
 } from './web-browser-kit.mjs';
@@ -187,8 +188,14 @@ async function tallEnough(page, within, label) {
   );
   note(`everything tapped is at least 44 high: ${label}`, short.length === 0, short.join(', '));
 }
-/** The phone menu's button, which also holds the account button's entries (one tap). */
-const openMenu = (page) => page.locator('.site-header .site-menu > summary').click();
+/**
+ * The phone menu's button, which also holds the account button's entries (one tap): the
+ * league's own on a public page, the admin's own inside the admin (step 2.103).
+ */
+const openMenu = async (page) => {
+  if ((await page.locator('.staff-bar').count()) > 0) return openStaffMenu(page);
+  return page.locator('.site-header .site-menu > summary').click();
+};
 /**
  * The account button on the scoring page: the tracker has a frame of its own, with no
  * league header (step 2.35; DESIGN.md section 7, line 11), and the button is in its first
@@ -321,9 +328,12 @@ if (browser) {
         note('two taps from the league home to the admin', true);
         await accessible(page, 'the admin home, signed in');
         await noSidewaysScroll(page, 'the admin home');
+        // "View the site" is apart at the foot of the admin's own menu (step 2.103).
+        await openMenu(page);
+        await tallEnough(page, '.staff-bar .staff-menu-panel', "the admin's menu on a phone");
         await Promise.all([
           page.waitForURL((url) => url.pathname === '/north-valley'),
-          link(page, 'View the site').click(),
+          page.locator('.staff-bar').getByRole('link', { name: 'View the site' }).click(),
         ]);
         await openMenu(page);
         await Promise.all([
@@ -496,12 +506,58 @@ if (browser) {
       await openMenu(page);
       await link(page, 'Sign in or create an account').click();
       await signIn(page, people.scheduler);
+      // The refusal's screen brings the admin's stylesheet with it (step 2.103), and
+      // Next.js sends that screen inside every page: a public page must not load it.
+      const staffRules = () =>
+        page.evaluate(() =>
+          [...document.styleSheets].some((sheet) => {
+            try {
+              return [...sheet.cssRules].some((rule) => rule.cssText.includes('.staff-bar'));
+            } catch {
+              return false;
+            }
+          }),
+        );
+      note('a public page loads none of the admin’s styles', !(await staffRules()));
       // The one address typed after the first: a refusal is only met at an address (U-6).
       await page.goto(`${origin}/north-valley/admin/people`);
       await page.getByRole('heading', { level: 1, name: 'You do not have access' }).waitFor();
       note(
         'the refusal says which account is signed in',
         (await page.getByText('You are signed in as scheduler@example.test.').count()) === 1,
+      );
+      // Step 2.103: the scheduler has part of this admin, so the refusal is drawn inside
+      // the admin's own frame (its row on top, its menu with their areas), in the
+      // league's workspace, and leads back to the admin's home.
+      const bar = page.locator('.staff-bar');
+      const barLook = await bar.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return { position: style.position, ground: style.backgroundColor };
+      });
+      note(
+        'a refusal inside an admin that is open to the person keeps the admin’s frame',
+        (await bar.isVisible()) &&
+          (await staffRules()) &&
+          barLook.position === 'sticky' &&
+          barLook.ground !== 'rgba(0, 0, 0, 0)',
+        JSON.stringify(barLook),
+      );
+      await openStaffMenu(page);
+      const areas = page.locator('.staff-menu-panel').getByRole('navigation', {
+        name: 'Admin areas',
+      });
+      note(
+        'the frame of the refusal lists the person’s own areas, and not the one refused',
+        (await areas.locator('a[href="/north-valley/admin/schedule"]').count()) === 1 &&
+          (await areas.locator('a[href="/north-valley/admin/people"]').count()) === 0,
+      );
+      await page.locator('.staff-bar .staff-menu > summary').click();
+      note(
+        'the refusal’s one clear way on is back to the admin',
+        (await page
+          .locator('main')
+          .getByRole('link', { name: 'Back to the admin' })
+          .getAttribute('href')) === '/north-valley/admin',
       );
       await accessible(page, 'no access, signed in');
       await noSidewaysScroll(page, 'no access, signed in');

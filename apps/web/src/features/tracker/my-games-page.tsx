@@ -67,7 +67,7 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
     );
   };
   return (
-    <main className="ui-stack">
+    <main className="admin-my-games ui-stack">
       <PageHead title={t('admin.myGames.title')} sub={t('admin.myGames.intro')} />
       {stopped !== null ? (
         <p className="ui-notice" role="status">
@@ -86,8 +86,9 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
         <ul className="ui-card-grid" data-my-games="">
           {games.map((game) => (
             <li key={game.id} data-game={game.id} data-today={game.isToday ? '' : undefined}>
-              <div className="ui-stack">
+              <div className="admin-game-panel admin-my-game">
                 <GameCard
+                  marks="emblem"
                   home={{ name: names[game.homeTeamId] ?? '', score: game.homeScore }}
                   away={{ name: names[game.awayTeamId] ?? '', score: game.awayScore }}
                   status={statusOf(game.status)}
@@ -116,7 +117,7 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
           ))}
         </ul>
       )}
-      <p data-shared-device="">
+      <p className="admin-my-games-foot" data-shared-device="">
         {t('tracker.sharedDevice.text')}{' '}
         <a href={platformUrl('account')}>{t('tracker.sharedDevice.link')}</a>
       </p>

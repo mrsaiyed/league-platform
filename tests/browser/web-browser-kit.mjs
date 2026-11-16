@@ -228,6 +228,32 @@ export async function buildNext() {
 }
 
 /**
+ * The admin's own menu (step 2.103): at the side on a laptop, behind one menu button on a
+ * phone. Opens it when its button is on the screen and the menu is shut, as a person would
+ * before tapping one of the admin's areas, "View the site" or "Sign out".
+ */
+export async function openStaffMenu(page) {
+  const menu = page.locator('.staff-bar .staff-menu');
+  const button = menu.locator('> summary');
+  if (!(await button.isVisible())) return;
+  if ((await menu.getAttribute('open')) === null) await button.click();
+}
+
+/**
+ * The box score grid on a phone shows one team at a time (step 2.103). Picks the team a
+ * box of the grid belongs to, as a person would before typing in it; nothing to do where
+ * both teams are on the screen (a laptop).
+ */
+export async function showSheetTeamOf(page, box) {
+  const team = await box.evaluate(
+    (el) => el.closest('[data-sheet-team]')?.getAttribute('data-sheet-team') ?? null,
+  );
+  const tabs = page.locator('.admin-sheet-tabs');
+  if (team === null || (await tabs.count()) === 0 || !(await tabs.isVisible())) return;
+  await tabs.locator('label').nth(Number(team)).click();
+}
+
+/**
  * What is wrong with the title in a page's raw HTML, as it arrived, before any script
  * runs: '' when the head holds a title with words in it (step 2.175). A title that comes
  * later, at the end of the body, is not one a person meets when the page is drawn.

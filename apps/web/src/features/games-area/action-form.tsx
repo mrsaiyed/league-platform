@@ -23,6 +23,7 @@ export function ActionForm({
   choice,
   button,
   refusal,
+  kind,
 }: {
   readonly action: (state: FormState, form: FormData) => Promise<FormState>;
   /** Where the browser lands with scripts off: the thing's place on the screen. */
@@ -33,6 +34,8 @@ export function ActionForm({
   readonly button: string;
   /** A refusal's sentence, naming the game, with {problem} for why. */
   readonly refusal: string;
+  /** A button that takes something away (calling a game off) is drawn as one. */
+  readonly kind?: 'danger';
 }) {
   const [state, dispatch, pending] = useActionState(action, untouched, permalink);
   const onSubmit = useOneSubmit(pending, state);
@@ -40,12 +43,12 @@ export function ActionForm({
   const refused = state.kind === 'refused' ? state : undefined;
   const describedBy = refused === undefined ? {} : { 'aria-describedby': problemId };
   return (
-    <form action={dispatch} onSubmit={onSubmit}>
+    <form action={dispatch} onSubmit={onSubmit} className="admin-action">
       {Object.entries(hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
       {choice === undefined ? null : (
-        <label>
+        <label className="staff-field">
           <span>{choice.label}</span>
           <select
             // React takes a select's defaultValue only as it is first drawn: drawn afresh
@@ -66,7 +69,7 @@ export function ActionForm({
           </select>
         </label>
       )}
-      <button type="submit" {...describedBy}>
+      <button type="submit" className="ui-button" data-kind={kind} {...describedBy}>
         {button}
       </button>
       {refused === undefined ? null : (

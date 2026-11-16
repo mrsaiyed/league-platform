@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { gameWhenText } from './game-when.ts';
+import { gameWhenText, leagueDayText } from './game-when.ts';
+
+describe('leagueDayText', () => {
+  it('writes a day of the league’s calendar as the public pages write a day', () => {
+    expect(leagueDayText('2026-10-02', 'en')).toBe('Fri, Oct 2');
+    expect(leagueDayText('2027-01-24', 'en')).toBe('Sun, Jan 24');
+    // The first and the last day of a year stay themselves: no zone moves a calendar day.
+    expect(leagueDayText('2027-01-01', 'en')).toBe('Fri, Jan 1');
+    expect(leagueDayText('2026-12-31', 'en')).toBe('Thu, Dec 31');
+  });
+
+  it('gives back a value that is not a day as it is', () => {
+    expect(leagueDayText('', 'en')).toBe('');
+    expect(leagueDayText('soon', 'en')).toBe('soon');
+    expect(leagueDayText('2026-13-40', 'en')).toBe('2026-13-40');
+  });
+});
 
 describe('gameWhenText', () => {
   const chicago = { locale: 'en', timeZone: 'America/Chicago' };

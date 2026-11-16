@@ -16,6 +16,7 @@ import {
   buildNext,
   freePort,
   launch,
+  openStaffMenu,
   startNext,
   trackedPlayer,
   trackerTablet,
@@ -95,6 +96,8 @@ if (browser) {
     try {
       // From the scorekeeper's home to Games, by tapping the admin's own "Games".
       await page.goto(`${origin}/north-valley/admin`);
+      // On a phone the admin's areas are behind its menu button (step 2.103).
+      await openStaffMenu(page);
       await Promise.all([
         page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
         page

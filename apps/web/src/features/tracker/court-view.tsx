@@ -5,14 +5,39 @@
 // scoring-view.ts; every word from the message files (T-187); every color from the
 // `--court-…` values of court.css, never from a league's design (record 064).
 //
+// Step 2.36 drew the clock in the places left for it (clock-parts.tsx): the clock itself
+// is the button that sets it and picks the period, Start or Pause and the way to the
+// timeouts are in the row under the scoreboard, team fouls and the bonus are in each
+// team's box of the scoreboard, and the pad at rest begins with the large Start clock
+// button.
+//
 // The places left for the steps that follow (their content is handed in as `slots`):
-// the clock controls and Undo (2.36, 2.37), the play log (2.37), the pad at rest (2.36's
-// Start clock; on a phone 2.37's latest plays), each team's fouls and timeouts (2.36),
-// the Players panel's buttons (2.118) and the once-a-game buttons behind More (2.37,
-// 2.118, 2.119).
+// Undo and Redo beside the clock's controls (2.37), the play log (2.37), the pad at rest
+// (on a phone 2.37's latest plays), the Players panel's buttons (2.118) and the
+// once-a-game buttons behind More (2.37, 2.118, 2.119).
 import type { Translate } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
-import { memo, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from 'react';
+import {
+  Fragment,
+  memo,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+  type Ref,
+} from 'react';
+import {
+  ClockButton,
+  ClockControls,
+  ClockSheetView,
+  StartBar,
+  TeamFouls,
+  TimeoutsChip,
+  TimeoutsPad,
+  teamBoardLabel,
+  type ClockHandlers,
+  type ClockSheet,
+  type CourtClock,
+} from './clock-parts.tsx';
 import { playerLabel, playerShortLabel } from './engine-words.ts';
 import type { PadAction, PadMode } from './scoring-moves.ts';
 import {
@@ -25,13 +50,13 @@ import {
 
 /** What the later steps draw in the places this frame leaves for them. */
 export type CourtSlots = {
-  /** Start and Pause, the period picker (2.36); Undo and Redo (2.37). */
+  /** After Start or Pause and the timeouts: Undo and Redo (2.37). */
   readonly controls?: ReactNode;
   /** The play log, where it has a panel of its own: a tablet (2.37). */
   readonly playLog?: ReactNode;
-  /** The pad while nobody is picked: the Start clock button (2.36), the latest plays (2.37). */
+  /** The pad while nobody is picked, under the Start clock button: the latest plays (2.37). */
   readonly padRest?: ReactNode;
-  /** Beside a team's name: its team fouls, the bonus badge and the timeouts chip (2.36). */
+  /** Beside a team's name, before its own chips. */
   readonly teamHead?: (side: Side) => ReactNode;
   /** In place of the floor of a team with no players: "Add players" (2.118). */
   readonly noPlayers?: (side: Side) => ReactNode;
@@ -43,11 +68,16 @@ export type CourtSlots = {
 
 export type CourtBanner = {
   readonly text: string;
+  /**
+   * The same said shorter, a line for each thing it says: what a phone short of room
+   * shows in place of `text` (the stylesheet picks which).
+   */
+  readonly short: readonly string[];
   /** `saved`: nothing waits; `waiting`: plays wait to be sent; `trouble`: not saved or not kept. */
   readonly state: 'saved' | 'waiting' | 'trouble';
 };
 
-export type CourtHandlers = {
+export type CourtHandlers = ClockHandlers & {
   readonly tile: (playerId: string, event: MouseEvent<HTMLButtonElement>) => void;
   readonly startShortHanded: (side: Side) => void;
   readonly action: (
@@ -82,8 +112,10 @@ export type CourtViewProps = {
   readonly title: string;
   /** The game's day and time, or null when it has none. */
   readonly when: string | null;
-  /** The game clock as it reads now, "7:58". */
-  readonly clock: ReactNode;
+  /** The game clock as it reads now, and whether Start is offered in the pad. */
+  readonly clock: CourtClock;
+  /** The form that sets the clock and picks the period, while it is open; null otherwise. */
+  readonly clockSheet?: ClockSheet | null;
   readonly banner: CourtBanner;
   /** What the tracker has to tell about holding the game; nothing most of the time. */
   readonly notices?: ReactNode;
@@ -168,10 +200,13 @@ export function CourtView(props: CourtViewProps) {
         </div>
         <div className="court-board" role="group" aria-label={t('tracker.court.scoreboard')}>
           <Score t={t} team={view.teams.home} />
-          <div className="court-clock" data-clock="">
-            <span className="court-clock-time">{props.clock}</span>
-            <span className="court-clock-period">{periodLabel(view, t)}</span>
-          </div>
+          <ClockButton
+            t={t}
+            view={view}
+            clock={props.clock}
+            open={props.clockSheet !== undefined && props.clockSheet !== null}
+            on={on}
+          />
           <Score t={t} team={view.teams.away} />
         </div>
         <p
@@ -181,7 +216,7 @@ export function CourtView(props: CourtViewProps) {
           data-saved-banner=""
           data-state={props.banner.state}
         >
-          {props.banner.text}
+          <SavedWords t={t} banner={props.banner} />
         </p>
         {props.notices === undefined || props.notices === null ? null : (
           <div className="court-notices">{props.notices}</div>
@@ -189,10 +224,18 @@ export function CourtView(props: CourtViewProps) {
       </header>
 
       <section
-        className="court-controls court-slot"
+        className="court-controls"
         data-slot="clock-controls"
         aria-label={t('tracker.court.controls')}
       >
+        <ClockControls
+          t={t}
+          view={view}
+          clock={props.clock}
+          timeoutsOpen={pad.kind === 'timeouts'}
+          padId={padId}
+          on={on}
+        />
         {slots.controls}
       </section>
 
@@ -213,17 +256,37 @@ export function CourtView(props: CourtViewProps) {
       <Pad {...props} />
 
       {props.moreOpen ? <More {...props} /> : null}
+      {props.clockSheet === undefined || props.clockSheet === null ? null : (
+        <ClockSheetView t={t} view={view} clock={props.clock} sheet={props.clockSheet} on={on} />
+      )}
       {props.children}
     </main>
   );
 }
 
-const periodLabel = (view: ScoringView, t: Translate): string =>
-  view.period > view.periods
-    ? t('tracker.period.overtime', { number: view.period - view.periods })
-    : t(view.periods === 2 ? 'tracker.period.half' : 'tracker.period.quarter', {
-        number: view.period,
-      });
+/**
+ * What the saved banner says. Where its short form says the same ("All saved") there is
+ * one form; otherwise both are drawn and the stylesheet shows one: the long one, or, on a
+ * phone whose scoreboard has no room for it, the short one (a line for each thing it
+ * says where the banner is a narrow column, joined as the long one is where it is a row).
+ */
+function SavedWords({ t, banner }: { readonly t: Translate; readonly banner: CourtBanner }) {
+  const separator = t('tracker.queue.separator');
+  if (banner.short.join(separator) === banner.text) return banner.text;
+  return (
+    <>
+      <span className="court-banner-long">{banner.text}</span>
+      <span className="court-banner-short">
+        {banner.short.map((line, index) => (
+          <Fragment key={line}>
+            {index === 0 ? null : <span className="court-banner-dot">{separator}</span>}
+            <span className="court-banner-line">{line}</span>
+          </Fragment>
+        ))}
+      </span>
+    </>
+  );
+}
 
 function Score({ t, team }: { readonly t: Translate; readonly team: TeamPanel }) {
   return (
@@ -233,7 +296,7 @@ function Score({ t, team }: { readonly t: Translate; readonly team: TeamPanel })
       data-color={team.color}
       data-score={team.side}
       role="group"
-      aria-label={t('tracker.court.teamScore', { team: team.name, score: team.score })}
+      aria-label={teamBoardLabel(team, t)}
     >
       <span className="court-score-name" aria-hidden="true">
         {team.name}
@@ -241,6 +304,7 @@ function Score({ t, team }: { readonly t: Translate; readonly team: TeamPanel })
       <span className="court-score-value" aria-hidden="true">
         {team.score}
       </span>
+      <TeamFouls t={t} team={team} />
     </div>
   );
 }
@@ -267,6 +331,18 @@ function Team(props: CourtViewProps & { readonly team: TeamPanel }) {
         </h2>
         <div className="court-team-chips">
           {slots.teamHead?.(team.side)}
+          {/* Where a team's heading has room for it (a tablet): its timeouts left. On a
+              phone the one Timeouts button under the scoreboard is the way to them. */}
+          {team.stage === 'set' ? (
+            <TimeoutsChip
+              t={t}
+              team={team}
+              open={pad.kind === 'timeouts'}
+              padId={padId}
+              disabled={props.view.status === 'final'}
+              on={on}
+            />
+          ) : null}
           {/* Where the bench is folded away (a short phone), this opens it in the pad. */}
           {team.stage === 'set' ? (
             <button
@@ -399,7 +475,6 @@ const sameTile = (a: PlayerTile, b: PlayerTile): boolean =>
     a.onCourt === b.onCourt &&
     a.points === b.points &&
     a.fouls === b.fouls &&
-    a.ms === b.ms &&
     a.fouledOut === b.fouledOut &&
     a.unlisted === b.unlisted &&
     a.picked === b.picked);
@@ -407,7 +482,10 @@ const sameTile = (a: PlayerTile, b: PlayerTile): boolean =>
 /**
  * A player's tile. Drawn again only when what it shows changed (finding M6): a tap that
  * opens one player's options, or a basket for one player, leaves the other tiles alone,
- * so a slow tablet answers at once.
+ * so a slow tablet answers at once. The minutes are not part of that: while the clock
+ * runs they are written into their own place by the screen's ticker
+ * (`data-minutes-of`, scoring-screen.tsx), so the clock's ticking never draws a tile
+ * again (step 2.36).
  */
 const Tile = memo(
   TileButton,
@@ -465,7 +543,9 @@ function TileButton({ t, tile, open, picking = false, onTap }: TileProps) {
         </span>
       )}
       {picking || !tile.onCourt ? null : (
-        <span className="court-tile-minutes">{basketball.formatMinutes(tile.ms)}</span>
+        <span className="court-tile-minutes" data-minutes-of={tile.id}>
+          {basketball.formatMinutes(tile.ms)}
+        </span>
       )}
     </button>
   );
@@ -474,11 +554,23 @@ function TileButton({ t, tile, open, picking = false, onTap }: TileProps) {
 function Pad(props: CourtViewProps) {
   const { t, view, pad, slots = {} } = props;
   const tile = pad.kind === 'player' ? findTile(view, pad.playerId) : undefined;
+  // Nobody picked and nothing open: a player no longer shown leaves the pad at rest too.
+  const atRest =
+    tile === undefined &&
+    pad.kind !== 'turnovers' &&
+    pad.kind !== 'bench' &&
+    pad.kind !== 'timeouts';
   return (
     <section
       className="court-pad"
       id={padId}
       data-pad=""
+      // The pad begins with the Start clock button, or at 0:00 the way to the next period.
+      data-start={
+        atRest && view.status !== 'final' && (props.clock.start !== null || props.clock.over)
+          ? ''
+          : undefined
+      }
       aria-label={t('tracker.court.pad')}
       data-color={
         tile !== undefined
@@ -488,6 +580,10 @@ function Pad(props: CourtViewProps) {
             : undefined
       }
     >
+      {/* At rest the pad begins with the large Start clock button (step 2.36), before
+          anything said: so it lies in the band where a picked player's name is shown,
+          whatever else the pad holds, and never where +2, Foul or a substitute lie. */}
+      {atRest ? <StartBar t={t} view={view} clock={props.clock} on={props.on} /> : null}
       {/* Always in the page, so a screen reader hears what is said the moment it is. */}
       <p className="court-say" role="status" aria-live="polite" data-say="">
         {props.said}
@@ -497,7 +593,10 @@ function Pad(props: CourtViewProps) {
       {pad.kind === 'bench' ? (
         <BenchPad {...props} team={view.teams[pad.side]} forId={pad.forId} />
       ) : null}
-      {tile === undefined && pad.kind !== 'turnovers' && pad.kind !== 'bench' ? (
+      {pad.kind === 'timeouts' ? (
+        <TimeoutsPad t={t} view={view} asking={pad.asking} on={props.on} />
+      ) : null}
+      {atRest ? (
         <div className="court-rest" data-rest="">
           <div className="court-slot-rest" data-slot="pad-rest">
             {slots.padRest}
@@ -545,18 +644,20 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
   const team = view.teams[tile.side];
   const name = playerLabel(tile.player, t);
   const others = tile.onCourt ? team.bench : team.floor;
-  const facts = [
-    t(
-      tile.fouledOut
-        ? 'tracker.pad.who.out'
-        : tile.onCourt
-          ? 'tracker.pad.who.floor'
-          : 'tracker.pad.who.bench',
-    ),
-    t.plural('tracker.pad.who.fouls', tile.fouls),
-    t('tracker.pad.who.points', { count: tile.points }),
-    t('tracker.pad.who.minutes', { minutes: basketball.formatMinutes(tile.ms) }),
-  ];
+  const separator = t('tracker.queue.separator');
+  const where = t(
+    tile.fouledOut
+      ? 'tracker.pad.who.out'
+      : tile.onCourt
+        ? 'tracker.pad.who.floor'
+        : 'tracker.pad.who.bench',
+  );
+  // The minutes in their short form ("0:07"), and the words the long form adds after it
+  // (" played"), which the line leaves off where it has no room for them.
+  const minutes = { minutes: basketball.formatMinutes(tile.ms) };
+  const played = t('tracker.pad.who.minutes', minutes);
+  const playedShort = t('tracker.pad.who.minutesShort', minutes);
+  const playedMore = played.startsWith(playedShort) ? played.slice(playedShort.length) : '';
   return (
     <div
       className="court-options"
@@ -570,8 +671,36 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
         </span>
         <span className="court-who-text">
           <span className="court-who-name">{name}</span>
+          {/* Where the pad is a narrow column (a phone or a tablet lying down) the line
+              begins at the fouls: "On court" is what the ringed tile already shows. For a
+              player who has fouled out it says "Fouled out" in place of the count, as the
+              tile says "Out" in place of it. So the line is whole there, and the minutes
+              at its end are never cut (the area 4 review of step 2.36, L6).
+              And on any device whose letters are too wide for the line, the stylesheet
+              leaves off what it can do without, in this order: "On court" first, then the
+              word after the minutes ("0:07 played" reads "0:07"). Nothing is set smaller
+              and nothing ends in "…". The whole line is still what a screen reader is
+              given. */}
           <span className="court-who-facts" data-out={tile.fouledOut ? '' : undefined}>
-            {facts.join(t('tracker.queue.separator'))}
+            <span className="court-who-where">
+              {where}
+              {separator}
+            </span>
+            <span className="court-who-rest">
+              <span className="court-who-core">
+                <span className="court-who-fouls">
+                  {t.plural('tracker.pad.who.fouls', tile.fouls)}
+                  {separator}
+                </span>
+                {t('tracker.pad.who.points', { count: tile.points })}
+                {separator}
+                {/* Ticks with the clock while it runs (the screen's ticker writes it). */}
+                <span data-minutes-of={tile.id} data-minutes-played="">
+                  {playedShort}
+                </span>
+              </span>
+              {playedMore}
+            </span>
           </span>
         </span>
         <button

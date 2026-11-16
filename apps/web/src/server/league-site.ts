@@ -1,13 +1,13 @@
 // What a league's pages look like and are called (T-90, P5 §2): its design document and
 // its display name. They come from a source by league id, one of the web app's ports
 // (`leagueSites`): on the made-up stand-in its made-up leagues' names and designs; on the
-// database the league's own name, as its owner saved it (step 2.93 part 3, record 070).
-// Until the design editor exists and saves a design with the league (T3's `sites` and
-// `site_releases`, not yet in the database), a league on the database has no design of
-// its own and gets the neutral starting design; so does a league the source does not
-// know, which also takes its short name.
-import type { DesignDocument, StartingDesignKey } from '@srleagues/site';
-import { startingDesign } from '@srleagues/site';
+// database the league's own name, as its owner saved it (step 2.93 part 3, record 070),
+// and the design of its latest published site release (T3 §10, step 2.187, record 073).
+// A league with no release, or whose stored design does not pass the schema, gets the
+// neutral starting design; so does a league the source does not know, which also takes
+// its short name.
+import type { DesignDocument } from '@srleagues/site';
+import { neutralStartingDesign, startingDesign } from '@srleagues/site';
 import { webPorts } from './container.ts';
 
 export type LeagueSite = {
@@ -27,8 +27,6 @@ export type LeagueSiteLookup = (
   leagueId: string,
 ) => FoundSite | undefined | Promise<FoundSite | undefined>;
 
-const fallbackDesign: StartingDesignKey = 'clean-court';
-
 /** The source a running server draws its leagues' pages from: its ports' own. */
 export async function leagueSites(): Promise<LeagueSiteLookup> {
   return (await webPorts()).leagueSites;
@@ -45,6 +43,6 @@ export async function siteOf(
 function siteFrom(league: { readonly slug: string }, found: FoundSite | undefined): LeagueSite {
   return {
     name: found?.name ?? league.slug,
-    design: found?.design ?? startingDesign(fallbackDesign),
+    design: found?.design ?? startingDesign(neutralStartingDesign),
   };
 }

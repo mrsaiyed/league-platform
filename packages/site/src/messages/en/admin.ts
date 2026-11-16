@@ -16,8 +16,31 @@ export const enAdmin = {
   'admin.area.standings': 'Standings and stats',
   'admin.area.teams': 'Teams',
   'admin.areasLabel': 'Admin areas',
-  'admin.emptyArea': 'Nothing here yet.',
+  // The admin's own frame and its home (step 2.103).
+  'admin.backToAdmin': 'Back to the admin',
+  // The home's one main action: the first of this person's jobs (step 2.103).
+  'admin.home.action.games': 'Enter results',
+  'admin.home.action.schedule': 'Open the schedule',
+  'admin.home.action.settings': 'Open league settings',
+  'admin.home.action.teams': 'Open teams',
+  'admin.home.areas': 'Where to go',
+  // The areas with no screen yet, named together under the cards.
+  'admin.home.coming': 'Coming',
+  'admin.home.purpose.games': 'Results, box scores and who scores each game.',
+  'admin.home.purpose.schedule': 'Rounds, games, places and times.',
+  'admin.home.purpose.season': 'Who can see each season.',
+  'admin.home.purpose.settings': 'The league’s rules and who sees what.',
+  'admin.home.purpose.teams': 'Teams, rosters and jersey numbers.',
+  'admin.home.sub': 'Everything you run for {league} is here.',
+  'admin.home.title': 'Welcome back.',
+  'admin.notReady.body': 'This part of the admin is not ready yet.',
+  'admin.notReady.mark': 'Not ready',
+  'admin.notReady.title': 'Not ready yet',
+  'admin.status.archived': 'Archived',
+  'admin.status.draft': 'Not published',
+  'admin.status.suspended': 'Suspended',
   // The admin (P4 §3).
   'admin.title': 'Admin',
+  'admin.trail': 'You are here',
   'admin.viewSite': 'View the site',
 } as const;

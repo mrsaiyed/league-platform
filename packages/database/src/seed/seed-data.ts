@@ -2,14 +2,20 @@
 // invented; email addresses end in .test, which can never be a real mailbox. Nothing here
 // is a person. A league is data: the loader (seed-leagues.ts) reads this list and
 // treats every entry the same way, so adding a third league means adding an entry.
+import type { StartingDesignKey } from '@srleagues/contracts';
 import type { Audience, Role } from '@srleagues/core';
 
 export type SeedMember = {
   readonly email: string;
   readonly displayName: string;
-  /** The role the account holds across the whole league. */
+  /** The role the account holds: across the whole league, or in one program only. */
   readonly role: Role;
+  /** The short name of the league's other program the role is limited to (`programs`). */
+  readonly program?: string;
 };
+
+/** A program of the league besides its hidden default one (U-3, U-12). */
+export type SeedProgram = { readonly slug: string; readonly name: string };
 
 export type SeedTeam = {
   readonly name: string;
@@ -38,10 +44,16 @@ export type SeedLeague = {
   readonly timeZone: string;
   /** Who plays: decides who counts as a child when their age is not known (R-15). */
   readonly audience: Audience;
-  /** A starting design key of packages/site; the web app checks it is a real one. */
-  readonly design: string;
+  /** The starting design its first site release is published in (step 2.187). */
+  readonly design: StartingDesignKey;
   readonly owner: { readonly email: string; readonly displayName: string };
   readonly members: readonly SeedMember[];
+  /**
+   * Programs besides the default one, with no season, so a role can be limited to one
+   * that is not the season's: what shows a scheduler of another program is told nothing
+   * of a season not public yet (P4 §4, step 2.93 part 4).
+   */
+  readonly programs?: readonly SeedProgram[];
   readonly season: { readonly slug: string; readonly name: string };
   readonly divisions: readonly SeedDivision[];
   /** People added to the league's list by hand. */
@@ -63,7 +75,15 @@ export const seedLeagues: readonly SeedLeague[] = [
       { email: 'admin@lakeside.example.test', displayName: 'Adele Admin', role: 'admin' },
       { email: 'scheduler@lakeside.example.test', displayName: 'Sam Scheduler', role: 'scheduler' },
       { email: 'scorer@lakeside.example.test', displayName: 'Sky Scorer', role: 'scorekeeper' },
+      // A scheduler of the league's other program only, not of the season's.
+      {
+        email: 'camp-scheduler@lakeside.example.test',
+        displayName: 'Cam Scheduler',
+        role: 'scheduler',
+        program: 'summer-camp',
+      },
     ],
+    programs: [{ slug: 'summer-camp', name: 'Summer Camp' }],
     season: { slug: 'winter-seed', name: 'Winter Season' },
     divisions: [
       {
@@ -104,7 +124,8 @@ export const seedLeagues: readonly SeedLeague[] = [
     timeZone: 'America/New_York',
     // A youth league: a player whose age is not known is shown as a child (R-15).
     audience: 'youth',
-    design: 'clean-court',
+    // Not the neutral design, so its pages show it is drawn in a design of its own.
+    design: 'midnight-gold',
     owner: { email: 'owner@maple.example.test', displayName: 'Mara Maple' },
     members: [
       { email: 'admin@maple.example.test', displayName: 'Abe Admin', role: 'admin' },

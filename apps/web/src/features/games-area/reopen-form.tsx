@@ -27,12 +27,12 @@ export function ReopenForm({ action, permalink, hidden, texts }: ReopenFormProps
   const refused = state.kind === 'refused' ? state : undefined;
   const wrong = refused?.wrong.includes('reason') === true;
   return (
-    <form action={dispatch} onSubmit={onSubmit} className="ui-stack" data-reopen-form="">
+    <form action={dispatch} onSubmit={onSubmit} className="staff-form" data-reopen-form="">
       {Object.entries(hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
       {texts.until === undefined ? null : <p>{texts.until}</p>}
-      <label className="ui-stack">
+      <label className="staff-field">
         <span>{texts.reason}</span>
         <input
           type="text"
@@ -49,7 +49,7 @@ export function ReopenForm({ action, permalink, hidden, texts }: ReopenFormProps
           {refused.said}
         </p>
       )}
-      <p>
+      <p className="staff-buttons">
         <button type="submit" className="ui-button" data-kind="main">
           {texts.reopen}
         </button>

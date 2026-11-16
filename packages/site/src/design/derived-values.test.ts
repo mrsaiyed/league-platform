@@ -731,4 +731,20 @@ describe('the frame of a dark design and of a light one', () => {
       designToCssVariables({ ...startingDesign('clean-court'), corners: 'sharp' }),
     ).toMatchObject({ '--radius': '0px', '--radius-small': '0px', '--radius-pill': '0px' });
   });
+
+  it('marks a refused field more strongly than an unmarked one, in every starting design', () => {
+    // Step 2.103: a refused field is edged in the danger color at full strength; an
+    // unmarked one in the text color at 45 percent (frame-look.ts, --color-line-strong).
+    // On the dark designs' panels the danger edge must still be the stronger of the two.
+    for (const key of startingDesignKeys) {
+      const colors = colorsOf(startingDesign(key));
+      const derived = derivedColors(colors);
+      for (const surface of [colors.background, colors.panel]) {
+        const unmarked = mixColors(surface, colors.text, 0.45);
+        expect(contrastRatio(derived.danger, surface), `${key} on ${surface}`).toBeGreaterThan(
+          contrastRatio(unmarked, surface),
+        );
+      }
+    }
+  });
 });

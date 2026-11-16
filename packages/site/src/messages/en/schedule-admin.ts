@@ -57,6 +57,8 @@ export const enScheduleAdmin = {
   'schedule.admin.draftChanges_other': 'Draft in progress: {count} changes not yet published.',
   'schedule.admin.draftOutOfDate':
     'A new version of the schedule was published after this draft was started. Discard the draft and start again from the published schedule.',
+  // The schedule's head and the draft's state, as drawn by step 2.103.
+  'schedule.admin.draftPill': 'Draft',
   'schedule.admin.edit': 'Edit this game',
   'schedule.admin.error.change-no-longer-fits': 'A change in the draft no longer fits.',
   'schedule.admin.error.change-refused': 'That change cannot be made to the schedule as it stands.',
@@ -100,6 +102,7 @@ export const enScheduleAdmin = {
   'schedule.admin.gameVs': '{away} at {home}',
   'schedule.admin.gameWhen': '{date}, {time}',
   'schedule.admin.gameWhere': '{venue}, {court}',
+  'schedule.admin.hiddenPill': 'Not public yet',
   'schedule.admin.home': 'Home team',
   'schedule.admin.importLink': 'Import fixtures from a spreadsheet',
   'schedule.admin.intro':
@@ -138,6 +141,7 @@ export const enScheduleAdmin = {
     'The schedule is published, but visitors cannot see this league until it is published, and {season} is hidden from them too.',
   'schedule.admin.publishedLeagueHidden':
     'The schedule is published, but visitors cannot see this league until it is published.',
+  'schedule.admin.publishedPill': 'Published',
   'schedule.admin.publishedSeasonHidden':
     'The schedule is published, but visitors cannot see {season} yet.',
   'schedule.admin.putBack': 'Put it back',
@@ -177,6 +181,7 @@ export const enScheduleAdmin = {
     'Nothing public changes until you publish. Put it back now and it is exactly as it was. Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
   'schedule.admin.renameRound': 'Round name',
   'schedule.admin.renameRoundSubmit': 'Rename round',
+  'schedule.admin.reviewPublish': 'Review and publish',
   'schedule.admin.round': 'Round {number}: {label}',
   'schedule.admin.roundDate': 'Date: {date}',
   'schedule.admin.roundEdit': 'Change or remove this round',

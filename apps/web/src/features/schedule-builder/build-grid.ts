@@ -3,6 +3,7 @@
 // games are in a clash, and the clashes in words. No page code here, so it is tested
 // without a server.
 import type { Clash, ScheduleDraftView, ScheduleGame, VenueWithCourts } from '@srleagues/core';
+import { leagueDayText } from '../../server/game-when.ts';
 import { locale, t } from '../../server/messages.ts';
 
 export type GridTeam = { readonly id: string; readonly name: string };
@@ -67,19 +68,28 @@ export function parsePlace(value: string): { venueId: string | null; court: stri
   return { venueId: value.slice(0, cut), court: court === '' ? null : court };
 }
 
-const dayFormat = new Intl.DateTimeFormat(locale, {
-  weekday: 'short',
-  month: 'short',
-  day: 'numeric',
+/**
+ * A calendar day in words, "Sun, Nov 29"; a value that is not a day is given back as it is.
+ * Written by the admin's one helper for a day of the league's calendar (server/game-when.ts).
+ */
+export function dayText(date: string): string {
+  return leagueDayText(date, locale);
+}
+
+const clockFormat = new Intl.DateTimeFormat(locale, {
+  hour: 'numeric',
+  minute: '2-digit',
   timeZone: 'UTC',
 });
 
-/** A calendar day in words, "Sun, Nov 29"; a value that is not a day is given back as it is. */
-export function dayText(date: string): string {
-  const day = new Date(`${date}T00:00:00.000Z`);
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(day.getTime())
-    ? dayFormat.format(day)
-    : date;
+/**
+ * A time of day in words, "6:00 PM", for the league's own clock time as the grid holds it
+ * ("18:00"); a value that is not a time is given back as it is. Only how it is written:
+ * the time is the league's own already (step 2.165 names the zone).
+ */
+export function clockText(time: string): string {
+  const at = new Date(`1970-01-01T${time}:00.000Z`);
+  return /^\d{2}:\d{2}$/.test(time) && !Number.isNaN(at.getTime()) ? clockFormat.format(at) : time;
 }
 
 /** The day after `date` by `days`, as YYYY-MM-DD; undefined for a value that is not a day. */

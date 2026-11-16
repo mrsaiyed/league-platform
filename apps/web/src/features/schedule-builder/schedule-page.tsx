@@ -9,6 +9,7 @@ import {
   type ScheduleGame,
   type VenueWithCourts,
 } from '@srleagues/core';
+import { Emblem, EmptyPanel, PageHead } from '@srleagues/ui';
 import { randomUUID } from 'node:crypto';
 import { Fragment, type ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
@@ -20,6 +21,7 @@ import {
   seasonSettingsAddress,
   visibilityAnchor,
 } from '../season-settings/index.ts';
+import { StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import {
   addGameAction,
@@ -36,6 +38,7 @@ import {
 } from './actions.ts';
 import {
   buildGrid,
+  clockText,
   dayText,
   daysAfter,
   type Grid,
@@ -95,9 +98,9 @@ export async function ScheduleBuilderPage({
   const action = leagueUrl(addressee, 'admin-area', { area: 'schedule' });
   if (season === undefined) {
     return (
-      <main>
-        <h1>{t('schedule.admin.title')}</h1>
-        <p>{t('schedule.admin.noSeason')}</p>
+      <main className="admin-schedule">
+        <PageHead title={t('schedule.admin.title')} />
+        <EmptyPanel text={t('schedule.admin.noSeason')} />
       </main>
     );
   }
@@ -107,15 +110,33 @@ export async function ScheduleBuilderPage({
     listVenues(context, {}, deps),
     ports.scheduleAdmin.teamsOf(addressee.id, season.id),
   ]);
-  const importLink = (
-    <p>
-      <a href={importLinkOf(addressee)}>{t('schedule.admin.importLink')}</a>
-    </p>
+  // What the page lets you do, at the top right of its head: bring games in from a
+  // spreadsheet and, while a draft is waiting, go to "Review and publish" (the box itself
+  // is at the foot of the grid; its place is step 2.53's).
+  const headActions = (reviewHref: string | null) => (
+    <div className="staff-actions">
+      <a className="ui-button" href={importLinkOf(addressee)}>
+        {t('schedule.admin.importLink')}
+      </a>
+      {reviewHref === null ? null : (
+        <a className="ui-button" data-kind="main" href={reviewHref}>
+          {t('schedule.admin.reviewPublish')}
+        </a>
+      )}
+    </div>
   );
-  const heading = (top: ReactNode, firstRound: ReactNode = null) => (
-    <ScheduleHeading seasons={seasons} season={season} action={action}>
+  const heading = (
+    top: ReactNode,
+    firstRound: ReactNode = null,
+    reviewHref: string | null = null,
+  ) => (
+    <ScheduleHeading
+      seasons={seasons}
+      season={season}
+      action={action}
+      actions={headActions(reviewHref)}
+    >
       {firstRound}
-      {importLink}
       {top}
     </ScheduleHeading>
   );
@@ -131,7 +152,13 @@ export async function ScheduleBuilderPage({
       : undefined;
   const plainNotice =
     published !== undefined ? (
-      <div className="ui-notice" role="status" data-notice="done" data-published="">
+      <div
+        className="ui-notice"
+        role="status"
+        data-kind="saved"
+        data-notice="done"
+        data-published=""
+      >
         <p>{published.text}</p>
         {published.next === undefined ? null : published.next.kind === 'link' ? (
           <p>
@@ -148,7 +175,7 @@ export async function ScheduleBuilderPage({
         className="ui-notice"
         role="status"
         data-notice={notice.kind}
-        {...(notice.kind === 'problem' ? { 'data-kind': 'error' } : {})}
+        data-kind={notice.kind === 'problem' ? 'error' : 'saved'}
       >
         {notice.text}
       </p>
@@ -156,9 +183,11 @@ export async function ScheduleBuilderPage({
   if (!drafted.ok) {
     const key = noticeOf({ problem: drafted.error.code });
     return (
-      <main>
+      <main className="admin-schedule">
         {heading(plainNotice)}
-        <p role="alert">{key?.text ?? t('schedule.admin.error.not-allowed')}</p>
+        <p className="ui-notice" data-kind="error" role="alert">
+          {key?.text ?? t('schedule.admin.error.not-allowed')}
+        </p>
       </main>
     );
   }
@@ -205,7 +234,7 @@ export async function ScheduleBuilderPage({
   const noRounds = grid.rounds.length === 0;
   // A season with no rounds: a calm panel under the intro, the first round's form open in it.
   const firstRound = noRounds ? (
-    <section className="ui-notice" aria-labelledby="no-rounds" data-no-rounds="">
+    <section className="staff-panel" aria-labelledby="no-rounds" data-no-rounds="">
       <h2 id="no-rounds">{t('schedule.admin.noRounds')}</h2>
       {basis.canEdit ? (
         <>
@@ -223,39 +252,64 @@ export async function ScheduleBuilderPage({
       : undefined;
 
   return (
-    <main>
-      {heading(top, firstRound)}
+    <main className="admin-schedule">
+      {heading(
+        top,
+        firstRound,
+        draft.draft !== null && (basis.canEdit || basis.canPublish) ? '#publish-heading' : null,
+      )}
+      {/* How the draft stands, in one line: a pill, then the sentence. */}
       {draft.draft !== null ? (
         // What publishing would change, counted as the publish box counts it (step 2.161):
         // a game removed and put back as it was is no change.
-        <p data-draft-count={toPublish}>
-          {toPublish === 0
-            ? t('schedule.admin.draftChangesNone')
-            : t.plural('schedule.admin.draftChanges', toPublish)}
+        <p className="admin-schedule-draft" data-draft-count={toPublish}>
+          <StaffPill kind="wait">{t('schedule.admin.draftPill')}</StaffPill>
+          <span>
+            {toPublish === 0
+              ? t('schedule.admin.draftChangesNone')
+              : t.plural('schedule.admin.draftChanges', toPublish)}
+          </span>
         </p>
-      ) : season.isPublic ? (
-        <p>{t('schedule.admin.noDraft')}</p>
       ) : (
-        <p>{t('schedule.admin.noDraftHidden')}</p>
+        <p className="admin-schedule-draft">
+          <StaffPill kind={season.isPublic ? 'good' : 'plain'}>
+            {t(season.isPublic ? 'schedule.admin.publishedPill' : 'schedule.admin.hiddenPill')}
+          </StaffPill>
+          <span>
+            {t(season.isPublic ? 'schedule.admin.noDraft' : 'schedule.admin.noDraftHidden')}
+          </span>
+        </p>
       )}
       {draft.draft?.outOfDate === true ? (
-        <p role="alert">{t('schedule.admin.draftOutOfDate')}</p>
+        <p className="ui-notice" data-kind="error" role="alert">
+          {t('schedule.admin.draftOutOfDate')}
+        </p>
       ) : null}
       {draft.rejected.length === 0 ? null : (
-        <p role="alert">{t.plural('schedule.admin.rejected', draft.rejected.length)}</p>
+        <p className="ui-notice" data-kind="error" role="alert">
+          {t.plural('schedule.admin.rejected', draft.rejected.length)}
+        </p>
       )}
-      {noRounds && grid.clashes.length === 0 ? null : (
-        <section aria-labelledby="clashes-heading">
+      {noRounds && grid.clashes.length === 0 ? null : grid.clashes.length === 0 ? (
+        // No clash: one quiet line, not a panel of its own.
+        <section className="admin-clashes" aria-labelledby="clashes-heading" data-clear="">
+          <h2 id="clashes-heading" className="ui-visually-hidden">
+            {t('schedule.admin.clashes')}
+          </h2>
+          <p className="staff-quiet">{t('schedule.admin.clashesNone')}</p>
+        </section>
+      ) : (
+        <section
+          className="ui-notice admin-clashes"
+          data-kind="error"
+          aria-labelledby="clashes-heading"
+        >
           <h2 id="clashes-heading">{t('schedule.admin.clashes')}</h2>
-          {grid.clashes.length === 0 ? (
-            <p>{t('schedule.admin.clashesNone')}</p>
-          ) : (
-            <ul data-clashes="">
-              {grid.clashes.map((c) => (
-                <li key={c.key}>{c.text}</li>
-              ))}
-            </ul>
-          )}
+          <ul data-clashes="">
+            {grid.clashes.map((c) => (
+              <li key={c.key}>{c.text}</li>
+            ))}
+          </ul>
         </section>
       )}
       {savedAt({ afterRound: null })}
@@ -288,18 +342,23 @@ export async function ScheduleBuilderPage({
         savedGame={savedGame}
       />
       {draft.draft === null || !(basis.canEdit || basis.canPublish) ? null : (
-        <section aria-labelledby="publish-heading">
+        <section aria-labelledby="publish-heading" className="staff-panel admin-publish">
           <h2 id="publish-heading">{t('schedule.admin.publish')}</h2>
           {!basis.canPublish || preview === undefined || !preview.ok ? null : (
             <PublishPanel preview={preview.value} basis={basis} />
           )}
+          {/* Throwing the draft away is apart from publishing it, and looks like neither. */}
           {basis.canEdit ? (
-            <details>
+            <details className="admin-discard">
               <summary>{t('schedule.admin.discard')}</summary>
-              <p>{t('schedule.admin.discardNote')}</p>
-              <form action={discardAction}>
+              <form action={discardAction} className="staff-form">
+                <p className="ui-field-help">{t('schedule.admin.discardNote')}</p>
                 <BasisFields basis={basis} />
-                <button type="submit">{t('schedule.admin.discardSubmit')}</button>
+                <p className="staff-buttons">
+                  <button type="submit" className="ui-button" data-kind="danger">
+                    {t('schedule.admin.discardSubmit')}
+                  </button>
+                </p>
               </form>
             </details>
           ) : null}
@@ -322,12 +381,10 @@ function BasisFields({ basis }: { readonly basis: Basis }) {
   );
 }
 
-const fieldStyle = { display: 'grid', gap: '0.25rem', marginBlock: '0.5rem' } as const;
-const wide = { maxWidth: '100%', boxSizing: 'border-box', minHeight: '2.5rem' } as const;
-
+/** A field of the grid's forms: its label above it (the staff area's field piece). */
 function Field({ label, children }: { readonly label: string; readonly children: ReactNode }) {
   return (
-    <label style={fieldStyle}>
+    <label className="staff-field">
       <span>{label}</span>
       {children}
     </label>
@@ -342,7 +399,7 @@ function PlaceSelect({
   readonly value: string;
 }) {
   return (
-    <select name="place" defaultValue={value} style={wide}>
+    <select name="place" defaultValue={value}>
       <option value="">{t('schedule.admin.noPlaceOption')}</option>
       {venues.flatMap((v) => [
         <option key={v.id} value={`${v.id}|`}>
@@ -360,7 +417,7 @@ function PlaceSelect({
 
 function RecordingSelect({ value }: { readonly value: GridGame['recording'] }) {
   return (
-    <select name="recording" defaultValue={value ?? ''} style={wide}>
+    <select name="recording" defaultValue={value ?? ''}>
       {value === null || value === undefined ? (
         <option value="">{t('schedule.admin.recording.rules')}</option>
       ) : null}
@@ -386,7 +443,7 @@ function TeamSelect({
 }) {
   return (
     <Field label={label}>
-      <select name={name} defaultValue={value} required style={wide}>
+      <select name={name} defaultValue={value} required>
         <option value="">{t('schedule.admin.chooseTeam')}</option>
         {teams.map((team) => (
           <option key={team.id} value={team.id}>
@@ -426,16 +483,22 @@ function RoundSection({
 }) {
   const headingId = roundAnchor(round.id);
   return (
-    <section aria-labelledby={headingId} data-round={round.id}>
-      <h2 id={headingId}>
-        {t('schedule.admin.round', { number: round.number, label: round.label })}
-      </h2>
-      <p>
-        {round.date === null
-          ? t('schedule.admin.roundNoDate')
-          : t('schedule.admin.roundDate', { date: round.date })}{' '}
-        {t.plural('schedule.admin.roundGames', round.games.length)}
-      </p>
+    <section aria-labelledby={headingId} data-round={round.id} className="staff-panel admin-round">
+      {/* The round's head: its name, then its day (as the public pages write a day) and
+          how many games it holds, as a pill. */}
+      <div className="staff-panel-head">
+        <h2 id={headingId}>
+          {t('schedule.admin.round', { number: round.number, label: round.label })}
+        </h2>
+        <p className="admin-round-facts">
+          <span>
+            {round.date === null
+              ? t('schedule.admin.roundNoDate')
+              : t('schedule.admin.roundDate', { date: dayText(round.date) })}
+          </span>{' '}
+          <StaffPill>{t.plural('schedule.admin.roundGames', round.games.length)}</StaffPill>
+        </p>
+      </div>
       {saved}
       {problem === undefined ? null : (
         <p className="ui-notice" data-kind="error" role="alert" data-notice="problem">
@@ -443,55 +506,62 @@ function RoundSection({
         </p>
       )}
       {basis.canEdit ? (
-        <details open={problem !== undefined}>
+        <details open={problem !== undefined} className="admin-round-edit">
           <summary>{t('schedule.admin.roundEdit')}</summary>
-          <form action={renameRoundAction}>
-            <BasisFields basis={basis} />
-            <input type="hidden" name="roundId" value={round.id} />
-            <Field label={t('schedule.admin.renameRound')}>
-              <input
-                name="label"
-                defaultValue={round.label}
-                required
-                maxLength={120}
-                style={wide}
-              />
-            </Field>
-            <button type="submit">{t('schedule.admin.renameRoundSubmit')}</button>
-          </form>
-          <form action={changeRoundDateAction}>
-            <BasisFields basis={basis} />
-            <input type="hidden" name="roundId" value={round.id} />
-            <Field label={t('schedule.admin.changeRoundDate')}>
-              <input
-                type="date"
-                name="date"
-                defaultValue={round.date ?? ''}
-                required
-                style={wide}
-              />
-            </Field>
-            <p>{t('schedule.admin.changeRoundDateNote')}</p>
-            <button type="submit">{t('schedule.admin.changeRoundDateSubmit')}</button>
-          </form>
-          {round.games.length === 0 ? (
-            <form action={removeRoundAction} data-remove-round={round.id}>
+          <div className="admin-round-forms">
+            <form action={renameRoundAction} className="staff-form">
               <BasisFields basis={basis} />
               <input type="hidden" name="roundId" value={round.id} />
-              <input type="hidden" name="afterRoundId" value={previousRoundId ?? ''} />
-              <p>{t('schedule.admin.removeRoundNote')}</p>
-              <button type="submit" className="ui-button" data-kind="danger">
-                {t('schedule.admin.removeRound')}
-              </button>
+              <Field label={t('schedule.admin.renameRound')}>
+                <input name="label" defaultValue={round.label} required maxLength={120} />
+              </Field>
+              <p className="staff-buttons">
+                <button type="submit" className="ui-button">
+                  {t('schedule.admin.renameRoundSubmit')}
+                </button>
+              </p>
             </form>
-          ) : (
-            <p data-remove-round-blocked={round.id}>
-              {t.plural('schedule.admin.removeRoundBlocked', round.games.length)}
-            </p>
-          )}
+            <form action={changeRoundDateAction} className="staff-form">
+              <BasisFields basis={basis} />
+              <input type="hidden" name="roundId" value={round.id} />
+              <Field label={t('schedule.admin.changeRoundDate')}>
+                <input type="date" name="date" defaultValue={round.date ?? ''} required />
+              </Field>
+              <p className="ui-field-help">{t('schedule.admin.changeRoundDateNote')}</p>
+              <p className="staff-buttons">
+                <button type="submit" className="ui-button">
+                  {t('schedule.admin.changeRoundDateSubmit')}
+                </button>
+              </p>
+            </form>
+            {/* Removing is apart from the two saves, and looks like neither. */}
+            {round.games.length === 0 ? (
+              <form
+                action={removeRoundAction}
+                data-remove-round={round.id}
+                className="staff-form admin-round-remove"
+              >
+                <BasisFields basis={basis} />
+                <input type="hidden" name="roundId" value={round.id} />
+                <input type="hidden" name="afterRoundId" value={previousRoundId ?? ''} />
+                <p className="ui-field-help">{t('schedule.admin.removeRoundNote')}</p>
+                <p className="staff-buttons">
+                  <button type="submit" className="ui-button" data-kind="danger">
+                    {t('schedule.admin.removeRound')}
+                  </button>
+                </p>
+              </form>
+            ) : (
+              <p className="ui-field-help admin-round-remove" data-remove-round-blocked={round.id}>
+                {t.plural('schedule.admin.removeRoundBlocked', round.games.length)}
+              </p>
+            )}
+          </div>
         </details>
       ) : null}
-      {round.games.length === 0 ? <p>{t('schedule.admin.noGamesInRound')}</p> : null}
+      {round.games.length === 0 ? (
+        <p className="staff-quiet">{t('schedule.admin.noGamesInRound')}</p>
+      ) : null}
       <GameList
         games={round.games}
         grid={grid}
@@ -522,7 +592,7 @@ function LooseGames({
   readonly savedGame: (gameId: string) => SavedGame;
 }) {
   return (
-    <section aria-labelledby="loose-heading">
+    <section aria-labelledby="loose-heading" className="staff-panel admin-round">
       <h2 id="loose-heading">{t('schedule.admin.otherGames')}</h2>
       {saved}
       <GameList
@@ -558,7 +628,7 @@ function GameList({
 }) {
   if (games.length === 0) return null;
   return (
-    <ol style={{ paddingInlineStart: '1.25rem' }}>
+    <ol className="admin-slots">
       {games.map((g) => (
         <GameItem
           key={g.id}
@@ -597,34 +667,43 @@ function GameItem({
   const flagged = game.outsideRound && saved?.asks !== true;
   const round = rounds.find((r) => r.id === game.roundId);
   const when = t('schedule.admin.gameWhen', {
-    date: game.date === '' ? t('schedule.admin.noDate') : game.date,
-    time: game.time ?? t('schedule.admin.noTime'),
+    // Written as the public pages write a day and a time: "Sun, Nov 22, 6:00 PM".
+    date: game.date === '' ? t('schedule.admin.noDate') : dayText(game.date),
+    time: game.time === null ? t('schedule.admin.noTime') : clockText(game.time),
   });
   const place = game.placeLabel ?? t('schedule.admin.noPlace');
   return (
     <li id={gameAnchor(game.id)} data-game={game.id} data-clash={game.clashed ? 'yes' : 'no'}>
-      <p>
+      {/* One row a game: its two teams' marks and names, then its day, time and place. */}
+      <p className="admin-slot-line">
+        <Emblem name={game.awayName} size="small" />
+        <Emblem name={game.homeName} size="small" />
         <strong>{t('schedule.admin.gameVs', { away: game.awayName, home: game.homeName })}</strong>
-        <br />
-        {game.recording === null || game.recording === undefined
-          ? t('schedule.admin.gameDetails', { when, place })
-          : t('schedule.admin.gameDetailsRecording', {
-              when,
-              place,
-              recording: t(`schedule.admin.recording.${game.recording}`),
-            })}
+        <span>
+          {game.recording === null || game.recording === undefined
+            ? t('schedule.admin.gameDetails', { when, place })
+            : t('schedule.admin.gameDetailsRecording', {
+                when,
+                place,
+                recording: t(`schedule.admin.recording.${game.recording}`),
+              })}
+        </span>
       </p>
       {saved?.node}
       {game.clashed ? (
         <p role="status">
-          <strong>{t('schedule.admin.clashFlag')}</strong>
+          <StaffPill kind="stop">{t('schedule.admin.clashFlag')}</StaffPill>
         </p>
       ) : null}
       {!flagged || game.offRoundDate === null || round === undefined ? null : (
-        <div data-off-round-date={game.id}>
+        <div className="ui-notice" data-off-round-date={game.id}>
           <p role="status">
             <strong>
-              {t('schedule.admin.offRoundDate', { round: round.label, date: game.offRoundDate })}
+              {/* The day in words, as everywhere else on this page (step 2.103). */}
+              {t('schedule.admin.offRoundDate', {
+                round: round.label,
+                date: dayText(game.offRoundDate),
+              })}
             </strong>
           </p>
           {basis.canEdit && game.editable ? (
@@ -632,13 +711,13 @@ function GameItem({
               game={game}
               date={game.offRoundDate}
               basis={basis}
-              label={t('schedule.admin.moveToRoundDate', { date: game.offRoundDate })}
+              label={t('schedule.admin.moveToRoundDate', { date: dayText(game.offRoundDate) })}
             />
           ) : null}
         </div>
       )}
       {!basis.canEdit ? null : !game.editable ? (
-        <p>
+        <p className="staff-quiet">
           {game.status === 'postponed' || game.status === 'cancelled'
             ? t('schedule.admin.gameNotScheduled', { status: game.status })
             : t('schedule.admin.gameLocked')}
@@ -646,7 +725,7 @@ function GameItem({
       ) : (
         <details>
           <summary>{t('schedule.admin.edit')}</summary>
-          <form action={saveGameAction}>
+          <form action={saveGameAction} className="staff-form admin-slot-form">
             <BasisFields basis={basis} />
             <input type="hidden" name="gameId" value={game.id} />
             <input
@@ -656,7 +735,7 @@ function GameItem({
             />
             <input type="hidden" name="wasRecording" value={game.recording ?? ''} />
             <Field label={t('schedule.admin.roundField')}>
-              <select name="roundId" defaultValue={game.roundId ?? ''} style={wide}>
+              <select name="roundId" defaultValue={game.roundId ?? ''}>
                 <option value="">{t('schedule.admin.noRound')}</option>
                 {rounds.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -666,10 +745,10 @@ function GameItem({
               </select>
             </Field>
             <Field label={t('schedule.admin.date')}>
-              <input type="date" name="date" defaultValue={game.date} required style={wide} />
+              <input type="date" name="date" defaultValue={game.date} required />
             </Field>
             <Field label={t('schedule.admin.time')}>
-              <input type="time" name="time" defaultValue={game.time ?? ''} style={wide} />
+              <input type="time" name="time" defaultValue={game.time ?? ''} />
             </Field>
             <Field label={t('schedule.admin.place')}>
               <PlaceSelect venues={venues} value={game.place} />
@@ -696,11 +775,11 @@ function GameItem({
             </p>
           </form>
           {others.length === 0 ? null : (
-            <form action={swapGamesAction}>
+            <form action={swapGamesAction} className="staff-form">
               <BasisFields basis={basis} />
               <input type="hidden" name="gameId" value={game.id} />
               <Field label={t('schedule.admin.swapWith')}>
-                <select name="otherGameId" defaultValue="" required style={wide}>
+                <select name="otherGameId" defaultValue="" required>
                   <option value="">{t('schedule.admin.swapChoose')}</option>
                   {others.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -712,8 +791,12 @@ function GameItem({
                   ))}
                 </select>
               </Field>
-              <p>{t('schedule.admin.swapNote')}</p>
-              <button type="submit">{t('schedule.admin.swapSubmit')}</button>
+              <p className="ui-field-help">{t('schedule.admin.swapNote')}</p>
+              <p className="staff-buttons">
+                <button type="submit" className="ui-button">
+                  {t('schedule.admin.swapSubmit')}
+                </button>
+              </p>
             </form>
           )}
         </details>
@@ -736,17 +819,17 @@ function AddGame({
   return (
     <details data-add-game={round?.id ?? 'none'}>
       <summary>{t('schedule.admin.addGame')}</summary>
-      <form action={addGameAction}>
+      <form action={addGameAction} className="staff-form admin-slot-form">
         <BasisFields basis={basis} />
         <input type="hidden" name="gameId" value={randomUUID()} />
         <input type="hidden" name="roundId" value={round?.id ?? ''} />
         <TeamSelect name="homeTeamId" label={t('schedule.admin.home')} teams={teams} value="" />
         <TeamSelect name="awayTeamId" label={t('schedule.admin.away')} teams={teams} value="" />
         <Field label={t('schedule.admin.date')}>
-          <input type="date" name="date" defaultValue={round?.date ?? ''} required style={wide} />
+          <input type="date" name="date" defaultValue={round?.date ?? ''} required />
         </Field>
         <Field label={t('schedule.admin.time')}>
-          <input type="time" name="time" style={wide} />
+          <input type="time" name="time" />
         </Field>
         <Field label={t('schedule.admin.place')}>
           <PlaceSelect venues={venues} value="" />
@@ -754,7 +837,11 @@ function AddGame({
         <Field label={t('schedule.admin.recording')}>
           <RecordingSelect value={null} />
         </Field>
-        <button type="submit">{t('schedule.admin.addGameSubmit')}</button>
+        <p className="staff-buttons">
+          <button type="submit" className="ui-button" data-kind="main">
+            {t('schedule.admin.addGameSubmit')}
+          </button>
+        </p>
       </form>
     </details>
   );
@@ -776,7 +863,7 @@ function MoveToRoundDate({
   readonly main?: boolean;
 }) {
   return (
-    <form action={saveGameAction}>
+    <form action={saveGameAction} className="admin-move-form">
       <BasisFields basis={basis} />
       <input type="hidden" name="gameId" value={game.id} />
       <input
@@ -839,39 +926,44 @@ function AddRoundForm({
       </p>
     );
   return (
-    <form action={addRoundAction} id={addRoundAnchor} data-add-round-form="">
+    <form action={addRoundAction} id={addRoundAnchor} data-add-round-form="" className="staff-form">
       <BasisFields basis={basis} />
       <input type="hidden" name="roundId" value={randomUUID()} />
-      <Field label={t('schedule.admin.addRoundName')}>
-        <input
-          name="label"
-          defaultValue={typed?.label ?? ''}
-          required
-          maxLength={120}
-          aria-describedby="add-round-name-help"
-          style={wide}
-        />
-      </Field>
-      {error('label')}
-      <p id="add-round-name-help" className="ui-field-help">
-        {t('schedule.admin.addRoundNameHelp')}
-      </p>
-      <Field label={t('schedule.admin.addRoundDate')}>
-        <input
-          type="date"
-          name="date"
-          defaultValue={typed === undefined || typed.date === '' ? suggested : typed.date}
-          required
-          aria-describedby="add-round-date-help"
-          style={wide}
-        />
-      </Field>
-      {error('date')}
-      <p id="add-round-date-help" className="ui-field-help">
-        {t('schedule.admin.addRoundNote')}
-      </p>
+      {/* Each field with its error and its help right under it, as one group. */}
+      <div className="admin-field-group">
+        <Field label={t('schedule.admin.addRoundName')}>
+          <input
+            name="label"
+            defaultValue={typed?.label ?? ''}
+            required
+            maxLength={120}
+            aria-describedby="add-round-name-help"
+            aria-invalid={problem?.field === 'label' ? true : undefined}
+          />
+        </Field>
+        {error('label')}
+        <p id="add-round-name-help" className="ui-field-help">
+          {t('schedule.admin.addRoundNameHelp')}
+        </p>
+      </div>
+      <div className="admin-field-group">
+        <Field label={t('schedule.admin.addRoundDate')}>
+          <input
+            type="date"
+            name="date"
+            defaultValue={typed === undefined || typed.date === '' ? suggested : typed.date}
+            required
+            aria-describedby="add-round-date-help"
+            aria-invalid={problem?.field === 'date' ? true : undefined}
+          />
+        </Field>
+        {error('date')}
+        <p id="add-round-date-help" className="ui-field-help">
+          {t('schedule.admin.addRoundNote')}
+        </p>
+      </div>
       {error('form')}
-      <p>
+      <p className="staff-buttons">
         <button type="submit" className="ui-button" data-kind="main">
           {t('schedule.admin.addRoundSubmit')}
         </button>
@@ -891,11 +983,18 @@ function AddRound(props: {
   readonly problem: AddRoundProblem;
 }) {
   return (
-    <section aria-label={t('schedule.admin.addRound')} data-add-round-section="">
-      <hr />
+    <section
+      className="admin-add-round"
+      aria-label={t('schedule.admin.addRound')}
+      data-add-round-section=""
+    >
       <details data-add-round="" open={props.problem !== undefined}>
-        <summary className="ui-button">{t('schedule.admin.addRound')}</summary>
-        <AddRoundForm {...props} />
+        <summary className="ui-button" data-icon="plus">
+          {t('schedule.admin.addRound')}
+        </summary>
+        <div className="staff-panel">
+          <AddRoundForm {...props} />
+        </div>
       </details>
     </section>
   );
@@ -936,8 +1035,10 @@ function savedHere(
   },
 ): { readonly place: SavedPlace; readonly node: ReactNode; readonly asks?: true } | undefined {
   if (saved === undefined) return undefined;
-  const said = (text: string, more?: ReactNode) => (
-    <div id={savedAnchor} className="ui-notice" role="status" data-notice="done">
+  // One notice in kinds told apart at a glance (step 2.103): saved, or removed with its
+  // way back.
+  const said = (text: string, more?: ReactNode, kind: 'saved' | 'removed' = 'saved') => (
+    <div id={savedAnchor} className="ui-notice" data-kind={kind} role="status" data-notice="done">
       <p>{text}</p>
       {more}
     </div>
@@ -958,7 +1059,10 @@ function savedHere(
     }
     case 'round-removed': {
       const after = roundOf(saved.afterRoundId)?.id ?? null;
-      return { place: { afterRound: after }, node: said(t('schedule.admin.savedRoundRemoved')) };
+      return {
+        place: { afterRound: after },
+        node: said(t('schedule.admin.savedRoundRemoved'), undefined, 'removed'),
+      };
     }
     case 'game-removed': {
       const roundShown = roundOf(saved.roundId);
@@ -984,7 +1088,10 @@ function savedHere(
         removed.status !== 'scheduled' ||
         !basis.canEdit
       ) {
-        return { place: { round }, node: said(t('schedule.admin.savedGameRemoved')) };
+        return {
+          place: { round },
+          node: said(t('schedule.admin.savedGameRemoved'), undefined, 'removed'),
+        };
       }
       const game = t('schedule.admin.gameVs', { away, home });
       return {
@@ -1001,6 +1108,7 @@ function savedHere(
             </p>
             <PutBack gameId={removed.id} basis={basis} />
           </div>,
+          'removed',
         ),
       };
     }
@@ -1106,22 +1214,28 @@ function PublishPanel({
         })}
       </p>
       {preview.clashes.length === 0 ? null : (
-        <p>{t.plural('schedule.admin.publishClashes', preview.clashes.length)}</p>
+        <p className="ui-notice">
+          {t.plural('schedule.admin.publishClashes', preview.clashes.length)}
+        </p>
       )}
       {preview.blockers.length > 0 ? (
-        <>
+        <div className="ui-notice" data-kind="error">
           <p>{t('schedule.admin.publishBlocked')}</p>
           <ul>
             {preview.blockers.map((b, i) => (
               <li key={`${b.code}-${i}`}>{noticeOf({ blocker: b.code })?.text}</li>
             ))}
           </ul>
-        </>
+        </div>
       ) : null}
       {preview.canPublish ? (
-        <form action={publishAction}>
+        <form action={publishAction} className="staff-form">
           <BasisFields basis={basis} />
-          <button type="submit">{t('schedule.admin.publishSubmit')}</button>
+          <p className="staff-buttons">
+            <button type="submit" className="ui-button" data-kind="main">
+              {t('schedule.admin.publishSubmit')}
+            </button>
+          </p>
         </form>
       ) : null}
     </>

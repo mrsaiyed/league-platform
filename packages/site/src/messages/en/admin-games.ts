@@ -6,8 +6,11 @@
 export const enAdminGames = {
   'admin.boxScore.back': 'Back to the games',
   'admin.boxScore.cellLabel': '{stat} for {name}',
+  'admin.boxScore.columnsKey': 'What the columns are',
   'admin.boxScore.done.reopen': 'The game is reopened. Fix the grid and save it again.',
   'admin.boxScore.done.save': 'The box score is saved and the game is final.',
+  // An empty box of a final game's grid, which is read and not filled in.
+  'admin.boxScore.empty': '–',
   'admin.boxScore.error.did-not-play-has-stats':
     'A player marked as not playing has numbers. Tick “Played” or clear the numbers.',
   'admin.boxScore.error.game-is-tracked':
@@ -52,6 +55,7 @@ export const enAdminGames = {
     'Leave a team’s score empty to use the total of its players’ points. A score you type is saved as you typed it, even if the players’ points add up to something else.',
   'admin.boxScore.scoreMismatch':
     'Check {team}: the score you typed is {score}, but its players’ points add up to {points}. It will be saved as {score} unless you change it.',
+  'admin.boxScore.teamShown': 'Team shown',
   'admin.boxScore.title': 'Box score: {away} at {home}',
   // The box score grid (step 2.64).
   'admin.games.boxScore': 'Box score',

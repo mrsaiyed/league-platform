@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { bears, games, hawks, liveLeagueId } from '../../server/tracker-endpoints.test-helper.ts';
 import { standInPlayerId } from '../../server/stand-in-games.ts';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
-import { CourtView, type CourtHandlers, type CourtSlots } from './court-view.tsx';
+import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
 import { endpointNetwork, type EndpointNetwork } from './endpoint-network.test-helper.ts';
 import { refusalText } from './engine-words.ts';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
@@ -159,6 +159,18 @@ const noHandlers: CourtHandlers = {
   more: () => undefined,
   swapColors: () => undefined,
   leave: () => () => undefined,
+  startClock: () => undefined,
+  pauseClock: () => undefined,
+  periodOver: () => undefined,
+  hideStart: () => undefined,
+  clockSheet: () => undefined,
+  clockKey: () => undefined,
+  setClock: () => undefined,
+  pickPeriod: () => undefined,
+  timeouts: () => undefined,
+  callTimeout: () => undefined,
+  answerTimeout: () => undefined,
+  takeBackTimeout: () => undefined,
 };
 
 /** The screen as it is drawn for `view`. */
@@ -171,6 +183,7 @@ function drawn(
     readonly slots?: CourtSlots;
     readonly when?: string | null;
     readonly account?: ReactNode;
+    readonly banner?: CourtBanner;
   } = {},
 ): string {
   return renderToStaticMarkup(
@@ -179,8 +192,8 @@ function drawn(
       view,
       title: 'Bears at Hawks',
       when: options.when === undefined ? 'Sat, 14 Nov, 7:00 PM' : options.when,
-      clock: '8:00',
-      banner: { text: 'All saved', state: 'saved' },
+      clock: { text: '8:00', running: false, over: false, start: null },
+      banner: options.banner ?? { text: 'All saved', short: ['All saved'], state: 'saved' },
       pad: options.pad ?? padAtRest,
       said: options.said ?? null,
       moreOpen: options.moreOpen ?? false,
@@ -218,6 +231,12 @@ const foulsDrawn = (html: string, id: string) =>
   Number(/data-fouls="(\d+)"/.exec(tileDrawn(html, id))?.[1]);
 /** The pad as drawn. */
 const padDrawn = (html: string): string => html.slice(html.indexOf('id="court-pad"'));
+/** The words of a piece of the screen, as they read, whatever they are wrapped in. */
+const wordsDrawn = (html: string): string =>
+  html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&#x27;/g, '’')
+    .replace(/&amp;/g, '&');
 
 describe('starting lineups (checklist C1 to C4)', () => {
   it('picks five by tapping, sets the lineup on the fifth, and draws the picks', async () => {
@@ -312,7 +331,15 @@ describe('a player’s options (checklist D1 to D11)', () => {
     const html = drawn(device.view(), { pad: { kind: 'player', playerId: h2 } });
     expect(foulsDrawn(html, h2)).toBe(1);
     expect(tagWith(padDrawn(html), 'data-act="unfoul"')).not.toContain('disabled');
-    expect(padDrawn(html)).toContain('On court · 1 foul · 0 pts · 0:00 played');
+    expect(wordsDrawn(padDrawn(html))).toContain('On court · 1 foul · 0 pts · 0:00 played');
+    // The line is drawn in the parts it can leave off where a device's letters are too
+    // wide for it: "On court" by itself, and the word after the minutes outside the part
+    // that always shows (which ends at the minutes, in their short form).
+    const line = padDrawn(html);
+    expect(line).toContain('<span class="court-who-where">On court · </span>');
+    expect(line).toMatch(
+      /<span class="court-who-core">.*<span data-minutes-of="[^"]+" data-minutes-played="">0:00<\/span><\/span> played<\/span>/,
+    );
   });
 
   it('marks a player at the league’s foul limit, and still scores them (D10)', async () => {
@@ -613,8 +640,29 @@ describe('the frame (checklist A3, A4, A6, I7, T1; DESIGN.md section 7, line 11)
       expect(top).toContain(piece);
     }
     expect(tagWith(top, 'data-saved-banner=""')).toContain('role="status"');
+    // "All saved" is said one way. What is longer is drawn at length and shorter too, a
+    // line for each thing it says: the stylesheet shows the short one on a phone whose
+    // scoreboard has no room for the long one.
+    expect(top).toContain('data-state="saved">All saved</p>');
+    const waiting = drawn(device.view(), {
+      banner: {
+        text: '12 actions waiting to send · 3 actions not saved',
+        short: ['12 to send', '3 not saved'],
+        state: 'trouble',
+      },
+    });
+    expect(waiting).toContain(
+      '<span class="court-banner-long">12 actions waiting to send · 3 actions not saved</span>' +
+        '<span class="court-banner-short"><span class="court-banner-line">12 to send</span>' +
+        '<span class="court-banner-dot"> · </span><span class="court-banner-line">3 not saved</span></span></p>',
+    );
+    // The clock's row, which step 2.36 filled: Start and the way to the timeouts; what
+    // step 2.37 adds (Undo, Redo) goes after them.
+    const controls = html.slice(html.indexOf('data-slot="clock-controls"'));
+    expect(controls.slice(0, controls.indexOf('</section>'))).toMatch(
+      /^data-slot="clock-controls" aria-label="Clock and undo"><button[^>]*data-clock-toggle=""[^>]*>.*<button[^>]*data-timeouts-open=""[^>]*><span class="court-timeouts-word">Timeouts<\/span>.*<span class="court-caret" aria-hidden="true"><\/span><\/button>$/s,
+    );
     // The places left: empty until the steps that own them.
-    expect(html).toContain('data-slot="clock-controls" aria-label="Clock and undo"></section>');
     expect(html).toContain('data-slot="play-log" aria-label="Plays"></section>');
     expect(html).toContain('data-slot="pad-rest"></div>');
     // The hint, in four sentences (I7).
