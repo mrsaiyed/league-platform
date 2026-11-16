@@ -650,7 +650,7 @@
   block-size: var(--step-5);
 }
 .staff .box-score-grid input[type='checkbox']::before {
-  border: 1px solid color-mix(in srgb, var(--color-text) 45%, transparent);
+  border: 1px solid var(--color-line-strong);
   border-radius: calc(var(--radius-small) - 2px);
   background: var(--color-panel);
 }

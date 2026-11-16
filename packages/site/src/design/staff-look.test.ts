@@ -92,6 +92,7 @@ beforeAll(() => {
       menuText: of('--staff-menu-text'),
       menuMuted: of('--staff-menu-muted'),
       menuLine: of('--staff-menu-line'),
+      menuEdge: of('--staff-menu-edge'),
       menuHover: of('--staff-menu-hover'),
       menuCurrent: of('--staff-menu-current'),
       onMenuCurrent: of('--staff-on-menu-current'),
@@ -136,6 +137,8 @@ describe('the staff area’s colors, for any league’s colors', () => {
           ['the menu’s words under the pointer', contrastRatio(c.menuText, c.menuHover), 7],
           ['quiet words on the menu', contrastRatio(c.menuMuted, c.menu), 4.5],
           ['quiet words under the pointer', contrastRatio(c.menuMuted, c.menuHover), 4.5],
+          // The menu button's edge is a control's (DESIGN.md line 17).
+          ['the edge of a control on the menu', contrastRatio(c.menuEdge, c.menu), 3],
         ];
       }),
     ).toEqual([]);

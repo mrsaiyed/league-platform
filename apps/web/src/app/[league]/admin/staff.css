@@ -126,7 +126,9 @@ html:has(.staff) {
   justify-content: center;
   inline-size: var(--tap);
   block-size: var(--tap);
-  border: 1px solid color-mix(in srgb, var(--staff-menu-text) 40%, transparent);
+  /* A control on a filled ground: its edge is the color of the words there, laid on as
+     strongly as it takes to stand 3 to 1 from the menu (line 17; staff-design.ts). */
+  border: 1px solid var(--staff-menu-edge);
   border-radius: var(--radius-small);
   list-style: none;
   cursor: pointer;
@@ -723,7 +725,9 @@ html:has(.staff) {
     select,
     textarea
   ) {
-  border-color: color-mix(in srgb, var(--color-text) 32%, transparent);
+  /* The edge of a control, worked out to stand 3 to 1 from the page and a panel
+     (DESIGN.md line 17; packages/site, frame-look.ts). */
+  border-color: var(--color-line-strong);
   background-color: var(--color-panel);
 }
 /* A field that cannot be changed is read, not filled in: no box around it and no faded

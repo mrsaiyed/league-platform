@@ -16,6 +16,7 @@ import { mixColors, readableOn, textOn } from './derived-colors.ts';
 import type { DesignDocument } from './design-document.ts';
 import { designToCssVariables } from './design-to-css.ts';
 import { fontStacks } from './fonts.ts';
+import { shareForEdge } from './frame-look.ts';
 
 /** The workspace before a league's main color is breathed into it: paper, a sheet, ink. */
 const paper = '#f6f4f1';
@@ -96,8 +97,9 @@ export type StaffColors = {
   readonly menuText: string;
   /** Quiet words and icons on the menu. */
   readonly menuMuted: string;
-  /** A fine line on the menu, and an item under the pointer. */
+  /** A fine line on the menu, the edge of a control on it, and an item under the pointer. */
   readonly menuLine: string;
+  readonly menuEdge: string;
   readonly menuHover: string;
   /**
    * The current item, filled with a tone of the main color that stands 3 to 1 from the
@@ -149,6 +151,9 @@ function colorsOf(main: string, dangerRed: string): StaffColors {
     // Quiet words read on the menu and on an item under the pointer.
     menuMuted: readableOn(mixColors('#ffffff', menu, 0.42), [menu, menuHover]),
     menuLine: mixColors(menu, '#ffffff', 0.14),
+    // The edge of a control on the menu (the menu's button): the color of the words
+    // there, as strongly as it takes to stand 3 to 1 from the menu (DESIGN.md line 17).
+    menuEdge: mixColors(menu, menuText, shareForEdge(menuText, [menu], 40) / 100),
     menuHover,
     menuCurrent,
     onMenuCurrent: textOn(menuCurrent, ['#ffffff', menuText]),
@@ -171,6 +176,7 @@ export function staffCssVariables(design: DesignDocument): Record<string, string
     '--staff-menu-text': colors.menuText,
     '--staff-menu-muted': colors.menuMuted,
     '--staff-menu-line': colors.menuLine,
+    '--staff-menu-edge': colors.menuEdge,
     '--staff-menu-hover': colors.menuHover,
     '--staff-menu-current': colors.menuCurrent,
     '--staff-on-menu-current': colors.onMenuCurrent,
