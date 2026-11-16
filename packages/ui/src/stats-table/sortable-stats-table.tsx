@@ -2,6 +2,7 @@
 
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { Emblem } from '../emblem/emblem.tsx';
+import { NoValue } from '../no-value/no-value.tsx';
 import { safeColor } from '../team-color.ts';
 import { nextSort, sortStatRows, type Sort, type StatRow } from './sort-stat-rows.ts';
 
@@ -16,6 +17,8 @@ export type StatsColumn = {
 export type StatsTableLabels = {
   /** Spoken on each heading button, before the column's name: "Sort by". */
   readonly sortBy: string;
+  /** Said to screen readers in a cell that holds no number, where a dash is drawn. */
+  readonly noValue?: string;
 };
 
 export type SortableStatsTableProps = {
@@ -36,6 +39,12 @@ export type SortableStatsTableProps = {
    * place of the plain chip of its color (docs/build/DESIGN.md, section 4, line 14).
    */
   readonly emblems?: boolean;
+  /**
+   * The key of a column that names the row's team. In a box as narrow as a phone's that
+   * column folds into the first: the team is its shield alone, before the row's name, with
+   * its name kept for screen readers, so the numbers come straight after the name.
+   */
+  readonly foldTeam?: string;
 };
 
 /**
@@ -60,6 +69,11 @@ function chipOf(row: StatRow, key: string, emblems: boolean): ReactNode {
   );
 }
 
+/** The words said after a figure this row draws quieter, when it does. */
+function quietWord(row: StatRow, key: string): string | undefined {
+  return row.quiet !== undefined && Object.hasOwn(row.quiet, key) ? row.quiet[key] : undefined;
+}
+
 /** A table of statistics the reader can sort by any column. Shows the initial sort without scripts. */
 export function SortableStatsTable({
   caption,
@@ -71,13 +85,17 @@ export function SortableStatsTable({
   locale,
   labels,
   emblems = false,
+  foldTeam,
 }: SortableStatsTableProps) {
   const [sort, setSort] = useState<Sort | null>(initialSort);
   const sorted = sortStatRows(rows, sort, locale);
   return (
     <div className="ui-table-frame">
       <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? caption}>
-        <table className="ui-table ui-stats">
+        <table
+          className="ui-table ui-stats"
+          data-fold={foldTeam === undefined ? undefined : 'true'}
+        >
           <caption dir="auto" className={captionHidden ? 'ui-visually-hidden' : undefined}>
             {caption}
           </caption>
@@ -91,6 +109,7 @@ export function SortableStatsTable({
                     scope="col"
                     className={i === 0 ? 'ui-team-cell' : c.numeric ? 'ui-num' : undefined}
                     aria-sort={active ?? 'none'}
+                    data-folded={c.key === foldTeam ? 'true' : undefined}
                   >
                     <button
                       type="button"
@@ -117,12 +136,31 @@ export function SortableStatsTable({
                   i === 0 ? (
                     <th key={c.key} scope="row" className="ui-team-cell">
                       {chipOf(row, c.key, emblems)}
+                      {foldTeam === undefined ? null : (
+                        <span className="ui-fold">{chipOf(row, foldTeam, true)}</span>
+                      )}
                       <span dir="auto">{row.cells[c.key] ?? ''}</span>
+                      {foldTeam === undefined ? null : (
+                        <span className="ui-fold ui-visually-hidden">
+                          <bdi>{row.cells[foldTeam] ?? ''}</bdi>
+                        </span>
+                      )}
                     </th>
                   ) : (
-                    <td key={c.key} className={c.numeric ? 'ui-num' : undefined}>
+                    <td
+                      key={c.key}
+                      className={c.numeric ? 'ui-num' : undefined}
+                      data-sorted={sort && sort.key === c.key ? 'true' : undefined}
+                      data-folded={c.key === foldTeam ? 'true' : undefined}
+                      data-quiet={quietWord(row, c.key) === undefined ? undefined : 'true'}
+                    >
                       {c.numeric ? (
-                        (row.cells[c.key] ?? '')
+                        <>
+                          {row.cells[c.key] ?? <NoValue word={labels.noValue} />}
+                          {quietWord(row, c.key) === undefined ? null : (
+                            <span className="ui-visually-hidden"> {quietWord(row, c.key)}</span>
+                          )}
+                        </>
                       ) : (
                         <>
                           {chipOf(row, c.key, emblems)}

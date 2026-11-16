@@ -650,9 +650,17 @@ describe('a game as a scoreboard', () => {
     // word too long even for a line of its own is cut short with "…", never split.
     const name =
       /\.ui-game-card\[data-layout='board'\] \.ui-game-team-name \{([^}]*)\}/.exec(css)?.[1] ?? '';
+    // The "…" needs the name's box to cut off what runs past it: 'hidden' first, which
+    // every browser we support knows (Safari 15 has no 'clip': there a long word ran out
+    // of its card with no "…"), then 'clip' where a browser knows it. Never by a
+    // physical 'overflow-x'. The name keeps room above and below for its letters' tails.
     expect(name).toMatch(
-      /overflow-wrap: normal;\s*hyphens: manual;\s*overflow-x: clip;\s*text-overflow: ellipsis;/,
+      /overflow-wrap: normal;\s*hyphens: manual;\s*overflow: hidden;\s*padding-block: var\(--step-1\);\s*margin-block: calc\(-1 \* var\(--step-1\)\);\s*text-overflow: ellipsis;/,
     );
+    expect(css).toMatch(
+      /@supports \(overflow: clip\) \{\s*\.ui-game-card\[data-layout='board'\] \.ui-game-team-name \{\s*overflow: clip;\s*\}\s*\}/,
+    );
+    expect(css).not.toMatch(/overflow-[xy]: clip/);
     expect(name).toMatch(/flex: 0 1 auto;\s*min-inline-size: 0;\s*max-inline-size: 100%;/);
     for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!/\.ui-game-(?:board|side)|data-layout='board'/.test(rule[1] ?? '')) continue;
@@ -786,9 +794,37 @@ describe('a game as a scoreboard', () => {
     // tint every text is fitted to, the accent for its words, and an edge at a line's
     // strength (DESIGN.md line 17: 12 to 25 percent). The same look on the big board and
     // on a round's "1 game postponed".
+    const softCard =
+      ".ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit']) .ui-game-state";
+    const softBoard = ".ui-scoreboard:not([data-pill='quiet']) .ui-game-state";
+    const roundMark = ".ui-group .ui-group-mark[data-kind='note']";
     expect(flat).toContain(
-      ".ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit']) .ui-game-state, .ui-scoreboard:not([data-pill='quiet']) .ui-game-state, .ui-group .ui-group-mark[data-kind='note'] { border-color: color-mix(in srgb, var(--color-accent) 25%, transparent); background: var(--color-tint); color: var(--color-accent-text); }",
+      `${softCard}, ${softBoard}, ${roundMark} { border-color: color-mix(in srgb, var(--color-accent) 25%, transparent); color: var(--color-accent-text); }`,
     );
+    // Its ground on a card and on the big board is one solid color, the panel with the
+    // tint in it: a see-through tint there lay over the card's own wash, and under a
+    // bright main color the pill's words fell short (measured, step 2.147 part 3). Only
+    // beside a round's name, on the page itself, is the tint see-through.
+    expect(flat).toContain(`${softCard}, ${softBoard} { background: var(--color-tint-panel); }`);
+    expect(flat).toContain(`${roundMark} { background: var(--color-tint); }`);
+    // And that is the ground each one ends up with: the last background any rule gives it.
+    const groundOf = (selector: string): string | undefined => {
+      let ground: string | undefined;
+      for (const rule of flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selectors = (rule[1] ?? '').split(/,(?![^(]*\))/).map((part) => part.trim());
+        if (!selectors.includes(selector)) continue;
+        ground = /(?:^|[;\s])background: ([^;]+);/.exec(rule[2] ?? '')?.[1] ?? ground;
+      }
+      return ground;
+    };
+    expect(groundOf(softCard)).toBe('var(--color-tint-panel)');
+    expect(groundOf(softBoard)).toBe('var(--color-tint-panel)');
+    expect(groundOf(roundMark)).toBe('var(--color-tint)');
+    // No rule lays the see-through tint under a state's pill on a card or a board.
+    for (const rule of flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\.ui-game-state/.test(rule[1] ?? '')) continue;
+      expect(rule[2], rule[1]).not.toMatch(/background: var\(--color-tint\);/);
+    }
     // No pill anywhere has a full-strength edge or the page's text color for its words.
     for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!/\.ui-game-state|ui-group-mark\[data-kind='note'\]/.test(rule[1] ?? '')) continue;
@@ -1084,6 +1120,14 @@ describe('the second landing’s smaller rules', () => {
     expect(laptop).toMatch(
       /\.ui-scoreboard-side:first-child > \.ui-scoreboard-score \{\s*grid-column: 2;\s*\}\s*\.ui-scoreboard-side:last-child > \.ui-scoreboard-score \{\s*grid-column: 4;\s*\}\s*\.ui-scoreboard-middle \{\s*grid-column: 3;/,
     );
+    // The two scores' places have one width, so the pill between them is in the middle of
+    // the board in every state. That width is reckoned from the size the figures are set
+    // in, never in "ch": a winner's heavier "0" is wider than the other's, and the Final
+    // and Forfeit pills stood about 8 pixels off the middle where the Live pill did not.
+    const place =
+      /\.ui-scoreboard-side > \.ui-scoreboard-score \{([^}]*)\}/.exec(laptop)?.[1] ?? '';
+    expect(place).toMatch(/min-inline-size: calc\(3 \* 0\.65em\);\s*text-align: center;/);
+    expect(place).not.toMatch(/\dch\b/);
   });
 
   it('keeps a left-over board of a narrow list the size of the others', () => {
@@ -1091,14 +1135,40 @@ describe('the second landing’s smaller rules', () => {
       /\.ui-card-grid\[data-layout='board'\]\[data-across='pair'\] > li:only-child \{\s*grid-column: 1 \/ -1;/,
     );
     expect(css).not.toMatch(/\[data-across='pair'\] > li:last-child:nth-child\(odd\)/);
+    // Nor is a hole left beside it (step 2.147 part 3): of an odd list of three or more it
+    // is the first board, the next game or the newest result, that takes the row.
+    expect(css).toMatch(
+      /\.ui-card-grid\[data-layout='board'\]\[data-across='pair'\]\s*> li:first-child:nth-last-child\(odd\):not\(:only-child\) \{\s*grid-column: 1 \/ -1;/,
+    );
+  });
+
+  it('never stretches a board that is a list by itself across the page: about 560 wide', () => {
+    // 8 × 64 + 48 = 560, from a tablet up, in a list at the page's width or in a column.
+    expect(css).toMatch(
+      /@media \(min-width: 48rem\) \{\s*\.ui-card-grid\[data-layout='board'\]:is\(\[data-across='two'\], \[data-across='pair'\]\) > li:only-child \{\s*max-inline-size: calc\(8 \* var\(--step-8\) \+ var\(--step-7\)\);/,
+    );
   });
 
   it('gives a table’s shield a little more than a line, and a round’s count its own line on a phone', () => {
     expect(css).toMatch(
       /\.ui-emblem\[data-size='small'\] \{\s*block-size: calc\(var\(--step-5\) \+ var\(--step-1\)\);/,
     );
+    // The count still has its own line, in line with the round's name. Since step 2.147
+    // part 3 it is the heading's own room at the start that puts it there (the mark that
+    // says the group opens stands in that room), so the count needs no margin of its own,
+    // and a note that wraps ("1 game postponed") wraps under the name too.
     expect(css).toMatch(
-      /@media \(max-width: 29\.99rem\) \{\s*\.ui-group-summary \{\s*flex: 1 1 100%;\s*margin-inline-start: var\(--step-5\);/,
+      /@media \(max-width: 29\.99rem\) \{\s*\.ui-group-summary \{\s*flex: 1 1 100%;\s*margin-inline-start: 0;/,
+    );
+    expect(css).toMatch(/\.ui-group > summary \{[^}]*padding-inline-start: var\(--step-6\);/);
+    expect(css).toMatch(
+      /\.ui-group > summary::before \{[^}]*position: absolute;[^}]*inset-inline-start: var\(--step-2\);/,
+    );
+  });
+
+  it('gives every state’s pill a line of its own on a phone, the long and the short alike', () => {
+    expect(css).toMatch(
+      /@media \(max-width: 47\.99rem\) \{\s*\.ui-game-card\[data-layout='board'\] \.ui-game-about \{\s*flex-basis: 100%;/,
     );
   });
 });
@@ -1128,11 +1198,72 @@ describe('a team’s card', () => {
     );
     expect(plain).toContain('<article class="ui-team-card">');
     expect(plain).not.toContain('red;x');
+    // The line is drawn as the shield's own lines are (the team's color with a little of
+    // the text color in it), so a dark team color shows on a dark page (step 2.147 part 3;
+    // it was the color at half strength, which a dark color lost on a dark panel).
     expect(css).toMatch(
-      /\.ui-team-card \{[^}]*border-block-start: var\(--line-heavy\) solid\s*color-mix\(in srgb, var\(--team-color, var\(--color-accent\)\) 50%, transparent\);/,
+      /\.ui-team-card \{[^}]*border-block-start: var\(--line-heavy\) solid\s*color-mix\(in srgb, var\(--team-color, var\(--color-accent\)\) 74%, var\(--color-text\)\);/,
+    );
+    expect(css).toMatch(
+      /\.ui-emblem \{[^}]*color: color-mix\(in srgb, var\(--emblem-color\) 74%, var\(--color-text\)\);/,
+    );
+    // Under the pointer the top line stays the team's.
+    expect(css).toMatch(
+      /\.ui-team-card:hover \{\s*border-inline-color: [^;]+;\s*border-block-end-color: [^;]+;\s*\}/,
     );
     expect(css).toMatch(/\.ui-team-card > \.ui-emblem \{\s*block-size: var\(--step-8\);/);
     expect(css).toMatch(/\.ui-team-card-figure \{[^}]*font-size: var\(--text-28\);/);
+  });
+
+  it('stands upright in a list of teams from a tablet up, three across, with a foot line', () => {
+    const html = render(
+      createElement(TeamCard, {
+        name: 'Owls',
+        href: '/x/teams/o',
+        figure: { label: 'Record', value: '2-1' },
+        facts: [{ key: 'seed', label: 'Seed', value: '1' }],
+        way: 'Roster',
+      }),
+    );
+    // The way on is only drawn: the card's one link is the team's name.
+    expect(html).toContain('<span class="ui-team-card-way" aria-hidden="true">Roster</span>');
+    expect(html.match(/<a /g)).toHaveLength(1);
+    expect(css).toMatch(/\.ui-team-card-way \{\s*display: none;/);
+    // The rules of the upright card: from a tablet up (the stylesheet with its notes taken out).
+    const upright =
+      /@media \(min-width: 48rem\) \{\s*\.ui-card-grid\[data-layout='teams'\] \{[\s\S]*?\n\}\n/.exec(
+        css,
+      )?.[0] ?? '';
+    expect(upright).toMatch(
+      /\.ui-card-grid\[data-layout='teams'\] \{\s*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);/,
+    );
+    expect(upright).toMatch(/\.ui-card-grid\[data-layout='teams'\] > li \{\s*grid-column: span 2;/);
+    // A shield of 72, the name in the display face at 22 (28 on a laptop).
+    expect(upright).toMatch(
+      /\.ui-team-card > \.ui-emblem \{\s*grid-column: 1 \/ -1;\s*block-size: calc\(var\(--step-8\) \+ var\(--step-2\)\);/,
+    );
+    expect(upright).toMatch(/\.ui-team-card-name \{[^}]*font-size: var\(--text-22\);/);
+    expect(upright).toMatch(/\.ui-team-card-way \{[^}]*display: inline-flex;/);
+    expect(css).toMatch(
+      /@media \(min-width: 64rem\) \{[\s\S]*?\.ui-card-grid\[data-layout='teams'\] \.ui-team-card-name \{\s*font-size: var\(--text-28\);/,
+    );
+  });
+
+  it('never splits a word of a team’s name', () => {
+    const name = /\.ui-team-card-name \{[^}]*\}/.exec(css)?.[0] ?? '';
+    expect(name).toMatch(/overflow-wrap: normal;/);
+    expect(name).toMatch(/hyphens: manual;/);
+    expect(name).toMatch(/text-overflow: ellipsis;/);
+    expect(name).not.toMatch(/hyphens: auto/);
+    // A word too long for a line of its own is cut short with "…" in Safari 15 too, which
+    // does not know 'clip': 'hidden' first, 'clip' only where a browser knows it.
+    expect(name).toMatch(
+      /overflow: hidden;\s*padding-block: var\(--step-1\);\s*margin-block: calc\(-1 \* var\(--step-1\)\);\s*text-overflow: ellipsis;/,
+    );
+    expect(name).not.toMatch(/overflow(-[a-z]+)?: clip/);
+    expect(css).toMatch(
+      /@supports \(overflow: clip\) \{\s*\.ui-team-card-name \{\s*overflow: clip;\s*\}\s*\}/,
+    );
   });
 });
 

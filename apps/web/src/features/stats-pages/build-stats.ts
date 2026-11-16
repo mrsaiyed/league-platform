@@ -10,7 +10,7 @@ import {
   type StatLeader,
   type StatLeaders,
 } from '@srleagues/core';
-import type { StatRow, StatsColumn } from '@srleagues/ui';
+import type { Sort, StatRow, StatsColumn } from '@srleagues/ui';
 import type { PublicStatsSettings } from '../../server/public-stats.ts';
 import type { StandingsReadStore } from '@srleagues/core';
 import { locale, t } from '../../server/messages.ts';
@@ -92,6 +92,10 @@ export type StatsPageData = {
   readonly teamRows: readonly StatRow[];
   /** Teams whose players' numbers this viewer does not see: only their totals are on the page. */
   readonly totalsOnlyTeams: readonly string[];
+  /** Those of them that have totals on the page: the teams the note under "Teams" names. */
+  readonly totalsNoteTeams: readonly string[];
+  /** How both tables are sorted when the page opens; nothing while the sport has no statistic. */
+  readonly openingSort: Sort | null;
 };
 
 export type StatsFailure = { readonly code: 'season-not-found' | 'invalid-input' };
@@ -160,6 +164,18 @@ function pageData(
     name.text ?? t('stats.unnamedPlayer');
   const valueOf = (entry: { total: number; average: number } | undefined): string | null =>
     entry === undefined ? null : shown(by === 'average' ? entry.average : entry.total, by);
+  // The numbers behind the written ones: a column is sorted by these, never by its words.
+  const numbersOf = (
+    stats: Readonly<Record<string, { total: number; average: number } | undefined>>,
+  ): Record<string, number> =>
+    Object.fromEntries(
+      table.statKeys.flatMap((key) => {
+        const entry = stats[key];
+        return entry === undefined
+          ? []
+          : [[key, by === 'average' ? entry.average : entry.total] as const];
+      }),
+    );
 
   const leaderColumns: StatsColumn[] = [
     { key: 'player', label: t('stats.col.player') },
@@ -234,6 +250,12 @@ function pageData(
       ...Object.fromEntries(table.statKeys.map((key) => [key, valueOf(player.stats[key])])),
     },
     chips: { team: colorOf(player.teamIds) },
+    sortValues: numbersOf(player.stats),
+    // Listed, not ranked: too few games for the league's leaders (the same rule core's
+    // leaders query applies). The games played are drawn quieter and say so.
+    ...(player.gamesPlayed < settings.minimumGames
+      ? { quiet: { games: t('stats.notRankedYet') } }
+      : {}),
     ...(player.teamIds.length > 1 ? { severalTeams: { team: true } } : {}),
   }));
   const teamColumns: StatsColumn[] = [{ key: 'team', label: t('stats.col.team') }, ...statColumns];
@@ -244,7 +266,11 @@ function pageData(
       ...Object.fromEntries(table.statKeys.map((key) => [key, valueOf(team.stats[key])])),
     },
     chips: { team: team.color },
+    sortValues: numbersOf(team.stats),
   }));
+  // The statistic both tables open sorted by, biggest first: points where the sport counts
+  // them, otherwise the first statistic it has.
+  const sortKey = table.statKeys.includes('points') ? 'points' : table.statKeys[0];
   return {
     by,
     minimumGames: settings.minimumGames,
@@ -254,5 +280,14 @@ function pageData(
     teamColumns,
     teamRows,
     totalsOnlyTeams: table.teams.filter((team) => !team.playerLinesShown).map((team) => team.name),
+    // Only a team that has totals on the page is named in the note: a team with no numbers
+    // recorded shows none, and the note must not say it does.
+    totalsNoteTeams: table.teams
+      .filter(
+        (team) =>
+          !team.playerLinesShown && table.statKeys.some((key) => team.stats[key] !== undefined),
+      )
+      .map((team) => team.name),
+    openingSort: sortKey === undefined ? null : { key: sortKey, direction: 'descending' },
   };
 }

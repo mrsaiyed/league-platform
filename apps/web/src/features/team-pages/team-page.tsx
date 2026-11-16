@@ -1,5 +1,13 @@
 import { leagueUrl, publicViewer } from '@srleagues/core';
-import { Emblem, EmptyPanel, PageHead, Section, SortableStatsTable } from '@srleagues/ui';
+import {
+  Emblem,
+  EmptyPanel,
+  NoValue,
+  PageHead,
+  Section,
+  SortableStatsTable,
+  StatStrip,
+} from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -50,7 +58,14 @@ function RosterTable({
           <tbody>
             {rows.map((row) => (
               <tr key={row.key}>
-                <td className="ui-num">{row.number}</td>
+                <td className="ui-num">
+                  {row.number === '' ? (
+                    // Someone with no number (a coach, say): a dash, never a blank cell.
+                    <NoValue word={t('team.noNumber')} />
+                  ) : (
+                    row.number
+                  )}
+                </td>
                 <th scope="row" className="ui-team-cell">
                   <span dir="auto">{row.name}</span>
                 </th>
@@ -86,40 +101,81 @@ export function RosterSections({ roster }: { readonly roster: RosterView }) {
   );
 }
 
-/** The team's statistics as its setting allows: totals always, player lines when shown. */
+/** How many statistics a team's totals may have and still stand beside the players' table. */
+const besideLimit = 4;
+
+/**
+ * The team's statistics as its setting allows: totals always, player lines when shown.
+ * The totals are a strip of big numbers under their small label, never a table of one row
+ * the width of the page: a few in one line, many wrapping onto a second (the strip's own
+ * doing). With few statistics the totals and the players' table stand side by side on a
+ * laptop, so a row's numbers stay near its name; with many each takes the page's width.
+ * A team with nothing recorded says so in a calm panel, whoever may see its players.
+ */
 export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
   const labels = displayLabels(t);
-  if (!stats.hasNumbers && stats.playerLinesShown) {
+  if (!stats.hasNumbers) {
     return <EmptyPanel text={t('team.statsNone')} />;
   }
+  const totals = stats.totalsRows[0];
+  const numbers =
+    totals === undefined
+      ? []
+      : stats.totalsColumns.slice(1).flatMap((column) => {
+          const value = totals.cells[column.key];
+          return value === null || value === undefined
+            ? []
+            : [{ key: column.key, label: column.fullName ?? column.label, value: String(value) }];
+        });
+  const beside = numbers.length > 0 && stats.totalsColumns.length - 1 <= besideLimit;
+  // The players open sorted by points, biggest first, as on the statistics page; by the
+  // first statistic where the sport has no points.
+  const sortColumn =
+    stats.playerColumns.find((column) => column.key === 'points') ??
+    stats.playerColumns.find((column) => column.numeric === true && column.key !== 'games');
+  const players =
+    stats.playerLinesShown && stats.playerRows.length > 0 ? (
+      <SortableStatsTable
+        caption={t('team.statsPlayers')}
+        columns={stats.playerColumns}
+        rows={stats.playerRows}
+        initialSort={
+          sortColumn === undefined ? null : { key: sortColumn.key, direction: 'descending' }
+        }
+        locale={locale}
+        labels={labels.stats}
+        emblems
+      />
+    ) : null;
   return (
-    <div className="ui-stack">
-      {stats.totalsRows.length > 0 ? (
-        <SortableStatsTable
-          caption={t('team.statsTotals')}
-          columns={stats.totalsColumns}
-          rows={stats.totalsRows}
-          locale={locale}
-          labels={labels.stats}
-          emblems
-        />
-      ) : null}
-      {stats.playerLinesShown ? (
-        stats.playerRows.length > 0 ? (
-          <SortableStatsTable
-            caption={t('team.statsPlayers')}
-            columns={stats.playerColumns}
-            rows={stats.playerRows}
-            locale={locale}
-            labels={labels.stats}
-            emblems
-          />
-        ) : null
-      ) : (
-        <p className="ui-section-note">{t('team.statsTotalsOnly')}</p>
+    <div className="team-stats" data-layout={beside && players !== null ? 'pair' : 'stack'}>
+      {numbers.length === 0 ? null : (
+        <div className="team-totals">
+          <p className="ui-eyebrow">{t('team.statsTotals')}</p>
+          <StatStrip label={t('team.statsTotals')} items={numbers} />
+          {stats.playerLinesShown ? null : (
+            <p className="ui-section-note">{t('team.statsTotalsOnly')}</p>
+          )}
+        </div>
       )}
+      {players}
     </div>
   );
+}
+
+/**
+ * Whether a team's results stand in the games' column beside the roster, or under both at
+ * the page's width. A long roster beside a short list of games to come would leave the
+ * games' column empty, so the results fill it; beside a short roster they would run far
+ * past it and leave the roster's column empty, so they take the width instead. Reckoned
+ * from how tall each is drawn: a row of two boards is about five roster lines.
+ */
+export function resultsBesideRoster(counts: {
+  readonly upcoming: number;
+  readonly rosterLines: number;
+}): boolean {
+  const boardRows = Math.max(1, Math.ceil(counts.upcoming / 2));
+  return counts.rosterLines > (boardRows + 1) * 5;
 }
 
 /** `/{league}/teams/{team}`: roster, schedule, results and statistics of one team. */
@@ -166,6 +222,24 @@ export async function TeamPage({
   const remembered = (await cookies()).get(myTeamCookieName(addressee.id))?.value;
   const isMine = remembered === head.team.slug;
   const seasonOption = season.isCurrent ? {} : { season: season.slug };
+  const resultsBeside = resultsBesideRoster({
+    upcoming: games.upcoming.length,
+    rosterLines: roster.current.length + roster.former.length,
+  });
+  const results = (
+    <Section title={t('team.results')}>
+      {games.results.length === 0 ? (
+        <EmptyPanel text={t('team.noResults')} />
+      ) : (
+        <GameList
+          leagueId={addressee.id}
+          games={games.results}
+          layout="board"
+          across={resultsBeside ? 'pair' : 'two'}
+        />
+      )}
+    </Section>
+  );
   return (
     <main>
       <nav className="ui-crumbs">
@@ -176,7 +250,7 @@ export async function TeamPage({
       </nav>
       <PageHead
         title={head.team.name}
-        eyebrow={season.name}
+        kicker={season.name}
         facts={[
           { key: 'seed', label: t('teams.col.seed'), value: head.seedValue },
           { key: 'record', label: t('teams.col.record'), value: head.recordText },
@@ -234,18 +308,7 @@ export async function TeamPage({
               />
             )}
           </Section>
-          <Section title={t('team.results')}>
-            {games.results.length === 0 ? (
-              <EmptyPanel text={t('team.noResults')} />
-            ) : (
-              <GameList
-                leagueId={addressee.id}
-                games={games.results}
-                layout="board"
-                across="pair"
-              />
-            )}
-          </Section>
+          {resultsBeside ? results : null}
         </div>
         <div className="team-roster">
           <Section title={t('team.roster')}>
@@ -253,6 +316,8 @@ export async function TeamPage({
           </Section>
         </div>
       </div>
+      {/* Beside a short roster the results take the page's width, under both columns. */}
+      {resultsBeside ? null : results}
       <Section title={t('team.stats')}>
         {stats === undefined ? (
           <EmptyPanel text={t('team.statsNone')} />
