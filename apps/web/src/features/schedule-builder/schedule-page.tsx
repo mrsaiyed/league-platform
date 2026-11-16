@@ -152,7 +152,13 @@ export async function ScheduleBuilderPage({
       : undefined;
   const plainNotice =
     published !== undefined ? (
-      <div className="ui-notice" role="status" data-notice="done" data-published="">
+      <div
+        className="ui-notice"
+        role="status"
+        data-kind="saved"
+        data-notice="done"
+        data-published=""
+      >
         <p>{published.text}</p>
         {published.next === undefined ? null : published.next.kind === 'link' ? (
           <p>

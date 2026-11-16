@@ -25,15 +25,18 @@
 
 /* ---------- The schedule ---------- */
 
-/* The season picker and the season's name, in one compact row under the page's head. */
-.admin-schedule-season {
+/* The season picker and the season's name, in one compact row under the page's head: on
+   the schedule and in Season settings alike. */
+.admin-schedule-season,
+.admin-season-pick {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--step-2) var(--step-4);
   margin-block-end: var(--step-4);
 }
-.staff .admin-schedule-season > * {
+.staff .admin-schedule-season > *,
+.staff .admin-season-pick > * {
   margin: 0;
 }
 /* How the draft stands: a pill, then the sentence. */
@@ -47,6 +50,8 @@
 }
 .admin-schedule > .ui-notice,
 .admin-schedule > .staff-panel,
+.admin-season > .ui-notice,
+.admin-season > .staff-panel,
 .admin-schedule > .admin-clashes,
 .admin-schedule > .admin-add-round {
   margin-block-end: var(--step-4);

@@ -28,6 +28,7 @@ export const enAdmin = {
   'admin.home.coming': 'Coming',
   'admin.home.purpose.games': 'Results, box scores and who scores each game.',
   'admin.home.purpose.schedule': 'Rounds, games, places and times.',
+  'admin.home.purpose.season': 'Who can see each season.',
   'admin.home.purpose.settings': 'The league’s rules and who sees what.',
   'admin.home.purpose.teams': 'Teams, rosters and jersey numbers.',
   'admin.home.sub': 'Everything you run for {league} is here.',

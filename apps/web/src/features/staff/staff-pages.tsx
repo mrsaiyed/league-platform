@@ -18,6 +18,7 @@ const purposes: Partial<Readonly<Record<Area, TextKey>>> = {
   teams: 'admin.home.purpose.teams',
   schedule: 'admin.home.purpose.schedule',
   games: 'admin.home.purpose.games',
+  season: 'admin.home.purpose.season',
   settings: 'admin.home.purpose.settings',
 };
 
