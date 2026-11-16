@@ -541,6 +541,7 @@ export const en = {
   'seasonSettings.intro': 'Settle how a season runs, and when visitors can see it.',
   'seasonSettings.noSeason': 'This league has no season yet.',
   'seasonSettings.seasonName': 'Season: {name}',
+  'seasonSettings.seasonNotFound': 'That season was not found, so this page shows {name}.',
   'seasonSettings.visibility.title': 'Who can see this season',
   'seasonSettings.visibility.hidden': 'Only the people who run the league can see {season}.',
   'seasonSettings.visibility.shown': 'Everyone can see {season}.',

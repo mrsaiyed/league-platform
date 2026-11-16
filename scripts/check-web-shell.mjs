@@ -445,6 +445,14 @@ const cases = [
     ['Only the people who run the league can see Winter 2027.', 'Show this season to visitors'],
     ['Everyone can see', 'Yes, show it'],
   ],
+  // A season the league does not list: the current one, said plainly, never "no season".
+  [
+    'owner',
+    '/north-valley/admin/season?season=no-such-season',
+    200,
+    ['That season was not found, so this page shows Fall 2026.', 'Everyone can see Fall 2026.'],
+    ['This league has no season yet.'],
+  ],
   // An address alone never makes the panel say something happened that did not.
   [
     'owner',

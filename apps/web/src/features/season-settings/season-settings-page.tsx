@@ -40,7 +40,12 @@ export async function SeasonSettingsPage({
   const context = commandContextOf(view.context);
   const holder = await ports.accessOf(context);
   const seasons = await ports.scheduleAdmin.seasonsOf(addressee.id, holder);
-  const chosen = chooseSeason(seasons, firstValue(search['season']));
+  // A `?season=` naming no season listed here falls back to the current or first one, and
+  // says so: the league has seasons, so "no season yet" would be untrue.
+  const asked = firstValue(search['season']);
+  const named = chooseSeason(seasons, asked);
+  const notFound = named === undefined && asked !== undefined && asked !== '';
+  const chosen = named ?? chooseSeason(seasons, undefined);
   const season = seasons.find((s) => s.id === chosen?.id);
   const top = (
     <>
@@ -77,6 +82,11 @@ export async function SeasonSettingsPage({
           options={seasons.map((s) => ({ value: s.slug, label: s.name }))}
         />
       )}
+      {notFound ? (
+        <p className="ui-notice" role="alert" data-kind="error">
+          {t('seasonSettings.seasonNotFound', { name: season.name })}
+        </p>
+      ) : null}
       <p>{t('seasonSettings.seasonName', { name: season.name })}</p>
       {read.ok ? (
         <VisibilityPanel
