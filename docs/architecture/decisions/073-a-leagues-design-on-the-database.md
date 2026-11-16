@@ -34,3 +34,4 @@ Saving drafts (`sites.design_draft`, `menu_draft`, `pages`) with the version che
 
 - A design's format changes (T-104): an upgrade on read, before the check, instead of the neutral design.
 - The editor arrives: the public read stays on the latest release; drafts are read only by the editor and preview.
+- A site is ever pointed back at an older release. The public read (`findPublishedDesign`) draws the league's highest-numbered release and does not look at `sites.published_release_id`. That is correct today, since every publish writes a new release and points the site at it (T3 §10: "latest"), so the two always agree. If a later step lets a site point at an older release instead of writing a new one, they will disagree, and the read must then follow the site's pointer.
