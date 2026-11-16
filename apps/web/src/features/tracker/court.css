@@ -1627,6 +1627,29 @@
 .court-timeouts .court-who {
   padding-inline-start: 6px;
 }
+/* While the timeouts are open, what the screen says ("Timeout taken back: Hawks, H2
+   6:30.") is drawn OVER the panel's first line, its title and the rule, and never above
+   the panel. A sentence that pushed the panel down put the "Full" button where − had been
+   a moment before: the second tap of a double tap on − then called a timeout (found by
+   the fix round's own double tap, in the browser). Nothing under the finger moves now;
+   the rule is back when the sentence goes, and × stays in reach beside it. */
+.court[data-pad-mode='timeouts'] .court-pad {
+  position: relative;
+}
+.court[data-pad-mode='timeouts'] .court-say {
+  /* The pad's own padding: its edge less its two lines, halved. */
+  --court-say-inset: calc((var(--court-pad-edge) - 2px) / 2);
+  position: absolute;
+  z-index: 1;
+  inset-block-start: var(--court-say-inset);
+  inset-inline: var(--court-say-inset) calc(var(--court-say-inset) + 54px);
+  display: flex;
+  align-items: center;
+  min-block-size: var(--court-who-height);
+}
+.court[data-pad-mode='timeouts'] .court-say:empty {
+  display: none;
+}
 .court-timeout-head {
   flex: 1;
   min-inline-size: 0;
@@ -2352,6 +2375,12 @@
   }
   .court-who-facts[data-out] .court-who-fouls {
     display: none;
+  }
+  /* What is said over the timeouts' first line, which is 40 high and narrow here: two
+     lines of smaller letters, so it covers that line and no more. */
+  .court[data-pad-mode='timeouts'] .court-say {
+    padding-block: 3px;
+    font-size: 13px;
   }
   .court-timeout-name {
     font-size: 11px;

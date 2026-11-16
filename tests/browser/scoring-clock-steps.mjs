@@ -198,8 +198,13 @@ export async function clockSteps(kit) {
             cross: getComputedStyle(bar.querySelector('[data-hide-start]')).opacity,
           };
         };
-        const began = performance.now();
         tap(pad.querySelector('[data-options] .court-close'));
+        // The pad is drawn at rest in the next frame or two: looked at the moment it is.
+        const waited = performance.now();
+        while (look() === null && performance.now() - waited < 1000) {
+          await new Promise((next) => requestAnimationFrame(next));
+        }
+        const began = performance.now();
         const early = look();
         // The tap that used to be swallowed with no sign: made while the button rests.
         const button = pad.querySelector('[data-start-clock]');
@@ -1091,13 +1096,30 @@ export async function clockSteps(kit) {
         await page.mouse.click(mx, my);
         const restingSeen = (await minus.getAttribute('data-resting')) !== null;
         await said(c, /^Timeout taken back: Hawks, H2 \d+:\d\d\.$/);
+        // While the sentence is on the screen nothing under the finger has moved: it is
+        // drawn over the panel's first line, not above the panel. (It used to push the
+        // panel down, and the second tap then landed on "Full" and called a timeout.)
+        const [minusNow, fullNow] = [await minus.boundingBox(), await none.boundingBox()];
+        const sayAt = await c.said.boundingBox();
+        note(
+          'what the screen says does not move − or the timeout buttons: it is drawn over the panel’s first line',
+          minusNow !== null &&
+            minusNow.x === minusAt.x &&
+            minusNow.y === minusAt.y &&
+            fullNow !== null &&
+            fullNow.y === at.y &&
+            sayAt !== null &&
+            sayAt.y + sayAt.height <= fullNow.y,
+          JSON.stringify({ minusAt, minusNow, fullBefore: at, fullNow, sayAt }),
+        );
         await page.waitForTimeout(500);
         await c.saved();
         note(
           'two fast taps on − take one timeout back, not two: − rests, is drawn resting, and the screen says which came back',
           (await takenInAll()) === 2 &&
             restingSeen &&
-            (await minus.getAttribute('data-resting')) === null,
+            (await minus.getAttribute('data-resting')) === null &&
+            (await c.timeoutsPad.locator('[data-timeout-ask]').count()) === 0,
           `${await takenInAll()} taken; drawn resting: ${restingSeen}`,
         );
         // A second, deliberate tap takes the next one back.
