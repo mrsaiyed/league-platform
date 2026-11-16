@@ -32,7 +32,12 @@
 //   hundred plays is measured and judged; the figures are printed, with how long the
 //   options and the count take to follow. And the tile counts a play only after the
 //   device's own store has finished writing it (T-114): the store's writes are timed.
+//   The clock runs through those hundred plays (step 2.36), and for three seconds after
+//   them its ticking is seen to change the clock's own place and nothing of any tile.
+// - Then the clock, periods, team fouls and timeouts of step 2.36, on the same game:
+//   scoring-clock-steps.mjs says what they check.
 // Accessibility checks on each state (T-186), and no sideways scrolling.
+import { clockSteps } from './scoring-clock-steps.mjs';
 import {
   addPlayers,
   court,
@@ -603,10 +608,17 @@ if (browser) {
       );
 
       // Before the first play the pad at rest says what to do next and, under it, how to
-      // score and how to substitute; at each of the five sizes it all fits (L3).
+      // score and how to substitute; at each of the five sizes it all fits (L3). With
+      // both lineups set, what to do next is the Start clock button of step 2.36, which
+      // says "Start it at the tip."; the words that said to tap the starters make way.
       for (const size of sizes) {
         await page.setViewportSize({ width: size.width, height: size.height });
-        await c.pad.locator('[data-pregame]').waitFor();
+        await c.pad.locator('[data-start-bar]').waitFor();
+        note(
+          `${size.width} x ${size.height}: before tip-off the pad says what to do next: start the clock at the tip`,
+          /Start clock · tip-off/.test(await c.pad.locator('[data-start-clock]').innerText()) &&
+            /Start it at the tip\./.test(await c.pad.locator('[data-start-bar]').innerText()),
+        );
         await restFits(page, `${size.width} x ${size.height}, before the first play`, 2);
       }
       await page.setViewportSize({ width: phone.width, height: phone.height });
@@ -880,7 +892,8 @@ if (browser) {
       // The options are seen open before the tap elsewhere, so "closed" after it is that
       // tap's doing and not the pad not yet drawn.
       await c.pad.locator('[data-options]').waitFor();
-      await c.root.locator('.court-clock').click();
+      // A team's box of the scoreboard: the clock beside it is a button since step 2.36.
+      await c.root.locator('.court-score').first().click();
       await c.pad.locator('[data-rest]').waitFor();
       note(
         'a tap anywhere else closes the options (D4)',
@@ -1631,8 +1644,11 @@ if (browser) {
           fold ? !/drag/i.test(hint) && /“Bench”/.test(hint) : /drag a bench player/.test(hint),
           hint,
         );
-        // And it fits (L3): all four sentences, the game being in play.
-        await restFits(page, `${label}, in play`, 4);
+        // And it fits (L3). The game is in play and its clock is stopped, so the pad
+        // begins with the Start clock button of step 2.36, whose own line says the rest:
+        // the hint is then its first two sentences. All four, with the clock running, are
+        // measured at each size by that step (scoring-clock-steps.mjs).
+        await restFits(page, `${label}, in play`, 2);
         // Where only its three dots show, More is still named for a screen reader.
         note(
           `${label}: the More button is named "More" for a screen reader, word shown or not`,
@@ -1848,6 +1864,24 @@ if (browser) {
     async () => {
       const { context, page } = await scorekeeperAt(phone);
       try {
+        // The clock's ticker is a timer of a quarter of a second (step 2.36): each of
+        // its ticks is timed, from outside the screen's code.
+        await context.addInitScript(() => {
+          window.clockTicks = [];
+          const set = window.setInterval;
+          window.setInterval = (run, ms, ...rest) =>
+            ms === 250
+              ? set(
+                  () => {
+                    const began = performance.now();
+                    run();
+                    window.clockTicks.push(performance.now() - began);
+                  },
+                  ms,
+                  ...rest,
+                )
+              : set(run, ms, ...rest);
+        });
         await page.goto(`${origin}${trackerPath()}`);
         const c = await openCourt(page);
         await c.saved();
@@ -1875,6 +1909,10 @@ if (browser) {
           'the banner tells the truth: 500 waiting to send',
           (await c.banner.getAttribute('data-state')) === 'waiting',
         );
+        // The clock is started (step 2.36) and runs through the hundred plays measured
+        // below: a running clock must never make a tile's tap late. Start is a tap like
+        // any other, kept on the device with no connection.
+        await c.startClock();
 
         // The processor slowed four times, as on a five-year-old tablet.
         const cdp = await context.newCDPSession(page);
@@ -2009,7 +2047,84 @@ if (browser) {
         // One run, and it is the answer: a run that misses is a failure, not a reason
         // to measure again.
         const times = await hundredPlays();
+        // The clock's ticking draws no tile again (step 2.36): for three seconds of a
+        // running clock, still slowed four times, with nobody tapping, the clock's own
+        // place changes and nothing of any tile does: no tile is replaced, none gains or
+        // loses a mark or a word. (Only the minutes' own places are written, and they
+        // are not shown on a phone.) The last play's mark has left its tile first.
+        await page.waitForFunction(
+          () => document.querySelector('[data-teams] [data-mark]') === null,
+        );
+        const ticking = await page.evaluate(
+          () =>
+            new Promise((resolve) => {
+              const teams = document.querySelector('[data-teams]');
+              const tiles = [...teams.querySelectorAll('[data-player]')];
+              const seen = { clock: 0, tiles: 0, minutes: 0 };
+              const onTiles = new MutationObserver((changes) => {
+                for (const change of changes) {
+                  const at =
+                    change.target.nodeType === Node.TEXT_NODE
+                      ? change.target.parentElement
+                      : change.target;
+                  if (at?.closest('[data-minutes-of]')) seen.minutes += 1;
+                  else seen.tiles += 1;
+                }
+              });
+              onTiles.observe(teams, {
+                subtree: true,
+                childList: true,
+                attributes: true,
+                characterData: true,
+              });
+              const onClock = new MutationObserver(() => (seen.clock += 1));
+              onClock.observe(document.querySelector('[data-clock-time]'), {
+                subtree: true,
+                childList: true,
+                characterData: true,
+              });
+              setTimeout(() => {
+                onTiles.disconnect();
+                onClock.disconnect();
+                const after = [...teams.querySelectorAll('[data-player]')];
+                // Every tick of the clock since it was started, the hundred plays
+                // included: how long each held the page (timed from outside the
+                // screen's code, by the watch put on its quarter-second timer).
+                const ticks = [...window.clockTicks].sort((a, b) => a - b);
+                resolve({
+                  ...seen,
+                  ticks: ticks.length,
+                  usual: ticks[Math.ceil(ticks.length * 0.95) - 1] ?? NaN,
+                  long: Math.max(0, ...ticks),
+                  running: document.querySelector('[data-clock-toggle]').dataset.state,
+                  sameTiles: tiles.length === after.length && tiles.every((t, i) => t === after[i]),
+                });
+              }, 3200);
+            }),
+        );
+        console.log(
+          `  the clock running, slowed 4 times: in 3.2 seconds its place written ${ticking.clock} times, a tile changed ${ticking.tiles} times; ${ticking.ticks} ticks through the hundred plays, each holding the page ${ticking.usual.toFixed(1)} ms or less 95 times in 100, the slowest ${ticking.long.toFixed(1)} ms`,
+        );
+        note(
+          'the clock’s ticking draws no tile again: only the clock’s own place changes',
+          ticking.running === 'pause' &&
+            ticking.clock >= 2 &&
+            ticking.clock <= 5 &&
+            ticking.tiles === 0 &&
+            ticking.sameTiles,
+          JSON.stringify(ticking),
+        );
+        // A tick is the clock read and, once a second, a few words written: with the
+        // processor slowed four times it takes less than the 16 ms of one frame, 95
+        // times in 100 as the taps are judged, so a tap made while the clock runs does
+        // not wait on it.
+        note(
+          'a tick of the clock holds the page for less than a frame (16 ms), 95 times in 100, slowed four times, through the hundred plays',
+          ticking.ticks >= 100 && ticking.usual < 16,
+          `${ticking.ticks} ticks, 95 in 100 within ${ticking.usual.toFixed(1)} ms, the slowest ${ticking.long.toFixed(1)} ms`,
+        );
         await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+        await c.pauseClock();
         note(
           'a player’s tap is painted within 100 ms, 95 times in 100',
           inTime(times.ringed),
@@ -2051,7 +2166,8 @@ if (browser) {
           null,
           { timeout: 180_000 },
         );
-        note('with the network back, all 600 waiting taps are saved', true);
+        // The 500 plays, the hundred measured, and the clock's Start and Pause.
+        note('with the network back, every waiting tap is saved', true);
       } finally {
         await letGo(page, context);
       }
@@ -2168,6 +2284,24 @@ if (browser) {
     } finally {
       await letGo(page, context);
     }
+  });
+
+  // Step 2.36: the clock, periods, team fouls and timeouts, on the game played above.
+  await clockSteps({
+    step,
+    note,
+    origin,
+    scorekeeperAt,
+    openCourt,
+    letGo,
+    tapWhereItIs,
+    measureTargets,
+    watchScrolling,
+    scrollsSeen,
+    twoFrames,
+    accessible,
+    keyboardOn,
+    restFits,
   });
 }
 

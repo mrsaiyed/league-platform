@@ -283,11 +283,15 @@ export function StartBar(props: {
           onClick={on.startClock}
         >
           <span className="court-mark-start" aria-hidden="true" />
-          <span className="court-start-title">
-            {t(clock.start.tipOff ? 'tracker.start.tipOff' : 'tracker.start.title')}
-          </span>
-          <span className="court-start-when">
-            {t('tracker.start.when', { period: period(view, t), clock: clock.text })}
+          {/* On one line where the pad is wide; the period and time go under the words
+              where it is narrow (a phone lying down), so neither is ever cut. */}
+          <span className="court-start-words">
+            <span className="court-start-title">
+              {t(clock.start.tipOff ? 'tracker.start.tipOff' : 'tracker.start.title')}
+            </span>
+            <span className="court-start-when">
+              {t('tracker.start.when', { period: period(view, t), clock: clock.text })}
+            </span>
           </span>
         </button>
         <button

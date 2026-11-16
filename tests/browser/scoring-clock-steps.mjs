@@ -1,0 +1,1018 @@
+// Step 2.36 in a real browser: the clock, periods, team fouls and timeouts of the scoring
+// screen, as steps of scoring-screen-test.mjs, which runs them last on the game its own
+// steps have played (fifteen a side, in play). Everything is tapped where it is on the
+// screen, as a finger taps it; nothing leaves this computer and everyone is made up.
+//
+// - Start and Pause differ in word and shape and are named for a screen reader; the clock
+//   counts down; the large Start clock button is in the pad at rest, says why the clock is
+//   stopped, and lies where no option of a picked player lies, so two fast taps on +2, on
+//   Foul or on × never start the clock; × and Escape hide it until the clock next stops.
+// - The clock's form has large keys, says what a time will do before it is set, is
+//   closed by × and by Escape with nothing changed, and a clock set wrongly is put right
+//   by setting it again. The period picker offers every period and three overtimes;
+//   "Halftime." and "End of H2." are said when the clock runs out, Start is then greyed
+//   as "Period over" and says why when tapped.
+// - A device whose own clock is 30 seconds slow, and one 30 seconds fast, show the game
+//   clock a correct device shows (finding M1): it counts from the server's time.
+// - Team fouls grow at the bonus and the double bonus; the badge is in the box of the team
+//   that shoots it; the bonus horn sounds one note, then two higher ones, with its
+//   sentence; a game opened already in the bonus is silent; and a device whose sound
+//   fails or is missing shows the badge and the sentence all the same, with no error.
+// - Timeouts: left by length, the clock stopped and why, "none left", the question before
+//   one too many with both answers, those taken, and the latest taken back.
+// - At the five sizes, in each state the clock adds, nothing tapped is under 44 x 44 or
+//   closer than 8 to the next, nothing scrolls, and each team's fouls and badge are whole
+//   in its box of the scoreboard.
+import { court, sizes, stopClockGame, trackerPath } from './tracker-driver.mjs';
+
+const [phone, phoneLying, tabletUpright, , phoneInBrowser] = sizes;
+
+/** "7:58" as seconds. */
+const seconds = (clock) => {
+  const [m, s] = clock.split(':').map(Number);
+  return m * 60 + s;
+};
+
+/** Where a thing is on the screen, as numbers a test can compare. */
+const rectOf = (locator) =>
+  locator.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  });
+const overlap = (a, b) =>
+  a.left < b.right - 0.5 &&
+  b.left < a.right - 0.5 &&
+  a.top < b.bottom - 0.5 &&
+  b.top < a.bottom - 0.5;
+
+/**
+ * The steps of step 2.36. `kit` is what scoring-screen-test.mjs has for every step: its
+ * notes, the browser at a size, opening and letting go of the game, and its measures.
+ */
+export async function clockSteps(kit) {
+  const { step, note, origin, scorekeeperAt, openCourt, letGo } = kit;
+  const { tapWhereItIs, measureTargets, watchScrolling, scrollsSeen, twoFrames } = kit;
+  const { accessible, keyboardOn, restFits } = kit;
+
+  /** The floor player of a team in place `nth`, whoever that is by now. */
+  const floor = (c, side, nth = 0) => c.root.locator(`[data-floor="${side}"] .court-tile`).nth(nth);
+  /** A foul on a floor player (by place, or the tile itself), through the screen's own buttons. */
+  const foul = async (c, side, which = 0) => {
+    const tile = typeof which === 'number' ? floor(c, side, which) : which;
+    const id = await tile.getAttribute('data-player');
+    const options = c.pad.locator(`[data-options="${id}"]`);
+    if (!(await options.isVisible())) await tile.click();
+    await c.recorded(() => options.locator('[data-act="foul"]').click());
+    await c.pad.locator('[data-rest]').waitFor();
+  };
+  /** Waits for the sentence the screen says next to hold `words`. */
+  const said = (c, words) => c.said.filter({ hasText: words }).waitFor();
+  /** The pad at rest for longer than the Start clock button waits after it comes to rest. */
+  const atRest = async (page, c) => {
+    await c.pad.locator('[data-rest]').waitFor();
+    await page.waitForTimeout(450);
+  };
+
+  await step('the clock: Start and Pause, the Start clock button, the form, periods', async () => {
+    // A foul or a timeout stops a running clock from here on (the league's own format is
+    // a running clock): the engine's switch, sent while the game is free.
+    await stopClockGame(origin);
+    const { context, page, errors } = await scorekeeperAt(phoneInBrowser);
+    try {
+      await page.goto(`${origin}${trackerPath()}`);
+      const c = await openCourt(page);
+      await c.saved();
+      // The first half, with time on the clock, whatever the steps before left.
+      if ((await c.clock.locator('[data-period]').getAttribute('data-period')) !== '1') {
+        await c.pickPeriod(1);
+      }
+      await c.setClock('1500');
+      await watchScrolling(page);
+
+      // --- Start, in a word and a shape; the large button in the pad says why (T2, T7, T9).
+      note(
+        'Start is named "Start the clock" for a screen reader and says "Start"',
+        (await page.getByRole('button', { name: 'Start the clock', exact: true }).isVisible()) &&
+          (await c.toggle.innerText()).trim() === 'Start' &&
+          (await c.toggle.locator('.court-mark-start').count()) === 1,
+      );
+      await atRest(page, c);
+      const bar = (await c.pad.locator('[data-start-bar]').innerText()).replace(/\s+/g, ' ');
+      note(
+        'the Start clock button is in the pad at rest, with the period, the time and why the clock is stopped',
+        /Start clock H1 · 15:00/.test(bar) &&
+          /The clock is stopped\. Scoring and substitutions still work\. × hides this button\./.test(
+            bar,
+          ),
+        bar,
+      );
+      await measureTargets(page, '390 x 664, the clock stopped');
+      await restFits(page, '390 x 664, the Start clock button offered', 2);
+      await accessible(page, 'the clock stopped, the Start clock button offered');
+
+      // It lies where no option of a picked player lies (the area 4 review of 2.35).
+      const [startAt, hideAt] = [await rectOf(c.startButton), await rectOf(c.hideStart)];
+      const tile = floor(c, 'home');
+      const tileId = await tile.getAttribute('data-player');
+      await tapWhereItIs(page, tile, 'a floor player');
+      const options = c.pad.locator(`[data-options="${tileId}"]`);
+      await options.waitFor();
+      const buttons = await options.locator('button').evaluateAll((els) =>
+        els
+          .filter((el) => el.getClientRects().length > 0)
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            return {
+              name: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30),
+              close: el.matches('.court-close'),
+              left: r.left,
+              top: r.top,
+              right: r.right,
+              bottom: r.bottom,
+            };
+          }),
+      );
+      const under = buttons.filter((b) => !b.close && overlap(b, startAt));
+      const closeAt = buttons.find((b) => b.close);
+      note(
+        'the Start clock button lies where no option of a picked player lies: not +1, +2, +3, Foul or a substitute',
+        buttons.length >= 9 && under.length === 0,
+        under.map((b) => b.name).join(', '),
+      );
+      note(
+        'its × is where the pad’s own × is, and nothing else of a player’s options is there',
+        closeAt !== undefined &&
+          overlap(closeAt, hideAt) &&
+          buttons.filter((b) => !b.close && overlap(b, hideAt)).length === 0,
+      );
+
+      // Two fast taps on +2, on Foul and on ×: one play each, and the clock is not started.
+      const twice = async (act) => {
+        if (!(await options.isVisible())) await tapWhereItIs(page, tile, 'a floor player');
+        await options.waitFor();
+        const target = act === 'close' ? options.locator('.court-close') : c.option(act);
+        const box = await target.boundingBox();
+        const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+        const before = Number(await c.root.getAttribute('data-plays'));
+        await page.mouse.click(x, y);
+        await page.waitForTimeout(90);
+        await page.mouse.click(x, y);
+        await atRest(page, c);
+        await c.saved();
+        return Number(await c.root.getAttribute('data-plays')) - before;
+      };
+      const twoOnPoints = await twice('p2');
+      const twoOnFoul = await twice('foul');
+      const twoOnClose = await twice('close');
+      note(
+        'two fast taps on +2, on Foul and on × record one basket, one foul and nothing, and never start the clock',
+        twoOnPoints === 1 &&
+          twoOnFoul === 1 &&
+          twoOnClose === 0 &&
+          (await c.toggle.getAttribute('data-state')) === 'start' &&
+          (await c.startButton.isVisible()),
+        JSON.stringify({ twoOnPoints, twoOnFoul, twoOnClose }),
+      );
+
+      // --- The large button starts the clock; Pause is a different word and shape (T2, T3).
+      await tapWhereItIs(page, c.startButton, 'the Start clock button');
+      await c.root.locator('[data-clock-toggle][data-state="pause"]').waitFor();
+      note(
+        'Pause is named "Pause the clock", says "Pause" and is drawn as two bars',
+        (await page.getByRole('button', { name: 'Pause the clock', exact: true }).isVisible()) &&
+          (await c.toggle.innerText()).trim() === 'Pause' &&
+          (await c.toggle.locator('.court-mark-pause').count()) === 1 &&
+          (await c.toggle.locator('.court-mark-start').count()) === 0,
+      );
+      note(
+        'while the clock runs the Start clock button is not offered',
+        !(await c.startButton.isVisible()),
+      );
+      const first = seconds(await c.clockText());
+      await page.waitForTimeout(2300);
+      const later = seconds(await c.clockText());
+      note(
+        'the clock counts down by itself',
+        first - later >= 1 && first - later <= 4,
+        `${first} to ${later} in 2.3 seconds`,
+      );
+      await measureTargets(page, '390 x 664, the clock running');
+      await restFits(page, '390 x 664, the clock running', 4);
+      await tapWhereItIs(page, c.toggle, 'Pause');
+      await c.root.locator('[data-clock-toggle][data-state="start"]').waitFor();
+      const paused = await c.clockText();
+      await page.waitForTimeout(1300);
+      note('paused, the clock stands still', (await c.clockText()) === paused);
+
+      // --- × and Escape hide the large button until the clock next stops (T10).
+      await atRest(page, c);
+      await tapWhereItIs(page, c.hideStart, 'the × of the Start clock button');
+      await c.startButton.waitFor({ state: 'detached' });
+      note(
+        '× hides the Start clock button; Start under the scoreboard is still there',
+        (await c.toggle.getAttribute('data-state')) === 'start' && (await c.toggle.isVisible()),
+      );
+      await c.startClock();
+      await c.pauseClock();
+      await c.startButton.waitFor();
+      note('once the clock stops again the Start clock button is back', true);
+      await page.keyboard.press('Escape');
+      await c.startButton.waitFor({ state: 'detached' });
+      note('Escape hides it too, and the keyboard is then on Start', await keyboardOn(c.toggle));
+      await c.startClock();
+      await c.pauseClock();
+      await c.startButton.waitFor();
+
+      // --- The clock's form: large keys, × and Escape, and setting it again (T5, M2).
+      await tapWhereItIs(page, c.clock, 'the clock');
+      await c.clockSheet.waitFor();
+      note(
+        'the clock opens a form named "Clock and period", and the keyboard is in it',
+        (await page.getByRole('dialog', { name: 'Clock and period' }).isVisible()) &&
+          (await c.clockSheet.evaluate((el) => el.contains(document.activeElement))),
+      );
+      await measureTargets(page, '390 x 664, the clock’s form');
+      await accessible(page, 'the clock’s form');
+      const keys = await c.clockSheet
+        .locator('[data-key]')
+        .evaluateAll((els) =>
+          els.map((el) =>
+            Math.min(el.getBoundingClientRect().width, el.getBoundingClientRect().height),
+          ),
+        );
+      note(
+        'the form has twelve keys, each 48 or more on its short side',
+        keys.length === 12 && keys.every((size) => size >= 47.99),
+        keys.map((size) => size.toFixed(0)).join(' '),
+      );
+      note(
+        'the whole form is on the screen and nothing in it scrolls',
+        await c.clockSheet.evaluate(
+          (el) =>
+            el.scrollHeight <= el.clientHeight &&
+            el.getBoundingClientRect().bottom <= window.innerHeight &&
+            el.querySelector('[data-set-clock]').getBoundingClientRect().bottom <=
+              window.innerHeight,
+        ),
+      );
+      const before = await c.clockText();
+      for (const key of ['6', '3', '0']) {
+        await tapWhereItIs(page, c.clockSheet.locator(`[data-key="${key}"]`), `the ${key} key`);
+      }
+      note(
+        'the keys fill the time from the right and the button names what it will do',
+        (await c.clockSheet.locator('[data-clock-entry]').innerText()).trim() === '6:30' &&
+          (await c.clockSheet.locator('[data-set-clock]').innerText()).trim() ===
+            'Set clock to 6:30',
+      );
+      await page.keyboard.press('Escape');
+      await c.root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
+      note(
+        'Escape closes the form with nothing changed, and the keyboard is back on the clock',
+        (await c.clockText()) === before && (await keyboardOn(c.clock)),
+      );
+      await c.typeClock('75');
+      note(
+        'a time the clock does not take is explained and cannot be set',
+        /Seconds go up to 59\./.test(await c.clockSheet.locator('[data-clock-note]').innerText()) &&
+          (await c.clockSheet.locator('[data-set-clock]').isDisabled()),
+      );
+      await tapWhereItIs(page, c.clockSheet.locator('.court-close'), 'the × of the clock’s form');
+      await c.root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
+      note('× closes the form with nothing changed', (await c.clockText()) === before);
+      // Typed on a keyboard, where there is one.
+      await c.clock.click();
+      await c.clockSheet.waitFor();
+      await page.keyboard.type('1800');
+      await page.keyboard.press('Backspace');
+      await page.keyboard.type('0');
+      const warning = await c.clockSheet.locator('[data-clock-note]').innerText();
+      note(
+        'time put back on the clock is said before it is set: it comes off the players’ minutes',
+        /^This puts \d+:\d\d back on, and takes it off the minutes of the players on the court\.$/.test(
+          warning.trim(),
+        ),
+        warning,
+      );
+      await tapWhereItIs(page, c.clockSheet.locator('[data-set-clock]'), 'Set clock');
+      await c.root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
+      await said(c, /^Clock set to 18:00\. \d+:\d\d went back on/);
+      note(
+        'the clock is set, stopped, and the screen says what came off the minutes',
+        (await c.clockText()) === '18:00' &&
+          (await c.toggle.getAttribute('data-state')) === 'start',
+      );
+      // Set wrongly: put right by setting it again (finding M2).
+      await c.setClock('1200');
+      const wrong = await c.clockText();
+      await c.setClock('1630');
+      note(
+        'a clock set wrongly is put right by setting it again',
+        wrong === '12:00' && (await c.clockText()) === '16:30',
+        `${wrong}, then ${await c.clockText()}`,
+      );
+
+      // --- The end of a period: "Halftime.", Start greyed, the way to the next (T2, T4, T6).
+      await c.setClock('2');
+      await c.startClock();
+      await c.root.locator('[data-clock-toggle][data-state="over"]').waitFor();
+      await said(c, /^Halftime\.$/);
+      const overToggle = c.toggle;
+      note(
+        'at 0:00 the clock is marked, and Start is greyed as "Period over", named with the reason',
+        (await c.clockText()) === '0:00' &&
+          (await c.clock.getAttribute('data-zero')) !== null &&
+          (await overToggle.innerText()).trim() === 'Period over' &&
+          (await overToggle.getAttribute('aria-disabled')) === 'true' &&
+          (await page
+            .getByRole('button', { name: 'Period over: pick the next period', exact: true })
+            .isVisible()),
+      );
+      await page.waitForTimeout(3400);
+      await tapWhereItIs(page, overToggle, 'the greyed Start');
+      await said(c, /^This period is over\. Pick the next period first\.$/);
+      note('tapped, the greyed Start says what to do, in a sentence', true);
+      await measureTargets(page, '390 x 664, the period over');
+      await restFits(page, '390 x 664, the period over', 2);
+      await accessible(page, 'the period over');
+      await tapWhereItIs(page, c.pickPeriodButton, 'Pick the next period');
+      await c.clockSheet.waitFor();
+      const periods = await c.clockSheet.locator('[data-period-pick]').evaluateAll((els) =>
+        els.map((el) => ({
+          name: el.querySelector('.court-opt-word').textContent,
+          now: el.getAttribute('aria-pressed') === 'true' && el.disabled,
+          next: el.getAttribute('data-next'),
+        })),
+      );
+      note(
+        'the picker offers both halves and three overtimes, the one played marked and the next one due',
+        periods.map((p) => p.name).join(' ') === 'H1 H2 OT1 OT2 OT3' &&
+          periods[0].now &&
+          periods[1].next === 'due' &&
+          periods.slice(2).every((p) => !p.now && p.next === null),
+        JSON.stringify(periods),
+      );
+      await c.recorded(() =>
+        tapWhereItIs(page, c.clockSheet.locator('[data-period-pick="2"]'), 'H2'),
+      );
+      await said(c, /^Start of H2\. Clock set to 20:00\.$/);
+      await c.startButton.waitFor();
+      note(
+        'picking a period sets the clock to its length, stopped, and the Start clock button says "Start of H2."',
+        (await c.clockText()) === '20:00' &&
+          (await c.clock.locator('[data-period]').innerText()).trim() === 'H2' &&
+          (await c.stopReason.innerText()).trim() === 'Start of H2.' &&
+          (await c.toggle.getAttribute('data-state')) === 'start',
+      );
+      note(
+        'team fouls start again with the new period (F5)',
+        (await c.teamFouls('home').innerText()).trim() === '0 fouls' &&
+          (await c.teamFouls('away').innerText()).trim() === '0 fouls',
+      );
+
+      // --- A foul on a running clock stops it, and says so (D8, T9).
+      await c.startClock();
+      // A player not yet at the foul limit: one who is has a sentence of their own.
+      const fouled = c.root.locator('[data-floor="home"] .court-tile:not([data-out])').first();
+      const fouledName = (await fouled.getAttribute('aria-label')).split(',')[0];
+      await foul(c, 'home', fouled);
+      await c.root.locator('[data-clock-toggle][data-state="start"]').waitFor();
+      await said(c, `Foul on ${fouledName}. Clock stopped.`);
+      await c.startButton.waitFor();
+      note(
+        'a foul on a running clock stops it; the Start clock button says who it was for',
+        (await c.stopReason.innerText()).trim() === `Stopped for a foul on ${fouledName}.`,
+        await c.stopReason.innerText(),
+      );
+      // A free throw on the stopped clock: scored as always, and the reason stays (T8).
+      await c.play('away', await floor(c, 'away').locator('.court-tile-number').innerText(), 'p1');
+      await atRest(page, c);
+      note(
+        'a free throw is scored on the stopped clock, and the button still says why it stopped',
+        (await c.stopReason.innerText()).trim() === `Stopped for a foul on ${fouledName}.` &&
+          (await c.toggle.getAttribute('data-state')) === 'start',
+      );
+
+      // --- "End of H2." at the end of the last period; overtime in the picker (T4, T6).
+      await c.setClock('2');
+      await c.startClock();
+      await c.root.locator('[data-clock-toggle][data-state="over"]').waitFor();
+      await said(c, /^End of H2\.$/);
+      await c.pickPeriod(3);
+      note(
+        'overtime is picked from the same form: OT1, at its own length',
+        (await c.clock.locator('[data-period]').innerText()).trim() === 'OT1' &&
+          (await c.clockText()) === '5:00',
+      );
+      note(
+        'overtime carries on the last period’s team fouls (F5)',
+        (await c.teamFouls('home').innerText()).trim() === '1 foul',
+        await c.teamFouls('home').innerText(),
+      );
+
+      const scrolled = await scrollsSeen(page);
+      note(
+        'nothing scrolled through all of it: Start, Pause, the form, the periods',
+        scrolled.events === 0 && scrolled.moved.length === 0,
+        JSON.stringify(scrolled),
+      );
+      await c.saved();
+      note('nothing broke on the page', errors.length === 0, errors.join('; '));
+    } finally {
+      await letGo(page, context);
+    }
+  });
+
+  // A device whose own clock is wrong (finding M1): its `Date` and the time its steady
+  // clock starts from are both moved, as on a tablet that was set wrongly. The game
+  // clock it shows is the one a correct device shows, because it counts from the
+  // server's time. Painted from the device's own time, a slow one would stand still for
+  // the first 30 seconds, and a fast one would drop 30 seconds at the tap.
+  for (const [what, wrong] of [
+    ['30 seconds slow', -30_000],
+    ['30 seconds fast', 30_000],
+  ]) {
+    await step(`a device whose clock is ${what} shows the same game clock (M1)`, async () => {
+      const { context, page, errors } = await scorekeeperAt(phone);
+      try {
+        await context.addInitScript((off) => {
+          const RealDate = Date;
+          const started = performance.timeOrigin + off;
+          Object.defineProperty(performance, 'timeOrigin', { get: () => started });
+          class DeviceDate extends RealDate {
+            constructor(...given) {
+              if (given.length === 0) super(RealDate.now() + off);
+              else super(...given);
+            }
+            static now() {
+              return RealDate.now() + off;
+            }
+          }
+          window.Date = DeviceDate;
+        }, wrong);
+        await page.goto(`${origin}${trackerPath()}`);
+        const c = await openCourt(page);
+        const device = await page.evaluate(() => Date.now());
+        note(
+          `the device’s own clock is ${what}`,
+          Math.abs(device - Date.now() - wrong) < 3_000,
+          String(device - Date.now()),
+        );
+        await c.setClock('400');
+        const tapped = Date.now();
+        await c.startClock();
+        await page.waitForTimeout(3200);
+        const shown = seconds(await c.clockText());
+        const ran = (Date.now() - tapped) / 1000;
+        // What a correct device shows: four minutes less the time that really passed,
+        // give or take the second the tap took to be taken and the rounding of the clock.
+        note(
+          `${what}: after ${ran.toFixed(1)} seconds the clock shows ${shown} seconds left, as a correct device does`,
+          Math.abs(240 - ran - shown) <= 1.6,
+          `${shown} shown, ${(240 - ran).toFixed(1)} on a correct device`,
+        );
+        await c.pauseClock();
+        const stopped = seconds(await c.clockText());
+        note(
+          `${what}: paused, it stops on the time it showed`,
+          shown - stopped >= 0 && shown - stopped <= 2,
+          `${shown}, then ${stopped}`,
+        );
+        await c.saved();
+        note('nothing broke on the page', errors.length === 0, errors.join('; '));
+      } finally {
+        await letGo(page, context);
+      }
+    });
+  }
+
+  await step('team fouls, the bonus badge and the bonus horn with its sentence', async () => {
+    // The notes the horn is asked to play are counted by the page itself.
+    const hears = (context) =>
+      context.addInitScript(() => {
+        window.hornNotes = [];
+        const Audio = window.AudioContext;
+        if (Audio === undefined) return;
+        const create = Audio.prototype.createOscillator;
+        Audio.prototype.createOscillator = function counted(...given) {
+          const oscillator = create.apply(this, given);
+          const set = oscillator.frequency.setValueAtTime.bind(oscillator.frequency);
+          oscillator.frequency.setValueAtTime = (value, at) => {
+            window.hornNotes.push(value);
+            return set(value, at);
+          };
+          return oscillator;
+        };
+      });
+    const notes = (page) => page.evaluate(() => window.hornNotes);
+    const level = (locator) => locator.getAttribute('data-level');
+    const { context, page, errors } = await scorekeeperAt(phoneLying);
+    try {
+      await hears(context);
+      await page.goto(`${origin}${trackerPath()}`);
+      const c = await openCourt(page);
+      await c.saved();
+      // The second half: the home team has the one foul the step before gave it there,
+      // the visitors none. (A period's fouls are its own: going back to it finds them.)
+      await c.pickPeriod(1);
+      await c.pickPeriod(2);
+      await page.waitForTimeout(3400);
+      // Going back to the first half found its bonus again, which the horn said: the
+      // notes are counted from here.
+      await page.evaluate(() => (window.hornNotes.length = 0));
+      note(
+        'each team’s fouls are in its box of the scoreboard, there from the first: "0 fouls"',
+        (await c.teamFouls('home').innerText()).trim() === '1 foul' &&
+          (await c.teamFouls('away').innerText()).trim() === '0 fouls' &&
+          (await level(c.teamFouls('away'))) === '0' &&
+          (await c.bonus('home').count()) === 0 &&
+          (await c.bonus('away').count()) === 0,
+        `${await c.teamFouls('home').innerText()} / ${await c.teamFouls('away').innerText()}`,
+      );
+      // Up to six by the home team: counted, no bonus yet (the bonus is on the seventh).
+      for (let i = 1; i < 6; i += 1) await foul(c, 'home', i % 5);
+      note(
+        'six team fouls: counted, not yet the bonus, and no horn',
+        (await c.teamFouls('home').innerText()).trim() === '6 fouls' &&
+          (await level(c.teamFouls('home'))) === '0' &&
+          (await c.bonus('away').count()) === 0 &&
+          (await notes(page)).length === 0,
+        JSON.stringify(await notes(page)),
+      );
+      await page.waitForTimeout(3400);
+      await foul(c, 'home', 1);
+      await c.bonus('away').waitFor();
+      await said(c, /^Bonus: Bears\.$/);
+      note(
+        'the seventh: the count grows, the OTHER team’s box gets "Bonus", the horn plays one note and the screen says it',
+        (await level(c.teamFouls('home'))) === '1' &&
+          (await c.bonus('away').textContent()) === 'Bonus' &&
+          (await level(c.bonus('away'))) === '1' &&
+          (await c.bonus('home').count()) === 0 &&
+          JSON.stringify(await notes(page)) === '[523]',
+        JSON.stringify(await notes(page)),
+      );
+      await foul(c, 'home', 2);
+      await foul(c, 'home', 3);
+      await page.waitForTimeout(3400);
+      await foul(c, 'home', 4);
+      await said(c, /^Double bonus: Bears\.$/);
+      note(
+        'the tenth: the count grows again, the badge says "Double bonus", the horn plays two higher notes',
+        (await level(c.teamFouls('home'))) === '2' &&
+          (await c.bonus('away').textContent()) === 'Double bonus' &&
+          (await level(c.bonus('away'))) === '2' &&
+          JSON.stringify(await notes(page)) === '[523,740,740]',
+        JSON.stringify(await notes(page)),
+      );
+      // A foul taken back drops it again, in silence.
+      await floor(c, 'home', 4).click();
+      await c.recorded(() => c.option('unfoul').click());
+      await c.root.locator('[data-bonus="away"][data-level="1"]').waitFor();
+      note(
+        'a foul taken back drops the badge to "Bonus" with no horn',
+        (await c.teamFouls('home').innerText()).trim() === '9 fouls' &&
+          (await notes(page)).length === 3,
+      );
+      await c.pad.locator('[data-rest]').waitFor();
+      await foul(c, 'home', 4);
+      // The visitors to ten as well: both boxes at their fullest.
+      for (let i = 0; i < 10; i += 1) await foul(c, 'away', i % 5);
+      await c.root.locator('[data-bonus="home"][data-level="2"]').waitFor();
+      await c.saved();
+      for (const size of sizes) {
+        await page.setViewportSize({ width: size.width, height: size.height });
+        await twoFrames(page);
+        const boxes = await page.evaluate(() =>
+          [...document.querySelectorAll('[data-score]')].map((box) => {
+            const edge = box.getBoundingClientRect();
+            const line = box.querySelector('.court-score-fouls');
+            const shown = [
+              ...line.querySelectorAll('.court-fouls-words, .court-fouls-short, .court-bonus'),
+            ]
+              .filter((el) => el.getClientRects().length > 0)
+              .map((el) => {
+                const r = el.getBoundingClientRect();
+                return {
+                  says: el.textContent,
+                  whole:
+                    r.left >= edge.left - 0.5 &&
+                    r.right <= edge.right + 0.5 &&
+                    r.top >= edge.top - 0.5 &&
+                    r.bottom <= edge.bottom + 0.5,
+                };
+              });
+            return { fits: line.scrollWidth <= line.clientWidth + 1, shown };
+          }),
+        );
+        note(
+          `${size.width} x ${size.height}: both teams in the double bonus: each box holds its fouls and "Double bonus" whole`,
+          boxes.length === 2 &&
+            boxes.every(
+              (box) =>
+                box.fits &&
+                box.shown.length === 2 &&
+                box.shown.every((part) => part.whole) &&
+                /^10( fouls|F)$/.test(box.shown[0].says) &&
+                box.shown[1].says === 'Double bonus',
+            ),
+          JSON.stringify(boxes),
+        );
+      }
+      await page.setViewportSize({ width: phoneLying.width, height: phoneLying.height });
+      await accessible(page, 'both teams in the double bonus');
+      note('nothing broke on the page', errors.length === 0, errors.join('; '));
+    } finally {
+      await letGo(page, context);
+    }
+
+    // Opened already in the bonus: silent. And the horn's failure never stops the screen:
+    // a device that refuses to make sound, and one with no sound at all, still show the
+    // badge and say the sentence, with no error.
+    const broken = {
+      'a device that refuses to make sound': () => {
+        window.AudioContext = class {
+          constructor() {
+            throw new DOMException('no sound allowed', 'NotAllowedError');
+          }
+        };
+        window.webkitAudioContext = undefined;
+      },
+      'a device with no sound at all': () => {
+        window.AudioContext = undefined;
+        window.webkitAudioContext = undefined;
+      },
+      'a device whose sound breaks as the note is made': () => {
+        window.AudioContext.prototype.createOscillator = () => {
+          throw new Error('no speaker');
+        };
+      },
+    };
+    for (const [device, breakSound] of Object.entries(broken)) {
+      const quiet = await scorekeeperAt(phoneInBrowser);
+      try {
+        await quiet.context.addInitScript(breakSound);
+        await quiet.page.goto(`${origin}${trackerPath()}`);
+        const c = await openCourt(quiet.page);
+        await c.bonus('away').waitFor();
+        note(
+          `${device}: a game opened already in the bonus says nothing`,
+          (await c.said.innerText()).trim() === '',
+        );
+        // Down to the bonus and up to the double again: the horn is asked for, and fails.
+        await floor(c, 'home', 4).click();
+        await c.recorded(() => c.option('unfoul').click());
+        await c.root.locator('[data-bonus="away"][data-level="1"]').waitFor();
+        await c.pad.locator('[data-rest]').waitFor();
+        await foul(c, 'home', 4);
+        await said(c, /^Double bonus: Bears\.$/);
+        await c.saved();
+        note(
+          `${device}: the badge and the sentence are there all the same, and the screen goes on`,
+          (await c.bonus('away').textContent()) === 'Double bonus' &&
+            (await c.toggle.isEnabled()) &&
+            quiet.errors.length === 0,
+          quiet.errors.join('; '),
+        );
+      } finally {
+        await letGo(quiet.page, quiet.context);
+      }
+    }
+  });
+
+  await step(
+    'timeouts: left by length, the question, those taken, taking the latest back',
+    async () => {
+      const { context, page, errors } = await scorekeeperAt(tabletUpright);
+      try {
+        await page.goto(`${origin}${trackerPath()}`);
+        const c = await openCourt(page);
+        await c.saved();
+        // A new half: two full timeouts each, and no 30-second ones in this league.
+        await c.pickPeriod(1);
+        await c.pickPeriod(2);
+        await page.waitForTimeout(3400);
+        const chip = (side) => c.root.locator(`[data-timeouts-chip="${side}"]`);
+        note(
+          'on a tablet each team’s heading says how many it has left, named in full for a screen reader',
+          (await chip('home').innerText()).trim() === 'Timeouts 2' &&
+            (await page.getByRole('button', { name: 'Hawks: 2 timeouts left' }).isVisible()),
+          await chip('home').innerText(),
+        );
+        await c.startClock();
+        await watchScrolling(page);
+        await tapWhereItIs(page, c.timeoutsButton, 'Timeouts');
+        await c.timeoutsPad.waitFor();
+        const padWords = (await c.timeoutsPad.innerText()).replace(/\s+/g, ' ');
+        note(
+          'the pad holds both teams’ timeouts, how many are left by length, and the rule in one line',
+          /Timeouts 2 full a half · 1 more each overtime · none carried over/.test(padWords) &&
+            /HAWKS Full 2 left None taken\./i.test(padWords) &&
+            /BEARS Full 2 left None taken\./i.test(padWords) &&
+            (await c.timeoutsPad.locator('[data-seconds="30"]').count()) === 0,
+          padWords,
+        );
+        note(
+          'the rule is read whole, never cut',
+          await c.timeoutsPad
+            .locator('.court-timeout-head')
+            .evaluate(
+              (el) => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight + 1,
+            ),
+        );
+        await measureTargets(page, '820 x 1180, the timeouts');
+        await accessible(page, 'the timeouts');
+        const clockBefore = seconds(await c.clockText());
+        await c.recorded(() => tapWhereItIs(page, c.timeoutButton('home'), 'Full, for Hawks'));
+        await said(c, /^Full timeout: Hawks\. Clock stopped\.$/);
+        await c.startButton.waitFor();
+        note(
+          'a timeout on a running clock stops it, the list closes, and the Start clock button says why',
+          (await c.toggle.getAttribute('data-state')) === 'start' &&
+            !(await c.timeoutsPad.isVisible()) &&
+            (await c.stopReason.innerText()).trim() === 'Stopped for a Hawks timeout.' &&
+            clockBefore - seconds(await c.clockText()) <= 3 &&
+            (await chip('home').innerText()).trim() === 'Timeouts 1',
+          await c.stopReason.innerText(),
+        );
+        await c.timeout('home');
+        await page.waitForTimeout(3400);
+        note(
+          'with none left the heading says so',
+          (await chip('home').innerText()).trim() === 'Timeouts 0' &&
+            (await chip('home').getAttribute('data-none')) !== null &&
+            (await page.getByRole('button', { name: 'Hawks: no timeouts left' }).isVisible()),
+        );
+        await c.timeoutsButton.click();
+        await c.timeoutsPad.waitFor();
+        const none = c.timeoutButton('home');
+        note(
+          'the button says "none left", and is named so',
+          /none left/.test(await none.innerText()) &&
+            (await none.getAttribute('aria-label')) === 'Full timeout for Hawks, none left',
+        );
+        const taken = c.timeoutsPad.locator('[data-timeouts-taken="home"] li');
+        note(
+          'those taken are listed with their period and clock time',
+          (await taken.count()) === 2 &&
+            (await taken.allInnerTexts()).every((line) => /^H2 \d+:\d\d · Full$/.test(line.trim())),
+          JSON.stringify(await taken.allInnerTexts()),
+        );
+        // Two fast taps on the button of a team with none left: asked, not recorded.
+        const plays = await c.root.getAttribute('data-plays');
+        const at = await none.boundingBox();
+        await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+        await page.waitForTimeout(90);
+        await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+        const ask = c.pad.locator('[data-timeout-ask]');
+        await ask.waitFor();
+        await page.waitForTimeout(500);
+        note(
+          'one more than the team has is asked about first, and two fast taps record nothing',
+          /^No full timeouts left for Hawks\. Officials charge a technical foul for an extra one\. Record it anyway\?/.test(
+            (await ask.innerText()).trim(),
+          ) && (await c.root.getAttribute('data-plays')) === plays,
+          await ask.innerText(),
+        );
+        await measureTargets(page, '820 x 1180, the question before a timeout too many');
+        await accessible(page, 'the question before a timeout too many');
+        await tapWhereItIs(page, ask.locator('[data-answer="no"]'), 'Do not record it');
+        await c.timeoutsPad.locator('[data-timeouts-of="home"]').waitFor();
+        note(
+          '"Do not record it" records nothing and goes back to the timeouts',
+          (await c.root.getAttribute('data-plays')) === plays && (await taken.count()) === 2,
+        );
+        await none.click();
+        await ask.waitFor();
+        await page.keyboard.press('Escape');
+        await c.timeoutsPad.locator('[data-timeouts-of="home"]').waitFor();
+        note('Escape answers no as well', (await c.root.getAttribute('data-plays')) === plays);
+        await none.click();
+        await ask.waitFor();
+        await page.waitForTimeout(450);
+        await c.recorded(() =>
+          tapWhereItIs(page, ask.locator('[data-answer="yes"]'), 'Record it anyway'),
+        );
+        await said(c, /^Full timeout: Hawks\.$/);
+        await c.timeoutsButton.click();
+        await c.timeoutsPad.waitFor();
+        note('"Record it anyway" records it: three taken', (await taken.count()) === 3);
+        // − takes back the latest, and says so; once more gives the team one back.
+        const minus = c.timeoutsPad.locator('[data-act="untimeout"][data-side="home"]');
+        note(
+          '− is named for what it takes back',
+          (await minus.getAttribute('aria-label')) === 'Take back the latest Hawks timeout',
+        );
+        await c.recorded(() => tapWhereItIs(page, minus, '−'));
+        await said(c, /^Timeout taken back: Hawks\.$/);
+        await c.recorded(() => minus.click());
+        note(
+          'taking back the latest gives it back: one taken, one left, and the list stays open',
+          (await taken.count()) === 1 &&
+            /Full 1 left/.test((await none.innerText()).replace(/\s+/g, ' ')) &&
+            (await none.getAttribute('data-none')) === null &&
+            (await c.timeoutsPad.isVisible()),
+        );
+        await page.keyboard.press('Escape');
+        await c.pad.locator('[data-rest]').waitFor();
+        note('Escape closes the timeouts', await keyboardOn(c.timeoutsButton));
+        const scrolled = await scrollsSeen(page);
+        note(
+          'nothing scrolled through the timeouts',
+          scrolled.events === 0 && scrolled.moved.length === 0,
+          JSON.stringify(scrolled),
+        );
+        await c.saved();
+        note('nothing broke on the page', errors.length === 0, errors.join('; '));
+      } finally {
+        await letGo(page, context);
+      }
+    },
+  );
+
+  await step('the five sizes: the clock’s states, their targets, nothing scrolling', async () => {
+    const { context, page, errors } = await scorekeeperAt(phone);
+    try {
+      await page.goto(`${origin}${trackerPath()}`);
+      const c = await openCourt(page);
+      await c.saved();
+      // The home team with none left, so the question can be asked at every size. (Its
+      // heading's chip knows, shown or not.)
+      const homeChip = c.root.locator('[data-timeouts-chip="home"]');
+      while ((await homeChip.getAttribute('data-none')) === null) await c.timeout('home');
+      await page.waitForTimeout(3400);
+      /** Measures the state the screen is in at each of the five sizes, then comes back. */
+      const atEverySize = async (state, more = async () => {}) => {
+        for (const size of sizes) {
+          await page.setViewportSize({ width: size.width, height: size.height });
+          const label = `${size.width} x ${size.height}, ${state}`;
+          await measureTargets(page, label);
+          const still = await page.evaluate(() => ({
+            page: document.scrollingElement.scrollHeight - window.innerHeight,
+            sideways: document.documentElement.scrollWidth - window.innerWidth,
+            panels: [...document.querySelectorAll('.court-team')].map(
+              (panel) => panel.scrollHeight - panel.clientHeight,
+            ),
+            board: [...document.querySelectorAll('[data-score], [data-clock]')].every((el) => {
+              const r = el.getBoundingClientRect();
+              return r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0;
+            }),
+            tiles: [...document.querySelectorAll('[data-floor] .court-tile')].every((el) => {
+              const r = el.getBoundingClientRect();
+              const pad = document.querySelector('[data-pad]').getBoundingClientRect();
+              const under =
+                r.bottom > pad.top + 0.5 &&
+                r.top < pad.bottom &&
+                r.right > pad.left &&
+                r.left < pad.right;
+              return r.top >= 0 && r.bottom <= window.innerHeight && !under;
+            }),
+          }));
+          note(
+            `${label}: nothing scrolls, the scoreboard and both fives are whole on the screen`,
+            still.page <= 0 &&
+              still.sideways <= 0 &&
+              still.panels.every((over) => over <= 0) &&
+              still.board &&
+              still.tiles,
+            JSON.stringify(still),
+          );
+          await more(size, label);
+        }
+        await page.setViewportSize({ width: phone.width, height: phone.height });
+        await twoFrames(page);
+      };
+      /** A thing is whole inside the pad, and on top there. */
+      const wholeInPad = (locator) =>
+        locator.evaluate((el) => {
+          const [r, pad] = [
+            el.getBoundingClientRect(),
+            document.querySelector('[data-pad]').getBoundingClientRect(),
+          ];
+          return (
+            r.left >= pad.left &&
+            r.right <= pad.right &&
+            r.top >= pad.top &&
+            r.bottom <= pad.bottom &&
+            el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2))
+          );
+        });
+
+      await c.startButton.waitFor();
+      await atEverySize('the clock stopped', async (size, label) => {
+        const box = await c.startButton.boundingBox();
+        note(
+          `${label}: the Start clock button is whole in the pad, 44 or more high and most of the pad wide`,
+          (await wholeInPad(c.startButton)) &&
+            (await wholeInPad(c.hideStart)) &&
+            box.height >= 43.99 &&
+            box.width >= 200,
+          JSON.stringify(box),
+        );
+        await restFits(page, label, 2);
+        // Start and Pause, the clock and the timeouts are named for a screen reader.
+        note(
+          `${label}: Start, the clock and the timeouts are each named for a screen reader`,
+          (await page.getByRole('button', { name: 'Start the clock', exact: true }).isVisible()) &&
+            (await page
+              .getByRole('button', { name: /Set the clock or change the period$/ })
+              .isVisible()) &&
+            (await page.getByRole('button', { name: 'Timeouts', exact: true }).isVisible()) &&
+            (await page.getByRole('button', { name: 'Hide the Start clock button' }).isVisible()),
+        );
+      });
+      await accessible(page, 'the clock stopped, at a phone upright');
+
+      await c.startClock();
+      await atEverySize('the clock running', async (size, label) => {
+        await restFits(page, label, 4);
+      });
+      await c.pauseClock();
+
+      await c.timeoutsButton.click();
+      await c.timeoutsPad.waitFor();
+      await atEverySize('the timeouts', async (size, label) => {
+        const parts = await c.timeoutsPad
+          .locator('button, .court-timeout-head, [data-timeouts-taken] li')
+          .evaluateAll((els) => {
+            const pad = document.querySelector('[data-pad]').getBoundingClientRect();
+            return els.every((el) => {
+              const r = el.getBoundingClientRect();
+              return (
+                r.left >= pad.left &&
+                r.right <= pad.right &&
+                r.top >= pad.top &&
+                r.bottom <= pad.bottom
+              );
+            });
+          });
+        note(`${label}: every button and every line of them is whole in the pad`, parts);
+      });
+      await c.timeoutButton('home').click();
+      await c.pad.locator('[data-timeout-ask]').waitFor();
+      await atEverySize('the question before a timeout too many', async (size, label) => {
+        note(
+          `${label}: the question and both answers are whole in the pad`,
+          (await wholeInPad(c.pad.locator('[data-answer="yes"]'))) &&
+            (await wholeInPad(c.pad.locator('[data-answer="no"]'))) &&
+            (await c.pad
+              .locator('[data-timeout-ask] p')
+              .evaluate((el) => el.scrollHeight <= el.clientHeight + 1)),
+        );
+      });
+      await page.waitForTimeout(450);
+      await c.pad.locator('[data-answer="no"]').click();
+      await c.pad.locator('.court-close').click();
+      await c.pad.locator('[data-rest]').waitFor();
+
+      await c.typeClock('1234');
+      await atEverySize('the clock’s form', async (size, label) => {
+        note(
+          `${label}: the whole form is on the screen, every key 44 or more, nothing in it scrolling`,
+          await c.clockSheet.evaluate((el) => {
+            const within = (part) => {
+              const r = part.getBoundingClientRect();
+              return (
+                r.top >= 0 &&
+                r.left >= 0 &&
+                r.bottom <= window.innerHeight &&
+                r.right <= window.innerWidth
+              );
+            };
+            const keys = [
+              ...el.querySelectorAll('[data-key], [data-period-pick], [data-set-clock]'),
+            ];
+            return (
+              el.scrollHeight <= el.clientHeight &&
+              within(el) &&
+              keys.length === 18 &&
+              keys.every((key) => {
+                const r = key.getBoundingClientRect();
+                return within(key) && r.width >= 43.99 && r.height >= 43.99;
+              })
+            );
+          }),
+        );
+      });
+      await c.clockSheet.locator('.court-close').click();
+      await c.root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
+
+      await c.setClock('1');
+      await c.startClock().catch(() => undefined);
+      await c.pickPeriodButton.waitFor();
+      await page.waitForTimeout(3400);
+      await atEverySize('the period over', async (size, label) => {
+        note(
+          `${label}: the way to the next period is whole in the pad`,
+          await wholeInPad(c.pickPeriodButton),
+        );
+        await restFits(page, label, 2);
+      });
+      await c.setClock('500');
+      await c.saved();
+      note('nothing broke on the page', errors.length === 0, errors.join('; '));
+    } finally {
+      await letGo(page, context);
+    }
+  });
+}

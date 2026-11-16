@@ -660,14 +660,17 @@
 .court-fouls-short {
   display: none;
 }
+/* The badge is no higher than the line it sits in, so the box is the same height with it
+   and without it. */
 .court-bonus {
-  padding-block: 2px;
+  padding-block: 1px;
   padding-inline: 5px;
   border: 1px solid var(--court-team-red);
   border-radius: 8px;
   color: var(--court-team-red);
   font-size: 11px;
   font-weight: 800;
+  line-height: 1;
   text-transform: uppercase;
 }
 .court-bonus[data-level='2'] {
@@ -1228,11 +1231,18 @@
   background: var(--court-gold);
   color: var(--court-gold-ink);
 }
+.court-start-words {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  column-gap: 10px;
+  min-inline-size: 0;
+  line-height: 1.1;
+}
 .court-start-when {
-  overflow: hidden;
   font-size: 15px;
   font-weight: 700;
-  text-overflow: ellipsis;
 }
 .court-start .court-close {
   align-self: center;
@@ -1243,8 +1253,12 @@
   line-height: 1.25;
 }
 /* While the Start clock button is offered the hint is its first two sentences, as before
-   the first play: the button's own line has said the rest. */
-.court-pad[data-start] .court-hint p:nth-of-type(n + 3) {
+   the first play: the button's own line has said the rest. And before tip-off, once both
+   lineups are set, the button IS what to do next ("Start it at the tip."), so the words
+   that said to check the numbers and tap the starters make way for it. */
+.court-pad[data-start] .court-hint p:nth-of-type(n + 3),
+.court-pad[data-start] .court-pregame > .court-label,
+.court-pad[data-start] .court-pregame > p {
   display: none;
 }
 .court-rest {
@@ -1541,6 +1555,10 @@
   padding: 4px;
   border: 2px solid var(--court-team-edge);
   border-radius: var(--court-radius);
+}
+/* − is 8 or more under the buttons that call a timeout. */
+.court-timeout-calls + .court-timeout-taken {
+  margin-block-start: 4px;
 }
 .court-timeout-name {
   flex: none;
@@ -1898,7 +1916,7 @@
 @media (max-width: 699px) and (orientation: portrait) {
   .court {
     --court-size-clock: 40px;
-    --court-size-score: 38px;
+    --court-size-score: 36px;
   }
   .court-board {
     gap: 6px;
@@ -1910,8 +1928,13 @@
     min-inline-size: 0;
     padding-inline: 3px;
   }
+  /* The row of Start and the timeouts is as high as the line of fouls it made room for. */
+  .court-controls {
+    min-block-size: 48px;
+  }
   .court-score-fouls {
     gap: 4px;
+    min-block-size: 16px;
     overflow: hidden;
   }
   .court-score-fouls[data-badge] .court-fouls-words {
@@ -1938,7 +1961,7 @@
 @media (max-width: 699px) and (max-height: 843px) and (orientation: portrait) {
   .court {
     --court-size-clock: 32px;
-    --court-size-score: 28px;
+    --court-size-score: 26px;
     --court-size-number: 24px;
     --court-tile-height: 56px;
     --court-chip-height: 44px;
@@ -2018,11 +2041,31 @@
     min-block-size: 18px;
     font-size: var(--court-size-small);
   }
+  /* Start and the timeouts are 8 above the chips of the team under them. */
   .court-controls {
     min-block-size: 44px;
+    margin-block-end: 2px;
   }
   .court-team-head {
     min-block-size: 44px;
+  }
+  /* A line of fouls was made room for on this screen, where every row counts: each
+     team's panel and its tiles give up a pixel or two of their own edges. */
+  .court-team {
+    padding-block-end: 3px;
+  }
+  .court-floor .court-tile {
+    padding-block: 1px;
+  }
+  .court-score-fouls {
+    min-block-size: 15px;
+  }
+  /* The clock's form: its keys a little lower, so the whole of it is on the screen. */
+  .court-keys {
+    grid-auto-rows: 48px;
+  }
+  .court-clock-note {
+    min-block-size: 32px;
   }
 }
 
@@ -2283,6 +2326,16 @@
   .court-teams {
     display: contents;
   }
+  /* The saved line sits in the first row, between the title and the buttons, upright as
+     lying down: the row it had under the scoreboard is what each team's box now uses
+     for its fouls and its bonus (step 2.36), so fifteen a side still fit upright. */
+  .court-top {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'title banner more'
+      'board board board'
+      'notices notices notices';
+  }
   .court-team[data-side='home'] {
     grid-area: home;
   }
@@ -2313,6 +2366,7 @@
   }
   .court-banner {
     min-block-size: 24px;
+    padding-inline: 12px;
     font-size: 15px;
   }
   .court-controls {
@@ -2490,16 +2544,6 @@
       'home pad away'
       'home log away';
     column-gap: 12px;
-  }
-  .court-top {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    grid-template-areas:
-      'title banner more'
-      'board board board'
-      'notices notices notices';
-  }
-  .court-banner {
-    padding-inline: 12px;
   }
   .court-team {
     align-self: start;

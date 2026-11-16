@@ -408,6 +408,11 @@ const states = [
     about: 'the last period’s clock ran out: "End of H2."',
     run: async (page) => {
       const c = court(page);
+      // Two team fouls for the home team and one for the visitors in the second half:
+      // overtime carries them on.
+      await c.play('home', 3, 'foul');
+      await c.play('home', 20, 'foul');
+      await c.play('away', 21, 'foul');
       await c.setClock('2');
       await c.startClock().catch(() => undefined);
       await c.pickPeriodButton.waitFor();

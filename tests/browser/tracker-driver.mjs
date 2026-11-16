@@ -84,14 +84,22 @@ export async function addPlayers(origin, players = morePlayers, game = liveGame)
  * another tablet, as the players are; the scorekeeper's switch on the screen is step 2.69.
  */
 export async function stopClockGame(origin, game = liveGame) {
-  await fromAnotherTablet(origin, [{ type: 'clock-mode', mode: 'stop' }], game);
+  // Refused when the game already stops its clock on fouls: that is the game wanted.
+  await fromAnotherTablet(origin, [{ type: 'clock-mode', mode: 'stop' }], game, {
+    refusalsAreFine: true,
+  });
 }
 
 /**
  * Sends taps to a game as a scorekeeper's device would (record 058), from a tablet that
  * is not the browser's, then lets go of the game so the browser can take it.
  */
-async function fromAnotherTablet(origin, inputs, game = liveGame) {
+async function fromAnotherTablet(
+  origin,
+  inputs,
+  game = liveGame,
+  { refusalsAreFine = false } = {},
+) {
   const post = async (at, body) => {
     const answer = await fetch(`${origin}/api/v1/leagues/${leagueId}/games/${game}${at}`, {
       method: 'POST',
@@ -108,12 +116,18 @@ async function fromAnotherTablet(origin, inputs, game = liveGame) {
   };
   const { sessionId } = await post('/session', { type: 'open', deviceId: 'setup-tablet' });
   const commands = inputs.map((input) => ({ commandId: randomUUID(), at: Date.now(), input }));
-  if (commands.length > 0) {
-    const reply = await post('/commands', { protocolVersion: 2, sessionId, commands });
-    const refused = reply.results.filter((r) => r.status !== 'accepted');
-    if (refused.length > 0) throw new Error(`taps refused: ${JSON.stringify(refused)}`);
+  try {
+    if (commands.length > 0) {
+      const reply = await post('/commands', { protocolVersion: 2, sessionId, commands });
+      const refused = reply.results.filter((r) => r.status !== 'accepted');
+      if (refused.length > 0 && !refusalsAreFine) {
+        throw new Error(`taps refused: ${JSON.stringify(refused)}`);
+      }
+    }
+  } finally {
+    // The game is let go of whatever happened, so the browser finds it free.
+    await post('/session', { type: 'release', sessionId });
   }
-  await post('/session', { type: 'release', sessionId });
 }
 
 /** The scoring screen on `page`: its parts, and the taps a scorekeeper makes. */
@@ -306,8 +320,16 @@ export function court(page) {
     /** Sets the clock through its form: '630' is 6:30. The clock is stopped by it. */
     async setClock(digits) {
       await this.typeClock(digits);
+      const typed = (
+        await root.locator('[data-clock-sheet] [data-clock-entry]').innerText()
+      ).trim();
       await root.locator('[data-clock-sheet] [data-set-clock]').click();
       await root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
+      // The form closes with the tap; the clock shows the time once the device has kept it.
+      await page.waitForFunction(
+        (time) => document.querySelector('[data-clock-time]')?.textContent === time,
+        typed,
+      );
     },
     /** Picks a period in the clock's form: 2 is the second, the first past regulation is overtime. */
     async pickPeriod(period) {
