@@ -139,7 +139,8 @@ describe('the scoring read of a public page', () => {
       headers: { 'Cache-Control': 'private, no-store' },
     };
     const leagueId = standInLeagues.live.id;
-    // A coach scores nowhere: answered before the games area is reached.
+    // A coach scores nowhere: no games, and no error (that the games area is not even reached
+    // is the next test's).
     expect(await askById('coach', leagueId, firstFive, true)).toEqual(none);
     // A scorekeeper's read reaches it, and its refusal is answered as no games.
     expect(await askById('scorekeeper', leagueId, firstFive, true)).toEqual(none);
@@ -155,6 +156,30 @@ describe('the scoring read of a public page', () => {
     await expect(
       scoringOffersRequest({ ok: true, context, ports: broken }, firstFive),
     ).rejects.toThrow('the games area broke');
+  });
+
+  it('never reaches the games area for someone who scores nowhere in the league', async () => {
+    // The early "scores nowhere" check, proven on its own: core would refuse them anyway, so
+    // only a games area that counts being reached tells whether the check ran first.
+    const world = trackerWorld();
+    const reachedBy = async (person: Person) => {
+      const context = await world.contextAs(person, 'live', ['scoring']);
+      let reached = 0;
+      const counting = {
+        accessOf: world.ports.accessOf,
+        games: () => {
+          reached += 1;
+          return world.ports.games.deps;
+        },
+      };
+      const answer = await scoringOffersRequest({ ok: true, context, ports: counting }, firstFive);
+      return { reached, status: answer.status };
+    };
+    for (const person of ['coach', 'stranger', 'otherAdmin'] as const) {
+      expect(await reachedBy(person), person).toEqual({ reached: 0, status: 200 });
+    }
+    // The counting games area is the one a scorekeeper's read does reach.
+    expect(await reachedBy('scorekeeper')).toEqual({ reached: 1, status: 200 });
   });
 
   it('gives a scorekeeper only their assigned games where only assigned ones may score', async () => {
