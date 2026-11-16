@@ -307,8 +307,9 @@ const adminPages = [
   // date of next year refused beside its field, with the date kept; the Falcons' page,
   // whose "Left the team" line has its put-back button and whose bin says how many people
   // are on the roster, ticked and ready to confirm; and a game removed from the schedule
-  // draft, answered "Removed: … Put it back".
-  ...['team-leaving-refused', 'team-left-and-bin'].map((step) => ({
+  // draft, answered "Removed: … Put it back". Step 2.180: the Badgers, with results and
+  // games to come, refused the bin, the sentence and its way on in the panel (A-17).
+  ...['team-leaving-refused', 'team-left-and-bin', 'team-bin-refused'].map((step) => ({
     name: `admin-${step}`,
     at: '/admin/teams',
     league: 'north-valley',
@@ -956,6 +957,21 @@ async function undoSteps(page, what) {
     await tapTo(
       formerly.getByRole('button', { name: 'Put back on the roster (marked by mistake)' }),
       /done=putBackNoNumber/,
+    );
+    return;
+  }
+  if (what === 'team-bin-refused') {
+    await tapTo(
+      page.locator('main').getByRole('link', { name: 'Badgers', exact: true }),
+      /\/admin\/teams\//,
+    );
+    const bin = page.locator('section', {
+      has: page.getByRole('heading', { name: 'Remove this team' }),
+    });
+    await bin.locator('input[name=confirm]').check();
+    await tapTo(
+      bin.getByRole('button', { name: 'Move the team to the bin' }),
+      /problem=teams\.remove_team/,
     );
     return;
   }
