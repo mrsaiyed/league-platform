@@ -14,13 +14,27 @@
 // yet (role_grants_scope_available), so no coach can exist on it; the stand-in's coach
 // holds nothing in Admin either.
 import {
+  addDraftGame,
+  addDraftRound,
+  changeDraftRoundDate,
   clearSetting,
   createSeason,
+  discardScheduleDraft,
   fail,
+  getScheduleDraft,
   getSeason,
+  listVenues,
   membersStartPage,
+  moveDraftGame,
   ok,
+  previewSchedulePublish,
+  publishSchedule,
+  removeDraftGame,
+  removeDraftRound,
+  renameDraftRound,
+  setDraftRecording,
   setSetting,
+  swapDraftGames,
   updateSeason,
   type CommandContext,
 } from '@srleagues/core';
@@ -364,5 +378,361 @@ describe("the seasons each person is told of (mayListSeason, the schedule admin'
     const theirs = await ports.scheduleAdmin.seasonsOf(otherLeagueId, theirOwner);
     expect(theirs.map((s) => s.name)).toEqual(['Spring Season']);
     expect(theirs.map((s) => s.id)).not.toContain(winterId);
+  });
+});
+
+// Admin → Schedule (half 2): every command the grid sends, through scheduleAdmin.deps, on
+// the seed's Winter Season (of the default program). Reading the schedule is the owner's,
+// the admins', the schedulers' at its program and the scorekeepers' (P4 §4,
+// `schedule.read`); editing the draft and publishing it the owner's, the admins' and the
+// schedulers' at its program (`schedule.edit`, `schedule.publish`).
+const readers: readonly Actor[] = [
+  'owner',
+  'admin',
+  'scheduler',
+  'programScheduler',
+  'scorekeeper',
+];
+const editors: readonly Actor[] = ['owner', 'admin', 'scheduler', 'programScheduler'];
+
+/** The Winter Season's schedule as the owner reads it. */
+async function draftNow() {
+  const read = await getScheduleDraft(
+    contextOf('owner'),
+    { seasonId: winterId },
+    ports.scheduleAdmin.deps,
+  );
+  if (!read.ok) throw new Error(`the owner cannot read the schedule: ${read.error.code}`);
+  return read.value;
+}
+/** What the next edit names: the latest revision and the draft's id and version. */
+const basisOf = (view: Awaited<ReturnType<typeof draftNow>>) => ({
+  seasonId: winterId,
+  basedOnRevision: view.latestRevision,
+  version: view.draft?.version ?? null,
+  draftId: view.draft?.id ?? null,
+});
+const must = <T>(what: string, result: { ok: true; value: T } | { ok: false; error: unknown }) => {
+  if (!result.ok) throw new Error(`${what}: ${JSON.stringify(result.error)}`);
+  return result.value;
+};
+
+/**
+ * A draft of its own, made by the owner from nothing: a round with two games in it and an
+ * empty round. Any draft left by the run before is discarded first.
+ */
+async function freshDraft(teams: readonly string[]) {
+  const as = contextOf('owner');
+  const deps = ports.scheduleAdmin.deps;
+  const before = await draftNow();
+  if (before.draft !== null) {
+    must(
+      'discard',
+      await discardScheduleDraft(
+        as,
+        { seasonId: winterId, draftId: before.draft.id, version: before.draft.version },
+        deps,
+      ),
+    );
+  }
+  const roundId = randomUUID();
+  const emptyRoundId = randomUUID();
+  const [g1, g2] = [randomUUID(), randomUUID()];
+  must(
+    'round',
+    await addDraftRound(
+      as,
+      { ...basisOf(await draftNow()), roundId, label: 'Week 1', date: '2026-12-13' },
+      deps,
+    ),
+  );
+  must(
+    'empty round',
+    await addDraftRound(
+      as,
+      {
+        ...basisOf(await draftNow()),
+        roundId: emptyRoundId,
+        label: 'Week 2',
+        date: '2026-12-20',
+      },
+      deps,
+    ),
+  );
+  for (const [gameId, home, away, time] of [
+    [g1, teams[0], teams[1], '18:00'],
+    [g2, teams[2], teams[3], '20:00'],
+  ] as const) {
+    must(
+      'game',
+      await addDraftGame(
+        as,
+        {
+          ...basisOf(await draftNow()),
+          gameId,
+          homeTeamId: home ?? '',
+          awayTeamId: away ?? '',
+          roundId,
+          date: '2026-12-13',
+          time,
+          venueId: null,
+          court: null,
+        },
+        deps,
+      ),
+    );
+  }
+  const view = await draftNow();
+  return { view, basis: basisOf(view), roundId, emptyRoundId, g1, g2 };
+}
+
+type Fresh = Awaited<ReturnType<typeof freshDraft>>;
+type Outcome = { readonly ok: boolean; readonly error?: unknown };
+type GridCommand = {
+  readonly name: string;
+  readonly who: readonly Actor[];
+  readonly run: (context: CommandContext, s: Fresh, teams: readonly string[]) => Promise<Outcome>;
+};
+
+const gridCommands: readonly GridCommand[] = [
+  {
+    name: 'getScheduleDraft',
+    who: readers,
+    run: (c) => getScheduleDraft(c, { seasonId: winterId }, ports.scheduleAdmin.deps),
+  },
+  {
+    name: 'listVenues',
+    // Venues are the league's, shared by every program: a scheduler of any program reads them.
+    who: [...readers, 'otherProgramScheduler'],
+    run: (c) => listVenues(c, {}, ports.scheduleAdmin.deps),
+  },
+  {
+    name: 'addDraftGame',
+    who: editors,
+    run: (c, s, teams) =>
+      addDraftGame(
+        c,
+        {
+          ...s.basis,
+          gameId: randomUUID(),
+          homeTeamId: teams[4] ?? '',
+          awayTeamId: teams[5] ?? '',
+          roundId: s.roundId,
+          date: '2026-12-13',
+          time: '19:00',
+          venueId: null,
+          court: null,
+        },
+        ports.scheduleAdmin.deps,
+      ),
+  },
+  {
+    name: 'moveDraftGame',
+    who: editors,
+    run: (c, s) =>
+      moveDraftGame(
+        c,
+        {
+          ...s.basis,
+          gameId: s.g1,
+          roundId: s.emptyRoundId,
+          date: '2026-12-20',
+          time: '17:00',
+          venueId: null,
+          court: null,
+        },
+        ports.scheduleAdmin.deps,
+      ),
+  },
+  {
+    name: 'swapDraftGames',
+    who: editors,
+    run: (c, s) =>
+      swapDraftGames(c, { ...s.basis, gameId: s.g1, otherGameId: s.g2 }, ports.scheduleAdmin.deps),
+  },
+  {
+    name: 'removeDraftGame',
+    who: editors,
+    run: (c, s) => removeDraftGame(c, { ...s.basis, gameId: s.g1 }, ports.scheduleAdmin.deps),
+  },
+  {
+    name: 'setDraftRecording',
+    who: editors,
+    run: (c, s) =>
+      setDraftRecording(
+        c,
+        { ...s.basis, gameId: s.g1, recording: 'live' },
+        ports.scheduleAdmin.deps,
+      ),
+  },
+  {
+    name: 'addDraftRound',
+    who: editors,
+    run: (c, s) =>
+      addDraftRound(
+        c,
+        { ...s.basis, roundId: randomUUID(), label: 'Week 3', date: '2026-12-27' },
+        ports.scheduleAdmin.deps,
+      ),
+  },
+  {
+    name: 'renameDraftRound',
+    who: editors,
+    run: (c, s) =>
+      renameDraftRound(
+        c,
+        { ...s.basis, roundId: s.roundId, label: 'Opening week' },
+        ports.scheduleAdmin.deps,
+      ),
+  },
+  {
+    name: 'changeDraftRoundDate',
+    who: editors,
+    run: (c, s) =>
+      changeDraftRoundDate(
+        c,
+        { ...s.basis, roundId: s.roundId, date: '2026-12-14' },
+        ports.scheduleAdmin.deps,
+      ),
+  },
+  {
+    name: 'removeDraftRound',
+    who: editors,
+    run: (c, s) =>
+      removeDraftRound(c, { ...s.basis, roundId: s.emptyRoundId }, ports.scheduleAdmin.deps),
+  },
+  {
+    name: 'discardScheduleDraft',
+    who: editors,
+    run: (c, s) =>
+      discardScheduleDraft(
+        c,
+        { seasonId: winterId, draftId: s.basis.draftId ?? '', version: s.basis.version ?? 1 },
+        ports.scheduleAdmin.deps,
+      ),
+  },
+  {
+    name: 'previewSchedulePublish',
+    who: editors,
+    run: (c) => previewSchedulePublish(c, { seasonId: winterId }, ports.scheduleAdmin.deps),
+  },
+  {
+    name: 'publishSchedule',
+    who: editors,
+    run: (c, s) =>
+      publishSchedule(
+        c,
+        {
+          seasonId: winterId,
+          basedOnRevision: s.basis.basedOnRevision,
+          draftId: s.basis.draftId ?? '',
+          version: s.basis.version ?? 1,
+        },
+        ports.scheduleAdmin.deps,
+      ),
+  },
+];
+
+describe('Admin → Schedule on the database ports, role by role', () => {
+  let teams: readonly string[] = [];
+  beforeAll(async () => {
+    teams = (await ports.scheduleAdmin.teamsOf(leagueId, winterId)).map((t) => t.id);
+  });
+
+  it("lists the season's teams by name, and none of another season or league", async () => {
+    const named = await ports.scheduleAdmin.teamsOf(leagueId, winterId);
+    expect(named.map((t) => t.name)).toEqual([
+      'Lakeside Foxes',
+      'Lakeside Gulls',
+      'Lakeside Herons',
+      'Lakeside Otters',
+      'Lakeside Owls',
+      'Lakeside Pines',
+    ]);
+    expect(await ports.scheduleAdmin.teamsOf(leagueId, campSeasonId)).toEqual([]);
+    expect(await ports.scheduleAdmin.teamsOf(otherLeagueId, winterId)).toEqual([]);
+    expect(await ports.scheduleAdmin.teamsOf(leagueId, 'not-an-id')).toEqual([]);
+  });
+
+  it.each(actors)('runs each command of the grid only for those it is for: %s', async (actor) => {
+    const outcomes: Record<string, string> = {};
+    const wanted: Record<string, string> = {};
+    for (const command of gridCommands) {
+      const fresh = await freshDraft(teams);
+      const result = await command.run(contextOf(actor), fresh, teams);
+      outcomes[command.name] = result.ok ? 'ok' : JSON.stringify(result.error);
+      wanted[command.name] = command.who.includes(actor)
+        ? 'ok'
+        : JSON.stringify({ code: 'not-allowed' });
+      // A refusal changes nothing: the draft is the owner's, as it was.
+      if (!result.ok) {
+        const after = await draftNow();
+        expect(after.draft?.version, command.name).toBe(fresh.view.draft?.version);
+        expect(after.latestRevision, command.name).toBe(fresh.view.latestRevision);
+      }
+    }
+    expect(outcomes).toEqual(wanted);
+  });
+
+  it('publishes the draft, and the public schedule then shows its games', async () => {
+    const s = await freshDraft(teams);
+    const before = s.view.latestRevision;
+    must(
+      'publish',
+      await publishSchedule(
+        contextOf('scheduler'),
+        {
+          seasonId: winterId,
+          basedOnRevision: s.basis.basedOnRevision,
+          draftId: s.basis.draftId ?? '',
+          version: s.basis.version ?? 1,
+        },
+        ports.scheduleAdmin.deps,
+      ),
+    );
+    const after = await draftNow();
+    expect(after.draft).toBeNull();
+    expect(after.latestRevision).toBe((before ?? 0) + 1);
+    const published = after.published.games.map((g) => g.id);
+    expect(published).toEqual(expect.arrayContaining([s.g1, s.g2]));
+    // Visitors see it once the season is shown (Season settings), and not before.
+    expect(await ports.publicSchedule.scheduleOf(leagueId, winterId, '2026-12-01')).toBeUndefined();
+    const { version } = await seasonNow(winterId);
+    must(
+      'show',
+      await updateSeason(
+        contextOf('owner'),
+        { seasonId: winterId, version, status: 'active' },
+        ports.adminSettings.deps,
+      ),
+    );
+    try {
+      const shown = await ports.publicSchedule.scheduleOf(leagueId, winterId, '2026-12-01');
+      const games = [
+        ...(shown?.rounds.flatMap((r) => r.games) ?? []),
+        ...(shown?.unplacedGames ?? []),
+      ];
+      expect(games.length).toBeGreaterThanOrEqual(2);
+      expect(shown?.rounds.map((r) => r.label)).toContain('Week 1');
+    } finally {
+      must(
+        'hide',
+        await updateSeason(
+          contextOf('owner'),
+          { seasonId: winterId, version: (await seasonNow(winterId)).version, status: 'draft' },
+          ports.adminSettings.deps,
+        ),
+      );
+    }
+  });
+
+  it("finds no draft of another league's season, even for that league's owner", async () => {
+    const maple = made.leagues.find((l) => l.slug === 'maple-street');
+    const read = await getScheduleDraft(
+      { leagueId: otherLeagueId, accountId: maple?.ownerAccountId ?? null, requestId: 'r' },
+      { seasonId: winterId },
+      ports.scheduleAdmin.deps,
+    );
+    expect(read.ok).toBe(false);
   });
 });

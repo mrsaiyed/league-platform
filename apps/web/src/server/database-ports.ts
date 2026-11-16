@@ -10,8 +10,9 @@
 // (database-public-stats.ts) and the members' start page the league home reads first
 // (database-public-teams.ts); in part 3 (record 070) the statistics, a team's roster, a
 // member's teams and each league's name (database-league-sites.ts); in part 4 League
-// settings and Season settings (database-admin-settings.ts) and the schedule admin's list
-// of seasons (database-schedule-admin.ts). Every other area
+// settings and Season settings (database-admin-settings.ts) and Admin → Schedule, the
+// grid with its drafts, rounds and publishing and its list of seasons
+// (database-schedule-admin.ts). Every other area
 // still runs on the stand-in only: here each one refuses with NotOnTheDatabaseYet
 // the first time it is used, so its page shows the error page rather than made-up
 // data that is not in the database. Each moves in a part of its own.
@@ -216,7 +217,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     fixtureImport: notMovedYet('fixture import'),
     publicSchedule: databasePublicSchedule(database, db, now),
     // Its seasonsOf lists only what mayListSeason allows the holder (part 4).
-    scheduleAdmin: databaseScheduleAdmin(database, db),
+    scheduleAdmin: databaseScheduleAdmin(database, db, options.log),
     publicTeams: databasePublicTeams(database, db),
     adminTeams: notMovedYet('Admin → Teams'),
     adminSettings: databaseAdminSettings(database, db, options.log),
