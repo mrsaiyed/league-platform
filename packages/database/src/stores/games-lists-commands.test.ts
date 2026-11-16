@@ -10,6 +10,7 @@ import {
   listEarlierGames,
   listGamesNeedingResult,
   listMyGames,
+  listScoringOffers,
   needsResultLimit,
   setSetting,
   type AccessTx,
@@ -390,5 +391,43 @@ describe('the earlier games by round, on the database', () => {
       listEarlierRound(scope, l.ownerId, everything, { roundId: fourWeeks?.roundId ?? '' }, 3),
     );
     expect(round.games).toHaveLength(3);
+  });
+});
+
+// Step 2.153 on the database: which of a public page's games the person may score.
+describe("a page's games the person may score, on the database", () => {
+  it('offers open games only, by the scoring rule, and nothing of a game in the bin', async () => {
+    const l = await league();
+    const live = await l.gameAt({ starts_at: l.at(60), capture_mode: 'live' });
+    const box = await l.gameAt({ starts_at: l.at(day), capture_mode: 'box' });
+    const decided = await l.gameAt(final(l.at(-day)));
+    const binned = await l.gameAt({ starts_at: l.at(day), deleted_at: new Date().toISOString() });
+    const keeper = await grant(l.leagueId, 'scorekeeper');
+    await pglite.query(
+      'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
+      [l.leagueId, box, keeper],
+    );
+    const offered = async (account: string) => {
+      const r = await listScoringOffers(
+        asAccount(l.leagueId, account),
+        { gameIds: [decided, box, live, binned] },
+        deps,
+      );
+      return r.ok ? r.value.games : r.error.code;
+    };
+    expect(await offered(keeper)).toEqual([
+      { gameId: box, recording: 'box-score' },
+      { gameId: live, recording: 'live' },
+    ]);
+    const chosen = await setSetting(
+      l.as(),
+      { level: 'league', key: 'games.whoMayScore', value: 'assignedOnly', version: null },
+      deps,
+    );
+    expect(chosen.ok).toBe(true);
+    expect(await offered(keeper)).toEqual([{ gameId: box, recording: 'box-score' }]);
+    expect(await offered(l.ownerId)).toHaveLength(2);
+    // Someone who scores nowhere here is refused, and so told nothing of any game.
+    expect(await offered(await grant(l.leagueId, 'editor'))).toBe('not-allowed');
   });
 });

@@ -287,6 +287,16 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
           .map(({ g }) => entryOf(s, g, accountId));
         return { today: s.today, games };
       },
+      // As the database: games of these ids not in the bin, of a season that is here.
+      listByIds: async (accountId, gameIds) => ({
+        today: s.today,
+        games: s.games
+          .filter(
+            (g) =>
+              gameIds.includes(g.id) && !g.binned && s.seasons.some((x) => x.id === g.seasonId),
+          )
+          .map((g) => entryOf(s, g, accountId)),
+      }),
       // Each keeps the games in the person's reach first, then cuts, as the database does.
       listNeedingResult: async (accountId, reach, limit) => ({
         today: s.today,

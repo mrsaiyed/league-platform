@@ -141,6 +141,7 @@ export { deleteGameAssignment } from './delete-game-assignment.ts';
 export { insertGameAssignment } from './insert-game-assignment.ts';
 export { isGameAssigned } from './is-game-assigned.ts';
 export { listGamesInWindow } from './list-games-in-window.ts';
+export { listGamesByIds } from './list-games-by-ids.ts';
 export { listGamesNeedingResult } from './list-games-needing-result.ts';
 export { listEarlierRounds } from './list-earlier-rounds.ts';
 export { listEarlierRound } from './list-earlier-round.ts';
