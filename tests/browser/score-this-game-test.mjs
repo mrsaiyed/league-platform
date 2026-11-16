@@ -599,6 +599,106 @@ if (browser) {
     },
   );
 
+  await step(
+    'the place stands at one height across a row, and a visitor’s cards never move',
+    async () => {
+      const laptop = { width: 1280, height: 900 };
+      /** Every card's box and its place line's, to the hundredth of a pixel. */
+      const boxes = (page) =>
+        page.$$eval('main .ui-game-card', (cards) =>
+          cards.map((card) => {
+            const at = (el) => {
+              if (el === null) return null;
+              const b = el.getBoundingClientRect();
+              return [b.left, b.top, b.width, b.height].map((v) => Math.round(v * 100) / 100);
+            };
+            return { card: at(card), place: at(card.querySelector('.ui-game-foot')) };
+          }),
+        );
+      // A visitor at laptop width: measured with the read held back, and again after it has
+      // answered; then once more with the rule for lists that have a button taken out.
+      const visitor = await browser.newContext({ viewport: laptop });
+      try {
+        const page = await visitor.newPage();
+        page.setDefaultTimeout(30_000);
+        let release = () => {};
+        const held = new Promise((done) => (release = done));
+        await page.route('**/api/v1/leagues/*/scoring*', async (route) => {
+          await held;
+          await route.continue();
+        });
+        await page.goto(`${origin}/north-valley/schedule`);
+        await page.locator('main .ui-game-card').first().waitFor();
+        const before = await boxes(page);
+        const read = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/scoring'));
+        release();
+        await read;
+        await page.waitForTimeout(400);
+        const after = await boxes(page);
+        note(
+          "a visitor's cards do not move by one pixel when the page's read answers",
+          before.length > 0 && JSON.stringify(before) === JSON.stringify(after),
+        );
+        const removed = await page.evaluate(() => {
+          let count = 0;
+          for (const sheet of document.styleSheets) {
+            let rules;
+            try {
+              rules = sheet.cssRules;
+            } catch {
+              continue;
+            }
+            for (let i = rules.length - 1; i >= 0; i -= 1) {
+              if (rules[i].selectorText?.includes(':has(.ui-game-action)')) {
+                sheet.deleteRule(i);
+                count += 1;
+              }
+            }
+          }
+          return count;
+        });
+        const without = await boxes(page);
+        note(
+          "the rule for a list with a button changes no pixel of a visitor's cards",
+          removed > 0 && JSON.stringify(without) === JSON.stringify(after),
+          `rules taken out: ${removed}`,
+        );
+      } finally {
+        await visitor.close();
+      }
+      // The scorekeeper at laptop width: in a row where one card has a button and another
+      // has none, both places stand at the same height.
+      const keeper = await fresh('scorekeeper', { viewport: laptop });
+      try {
+        await open(keeper.page, '/north-valley/schedule');
+        await offersDrawn(keeper.page);
+        const rows = await keeper.page.$$eval('main .ui-card-grid', (grids) =>
+          grids.flatMap((grid) => {
+            const byRow = new Map();
+            for (const card of grid.querySelectorAll('.ui-game-card[data-layout="board"]')) {
+              if (card.getClientRects().length === 0) continue;
+              const top = Math.round(card.getBoundingClientRect().top);
+              const place = card.querySelector('.ui-game-foot')?.getBoundingClientRect().top;
+              const entry = { action: card.querySelector('.ui-game-action') !== null, place };
+              byRow.set(top, [...(byRow.get(top) ?? []), entry]);
+            }
+            return [...byRow.values()].filter(
+              (row) => row.some((c) => c.action) && row.some((c) => !c.action),
+            );
+          }),
+        );
+        const uneven = rows.filter((row) => new Set(row.map((c) => Math.round(c.place))).size > 1);
+        note(
+          'in a row of cards with and without a button, every place stands at one height',
+          rows.length > 0 && uneven.length === 0,
+          JSON.stringify({ rows: rows.length, uneven }),
+        );
+      } finally {
+        await keeper.context.close();
+      }
+    },
+  );
+
   await step('with scripts off there is no button, and "My games to score" leads on', async () => {
     const { context, page } = await fresh('scorekeeper', { javaScriptEnabled: false });
     try {
