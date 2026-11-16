@@ -809,11 +809,17 @@ export async function clockSteps(kit) {
           };
         }),
       );
-    /** The steps the fix round gave the count and the badge, at a size (court.css). */
+    /**
+     * The steps the fix round gave the count and the badge, at a size (court.css): a
+     * tablet's; a phone lying down's (`orientation: landscape` and no higher than 520),
+     * a step larger at the double bonus and for the badge; and an upright phone's.
+     */
     const steps = (size) =>
       size.width >= 700 && size.height >= 521
         ? { count: [14, 20, 26], badge: [15, 19] }
-        : { count: [11, 13, 15], badge: [11, 12] };
+        : size.width > size.height && size.height <= 520
+          ? { count: [11, 13, 16], badge: [12, 13] }
+          : { count: [11, 13, 15], badge: [11, 12] };
     const { context, page, errors } = await scorekeeperAt(phoneLying);
     try {
       await hears(context);
@@ -987,7 +993,8 @@ export async function clockSteps(kit) {
           JSON.stringify({ boxes, drawn }),
         );
         // The bonus at a glance (the area 4 review, M3): at the double bonus the count is
-        // 15 px or more and the badge 12 or more on a phone, 26 and 19 on a tablet, in
+        // 15 px or more and the badge 12 or more on an upright phone, 16 and 13 on a phone
+        // lying down, 26 and 19 on a tablet, in
         // this device's own letters and in wider ones: the screen never sets them a step
         // smaller for want of room (it shortens the badge's words, above). And the count
         // is never larger than the score beside it.
