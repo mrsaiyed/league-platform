@@ -110,6 +110,13 @@ To try it as a league's admin:
    (account button, "Sign out") and look at the home page, the team, the game, the
    standings and the statistics.
 
+To try the whole job from an empty league: sign in as the made-up owner, open Still Waters
+(`http://127.0.0.1:3000/still-waters/admin`, a draft league with one current season, "First
+Season", and nothing in it yet). Add the teams and their people in Admin → Teams; add rounds
+and games in Admin → Schedule and publish the schedule; show the season to the public in
+the season's settings; then score a game in Admin → Games (or with the tracker) and look at
+the final table on the standings. It starts empty again every time the app restarts.
+
 ### Signing in as the made-up people
 
 To walk the product by tapping, open `http://127.0.0.1:3000/north-valley` (as above), tap "Sign in or create an account" and sign in as one of these. They exist only in the made-up world on this computer, in the app's memory: the made-up stand-in refuses to start anywhere but on this computer or a test address (`APP_ENV` must be `local` or `test`, and `PUBLIC_BASE_URL` must be this computer's own address or a `.test` name).
