@@ -8,6 +8,8 @@
 //   node scripts/shots.mjs --only=home,admin    only pictures whose name contains one of these
 //   node scripts/shots.mjs --design=pine        the first made-up league under a named design
 //   node scripts/shots.mjs --measure            also measures the contrast of every public page
+//   LOCAL_NOW=<UTC time> node scripts/shots.mjs  the made-up world's clock starts there, as in
+//                                                the browser tests (a game day at noon: worldAtNoon)
 //
 // `--measure` sets every piece of text on each public page it pictures against what the
 // text stands on, and every control's edge against what is around it, and writes what it
@@ -408,6 +410,14 @@ const scorekeeperPages = [
   { name: 'scorekeeper-home', at: '', steps: offersDrawn },
   { name: 'scorekeeper-schedule', at: '/schedule', steps: offersDrawn },
   { name: 'scorekeeper-game', at: `/games/${liveGame}`, steps: offersDrawn },
+  // In the draft league, which scores assigned games only: the scorekeeper's one game whose
+  // day has come carries the button, its neighbours none (S-70; the card's foot, 2.153).
+  {
+    name: 'scorekeeper-schedule-assigned',
+    league: 'quiet-pines',
+    at: '/schedule',
+    steps: offersDrawn,
+  },
   { name: 'scorekeeper-games', at: '/admin' },
   { name: 'scorekeeper-tracker', at: '/admin', first: '/score/' },
   // The games list as a scorekeeper sees it: a final game says who can reopen it (2.154).
@@ -1157,9 +1167,9 @@ try {
       })),
       ...scorekeeperPages.map((page) => ({
         ...page,
-        name: `${leagues[0]}-${page.name}`,
+        name: `${page.league ?? leagues[0]}-${page.name}`,
         context: keeper,
-        base: `/${leagues[0]}`,
+        base: `/${page.league ?? leagues[0]}`,
       })),
     ].filter((job) => wanted(job.name));
     for (const job of jobs) {
