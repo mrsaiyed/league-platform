@@ -376,6 +376,7 @@ All dated November 12, 2026.
 | T-273                 | New                                                                          | On the database, the public schedule and standings move first; statistics refuse until part 3; local seasons under way (rec. 069)               | Step 2.93 part 2: one port serves both the standings and the statistics, and the seed had no games |
 | T-274                 | New                                                                          | Names read with the league's own settings in one snapshot; no design stored yet; a season naming no statistics keeps its rules' (rec. 070)      | Step 2.93 part 3: the statistics and team pages show children's names; nothing wrote `stat_keys`   |
 | T-275                 | New                                                                          | Page titles and other page metadata are never streamed: every page has its title in the head of its first bytes (rec. 071)                      | Step 2.175: a page could arrive with its content before its title; browser checks met it untitled  |
+| T-277                 | New                                                                          | A design is kept as site releases (history) and a draft site, checked by one schema in contracts, read again on draw (rec. 073)                 | Step 2.187: nothing stored a league's design; every league on the database was drawn neutral       |
 
 ## The full list
 
@@ -702,6 +703,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-264 | A game marked not started goes back to scheduled with its format and the time it was fixed cleared together, in that one update only; a marker event bounds the cleared plays (rec. 061)       | Agreed (delegated) |         |
 | T-266 | A draft league made by mistake is removed by a script: the migration login runs remove_draft_league (lock, checks, platform log, delete) for the set league only (rec. 063)                    | Agreed (delegated) |         |
 | T-272 | On one connection each id public.uuid_v7() makes sorts after every id it made before (it remembers the last in a setting of the session); nothing is promised across connections (rec. 068)    | Agreed (delegated) |         |
+| T-277 | A league's design is kept in T3's sites and site_releases, checked by one written schema in contracts when published and again when drawn; a league with none is neutral (rec. 073)            | Agreed (delegated) |         |
 
 ### [T4 — Keeping leagues apart, sign-in, security](technical/T4-tenancy-auth-security.md)
 
