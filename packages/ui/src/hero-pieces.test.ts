@@ -1091,6 +1091,11 @@ describe('the second landing’s smaller rules', () => {
       /\.ui-card-grid\[data-layout='board'\]\[data-across='pair'\] > li:only-child \{\s*grid-column: 1 \/ -1;/,
     );
     expect(css).not.toMatch(/\[data-across='pair'\] > li:last-child:nth-child\(odd\)/);
+    // Nor is a hole left beside it (step 2.147 part 3): of an odd list of three or more it
+    // is the first board, the next game or the newest result, that takes the row.
+    expect(css).toMatch(
+      /\.ui-card-grid\[data-layout='board'\]\[data-across='pair'\]\s*> li:first-child:nth-last-child\(odd\):not\(:only-child\) \{\s*grid-column: 1 \/ -1;/,
+    );
   });
 
   it('never stretches a board that is a list by itself across the page: about 560 wide', () => {

@@ -556,6 +556,12 @@ export const gameCss = String.raw`
   .ui-card-grid[data-layout='board'][data-across='pair'] > li:only-child {
     grid-column: 1 / -1;
   }
+  /* An odd list of three or more has no hole at its end either: its first board, the next
+     game to come or the newest result, takes the row, and the rest stand two across. */
+  .ui-card-grid[data-layout='board'][data-across='pair']
+    > li:first-child:nth-last-child(odd):not(:only-child) {
+    grid-column: 1 / -1;
+  }
 }
 /* On a laptop a board left over is not stretched across the page: an odd number of boards
    ends with three in a row, each a third of it (three boards are one row of three, five

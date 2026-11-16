@@ -898,6 +898,32 @@ html {
     align-items: start;
   }
 }
+/* A team's statistics: its totals as a strip of big numbers under their small label, and
+   its players' table. With few statistics the two stand side by side on a laptop, so a
+   row's numbers stay near its name; otherwise one under the other. */
+.team-stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-4) var(--step-5);
+}
+.team-stats > * {
+  min-inline-size: 0;
+}
+.team-totals {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--step-3);
+}
+.team-stats .ui-section-note {
+  margin: 0;
+}
+@media (min-width: 64rem) {
+  .team-stats[data-layout='pair'] {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    align-items: start;
+  }
+}
 /* "Make this my team": a quiet choice beside the team's name. */
 .league-site .team-mine {
   display: flex;

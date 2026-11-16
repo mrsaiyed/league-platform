@@ -334,14 +334,16 @@ export const tableCss = String.raw`
   .ui-stats[data-fold] [data-folded] {
     display: none;
   }
-  .ui-stats[data-fold] th,
-  .ui-stats[data-fold] td {
+  /* In a box that narrow the cells of any table of statistics stand a step closer, as a
+     standings table's do, so one more column is in view. */
+  .ui-stats th,
+  .ui-stats td {
     padding-inline: var(--step-2);
   }
-  .ui-stats[data-fold] tr > :first-child {
+  .ui-stats tr > :first-child {
     padding-inline-start: var(--step-4);
   }
-  .ui-stats[data-fold] tr > :last-child {
+  .ui-stats tr > :last-child {
     padding-inline-end: var(--step-4);
   }
   /* The name gives up what the shield takes, as a standings table's does. */

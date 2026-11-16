@@ -28,6 +28,7 @@ import {
   loadTeamStats,
 } from './build-team.ts';
 import { chooseMyTeam, leagueHomeStayUrl, teamIdsFromGrants } from './start-page.ts';
+import { resultsBesideRoster, TeamStatsSection } from './team-page.tsx';
 import { TeamCards } from './teams-page.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -274,6 +275,50 @@ describe('a team page', () => {
     expect(shown?.playerRows.map((r) => r.cells['player'])).toEqual(
       expect.arrayContaining(['Dana Whitfield', 'Marcus Oyelaran']),
     );
+    // On the page a few totals are a strip of big numbers under "Team totals", not a table
+    // of one row; a team whose players are hidden says so under the strip, and names none.
+    if (hidden === undefined || shown === undefined) throw new Error('no statistics');
+    const hiddenText = renderToStaticMarkup(createElement(TeamStatsSection, { stats: hidden }));
+    expect(hiddenText).toContain('<p class="ui-eyebrow">Team totals</p>');
+    expect(hiddenText).toMatch(/<dt>Points<\/dt><dd>155<\/dd>/);
+    expect(hiddenText).toContain('Only this team&#x27;s totals are shown');
+    expect(hiddenText).not.toContain('<table');
+    expect(hiddenText).not.toContain('Castellanos');
+    // Where the players are shown, their table stands beside the strip and opens sorted by
+    // points, biggest first.
+    const shownText = renderToStaticMarkup(createElement(TeamStatsSection, { stats: shown }));
+    expect(shownText).toContain('<div class="team-stats" data-layout="pair">');
+    expect(shownText).toContain('Team totals');
+    expect(shownText.match(/aria-sort="descending"/g)).toHaveLength(1);
+    expect(shownText.indexOf('Dana Whitfield')).toBeLessThan(shownText.indexOf('Marcus Oyelaran'));
+    expect(shownText).not.toContain('Only this team');
+    // Many statistics stay a table: nine numbers are not a strip.
+    const many = [...'abcde'].map((key) => ({ key, label: key, numeric: true }));
+    const wide = renderToStaticMarkup(
+      createElement(TeamStatsSection, {
+        stats: {
+          ...hidden,
+          totalsColumns: [{ key: 'team', label: 'Team' }, ...many],
+          totalsRows: [
+            {
+              id: 't',
+              cells: { team: 'Owls', ...Object.fromEntries(many.map((c) => [c.key, '1'])) },
+            },
+          ],
+        },
+      }),
+    );
+    expect(wide).toContain('<table');
+    expect(wide).toContain('Only this team');
+  });
+
+  it('puts the results beside a long roster, and at the page’s width beside a short one', () => {
+    // Two roster lines beside two games to come: the results take the width under both.
+    expect(resultsBesideRoster({ upcoming: 2, rosterLines: 2 })).toBe(false);
+    expect(resultsBesideRoster({ upcoming: 0, rosterLines: 9 })).toBe(false);
+    // Twelve players beside one row of games: the results fill the games' column.
+    expect(resultsBesideRoster({ upcoming: 2, rosterLines: 12 })).toBe(true);
+    expect(resultsBesideRoster({ upcoming: 6, rosterLines: 12 })).toBe(false);
   });
 
   it('splits one teams games into the ones to play and the results', async () => {

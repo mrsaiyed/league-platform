@@ -212,6 +212,13 @@ export async function loadTeamStats(
         }),
       ),
     },
+    // The numbers behind the written ones: a column is sorted by these, never by its words.
+    sortValues: Object.fromEntries(
+      table.value.statKeys.flatMap((key) => {
+        const entry = player.stats[key];
+        return entry === undefined ? [] : [[key, entry.total] as const];
+      }),
+    ),
   }));
   const totalsColumns: StatsColumn[] = [
     { key: 'team', label: t('stats.col.team') },

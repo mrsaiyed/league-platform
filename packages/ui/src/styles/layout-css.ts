@@ -90,6 +90,34 @@ export const layoutCss = String.raw`
 .ui-crumbs a:hover {
   text-decoration: underline;
 }
+/* Two ways back side by side are parted by a fine slanted line; one alone has the arrow of
+   a way on before it, turned to point back. */
+.ui-crumbs a + a::before {
+  content: '';
+  flex: none;
+  inline-size: 1px;
+  block-size: var(--step-4);
+  margin-inline-end: var(--step-4);
+  background: var(--color-line-strong);
+  transform: rotate(18deg);
+}
+.ui-crumbs a:only-child::before {
+  content: '';
+  flex: none;
+  inline-size: var(--step-4);
+  block-size: var(--step-4);
+  margin-inline-end: var(--step-2);
+  background: currentColor;
+  -webkit-mask: var(--ui-arrow) center / contain no-repeat;
+  mask: var(--ui-arrow) center / contain no-repeat;
+  transform: scaleX(-1);
+}
+[dir='rtl'] .ui-crumbs a + a::before {
+  transform: rotate(-18deg);
+}
+[dir='rtl'] .ui-crumbs a:only-child::before {
+  transform: none;
+}
 
 /* A section: its title with a short rule, and one way on beside it. The rule is in the
    color the eye lands on, which is the main color wherever that shows on the page. */
