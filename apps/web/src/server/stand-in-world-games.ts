@@ -248,6 +248,19 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
           .map((g) => entryOf(g, accountId, today)),
       };
     },
+    // As list-games-by-ids.ts: the games of these ids not in the bin, of a season here.
+    listByIds: async (accountId, gameIds) => {
+      const today = dayIn(now(), s.timeZone);
+      return {
+        today,
+        games: s.games
+          .filter(
+            (g) =>
+              gameIds.includes(g.id) && !g.binned && s.seasons.some((x) => x.id === g.seasonId),
+          )
+          .map((g) => entryOf(g, accountId, today)),
+      };
+    },
     // As list-games-needing-result.ts: core's own rule, by the server's clock.
     // The games in the person's reach first, then the cut.
     listNeedingResult: async (accountId, reach, limit) => {

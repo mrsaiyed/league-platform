@@ -20,6 +20,11 @@ export type FakeSupabaseAuthOptions = {
   readonly codeSeconds?: number;
   /** Stands in for the leaked-password check. Lower case. */
   readonly leakedPasswords?: readonly string[];
+  /**
+   * The project's "Confirm email" switch turned off, answered as `mailer_autoconfirm`
+   * in `GET /settings` (step 2.115). Off by default: record 018's settings.
+   */
+  readonly mailerAutoconfirm?: boolean;
 };
 
 export type FakeCall = {
@@ -345,6 +350,18 @@ export function createFakeSupabaseAuth(options: FakeSupabaseAuthOptions) {
         endSessions(user.id, session.id);
         return json(200, userJson(user));
       }
+    }
+
+    if (call.method === 'GET' && path === '/settings') {
+      // The public settings any visitor with the project's key may read.
+      return json(200, {
+        external: { email: true, google: true, phone: false },
+        disable_signup: false,
+        mailer_autoconfirm: options.mailerAutoconfirm ?? false,
+        phone_autoconfirm: false,
+        sms_provider: '',
+        saml_enabled: false,
+      });
     }
 
     if (call.method === 'POST' && path === '/logout') {
