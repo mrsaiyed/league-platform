@@ -12,12 +12,15 @@
 // 3. Staging and production open PLATFORM_DATABASE_URL (never the tracker's
 //    DATABASE_URL, R8) and check the login role it uses
 //    (checkLoginRole, T-60): a superuser, a role that bypasses row-level security,
-//    or the tables' owner stops the start. They then stop anyway, with a plain
+//    or the tables' owner stops the start. They then ask the real sign-in service
+//    whether it confirms email addresses, and stop unless it plainly says it does
+//    (requireEmailConfirmation, step 2.115). They then stop anyway, with a plain
 //    reason, until sign-in on the real service is wired and every area has moved
 //    onto the database (step 2.93's later parts, record 055).
 import type { CommandLogLine } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
+import type { EmailConfirmation, EmailConfirmationQuestion } from '@srleagues/providers';
 import type { Config } from './config-schema.ts';
 import { databasePorts, type DatabaseQueries } from './database-ports.ts';
 import type { WebPorts } from './ports.ts';
@@ -40,9 +43,18 @@ export type DatabasePackage = Pick<
 > &
   DatabaseQueries;
 
+/** Where the real sign-in service is, from SUPABASE_URL and SUPABASE_SECRET_KEY (T-30). */
+export type RealSignInSettings = { readonly projectUrl: string; readonly secretKey: string };
+
 export type StartupDeps = {
   /** Loads packages/database; only staging and production ask for it. */
   readonly database: () => Promise<DatabasePackage>;
+  /**
+   * The real sign-in service; only staging and production ask for it. Today start-up
+   * asks it one question (step 2.115); step 2.93's last part builds the whole adapter
+   * here and hands it the same question first.
+   */
+  readonly realSignIn: (service: RealSignInSettings) => EmailConfirmationQuestion;
   /** Where the access module's T-196 lines go. */
   readonly log: (line: CommandLogLine) => void;
   /**
@@ -70,10 +82,17 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
     await ports.signUpMadeUpStaff();
     return ports;
   }
-  // loadConfig requires it here; checked again so the type says so.
+  // loadConfig requires these here; checked again so the type says so.
   const url = config.PLATFORM_DATABASE_URL;
   if (url === undefined) {
     throw new StartupError(`PLATFORM_DATABASE_URL is needed when APP_ENV is ${config.APP_ENV}.`);
+  }
+  const projectUrl = config.SUPABASE_URL;
+  const secretKey = config.SUPABASE_SECRET_KEY;
+  if (projectUrl === undefined || secretKey === undefined) {
+    throw new StartupError(
+      `SUPABASE_URL and SUPABASE_SECRET_KEY are needed when APP_ENV is ${config.APP_ENV}.`,
+    );
   }
   const database = await deps.database();
   const db = database.createDatabase({ kind: 'postgres', url });
@@ -90,12 +109,53 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
         `the database login role is not fit for the app (T-60): ${problems.join('; ')}.`,
       );
     }
+    // Step 2.115, before anyone can sign in: `account_for_sign_in` links an account
+    // made in advance to whoever presents its address, which is safe only if the
+    // service confirms addresses. Step 2.93's last part replaces the refusal below
+    // with the real ports; this check stays above it, asked of the adapter it builds.
+    await requireEmailConfirmation(realSignIn(deps, { projectUrl, secretKey }));
     throw new StartupError(
       `sign-in on the real service is not wired yet and not every area runs on the database (step 2.93, record 055), so "${config.APP_ENV}" cannot serve anyone.`,
     );
   } finally {
     await db.close();
   }
+}
+
+/** The real sign-in service; a fault in its settings is said in fixed words, never with a value. */
+function realSignIn(deps: StartupDeps, service: RealSignInSettings): EmailConfirmationQuestion {
+  try {
+    return deps.realSignIn(service);
+  } catch {
+    throw new StartupError(
+      'the sign-in service could not be set up from SUPABASE_URL and SUPABASE_SECRET_KEY: the address must be the project’s https address and the key its secret key.',
+    );
+  }
+}
+
+const turnItOn =
+  'turn on "Confirm email" in the Supabase project’s dashboard (Authentication, then Sign In / Providers, then Email), then start the app again';
+
+const refusals: Readonly<Record<Exclude<EmailConfirmation, 'on'>, string>> = {
+  off: `the sign-in service does not confirm email addresses, so anyone could take over an account made in advance by typing its address: ${turnItOn}.`,
+  unknown: `the sign-in service could not say whether it confirms email addresses, and the app never starts without that: check that SUPABASE_URL and SUPABASE_SECRET_KEY are the project’s and that it can be reached, and ${turnItOn}.`,
+};
+
+/**
+ * Step 2.115: the start stops unless the sign-in service plainly says it confirms
+ * email addresses before a sign-in counts. `off` and `unknown` stop it alike, each
+ * with one sentence saying what to turn on and where. Nothing is logged, and the
+ * message names no key, address or person.
+ */
+export async function requireEmailConfirmation(signIn: EmailConfirmationQuestion): Promise<void> {
+  let answer: EmailConfirmation;
+  try {
+    answer = await signIn.emailConfirmation();
+  } catch {
+    answer = 'unknown';
+  }
+  if (answer === 'on') return;
+  throw new StartupError(answer === 'off' ? refusals.off : refusals.unknown);
 }
 
 /** Local work and tests on the made-up database in memory (record 055). */

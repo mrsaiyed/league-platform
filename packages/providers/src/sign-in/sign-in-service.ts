@@ -181,6 +181,15 @@ export type ConfirmPasswordError =
 /** Signing out by either token: the access token may have run out; the refresh token is in the cookie. */
 export type SignOutInput = { readonly accessToken: string } | { readonly refreshToken: string };
 
+/**
+ * Whether the service itself holds an address as proved only once its owner has shown
+ * they hold the mailbox (step 2.115). `on`: it does. `off`: it takes an address as
+ * proved without that, so anyone could sign up with another person's address by
+ * typing it. `unknown`: the service could not be asked, or answered in a shape we do
+ * not know. Unknown is never taken as `on`.
+ */
+export type EmailConfirmation = 'on' | 'off' | 'unknown';
+
 export type SignInService = {
   /** Emails a 6-digit code, valid 10 minutes, to prove the address (T-67). */
   readonly startSignUp: (input: {
@@ -250,4 +259,15 @@ export type SignInService = {
   readonly listSessions: (input: {
     readonly accessToken: string;
   }) => Promise<Result<readonly SessionSummary[], SessionError>>;
+  /**
+   * "Does this service confirm email addresses before a sign-in counts?" (step 2.115).
+   * Linking an account made in advance to whoever presents its address
+   * (`account_for_sign_in`, record 052) is safe only when it does, so the web app
+   * refuses to start on a real service that answers anything but `on`. Never throws:
+   * a failure to ask is `unknown`. Says nothing about any person.
+   */
+  readonly emailConfirmation: () => Promise<EmailConfirmation>;
 };
+
+/** The one question start-up asks a sign-in service before it serves anyone (step 2.115). */
+export type EmailConfirmationQuestion = Pick<SignInService, 'emailConfirmation'>;

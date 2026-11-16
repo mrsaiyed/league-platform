@@ -181,6 +181,20 @@ function refusalOf(status: number, body: unknown, headers: Headers): GoTrueRefus
   };
 }
 
+/** The project's address must be https, or plain http to this machine when allowed (development only). */
+export function checkProjectUrl(projectUrl: string, allowLocalHttp: boolean) {
+  let url: URL;
+  try {
+    url = new URL(projectUrl);
+  } catch {
+    throw new Error('The Supabase project address is not an address.');
+  }
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !(allowLocalHttp && local && url.protocol === 'http:')) {
+    throw new Error('The Supabase project address must use https.');
+  }
+}
+
 export type GoTrueClient = ReturnType<typeof createGoTrueClient>;
 
 export function createGoTrueClient(options: GoTrueClientOptions) {
@@ -366,6 +380,15 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
     async signOut(accessToken: string, scope: 'local' | 'others' | 'global') {
       const answer = await call('logout', 'POST', `/logout?scope=${scope}`, accessToken);
       return mapAnswer(answer, () => null);
+    },
+
+    /**
+     * The project's public sign-in settings (`GET /settings`): the same answer any
+     * visitor with the project's key gets, so it needs no power the app does not hold.
+     * Read by `email-confirmation.ts`; the body is handed back as it came.
+     */
+    async settings() {
+      return call('settings', 'GET', '/settings', admin);
     },
 
     /** Where to send the browser for Google: Supabase's authorize address, with our PKCE challenge. */
