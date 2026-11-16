@@ -79,6 +79,7 @@ import {
   type ScoringView,
 } from './scoring-view.ts';
 import {
+  clockToggleTap,
   createTapRest,
   takeBackTimeoutTap,
   tapTaken,
@@ -140,6 +141,8 @@ const restTimers: RestTimers = {
  * stylesheet draws it not yet ready.
  */
 const restingPlaces = {
+  /** Start or Pause under the scoreboard, after a tap on it and after its word changes. */
+  toggle: '[data-clock-toggle]',
   /** − on a team's timeouts, after a take-back (the area 4 review, M2). */
   minus: '[data-pad] [data-act="untimeout"]',
   /** The answers to "Record it anyway?", after the question is asked. */
@@ -359,6 +362,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     }
   }, []);
   rests.current ??= {
+    toggle: createTapRest(restTimers, drawRests),
     minus: createTapRest(restTimers, drawRests),
     answers: createTapRest(restTimers, drawRests),
   };
@@ -462,6 +466,15 @@ export function ScoringScreen(props: ScoringScreenProps) {
       ? { tipOff: state.status === 'scheduled', why: whyStopped(stopReason(state)) }
       : null,
   };
+  // Start or Pause under the scoreboard rests when its word changes, whatever changed it
+  // (a tap kept by the device, a foul that stopped the clock, the clock running out): a
+  // tap already on its way was meant for the word that was there.
+  const toggleWord = reading.running ? 'pause' : reading.over ? 'over' : 'start';
+  const toggleDrawn = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (toggleDrawn.current !== null && toggleDrawn.current !== toggleWord) resting.toggle.begin();
+    toggleDrawn.current = toggleWord;
+  }, [toggleWord, resting]);
   const entry = clockEntry(digits);
   const back = entry.ms === null ? 0 : putsBackMs(reading, entry.ms);
   const clockSheet: ClockSheet | null = clockOpen
@@ -712,13 +725,24 @@ export function ScoringScreen(props: ScoringScreenProps) {
     },
     // --- The clock, periods and timeouts (step 2.36). ---
     startClock(event) {
-      if (tooSoonAfterRest(event)) return;
+      // The pad's large button waits a moment after the pad comes to rest; the button
+      // under the scoreboard rests after a tap on it and after its word changes (the code
+      // review, M-a), so the second tap of a double tap is not a tap on Pause.
+      const input =
+        event.currentTarget.closest('[data-pad]') !== null
+          ? tooSoonAfterRest(event)
+            ? null
+            : ({ type: 'start' } as const)
+          : clockToggleTap('start', resting.toggle, tapOf(event));
+      if (input === null) return;
       // The first tap of a game is often this one: the horn is made ready for later.
       bonusHorn.ready();
-      void send({ type: 'start' }).finally(taken(event.currentTarget));
+      void send(input).finally(taken(event.currentTarget));
     },
     pauseClock(event) {
-      void send({ type: 'pause' }).finally(taken(event.currentTarget));
+      const input = clockToggleTap('pause', resting.toggle, tapOf(event));
+      if (input === null) return;
+      void send(input).finally(taken(event.currentTarget));
     },
     periodOver() {
       say(t('tracker.refusal.periodOver'));

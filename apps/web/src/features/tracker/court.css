@@ -809,6 +809,14 @@
 .court-go:disabled .court-mark-start {
   display: none;
 }
+/* Resting (tap-rest.ts): for a third of a second after a tap on it, and after its word
+   changes, the button takes no tap: the second tap of a double tap on Start must not land
+   on Pause. It is drawn hollow for exactly as long, as a tile's mark is hollow until its
+   tap is stored: the edge, the shape and the word stay where they are, and the fill comes
+   back when a tap will be taken. */
+.court-go[data-resting]:not([data-state='over'], :disabled) {
+  background: transparent;
+}
 /* Tapped, and not yet kept by the device: ringed at once, as a tapped tile is. */
 .court-go[data-taken],
 .court-start-button[data-taken] {
@@ -1916,6 +1924,12 @@
   }
   .court-opt[data-resting],
   [data-resting] > .court-opt {
+    transition: none;
+  }
+  .court-go {
+    transition: background-color 120ms ease-out;
+  }
+  .court-go[data-resting] {
     transition: none;
   }
   /* The Start clock button's triangle breathes while the clock waits to be started, as

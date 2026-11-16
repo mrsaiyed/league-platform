@@ -3,10 +3,11 @@
 // tap is taken, and when it shows ready again.
 //
 // A scorekeeper double-taps. The second tap lands a tenth to a third of a second after the
-// first, on whatever is under the finger by then: − again after the list has lost its
-// latest timeout, an answer where the timeout button was. None of those second taps was
-// meant, and each would change the game. So such a control RESTS for a third of a second
-// after it comes under the finger, and a pointer's tap in that time is not taken.
+// first, on whatever is under the finger by then: Pause where Start was, − again after
+// the list has lost its latest timeout, an answer where the timeout button was. None of
+// those second taps was meant, and each would change the game. So such a control RESTS
+// for a third of a second after it comes under the finger, and a pointer's tap in that
+// time is not taken.
 //
 // A tap that is not taken must never look as if it were. So the rest is also something
 // the screen SHOWS: `ready()` is false while the control rests, the screen draws it not
@@ -71,6 +72,20 @@ export type Tap = { readonly at: number; readonly keyboard: boolean };
  * on the control that has the keyboard, never on one that moved under a finger.
  */
 export const tapTaken = (rest: TapRest, tap: Tap): boolean => tap.keyboard || rest.takes(tap.at);
+
+/**
+ * Start or Pause tapped in the row under the scoreboard (checklist T2; the code review,
+ * M-a): the tap that is sent, or null while the button rests. The button changes from
+ * Start to Pause as soon as the device has kept the tap, so the second tap of a double
+ * tap would land on Pause and stop the clock that had just been started (and Pause, then
+ * Start, likewise). So it rests from each tap it takes, and again when its word changes
+ * (the screen begins that rest): one double tap is one tap.
+ */
+export function clockToggleTap(kind: 'start' | 'pause', rest: TapRest, tap: Tap): TapInput | null {
+  if (!tapTaken(rest, tap)) return null;
+  rest.begin(tap.at);
+  return { type: kind };
+}
 
 /**
  * − tapped on a team's timeouts (G7; M2): the tap that takes the latest one back, or null

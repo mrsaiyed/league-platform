@@ -423,6 +423,74 @@ export async function clockSteps(kit) {
     }
   });
 
+  // Start and Pause under a double tap (the code review, M-a). The button changes from
+  // Start to Pause as soon as the device has kept the tap, so the second tap of a double
+  // tap used to land on Pause and stop the clock again. It now rests after a tap on it
+  // and after its word changes: two taps 150 ms apart are one.
+  for (const size of [phoneInBrowser, phoneLying]) {
+    const at = `${size.width} x ${size.height}`;
+    await step(`Start and Pause under a double tap, at ${at} (M-a)`, async () => {
+      const { context, page, errors } = await scorekeeperAt(size);
+      try {
+        await page.goto(`${origin}${trackerPath()}`);
+        const c = await openCourt(page);
+        await c.saved();
+        // Stopped, with time on the clock, whatever the step before left.
+        await c.setClock('300');
+        await page.waitForTimeout(3400);
+        const ready = (state) =>
+          c.root.locator(`[data-clock-toggle][data-state="${state}"]:not([data-resting])`);
+        /** Two taps where the button is, 150 ms apart, as a double tap lands. */
+        const twice = async () => {
+          const box = await c.toggle.boundingBox();
+          const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+          await page.mouse.click(x, y);
+          await page.waitForTimeout(150);
+          await page.mouse.click(x, y);
+          const drawnResting = (await c.toggle.getAttribute('data-resting')) !== null;
+          await page.waitForTimeout(700);
+          await c.saved();
+          return drawnResting;
+        };
+
+        await ready('start').waitFor();
+        const restingAfterStart = await twice();
+        const running = await c.toggle.getAttribute('data-state');
+        const first = seconds(await c.clockText());
+        await page.waitForTimeout(1300);
+        const later = seconds(await c.clockText());
+        note(
+          `${at}: two taps on Start 150 ms apart: the clock is running, once, and nothing was refused`,
+          running === 'pause' &&
+            later < first &&
+            restingAfterStart &&
+            (await c.said.innerText()).trim() === '',
+          JSON.stringify({ running, first, later, said: await c.said.innerText() }),
+        );
+        note(
+          `${at}: once it has rested the button is drawn ready again`,
+          (await ready('pause').count()) === 1,
+        );
+
+        const restingAfterPause = await twice();
+        const paused = await c.toggle.getAttribute('data-state');
+        const stoodAt = await c.clockText();
+        await page.waitForTimeout(1300);
+        note(
+          `${at}: two taps on Pause 150 ms apart: the clock is paused, once, and nothing was refused`,
+          paused === 'start' &&
+            (await c.clockText()) === stoodAt &&
+            restingAfterPause &&
+            (await c.said.innerText()).trim() === '',
+          JSON.stringify({ paused, stoodAt, now: await c.clockText() }),
+        );
+        note('nothing broke on the page', errors.length === 0, errors.join('; '));
+      } finally {
+        await letGo(page, context);
+      }
+    });
+  }
+
   // A device whose own clock is wrong (finding M1): its `Date` and the time its steady
   // clock starts from are both moved, as on a tablet that was set wrongly. The game
   // clock it shows is the one a correct device shows, because it counts from the

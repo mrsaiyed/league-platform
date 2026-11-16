@@ -301,13 +301,17 @@ export function court(page) {
     timeoutsPad: pad.locator('[data-timeout-list]'),
     timeoutButton: (side, seconds = 60) =>
       pad.locator(`[data-act="timeout"][data-side="${side}"][data-seconds="${seconds}"]`),
-    /** Starts the clock with the button under the scoreboard, and waits until it runs. */
+    /**
+     * Starts the clock with the button under the scoreboard, and waits until it runs. The
+     * button rests for a third of a second after its word changes and takes no tap then
+     * (it is marked `data-resting`): it is tapped once it is ready, as a person would.
+     */
     async startClock() {
-      await root.locator('[data-clock-toggle][data-state="start"]').click();
+      await root.locator('[data-clock-toggle][data-state="start"]:not([data-resting])').click();
       await root.locator('[data-clock-toggle][data-state="pause"]').waitFor();
     },
     async pauseClock() {
-      await root.locator('[data-clock-toggle][data-state="pause"]').click();
+      await root.locator('[data-clock-toggle][data-state="pause"]:not([data-resting])').click();
       await root.locator('[data-clock-toggle][data-state="start"]').waitFor();
     },
     /** Opens the clock's form and types a time on its keys: '630' is 6:30. Does not set it. */

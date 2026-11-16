@@ -2,6 +2,7 @@
 // when a tap is taken and when it is not, and what the screen is told to draw meanwhile.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  clockToggleTap,
   createTapRest,
   restMs,
   takeBackTimeoutTap,
@@ -93,6 +94,52 @@ describe('a control that rests', () => {
     vi.advanceTimersByTime(1_000);
     expect(drawn).toEqual([false]);
     expect(rest.ready()).toBe(true);
+  });
+});
+
+describe('Start and Pause under the scoreboard (the code review, M-a)', () => {
+  it('a double tap on Start starts the clock once: the second tap is not a tap on Pause', () => {
+    const rest = createTapRest(timers);
+    expect(clockToggleTap('start', rest, finger())).toEqual({ type: 'start' });
+    // The device has kept the tap and the button now says Pause; the second touch of the
+    // double tap lands on it 100, 150 and 250 ms after the first.
+    for (const later of [100, 50, 100]) {
+      vi.advanceTimersByTime(later);
+      expect(clockToggleTap('pause', rest, finger())).toBeNull();
+      expect(rest.ready()).toBe(false);
+    }
+    // Once it has rested, Pause is Pause.
+    vi.advanceTimersByTime(110);
+    expect(rest.ready()).toBe(true);
+    expect(clockToggleTap('pause', rest, finger())).toEqual({ type: 'pause' });
+  });
+
+  it('and a double tap on Pause pauses it once: the second tap is not a tap on Start', () => {
+    const rest = createTapRest(timers);
+    expect(clockToggleTap('pause', rest, finger())).toEqual({ type: 'pause' });
+    vi.advanceTimersByTime(150);
+    expect(clockToggleTap('start', rest, finger())).toBeNull();
+    vi.advanceTimersByTime(210);
+    expect(clockToggleTap('start', rest, finger())).toEqual({ type: 'start' });
+  });
+
+  it('rests again when its word changes, however late the device kept the tap', () => {
+    const rest = createTapRest(timers);
+    expect(clockToggleTap('start', rest, finger())).not.toBeNull();
+    // A slow tablet: the word changes 300 ms after the tap, and the screen begins the
+    // rest again. A tap 100 ms after the change is still not taken.
+    vi.advanceTimersByTime(300);
+    rest.begin();
+    vi.advanceTimersByTime(100);
+    expect(clockToggleTap('pause', rest, finger())).toBeNull();
+    vi.advanceTimersByTime(260);
+    expect(clockToggleTap('pause', rest, finger())).toEqual({ type: 'pause' });
+  });
+
+  it('Enter and Space are always taken', () => {
+    const rest = createTapRest(timers);
+    expect(clockToggleTap('start', rest, key())).toEqual({ type: 'start' });
+    expect(clockToggleTap('pause', rest, key())).toEqual({ type: 'pause' });
   });
 });
 
