@@ -5,25 +5,51 @@
 // the same for everyone who opens it and holds no trace of a button (T5 §4).
 //
 // The league comes from the address and the account from the session (league-api.ts), never
-// from the request; the ids asked are only a question. Which games is games.list_scoring_offers'
-// rule, the one the scoring commands enforce. A visitor, a session that no longer works, and
-// anyone who scores nowhere in the league get no games and no words; nothing is said about a
-// game the person may not score, nor whether it exists. Always private, never kept by a cache.
+// from the request; the ids asked are only a question. A league its visitor may not see (a
+// draft or a suspended one, mayOpenLeague, U-9) is "not found", exactly the answer for a
+// league that does not exist or is in the bin, and the same as the other public read's (the
+// snapshot, game-snapshot-endpoint.ts), so the answer never tells anyone a hidden league is
+// there. Which games is games.list_scoring_offers' rule, the one the scoring commands enforce.
+// A visitor, a session that no longer works, and anyone who scores nowhere in the league get
+// no games and no words; nothing is said about a game the person may not score, nor whether
+// it exists. Always private, never kept by a cache.
 import {
   leagueUrl,
   listScoringOffers,
+  mayOpenLeague,
   scoringOffersLimit,
+  type AccessHolder,
+  type CommandContext,
   type ScoringOffer,
 } from '@srleagues/core';
 import type { CommandDeps, LeagueAddressee, TrackerTx } from '@srleagues/core';
 import { gameAnchor } from '../features/games-area/index.ts';
 import type { ScoringOfferReply } from '../features/schedule-pages/index.ts';
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
-import { isGameIdFormat, type ApiAnswer } from './league-api.ts';
+import { isGameIdFormat, refusalAnswer, type ApiAnswer, type ApiRefusal } from './league-api.ts';
 import { t } from './messages.ts';
 
 const privately = { 'Cache-Control': 'private, no-store' } as const;
 const answer = (body: ScoringOfferReply): ApiAnswer => ({ status: 200, body, headers: privately });
+
+/**
+ * "Not found", for a league that is not there, is in the bin, or may not be seen by this
+ * person: the very answer the snapshot gives a hidden league (game-snapshot-endpoint.ts),
+ * so this read and that one say the same.
+ */
+const notFound: ApiAnswer = {
+  status: 404,
+  body: { error: 'not-found' },
+  headers: { 'Cache-Control': 'no-store' },
+};
+
+/** What the read needs from the web app's ports. */
+export type ScoringOffersPorts = {
+  /** What the account holds in the league, read fresh (T-75). */
+  readonly accessOf: (context: CommandContext) => Promise<AccessHolder | undefined>;
+  /** What the games commands run on, reached only once there is someone to ask for. */
+  readonly games: () => CommandDeps<TrackerTx>;
+};
 
 /**
  * Where a button leads: the tracker's opening screen for a game recorded live; for one
@@ -46,10 +72,35 @@ export function askedGameIds(games: string | null): readonly string[] {
   return [...new Set(ids)].slice(0, scoringOffersLimit);
 }
 
-export async function scoringOffers(
+/**
+ * The answer to the read, from the league request as league-api.ts resolved it with the
+ * ports beside it (or why there is none), and the address's `games`.
+ */
+export async function scoringOffersRequest(
+  resolved:
+    | {
+        readonly ok: true;
+        readonly context: LeagueRequestContext;
+        readonly ports: ScoringOffersPorts;
+      }
+    | { readonly ok: false; readonly refusal: ApiRefusal },
+  games: string | null,
+): Promise<ApiAnswer> {
+  if (!resolved.ok) {
+    return resolved.refusal.status === 404 ? notFound : refusalAnswer(resolved.refusal);
+  }
+  const { context, ports } = resolved;
+  const holder =
+    context.account === null ? undefined : await ports.accessOf(commandContextOf(context));
+  // The league gate, as for the league's pages and the snapshot (U-9).
+  if (!mayOpenLeague(context.league.status, holder)) return notFound;
+  return scoringOffers(context, games, ports.games);
+}
+
+/** The read for a league this person may see. */
+async function scoringOffers(
   context: LeagueRequestContext,
   games: string | null,
-  /** What the games commands run on, reached only once there is someone to ask for. */
   deps: () => CommandDeps<TrackerTx>,
 ): Promise<ApiAnswer> {
   const none = answer({ games: [] });

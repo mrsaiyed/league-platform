@@ -1,21 +1,38 @@
 // Step 2.153: the read a public page's script makes for its "Score this game" buttons, over
 // the made-up stand-in. Only a signed-in person who may score a game hears of it; the answer
-// is never kept by a cache; the league is the address's and the account the session's.
-import { scoringOffersLimit } from '@srleagues/core';
+// is never kept by a cache; the league is the address's and the account the session's; and
+// a league this person may not see is "not found", exactly as one that is not there (U-9).
+import { leagueApiUrl, scoringOffersLimit } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { offersAskedAtOnce } from '../features/schedule-pages/scoring-offers.ts';
-import { askedGameIds, offerHref, scoringOffers } from './scoring-offers-endpoint.ts';
+import { resolveLeagueApi } from './league-api.ts';
+import { standInLeagues, standInPeople } from './stand-in-ports.ts';
+import { askedGameIds, offerHref, scoringOffersRequest } from './scoring-offers-endpoint.ts';
 import { trackerWorld, type League, type Person } from './tracker-endpoints.test-helper.ts';
 
 const gameId = (n: number) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0')}`;
 /** Games 1 to 5 of the made-up league: 1 and 4 final score only, 2 live, 3 tracked, 5 final. */
 const firstFive = [1, 2, 3, 4, 5].map(gameId).join(',');
+/** A league id nobody has. */
+const noLeague = '01900000-0000-7000-8000-0000000fffff';
 
-async function ask(person: Person, league: League = 'live', games: string | null = firstFive) {
+/** The read as `person` through the address of `league` (by its id), as the route makes it. */
+async function askById(person: Person, leagueId: string, games: string | null = firstFive) {
   const world = trackerWorld();
-  const context = await world.contextAs(person, league, ['scoring']);
-  return scoringOffers(context, games, () => world.ports.games.deps);
+  const { ports } = world;
+  const session = person === 'visitor' ? null : await ports.identify(standInPeople[person].token);
+  const parts = ['scoring'];
+  const resolved = await resolveLeagueApi(
+    { host: 'localhost:3000', path: leagueApiUrl({ id: leagueId }, parts), session },
+    parts,
+    { ...ports, siteOrigin: 'http://localhost:3000' },
+    'visitor',
+  );
+  const read = { accessOf: ports.accessOf, games: () => ports.games.deps };
+  return scoringOffersRequest(resolved.ok ? { ...resolved, ports: read } : resolved, games);
 }
+const ask = (person: Person, league: League = 'live', games: string | null = firstFive) =>
+  askById(person, standInLeagues[league].id, games);
 
 describe('the scoring read of a public page', () => {
   it("gives a scorekeeper each game they may score, the button's kind and where it leads", async () => {
@@ -46,6 +63,27 @@ describe('the scoring read of a public page', () => {
         headers: { 'Cache-Control': 'private, no-store' },
       });
     }
+  });
+
+  it('answers a hidden league exactly as one that is not there or is in the bin (U-9)', async () => {
+    for (const person of ['visitor', 'stranger', 'coach'] as const) {
+      const [unknown, binned, draft, suspended] = await Promise.all([
+        askById(person, noLeague),
+        ask(person, 'inBin'),
+        ask(person, 'draft'),
+        ask(person, 'suspended'),
+      ]);
+      // Compared with each other: status, body and headers, all of them.
+      expect(binned, `${person}: in the bin`).toEqual(unknown);
+      expect(draft, `${person}: a draft`).toEqual(unknown);
+      expect(suspended, `${person}: suspended`).toEqual(unknown);
+      expect(unknown.status, person).toBe(404);
+    }
+    // The draft league's own owner, and its scorekeeper, get the ordinary answer.
+    const owner = await ask('owner', 'draft');
+    expect(owner.status).toBe(200);
+    expect(owner.headers).toEqual({ 'Cache-Control': 'private, no-store' });
+    expect((await ask('scorekeeper', 'draft')).status).toBe(200);
   });
 
   it('gives a scorekeeper only their assigned games where only assigned ones may score', async () => {

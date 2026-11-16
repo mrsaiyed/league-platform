@@ -734,6 +734,7 @@ try {
     );
   }
   failures.push(...(await sameAsNoLeague(origin)));
+  failures.push(...(await scoringSameAsNoLeague(origin)));
   failures.push(...(await checkStylesheets(origin)));
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
@@ -782,7 +783,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Web shell check passed: ${cases.length + spoofs.length + 6} checks against the built server.`,
+  `Web shell check passed: ${cases.length + spoofs.length + 7} checks against the built server.`,
 );
 
 // When Node refused a TypeScript file it was to run itself, the server prints only
@@ -922,6 +923,58 @@ async function sameAsNoLeague(origin) {
   }
   if (a.rows !== b.rows) {
     found.push(`a draft's page data differs from no league's ${firstDifference(a.rows, b.rows)}`);
+  }
+  return found;
+}
+
+/**
+ * Step 2.153's read of a page's buttons (GET /api/v1/leagues/{leagueId}/scoring) answers a
+ * league its visitor may not see, a draft or a suspended one, exactly as a league that does
+ * not exist or is in the bin (U-9): for a visitor and a signed-in stranger the four answers
+ * are compared with each other, status, body and every header but the date and the length.
+ * The draft league's owner gets the ordinary answer.
+ */
+async function scoringSameAsNoLeague(origin) {
+  const leagueOf = (n) => `01900000-0000-7000-8000-${n.toString(16).padStart(12, '0')}`;
+  const leagues = {
+    'no league': leagueOf(0xfffff),
+    'in the bin': leagueOf(6),
+    draft: leagueOf(3),
+    suspended: leagueOf(5),
+  };
+  const ask = async (who, leagueId) => {
+    const response = await fetch(
+      `${origin}/api/v1/leagues/${leagueId}/scoring?games=${liveGame},${unassignedGame}`,
+      {
+        headers: who === 'visitor' ? {} : { cookie: `srl_session=${tokens[who]}` },
+        redirect: 'manual',
+      },
+    );
+    const headers = [...response.headers]
+      .filter(([header]) => !['date', 'content-length'].includes(header))
+      .map(([header, value]) => `${header}: ${value}`)
+      .join('\n');
+    return { status: response.status, headers, body: await response.text() };
+  };
+  const found = [];
+  for (const who of ['visitor', 'stranger']) {
+    const answers = [];
+    for (const [what, leagueId] of Object.entries(leagues)) {
+      answers.push([what, await ask(who, leagueId)]);
+    }
+    const [, first] = answers[0];
+    if (first.status !== 404) found.push(`${who}'s scoring read of no league is ${first.status}`);
+    for (const [what, answer] of answers.slice(1)) {
+      if (JSON.stringify(answer) !== JSON.stringify(first)) {
+        found.push(
+          `${who}'s scoring read of a league ${what} differs from no league's:\n${JSON.stringify(answer)}\n---\n${JSON.stringify(first)}`,
+        );
+      }
+    }
+  }
+  const owner = await ask('owner', leagues.draft);
+  if (owner.status !== 200 || !/private, no-store/.test(owner.headers)) {
+    found.push(`the draft league's owner's scoring read is ${owner.status}: ${owner.headers}`);
   }
   return found;
 }
