@@ -121,6 +121,26 @@ describe('the team cards', () => {
     expect(text).not.toMatch(/<h[3-6]/);
   });
 
+  it('group the cards under each division’s small label, as the standings are, only where there are divisions', () => {
+    const text = html([card('owls', 'East'), card('herons', 'East'), card('otters', 'West')]);
+    // One list for each division, named by its label; the cards stand upright from a tablet up.
+    expect(text.match(/<ul class="ui-card-grid" data-layout="teams"/g)).toHaveLength(2);
+    expect(text).toContain('<p class="ui-eyebrow" id="teams-division-1" dir="auto">East</p>');
+    expect(text).toContain('aria-labelledby="teams-division-2"');
+    expect(text.indexOf('/x/teams/herons')).toBeLessThan(text.indexOf('>West</p>'));
+    expect(text.indexOf('>West</p>')).toBeLessThan(text.indexOf('/x/teams/otters'));
+    // Every card says what it leads to at its foot.
+    expect(
+      text.match(/<span class="ui-team-card-way" aria-hidden="true">Roster<\/span>/g),
+    ).toHaveLength(3);
+    // A league with no divisions is one list with no label.
+    const plain = html([card('comets', null), card('rockets', null)]);
+    expect(
+      plain.match(/<ul class="ui-card-grid" data-layout="teams" aria-label="Teams">/g),
+    ).toHaveLength(1);
+    expect(plain).not.toContain('ui-eyebrow');
+  });
+
   it("a team's page puts its games before its roster, in the page and on the screen", () => {
     const page = readFileSync(new URL('./team-page.tsx', import.meta.url), 'utf8');
     expect(page.indexOf('className="team-games"')).toBeGreaterThan(-1);

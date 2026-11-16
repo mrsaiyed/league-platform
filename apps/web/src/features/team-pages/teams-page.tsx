@@ -18,9 +18,14 @@ export function TeamCards({ cards }: { readonly cards: readonly TeamCard[] }) {
   // A league with no divisions says nothing about divisions; one that has them says which
   // team has none.
   const hasDivisions = cards.some((card) => card.divisionName !== null);
-  return (
-    <ul className="ui-card-grid" aria-label={t('teams.title')}>
-      {cards.map((card) => (
+  const list = (group: readonly TeamCard[], labelledBy?: string) => (
+    <ul
+      className="ui-card-grid"
+      data-layout="teams"
+      aria-label={labelledBy === undefined ? t('teams.title') : undefined}
+      aria-labelledby={labelledBy}
+    >
+      {group.map((card) => (
         <li key={card.slug}>
           <TeamCardPiece
             name={card.name}
@@ -39,10 +44,32 @@ export function TeamCards({ cards }: { readonly cards: readonly TeamCard[] }) {
                   ]
                 : []),
             ]}
+            way={t('team.roster')}
           />
         </li>
       ))}
     </ul>
+  );
+  if (!hasDivisions) return list(cards);
+  // A league with divisions shows each under its own small label, as its standings do, in
+  // the order the cards came in (a division's teams stand together, by seed).
+  const groups: { readonly name: string | null; readonly cards: TeamCard[] }[] = [];
+  for (const card of cards) {
+    const group = groups.find((g) => g.name === card.divisionName);
+    if (group === undefined) groups.push({ name: card.divisionName, cards: [card] });
+    else group.cards.push(card);
+  }
+  return (
+    <div className="teams-divisions">
+      {groups.map((group, index) => (
+        <div key={group.name ?? ''} className="teams-division">
+          <p className="ui-eyebrow" id={`teams-division-${index + 1}`} dir="auto">
+            {group.name ?? t('teams.noDivision')}
+          </p>
+          {list(group.cards, `teams-division-${index + 1}`)}
+        </div>
+      ))}
+    </div>
   );
 }
 

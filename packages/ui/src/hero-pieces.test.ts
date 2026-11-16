@@ -1128,11 +1128,63 @@ describe('a team’s card', () => {
     );
     expect(plain).toContain('<article class="ui-team-card">');
     expect(plain).not.toContain('red;x');
+    // The line is drawn as the shield's own lines are (the team's color with a little of
+    // the text color in it), so a dark team color shows on a dark page (step 2.147 part 3;
+    // it was the color at half strength, which a dark color lost on a dark panel).
     expect(css).toMatch(
-      /\.ui-team-card \{[^}]*border-block-start: var\(--line-heavy\) solid\s*color-mix\(in srgb, var\(--team-color, var\(--color-accent\)\) 50%, transparent\);/,
+      /\.ui-team-card \{[^}]*border-block-start: var\(--line-heavy\) solid\s*color-mix\(in srgb, var\(--team-color, var\(--color-accent\)\) 74%, var\(--color-text\)\);/,
+    );
+    expect(css).toMatch(
+      /\.ui-emblem \{[^}]*color: color-mix\(in srgb, var\(--emblem-color\) 74%, var\(--color-text\)\);/,
+    );
+    // Under the pointer the top line stays the team's.
+    expect(css).toMatch(
+      /\.ui-team-card:hover \{\s*border-inline-color: [^;]+;\s*border-block-end-color: [^;]+;\s*\}/,
     );
     expect(css).toMatch(/\.ui-team-card > \.ui-emblem \{\s*block-size: var\(--step-8\);/);
     expect(css).toMatch(/\.ui-team-card-figure \{[^}]*font-size: var\(--text-28\);/);
+  });
+
+  it('stands upright in a list of teams from a tablet up, three across, with a foot line', () => {
+    const html = render(
+      createElement(TeamCard, {
+        name: 'Owls',
+        href: '/x/teams/o',
+        figure: { label: 'Record', value: '2-1' },
+        facts: [{ key: 'seed', label: 'Seed', value: '1' }],
+        way: 'Roster',
+      }),
+    );
+    // The way on is only drawn: the card's one link is the team's name.
+    expect(html).toContain('<span class="ui-team-card-way" aria-hidden="true">Roster</span>');
+    expect(html.match(/<a /g)).toHaveLength(1);
+    expect(css).toMatch(/\.ui-team-card-way \{\s*display: none;/);
+    // The rules of the upright card: from a tablet up (the stylesheet with its notes taken out).
+    const upright =
+      /@media \(min-width: 48rem\) \{\s*\.ui-card-grid\[data-layout='teams'\] \{[\s\S]*?\n\}\n/.exec(
+        css,
+      )?.[0] ?? '';
+    expect(upright).toMatch(
+      /\.ui-card-grid\[data-layout='teams'\] \{\s*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);/,
+    );
+    expect(upright).toMatch(/\.ui-card-grid\[data-layout='teams'\] > li \{\s*grid-column: span 2;/);
+    // A shield of 72, the name in the display face at 22 (28 on a laptop).
+    expect(upright).toMatch(
+      /\.ui-team-card > \.ui-emblem \{\s*grid-column: 1 \/ -1;\s*block-size: calc\(var\(--step-8\) \+ var\(--step-2\)\);/,
+    );
+    expect(upright).toMatch(/\.ui-team-card-name \{[^}]*font-size: var\(--text-22\);/);
+    expect(upright).toMatch(/\.ui-team-card-way \{[^}]*display: inline-flex;/);
+    expect(css).toMatch(
+      /@media \(min-width: 64rem\) \{[\s\S]*?\.ui-card-grid\[data-layout='teams'\] \.ui-team-card-name \{\s*font-size: var\(--text-28\);/,
+    );
+  });
+
+  it('never splits a word of a team’s name', () => {
+    const name = /\.ui-team-card-name \{[^}]*\}/.exec(css)?.[0] ?? '';
+    expect(name).toMatch(/overflow-wrap: normal;/);
+    expect(name).toMatch(/hyphens: manual;/);
+    expect(name).toMatch(/text-overflow: ellipsis;/);
+    expect(name).not.toMatch(/hyphens: auto/);
   });
 });
 

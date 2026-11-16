@@ -871,6 +871,17 @@ html {
   }
 }
 
+/* The teams page of a league with divisions: each division's cards under its own small
+   label, as its standings are. */
+.teams-divisions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-6);
+}
+.teams-division > .ui-eyebrow {
+  margin-block-end: var(--step-3);
+}
+
 /* A team's page: the games take the width, the roster sits beside them. */
 .team-layout {
   display: grid;

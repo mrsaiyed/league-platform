@@ -78,19 +78,23 @@ export const cardsCss = String.raw`
   padding-block: var(--step-5);
   padding-inline: var(--step-5);
   /* As a game's card: the panel, warmed at one corner in a dark design. At its top a fine
-     line in the team's own color (the accent for a team with none), strong enough to be
-     told from its neighbors' and no stronger than a picked-out card's edge. */
+     line in the team's own color (the accent for a team with none), drawn as the lines of
+     the team's shield are: the color itself with a little of the page's text color in it,
+     so a dark team color still shows on a dark page and a pale one on a light page. */
   background-color: var(--color-panel);
   background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   border: var(--card-border-width) solid var(--color-line);
   border-block-start: var(--line-heavy) solid
-    color-mix(in srgb, var(--team-color, var(--color-accent)) 50%, transparent);
+    color-mix(in srgb, var(--team-color, var(--color-accent)) 74%, var(--color-text));
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   transition: border-color 0.15s;
 }
+/* Under the pointer the card's other three edges take the color the eye lands on; its top
+   keeps the team's own. */
 .ui-team-card:hover {
-  border-color: color-mix(in srgb, var(--color-pop) 50%, transparent);
+  border-inline-color: color-mix(in srgb, var(--color-pop) 50%, transparent);
+  border-block-end-color: color-mix(in srgb, var(--color-pop) 50%, transparent);
 }
 /* The team's shield is the largest thing on its card. */
 .ui-team-card > .ui-emblem {
@@ -113,9 +117,12 @@ export const cardsCss = String.raw`
   letter-spacing: var(--heading-tracking);
   line-height: 1.2;
   text-transform: var(--heading-case);
-  /* A word too long for the card is broken at a syllable, with a hyphen, where the
-     browser knows the language. */
-  hyphens: auto;
+  /* A name breaks only between its words: a word is never split, and one too long even
+     for a line of its own is cut short with "…", as on a scoreboard. */
+  overflow-wrap: normal;
+  hyphens: manual;
+  overflow-x: clip;
+  text-overflow: ellipsis;
 }
 .ui-team-card-name a {
   color: var(--color-text);
@@ -168,6 +175,134 @@ export const cardsCss = String.raw`
   font-weight: var(--heading-weight);
   font-variant-numeric: lining-nums tabular-nums;
   line-height: 1;
+}
+/* The way on at an upright card's foot ("Roster", with the arrow): not drawn on a card
+   that is one row. */
+.ui-team-card-way {
+  display: none;
+}
+/* On the narrowest phones the shield is a step smaller and the card's sides closer, so a
+   name's longest word has the room it needs beside the record. */
+@media (max-width: 22.49rem) {
+  .ui-team-card {
+    gap: var(--step-3);
+    padding-inline: var(--step-4);
+  }
+  .ui-team-card > .ui-emblem {
+    block-size: var(--step-7);
+  }
+}
+
+/* A page of teams ("meet the teams"). On a phone each card is one row, so nine teams are
+   not a long scroll. From a tablet up the cards stand upright, three across: the shield
+   centered and large, the name in the display face, the record beneath as the number the
+   eye lands on, and a foot line with the seed and division at its start and the way on at
+   its end. */
+@media (min-width: 48rem) {
+  /* Three across on a grid of six, so a row that is left short is shared out and no card
+     has a hole beside it: two left over take half the row each; one left over joins the
+     three before it, two rows of two. */
+  .ui-card-grid[data-layout='teams'] {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--step-5);
+  }
+  .ui-card-grid[data-layout='teams'] > li {
+    grid-column: span 2;
+  }
+  .ui-card-grid[data-layout='teams'] > li:nth-last-child(2):nth-child(3n + 1),
+  .ui-card-grid[data-layout='teams'] > li:nth-last-child(2):nth-child(3n + 1) ~ li,
+  .ui-card-grid[data-layout='teams'] > li:nth-last-child(4):nth-child(3n + 1),
+  .ui-card-grid[data-layout='teams'] > li:nth-last-child(4):nth-child(3n + 1) ~ li {
+    grid-column: span 3;
+  }
+  .ui-card-grid[data-layout='teams'] .ui-team-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto 1fr auto;
+    align-items: start;
+    justify-items: center;
+    gap: 0;
+    padding-block: var(--step-6) var(--step-4);
+    padding-inline: var(--step-4);
+    text-align: center;
+  }
+  .ui-card-grid[data-layout='teams'] .ui-team-card > .ui-emblem {
+    grid-column: 1 / -1;
+    block-size: calc(var(--step-8) + var(--step-2));
+  }
+  /* The name and the facts leave their box and take their own places on the card. */
+  .ui-card-grid[data-layout='teams'] .ui-team-card-text {
+    display: contents;
+  }
+  .ui-card-grid[data-layout='teams'] .ui-team-card-name {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-inline-size: 100%;
+    margin-block-start: var(--step-4);
+    font-size: var(--text-22);
+    text-wrap: balance;
+  }
+  .ui-card-grid[data-layout='teams'] .ui-team-card-figure {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-block: var(--step-3) var(--step-5);
+  }
+  .ui-card-grid[data-layout='teams'] :is(.ui-facts, .ui-team-card-way) {
+    grid-row: 4;
+    align-self: stretch;
+    justify-self: stretch;
+    align-items: center;
+    min-block-size: var(--step-6);
+    padding-block-start: var(--step-3);
+    border-block-start: 1px solid var(--color-line);
+  }
+  .ui-card-grid[data-layout='teams'] .ui-facts {
+    grid-column: 1;
+    gap: var(--step-1) var(--step-3);
+    font-size: var(--text-12);
+    text-align: start;
+  }
+  .ui-card-grid[data-layout='teams'] .ui-facts dd {
+    font-size: var(--text-14);
+  }
+  .ui-card-grid[data-layout='teams'] .ui-team-card-way {
+    grid-column: 2;
+    display: inline-flex;
+    gap: var(--step-2);
+    padding-inline-start: var(--step-3);
+    color: var(--color-muted);
+    font-size: var(--text-14);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .ui-card-grid[data-layout='teams'] .ui-team-card-way::after {
+    content: '';
+    flex: none;
+    inline-size: var(--step-4);
+    block-size: var(--step-4);
+    background: currentColor;
+    -webkit-mask: var(--ui-arrow) center / contain no-repeat;
+    mask: var(--ui-arrow) center / contain no-repeat;
+  }
+  [dir='rtl'] .ui-card-grid[data-layout='teams'] .ui-team-card-way::after {
+    transform: scaleX(-1);
+  }
+  /* Under the pointer, and with the keyboard on the card, the way on is in the text color:
+     the record stays the one thing on the card in the color the eye lands on. */
+  .ui-card-grid[data-layout='teams'] .ui-team-card:is(:hover, :focus-within) .ui-team-card-way {
+    color: var(--color-text);
+  }
+}
+@media (min-width: 64rem) {
+  .ui-card-grid[data-layout='teams'] .ui-team-card {
+    padding-inline: var(--step-5);
+  }
+  .ui-card-grid[data-layout='teams'] .ui-team-card-name {
+    font-size: var(--text-28);
+  }
+  .ui-card-grid[data-layout='teams'] .ui-team-card-figure {
+    font-size: var(--text-36);
+  }
 }
 
 /* A leader board: who leads, with the leader's number the biggest thing on the card. */
