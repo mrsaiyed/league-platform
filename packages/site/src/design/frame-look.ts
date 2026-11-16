@@ -12,7 +12,7 @@
 //
 // Every value is fixed text that names other variables; nothing a league types is in it.
 import { contrastRatio } from './contrast.ts';
-import { mixColors } from './derived-colors.ts';
+import { bandSurfaces, derivedColors, headerSurfaces, mixColors } from './derived-colors.ts';
 import type { DesignDocument } from './design-document.ts';
 import { headingTraits } from './fonts.ts';
 
@@ -27,16 +27,43 @@ const lineContrast = 3;
  * get an edge that can be seen.
  */
 const edgeContrast = 3;
-export function edgeShare(colors: DesignDocument['colors']): number {
-  const surfaces = [colors.background, colors.panel];
-  for (let share = 45; share < 100; share += 5) {
+
+/**
+ * How much of `ink` (the color of the words there) an edge must be laid on with to stand
+ * 3 to 1 from every one of `surfaces`: from `least` percent, in steps of five.
+ */
+export function shareForEdge(ink: string, surfaces: readonly string[], least: number): number {
+  for (let share = least; share < 100; share += 5) {
     const reads = surfaces.every(
-      (surface) =>
-        contrastRatio(mixColors(surface, colors.text, share / 100), surface) >= edgeContrast,
+      (surface) => contrastRatio(mixColors(surface, ink, share / 100), surface) >= edgeContrast,
     );
     if (reads) return share;
   }
   return 100;
+}
+
+export function edgeShare(colors: DesignDocument['colors']): number {
+  return shareForEdge(colors.text, [colors.background, colors.panel], 45);
+}
+
+/**
+ * The same edge where a control stands on a filled ground: in the header (the menu's
+ * button, the season picker, the account button) and on a band (the outlined button
+ * beside the one that matters). It is the color of the words there, laid on at 40 percent
+ * or as much more as it takes: a light design's bar or band of a mid-strength main color
+ * needs more than a dark page does.
+ */
+export function filledEdgeShares(design: DesignDocument): {
+  readonly header: number;
+  readonly band: number;
+} {
+  const colors = { ...design.colors, highlight: design.colors.highlight ?? design.colors.accent };
+  const derived = derivedColors(colors, design.base);
+  const headerText = design.base === 'dark' ? colors.text : derived.onPrimary;
+  return {
+    header: shareForEdge(headerText, headerSurfaces(colors, design.base), 40),
+    band: shareForEdge(derived.onBand, Object.values(bandSurfaces(colors, design.base)), 40),
+  };
 }
 
 const bases = {
@@ -141,10 +168,13 @@ export function frameVariables(design: DesignDocument): Record<string, string> {
   // Rounded links are filled with the bar's own colors, so they belong to a light design's
   // bar; a dark design always has the line.
   const tabStyle = !dark && design.corners === 'round' ? tabs.pill : tabs.line;
+  const filled = filledEdgeShares(design);
   return {
     ...bases[design.base],
-    // A whole number from a fixed list, never anything a league typed.
+    // Whole numbers from a fixed list, never anything a league typed.
     '--color-line-strong': `color-mix(in srgb, var(--color-text) ${edgeShare(design.colors)}%, transparent)`,
+    '--header-edge': `color-mix(in srgb, var(--header-text) ${filled.header}%, transparent)`,
+    '--band-edge': `color-mix(in srgb, var(--color-on-band) ${filled.band}%, transparent)`,
     '--color-line': mainShows
       ? 'color-mix(in srgb, var(--color-primary) 22%, transparent)'
       : 'color-mix(in srgb, var(--color-text) 14%, transparent)',

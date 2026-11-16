@@ -577,7 +577,12 @@ function measureContrast() {
     const layers = [];
     for (let node = element; node; node = node.parentElement) {
       const style = getComputedStyle(node);
-      const image = style.backgroundImage === 'none' ? [] : colorsIn(style.backgroundImage);
+      // The box a table scrolls in draws a soft shadow at an edge it is scrolled from, 12
+      // wide, over its panel's color: no text stands on that at rest, so it is not a ground.
+      const image =
+        style.backgroundImage === 'none' || node.classList.contains('ui-table-wrap')
+          ? []
+          : colorsIn(style.backgroundImage);
       const fill = parse(style.backgroundColor);
       layers.push({ fill, image });
       if (fill && fill[3] === 1 && image.every((c) => c[3] === 1)) break;

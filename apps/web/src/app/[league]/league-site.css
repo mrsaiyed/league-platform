@@ -55,7 +55,9 @@ html {
    the name and the menu button), and the button opens a panel in the header itself that
    holds the menu, sign-in and the season picker. */
 .site-header {
-  /* A fine line inside the header, in the header's own text color. */
+  /* A fine line inside the header, in the header's own text color. The edge of a control
+     in the header (--header-edge) is the design's: the same color, as strongly as it
+     takes to stand 3 to 1 from the header's ground (packages/site, frame-look.ts). */
   --header-rule: color-mix(in srgb, var(--header-text) 14%, transparent);
   position: sticky;
   inset-block-start: 0;
@@ -149,7 +151,7 @@ html {
   gap: var(--step-2);
   min-block-size: var(--tap);
   padding-inline: var(--step-3);
-  border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+  border: 1px solid var(--header-edge);
   border-radius: var(--radius-small);
   color: var(--header-text);
   font-size: var(--text-14);
@@ -268,7 +270,7 @@ html {
   justify-content: center;
   min-block-size: var(--tap);
   margin-block-start: var(--step-3);
-  border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+  border: 1px solid var(--header-edge);
   border-radius: var(--radius-small);
   color: var(--header-text);
   font-size: var(--text-14);
@@ -309,7 +311,7 @@ html {
   min-block-size: var(--tap);
   margin-block-start: var(--step-3);
   padding-inline: var(--step-3);
-  border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+  border: 1px solid var(--header-edge);
   border-radius: var(--radius-small);
   background: transparent;
   color: var(--header-text);
@@ -364,7 +366,7 @@ html {
 }
 .site-header .site-season select,
 .site-header .site-season button {
-  border-color: color-mix(in srgb, var(--header-text) 40%, transparent);
+  border-color: var(--header-edge);
   background-color: transparent;
   color: var(--header-text);
 }
@@ -529,7 +531,7 @@ html {
     justify-content: center;
     inline-size: var(--step-6);
     block-size: var(--step-6);
-    border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+    border: 1px solid var(--header-edge);
     border-radius: 50%;
     color: var(--header-text);
     font-size: var(--text-14);

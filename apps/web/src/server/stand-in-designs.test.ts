@@ -122,6 +122,24 @@ describe('contrast in the three color sets the pieces are proved in', () => {
         const edge = mixColors(surface, colors.text, share);
         expect(contrastRatio(edge, surface), `${key}: a control's edge`).toBeGreaterThanOrEqual(3);
       }
+      // The same in the header (the menu's button, the season picker) and on a band (the
+      // outlined button): the edge is the color of the words there, laid on as the frame says.
+      const shareOf = (name: string, ink: string) =>
+        Number(
+          new RegExp(`var\\(${ink}\\) (\\d+)%`).exec(designToCssVariables(design)[name] ?? '')?.[1],
+        ) / 100;
+      const headerText = design.base === 'dark' ? colors.text : derived.onPrimary;
+      for (const surface of headerSurfaces(colors, design.base)) {
+        const edge = mixColors(surface, headerText, shareOf('--header-edge', '--header-text'));
+        expect(
+          contrastRatio(edge, surface),
+          `${key}: an edge in the header`,
+        ).toBeGreaterThanOrEqual(3);
+      }
+      for (const surface of Object.values(bandSurfaces(colors, design.base))) {
+        const edge = mixColors(surface, derived.onBand, shareOf('--band-edge', '--color-on-band'));
+        expect(contrastRatio(edge, surface), `${key}: an edge on a band`).toBeGreaterThanOrEqual(3);
+      }
     });
   }
 
