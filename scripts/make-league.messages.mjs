@@ -24,6 +24,12 @@ export const usage = [
   '                           time zone, such as "Fall 2026" or "Winter 2026–2027")',
   '  --season-starts <date>   when it starts, YYYY-MM-DD (optional)',
   '  --season-ends <date>     when it ends, YYYY-MM-DD (optional)',
+  '  --design <name>          the starting design its site opens in: crest, crest-light,',
+  '                           midnight-gold or clean-court (default: clean-court, the',
+  '                           neutral one)',
+  '  --main-color <#rrggbb>   colors in place of the design’s own (each optional):',
+  '  --accent-color <#rrggbb>   the main color, the accent and the highlight',
+  '  --highlight-color <#rrggbb>',
   '  --as <email>             your own email, as SR Leagues staff',
   '  --db <folder>            a local test database folder (default: .local/seed-db)',
   '  --hosted                 a hosted database instead: see below',
@@ -57,7 +63,13 @@ export const questions = {
 };
 
 /** The words of the fields that are never asked, for their problems. */
-const otherFields = { listed: 'Listed (--listed)' };
+const otherFields = {
+  listed: 'Listed (--listed)',
+  design: 'Starting design (--design)',
+  mainColor: 'Main color (--main-color)',
+  accentColor: 'Accent color (--accent-color)',
+  highlightColor: 'Highlight color (--highlight-color)',
+};
 
 /** "Fall 2026" or "Winter 2026–2027" (P3 §1 step 4). */
 export const seasonPartNames = {
@@ -89,6 +101,10 @@ export const problemWords = {
     seasonStartsOn: 'First season starts: a real date written YYYY-MM-DD, such as 2026-09-01.',
     seasonEndsOn: 'First season ends: a real date written YYYY-MM-DD, such as 2027-02-28.',
     staffEmail: 'Your own email: not an email address (an address on .invalid cannot sign in).',
+    design: 'Starting design: one of crest, crest-light, midnight-gold or clean-court.',
+    mainColor: 'Main color: a color written #rrggbb, such as #96062d.',
+    accentColor: 'Accent color: a color written #rrggbb, such as #d3b780.',
+    highlightColor: 'Highlight color: a color written #rrggbb, such as #d3b780.',
   },
   blocked: {
     shortName: 'Short name: that word is not allowed (one of ours, or offensive). Choose another.',
@@ -117,6 +133,19 @@ const listedWords = (plan) => {
   return plan.audience === 'adult'
     ? 'yes: an adult league is listed unless told otherwise (--listed no)'
     : 'no: a league with under-18s is listed only if it chooses to be (--listed yes)';
+};
+
+const colorNames = { primary: 'main', accent: 'accent', highlight: 'highlight' };
+
+/** The starting design and any colors chosen in place of its own, in plain words. */
+const designWords = (design) => {
+  const chosen = Object.entries(design.colors).map(
+    ([part, color]) => `${colorNames[part]} ${color}`,
+  );
+  const colors = chosen.length === 0 ? '' : `, with its ${chosen.join(', ')}`;
+  return design.chosen
+    ? `${design.startingDesign}${colors}`
+    : `${design.startingDesign}${colors} (the neutral one; choose another with --design)`;
 };
 
 const seasonDates = (season) => {
@@ -174,6 +203,7 @@ export const planLines = (plan, preview, place, address) => [
   `  Contact email   ${plan.contactEmail}`,
   `  Owner           ${plan.ownerEmail} ${accountWords.owner[preview.owner]}`,
   `  First season    ${plan.season.name}, the current one, ${seasonDates(plan.season)}`,
+  `  Design          ${designWords(plan.design)}; the admin can change its colors later`,
   '  State           draft: only the league’s own staff can see it until it is published',
   `  Made by         ${plan.staffEmail} ${accountWords.staff[preview.staff]}`,
   `  Where           ${placeWords(place)}`,

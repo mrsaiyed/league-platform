@@ -2,8 +2,17 @@
 // before anything is made: the questions of P3 §1 step 2 (name, short name, sport,
 // who plays, where), whether it is listed, the contact email, the owner's email, the
 // first season's name and rough dates (step 4: "Rough dates: optional"), and the email
-// of the member of our staff who makes it. Pure: it reads nothing and makes nothing.
+// of the member of our staff who makes it, and the starting design its site opens in,
+// with any main, accent and highlight colors chosen in place of the design's own (step
+// 2.187, P5 §2; left out, the neutral design). Pure: it reads nothing and makes nothing.
 // The commands check everything again when they run.
+import {
+  designColorPattern,
+  isStartingDesignKey,
+  neutralStartingDesign,
+  type StartingColors,
+  type StartingDesignKey,
+} from '@srleagues/contracts';
 import { z } from 'zod';
 import { isBlockedShortName, shortNameSchema } from '../short-names.ts';
 import { namedTimeZone } from '../time-zone.ts';
@@ -45,6 +54,12 @@ export type NewLeagueAnswers = {
   readonly seasonEndsOn?: string | undefined;
   /** The member of our staff who makes it (P3 §8). */
   readonly staffEmail?: string | undefined;
+  /** One of the starting designs, by its key; left out, the neutral one. */
+  readonly design?: string | undefined;
+  /** Colors written #rrggbb, in place of the starting design's own; each optional. */
+  readonly mainColor?: string | undefined;
+  readonly accentColor?: string | undefined;
+  readonly highlightColor?: string | undefined;
 };
 
 export const newLeagueFields = [
@@ -61,6 +76,10 @@ export const newLeagueFields = [
   'seasonStartsOn',
   'seasonEndsOn',
   'staffEmail',
+  'design',
+  'mainColor',
+  'accentColor',
+  'highlightColor',
 ] as const;
 export type NewLeagueField = (typeof newLeagueFields)[number];
 
@@ -93,6 +112,13 @@ export type NewLeaguePlan = {
     readonly slug: string;
     readonly startsOn: string | null;
     readonly endsOn: string | null;
+  };
+  /** The site's first release: a starting design and the colors chosen in place of its own. */
+  readonly design: {
+    readonly startingDesign: StartingDesignKey;
+    /** True when the answers named it; false when it is the neutral one by default. */
+    readonly chosen: boolean;
+    readonly colors: StartingColors;
   };
 };
 
@@ -249,6 +275,14 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
     problems.push({ field: 'seasonEndsOn', problem: 'before-start' });
   }
   const staffEmail = need('staffEmail', text(answers.staffEmail), personEmail);
+  const designAnswer = text(answers.design)?.toLowerCase();
+  const startingDesign = check('design', designAnswer, (value) =>
+    isStartingDesignKey(value) ? value : invalid,
+  );
+  const color = (value: string) => (designColorPattern.test(value) ? value.toLowerCase() : invalid);
+  const primary = check('mainColor', text(answers.mainColor), color);
+  const accent = check('accentColor', text(answers.accentColor), color);
+  const highlight = check('highlightColor', text(answers.highlightColor), color);
 
   if (
     problems.length > 0 ||
@@ -280,6 +314,15 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
       ownerEmail,
       staffEmail,
       season: { ...season, startsOn: startsOn ?? null, endsOn: endsOn ?? null },
+      design: {
+        startingDesign: startingDesign ?? neutralStartingDesign,
+        chosen: startingDesign !== undefined,
+        colors: {
+          ...(primary === undefined ? {} : { primary }),
+          ...(accent === undefined ? {} : { accent }),
+          ...(highlight === undefined ? {} : { highlight }),
+        },
+      },
     },
   };
 }

@@ -130,6 +130,31 @@ describe('npm run league:make with no terminal', () => {
     expect(ran.stderr).toContain('First season ends: before it starts.');
     expect(ran.stdout).not.toContain('This will make');
   });
+
+  it('shows the starting design and colors in the plan, the neutral one by default (step 2.187)', async () => {
+    const plain = await runScript(every(), '');
+    expect(plain.stdout).toContain(
+      'Design          clean-court (the neutral one; choose another with --design)',
+    );
+    const chosen = await runScript(
+      [...every(), '--design', 'midnight-gold', '--main-color', '#0A3D62'],
+      '',
+    );
+    expect(chosen.stdout).toContain('Design          midnight-gold, with its main #0a3d62;');
+    expect(await rowsIn('leagues')).toBe(0);
+  });
+
+  it('refuses a starting design that is not one and a color that is not #rrggbb, making nothing', async () => {
+    const ran = await runScript(
+      [...every(), '--design', 'shiny', '--accent-color', 'red; } body { display:none'],
+      '',
+    );
+    expect(ran.code).toBe(2);
+    expect(ran.stderr).toContain('Starting design: one of crest, crest-light, midnight-gold');
+    expect(ran.stderr).toContain('Accent color: a color written #rrggbb');
+    expect(ran.stdout).not.toContain('This will make');
+    expect(await rowsIn('leagues')).toBe(0);
+  });
 });
 
 describe('npm run league:make: local unless told otherwise', () => {

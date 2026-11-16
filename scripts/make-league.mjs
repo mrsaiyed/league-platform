@@ -50,6 +50,10 @@ try {
       season: { type: 'string' },
       'season-starts': { type: 'string' },
       'season-ends': { type: 'string' },
+      design: { type: 'string' },
+      'main-color': { type: 'string' },
+      'accent-color': { type: 'string' },
+      'highlight-color': { type: 'string' },
       as: { type: 'string' },
       db: { type: 'string' },
       hosted: { type: 'boolean', default: false },
@@ -82,6 +86,10 @@ const answers = {
   seasonStartsOn: values['season-starts'],
   seasonEndsOn: values['season-ends'],
   staffEmail: values.as,
+  design: values.design,
+  mainColor: values['main-color'],
+  accentColor: values['accent-color'],
+  highlightColor: values['highlight-color'],
 };
 
 const computerZone = () => namedTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
