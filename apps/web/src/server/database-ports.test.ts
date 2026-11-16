@@ -8,6 +8,7 @@ import type { SessionIdentity, SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databasePorts, NotOnTheDatabaseYet } from './database-ports.ts';
+import { GameNamesOnlyWithSettings } from './database-tracker.ts';
 import type { WebPorts } from './ports.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
 
@@ -359,15 +360,43 @@ describe('databasePorts (record 055)', () => {
   }, 120_000);
 
   it('refuses each area not yet on the database when it is reached, not before', async () => {
-    const areas = [ports.fixtureImport, ports.adminTeams, ports.tracker];
+    const areas = [ports.fixtureImport, ports.adminTeams];
     for (const area of areas) {
       expect(await Promise.resolve(area)).toBe(area);
       expect(() => Reflect.get(area, 'deps')).toThrow(NotOnTheDatabaseYet);
     }
-    await expect(ports.publishPlays(lakeside().leagueId, randomUUID())).rejects.toThrow(
-      NotOnTheDatabaseYet,
-    );
+  });
+
+  it('runs the tracker on the database, with no live service: nothing is published (part 6)', async () => {
+    const leagueId = lakeside().leagueId;
+    // The tracker's commands run on the games area's one transaction (record 076).
+    expect(ports.tracker.deps).toBe(ports.games.deps);
+    // No live service yet: a saved play is published nowhere, and a watcher asks again.
+    await expect(ports.publishPlays(leagueId, randomUUID())).resolves.toBeUndefined();
     expect(ports.liveFeed).toBeNull();
+    // The league's own audience and name settings, alone and with a game's reads.
+    expect(await ports.tracker.namesShownOf(leagueId)).toMatchObject({ audience: 'adult' });
+    const read = await ports.tracker.gameReadsOf(leagueId, async ({ store, audience }) => ({
+      audience,
+      game: await store.findGame(randomUUID()),
+    }));
+    expect(read).toEqual({ audience: 'adult', game: undefined });
+    // A person's name is read only with those settings, in the same snapshot.
+    await expect(ports.tracker.snapshotStoreOf(leagueId).people([randomUUID()])).rejects.toThrow(
+      GameNamesOnlyWithSettings,
+    );
+    // What another scorekeeper is shown of the holder: the account's own name, in this
+    // league only.
+    expect(await ports.tracker.displayNameOf(leagueId, lakeside().ownerAccountId)).toBe(
+      'Ola Lakeside',
+    );
+    expect(
+      await ports.tracker.displayNameOf(
+        seedLeague('maple-street').leagueId,
+        lakeside().ownerAccountId,
+      ),
+    ).toBe('');
+    // The rest is database-tracker.test.ts.
   });
 
   it('runs the games area on the database: its commands and the names beside its games (part 6)', async () => {
