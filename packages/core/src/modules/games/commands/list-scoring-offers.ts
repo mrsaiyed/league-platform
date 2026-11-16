@@ -4,17 +4,20 @@
 // final score or a box score) on these games, for this person only. Who may is the one rule
 // the scoring commands enforce (mayScoreUnder, scoring-access.ts): their roles, a role held
 // for one program only, the league's "who may score" and their assignments, all read in this
-// transaction (T-75). Only a game still to be played or under way is offered: one decided,
-// postponed or called off is not, and nothing is while the league is archived or suspended
-// (U-9). The answer is game ids and how each is recorded, nothing about a game the person
-// may not score. It changes nothing, but runs in the same shape as a command (record 014).
+// transaction (T-75). Only a game under way, or one still to be played whose day has come in
+// the league's time zone, is offered (S-70, offeredOnItsDay): one days ahead, one with no
+// date, and one decided, postponed or called off are not, and nothing is while the league is
+// archived or suspended (U-9). The menu's "My games to score" and Admin → Games still lead
+// to a game days ahead. The answer is game ids and how each is recorded, nothing about a
+// game the person may not score. It changes nothing, but runs in the same shape as a
+// command (record 014).
 import { z } from 'zod';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
 import { accessOfAccount, type Scope } from '../../access/index.ts';
 import { recordingOf } from '../game-fields.ts';
 import { leagueScores } from '../my-games-of.ts';
 import { mayReadGames } from '../policy.ts';
-import type { GamesTx } from '../ports.ts';
+import type { GameInWindow, GamesTx } from '../ports.ts';
 import { lowerId } from '../scoring-session.ts';
 import { mayScoreUnder, scoringRuleOf } from '../scoring-access.ts';
 
@@ -32,8 +35,18 @@ export type ScoringOffers = {
   readonly games: readonly ScoringOffer[];
 };
 
-/** A game still to be decided: to be played, or being played. */
-const stillOpen = (status: string) => status === 'scheduled' || status === 'live';
+/**
+ * Whether a game is offered now (S-70): one under way; one still to be played from the start
+ * of its own day in the league's time zone until it has a result, so today's games and those
+ * of earlier days that still have none, but never one of a day still ahead, nor one with no
+ * date yet. Decided, put off and called off games are never offered. `today` and the game's
+ * day are the store's, by its clock and the league's time zone: the very days the games
+ * list reads (GamesWindow), so a game offered here is one the list shows.
+ */
+export function offeredOnItsDay(entry: GameInWindow, today: string): boolean {
+  if (entry.game.status === 'live') return true;
+  return entry.game.status === 'scheduled' && entry.game.startsAt !== null && entry.day <= today;
+}
 
 export const listScoringOffers = defineCommand({
   name: 'games.list_scoring_offers',
@@ -53,7 +66,7 @@ export const listScoringOffers = defineCommand({
     const offered = new Map<string, ScoringOffer>();
     for (const entry of found.games) {
       const recording = recordingOf(entry.game.captureMode);
-      if (recording === undefined || !stillOpen(entry.game.status)) continue;
+      if (recording === undefined || !offeredOnItsDay(entry, found.today)) continue;
       const scope: Scope = { type: 'program', id: entry.programId };
       if (!mayScoreUnder(holder, scope, rule, entry.assigned)) continue;
       offered.set(entry.game.id, { gameId: entry.game.id, recording });

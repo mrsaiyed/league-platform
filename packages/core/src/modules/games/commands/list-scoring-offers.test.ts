@@ -24,6 +24,7 @@ import {
   scoringRule,
   type MemoryGames,
 } from '../memory-games.test-helper.ts';
+import type { GameRecord } from '../ports.ts';
 import { mayScoreGame } from '../policy.ts';
 import { mayScoreUnder, scoringRuleOf } from '../scoring-access.ts';
 import { listScoringOffers, scoringOffersLimit } from './list-scoring-offers.ts';
@@ -100,6 +101,85 @@ describe('listScoringOffers', () => {
     // A scheduler and the owner score any game, assigned or not.
     expect(await offers(schedulerId, every, state)).toHaveLength(4);
     expect(await offers(ownerId, every, state)).toHaveLength(4);
+  });
+
+  describe("from the start of the game's own day in the league's time zone (S-70)", () => {
+    /** Which of `day`'s games are offered to the owner with the clock at `now` in `timeZone`. */
+    async function offeredAt(timeZone: string, now: string, day: readonly GameRecord[]) {
+      const listed = await offers(
+        ownerId,
+        day.map((g) => g.id),
+        { games: day, timeZone, now },
+      );
+      return Array.isArray(listed) ? listed.map((o) => o.gameId) : listed;
+    }
+    const at = (n: number, startsAt: string | null, fields: Partial<GameRecord> = {}) =>
+      game(n, { captureMode: 'live', startsAt, ...fields });
+
+    it('offers a game at 23:50 tonight all day, and one at 00:10 tomorrow not before its day', async () => {
+      // Chicago in December is six hours behind UTC: 23:50 there is the next day in UTC.
+      const tonight = at(1, '2026-12-07T05:50:00.000Z');
+      const tomorrow = at(2, '2026-12-07T06:10:00.000Z');
+      const zone = 'America/Chicago';
+      // Just after the league's midnight, at noon, and at 23:55, when UTC's day is already the 7th.
+      for (const now of [
+        '2026-12-06T06:01:00.000Z',
+        '2026-12-06T18:00:00.000Z',
+        '2026-12-07T05:55:00.000Z',
+      ]) {
+        expect(await offeredAt(zone, now, [tonight, tomorrow]), now).toEqual([tonight.id]);
+      }
+      // From the league's midnight, tomorrow's game is today's.
+      expect(await offeredAt(zone, '2026-12-07T06:00:00.000Z', [tonight, tomorrow])).toEqual([
+        tonight.id,
+        tomorrow.id,
+      ]);
+    });
+
+    it("offers yesterday's game that still has no result, and never one days ahead or with no date", async () => {
+      const zone = 'America/Chicago';
+      const yesterday = at(1, '2026-12-06T01:00:00.000Z'); // 19:00 on the 5th there
+      const lastWeek = at(2, '2026-11-29T01:00:00.000Z', { captureMode: 'final' });
+      const live = at(3, '2026-12-05T02:00:00.000Z', { status: 'live' });
+      const noDate = at(4, null);
+      const liveNoDate = at(5, null, { status: 'live' });
+      const inThreeDays = at(6, '2026-12-09T18:00:00.000Z');
+      const decided = finalGame(7, { captureMode: 'live', startsAt: '2026-12-06T01:00:00.000Z' });
+      const day = [yesterday, lastWeek, live, noDate, liveNoDate, inThreeDays, decided];
+      expect(await offeredAt(zone, '2026-12-06T18:00:00.000Z', day)).toEqual([
+        yesterday.id,
+        lastWeek.id,
+        live.id,
+        liveNoDate.id,
+      ]);
+    });
+
+    it('keeps to the league’s own day on the day its clocks go back', async () => {
+      // 1 November 2026 in Chicago: 02:00 summer time becomes 01:00 winter time, so the day
+      // is 25 hours long; its midnight is 05:00 UTC and the next one 06:00 UTC.
+      const zone = 'America/Chicago';
+      const early = at(1, '2026-11-01T05:30:00.000Z'); // 00:30 summer time
+      const late = at(2, '2026-11-02T05:50:00.000Z'); // 23:50 winter time
+      const next = at(3, '2026-11-02T06:10:00.000Z'); // 00:10 on the 2nd
+      const games = [early, late, next];
+      // At 00:05 summer time and at 23:55 winter time, both the 1st there.
+      for (const now of ['2026-11-01T05:05:00.000Z', '2026-11-02T05:55:00.000Z']) {
+        expect(await offeredAt(zone, now, games), now).toEqual([early.id, late.id]);
+      }
+      // Not before the league's midnight: at 23:55 on 31 October, nothing of the 1st.
+      expect(await offeredAt(zone, '2026-11-01T04:55:00.000Z', games)).toEqual([]);
+    });
+
+    it('takes the league’s day, not UTC’s, east of UTC too', async () => {
+      // Tokyo is nine hours ahead: 01:00 on the 7th there is still the 6th in UTC.
+      const zone = 'Asia/Tokyo';
+      const now = '2026-12-06T16:00:00.000Z';
+      const todayThere = at(1, '2026-12-07T10:00:00.000Z'); // 19:00 on the 7th there
+      const tomorrowThere = at(2, '2026-12-07T15:10:00.000Z'); // 00:10 on the 8th there
+      expect(await offeredAt(zone, now, [todayThere, tomorrowThere])).toEqual([todayThere.id]);
+      // With UTC as the league's zone, the same moment offers neither: both are days ahead.
+      expect(await offeredAt('UTC', now, [todayThere, tomorrowThere])).toEqual([]);
+    });
   });
 
   it('takes no more games than its limit at once', async () => {

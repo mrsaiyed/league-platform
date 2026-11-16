@@ -7,7 +7,11 @@
 //   for that game in one tap; the card's own link still leads to the game, by touch and by
 //   keyboard; "Score this game" is on the schedule, a team's page and a game's page too.
 // - A game recorded as a final score shows "Enter the score", which leads to that game's
-//   entry in Games; a final game shows neither.
+//   own row in Games; a final game shows neither.
+// - The button shows from the start of the game's own day in the league's time (S-70): on
+//   the game under way and tonight's, and on an earlier day's game with no result yet, never
+//   on tomorrow's. The made-up world starts at noon in the league's zone (worldAtNoon), so
+//   what is today never depends on when the test runs.
 // - A visitor, a coach and another league's admin see no button on the home page, the
 //   schedule, a team's page or a game's page.
 // - Where only assigned scorekeepers may score (the draft league), the scorekeeper sees it on
@@ -25,6 +29,7 @@ import {
   launch,
   startNext,
   waitFor,
+  worldAtNoon,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -56,7 +61,7 @@ const game = (n) => hexId('006a', n);
 const finalScoreToday = game(1); // Tigers at Lions, tonight, final score only
 const liveGame = game(2); // Bears at Hawks, under way, recorded live
 const trackedTomorrow = game(3); // Lions at Hawks, tomorrow, recorded live
-const finalScoreLater = game(4); // in the draft league, assigned to the scorekeeper
+const finalScoreLater = game(4); // in two days; in the draft league, assigned to the scorekeeper
 const decided = game(5); // Lions at Bears, final this morning
 /** The draft league's game nobody scored, two days ago, assigned to the scorekeeper. */
 const draftUnscored = hexId('0000', 0xb2000000 + 1000);
@@ -77,6 +82,7 @@ if (built) {
   server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
+    LOCAL_NOW: worldAtNoon(),
   });
   await step('starting the server and the browser', async () => {
     await waitFor(`${origin}/`, server);
@@ -282,8 +288,14 @@ if (browser) {
         await offersDrawn(page);
         const schedule = await cardsOn(page);
         note(
-          'the schedule offers "Score this game" on a game recorded live',
-          cardOf(schedule, trackedTomorrow)?.offer?.kind === 'score',
+          'the schedule offers "Score this game" on the game under way, recorded live',
+          cardOf(schedule, liveGame)?.offer?.kind === 'score',
+          JSON.stringify(cardOf(schedule, liveGame)),
+        );
+        note(
+          "tomorrow's game on the schedule has no button: not before its day (S-70)",
+          cardOf(schedule, trackedTomorrow) !== undefined &&
+            cardOf(schedule, trackedTomorrow)?.offer === null,
           JSON.stringify(cardOf(schedule, trackedTomorrow)),
         );
         note(
@@ -313,11 +325,23 @@ if (browser) {
           page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
           enter.click(),
         ]);
+        // The list shows today's game, and the phone lands on its own row, not the list's top.
+        const row = page.locator(`[id="game-${finalScoreToday}"]`);
+        await row.waitFor();
+        await page.waitForTimeout(300);
+        const landed = await row.evaluate((el) => ({
+          top: Math.round(el.getBoundingClientRect().top),
+          height: window.innerHeight,
+          scrolled: window.scrollY,
+        }));
         note(
-          '"Enter the score" leads to that game\'s entry in Games',
+          '"Enter the score" on a game of today lands on that game\'s own row in Games',
           new URL(page.url()).hash === `#game-${finalScoreToday}` &&
-            (await page.locator(`[id="game-${finalScoreToday}"]`).count()) === 1,
-          page.url(),
+            (await row.count()) === 1 &&
+            landed.scrolled > 0 &&
+            landed.top >= 0 &&
+            landed.top < landed.height / 2,
+          `${page.url()} ${JSON.stringify(landed)}`,
         );
         await page.goBack();
 
@@ -332,8 +356,9 @@ if (browser) {
         await offersDrawn(page);
         const team = await cardsOn(page);
         note(
-          "a team's page offers the button on its games to score",
-          cardOf(team, trackedTomorrow)?.offer?.kind === 'score',
+          "a team's page offers the button on its game to score today, not tomorrow's",
+          cardOf(team, liveGame)?.offer?.kind === 'score' &&
+            cardOf(team, trackedTomorrow)?.offer === null,
           JSON.stringify(team),
         );
         await accessible(page, "a team's page with the buttons");
@@ -342,19 +367,26 @@ if (browser) {
 
         // A game's page, by its card.
         const gameRead = readOfPage(page);
-        await page.locator(`main a.ui-game-link[href*="${trackedTomorrow}"]`).click();
-        await page.waitForURL((url) => url.pathname === `/north-valley/games/${trackedTomorrow}`);
+        await page.locator(`main a.ui-game-link[href*="${liveGame}"]`).first().click();
+        await page.waitForURL((url) => url.pathname === `/north-valley/games/${liveGame}`);
         await gameRead;
         await gameOffer(page).waitFor();
         note(
           'a game\'s page offers "Score this game", to that game\'s opening screen',
           (await gameOffer(page).textContent())?.trim() === 'Score this game' &&
-            (await gameOffer(page).getAttribute('href')) ===
-              `/north-valley/score/${trackedTomorrow}`,
+            (await gameOffer(page).getAttribute('href')) === `/north-valley/score/${liveGame}`,
         );
         await accessible(page, "a game's page with the button");
         await noSidewaysScroll(page, "a game's page with the button");
         await tallEnough(page, "a game's page");
+        // Tomorrow's game's own page has none.
+        await page.goBack();
+        await page.waitForURL((url) => url.pathname === '/north-valley/teams/hawks');
+        const tomorrowRead = readOfPage(page);
+        await page.locator(`main a.ui-game-link[href*="${trackedTomorrow}"]`).first().click();
+        await page.waitForURL((url) => url.pathname === `/north-valley/games/${trackedTomorrow}`);
+        await tomorrowRead;
+        note("tomorrow's game's page has no button", (await gameOffer(page).count()) === 0);
       } finally {
         await context.close();
       }
@@ -457,13 +489,11 @@ if (browser) {
       const { context, page } = await fresh('scorekeeper');
       try {
         await open(page, '/quiet-pines/schedule');
-        await offersDrawn(page);
         const cards = await cardsOn(page);
         const offered = cards.filter((card) => card.offer !== null).map((card) => card.game);
         note(
-          'a button on the scorekeeper’s assigned games only',
-          offered.length > 0 &&
-            offered.every((id) => [finalScoreLater, draftUnscored].includes(id)),
+          'a button only on the scorekeeper’s assigned game whose day has come',
+          offered.every((id) => id === draftUnscored),
           offered.join(', '),
         );
         note(
@@ -472,9 +502,20 @@ if (browser) {
           JSON.stringify(cardOf(cards, liveGame)),
         );
         note(
-          'their assigned game recorded as a final score says "Enter the score"',
-          cardOf(cards, finalScoreLater)?.offer?.words === 'Enter the score',
+          'none yet on their assigned game two days ahead (S-70)',
+          cardOf(cards, finalScoreLater) !== undefined &&
+            cardOf(cards, finalScoreLater)?.offer === null,
           JSON.stringify(cardOf(cards, finalScoreLater)),
+        );
+        // Their game of two days ago that nobody scored: "Enter the score", to its row.
+        await open(page, `/quiet-pines/games/${draftUnscored}`);
+        await gameOffer(page).waitFor();
+        note(
+          'their assigned game of two days ago with no result says "Enter the score"',
+          (await gameOffer(page).textContent())?.trim() === 'Enter the score' &&
+            (await gameOffer(page).getAttribute('href')) ===
+              `/quiet-pines/admin/games#game-${draftUnscored}`,
+          String(await gameOffer(page).getAttribute('href')),
         );
       } finally {
         await context.close();

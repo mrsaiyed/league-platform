@@ -13,8 +13,13 @@ import { askedGameIds, offerHref, scoringOffersRequest } from './scoring-offers-
 import { trackerWorld, type League, type Person } from './tracker-endpoints.test-helper.ts';
 
 const gameId = (n: number) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0')}`;
-/** Games 1 to 5 of the made-up league: 1 and 4 final score only, 2 live, 3 tracked, 5 final. */
+/**
+ * Games 1 to 5 of the made-up league: 1 tonight and 4 in two days, final score only; 2 under
+ * way; 3 tomorrow, tracked; 5 final this morning (stand-in-world-seed.ts).
+ */
 const firstFive = [1, 2, 3, 4, 5].map(gameId).join(',');
+/** The draft league's game nobody scored, two days ago, assigned to its scorekeeper. */
+const draftUnscored = '01900000-0000-7000-8000-0000b20003e8';
 /** A league id nobody has. */
 const noLeague = '01900000-0000-7000-8000-0000000fffff';
 
@@ -50,12 +55,11 @@ describe('the scoring read of a public page', () => {
     const answer = await ask('scorekeeper');
     expect(answer.status).toBe(200);
     expect(answer.headers).toEqual({ 'Cache-Control': 'private, no-store' });
+    // Today's game and the one under way (S-70): not tomorrow's (3) nor the one in two days (4).
     expect(answer.body).toEqual({
       games: [
         { gameId: gameId(1), kind: 'enter', href: `/north-valley/admin/games#game-${gameId(1)}` },
         { gameId: gameId(2), kind: 'score', href: `/north-valley/score/${gameId(2)}` },
-        { gameId: gameId(3), kind: 'score', href: `/north-valley/score/${gameId(3)}` },
-        { gameId: gameId(4), kind: 'enter', href: `/north-valley/admin/games#game-${gameId(4)}` },
       ],
       words: {
         score: 'Score this game',
@@ -123,14 +127,23 @@ describe('the scoring read of a public page', () => {
   });
 
   it('gives a scorekeeper only their assigned games where only assigned ones may score', async () => {
-    const answer = await ask('scorekeeper', 'draft');
+    // Assigned the game in two days (4, not offered until its day) and the one two days ago
+    // that nobody scored (offered: it still has no result).
+    const games = `${firstFive},${draftUnscored}`;
+    const answer = await ask('scorekeeper', 'draft', games);
     expect(answer.body).toMatchObject({
-      games: [{ gameId: gameId(4), kind: 'enter' }],
+      games: [
+        {
+          gameId: draftUnscored,
+          kind: 'enter',
+          href: `/quiet-pines/admin/games#game-${draftUnscored}`,
+        },
+      ],
     });
-    // The league's admin, given the live games, may score every one of them.
-    const admin = await ask('admin', 'draft');
+    // The league's admin, given the live games, may score every one of them on its day.
+    const admin = await ask('admin', 'draft', games);
     expect(admin.body).toMatchObject({
-      games: [1, 2, 3, 4].map((n) => ({ gameId: gameId(n) })),
+      games: [gameId(1), gameId(2), draftUnscored].map((id) => ({ gameId: id })),
     });
   });
 

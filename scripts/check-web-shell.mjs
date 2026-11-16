@@ -79,6 +79,8 @@ const unassignedGame = '01900000-0000-7000-8000-006a00000003';
 /** A made-up game of North Valley (apps/web/src/server/stand-in-games.ts): 1 scheduled,
  * 2 live (Hawks v Bears), 5 final (Bears v Lions), 6 in a season still being set up. */
 const game = (n) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0')}`;
+/** The draft league's game nobody scored, two days ago, assigned to the scorekeeper. */
+const draftUnscored = '01900000-0000-7000-8000-0000b20003e8';
 
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
 // browser's script fills with the not-found or forbidden screen (record 020), so
@@ -588,10 +590,19 @@ const cases = [
   ]),
   [
     'scorekeeper',
-    `/api/v1/leagues/${quietPines}/scoring?games=${liveGame},${unassignedGame},${game(4)}`,
+    `/api/v1/leagues/${quietPines}/scoring?games=${liveGame},${unassignedGame},${game(4)},${draftUnscored}`,
     200,
-    [`"gameId":"${game(4)}"`, '"kind":"enter"'],
-    [liveGame, unassignedGame],
+    [`"gameId":"${draftUnscored}"`, '"kind":"enter"'],
+    // Game 4 is theirs too, but two days ahead: not offered before its day (S-70).
+    [liveGame, unassignedGame, game(4)],
+  ],
+  // A game of tomorrow is not offered today, to its scorekeeper either (S-70).
+  [
+    'scorekeeper',
+    `/api/v1/leagues/${northValley}/scoring?games=${unassignedGame}`,
+    200,
+    ['{"games":[]}'],
+    [unassignedGame],
   ],
   [
     'clubAdmin',

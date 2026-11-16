@@ -62,7 +62,7 @@ A **search box** at the top of the dashboard finds any person, team or game by n
 
 A person can hold several roles. A role can be limited to **one program** ("volleyball scheduler") in leagues that have several.
 
-What each role sees is trimmed to what they can use. A scorekeeper who opens the admin sees a list of their games and nothing else, tonight's first; games recorded live carry a "Score this game" button (S-38, decided for you; the same button is on the game's public card and page for them, S-50), and the others say how they are recorded, with a link to enter the score ([P7 §5.1](P7-teams-schedule-gameday.md)). Coaches and captains do not use the admin at all; their tools are on the team page under `/{league}/my`.
+What each role sees is trimmed to what they can use. A scorekeeper who opens the admin sees a list of their games and nothing else, tonight's first; games recorded live carry a "Score this game" button (S-38, decided for you), and the others say how they are recorded, with a link to enter the score ([P7 §5.1](P7-teams-schedule-gameday.md)). On a league's public pages, the game's card and page carry the button for the person who may score that game, never for a visitor: "Score this game" or "Enter the score", from the start of the game's own day until it is final (S-50, S-70, decided for you). Coaches and captains do not use the admin at all; their tools are on the team page under `/{league}/my`.
 
 **Inviting someone:** enter an email, pick a role, send. They get a link, sign in (or create their account), and they are in. Pending invitations can be re-sent or cancelled. Access can be removed at any time and takes effect immediately.
 
