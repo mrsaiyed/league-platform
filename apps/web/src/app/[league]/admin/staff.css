@@ -360,6 +360,13 @@ html:has(.staff) {
     padding-inline: var(--step-2);
     overflow-y: auto;
   }
+  /* At the side the rows are a pointer's: 40 high, so every area of a full menu is on a
+     laptop's screen at once and the current one is never out of sight. */
+  .staff .staff-side .staff-nav a,
+  .staff .staff-side .staff-foot-link {
+    min-block-size: calc(var(--tap) - var(--step-1));
+    padding-block: var(--step-1);
+  }
   .staff .staff-side-brand {
     flex: none;
     padding-inline: var(--step-2);

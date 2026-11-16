@@ -13,16 +13,40 @@ export type SearchProps = {
   readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
 };
 
-/** What went well or why a change was refused, from the address. */
+/**
+ * What went well or why a change was refused, from the address. A refusal said beside
+ * the field it is about, or what went well said on its own roster line (`saidBeside`), is
+ * not said again here.
+ */
 export function Notice({
   query,
+  saidBeside = false,
 }: {
   readonly query: Readonly<Record<string, string | string[] | undefined>>;
+  readonly saidBeside?: boolean;
 }) {
   const problem = problemKey(query);
   const good = doneKey(query);
-  if (problem !== undefined) return <p role="alert">{t(problem)}</p>;
-  if (good !== undefined) return <p role="status">{t(good)}</p>;
+  if (saidBeside) return null;
+  // One notice, in kinds told apart at a glance (step 2.103): refused; saved; or removed.
+  if (problem !== undefined) {
+    return (
+      <p className="ui-notice" data-kind="error" role="alert">
+        {t(problem)}
+      </p>
+    );
+  }
+  if (good !== undefined) {
+    return (
+      <p
+        className="ui-notice"
+        data-kind={/removed$/i.test(good) ? 'removed' : 'saved'}
+        role="status"
+      >
+        {t(good)}
+      </p>
+    );
+  }
   return null;
 }
 
@@ -146,13 +170,19 @@ export function Swatch({
 /** A part of a Teams screen: a panel with its title (the staff area's panel, step 2.103). */
 export function Section({
   title,
+  id,
+  kind,
   children,
 }: {
   readonly title: string;
+  /** The part's own place on the page, for a button at the top that leads to it. */
+  readonly id?: string;
+  /** A part that takes something away is edged as one, apart from the rest. */
+  readonly kind?: 'danger';
   readonly children: ReactNode;
 }) {
   return (
-    <section className="staff-panel admin-team-part">
+    <section id={id} className="staff-panel admin-team-part" data-kind={kind}>
       <h2>{title}</h2>
       {children}
     </section>

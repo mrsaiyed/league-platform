@@ -1,15 +1,20 @@
 // Changes a roster entry of the scope's league: its number, role, leaving date or
 // place. With `version`, only if it is still at it (T-46; the database adds one to the
 // version itself, 0002). A number someone on the team wears, where the season asks for
-// unique numbers, comes back as 'jersey-taken' (0008), and the transaction is then
-// unusable: the caller rolls it back.
+// unique numbers, comes back as 'jersey-taken' (0008). The write runs in a savepoint of
+// its own (record 058), so after a refusal the transaction carries on: putting a player
+// back whose number is worn then puts them back with no number (step 2.161, R-32). A
+// leaving date of null puts the entry back on the roster: an open entry of the same
+// person on the team comes back as 'already-on-team' (roster_entries_once).
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { constraintOf } from './constraint-of.ts';
+import { inSavepoint } from './in-savepoint.ts';
 
 export type RosterEntryChangeRow = {
   jerseyNumber?: string | null;
   role?: string;
-  leftOn?: string;
+  /** null clears the leaving date: the entry is on the roster again. */
+  leftOn?: string | null;
   sort?: number;
 };
 
@@ -21,19 +26,21 @@ export async function updateRosterEntry(
   version?: number,
 ): Promise<number | 'already-on-team' | 'jersey-taken' | undefined> {
   try {
-    const row = await transactionOf(scope)
-      .updateTable('roster_entries')
-      .set({
-        ...(change.jerseyNumber === undefined ? {} : { jersey_number: change.jerseyNumber }),
-        ...(change.role === undefined ? {} : { role: change.role }),
-        ...(change.leftOn === undefined ? {} : { left_on: change.leftOn }),
-        ...(change.sort === undefined ? {} : { sort: change.sort }),
-      })
-      .where('league_id', '=', scope.leagueId)
-      .where('id', '=', entryId)
-      .$if(version !== undefined, (q) => q.where('version', '=', version ?? 0))
-      .returning('version')
-      .executeTakeFirst();
+    const row = await inSavepoint(scope, () =>
+      transactionOf(scope)
+        .updateTable('roster_entries')
+        .set({
+          ...(change.jerseyNumber === undefined ? {} : { jersey_number: change.jerseyNumber }),
+          ...(change.role === undefined ? {} : { role: change.role }),
+          ...(change.leftOn === undefined ? {} : { left_on: change.leftOn }),
+          ...(change.sort === undefined ? {} : { sort: change.sort }),
+        })
+        .where('league_id', '=', scope.leagueId)
+        .where('id', '=', entryId)
+        .$if(version !== undefined, (q) => q.where('version', '=', version ?? 0))
+        .returning('version')
+        .executeTakeFirst(),
+    );
     return row?.version;
   } catch (error) {
     const constraint = constraintOf(error)?.constraint;

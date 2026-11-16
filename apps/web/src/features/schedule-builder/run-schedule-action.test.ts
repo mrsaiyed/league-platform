@@ -4,6 +4,7 @@
 import {
   getScheduleDraft,
   listVenues,
+  publishChangeCount,
   type CommandContext,
   type ScheduleDraftView,
 } from '@srleagues/core';
@@ -12,6 +13,7 @@ import { standInSchedule } from '../../server/stand-in-schedule.ts';
 import { adultTeams } from '../../server/stand-in-world-seed.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildGrid, parsePlace, placeValue } from './build-grid.ts';
+import { answerParams, savedDetailOf } from './grid-answer.ts';
 import { runScheduleAction, type ScheduleActionKind } from './run-schedule-action.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -158,7 +160,7 @@ describe('schedule grid', () => {
           gameId: gameId(10),
           wasSlot: [round.id, round.date, '17:00', place].join('~'),
         }),
-      ).toEqual({ kind: 'saved', detail: { what: 'game-removed', roundId: round.id } });
+      ).toMatchObject({ kind: 'saved', detail: { what: 'game-removed', roundId: round.id } });
       expect(
         await press('rename-round', { roundId: round.id, label: 'Week 5, Rivalry Week' }),
       ).toEqual({ kind: 'saved', detail: { what: 'round-saved', roundId: round.id } });
@@ -176,6 +178,107 @@ describe('schedule grid', () => {
       expect(view.published.rounds[0]?.label).toBe('Week 5, Rivalry Week');
     },
   );
+
+  it('puts a game removed by mistake back exactly as it was, published or only drafted (step 2.161)', async () => {
+    const { ports, read, press } = setup();
+    const first = await read();
+    const round = first.result.rounds[0];
+    if (round === undefined || round.date === null) throw new Error('no round');
+    const venues = await listVenues(context, {}, ports.deps);
+    const gym = venues.ok ? venues.value[0] : undefined;
+    const court = gym?.courts[0];
+    if (gym === undefined || court === undefined) throw new Error('no court');
+    const place = placeValue(gym.id, court.name);
+    expect(
+      await press('add-game', {
+        gameId: gameId(30),
+        homeTeamId: team(1),
+        awayTeamId: team(2),
+        roundId: round.id,
+        date: round.date,
+        time: '08:00',
+        place,
+        recording: 'box-score',
+      }),
+    ).toMatchObject({ kind: 'saved' });
+    // Only a game still just scheduled has "Remove game" on the grid.
+    const published = first.published.games.find((g) => g.status === 'scheduled');
+    if (published === undefined) throw new Error('no published game');
+    const grid = buildGrid(await read(), teams, venues.ok ? venues.value : []);
+    for (const id of [gameId(30), published.id]) {
+      const before = grid.allGames.find((g) => g.id === id);
+      if (before === undefined) throw new Error('no game');
+      const wasSlot = [before.roundId ?? '', before.date, before.time ?? '', before.place];
+      const removed = await press('remove-game', {
+        gameId: id,
+        wasSlot: wasSlot.join('~'),
+        wasRecording: before.recording ?? '',
+        // What the fields held when "Remove game" was tapped does not count.
+        date: '2030-01-01',
+        time: '23:00',
+      });
+      expect(removed).toEqual({
+        kind: 'saved',
+        detail: { what: 'game-removed', roundId: before.roundId, gameId: id },
+      });
+      const out = await read();
+      expect(out.result.games.some((g) => g.id === id)).toBe(false);
+      // The draft keeps its own record of the game as it was: "Put it back" reads that.
+      expect(out.removed.map((g) => g.id)).toEqual([id]);
+      // The address carries only which game.
+      const answer = answerParams(removed);
+      expect(answer.query).toMatchObject({ saved: 'game-removed', game: id });
+      expect(savedDetailOf(answer.query)).toEqual(removed.kind === 'saved' && removed.detail);
+      // The form names only the game, with a basis that is out of date: still put back.
+      expect(
+        await press('put-back-game', { gameId: id, version: '1', homeTeamId: team(5) }),
+      ).toEqual({ kind: 'saved', detail: { what: 'game-put-back', gameId: id } });
+      const after = buildGrid(await read(), teams, venues.ok ? venues.value : []).allGames.find(
+        (g) => g.id === id,
+      );
+      expect(after).toEqual(before);
+      // Tapped again (a reload): it is back, said so, and nothing is added twice.
+      const entries = (await read()).draft?.changeCount;
+      expect(await press('put-back-game', { gameId: id })).toEqual({
+        kind: 'saved',
+        detail: { what: 'game-put-back', gameId: id },
+      });
+      expect((await read()).draft?.changeCount).toBe(entries);
+    }
+    // Put back as it was, the published game is no change at all to publish.
+    const view = await read();
+    expect(view.summary.gamesRemoved).toEqual([]);
+    expect(view.summary.gamesMoved).toEqual([]);
+    expect(view.summary.gamesRecordingChanged).toEqual([]);
+    expect(view.summary.gamesAdded).toEqual([gameId(30)]);
+    // The grid's count says what publishing would change: the one new game, not the five
+    // entries the draft holds (an add, two removes, two put backs).
+    expect(view.draft?.changeCount).toBe(5);
+    expect(publishChangeCount(view.summary)).toBe(1);
+    expect(view.published.games.some((g) => g.id === published.id)).toBe(true);
+  });
+
+  it('offers nothing to put back from an old address once the draft is published (step 2.161)', async () => {
+    const { read, press } = setup();
+    const first = await read();
+    const game = first.published.games.find((g) => g.status === 'scheduled');
+    if (game === undefined) throw new Error('no published game');
+    const wasSlot = [game.roundId ?? '', game.date, game.time ?? '', ''].join('~');
+    expect(await press('remove-game', { gameId: game.id, wasSlot })).toMatchObject({
+      kind: 'saved',
+    });
+    expect(await press('publish', {})).toEqual({ kind: 'published' });
+    const published = await read();
+    expect(published.published.games.some((g) => g.id === game.id)).toBe(false);
+    // The old page's "Put it back": refused in words, and no game is added to a new draft.
+    expect(await press('put-back-game', { gameId: game.id })).toEqual({
+      kind: 'refused',
+      code: 'nothing-to-put-back',
+    });
+    const after = await read();
+    expect(after.draft).toBeNull();
+    expect(after.result.games.some((g) => g.id === game.id)).toBe(false);
+  });
 
   it('says the move was saved when the recording change after it is refused', async () => {
     const { read, press } = setup();

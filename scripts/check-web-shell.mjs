@@ -1015,7 +1015,14 @@ async function checkTeams(origin) {
     version: version ?? '1',
     leftOn: '2026-11-13',
   });
-  if (gone === undefined || to(gone) !== `${page}?done=left`) {
+  // The answer lands on the marked player's own line (step 2.161): the address names
+  // exactly the roster entry this check marked.
+  if (
+    gone === undefined ||
+    entry === undefined ||
+    gone.status !== 303 ||
+    to(gone) !== `${page}?done=left&entry=${entry}`
+  ) {
     problems.push(
       `marking a player as left answers ${gone?.status} to ${gone && to(gone)} of ${forms} forms`,
     );

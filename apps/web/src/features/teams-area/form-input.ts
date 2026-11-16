@@ -96,14 +96,22 @@ export function changeEntryInput(fields: Fields) {
 
 /**
  * The leaving date is always typed by the admin (the field is required): the server
- * does not guess "today", because its clock is UTC and the league has no time zone
- * here yet, so a guess could be a day off.
+ * does not guess "today". The command refuses a date after the league's own today.
  */
 export function markLeftInput(fields: Fields) {
   return {
     rosterEntryId: text(fields, 'entry'),
     version: versionOf(fields),
     leftOn: text(fields, 'leftOn'),
+  };
+}
+
+/** A "Left the team" line put back on the roster: the team's page, the entry and its version. */
+export function putBackInput(fields: Fields) {
+  return {
+    teamId: text(fields, 'team'),
+    rosterEntryId: text(fields, 'entry'),
+    version: versionOf(fields),
   };
 }
 

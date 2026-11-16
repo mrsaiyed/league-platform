@@ -1,6 +1,7 @@
 // One team's page in Admin → Teams (step 2.51): its details, who sees its numbers, and
 // its roster: people added with a jersey number and a role, put in order, and marked
-// as having left (R-17: they stay in the team's history). Every change is a plain form.
+// as having left (R-17: they stay in the team's history), and put back when that was a
+// mistake (step 2.161). Every change is a plain form.
 import {
   leagueUrl,
   listPeople,
@@ -9,12 +10,16 @@ import {
   type PersonRecord,
   type RosterLine,
 } from '@srleagues/core';
+import { PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { StaffTrail } from '../staff/index.ts';
 import { t, type TextKey } from '../../server/messages.ts';
+import { doneAtOf, entryAnchor, leavingAtOf, problemKey } from './answer.ts';
+import { putBackOffer } from './put-back-offer.ts';
+import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
 import {
   addNewPersonAction,
@@ -22,6 +27,7 @@ import {
   changeEntryAction,
   markLeftAction,
   moveEntryAction,
+  putBackAction,
   removePersonAction,
   removeTeamAction,
   saveTeamAction,
@@ -38,7 +44,12 @@ import {
   TextField,
 } from './parts.tsx';
 
+/** Where "Add a player", the page's main action, leads: the form's own place on the page. */
+const addPlayerAnchor = 'add-player';
+
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** How many of the league list one page reads. */
+const peopleShown = 200;
 
 const roleText = (role: string): string =>
   (rosterRoles as readonly string[]).includes(role)
@@ -79,22 +90,40 @@ export async function TeamPage({
   // S-44: a clash of numbers is marked on both players, for the admin to put right.
   const wornTwice = numbersWornTwice(open);
   const left = lines.filter((line) => line.leftOn !== null);
-  const people = await listPeople(context, { limit: 200 }, ports.deps);
+  const people = await listPeople(context, { limit: peopleShown }, ports.deps);
   const everyone: readonly PersonRecord[] = people.ok ? people.value : [];
+  const leagueList = people.ok
+    ? { ids: new Set(everyone.map((person) => person.id)), complete: everyone.length < peopleShown }
+    : undefined;
   // A read that fails is shown as such, never as an empty roster or list.
   const readFailed = !roster.ok || !people.ok;
   const onRoster = new Set(open.map((line) => line.personId));
   const available = everyone.filter((person) => !onRoster.has(person.id));
   const listUrl = leagueUrl(here, 'admin-area', { area: 'teams' });
+  // A refused leaving date is said beside the line it was typed in, with the date kept.
+  const leaving = leavingAtOf(query);
+  const besideEntry = open.some((line) => line.id === leaving?.entry) ? leaving : undefined;
+  const leavingProblem = besideEntry === undefined ? undefined : problemKey(query);
+  // What went well on one line is said on that line, naming the player (step 2.161).
+  const onLine = saidOnLine(doneAtOf(query), lines, team.name);
+  const saidHere = (entryId: string) =>
+    onLine?.entry !== entryId ? null : (
+      <p className="ui-notice" data-kind="saved" role="status" data-said-on={entryId}>
+        {onLine.text}
+      </p>
+    );
 
   return (
     <main className="admin-teams admin-team">
+      {/* The way back, then the page's head: the team's shield and name, one line of what
+          the page is for, and its main action at the top right (step 2.103). */}
       <StaffTrail steps={[{ href: listUrl, label: t('admin.area.teams') }]} here={team.name} />
-      <h1>
-        <Swatch team={team} />
-        {team.name}
-      </h1>
-      <Notice query={query} />
+      <PageHead title={team.name} sub={t('adminTeams.team.sub')} lead={<Swatch team={team} />}>
+        <a className="ui-button" data-kind="main" data-icon="plus" href={`#${addPlayerAnchor}`}>
+          {t('adminTeams.add.title')}
+        </a>
+      </PageHead>
+      <Notice query={query} saidBeside={leavingProblem !== undefined || onLine !== undefined} />
 
       <Section title={t('adminTeams.edit.title')}>
         <form action={saveTeamAction} className="staff-form">
@@ -144,18 +173,29 @@ export async function TeamPage({
 
       <Section title={t('adminTeams.roster.title')}>
         {!roster.ok ? (
-          <p role="alert">{t('adminTeams.roster.readFailed')}</p>
+          <p className="ui-notice" data-kind="error" role="alert">
+            {t('adminTeams.roster.readFailed')}
+          </p>
         ) : open.length === 0 ? (
-          <p>{t('adminTeams.roster.none')}</p>
+          <p className="staff-quiet">{t('adminTeams.roster.none')}</p>
         ) : (
           <ol className="admin-roster">
             {open.map((line, place) => (
-              <li key={line.id}>
-                <strong>{nameOf(line)}</strong>
-                {line.needsReview === true ? <> {t('adminTeams.roster.toReview')}</> : null}
-                {line.jerseyNumber !== null && wornTwice.has(line.jerseyNumber) ? (
-                  <> {t('adminTeams.roster.numberTwice', { number: line.jerseyNumber })}</>
-                ) : null}
+              <li key={line.id} id={entryAnchor(line.id)}>
+                {/* The player's line: their name, then what needs a look, in its own color. */}
+                <p className="admin-roster-name">
+                  <strong dir="auto">{nameOf(line)}</strong>
+                  {line.needsReview === true ? (
+                    <span data-flag="review"> {t('adminTeams.roster.toReview')}</span>
+                  ) : null}
+                  {line.jerseyNumber !== null && wornTwice.has(line.jerseyNumber) ? (
+                    <span data-flag="clash">
+                      {' '}
+                      {t('adminTeams.roster.numberTwice', { number: line.jerseyNumber })}
+                    </span>
+                  ) : null}
+                </p>
+                {saidHere(line.id)}
                 <form action={changeEntryAction} className="admin-roster-form">
                   <LeagueField league={here.slug} />
                   <input type="hidden" name="team" value={team.id} />
@@ -186,13 +226,15 @@ export async function TeamPage({
                   <input type="hidden" name="team" value={team.id} />
                   <input type="hidden" name="entry" value={line.id} />
                   <input type="hidden" name="version" value={line.version} />
-                  <p>
-                    <label>
-                      {t('adminTeams.roster.leftOn')}
-                      <input name="leftOn" type="date" required />
-                    </label>{' '}
-                    <button type="submit">{t('adminTeams.roster.markLeft')}</button>
-                  </p>
+                  <LeavingDate
+                    entryId={line.id}
+                    typed={besideEntry?.entry === line.id ? besideEntry.leftOn : undefined}
+                    problem={
+                      besideEntry?.entry === line.id && leavingProblem !== undefined
+                        ? t(leavingProblem)
+                        : undefined
+                    }
+                  />
                 </form>
                 <MoveForm
                   league={here.slug}
@@ -211,11 +253,36 @@ export async function TeamPage({
             <h3>{t('adminTeams.roster.leftTitle')}</h3>
             <ul className="admin-left">
               {left.map((line) => (
-                <li key={line.id}>
-                  {t('adminTeams.roster.leftLine', {
-                    name: nameOf(line),
-                    date: line.leftOn ?? '',
-                  })}
+                <li key={line.id} id={entryAnchor(line.id)} data-left-entry={line.id}>
+                  <span className="admin-left-line">
+                    {t('adminTeams.roster.leftLine', {
+                      name: nameOf(line),
+                      date: line.leftOn ?? '',
+                    })}
+                  </span>
+                  {saidHere(line.id)}
+                  {/* Offered only where it can work (step 2.161); else said in words. */}
+                  {putBackOffer(line.personId, onRoster, leagueList) === 'back' ? (
+                    <p className="staff-quiet" data-put-back-not-offered="back">
+                      {t('adminTeams.roster.backAlready')}
+                    </p>
+                  ) : putBackOffer(line.personId, onRoster, leagueList) === 'off-the-list' ? (
+                    <p className="staff-quiet" data-put-back-not-offered="off-the-list">
+                      {t('adminTeams.roster.offTheList')}
+                    </p>
+                  ) : (
+                    <form action={putBackAction} className="admin-left-form">
+                      <LeagueField league={here.slug} />
+                      <input type="hidden" name="team" value={team.id} />
+                      <input type="hidden" name="entry" value={line.id} />
+                      <input type="hidden" name="version" value={line.version} />
+                      <p>
+                        <button type="submit" className="ui-button">
+                          {t('adminTeams.roster.putBack')}
+                        </button>
+                      </p>
+                    </form>
+                  )}
                 </li>
               ))}
             </ul>
@@ -223,11 +290,13 @@ export async function TeamPage({
         )}
       </Section>
 
-      <Section title={t('adminTeams.add.title')}>
+      <Section title={t('adminTeams.add.title')} id={addPlayerAnchor}>
         {readFailed ? (
-          <p role="alert">{t('adminTeams.add.readFailed')}</p>
+          <p className="ui-notice" data-kind="error" role="alert">
+            {t('adminTeams.add.readFailed')}
+          </p>
         ) : available.length === 0 ? (
-          <p>{t('adminTeams.add.noOne')}</p>
+          <p className="staff-quiet">{t('adminTeams.add.noOne')}</p>
         ) : (
           <form action={addToRosterAction} className="staff-form">
             <LeagueField league={here.slug} />
@@ -283,34 +352,101 @@ export async function TeamPage({
       </Section>
 
       <Section title={t('adminTeams.people.title')}>
-        <p>{t('adminTeams.people.body')}</p>
-        {people.ok ? null : <p role="alert">{t('adminTeams.people.readFailed')}</p>}
+        <p className="staff-quiet">{t('adminTeams.people.body')}</p>
+        {people.ok ? null : (
+          <p className="ui-notice" data-kind="error" role="alert">
+            {t('adminTeams.people.readFailed')}
+          </p>
+        )}
         <ul className="staff-rows admin-people">
           {everyone.map((person) => (
             <li key={person.id}>
-              {nameOf(person)}
+              <span className="staff-row-name" dir="auto">
+                {nameOf(person)}
+              </span>
               <form action={removePersonAction} className="admin-person-form">
                 <LeagueField league={here.slug} />
                 <input type="hidden" name="team" value={team.id} />
                 <input type="hidden" name="personId" value={person.id} />
                 <ConfirmBox />
-                <button type="submit">{t('adminTeams.people.remove')}</button>
+                <button type="submit" className="ui-button" data-kind="danger">
+                  {t('adminTeams.people.remove')}
+                </button>
               </form>
             </li>
           ))}
         </ul>
       </Section>
 
-      <Section title={t('adminTeams.remove.title')}>
-        <p>{t('adminTeams.remove.body')}</p>
-        <form action={removeTeamAction}>
+      <Section title={t('adminTeams.remove.title')} kind="danger">
+        <p className="staff-quiet">{t('adminTeams.remove.body')}</p>
+        {/* How many people the bin would take with the team, said before it is confirmed. */}
+        <p className="staff-quiet" data-remove-roster-count={open.length}>
+          {!roster.ok
+            ? t('adminTeams.remove.rosterUnknown')
+            : open.length === 0
+              ? t('adminTeams.remove.rosterNone')
+              : t.plural('adminTeams.remove.roster', open.length)}
+        </p>
+        <form action={removeTeamAction} className="staff-form">
           <LeagueField league={here.slug} />
           <input type="hidden" name="team" value={team.id} />
           <ConfirmBox />
-          <button type="submit">{t('adminTeams.remove.submit')}</button>
+          <p className="staff-buttons">
+            <button type="submit" className="ui-button" data-kind="danger">
+              {t('adminTeams.remove.submit')}
+            </button>
+          </p>
         </form>
       </Section>
     </main>
+  );
+}
+
+/**
+ * The leaving date and "Mark as left": after a refusal the date typed is kept in the
+ * field and the reason is said beside it (step 2.161).
+ */
+function LeavingDate({
+  entryId,
+  typed,
+  problem,
+}: {
+  readonly entryId: string;
+  readonly typed: string | undefined;
+  readonly problem: string | undefined;
+}) {
+  const helpId = `left-on-help-${entryId}`;
+  const errorId = `left-on-error-${entryId}`;
+  return (
+    <>
+      <p>
+        <label className="staff-field">
+          {t('adminTeams.roster.leftOn')}
+          <input
+            name="leftOn"
+            type="date"
+            required
+            defaultValue={typed ?? ''}
+            aria-describedby={problem === undefined ? helpId : `${errorId} ${helpId}`}
+            aria-invalid={problem === undefined ? undefined : true}
+          />
+        </label>
+      </p>
+      {problem === undefined ? null : (
+        <p id={errorId} className="ui-field-error" role="alert" data-left-on-problem={entryId}>
+          {problem}
+        </p>
+      )}
+      <p id={helpId} className="ui-field-help">
+        {t('adminTeams.roster.leftOnHelp')}
+      </p>
+      <p>
+        <button type="submit" className="ui-button">
+          {t('adminTeams.roster.markLeft')}
+        </button>
+      </p>
+    </>
   );
 }
 

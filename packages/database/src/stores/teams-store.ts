@@ -3,6 +3,7 @@ import type { TeamsStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
   findDivision,
+  findLeagueToday,
   findPerson,
   findRosterEntry,
   findSeasonProgramId,
@@ -38,6 +39,11 @@ export function teamsStore(scope: LeagueScope): TeamsStore {
     addRosterEntry: (entry) => insertRosterEntry(scope, entry),
     updateRosterEntry: (entryId, change, version) =>
       updateRosterEntry(scope, entryId, change, version),
+    leagueToday: async () => {
+      const today = await findLeagueToday(scope);
+      if (today === undefined) throw new Error('teams store: the league is not there.');
+      return today;
+    },
     seasonProgramId: (seasonId) => findSeasonProgramId(scope, seasonId),
     findDivision: async (divisionId) => {
       const division = await findDivision(scope, divisionId);

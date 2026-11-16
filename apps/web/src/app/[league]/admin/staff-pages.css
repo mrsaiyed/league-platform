@@ -649,3 +649,159 @@
   font-size: var(--text-14);
   font-weight: 600;
 }
+
+/* ---------- Teams, and a team ---------- */
+
+.admin-teams > .ui-notice,
+.admin-teams > .staff-rows,
+.admin-teams > .ui-empty,
+.admin-teams > .admin-team-part,
+.admin-add-team {
+  margin-block-end: var(--step-4);
+}
+/* Where "Add a team" and "Add a player" lead stops clear of the row that stays on top. */
+.admin-add-team,
+.admin-team-part[id] {
+  scroll-margin-block-start: var(--step-4);
+}
+.staff .admin-team-part form p {
+  margin: 0;
+}
+/* The part that takes the team away is edged as what it is, apart at the foot. */
+.admin-team-part[data-kind='danger'] {
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+.admin-team .ui-page-head-row > .ui-emblem {
+  block-size: var(--step-7);
+}
+/* A color and "use the league's own": the swatch under its label, the tick beside it. */
+.staff .admin-color-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--step-2) var(--step-5);
+}
+/* The roster: one player under another between fine lines. Their name, then their number
+   and role with Save (filled), their leaving date with "Mark as left" (outlined), and
+   moving them up or down (quiet, with an arrow): three buttons that cannot be mistaken. */
+.staff .admin-roster,
+.staff .admin-left {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  border-block-start: 1px solid var(--color-line);
+  list-style: none;
+}
+.admin-roster > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-3);
+  padding-block: var(--step-4);
+  border-block-end: 1px solid var(--color-line);
+  scroll-margin-block-start: calc(var(--tap) + var(--step-5));
+}
+.staff .admin-roster > li > *,
+.staff .admin-roster form > * {
+  margin: 0;
+}
+.admin-roster-name [data-flag] {
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.admin-roster-name [data-flag='clash'] {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+.admin-roster-fields,
+.staff .admin-roster-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--step-3);
+}
+.staff .admin-roster-fields > .staff-field {
+  flex: 0 1 auto;
+}
+.staff .admin-roster-fields select {
+  inline-size: calc(3 * var(--step-7));
+}
+.staff .admin-roster-form .staff-field input[type='date'] {
+  inline-size: calc(3 * var(--step-7) + var(--step-4));
+}
+/* The leaving date's own words come after its row: the error, then the quiet help. */
+.admin-roster-form > .ui-field-error,
+.admin-roster-form > .ui-field-help {
+  flex: 1 1 100%;
+  order: 2;
+}
+.staff .admin-move .staff-buttons {
+  gap: var(--step-1);
+}
+.staff .ui-button:is([data-icon='up'], [data-icon='down'])::before {
+  content: '';
+  flex: none;
+  inline-size: var(--step-4);
+  block-size: var(--step-4);
+  background: currentColor;
+  -webkit-mask: var(--staff-chevron) center / contain no-repeat;
+  mask: var(--staff-chevron) center / contain no-repeat;
+  transform: rotate(-90deg);
+}
+.staff .ui-button[data-icon='down']::before {
+  transform: rotate(90deg);
+}
+@media (min-width: 64rem) {
+  /* On a laptop a player's two forms stand side by side under their name. */
+  .admin-roster > li {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--step-6);
+    align-items: start;
+  }
+  .admin-roster > li > :is(.admin-roster-name, .ui-notice, .admin-move) {
+    grid-column: 1 / -1;
+  }
+}
+/* Who has left, under the roster: one line each, with the way back at its end. */
+.staff .admin-team-part > h3 {
+  margin-block-start: var(--step-2);
+  color: var(--color-muted);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+}
+.admin-left > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-2) var(--step-4);
+  padding-block: var(--step-2);
+  border-block-end: 1px solid var(--color-line);
+  font-size: var(--text-14);
+  scroll-margin-block-start: calc(var(--tap) + var(--step-5));
+}
+.staff .admin-left > li > * {
+  margin: 0;
+}
+.admin-left > li > .ui-notice {
+  flex: 1 1 100%;
+}
+/* The league's people: a name, then the tick and the button that takes them off. */
+.admin-people > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-1) var(--step-4);
+  padding-block: var(--step-2);
+  padding-inline: var(--step-4);
+}
+.staff .admin-person-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-2) var(--step-4);
+  margin: 0;
+}

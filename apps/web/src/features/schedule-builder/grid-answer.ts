@@ -72,11 +72,14 @@ export function answerParams(outcome: ScheduleActionOutcome): {
           ...query,
           saved: detail.what,
           ...(detail.roundId === null ? {} : { round: detail.roundId }),
+          // Which game, so "Put it back" can be offered; what it was is the draft's to say.
+          ...(detail.gameId === undefined ? {} : { game: detail.gameId }),
         },
         hash,
       };
     case 'game-saved':
     case 'game-round':
+    case 'game-put-back':
       return { query: { ...query, saved: detail.what, game: detail.gameId }, hash };
   }
 }
@@ -94,10 +97,14 @@ export function savedDetailOf(search: Search): SavedDetail | undefined {
     }
     case 'round-removed':
       return { what, afterRoundId: idOf(first(search['after'])) ?? null };
-    case 'game-removed':
-      return { what, roundId: idOf(round) ?? null };
+    case 'game-removed': {
+      const roundId = idOf(round) ?? null;
+      const gameId = idOf(first(search['game']));
+      return gameId === undefined ? { what, roundId } : { what, roundId, gameId };
+    }
     case 'game-saved':
-    case 'game-round': {
+    case 'game-round':
+    case 'game-put-back': {
       const gameId = idOf(first(search['game']));
       return gameId === undefined ? undefined : { what, gameId };
     }
