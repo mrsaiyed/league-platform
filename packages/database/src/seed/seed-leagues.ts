@@ -7,9 +7,10 @@
 // transaction for that league (create the league with its first season, status,
 // divisions, teams, people), acting as the people the data names: our own staff
 // creates the league and its current season in one step (T-260), and its owner does
-// the rest. Two things are written directly, not by a command: accounts
-// (they come from signing in, which has no command here) and role grants (through the
-// access store, as the owner; the invite and accept commands need email tokens).
+// the rest. Three things are written directly, not by a command: accounts
+// (they come from signing in, which has no command here), role grants (through the
+// access store, as the owner; the invite and accept commands need email tokens) and a
+// league's programs besides its default one (no command makes one yet, U-12).
 //
 // Loading is NOT one transaction, since each command has its own, so a load that stops
 // part-way leaves a partly loaded league. A rerun checks each existing league against
@@ -90,6 +91,7 @@ async function holdsEverything(
     ).rows[0]!.n;
   const teams = league.divisions.reduce((sum, d) => sum + d.teams.length, 0);
   return (
+    (await count('programs')) === 1 + (league.programs ?? []).length &&
     (await count('seasons')) === 1 &&
     (await count('divisions')) === league.divisions.length &&
     (await count('teams')) === teams &&
@@ -170,13 +172,26 @@ async function loadLeague(
   for (const person of league.people) {
     must('person', await createPerson(as(ownerId), person, deps.people));
   }
+  const programIds = new Map<string, string>();
+  for (const program of league.programs ?? []) {
+    const made = await pglite.query<{ id: string }>(
+      `insert into programs (league_id, slug, name, sport_key)
+       values ($1, $2, $3, 'basketball') returning id`,
+      [leagueId, program.slug, program.name],
+    );
+    programIds.set(program.slug, made.rows[0]!.id);
+  }
   for (const member of league.members) {
     const memberId = await accountId(pglite, member.email, member.displayName);
+    const programId = member.program === undefined ? undefined : programIds.get(member.program);
+    if (member.program !== undefined && programId === undefined) {
+      throw new Error(`Seeding failed at role: ${league.slug} has no program ${member.program}.`);
+    }
     await withTransaction(db, { leagueId, accountId: ownerId }, (scope) =>
       accessStore(scope).createGrant({
         accountId: memberId,
         role: member.role,
-        scope: leagueScope,
+        scope: programId === undefined ? leagueScope : { type: 'program', id: programId },
         grantedByAccountId: ownerId,
       }),
     );
