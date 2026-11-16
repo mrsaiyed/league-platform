@@ -10,6 +10,7 @@
 import { GameSnapshotReading, type GameSnapshot } from '@srleagues/contracts';
 import {
   BoxScoreTable,
+  lettersWide,
   Scoreboard,
   type BoxScoreColumn,
   type BoxScoreLabels,
@@ -156,6 +157,13 @@ function PlayersTable({
       }))
     : null;
   const fouls = own.reduce((sum, p) => sum + (p.fouls ?? 0), 0);
+  // The two teams' tables give their names the same room: the longest name of either.
+  const nameRoom = Math.max(
+    0,
+    ...(game.players ?? []).map((p) =>
+      lettersWide(boxScoreName(labels.jerseyOnly, labels.nameNotShown, p)),
+    ),
+  );
   return (
     <BoxScoreTable
       teamName={team.name}
@@ -164,6 +172,7 @@ function PlayersTable({
       totals={{ points: game.score[side], fouls: team.statsVisible ? fouls : '' }}
       hiddenNotice={labels.playersHidden}
       labels={labels.boxScore}
+      nameRoom={nameRoom}
     />
   );
 }

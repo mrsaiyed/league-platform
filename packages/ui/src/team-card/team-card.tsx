@@ -13,10 +13,27 @@ export type TeamCardProps = {
   /** The one figure the card leads with: the team's record. */
   readonly figure: { readonly label: string; readonly value: string };
   readonly facts: readonly TeamCardFact[];
+  /**
+   * What the card leads to, in a word, for the foot of a card that stands upright
+   * ("Roster"): drawn with the arrow of a way on. The card's link is the team's name, so
+   * this word is only drawn, never said.
+   */
+  readonly way?: string | undefined;
+  /**
+   * The level of the heading the team's name is: two on a teams page (its title, then its
+   * teams), three for cards that stand under a section's own title.
+   */
+  readonly level?: 2 | 3;
 };
 
-/** A team as a card: its emblem, its name, its record and a few facts. One link, whole. */
-export function TeamCard({ name, href, color, figure, facts }: TeamCardProps) {
+/**
+ * A team as a card: its emblem, its name, its record and a few facts. One link, whole. In
+ * a list that stands its cards upright (`data-layout="teams"`, from a tablet up) the shield
+ * is centered over the name, the record is the number beneath, and the facts and the way on
+ * are the card's foot line; in a narrower list it is one row.
+ */
+export function TeamCard({ name, href, color, figure, facts, way, level = 2 }: TeamCardProps) {
+  const Name = level === 3 ? 'h3' : 'h2';
   return (
     <article
       className="ui-team-card"
@@ -25,17 +42,23 @@ export function TeamCard({ name, href, color, figure, facts }: TeamCardProps) {
     >
       <Emblem name={name} color={color} />
       <div className="ui-team-card-text">
-        {/* Level two: a teams page has its title and then its teams, with no level between. */}
-        <h2 className="ui-team-card-name">
+        {/* Level two unless told: a teams page has its title and then its teams, with no
+            level between. */}
+        <Name className="ui-team-card-name">
           <a href={href} dir="auto">
             {name}
           </a>
-        </h2>
+        </Name>
         <Facts facts={facts} />
       </div>
       <p className="ui-team-card-figure">
         <span className="ui-visually-hidden">{figure.label}</span> {figure.value}
       </p>
+      {way === undefined ? null : (
+        <span className="ui-team-card-way" aria-hidden="true">
+          {way}
+        </span>
+      )}
     </article>
   );
 }

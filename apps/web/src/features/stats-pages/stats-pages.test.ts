@@ -81,8 +81,16 @@ describe('statistics page', () => {
     // (56 + 58 + 41) / 3, from the Owls' box score lines.
     expect(data.teamRows.find((r) => r.cells['team'] === 'Owls')?.cells['points']).toBe('51.7');
     expect(text).toContain('Owls');
-    // The Bears keep their players' numbers for their staff too.
-    expect(text).toContain('Only team totals are shown for Bears, Owls.');
+    // The Bears keep their players' numbers for their staff too. They have no numbers
+    // recorded, so the page shows no totals for them, and the note names only the team
+    // whose totals are there (step 2.147 part 3: the note said totals were shown for both).
+    expect(data.totalsOnlyTeams).toEqual(['Bears', 'Owls']);
+    expect(text).toContain('Only team totals are shown for Owls.');
+    expect(text).not.toContain('shown for Bears');
+    // A team with nothing recorded has a dash in each cell, and a word for screen readers.
+    const bears = /<span dir="auto">Bears<\/span><\/th>(.*?)<\/tr>/.exec(text)?.[1] ?? '';
+    expect(bears.match(/aria-hidden="true">–<\/span>/g)).toHaveLength(data.teamColumns.length - 1);
+    expect(bears).toContain('Nothing recorded');
     // ...and none of its players, in the table or among the leaders.
     for (const hidden of ['Jordan', 'Castellanos', 'Imani', 'Brooks']) {
       expect(text).not.toContain(hidden);
@@ -188,6 +196,8 @@ describe('statistics page', () => {
     teamColumns: [{ key: 'team', label: 'Team' }],
     teamRows: [],
     totalsOnlyTeams: [],
+    totalsNoteTeams: [],
+    openingSort: null,
   });
   // The lists of the page, in order: each one's title, whether it follows a card, and the
   // place its first line shows.
@@ -259,10 +269,18 @@ describe('statistics page', () => {
     const text = html(data);
     expect(text).toContain(`--team-color:${colorOfTeam.get('Falcons')}`);
     // One mark for each team in the teams table and one beside each player's team. Since
-    // step 2.147 part 2 the mark is the team's small shield, where a chip used to be.
+    // step 2.147 part 2 the mark is the team's small shield, where a chip used to be. Since
+    // part 3 a player's row carries that shield a second time, beside the player's name:
+    // that one is drawn only on a phone, where the team's own column folds away.
     expect(text.match(/<svg class="ui-emblem" data-size="small"/g)).toHaveLength(
-      data.teamRows.length + data.playerRows.length,
+      data.teamRows.length + 2 * data.playerRows.length,
     );
+    expect(text.match(/<span class="ui-fold"><svg class="ui-emblem"/g)).toHaveLength(
+      data.playerRows.length,
+    );
+    // Both tables open sorted by points, biggest first, and say so on that heading only.
+    expect(data.openingSort).toEqual({ key: 'points', direction: 'descending' });
+    expect(text.match(/aria-sort="descending"/g)).toHaveLength(2);
     expect(text).not.toContain('ui-team-chip');
   });
 
@@ -292,6 +310,78 @@ describe('statistics page', () => {
     expect(leaders.length).toBeGreaterThan(0);
     expect(leaders).not.toContain('Theo Lindqvist');
     expect(html(data)).toContain('at least 3 games');
+  });
+
+  // The players' table lists everyone and opens sorted by points, so its first row may be a
+  // player with too few games to lead a card (design review M1 of step 2.147 part 3). The
+  // rows under the league's own minimum are marked, and one line under the title says so.
+  const loadWithMinimum = async (minimumGames: number) => {
+    const [season] = await seasonsOf(adult);
+    if (season === undefined) throw new Error('no season');
+    const data = await loadStatsPage(
+      stats.readStoreOf(adult),
+      { ...(await stats.settingsOf(adult)), minimumGames },
+      { leagueId: adult, seasonId: season.id, by: 'average' },
+    );
+    if ('code' in data) throw new Error(data.code);
+    return data;
+  };
+  const gamesOf = (row: StatsPageData['playerRows'][number]) => Number(row.cells['games']);
+
+  it("marks the players under the league's own minimum games, and only them", async () => {
+    const data = await statsFor(adult);
+    expect(data.minimumGames).toBe(3);
+    const marked = data.playerRows.filter((row) => row.quiet !== undefined);
+    expect(marked.length).toBeGreaterThan(0);
+    expect(marked.length).toBeLessThan(data.playerRows.length);
+    for (const row of data.playerRows) {
+      expect(row.quiet).toEqual(gamesOf(row) < 3 ? { games: 'not ranked yet' } : undefined);
+    }
+    // The player the table puts first has one game, and is marked; the leader is not.
+    const named = (name: string) => data.playerRows.find((row) => row.cells['player'] === name);
+    expect(named('Ravi Patel')?.cells['games']).toBe(1);
+    expect(named('Ravi Patel')?.quiet).toEqual({ games: 'not ranked yet' });
+    expect(named('Dana Whitfield')?.quiet).toBeUndefined();
+    // Nobody marked is among the leaders, and nobody among the leaders is marked. By name: a
+    // row's key is only its place on the page (T-81, record 070), so the leaders' lists and
+    // the players' table share no key.
+    const leaders = new Set(
+      data.leaders.flatMap((board) =>
+        board.rows.map((row) => String(row.cells['player']).replace(/^\d+\. /u, '')),
+      ),
+    );
+    expect(leaders.size).toBeGreaterThan(0);
+    expect(marked.filter((row) => leaders.has(String(row.cells['player'])))).toEqual([]);
+    const text = html(data);
+    expect(text).toContain(
+      '<p class="ui-section-note">Every player is listed. Fewer than 3 games: not ranked yet.</p>',
+    );
+    expect(text.indexOf('Every player is listed.')).toBeGreaterThan(text.indexOf('All players'));
+    expect(text.match(/data-quiet="true"/g)).toHaveLength(marked.length);
+    expect(text).toContain(
+      'data-quiet="true">1<span class="ui-visually-hidden"> not ranked yet</span></td>',
+    );
+    expect(text).not.toMatch(/<th[^>]*>(Rank|#)</);
+  });
+
+  it('follows the minimum the league has, not a fixed three', async () => {
+    const two = await loadWithMinimum(2);
+    const underTwo = two.playerRows.filter((row) => gamesOf(row) < 2);
+    expect(underTwo.length).toBeGreaterThan(0);
+    expect(two.playerRows.filter((row) => row.quiet !== undefined)).toEqual(underTwo);
+    // Someone with two games is marked under a minimum of three and not under one of two.
+    expect(two.playerRows.some((row) => gamesOf(row) === 2 && row.quiet === undefined)).toBe(true);
+    expect(html(two)).toContain('Fewer than 2 games: not ranked yet.');
+    expect(html(two)).not.toContain('Fewer than 3');
+    // A league with no minimum ranks everyone: no row is marked and the line is not drawn.
+    const none = await loadWithMinimum(0);
+    expect(none.playerRows.every((row) => row.quiet === undefined)).toBe(true);
+    expect(html(none)).not.toContain('not ranked yet');
+    expect(html(none)).not.toContain('Every player is listed');
+    // And a minimum nobody is under draws no line either.
+    const one = await loadWithMinimum(1);
+    expect(one.playerRows.every((row) => row.quiet === undefined)).toBe(true);
+    expect(html(one)).not.toContain('Every player is listed');
   });
 
   it("holds no person's id in its data or its HTML, in either league (T-81, record 070)", async () => {

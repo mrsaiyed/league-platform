@@ -21,10 +21,13 @@ export function reloadAt(href: string, win: ReloadWindow): void {
 
 export function NewerPlaysLink({
   href,
+  className,
   children,
 }: {
   /** The page's own address with the play-by-play's anchor. */
   readonly href: string;
+  /** How the page draws it: as the way on beside the play-by-play's title. */
+  readonly className?: string;
   readonly children: ReactNode;
 }) {
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -36,7 +39,7 @@ export function NewerPlaysLink({
     reloadAt(href, window);
   };
   return (
-    <a href={href} onClick={onClick}>
+    <a className={className} href={href} onClick={onClick}>
       {children}
     </a>
   );

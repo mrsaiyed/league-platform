@@ -4,11 +4,19 @@
 // with their rule, tables in their frame two across on a laptop, and calm panels where
 // there is nothing to list.
 import type { GameSnapshot } from '@srleagues/contracts';
-import { BoxScoreTable, EmptyPanel, PlayTable } from '@srleagues/ui';
+import {
+  BoxScoreTable,
+  EmptyPanel,
+  lettersWide,
+  PlayTable,
+  Section,
+  TeamCard,
+} from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { t } from '../../server/messages.ts';
 import {
   boardStateText,
+  forfeitNote,
   gameWords,
   liveGameLabels,
   statusNote,
@@ -41,6 +49,22 @@ export type GameView = {
   readonly numberText?: string | undefined;
   /** The teams' colors, and when and where the game is played. */
   readonly board?: GameBoard | undefined;
+  /**
+   * The two teams with their records, away team first, for the foot of the page of a game
+   * still to come or put off: such a page has no box score and no plays to end with.
+   */
+  readonly teams?: readonly GameTeamCard[] | undefined;
+};
+
+/** A team as the foot of a game's page draws it: the same facts as on the teams page. */
+export type GameTeamCard = {
+  readonly slug: string;
+  readonly name: string;
+  readonly color: string | null;
+  readonly href: string;
+  readonly seedText: string;
+  readonly recordText: string;
+  readonly divisionName: string | null;
 };
 
 /** The play-by-play's own id: "Show newer plays" lands on it, not on the top of the page. */
@@ -50,11 +74,22 @@ const playsId = 'game-plays';
 export function GameContent({ view }: { readonly view: GameView }) {
   const labels = displayLabels(t);
   const arrivedFinal = view.snapshot.status === 'final';
+  const pending = ['scheduled', 'postponed', 'cancelled'].includes(view.status);
   const playLabels = {
     time: t('game.col.time'),
     play: t('game.col.play'),
     score: t('game.col.score'),
   };
+  // The two box scores give their names the same room: the longest name of either team.
+  const nameRoom =
+    view.boxScores?.kind === 'tables'
+      ? Math.max(
+          0,
+          ...view.boxScores.tables.flatMap((table) =>
+            (table.players ?? []).map((player) => lettersWide(player.name)),
+          ),
+        )
+      : 0;
   return (
     <main className="game-page">
       {view.scheduleAddress === undefined ? null : (
@@ -63,7 +98,7 @@ export function GameContent({ view }: { readonly view: GameView }) {
         </nav>
       )}
       <header className="ui-page-head">
-        {view.numberText === undefined ? null : <p className="ui-eyebrow">{view.numberText}</p>}
+        {view.numberText === undefined ? null : <p className="ui-kicker">{view.numberText}</p>}
         {/* The board under this head says the two names at title size, so the title is
             kept for screen readers and the browser's tab and not drawn. */}
         <h1 className="ui-visually-hidden" dir="auto">
@@ -86,9 +121,57 @@ export function GameContent({ view }: { readonly view: GameView }) {
         board={{
           ...view.board,
           stateText: boardStateText(view.status),
-          noteText: statusNote(view.status) ?? undefined,
+          noteText:
+            view.status === 'forfeit'
+              ? forfeitNote(
+                  { name: view.snapshot.teams.away.name, score: view.snapshot.score.away },
+                  { name: view.snapshot.teams.home.name, score: view.snapshot.score.home },
+                )
+              : (statusNote(view.status) ?? undefined),
         }}
       />
+      {/* A game still to come, or put off, has no box score and no plays: its page ends with
+          the two teams, each with its record and the way to its own page, and the way back
+          to the whole schedule. */}
+      {pending && view.teams !== undefined && view.teams.length > 0 ? (
+        <Section
+          title={t('game.teams')}
+          more={
+            view.scheduleAddress === undefined
+              ? undefined
+              : { href: view.scheduleAddress, label: t('home.fullSchedule') }
+          }
+        >
+          {/* As on the teams page: upright and side by side from a tablet up, away team
+              first as on the board above; one row each on a phone. */}
+          <ul className="ui-card-grid" data-layout="teams">
+            {view.teams.map((team) => (
+              <li key={team.slug}>
+                <TeamCard
+                  name={team.name}
+                  href={team.href}
+                  color={team.color}
+                  level={3}
+                  way={t('team.roster')}
+                  figure={{ label: t('teams.col.record'), value: team.recordText }}
+                  facts={[
+                    { key: 'seed', label: t('teams.col.seed'), value: team.seedText },
+                    ...(team.divisionName === null
+                      ? []
+                      : [
+                          {
+                            key: 'division',
+                            label: t('teams.col.division'),
+                            value: team.divisionName,
+                          },
+                        ]),
+                  ]}
+                />
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
       {view.boxScores === null ? null : (
         <section className="ui-section" aria-labelledby="game-box-scores">
           <div className="ui-section-head">
@@ -109,6 +192,7 @@ export function GameContent({ view }: { readonly view: GameView }) {
                   totals={table.totals}
                   hiddenNotice={t('game.playersHidden')}
                   labels={labels.boxScore}
+                  nameRoom={nameRoom}
                 />
               ))}
             </div>
@@ -121,14 +205,16 @@ export function GameContent({ view }: { readonly view: GameView }) {
         <section className="ui-section" aria-labelledby={playsId}>
           <div className="ui-section-head">
             <h2 id={playsId}>{t('game.plays')}</h2>
-          </div>
-          {view.snapshot.status === 'live' ? (
-            <p className="ui-section-note">
-              {t('game.playsAsOpened')}{' '}
-              <NewerPlaysLink href={`${view.selfAddress}#${playsId}`}>
+            {/* The way to newer plays stands beside the title, drawn as every way on is (in
+                the color the eye lands on, with its arrow), not as a link inside a sentence. */}
+            {view.snapshot.status === 'live' ? (
+              <NewerPlaysLink className="ui-more" href={`${view.selfAddress}#${playsId}`}>
                 {t('game.newerPlays')}
               </NewerPlaysLink>
-            </p>
+            ) : null}
+          </div>
+          {view.snapshot.status === 'live' ? (
+            <p className="ui-section-note">{t('game.playsAsOpened')}</p>
           ) : null}
           {view.plays.length === 0 ? (
             <EmptyPanel text={t('game.noPlays')} />

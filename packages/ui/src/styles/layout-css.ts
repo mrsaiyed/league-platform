@@ -90,6 +90,34 @@ export const layoutCss = String.raw`
 .ui-crumbs a:hover {
   text-decoration: underline;
 }
+/* Two ways back side by side are parted by a fine slanted line; one alone has the arrow of
+   a way on before it, turned to point back. */
+.ui-crumbs a + a::before {
+  content: '';
+  flex: none;
+  inline-size: 1px;
+  block-size: var(--step-4);
+  margin-inline-end: var(--step-4);
+  background: var(--color-line-strong);
+  transform: rotate(18deg);
+}
+.ui-crumbs a:only-child::before {
+  content: '';
+  flex: none;
+  inline-size: var(--step-4);
+  block-size: var(--step-4);
+  margin-inline-end: var(--step-2);
+  background: currentColor;
+  -webkit-mask: var(--ui-arrow) center / contain no-repeat;
+  mask: var(--ui-arrow) center / contain no-repeat;
+  transform: scaleX(-1);
+}
+[dir='rtl'] .ui-crumbs a + a::before {
+  transform: rotate(-18deg);
+}
+[dir='rtl'] .ui-crumbs a:only-child::before {
+  transform: none;
+}
 
 /* A section: its title with a short rule, and one way on beside it. The rule is in the
    color the eye lands on, which is the main color wherever that shows on the page. */
@@ -265,7 +293,35 @@ export const layoutCss = String.raw`
     border-block-start: 1px solid var(--color-line);
   }
 }
+/* More than four numbers (a team's totals in a sport that keeps many statistics) wrap onto
+   further lines of the same strip: as many across as the piece worked out for a phone, so
+   the lines are even. Every cell has a hairline after it and under it, each pushed one
+   line's width out of its place: the lines of the last column and of the last row fall
+   outside the strip, which cuts them off, and the rest stand between the cells, however
+   many there are across. A last line that is one short keeps the lines around its empty
+   place. */
+.ui-stat-strip[data-wrap='true'] {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(var(--ui-stat-across), minmax(0, 1fr));
+  overflow: hidden;
+}
+.ui-stat-strip[data-wrap='true'] > .ui-stat {
+  margin-block-end: -1px;
+  margin-inline-end: -1px;
+  border-block-start: 0;
+  border-inline-start: 0;
+  border-block-end: 1px solid var(--color-line);
+  border-inline-end: 1px solid var(--color-line);
+}
+@media (max-width: 22.49rem) {
+  .ui-stat-strip[data-wrap='true'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (min-width: 48rem) {
+  .ui-stat-strip[data-wrap='true'] {
+    grid-template-columns: repeat(var(--ui-stat-across-wide), minmax(0, 1fr));
+  }
   .ui-stat {
     gap: var(--step-2);
     padding-block: var(--step-5);
