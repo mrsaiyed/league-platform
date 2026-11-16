@@ -10,9 +10,14 @@
 // For each seed league: the home page shows its season, its result and its standings;
 // the schedule lists the season's four games, two with their final scores; the standings
 // show both divisions' three teams, with one win and one loss in each; no team of the
-// stand-in's made-up leagues appears; each page passes the accessibility checks. The
-// statistics have not moved yet (part 3): their page is the error page, never made-up
-// data.
+// stand-in's made-up leagues appears; each page passes the accessibility checks.
+// Part 3 (record 070): the statistics page lists the seed's players by the league's own
+// name setting and audience (an adult league's child, a youth league's players, by first
+// name and last initial) with the points their box scores gave, a points leaders card and
+// none for fouls (S-48); the teams page lists every team; one team's page shows its record,
+// its roster and its totals; the home page's leaders name the top scorers; the header
+// shows the league's own name, and its look is the neutral starting design (no design is
+// stored on the database yet); and no page holds a withheld name or a private value.
 import {
   accessibilityProblems,
   buildNext,
@@ -59,6 +64,44 @@ const leagues = [
     divisions: { Open: ['Maple Comets', 'Maple Rockets', 'Maple Hawks', 'Maple Bears'] },
     finals: 1,
     teamsPlaying: 3,
+  },
+];
+/**
+ * The seed leagues' people as their pages show them on the leagues' starting name setting
+ * (full names, no confirmation): Lakeside is an adult league with a child in it, Maple
+ * Street a youth league. The season under way puts the league's people, in order, on the
+ * teams that played, numbers 4 and on, and records their box scores: 10, 14, 18 points.
+ */
+const people = [
+  {
+    slug: 'lakeside',
+    name: 'Lakeside Hoops League',
+    players: [
+      { shown: 'Morgan Example', points: 10 },
+      { shown: 'Quinn S.', points: 14 },
+      { shown: 'Robin Placeholder', points: 18 },
+    ],
+    team: {
+      slug: 'herons',
+      name: 'Lakeside Herons',
+      player: 'Morgan Example',
+      number: '4',
+      points: 10,
+    },
+    homeLeaders: ['Robin Placeholder', 'Quinn S.'],
+    // The child's surname, and the made-up private values the seed holds.
+    neverShown: ['Sample', 'morgan@lakeside', 'robin@lakeside', '1990-04-12', '2012-09-03'],
+  },
+  {
+    slug: 'maple-street',
+    name: 'Maple Street Rec League',
+    players: [
+      { shown: 'Jordan I.', points: 10 },
+      { shown: 'Casey F.', points: 14 },
+    ],
+    team: { slug: 'comets', name: 'Maple Comets', player: 'Jordan I.', number: '4', points: 10 },
+    homeLeaders: ['Casey F.', 'Jordan I.'],
+    neverShown: ['Imaginary', 'Fictional', 'jordan.parent@maple', '2013-06-02'],
   },
 ];
 /** Whether a page's text holds some words, whatever case the page's styles draw them in. */
@@ -184,15 +227,120 @@ if (browser) {
     });
   }
 
-  await step('the statistics have not moved yet (part 3)', async () => {
-    const response = await page.goto(`${origin}/lakeside/stats`);
-    const text = await page.locator('body').innerText();
-    note(
-      'statistics: the error page, not a page of statistics',
-      (response?.status() ?? 0) >= 500 && !has(text, 'Lakeside Herons'),
-      `status ${response?.status()}`,
-    );
-  });
+  // Part 3 (record 070): the pages that show people, and each league's name and look.
+  for (const league of people) {
+    const { slug } = league;
+    /** Nothing a visitor may not see: a withheld name or a private value, anywhere. */
+    const nothingPrivate = async (label) => {
+      const html = await page.content();
+      const found = league.neverShown.filter((value) => has(html, value));
+      note(
+        `${slug}: ${label} holds no withheld name or private value`,
+        found.length === 0,
+        found.join(', '),
+      );
+    };
+    await step(`${slug}: the pages that show people, read from the database`, async () => {
+      const stats = await open(`/${slug}/stats?by=total`);
+      note(`${slug}: the statistics page is served`, stats.status === 200);
+      const players = await page.evaluate(() =>
+        [...document.querySelectorAll('table')]
+          .filter((table) =>
+            (table.querySelector('caption')?.textContent ?? '').includes('All players'),
+          )
+          .flatMap((table) =>
+            [...table.querySelectorAll('tbody tr')].map((row) => row.textContent ?? ''),
+          ),
+      );
+      for (const player of league.players) {
+        note(
+          `${slug}: the statistics list ${player.shown} with ${player.points} points`,
+          players.some((row) => has(row, player.shown) && row.includes(String(player.points))),
+          players.join(' | '),
+        );
+      }
+      note(
+        `${slug}: the statistics list the seed's players only`,
+        players.length === league.players.length,
+        String(players.length),
+      );
+      const leaders = await page.evaluate(
+        () => document.querySelector('.stats-leaders')?.textContent ?? '',
+      );
+      note(
+        `${slug}: the statistics have a points leaders card`,
+        has(leaders, 'Points'),
+        leaders.slice(0, 300),
+      );
+      note(
+        `${slug}: fouls get no leaders card (S-48)`,
+        !has(leaders, 'Fouls'),
+        leaders.slice(0, 300),
+      );
+      note(
+        `${slug}: fouls are still in the players' table`,
+        has(stats.text, 'Fouls') || has(stats.text, 'PF'),
+      );
+      note(`${slug}: nothing of the stand-in in the statistics`, !standInOnly.test(stats.text));
+      await nothingPrivate('the statistics page');
+      await accessible(`/${slug}/stats on the database`);
+
+      const teams = await open(`/${slug}/teams`);
+      note(`${slug}: the teams page is served`, teams.status === 200);
+      const allTeams = Object.values(leagues.find((l) => l.slug === slug)?.divisions ?? {}).flat();
+      note(
+        `${slug}: the teams page lists every team of the season`,
+        allTeams.every((team) => has(teams.text, team)),
+        teams.text.slice(0, 300),
+      );
+      note(
+        `${slug}: the teams page shows a winner's record`,
+        /\b1-0\b/.test(teams.text),
+        teams.text.slice(0, 300),
+      );
+      note(`${slug}: nothing of the stand-in on the teams page`, !standInOnly.test(teams.text));
+      await accessible(`/${slug}/teams on the database`);
+
+      const team = await open(`/${slug}/teams/${league.team.slug}`);
+      note(`${slug}: ${league.team.name}'s page is served`, team.status === 200);
+      note(`${slug}: ${league.team.name}'s page names the team`, has(team.text, league.team.name));
+      note(
+        `${slug}: ${league.team.name}'s roster shows ${league.team.player} with number ${league.team.number}`,
+        has(team.text, league.team.player) && team.text.includes(league.team.number),
+        team.text.slice(0, 600),
+      );
+      note(`${slug}: ${league.team.name}'s record is 1-0`, /\b1-0\b/.test(team.text));
+      note(
+        `${slug}: ${league.team.name}'s totals show its ${league.team.points} points`,
+        team.text.includes(String(league.team.points)),
+      );
+      await nothingPrivate(`${league.team.name}'s page`);
+      await accessible(`/${slug}/teams/${league.team.slug} on the database`);
+
+      const home = await open(`/${slug}`);
+      for (const leader of league.homeLeaders) {
+        note(
+          `${slug}: the home page's leaders show ${leader}`,
+          has(home.text, leader),
+          home.text.slice(0, 600),
+        );
+      }
+      await nothingPrivate('the home page');
+      const look = await page.evaluate(() => ({
+        name: document.querySelector('.site-name')?.textContent?.trim() ?? '',
+        primary: getComputedStyle(document.documentElement)
+          .getPropertyValue('--color-primary')
+          .trim(),
+      }));
+      note(`${slug}: the header shows the league's own name`, look.name === league.name, look.name);
+      // No design is stored on the database yet: every league has the neutral one.
+      note(
+        `${slug}: the neutral starting design (none stored yet)`,
+        look.primary === '#1f5fbf',
+        look.primary,
+      );
+    });
+  }
 }
 
 await browser?.close();
