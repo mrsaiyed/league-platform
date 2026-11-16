@@ -529,6 +529,10 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
         }));
       return ok(list);
     },
+
+    // Every address is proved here by a right code, or by the made-up Google consent:
+    // there is no way in that skips the mailbox (step 2.115).
+    emailConfirmation: async () => 'on',
   };
 
   return {

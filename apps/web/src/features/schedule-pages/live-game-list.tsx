@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { GameCard, listRoom, type GameCardLabels, type GameStatus } from '@srleagues/ui';
 import type { GameView } from './build-schedule.ts';
 import { gameLinkText, type GameLinkWords } from './game-link-text.ts';
+import { mayBeOffered, OfferButton, useScoringOffers } from './score-game-button.tsx';
 import { pageLeagueScores } from './shared-league-scores.ts';
 
 export type Update = {
@@ -49,8 +50,14 @@ export function LiveGameList({
   across = 'two',
   featured = false,
   awaitingLabel,
+  scoringAddress,
 }: {
   readonly leagueId: string;
+  /**
+   * The scoring endpoint's address (leagueApiUrl): asked after the page, on this device, which
+   * of these games its signed-in person may score (step 2.153). The page holds no more.
+   */
+  readonly scoringAddress?: string;
   readonly games: readonly GameView[];
   /** Compact cards, or scoreboards: one across in a column of their own, or two. */
   readonly layout?: 'rows' | 'board';
@@ -102,6 +109,25 @@ export function LiveGameList({
     });
   }, [leagueId, games, watched, labels, announcement]);
   const shown = games.map((raw) => applyUpdate(raw, updates[raw.id]));
+  // "Score this game" for the person signed in here, once the read says they may (step 2.153).
+  // A game the live channel has since ended offers nothing.
+  const scoring = useScoringOffers(
+    scoringAddress,
+    games.filter((g) => mayBeOffered(g.status)).map((g) => g.id),
+  );
+  const actionOf = (g: GameView) => {
+    const offer = scoring.offers.get(g.id);
+    if (offer === undefined || scoring.words === undefined || !mayBeOffered(g.status)) {
+      return undefined;
+    }
+    return (
+      <OfferButton
+        offer={offer}
+        words={scoring.words}
+        which={{ away: g.away.name, home: g.home.name }}
+      />
+    );
+  };
   // Every board of the list reckons with the same room, so the list is one shape: all
   // side by side, or all as two rows (never one of each under the other).
   const room = layout === 'board' ? listRoom(shown) : undefined;
@@ -137,6 +163,7 @@ export function LiveGameList({
                 layout={layout}
                 featured={featured}
                 room={room}
+                action={actionOf(g)}
                 {...(g.awaiting === true && awaitingLabel !== undefined
                   ? { note: awaitingLabel }
                   : {})}

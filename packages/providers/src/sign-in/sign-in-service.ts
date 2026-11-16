@@ -181,6 +181,42 @@ export type ConfirmPasswordError =
 /** Signing out by either token: the access token may have run out; the refresh token is in the cookie. */
 export type SignOutInput = { readonly accessToken: string } | { readonly refreshToken: string };
 
+/**
+ * Whether the service itself holds an address as proved only once its owner has shown
+ * they hold the mailbox (step 2.115). `on`: it does. `off`: it takes an address as
+ * proved without that, so anyone could sign up with another person's address by
+ * typing it. `unknown`: the service could not be asked, or answered in a shape we do
+ * not know, and why, as one of a few fixed kinds. Unknown is never taken as `on`.
+ */
+export type EmailConfirmation =
+  | 'on'
+  | 'off'
+  | {
+      readonly unknown: EmailConfirmationUnknown;
+      /**
+       * The answer's status number, for `key-refused` and an `unexpected-answer` that
+       * had one. Nothing else of the answer is ever kept: never its words, never an
+       * address, a key or a token.
+       */
+      readonly status?: number;
+    };
+
+/**
+ * Why a service could not say whether it confirms addresses (step 2.115), so that the
+ * person starting the app can tell a refused key from a timeout:
+ * - `no-answer-in-time`: it did not answer within the time limit;
+ * - `no-connection`: it could not be reached, or its answer was cut off;
+ * - `key-refused`: it refused the key the app holds (401 or 403);
+ * - `setting-missing`: it answered, but not with the setting as a plain yes or no;
+ * - `unexpected-answer`: any other answer, such as a redirect, a 404 or a 5xx.
+ */
+export type EmailConfirmationUnknown =
+  | 'no-answer-in-time'
+  | 'no-connection'
+  | 'key-refused'
+  | 'setting-missing'
+  | 'unexpected-answer';
+
 export type SignInService = {
   /** Emails a 6-digit code, valid 10 minutes, to prove the address (T-67). */
   readonly startSignUp: (input: {
@@ -250,4 +286,15 @@ export type SignInService = {
   readonly listSessions: (input: {
     readonly accessToken: string;
   }) => Promise<Result<readonly SessionSummary[], SessionError>>;
+  /**
+   * "Does this service confirm email addresses before a sign-in counts?" (step 2.115).
+   * Linking an account made in advance to whoever presents its address
+   * (`account_for_sign_in`, record 052) is safe only when it does, so the web app
+   * refuses to start on a real service that answers anything but `on`. Never throws:
+   * a failure to ask is `unknown`, with its kind. Says nothing about any person.
+   */
+  readonly emailConfirmation: () => Promise<EmailConfirmation>;
 };
+
+/** The one question start-up asks a sign-in service before it serves anyone (step 2.115). */
+export type EmailConfirmationQuestion = Pick<SignInService, 'emailConfirmation'>;
