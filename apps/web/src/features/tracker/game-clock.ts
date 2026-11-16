@@ -56,8 +56,35 @@ export type StopReason =
   | { readonly kind: 'timeout'; readonly side: basketball.Side }
   /** A period was picked and the clock stands at its start. */
   | { readonly kind: 'period-start'; readonly period: number }
-  /** Paused by hand, or set. */
+  /** Paused by hand, or set; or stopped for a foul or timeout that was since taken back. */
   | { readonly kind: 'stopped' };
+
+/**
+ * Whether the foul or the timeout at place `at` of the plays still stands. A take-back
+ * takes back the latest foul of that player, or the latest timeout of that team: this
+ * one, unless another was given after it.
+ */
+function stillStands(plays: basketball.GameState['plays'], at: number): boolean {
+  const play = plays[at];
+  if (play === undefined) return false;
+  let later = 0;
+  for (const next of plays.slice(at + 1)) {
+    if (play.type === 'foul') {
+      if (next.type === 'foul' && next.playerId === play.playerId) later += 1;
+      else if (next.type === 'unfoul' && next.playerId === play.playerId) {
+        if (later === 0) return false;
+        later -= 1;
+      }
+    } else if (play.type === 'timeout') {
+      if (next.type === 'timeout' && next.side === play.side) later += 1;
+      else if (next.type === 'untimeout' && next.side === play.side) {
+        if (later === 0) return false;
+        later -= 1;
+      }
+    }
+  }
+  return true;
+}
 
 export function stopReason(game: basketball.GameState): StopReason {
   if (game.status === 'scheduled') return { kind: 'tip-off' };
@@ -67,6 +94,10 @@ export function stopReason(game: basketball.GameState): StopReason {
     const play = game.plays[i];
     if (play === undefined || play.stoppedClock !== true) continue;
     if (play.at !== game.clock.anchorAt) break;
+    // A foul or a timeout that has since been taken back is no longer named as the
+    // reason (the area 4 review of step 2.36, L4): the clock is stopped, and that is all
+    // that is said.
+    if (!stillStands(game.plays, i)) break;
     if (play.type === 'foul') return { kind: 'foul', side: play.side, playerId: play.playerId };
     if (play.type === 'timeout') return { kind: 'timeout', side: play.side };
     break;

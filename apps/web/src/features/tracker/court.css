@@ -1257,6 +1257,18 @@
 .court-say:empty {
   display: none;
 }
+/* At 0:00 the pad begins with the gold button that takes the next step, and the sentence
+   under it ("Halftime.") was a second gold bar of the same width and shape: two gold
+   bars, one of them a button (the area 4 review of step 2.36, L1; DESIGN.md section 7,
+   line 2). Under that button the sentence is drawn plainly as a statement, as the
+   tracker's notices are: the tile's ground, a gold line at its start, and nothing that
+   looks as if it could be pressed. */
+.court-start[data-period-over] ~ .court-say {
+  border-inline-start: 4px solid var(--court-gold);
+  border-radius: 4px;
+  background: var(--court-tile);
+  color: var(--court-text);
+}
 /* The large Start clock button (step 2.36; checklist T7 to T10): the pad's first line
    while nobody is picked, by the thumbs on an upright phone and between the two teams
    elsewhere. Its row is as high as the line that names a picked player and the gap under
@@ -1796,13 +1808,16 @@
 .court-clock-part[data-part='time'] {
   grid-area: time;
 }
+/* A period's button acts at once and with no question, at the top of the form, far from
+   the thumb: 56 or more on its short side, as the point buttons are (the area 4 review
+   of step 2.36, L2: they were 53 x 48). */
 .court-period-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
   gap: var(--court-gap);
 }
 .court-opt-period {
-  min-block-size: 48px;
+  min-block-size: 56px;
 }
 /* The period being played: marked and named, and not a button to tap. */
 .court-opt-period[aria-pressed='true'] {
@@ -2199,7 +2214,16 @@
   .court-score-fouls {
     min-block-size: 15px;
   }
-  /* The clock's form: its keys a little lower, so the whole of it is on the screen. */
+  /* The clock's form: its keys a little lower and its parts a little closer, so the
+     whole of it is on the screen, also where the periods take two rows (quarters and
+     three overtimes are seven buttons of 56). */
+  .court-sheet.court-clock-sheet,
+  .court-clock-parts {
+    gap: 8px;
+  }
+  .court-clock-entry {
+    font-size: 34px;
+  }
   .court-keys {
     grid-auto-rows: 48px;
   }
@@ -2326,6 +2350,9 @@
   .court-who-facts[data-out] .court-who-where {
     display: inline;
   }
+  .court-who-facts[data-out] .court-who-fouls {
+    display: none;
+  }
   .court-timeout-name {
     font-size: 11px;
   }
@@ -2408,8 +2435,9 @@
   }
   /* The clock's form, lying down: the period and the time on one side, the keys on the
      other, so the whole of it is on the screen with nothing scrolling. */
+  /* Wide enough for five periods of 56 in one row beside the keys. */
   .court-sheet.court-clock-sheet {
-    inline-size: min(100%, 620px);
+    inline-size: min(100%, 700px);
     gap: 8px;
     padding-block: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-bottom));
   }
@@ -2425,9 +2453,6 @@
   }
   .court-clock-help {
     display: none;
-  }
-  .court-opt-period {
-    min-block-size: 44px;
   }
   .court-clock-entry {
     font-size: 30px;
@@ -2724,6 +2749,18 @@
   /* The pad is a narrow column here: the hint in the size that fits it. */
   .court-hint p {
     font-size: 13px;
+  }
+  /* And a picked player's second line begins at the fouls, as on a phone lying down:
+     "On court · 2 fouls · 28 pts · 1:23 played" was 17 wider than the column and lost the
+     end of its minutes (the area 4 review of step 2.36, L6). */
+  .court-who-where {
+    display: none;
+  }
+  .court-who-facts[data-out] .court-who-where {
+    display: inline;
+  }
+  .court-who-facts[data-out] .court-who-fouls {
+    display: none;
   }
   .court[data-stage='lineups'] .court-pad {
     block-size: auto;

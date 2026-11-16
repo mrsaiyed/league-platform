@@ -616,10 +616,6 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
         ? 'tracker.pad.who.floor'
         : 'tracker.pad.who.bench',
   );
-  const facts = [
-    t.plural('tracker.pad.who.fouls', tile.fouls),
-    t('tracker.pad.who.points', { count: tile.points }),
-  ];
   return (
     <div
       className="court-options"
@@ -633,14 +629,21 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
         </span>
         <span className="court-who-text">
           <span className="court-who-name">{name}</span>
-          {/* Where the pad is narrow (a phone lying down) the line begins at the fouls:
-              "On court" is what the ringed tile already shows, and "Fouled out" stays. */}
+          {/* Where the pad is a narrow column (a phone or a tablet lying down) the line
+              begins at the fouls: "On court" is what the ringed tile already shows. For a
+              player who has fouled out it says "Fouled out" in place of the count, as the
+              tile says "Out" in place of it. So the line is whole there, and the minutes
+              at its end are never cut (the area 4 review of step 2.36, L6). */}
           <span className="court-who-facts" data-out={tile.fouledOut ? '' : undefined}>
             <span className="court-who-where">
               {where}
               {separator}
             </span>
-            {facts.join(separator)}
+            <span className="court-who-fouls">
+              {t.plural('tracker.pad.who.fouls', tile.fouls)}
+              {separator}
+            </span>
+            {t('tracker.pad.who.points', { count: tile.points })}
             {separator}
             {/* Ticks with the clock while it runs (the screen's ticker writes it). */}
             <span data-minutes-of={tile.id} data-minutes-played="">

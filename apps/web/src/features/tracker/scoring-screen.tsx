@@ -37,6 +37,7 @@ import {
   type BonusShown,
 } from './bonus-horn.ts';
 import type { ClockSheet, CourtClock } from './clock-parts.tsx';
+import { createClockTicker } from './clock-ticker.ts';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
 import { findPlayer, periodText, playerLabel, refusalText } from './engine-words.ts';
 import {
@@ -213,9 +214,6 @@ function taken(button: Element): () => void {
   return () => button.removeAttribute('data-taken');
 }
 
-/** How often the running clock is read (checklist T3: four times a second). */
-const tickMs = 250;
-
 /** Writes `text` into a place React drew, keeping React's own text node where there is one. */
 function writeText(place: Element | null, text: string): void {
   if (place === null || place.textContent === text) return;
@@ -231,6 +229,14 @@ function writeText(place: Element | null, text: string): void {
  * `data-minutes-of`): nothing of the screen is drawn again for a tick, so a running
  * clock never makes a tile's tap wait. The screen is drawn again only when the clock
  * runs out, and `onRanOut` is then called once.
+ *
+ * Every tick writes whatever reads differently, the clock and each player's minutes
+ * alike: a player's minutes turn over at their own moment of the second, not at the
+ * clock's, so writing them only when the clock's text changed left them up to a second
+ * behind (the code review of step 2.36). The clock's form, while nothing is typed in it,
+ * shows the clock too (`data-clock-now`) and ticks with it. While the page is hidden the
+ * timer is put down, and the clock is read the moment it is shown again
+ * (clock-ticker.ts).
  */
 function useGameClock(
   game: basketball.GameState,
@@ -251,37 +257,31 @@ function useGameClock(
     }
     return held;
   }, [view]);
-  const painted = useRef<{ game: basketball.GameState; text: string } | null>(null);
-  const paint = useCallback(
-    (all: boolean): ClockReading => {
-      const reading = readClock(game, now());
-      const last = painted.current;
-      // Between seconds nothing reads differently: nothing is looked for, nothing written.
-      if (!all && last !== null && last.game === game && last.text === reading.text) {
-        return reading;
-      }
-      painted.current = { game, text: reading.text };
-      const screen = root.current;
-      if (screen === null) return reading;
-      writeText(screen.querySelector('[data-clock-time]'), reading.text);
-      for (const place of screen.querySelectorAll<HTMLElement>('[data-minutes-of]')) {
-        const held = minutes.get(place.dataset.minutesOf ?? '');
-        if (held === undefined) continue;
-        const text = minutesNow(game, reading, held.ms, held.onCourt);
-        writeText(
-          place,
-          place.hasAttribute('data-minutes-played')
-            ? t('tracker.pad.who.minutes', { minutes: text })
-            : text,
-        );
-      }
-      return reading;
-    },
-    [game, now, root, minutes, t],
-  );
+  const paint = useCallback((): ClockReading => {
+    const reading = readClock(game, now());
+    const screen = root.current;
+    if (screen === null) return reading;
+    // `writeText` writes only what reads differently: between changes a tick looks for
+    // these few places and touches nothing.
+    for (const place of screen.querySelectorAll('[data-clock-time], [data-clock-now]')) {
+      writeText(place, reading.text);
+    }
+    for (const place of screen.querySelectorAll<HTMLElement>('[data-minutes-of]')) {
+      const held = minutes.get(place.dataset.minutesOf ?? '');
+      if (held === undefined) continue;
+      const text = minutesNow(game, reading, held.ms, held.onCourt);
+      writeText(
+        place,
+        place.hasAttribute('data-minutes-played')
+          ? t('tracker.pad.who.minutes', { minutes: text })
+          : text,
+      );
+    }
+    return reading;
+  }, [game, now, root, minutes, t]);
   // After every drawing: what was just drawn from the game's latest tap reads as of now.
   useLayoutEffect(() => {
-    paint(true);
+    paint();
   });
   const ranOut = useRef(onRanOut);
   useLayoutEffect(() => {
@@ -290,13 +290,30 @@ function useGameClock(
   useEffect(() => {
     // A clock already at 0:00 when the game is shown ran out unseen: nothing is announced.
     if (!game.clock.running || !readClock(game, now()).running) return;
-    const timer = window.setInterval(() => {
-      if (paint(false).running) return;
-      window.clearInterval(timer);
-      setRanOut(game);
-      ranOut.current();
-    }, tickMs);
-    return () => window.clearInterval(timer);
+    const shown = () => document.visibilityState !== 'hidden';
+    const ticker = createClockTicker(
+      {
+        paint: () => paint().running,
+        ranOut: () => {
+          setRanOut(game);
+          ranOut.current();
+        },
+        every: (ms, run) => {
+          const timer = window.setInterval(run, ms);
+          return () => window.clearInterval(timer);
+        },
+      },
+      shown(),
+    );
+    // Hidden (the phone locked, another app in front): the timer is put down. Shown
+    // again: the clock is read at once, from the server's time, which the controller
+    // carries on across a sleep; a period that ended meanwhile is said then.
+    const onVisibility = () => ticker.shown(shown());
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      ticker.stop();
+    };
   }, [game, now, paint]);
   return readClock(game, now());
 }

@@ -456,7 +456,9 @@ describe('the form that sets the clock and picks the period (T5, T6)', () => {
     expect(tag(html, 'role="dialog"')).toContain('aria-modal="true"');
     expect(html.match(/data-key="/g)).toHaveLength(12);
     expect(tag(html, 'data-key="back"')).toContain('aria-label="Delete the last digit"');
-    expect(html).toContain('data-clock-entry="" aria-live="polite">7:30<');
+    // The clock as it reads now, in the place the ticker writes while it runs; a ticking
+    // clock is not read out second by second.
+    expect(html).toContain('data-clock-entry="" data-clock-now="" aria-live="off">7:30<');
     expect(tag(html, 'data-set-clock')).toMatch(/\sdisabled=""/);
     expect(words(html)).toContain('Type the time left: 6, 3, 0 is 6:30.');
   });
@@ -464,6 +466,9 @@ describe('the form that sets the clock and picks the period (T5, T6)', () => {
   it('shows what is typed and names what Set will do', () => {
     const html = form(sheetOf('630'));
     expect(tag(html, 'data-clock-entry')).toContain('data-typed=""');
+    // What is typed is announced, and the ticker leaves it alone.
+    expect(tag(html, 'data-clock-entry')).toContain('aria-live="polite"');
+    expect(tag(html, 'data-clock-entry')).not.toContain('data-clock-now');
     expect(html).toContain('>6:30</output>');
     expect(tag(html, 'data-set-clock')).not.toMatch(/\sdisabled=""/);
     expect(words(html)).toContain('Set clock to 6:30');

@@ -260,6 +260,28 @@ export async function clockSteps(kit) {
       );
       await measureTargets(page, '390 x 664, the clock running');
       await restFits(page, '390 x 664, the clock running', 4);
+      // The clock's form opened while the clock runs shows the clock as it reads now,
+      // ticking, until a time is typed: it used to stand at the moment the form opened.
+      await c.clock.click();
+      await c.clockSheet.waitFor();
+      const shownInForm = c.clockSheet.locator('[data-clock-entry]');
+      const formFirst = seconds((await shownInForm.innerText()).trim());
+      await page.waitForTimeout(2300);
+      const formLater = seconds((await shownInForm.innerText()).trim());
+      note(
+        'the clock’s form, opened while the clock runs, shows the time ticking, the same as the scoreboard’s',
+        formFirst - formLater >= 1 &&
+          formFirst - formLater <= 4 &&
+          Math.abs(formLater - seconds(await c.clockText())) <= 1 &&
+          (await shownInForm.getAttribute('aria-live')) === 'off',
+        `${formFirst} to ${formLater} in 2.3 seconds; the scoreboard: ${await c.clockText()}`,
+      );
+      await page.keyboard.press('Escape');
+      await c.root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
+      note(
+        'closing the form leaves the clock running',
+        (await c.toggle.getAttribute('data-state')) === 'pause',
+      );
       await tapWhereItIs(page, c.toggle, 'Pause');
       await c.root.locator('[data-clock-toggle][data-state="start"]').waitFor();
       const paused = await c.clockText();
@@ -401,6 +423,22 @@ export async function clockSteps(kit) {
       await c.startClock();
       await c.root.locator('[data-clock-toggle][data-state="over"]').waitFor();
       await said(c, /^Halftime\.$/);
+      // "Halftime." under the gold button is plainly a statement, not a second gold
+      // button (the area 4 review, L1): not gold, and marked with a line at its start.
+      const strip = await page.evaluate(() => {
+        const say = getComputedStyle(document.querySelector('[data-say]'));
+        const button = getComputedStyle(document.querySelector('[data-pick-period]'));
+        return {
+          say: say.backgroundColor,
+          button: button.backgroundColor,
+          line: say.borderInlineStartWidth,
+        };
+      });
+      note(
+        'at 0:00 the sentence under the gold "Pick the next period" is drawn as a statement, not as a second gold bar',
+        strip.say !== strip.button && strip.line === '4px',
+        JSON.stringify(strip),
+      );
       const overToggle = c.toggle;
       note(
         'at 0:00 the clock is marked, and Start is greyed as "Period over", named with the reason',
@@ -457,7 +495,11 @@ export async function clockSteps(kit) {
       // --- A foul on a running clock stops it, and says so (D8, T9).
       await c.startClock();
       // A player not yet at the foul limit: one who is has a sentence of their own.
-      const fouled = c.root.locator('[data-floor="home"] .court-tile:not([data-out])').first();
+      const notOut = c.root.locator('[data-floor="home"] .court-tile:not([data-out])').first();
+      // That player's own tile from here on, whatever the foul makes of them.
+      const fouled = c.root.locator(
+        `[data-teams] [data-player="${await notOut.getAttribute('data-player')}"]`,
+      );
       const fouledName = (await fouled.getAttribute('aria-label')).split(',')[0];
       await foul(c, 'home', fouled);
       await c.root.locator('[data-clock-toggle][data-state="start"]').waitFor();
@@ -475,6 +517,24 @@ export async function clockSteps(kit) {
         'a free throw is scored on the stopped clock, and the button still says why it stopped',
         (await c.stopReason.innerText()).trim() === `Stopped for a foul on ${fouledName}.` &&
           (await c.toggle.getAttribute('data-state')) === 'start',
+      );
+      // That foul taken back: the button no longer names it (the area 4 review, L4).
+      await fouled.click();
+      await c.recorded(() => c.option('unfoul').click());
+      await atRest(page, c);
+      note(
+        'once the foul that stopped the clock is taken back, the button says only that the clock is stopped',
+        (await c.stopReason.innerText()).trim() === 'The clock is stopped.' &&
+          (await c.toggle.getAttribute('data-state')) === 'start',
+        await c.stopReason.innerText(),
+      );
+      // Given again on the stopped clock: it did not stop the clock, and is not named.
+      await foul(c, 'home', fouled);
+      await atRest(page, c);
+      note(
+        'a foul given on a clock that is already stopped is not named as what stopped it',
+        (await c.stopReason.innerText()).trim() === 'The clock is stopped.',
+        await c.stopReason.innerText(),
       );
 
       // --- "End of H2." at the end of the last period; overtime in the picker (T4, T6).
@@ -1240,6 +1300,18 @@ export async function clockSteps(kit) {
         );
         await floorOptions.waitFor();
         await measure('a floor player’s options', floorOptions);
+        // A picked player's second line is whole, to the end of the minutes (the area 4
+        // review, L6: it was cut on a tablet lying down).
+        const facts = await floorOptions.locator('.court-who-facts').evaluate((el) => ({
+          says: el.innerText,
+          needs: el.scrollWidth,
+          has: el.clientWidth,
+        }));
+        note(
+          `${label}: a picked player’s second line is whole, to the end of the minutes`,
+          facts.needs <= facts.has && /played$/.test(facts.says.trim()),
+          JSON.stringify(facts),
+        );
         await floorOptions.locator('.court-close').click();
         await c.pad.locator('[data-rest]').waitFor();
         // The bench's button is drawn only where the bench is folded away; it is there
@@ -1365,6 +1437,20 @@ export async function clockSteps(kit) {
 
       await c.typeClock('1234');
       await atEverySize('the clock’s form', async (size, label) => {
+        // A period's button acts at once: 56 or more on its short side (the area 4
+        // review, L2: they were 53 x 48).
+        const periodSizes = await c.clockSheet
+          .locator('[data-period-pick]')
+          .evaluateAll((els) =>
+            els.map((el) =>
+              Math.min(el.getBoundingClientRect().width, el.getBoundingClientRect().height),
+            ),
+          );
+        note(
+          `${label}: every period’s button in the form is 56 or more on its short side`,
+          periodSizes.length === 5 && periodSizes.every((short) => short >= 55.99),
+          periodSizes.map((short) => short.toFixed(0)).join(' '),
+        );
         note(
           `${label}: the whole form is on the screen, every key 44 or more, nothing in it scrolling`,
           await c.clockSheet.evaluate((el) => {

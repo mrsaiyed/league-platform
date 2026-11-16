@@ -669,12 +669,17 @@ export function ClockSheetView(props: {
             <h3 className="court-label" id="court-time-title">
               {t('tracker.clockSheet.time')}
             </h3>
+            {/* Until a time is typed this shows the clock as it reads NOW: while the clock
+                runs it ticks with it (the screen's ticker writes `data-clock-now`), where
+                it used to stand at the time the form was opened. A ticking clock is not
+                read out second by second: only what is typed is announced. */}
             <output
               className="court-clock-entry"
               data-clock-entry=""
               data-typed={typed ? '' : undefined}
+              data-clock-now={typed ? undefined : ''}
               data-problem={entry.ms === null && typed ? '' : undefined}
-              aria-live="polite"
+              aria-live={typed ? 'polite' : 'off'}
             >
               {typed ? entry.text : clock.text}
             </output>

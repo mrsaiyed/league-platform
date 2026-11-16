@@ -85,6 +85,38 @@ describe('why the clock is stopped (T9)', () => {
     expect(stopReason(called)).toEqual({ kind: 'timeout', side: 'away' });
   });
 
+  it('a foul or a timeout since taken back is no longer the reason: the clock is just stopped (L4)', () => {
+    const started = at(tippedOff(), 10_000, { type: 'start' });
+    const fouled = at(started, 20_000, { type: 'foul', side: 'home', playerId: 'h3' });
+    // Another player's foul taken back leaves the reason alone.
+    const other = at(at(fouled, 21_000, { type: 'foul', side: 'home', playerId: 'h5' }), 22_000, {
+      type: 'unfoul',
+      side: 'home',
+      playerId: 'h5',
+    });
+    expect(stopReason(other)).toEqual({ kind: 'foul', side: 'home', playerId: 'h3' });
+    // A second foul on the same player, then one taken back: that takes back the second,
+    // and the foul that stopped the clock still stands.
+    const twice = at(other, 23_000, { type: 'foul', side: 'home', playerId: 'h3' });
+    const once = at(twice, 24_000, { type: 'unfoul', side: 'home', playerId: 'h3' });
+    expect(stopReason(once)).toEqual({ kind: 'foul', side: 'home', playerId: 'h3' });
+    // Taken back as well: the foul the button named is gone, and it no longer names it.
+    const none = at(once, 25_000, { type: 'unfoul', side: 'home', playerId: 'h3' });
+    expect(basketball.derive(none).players['h3']?.fouls).toBe(0);
+    expect(stopReason(none)).toEqual({ kind: 'stopped' });
+    expect(readClock(none, 99_000)).toMatchObject({ text: '7:50', running: false });
+
+    const called = at(started, 20_000, { type: 'timeout', side: 'away', seconds: 60 });
+    // The other team's timeout, called and taken back on the stopped clock: no matter.
+    const theirs = at(at(called, 21_000, { type: 'timeout', side: 'home', seconds: 60 }), 22_000, {
+      type: 'untimeout',
+      side: 'home',
+    });
+    expect(stopReason(theirs)).toEqual({ kind: 'timeout', side: 'away' });
+    const back = at(theirs, 23_000, { type: 'untimeout', side: 'away' });
+    expect(stopReason(back)).toEqual({ kind: 'stopped' });
+  });
+
   it('under a running clock a foul does not stop it, and no reason says it did', () => {
     const running = tippedOff({ ...basketball.QUARTERS, clockMode: 'running' });
     const started = at(running, 10_000, { type: 'start' });
