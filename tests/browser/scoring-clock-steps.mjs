@@ -1047,7 +1047,18 @@ export async function clockSteps(kit) {
               cut:
                 name.scrollWidth > name.clientWidth + 0.5 ||
                 name.scrollHeight > name.clientHeight + Number.parseFloat(style.lineHeight) / 2,
-              ends: style.webkitLineClamp === '2' ? 'ellipsis' : style.textOverflow,
+              // How its cut end is drawn: "…" by its own `text-overflow`, or by a clamp of
+              // two lines, which draws one only on a box that clamps (Chromium reports
+              // `-webkit-box` for it). A clamp left set on a name drawn as a block does
+              // nothing, so it is not read as an "…" there.
+              ends:
+                style.textOverflow === 'ellipsis' ||
+                (['-webkit-box', '-webkit-inline-box'].includes(style.display) &&
+                  style.webkitBoxOrient === 'vertical' &&
+                  style.webkitLineClamp === '2')
+                  ? 'ellipsis'
+                  : style.textOverflow,
+              display: style.display,
             };
           }),
         );
