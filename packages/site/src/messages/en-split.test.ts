@@ -1,7 +1,9 @@
 // The proof of step 2.188's split of the English messages: the object that en.ts joins
 // from ./en/ holds exactly the keys and texts the one file held before the split. The
 // snapshot beside it was written from the old en.ts just before the split, by importing it.
-// Both are kept only for as long as the proof needs (record 072).
+// Both are kept only for as long as the proof needs (record 072): the lead removes them in
+// the commit that lands step 2.188, once GitHub has passed the lane, because any later step
+// that adds or changes a message would make them fail.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { en } from './en.ts';
