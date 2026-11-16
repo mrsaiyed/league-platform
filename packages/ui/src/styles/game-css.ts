@@ -396,12 +396,23 @@ export const gameCss = String.raw`
   letter-spacing: var(--heading-tracking);
   line-height: 1.2;
   /* A long name wraps under itself between its words, and only there: a word is never
-     split. A word too long even for a line of its own is cut short with "…". */
+     split. A word too long even for a line of its own is cut short with "…": by 'hidden'
+     in every browser we support (Safari 15 does not know 'clip'), and by 'clip', which
+     makes no scrolling box of the name, below where a browser knows it. Either cuts off
+     above and below as well, so the name keeps a little room there for the tails and
+     marks of its letters, taken back outside it: it stands where it stood. */
   overflow-wrap: normal;
   hyphens: manual;
-  overflow-x: clip;
+  overflow: hidden;
+  padding-block: var(--step-1);
+  margin-block: calc(-1 * var(--step-1));
   text-overflow: ellipsis;
   text-wrap: balance;
+}
+@supports (overflow: clip) {
+  .ui-game-card[data-layout='board'] .ui-game-team-name {
+    overflow: clip;
+  }
 }
 /* The winner is said in words (kept for screen readers), by the weight of its name and
    its score, and by a bar under its score: never by color alone. */

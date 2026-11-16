@@ -118,11 +118,23 @@ export const cardsCss = String.raw`
   line-height: 1.2;
   text-transform: var(--heading-case);
   /* A name breaks only between its words: a word is never split, and one too long even
-     for a line of its own is cut short with "…", as on a scoreboard. */
+     for a line of its own is cut short with "…", as on a scoreboard. The "…" is drawn
+     only where the name's box cuts off what runs past it: 'hidden' does that in every
+     browser we support (Safari 15 does not know 'clip'), and 'clip', which makes no
+     scrolling box of the name, takes over below where a browser knows it. Either cuts
+     off above and below as well, so the name keeps a little room there for the tails
+     and marks of its letters, taken back outside it: it stands where it stood. */
   overflow-wrap: normal;
   hyphens: manual;
-  overflow-x: clip;
+  overflow: hidden;
+  padding-block: var(--step-1);
+  margin-block: calc(-1 * var(--step-1));
   text-overflow: ellipsis;
+}
+@supports (overflow: clip) {
+  .ui-team-card-name {
+    overflow: clip;
+  }
 }
 .ui-team-card-name a {
   color: var(--color-text);
@@ -238,7 +250,8 @@ export const cardsCss = String.raw`
     grid-column: 1 / -1;
     grid-row: 2;
     max-inline-size: 100%;
-    margin-block-start: var(--step-4);
+    /* 16 clear over the name: the name's own room for its letters' tails is part of it. */
+    margin-block-start: calc(var(--step-4) - var(--step-1));
     font-size: var(--text-22);
     text-wrap: balance;
   }

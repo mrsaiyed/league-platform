@@ -650,9 +650,17 @@ describe('a game as a scoreboard', () => {
     // word too long even for a line of its own is cut short with "…", never split.
     const name =
       /\.ui-game-card\[data-layout='board'\] \.ui-game-team-name \{([^}]*)\}/.exec(css)?.[1] ?? '';
+    // The "…" needs the name's box to cut off what runs past it: 'hidden' first, which
+    // every browser we support knows (Safari 15 has no 'clip': there a long word ran out
+    // of its card with no "…"), then 'clip' where a browser knows it. Never by a
+    // physical 'overflow-x'. The name keeps room above and below for its letters' tails.
     expect(name).toMatch(
-      /overflow-wrap: normal;\s*hyphens: manual;\s*overflow-x: clip;\s*text-overflow: ellipsis;/,
+      /overflow-wrap: normal;\s*hyphens: manual;\s*overflow: hidden;\s*padding-block: var\(--step-1\);\s*margin-block: calc\(-1 \* var\(--step-1\)\);\s*text-overflow: ellipsis;/,
     );
+    expect(css).toMatch(
+      /@supports \(overflow: clip\) \{\s*\.ui-game-card\[data-layout='board'\] \.ui-game-team-name \{\s*overflow: clip;\s*\}\s*\}/,
+    );
+    expect(css).not.toMatch(/overflow-[xy]: clip/);
     expect(name).toMatch(/flex: 0 1 auto;\s*min-inline-size: 0;\s*max-inline-size: 100%;/);
     for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!/\.ui-game-(?:board|side)|data-layout='board'/.test(rule[1] ?? '')) continue;
@@ -1239,6 +1247,15 @@ describe('a team’s card', () => {
     expect(name).toMatch(/hyphens: manual;/);
     expect(name).toMatch(/text-overflow: ellipsis;/);
     expect(name).not.toMatch(/hyphens: auto/);
+    // A word too long for a line of its own is cut short with "…" in Safari 15 too, which
+    // does not know 'clip': 'hidden' first, 'clip' only where a browser knows it.
+    expect(name).toMatch(
+      /overflow: hidden;\s*padding-block: var\(--step-1\);\s*margin-block: calc\(-1 \* var\(--step-1\)\);\s*text-overflow: ellipsis;/,
+    );
+    expect(name).not.toMatch(/overflow(-[a-z]+)?: clip/);
+    expect(css).toMatch(
+      /@supports \(overflow: clip\) \{\s*\.ui-team-card-name \{\s*overflow: clip;\s*\}\s*\}/,
+    );
   });
 });
 
