@@ -129,6 +129,23 @@ describe('readKeptEmails', () => {
   });
 });
 
+// Review of step 2.96, L3: the worker's capture writes every address into the folder it is
+// given, so the page checks each address as it reads.
+describe('readKeptEmails and the address', () => {
+  it('shows no email to an address that is not made up, whoever wrote the file', async () => {
+    const folder = path.join(scratch(), 'captured-email');
+    // As the worker writes them (EMAIL_CAPTURE_DIR): every address, no check.
+    const worker = captureEmail({ directory: folder, now: () => new Date('2026-11-16T12:00:00Z') });
+    await worker.send(message('someone@gmail.com', 'Your code is 444444.'));
+    await worker.send(message('player@example.test', 'Your code is 555555.'));
+    await worker.send(message('owner@example.com.evil.org', 'Your code is 666666.'));
+    const kept = await readKeptEmails(folder, origin);
+    expect(kept.map((m) => m.to)).toEqual(['player@example.test']);
+    expect(JSON.stringify(kept)).not.toContain('444444');
+    expect(JSON.stringify(kept)).not.toContain('666666');
+  });
+});
+
 describe('keptEmailOf', () => {
   const email = (text: string) =>
     keptEmailOf(

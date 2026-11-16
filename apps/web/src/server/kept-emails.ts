@@ -9,7 +9,9 @@
 // page reads the files' JSON itself and shows their words as text.
 //
 // Only an email to a made-up address is written (isMadeUpAddress): one typed by mistake
-// with a real address is kept in memory only and never reaches a file. Nothing here logs
+// with a real address is kept in memory only and never reaches a file. The page shows only
+// those too, as it reads: the worker's own capture (EMAIL_CAPTURE_DIR, which .env.example
+// suggests pointing at the same folder) writes every address it is given. Nothing here logs
 // what an email holds: a failure to write is reported by its kind only (T4 §10, T-86).
 import type { EmailMessage, EmailSender, SentEmail } from '@srleagues/core';
 import { captureEmail } from '@srleagues/providers';
@@ -139,7 +141,10 @@ const keptShape = z.object({
   text: z.string(),
 });
 
-/** The newest `most` kept emails in `folder`, newest first; none when it is missing. */
+/**
+ * The newest `most` kept emails in `folder` to made-up addresses, newest first; none when it
+ * is missing.
+ */
 export async function readKeptEmails(
   folder: string,
   siteOrigin: string,
@@ -163,7 +168,10 @@ export async function readKeptEmails(
         const parsed = keptShape.safeParse(
           JSON.parse(await readFile(path.join(folder, name), 'utf8')),
         );
-        return parsed.success ? keptEmailOf(parsed.data, siteOrigin) : null;
+        // An email to any other address is never shown, whoever wrote the file.
+        return parsed.success && isMadeUpAddress(parsed.data.to)
+          ? keptEmailOf(parsed.data, siteOrigin)
+          : null;
       } catch {
         return null;
       }
