@@ -4,17 +4,36 @@
 // button over everything (stats and subs still working under it), survive a lost
 // response, watch the live page update, end the game and see the season stats. Saves
 // screenshots under artifacts/screenshots/live-stats-*.png.
+//
+// When it fails it says what failed, in the shape the gate's notes on GitHub read
+// (scripts/browser-failure-rules.mjs, step 2.175): a heading, the failure on an indented
+// line with the line of this script it came from, then the last lines each server printed.
+// Its two servers listen on ports free when it starts, not fixed ones another run of it
+// (another lane on the same computer) may be holding.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inspect } from 'node:util';
+
+/** A port nothing on this computer's loopback address is listening on now. */
+const freePort = () =>
+  new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port: free } = probe.address();
+      probe.close(() => resolve(free));
+    });
+  });
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'live-stats-browser-'));
-const port = 4191;
+const port = await freePort();
 const base = `http://127.0.0.1:${port}`;
 const server = spawn(
   process.execPath,
@@ -39,6 +58,45 @@ const shots = path.join(root, 'artifacts/screenshots');
 await mkdir(shots, { recursive: true });
 const shot = (page, name, fullPage = false) =>
   page.screenshot({ path: path.join(shots, `live-stats-${name}.png`), fullPage });
+
+let onlineOutput = '';
+let onlineExit = null;
+
+/** The last 30 lines a server printed, as the web tests' sayOnFailure prints them. */
+const lastLinesOf = (label, said, exitCode) => {
+  const lines = said
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() !== '')
+    .slice(-30);
+  const how = exitCode === null ? 'it was still running' : `it ended with code ${exitCode}`;
+  const shown = lines.length > 0 ? lines.map((line) => `  | ${line}`).join('\n') : '  | (nothing)';
+  return `The last ${lines.length} lines \`${label}\` printed (${how}):\n${shown}`;
+};
+
+/** Says what failed: its first line, what a wait was waiting for, and where in this script. */
+function sayWhatFailed(error) {
+  const plain = (text) => String(text ?? '').replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
+  const lines = plain(error?.message ?? error)
+    .split('\n')
+    .map((line) => line.trim());
+  let what = lines.find((line) => line !== '') ?? 'it stopped without saying why';
+  if (error?.code === 'ERR_ASSERTION')
+    what += ` (it was ${inspect(error.actual, { breakLength: Infinity })}, expected ${inspect(error.expected, { breakLength: Infinity })})`;
+  const waiting = lines.find((line) => /^-\s*waiting for /.test(line))?.slice(2);
+  if (waiting) what += ` (${waiting})`;
+  const at = /check-live-stats-browser\.mjs:(\d+)/.exec(plain(error?.stack))?.[1];
+  if (at) what += ` (at scripts/check-live-stats-browser.mjs line ${at})`;
+  console.error(`Live stats browser check failed:\n  ${what}`);
+  console.error(
+    `The machine: ${os.cpus().length} processors, ${(os.freemem() / 2 ** 30).toFixed(1)} GB memory free, ${browser ? `browser ${browser.version()}` : 'the browser not started'}.`,
+  );
+  console.error(lastLinesOf('live-stats server', output, server.exitCode));
+  if (onlineOutput !== '')
+    console.error(lastLinesOf('online live-stats server', onlineOutput, onlineExit));
+  console.error(plain(error?.stack ?? error));
+}
 
 let browser;
 try {
@@ -507,7 +565,7 @@ try {
   await shot(phone, 'game-phone', true);
 
   // Online: scorers sign in first, and taps made after a sign-in runs out wait for the next.
-  const onlinePort = 4195;
+  const onlinePort = await freePort();
   const onlineBase = `http://127.0.0.1:${onlinePort}`;
   const online = spawn(
     process.execPath,
@@ -526,7 +584,7 @@ try {
       },
     },
   );
-  let onlineOutput = '';
+  online.on('exit', (code) => (onlineExit = code));
   online.stdout.on('data', (s) => (onlineOutput += s));
   online.stderr.on('data', (s) => (onlineOutput += s));
   try {
@@ -596,6 +654,9 @@ try {
   console.log(
     'Live stats browser check passed. Screenshots: artifacts/screenshots/live-stats-*.png',
   );
+} catch (error) {
+  sayWhatFailed(error);
+  process.exitCode = 1;
 } finally {
   await browser?.close();
   server.kill();
