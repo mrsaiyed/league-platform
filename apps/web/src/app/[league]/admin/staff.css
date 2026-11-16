@@ -93,6 +93,23 @@ html:has(.staff) {
 .staff-bar-brand .ui-emblem {
   block-size: var(--step-6);
 }
+/* The league's mark stands on the menu here, not on a public header: it is filled with
+   the tone of the main color that can be told from the menu under any league's colors
+   (the current item's own fill), edged and lettered in the color that reads on it. A
+   public header's fill is worked out against that header, and a pale league's (a band
+   made from its dark text color) was a dark shield lost on the dark menu. */
+.staff .staff-bar .ui-emblem[data-kind='league'],
+.staff .staff-side .ui-emblem[data-kind='league'] {
+  color: var(--staff-on-menu-current);
+}
+.staff .staff-bar .ui-emblem[data-kind='league'] .ui-emblem-shield,
+.staff .staff-side .ui-emblem[data-kind='league'] .ui-emblem-shield {
+  fill: var(--staff-menu-current);
+}
+.staff .staff-bar .ui-emblem[data-kind='league'] .ui-emblem-letter,
+.staff .staff-side .ui-emblem[data-kind='league'] .ui-emblem-letter {
+  color: var(--staff-on-menu-current);
+}
 .staff-bar-words,
 .staff-side-words {
   display: grid;
