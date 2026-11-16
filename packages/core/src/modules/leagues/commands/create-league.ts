@@ -11,9 +11,28 @@
 // season because a second step refused could be neither finished nor removed. The
 // activity log names our staff for both, set up for the owner (`forOwnerAccountId`).
 // The contact email and city (P3 §1 step 2, "Where") may be left out and given later.
+//
+// When a design is given (one of the starting designs, with the main, accent and
+// highlight colors the league chose, step 2.187, record 073), the league's site and its
+// first release are made in the same transaction, published by our staff for the owner;
+// the `leagues.create` entry names the starting design. A league made without one has
+// no release, and is drawn in the neutral design until one is published.
+import {
+  startingColors,
+  startingDesignKeys,
+  startingDesignWith,
+  type StartingColors,
+  type StartingDesignKey,
+} from '@srleagues/contracts';
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
-import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
+import {
+  defineCommand,
+  fail,
+  ok,
+  type CommandContext,
+  type Result,
+} from '../../../command/index.ts';
 import { leagueCreated } from '../events.ts';
 import { audiences, defaultProgramSlug, listedByDefault } from '../league-values.ts';
 import { mayActAsPlatform } from '../policy.ts';
@@ -77,6 +96,10 @@ export const createLeague = defineCommand({
     sportKey: z.string().regex(/^[a-z][a-z0-9_]{0,39}$/),
     /** Made in the default program, in draft, as the current season. */
     firstSeason: firstSeason.optional(),
+    /** Its first site release: a starting design and the colors chosen in place of its own. */
+    design: z
+      .object({ startingDesign: z.enum(startingDesignKeys), colors: startingColors.optional() })
+      .optional(),
   }),
   allowed: (context, _input, tx: LeaguesTx) => mayActAsPlatform(context, tx),
   run: async ({ context, input, tx, emit }): Promise<Result<CreatedLeague, CreateLeagueError>> => {
@@ -94,10 +117,14 @@ export const createLeague = defineCommand({
     });
     if (typeof created === 'string') return fail({ code: created });
     const setUp = { forOwnerAccountId: input.ownerAccountId };
+    if (input.design !== undefined) await publishFirstDesign(tx, context, input.design);
     await recordActivity(tx, context, {
       action: 'leagues.create',
       target: { type: 'league', id: context.leagueId },
-      details: setUp,
+      details:
+        input.design === undefined
+          ? setUp
+          : { ...setUp, startingDesign: input.design.startingDesign },
     });
     const firstSeasonId =
       input.firstSeason === undefined ? null : await makeFirstSeason(tx, input.firstSeason);
@@ -112,6 +139,28 @@ export const createLeague = defineCommand({
     return ok({ ...created, firstSeasonId });
   },
 });
+
+/**
+ * The new league's first site release, and its site pointed at it (T3 §10). A new league
+ * has no release, so its number cannot be taken: that would be a fault, thrown so the
+ * whole league is rolled back.
+ */
+async function publishFirstDesign(
+  tx: LeaguesTx,
+  context: CommandContext,
+  design: { startingDesign: StartingDesignKey; colors?: StartingColors | undefined },
+): Promise<void> {
+  if (context.accountId === null) throw new Error('leagues.create: no account.');
+  const released = await tx.leagues.publishSiteRelease({
+    number: 1,
+    startingDesign: design.startingDesign,
+    design: startingDesignWith(design.startingDesign, design.colors),
+    publishedByAccountId: context.accountId,
+  });
+  if (released === 'number-taken') {
+    throw new Error('leagues.create: a new league already had a site release.');
+  }
+}
 
 /**
  * The first season, in the default program just made, as its current one. A new

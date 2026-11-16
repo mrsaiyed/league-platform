@@ -14,7 +14,14 @@ import {
   type StandingsData,
 } from '../../command/testing/memory-standings-stores.ts';
 import type { Audience, SeasonStatus } from './league-values.ts';
-import type { DivisionRecord, LeagueRecord, LeaguesTx, NewLeague, SettingPlace } from './ports.ts';
+import type {
+  DivisionRecord,
+  LeagueRecord,
+  LeaguesTx,
+  NewLeague,
+  NewSiteRelease,
+  SettingPlace,
+} from './ports.ts';
 
 export type MemoryLeagues = {
   /** Undefined until createLeague runs. */
@@ -59,6 +66,12 @@ export type MemoryLeagues = {
   activity: ActivityEntry[];
   /** The season's teams, results, adjustments and saved standings (the standings module's). */
   standing: Omit<StandingsData, 'seasons'>;
+  /** The league's published site releases, oldest first (T3 §10). */
+  siteReleases: (NewSiteRelease & { id: string })[];
+  /** The league's site in its draft state, once a release was published. */
+  site: { startingDesign: string; designDraft: unknown; publishedReleaseId: string } | undefined;
+  /** A number another publish took first (the database's unique key), for a race. */
+  takenReleaseNumbers: number[];
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -114,6 +127,9 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
       totals: {},
       locked: [],
     },
+    siteReleases: [],
+    site: undefined,
+    takenReleaseNumbers: [],
     ...state,
   });
   let accountId: string | null = null;
@@ -330,6 +346,23 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           if (at < 0) return false;
           s.settings.splice(at, 1);
           return true;
+        },
+        latestSiteReleaseNumber: async () => s.siteReleases.at(-1)?.number ?? 0,
+        publishSiteRelease: async (release) => {
+          if (
+            s.takenReleaseNumbers.includes(release.number) ||
+            s.siteReleases.some((r) => r.number === release.number)
+          ) {
+            return 'number-taken';
+          }
+          const id = `01900000-0000-7000-8000-0000000e${String(release.number).padStart(4, '0')}`;
+          s.siteReleases.push({ ...release, id });
+          s.site = {
+            startingDesign: release.startingDesign,
+            designDraft: release.design,
+            publishedReleaseId: id,
+          };
+          return id;
         },
       },
     };

@@ -17,6 +17,7 @@ import {
   buildNext,
   freePort,
   launch,
+  showSheetTeamOf,
   startNext,
   waitFor,
 } from './web-browser-kit.mjs';
@@ -92,6 +93,8 @@ if (built) {
     await page.getByRole('heading', { level: 1 }).first().waitFor();
 
     at = 'the owner adds a team';
+    // The admin's areas are behind its own menu button on a phone (step 2.103).
+    await openMenu();
     await tap(adminLink('Teams'), /\/admin\/teams$/);
     await page.locator('input[name=name]').fill(team);
     await page.locator('select[name=divisionId]').selectOption({ label: 'East' });
@@ -116,6 +119,7 @@ if (built) {
     );
 
     at = 'the owner adds two games to this week and publishes';
+    await openMenu();
     await tap(adminLink('Schedule'), /\/admin\/schedule$/);
     // This week's round: the one dated the world's today. That day is the world's own,
     // taken once when the server made it, not this test's clock (a midnight could fall
@@ -153,6 +157,7 @@ if (built) {
     await accessible('the published schedule in the admin');
 
     at = "the owner types the first game's final score";
+    await openMenu();
     await tap(adminLink('Games'), /\/admin\/games$/);
     const gameRow = (away) =>
       page.locator('li', { hasText: team }).filter({ hasText: away }).first();
@@ -194,10 +199,13 @@ if (built) {
         `the grid has ${await points.count()} ${team} players, not ${players.length}`,
       );
     }
-    // Robin's row first: the roster's order.
+    // Robin's row first: the roster's order. On a phone one team's grid is shown at a
+    // time (step 2.103): each team is picked before its boxes are typed in.
+    await showSheetTeamOf(page, points.nth(0));
     await points.nth(0).fill(String(players[0].points));
     await points.nth(1).fill(String(players[1].points));
     const theirs = page.locator('[role=region][aria-label="Herons"] input[name^="stat.points."]');
+    await showSheetTeamOf(page, theirs.nth(0));
     await theirs.nth(0).fill('30');
     await tap(
       page.getByRole('button', { name: 'Save box score and make it final' }),
@@ -212,7 +220,13 @@ if (built) {
     // A visitor: signed out, from the league home, tapping only.
     at = 'a visitor opens the league home';
     await context.clearCookies();
-    await tap(page.locator('.site-header .site-name').first(), /\/north-valley(\?start=league)?$/);
+    // The public site's header is not drawn in the admin (step 2.103): the way out is the
+    // admin's own "View the site", behind its menu button on a phone.
+    await openMenu();
+    await tap(
+      page.locator('.staff-bar').getByRole('link', { name: 'View the site' }),
+      /\/north-valley(\?start=league)?$/,
+    );
     const home = await page.locator('main').innerText();
     note(`the home page names ${team}`, home.includes(team));
 

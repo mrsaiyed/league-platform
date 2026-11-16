@@ -81,6 +81,9 @@ export const findingWords = (found) => {
   if (found.kind === 'season-changed') {
     return 'it has a second season, or its season was published, changed or put in the bin';
   }
+  if (found.kind === 'site-changed') {
+    return 'its site’s design was published again or changed after it was made';
+  }
   if (found.kind === 'activity') {
     return 'its activity log holds changes made after it was set up, or by someone else';
   }
@@ -144,8 +147,8 @@ export const planLines = (preview, place, nowMs) => {
     `  State           ${league.status}`,
     `  City            ${league.city ?? '(none given)'}`,
     `  Season          ${seasons}`,
-    '  With it         its default program, and the two lines its making wrote in its own',
-    `${indent}activity log`,
+    '  With it         its default program, its site and its first published design (when',
+    `${indent}it has them), and the two lines its making wrote in its own activity log`,
     ownerKept.length === 0
       ? `  Owner’s account ${league.ownerEmail}: removed too (nobody has ever signed in with it, and nothing else uses it)`
       : `  Owner’s account ${league.ownerEmail}: kept, because ${keptReasons(ownerKept)}`,

@@ -47,6 +47,11 @@ test('the plan says what goes, what stays, and why the owner’s account is kept
     removing,
     /Made {12}2026-11-15 14:03 UTC \(40 minutes ago\), by staff@example\.test/,
   );
+  // What goes with it, its site and first published design among them (step 2.187).
+  assert.match(
+    removing,
+    /With it {9}its default program, its site and its first published design \(when\n {18}it has them\), and the two lines its making wrote in its own activity log/,
+  );
   assert.match(removing, /owner@example\.test: removed too \(nobody has ever signed in with it/);
   assert.match(removing, /one line in the platform’s own log: who removed it, and when/);
   assert.match(removing, /Where {11}a folder: \/made-up\/seed-db/);

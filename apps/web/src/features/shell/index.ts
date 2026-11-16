@@ -9,8 +9,6 @@ export {
   waitingQuestionWords,
   type AccountMenu,
 } from './account-menu.ts';
-export { AdminArea } from './admin-area.tsx';
-export { AdminNav } from './admin-nav.tsx';
 export { currentMenuPage, type MenuPage } from './current-menu-page.ts';
 export { DesignStyle, displayStylesheet, displayStylesheetMark } from './design-style.tsx';
 export { headerSeason, type HeaderSeason } from './header-season.ts';

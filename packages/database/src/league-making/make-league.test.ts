@@ -4,11 +4,12 @@
 // theirs and owns the league. A run that makes no league leaves no account it made.
 import { PGlite } from '@electric-sql/pglite';
 import { getSeason, planNewLeague, setLeagueName, type NewLeaguePlan } from '@srleagues/core';
+import { parseDesignDocument, startingDesign, startingDesignWith } from '@srleagues/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
 import { withTransaction } from '../db/with-transaction.ts';
-import { accountForSignIn } from '../queries/index.ts';
+import { accountForSignIn, findPublishedDesign } from '../queries/index.ts';
 import { freshSchema, newAccount, one, unique } from '../schema/schema.test-helper.ts';
 import { accessStore } from '../stores/access-store.ts';
 import { activityLogStore } from '../stores/activity-log-store.ts';
@@ -235,6 +236,53 @@ describe('makeLeague', () => {
     expect(
       await one(pglite, 'select listed from leagues where id = $1', [outcome.made.leagueId]),
     ).toEqual({ listed: true });
+  });
+
+  it('gives the league the starting design and colors it was given, as its first release (step 2.187)', async () => {
+    const plan = planFor({
+      design: 'Midnight-Gold',
+      mainColor: '#0A3D62',
+      highlightColor: '#ffcc00',
+    });
+    const outcome = await makeLeague(target, plan);
+    if (!outcome.ok) throw new Error(JSON.stringify(outcome));
+    const { leagueId } = outcome.made;
+    // What its pages are drawn from: its latest release, read as the web app reads it.
+    const published = await withTransaction(target.db, { leagueId }, findPublishedDesign, {
+      snapshot: 'page',
+    });
+    const expected = startingDesignWith('midnight-gold', {
+      primary: '#0a3d62',
+      highlight: '#ffcc00',
+    });
+    expect(published).toEqual({ number: 1, startingDesign: 'midnight-gold', design: expected });
+    expect(parseDesignDocument(published?.design)).toEqual({ ok: true, design: expected });
+    // Published by our staff member, in the same step: the log has no entry of its own.
+    expect(outcome.made.readBack?.log).toEqual([
+      { action: 'leagues.create', actorEmail: staffEmail },
+      { action: 'leagues.create_season', actorEmail: staffEmail },
+    ]);
+  });
+
+  it('gives a league made without a design the first starting design, crest, never the neutral one (C-16)', async () => {
+    const outcome = await makeLeague(target, planFor());
+    if (!outcome.ok) throw new Error(JSON.stringify(outcome));
+    const { leagueId } = outcome.made;
+    expect(
+      await one(
+        pglite,
+        'select number, starting_design, design from site_releases where league_id = $1',
+        [leagueId],
+      ),
+    ).toEqual({ number: 1, starting_design: 'crest', design: startingDesign('crest') });
+    // What its public pages are drawn from, read as the web app reads it: crest's main color.
+    const published = await withTransaction(target.db, { leagueId }, findPublishedDesign, {
+      snapshot: 'page',
+    });
+    const drawn = parseDesignDocument(published?.design);
+    if (!drawn.ok) throw new Error(drawn.problems.join('; '));
+    expect(drawn.design.colors.primary).toBe('#96062d');
+    expect(drawn.design.colors.primary).not.toBe(startingDesign('clean-court').colors.primary);
   });
 
   it('makes nothing, not even an account, when the short name is held', async () => {

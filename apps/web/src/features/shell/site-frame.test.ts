@@ -241,15 +241,11 @@ describe('header, menu and footer', () => {
     const colored = [...shared.matchAll(/([^{}]+)\{[^{}]*outline: [^;]*var\(--color[^{}]*\}/g)]
       .map((m) => (m[1] ?? '').trim())
       .sort();
-    // The edge of a field a refusal is about (step 2.155) is drawn only while the field is
-    // not focused (`:not(:focus-visible)`), so it never colors a focus ring, in the header
+    // The edge of a field a refusal is about is its border and a second line inside the
+    // field (step 2.103), never an outline, so it never colors a focus ring, in the header
     // or anywhere.
     expect(colored).toEqual(
-      [
-        '.ui-root :focus-visible',
-        '.ui-team-card-name a:focus-visible::after',
-        ".ui-root [aria-invalid='true']:not(:focus-visible)",
-      ].sort(),
+      ['.ui-root :focus-visible', '.ui-team-card-name a:focus-visible::after'].sort(),
     );
     const weight = (selector: string) => (selector.match(/[.:][a-z-]+/g) ?? []).length;
     expect(weight(ring ?? '')).toBeGreaterThan(weight('.ui-root :focus-visible'));

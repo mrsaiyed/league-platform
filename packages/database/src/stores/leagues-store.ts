@@ -8,11 +8,13 @@ import {
   findSeason,
   findCurrentLeague,
   findLeagueAudience,
+  findPublishedDesign,
   findProgramId,
   hasRecordedChild,
   findSeasonProgramId,
   insertLeague,
   insertSeason,
+  insertSiteRelease,
   listSettingValues,
   renameLeagueSlug,
   setCurrentSeason,
@@ -77,5 +79,14 @@ export function leaguesStore(
         version,
       ),
     clearSetting: (place, key, version) => deleteSettingValue(scope, place, key, version),
+    latestSiteReleaseNumber: async () => (await findPublishedDesign(scope))?.number ?? 0,
+    publishSiteRelease: (release) =>
+      insertSiteRelease(scope, {
+        number: release.number,
+        startingDesign: release.startingDesign,
+        // A design is a checked typed document in core and plain JSON in the database.
+        design: toJson(release.design) as JsonObject,
+        publishedByAccountId: release.publishedByAccountId,
+      }),
   };
 }

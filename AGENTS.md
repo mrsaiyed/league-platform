@@ -6,6 +6,8 @@ The rest of this file is for an agent that is asked to carry on the build after 
 
 ## Taking over the build
 
+On a computer that has only this repository, start with `docs/build/START-HERE.md`: it says how to set the computer up and what did not come with the repository.
+
 1. **Read, in this order:** `CLAUDE.md`; `docs/specs/v1/PROGRESS.md`; `docs/build/STATUS.md` (where the build is, what is open, what waits for the founder); `docs/build/RUNBOOK.md` (how a run works); `docs/build/LEADS.md` (who owns each outcome, and what "good" means there); `docs/build/DESIGN.md` (the standard every screen is held to).
 2. **Make sure you are the only lead.** Two leads writing the plans at once has caused a mix-up in this build before.
    - If `docs/build/.lock` holds a time less than 40 minutes old, or a lane branch has a commit that recent, another lead may be working. Stop and tell the founder.

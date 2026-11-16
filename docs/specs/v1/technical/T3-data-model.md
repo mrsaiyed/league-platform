@@ -156,19 +156,21 @@ These are never edited by hand (A-12, S-9). They are rebuilt from games whenever
 
 ## 10. Site and content
 
-| Table                              | What a row is                                        | Key columns                                                                                                    |
-| ---------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `sites`                            | A league's site in its draft state                   | `league_id`, `design_draft` (JSON), `menu_draft` (JSON), `published_release_id`                                |
-| `pages`                            | A page in its draft state                            | `league_id`, `slug`, `title`, `kind` (standard or custom), `program_id`, `draft` (JSON: the stack of sections) |
-| `site_releases`                    | A published version of the whole site. Never edited. | `league_id`, `number`, `design`, `menu`, `pages` (JSON), `published_by`, `published_at`                        |
-| `assets`                           | An uploaded image                                    | `league_id`, `path`, `width`, `height`, `alt_text`, `bytes`                                                    |
-| `news_posts`                       | A news post                                          | `slug`, `title`, `body` (JSON), `status`, `pinned`, `published_at`                                             |
-| `award_types`                      | An award the league gives                            | `name`, `cadence` (per round or per season), `stat_key`, `sort`                                                |
-| `awards`                           | An award given                                       | `season_id`, `round_id`, `award_type_id`, `person_id`, `team_id`, `note`                                       |
-| `sponsors`                         | A sponsor in a season                                | `season_id`, `name`, `tier`, `logo`, `link`, `division_id`, `team_id`, `sort`                                  |
-| `media_collections`, `media_items` | A named collection and a video link in it            | `name`; `season_id`, `round_id`, `title`, `link`                                                               |
+| Table                              | What a row is                                        | Key columns                                                                                                           |
+| ---------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `sites`                            | A league's site in its draft state                   | `league_id`, `starting_design`, `design_draft` (JSON), `menu_draft` (JSON), `published_release_id`                    |
+| `pages`                            | A page in its draft state                            | `league_id`, `slug`, `title`, `kind` (standard or custom), `program_id`, `draft` (JSON: the stack of sections)        |
+| `site_releases`                    | A published version of the whole site. Never edited. | `league_id`, `number`, `starting_design`, `design`, `menu`, `pages` (JSON), `published_by_account_id`, `published_at` |
+| `assets`                           | An uploaded image                                    | `league_id`, `path`, `width`, `height`, `alt_text`, `bytes`                                                           |
+| `news_posts`                       | A news post                                          | `slug`, `title`, `body` (JSON), `status`, `pinned`, `published_at`                                                    |
+| `award_types`                      | An award the league gives                            | `name`, `cadence` (per round or per season), `stat_key`, `sort`                                                       |
+| `awards`                           | An award given                                       | `season_id`, `round_id`, `award_type_id`, `person_id`, `team_id`, `note`                                              |
+| `sponsors`                         | A sponsor in a season                                | `season_id`, `name`, `tier`, `logo`, `link`, `division_id`, `team_id`, `sort`                                         |
+| `media_collections`, `media_items` | A named collection and a video link in it            | `name`; `season_id`, `round_id`, `title`, `link`                                                                      |
 
 The public site is always drawn from the latest `site_releases` row, never from drafts (A-9, C-3).
+
+**A league's design** (step 2.187, [record 073](../../../architecture/decisions/073-a-leagues-design-on-the-database.md), T-277). `design` and `design_draft` hold the whole design document of T5 §1, checked against its one written schema (in packages/contracts) when it is published and again before it is drawn; `starting_design` is the key of the starting design it began from. A release is history: never changed or removed (T-45, T-96), its `number` taken once in its league; a site points only at a release of its own league, one site per league. Publishing writes the next release and points the site at it in one transaction (`leagues.publish_site_design`; a league made by our tools gets release 1 with the league itself). Until the design editor exists, `menu`, `pages` and `menu_draft` are empty documents and the draft is set to what was published. A league with no release is drawn in the neutral starting design; so is one whose stored design no longer passes the schema, which is reported in the server's log.
 
 ## 11. Notifications and background work
 

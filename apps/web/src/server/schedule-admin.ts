@@ -2,8 +2,8 @@
 // (their transaction is bound to the league of the command's context, T-28), the names
 // of a season's teams, which the scheduling store does not hold, and the league's
 // seasons, the ones not public yet among them, since a season is scheduled before it is
-// shown (step 2.160). The real database fills it in a later step; until then only the
-// made-up stand-in does.
+// shown (step 2.160). The made-up stand-in fills it (stand-in-schedule.ts), and so does
+// the database (database-schedule-admin.ts, step 2.93 part 4).
 import type { AccessHolder, CommandDeps, SchedulingTx } from '@srleagues/core';
 import type { PublicSeason } from './public-stats.ts';
 
@@ -29,9 +29,9 @@ export type ScheduleAdminPorts = {
    * The list itself applies the scheduling module's one rule (`mayListSeason`: a season not
    * public only to someone with `schedule.read` at its program), so no screen that lists
    * seasons to staff can leave it out. `holder` is required: undefined (nobody signed in,
-   * or no access read) gets the public seasons only. The database's version is not built
-   * yet (database-ports.ts, `notMovedYet`): when it is moved (step 2.93) it must apply the
-   * same rule, `mayListSeason`, to what it reads.
+   * or no access read) gets the public seasons only. The database's version applies the
+   * same rule, `mayListSeason`, to what it reads, and reads what the holder's account holds
+   * again for `leagueId` itself, so a holder of another league opens nothing here.
    */
   readonly seasonsOf: (
     leagueId: string,

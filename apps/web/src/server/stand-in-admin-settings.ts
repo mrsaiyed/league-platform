@@ -7,7 +7,8 @@
 // the statistics settings (Admin → Teams). Every rule (who may change a setting, its
 // limits, the version check) is the product's own: only the storage is made up.
 //
-// Gone when the database's leagues store is wired to the web app.
+// On the database the same screen runs on the leagues store (database-admin-settings.ts);
+// this one goes with the made-up world.
 import type { AdminSettingsPorts } from './admin-settings.ts';
 import type { World } from './stand-in-world.ts';
 

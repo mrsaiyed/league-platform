@@ -470,6 +470,16 @@ const uses: [string, (league: Made) => Promise<unknown>, string][] = [
     'season-changed',
   ],
   [
+    // The tool gives the league its site and first release (step 2.187): those may go,
+    // a changed site may not.
+    'its site’s design changed',
+    (league) =>
+      pglite.query(`update sites set starting_design = 'crest-light' where league_id = $1`, [
+        league.leagueId,
+      ]),
+    'site-changed',
+  ],
+  [
     'an activity-log entry by someone else',
     async (league) =>
       pglite.query(

@@ -150,5 +150,6 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
       tools: madeUpDatabaseTools(database.seedLeagues, standInMember, signIn),
       publicBaseUrl: options.publicBaseUrl,
     },
+    reportDesign: (message, fields) => deps.warn?.(message, fields),
   });
 }
