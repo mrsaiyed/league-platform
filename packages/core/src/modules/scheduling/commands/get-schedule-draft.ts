@@ -26,6 +26,8 @@ export type ScheduleDraftView = {
   readonly result: ApplyDraftResult['state'];
   readonly rejected: ApplyDraftResult['rejected'];
   readonly clashes: ApplyDraftResult['clashes'];
+  /** Games the draft removes, as they were just before: what "Put it back" adds again. */
+  readonly removed: ApplyDraftResult['removed'];
   readonly summary: PublishSummary;
 };
 
@@ -63,6 +65,7 @@ export const getScheduleDraft = defineCommand({
       result: applied.state,
       rejected: applied.rejected,
       clashes: applied.clashes,
+      removed: applied.removed,
       summary: summarizePublish(published, applied.state),
     });
   },

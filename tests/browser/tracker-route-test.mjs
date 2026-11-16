@@ -158,6 +158,8 @@ const gamesKeptOnDevice = (page) =>
   );
 const formatHeading = (page) =>
   page.getByRole('heading', { level: 2, name: 'Check the game format' });
+/** The scoring screen (step 2.35), where "This device is scoring the game." used to stand. */
+const scoringScreen = (page) => page.locator('[data-scoring]');
 const signOutHint = 'On a shared phone or tablet, sign out when you finish.';
 const signOutLink = (page) => page.getByRole('link', { name: 'Sign out on your account page' });
 /** The height of the main tap, in CSS pixels: at least 44 (A-2). */
@@ -201,7 +203,13 @@ if (browser) {
           .getByRole('link', { name: 'Score this game' })
           .click(),
       ]);
-      await page.getByRole('heading', { level: 1, name: 'Score a game' }).waitFor();
+      // Since step 2.35 the tracker's title is the game itself (the two teams, the day and
+      // the time), with "Score a game" as the small line above it.
+      await page.getByRole('heading', { level: 1, name: /Bears at Hawks/ }).waitFor();
+      note(
+        'the tracker says what it is for, above the game',
+        (await page.getByText('Score a game').count()) === 1,
+      );
       note('the tracker names the game', (await page.getByText('Bears at Hawks').count()) > 0);
       await formatHeading(page).waitFor();
       note('the format is shown', (await page.getByText('Overtime periods of').count()) === 1);
@@ -230,22 +238,25 @@ if (browser) {
       note('the state is stored on the device', typeof kept?.state?.sequence === 'number');
 
       await page.getByRole('button', { name: 'Confirm and start scoring' }).click();
-      await page.getByText('This device is scoring the game.').waitFor();
+      await scoringScreen(page).waitFor();
       note('the banner says all is saved', (await page.getByText('All saved').count()) === 1);
       note(
         'the confirmed format is stored on the device',
         (await keptOnDevice(page, liveGame))?.confirmedFormat !== null,
       );
-      await accessible(page, 'scoring placeholder');
+      await accessible(page, 'the scoring screen');
 
       // The same device opens straight to scoring: the format was confirmed here.
       await page.reload();
-      await page.getByText('This device is scoring the game.').waitFor();
+      await scoringScreen(page).waitFor();
       note(
         'the format is not asked again on this device',
         (await formatHeading(page).count()) === 0,
       );
 
+      // On the scoring screen the one way out is behind More (step 2.35), where a stray
+      // tap cannot leave the game.
+      await page.getByRole('button', { name: 'More' }).click();
       note(
         'one way out of the game: "Back to your games", no "Leave the game" beside it',
         (await page.getByRole('button', { name: 'Leave the game' }).count()) === 0 &&
@@ -560,10 +571,7 @@ if (browser) {
       note('after about ten seconds the connection is mentioned', waited >= 9_000, `${waited} ms`);
       await accessible(page, 'no answer from the server');
       await context.unroute('**/api/**');
-      await page
-        .getByText('This device is scoring the game.')
-        .or(formatHeading(page))
-        .waitFor({ timeout: 60_000 });
+      await scoringScreen(page).or(formatHeading(page)).waitFor({ timeout: 60_000 });
       note(
         'once the server answers the game opens by itself, and the words go',
         (await page.getByText('No answer yet.').count()) === 0,
@@ -582,7 +590,7 @@ if (browser) {
     const { context, page } = await signedInAs('local-scorekeeper-token');
     try {
       await page.goto(origin + tracker(liveGame));
-      await page.getByText('This device is scoring the game.').or(formatHeading(page)).waitFor();
+      await scoringScreen(page).or(formatHeading(page)).waitFor();
       // The session cookie goes; the device finds out at its next renewal (30 s).
       await context.clearCookies();
       await page.getByText('You are signed out.').waitFor({ timeout: 60_000 });
@@ -605,8 +613,7 @@ if (browser) {
     try {
       await page.goto(origin + tracker(liveGame));
       // The device signed out above may still hold the game: then this one is told so.
-      await page
-        .getByText('This device is scoring the game.')
+      await scoringScreen(page)
         .or(formatHeading(page))
         .or(page.getByText('is scoring this game on another device.'))
         .waitFor();

@@ -337,6 +337,10 @@ const win = SeasonRules.parse(defaultSeasonRules());
 const byPoints = SeasonRules.parse({
   ...defaultSeasonRules(),
   standings: { ...win.standings, rankBy: 'points', columns: [...win.standings.columns, 'points'] },
+  // The youth league asks for a different number for each player in a team (T-44), so the
+  // made-up world shows that rule too: a player put back whose number is worn comes back
+  // with none (step 2.161, R-32). Its rosters wear each number once.
+  rosters: { ...win.rosters, uniqueJerseys: true },
 });
 
 const gym = venue(1);

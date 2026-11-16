@@ -13,6 +13,7 @@ import type {
   TeamRecord,
   TeamsStore,
 } from '@srleagues/core';
+import { dayIn } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { uniqueJerseysOf } from './stand-in-world-games.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
@@ -24,7 +25,8 @@ const entryOf = ({
   ...entry
 }: LeagueWorld['roster'][number]): RosterEntryRecord => entry;
 
-export function worldTeamsStore(s: LeagueWorld): TeamsStore {
+/** The teams store over one league's world; `now` is the world's one clock (stand-in-world.ts). */
+export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
   const clash = (t: { seasonId: string; slug: string; name: string }, except?: string) => {
     const others = s.teams.filter((o) => o.id !== except && !o.binned && o.seasonId === t.seasonId);
     if (others.some((o) => o.slug === t.slug)) return 'slug-taken' as const;
@@ -134,12 +136,35 @@ export function worldTeamsStore(s: LeagueWorld): TeamsStore {
       if (found === undefined || (version !== undefined && found.version !== version)) {
         return undefined;
       }
-      if (change.jerseyNumber !== undefined && jerseyWorn(found.teamId, change.jerseyNumber, id)) {
+      // An entry waiting for review is not held to unique numbers until it is confirmed:
+      // the database's trigger skips it (0015, `or new.needs_review`).
+      const checked = !found.needsReview;
+      if (
+        checked &&
+        change.jerseyNumber !== undefined &&
+        jerseyWorn(found.teamId, change.jerseyNumber, id)
+      ) {
         return 'jersey-taken';
+      }
+      // Put back on the roster (leaving date cleared): as the database's roster_entries_once
+      // index and unique-number trigger refuse an entry opened again.
+      if (change.leftOn === null && found.leftOn !== null) {
+        const open = s.roster.some(
+          (r) =>
+            r.id !== id &&
+            r.teamId === found.teamId &&
+            r.personId === found.personId &&
+            r.leftOn === null,
+        );
+        if (open) return 'already-on-team';
+        const jersey = change.jerseyNumber === undefined ? found.jerseyNumber : change.jerseyNumber;
+        if (checked && jerseyWorn(found.teamId, jersey, id)) return 'jersey-taken';
       }
       s.roster = replacedAt(s.roster, at, { ...found, ...change, version: found.version + 1 });
       return found.version + 1;
     },
+    // The league's today in its own zone, by the world's own clock (as the games store's).
+    leagueToday: async () => dayIn(now(), s.timeZone),
     seasonProgramId: async (id) => s.seasons.find((x) => x.id === id)?.programId,
     findDivision: async (id) => {
       const d = s.divisions.find((x) => x.id === id);
@@ -220,8 +245,14 @@ export function worldPeopleStore(s: LeagueWorld): PeopleStore {
       s.people = replacedAt(s.people, at, { ...found, binned, version: found.version + 1 });
       return true;
     },
+    // As queries/is-person-on-roster.ts: a place on a team in the bin does not count (A-16).
     isOnRoster: async (personId) =>
-      s.roster.some((r) => r.personId === personId && r.leftOn === null),
+      s.roster.some(
+        (r) =>
+          r.personId === personId &&
+          r.leftOn === null &&
+          s.teams.some((t) => t.id === r.teamId && !t.binned),
+      ),
     leagueAudience: async () => s.audience,
     leagueSettingRows: async (key) =>
       s.settings

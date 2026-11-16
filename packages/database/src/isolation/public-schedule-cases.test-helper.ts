@@ -6,6 +6,7 @@ import { defaultNamePolicy, publicViewer, type PublicDisplay } from '@srleagues/
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
   findLeagueTimeZone,
+  findLeagueToday,
   findPublicGameFacts,
   findPublicSeason,
   findPublicTeam,
@@ -84,6 +85,12 @@ registerIsolationCase({
   subject: findLeagueTimeZone,
   name: "read the league's time zone (the target's own, in its scope)",
   run: (scope) => findLeagueTimeZone(scope),
+});
+
+registerIsolationCase({
+  subject: findLeagueToday,
+  name: "read the league's today (the target's own, in its scope)",
+  run: (scope) => findLeagueToday(scope),
 });
 
 registerIsolationCase({

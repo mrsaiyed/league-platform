@@ -17,7 +17,12 @@
 // releases, so every step from the stored version on runs in turn. An older build
 // opening a database a newer one has upgraded gets `storage-newer-version`.
 import { QueueError, type QueueErrorCode } from './queue-storage.ts';
-import { stillKept, type OpenedGame, type OpenedGameStorage } from './opened-game-storage.ts';
+import {
+  stillKept,
+  withLineupPicks,
+  type OpenedGame,
+  type OpenedGameStorage,
+} from './opened-game-storage.ts';
 
 export const openedGamesDatabaseName = 'srleagues-tracker-games';
 const gamesStore = 'games';
@@ -134,6 +139,7 @@ export async function openIndexedDbOpenedGameStorage(
             rostersSavedAt: savedAt,
             state: found?.state ?? null,
             confirmedFormat: found?.confirmedFormat ?? null,
+            ...(found?.lineupPicks === undefined ? {} : { lineupPicks: found.lineupPicks }),
           };
           store.put(game);
         };
@@ -160,6 +166,9 @@ export async function openIndexedDbOpenedGameStorage(
     },
     confirmFormat(gameId, format) {
       return change(gameId, (game) => ({ ...game, confirmedFormat: format }));
+    },
+    saveLineupPicks(gameId, picks) {
+      return change(gameId, (game) => withLineupPicks(game, picks));
     },
     deviceId(make) {
       return run(deviceStore, 'readwrite', '', (store, set) => {

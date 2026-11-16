@@ -4,6 +4,11 @@ export { changeRosterEntry, type ChangeRosterEntryError } from './commands/chang
 export { listRoster, type ListRosterError } from './commands/list-roster.ts';
 export { markLeft, type MarkLeftError } from './commands/mark-left.ts';
 export {
+  putBackOnRoster,
+  type PutBackOnRosterError,
+  type PutBackOnRosterValue,
+} from './commands/put-back-on-roster.ts';
+export {
   reorderRoster,
   type ReorderRosterError,
   type ReorderRosterResult,
