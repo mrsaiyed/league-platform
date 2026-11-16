@@ -89,7 +89,13 @@ const notFound = 'NEXT_HTTP_ERROR_FALLBACK;404';
 // name alone is no proof: the site's menu has "Schedule" and "Teams" too.
 const adminLink = (league, area) => `href="/${league}/admin/${area}"`;
 
-/** [who, path, status, words that must be there, words that must not, forward to, extra cookies] */
+/**
+ * [who, path, status, words that must be there, words that must not, forward to, extra cookies]
+ *
+ * Grouped by page, in the order a person meets them. A new case goes in the group of its
+ * own page or area, beside the cases like it, never at the end of the list, so two steps
+ * that each add one rarely touch the same lines (step 2.188, record 072).
+ */
 const cases = [
   // Step 2.127: the front page says what SR Leagues is and offers "Sign in" to a visitor
   // (the words it is found by changed from the placeholder's "Find your league, or start
