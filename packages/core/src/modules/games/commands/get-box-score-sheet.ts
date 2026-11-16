@@ -30,11 +30,12 @@ export type BoxScoreSheet = {
   /** Whether the grid asks for minutes played. */
   readonly minutes: boolean;
   /**
-   * Null when the sheet can be saved; otherwise why not: the game is cancelled, tracked
-   * live (corrected in the tracker's grid, even once final), or decided (reopen it to
-   * correct it).
+   * Null when the sheet can be saved; otherwise why not: the game is cancelled,
+   * postponed (it waits for a new date and is not played yet: step 2.158), tracked live
+   * (corrected in the tracker's grid, even once final), or decided (reopen it to correct
+   * it).
    */
-  readonly locked: 'decided' | 'cancelled' | 'tracked' | null;
+  readonly locked: 'decided' | 'cancelled' | 'postponed' | 'tracked' | null;
 };
 
 export type GetBoxScoreSheetError = { readonly code: 'game-not-found' };
@@ -58,11 +59,13 @@ export const getBoxScoreSheet = defineCommand({
     const locked =
       game.status === 'cancelled'
         ? 'cancelled'
-        : tracked
-          ? 'tracked'
-          : isDecided(game.status)
-            ? 'decided'
-            : null;
+        : game.status === 'postponed'
+          ? 'postponed'
+          : tracked
+            ? 'tracked'
+            : isDecided(game.status)
+              ? 'decided'
+              : null;
     const mayCorrect =
       context.accountId !== null &&
       (await mayChangeGames(context, tx, 'games.correct', await gameScope(tx, game.id)));

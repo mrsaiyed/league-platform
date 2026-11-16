@@ -12,7 +12,8 @@
 // play has no stats and no minutes (P7 §5.6). A game the tracker has recorded plays
 // for is corrected in the tracker's own grid (T-122, step 2.65), never here, so its
 // event log always explains its numbers. A decided game is corrected by reopening it
-// with a reason first (S-7), then entering the sheet again.
+// with a reason first (S-7), then entering the sheet again. A postponed game is refused
+// (`game-postponed`, step 2.158): it has not been played yet.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
 import { decideGame, openGameByHand, type DecideGameError } from '../decide-game.ts';
@@ -24,7 +25,11 @@ import { effectiveRulesOf } from '../season-rules-of.ts';
 export type SetBoxScoreError =
   | DecideGameError
   | {
-      readonly code: 'player-not-on-team' | 'player-listed-twice' | 'did-not-play-has-stats';
+      readonly code:
+        | 'player-not-on-team'
+        | 'player-listed-twice'
+        | 'did-not-play-has-stats'
+        | 'game-postponed';
     };
 
 /** A stat key as the database takes it (is_stat_counts, migration 0010). */
@@ -69,6 +74,8 @@ export const setBoxScore = defineCommand({
     if (!open.ok) return open;
     const game = open.value;
     if (game.status === 'live') return fail({ code: 'game-is-tracked' });
+    // A postponed game has not been played (step 2.158, M32): its sheet waits for its new date.
+    if (game.status === 'postponed') return fail({ code: 'game-postponed' });
     if (input.homeScore === input.awayScore) {
       const rules = await effectiveRulesOf(tx, game);
       if (!rules.allowTies) return fail({ code: 'tie-not-allowed' });

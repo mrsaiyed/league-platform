@@ -32,6 +32,9 @@ export const enAdminGames = {
   'admin.boxScore.locked.cancelled': 'This game was cancelled, so it has no box score.',
   'admin.boxScore.locked.decided':
     'This game is final. To correct it, reopen it with a reason; then enter its result again.',
+  // Step 2.158 (M32): a postponed game's own page offers no score entry.
+  'admin.boxScore.locked.postponed':
+    'This game is postponed, so it has no score yet. It is scored once it is played on its new date.',
   'admin.boxScore.locked.tracked':
     'This game was scored with the live tracker. Correct it in the tracker, so its list of plays still explains the numbers.',
   'admin.boxScore.minutes': 'Minutes',
@@ -104,6 +107,8 @@ export const enAdminGames = {
   'admin.games.error.game-not-cancellable': 'Only a game that has not started can be cancelled.',
   'admin.games.error.game-not-found': 'That game is not there.',
   'admin.games.error.game-not-postponable': 'Only a game that has not started can be postponed.',
+  'admin.games.error.game-postponed':
+    'That game is postponed, so it cannot have a score yet. Enter its score once it is played on its new date.',
   'admin.games.error.invalid-input': 'Enter the score as two whole numbers from 0 to 999.',
   'admin.games.error.not-allowed': 'You are not allowed to do that to this game.',
   'admin.games.error.team-not-in-game': 'That team is not in this game.',

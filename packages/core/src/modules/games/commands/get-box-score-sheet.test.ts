@@ -135,6 +135,13 @@ describe('getBoxScoreSheet', () => {
     ).toMatchObject({ value: { locked: 'tracked' } });
   });
 
+  it('says a postponed game cannot be saved here: it has not been played (step 2.158)', async () => {
+    const { deps, as } = memoryGames({ games: [game(1, { status: 'postponed' })] });
+    expect(await getBoxScoreSheet(as(ownerId), { gameId: gameUuid(1) }, deps)).toMatchObject({
+      value: { locked: 'postponed', mayReopen: false },
+    });
+  });
+
   it('answers a missing or binned game as not found, and refuses one who may not score', async () => {
     const { deps, as } = memoryGames({
       games: [game(1, { binned: true })],

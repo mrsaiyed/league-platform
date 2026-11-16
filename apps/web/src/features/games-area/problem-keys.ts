@@ -14,6 +14,7 @@ const gamesKeys: readonly TextKey[] = [
   'admin.games.error.game-is-tracked',
   'admin.games.error.game-not-postponable',
   'admin.games.error.game-not-cancellable',
+  'admin.games.error.game-postponed',
 ];
 
 const boxScoreKeys: readonly TextKey[] = [
