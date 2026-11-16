@@ -17,7 +17,7 @@ Do not touch `adminTeams` (another part), `fixtureImport` (parked), `adminSettin
 
 **A result must move the standings in the same transaction.** Pass core's event handlers to the ports' `deps.events`, as the made-up world does. Never `events: []` here (the area 5 lead flagged it: the settings and schedule ports use `[]`, and that must not be copied to the ports that move games).
 
-**Live updates:** `liveFeed` stays `null` on the database. A watcher's page asks again about every 7 seconds through the snapshot. Do not build the real-time service (steps 2.124 and 2.116 are parked).
+**Live updates:** `liveFeed` stays `null` on the database. A watcher's page asks for the snapshot again every 5 seconds (T-119), and the cache may answer up to 2 seconds old, so about 7 seconds in all. Do not build the real-time service (steps 2.124 and 2.116 are parked).
 
 **The done test:**
 

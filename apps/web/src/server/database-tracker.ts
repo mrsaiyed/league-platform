@@ -13,7 +13,9 @@
 // core (readGameSnapshot, showName); these ports only fetch.
 //
 // Live updates: none on the database yet (steps 2.124 and 2.116). A watcher's page asks
-// for the snapshot again about every 7 seconds, so the publisher here publishes nowhere.
+// for the snapshot again every 5 seconds (T-119, follow-game.ts), and the answer may be
+// up to 2 seconds old from the cache in front of the site (s-maxage=2), so a watcher is
+// at most about 7 seconds behind; the publisher here publishes nowhere.
 //
 // packages/database is handed in, not imported: Node.js loads it when the app starts
 // (container.ts), so Next.js never bundles it.

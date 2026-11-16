@@ -2,11 +2,16 @@
 // games module's own transaction, made of packages/database's stores, as the stand-in
 // hands its one world's (stand-in-games.ts). The games commands run on it, so every rule
 // (who may score which game under the league's scorekeepers' rule, who may decide or
-// correct one, the version checks, the reopening window) is the product's own. Each read
-// and command is an ordinary league transaction, set to the league and the account of the
-// command's context, which comes from the session (T-23, T-28), never a page snapshot of
-// the public pages (record 070). The tracker's ports (database-tracker.ts) run on the same
-// transaction: reopening a game hands a tracked one back (step 2.30).
+// correct one, the version checks, the reopening window) is the product's own. Each
+// command and each of its reads is an ordinary league transaction, set to the league and
+// the account of the command's context, which comes from the session (T-23, T-28), never
+// a page snapshot of the public pages (record 070). namesOf is the one read that is not a
+// command: its transaction is set to the league only, with no account, as it reads only
+// the league's own rows (its teams, seasons, game assignments, and its staff's names
+// through access_list_names), none of which the fence opens to one account more than
+// another. A page shows its names only beside the games a games command gave the person,
+// whose own check decides what they may see. The tracker's ports (database-tracker.ts)
+// run on the same transaction: reopening a game hands a tracked one back (step 2.30).
 //
 // A result moves the standings in the same transaction (T-24): core's event handlers run
 // inside each command's transaction, which holds the standings store besides the games
