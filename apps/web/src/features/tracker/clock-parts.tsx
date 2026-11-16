@@ -19,7 +19,7 @@ import type { Translate } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
 import { Fragment, type MouseEvent } from 'react';
 import { periodText } from './engine-words.ts';
-import type { ClockEntry, PeriodChoice, SetEffect } from './game-clock.ts';
+import type { ClockEntry, MinutesMoved, PeriodChoice, SetEffect } from './game-clock.ts';
 import type { TimeoutCall } from './scoring-moves.ts';
 import type { ScoringView, Side, TakenTimeout, TeamPanel } from './scoring-view.ts';
 
@@ -591,16 +591,27 @@ function effectSaid(t: Translate, effect: SetEffect): string {
 /**
  * The sentence said once the clock is set to `clock` ("12:00"): what truly came off or was
  * added to the minutes (`minutesMoved` of game-clock.ts), or only the time it was set to.
+ * Where the minutes moved, with a short form of one line for a phone short of room
+ * ("Clock 12:00 · 4:55 added"); where a player moved by less than the figure, the short
+ * form says only the time, and the full sentence (what a screen reader hears) the rest.
  */
 export function clockSetSaid(
   t: Translate,
   clock: string,
-  moved: { readonly kind: 'back' | 'added'; readonly time: string } | null,
-): string {
-  if (moved === null) return t('tracker.say.clockSet', { clock });
-  return moved.kind === 'back'
-    ? t('tracker.say.clockSetBack', { clock, back: moved.time })
-    : t('tracker.say.clockSetAdded', { clock, time: moved.time });
+  moved: MinutesMoved | null,
+): string | { readonly text: string; readonly short: string } {
+  const plain = t('tracker.say.clockSet', { clock });
+  if (moved === null) return plain;
+  const text =
+    moved.kind === 'back'
+      ? t('tracker.say.clockSetBack', { clock, back: moved.time })
+      : t('tracker.say.clockSetAdded', { clock, time: moved.time });
+  if (!moved.even) return { text, short: plain };
+  const short =
+    moved.kind === 'back'
+      ? t('tracker.say.clockSetBackShort', { clock, back: moved.time })
+      : t('tracker.say.clockSetAddedShort', { clock, time: moved.time });
+  return { text, short };
 }
 
 /**

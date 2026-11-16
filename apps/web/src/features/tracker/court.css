@@ -782,7 +782,8 @@
 }
 /* The same said shorter ("12 to send"): only on a phone whose scoreboard has no room for
    the long one (lying down, and upright in its browser: further down). */
-.court-banner-short {
+.court-banner-short,
+.court-say-short {
   display: none;
 }
 .court-notices {
@@ -2274,8 +2275,20 @@
   .court-banner-long {
     display: none;
   }
-  .court-banner-short {
+  .court-banner-short,
+  .court-say-short {
     display: inline;
+  }
+  /* The sentence after a set clock says it shorter here too ("Clock 15:00 · 4:59 added"),
+     one line; the full one is taken out of sight, never out of the page, for a screen
+     reader. */
+  .court-say-long {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   /* Start and the timeouts are 8 above the chips of the team under them. */
   .court-controls {
@@ -2474,6 +2487,18 @@
   .court-banner-short,
   .court-banner-line {
     display: block;
+  }
+  /* The sentence after a set clock, shorter, as upright in a browser (above). */
+  .court-say-short {
+    display: inline;
+  }
+  .court-say-long {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .court-who-where {
     display: none;

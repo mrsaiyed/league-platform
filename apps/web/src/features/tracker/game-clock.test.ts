@@ -315,9 +315,10 @@ describe('the clock’s keys (T5)', () => {
     // 12:00 takes 4:55 off the clock: the form says it adds 4:55, and the engine does.
     expect(setEffect(paused, 12 * 60_000, 196_000)).toEqual({ kind: 'added', time: '4:55' });
     const wrong = at(paused, 200_000, { type: 'set-clock', ms: 12 * 60_000 });
-    expect(minutesMoved(readClock(paused, 200_000), wrong)).toEqual({
+    expect(minutesMoved(paused, readClock(paused, 200_000), wrong)).toEqual({
       kind: 'added',
       time: '4:55',
+      even: true,
     });
     expect(basketball.derive(wrong).players['h3']?.ms).toBe(480_000);
     // Put right: the same 4:55 comes off again, not the half.
@@ -328,11 +329,33 @@ describe('the clock’s keys (T5)', () => {
     });
     expect(tookOff(wrong, 201_000, 1_015_000)).toBe(295_000);
     const right = at(wrong, 210_000, { type: 'set-clock', ms: 1_015_000 });
-    expect(minutesMoved(readClock(wrong, 210_000), right)).toEqual({ kind: 'back', time: '4:55' });
+    expect(minutesMoved(wrong, readClock(wrong, 210_000), right)).toEqual({
+      kind: 'back',
+      time: '4:55',
+      even: true,
+    });
     expect(basketball.formatMinutes(basketball.derive(right).players['h3']?.ms ?? -1)).toBe('3:05');
     // The same time as the clock shows already moves nothing, and says nothing.
     expect(setEffect(right, 1_015_000, 211_000)).toBeNull();
-    expect(minutesMoved(readClock(right, 211_000), right)).toBeNull();
+    expect(minutesMoved(right, readClock(right, 211_000), right)).toBeNull();
+    // Put back past a substitution: the player who went off in that stretch moves by less
+    // than the figure, so the short form must not promise it to everyone (`even`).
+    const subbed = at(
+      at(at(tippedOff(rules), 10_000, { type: 'start' }), 70_000, {
+        type: 'sub',
+        side: 'home',
+        inId: 'h13',
+        outId: 'h3',
+      }),
+      130_000,
+      { type: 'pause' },
+    );
+    const back = at(subbed, 131_000, { type: 'set-clock', ms: 20 * 60_000 });
+    expect(minutesMoved(subbed, readClock(subbed, 131_000), back)).toEqual({
+      kind: 'back',
+      time: '2:00',
+      even: false,
+    });
     // Before the clock has run in the period, a set only says where the period starts.
     expect(setEffect(tippedOff(rules), 15 * 60_000, 0)).toEqual({ kind: 'start', clock: '15:00' });
   });

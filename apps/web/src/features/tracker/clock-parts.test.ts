@@ -501,13 +501,20 @@ describe('the form that sets the clock and picks the period (T5, T6)', () => {
     );
   });
 
-  it('says once set what truly came off or was added, or only the time', () => {
-    expect(clockSetSaid(t, '12:00', { kind: 'added', time: '4:55' })).toBe(
-      'Clock set to 12:00. 4:55 was added to the minutes of the players on the court.',
-    );
-    expect(clockSetSaid(t, '16:55', { kind: 'back', time: '4:55' })).toBe(
-      'Clock set to 16:55. 4:55 came off the minutes of the players on the court.',
-    );
+  it('says once set what truly came off or was added, in one line too, or only the time', () => {
+    expect(clockSetSaid(t, '12:00', { kind: 'added', time: '4:55', even: true })).toEqual({
+      text: 'Clock set to 12:00. 4:55 was added to the minutes of the players on the court.',
+      short: 'Clock 12:00 · 4:55 added',
+    });
+    expect(clockSetSaid(t, '16:55', { kind: 'back', time: '4:55', even: true })).toEqual({
+      text: 'Clock set to 16:55. 4:55 came off the minutes of the players on the court.',
+      short: 'Clock 16:55 · 4:55 off',
+    });
+    // A player moved by less than the figure: the short form promises no amount.
+    expect(clockSetSaid(t, '8:00', { kind: 'back', time: '1:30', even: false })).toEqual({
+      text: 'Clock set to 8:00. 1:30 came off the minutes of the players on the court.',
+      short: 'Clock set to 8:00.',
+    });
     expect(clockSetSaid(t, '7:00', null)).toBe('Clock set to 7:00.');
   });
 

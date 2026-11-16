@@ -232,9 +232,13 @@ export const enTracker = {
   // {time} is what was added to the minutes: the time taken off the clock (S-71).
   'tracker.say.clockSetAdded':
     'Clock set to {clock}. {time} was added to the minutes of the players on the court.',
+  // The same said in one line, where a phone is short of room: "Clock 15:00 · 4:59 added".
+  'tracker.say.clockSetAddedShort': 'Clock {clock} · {time} added',
   // {back} is what came off the minutes, which can be less than went back on the clock.
   'tracker.say.clockSetBack':
     'Clock set to {clock}. {back} came off the minutes of the players on the court.',
+  // The same said in one line, where a phone is short of room: "Clock 15:00 · 4:59 off".
+  'tracker.say.clockSetBackShort': 'Clock {clock} · {back} off',
   'tracker.say.foulStopped': 'Foul on {player}. Clock stopped.',
   'tracker.say.halftime': 'Halftime.',
   'tracker.say.notScoring':

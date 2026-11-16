@@ -328,7 +328,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const root = useRef<HTMLElement | null>(null);
   const [picks, setPicks] = useState<LineupPicks>(() => game.lineupPicks());
   const [padMode, setPadMode] = useState<PadMode>(padAtRest);
-  const [said, setSaid] = useState<string | null>(null);
+  const [said, setSaid] = useState<ReturnType<typeof clockSetSaid> | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
   // The marks of the tiles (tile-marks.ts): kept by player, so a tile drawn anew (a
@@ -403,7 +403,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
   );
 
   const sayTimer = useRef<number | null>(null);
-  const say = useCallback((text: string) => {
+  const say = useCallback((text: ReturnType<typeof clockSetSaid>) => {
     if (sayTimer.current !== null) window.clearTimeout(sayTimer.current);
     setSaid(text);
     sayTimer.current = window.setTimeout(() => setSaid(null), saidForMs);
@@ -802,7 +802,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       void tap({ type: 'set-clock', ms: typed.ms }).then((result) => {
         if (!result.ok || result.game === null) return;
         // What the engine truly did to the minutes: what came off, or what was added.
-        say(clockSetSaid(t, typed.text, minutesMoved(before, result.game)));
+        say(clockSetSaid(t, typed.text, minutesMoved(state, before, result.game)));
       });
     },
     pickPeriod(period) {

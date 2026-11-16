@@ -238,18 +238,44 @@ export function setEffect(
   }
 }
 
+/** What a set clock did to the minutes; see `minutesMoved`. */
+export type MinutesMoved = {
+  readonly kind: 'back' | 'added';
+  /** "4:59": how far the game's time moved. */
+  readonly time: string;
+  /**
+   * Every player on the court moved by exactly that, and nobody else moved: so a short
+   * form may say the figure alone. False when a correction reached past a substitution
+   * and a player who came on or went off in it moved by less.
+   */
+  readonly even: boolean;
+};
+
 /**
  * What a set clock truly did to the minutes, for the sentence said once it is done: the
- * game time before (`before`, read as the form was used) against the engine's own after
- * the set. Null when the minutes did not move.
+ * game (`game`) and its clock (`before`) as the form was used, against the engine's own
+ * after the set. Null when the minutes did not move.
  */
 export function minutesMoved(
+  game: basketball.GameState,
   before: ClockReading,
   after: basketball.GameState,
-): { readonly kind: 'back' | 'added'; readonly time: string } | null {
+): MinutesMoved | null {
   const change = after.clock.elapsedMs - before.elapsedMs;
   if (change === 0) return null;
-  return { kind: change < 0 ? 'back' : 'added', time: basketball.formatClock(Math.abs(change)) };
+  const was = basketball.derive(game, before.elapsedMs);
+  const now = basketball.derive(after);
+  const onCourt = new Set([...now.teams.home.onCourt, ...now.teams.away.onCourt]);
+  const ids = new Set([...Object.keys(was.players), ...Object.keys(now.players)]);
+  const even = [...ids].every((id) => {
+    const moved = (now.players[id]?.ms ?? 0) - (was.players[id]?.ms ?? 0);
+    return moved === (onCourt.has(id) ? change : 0);
+  });
+  return {
+    kind: change < 0 ? 'back' : 'added',
+    time: basketball.formatClock(Math.abs(change)),
+    even,
+  };
 }
 
 /** A period the picker offers. */

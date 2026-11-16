@@ -13,7 +13,21 @@
 // - after each set, the sentence says what truly happened, with the same figure;
 // - all ten read 3:05 at the end, on the screen and again after a reload, and the basket
 //   still reads 19:00 in the game the server holds.
-import { court, leagueId, liveGame, scorekeeper, trackerPath } from './tracker-driver.mjs';
+// - At the five sizes, in the device's face and in the wider one, the sentence after each
+//   set fits: where the screen is short of room (upright in a browser, and lying down, as
+//   the saved banner decides) it says it in one line ("Clock 12:00 · 4:55 added", "Clock
+//   16:55 · 4:55 off"), the full sentence kept out of sight for a screen reader; elsewhere
+//   the full sentence is shown.
+import {
+  court,
+  drawIn,
+  leagueId,
+  liveGame,
+  scorekeeper,
+  sizes,
+  trackerPath,
+  widerFace,
+} from './tracker-driver.mjs';
 import {
   accessibilityProblems,
   buildNext,
@@ -234,6 +248,89 @@ if (browser) {
       await context.close();
     }
   });
+}
+
+/** The sentence after a set, as drawn: each form, whether shown, and its lines. */
+const saidDrawn = (page) =>
+  page.evaluate(() => {
+    const p = document.querySelector('[data-say]');
+    const long = p?.querySelector('.court-say-long');
+    const short = p?.querySelector('.court-say-short');
+    const shown = (el) =>
+      el !== null && el !== undefined && getComputedStyle(el).display !== 'none'
+        ? el.getBoundingClientRect().width > 1
+        : false;
+    const style = p === null ? null : getComputedStyle(p);
+    const inner =
+      p === null || style === null
+        ? 0
+        : p.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    return {
+      long: long?.textContent ?? '',
+      short: short?.textContent ?? '',
+      longShown: shown(long),
+      shortShown: shown(short),
+      shortHidden: short?.getAttribute('aria-hidden') === 'true',
+      lines: style === null ? 0 : Math.round(inner / parseFloat(style.lineHeight)),
+    };
+  });
+
+const roomless = new Set(['phone-lying', 'phone-in-browser']);
+const forms = [
+  {
+    digits: '1200',
+    text: 'Clock set to 12:00. 4:55 was added to the minutes of the players on the court.',
+    short: 'Clock 12:00 · 4:55 added',
+  },
+  {
+    digits: '1655',
+    text: 'Clock set to 16:55. 4:55 came off the minutes of the players on the court.',
+    short: 'Clock 16:55 · 4:55 off',
+  },
+];
+
+if (browser) {
+  for (const size of sizes) {
+    await step(`${size.name}: the sentence after a set clock fits`, async () => {
+      const context = await browser.newContext({
+        viewport: { width: size.width, height: size.height },
+      });
+      await context.addCookies([{ ...scorekeeper, url: origin }]);
+      const page = await context.newPage();
+      page.setDefaultTimeout(30_000);
+      try {
+        await page.goto(`${origin}${trackerPath()}`);
+        const c = court(page);
+        await c.open();
+        for (const face of ['', widerFace]) {
+          await drawIn(page, face);
+          const where = `${size.width} x ${size.height}${face === '' ? '' : ', in wider letters'}`;
+          for (const form of forms) {
+            await c.setClock(form.digits);
+            await page.waitForFunction(
+              (text) => document.querySelector('[data-say]')?.textContent?.startsWith(text),
+              form.text,
+            );
+            const drawn = await saidDrawn(page);
+            const both = drawn.long === form.text && drawn.short === form.short;
+            note(
+              roomless.has(size.name)
+                ? `${where}: short of room, “${form.short}” is one line and the full sentence is kept out of sight for a screen reader`
+                : `${where}: with room, the full sentence “${form.text}” is shown`,
+              both &&
+                drawn.shortHidden &&
+                (roomless.has(size.name)
+                  ? drawn.shortShown && !drawn.longShown && drawn.lines === 1
+                  : drawn.longShown && !drawn.shortShown),
+              JSON.stringify(drawn),
+            );
+          }
+        }
+      } finally {
+        await context.close();
+      }
+    });
+  }
 }
 
 await browser?.close();
