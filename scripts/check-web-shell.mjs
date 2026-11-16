@@ -71,6 +71,7 @@ const tokens = {
 // The made-up leagues' ids (stand-in-ports.ts), which name the cookie of a device's "my team".
 const northValley = '01900000-0000-7000-8000-000000000001';
 const harborCity = '01900000-0000-7000-8000-000000000002';
+const quietPines = '01900000-0000-7000-8000-000000000003';
 // Two of the made-up games of the first league (stand-in-games.ts).
 const liveGame = '01900000-0000-7000-8000-006a00000002';
 const unassignedGame = '01900000-0000-7000-8000-006a00000003';
@@ -558,6 +559,39 @@ const cases = [
     200,
     ['You are not assigned to score this game.'],
     ['Lions at Hawks', noAccess],
+  ],
+  // Step 2.153: "Score this game" on the public pages is read after the page, for the person
+  // signed in only. The page a scorekeeper is served holds no trace of it, as a visitor's;
+  // the read gives a scorekeeper the games they may score (in the draft league, which scores
+  // assigned games only, only theirs) and gives a visitor, a coach and another league's
+  // admin nothing, privately.
+  [
+    'scorekeeper',
+    '/north-valley/schedule',
+    200,
+    ['Hawks'],
+    ['Score this game', 'Enter the score', '/north-valley/score/'],
+  ],
+  [
+    'scorekeeper',
+    `/api/v1/leagues/${northValley}/scoring?games=${liveGame},${game(5)}`,
+    200,
+    [`"href":"/north-valley/score/${liveGame}"`, '"score":"Score this game"'],
+    [game(5)],
+  ],
+  ...['visitor', 'coach', 'otherAdmin'].map((who) => [
+    who,
+    `/api/v1/leagues/${northValley}/scoring?games=${liveGame},${unassignedGame}`,
+    200,
+    ['{"games":[]}'],
+    [liveGame, unassignedGame, 'Score this game'],
+  ]),
+  [
+    'scorekeeper',
+    `/api/v1/leagues/${quietPines}/scoring?games=${liveGame},${unassignedGame},${game(4)}`,
+    200,
+    [`"gameId":"${game(4)}"`, '"kind":"enter"'],
+    [liveGame, unassignedGame],
   ],
   [
     'clubAdmin',

@@ -364,8 +364,16 @@ async function askFinal(page, n, away, home) {
   return game;
 }
 
+/** The buttons are read after the page (step 2.153): the picture waits for the first one. */
+const offersDrawn = (page) =>
+  page.locator('main [data-offer]').first().waitFor({ state: 'attached', timeout: 60_000 });
 // What the scorekeeper sees (step 2.33): their games, and the tracker opened from them.
 const scorekeeperPages = [
+  // The league's own pages as the scorekeeper sees them (step 2.153): "Score this game" or
+  // "Enter the score" on the cards of the games they may score, and on a game's page.
+  { name: 'scorekeeper-home', at: '', steps: offersDrawn },
+  { name: 'scorekeeper-schedule', at: '/schedule', steps: offersDrawn },
+  { name: 'scorekeeper-game', at: `/games/${liveGame}`, steps: offersDrawn },
   { name: 'scorekeeper-games', at: '/admin' },
   { name: 'scorekeeper-tracker', at: '/admin', first: '/score/' },
   // The games list as a scorekeeper sees it: a final game says who can reopen it (2.154).

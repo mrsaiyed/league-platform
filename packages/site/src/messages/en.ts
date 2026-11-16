@@ -243,6 +243,12 @@ export const en = {
   'schedule.link.forfeit': 'forfeit',
   'schedule.link.postponed': 'postponed',
   'schedule.link.cancelled': 'cancelled',
+  // On a game's card and its page, for a signed-in person who may score it (step 2.153;
+  // S-38, S-50): the tracker for a game recorded live, Games for one recorded as a final
+  // score or a box score. `which` follows the button's words for a screen reader.
+  'schedule.offer.score': 'Score this game',
+  'schedule.offer.enter': 'Enter the score',
+  'schedule.offer.which': '{away} against {home}',
   // A finished round that still holds a game waiting for a new day says so beside its mark.
   'schedule.postponedCount_one': '{count} game postponed',
   'schedule.postponedCount_other': '{count} games postponed',

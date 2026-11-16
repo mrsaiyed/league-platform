@@ -232,6 +232,42 @@ describe('a game card in any state', () => {
       expect(html, status).not.toContain('View box score');
     }
   });
+  // Step 2.153: "Score this game" for one person, never inside the card's link.
+  it('draws a second action after the card’s link and outside it, at the foot of the board', () => {
+    const card = (action?: ReturnType<typeof createElement>) =>
+      render(
+        createElement(GameCard, {
+          home: { name: 'Falcons', score: null },
+          away: { name: 'Herons', score: null },
+          status: 'scheduled',
+          whenText: 'Sat 9:00',
+          placeText: 'Central Gym, Court 1',
+          detailsHref: '/x/games/1',
+          linkText: 'Herons against Falcons',
+          labels: cardLabels,
+          layout: 'board',
+          ...(action === undefined ? {} : { action }),
+        }),
+      );
+    const button = createElement('a', { className: 'ui-button', href: '/x/score/1' }, 'Score');
+    const plain = card();
+    const offered = card(button);
+    expect(plain).not.toContain('ui-game-action');
+    expect(plain).not.toContain('ui-game-end');
+    // The card's link closes before the action opens, and the place and the action share
+    // the board's third part.
+    const link = offered.indexOf('</a>');
+    expect(link).toBeGreaterThan(0);
+    expect(
+      offered.indexOf('<div class="ui-game-end"><footer class="ui-game-foot">'),
+    ).toBeGreaterThan(link);
+    expect(offered).toContain(
+      '<div class="ui-game-action"><a class="ui-button" href="/x/score/1">Score</a></div></div></article>',
+    );
+    expect(offered.match(/<a /g)).toHaveLength(2);
+    // The stylesheet draws it over the card's link.
+    expect(displayCss).toMatch(/\.ui-game-action \{\s*position: relative;/);
+  });
 });
 
 describe('a box score', () => {

@@ -492,6 +492,16 @@ export const gameCss = String.raw`
   -webkit-mask: var(--ui-pin) center / contain no-repeat;
   mask: var(--ui-pin) center / contain no-repeat;
 }
+/* A second thing to do with a game, for one person only (step 2.153: "Score this game"):
+   the shared button at the card's foot, spaced as the place's line above it, and drawn
+   over the link that covers the card, so the button and the card are each tapped on
+   their own. */
+.ui-game-action {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-block-start: var(--step-3);
+}
 /* Where the card has the room, everything on the board is a step larger (the card is the
    measure here, by its name, not the board inside it). */
 @container card (min-width: 26rem) {
