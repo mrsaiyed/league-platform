@@ -114,14 +114,57 @@ function wallClock(moment) {
  * line starts it there instead. One helper for every such test (step 2.175).
  */
 export function worldAtNoon(argv = process.argv) {
+  return worldAtLeagueTime('12:00', argv);
+}
+
+/**
+ * The same at `time` (HH:MM) in the league's zone on the league's today: a test that is
+ * about the hour itself, such as just after the league's midnight (step 2.175).
+ */
+export function worldAtLeagueTime(time, argv = process.argv) {
   const asked = argv.find((a) => a.startsWith('--now='))?.slice('--now='.length);
   if (asked !== undefined) return asked;
   const today = new Date(wallClock(new Date())).toISOString().slice(0, 10);
-  const wanted = Date.parse(`${today}T12:00:00Z`);
-  // Noon there: moved by the zone's offset, twice so a day of a clock change settles too.
+  const wanted = Date.parse(`${today}T${time}:00Z`);
+  // That time there: moved by the zone's offset, twice so a day of a clock change settles.
   let guess = wanted;
   for (let i = 0; i < 2; i += 1) guess += wanted - wallClock(new Date(guess));
   return new Date(guess).toISOString();
+}
+
+/** The first made-up league's address in the tracker's own endpoints. */
+const leagueApi = '/api/v1/leagues/01900000-0000-7000-8000-000000000001';
+
+/** A made-up tracked player: team `team`'s player `n` (stand-in-world-seed.ts). */
+export const trackedPlayer = (team, n) =>
+  `01900000-0000-7000-8000-${(0x70 + team).toString(16).padStart(4, '0')}${n.toString(16).padStart(8, '0')}`;
+
+/**
+ * A scorekeeper's tablet scoring a game through the tracker's own endpoints (step 2.32),
+ * as tests/browser and scripts/shots.mjs do: nothing typed in the browser. Returns a
+ * function that sends inputs and throws if any is refused.
+ */
+export async function trackerTablet(origin, game, token, deviceId) {
+  const post = async (at, body) => {
+    const answer = await fetch(`${origin}${leagueApi}/games/${game}${at}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `srl_session=${token}`, origin },
+      body: JSON.stringify(body),
+    });
+    const text = await answer.text();
+    if (!answer.ok) throw new Error(`${at} answered ${answer.status}: ${text.slice(0, 200)}`);
+    return JSON.parse(text);
+  };
+  const { sessionId } = await post('/session', { type: 'open', deviceId });
+  return async (...inputs) => {
+    const reply = await post('/commands', {
+      protocolVersion: 1,
+      sessionId,
+      commands: inputs.map((input) => ({ commandId: crypto.randomUUID(), at: Date.now(), input })),
+    });
+    const refused = reply.results.filter((r) => r.status !== 'accepted');
+    if (refused.length > 0) throw new Error(`refused: ${JSON.stringify(refused)}`);
+  };
 }
 
 export function freePort() {
