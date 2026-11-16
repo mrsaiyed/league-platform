@@ -436,6 +436,15 @@ describe('the stylesheet', () => {
     }
     expect(css).toMatch(/\.ui-root \[aria-invalid='true'\] \{\s*border-color: [^;]*--color-danger/);
   });
+  it('marks a refused field in the danger color at full strength, 2 wide (step 2.103)', () => {
+    // At 40 percent the edge was fainter than an unmarked field's in a dark design: the
+    // danger color is never thinned here, and a second line inside the edge makes it 2.
+    const marked = [...css.matchAll(/([^{}]*\[aria-invalid='true'\][^{}]*)\{([^{}]*)\}/g)];
+    for (const [, , body = ''] of marked) expect(body).not.toContain('color-mix');
+    expect(css).toMatch(
+      /\.ui-root \[aria-invalid='true'\] \{\s*border-color: var\(--color-danger\);\s*box-shadow: inset 0 0 0 1px var\(--color-danger\);\s*\}/,
+    );
+  });
   it('holds no color of its own: only the design variables (T-90)', () => {
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(css).not.toMatch(/\brgba?\(|\bhsla?\(/);

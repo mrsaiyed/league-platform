@@ -206,22 +206,26 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
         </section>
       ))}
       <fieldset id={sheetScoresId}>
-        {teams.map((team) => (
-          <label key={team.score.field}>
-            <span>{team.score.label}</span>
-            <input
-              type="number"
-              name={team.score.field}
-              inputMode="numeric"
-              min={0}
-              max={999}
-              step={1}
-              defaultValue={text(team.score)}
-              disabled={!editable}
-              {...marked(team.score.field)}
-            />
-          </label>
-        ))}
+        {/* Each team's label above its own box, at every width (step 2.103): beside the
+            boxes, the second box wrapped under the first team's label on a phone. */}
+        <div className="staff-scores">
+          {teams.map((team) => (
+            <label key={team.score.field} className="staff-field" data-size="figure">
+              <span>{team.score.label}</span>
+              <input
+                type="number"
+                name={team.score.field}
+                inputMode="numeric"
+                min={0}
+                max={999}
+                step={1}
+                defaultValue={text(team.score)}
+                disabled={!editable}
+                {...marked(team.score.field)}
+              />
+            </label>
+          ))}
+        </div>
         {editable ? <p>{texts.scoreHelp}</p> : null}
         {editable && props.check !== undefined ? <ScoreCheck {...props.check} /> : null}
         {problem === undefined ? null : (

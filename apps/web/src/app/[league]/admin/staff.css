@@ -1,0 +1,40 @@
+/* The staff area's own stylesheet (step 2.103; docs/build/DESIGN.md section 4, lines 20 to
+   23): the frame an owner, admin, scheduler, registrar or scorekeeper works in, and the
+   pieces their pages are made of. Loaded by the admin's layout only, so no public page
+   carries it. Every color, font, corner and space comes from the design's variables
+   (T-90); nothing here names a league. Logical properties only, so right-to-left pages
+   mirror themselves (T-188). */
+
+/* A field: its label above it, the field 44 high, help quiet beneath, the error in words
+   beside it. A label never sits beside its box, so a box is never read under the wrong
+   label, at any width. */
+.staff-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-1);
+  min-inline-size: 0;
+  margin: 0;
+}
+.staff-field > span:first-child,
+.staff-field > label {
+  font-size: var(--text-14);
+  font-weight: 600;
+}
+.staff-field :is(input, select, textarea) {
+  inline-size: 100%;
+  margin-inline-start: 0;
+}
+/* A number of a few figures (a score, a jersey number) has a box as wide as it needs. */
+.staff-field[data-size='figure'] :is(input, select) {
+  inline-size: calc(2 * var(--step-7));
+}
+
+/* Two teams' scores: each label above its own box, the two side by side where both fit
+   and one under the other where they do not. */
+.staff-scores {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--step-4) var(--step-5);
+  margin-block-end: var(--step-4);
+}

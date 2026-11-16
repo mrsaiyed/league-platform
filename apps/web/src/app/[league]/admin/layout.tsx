@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { AdminNav, type LeagueRouteProps } from '../../../features/shell/index.ts';
 import { leagueView } from '../../../server/load-league-page.ts';
+// The staff area's own stylesheet: only the admin's pages carry it (step 2.103).
+import './staff.css';
 
 /** The admin (P4): its navigation, trimmed to what this person can use, and the area. */
 export default async function AdminLayout({
