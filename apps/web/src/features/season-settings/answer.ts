@@ -5,6 +5,7 @@
 // person typed (T-187).
 import { catalogs } from '@srleagues/site';
 import type { TextKey } from '../../server/messages.ts';
+import type { Visibility } from './season-visibility.ts';
 
 export const doneNames = ['shown', 'hidden'] as const;
 export type DoneName = (typeof doneNames)[number];
@@ -36,6 +37,18 @@ const only = (value: string | readonly string[] | undefined): string | undefined
 
 export function doneOf(query: Query): DoneName | undefined {
   return doneNames.find((name) => name === only(query['done']));
+}
+
+/**
+ * The done word only when the season, read fresh, is as it says: "shown" for a season
+ * visitors may see, "hidden" for one they may not. An address alone never makes the page
+ * say something happened that did not.
+ */
+export function earnedDone(query: Query, visibility: Visibility): DoneName | undefined {
+  const said = doneOf(query);
+  if (said === 'shown') return visibility === 'shown' ? said : undefined;
+  if (said === 'hidden') return visibility === 'hidden' ? said : undefined;
+  return undefined;
 }
 
 /**

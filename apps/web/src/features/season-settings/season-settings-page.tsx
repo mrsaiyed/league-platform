@@ -19,7 +19,7 @@ import { t } from '../../server/messages.ts';
 import type { PublicSchedulePorts } from '../../server/public-schedule.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { changeVisibilityAction } from './actions.ts';
-import { doneOf, problemKey } from './answer.ts';
+import { earnedDone, problemKey } from './answer.ts';
 import { mayShowSeason } from './may-show-season.ts';
 import { panelWords } from './panel-words.ts';
 import { seasonSettingsAddress, visibilityAnchor } from './season-settings-address.ts';
@@ -144,7 +144,7 @@ function VisibilityPanel({
   });
   const wish = mayChange ? wishOf(season.status) : undefined;
   const asked = firstValue(search['ask']);
-  const said = doneOf(search);
+  const said = earnedDone(search, visibility);
   const problem = problemKey(search);
   return (
     <section className="ui-panel" id={visibilityAnchor} aria-labelledby="who-can-see-title">

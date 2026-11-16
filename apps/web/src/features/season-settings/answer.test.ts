@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { answerParams, done, doneOf, problemKey, refusedBy, refusedHere } from './answer.ts';
+import {
+  answerParams,
+  done,
+  doneOf,
+  earnedDone,
+  problemKey,
+  refusedBy,
+  refusedHere,
+} from './answer.ts';
 
 describe("Season settings' answers in the address", () => {
   it('carries a done word and reads back only the known ones', () => {
@@ -7,6 +15,16 @@ describe("Season settings' answers in the address", () => {
     expect(doneOf({ done: 'hidden' })).toBe('hidden');
     expect(doneOf({ done: 'deleted' })).toBeUndefined();
     expect(doneOf({ done: ['shown', 'hidden'] })).toBeUndefined();
+  });
+
+  it('says a done word only when the season, read fresh, agrees with it', () => {
+    expect(earnedDone({ done: 'shown' }, 'shown')).toBe('shown');
+    expect(earnedDone({ done: 'hidden' }, 'hidden')).toBe('hidden');
+    expect(earnedDone({ done: 'shown' }, 'hidden')).toBeUndefined();
+    expect(earnedDone({ done: 'shown' }, 'over')).toBeUndefined();
+    expect(earnedDone({ done: 'hidden' }, 'shown')).toBeUndefined();
+    expect(earnedDone({ done: 'hidden' }, 'over')).toBeUndefined();
+    expect(earnedDone({}, 'shown')).toBeUndefined();
   });
 
   it("names the command's own message, then the code's, then a plain one", () => {

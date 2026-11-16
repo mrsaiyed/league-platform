@@ -445,6 +445,14 @@ const cases = [
     ['Only the people who run the league can see Winter 2027.', 'Show this season to visitors'],
     ['Everyone can see', 'Yes, show it'],
   ],
+  // An address alone never makes the panel say something happened that did not.
+  [
+    'owner',
+    '/north-valley/admin/season?season=winter-2027&done=shown',
+    200,
+    ['Only the people who run the league can see Winter 2027.'],
+    ['Visitors can see Winter 2027 now.'],
+  ],
   [
     'owner',
     '/north-valley/admin/season?season=winter-2027&ask=show',
