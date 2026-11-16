@@ -10,6 +10,12 @@
 //   node scripts/tracker-shots.mjs --dev           `next dev` instead of a build
 //   node scripts/tracker-shots.mjs --no-build      serves the build that is already here
 //   node scripts/tracker-shots.mjs --only=options  only the states whose name contains this
+//   node scripts/tracker-shots.mjs --face=wider    in letters as wide as GitHub's Ubuntu
+//                                                  machines and some phones draw (the face
+//                                                  the browser test also measures in); or
+//                                                  --face="Tahoma", any face this computer
+//                                                  has. The files then end in the face:
+//                                                  <state>-<width>x<height>-wider.png
 //
 // The files go to .local/shots/court/<state>-<width>x<height>.png, which git ignores; open
 // them with the Read tool, beside the Al-Hadi tracker's own at the same sizes. Each state
@@ -34,6 +40,7 @@ import {
   sizes,
   stopClockGame,
   trackerPath,
+  widerFace,
 } from '../tests/browser/tracker-driver.mjs';
 import {
   buildNext,
@@ -50,6 +57,13 @@ const only = process.argv
   .find((arg) => arg.startsWith('--only='))
   ?.slice('--only='.length)
   .split(',');
+// The screen draws with the face the device has, so a picture taken on this computer
+// shows this computer's letters. `--face` draws it in another: `wider` is the face the
+// browser test measures the fit in (tracker-driver.mjs).
+const faceAsked = process.argv.find((arg) => arg.startsWith('--face='))?.slice('--face='.length);
+const face = faceAsked === 'wider' ? widerFace : (faceAsked ?? '');
+const faceEnding =
+  faceAsked === undefined ? '' : `-${faceAsked.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
 /**
  * The states photographed, in the order a game reaches them. `run` brings the screen from
@@ -579,6 +593,17 @@ async function main() {
       viewport: { width: first.width, height: first.height },
     });
     await context.addCookies([{ ...scorekeeper, url: origin }]);
+    if (face !== '') {
+      // On every page the game is opened in, from its first drawing, as a device's own
+      // face is.
+      await context.addInitScript((family) => {
+        document.addEventListener('DOMContentLoaded', () => {
+          const style = document.createElement('style');
+          style.textContent = `.court, .court * { font-family: ${family}, sans-serif !important; }`;
+          document.head.append(style);
+        });
+      }, face);
+    }
     const page = await context.newPage();
     page.setDefaultTimeout(flag('dev') ? 120_000 : 30_000);
     const problems = [];
@@ -595,7 +620,7 @@ async function main() {
         if (state.sizes !== undefined && !state.sizes.includes(size.name)) continue;
         await page.setViewportSize({ width: size.width, height: size.height });
         await page.waitForTimeout(200);
-        const file = path.join(out, `${state.name}-${size.width}x${size.height}.png`);
+        const file = path.join(out, `${state.name}-${size.width}x${size.height}${faceEnding}.png`);
         if (state.shoot === undefined) await page.screenshot({ path: file });
         else await state.shoot(page, file);
       }
