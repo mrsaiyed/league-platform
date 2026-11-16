@@ -248,6 +248,11 @@ function pageData(
     },
     chips: { team: colorOf(player.teamIds) },
     sortValues: numbersOf(player.stats),
+    // Listed, not ranked: too few games for the league's leaders (the same rule core's
+    // leaders query applies). The games played are drawn quieter and say so.
+    ...(player.gamesPlayed < settings.minimumGames
+      ? { quiet: { games: t('stats.notRankedYet') } }
+      : {}),
     ...(player.teamIds.length > 1 ? { severalTeams: { team: true } } : {}),
   }));
   const teamColumns: StatsColumn[] = [{ key: 'team', label: t('stats.col.team') }, ...statColumns];

@@ -375,6 +375,13 @@ export const tableCss = String.raw`
 .ui-stats td[data-sorted='true'] {
   font-weight: 700;
 }
+/* A figure a row draws quieter (the games played of a player with too few to be ranked):
+   the quiet text color, which still reads on a panel, and never heavier than plain, even
+   in the column the table is sorted by. */
+.ui-stats td[data-quiet='true'] {
+  color: var(--color-muted);
+  font-weight: 400;
+}
 /* A table whose team column folds (the statistics page's players): in a box as narrow as a
    phone's the team is its shield alone, before the player's name, and the team's own
    column is gone, so the numbers come straight after the name. The team's name is still

@@ -137,6 +137,13 @@ export const en = {
   'stats.col.gamesFull': 'Games played',
   'stats.col.value': 'Value',
   'stats.allPlayers': 'All players',
+  // Under "All players": the table lists everyone, the leaders above it only those with the
+  // league's minimum games, so a player the table puts first may lead no card. The second
+  // is said to screen readers after the games played of each such player.
+  'stats.listedNotRanked_one': 'Every player is listed. Fewer than {count} game: not ranked yet.',
+  'stats.listedNotRanked_other':
+    'Every player is listed. Fewer than {count} games: not ranked yet.',
+  'stats.notRankedYet': 'not ranked yet',
   'stats.teams': 'Teams',
   'stats.teamsTotalsOnly': 'Only team totals are shown for {teams}.',
   'stats.teamsJoin': ', ',

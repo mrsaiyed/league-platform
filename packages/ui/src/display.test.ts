@@ -323,6 +323,37 @@ describe('sortable statistics table', () => {
     ).toHaveLength(2);
     expect(displayCss).toMatch(/\.ui-stats td\[data-sorted='true'\] \{\s*font-weight: 700;/);
   });
+  it('draws a figure a row marks quieter, with its words for screen readers, and no other', () => {
+    const html = render(
+      createElement(SortableStatsTable, {
+        caption: 'All players',
+        columns: [
+          { key: 'name', label: 'Player' },
+          { key: 'games', label: 'GP', numeric: true },
+          { key: 'pts', label: 'PTS', numeric: true },
+        ],
+        rows: [
+          { id: 'a', cells: { name: 'Ravi', games: 1, pts: '35.0' }, quiet: { games: 'not yet' } },
+          { id: 'b', cells: { name: 'Dana', games: 3, pts: '24.3' } },
+        ],
+        initialSort: { key: 'pts', direction: 'descending' },
+        labels: { sortBy: 'Sort by' },
+      }),
+    );
+    expect(html).toContain(
+      '<td class="ui-num" data-quiet="true">1<span class="ui-visually-hidden"> not yet</span></td>',
+    );
+    expect(html.match(/data-quiet/g)).toHaveLength(1);
+    expect(html).toContain('<td class="ui-num">3</td>');
+    // Quieter is the quiet text color, which the design holds to AA on a panel, and plain
+    // weight even where the column is the sorted one.
+    expect(displayCss).toMatch(
+      /\.ui-stats td\[data-quiet='true'\] \{\s*color: var\(--color-muted\);\s*font-weight: 400;/,
+    );
+    expect(displayCss.indexOf("td[data-quiet='true']")).toBeGreaterThan(
+      displayCss.indexOf("td[data-sorted='true']"),
+    );
+  });
   it('folds a team column into the name in a box as narrow as a phone’s', () => {
     const html = render(
       createElement(SortableStatsTable, {

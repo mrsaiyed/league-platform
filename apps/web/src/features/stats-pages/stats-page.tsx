@@ -126,7 +126,16 @@ export function StatsTables({
         )}
       </Section>
       <div className="stats-tables" data-layout={sideBySide ? 'pair' : 'stack'}>
-        <Section title={t('stats.allPlayers')}>
+        <Section
+          title={t('stats.allPlayers')}
+          note={
+            // Said where the eye is: the table lists everyone and opens sorted by points, so
+            // its first row may be a player with too few games to lead a card above.
+            data.playerRows.some((row) => row.quiet !== undefined)
+              ? t.plural('stats.listedNotRanked', data.minimumGames)
+              : undefined
+          }
+        >
           <SortableStatsTable
             caption={t('stats.allPlayers')}
             captionHidden

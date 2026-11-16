@@ -23,6 +23,12 @@ export type StatRow = {
    * key: the column is sorted by it, so a written number is never ordered as text.
    */
   readonly sortValues?: Readonly<Record<string, number>>;
+  /**
+   * The columns of this row whose figure is drawn quieter, by the column's key, each with
+   * the words said to screen readers after the figure ("not ranked yet"): a player with too
+   * few games to be ranked keeps every number, and the games played say why no card is theirs.
+   */
+  readonly quiet?: Readonly<Record<string, string>>;
 };
 
 export type SortDirection = 'ascending' | 'descending';

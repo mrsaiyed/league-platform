@@ -83,6 +83,11 @@ function noValue(word: string | undefined): ReactNode {
   );
 }
 
+/** The words said after a figure this row draws quieter, when it does. */
+function quietWord(row: StatRow, key: string): string | undefined {
+  return row.quiet !== undefined && Object.hasOwn(row.quiet, key) ? row.quiet[key] : undefined;
+}
+
 /** A table of statistics the reader can sort by any column. Shows the initial sort without scripts. */
 export function SortableStatsTable({
   caption,
@@ -161,9 +166,15 @@ export function SortableStatsTable({
                       className={c.numeric ? 'ui-num' : undefined}
                       data-sorted={sort && sort.key === c.key ? 'true' : undefined}
                       data-folded={c.key === foldTeam ? 'true' : undefined}
+                      data-quiet={quietWord(row, c.key) === undefined ? undefined : 'true'}
                     >
                       {c.numeric ? (
-                        (row.cells[c.key] ?? noValue(labels.noValue))
+                        <>
+                          {row.cells[c.key] ?? noValue(labels.noValue)}
+                          {quietWord(row, c.key) === undefined ? null : (
+                            <span className="ui-visually-hidden"> {quietWord(row, c.key)}</span>
+                          )}
+                        </>
                       ) : (
                         <>
                           {chipOf(row, c.key, emblems)}
