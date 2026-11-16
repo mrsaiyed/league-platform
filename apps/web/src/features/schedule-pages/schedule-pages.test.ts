@@ -10,6 +10,7 @@ import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildHomeGames, buildScheduleView, comingOrder, parseRound } from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
+import { LatestResultsSection, latestResultsCount } from './latest-results.tsx';
 import { applyUpdate } from './live-game-list.tsx';
 import { RoundSections, gameLinkWords } from './schedule-views.tsx';
 
@@ -225,6 +226,31 @@ describe('home', () => {
     expect(home.recent.every((g) => g.status === 'final' || g.status === 'forfeit')).toBe(true);
     expect(home.upcoming[0]?.status).toBe('live');
     expect(home.recent.length).toBeLessThanOrEqual(5);
+  });
+});
+
+describe('the latest results under the standings', () => {
+  it('are the newest decided games as boards, under a kicker and a title, with the way to the schedule', async () => {
+    const { clock, schedule } = await load(adult);
+    const games = buildHomeGames(schedule, clock, addressee).recent.slice(0, latestResultsCount);
+    expect(games).toHaveLength(3);
+    const html = renderToStaticMarkup(
+      createElement(LatestResultsSection, { leagueId: adult, games, scheduleHref: '/x/schedule' }),
+    );
+    expect(html).toContain('<p class="ui-kicker">How they got here</p><h2>Latest results</h2>');
+    expect(html).toContain('<a class="ui-more" href="/x/schedule">See the full schedule</a>');
+    // Three boards at the page's width: one row of three on a laptop.
+    expect(html).toContain('data-layout="board" data-across="two"');
+    expect(html.match(/<article class="ui-game-card"/g)).toHaveLength(3);
+    expect(html).not.toContain('data-status="scheduled"');
+  });
+
+  it('are not drawn while no game is decided', () => {
+    expect(
+      renderToStaticMarkup(
+        createElement(LatestResultsSection, { leagueId: adult, games: [], scheduleHref: '/x' }),
+      ),
+    ).toBe('');
   });
 });
 
