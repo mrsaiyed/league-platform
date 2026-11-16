@@ -14,6 +14,7 @@ import {
   Group,
   LeaderCard,
   MessagePage,
+  NoValue,
   PageHead,
   RoundPicker,
   Section,
@@ -113,6 +114,49 @@ describe('message page', () => {
     expect(render(createElement(MessagePage, { title: 'T', className: 'score-root' }))).toContain(
       'class="ui-message score-root"',
     );
+  });
+});
+
+describe('a cell with nothing to show', () => {
+  it('is a dash kept from screen readers, and a word kept for them', () => {
+    expect(render(createElement(NoValue, { word: 'Nothing recorded' }))).toBe(
+      '<span class="ui-no-value" aria-hidden="true">–</span><span class="ui-visually-hidden">Nothing recorded</span>',
+    );
+    // With no word it is the dash alone.
+    expect(render(createElement(NoValue, {}))).toBe(
+      '<span class="ui-no-value" aria-hidden="true">–</span>',
+    );
+    expect(displayCss).toMatch(/\.ui-no-value \{\s*color: var\(--color-muted\);/);
+  });
+
+  it('is the one piece every table draws its empty cells with', () => {
+    const dash = '<span class="ui-no-value" aria-hidden="true">–</span>';
+    const one = render(createElement(NoValue, { word: 'Nothing recorded' }));
+    const stats = render(
+      createElement(SortableStatsTable, {
+        caption: 'Teams',
+        columns: [
+          { key: 'name', label: 'Team' },
+          { key: 'pts', label: 'PTS', numeric: true },
+        ],
+        rows: [{ id: 'a', cells: { name: 'Bears', pts: null } }],
+        labels: { sortBy: 'Sort by', noValue: 'Nothing recorded' },
+      }),
+    );
+    expect(stats).toContain(`<td class="ui-num">${one}</td>`);
+    const box = render(
+      createElement(BoxScoreTable, {
+        teamName: 'Bears',
+        columns: [{ key: 'pts', label: 'PTS' }],
+        players: [{ id: 'p', name: 'Ada', cells: {} }],
+        totals: {},
+        labels: { jersey: 'Number', player: 'Player', total: 'Total', noValue: 'Nothing recorded' },
+      }),
+    );
+    expect(box.match(new RegExp(`<td class="ui-num">${one}</td>`, 'g'))).toHaveLength(2);
+    // And nothing in a table writes a dash of its own.
+    expect(stats.split(dash)).toHaveLength(2);
+    expect(box.split(dash)).toHaveLength(3);
   });
 });
 

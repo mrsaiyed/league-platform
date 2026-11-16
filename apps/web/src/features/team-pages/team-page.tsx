@@ -2,6 +2,7 @@ import { leagueUrl, publicViewer } from '@srleagues/core';
 import {
   Emblem,
   EmptyPanel,
+  NoValue,
   PageHead,
   Section,
   SortableStatsTable,
@@ -60,12 +61,7 @@ function RosterTable({
                 <td className="ui-num">
                   {row.number === '' ? (
                     // Someone with no number (a coach, say): a dash, never a blank cell.
-                    <>
-                      <span className="ui-no-value" aria-hidden="true">
-                        –
-                      </span>
-                      <span className="ui-visually-hidden">{t('team.noNumber')}</span>
-                    </>
+                    <NoValue word={t('team.noNumber')} />
                   ) : (
                     row.number
                   )}

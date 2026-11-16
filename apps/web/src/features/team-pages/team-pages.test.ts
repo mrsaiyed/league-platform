@@ -28,7 +28,7 @@ import {
   loadTeamStats,
 } from './build-team.ts';
 import { chooseMyTeam, leagueHomeStayUrl, teamIdsFromGrants } from './start-page.ts';
-import { resultsBesideRoster, TeamStatsSection } from './team-page.tsx';
+import { resultsBesideRoster, RosterSections, TeamStatsSection } from './team-page.tsx';
 import { TeamCards } from './teams-page.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -239,6 +239,24 @@ describe('a team page', () => {
       // No name and no number cannot be added at the table; were it there, it is nameless.
       ['', 'Name not shown'],
     ]);
+  });
+
+  it('draws a dash with its word, the shared piece, for someone on the roster with no number', () => {
+    const text = renderToStaticMarkup(
+      createElement(RosterSections, {
+        roster: {
+          current: [
+            { key: 'a', number: '12', name: 'Dana', role: 'Player', former: false },
+            { key: 'b', number: '', name: 'Sam', role: 'Coach', former: false },
+          ],
+          former: [],
+        },
+      }),
+    );
+    expect(text).toContain('<td class="ui-num">12</td>');
+    expect(text).toContain(
+      '<td class="ui-num"><span class="ui-no-value" aria-hidden="true">–</span><span class="ui-visually-hidden">No number</span></td>',
+    );
   });
 
   it('is not there for a team of another season', async () => {

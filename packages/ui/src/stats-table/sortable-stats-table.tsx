@@ -2,6 +2,7 @@
 
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { Emblem } from '../emblem/emblem.tsx';
+import { NoValue } from '../no-value/no-value.tsx';
 import { safeColor } from '../team-color.ts';
 import { nextSort, sortStatRows, type Sort, type StatRow } from './sort-stat-rows.ts';
 
@@ -65,21 +66,6 @@ function chipOf(row: StatRow, key: string, emblems: boolean): ReactNode {
       aria-hidden="true"
       style={color ? ({ '--team-color': color } as CSSProperties) : undefined}
     />
-  );
-}
-
-/**
- * What a cell with no number shows: a dash, and a word for screen readers. Never blank,
- * so an empty row is not read as a table that failed to load.
- */
-function noValue(word: string | undefined): ReactNode {
-  return (
-    <>
-      <span className="ui-no-value" aria-hidden="true">
-        –
-      </span>
-      {word === undefined ? null : <span className="ui-visually-hidden">{word}</span>}
-    </>
   );
 }
 
@@ -170,7 +156,7 @@ export function SortableStatsTable({
                     >
                       {c.numeric ? (
                         <>
-                          {row.cells[c.key] ?? noValue(labels.noValue)}
+                          {row.cells[c.key] ?? <NoValue word={labels.noValue} />}
                           {quietWord(row, c.key) === undefined ? null : (
                             <span className="ui-visually-hidden"> {quietWord(row, c.key)}</span>
                           )}

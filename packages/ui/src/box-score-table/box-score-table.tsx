@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { NoValue } from '../no-value/no-value.tsx';
 
 export type BoxScoreColumn = {
   readonly key: string;
@@ -57,14 +58,7 @@ export type BoxScoreTableProps = {
 /** A number, or a dash with a word for screen readers where there is none: never a blank cell. */
 function valueOrDash(value: string | number | undefined, word: string | undefined): ReactNode {
   if (value !== undefined && value !== '') return value;
-  return (
-    <>
-      <span className="ui-no-value" aria-hidden="true">
-        –
-      </span>
-      {word === undefined ? null : <span className="ui-visually-hidden">{word}</span>}
-    </>
-  );
+  return <NoValue word={word} />;
 }
 
 /** One team's box score: players in the order given, then the team's totals. */
