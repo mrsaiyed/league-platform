@@ -12,6 +12,7 @@ import {
   listPostponedGames as listPostponedGamesCommand,
   openScoringSession,
   postponeGame,
+  putGameBack,
   readTrackerRosters,
   readTrackerState,
   recordFinalScore,
@@ -168,6 +169,26 @@ registerCommandCase(postponeGame, harnessTx, {
 registerCommandCase(cancelGame, harnessTx, {
   name: "cancel the target's upcoming game",
   input: (target) => ({ gameId: target.upcomingGameId, version: 1 }),
+});
+
+// Step 2.158 (S-51): the target's upcoming game cancelled in the run's own scope (in any
+// other league that finds nothing), then put back.
+registerIsolationCase({
+  subject: putGameBack,
+  name: "put the target's upcoming game back after cancelling it",
+  run: async (scope, target) => {
+    await updateGameResult(
+      scope,
+      target.upcomingGameId,
+      { status: 'cancelled', homeScore: null, awayScore: null, decided: false },
+      1,
+    );
+    return runAsApp(putGameBack, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      version: 2,
+      reason: 'cancelledByMistake',
+    });
+  },
 });
 
 registerCommandCase(reopenGame, harnessTx, {
