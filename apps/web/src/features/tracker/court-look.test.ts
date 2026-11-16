@@ -41,6 +41,8 @@ function contrast(text: string, ground: string): number {
 /** What is read at arm's length, between plays: each on the ground it sits on. */
 const glance: readonly (readonly [what: string, text: string, ground: string])[] = [
   ['the clock', 'gold', 'page'],
+  ['the clock at 0:00 (step 2.36)', 'red-text', 'page'],
+  ['the time typed in the clock’s form (step 2.36)', 'gold', 'page'],
   ['the score and a number of the team drawn light', 'light-ink', 'light'],
   ['a bench number of the team drawn light', 'light-ink', 'light-bench'],
   ['the score and a number of the team drawn dark', 'text', 'tile'],
@@ -73,6 +75,13 @@ const rest: readonly (readonly [what: string, text: string, ground: string])[] =
   ['−Foul and a take-back, on a panel', 'red-text', 'panel'],
   ['a timeout button (step 2.36)', 'text', 'blue'],
   ['timeouts on a panel (step 2.36)', 'blue-text', 'panel'],
+  ['Start and the Start clock button (step 2.36)', 'text', 'green'],
+  ['Pause (step 2.36)', 'text', 'red'],
+  ['Start greyed at 0:00, "Period over" (step 2.36)', 'muted', 'tile'],
+  ['a dark team’s fouls at the bonus, in its box (step 2.36)', 'red-text', 'tile'],
+  ['a light team’s fouls at the bonus, in its box (step 2.36)', 'light-red', 'light'],
+  ['the double bonus badge (step 2.36)', 'text', 'red'],
+  ['"none left" on a timeout button (step 2.36)', 'red-text', 'panel'],
   ['a name on a light tile', 'light-muted', 'light'],
   ['a name on a light bench tile', 'light-muted', 'light-bench'],
   ['fouls on a light tile', 'light-red', 'light'],
@@ -109,6 +118,68 @@ describe('the courtside look: contrast', () => {
   it('tells the two teams apart by light and dark, not by a hue', () => {
     expect(contrast('light', 'tile')).toBeGreaterThanOrEqual(7);
     expect(contrast('light-bench', 'page')).toBeGreaterThanOrEqual(7);
+  });
+});
+
+describe('the courtside look: the bonus at a glance (the area 4 review of step 2.36, M3)', () => {
+  /** The sizes one arrangement sets, on top of the ones before it. */
+  const sizes = (from: string, over: Record<string, number> = {}): Record<string, number> => {
+    const start = rules.indexOf(from);
+    if (start === -1) throw new Error(`court.css has no "${from}"`);
+    const end = rules.indexOf('}', start);
+    const set = { ...over };
+    for (const m of rules
+      .slice(start, end)
+      .matchAll(/--court-((?:fouls|badge)-[a-z0-9]+):\s*(\d+)px/g)) {
+      set[m[1] ?? ''] = Number(m[2]);
+    }
+    return set;
+  };
+  const phone = sizes('.court {');
+  const arrangements: [string, Record<string, number>][] = [
+    ['an upright phone', phone],
+    ['a phone lying down', sizes('@media (orientation: landscape) and (max-height: 520px)', phone)],
+    ['a tablet', sizes('@media (min-width: 700px) and (min-height: 521px)', phone)],
+  ];
+
+  it.each(arrangements)('on %s the count grows in steps a glance tells apart', (_what, size) => {
+    const [rest, bonus, double] = [size['fouls-0'], size['fouls-1'], size['fouls-2']];
+    // Two pixels or more a step, and each step at least a seventh larger: never the one
+    // pixel a step the first build had on a phone.
+    expect((bonus ?? 0) - (rest ?? 0)).toBeGreaterThanOrEqual(2);
+    expect((double ?? 0) - (bonus ?? 0)).toBeGreaterThanOrEqual(2);
+    expect((bonus ?? 0) / (rest ?? 1)).toBeGreaterThanOrEqual(1.14);
+    expect((double ?? 0) / (bonus ?? 1)).toBeGreaterThanOrEqual(1.14);
+  });
+
+  it.each(arrangements)('on %s the badge is larger at the double bonus', (_what, size) => {
+    expect(size['badge-2']).toBeGreaterThan(size['badge-1'] ?? 0);
+    // Where letters are wider than the box, one step down, never up.
+    expect(size['badge-tight']).toBeLessThan(size['badge-1'] ?? 0);
+    expect(size['fouls-tight']).toBeLessThanOrEqual(size['fouls-1'] ?? 0);
+  });
+
+  it('a tablet uses the room it has', () => {
+    const tablet = arrangements[2]?.[1] ?? {};
+    expect(tablet['fouls-2']).toBeGreaterThanOrEqual(24);
+    expect(tablet['badge-2']).toBeGreaterThanOrEqual(18);
+  });
+
+  it('never by color alone: the badge says it in words, hollow then filled', () => {
+    const badge = /^\.court-bonus\s*\{[^}]*\}/m.exec(rules)?.[0] ?? '';
+    const double = /^\.court-bonus\[data-level='2'\]\s*\{[^}]*\}/m.exec(rules)?.[0] ?? '';
+    expect(badge).toContain('border: 1px solid var(--court-team-red)');
+    expect(badge).not.toContain('background');
+    expect(double).toContain('background: var(--court-red)');
+    expect(double).toContain('font-size: var(--court-badge-2)');
+  });
+
+  it('for want of room the badge’s words wrap out of sight: they are not set smaller', () => {
+    const words = /^\.court-bonus-words\s*\{[^}]*\}/m.exec(rules)?.[0] ?? '';
+    expect(words).toContain('white-space: normal');
+    expect(words).toContain('overflow: hidden');
+    expect(words).not.toContain('font-size');
+    expect(words).not.toContain('text-overflow');
   });
 });
 

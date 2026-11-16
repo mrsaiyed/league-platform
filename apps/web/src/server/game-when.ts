@@ -11,6 +11,24 @@ export type LeagueTimes = {
   readonly timeZone: string;
 };
 
+/**
+ * A day of the league's own calendar in words, as the public pages write a day: "Fri, Oct 2"
+ * for `2026-10-02`. The day is the league's already (a round's day, the day a player left:
+ * worked out in its time zone when it was saved), so it is written as that calendar day
+ * and no zone can move it to the day before. A value that is not a day is given back as
+ * it is. The admin's pages write every such day through this (step 2.103).
+ */
+export function leagueDayText(day: string, locale: string): string {
+  const at = new Date(`${day}T12:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(at.getTime())) return day;
+  return new Intl.DateTimeFormat(locale, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(at);
+}
+
 /** A time of day in the league's own zone: "7:42 PM", for a moment given in milliseconds. */
 export function clockTimeText(at: number, times: LeagueTimes): string {
   return new Intl.DateTimeFormat(times.locale, {

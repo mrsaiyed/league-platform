@@ -1,4 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
+import { startingDesign } from '@srleagues/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyMigrations, pgliteDriver } from '../migrations/index.ts';
 import { asApp } from '../schema/schema.test-helper.ts';
@@ -238,6 +239,39 @@ describe('a load that stops part-way', () => {
       await expect(seedLeaguesInto(fresh, [broken])).rejects.toThrow(/only partly loaded/);
     } finally {
       await fresh.close();
+    }
+  });
+});
+
+describe("the seed leagues' designs (step 2.187)", () => {
+  it('gives each league its own starting design as its first release, published by its owner', async () => {
+    await seedLeaguesInto(pglite);
+    for (const league of seedLeagues) {
+      const { rows } = await pglite.query<{
+        number: number;
+        starting_design: string;
+        design: unknown;
+        by_owner: boolean;
+        site_points: boolean;
+      }>(
+        `select r.number, r.starting_design, r.design,
+           r.published_by_account_id = l.owner_account_id as by_owner,
+           s.published_release_id = r.id as site_points
+         from site_releases r
+         join leagues l on l.id = r.league_id
+         join sites s on s.league_id = r.league_id
+         where l.slug = $1`,
+        [league.slug],
+      );
+      expect(rows).toEqual([
+        {
+          number: 1,
+          starting_design: league.design,
+          design: startingDesign(league.design),
+          by_owner: true,
+          site_points: true,
+        },
+      ]);
     }
   });
 });

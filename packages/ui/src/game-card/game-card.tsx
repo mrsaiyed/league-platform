@@ -58,6 +58,11 @@ export type GameCardProps = {
   /** A board picked out from the others: the game being played now. Larger figures. */
   readonly featured?: boolean;
   /**
+   * What stands before a team's name on the compact card (`rows`): a small chip of its
+   * color (the default), or its small shield with its initial (`emblem`), as in a table.
+   */
+  readonly marks?: 'chip' | 'emblem';
+  /**
    * The room every board of the same list reckons with (`listRoom`), so that all of them
    * are drawn the same way: side by side, or all as two rows. Left out, a board reckons
    * with its own two names and its own score.
@@ -127,10 +132,12 @@ function Team({
   team,
   isWinner,
   labels,
+  marks,
 }: {
   readonly team: GameCardTeam;
   readonly isWinner: boolean;
   readonly labels: GameCardLabels;
+  readonly marks: 'chip' | 'emblem';
 }) {
   const color = safeColor(team.color);
   return (
@@ -139,7 +146,11 @@ function Team({
       data-winner={isWinner ? 'true' : undefined}
       style={color ? ({ '--team-color': color } as CSSProperties) : undefined}
     >
-      <span className="ui-team-chip" aria-hidden="true" />
+      {marks === 'emblem' ? (
+        <Emblem name={team.name} color={team.color} size="small" />
+      ) : (
+        <span className="ui-team-chip" aria-hidden="true" />
+      )}
       <span className="ui-game-team-name" dir="auto">
         {team.name}
       </span>
@@ -245,6 +256,7 @@ export function GameCard({
   layout = 'rows',
   note,
   featured = false,
+  marks = 'chip',
   room,
 }: GameCardProps) {
   const winner = winnerOf(status, home, away);
@@ -354,8 +366,8 @@ export function GameCard({
         ) : null}
       </header>
       <ul className="ui-game-teams">
-        <Team team={away} isWinner={winner === 'away'} labels={labels} />
-        <Team team={home} isWinner={winner === 'home'} labels={labels} />
+        <Team team={away} isWinner={winner === 'away'} labels={labels} marks={marks} />
+        <Team team={home} isWinner={winner === 'home'} labels={labels} marks={marks} />
       </ul>
       {link}
     </article>

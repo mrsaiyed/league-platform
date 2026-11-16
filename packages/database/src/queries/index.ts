@@ -76,6 +76,7 @@ export { findPublicGameFacts, type PublicGameFactsRow } from './find-public-game
 export { findPublicTeam } from './find-public-team.ts';
 export { findLeagueTimeZone } from './find-league-time-zone.ts';
 export { findLeagueName } from './find-league-name.ts';
+export { findPublishedDesign, type PublishedDesign } from './find-published-design.ts';
 export { listTeamsOfAccount } from './list-teams-of-account.ts';
 export { findLeagueToday } from './find-league-today.ts';
 export { listLeagueSeasons, type LeagueSeasonRow } from './list-league-seasons.ts';
@@ -91,6 +92,7 @@ export { insertJob } from './insert-job.ts';
 export { insertLeague, type InsertLeagueRefusal, type NewLeagueRows } from './insert-league.ts';
 export { insertRoleGrant } from './insert-role-grant.ts';
 export { insertSeason, type NewSeasonRow } from './insert-season.ts';
+export { insertSiteRelease, type NewSiteReleaseRow } from './insert-site-release.ts';
 export { listActiveGrantsOf } from './list-active-grants-of.ts';
 export { listActivityEntries } from './list-activity-entries.ts';
 export { listOpenInvitations } from './list-open-invitations.ts';

@@ -23,6 +23,7 @@ const plan = {
   ownerEmail: 'owner@example.test',
   staffEmail: 'staff@example.test',
   season: { name: 'Fall 2026', slug: 'fall-2026', startsOn: null, endsOn: null },
+  design: { startingDesign: 'crest', chosen: false, colors: {} },
 };
 const preview = { ready: true, shortNameHeld: false, owner: 'none', staff: 'none' };
 

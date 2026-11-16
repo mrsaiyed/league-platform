@@ -34,7 +34,11 @@ import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
 import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
-import { databaseLeagueSites, type LeagueSitesQueries } from './database-league-sites.ts';
+import {
+  databaseLeagueSites,
+  type DesignReport,
+  type LeagueSitesQueries,
+} from './database-league-sites.ts';
 import { databasePublicSchedule, type PublicScheduleQueries } from './database-public-schedule.ts';
 import { databasePublicStats, type PublicStatsQueries } from './database-public-stats.ts';
 import { databasePublicTeams, type PublicTeamsQueries } from './database-public-teams.ts';
@@ -82,6 +86,11 @@ export type DatabasePortsOptions = {
    * the sign-in user's id, never an address or a token (T-86).
    */
   readonly warn: (message: string, fields: { readonly signInUserId: string }) => void;
+  /**
+   * Where a league's published design that cannot be drawn is reported: a fixed message,
+   * the league's id and the release's number only (record 073).
+   */
+  readonly reportDesign?: DesignReport;
   readonly now?: () => Date;
 };
 
@@ -213,7 +222,10 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // account and no league, through my_leagues(), which answers for that account only.
     leaguesOfAccount: (accountId) =>
       database.withTransaction(db, { accountId }, (scope) => database.listMyLeagues(scope)),
-    leagueSites: databaseLeagueSites(database, db),
+    leagueSites: databaseLeagueSites(database, db, {
+      ...(options.reportDesign === undefined ? {} : { report: options.reportDesign }),
+      now: () => now().getTime(),
+    }),
     publicStats: databasePublicStats(database, db),
     games: notMovedYet('games area'),
     fixtureImport: notMovedYet('fixture import'),

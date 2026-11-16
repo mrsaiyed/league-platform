@@ -20,7 +20,7 @@ export function SavedLine({ text }: { readonly text: string }) {
     }
   }, [text]);
   return (
-    <p ref={ref} className="ui-notice" role="status">
+    <p ref={ref} className="ui-notice" data-kind="saved" role="status">
       {text}
     </p>
   );

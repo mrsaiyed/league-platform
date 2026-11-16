@@ -6,6 +6,18 @@
 // above the save button, naming the box (or the score, for a tie). With scripts off the
 // browser lands there (the form's permalink). It goes quiet once sent. Words come from
 // the server, from the message files (T-187).
+//
+// The browser's own checking is switched off for this form (`noValidate`; step 2.103). On
+// a phone one team's grid is shown at a time and the other is put away, and a browser
+// that finds a box out of range in the grid put away blocks the save on a box it can
+// neither show nor focus: nothing happens and nothing is said. So the server does the
+// telling, as it does for a tie: it refuses anything that is not a whole number from 0 to
+// the box's limit (box-score-form.ts: 999, or 1440 for minutes), in words, with that team
+// shown and that box marked, and with scripts off too.
+// And every box is a text box that asks a phone for its number keys, not a number box: a
+// number box sends text it cannot read ("1-2", "8o") as an empty box, which the server
+// would take as nothing typed (a stat of 0, a score of the players' points) and save as
+// final. A text box sends what was typed, and the server refuses it by name.
 import { useActionState, useEffect, useId, useRef } from 'react';
 import { fillScores, sheetScoresId, untouched, type BoxScoreState } from './form-state.ts';
 import { ScoreCheck, type ScoreCheckProps } from './score-check.tsx';
@@ -50,7 +62,13 @@ export type SheetTexts = {
     readonly short: string;
     readonly full: string;
   }[];
+  /** What the choice of team shown on a phone is called. */
+  readonly teamShown: string;
+  /** What the list of column names above the grids is called. */
+  readonly columnsKey: string;
   readonly noPlayers: string;
+  /** What an empty box of a grid that cannot be changed shows: a dash. */
+  readonly empty: string;
   readonly scoreHelp: string;
   readonly save: string;
   /** A stat box that is not a count, with {cell} for the box's label. */
@@ -79,16 +97,26 @@ export type BoxScoreSheetFormProps = {
 export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
   const { teams, texts, editable } = props;
   const [state, dispatch, pending] = useActionState(props.action, untouched, props.permalink);
-  const onSubmit = useOneSubmit(pending, state);
+  const sendOnce = useOneSubmit(pending, state);
   const problemId = `${useId()}-problem`;
   // After a refusal (scripts on), the first wrong box takes the focus, which brings it into
   // view inside the grid: the sentence beside the scores names it.
   const formRef = useRef<HTMLFormElement>(null);
+  const tabsId = useId();
   useEffect(() => {
-    if (state.kind !== 'refused') return;
-    const first = state.wrong[0];
+    const first = state.kind === 'refused' ? state.wrong[0] : undefined;
     const box = first === undefined ? null : formRef.current?.elements.namedItem(first);
-    if (box instanceof HTMLInputElement) box.focus();
+    if (!(box instanceof HTMLInputElement)) return;
+    // On a phone one team's grid is shown at a time: the wrong box's team is shown first.
+    const team = box.closest<HTMLElement>('[data-sheet-team]')?.dataset['sheetTeam'];
+    const tab =
+      team === undefined
+        ? null
+        : formRef.current?.querySelector<HTMLInputElement>(
+            `.admin-sheet-tabs input[value="${team}"]`,
+          );
+    if (tab !== null && tab !== undefined) tab.checked = true;
+    box.focus();
   }, [state]);
   const refused = state.kind === 'refused' ? state : undefined;
   const wrong = new Set(refused?.wrong ?? []);
@@ -103,7 +131,8 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
     if (refused.code === 'tie-not-allowed' && refused.scores !== undefined) {
       return fillScores(texts.tie, refused.scores);
     }
-    if (refused.code !== 'invalid-input' || firstWrong === undefined) return refused.said;
+    if (refused.code !== 'invalid-input') return refused.said;
+    if (firstWrong === undefined) return refused.said;
     for (const team of teams) {
       if (team.score.field === firstWrong) return team.wrongScore;
       for (const row of team.rows) {
@@ -116,113 +145,168 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
         }
       }
     }
-    return refused.said;
+    return refused?.said;
   })();
+  // The team whose grid a phone shows first: the one a refusal's first wrong box is in.
+  const wrongTeam = teams.findIndex((team) =>
+    team.rows.some(
+      (row) => row.minutes?.field === firstWrong || row.stats.some((s) => s.field === firstWrong),
+    ),
+  );
+  const shownFirst = Math.max(0, wrongTeam);
 
+  // A grid that cannot be changed (a final game's) is read, not filled: its boxes are drawn
+  // as plain values (staff.css), and one with nothing in it shows a quiet mark, not a hole.
+  const emptyMark = editable ? undefined : texts.empty;
+  const columns = [...(texts.minutes === undefined ? [] : [texts.minutes]), ...texts.columns];
   return (
-    <form ref={formRef} action={dispatch} onSubmit={onSubmit}>
+    <form
+      ref={formRef}
+      action={dispatch}
+      onSubmit={sendOnce}
+      className="admin-sheet-form"
+      noValidate
+    >
       {Object.entries(props.hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      {teams.map((team) => (
-        <section key={team.teamId}>
-          <h2>{team.name}</h2>
+      {/* Each short column name spelled out once, above the grids (step 2.103). */}
+      {columns.length === 0 ? null : (
+        <dl className="admin-sheet-key" aria-label={texts.columnsKey}>
+          {columns.map((column) => (
+            <div key={column.short}>
+              <dt>{column.short}</dt>
+              <dd>{column.full}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {/* On a phone one team's grid is shown at a time: which, is picked here. The choice
+          is the screen's own and is no part of what the form sends (it belongs to no form). */}
+      {teams.length < 2 ? null : (
+        <div className="admin-sheet-tabs" role="radiogroup" aria-label={texts.teamShown}>
+          {teams.map((team, index) => (
+            <label key={team.teamId}>
+              <input
+                type="radio"
+                name={`${tabsId}-team`}
+                form={`${tabsId}-none`}
+                value={index}
+                defaultChecked={index === shownFirst}
+              />
+              <span dir="auto">{team.name}</span>
+            </label>
+          ))}
+        </div>
+      )}
+      {teams.map((team, index) => (
+        <section key={team.teamId} className="staff-panel" data-sheet-team={index}>
+          <h2 dir="auto">{team.name}</h2>
           {team.rows.length === 0 ? (
-            <p>{texts.noPlayers}</p>
+            <p className="staff-quiet">{texts.noPlayers}</p>
           ) : (
-            <div className="box-score-grid" role="region" aria-label={team.name} tabIndex={0}>
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">{texts.player}</th>
-                    <th scope="col">{texts.played}</th>
-                    {texts.minutes === undefined ? null : (
-                      <th scope="col">
-                        <abbr title={texts.minutes.full}>{texts.minutes.short}</abbr>
-                      </th>
-                    )}
-                    {texts.columns.map((column) => (
-                      <th scope="col" key={column.key}>
-                        <abbr title={column.full}>{column.short}</abbr>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {team.rows.map((row) => (
-                    <tr key={row.personId}>
-                      <th scope="row">{row.heading}</th>
-                      <td>
-                        <input
-                          type="checkbox"
-                          name={row.played.field}
-                          defaultChecked={
-                            refused === undefined
-                              ? row.played.saved
-                              : refused.typed[row.played.field] !== undefined
-                          }
-                          disabled={!editable}
-                          aria-label={row.played.label}
-                        />
-                      </td>
-                      {row.minutes === undefined ? null : (
-                        <td>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            max={1440}
-                            step={1}
-                            name={row.minutes.field}
-                            defaultValue={text(row.minutes)}
-                            disabled={!editable}
-                            aria-label={row.minutes.label}
-                            {...marked(row.minutes.field)}
-                          />
-                        </td>
+            <div className="ui-table-frame box-score-frame">
+              {/* The frame stays still while the grid scrolls in it, so its far edge can
+                  say the grid goes on, as a public table's does (DESIGN.md line 14). */}
+              <div
+                className="ui-table-wrap box-score-grid"
+                role="region"
+                aria-label={team.name}
+                tabIndex={0}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">{texts.player}</th>
+                      <th scope="col">{texts.played}</th>
+                      {texts.minutes === undefined ? null : (
+                        <th scope="col">
+                          <abbr title={texts.minutes.full}>{texts.minutes.short}</abbr>
+                        </th>
                       )}
-                      {row.stats.map((box) => (
-                        <td key={box.field}>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            max={999}
-                            step={1}
-                            name={box.field}
-                            defaultValue={text(box)}
-                            disabled={!editable}
-                            aria-label={box.label}
-                            {...marked(box.field)}
-                          />
-                        </td>
+                      {texts.columns.map((column) => (
+                        <th scope="col" key={column.key}>
+                          <abbr title={column.full}>{column.short}</abbr>
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {team.rows.map((row) => (
+                      <tr key={row.personId}>
+                        <th scope="row">{row.heading}</th>
+                        <td>
+                          <input
+                            type="checkbox"
+                            name={row.played.field}
+                            defaultChecked={
+                              refused === undefined
+                                ? row.played.saved
+                                : refused.typed[row.played.field] !== undefined
+                            }
+                            disabled={!editable}
+                            aria-label={row.played.label}
+                          />
+                        </td>
+                        {row.minutes === undefined ? null : (
+                          <td>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              autoComplete="off"
+                              name={row.minutes.field}
+                              defaultValue={text(row.minutes)}
+                              disabled={!editable}
+                              placeholder={emptyMark}
+                              aria-label={row.minutes.label}
+                              {...marked(row.minutes.field)}
+                            />
+                          </td>
+                        )}
+                        {row.stats.map((box) => (
+                          <td key={box.field}>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              autoComplete="off"
+                              name={box.field}
+                              defaultValue={text(box)}
+                              disabled={!editable}
+                              placeholder={emptyMark}
+                              aria-label={box.label}
+                              {...marked(box.field)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </section>
       ))}
-      <fieldset id={sheetScoresId}>
-        {teams.map((team) => (
-          <label key={team.score.field}>
-            <span>{team.score.label}</span>
-            <input
-              type="number"
-              name={team.score.field}
-              inputMode="numeric"
-              min={0}
-              max={999}
-              step={1}
-              defaultValue={text(team.score)}
-              disabled={!editable}
-              {...marked(team.score.field)}
-            />
-          </label>
-        ))}
-        {editable ? <p>{texts.scoreHelp}</p> : null}
+      <fieldset id={sheetScoresId} className="staff-panel admin-sheet-scores">
+        {/* Each team's label above its own box, at every width (step 2.103): beside the
+            boxes, the second box wrapped under the first team's label on a phone. */}
+        <div className="staff-scores">
+          {teams.map((team) => (
+            <label key={team.score.field} className="staff-field" data-size="figure">
+              <span>{team.score.label}</span>
+              <input
+                type="text"
+                name={team.score.field}
+                inputMode="numeric"
+                autoComplete="off"
+                defaultValue={text(team.score)}
+                disabled={!editable}
+                {...marked(team.score.field)}
+              />
+            </label>
+          ))}
+        </div>
+        {editable ? <p className="staff-quiet">{texts.scoreHelp}</p> : null}
         {editable && props.check !== undefined ? <ScoreCheck {...props.check} /> : null}
         {problem === undefined ? null : (
           <p id={problemId} className="ui-field-error" role="alert">
@@ -231,7 +315,13 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
         )}
         {props.saved === undefined ? null : <SavedLine text={props.saved} />}
       </fieldset>
-      {editable ? <button type="submit">{texts.save}</button> : null}
+      {editable ? (
+        <p className="staff-buttons">
+          <button type="submit" className="ui-button" data-kind="main">
+            {texts.save}
+          </button>
+        </p>
+      ) : null}
     </form>
   );
 }
