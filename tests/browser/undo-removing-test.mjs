@@ -141,6 +141,12 @@ if (built) {
       name: 'Put back on the roster (marked by mistake)',
     });
     note('the "left" line has its put-back button', (await back.count()) === 1);
+    const leftSaid = leftLine.locator('[data-said-on]');
+    note(
+      'the "left" line names who left and which team',
+      (await leftSaid.count()) === 1 &&
+        (await leftSaid.innerText()) === `${player} was marked as having left Falcons.`,
+    );
     const whileLeft = count(await publicText('/teams/falcons'), player);
     note('their game lines stay while they are marked as left (R-17)', whileLeft >= 1);
     await accessible('a player marked as left');
@@ -152,8 +158,14 @@ if (built) {
       (await page.locator('[data-left-entry]', { hasText: player }).count()) === 0,
     );
     note('the player is on the roster again', (await line.count()) === 1);
-    const note1 = await page.locator('main [role=status]').first().innerText();
-    note('the page says they were put back', note1.includes('put back on the roster'), note1);
+    const backSaid = line.locator('[data-said-on]');
+    const note1 = (await backSaid.count()) === 1 ? await backSaid.innerText() : '';
+    note(
+      'the player’s own row says they are back, by name',
+      note1.startsWith(`${player} is back on the roster.`),
+      note1,
+    );
+    note('said where the phone lands', await onScreen(backSaid));
     note(
       'every game line of the player is kept',
       count(await publicText('/teams/falcons'), player) === linesBefore,
@@ -265,13 +277,20 @@ if (built) {
     await game.locator('summary', { hasText: 'Edit this game' }).click();
     const remove = game.getByRole('button', { name: 'Remove game' });
     note(
-      '"Remove game" is a destructive button',
-      (await remove.getAttribute('data-kind')) === 'danger',
+      '"Remove game" is the outlined destructive button, "Save game" the main one',
+      (await remove.getAttribute('data-kind')) === 'danger' &&
+        (await game.getByRole('button', { name: 'Save game' }).getAttribute('data-kind')) ===
+          'main',
     );
     await tap(remove, /saved=game-removed/);
+    const removedAddress = page.url();
     const answer = page.locator('#saved');
     const answerText = (await answer.count()) === 1 ? await answer.innerText() : '';
-    note('the answer names the game', answerText.includes(`Removed: ${name}.`), answerText);
+    note(
+      'the answer names the game and its round',
+      new RegExp(`^Removed: ${name}, (Round|Week|[A-Z])`).test(answerText),
+      answerText,
+    );
     note('the answer is where the phone is looking', await onScreen(answer));
     note(
       'the game is out of the draft',
@@ -299,11 +318,62 @@ if (built) {
         : summaryAfter === summaryBefore,
       summaryAfter,
     );
+    const count1 = page.locator('[data-draft-count]');
+    note(
+      'the top line counts what publishing would change, as the publish box does',
+      summaryBefore !== '' ||
+        ((await count1.getAttribute('data-draft-count')) === '0' &&
+          (await count1.innerText()).includes('changes nothing')),
+      await count1.innerText(),
+    );
     note(
       'nothing public changed after putting it back',
       (await publicText('/schedule')) === publicBefore,
     );
     await accessible('a game put back');
+
+    at = 'the old address of the removal is opened again';
+    await page.goto(removedAddress);
+    const reloaded = page.locator('#saved');
+    const reloadedText = (await reloaded.count()) === 1 ? await reloaded.innerText() : '';
+    note(
+      'an old address says truthfully the game is back, and offers nothing',
+      reloadedText.startsWith(`Put back in the draft: ${name}`) &&
+        (await page.getByRole('button', { name: 'Put it back' }).count()) === 0,
+      reloadedText,
+    );
+
+    at = 'a player whose number is worn now is put back without it (R-32)';
+    await page.goto(`${origin}/harbor-city`);
+    await page.goto(`${origin}/harbor-city/admin`);
+    await openTeam('Rockets');
+    const wearer = page.locator('main ol > li', { hasText: 'Jay Whitaker' });
+    await wearer.locator('input[name=jerseyNumber]').fill('1');
+    await tap(wearer.getByRole('button', { name: 'Save number and role' }), /done=entrySaved/);
+    const formerly = page.locator('[data-left-entry]', { hasText: 'Tess Moreno' });
+    await tap(
+      formerly.getByRole('button', { name: 'Put back on the roster (marked by mistake)' }),
+      /done=putBackNoNumber/,
+    );
+    const tess = page.locator('main ol > li', { hasText: 'Tess Moreno' });
+    const noNumber = tess.locator('[data-said-on]');
+    const noNumberText = (await noNumber.count()) === 1 ? await noNumber.innerText() : '';
+    note(
+      'back with no number, the row naming who wears it',
+      noNumberText ===
+        'Tess Moreno is back on the roster with no number: 1 is now worn by Jay Whitaker. Give them a number.',
+      noNumberText,
+    );
+    note('said on her row where the phone lands', await onScreen(noNumber));
+    note(
+      'her number field is empty, ready for a new one',
+      (await tess.locator('input[name=jerseyNumber]').inputValue()) === '',
+    );
+    note(
+      'no "left" line remains for her',
+      (await page.locator('[data-left-entry]', { hasText: 'Tess Moreno' }).count()) === 0,
+    );
+    await accessible('a player put back without a number');
     await visitor.close();
   } catch (error) {
     failures.push(`${at}: ${whatWentWrong(error)}`);

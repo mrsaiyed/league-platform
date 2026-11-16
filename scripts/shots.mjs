@@ -286,6 +286,14 @@ const adminPages = [
     league: 'north-valley',
     steps: (page) => undoSteps(page, step),
   })),
+  // A player put back without the number someone else now wears (R-32), in the second
+  // league, whose youth season asks for a different number for each player.
+  {
+    name: 'admin-team-put-back-no-number',
+    at: '/admin/teams',
+    league: 'harbor-city',
+    steps: (page) => undoSteps(page, 'team-put-back-no-number'),
+  },
   { name: 'admin-schedule', at: '/admin/schedule' },
   {
     name: 'admin-schedule-game-removed',
@@ -562,6 +570,34 @@ async function undoSteps(page, what) {
       .first();
     await game.locator('summary', { hasText: 'Edit this game' }).click();
     await tapTo(game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+    return;
+  }
+  if (what === 'team-put-back-no-number') {
+    // The youth league asks for unique numbers: Jay Whitaker takes the 1 Tess Moreno wore,
+    // then Tess, marked as left, is put back without it (R-32).
+    await tapTo(
+      page.locator('main').getByRole('link', { name: 'Rockets', exact: true }),
+      /\/admin\/teams\//,
+    );
+    const row = (name) => page.locator('main ol > li', { hasText: name });
+    const number = async (name, value) => {
+      await row(name).locator('input[name=jerseyNumber]').fill(value);
+      await tapTo(row(name).getByRole('button', { name: 'Save number and role' }), /done=/);
+    };
+    // The picture at the other width finds Tess already back: set the scene again.
+    if ((await row('Tess Moreno').count()) === 1) {
+      await number('Jay Whitaker', '13');
+      await number('Tess Moreno', '1');
+      const lately = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+      await row('Tess Moreno').locator('input[name=leftOn]').fill(lately);
+      await tapTo(row('Tess Moreno').getByRole('button', { name: 'Mark as left' }), /done=left/);
+    }
+    await number('Jay Whitaker', '1');
+    const formerly = page.locator('[data-left-entry]', { hasText: 'Tess Moreno' });
+    await tapTo(
+      formerly.getByRole('button', { name: 'Put back on the roster (marked by mistake)' }),
+      /done=putBackNoNumber/,
+    );
     return;
   }
   await tapTo(
