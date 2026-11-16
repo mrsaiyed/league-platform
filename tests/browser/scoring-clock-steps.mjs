@@ -877,7 +877,102 @@ export async function clockSteps(kit) {
           JSON.stringify(drawn),
         );
       }
+      // A team's name is never cut on the scoreboard at its fullest, lying down (the
+      // pictures after the fix round: "HAWKS" read "HA W…"). Both teams in the double
+      // bonus, three-figure scores made with no connection, so the banner is waiting,
+      // and then the longest the banner can say. The name sat beside the fouls and was
+      // left 3 wide; it is over them now, and only a truly long one ends in "…".
       await page.setViewportSize({ width: phoneLying.width, height: phoneLying.height });
+      await context.setOffline(true);
+      await page.evaluate(async () => {
+        const drawn = () => new Promise((resolve) => setTimeout(resolve, 0));
+        for (const side of ['home', 'away']) {
+          for (let i = 0; i < 34; i += 1) {
+            document.querySelector(`[data-floor="${side}"] .court-tile`).click();
+            while (document.querySelector('[data-pad] [data-act="p3"]') === null) await drawn();
+            document.querySelector('[data-pad] [data-act="p3"]').click();
+            while (document.querySelector('[data-pad] [data-rest]') === null) await drawn();
+          }
+        }
+      });
+      await c.root.locator('[data-saved-banner][data-state="waiting"]').waitFor();
+      const fullest = await c.score();
+      /** Each name on the scoreboard, as wide as it is drawn, and whether its text is cut. */
+      const names = () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('[data-score] .court-score-name')].map((name) => ({
+            says: name.textContent,
+            width: Math.round(name.clientWidth),
+            cut: name.scrollWidth > name.clientWidth + 0.5,
+            ends: getComputedStyle(name).textOverflow,
+          })),
+        );
+      /** Writes words into the page for a moment, and puts back what was there. */
+      const written = (into) =>
+        page.evaluate((words) => {
+          window.keptWords ??= new Map();
+          for (const [selector, text] of Object.entries(words)) {
+            for (const el of document.querySelectorAll(selector)) {
+              if (text === null) {
+                el.replaceChildren(...(window.keptWords.get(el) ?? []));
+              } else {
+                if (!window.keptWords.has(el)) window.keptWords.set(el, [...el.childNodes]);
+                el.textContent = text;
+              }
+            }
+          }
+        }, into);
+      await twoFrames(page);
+      const asTheyAre = await names();
+      const bannerNow = (await c.banner.textContent()) ?? '';
+      // The longest the banner says: all three of its lines at once (queue-banner.ts).
+      await written({
+        '[data-saved-banner]': `This device could not save to its storage · ${bannerNow} · 12 actions not saved`,
+      });
+      await twoFrames(page);
+      const longestBanner = await names();
+      // A name of fifteen letters, and a truly long one (made-up names, written in).
+      await written({
+        '[data-score="home"] .court-score-name': 'Riverside Bears',
+        '[data-score="away"] .court-score-name': 'Northside Academy Hawks of the Valley',
+      });
+      await twoFrames(page);
+      const longNames = await names();
+      await written({
+        '[data-saved-banner]': null,
+        '[data-score="home"] .court-score-name': null,
+        '[data-score="away"] .court-score-name': null,
+      });
+      note(
+        '844 x 390, both teams in the double bonus, three-figure scores and the banner waiting: neither team’s name is cut',
+        fullest.home >= 100 &&
+          fullest.away >= 100 &&
+          /waiting to send/.test(bannerNow) &&
+          asTheyAre.length === 2 &&
+          asTheyAre.every((name) => !name.cut),
+        JSON.stringify({ fullest, bannerNow, asTheyAre }),
+      );
+      note(
+        '…and with the longest the banner says, neither name is cut',
+        longestBanner.length === 2 && longestBanner.every((name) => !name.cut),
+        JSON.stringify(longestBanner),
+      );
+      note(
+        '…a name of fifteen letters is whole; only a truly long one is cut, ending in "…", with room for fifteen',
+        longNames.length === 2 &&
+          !longNames[0].cut &&
+          longNames[1].cut &&
+          longNames[1].ends === 'ellipsis' &&
+          longNames[1].width >= longNames[0].width - 1,
+        JSON.stringify(longNames),
+      );
+      await context.setOffline(false);
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await page.waitForFunction(
+        () => document.querySelector('[data-saved-banner]').dataset.state === 'saved',
+        null,
+        { timeout: 120_000 },
+      );
       await accessible(page, 'both teams in the double bonus');
       note('nothing broke on the page', errors.length === 0, errors.join('; '));
     } finally {

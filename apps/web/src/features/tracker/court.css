@@ -672,7 +672,7 @@
   font-weight: 800;
 }
 /* The count as the tiles write it ("10F"): only where the box is narrow and holds a
-   badge as well (an upright phone, further down). */
+   badge as well (a phone, upright or lying down, further down). */
 .court-fouls-short {
   display: none;
 }
@@ -2287,8 +2287,9 @@
     --court-size-clock: 32px;
     --court-size-score: 30px;
     --court-size-number: 22px;
-    /* The box is one row here, 36 high inside: the count over the badge, 11, 13, 16 and
-       12, 13, which is all that height holds (16 + 2 + 17 at the double bonus). */
+    /* The box is 36 high inside here: the name over one line of the count beside the
+       badge, 11, 13, 16 and 12, 13, which is all that height holds (12 + 2 + 17 at the
+       double bonus). */
     --court-fouls-2: 16px;
     --court-badge-1: 12px;
     --court-badge-2: 13px;
@@ -2324,36 +2325,69 @@
     overflow: hidden;
     clip-path: inset(50%);
   }
+  /* The name over the team's fouls and its bonus, the score beside both (at the end of
+     the home team's box, at the start of the visitors'), in the 36 the box has inside.
+     The name was beside the fouls once: with "Double bonus", a three-figure score and the
+     saved banner waiting, it was left 3 wide and "HAWKS" read "HA W…" or nothing at all.
+     Over the fouls it has the width of the fouls' whole line: a five-letter name is
+     always whole, and only a truly long one ends in "…". */
   .court-score {
-    flex-direction: row;
-    justify-content: space-between;
-    gap: var(--court-gap);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name value'
+      'fouls value';
+    align-content: center;
+    column-gap: var(--court-gap);
+    row-gap: 2px;
     min-block-size: 44px;
     padding-block: 2px;
-    padding-inline: 12px;
+    padding-inline: var(--court-gap);
   }
   .court-score[data-side='away'] {
-    flex-direction: row-reverse;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'value name'
+      'value fouls';
   }
-  /* In one row: the name, the team's fouls over its bonus, the score. */
   .court-score-name {
-    flex: 0 1 auto;
+    grid-area: name;
+    display: block;
     min-inline-size: 0;
+    overflow: hidden;
+    text-align: start;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+  .court-score[data-side='away'] .court-score-name {
+    text-align: end;
+  }
+  /* The fouls' line folds as on an upright phone: with a badge the count is written as
+     the tiles write a player's ("10F"), and the double bonus is a filled bar as wide as
+     the rest of the line, seen from the corner of the eye. */
   .court-score-fouls {
-    flex: 1 0 auto;
-    flex-direction: column;
-    gap: 2px;
-    order: 1;
+    grid-area: fouls;
+    justify-content: flex-start;
+    gap: 4px;
+    min-inline-size: 0;
+    overflow: hidden;
   }
-  /* At the double bonus the badge is a filled bar as wide as its place, as on an upright
-     phone: seen from the corner of the eye, where a pill of small letters is not. */
+  .court-score[data-side='away'] .court-score-fouls {
+    justify-content: flex-end;
+  }
+  .court-score-fouls[data-badge] .court-fouls-words {
+    display: none;
+  }
+  .court-score-fouls[data-badge] .court-fouls-short {
+    display: inline;
+  }
   .court-bonus[data-level='2'] {
-    align-self: stretch;
-    margin-inline: 6px;
+    flex: 1 1 auto;
+    padding-inline: 3px;
   }
   .court-score-value {
-    order: 2;
+    grid-area: value;
+    align-self: center;
   }
   .court-clock {
     flex-direction: row;

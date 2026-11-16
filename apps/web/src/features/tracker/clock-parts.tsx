@@ -96,7 +96,7 @@ export function teamBoardLabel(team: TeamPanel, t: Translate): string {
  * bonus (F1 to F3). The count is always there, so nothing moves when the first foul is
  * given; it grows and turns red at the bonus, and again at the double bonus. The badge
  * sits with the team that SHOOTS the bonus, and says which in words. Where the box is
- * narrow (an upright phone) and holds a badge too, the count is written as the tiles
+ * narrow (a phone, either way up) and holds a badge too, the count is written as the tiles
  * write a player's fouls ("10F"), so "Double bonus" is never cut.
  */
 export function TeamFouls({ t, team }: { readonly t: Translate; readonly team: TeamPanel }) {

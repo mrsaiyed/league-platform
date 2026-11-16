@@ -15,7 +15,9 @@
 // them with the Read tool, beside the Al-Hadi tracker's own at the same sizes. Each state
 // is one entry of `states` below. Step 2.36 added the clock's (19 to 37: stopped with its
 // reason, running, the form, timeouts and the question, the bonus and the double bonus on
-// each team, halftime, the period picker, overtime, six timeouts taken by each team);
+// each team, halftime, the period picker, overtime, six timeouts taken by each team; and
+// after its fix round 38 to 40: a time longer than the period, the Start clock button
+// caught in its third of a second not yet ready, the scoreboard at its fullest);
 // step 2.37 adds its own (offline, read-only, final) by adding entries, with the taps in
 // tests/browser/tracker-driver.mjs.
 // From state 02 on the game is a stop-clock game, so a foul and a timeout are seen to
@@ -454,6 +456,94 @@ const states = [
       await c.timeoutsPad.waitFor();
     },
   },
+  {
+    name: '38-clock-longer-than-period',
+    about: 'a time longer than the period typed in the clock’s form: refused in words, not offered',
+    run: async (page) => {
+      const c = court(page);
+      await c.pad.locator('.court-close').click();
+      // Overtime is 5:00 long here: 20:00 is longer.
+      await c.typeClock('2000');
+      await c.clockSheet.locator('[data-clock-note]', { hasText: /or less\.$/ }).waitFor();
+    },
+  },
+  {
+    name: '39-start-clock-not-ready',
+    about:
+      'the Start clock button in the third of a second after the pad comes to rest: hollow, its × faint',
+    run: async (page) => {
+      const c = court(page);
+      await c.clockSheet.locator('.court-close').click();
+      await c.root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
+    },
+    // Taken inside the third of a second, for each size: a player's options are opened
+    // and closed with ×, and the picture is kept only if the button was still resting
+    // once it was taken; otherwise it is taken again.
+    shoot: async (page, file) => {
+      const c = court(page);
+      for (let tries = 0; tries < 8; tries += 1) {
+        const tile = c.root.locator('[data-floor="home"] .court-tile').first();
+        await tile.click();
+        await c.pad.locator('[data-options] .court-close').waitFor();
+        await page.waitForTimeout(200);
+        await c.pad.locator('[data-options] .court-close').click();
+        await c.pad.locator('[data-start-bar][data-resting]').waitFor({ timeout: 2000 });
+        await page.screenshot({ path: file });
+        if ((await c.pad.locator('[data-start-bar][data-resting]').count()) === 1) return;
+      }
+      throw new Error('the Start clock button could not be caught resting in eight tries');
+    },
+  },
+  {
+    name: '40-scoreboard-fullest',
+    about:
+      'the scoreboard at its fullest: both teams in the double bonus, three-figure scores, the longest the banner says and long names (written in)',
+    sizes: ['phone-lying', 'phone-in-browser'],
+    run: async (page) => {
+      const c = court(page);
+      await c.pad.locator('[data-rest]').waitFor();
+      await page.context().setOffline(true);
+      // Ten team fouls a side this period, on floor players with room for more, then
+      // baskets to past a hundred: all kept on the device, so the banner is waiting.
+      await page.evaluate(async () => {
+        const drawn = () => new Promise((resolve) => setTimeout(resolve, 0));
+        const tap = async (tile, act) => {
+          tile.click();
+          while (document.querySelector(`[data-pad] [data-act="${act}"]`) === null) await drawn();
+          document.querySelector(`[data-pad] [data-act="${act}"]`).click();
+          while (document.querySelector('[data-pad] [data-rest]') === null) await drawn();
+        };
+        const fouls = (tile) => Number(tile.querySelector('[data-fouls]')?.dataset.fouls ?? 0);
+        for (const side of ['home', 'away']) {
+          const count = () =>
+            Number(document.querySelector(`[data-team-fouls="${side}"]`).textContent.match(/\d+/));
+          while (count() < 10) {
+            const tiles = [...document.querySelectorAll(`[data-floor="${side}"] .court-tile`)];
+            const tile = tiles
+              .filter((t) => !t.hasAttribute('data-out'))
+              .sort((a, b) => fouls(a) - fouls(b))[0];
+            await tap(tile, 'foul');
+          }
+          const floor = `[data-floor="${side}"] .court-tile:not([data-out])`;
+          const scored = () =>
+            Number(document.querySelector(`[data-score="${side}"] .court-score-value`).textContent);
+          while (scored() < 100) await tap(document.querySelector(floor), 'p3');
+        }
+      });
+      await c.root.locator('[data-bonus="home"][data-level="2"]').waitFor();
+      await c.root.locator('[data-bonus="away"][data-level="2"]').waitFor();
+      await c.root.locator('[data-saved-banner][data-state="waiting"]').waitFor();
+      // Written into the page for the picture only: the banner's three lines at once
+      // (queue-banner.ts), and long made-up names.
+      await page.evaluate(() => {
+        const banner = document.querySelector('[data-saved-banner]');
+        banner.textContent = `This device could not save to its storage · ${banner.textContent} · 12 actions not saved`;
+        const [home, away] = document.querySelectorAll('[data-score] .court-score-name');
+        home.textContent = 'Riverside Bears';
+        away.textContent = 'Northside Academy Hawks of the Valley';
+      });
+    },
+  },
 ];
 
 async function main() {
@@ -491,9 +581,9 @@ async function main() {
         if (state.sizes !== undefined && !state.sizes.includes(size.name)) continue;
         await page.setViewportSize({ width: size.width, height: size.height });
         await page.waitForTimeout(200);
-        await page.screenshot({
-          path: path.join(out, `${state.name}-${size.width}x${size.height}.png`),
-        });
+        const file = path.join(out, `${state.name}-${size.width}x${size.height}.png`);
+        if (state.shoot === undefined) await page.screenshot({ path: file });
+        else await state.shoot(page, file);
       }
       await page.setViewportSize({ width: first.width, height: first.height });
       console.log(`${state.name}: ${state.about}`);
