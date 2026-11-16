@@ -42,6 +42,9 @@ Set to match T-225 and T-70 when the project is made (step 1.25): access token (
 8. **Timing (T-68):** measure, over many tries, how long a password sign-in takes for an address with an account and one without, and how long a reset request takes for each. The password floor (`passwordMinMilliseconds`) must sit above the slower of the two with room to spare; raise it if not. The reset request makes the same calls either way, but Supabase's own work may differ: if it does by more than noise, pad it too.
 9. That "Allow new sign-ups" is on and "Secure password change" is off, and that a reset by code then changes the password.
 10. That leaked-password protection is available on the project's plan (it is a paid-plan feature at Supabase): **the founder's call**, since it costs money. Without it the adapter cannot refuse leaked passwords (T-85).
+11. **Email confirmation (step 2.115):** that `GET /auth/v1/settings` answers through the gateway with the secret key as `apikey` (a 401 or 403 there makes start-up refuse with "it refused the key").
+12. That `mailer_autoconfirm` in that answer follows the dashboard's "Confirm email" switch: `false` with it on, `true` with it off (switch it off and back on, and look each time).
+13. That the dashboard path the refusal names, Authentication, then Sign In / Providers, then Email, is where "Confirm email" is; if Supabase has moved it, correct the sentence in `apps/web/src/server/startup.ts` and the make-a-league page together.
 
 ## Considered
 
