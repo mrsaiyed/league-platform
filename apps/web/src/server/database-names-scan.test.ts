@@ -206,6 +206,25 @@ async function peopleOf(slug: string) {
   return kept;
 }
 
+/**
+ * The id of every roster place on the league's teams, as the teams module's own store lists
+ * them, kept as they are found, so a place whose person went to the bin is still looked for.
+ */
+const entriesKept = new Map<string, Set<string>>();
+async function rosterEntriesOf(slug: string, teamIds: readonly string[]) {
+  const kept = entriesKept.get(slug) ?? new Set<string>();
+  entriesKept.set(slug, kept);
+  const { leagueId, ownerAccountId } = leagueOf(slug);
+  await teamsDeps.transaction({ leagueId, accountId: ownerAccountId, requestId: 'scan' }, (tx) =>
+    Promise.all(
+      teamIds.map(async (teamId) => {
+        for (const line of await tx.teams.listRoster(teamId)) kept.add(line.id);
+      }),
+    ),
+  );
+  return [...kept];
+}
+
 /** The person ids found in a page's data or its HTML, in any capitals. */
 const personIdsIn = (data: unknown, ids: readonly string[]) => {
   const text = (typeof data === 'string' ? data : JSON.stringify(data)).toLowerCase();
@@ -343,6 +362,12 @@ async function scan(
   const ids = (await peopleOf(slug)).map((p) => p.id);
   expect(ids.length).toBe(seed.people.length);
   for (const response of pages.pageData) expect(personIdsIn(response, ids)).toEqual([]);
+  // Nor a roster place's id, on any team's page: it stays the same across loads and
+  // carries when the place was made; a roster row's key is its place on the page.
+  const teamIds = pages.teamPages.map((p) => p.head.teamId);
+  const entryIds = await rosterEntriesOf(slug, teamIds);
+  expect(entryIds.length).toBeGreaterThanOrEqual(seed.people.length);
+  for (const response of pages.pageData) expect(personIdsIn(response, entryIds)).toEqual([]);
   return privateValues;
 }
 
@@ -521,6 +546,7 @@ describe('the T-81 scan on the database: a league whose players are of mixed age
     await db.close();
     await made.close();
     peopleKept.clear();
+    entriesKept.clear();
     versions.clear();
     await open({ audiences: { lakeside: 'mixed' } });
   }, 120_000);

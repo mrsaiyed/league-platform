@@ -98,10 +98,15 @@ function nameText(line: PublicRosterLine): string {
   return line.leftOn === null ? name : t('team.nameLeft', { name, date: dayText(line.leftOn) });
 }
 
-export function rosterRow(line: PublicRosterLine): RosterRowView {
+/**
+ * One line of the roster. Its key is its place in this page's roster, `roster-N`: the roster
+ * place's database id stays the same across loads and carries when the place was made, so it
+ * does not go into the page (as with the statistics rows).
+ */
+export function rosterRow(line: PublicRosterLine, index: number): RosterRowView {
   const known = roles.find((r) => r === line.role);
   return {
-    key: line.entryId,
+    key: `roster-${index}`,
     number: line.jerseyNumber ?? '',
     name: nameText(line),
     role: known === undefined ? t('team.role.player') : t(`team.role.${known}`),
@@ -311,6 +316,6 @@ export type RosterView = {
 };
 
 export function buildRoster(roster: PublicRoster): RosterView {
-  const rows = roster.lines.map(rosterRow);
+  const rows = roster.lines.map((line, index) => rosterRow(line, index));
   return { current: rows.filter((r) => !r.former), former: rows.filter((r) => r.former) };
 }

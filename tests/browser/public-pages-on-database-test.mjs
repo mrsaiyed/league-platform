@@ -246,6 +246,30 @@ if (browser) {
         found.join(', '),
       );
     };
+    /**
+     * No person's or roster place's database id in the page's HTML, the data sent with it
+     * included. The server's made-up database makes its ids as it starts, so this test
+     * cannot know the seed's person ids by value; instead every id-shaped value in the HTML
+     * must be one the page links to openly (a game's address). A person's id, a roster
+     * place's or any other would be left over and fail.
+     */
+    const noPersonIds = async (label) => {
+      const idShape = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+      const html = (await page.content()).toLowerCase();
+      const linked = new Set(
+        (
+          await page.evaluate(() =>
+            [...document.querySelectorAll('[href]')].map((el) => el.getAttribute('href') ?? ''),
+          )
+        ).flatMap((href) => href.toLowerCase().match(idShape) ?? []),
+      );
+      const others = [...new Set(html.match(idShape) ?? [])].filter((id) => !linked.has(id));
+      note(
+        `${slug}: ${label} holds no person's or roster place's id`,
+        others.length === 0,
+        others.join(', '),
+      );
+    };
     await step(`${slug}: the pages that show people, read from the database`, async () => {
       const stats = await open(`/${slug}/stats?by=total`);
       note(`${slug}: the statistics page is served`, stats.status === 200);
@@ -354,6 +378,7 @@ if (browser) {
         JSON.stringify(totals?.cells ?? tables),
       );
       await nothingPrivate(`${league.team.name}'s page`);
+      await noPersonIds(`${league.team.name}'s page`);
       await accessible(`/${slug}/teams/${league.team.slug} on the database`);
 
       // A child's own team page: their roster line by first name and last initial (R-14).
@@ -374,6 +399,7 @@ if (browser) {
           !has(theirs.text, child.lastName),
         );
         await nothingPrivate(`${child.team.name}'s page`);
+        await noPersonIds(`${child.team.name}'s page`);
       }
 
       const home = await open(`/${slug}`);

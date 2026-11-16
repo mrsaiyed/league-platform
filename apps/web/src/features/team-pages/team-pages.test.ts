@@ -223,6 +223,8 @@ describe('a team page', () => {
       // No name and no number cannot be added at the table; were it there, it is nameless.
       ['', 'Name not shown'],
     ]);
+    // Each row's key is its place in the page's roster, never the roster place's id.
+    expect(roster.current.map((r) => r.key)).toEqual(['roster-0', 'roster-1', 'roster-2']);
   });
 
   it('is not there for a team of another season', async () => {
