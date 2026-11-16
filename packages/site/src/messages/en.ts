@@ -536,6 +536,35 @@ export const en = {
   'adminSettings.clear': 'Go back to the default',
   'adminSettings.done.saved': 'The setting was saved.',
   'adminSettings.done.cleared': 'The setting is back to its default.',
+  // Admin → Season settings (step 2.182, A-18): its first panel, who can see a season.
+  // Step 2.47 builds the season's name, dates and rules around it.
+  'seasonSettings.intro': 'Settle how a season runs, and when visitors can see it.',
+  'seasonSettings.noSeason': 'This league has no season yet.',
+  'seasonSettings.seasonName': 'Season: {name}',
+  'seasonSettings.visibility.title': 'Who can see this season',
+  'seasonSettings.visibility.hidden': 'Only the people who run the league can see {season}.',
+  'seasonSettings.visibility.shown': 'Everyone can see {season}.',
+  'seasonSettings.visibility.over':
+    '{season} is over. A season that is over stays shown, so its results stay on the site.',
+  'seasonSettings.visibility.leagueHidden':
+    'Visitors cannot see this league until it is published, so they will see this season only after that.',
+  'seasonSettings.show': 'Show this season to visitors',
+  'seasonSettings.hide': 'Hide it again',
+  'seasonSettings.showAsk':
+    'Show {season} to visitors? Visitors will see its teams, schedule and results.',
+  'seasonSettings.showYes': 'Yes, show it',
+  'seasonSettings.showNo': 'No, keep it hidden',
+  'seasonSettings.hideAsk':
+    'Hide {season} from visitors? Its teams, schedule, results and standings disappear from the public site, and its address shows "Page not found". Nothing is deleted, and you can show it again.',
+  'seasonSettings.hideYes': 'Yes, hide it',
+  'seasonSettings.hideNo': 'No, keep it shown',
+  'seasonSettings.done.shown': 'Visitors can see {season} now.',
+  'seasonSettings.done.hidden': '{season} is hidden from visitors again.',
+  'error.leagues.update_season.season-not-found': 'That season is not there.',
+  'seasonSettings.refused.not-hidden':
+    'That season is not hidden any more, so nothing was changed. The page shows it as it is now.',
+  'seasonSettings.refused.not-shown':
+    'That season is over or already hidden, so nothing was changed. The page shows it as it is now.',
   // A heading for each group of settings, by the first part of their keys.
   'adminSettings.area.members': 'Start page for members',
   'adminSettings.area.games': 'Scoring',
@@ -1785,6 +1814,14 @@ export const en = {
     '{count} changes in the draft no longer fit the schedule and are being left out.',
   'schedule.admin.saved': 'Saved to the draft. It is not public until you publish.',
   'schedule.admin.published': 'The schedule is published. Visitors can see it now.',
+  'schedule.admin.publishedSeasonHidden':
+    'The schedule is published, but visitors cannot see {season} yet.',
+  'schedule.admin.publishedLeagueHidden':
+    'The schedule is published, but visitors cannot see this league until it is published.',
+  'schedule.admin.publishedBothHidden':
+    'The schedule is published, but visitors cannot see this league until it is published, and {season} is hidden from them too.',
+  'schedule.admin.showInSeasonSettings': 'Show it in Season settings.',
+  'schedule.admin.askToShow': "Ask the league's owner or an admin to show it.",
   'schedule.admin.discarded': 'The draft was discarded.',
   'schedule.admin.problem': 'That was not saved: {reason}',
   'schedule.admin.problemPartial':
