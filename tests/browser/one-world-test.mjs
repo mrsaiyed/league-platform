@@ -220,7 +220,13 @@ if (built) {
     // A visitor: signed out, from the league home, tapping only.
     at = 'a visitor opens the league home';
     await context.clearCookies();
-    await tap(page.locator('.site-header .site-name').first(), /\/north-valley(\?start=league)?$/);
+    // The public site's header is not drawn in the admin (step 2.103): the way out is the
+    // admin's own "View the site", behind its menu button on a phone.
+    await openMenu();
+    await tap(
+      page.locator('.staff-bar').getByRole('link', { name: 'View the site' }),
+      /\/north-valley(\?start=league)?$/,
+    );
     const home = await page.locator('main').innerText();
     note(`the home page names ${team}`, home.includes(team));
 
