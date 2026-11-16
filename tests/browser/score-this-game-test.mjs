@@ -13,7 +13,8 @@
 //   on tomorrow's. The made-up world starts at noon in the league's zone (worldAtNoon), so
 //   what is today never depends on when the test runs.
 // - A visitor, a coach and another league's admin see no button on the home page, the
-//   schedule, a team's page or a game's page.
+//   schedule, a team's page or a game's page; nor does another league's scorekeeper on that
+//   league's home and schedule.
 // - Where only assigned scorekeepers may score (the draft league), the scorekeeper sees it on
 //   their assigned games only.
 // - The page as fetched by a visitor and by the scorekeeper, same address, raw answer, is the
@@ -456,35 +457,60 @@ if (browser) {
     },
   );
 
-  await step('a visitor, a coach and another league’s admin see no button', async () => {
-    const pages = [
-      '/north-valley',
-      '/north-valley/schedule',
-      '/north-valley/teams/hawks',
-      `/north-valley/games/${trackedTomorrow}`,
-    ];
-    for (const who of [undefined, 'coach', 'otherAdmin']) {
-      const { context, page } = await fresh(who);
-      const name = who ?? 'a visitor';
+  await step(
+    'a visitor, a coach, another league’s admin and scorekeeper see no button',
+    async () => {
+      const pages = [
+        '/north-valley',
+        '/north-valley/schedule',
+        '/north-valley/teams/hawks',
+        `/north-valley/games/${trackedTomorrow}`,
+      ];
+      for (const who of [undefined, 'coach', 'otherAdmin']) {
+        const { context, page } = await fresh(who);
+        const name = who ?? 'a visitor';
+        try {
+          for (const path of pages) {
+            const answer = await open(page, path);
+            const body = answer === null ? null : await answer.json().catch(() => null);
+            note(
+              `${name}'s read of ${path} holds no games`,
+              body !== null && Array.isArray(body.games) && body.games.length === 0,
+              JSON.stringify(body),
+            );
+            note(
+              `${name} sees no button on ${path}`,
+              (await page.locator('main [data-offer]').count()) === 0,
+            );
+          }
+        } finally {
+          await context.close();
+        }
+      }
+      // Another league's scorekeeper: the made-up scorekeeper scores in North Valley (and the
+      // draft and archived leagues) and holds nothing in Harbor City. On Harbor City's own
+      // pages, none.
+      const { context, page } = await fresh('scorekeeper');
       try {
-        for (const path of pages) {
-          const answer = await open(page, path);
+        for (const path of ['/harbor-city', '/harbor-city/schedule']) {
+          const answer = await open(page, path, false);
           const body = answer === null ? null : await answer.json().catch(() => null);
           note(
-            `${name}'s read of ${path} holds no games`,
-            body !== null && Array.isArray(body.games) && body.games.length === 0,
+            `another league's scorekeeper's read of ${path} holds no games`,
+            answer === null || (Array.isArray(body?.games) && body.games.length === 0),
             JSON.stringify(body),
           );
           note(
-            `${name} sees no button on ${path}`,
-            (await page.locator('main [data-offer]').count()) === 0,
+            `another league's scorekeeper sees no button on ${path}`,
+            (await page.locator('main .ui-game-card').count()) > 0 &&
+              (await page.locator('main [data-offer]').count()) === 0,
           );
         }
       } finally {
         await context.close();
       }
-    }
-  });
+    },
+  );
 
   await step(
     'where only assigned scorekeepers may score, the scorekeeper sees theirs only',
