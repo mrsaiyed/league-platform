@@ -34,16 +34,14 @@ function Confirm({ row, say }: { readonly row: LeagueSettingRow; readonly say: S
   if (row.confirm.length === 0 || drawnAsTick(row)) return null;
   const choices = row.confirm.map((value) => valueText(row, value, say)).join(', ');
   return (
-    <>
+    <div className="settings-confirm">
+      <p className="ui-field-help">{say('adminSettings.confirmNote', { choice: choices })}</p>
       <p>
-        <small>{say('adminSettings.confirmNote', { choice: choices })}</small>
-      </p>
-      <p>
-        <label>
+        <label className="staff-check">
           <input type="checkbox" name="confirmed" value="yes" /> {say(`${wordsOf(row)}.confirm`)}
         </label>
       </p>
-    </>
+    </div>
   );
 }
 
@@ -90,11 +88,11 @@ export function drawnAsTick(row: LeagueSettingRow): boolean {
 function Control({ row, say }: { readonly row: LeagueSettingRow; readonly say: Say }) {
   if (drawnAsTick(row)) {
     return (
-      <fieldset aria-describedby={`${row.key}-about`}>
+      <fieldset className="settings-choice" aria-describedby={`${row.key}-about`}>
         <legend>{say(row.label)}</legend>
         <input type="hidden" name="value" value={tickValue} />
         <p>
-          <label>
+          <label className="staff-check">
             <input
               type="checkbox"
               name="confirmed"
@@ -110,11 +108,11 @@ function Control({ row, say }: { readonly row: LeagueSettingRow; readonly say: S
   const { field } = row;
   const describedBy = `${row.key}-about`;
   const radios = (options: readonly { value: string; text: string }[], current: string) => (
-    <fieldset aria-describedby={describedBy}>
+    <fieldset className="settings-choice" aria-describedby={describedBy}>
       <legend>{say(row.label)}</legend>
       {options.map((option) => (
         <p key={option.value}>
-          <label>
+          <label className="staff-check">
             <input
               type="radio"
               name="value"
@@ -150,7 +148,7 @@ function Control({ row, say }: { readonly row: LeagueSettingRow; readonly say: S
     case 'number':
       return (
         <p>
-          <label>
+          <label className="staff-field" data-size="figure">
             {say(row.label)}{' '}
             <input
               type="number"
@@ -168,7 +166,7 @@ function Control({ row, say }: { readonly row: LeagueSettingRow; readonly say: S
     case 'text':
       return (
         <p>
-          <label>
+          <label className="staff-field">
             {say(row.label)}{' '}
             <input
               type="text"
@@ -182,7 +180,7 @@ function Control({ row, say }: { readonly row: LeagueSettingRow; readonly say: S
         </p>
       );
     case 'other':
-      return <p>{say(row.label)}</p>;
+      return <p className="settings-name">{say(row.label)}</p>;
   }
 }
 
@@ -205,37 +203,59 @@ export function SettingForms({
   return (
     <>
       {byArea(rows).map((group) => (
-        <section key={group.area} data-area={group.area}>
+        // One panel a group (step 2.103): its title, then each setting as a form of its
+        // own under a fine line. The class comes before the group's name in the markup.
+        <section
+          key={group.area}
+          className="staff-panel settings-group"
+          id={`settings-${group.area}`}
+          data-area={group.area}
+        >
           <h2>{say(`adminSettings.area.${group.area}`)}</h2>
           {lines(notes.area?.[group.area])}
           {group.rows.map((row) => (
-            <section key={row.key} data-setting={row.key}>
+            <section key={row.key} className="settings-item" data-setting={row.key}>
               {lines(notes.rows?.[row.key]?.before)}
               {notes.rows?.[row.key]?.offered === false ? null : (
-                <form action={saveSettingAction}>
+                <form action={saveSettingAction} className="staff-form">
                   <input type="hidden" name="league" value={league} />
                   <input type="hidden" name="key" value={row.key} />
                   <input type="hidden" name="version" value={row.version ?? ''} />
                   <Control row={row} say={say} />
                   <Confirm row={row} say={say} />
-                  <p id={`${row.key}-about`}>
-                    <small>
-                      {say('adminSettings.default', { value: valueText(row, row.default, say) })}{' '}
-                      {limitsText(row, say)}{' '}
+                  {/* What it is set to, quietly, in one line: how it stands now as a small
+                      pill, then its default and what it accepts. */}
+                  <p id={`${row.key}-about`} className="settings-about">
+                    <span
+                      className="staff-pill"
+                      data-kind={row.source === 'league' ? 'good' : 'plain'}
+                    >
                       {say(
                         row.source === 'league'
                           ? 'adminSettings.usingOwn'
                           : 'adminSettings.usingDefault',
                       )}
-                    </small>
+                    </span>{' '}
+                    <span>
+                      {say('adminSettings.default', { value: valueText(row, row.default, say) })}
+                    </span>{' '}
+                    <span>{limitsText(row, say)}</span>
                   </p>
                   {row.field.kind === 'other' ? null : (
-                    <p>
-                      <button type="submit">{say('adminSettings.save')}</button>
+                    <p className="staff-buttons">
+                      <button type="submit" className="ui-button" data-kind="main">
+                        {say('adminSettings.save')}
+                      </button>
                       {row.version === null ? null : (
                         <>
                           {' '}
-                          <button type="submit" name="intent" value={clearIntent} formNoValidate>
+                          <button
+                            type="submit"
+                            className="ui-button"
+                            name="intent"
+                            value={clearIntent}
+                            formNoValidate
+                          >
                             {say('adminSettings.clear')}
                           </button>
                         </>

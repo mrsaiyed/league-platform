@@ -336,7 +336,12 @@ html:has(.staff) {
   .staff-bar {
     display: none;
   }
+  /* The side's dark ground runs the height of the page; what it holds stays on the screen
+     while the page scrolls. */
   .staff-side {
+    display: block;
+  }
+  .staff-side-held {
     position: sticky;
     inset-block-start: 0;
     display: flex;
@@ -565,8 +570,7 @@ html:has(.staff) {
   gap: var(--step-1);
   min-inline-size: 0;
   margin: 0;
-}
-.staff .staff-field > span:first-child {
+  /* The label's own words, whether or not they have an element of their own. */
   font-size: var(--text-14);
   font-weight: 600;
 }
@@ -575,6 +579,8 @@ html:has(.staff) {
   :is(input:not([type='checkbox'], [type='radio'], [type='color']), select, textarea) {
   inline-size: 100%;
   margin-inline-start: 0;
+  font-size: var(--text-16);
+  font-weight: 400;
 }
 .staff .staff-field > .ui-field-help,
 .staff .staff-field > .ui-field-error {

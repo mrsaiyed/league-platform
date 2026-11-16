@@ -16,6 +16,7 @@ import {
   type GameLine,
   type GameRosterPlayer,
 } from '@srleagues/core';
+import { MessagePage, PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
@@ -23,6 +24,7 @@ import { clockTimeText } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
+import { StaffTrail } from '../staff/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
 import { hasName, rosterName } from '../teams-area/index.ts';
 import { reopenBoxScoreAction, saveBoxScoreAction } from './actions.ts';
@@ -110,11 +112,15 @@ export async function BoxScorePage({
   const read = await getBoxScoreSheet(context, { gameId: gameId.toLowerCase() }, ports.games.deps);
   const back = leagueUrl(here, 'admin-area', { area: 'games' });
   if (!read.ok) {
+    // A finished page too (DESIGN.md section 4, line 19): centered, titled, one way on.
     return (
-      <main className="admin-games">
+      <MessagePage
+        className="admin-games"
+        title={t('common.notFoundTitle')}
+        action={{ href: back, label: t('admin.boxScore.back') }}
+      >
         <p role="alert">{t('admin.boxScore.notFound')}</p>
-        <a href={back}>{t('admin.boxScore.back')}</a>
-      </main>
+      </MessagePage>
     );
   }
   const sheet = read.value;
@@ -171,46 +177,53 @@ export async function BoxScorePage({
     wrongScore: t('admin.boxScore.refused.score', { team: side.name }),
   }));
   return (
-    <main className="admin-games">
-      <p>
-        <a href={back}>{t('admin.boxScore.back')}</a>
-      </p>
-      <h1>{t('admin.boxScore.title', { away: awayName, home: homeName })}</h1>
+    <main className="admin-games admin-sheet">
+      <StaffTrail
+        steps={[{ href: back, label: t('admin.area.games') }]}
+        here={t('admin.games.game', { away: awayName, home: homeName })}
+      />
+      <PageHead
+        title={t('admin.boxScore.title', { away: awayName, home: homeName })}
+        sub={
+          sheet.locked === null
+            ? t('admin.boxScore.help')
+            : t(`admin.boxScore.locked.${sheet.locked}`)
+        }
+      />
       {reopened === undefined ? null : <SavedLine text={reopened} />}
-      {sheet.locked === null ? (
-        <p>{t('admin.boxScore.help')}</p>
-      ) : (
-        <p>{t(`admin.boxScore.locked.${sheet.locked}`)}</p>
-      )}
       {reopen.kind === 'correct' ? (
-        <ReopenForm
-          action={reopenBoxScoreAction}
-          permalink={sheetHref}
-          hidden={{
-            league,
-            gameId: game.id,
-            version: String(game.version),
-            door: reopen.door,
-            requestToken: crypto.randomUUID(),
-            // Made once as the form is drawn: a second send of it is the same reopen.
-            ...(reopen.door === 'tracked' ? { requestId: crypto.randomUUID() } : {}),
-            // A game not entered as a box score is put right on the games list, beside it.
-            ...(game.captureMode === 'box' ? {} : { then: 'games' }),
-          }}
-          texts={{
-            ...(reopen.until === null
-              ? {}
-              : {
-                  until: t('admin.games.reopenUntil', {
-                    time: clockTimeText(reopen.until, { locale, timeZone }),
+        <div className="staff-panel">
+          <ReopenForm
+            action={reopenBoxScoreAction}
+            permalink={sheetHref}
+            hidden={{
+              league,
+              gameId: game.id,
+              version: String(game.version),
+              door: reopen.door,
+              requestToken: crypto.randomUUID(),
+              // Made once as the form is drawn: a second send of it is the same reopen.
+              ...(reopen.door === 'tracked' ? { requestId: crypto.randomUUID() } : {}),
+              // A game not entered as a box score is put right on the games list, beside it.
+              ...(game.captureMode === 'box' ? {} : { then: 'games' }),
+            }}
+            texts={{
+              ...(reopen.until === null
+                ? {}
+                : {
+                    until: t('admin.games.reopenUntil', {
+                      time: clockTimeText(reopen.until, { locale, timeZone }),
+                    }),
                   }),
-                }),
-            reason: t('admin.boxScore.reopenReason'),
-            reopen: t('admin.boxScore.reopen'),
-          }}
-        />
+              reason: t('admin.boxScore.reopenReason'),
+              reopen: t('admin.boxScore.reopen'),
+            }}
+          />
+        </div>
       ) : reopen.kind === 'who' ? (
-        <p data-reopen="who">{t(`admin.games.reopenWho.${reopen.because}`)}</p>
+        <p className="ui-notice" data-reopen="who">
+          {t(`admin.games.reopenWho.${reopen.because}`)}
+        </p>
       ) : null}
       <BoxScoreSheetForm
         action={saveBoxScoreAction}
@@ -239,6 +252,8 @@ export async function BoxScorePage({
             const label = statLabel(key);
             return { key, short: label.short, full: label.full };
           }),
+          teamShown: t('admin.boxScore.teamShown'),
+          columnsKey: t('admin.boxScore.columnsKey'),
           noPlayers: t('admin.boxScore.noPlayers'),
           scoreHelp: t('admin.boxScore.scoreHelp'),
           save: t('admin.boxScore.save'),

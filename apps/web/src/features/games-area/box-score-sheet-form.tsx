@@ -50,6 +50,10 @@ export type SheetTexts = {
     readonly short: string;
     readonly full: string;
   }[];
+  /** What the choice of team shown on a phone is called. */
+  readonly teamShown: string;
+  /** What the list of column names above the grids is called. */
+  readonly columnsKey: string;
   readonly noPlayers: string;
   readonly scoreHelp: string;
   readonly save: string;
@@ -84,11 +88,22 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
   // After a refusal (scripts on), the first wrong box takes the focus, which brings it into
   // view inside the grid: the sentence beside the scores names it.
   const formRef = useRef<HTMLFormElement>(null);
+  const tabsId = useId();
   useEffect(() => {
     if (state.kind !== 'refused') return;
     const first = state.wrong[0];
     const box = first === undefined ? null : formRef.current?.elements.namedItem(first);
-    if (box instanceof HTMLInputElement) box.focus();
+    if (!(box instanceof HTMLInputElement)) return;
+    // On a phone one team's grid is shown at a time: the wrong box's team is shown first.
+    const team = box.closest<HTMLElement>('[data-sheet-team]')?.dataset['sheetTeam'];
+    const tab =
+      team === undefined
+        ? null
+        : formRef.current?.querySelector<HTMLInputElement>(
+            `.admin-sheet-tabs input[value="${team}"]`,
+          );
+    if (tab !== null && tab !== undefined) tab.checked = true;
+    box.focus();
   }, [state]);
   const refused = state.kind === 'refused' ? state : undefined;
   const wrong = new Set(refused?.wrong ?? []);
@@ -118,17 +133,54 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
     }
     return refused.said;
   })();
+  // The team whose grid a phone shows first: the one a refusal's first wrong box is in.
+  const wrongTeam = teams.findIndex((team) =>
+    team.rows.some(
+      (row) => row.minutes?.field === firstWrong || row.stats.some((s) => s.field === firstWrong),
+    ),
+  );
+  const shownFirst = Math.max(0, wrongTeam);
 
+  const columns = [...(texts.minutes === undefined ? [] : [texts.minutes]), ...texts.columns];
   return (
-    <form ref={formRef} action={dispatch} onSubmit={onSubmit}>
+    <form ref={formRef} action={dispatch} onSubmit={onSubmit} className="admin-sheet-form">
       {Object.entries(props.hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      {teams.map((team) => (
-        <section key={team.teamId}>
-          <h2>{team.name}</h2>
+      {/* Each short column name spelled out once, above the grids (step 2.103). */}
+      {columns.length === 0 ? null : (
+        <dl className="admin-sheet-key" aria-label={texts.columnsKey}>
+          {columns.map((column) => (
+            <div key={column.short}>
+              <dt>{column.short}</dt>
+              <dd>{column.full}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {/* On a phone one team's grid is shown at a time: which, is picked here. The choice
+          is the screen's own and is no part of what the form sends (it belongs to no form). */}
+      {teams.length < 2 ? null : (
+        <div className="admin-sheet-tabs" role="radiogroup" aria-label={texts.teamShown}>
+          {teams.map((team, index) => (
+            <label key={team.teamId}>
+              <input
+                type="radio"
+                name={`${tabsId}-team`}
+                form={`${tabsId}-none`}
+                value={index}
+                defaultChecked={index === shownFirst}
+              />
+              <span dir="auto">{team.name}</span>
+            </label>
+          ))}
+        </div>
+      )}
+      {teams.map((team, index) => (
+        <section key={team.teamId} className="staff-panel" data-sheet-team={index}>
+          <h2 dir="auto">{team.name}</h2>
           {team.rows.length === 0 ? (
-            <p>{texts.noPlayers}</p>
+            <p className="staff-quiet">{texts.noPlayers}</p>
           ) : (
             <div className="box-score-grid" role="region" aria-label={team.name} tabIndex={0}>
               <table>
@@ -205,7 +257,7 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
           )}
         </section>
       ))}
-      <fieldset id={sheetScoresId}>
+      <fieldset id={sheetScoresId} className="staff-panel admin-sheet-scores">
         {/* Each team's label above its own box, at every width (step 2.103): beside the
             boxes, the second box wrapped under the first team's label on a phone. */}
         <div className="staff-scores">
@@ -226,7 +278,7 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
             </label>
           ))}
         </div>
-        {editable ? <p>{texts.scoreHelp}</p> : null}
+        {editable ? <p className="staff-quiet">{texts.scoreHelp}</p> : null}
         {editable && props.check !== undefined ? <ScoreCheck {...props.check} /> : null}
         {problem === undefined ? null : (
           <p id={problemId} className="ui-field-error" role="alert">
@@ -235,7 +287,13 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
         )}
         {props.saved === undefined ? null : <SavedLine text={props.saved} />}
       </fieldset>
-      {editable ? <button type="submit">{texts.save}</button> : null}
+      {editable ? (
+        <p className="staff-buttons">
+          <button type="submit" className="ui-button" data-kind="main">
+            {texts.save}
+          </button>
+        </p>
+      ) : null}
     </form>
   );
 }

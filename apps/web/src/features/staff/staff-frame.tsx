@@ -114,18 +114,22 @@ export async function StaffFrame({
           <div className="staff-menu-panel">{menu}</div>
         </details>
       </header>
+      {/* The side's dark ground runs the height of the page; what it holds stays on the
+          screen while the page scrolls. */}
       <aside className="staff-side">
-        <a className="staff-side-brand" href={home}>
-          <Emblem name={site.name} kind="league" />
-          <span className="staff-side-words">
-            <span className="staff-side-name" dir="auto">
-              {site.name}
+        <div className="staff-side-held">
+          <a className="staff-side-brand" href={home}>
+            <Emblem name={site.name} kind="league" />
+            <span className="staff-side-words">
+              <span className="staff-side-name" dir="auto">
+                {site.name}
+              </span>
+              <span className="staff-side-label">{t('admin.title')}</span>
             </span>
-            <span className="staff-side-label">{t('admin.title')}</span>
-          </span>
-        </a>
-        <StaffStatus status={league.status} />
-        {menu}
+          </a>
+          <StaffStatus status={league.status} />
+          {menu}
+        </div>
       </aside>
       <div className="staff-main">
         <div className="staff-body" id="content">

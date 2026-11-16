@@ -129,6 +129,20 @@ export async function openStaffMenu(page) {
 }
 
 /**
+ * The box score grid on a phone shows one team at a time (step 2.103). Picks the team a
+ * box of the grid belongs to, as a person would before typing in it; nothing to do where
+ * both teams are on the screen (a laptop).
+ */
+export async function showSheetTeamOf(page, box) {
+  const team = await box.evaluate(
+    (el) => el.closest('[data-sheet-team]')?.getAttribute('data-sheet-team') ?? null,
+  );
+  const tabs = page.locator('.admin-sheet-tabs');
+  if (team === null || (await tabs.count()) === 0 || !(await tabs.isVisible())) return;
+  await tabs.locator('label').nth(Number(team)).click();
+}
+
+/**
  * Accessibility checks on the screen the page shows (T-186). axe is not a dependency,
  * so these are the checks that can be made from the page itself: language, title, one
  * main landmark and one level-one heading, names on every link, button and field,

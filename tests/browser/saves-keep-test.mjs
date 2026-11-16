@@ -25,6 +25,7 @@ import {
   freePort,
   launch,
   openStaffMenu,
+  showSheetTeamOf,
   startNext,
   waitFor,
   whatWentWrong,
@@ -186,7 +187,11 @@ async function typeTiedSheet(page, away, home) {
   const points = [3, 4, 5, 6, 7, 5, 10, 4, 4, 4, 4, 4];
   const boxes = pointsBoxes(page);
   note(`the grid has twelve points boxes (${away} at ${home})`, (await boxes.count()) === 12);
-  for (const [i, value] of points.entries()) await boxes.nth(i).fill(String(value));
+  for (const [i, value] of points.entries()) {
+    // At 390 wide one team's grid is shown at a time: the box's team is picked first.
+    await showSheetTeamOf(page, boxes.nth(i));
+    await boxes.nth(i).fill(String(value));
+  }
   await page.getByLabel(`Score for ${away}`).fill('30');
   await page.getByLabel(`Score for ${home}`).fill('30');
   return points.map(String);
@@ -309,6 +314,36 @@ if (browser) {
       const { context, page } = await signedInAs('local-scheduler-token');
       try {
         await openBoxScore(page, finalScoreGame, 'Box score: Tigers at Lions');
+        // Step 2.103, at 390 wide: one team's grid at a time; with the grid moved to its
+        // last column every row still shows its player; and a tick box is a thumb high.
+        const grids = page.locator('.box-score-grid');
+        note(
+          'the box score shows one team at a time at 390 wide',
+          (await grids.nth(0).isVisible()) && !(await grids.nth(1).isVisible()),
+        );
+        const names = await grids.nth(0).evaluate((grid) => {
+          grid.scrollLeft = grid.scrollWidth;
+          const box = grid.getBoundingClientRect();
+          const moved = grid.scrollLeft > 0;
+          const rows = [...grid.querySelectorAll('tbody th[scope=row]')];
+          const hidden = rows.filter((th) => {
+            const at = th.getBoundingClientRect();
+            return at.left < box.left - 1 || at.right > box.right + 1 || at.width < 40;
+          });
+          grid.scrollLeft = 0;
+          return { moved, rows: rows.length, hidden: hidden.length };
+        });
+        note(
+          'the box score: every row still shows its player with the last column in view',
+          names.rows === 6 && names.hidden === 0,
+          JSON.stringify(names),
+        );
+        const tick = await grids.nth(0).locator('input[type=checkbox]').first().boundingBox();
+        note(
+          'the box score: a tick box is at least 44 high and wide',
+          tick !== null && tick.height >= 43.5 && tick.width >= 43.5,
+          JSON.stringify(tick),
+        );
         const typed = await typeTiedSheet(page, 'Tigers', 'Lions');
         await page.getByRole('button', { name: 'Save box score and make it final' }).click();
         await checkTiedSheetRefused(page, 'the box score', typed, 'Tigers', 'Lions');
@@ -316,6 +351,7 @@ if (browser) {
         // Put right and saved with a real double tap: saved once, "Saved" names the game and
         // its score under the title, on the screen, and nothing says someone changed it;
         // nothing of it is in the address, and a reload does not say it again.
+        await showSheetTeamOf(page, pointsBoxes(page).nth(0));
         await pointsBoxes(page).nth(0).fill('4');
         await page.getByLabel('Score for Tigers').fill('31');
         await page.getByRole('button', { name: 'Save box score and make it final' }).dblclick();
@@ -365,6 +401,7 @@ if (browser) {
       await checkTiedSheetRefused(page, 'the box score with scripts off', typed, 'Bears', 'Tigers');
       await page.getByLabel('Score for Bears').fill('');
       await page.getByLabel('Score for Tigers').fill('');
+      await showSheetTeamOf(page, pointsBoxes(page).nth(0));
       await pointsBoxes(page).nth(0).fill('4');
       await Promise.all([
         page.waitForEvent('load'),

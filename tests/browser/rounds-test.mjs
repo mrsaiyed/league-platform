@@ -19,6 +19,7 @@ import {
   buildNext,
   freePort,
   launch,
+  openStaffMenu,
   startNext,
   waitFor,
   whatWentWrong,
@@ -111,6 +112,8 @@ if (built) {
     at = 'the owner opens the admin and taps Schedule';
     await page.goto(`${origin}/north-valley`);
     await page.goto(`${origin}/north-valley/admin`);
+    // The admin's areas are behind its own menu button on a phone (step 2.103).
+    await openStaffMenu(page);
     await tap(
       page.locator('nav').getByRole('link', { name: 'Schedule', exact: true }).first(),
       /\/admin\/schedule$/,
@@ -312,6 +315,7 @@ if (built) {
 
     // The public season: a new round is not public until it is published.
     at = 'the owner adds a round to the public season';
+    await openStaffMenu(page);
     await tap(
       page.locator('nav').getByRole('link', { name: 'Schedule', exact: true }).first(),
       /\/admin\/schedule$/,

@@ -1,0 +1,612 @@
+/* The admin's pages, one after another (step 2.103): what each needs beyond the shared
+   staff pieces of staff.css. The same rules hold: every color, font, corner and space
+   from the design's variables (T-90), logical properties only (T-188). */
+
+.staff {
+  /* A plain tick, for a ticked box. */
+  --staff-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5.5 12.5 4.5 4.5 8.5-9.5'/%3E%3C/svg%3E");
+}
+
+/* ---------- Games ---------- */
+
+/* One panel a game: its card, then who scores it and what may be done to it. "Saved"
+   stands over the panel it is about. */
+.admin-game-list {
+  gap: var(--step-4);
+}
+/* On a laptop the games stand two across, each as tall as its own content: a game's card
+   is never stretched across the workspace. */
+@media (min-width: 80rem) {
+  .admin-game-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+/* ---------- The schedule ---------- */
+
+/* The season picker and the season's name, in one compact row under the page's head. */
+.admin-schedule-season {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-2) var(--step-4);
+  margin-block-end: var(--step-4);
+}
+.staff .admin-schedule-season > * {
+  margin: 0;
+}
+/* How the draft stands: a pill, then the sentence. */
+.staff .admin-schedule-draft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-2) var(--step-3);
+  margin-block: 0 var(--step-4);
+  font-size: var(--text-14);
+}
+.admin-schedule > .ui-notice,
+.admin-schedule > .staff-panel,
+.admin-schedule > .admin-clashes,
+.admin-schedule > .admin-add-round {
+  margin-block-end: var(--step-4);
+}
+.staff .admin-clashes > p {
+  margin: 0;
+}
+.staff .admin-clashes ul {
+  margin: 0;
+  padding-inline-start: var(--step-4);
+}
+/* A round: its name, its day and how many games it holds; then its games as rows. */
+.admin-round-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-2) var(--step-3);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+/* What changes or removes a round opens under its head: two small forms side by side
+   where there is room, and removing apart beneath them. */
+.admin-round-forms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--step-4) var(--step-5);
+  align-items: start;
+  padding-block: var(--step-2) var(--step-3);
+}
+.admin-round-remove {
+  grid-column: 1 / -1;
+  padding-block-start: var(--step-4);
+  border-block-start: 1px solid var(--color-line);
+}
+/* A field with its error and its help right under it. */
+.admin-field-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-1);
+}
+.staff .admin-field-group > * {
+  margin: 0;
+}
+.admin-add-round > details[open] > summary {
+  margin-block-end: var(--step-3);
+}
+/* The games of a round: rows under fine lines, each with its teams' marks, its facts and
+   one way in ("Edit this game", a row with a chevron). */
+.staff .admin-slots {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  border-block-start: 1px solid var(--color-line);
+  list-style: none;
+}
+.admin-slots > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-2);
+  padding-block: var(--step-3);
+  border-block-end: 1px solid var(--color-line);
+}
+.staff .admin-slots > li > * {
+  margin: 0;
+}
+.admin-slot-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-1) var(--step-3);
+}
+.admin-slot-line > .ui-emblem + .ui-emblem {
+  margin-inline-start: calc(-1 * var(--step-2));
+}
+.admin-slot-line > strong {
+  flex: 1 1 12rem;
+  min-inline-size: 0;
+}
+.admin-slot-line > span {
+  flex: 1 1 100%;
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.admin-slots details[open] > summary {
+  margin-block-end: var(--step-2);
+}
+.admin-slots details > form + form,
+.admin-publish > details {
+  margin-block-start: var(--step-4);
+  padding-block-start: var(--step-4);
+  border-block-start: 1px solid var(--color-line);
+}
+.staff .admin-publish > p {
+  margin: 0;
+  font-size: var(--text-14);
+}
+
+/* ---------- League settings ---------- */
+
+/* The groups, as a short row that reaches each one. */
+.settings-jump ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--step-2);
+  margin-block: 0 var(--step-4);
+  padding: 0;
+  list-style: none;
+}
+.staff .settings-jump a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap);
+  padding-inline: var(--step-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: var(--text-14);
+  font-weight: 600;
+  text-decoration: none;
+}
+.staff .settings-jump a:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+}
+.admin-settings > .ui-notice,
+.admin-settings > .settings-group {
+  margin-block-end: var(--step-4);
+}
+.staff .settings-group > p {
+  max-inline-size: 44rem;
+  font-size: var(--text-14);
+}
+/* Each setting under a fine line: its name, its choices one a row, how it stands, Save. */
+.settings-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-3);
+  padding-block-start: var(--step-4);
+  border-block-start: 1px solid var(--color-line);
+}
+.staff .settings-item > p {
+  max-inline-size: 44rem;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.staff .settings-choice {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.staff .settings-choice > legend {
+  margin-block-end: var(--step-1);
+  padding: 0;
+  font-weight: 600;
+}
+.staff .settings-choice > p,
+.staff .settings-item form > p,
+.staff .settings-confirm > p {
+  margin: 0;
+}
+.staff .settings-choice .staff-check {
+  align-items: flex-start;
+  padding-block: var(--step-2);
+  line-height: 1.4;
+}
+.settings-confirm {
+  display: grid;
+  gap: var(--step-1);
+  padding: var(--step-3);
+  border-radius: var(--radius-small);
+  background: var(--staff-wait-soft);
+}
+.staff .settings-name {
+  font-weight: 600;
+}
+.staff .settings-about {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-1) var(--step-3);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+
+/* ---------- Import, and any plain table ---------- */
+
+.admin-import > .ui-notice,
+.admin-import > .staff-panel,
+.admin-import > .staff-quiet {
+  margin-block-end: var(--step-4);
+}
+.staff .admin-import-report ul {
+  margin: 0;
+  padding-inline-start: var(--step-4);
+  font-size: var(--text-14);
+}
+.admin-import-report > section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-2);
+  padding-block-start: var(--step-4);
+  border-block-start: 1px solid var(--color-line);
+}
+.staff .admin-import-report > section > * {
+  margin: 0;
+}
+/* A wide table scrolls by itself at phone width, never the whole page (A-2). */
+.staff-table-box {
+  max-inline-size: 100%;
+  overflow-x: auto;
+}
+.staff-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-14);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.staff-table th,
+.staff-table td {
+  padding-block: var(--step-2);
+  padding-inline: var(--step-3);
+  text-align: start;
+  white-space: nowrap;
+}
+.staff-table thead th {
+  color: var(--color-muted);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+}
+.staff-table tbody tr > * {
+  border-block-start: 1px solid var(--color-line);
+}
+.staff-table tbody tr:hover > * {
+  background: var(--color-tint);
+}
+
+/* ---------- A scorekeeper's games ---------- */
+
+/* One panel a game, as on the games list: its card, then what to do with it, each line
+   with its button at the end. */
+.staff .admin-my-game {
+  align-content: start;
+  padding-block-end: var(--step-3);
+}
+.staff .admin-my-game > p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-2) var(--step-3);
+  margin: 0;
+  padding-block: var(--step-1);
+  padding-inline: var(--space);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.staff .admin-my-games-foot {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+
+/* ---------- A game's panel, on the games list and among a scorekeeper's games ---------- */
+
+.admin-game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-2);
+}
+.admin-game-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-panel);
+}
+.staff .admin-game-panel > .ui-game-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+/* In the workspace a winner's score is in the color the eye lands on, which reads on white. */
+.staff .ui-game-team[data-winner='true'] .ui-game-team-score {
+  color: var(--color-pop);
+}
+.staff .admin-game-who {
+  margin: 0;
+  padding-block: 0 var(--step-3);
+  padding-inline: var(--space);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+/* What may be done to a game, in one row under a fine line: the thing to do first, the
+   other ways beside it, and "Forfeit, postpone or cancel" apart at the end. Whatever
+   opens (the score boxes, the question, the other ways) takes the row beneath. */
+.admin-game-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-3);
+  padding-block: var(--step-3);
+  padding-inline: var(--space);
+  border-block-start: 1px solid var(--color-line);
+}
+.admin-game-controls:empty {
+  display: none;
+}
+.staff .admin-game-controls > * {
+  margin: 0;
+}
+.admin-game-controls > p:not(:has(.ui-button)) {
+  flex: 1 1 100%;
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.admin-game-controls > p:has(.ui-button) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-2) var(--step-3);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.admin-game-controls > details[open],
+.admin-game-controls > [data-question] {
+  flex: 1 1 100%;
+}
+.admin-game-controls > details[open] > summary {
+  margin-block-end: var(--step-3);
+}
+.admin-game-controls > .admin-game-other:not([open]) {
+  margin-inline-start: auto;
+}
+.staff .admin-game-controls > [data-question] {
+  padding: var(--step-4);
+  box-shadow: none;
+}
+/* The other ways a game ends, each a small form of its own: the choice above its button. */
+.admin-game-other[open] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-3);
+}
+.staff .admin-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--step-3);
+  margin: 0;
+}
+.admin-action > .staff-field {
+  flex: 0 1 16rem;
+}
+.staff .admin-action > .ui-field-error {
+  flex: 1 1 100%;
+}
+/* A day of this week, over its games. */
+.staff .admin-games .ui-section h3 {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-14);
+  font-weight: 700;
+}
+
+/* ---------- The box score ---------- */
+
+.admin-sheet-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-4);
+  margin: 0;
+}
+.staff .admin-sheet-form > * {
+  margin: 0;
+}
+.admin-sheet > .staff-panel,
+.admin-sheet > .ui-notice {
+  margin-block-end: var(--step-4);
+}
+/* Each short column name spelled out once, above the grids. */
+.admin-sheet-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--step-1) var(--step-4);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.admin-sheet-key > div {
+  display: flex;
+  gap: var(--step-1);
+}
+.admin-sheet-key dt {
+  color: var(--color-text);
+  font-weight: 700;
+}
+.admin-sheet-key dd {
+  margin: 0;
+}
+/* On a phone one team's grid is shown at a time: the two teams' names as one control,
+   the team shown filled. Where there is room for both grids the control is put away. */
+.admin-sheet-tabs {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  padding: var(--step-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-small);
+  background: var(--color-panel);
+}
+.admin-sheet-tabs label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: var(--tap);
+  padding-inline: var(--step-3);
+  border-radius: calc(var(--radius-small) - 2px);
+  font-size: var(--text-14);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+.admin-sheet-tabs input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.admin-sheet-tabs label:has(input:checked) {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.admin-sheet-tabs label:has(input:focus-visible) {
+  outline: 3px solid var(--color-primary-text);
+  outline-offset: 2px;
+}
+@media (max-width: 47.99rem) {
+  .admin-sheet-form:has(.admin-sheet-tabs input[value='0']:checked) [data-sheet-team='1'],
+  .admin-sheet-form:has(.admin-sheet-tabs input[value='1']:checked) [data-sheet-team='0'] {
+    display: none;
+  }
+}
+@media (min-width: 48rem) {
+  .admin-sheet-tabs {
+    display: none;
+  }
+}
+/* The grid (step 2.64): on a phone it scrolls sideways in its own box, never the page
+   (A-2). The player's name stays in place while the columns move, and a shadow at either
+   edge says there are more columns that way. */
+.box-score-grid {
+  max-inline-size: 100%;
+  overflow-x: auto;
+  background:
+    linear-gradient(90deg, var(--color-panel) 40%, transparent) 0 0 / var(--step-6) 100% no-repeat
+      local,
+    linear-gradient(270deg, var(--color-panel) 40%, transparent) 100% 0 / var(--step-6) 100%
+      no-repeat local,
+    linear-gradient(90deg, var(--scroll-shadow), transparent) 0 0 / var(--step-3) 100% no-repeat
+      scroll,
+    linear-gradient(270deg, var(--scroll-shadow), transparent) 100% 0 / var(--step-3) 100% no-repeat
+      scroll;
+}
+.box-score-grid table {
+  border-collapse: collapse;
+}
+.box-score-grid th,
+.box-score-grid td {
+  padding: var(--step-1);
+  text-align: center;
+  white-space: nowrap;
+}
+.box-score-grid thead th {
+  color: var(--color-muted);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+}
+.box-score-grid thead abbr {
+  text-decoration: none;
+}
+.box-score-grid tbody tr + tr > * {
+  border-block-start: 1px solid var(--color-line);
+}
+.box-score-grid th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  max-inline-size: 9.5rem;
+  padding-inline: 0 var(--step-3);
+  overflow: hidden;
+  background: var(--color-panel);
+  font-size: var(--text-14);
+  text-align: start;
+  text-overflow: ellipsis;
+}
+.staff .box-score-grid input[type='number'] {
+  inline-size: calc(var(--step-7) + var(--step-2));
+  padding-inline: var(--step-2);
+  font-size: var(--text-16);
+  text-align: center;
+}
+/* A tick a thumb can hit: the box is drawn 24 in a square 44 that is all the tick's. */
+.staff .box-score-grid input[type='checkbox'] {
+  display: inline-grid;
+  place-content: center;
+  inline-size: var(--tap);
+  block-size: var(--tap);
+  margin: 0;
+  border: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+.staff .box-score-grid input[type='checkbox']::before,
+.staff .box-score-grid input[type='checkbox']::after {
+  content: '';
+  grid-area: 1 / 1;
+  inline-size: var(--step-5);
+  block-size: var(--step-5);
+}
+.staff .box-score-grid input[type='checkbox']::before {
+  border: 1px solid color-mix(in srgb, var(--color-text) 45%, transparent);
+  border-radius: calc(var(--radius-small) - 2px);
+  background: var(--color-panel);
+}
+.staff .box-score-grid input[type='checkbox']:checked::before {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+.staff .box-score-grid input[type='checkbox']:checked::after {
+  background: var(--color-on-primary);
+  -webkit-mask: var(--staff-check) center / var(--step-4) no-repeat;
+  mask: var(--staff-check) center / var(--step-4) no-repeat;
+}
+.staff .box-score-grid input[type='checkbox']:disabled {
+  cursor: not-allowed;
+}
+/* The two scores, the warning while typing, the refusal and "Saved", in one panel. */
+.staff .admin-sheet-scores {
+  min-inline-size: 0;
+}
+/* A typed score that differs from the players' points (S-26): seen, not blocking. */
+.box-score-warning:empty {
+  display: none;
+}
+.staff .box-score-warning p {
+  margin: 0;
+  padding-inline-start: var(--step-3);
+  border-inline-start: var(--step-1) solid var(--staff-wait);
+  color: var(--staff-wait);
+  font-size: var(--text-14);
+  font-weight: 600;
+}

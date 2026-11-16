@@ -2,8 +2,10 @@ import type { ReactNode } from 'react';
 import type { LeagueRouteProps } from '../../../features/shell/index.ts';
 import { StaffFrame } from '../../../features/staff/index.ts';
 import { leagueView } from '../../../server/load-league-page.ts';
-// The staff area's own stylesheet: only the admin's pages carry it (step 2.103).
+// The staff area's own stylesheets: only the admin's pages carry them (step 2.103). The
+// frame and the shared staff pieces first, then what each page needs beyond them.
 import './staff.css';
+import './staff-pages.css';
 
 /**
  * The admin (P4): its own frame around every one of its pages (step 2.103), with the menu

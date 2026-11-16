@@ -82,6 +82,22 @@ export function dayText(date: string): string {
     : date;
 }
 
+const clockFormat = new Intl.DateTimeFormat(locale, {
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'UTC',
+});
+
+/**
+ * A time of day in words, "6:00 PM", for the league's own clock time as the grid holds it
+ * ("18:00"); a value that is not a time is given back as it is. Only how it is written:
+ * the time is the league's own already (step 2.165 names the zone).
+ */
+export function clockText(time: string): string {
+  const at = new Date(`1970-01-01T${time}:00.000Z`);
+  return /^\d{2}:\d{2}$/.test(time) && !Number.isNaN(at.getTime()) ? clockFormat.format(at) : time;
+}
+
 /** The day after `date` by `days`, as YYYY-MM-DD; undefined for a value that is not a day. */
 export function daysAfter(date: string, days: number): string | undefined {
   const day = new Date(`${date}T00:00:00.000Z`);

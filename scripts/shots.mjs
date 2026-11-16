@@ -109,6 +109,18 @@ const gamePages = {
     { name: 'game-undated', at: `/games/${listedGame(5, 4)}` },
   ],
 };
+/**
+ * The box score grid on a phone shows one team at a time (step 2.103): picks the team a
+ * box belongs to before it is typed in, as a person would. Nothing to do on a laptop.
+ */
+async function showSheetTeamOf(page, box) {
+  const team = await box.evaluate(
+    (el) => el.closest('[data-sheet-team]')?.getAttribute('data-sheet-team') ?? null,
+  );
+  const tabs = page.locator('.admin-sheet-tabs');
+  if (team === null || (await tabs.count()) === 0 || !(await tabs.isVisible())) return;
+  await tabs.locator('label').nth(Number(team)).click();
+}
 // The games area's states, reached by tapping (steps 2.154 and 2.155); see adminPages.
 const gamesStates = [
   { name: 'admin-games-boxes-open', at: '/admin/games', onlyIn: leagues[0], tap: openBoxes(1) },
@@ -230,7 +242,10 @@ const gamesStates = [
     tap: async (page) => {
       const points = page.locator('main input[name^="stat.points."]');
       const typed = [3, 4, 5, 6, 7, 5, 10, 4, 4, 4, 4, 4];
-      for (const [i, value] of typed.entries()) await points.nth(i).fill(String(value));
+      for (const [i, value] of typed.entries()) {
+        await showSheetTeamOf(page, points.nth(i));
+        await points.nth(i).fill(String(value));
+      }
       await page.locator('main input[name="awayScore"]').fill('30');
       await page.locator('main input[name="homeScore"]').fill('30');
       await page.locator('main form button[type="submit"]').last().click();
@@ -246,6 +261,7 @@ const gamesStates = [
       // A count the phone's own check would stop: the form is sent as a browser that does
       // not check would send it, so the server's refusal is what is pictured.
       const points = page.locator('main input[name^="stat.points."]');
+      await showSheetTeamOf(page, points.nth(3));
       await points.nth(3).fill('1000');
       await page.locator('main form:has(#box-score-scores)').evaluate((form) => {
         form.noValidate = true;

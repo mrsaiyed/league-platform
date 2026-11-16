@@ -507,6 +507,7 @@ export const en = {
   'adminSettings.intro':
     'These settings apply to the whole league. Each shows what it is set to now, its default and what it accepts.',
   'adminSettings.none': 'This league has no settings to change yet.',
+  'adminSettings.groups': 'Groups of settings',
   'adminSettings.default': 'Default: {value}',
   'adminSettings.defaultMark': '{choice} (the default)',
   'adminSettings.yes': 'Yes',
@@ -742,6 +743,8 @@ export const en = {
   'admin.boxScore.scoreMismatch':
     'Check {team}: the score you typed is {score}, but its players’ points add up to {points}. It will be saved as {score} unless you change it.',
   'admin.boxScore.back': 'Back to the games',
+  'admin.boxScore.teamShown': 'Team shown',
+  'admin.boxScore.columnsKey': 'What the columns are',
   'admin.boxScore.player': 'Player',
   'admin.boxScore.jersey': '#{number}',
   'admin.boxScore.left': '(left the team)',
@@ -1749,6 +1752,11 @@ export const en = {
   'schedule.admin.noSeason': 'There is no season to schedule yet.',
   'schedule.admin.seasonName': 'Season: {name}',
   'schedule.admin.noDraft': 'There is no draft yet. You are looking at the published schedule.',
+  // The schedule's head and the draft's state, as drawn by step 2.103.
+  'schedule.admin.reviewPublish': 'Review and publish',
+  'schedule.admin.draftPill': 'Draft',
+  'schedule.admin.publishedPill': 'Published',
+  'schedule.admin.hiddenPill': 'Not public yet',
   'schedule.admin.draftChanges_one': 'Draft in progress: {count} change not yet published.',
   'schedule.admin.draftChanges_other': 'Draft in progress: {count} changes not yet published.',
   'schedule.admin.draftOutOfDate':
