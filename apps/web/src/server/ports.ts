@@ -1,19 +1,22 @@
 // What the web app's pages need from outside, as one object (T-21: the app wires
 // adapters to core). container.ts chooses which adapters fill it: the made-up
 // stand-ins for local work and tests, or the database for staging and production.
+//
+// The imports, and each area's ports below (adminSettings to tracker), are in alphabetical
+// order: a new area's go in their place, never at the end (step 2.188, record 072).
 import type { AccessHolder, AccountLeagueRow, CommandContext, Result } from '@srleagues/core';
 import type { SessionIdentity, SignInService } from '@srleagues/providers';
-import type { Renew } from './sign-in/renew-session.ts';
-import type { SignInMail } from './sign-in/sign-in-mail.ts';
+import type { AdminSettingsPorts } from './admin-settings.ts';
+import type { AdminTeamsPorts } from './admin-teams.ts';
 import type { ContextDeps, IdentifyError } from './context.ts';
 import type { FixtureImportPorts } from './fixture-import-ports.ts';
 import type { GamesAreaPorts } from './games-area-ports.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
-import type { ScheduleAdminPorts } from './schedule-admin.ts';
 import type { PublicTeamsPorts } from './public-teams.ts';
-import type { AdminTeamsPorts } from './admin-teams.ts';
-import type { AdminSettingsPorts } from './admin-settings.ts';
+import type { ScheduleAdminPorts } from './schedule-admin.ts';
+import type { Renew } from './sign-in/renew-session.ts';
+import type { SignInMail } from './sign-in/sign-in-mail.ts';
 import type { PublishPlays } from './tracker-commands-endpoint.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
@@ -43,22 +46,22 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * myLeagues may turn them into a list, in its one caller (signed-in-leagues.ts).
    */
   readonly leaguesOfAccount: (accountId: string) => Promise<readonly AccountLeagueRow[]>;
-  /** What the public standings and statistics pages read (step 2.43). */
-  readonly publicStats: PublicStatsPorts;
-  /** What the admin's games area runs on (step 2.55). */
-  readonly games: GamesAreaPorts;
-  /** What the admin's fixture import screen runs on (step 2.54). */
-  readonly fixtureImport: FixtureImportPorts;
-  /** What the public home and schedule pages read (step 2.42). */
-  readonly publicSchedule: PublicSchedulePorts;
-  /** What Admin → Schedule runs its commands on (step 2.52). */
-  readonly scheduleAdmin: ScheduleAdminPorts;
-  /** What the public teams pages and the members' start page read (step 2.44). */
-  readonly publicTeams: PublicTeamsPorts;
-  /** What the admin's Teams screens read and run (step 2.51). */
-  readonly adminTeams: AdminTeamsPorts;
   /** What the admin's League settings screen runs on (step 2.48). */
   readonly adminSettings: AdminSettingsPorts;
+  /** What the admin's Teams screens read and run (step 2.51). */
+  readonly adminTeams: AdminTeamsPorts;
+  /** What the admin's fixture import screen runs on (step 2.54). */
+  readonly fixtureImport: FixtureImportPorts;
+  /** What the admin's games area runs on (step 2.55). */
+  readonly games: GamesAreaPorts;
+  /** What the public home and schedule pages read (step 2.42). */
+  readonly publicSchedule: PublicSchedulePorts;
+  /** What the public standings and statistics pages read (step 2.43). */
+  readonly publicStats: PublicStatsPorts;
+  /** What the public teams pages and the members' start page read (step 2.44). */
+  readonly publicTeams: PublicTeamsPorts;
+  /** What Admin → Schedule runs its commands on (step 2.52). */
+  readonly scheduleAdmin: ScheduleAdminPorts;
   /** What the tracker's endpoints run on (step 2.32). */
   readonly tracker: TrackerPorts;
   /** Publishes a game's newest state for the people watching, after a batch is saved (T-117). */

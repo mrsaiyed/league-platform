@@ -38,7 +38,18 @@ import {
   type SessionIdentity,
 } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
+// In alphabetical order by file, a new one in its place, never at the end (step 2.188). A
+// new area's stand-in is wired in standInPorts beside the areas like it, not at the end.
 import { accessOfVia } from './access-of.ts';
+import type { FoundLeague, LeagueById } from './context.ts';
+import { liveListenAuthorize } from './live-listen.ts';
+import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
+import type { WebPorts } from './ports.ts';
+import { createPlayPublisher } from './publish-plays.ts';
+import { sharedRenewal } from './sign-in/renew-session.ts';
+import { createSignInMail } from './sign-in/sign-in-mail.ts';
+import { standInAdminSettings } from './stand-in-admin-settings.ts';
+import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import {
   castId,
   standInDraftProgramId,
@@ -46,20 +57,13 @@ import {
   standInPeople,
   standInSeedCast,
 } from './stand-in-cast.ts';
-import type { FoundLeague, LeagueById } from './context.ts';
-import { liveListenAuthorize } from './live-listen.ts';
-import type { WebPorts } from './ports.ts';
-import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
-import { standInAdminSettings } from './stand-in-admin-settings.ts';
-import { createPlayPublisher } from './publish-plays.ts';
-import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import { standInFixtureImport } from './stand-in-fixture-import.ts';
 import { standInGames } from './stand-in-games.ts';
+import { standInMyLeagues } from './stand-in-my-leagues.ts';
 import { standInPublicSchedule } from './stand-in-public-schedule.ts';
 import { standInPublicStats } from './stand-in-public-stats.ts';
-import { standInSchedule } from './stand-in-schedule.ts';
 import { standInPublicTeams } from './stand-in-public-teams.ts';
-import { standInMyLeagues } from './stand-in-my-leagues.ts';
+import { standInSchedule } from './stand-in-schedule.ts';
 import {
   madeUpAccountOf,
   standInMemberAccountId,
@@ -67,8 +71,6 @@ import {
 } from './stand-in-sign-ins.ts';
 import { madeUpLeagues } from './stand-in-world-seed.ts';
 import { madeUpWorld } from './stand-in-world.ts';
-import { sharedRenewal } from './sign-in/renew-session.ts';
-import { createSignInMail } from './sign-in/sign-in-mail.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
 export { standInDraftProgramId, standInLeagues, standInPeople } from './stand-in-cast.ts';
