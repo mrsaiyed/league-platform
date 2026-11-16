@@ -485,9 +485,13 @@ describe('the T-81 scan on the database: each way a person is shown less or leav
     // statistics of the games they played (R-17).
     const morgan = await personNamed(slug, 'Morgan');
     const morgansTeam = await playedFor(morgan);
-    const entry = await teamsDeps.transaction(as, async (tx) =>
-      (await tx.teams.listRoster(morgansTeam)).find((line) => line.personId === morgan),
-    );
+    // The day they left: the day they joined, or the league's own today (a leaving date
+    // after the league's today is refused, step 2.161; the computer's UTC date can be
+    // a day ahead of it).
+    const { entry, today } = await teamsDeps.transaction(as, async (tx) => ({
+      entry: (await tx.teams.listRoster(morgansTeam)).find((line) => line.personId === morgan),
+      today: await tx.teams.leagueToday(),
+    }));
     if (entry === undefined) throw new Error('no roster entry for Morgan');
     must(
       'left',
@@ -496,7 +500,7 @@ describe('the T-81 scan on the database: each way a person is shown less or leav
         {
           rosterEntryId: entry.id,
           version: entry.version,
-          leftOn: entry.joinedOn ?? new Date().toISOString().slice(0, 10),
+          leftOn: entry.joinedOn ?? today,
         },
         teamsDeps,
       ),
