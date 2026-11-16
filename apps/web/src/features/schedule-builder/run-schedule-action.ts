@@ -7,6 +7,7 @@ import {
   addDraftRound,
   changeDraftRoundDate,
   discardScheduleDraft,
+  getScheduleDraft,
   moveDraftGame,
   publishSchedule,
   removeDraftGame,
@@ -25,6 +26,7 @@ export type ScheduleActionKind =
   | 'save-game'
   | 'add-game'
   | 'remove-game'
+  | 'put-back-game'
   | 'swap-games'
   | 'rename-round'
   | 'change-round-date'
@@ -43,8 +45,14 @@ export type SavedDetail =
   | { readonly what: 'game-saved'; readonly gameId: string }
   /** A game went to another round and its date was left as it was: the grid offers the round's. */
   | { readonly what: 'game-round'; readonly gameId: string }
-  /** A game was removed from this round (null: from the games with no round). */
-  | { readonly what: 'game-removed'; readonly roundId: string | null };
+  /**
+   * A game was removed from this round (null: from the games with no round), and which,
+   * so the grid can offer to put it back (step 2.161). What it was is read from the draft
+   * on the server, never from the address.
+   */
+  | { readonly what: 'game-removed'; readonly roundId: string | null; readonly gameId?: string }
+  /** A removed game was put back in the draft as it was. */
+  | { readonly what: 'game-put-back'; readonly gameId: string };
 
 /** Which form a refusal belongs beside: the new round's, or one round's own. */
 export type RefusedAt =
@@ -191,12 +199,13 @@ export async function runScheduleAction(
     }
     case 'remove-game': {
       const done = await removeDraftGame(context, { ...basis, gameId }, deps);
+      if (!done.ok) return refusal(done);
       // Said in the round the game was in when the form was drawn.
-      const [wasRound] = text(form, 'wasSlot').split('~');
-      return done.ok
-        ? { kind: 'saved', detail: { what: 'game-removed', roundId: orNull(wasRound ?? '') } }
-        : refusal(done);
+      const [wasRound = ''] = text(form, 'wasSlot').split('~');
+      return { kind: 'saved', detail: { what: 'game-removed', roundId: orNull(wasRound), gameId } };
     }
+    case 'put-back-game':
+      return putBackGame(gameId, basis.seasonId, context, deps);
     case 'swap-games': {
       const otherGameId = text(form, 'otherGameId');
       if (otherGameId === '') return invalid;
@@ -242,4 +251,50 @@ export async function runScheduleAction(
       return done.ok ? { kind: 'discarded' } : refusal(done);
     }
   }
+}
+
+/**
+ * "Put it back" (step 2.161): adds a game removed from the draft again exactly as it was,
+ * read from the draft on the server by its id (the game as it stood just before it was
+ * removed), never from the page's address. Its basis is the draft as it is now, so a page
+ * reloaded or tapped twice is not told someone else changed the draft: a game already back
+ * is answered "put back"; one the draft no longer removes (published or discarded since,
+ * or never removed) is refused in words, and nothing is added.
+ */
+async function putBackGame(
+  gameId: string,
+  seasonId: string,
+  context: CommandContext,
+  deps: CommandDeps<SchedulingTx>,
+): Promise<ScheduleActionOutcome> {
+  const read = await getScheduleDraft(context, { seasonId }, deps);
+  if (!read.ok) return refusal(read);
+  const view = read.value;
+  if (view.result.games.some((g) => g.id === gameId)) {
+    return { kind: 'saved', detail: { what: 'game-put-back', gameId } };
+  }
+  const was = view.removed.find((g) => g.id === gameId);
+  if (was === undefined || view.draft === null || was.status !== 'scheduled') {
+    return { kind: 'refused', code: 'nothing-to-put-back' };
+  }
+  const done = await addDraftGame(
+    context,
+    {
+      seasonId,
+      basedOnRevision: view.latestRevision,
+      draftId: view.draft.id,
+      version: view.draft.version,
+      gameId,
+      homeTeamId: was.homeTeamId,
+      awayTeamId: was.awayTeamId,
+      roundId: was.roundId,
+      date: was.date,
+      time: was.time,
+      venueId: was.venueId,
+      court: was.court,
+      recording: was.recording ?? null,
+    },
+    deps,
+  );
+  return done.ok ? { kind: 'saved', detail: { what: 'game-put-back', gameId } } : refusal(done);
 }

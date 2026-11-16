@@ -2,12 +2,15 @@
 // the screens' actions run them, over the made-up in-memory store (step 2.51).
 import {
   addToRoster,
+  changeRosterEntry,
   createPerson,
   createTeam,
   listPeople,
   listRoster,
   markLeft,
+  putBackOnRoster,
   removePerson,
+  removeTeam,
   reorderRoster,
   setTeamStatsVisibility,
   updateTeam,
@@ -146,6 +149,143 @@ describe('the admin Teams screens over the stand-in', () => {
     );
     const removed = await removePerson(m.owner, { personId: people[0] }, m.ports.deps);
     expect(removed.ok).toBe(true);
+  });
+
+  it('refuses a leaving date of next year, and puts back one marked as left by mistake', async () => {
+    const m = made(true);
+    const { teamId, entries } = await teamOfTen(m);
+    const entry = entries[2] ?? '';
+    const nextYear = `${new Date().getUTCFullYear() + 1}-06-01`;
+    const early = await markLeft(
+      m.owner,
+      markLeftInput({ entry, version: '1', leftOn: nextYear }),
+      m.ports.deps,
+    );
+    expect(early).toEqual({ ok: false, error: { code: 'left-after-today' } });
+    value(
+      await markLeft(
+        m.owner,
+        markLeftInput({ entry, version: '1', leftOn: '2026-11-13' }),
+        m.ports.deps,
+      ),
+    );
+    expect(
+      await putBackOnRoster(m.owner, { teamId, rosterEntryId: entry, version: 1 }, m.ports.deps),
+    ).toEqual({ ok: false, error: { code: 'changed-since-read' } });
+    value(
+      await putBackOnRoster(m.owner, { teamId, rosterEntryId: entry, version: 2 }, m.ports.deps),
+    );
+    const roster = value(await listRoster(m.owner, { teamId }, m.ports.deps));
+    expect(roster.filter((line) => line.leftOn !== null)).toEqual([]);
+    expect(roster.map((line) => line.jerseyNumber)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      '10',
+    ]);
+    // In a season of unique numbers, a number worn since keeps them off, as the database does.
+    value(
+      await markLeft(
+        m.owner,
+        markLeftInput({ entry, version: '3', leftOn: '2026-11-13' }),
+        m.ports.deps,
+      ),
+    );
+    const other = roster.find((line) => line.jerseyNumber === '4');
+    value(
+      await changeRosterEntry(
+        m.owner,
+        { rosterEntryId: other?.id ?? '', version: other?.version ?? 0, jerseyNumber: '3' },
+        m.ports.deps,
+      ),
+    );
+    // Back with no number (R-32), as the database puts them back.
+    expect(
+      await putBackOnRoster(m.owner, { teamId, rosterEntryId: entry, version: 4 }, m.ports.deps),
+    ).toEqual({ ok: true, value: { version: 5, numberDropped: '3' } });
+    const after = value(await listRoster(m.owner, { teamId }, m.ports.deps));
+    expect(after.find((line) => line.id === entry)).toMatchObject({
+      leftOn: null,
+      jerseyNumber: null,
+    });
+  });
+
+  it("takes the league's today from the world's own clock, not the computer's", async () => {
+    // The world's clock says March 2030, years after this computer's.
+    const world = testWorld(
+      () => access,
+      () => new Date('2030-03-01T18:00:00Z'),
+    );
+    const m = { ...made(), ports: standInAdminTeams(world) };
+    const { entries } = await teamOfTen(m);
+    const leave = (n: number, leftOn: string) =>
+      markLeft(
+        m.owner,
+        markLeftInput({ entry: entries[n] ?? '', version: '1', leftOn }),
+        m.ports.deps,
+      );
+    expect(await leave(0, '2030-03-05')).toEqual({
+      ok: false,
+      error: { code: 'left-after-today' },
+    });
+    expect((await leave(0, '2029-12-01')).ok).toBe(true);
+    expect((await leave(1, '2030-03-01')).ok).toBe(true);
+  });
+
+  it('puts back one waiting for review with their number, as the database does (0015)', async () => {
+    // Pat Gorski (left, #8) was added at a scorer's table and waits for review; since then
+    // Marcus Oyelaran wears 8, in a season that asks for a different number for each.
+    const world = testWorld(
+      () => access,
+      undefined,
+      (leagues) => {
+        withUniqueJerseys(leagues);
+        for (const league of leagues) {
+          const id = (first: string) =>
+            league.people.find((p) => p.firstName === first && p.lastName !== '')?.id;
+          league.roster = league.roster.map((r) =>
+            r.personId === id('Pat')
+              ? { ...r, needsReview: true }
+              : r.personId === id('Marcus')
+                ? { ...r, jerseyNumber: '8' }
+                : r,
+          );
+        }
+      },
+    );
+    const m = { ...made(), ports: standInAdminTeams(world) };
+    const read = await world.read(leagueId);
+    const pat = read?.people.find((p) => p.firstName === 'Pat' && p.lastName === 'Gorski');
+    const entry = read?.roster.find((r) => r.personId === pat?.id);
+    if (entry === undefined) throw new Error('no Pat Gorski');
+    expect(
+      await putBackOnRoster(
+        m.owner,
+        { teamId: entry.teamId, rosterEntryId: entry.id, version: entry.version },
+        m.ports.deps,
+      ),
+    ).toMatchObject({ ok: true });
+    const after = value(await listRoster(m.owner, { teamId: entry.teamId }, m.ports.deps));
+    expect(after.find((line) => line.id === entry.id)).toMatchObject({
+      leftOn: null,
+      jerseyNumber: '8',
+    });
+  });
+
+  it('lets a player of a team in the bin be taken off the league list (A-16)', async () => {
+    const m = made();
+    const { teamId, people } = await teamOfTen(m);
+    value(await removeTeam(m.owner, { teamId }, m.ports.deps));
+    value(await removePerson(m.owner, { personId: people[0] }, m.ports.deps));
+    // Their place on the binned team is kept as it was, with no leaving date.
+    const roster = await m.ports.deps.transaction(m.owner, (tx) => tx.teams.listRoster(teamId));
+    expect(roster.filter((line) => line.leftOn === null)).toHaveLength(10);
   });
 
   it('puts the roster in a new order, one place at a time', async () => {
@@ -349,6 +489,11 @@ describe('the admin Teams screens over the stand-in', () => {
     expect(await listPeopleCount(m)).toBe(before + 1);
   });
 });
+
+function value<T>(result: { ok: true; value: T } | { ok: false; error: { code: string } }): T {
+  if (!result.ok) throw new Error(`refused: ${result.error.code}`);
+  return result.value;
+}
 
 async function listPeopleCount(m: ReturnType<typeof made>): Promise<number> {
   const people = await listPeople(m.owner, { limit: 200 }, m.ports.deps);

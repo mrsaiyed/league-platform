@@ -408,8 +408,16 @@ export const en = {
   'adminTeams.stats.everyone': 'Everyone',
   'adminTeams.stats.staff': "Only the team's staff and the league's admins",
   'adminTeams.remove.title': 'Remove this team',
+  // Until step 2.77 gives the bin a screen, nothing here promises a way back (step 2.161).
   'adminTeams.remove.body':
-    'The team is moved to the bin. Its games and numbers are kept and it can be brought back.',
+    'The team is moved to the bin. Its games and numbers are kept. It is kept for 30 days; the screen to bring it back is not ready yet.',
+  'adminTeams.remove.roster_one':
+    '{count} person is on its roster now. Once the team is removed, they can be taken off the league list.',
+  'adminTeams.remove.roster_other':
+    '{count} people are on its roster now. Once the team is removed, they can be taken off the league list.',
+  'adminTeams.remove.rosterNone': 'Nobody is on its roster now.',
+  'adminTeams.remove.rosterUnknown':
+    'The roster could not be read just now, so how many people are on it is not shown.',
   'adminTeams.remove.submit': 'Move the team to the bin',
   'adminTeams.roster.title': 'Roster',
   'adminTeams.roster.none': 'Nobody is on this roster yet.',
@@ -425,6 +433,12 @@ export const en = {
   'adminTeams.roster.saveEntry': 'Save number and role',
   'adminTeams.roster.leftOn': 'Left on',
   'adminTeams.roster.markLeft': 'Mark as left',
+  'adminTeams.roster.leftOnHelp': 'The day they left: today or a day before.',
+  'adminTeams.roster.putBack': 'Put back on the roster (marked by mistake)',
+  'adminTeams.roster.backAlready':
+    'They are on this roster again, so there is nothing to put back.',
+  'adminTeams.roster.offTheList':
+    'They were taken off the league list, so they cannot be put back on the roster.',
   'adminTeams.roster.leftTitle': 'Left the team',
   'adminTeams.roster.leftLine': '{name}, left on {date}',
   'adminTeams.roster.readFailed':
@@ -454,18 +468,32 @@ export const en = {
   'adminTeams.newPerson.submit': 'Add the person and put them on the roster',
   'adminTeams.people.title': 'The league list',
   'adminTeams.people.body':
-    'Taking someone off the list is refused while they are on a roster: mark them as having left first.',
+    'Taking someone off the list is refused while they are on a roster: mark them as having left first. A place on a team that was moved to the bin does not count.',
   'adminTeams.people.remove': 'Remove from the league list',
   'adminTeams.confirm': 'Yes, I am sure',
   'adminTeams.done.created': 'The team was added.',
   'adminTeams.done.updated': 'The team was saved.',
   'adminTeams.done.statsSaved': 'Who sees the numbers was saved.',
-  'adminTeams.done.removed': 'The team was moved to the bin.',
+  'adminTeams.done.removed':
+    'Removed. The team is kept for 30 days; the screen to bring it back is not ready yet.',
   'adminTeams.done.added': 'The player was added to the roster.',
   'adminTeams.done.entrySaved': 'The number and role were saved.',
   'adminTeams.done.moved': 'The roster order was saved.',
   'adminTeams.done.left': 'The player was marked as having left.',
-  'adminTeams.done.personRemoved': 'The person was taken off the league list.',
+  'adminTeams.done.putBack':
+    'The player was put back on the roster. Their games and numbers are as they were.',
+  'adminTeams.done.putBackNoNumber':
+    'The player is back on the roster with no number, because someone else now wears theirs. Give them a number.',
+  // Said on the player's own line, naming them (step 2.161; R-32 for the number).
+  'adminTeams.said.left': '{name} was marked as having left {team}.',
+  'adminTeams.said.putBack':
+    '{name} is back on the roster. Their games and numbers are as they were.',
+  'adminTeams.said.putBackNoNumber':
+    '{name} is back on the roster with no number: {number} is now worn by {wearer}. Give them a number.',
+  'adminTeams.said.putBackNoNumberNoWearer':
+    '{name} is back on the roster with no number: someone else on the team now wears {number}. Give them a number.',
+  'adminTeams.done.personRemoved':
+    'Removed from the league list. The person is kept for 30 days; the screen to bring them back is not ready yet.',
   // Why a teams or people change was refused (T-187): `error.`, the command's name, the code.
   'error.invalid-input': 'Something you entered is not valid. Check the fields and try again.',
   'error.not-allowed': 'You are not allowed to do that.',
@@ -914,10 +942,194 @@ export const en = {
   'tracker.format.wrong':
     'If this is not how the game is being played, ask a league admin to change the game format before you start.',
   'tracker.format.confirm': 'Confirm and start scoring',
-  'tracker.ready':
-    'This device is scoring the game. The scoring screen will appear here in a later version.',
-  'tracker.savedOnDevice':
-    'Saved on this device: {home} ({homeCount} players) and {away} ({awayCount} players), and the game as it stands.',
+  // The scoring screen (step 2.35; docs/build/DESIGN.md section 7): its frame, the
+  // lineups, the players' tiles and the pad, substitutions, turnovers and swap colors.
+  'tracker.court.scoreboard': 'Scoreboard',
+  'tracker.court.teamScore': '{team}: {score}',
+  'tracker.court.more': 'More',
+  'tracker.court.moreTitle': 'More for this game',
+  'tracker.court.close': 'Close',
+  'tracker.court.swapColors': 'Swap colors',
+  'tracker.court.swapColorsHelp':
+    'Swaps which team is drawn light and which dark. It is saved with the game.',
+  'tracker.court.watch': 'Open the public game page',
+  'tracker.court.watchHelp': 'Opens in a new tab. This screen stays open.',
+  'tracker.court.controls': 'Clock and undo',
+  'tracker.court.plays': 'Plays',
+  'tracker.court.pad': 'Scoring pad',
+  'tracker.period.quarter': 'Q{number}',
+  'tracker.period.half': 'H{number}',
+  'tracker.period.overtime': 'OT{number}',
+  'tracker.player.numberName': '#{jersey} {name}',
+  'tracker.player.name': '{name}',
+  'tracker.player.number': '#{jersey}',
+  'tracker.player.fullName': '{first} {last}',
+  // A player the game has and this device's rosters do not (added at another table).
+  'tracker.player.unknown': 'Player not on this device’s list',
+  'tracker.player.unlistedShort': 'Not listed',
+  'tracker.team.light': 'light',
+  'tracker.team.dark': 'dark',
+  'tracker.floor.title': 'On court',
+  'tracker.bench.title': 'Bench',
+  'tracker.bench.everyoneOn': 'Everyone is on the court.',
+  'tracker.bench.open': 'Bench {count}',
+  'tracker.bench.showAll': 'Show all of the {team} bench',
+  'tracker.bench.more_one': '{count} more',
+  'tracker.bench.more_other': '{count} more',
+  'tracker.bench.of': '{team} bench',
+  'tracker.bench.comesInFor': 'Who comes in for {player}?',
+  'tracker.lineup.pick': 'Pick the starting {size}: tap players below.',
+  'tracker.lineup.picked': '{count} of {size} picked.',
+  'tracker.lineup.startWith': 'Start with {count}',
+  'tracker.lineup.noPlayers': 'No {team} players yet.',
+  'tracker.pregame.title': 'Before tip-off',
+  'tracker.pregame.players_one': '{team}: {count} player',
+  'tracker.pregame.players_other': '{team}: {count} players',
+  'tracker.pregame.todo':
+    'Check both teams’ jersey numbers, tap each team’s starters, then start the clock.',
+  'tracker.tile.noNumber': '–',
+  'tracker.tile.fouls': '{count}F',
+  'tracker.tile.points': '{count} pts',
+  'tracker.tile.out': 'Out',
+  'tracker.tile.label': '{player}, {where}, {points}, {fouls}',
+  'tracker.tile.pointsCount_one': '{count} point',
+  'tracker.tile.pointsCount_other': '{count} points',
+  'tracker.tile.foulsCount_one': '{count} foul',
+  'tracker.tile.foulsCount_other': '{count} fouls',
+  'tracker.tile.labelOut': '{label}, fouled out',
+  'tracker.where.floor': 'on court',
+  'tracker.where.bench': 'bench',
+  'tracker.pad.who.floor': 'On court',
+  'tracker.pad.who.bench': 'Bench',
+  'tracker.pad.who.out': 'Fouled out',
+  'tracker.pad.who.fouls_one': '{count} foul',
+  'tracker.pad.who.fouls_other': '{count} fouls',
+  'tracker.pad.who.points': '{count} pts',
+  'tracker.pad.who.minutes': '{minutes} played',
+  'tracker.pad.points': '+{points}',
+  'tracker.pad.pointsLabel.1': 'Free throw',
+  'tracker.pad.pointsLabel.2': '2 points',
+  'tracker.pad.pointsLabel.3': '3 points',
+  'tracker.pad.scoreFor': '{points} for {player}',
+  'tracker.pad.foul': 'Foul',
+  'tracker.pad.foulFor': 'Foul on {player}',
+  'tracker.pad.unfoul': '−Foul',
+  'tracker.pad.unfoulFor': 'Take back a foul from {player}',
+  'tracker.pad.turnover': 'Turnover',
+  'tracker.pad.turnoverFor': 'Turnover by {player}',
+  'tracker.pad.inFor': 'In for',
+  'tracker.pad.subIn': 'Sub in',
+  'tracker.pad.inForPlayer': '{in} in for {out}',
+  'tracker.pad.closeOptions': 'Close',
+  'tracker.pad.optionsFor': 'Options for {player}',
+  'tracker.hint.title': 'How to score',
+  'tracker.hint.players':
+    'Tap a player, then +1, +2, +3, Foul or Turnover. −Foul takes back that player’s latest foul.',
+  'tracker.hint.subs':
+    'To substitute, tap one player and then the other, or drag a bench player onto the one coming off.',
+  // Where the bench is not on the screen (a short phone): nothing to tap or drag there.
+  'tracker.hint.subsFolded':
+    'To substitute, tap the player coming off, then who comes in. “Bench” opens a team’s whole bench.',
+  'tracker.hint.turnovers':
+    'Tap a team’s turnovers to see each player’s, take one back, or add a team turnover.',
+  'tracker.hint.saved':
+    'Every tap is kept on this device and sent to the league. The top line says when all is saved.',
+  'tracker.turnovers.chip_one': '{count} turnover',
+  'tracker.turnovers.chip_other': '{count} turnovers',
+  'tracker.turnovers.title': '{team} turnovers',
+  'tracker.turnovers.none': 'No turnovers yet. Tap a player, then Turnover.',
+  'tracker.turnovers.team': 'Team',
+  'tracker.turnovers.addTeam': '+ Team turnover',
+  'tracker.turnovers.addTeamHelp':
+    'For a turnover charged to no player, such as a shot-clock violation.',
+  'tracker.turnovers.takeBack': 'Take back one turnover from {who}',
+  'tracker.turnovers.takeBackTeam': 'Take back one team turnover from {team}',
+  'tracker.say.turnover': 'Turnover: {player}.',
+  'tracker.say.teamTurnover': 'Team turnover: {team}.',
+  'tracker.say.subAcrossTeams': 'Substitutions have to stay within one team.',
+  'tracker.say.subBenchToFloor': 'Drag a bench player onto someone on the court.',
+  'tracker.say.notScoring':
+    'This device is not scoring the game right now, so that was not recorded.',
+  'tracker.say.storage':
+    'This device could not keep that tap, so it was not recorded. Tap it again.',
+  'tracker.say.outRecorded': '{player} is out. The foul was recorded anyway.',
+  // On a tile for a moment, for the two players of a substitution.
+  'tracker.mark.on': 'On',
+  'tracker.mark.off': 'Off',
+  // On the page that replaces the scoring screen when the device stops scoring (taken
+  // over, signed out, no longer allowed) in the very moment a tap was made.
+  'tracker.lastTapNotRecorded':
+    'Your last tap was made as this device stopped scoring, so it was not recorded. Enter it again once the game is being scored.',
+  // What the game's rules refuse, in the tracker's words (finding M3 of the 2.107 audit):
+  // one sentence for each refusal of the engine (packages/sports/src/basketball/live.ts),
+  // matched by apps/web/src/features/tracker/engine-words.ts. A test fails when the
+  // engine gains a refusal with no sentence here.
+  'tracker.refusal.gameFinal': 'This game is final. Reopen it to make changes.',
+  'tracker.refusal.clockRunning': 'The clock is already running.',
+  'tracker.refusal.periodOver': 'This period is over. Pick the next period first.',
+  'tracker.refusal.clockNotRunning': 'The clock is not running.',
+  'tracker.refusal.nothingToUndo': 'There is nothing to undo.',
+  'tracker.refusal.nothingToRedo': 'There is nothing to redo.',
+  'tracker.refusal.formatFixed':
+    'The format is fixed once the game is under way. Mark the game not started to change it.',
+  'tracker.refusal.nothingRecorded': 'Nothing is recorded for this game yet.',
+  'tracker.refusal.notFinal': 'Only a final game can be reopened.',
+  'tracker.refusal.unknownAction': 'This version of the tracker does not know that action.',
+  'tracker.refusal.pickPeriod': 'Pick a period.',
+  'tracker.refusal.alreadyThatPeriod': 'The game is already in that period.',
+  'tracker.refusal.pickClockMode': 'Pick a stop clock or a running clock.',
+  'tracker.refusal.alreadyRunningClock': 'The clock already runs through fouls.',
+  'tracker.refusal.alreadyStopClock': 'The clock already stops on fouls.',
+  'tracker.refusal.unknownTeam': 'That team is not in this game.',
+  'tracker.refusal.lineupSize': 'Pick 1 to {size} players.',
+  'tracker.refusal.lineupRepeats': 'Pick each player once.',
+  'tracker.refusal.lineupAlreadySet':
+    'This team already has players on the court. Use substitutions.',
+  'tracker.refusal.badPoints': 'A basket is 1, 2 or 3 points.',
+  'tracker.refusal.pickPlayer': 'Pick a player.',
+  'tracker.refusal.noFoulToTakeBack': 'That player has no foul to take back.',
+  'tracker.refusal.noTurnoverToTakeBack': 'That player has no turnover to take back.',
+  'tracker.refusal.noTeamTurnoverToTakeBack': 'There is no team turnover to take back.',
+  'tracker.refusal.badTimeout': 'A timeout is 60 or 30 seconds.',
+  'tracker.refusal.noTimeoutToTakeBack': 'There is no timeout to take back.',
+  'tracker.refusal.subNeedsBoth': 'Pick who comes on and who comes off.',
+  'tracker.refusal.subOutNotOnCourt': 'The player coming off is not on the court.',
+  'tracker.refusal.subInOnCourt': 'That player is already on the court.',
+  'tracker.refusal.clockRange': 'Set the clock between 0:00 and 60:00.',
+  'tracker.refusal.rules.periods': 'Play halves or quarters.',
+  'tracker.refusal.rules.periodLength': 'A period runs 1 to 60 minutes.',
+  'tracker.refusal.rules.overtimeLength': 'Overtime runs 1 to 30 minutes.',
+  'tracker.refusal.rules.bonus': 'The bonus starts between 1 and 30 team fouls.',
+  'tracker.refusal.rules.doubleBonus': 'The double bonus must come after the bonus.',
+  'tracker.refusal.rules.timeoutCount': 'Allow 0 to 10 timeouts of each length.',
+  'tracker.refusal.rules.timeoutsPer': 'Timeouts are per game or per half.',
+  'tracker.refusal.rules.overtimeTimeouts': 'Allow 0 to 5 timeouts each overtime.',
+  'tracker.refusal.rules.timeoutsCarry': 'Say whether unused timeouts carry over.',
+  'tracker.refusal.rules.lastMinutesLength':
+    'The last-minutes stop clock runs 1 second to 10 minutes, and no longer than a period.',
+  'tracker.refusal.rules.lastMinutesScope':
+    'The last-minutes stop clock is at the end of each period, each half or the game.',
+  'tracker.refusal.rules.mercyLead': 'The mercy rule starts at a lead of 1 to 100 points.',
+  'tracker.refusal.rules.foulLimit': 'A player fouls out after 1 to 20 fouls, or never.',
+  'tracker.refusal.other': 'The game’s rules do not allow that.',
+  // A play in the tracker's words, for the play log, Undo and the "not saved" lists
+  // (finding M3): one for each kind of play the engine has, matched by engine-words.ts.
+  'tracker.play.score': '{player} +{points}',
+  'tracker.play.foul': 'Foul on {player}',
+  'tracker.play.unfoul': 'Foul taken back: {player}',
+  'tracker.play.turnover': 'Turnover by {player}',
+  'tracker.play.unturnover': 'Turnover taken back: {player}',
+  'tracker.play.team-turnover': 'Team turnover: {team}',
+  'tracker.play.team-unturnover': 'Team turnover taken back: {team}',
+  'tracker.play.timeout.full': 'Full timeout: {team}',
+  'tracker.play.timeout.short': '30-second timeout: {team}',
+  'tracker.play.untimeout': 'Timeout taken back: {team}',
+  'tracker.play.sub': 'Sub: {in} in for {out}',
+  'tracker.play.lineup': '{team} starters: {players}',
+  'tracker.play.lineup.separator': ', ',
+  'tracker.play.period': 'Start of {period}',
+  'tracker.play.clock-mode.running': 'Running clock on',
+  'tracker.play.clock-mode.stop': 'Stop clock on',
   // The tracker's own refusals, each with the way back to the games (step 2.33).
   'tracker.notLive.final-score':
     'This game is set to final score only, so there is no live scoring. Enter its score in Games.',
@@ -957,6 +1169,17 @@ export const en = {
     'This person has left the team, so their entry can no longer be changed.',
   'error.teams.mark_left.already-left': 'This person is already marked as having left.',
   'error.teams.mark_left.left-before-joined': 'The leaving date is before the day they joined.',
+  'error.teams.mark_left.left-after-today':
+    'The leaving date is after today. Choose today or a day before: nobody was marked as left.',
+  'error.teams.put_back_on_roster.roster-entry-not-found': 'That roster entry is not there.',
+  'error.teams.put_back_on_roster.not-left':
+    'This person is already on the roster, so there was nothing to put back.',
+  'error.teams.put_back_on_roster.person-not-found':
+    'This person has been taken off the league list, so they cannot be put back on the roster.',
+  'error.teams.put_back_on_roster.already-on-team':
+    'This person is on the team again already, so they were not put back a second time.',
+  'error.teams.put_back_on_roster.jersey-taken':
+    'This player could not be put back, even with no number: the roster refused it. Nothing was changed; reload the page and try again.',
   // Why assigning a scorekeeper was refused (T-187).
   'error.games.assign_scorekeeper.game-not-found': 'That game is not there.',
   'error.games.assign_scorekeeper.game-closed':
@@ -1265,6 +1488,7 @@ export const en = {
   'activity.teams.change_roster_entry': "Changed a player's number or role",
   'activity.teams.reorder_roster': 'Changed the order of a roster',
   'activity.teams.mark_left': 'Marked a person as having left a team',
+  'activity.teams.put_back_on_roster': 'Put a person marked as left by mistake back on a roster',
   'activity.scheduling.add_draft_game': 'Added a game to the schedule draft',
   'activity.scheduling.move_draft_game': 'Moved a game in the schedule draft',
   'activity.scheduling.swap_draft_games': 'Swapped two games in the schedule draft',
@@ -1554,6 +1778,8 @@ export const en = {
   'schedule.admin.noDraft': 'There is no draft yet. You are looking at the published schedule.',
   'schedule.admin.draftChanges_one': 'Draft in progress: {count} change not yet published.',
   'schedule.admin.draftChanges_other': 'Draft in progress: {count} changes not yet published.',
+  'schedule.admin.draftChangesNone':
+    'Draft in progress: as it stands it changes nothing in the published schedule.',
   'schedule.admin.draftOutOfDate':
     'A new version of the schedule was published after this draft was started. Discard the draft and start again from the published schedule.',
   'schedule.admin.rejected_one':
@@ -1594,6 +1820,17 @@ export const en = {
     'Saved to the draft: the round was removed. It is not public until you publish.',
   'schedule.admin.savedGame': 'Saved to the draft: {game}.',
   'schedule.admin.savedGameRemoved': 'Saved to the draft: a game was removed here.',
+  // Removing a game from the draft, and putting it back in one tap (step 2.161).
+  'schedule.admin.savedGameRemovedNamed': 'Removed: {game}, {round}.',
+  'schedule.admin.savedGameRemovedNoRound': 'Removed: {game}, from the games with no round.',
+  'schedule.admin.error.nothing-to-put-back':
+    'That game is no longer waiting to be put back: the draft was published or discarded since, so nothing was added.',
+  'schedule.admin.removedDraftOnly':
+    'It was only in the draft, so nothing public has changed. Put it back and it is exactly as it was.',
+  'schedule.admin.removedPublished':
+    'Nothing public changes until you publish. Put it back now and it is exactly as it was. Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
+  'schedule.admin.putBack': 'Put it back',
+  'schedule.admin.savedGamePutBack': 'Put back in the draft: {game}, as it was.',
   'schedule.admin.savedGameRound': 'Saved to the draft: {game} is now in {round}.',
   'schedule.admin.followRoundDate': 'Move it to {date} too?',
   'schedule.admin.followRoundDateYes': 'Yes, move it to {date}',

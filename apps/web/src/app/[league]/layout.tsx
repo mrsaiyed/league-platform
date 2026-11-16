@@ -11,6 +11,7 @@ import {
   SiteHeader,
   type LeagueRouteProps,
 } from '../../features/shell/index.ts';
+import { isTrackerAddress } from '../../features/tracker/index.ts';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { leagueSites, siteOf } from '../../server/league-site.ts';
@@ -41,6 +42,11 @@ export default async function LeagueLayout({
   const site = await siteOf(view.context.league, await leagueSites());
   const path = (await headers()).get(pathHeader) ?? '';
   const league = view.context.league;
+  // The tracker has a frame of its own (step 2.35; docs/build/DESIGN.md section 7, line
+  // 11): no public header, menu or footer, so one stray tap cannot leave a game, and
+  // none of the league's design, which must never reach the scoring screen (record 064).
+  // Its page draws the league's look itself where it only refuses (tracker-page.tsx).
+  if (isTrackerAddress(league, path)) return children;
   const current = currentMenuPage(league, path);
   const season =
     current === null ? null : headerSeason(league, path, await seasonsOfLeague(league.id));

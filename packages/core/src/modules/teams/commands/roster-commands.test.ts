@@ -201,6 +201,22 @@ describe('markLeft', () => {
       error: { code: 'roster-entry-not-found' },
     });
   });
+
+  it("refuses a leaving date after the league's today, and takes today itself", async () => {
+    const { db, deps, as } = memoryTeams({
+      ...base(),
+      today: '2026-11-15',
+      roster: [entry(1, { joinedOn: '2026-10-01' })],
+    });
+    const leave = (leftOn: string) =>
+      markLeft(as(ownerId), { rosterEntryId: entryUuid(1), version: 1, leftOn }, deps);
+    for (const later of ['2026-11-16', '2027-11-15', '2031-01-01']) {
+      expect(await leave(later)).toEqual({ ok: false, error: { code: 'left-after-today' } });
+    }
+    expect(db.state.roster[0]?.leftOn).toBeNull();
+    expect(db.state.activity).toEqual([]);
+    expect(await leave('2026-11-15')).toEqual({ ok: true, value: { version: 2 } });
+  });
 });
 
 describe('reorderRoster', () => {
