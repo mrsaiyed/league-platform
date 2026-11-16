@@ -101,6 +101,39 @@ export function openedGameStorageContract(
       expect(await storage.find(other)).toBeUndefined();
     });
 
+    it('keeps the starters being picked through opening again, and forgets them when none are picked', async () => {
+      const storage = await make();
+      const picks = { home: ['00000000-0000-4000-8000-0000000000e1'], away: [] };
+      // Nothing is kept for a game whose rosters the device does not hold.
+      await storage.saveLineupPicks(other, picks);
+      expect(await storage.find(other)).toBeUndefined();
+      await storage.saveRosters(owner, madeUpRosters, 10);
+      expect((await storage.find(game))?.lineupPicks).toBeUndefined();
+      await storage.saveLineupPicks(game, picks);
+      await storage.saveState(game, state);
+      // Opening again (a reload) stores the rosters anew and keeps the picks.
+      await storage.saveRosters(owner, madeUpRosters, 20);
+      expect(await storage.find(game)).toEqual({
+        gameId: game,
+        leagueId: league,
+        accountId: account,
+        rosters: madeUpRosters,
+        rostersSavedAt: 20,
+        state,
+        confirmedFormat: null,
+        lineupPicks: picks,
+      });
+      // The lineup is set: nobody is being picked any more.
+      await storage.saveLineupPicks(game, { home: [], away: [] });
+      const kept = await storage.find(game);
+      expect(kept !== undefined && 'lineupPicks' in kept).toBe(false);
+      expect(kept?.state).toEqual(state);
+      // Signing out clears them with the game.
+      await storage.saveLineupPicks(game, picks);
+      await storage.forgetAll();
+      expect(await storage.find(game)).toBeUndefined();
+    });
+
     it('gives what it holds as a copy', async () => {
       const storage = await make();
       await storage.saveRosters(owner, madeUpRosters, 10);

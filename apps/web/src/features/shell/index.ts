@@ -20,7 +20,7 @@ export { LeagueSitePage } from './league-site-page.tsx';
 export { NotBuilt } from './not-built.tsx';
 export { LeagueNotFound, PlatformNotFound } from './not-found-screens.tsx';
 export { SiteFooter } from './site-footer.tsx';
-export { SiteHeader } from './site-header.tsx';
+export { AccountButton, SiteHeader } from './site-header.tsx';
 export { StandalonePage } from './standalone-page.tsx';
 
 /** What Next.js gives every page and layout under `[league]`. */
