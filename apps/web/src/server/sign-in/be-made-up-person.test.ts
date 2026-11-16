@@ -6,7 +6,7 @@
 import { platformUrl } from '@srleagues/core';
 import { seedLeagues } from '@srleagues/database';
 import { createLogger, memorySink } from '@srleagues/observability';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,13 +19,22 @@ import type { Visit } from './device.ts';
 import { askForCode, choosePassword, enterCode, type FlowDeps } from './flows.ts';
 
 const origin = 'http://127.0.0.1:3000';
-const options = (log: (line: unknown) => void = () => {}) => ({
-  appEnv: 'test',
-  publicBaseUrl: origin,
-  log,
-  emailFrom: 'hello@example.test',
-  keptEmailsFolder: path.join(mkdtempSync(path.join(os.tmpdir(), 'be-made-up-')), 'captured-email'),
+/** The scratch folders this file made in the system's temp folder: removed after each test. */
+const made: string[] = [];
+afterEach(() => {
+  for (const folder of made.splice(0)) rmSync(folder, { recursive: true, force: true });
 });
+const options = (log: (line: unknown) => void = () => {}) => {
+  const folder = mkdtempSync(path.join(os.tmpdir(), 'be-made-up-'));
+  made.push(folder);
+  return {
+    appEnv: 'test',
+    publicBaseUrl: origin,
+    log,
+    emailFrom: 'hello@example.test',
+    keptEmailsFolder: path.join(folder, 'captured-email'),
+  };
+};
 
 function browser() {
   const cookies = new Map<string, string>();

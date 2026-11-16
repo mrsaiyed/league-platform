@@ -24,7 +24,11 @@ export type SeedLeagueFacts = {
 };
 
 /** The made-up member of the sign-in stand-in (standInMember), who signs in with a password. */
-export type MadeUpMember = { readonly email: string; readonly password: string };
+export type MadeUpMember = {
+  readonly name: string;
+  readonly email: string;
+  readonly password: string;
+};
 
 export function madeUpDatabaseTools(
   seed: readonly SeedLeagueFacts[],
@@ -61,7 +65,7 @@ export function madeUpDatabaseTools(
     ...byEmail.values(),
     ...(byEmail.has(memberKey)
       ? []
-      : [{ key: memberKey, name: 'Morgan Member', email: memberKey, places: [] }]),
+      : [{ key: memberKey, name: member.name, email: memberKey, places: [] }]),
   ];
   return {
     keptEmails: signIn.keptEmails,

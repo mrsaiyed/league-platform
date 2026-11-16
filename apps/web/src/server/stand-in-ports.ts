@@ -232,6 +232,8 @@ function clockStartingAt(startsAt: string): Clock {
  * computer's loopback address only, whatever LOCAL_DATA says (scripts/web-listen.mjs).
  */
 export const standInMember = {
+  /** Their name on "be this made-up person" (step 2.96), on the stand-in and the made-up database. */
+  name: 'Morgan Member',
   email: 'member@example.test',
   password: 'made-up member password',
 } as const;
@@ -248,7 +250,7 @@ function madeUpSignInChoices() {
     })),
     {
       key: 'member',
-      name: 'Morgan Member',
+      name: standInMember.name,
       email: standInMember.email,
       password: standInMember.password,
       accountId: standInMemberAccountId,

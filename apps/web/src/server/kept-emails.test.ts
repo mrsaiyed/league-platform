@@ -2,10 +2,10 @@
 // for made-up addresses and only once started, read back newest first with their code and
 // their links to this site only.
 import { captureEmail } from '@srleagues/providers';
-import { mkdtempSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   isMadeUpAddress,
   keepingSender,
@@ -17,7 +17,16 @@ import {
 import { t } from './messages.ts';
 
 const origin = 'http://127.0.0.1:3000';
-const scratch = () => mkdtempSync(path.join(os.tmpdir(), 'kept-emails-'));
+/** The scratch folders this file made in the system's temp folder: removed after each test. */
+const made: string[] = [];
+const scratch = () => {
+  const folder = mkdtempSync(path.join(os.tmpdir(), 'kept-emails-'));
+  made.push(folder);
+  return folder;
+};
+afterEach(() => {
+  for (const folder of made.splice(0)) rmSync(folder, { recursive: true, force: true });
+});
 const message = (to: string, text: string, key = `key-${to}-${text}`) => ({
   from: 'SR Leagues <hello@example.test>',
   to,
