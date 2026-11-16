@@ -10,6 +10,7 @@ import {
   derivedColors,
   designToCssVariables,
   headerSurfaces,
+  mixColors,
   parseDesignDocument,
   startingDesignKeys,
   textSurfaces,
@@ -25,12 +26,15 @@ import {
 import { standInLeagueSites, standInLeagueSitesIn } from './stand-in-league-sites.ts';
 import { standInLeagues } from './stand-in-ports.ts';
 
-const proof = ['crest', 'crest-light', 'pine'] as const;
+// Since step 2.147 part 3 the proof is every design a league can be pictured under: the
+// four starting designs and the two made-up ones (the green `pine`, and `ember`, whose
+// bright orange main color cannot be read as text).
+const proof = picturedDesignKeys;
 
 describe('the designs a made-up league can be pictured under', () => {
   it('are every starting design and the made-up ones, each a whole design', () => {
     expect(picturedDesignKeys).toEqual([...startingDesignKeys, ...madeUpDesignKeys]);
-    expect(madeUpDesignKeys).toEqual(['pine']);
+    expect(madeUpDesignKeys).toEqual(['pine', 'ember']);
     for (const key of picturedDesignKeys) {
       expect(parseDesignDocument(picturedDesign(key)).ok, key).toBe(true);
     }
@@ -103,9 +107,38 @@ describe('contrast in the three color sets the pieces are proved in', () => {
       for (const surface of headerSurfaces(colors, design.base)) {
         reads(derived.headerMuted, surface, 'the menu');
         reads(derived.headerPop, surface, 'the current page');
+        // The league's name and the words of the header's first row.
+        reads(design.base === 'dark' ? colors.text : derived.onPrimary, surface, 'the name');
+      }
+      // The parts of controls (3 to 1, WCAG 1.4.11): the edge of a field, a picker or an
+      // outlined button is the text color laid on the page or a panel at the strength
+      // the design's frame gives it, and must stand out from what it is drawn on.
+      const strong = /var\(--color-text\) (\d+)%/.exec(
+        designToCssVariables(design)['--color-line-strong'] ?? '',
+      );
+      expect(strong, `${key}: a control's edge`).not.toBeNull();
+      const share = Number(strong?.[1] ?? 0) / 100;
+      for (const surface of [colors.background, colors.panel]) {
+        const edge = mixColors(surface, colors.text, share);
+        expect(contrastRatio(edge, surface), `${key}: a control's edge`).toBeGreaterThanOrEqual(3);
       }
     });
   }
+
+  it('gives the eye the highlight where a bright main color cannot be read: the orange league', () => {
+    const design = madeUpDesign('ember');
+    const colors = { ...design.colors, highlight: design.colors.highlight ?? design.colors.accent };
+    const derived = derivedColors(colors, design.base);
+    // The orange reads neither as text on the page nor under white words...
+    expect(contrastRatio(colors.primary, colors.background)).toBeLessThan(3);
+    expect(contrastRatio('#ffffff', colors.primary)).toBeLessThan(3);
+    // ...so the eye lands on the highlight as the league gave it, the bar's words are the
+    // dark text color, and a band is a dark ground the orange itself shines on.
+    expect(derived.pop).toBe(colors.highlight);
+    expect(derived.onPrimary).toBe(colors.text);
+    expect(contrastRatio(derived.band, colors.text)).toBeLessThan(2);
+    expect(derived.bandPop).toBe(colors.primary);
+  });
 
   it('reaches the page as variables, the same for a made-up design as for a starting one', () => {
     for (const key of proof) {

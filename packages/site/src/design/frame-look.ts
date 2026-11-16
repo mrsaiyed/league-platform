@@ -12,15 +12,35 @@
 //
 // Every value is fixed text that names other variables; nothing a league types is in it.
 import { contrastRatio } from './contrast.ts';
+import { mixColors } from './derived-colors.ts';
 import type { DesignDocument } from './design-document.ts';
 import { headingTraits } from './fonts.ts';
 
 /** A main color needs this much against the page to show as a hairline at low strength. */
 const lineContrast = 3;
 
+/**
+ * The edge of a control (a field, a picker, an outlined button) and every other strong
+ * line: the text color laid on at 45 percent, or as much more as it takes for the line to
+ * stand 3 to 1 from the page and from a panel (WCAG 1.4.11). On a dark page 45 is plenty;
+ * on a white one a dark text color needs about half. Worked out, so a league's own colors
+ * get an edge that can be seen.
+ */
+const edgeContrast = 3;
+export function edgeShare(colors: DesignDocument['colors']): number {
+  const surfaces = [colors.background, colors.panel];
+  for (let share = 45; share < 100; share += 5) {
+    const reads = surfaces.every(
+      (surface) =>
+        contrastRatio(mixColors(surface, colors.text, share / 100), surface) >= edgeContrast,
+    );
+    if (reads) return share;
+  }
+  return 100;
+}
+
 const bases = {
   dark: {
-    '--color-line-strong': 'color-mix(in srgb, var(--color-text) 45%, transparent)',
     '--color-tint': 'color-mix(in srgb, var(--color-primary) 9%, transparent)',
     '--header-background': 'var(--color-background)',
     '--header-text': 'var(--color-text)',
@@ -38,7 +58,6 @@ const bases = {
     '--scroll-shadow': 'rgba(0, 0, 0, 0.5)',
   },
   light: {
-    '--color-line-strong': 'color-mix(in srgb, var(--color-text) 45%, transparent)',
     '--color-tint': 'color-mix(in srgb, var(--color-primary) 7%, transparent)',
     '--header-background': 'var(--color-primary)',
     '--header-text': 'var(--color-on-primary)',
@@ -124,6 +143,8 @@ export function frameVariables(design: DesignDocument): Record<string, string> {
   const tabStyle = !dark && design.corners === 'round' ? tabs.pill : tabs.line;
   return {
     ...bases[design.base],
+    // A whole number from a fixed list, never anything a league typed.
+    '--color-line-strong': `color-mix(in srgb, var(--color-text) ${edgeShare(design.colors)}%, transparent)`,
     '--color-line': mainShows
       ? 'color-mix(in srgb, var(--color-primary) 22%, transparent)'
       : 'color-mix(in srgb, var(--color-text) 14%, transparent)',
