@@ -1120,6 +1120,14 @@ describe('the second landing’s smaller rules', () => {
     expect(laptop).toMatch(
       /\.ui-scoreboard-side:first-child > \.ui-scoreboard-score \{\s*grid-column: 2;\s*\}\s*\.ui-scoreboard-side:last-child > \.ui-scoreboard-score \{\s*grid-column: 4;\s*\}\s*\.ui-scoreboard-middle \{\s*grid-column: 3;/,
     );
+    // The two scores' places have one width, so the pill between them is in the middle of
+    // the board in every state. That width is reckoned from the size the figures are set
+    // in, never in "ch": a winner's heavier "0" is wider than the other's, and the Final
+    // and Forfeit pills stood about 8 pixels off the middle where the Live pill did not.
+    const place =
+      /\.ui-scoreboard-side > \.ui-scoreboard-score \{([^}]*)\}/.exec(laptop)?.[1] ?? '';
+    expect(place).toMatch(/min-inline-size: calc\(3 \* 0\.65em\);\s*text-align: center;/);
+    expect(place).not.toMatch(/\dch\b/);
   });
 
   it('keeps a left-over board of a narrow list the size of the others', () => {

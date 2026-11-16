@@ -748,11 +748,15 @@ export const gameCss = String.raw`
   }
   /* Each score has a place of the same width (three figures of the score face), with its
      figures in the middle of it: so what stands between the two scores (the state's pill)
-     is in the middle of the board whether the scores are "0" and "20" or "58" and "44". */
+     is in the middle of the board whether the scores are "0" and "20" or "58" and "44".
+     The width is reckoned from the size the figures are set in, as a card's is (0.65 of
+     it a figure), not from the width of a drawn "0": the winner's figures are heavier
+     and wider than the other's, and two places of "three figures" each then differed by
+     enough to stand a decided game's pill off the middle. */
   .ui-scoreboard-side > .ui-scoreboard-score {
     grid-row: 1 / span 2;
     align-self: center;
-    min-inline-size: 3ch;
+    min-inline-size: calc(3 * 0.65em);
     text-align: center;
   }
   .ui-scoreboard-side:first-child > .ui-scoreboard-score {
