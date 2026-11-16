@@ -23,6 +23,14 @@
 //   line of its own, `// In the browser chain: <arguments>`, in its own file.
 // - The chain stops at the first test that fails, with that test's own exit code; a test
 //   stopped by a signal is named and ends the chain with 128 and the signal's number.
+//
+// Groups (step 2.191): on GitHub the chain runs as n groups side by side, each a job of its
+// own. Group k of n is every test whose place in the whole chain above, counted from 0, is
+// k - 1 more than a multiple of n: the exit test (place 0) is always first in group 1 and
+// builds there, as it does in the whole chain, and the first test of every other group
+// builds that group's own copy of the app. So the groups together hold every test exactly
+// once, a new test file lands in a group by its name alone, and nobody edits the workflow
+// to add one (tests/ci-workflow.test.mjs checks the workflow's groups against this rule).
 import os from 'node:os';
 
 /** The test that runs first and builds the app; the rest are given --no-build. */
@@ -76,15 +84,38 @@ export function extraArguments(source) {
 }
 
 /**
+ * A group as `--group=<k>/<n>` writes it: { k, n }, whole numbers with 1 <= k <= n. Throws
+ * a sentence for anything else.
+ */
+export function parseGroup(text) {
+  const found = /^([1-9]\d*)\/([1-9]\d*)$/.exec(text);
+  const group = found ? { k: Number(found[1]), n: Number(found[2]) } : null;
+  if (!group || group.k > group.n) {
+    throw new Error(
+      `"${text}" is not a group: write --group=<k>/<n>, as --group=2/3 for the second of three.`,
+    );
+  }
+  return group;
+}
+
+/** Whether the test at `place` in the whole chain (counted from 0) is in group { k, n }. */
+export const inGroup = (place, { k, n }) => place % n === k - 1;
+
+/**
  * The chain: `names` are the files in tests/browser, `read(name)` gives a file's text. Each
  * entry is { file, args }, as `node <file> <args…>` runs it from the repository's root.
  * `only`, when given, keeps just those tests (by file name, with or without ".mjs"), in the
- * chain's order; the first kept builds.
+ * chain's order; the first kept builds. `group`, when given ({ k, n }, from parseGroup),
+ * keeps just the tests of group k of n, by their places in the whole chain; the first kept
+ * builds.
  */
-export function browserChain(names, read, only = [], folder = 'tests/browser') {
+export function browserChain(names, read, only = [], folder = 'tests/browser', group = null) {
   const problems = folderProblems(names, read);
   if (problems.length > 0) {
     throw new Error(`The browser tests in ${folder} cannot run:\n  ${problems.join('\n  ')}`);
+  }
+  if (group && only.length > 0) {
+    throw new Error('Name tests or give a group, not both: nothing was run.');
   }
   const wanted = only.map((name) => (name.endsWith('.mjs') ? name : `${name}.mjs`));
   const unknown = wanted.filter((name) => !names.filter(isBrowserTest).includes(name));
@@ -95,8 +126,9 @@ export function browserChain(names, read, only = [], folder = 'tests/browser') {
   }
   const tests = names
     .filter(isBrowserTest)
-    .filter((name) => wanted.length === 0 || wanted.includes(name))
-    .sort((a, b) => (a === FIRST ? -1 : b === FIRST ? 1 : a < b ? -1 : a > b ? 1 : 0));
+    .sort((a, b) => (a === FIRST ? -1 : b === FIRST ? 1 : a < b ? -1 : a > b ? 1 : 0))
+    .filter((_, place) => !group || inGroup(place, group))
+    .filter((name) => wanted.length === 0 || wanted.includes(name));
   return tests.map((name, i) => ({
     file: `${folder}/${name}`,
     args: [...(i === 0 ? [] : ['--no-build']), ...extraArguments(read(name))],

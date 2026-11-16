@@ -13,7 +13,9 @@ import {
   extraArguments,
   folderProblems,
   HELPERS,
+  inGroup,
   isBrowserTest,
+  parseGroup,
   startLine,
   stoppedLine,
 } from '../scripts/web-browser-chain.mjs';
@@ -102,6 +104,84 @@ test("a test's own extra arguments come from its own line, after --no-build", ()
     browserChain(Object.keys(files), (n) => files[n], ['b-test', 'a-test.mjs']).map((t) => t.args),
     [[], ['--no-build', '--now=2026-11-16T18:00:00Z', '--dev']],
   );
+});
+
+/** The groups 1..n of a folder, as file names: one list per group. */
+const groupsOf = (names, readName, n) =>
+  Array.from({ length: n }, (_, i) =>
+    browserChain(names, readName, [], 'tests/browser', { k: i + 1, n }).map((t) =>
+      t.file.replace('tests/browser/', ''),
+    ),
+  );
+
+test('groups: a group is "<k>/<n>", 1 <= k <= n, and anything else is refused', () => {
+  assert.deepEqual(parseGroup('1/3'), { k: 1, n: 3 });
+  assert.deepEqual(parseGroup('3/3'), { k: 3, n: 3 });
+  assert.deepEqual(parseGroup('12/20'), { k: 12, n: 20 });
+  for (const bad of ['0/3', '4/3', '1/0', '1', '1/3/4', '-1/3', 'a/b', '', '01/3', ' 1/3'])
+    assert.throws(() => parseGroup(bad), /is not a group: write --group=<k>\/<n>/, bad);
+  assert.ok(inGroup(0, { k: 1, n: 3 }) && inGroup(4, { k: 2, n: 3 }) && inGroup(8, { k: 3, n: 3 }));
+  assert.ok(!inGroup(0, { k: 2, n: 3 }));
+  // A group and names together are refused.
+  assert.throws(
+    () => browserChain(['web-exit-test.mjs'], () => ends, ['web-exit-test'], 'x', { k: 1, n: 2 }),
+    /Name tests or give a group, not both/,
+  );
+});
+
+test('groups: every real test is in exactly one group, for any number of groups', () => {
+  const names = fs.readdirSync(folder);
+  const whole = browserChain(names, read).map((t) => t.file.replace('tests/browser/', ''));
+  for (let n = 1; n <= 6; n += 1) {
+    const groups = groupsOf(names, read, n);
+    // Together, in the whole chain's order, the groups are the whole chain, once each.
+    assert.deepEqual([...groups.flat()].sort(), [...whole].sort(), `${n} groups`);
+    assert.equal(new Set(groups.flat()).size, whole.length, `${n} groups: no test twice`);
+    // The exit test leads group 1, building there; each group keeps the chain's order.
+    assert.equal(groups[0][0], 'web-exit-test.mjs');
+    for (const group of groups) {
+      const places = group.map((name) => whole.indexOf(name));
+      assert.deepEqual(places, [...places].sort((a, b) => a - b));
+    }
+  }
+  // And with groups, the exit test still runs without --no-build, so all its checks run once.
+  const first = browserChain(names, read, [], 'tests/browser', { k: 1, n: 3 })[0];
+  assert.deepEqual(first, { file: 'tests/browser/web-exit-test.mjs', args: [] });
+});
+
+test('groups: each group builds once, in its first test, and keeps a test its own arguments', () => {
+  const files = {
+    'web-exit-test.mjs': ends,
+    'a-test.mjs': ends,
+    'b-test.mjs': ends,
+    'c-test.mjs': `// In the browser chain: --dev\n${ends}`,
+    'd-test.mjs': ends,
+    'web-browser-kit.mjs': 'export const kit = 1;\n',
+  };
+  const names = Object.keys(files);
+  const readMadeUp = (n) => files[n];
+  // Whole chain: web-exit, a, b, c, d (places 0..4). Two groups: places 0, 2, 4 and 1, 3.
+  assert.deepEqual(groupsOf(names, readMadeUp, 2), [
+    ['web-exit-test.mjs', 'b-test.mjs', 'd-test.mjs'],
+    ['a-test.mjs', 'c-test.mjs'],
+  ]);
+  assert.deepEqual(
+    browserChain(names, readMadeUp, [], 'tests/browser', { k: 2, n: 2 }),
+    [
+      { file: 'tests/browser/a-test.mjs', args: [] },
+      { file: 'tests/browser/c-test.mjs', args: ['--no-build', '--dev'] },
+    ],
+  );
+  // A new test file lands in a group by its name alone: "bb" comes after "b", so the tests
+  // after it move along one place, and still every test is in one group exactly.
+  const grown = [...names, 'bb-test.mjs'];
+  const readGrown = (n) => files[n] ?? ends;
+  assert.deepEqual(groupsOf(grown, readGrown, 2), [
+    ['web-exit-test.mjs', 'b-test.mjs', 'c-test.mjs'],
+    ['a-test.mjs', 'bb-test.mjs', 'd-test.mjs'],
+  ]);
+  // More groups than tests: the last groups are empty (the runner then refuses to run).
+  assert.deepEqual(groupsOf(names, readMadeUp, 6)[5], []);
 });
 
 test('the line printed before a test is the one the notes on GitHub name the test by', () => {
@@ -228,11 +308,47 @@ test('an unknown test name or an unknown flag stops the runner with a sentence, 
   assert.equal(flag.status, 1);
   assert.match(
     flag.stderr,
-    /does not know --no-bulid \(it knows --list and test names\): nothing was run\./,
+    /does not know --no-bulid \(it knows --list, --group=<k>\/<n> and test names\): nothing was run\./,
   );
   assert.doesNotMatch(flag.stdout, /ran/);
   assert.throws(
     () => browserChain(['a-pass-test.mjs'], () => ends, ['b-test']),
     /No browser test is named b-test\.mjs in tests\/browser/,
   );
+});
+
+test('the runner runs one group, names its tests before and after, and refuses a bad group', () => {
+  const tests = {
+    'a-test.mjs': `console.log('ran a', process.argv.slice(2).join(' '));\n${ends}`,
+    'b-test.mjs': `console.log('ran b', process.argv.slice(2).join(' '));\n${ends}`,
+    'c-test.mjs': `console.log('ran c', process.argv.slice(2).join(' '));\n${ends}`,
+  };
+  const second = runOn(tests, '--group=2/2');
+  assert.equal(second.status, 0, second.stderr);
+  assert.match(second.stdout, /^Browser tests to run in group 2 of 2 \(1 test\): b-test\.mjs$/m);
+  // The first test of a group builds: it is given no --no-build.
+  assert.match(second.stdout, /^ran b $/m);
+  assert.doesNotMatch(second.stdout, /ran a|ran c/);
+  assert.match(second.stdout, /^Browser tests passed in group 2 of 2 \(1 test\): b-test\.mjs$/m);
+  const first = runOn(tests, '--group=1/2');
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /\(2 tests\): a-test\.mjs, c-test\.mjs$/m);
+  assert.match(first.stdout, /^ran c --no-build$/m);
+  const listed = runOn(tests, '--list', '--group=1/2');
+  assert.equal(listed.status, 0, listed.stderr);
+  assert.deepEqual(listed.stdout.trim().split(/\r?\n/), [
+    `node .local/${listed.dir}/a-test.mjs`,
+    `node .local/${listed.dir}/c-test.mjs --no-build`,
+  ]);
+  for (const [args, said] of [
+    [['--group=3/2'], /"3\/2" is not a group/],
+    [['--group=1/2', '--group=2/2'], /Give one group at most/],
+    [['--group=1/2', 'a-test'], /Name tests or give a group, not both/],
+    [['--group=4/4'], /There is no browser test in group 4 of 4: nothing was run\./],
+  ]) {
+    const run = runOn(tests, ...args);
+    assert.equal(run.status, 1, args.join(' '));
+    assert.match(run.stderr, said, args.join(' '));
+    assert.doesNotMatch(run.stdout, /ran /, args.join(' '));
+  }
 });
