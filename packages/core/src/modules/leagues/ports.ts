@@ -255,6 +255,8 @@ export type LeagueRemovalFinding =
   | { readonly kind: 'program-changed' }
   /** A second season, or the first one published, in the bin or changed. */
   | { readonly kind: 'season-changed' }
+  /** Its site: a second release, one by someone else, or the draft changed (0020). */
+  | { readonly kind: 'site-changed' }
   /** An activity-log entry by anyone but the maker, or of anything else. */
   | { readonly kind: 'activity' }
   /** Rows of the league in another table (a game, a person, a role, ...), by table. */

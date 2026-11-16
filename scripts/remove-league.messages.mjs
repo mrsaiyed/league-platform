@@ -81,6 +81,9 @@ export const findingWords = (found) => {
   if (found.kind === 'season-changed') {
     return 'it has a second season, or its season was published, changed or put in the bin';
   }
+  if (found.kind === 'site-changed') {
+    return 'its site’s design was published again or changed after it was made';
+  }
   if (found.kind === 'activity') {
     return 'its activity log holds changes made after it was set up, or by someone else';
   }
