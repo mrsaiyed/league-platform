@@ -1,6 +1,6 @@
 // Publishes the season's schedule draft (P7 §4.4, A-9): new games are created, moved games
 // updated, removed games go to the bin, rounds are added, renamed, re-dated or removed
-// (step 2.160), a numbered schedule
+// (step 2.160; a removed round's games in the bin lose their round, S-60), a numbered schedule
 // revision is written with its summary and the publication is logged (A-6). The admin
 // names the draft, its version and the revision it was based on, so a draft someone else
 // changed, or one made on an older schedule, is never published unseen (A-8). The draft is
@@ -137,7 +137,8 @@ export const publishSchedule = defineCommand({
     const binned = await store.binPublishedGames(input.seasonId, summary.gamesRemoved);
     if (binned !== summary.gamesRemoved.length) return fail({ code: 'game-cannot-be-removed' });
 
-    // Last, once every game has left them: a round a game still names stays (the plan blocks it).
+    // Last, once every game has left them or is in the bin: the games in the bin lose their
+    // round (S-60); a round a game outside the bin still names stays (the plan blocks it).
     const removedRounds = await store.deleteRounds(input.seasonId, summary.roundsRemoved);
     if (removedRounds !== summary.roundsRemoved.length) return fail({ code: 'round-in-use' });
 

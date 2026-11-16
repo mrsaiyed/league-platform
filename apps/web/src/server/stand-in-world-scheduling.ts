@@ -217,20 +217,30 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       return added;
     },
     deleteRounds: async (seasonId, roundIds) => {
-      // As delete-rounds.ts: a round any game is in stays, in the bin or not.
+      // As delete-rounds.ts: a round a game outside the bin is in stays; the games in the
+      // bin in a round that goes lose their round and keep everything else (S-60).
       const gone = s.rounds.filter(
         (r) =>
           r.seasonId === seasonId &&
           roundIds.includes(r.id) &&
-          !s.games.some((g) => g.roundId === r.id),
+          !s.games.some((g) => g.roundId === r.id && !g.binned),
       );
-      s.rounds = s.rounds.filter((r) => !gone.includes(r));
+      const goneIds = new Set(gone.map((r) => r.id));
+      s.games = s.games.map((g) =>
+        g.binned && g.roundId !== null && goneIds.has(g.roundId) ? { ...g, roundId: null } : g,
+      );
+      s.rounds = s.rounds.filter((r) => !goneIds.has(r.id));
       return gone.length;
     },
+    // As list-games-in-rounds.ts: the games not in the bin, dated or not.
     gamesInRounds: async (seasonId, roundIds) =>
       s.games
         .filter(
-          (g) => g.seasonId === seasonId && g.roundId !== null && roundIds.includes(g.roundId),
+          (g) =>
+            g.seasonId === seasonId &&
+            !g.binned &&
+            g.roundId !== null &&
+            roundIds.includes(g.roundId),
         )
         .map((g) => ({ id: g.id, roundId: g.roundId ?? '' })),
     insertRevision: async (seasonId, revision) => {

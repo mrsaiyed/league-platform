@@ -99,7 +99,7 @@ export type NewRound = {
   readonly date: string | null;
 };
 
-/** A game that is in a round, whatever it is: in the bin, with no date, scored or not. */
+/** A game that is in a round and not in the bin, dated or not, scored or not. */
 export type GameInRound = { readonly id: string; readonly roundId: string };
 
 export type NewScheduleRevision = {
@@ -175,9 +175,12 @@ export type SchedulingStore = {
    * whose id or number is taken is not added.
    */
   readonly insertRounds: (seasonId: string, rounds: readonly NewRound[]) => Promise<number>;
-  /** Removes these rounds of the season that no game names, in the bin or not: how many went. */
+  /**
+   * Removes these rounds of the season that no game outside the bin is in: how many went.
+   * The games in the bin that are in them lose their round and keep everything else (S-60).
+   */
   readonly deleteRounds: (seasonId: string, roundIds: readonly string[]) => Promise<number>;
-  /** The season's games, in the bin or not, dated or not, that are in any of these rounds. */
+  /** The season's games not in the bin, dated or not, that are in any of these rounds (S-60). */
   readonly gamesInRounds: (
     seasonId: string,
     roundIds: readonly string[],

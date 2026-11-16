@@ -15,6 +15,8 @@ import {
   removeDraftGame,
   removeDraftRound,
   renameDraftRound,
+  restoreGame,
+  type BinTx,
   type CommandDeps,
   type Job,
   type SchedulingTx,
@@ -41,17 +43,19 @@ import {
 } from '../schema/schema.test-helper.ts';
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
+import { binStore } from './bin-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
 
 let pglite: PGlite;
 let db: DatabaseHandle;
-let deps: CommandDeps<SchedulingTx>;
+let deps: CommandDeps<SchedulingTx & BinTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
   const transaction = commandTransaction(db, (scope) => ({
     jobs: { enqueue: async (_job: Job) => {} },
     scheduling: schedulingStore(scope),
+    bin: binStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));
@@ -151,6 +155,33 @@ async function draftState(s: Season) {
     [s.leagueId],
   );
   return row;
+}
+
+type Edit = (b: ReturnType<typeof basis>) => Promise<{ ok: boolean }>;
+
+/** Starts a draft on `revision` with `first`, makes the other edits, and publishes it. */
+async function publishDraft(s: Season, revision: number, first: Edit, more: Edit[] = []) {
+  const at = (version: number | null, draftId: string | null) => ({
+    ...basis(s, version, draftId),
+    basedOnRevision: revision,
+  });
+  expect(await first(at(null, null))).toMatchObject({ ok: true });
+  for (const edit of more) {
+    const draft = await draftState(s);
+    expect(await edit(at(draft.version, draft.id))).toMatchObject({ ok: true });
+  }
+  const draft = await draftState(s);
+  const published = await publishSchedule(
+    s.as,
+    {
+      seasonId: s.seasonId,
+      basedOnRevision: revision,
+      draftId: draft.id,
+      version: draft.version,
+    },
+    deps,
+  );
+  expect(published).toMatchObject({ ok: true, value: { revision: revision + 1 } });
 }
 
 /** The season's games by id, as the tests compare them. */
@@ -577,12 +608,102 @@ describe('publishing against the database', () => {
     expect(revision.summary).toMatchObject({ roundsAdded: 2, roundsRemoved: 1 });
   });
 
-  it('keeps a round a game in the bin is still in (step 2.160)', async () => {
+  it('removes a round whose only games are in the bin; they keep teams, date and number, and come back with no round (S-60)', async () => {
     const s = await season();
-    await s.game(s.teams.a, s.teams.b, {
+    // Week 2's two games, as the walk of 2026-11-16 found them: removed and published.
+    const first = await s.game(s.teams.a, s.teams.b, {
+      round_id: s.round2,
+      game_number: 7,
+      starts_at: '2026-12-14T00:30:00Z',
+    });
+    const second = await s.game(s.teams.c, s.teams.d, {
+      round_id: s.round2,
+      game_number: 8,
+      starts_at: '2026-12-14T01:30:00Z',
+    });
+    // A game in the bin in Week 1, which stays: it keeps its round.
+    const stays = await s.game(s.teams.a, s.teams.c, {
+      starts_at: '2026-12-07T00:30:00Z',
+      deleted_at: '2026-12-01T00:00:00Z',
+    });
+    const before = await gameRow(first);
+    await publishDraft(s, 1, (b) => removeDraftGame(s.as, { ...b, gameId: first }, deps), [
+      (b) => removeDraftGame(s.as, { ...b, gameId: second }, deps),
+    ]);
+    expect((await gameRow(first)).deleted_at).not.toBeNull();
+    // Week 2 shows no game, and the tap that says it can go does.
+    const view = await getScheduleDraft(s.as, { seasonId: s.seasonId }, deps);
+    expect(view).toMatchObject({ ok: true, value: { undated: [] } });
+    if (!view.ok) throw new Error('no draft view');
+    expect(view.value.result.games.filter((g) => g.roundId === s.round2)).toEqual([]);
+    await publishDraft(s, 2, (b) => removeDraftRound(s.as, { ...b, roundId: s.round2 }, deps));
+
+    const rounds = await pglite.query<{ id: string }>(
+      'select id from rounds where league_id = $1 order by number',
+      [s.leagueId],
+    );
+    expect(rounds.rows).toEqual([{ id: s.round1 }]);
+    const numbers = await pglite.query<{ id: string; game_number: number | null }>(
+      'select id, game_number from games where id = any($1) order by game_number',
+      [[first, second]],
+    );
+    expect(numbers.rows).toEqual([
+      { id: first, game_number: 7 },
+      { id: second, game_number: 8 },
+    ]);
+    const after = await gameRow(first);
+    expect(after).toMatchObject({
+      round_id: null,
+      starts_at: before.starts_at,
+      status: 'scheduled',
+      stage_id: before.stage_id,
+      court_name: before.court_name,
+    });
+    expect(after.deleted_at).not.toBeNull();
+    const teamsOf = await one<{ home_team_id: string; away_team_id: string }>(
+      pglite,
+      'select home_team_id, away_team_id from games where id = $1',
+      [second],
+    );
+    expect(teamsOf).toEqual({ home_team_id: s.teams.c, away_team_id: s.teams.d });
+    expect((await gameRow(stays)).round_id).toBe(s.round1);
+
+    // Brought back from the bin, it has no round.
+    expect(await restoreGame(s.as, { gameId: first }, deps)).toEqual({
+      ok: true,
+      value: { gameId: first },
+    });
+    expect(await gameRow(first)).toMatchObject({ deleted_at: null, round_id: null });
+  });
+
+  it('removes a round and its games in one draft: they go to the bin, then lose their round (S-60)', async () => {
+    const s = await season();
+    const game = await s.game(s.teams.a, s.teams.b, {
+      round_id: s.round2,
+      starts_at: '2026-12-14T00:30:00Z',
+    });
+    await publishDraft(s, 1, (b) => removeDraftGame(s.as, { ...b, gameId: game }, deps), [
+      (b) => removeDraftRound(s.as, { ...b, roundId: s.round2 }, deps),
+    ]);
+    const row = await gameRow(game);
+    expect(row.round_id).toBeNull();
+    expect(row.deleted_at).not.toBeNull();
+    const kept = await pglite.query('select id from rounds where id = $1', [s.round2]);
+    expect(kept.rows).toEqual([]);
+  });
+
+  it('refuses a round a game with no date is in, and the draft view shows that game in it (step 2.181)', async () => {
+    const s = await season();
+    const undated = await s.game(s.teams.a, s.teams.b, { round_id: s.round2 });
+    // One in the bin beside it changes nothing: the game with no date holds the round.
+    await s.game(s.teams.c, s.teams.d, {
       round_id: s.round2,
       starts_at: '2026-12-14T00:30:00Z',
       deleted_at: '2026-12-01T00:00:00Z',
+    });
+    expect(await getScheduleDraft(s.as, { seasonId: s.seasonId }, deps)).toMatchObject({
+      ok: true,
+      value: { undated: [{ id: undated, roundId: s.round2 }] },
     });
     const refused = await removeDraftRound(s.as, { ...basis(s), roundId: s.round2 }, deps);
     expect(refused).toEqual({ ok: false, error: { code: 'round-in-use' } });
@@ -603,6 +724,7 @@ describe('publishing against the database', () => {
     });
     const kept = await pglite.query('select id from rounds where id = $1', [s.round2]);
     expect(kept.rows).toHaveLength(1);
+    expect((await gameRow(undated)).round_id).toBe(s.round2);
   });
 
   it('shows another league nothing: a season of another league is not found', async () => {

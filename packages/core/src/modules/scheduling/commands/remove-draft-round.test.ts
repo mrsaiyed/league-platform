@@ -14,6 +14,7 @@ import {
   type MemoryScheduling,
 } from '../memory-scheduling.test-helper.ts';
 import type { DraftChange, ScheduleGame } from '../rules/schedule-types.ts';
+import { getScheduleDraft } from './get-schedule-draft.ts';
 import { previewSchedulePublish } from './preview-schedule-publish.ts';
 import { publishSchedule } from './publish-schedule.ts';
 import { removeDraftRound } from './remove-draft-round.ts';
@@ -111,21 +112,56 @@ describe('removing a round from the schedule draft (step 2.160)', () => {
     expect(db.state.roundsRemoved).toEqual([roundUuid(1)]);
   });
 
-  it('refuses a round a game outside the draft is in: binned, undated, or removed by the draft', async () => {
-    const binned = world([], { gamesInOtherRounds: [{ id: gameUuid(8), roundId: roundUuid(2) }] });
-    expect(
-      await removeDraftRound(binned.as(ownerId), { ...basis, roundId: roundUuid(2) }, binned.deps),
-    ).toEqual({ ok: false, error: { code: 'round-in-use' } });
+  it('refuses a round a game with no date yet is in, and the draft view shows that game in it (step 2.181)', async () => {
+    const undated = { id: gameUuid(8), roundId: roundUuid(2) };
+    const { db, deps, as } = world([], { gamesInOtherRounds: [undated] });
+    expect(await removeDraftRound(as(ownerId), { ...basis, roundId: roundUuid(2) }, deps)).toEqual({
+      ok: false,
+      error: { code: 'round-in-use' },
+    });
+    expect(db.state.draft?.version).toBe(1);
+    // The grid reads the round's games with no date from the draft view: the same game.
+    expect(await getScheduleDraft(as(ownerId), { seasonId }, deps)).toMatchObject({
+      ok: true,
+      value: { undated: [undated] },
+    });
+  });
 
-    // Removing Week 1's game in the draft leaves it in Week 1 in the bin.
-    const removedGame = world([{ kind: 'remove-game', gameId: gameUuid(1) }]);
-    expect(
-      await removeDraftRound(
-        removedGame.as(ownerId),
-        { ...basis, roundId: roundUuid(1) },
-        removedGame.deps,
-      ),
-    ).toEqual({ ok: false, error: { code: 'round-in-use' } });
+  it('removes a round whose only games are in the bin; publishing removes it and they lose their round (S-60)', async () => {
+    const { db, deps, as } = world([], {
+      binnedInRounds: [
+        { id: gameUuid(8), roundId: roundUuid(2) },
+        { id: gameUuid(9), roundId: roundUuid(2) },
+      ],
+    });
+    // Nothing in the bin is shown as in the round.
+    expect(await getScheduleDraft(as(ownerId), { seasonId }, deps)).toMatchObject({
+      ok: true,
+      value: { undated: [] },
+    });
+    const removed = await removeDraftRound(as(ownerId), { ...basis, roundId: roundUuid(2) }, deps);
+    expect(removed).toMatchObject({ ok: true, value: { version: 2 } });
+    expect(await publishSchedule(as(ownerId), publish, deps)).toMatchObject({ ok: true });
+    expect(db.state.roundsRemoved).toEqual([roundUuid(2)]);
+    expect(db.state.roundsCleared).toEqual([gameUuid(8), gameUuid(9)]);
+  });
+
+  it('removes a round whose games the same draft removes: publishing bins them, then removes the round', async () => {
+    const { db, deps, as } = world([{ kind: 'remove-game', gameId: gameUuid(1) }]);
+    const removed = await removeDraftRound(as(ownerId), { ...basis, roundId: roundUuid(1) }, deps);
+    expect(removed).toMatchObject({ ok: true, value: { version: 2 } });
+    const preview = await previewSchedulePublish(as(ownerId), { seasonId }, deps);
+    expect(preview).toMatchObject({
+      ok: true,
+      value: {
+        canPublish: true,
+        summary: { gamesRemoved: [gameUuid(1)], roundsRemoved: [roundUuid(1)] },
+      },
+    });
+    expect(await publishSchedule(as(ownerId), publish, deps)).toMatchObject({ ok: true });
+    expect(db.state.binned).toEqual([gameUuid(1)]);
+    expect(db.state.roundsRemoved).toEqual([roundUuid(1)]);
+    expect(db.state.roundsCleared).toEqual([gameUuid(1)]);
   });
 
   it('blocks publishing a draft that removes a round a game came into since', async () => {
