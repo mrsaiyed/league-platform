@@ -149,6 +149,38 @@ const cases = [
       ],
     ),
   ),
+  // Step 2.96: the two local-only pages answer on made-up data (here APP_ENV=test) and
+  // show no password; nothing is served under the kept emails' page, not its files; and
+  // no page a visitor sees links to either. In staging and production they answer "not
+  // found" before the app is asked for anything (apps/web/src/server/local-only.test.ts):
+  // neither mode can serve a page today, as the check at the end of this file shows.
+  [
+    'visitor',
+    '/signin/kept-emails',
+    200,
+    ['Emails kept on this computer', 'None of them left it'],
+    ['made-up owner password'],
+  ],
+  [
+    'visitor',
+    '/signin/made-up-people',
+    200,
+    ['Be a made-up person', 'Olive Owner', 'owner@example.test', 'Open North Valley League as'],
+    ['made-up owner password', 'made-up member password', 'local-owner-token'],
+  ],
+  ...['/signin/kept-emails/anything.json', '/signin/kept-emails/anything.html'].map((address) => [
+    'visitor',
+    address,
+    404,
+    [notFound],
+  ]),
+  ...['/', '/signin', '/signup', '/north-valley'].map((address) => [
+    'visitor',
+    address,
+    200,
+    [],
+    ['/signin/kept-emails', '/signin/made-up-people'],
+  ]),
   // The account button (U-8): a signed-in person's own, never in a visitor's page.
   [
     'owner',
@@ -792,38 +824,45 @@ try {
   server.child.kill();
 }
 
-// Staging with a database that answers nobody: the app must refuse to start.
-const staging = start(['start', '--port', String(await freePort())], {
-  APP_ENV: 'staging',
-  PUBLIC_BASE_URL: 'https://staging.example.test',
-  // Required in staging (config-schema.ts), so the settings check passes and the
-  // database is reached. All made up: the address answers nobody on this computer. A
-  // host name, as staging refuses an IP address as the host (record 055).
-  TRUSTED_PROXY: 'one',
-  PLATFORM_DATABASE_URL: 'postgres://made-up:made-up-password@localhost:1/nowhere',
-  SUPABASE_URL: 'http://localhost:54321',
-  SUPABASE_SECRET_KEY: 'made-up-supabase-secret-key',
-});
-const code = await new Promise((resolve) => {
-  const timer = setTimeout(() => {
-    staging.child.kill();
-    resolve('still running');
-  }, 60_000);
-  staging.child.on('exit', (exitCode) => {
-    clearTimeout(timer);
-    resolve(exitCode);
+// Staging, and since step 2.96 production too, with a database that answers nobody: the app
+// must refuse to start, so in neither mode does any page answer, the local-only pages of
+// step 2.96 among them (their own "not found" there is apps/web/src/server/local-only.test.ts).
+for (const appEnv of ['staging', 'production']) {
+  const deployed = start(['start', '--port', String(await freePort())], {
+    APP_ENV: appEnv,
+    PUBLIC_BASE_URL: `https://${appEnv}.example.test`,
+    // Required in staging and production (config-schema.ts), so the settings check passes
+    // and the database is reached. All made up: the address answers nobody on this
+    // computer. A host name, as staging refuses an IP address as the host (record 055).
+    TRUSTED_PROXY: 'one',
+    PLATFORM_DATABASE_URL: 'postgres://made-up:made-up-password@localhost:1/nowhere',
+    SUPABASE_URL: 'http://localhost:54321',
+    SUPABASE_SECRET_KEY: 'made-up-supabase-secret-key',
+    ...(appEnv === 'production' ? { RESEND_API_KEY: 'made-up-resend-key' } : {}),
   });
-});
-if (code === 0 || code === 'still running') {
-  failures.push(`staging with an unreachable database did not refuse to start (${code})`);
-} else if (!staging.output().includes('the database could not be reached')) {
-  failures.push(
-    `staging refused to start without saying why:\n${staging.output()}${whichFileNodeRefused(staging.output())}`,
-  );
-} else if (staging.output().includes('made-up-password')) {
-  failures.push('the refusal printed the database address');
-} else if (staging.output().includes('made-up-supabase-secret-key')) {
-  failures.push('the refusal printed SUPABASE_SECRET_KEY');
+  const code = await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      deployed.child.kill();
+      resolve('still running');
+    }, 60_000);
+    deployed.child.on('exit', (exitCode) => {
+      clearTimeout(timer);
+      resolve(exitCode);
+    });
+  });
+  if (code === 0 || code === 'still running') {
+    failures.push(`${appEnv} with an unreachable database did not refuse to start (${code})`);
+  } else if (!deployed.output().includes('the database could not be reached')) {
+    failures.push(
+      `${appEnv} refused to start without saying why:\n${deployed.output()}${whichFileNodeRefused(deployed.output())}`,
+    );
+  } else if (deployed.output().includes('made-up-password')) {
+    failures.push(`the ${appEnv} refusal printed the database address`);
+  } else if (deployed.output().includes('made-up-supabase-secret-key')) {
+    failures.push(`the ${appEnv} refusal printed SUPABASE_SECRET_KEY`);
+  } else if (deployed.output().includes('made-up-resend-key')) {
+    failures.push(`the ${appEnv} refusal printed RESEND_API_KEY`);
+  }
 }
 
 if (failures.length > 0) {
@@ -831,7 +870,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Web shell check passed: ${cases.length + spoofs.length + 6} checks against the built server.`,
+  `Web shell check passed: ${cases.length + spoofs.length + 7} checks against the built server.`,
 );
 
 // When Node refused a TypeScript file it was to run itself, the server prints only
