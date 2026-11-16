@@ -177,6 +177,8 @@ How the grid works (built in step 2.64):
 
 A cancelled game can be put back, with a reason, by whoever may cancel it; it is a scheduled game again (**S-51**, decided for you).
 
+Forfeiting, postponing and cancelling each ask once, naming the game, before anything changes; the team that forfeits is always chosen, never filled in. The reason a game is put back is chosen from a short list ("cancelled by mistake", "the game will be played after all", "the wrong game was cancelled", "another reason"), because the activity log keeps fixed words only. A game whose line-ups were already set at the scorer's table can still be postponed or cancelled: its line-ups are kept for when it is played. A postponed game has no score until it is played on its new date (step 2.158).
+
 ## 6. Standings and statistics
 
 - **S-9: standings are always calculated from final games; nobody types them in.** Each division has its own table with seeds. When teams are level, the page can show why one is ahead ("head-to-head").
