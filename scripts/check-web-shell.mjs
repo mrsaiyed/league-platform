@@ -555,7 +555,14 @@ const cases = [
     'owner',
     '/north-valley/admin/season',
     200,
-    ['Who can see this season', 'Everyone can see Fall 2026.', 'Hide it again'],
+    [
+      'Who can see this season',
+      'Everyone can see Fall 2026.',
+      'Hide it again',
+      // Drawn inside the staff frame, its menu at Season settings (step 2.103).
+      staffFrameAt('/north-valley/admin/season'),
+      oneHeading,
+    ],
     [adminPlaceholder, 'Show this season to visitors'],
   ],
   [
@@ -585,7 +592,13 @@ const cases = [
     'owner',
     '/north-valley/admin/season?season=winter-2027&ask=show',
     200,
-    ['Visitors will see its teams, schedule and results.', 'Yes, show it', 'No, keep it hidden'],
+    [
+      'Visitors will see its teams, schedule and results.',
+      'Yes, show it',
+      'No, keep it hidden',
+      staffFrameAt('/north-valley/admin/season'),
+      oneHeading,
+    ],
   ],
   // Hiding the current season, with a game being scored (Hawks v Bears), says both.
   [
@@ -597,6 +610,8 @@ const cases = [
       'will show another season visitors can see instead',
       'A game of Fall 2026 is being scored right now',
       'Yes, hide it',
+      staffFrameAt('/north-valley/admin/season'),
+      oneHeading,
     ],
   ],
   // In a league not published, a shown season is never said to be seen by visitors.
