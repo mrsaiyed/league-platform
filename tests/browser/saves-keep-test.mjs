@@ -286,6 +286,102 @@ if (browser) {
     }
   });
 
+  // Step 2.103: at 390 wide one team's grid is shown and the other is put away. A number
+  // out of range typed in one team's grid, the other team picked, Save tapped: a browser's
+  // own checking blocked the save on a box it could not show, and said nothing. The form
+  // now leaves the telling to the server: the page says in words what is wrong, shows
+  // that team with that box marked, and keeps what was typed in both grids.
+  for (const scripts of [true, false]) {
+    const label = `a wrong box in the team put away${scripts ? '' : ', with scripts off'}`;
+    await step(`${label}, is said in words with that team shown`, async () => {
+      const { context, page } = await signedInAs('local-scheduler-token', {
+        javaScriptEnabled: scripts,
+      });
+      try {
+        await openBoxScore(page, finalScoreGame, 'Box score: Tigers at Lions');
+        const boxes = pointsBoxes(page);
+        const grids = page.locator('.box-score-grid');
+        const tabs = page.locator('.admin-sheet-tabs label');
+        // The Tigers (away, shown first): a good number, then one over the box's limit.
+        await boxes.nth(0).fill('7');
+        await boxes.nth(1).fill('1000');
+        // The Lions are picked, and a number typed there; the Tigers' grid is put away.
+        await tabs.nth(1).click();
+        await boxes.nth(6).fill('9');
+        note(
+          `${label}: the grid with the wrong box is put away when Save is tapped`,
+          !(await grids.nth(0).isVisible()) && (await grids.nth(1).isVisible()),
+        );
+        const save = page.getByRole('button', { name: 'Save box score and make it final' });
+        await (scripts ? save.click() : Promise.all([page.waitForEvent('load'), save.click()]));
+        const refusal = page.locator('#box-score-scores').getByRole('alert');
+        await refusal.waitFor();
+        const text = ((await refusal.textContent()) ?? '').trim();
+        const named = (await boxes.nth(1).getAttribute('aria-label')) ?? '';
+        note(
+          `${label}: the page says in words what is wrong`,
+          text.endsWith(': enter a whole number from 0 to 999, or leave it empty.') &&
+            text.includes('Points'),
+          text,
+        );
+        note(
+          `${label}: the team with the wrong box is the one shown`,
+          (await grids.nth(0).isVisible()) && !(await grids.nth(1).isVisible()),
+        );
+        note(
+          `${label}: that box is marked, on the screen, and described by the sentence`,
+          (await boxes.nth(1).getAttribute('aria-invalid')) === 'true' &&
+            (await boxes.nth(1).getAttribute('aria-describedby')) ===
+              (await refusal.getAttribute('id')) &&
+            (await boxes.nth(1).isVisible()),
+          named,
+        );
+        note(
+          `${label}: no other box is marked`,
+          (await page.locator('main input[aria-invalid="true"]').count()) === 1,
+        );
+        const kept = await boxes.evaluateAll((all) => all.map((b) => b.value));
+        note(
+          `${label}: what was typed in both grids is kept`,
+          kept[0] === '7' && kept[1] === '1000' && kept[6] === '9',
+          JSON.stringify(kept),
+        );
+        await accessible(page, `${label}, refused`);
+        if (scripts) {
+          // Text a number box cannot read at all is sent by a browser as an empty box:
+          // with scripts on it is caught before the send and said the same way.
+          await boxes.nth(1).fill('4');
+          await tabs.nth(1).click();
+          await boxes.nth(7).focus();
+          await page.keyboard.type('1-2');
+          await tabs.nth(0).click();
+          let posts = 0;
+          const count = (request) => {
+            if (request.method() === 'POST') posts += 1;
+          };
+          page.on('request', count);
+          await save.click();
+          await page.locator('main input[name^="stat.points."][aria-invalid="true"]').waitFor();
+          await page.waitForTimeout(500);
+          page.off('request', count);
+          const unread = ((await refusal.textContent()) ?? '').trim();
+          note(
+            `${label}: text a number box cannot read is said in words, with its team shown`,
+            unread.endsWith(': enter a whole number from 0 to 999, or leave it empty.') &&
+              (await boxes.nth(7).getAttribute('aria-invalid')) === 'true' &&
+              (await boxes.nth(1).getAttribute('aria-invalid')) === null &&
+              (await grids.nth(1).isVisible()) &&
+              !(await grids.nth(0).isVisible()),
+            unread,
+          );
+          note(`${label}: a box that cannot be read is not sent as an empty one`, posts === 0);
+        }
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
   await step(
     'twelve players’ points and a tie in the box score are kept after the refusal',
     async () => {

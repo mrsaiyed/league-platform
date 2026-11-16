@@ -124,6 +124,35 @@ describe('the box score grid', () => {
     });
   });
 
+  // Step 2.103: the grid's form switches the browser's own checking off (a phone shows
+  // one team's grid at a time, and a browser blocks a save on a box it cannot show), so
+  // the server must refuse everything the boxes' `min`, `max` and `step` would have.
+  it('refuses, by name, whatever a box’s min, max or step would have stopped', async () => {
+    const { games, sheetOf } = setup();
+    const target = (await games()).find((g) => g.id === lionsTigers);
+    const sheet = { ...(await sheetOf(target?.id ?? '')), minutes: true };
+    const someone = sheet.players[0]?.personId ?? '';
+    const boxes = [
+      // The limits the form writes on each kind of box: min 0, step 1, and this max.
+      { name: boxScoreField.stat(someone, 'points'), max: 999 },
+      { name: boxScoreField.minutes(someone), max: 1440 },
+      { name: 'awayScore', max: 999 },
+      { name: 'homeScore', max: 999 },
+    ];
+    for (const { name, max } of boxes) {
+      const belowMin = ['-1', '-0.5'];
+      const aboveMax = [String(max + 1), '99999'];
+      const offStep = ['0.5', '2.5', '1e1', '7.0'];
+      for (const bad of [...belowMin, ...aboveMax, ...offStep]) {
+        expect(wrongBoxScoreFields(sheet, { [name]: bad }), `${name} = ${bad}`).toEqual([name]);
+        expect(readBoxScoreForm(sheet, { [name]: bad }), `${name} = ${bad}`).toBeUndefined();
+      }
+      for (const good of ['0', String(max), '']) {
+        expect(wrongBoxScoreFields(sheet, { [name]: good }), `${name} = ${good}`).toEqual([]);
+      }
+    }
+  });
+
   it('names the boxes a refusal is about, in screen order, and the score of a tie (2.155)', async () => {
     const { ports, ctx, games, sheetOf } = setup();
     const target = (await games()).find((g) => g.id === lionsTigers);

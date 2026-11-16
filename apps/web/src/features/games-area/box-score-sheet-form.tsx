@@ -6,7 +6,18 @@
 // above the save button, naming the box (or the score, for a tie). With scripts off the
 // browser lands there (the form's permalink). It goes quiet once sent. Words come from
 // the server, from the message files (T-187).
-import { useActionState, useEffect, useId, useRef } from 'react';
+//
+// The browser's own checking is switched off for this form (`noValidate`; step 2.103). On
+// a phone one team's grid is shown at a time and the other is put away, and a browser
+// that finds a box out of range in the grid put away blocks the save on a box it can
+// neither show nor focus: nothing happens and nothing is said. So the server does the
+// telling, as it does for a tie: it refuses anything that is not a whole number from 0 to
+// the box's limit (box-score-form.ts, which is stricter than every `min`, `max` and `step`
+// here), in words, with that team shown and that box marked, and with scripts off too.
+// One thing never reaches the server: text a number box cannot read at all ("1-2", "e"),
+// which a browser sends as an empty box. With scripts on that is caught here before the
+// send and said the same way; with scripts off it is saved as an empty box.
+import { useActionState, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { fillScores, sheetScoresId, untouched, type BoxScoreState } from './form-state.ts';
 import { ScoreCheck, type ScoreCheckProps } from './score-check.tsx';
 import { SavedLine } from './saved-line.tsx';
@@ -83,15 +94,26 @@ export type BoxScoreSheetFormProps = {
 export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
   const { teams, texts, editable } = props;
   const [state, dispatch, pending] = useActionState(props.action, untouched, props.permalink);
-  const onSubmit = useOneSubmit(pending, state);
+  const sendOnce = useOneSubmit(pending, state);
   const problemId = `${useId()}-problem`;
+  // A box whose text the browser could not read as a number, found as the form was about
+  // to be sent; it stands until the server next answers.
+  const [unread, setUnread] = useState<{ readonly field: string; readonly under: BoxScoreState }>();
+  const unreadField = unread?.under === state ? unread.field : undefined;
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    const boxes = [...event.currentTarget.querySelectorAll<HTMLInputElement>('input[type=number]')];
+    const bad = boxes.find((box) => box.validity.badInput);
+    if (bad === undefined) return sendOnce(event);
+    // Nothing is sent: the box would arrive empty and be saved as one.
+    event.preventDefault();
+    setUnread({ field: bad.name, under: state });
+  };
   // After a refusal (scripts on), the first wrong box takes the focus, which brings it into
   // view inside the grid: the sentence beside the scores names it.
   const formRef = useRef<HTMLFormElement>(null);
   const tabsId = useId();
   useEffect(() => {
-    if (state.kind !== 'refused') return;
-    const first = state.wrong[0];
+    const first = unreadField ?? (state.kind === 'refused' ? state.wrong[0] : undefined);
     const box = first === undefined ? null : formRef.current?.elements.namedItem(first);
     if (!(box instanceof HTMLInputElement)) return;
     // On a phone one team's grid is shown at a time: the wrong box's team is shown first.
@@ -104,21 +126,24 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
           );
     if (tab !== null && tab !== undefined) tab.checked = true;
     box.focus();
-  }, [state]);
+  }, [state, unread, unreadField]);
   const refused = state.kind === 'refused' ? state : undefined;
-  const wrong = new Set(refused?.wrong ?? []);
+  const wrong = new Set(unreadField === undefined ? (refused?.wrong ?? []) : [unreadField]);
   const text = (box: SheetBox) =>
     refused === undefined ? box.saved : (refused.typed[box.field] ?? '');
   const marked = (field: string) =>
     wrong.has(field) ? { 'aria-invalid': true, 'aria-describedby': problemId } : {};
 
-  const firstWrong = refused?.wrong[0];
+  const firstWrong = unreadField ?? refused?.wrong[0];
   const problem = (() => {
-    if (refused === undefined) return undefined;
-    if (refused.code === 'tie-not-allowed' && refused.scores !== undefined) {
-      return fillScores(texts.tie, refused.scores);
+    if (unreadField === undefined) {
+      if (refused === undefined) return undefined;
+      if (refused.code === 'tie-not-allowed' && refused.scores !== undefined) {
+        return fillScores(texts.tie, refused.scores);
+      }
+      if (refused.code !== 'invalid-input') return refused.said;
     }
-    if (refused.code !== 'invalid-input' || firstWrong === undefined) return refused.said;
+    if (firstWrong === undefined) return refused?.said;
     for (const team of teams) {
       if (team.score.field === firstWrong) return team.wrongScore;
       for (const row of team.rows) {
@@ -131,7 +156,7 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
         }
       }
     }
-    return refused.said;
+    return refused?.said;
   })();
   // The team whose grid a phone shows first: the one a refusal's first wrong box is in.
   const wrongTeam = teams.findIndex((team) =>
@@ -143,7 +168,13 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
 
   const columns = [...(texts.minutes === undefined ? [] : [texts.minutes]), ...texts.columns];
   return (
-    <form ref={formRef} action={dispatch} onSubmit={onSubmit} className="admin-sheet-form">
+    <form
+      ref={formRef}
+      action={dispatch}
+      onSubmit={onSubmit}
+      className="admin-sheet-form"
+      noValidate
+    >
       {Object.entries(props.hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
