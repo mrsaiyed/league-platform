@@ -442,8 +442,12 @@ export function clockAt(state: GameState, now: number): Clock {
 // so far), and never above L. A moment's game time is the segment's base (the game time
 // at its start) plus L less the corrected reading; derive counts minutes in it as ever.
 
-/** Whether the rules count minutes on the game clock. */
-const onGameClock = (rules: Rules): boolean => rules.minutesFollow === 'game-clock';
+/**
+ * Whether the rules count minutes on the game clock. The Al-Hadi tracker's pages call
+ * `clockAt` with a state holding only its clock (`{ clock }`, public/js/common.js), so
+ * rules that are not there read as the tracker's own rule.
+ */
+const onGameClock = (rules: Rules | undefined): boolean => rules?.minutesFollow === 'game-clock';
 /** The true running time of the clock, for a state made before it was kept (all zero then). */
 const ranOfClock = (clock: Clock): number => clock.ranMs ?? clock.elapsedMs;
 const ranOfPlay = (play: LoggedPlay): number => play.ranMs ?? play.elapsedMs;

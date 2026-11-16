@@ -10,12 +10,28 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
   apply,
+  clockAt,
   derive,
   newGame,
   HALVES,
   QUARTERS,
 } from '../packages/sports/src/basketball/live.ts';
 import { cases } from './support/set-clock-cases.mjs';
+
+test('the clock alone, as the tracker’s pages hand it, reads as it did', () => {
+  // apps/live-stats/public/js/common.js calls clockAt({ clock }, now): no rules at all.
+  const clock = { remainingMs: 480_000, running: true, anchorAt: 10_000, elapsedMs: 30_000 };
+  assert.deepEqual(clockAt({ clock }, 70_000), {
+    remainingMs: 420_000,
+    running: true,
+    anchorAt: 70_000,
+    elapsedMs: 90_000,
+  });
+  assert.deepEqual(clockAt({ clock: { ...clock, running: false } }, 70_000), {
+    ...clock,
+    running: false,
+  });
+});
 
 const everyone = (minutes, ms, but = {}) =>
   Object.fromEntries(Object.keys(minutes).map((id) => [id, but[id] ?? ms]));
