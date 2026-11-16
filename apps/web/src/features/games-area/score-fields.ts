@@ -35,6 +35,3 @@ export function wrongScoreFields(
 ): readonly ScoreField[] {
   return scoreFields.filter((name) => !scoreShape.test((fields[name] ?? '').trim()));
 }
-
-/** The id a game's place on the list carries, so an answer can lead straight to it. */
-export const gameAnchor = (gameId: string) => `game-${gameId}`;

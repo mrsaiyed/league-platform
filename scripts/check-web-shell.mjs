@@ -72,6 +72,7 @@ const tokens = {
 // The made-up leagues' ids (stand-in-ports.ts), which name the cookie of a device's "my team".
 const northValley = '01900000-0000-7000-8000-000000000001';
 const harborCity = '01900000-0000-7000-8000-000000000002';
+const quietPines = '01900000-0000-7000-8000-000000000003';
 // Two of the made-up games of the first league (stand-in-games.ts).
 const liveGame = '01900000-0000-7000-8000-006a00000002';
 const unassignedGame = '01900000-0000-7000-8000-006a00000003';
@@ -79,6 +80,8 @@ const unassignedGame = '01900000-0000-7000-8000-006a00000003';
 /** A made-up game of North Valley (apps/web/src/server/stand-in-games.ts): 1 scheduled,
  * 2 live (Hawks v Bears), 5 final (Bears v Lions), 6 in a season still being set up. */
 const game = (n) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0')}`;
+/** The draft league's game nobody scored, two days ago, assigned to the scorekeeper. */
+const draftUnscored = '01900000-0000-7000-8000-0000b20003e8';
 
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
 // browser's script fills with the not-found or forbidden screen (record 020), so
@@ -779,6 +782,48 @@ const cases = [
     ['You are not assigned to score this game.'],
     ['Lions at Hawks', noAccess],
   ],
+  // Step 2.153: "Score this game" on the public pages is read after the page, for the person
+  // signed in only. The page a scorekeeper is served holds no trace of it, as a visitor's;
+  // the read gives a scorekeeper the games they may score (in the draft league, which scores
+  // assigned games only, only theirs) and gives a visitor, a coach and another league's
+  // admin nothing, privately.
+  [
+    'scorekeeper',
+    '/north-valley/schedule',
+    200,
+    ['Hawks'],
+    ['Score this game', 'Enter the score', '/north-valley/score/'],
+  ],
+  [
+    'scorekeeper',
+    `/api/v1/leagues/${northValley}/scoring?games=${liveGame},${game(5)}`,
+    200,
+    [`"href":"/north-valley/score/${liveGame}"`, '"score":"Score this game"'],
+    [game(5)],
+  ],
+  ...['visitor', 'coach', 'otherAdmin'].map((who) => [
+    who,
+    `/api/v1/leagues/${northValley}/scoring?games=${liveGame},${unassignedGame}`,
+    200,
+    ['{"games":[]}'],
+    [liveGame, unassignedGame, 'Score this game'],
+  ]),
+  [
+    'scorekeeper',
+    `/api/v1/leagues/${quietPines}/scoring?games=${liveGame},${unassignedGame},${game(4)},${draftUnscored}`,
+    200,
+    [`"gameId":"${draftUnscored}"`, '"kind":"enter"'],
+    // Game 4 is theirs too, but two days ahead: not offered before its day (S-70).
+    [liveGame, unassignedGame, game(4)],
+  ],
+  // A game of tomorrow is not offered today, to its scorekeeper either (S-70).
+  [
+    'scorekeeper',
+    `/api/v1/leagues/${northValley}/scoring?games=${unassignedGame}`,
+    200,
+    ['{"games":[]}'],
+    [unassignedGame],
+  ],
   [
     'clubAdmin',
     '/quiet-pines/admin/teams',
@@ -925,6 +970,7 @@ try {
     );
   }
   failures.push(...(await sameAsNoLeague(origin)));
+  failures.push(...(await scoringSameAsNoLeague(origin)));
   failures.push(...(await checkStylesheets(origin)));
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
@@ -973,7 +1019,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Web shell check passed: ${cases.length + spoofs.length + 6} checks against the built server.`,
+  `Web shell check passed: ${cases.length + spoofs.length + 7} checks against the built server.`,
 );
 
 // When Node refused a TypeScript file it was to run itself, the server prints only
@@ -1113,6 +1159,87 @@ async function sameAsNoLeague(origin) {
   }
   if (a.rows !== b.rows) {
     found.push(`a draft's page data differs from no league's ${firstDifference(a.rows, b.rows)}`);
+  }
+  return found;
+}
+
+/**
+ * Step 2.153's read of a page's buttons (GET /api/v1/leagues/{leagueId}/scoring) answers a
+ * league its visitor may not see, a draft or a suspended one, exactly as a league that does
+ * not exist or is in the bin (U-9): for a visitor, a signed-in stranger, another league's
+ * admin and another league's scorekeeper, the answers for the leagues each may not see are
+ * compared with no league's, status, body and every header but the date and the length.
+ * The draft league's owner gets the ordinary answer.
+ */
+async function scoringSameAsNoLeague(origin) {
+  const leagueOf = (n) => `01900000-0000-7000-8000-${n.toString(16).padStart(12, '0')}`;
+  const leagues = {
+    'no league': leagueOf(0xfffff),
+    'in the bin': leagueOf(6),
+    draft: leagueOf(3),
+    suspended: leagueOf(5),
+    'another draft': leagueOf(7),
+  };
+  // Who may not see which: another league's admin holds the other draft; another league's
+  // scorekeeper holds north-valley, the draft and the archived league (stand-in-ports.ts).
+  const hiddenFrom = {
+    visitor: ['draft', 'suspended'],
+    stranger: ['draft', 'suspended'],
+    otherAdmin: ['draft', 'suspended'],
+    scorekeeper: ['another draft', 'suspended'],
+  };
+  const ask = async (who, leagueId) => {
+    const response = await fetch(
+      `${origin}/api/v1/leagues/${leagueId}/scoring?games=${liveGame},${unassignedGame}`,
+      {
+        headers: who === 'visitor' ? {} : { cookie: `srl_session=${tokens[who]}` },
+        redirect: 'manual',
+      },
+    );
+    const headers = [...response.headers]
+      .filter(([header]) => !['date', 'content-length'].includes(header))
+      .map(([header, value]) => `${header}: ${value}`)
+      .join('\n');
+    return { status: response.status, headers, body: await response.text() };
+  };
+  const found = [];
+  for (const [who, hidden] of Object.entries(hiddenFrom)) {
+    const answers = [];
+    for (const what of ['no league', 'in the bin', ...hidden]) {
+      answers.push([what, await ask(who, leagues[what])]);
+    }
+    const [, first] = answers[0];
+    if (first.status !== 404) found.push(`${who}'s scoring read of no league is ${first.status}`);
+    for (const [what, answer] of answers.slice(1)) {
+      if (JSON.stringify(answer) !== JSON.stringify(first)) {
+        found.push(
+          `${who}'s scoring read of a league ${what} differs from no league's:\n${JSON.stringify(answer)}\n---\n${JSON.stringify(first)}`,
+        );
+      }
+    }
+  }
+  // And exactly as the other public read, the snapshot, answers a visitor of a hidden league.
+  const snapshot = await fetch(
+    `${origin}/api/v1/leagues/${leagues.draft}/games/${liveGame}/snapshot`,
+    { redirect: 'manual' },
+  );
+  const snapshotAnswer = {
+    status: snapshot.status,
+    headers: [...snapshot.headers]
+      .filter(([header]) => !['date', 'content-length'].includes(header))
+      .map(([header, value]) => `${header}: ${value}`)
+      .join('\n'),
+    body: await snapshot.text(),
+  };
+  const scoringAnswer = await ask('visitor', leagues.draft);
+  if (JSON.stringify(scoringAnswer) !== JSON.stringify(snapshotAnswer)) {
+    found.push(
+      `a visitor's scoring read of a draft differs from its snapshot:\n${JSON.stringify(scoringAnswer)}\n---\n${JSON.stringify(snapshotAnswer)}`,
+    );
+  }
+  const owner = await ask('owner', leagues.draft);
+  if (owner.status !== 200 || !/private, no-store/.test(owner.headers)) {
+    found.push(`the draft league's owner's scoring read is ${owner.status}: ${owner.headers}`);
   }
   return found;
 }

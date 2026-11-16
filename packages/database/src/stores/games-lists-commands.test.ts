@@ -10,6 +10,7 @@ import {
   listEarlierGames,
   listGamesNeedingResult,
   listMyGames,
+  listScoringOffers,
   needsResultLimit,
   setSetting,
   type AccessTx,
@@ -390,5 +391,61 @@ describe('the earlier games by round, on the database', () => {
       listEarlierRound(scope, l.ownerId, everything, { roundId: fourWeeks?.roundId ?? '' }, 3),
     );
     expect(round.games).toHaveLength(3);
+  });
+});
+
+// Step 2.153 on the database: which of a public page's games the person may score.
+describe("a page's games the person may score, on the database", () => {
+  it('offers open games only, by the scoring rule, and nothing of a game in the bin', async () => {
+    const l = await league();
+    const live = await l.gameAt({ starts_at: l.at(60), capture_mode: 'live' });
+    // 23:50 tonight in the league's zone, whenever the test runs (S-70: offered all day).
+    const box = await l.gameAt({ starts_at: l.at(day - 10), capture_mode: 'box' });
+    const decided = await l.gameAt(final(l.at(-day)));
+    const binned = await l.gameAt({ starts_at: l.at(day), deleted_at: new Date().toISOString() });
+    const keeper = await grant(l.leagueId, 'scorekeeper');
+    await pglite.query(
+      'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
+      [l.leagueId, box, keeper],
+    );
+    const offered = async (account: string) => {
+      const r = await listScoringOffers(
+        asAccount(l.leagueId, account),
+        { gameIds: [decided, box, live, binned] },
+        deps,
+      );
+      return r.ok ? r.value.games : r.error.code;
+    };
+    expect(await offered(keeper)).toEqual([
+      { gameId: box, recording: 'box-score' },
+      { gameId: live, recording: 'live' },
+    ]);
+    const chosen = await setSetting(
+      l.as(),
+      { level: 'league', key: 'games.whoMayScore', value: 'assignedOnly', version: null },
+      deps,
+    );
+    expect(chosen.ok).toBe(true);
+    expect(await offered(keeper)).toEqual([{ gameId: box, recording: 'box-score' }]);
+    expect(await offered(l.ownerId)).toHaveLength(2);
+    // Someone who scores nowhere here is refused, and so told nothing of any game.
+    expect(await offered(await grant(l.leagueId, 'editor'))).toBe('not-allowed');
+  });
+
+  it("offers a game from the start of its own day in the league's zone until it has a result (S-70)", async () => {
+    // The league keeps America/Chicago, whose day is not UTC's: its days are read by the
+    // database's clock in that zone, as the games list reads them.
+    const l = await league();
+    const tonight = await l.gameAt({ starts_at: l.at(day - 10), capture_mode: 'live' });
+    const tomorrow = await l.gameAt({ starts_at: l.at(day + 10), capture_mode: 'live' });
+    const yesterday = await l.gameAt({ starts_at: l.at(-day + 19 * 60), capture_mode: 'final' });
+    const ahead = await l.gameAt({ starts_at: l.at(3 * day), capture_mode: 'live' });
+    const noDate = await l.gameAt({ starts_at: null, capture_mode: 'live' });
+    const r = await listScoringOffers(
+      l.as(),
+      { gameIds: [tonight, tomorrow, yesterday, ahead, noDate] },
+      deps,
+    );
+    expect(r.ok && r.value.games.map((g) => g.gameId)).toEqual([tonight, yesterday]);
   });
 });
