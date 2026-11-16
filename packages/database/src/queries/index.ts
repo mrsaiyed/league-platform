@@ -79,6 +79,7 @@ export { findLeagueName } from './find-league-name.ts';
 export { findPublishedDesign, type PublishedDesign } from './find-published-design.ts';
 export { listTeamsOfAccount } from './list-teams-of-account.ts';
 export { findLeagueToday } from './find-league-today.ts';
+export { listLeagueSeasons, type LeagueSeasonRow } from './list-league-seasons.ts';
 export { listPublicGames, type PublicGameInRound } from './list-public-games.ts';
 export { listPublicRoster } from './list-public-roster.ts';
 export { listPublicSchedule } from './list-public-schedule.ts';

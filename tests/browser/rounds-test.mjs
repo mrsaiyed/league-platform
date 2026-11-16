@@ -19,6 +19,7 @@ import {
   buildNext,
   freePort,
   launch,
+  openStaffMenu,
   startNext,
   waitFor,
   whatWentWrong,
@@ -111,6 +112,8 @@ if (built) {
     at = 'the owner opens the admin and taps Schedule';
     await page.goto(`${origin}/north-valley`);
     await page.goto(`${origin}/north-valley/admin`);
+    // The admin's areas are behind its own menu button on a phone (step 2.103).
+    await openStaffMenu(page);
     await tap(
       page.locator('nav').getByRole('link', { name: 'Schedule', exact: true }).first(),
       /\/admin\/schedule$/,
@@ -289,7 +292,8 @@ if (built) {
     const flag = (await page.locator('[data-off-round-date]').textContent()) ?? '';
     note(
       "the game is flagged as outside its round's days, in one plain sentence",
-      flag.includes(`This game falls outside Week 1, which is on ${weeks[0].date}.`),
+      // The round's day in words, as the page writes every other day (step 2.103).
+      flag.includes(`This game falls outside Week 1, which is on ${weeks[0].words}.`),
       flag,
     );
     await accessible("a game outside its round's days");
@@ -312,6 +316,7 @@ if (built) {
 
     // The public season: a new round is not public until it is published.
     at = 'the owner adds a round to the public season';
+    await openStaffMenu(page);
     await tap(
       page.locator('nav').getByRole('link', { name: 'Schedule', exact: true }).first(),
       /\/admin\/schedule$/,

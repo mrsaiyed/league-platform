@@ -19,6 +19,7 @@ import {
   buildNext,
   freePort,
   launch,
+  openStaffMenu,
   startNext,
   waitFor,
   whatWentWrong,
@@ -97,6 +98,8 @@ if (built) {
     const adminLink = (name) =>
       page.locator('nav').getByRole('link', { name, exact: true }).first();
     const openTeam = async (name) => {
+      // On a phone the admin's areas are behind its own menu button (step 2.103).
+      await openStaffMenu(page);
       await tap(adminLink('Teams'), /\/admin\/teams$/);
       await tap(page.locator('main').getByRole('link', { name, exact: true }), /\/admin\/teams\//);
     };
@@ -173,6 +176,7 @@ if (built) {
     await accessible('a player put back');
 
     at = 'a team with two players is made';
+    await openStaffMenu(page);
     await tap(adminLink('Teams'), /\/admin\/teams$/);
     await page.locator('input[name=name]').fill(wrens.team);
     await tap(page.getByRole('button', { name: 'Add team' }), /done=created/);
@@ -259,6 +263,7 @@ if (built) {
 
     at = 'a game is removed from the draft by mistake';
     const publicBefore = await publicText('/schedule');
+    await openStaffMenu(page);
     await tap(adminLink('Schedule'), /\/admin\/schedule$/);
     const summaryOf = async () => {
       const panel = page.locator('section', {

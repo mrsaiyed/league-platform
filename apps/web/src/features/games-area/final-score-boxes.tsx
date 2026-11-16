@@ -38,6 +38,8 @@ export type FinalScoreBoxesProps = {
   readonly token: string;
   /** Open to start with: the game was just reopened to correct it. */
   readonly open: boolean;
+  /** The one thing to do for this game (its start has passed): its button is the filled one. */
+  readonly main?: boolean;
   /** The game's place on the list, where the browser lands with scripts off. */
   readonly permalink: string;
   readonly texts: FinalScoreTexts;
@@ -81,24 +83,26 @@ export function FinalScoreBoxes(props: FinalScoreBoxesProps) {
         <p id={`${id}-question`}>
           <strong>{fillScores(texts.ask, scores)}</strong>
         </p>
-        <form action={dispatch} onSubmit={onSubmit}>
-          {common}
-          {asked}
-          <input type="hidden" name="version" value={state.version} />
-          <input type="hidden" name="step" value="confirm" />
-          <input type="hidden" name="confirmed" value="yes" />
-          <button type="submit" className="ui-button" data-kind="main">
-            {texts.yes}
-          </button>
-        </form>
-        <form action={dispatch} onSubmit={onSubmit}>
-          {common}
-          {asTyped}
-          <input type="hidden" name="step" value="change" />
-          <button type="submit" className="ui-button">
-            {texts.no}
-          </button>
-        </form>
+        <div className="staff-buttons">
+          <form action={dispatch} onSubmit={onSubmit}>
+            {common}
+            {asked}
+            <input type="hidden" name="version" value={state.version} />
+            <input type="hidden" name="step" value="confirm" />
+            <input type="hidden" name="confirmed" value="yes" />
+            <button type="submit" className="ui-button" data-kind="main">
+              {texts.yes}
+            </button>
+          </form>
+          <form action={dispatch} onSubmit={onSubmit}>
+            {common}
+            {asTyped}
+            <input type="hidden" name="step" value="change" />
+            <button type="submit" className="ui-button">
+              {texts.no}
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
@@ -119,35 +123,40 @@ export function FinalScoreBoxes(props: FinalScoreBoxesProps) {
           : state.said;
   return (
     <details open={props.open || typed !== undefined} data-score-boxes="">
-      <summary className="ui-button">{texts.enterFinal}</summary>
-      <form action={dispatch} onSubmit={onSubmit} className="ui-panel ui-stack">
+      <summary className="ui-button" data-kind={props.main === true ? 'main' : undefined}>
+        {texts.enterFinal}
+      </summary>
+      <form action={dispatch} onSubmit={onSubmit} className="staff-form admin-score-form">
         {common}
         <input type="hidden" name="version" value={props.version} />
         <input type="hidden" name="step" value="ask" />
-        {scoreFields.map((name) => (
-          <label key={name} className="ui-stack">
-            <span>{texts.labels[name]}</span>
-            <input
-              type="number"
-              name={name}
-              inputMode="numeric"
-              min={0}
-              max={999}
-              step={1}
-              required
-              defaultValue={typed?.[name] ?? ''}
-              {...(wrong.includes(name)
-                ? { 'aria-invalid': true, 'aria-describedby': problemId }
-                : {})}
-            />
-          </label>
-        ))}
+        {/* Each team's label above its own box, the two side by side (step 2.103). */}
+        <div className="staff-scores">
+          {scoreFields.map((name) => (
+            <label key={name} className="staff-field" data-size="figure">
+              <span>{texts.labels[name]}</span>
+              <input
+                type="number"
+                name={name}
+                inputMode="numeric"
+                min={0}
+                max={999}
+                step={1}
+                required
+                defaultValue={typed?.[name] ?? ''}
+                {...(wrong.includes(name)
+                  ? { 'aria-invalid': true, 'aria-describedby': problemId }
+                  : {})}
+              />
+            </label>
+          ))}
+        </div>
         {problem === undefined ? null : (
           <p id={problemId} className="ui-field-error" role="alert">
             {problem}
           </p>
         )}
-        <p>
+        <p className="staff-buttons">
           <button type="submit" className="ui-button" data-kind="main">
             {texts.save}
           </button>

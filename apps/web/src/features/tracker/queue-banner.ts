@@ -33,3 +33,23 @@ export function savedBannerLineText(line: SavedBannerLine, t: Translate): string
 export function savedBannerText(banner: SavedBanner, t: Translate): string {
   return banner.map((line) => savedBannerLineText(line, t)).join(t('tracker.queue.separator'));
 }
+
+/**
+ * The same lines said shorter, one each: what a phone's scoreboard shows where it has no
+ * room for the long ones ("12 to send" for "12 actions waiting to send"). They say no
+ * less: which line it is, and how many.
+ */
+export function savedBannerShortLines(banner: SavedBanner, t: Translate): readonly string[] {
+  return banner.map((line) => {
+    switch (line.key) {
+      case 'tracker.queue.allSaved':
+        return t('tracker.queue.allSaved');
+      case 'tracker.queue.storageFailed':
+        return t('tracker.queue.storageFailedShort');
+      case 'tracker.queue.waiting':
+        return t.plural('tracker.queue.waitingShort', line.count);
+      case 'tracker.queue.notSaved':
+        return t.plural('tracker.queue.notSavedShort', line.count);
+    }
+  });
+}

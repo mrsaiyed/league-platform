@@ -4,6 +4,8 @@ This repository is becoming a league management platform. One person, the founde
 
 ## Read these first
 
+On a computer that has only this repository (you were given its address and told to start), read `docs/build/START-HERE.md` before anything else.
+
 1. `docs/specs/v1/PROGRESS.md` — where the specification stands and the facts several files share.
 2. `docs/build/STATUS.md` — where the build stands and what to do next.
 3. `docs/build/RUNBOOK.md` — how a build run works. Follow it exactly when you are asked to continue the build.

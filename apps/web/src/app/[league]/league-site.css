@@ -972,34 +972,3 @@ html {
     align-items: start;
   }
 }
-
-/* The box score grid (step 2.64): on a phone it scrolls sideways in its own box, and
-   the page never does (A-2). */
-.box-score-grid {
-  max-inline-size: 100%;
-  overflow-x: auto;
-}
-.box-score-grid table {
-  border-collapse: collapse;
-}
-.box-score-grid th,
-.box-score-grid td {
-  padding-block: var(--step-1);
-  padding-inline: var(--step-2);
-  text-align: start;
-  white-space: nowrap;
-}
-.box-score-grid input[type='number'] {
-  inline-size: var(--step-8);
-  font-size: var(--text-16);
-}
-.box-score-grid input[type='checkbox'] {
-  inline-size: var(--step-5);
-  block-size: var(--step-5);
-}
-/* A typed score that differs from the players' points (S-26): seen, not blocking. */
-.box-score-warning p {
-  border-inline-start: var(--step-1) solid currentColor;
-  padding-inline-start: var(--step-2);
-  font-weight: 600;
-}
