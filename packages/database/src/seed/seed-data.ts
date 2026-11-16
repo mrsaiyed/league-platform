@@ -2,6 +2,7 @@
 // invented; email addresses end in .test, which can never be a real mailbox. Nothing here
 // is a person. A league is data: the loader (seed-leagues.ts) reads this list and
 // treats every entry the same way, so adding a third league means adding an entry.
+import type { StartingDesignKey } from '@srleagues/contracts';
 import type { Audience, Role } from '@srleagues/core';
 
 export type SeedMember = {
@@ -38,8 +39,8 @@ export type SeedLeague = {
   readonly timeZone: string;
   /** Who plays: decides who counts as a child when their age is not known (R-15). */
   readonly audience: Audience;
-  /** A starting design key of packages/site; the web app checks it is a real one. */
-  readonly design: string;
+  /** The starting design its first site release is published in (step 2.187). */
+  readonly design: StartingDesignKey;
   readonly owner: { readonly email: string; readonly displayName: string };
   readonly members: readonly SeedMember[];
   readonly season: { readonly slug: string; readonly name: string };
@@ -104,7 +105,8 @@ export const seedLeagues: readonly SeedLeague[] = [
     timeZone: 'America/New_York',
     // A youth league: a player whose age is not known is shown as a child (R-15).
     audience: 'youth',
-    design: 'clean-court',
+    // Not the neutral design, so its pages show it is drawn in a design of its own.
+    design: 'midnight-gold',
     owner: { email: 'owner@maple.example.test', displayName: 'Mara Maple' },
     members: [
       { email: 'admin@maple.example.test', displayName: 'Abe Admin', role: 'admin' },
