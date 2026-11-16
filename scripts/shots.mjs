@@ -121,6 +121,18 @@ const gamePages = {
     { name: 'game-undated', at: `/games/${listedGame(5, 4)}` },
   ],
 };
+/**
+ * The box score grid on a phone shows one team at a time (step 2.103): picks the team a
+ * box belongs to before it is typed in, as a person would. Nothing to do on a laptop.
+ */
+async function showSheetTeamOf(page, box) {
+  const team = await box.evaluate(
+    (el) => el.closest('[data-sheet-team]')?.getAttribute('data-sheet-team') ?? null,
+  );
+  const tabs = page.locator('.admin-sheet-tabs');
+  if (team === null || (await tabs.count()) === 0 || !(await tabs.isVisible())) return;
+  await tabs.locator('label').nth(Number(team)).click();
+}
 // The games area's states, reached by tapping (steps 2.154 and 2.155); see adminPages.
 const gamesStates = [
   { name: 'admin-games-boxes-open', at: '/admin/games', onlyIn: leagues[0], tap: openBoxes(1) },
@@ -242,7 +254,10 @@ const gamesStates = [
     tap: async (page) => {
       const points = page.locator('main input[name^="stat.points."]');
       const typed = [3, 4, 5, 6, 7, 5, 10, 4, 4, 4, 4, 4];
-      for (const [i, value] of typed.entries()) await points.nth(i).fill(String(value));
+      for (const [i, value] of typed.entries()) {
+        await showSheetTeamOf(page, points.nth(i));
+        await points.nth(i).fill(String(value));
+      }
       await page.locator('main input[name="awayScore"]').fill('30');
       await page.locator('main input[name="homeScore"]').fill('30');
       await page.locator('main form button[type="submit"]').last().click();
@@ -255,13 +270,14 @@ const gamesStates = [
     onlyIn: leagues[0],
     first: `/admin/games/${trackedGame(1)}`,
     tap: async (page) => {
-      // A count the phone's own check would stop: the form is sent as a browser that does
-      // not check would send it, so the server's refusal is what is pictured.
+      // A count over the box's limit, typed in one team's grid; then the other team is
+      // picked, so that grid is put away on a phone, and Save is tapped. The form leaves the
+      // telling to the server (step 2.103): the refusal names the box, and its team is shown.
       const points = page.locator('main input[name^="stat.points."]');
+      await showSheetTeamOf(page, points.nth(3));
       await points.nth(3).fill('1000');
-      await page.locator('main form:has(#box-score-scores)').evaluate((form) => {
-        form.noValidate = true;
-      });
+      await showSheetTeamOf(page, points.nth(8));
+      await points.nth(8).fill('9');
       await page.locator('main form button[type="submit"]').last().click();
       await page.locator('#box-score-scores [role="alert"]').waitFor();
     },
@@ -317,7 +333,8 @@ const adminPages = [
   // one), each also in the second league's light look: the empty season with its form;
   // "Saved" after adding a round; the moved game's question; a game outside its round with
   // its button; a round's controls opened, one with "Remove this round" and one saying why
-  // it cannot be removed; a round date refused beside its round, and a new round's date
+  // it cannot be removed; a game's own form opened ("Edit this game": Save game, and Remove
+  // game apart from it); a round date refused beside its round, and a new round's date
   // refused beside its field. Each is reached by the owner's own taps (roundSteps).
   ...[
     { name: 'admin-schedule-no-rounds', steps: [] },
@@ -325,6 +342,7 @@ const adminPages = [
     { name: 'admin-schedule-move-question', steps: ['rounds', 'game', 'move'] },
     { name: 'admin-schedule-outside-round', steps: ['rounds', 'game', 'move', 'keep'] },
     { name: 'admin-schedule-round-controls', steps: ['rounds', 'game', 'open'] },
+    { name: 'admin-schedule-edit-game', steps: ['rounds', 'game', 'edit'] },
     { name: 'admin-schedule-round-refused', steps: ['rounds', 'game', 'bad-round-date'] },
     { name: 'admin-schedule-add-round-refused', steps: ['rounds', 'bad-new-date'] },
   ].flatMap(({ name, steps }) =>
@@ -375,6 +393,24 @@ const adminPages = [
   { name: 'admin-settings', at: '/admin/settings' },
   { name: 'admin-people', at: '/admin/people' },
   { name: 'admin-standings', at: '/admin/standings' },
+  // The admin's own frame (step 2.103): its menu, open, as a phone holds it (on a laptop the
+  // menu is always at the side, so the picture is the page's first screen); and "not
+  // found" inside the admin, for a team that is not there.
+  { name: 'admin-menu-open', at: '/admin/teams', opensStaffMenu: true },
+  { name: 'admin-not-found', at: '/admin/teams/01900000-0000-7000-8000-00000000dead' },
+];
+// The admin of the made-up league that is not published (step 2.103): its pill in the header.
+const draftLeague = 'quiet-pines';
+const draftPages = [
+  { name: 'admin-home', at: '/admin' },
+  { name: 'admin-status-open', at: '/admin', opensStaffStatus: true },
+];
+// What the made-up scheduler sees (step 2.103): a menu of their own areas only, and "You
+// do not have access" at an area that is not theirs.
+const scheduler = { name: 'srl_session', value: 'local-scheduler-token' };
+const schedulerPages = [
+  { name: 'scheduler-admin-home', at: '/admin' },
+  { name: 'scheduler-admin-refused', at: '/admin/teams' },
 ];
 // The games list's taps (step 2.155): a game's place on the list, its boxes opened, and a
 // score typed and saved, which only asks.
@@ -1020,6 +1056,9 @@ async function roundSteps(page, steps) {
         page.locator('[data-follow-round-date] a', { hasText: 'No, keep' }),
         /season=winter-2027/,
       );
+    } else if (step === 'edit') {
+      // "Edit this game", opened: its fields, then Save game and, apart, Remove game.
+      await game.locator('summary', { hasText: 'Edit this game' }).click();
     } else if (step === 'open') {
       for (const label of ['Week 1', 'Week 2']) {
         await round(label).locator('summary', { hasText: 'Change or remove this round' }).click();
@@ -1041,9 +1080,17 @@ async function roundSteps(page, steps) {
   }
 }
 
-/** A league's design values as its pages carry them: the one `:root` block (T-90). */
-async function designValuesOf(origin, league) {
-  const html = await (await fetch(`${origin}/${league}`)).text();
+/**
+ * A league's design values as its pages carry them: the one `:root` block (T-90). The
+ * admin's pages carry the workspace's own values, worked out from the league's (step
+ * 2.103), so an admin page's are read from that league's admin, as its made-up owner.
+ */
+async function designValuesOf(origin, league, staff = false) {
+  const html = await (
+    await fetch(`${origin}/${league}${staff ? '/admin' : ''}`, {
+      headers: staff ? { cookie: `${owner.name}=${owner.value}` } : {},
+    })
+  ).text();
   const found = /:root \{[^}]*\}/.exec(html);
   if (!found) throw new Error(`no design values on /${league}`);
   return found[0];
@@ -1102,6 +1149,8 @@ try {
     await staffTapping.addCookies([{ ...owner, url: origin }]);
     const keeper = await browser.newContext({ viewport: width.viewport });
     await keeper.addCookies([{ ...scorekeeper, url: origin }]);
+    const planner = await browser.newContext({ viewport: width.viewport });
+    await planner.addCookies([{ ...scheduler, url: origin }]);
     const jobs = [
       ...(design === '' ? platformPages : []).map((page) => ({
         ...page,
@@ -1120,7 +1169,14 @@ try {
             // A league's public page: its text is measured too, when that is asked for.
             publicPage: true,
           })),
-        ...(design === '' ? adminPages : [])
+        // Under a named design the admin's plain pages are taken too: the workspace's look
+        // is worked out from the league's design (step 2.103).
+        ...(design === ''
+          ? adminPages
+          : adminPages.filter(
+              (page) => !page.lookOf && !page.steps && !page.tap && !page.onlyIn && !page.league,
+            )
+        )
           // A page of one league's own season (`league`), or one state taken in one league
           // only (`onlyIn`), is taken in that league only.
           .filter(
@@ -1153,6 +1209,18 @@ try {
         context: keeper,
         base: `/${leagues[0]}`,
       })),
+      ...(design === '' ? schedulerPages : []).map((page) => ({
+        ...page,
+        name: `${leagues[0]}-${page.name}`,
+        context: planner,
+        base: `/${leagues[0]}`,
+      })),
+      ...(design === '' ? draftPages : []).map((page) => ({
+        ...page,
+        name: `${draftLeague}-${page.name}`,
+        context: staff,
+        base: `/${draftLeague}`,
+      })),
     ].filter((job) => wanted(job.name));
     for (const job of jobs) {
       const label = `${width.name}/${fileName(job.name)}`;
@@ -1180,7 +1248,9 @@ try {
         }
         if (job.lookOf) {
           // The same page under another league's design values: only the `:root` block changes.
-          looks[job.lookOf] ??= await designValuesOf(origin, job.lookOf);
+          const staffLook = job.at.startsWith('/admin');
+          const look = `${job.lookOf}${staffLook ? ' (admin)' : ''}`;
+          looks[look] ??= await designValuesOf(origin, job.lookOf, staffLook);
           await page.evaluate((values) => {
             for (const style of document.querySelectorAll('style')) {
               if (/:root \{[^}]*--color-background/.test(style.textContent ?? '')) {
@@ -1188,7 +1258,7 @@ try {
               }
             }
             return document.fonts.ready.then(() => undefined);
-          }, looks[job.lookOf]);
+          }, looks[look]);
           await page.waitForTimeout(500);
         }
         // The faces a page draws are fetched as it is laid out: wait for them, so no
@@ -1203,6 +1273,17 @@ try {
             .waitFor({ state: 'visible' });
           await page.waitForTimeout(300);
         }
+        // The admin's own menu on a phone, and the pill of a league that is not public:
+        // each a plain disclosure, opened by its own button where that is on the screen.
+        const opened = job.opensStaffMenu
+          ? '.staff-bar .staff-menu'
+          : job.opensStaffStatus
+            ? `.${width.viewport.width < 1024 ? 'staff-bar' : 'staff-side'} .staff-status`
+            : null;
+        if (opened !== null && (await page.locator(`${opened} > summary`).isVisible())) {
+          await page.locator(`${opened} > summary`).click();
+          await page.waitForTimeout(300);
+        }
         // Nothing of the tool on the screen: Next.js's dev indicator hidden, and the pointer
         // away from every card (step 2.155's design review). After the account button is
         // opened, so the pointer leaves it too; an opened panel stays open when it does.
@@ -1214,7 +1295,16 @@ try {
         });
         await page.mouse.move(0, 0);
         const file = path.join(out, width.name, `${fileName(job.name)}.jpg`);
-        await page.screenshot({ path: file, fullPage: !job.opens, type: 'jpeg', quality: 80 });
+        const whole = !job.opens && opened === null;
+        // A whole page is taken from its top: a page a tap has scrolled (to a box that took
+        // the focus) would be drawn with the row that stays on top across its middle.
+        if (whole) await page.evaluate(() => window.scrollTo(0, 0));
+        await page.screenshot({
+          path: file,
+          fullPage: whole,
+          type: 'jpeg',
+          quality: 80,
+        });
         if (measuring && job.publicPage) {
           measured.push({ label, ...(await page.evaluate(measureContrast)) });
         }
@@ -1231,6 +1321,7 @@ try {
     await staff.close();
     await staffTapping.close();
     await keeper.close();
+    await planner.close();
   }
   // The phone menu, open (`--only=menu`), at 390 in each league's own look.
   {

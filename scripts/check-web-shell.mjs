@@ -15,6 +15,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { adminPlaceholder } from './admin-placeholder.mjs';
 import { checkStructure, formatViolation } from './structure/index.mjs';
 import { withLoopback } from './web-listen.mjs';
 
@@ -85,12 +86,54 @@ const game = (n) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0
 const noAccess = 'NEXT_HTTP_ERROR_FALLBACK;403';
 const notFound = 'NEXT_HTTP_ERROR_FALLBACK;404';
 
-// A link in the admin's own navigation (features/shell/admin-nav.tsx). The area's
+// A link in the admin's own navigation (features/staff/staff-nav.tsx). The area's
 // name alone is no proof: the site's menu has "Schedule" and "Teams" too.
 const adminLink = (league, area) => `href="/${league}/admin/${area}"`;
 
+// A page's own markup: what the browser draws before any script runs. The page's data
+// (`self.__next_f.push` pieces) and every other script are left out, so words a refusal's
+// copy or any other data holds cannot stand in for what is drawn.
+const drawnMarkup = (html) => html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '');
+
 /**
- * [who, path, status, words that must be there, words that must not, forward to, extra cookies]
+ * The staff frame drawn in the page's markup (features/staff/staff-frame.tsx and
+ * staff-nav.tsx, step 2.103): the bar on top, and the admin's own menu, both copies of it
+ * (the phone's panel and the side), each marking `href` as the place the page is in, and
+ * only that. The words "Admin areas" alone are no proof: they are in a refusal's copy in
+ * every admin page's data.
+ */
+const staffFrameAt = (href) => ({
+  label: `the staff frame drawn, its menu at ${href}`,
+  problem(html) {
+    const markup = drawnMarkup(html);
+    if (!markup.includes('<header class="staff-bar">')) return 'no staff bar drawn';
+    const menus = [...markup.matchAll(/<nav class="staff-nav"[^>]*>([\s\S]*?)<\/nav>/g)];
+    if (menus.length !== 2) return `${menus.length} copies of the admin's menu drawn, not 2`;
+    for (const [, menu] of menus) {
+      const marked = [...menu.matchAll(/<a\b[^>]*\baria-current="page"[^>]*>/g)];
+      if (marked.length !== 1 || !marked[0][0].includes(`href="${href}"`)) {
+        return `the admin's menu marks ${marked.map((m) => m[0]).join(', ') || 'nothing'}`;
+      }
+    }
+    return undefined;
+  },
+});
+
+/** Exactly one main heading drawn in the page's markup. */
+const oneHeading = {
+  label: 'one h1',
+  problem(html) {
+    const count = (drawnMarkup(html).match(/<h1[\s>]/g) ?? []).length;
+    return count === 1 ? undefined : `${count} h1 headings drawn, not 1`;
+  },
+};
+
+/** The Lions, a team of the first league's current season (stand-in-world-seed.ts). */
+const lionsTeam = '01900000-0000-7000-8000-007e00000001';
+
+/**
+ * [who, path, status, words that must be there (or a check of the drawn markup, such as
+ * staffFrameAt), words that must not, forward to, extra cookies]
  *
  * Grouped by page, in the order a person meets them. A new case goes in the group of its
  * own page or area, beside the cases like it, never at the end of the list, so two steps
@@ -391,33 +434,99 @@ const cases = [
     '/signin?next=%2Fnorth-valley%2Fadmin',
   ],
   ['visitor', '/north-valley/admin/teams', 403, [noAccess], ['Admin areas']],
-  ['stranger', '/north-valley/admin', 403, [noAccess]],
-  ['coach', '/north-valley/admin/teams', 403, [noAccess]],
+  // Someone the admin is not open to at all is refused on the plain screen of SR Leagues'
+  // own: nothing of the admin's frame, and no way "back to the admin" (U-9).
+  ['stranger', '/north-valley/admin', 403, [noAccess], ['Admin areas', 'Back to the admin']],
+  ['coach', '/north-valley/admin/teams', 403, [noAccess], ['Admin areas', 'Back to the admin']],
   [
     'scheduler',
     '/north-valley/admin',
     200,
-    ['Admin areas', adminLink('north-valley', 'schedule'), adminLink('north-valley', 'games')],
+    [
+      'Admin areas',
+      adminLink('north-valley', 'schedule'),
+      adminLink('north-valley', 'games'),
+      staffFrameAt('/north-valley/admin'),
+      oneHeading,
+    ],
     [adminLink('north-valley', 'people')],
   ],
   [
     'scheduler',
     '/north-valley/admin/schedule',
     200,
-    [adminLink('north-valley', 'schedule'), 'Build the schedule here, round by round.'],
-    ['Nothing here yet.'],
+    [
+      adminLink('north-valley', 'schedule'),
+      'Build the schedule here, round by round.',
+      staffFrameAt('/north-valley/admin/schedule'),
+      oneHeading,
+    ],
+    [adminPlaceholder],
   ],
-  ['scheduler', '/north-valley/admin/teams', 403, [noAccess]],
+  // Each built area's page draws the staff frame, marked at its area, and one main
+  // heading (step 2.103): an import under Schedule, a box score under Games.
+  [
+    'scheduler',
+    '/north-valley/admin/schedule/import',
+    200,
+    ['Import fixtures', staffFrameAt('/north-valley/admin/schedule'), oneHeading],
+    [adminPlaceholder],
+  ],
+  [
+    'scheduler',
+    '/north-valley/admin/games',
+    200,
+    ['Enter the final score', staffFrameAt('/north-valley/admin/games'), oneHeading],
+    [adminPlaceholder],
+  ],
+  [
+    'scheduler',
+    `/north-valley/admin/games/${game(1)}`,
+    200,
+    ['Box score: Tigers at Lions', staffFrameAt('/north-valley/admin/games'), oneHeading],
+    [adminPlaceholder],
+  ],
+  // A scheduler at an area that is not theirs is refused inside the admin's own frame,
+  // which is open to them: their own areas in its menu, and the way back to its home
+  // (step 2.103). Another league's admin, which is not open to them, shows them no frame.
+  // (A refusal's screen is in the page's data, so an area's address is looked for bare.)
+  [
+    'scheduler',
+    '/north-valley/admin/teams',
+    403,
+    [noAccess, 'Admin areas', '/north-valley/admin/schedule', 'Back to the admin'],
+    ['/north-valley/admin/people'],
+  ],
+  ['scheduler', '/harbor-city/admin/teams', 403, [noAccess], ['Admin areas', 'Back to the admin']],
+  // An area with no screen yet is the placeholder, in the words the checks around this
+  // one look for to prove a real screen has replaced it (scripts/admin-placeholder.mjs).
+  ['owner', '/north-valley/admin/people', 200, [adminPlaceholder, 'Back to the admin']],
   // Admin → Teams (step 2.51): the season's teams and the form to add one.
   [
     'owner',
     '/north-valley/admin/teams',
     200,
-    ['Teams of Fall 2026', 'Lions', 'Owls', 'Add a team', 'Short name'],
-    ['Nothing here yet.'],
+    [
+      'Teams of Fall 2026',
+      'Lions',
+      'Owls',
+      'Add a team',
+      'Short name',
+      staffFrameAt('/north-valley/admin/teams'),
+      oneHeading,
+    ],
+    [adminPlaceholder],
   ],
   // Each league's own teams: the youth league's, none of the first league's.
   ['owner', '/harbor-city/admin/teams', 200, ['Comets', 'Add a team'], ['Lions']],
+  // A team's page is under Teams.
+  [
+    'owner',
+    `/north-valley/admin/teams/${lionsTeam}`,
+    200,
+    ['Lions', staffFrameAt('/north-valley/admin/teams'), oneHeading],
+    [adminPlaceholder],
+  ],
   ['owner', '/north-valley/admin/teams/not-a-team', 404, [notFound]],
   ['scheduler', '/harbor-city/admin', 403, [noAccess]],
   [
@@ -434,6 +543,8 @@ const cases = [
       'Default: Any game',
       'Accepts yes or no.',
       'Accepts one of the choices shown.',
+      staffFrameAt('/north-valley/admin/settings'),
+      oneHeading,
     ],
   ],
   ['scheduler', '/north-valley/admin/settings', 403, [noAccess]],
@@ -444,8 +555,15 @@ const cases = [
     'owner',
     '/north-valley/admin/season',
     200,
-    ['Who can see this season', 'Everyone can see Fall 2026.', 'Hide it again'],
-    ['Nothing here yet.', 'Show this season to visitors'],
+    [
+      'Who can see this season',
+      'Everyone can see Fall 2026.',
+      'Hide it again',
+      // Drawn inside the staff frame, its menu at Season settings (step 2.103).
+      staffFrameAt('/north-valley/admin/season'),
+      oneHeading,
+    ],
+    [adminPlaceholder, 'Show this season to visitors'],
   ],
   [
     'owner',
@@ -474,7 +592,13 @@ const cases = [
     'owner',
     '/north-valley/admin/season?season=winter-2027&ask=show',
     200,
-    ['Visitors will see its teams, schedule and results.', 'Yes, show it', 'No, keep it hidden'],
+    [
+      'Visitors will see its teams, schedule and results.',
+      'Yes, show it',
+      'No, keep it hidden',
+      staffFrameAt('/north-valley/admin/season'),
+      oneHeading,
+    ],
   ],
   // Hiding the current season, with a game being scored (Hawks v Bears), says both.
   [
@@ -486,6 +610,8 @@ const cases = [
       'will show another season visitors can see instead',
       'A game of Fall 2026 is being scored right now',
       'Yes, hide it',
+      staffFrameAt('/north-valley/admin/season'),
+      oneHeading,
     ],
   ],
   // In a league not published, a shown season is never said to be seen by visitors.
@@ -555,8 +681,14 @@ const cases = [
     'scorekeeper',
     '/north-valley/admin',
     200,
-    ['Your games', 'Score this game', `href="/north-valley/score/${liveGame}"`],
-    ['Nothing here yet.'],
+    [
+      'Your games',
+      'Score this game',
+      `href="/north-valley/score/${liveGame}"`,
+      staffFrameAt('/north-valley/admin'),
+      oneHeading,
+    ],
+    [adminPlaceholder],
   ],
   // A game's page (step 2.45): drawn with how the game stands, its live part ready to
   // follow it; a finished game's result; a game not started; a game that is not this
@@ -590,7 +722,12 @@ const cases = [
   ['otherAdmin', '/quiet-pines', 404, [notFound], ['This league is not published.']],
   ['otherAdmin', '/quiet-pines/admin', 404, [notFound], [noAccess, 'Admin areas']],
   ['owner', '/quiet-pines', 200, ['This league is not published.']],
-  ['owner', '/quiet-pines/admin', 200, ['Admin areas']],
+  [
+    'owner',
+    '/quiet-pines/admin',
+    200,
+    ['Admin areas', staffFrameAt('/quiet-pines/admin'), oneHeading],
+  ],
   // Everyone with an admin area in a draft league may open it (step 2.87).
   ['admin', '/quiet-pines/admin', 200, [adminLink('quiet-pines', 'settings')]],
   ['scheduler', '/quiet-pines', 200, ['This league is not published.']],
@@ -607,7 +744,7 @@ const cases = [
     200,
     // The draft league's season is of the program this scheduler holds (step 2.152).
     [adminLink('quiet-pines', 'schedule'), 'Build the schedule here, round by round.'],
-    ['Nothing here yet.'],
+    [adminPlaceholder],
   ],
   [
     'registrar',
@@ -747,7 +884,12 @@ try {
     const label = `${who} ${address}`;
     if (response.status !== status)
       failures.push(`${label}: status ${response.status}, not ${status}`);
-    for (const words of must) if (!text.includes(words)) failures.push(`${label}: no "${words}"`);
+    for (const words of must) {
+      if (typeof words !== 'string') {
+        const problem = words.problem(text);
+        if (problem !== undefined) failures.push(`${label}: ${words.label}: ${problem}`);
+      } else if (!text.includes(words)) failures.push(`${label}: no "${words}"`);
+    }
     for (const words of mustNot)
       if (text.includes(words)) failures.push(`${label}: has "${words}"`);
     for (const [name, value] of Object.entries(securityHeaders)) {
@@ -1023,10 +1165,14 @@ async function checkStylesheets(origin) {
 /**
  * The page's own forms: those after the league's header. Since step 2.127 the header holds
  * the account button's "Sign out" form (twice: the phone menu and the laptop's button),
- * so forms are counted from the page's own content, as they were before it.
+ * so forms are counted from the page's own content, as they were before it. The admin's
+ * own frame (step 2.103) holds "Sign out" too, in its phone menu and again in its side
+ * menu, which comes after its header: so the count starts where the page's content does
+ * (`id="content"`, in the league's frame and in the admin's alike).
  */
 function pageForms(html) {
-  return html.slice(Math.max(0, html.indexOf('</header>')));
+  const content = html.indexOf('id="content"');
+  return html.slice(Math.max(0, content >= 0 ? content : html.indexOf('</header>')));
 }
 
 async function checkTeams(origin) {
@@ -1110,7 +1256,8 @@ async function checkTeams(origin) {
     );
     return problems;
   }
-  if (!(await pageOf('owner', page)).includes('Casey Walker, left on 2026-11-13')) {
+  // The day is written in words, as the public pages write a day (step 2.103).
+  if (!(await pageOf('owner', page)).includes('Casey Walker, left on Fri, Nov 13')) {
     problems.push('the roster does not show the player who left');
   }
   // Forged posts change nothing: a league field that is not the page's league is "not

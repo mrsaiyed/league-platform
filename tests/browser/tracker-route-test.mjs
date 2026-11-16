@@ -32,6 +32,7 @@ import {
   waitFor,
   whatWentWrong,
 } from './web-browser-kit.mjs';
+import { adminPlaceholder } from '../../scripts/admin-placeholder.mjs';
 
 const failures = [];
 const checked = [];
@@ -175,7 +176,7 @@ if (browser) {
       note('each game to be played has a button to the tracker', (await buttons.count()) >= 2);
       note(
         'the admin shows nothing but the games',
-        (await page.getByText('Nothing here yet.').count()) === 0,
+        (await page.getByText(adminPlaceholder).count()) === 0,
       );
       note(
         'the games list tells a shared device to sign out, with a link to the account page',

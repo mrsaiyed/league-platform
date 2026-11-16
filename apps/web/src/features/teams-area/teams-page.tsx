@@ -1,5 +1,9 @@
 // Admin → Teams (step 2.51, P4 §3, P7 §2): the season's teams, and a form to add one.
+// Drawn by step 2.103 as a list page: a title, one line of what it is for, and its main
+// action ("Add a team") at the top right, which leads to the form; each team a row with
+// its shield, its division and one way in; an empty list a calm panel with the action.
 import { leagueUrl } from '@srleagues/core';
+import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
@@ -14,6 +18,9 @@ import {
   TextField,
 } from './parts.tsx';
 
+/** Where "Add a team" leads: the form's own place on the page. */
+const addTeamAnchor = 'add-team';
+
 export async function TeamsPage({
   league,
   query,
@@ -27,13 +34,22 @@ export async function TeamsPage({
   const ports = (await webPorts()).adminTeams;
   const season = await ports.currentSeason(here.id);
   return (
-    <main>
-      <h1>{t('admin.area.teams')}</h1>
+    <main className="admin-teams">
+      <PageHead
+        title={t('admin.area.teams')}
+        sub={season === undefined ? undefined : t('adminTeams.seasonLine', { season: season.name })}
+      >
+        {season === undefined ? null : (
+          <a className="ui-button" data-kind="main" data-icon="plus" href={`#${addTeamAnchor}`}>
+            {t('adminTeams.create.title')}
+          </a>
+        )}
+      </PageHead>
       <Notice query={query} />
       {season === undefined ? (
-        <p>{t('adminTeams.noSeason')}</p>
+        <EmptyPanel text={t('adminTeams.noSeason')} />
       ) : (
-        await Body({ league: here, seasonId: season.id, seasonName: season.name })
+        await Body({ league: here, seasonId: season.id })
       )}
     </main>
   );
@@ -42,11 +58,9 @@ export async function TeamsPage({
 async function Body({
   league,
   seasonId,
-  seasonName,
 }: {
   readonly league: { readonly id: string; readonly slug: string };
   readonly seasonId: string;
-  readonly seasonName: string;
 }) {
   const ports = (await webPorts()).adminTeams;
   const [teams, divisions] = await Promise.all([
@@ -56,42 +70,59 @@ async function Body({
   const divisionName = (id: string | null) => divisions.find((d) => d.id === id)?.name;
   return (
     <>
-      <Section title={t('adminTeams.seasonLine', { season: seasonName })}>
-        {teams.length === 0 ? (
-          <p>{t('adminTeams.none')}</p>
-        ) : (
-          <ul>
-            {teams.map((team) => (
-              <li key={team.id}>
-                <Swatch team={team} />
-                <a href={leagueUrl(league, 'admin-area', { area: 'teams', subpath: [team.id] })}>
-                  {team.name}
-                </a>
-                {divisionName(team.divisionId) === undefined
-                  ? null
-                  : t('adminTeams.inDivision', { division: divisionName(team.divisionId) ?? '' })}
+      {teams.length === 0 ? (
+        <EmptyPanel
+          text={t('adminTeams.none')}
+          action={{ href: `#${addTeamAnchor}`, label: t('adminTeams.create.title') }}
+        />
+      ) : (
+        <ul className="staff-rows">
+          {teams.map((team) => {
+            const division = divisionName(team.divisionId);
+            return (
+              // The link is the team's name alone and covers the whole row (staff.css).
+              <li key={team.id} className="staff-row">
+                <Swatch team={team} size="small" />
+                <span className="staff-row-words">
+                  <a
+                    className="staff-row-link"
+                    href={leagueUrl(league, 'admin-area', { area: 'teams', subpath: [team.id] })}
+                    dir="auto"
+                  >
+                    {team.name}
+                  </a>
+                  {division === undefined ? null : (
+                    <span className="staff-row-facts" dir="auto">
+                      {division}
+                    </span>
+                  )}
+                </span>
               </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-      <Section title={t('adminTeams.create.title')}>
-        <form action={createTeamAction}>
-          <LeagueField league={league.slug} />
-          <TextField name="name" label={t('adminTeams.field.name')} required maxLength={120} />
-          <TextField
-            name="shortName"
-            label={t('adminTeams.field.shortName')}
-            hint={t('adminTeams.field.shortNameHint')}
-            maxLength={60}
-          />
-          <ColorFields color={null} />
-          <DivisionField divisions={divisions} value={null} />
-          <p>
-            <button type="submit">{t('adminTeams.create.submit')}</button>
-          </p>
-        </form>
-      </Section>
+            );
+          })}
+        </ul>
+      )}
+      <div id={addTeamAnchor} className="admin-add-team">
+        <Section title={t('adminTeams.create.title')}>
+          <form action={createTeamAction} className="staff-form">
+            <LeagueField league={league.slug} />
+            <TextField name="name" label={t('adminTeams.field.name')} required maxLength={120} />
+            <TextField
+              name="shortName"
+              label={t('adminTeams.field.shortName')}
+              hint={t('adminTeams.field.shortNameHint')}
+              maxLength={60}
+            />
+            <ColorFields color={null} />
+            <DivisionField divisions={divisions} value={null} />
+            <p className="staff-buttons">
+              <button type="submit" className="ui-button" data-kind="main">
+                {t('adminTeams.create.submit')}
+              </button>
+            </p>
+          </form>
+        </Section>
+      </div>
     </>
   );
 }
