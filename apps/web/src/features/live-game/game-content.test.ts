@@ -31,6 +31,7 @@ import {
   buildBoxScores,
   buildPlays,
   correctedText,
+  forfeitNote,
   gameTitle,
   gameWords,
   startText,
@@ -129,7 +130,10 @@ describe('a game page', () => {
     expect(html).toContain('Only this team&#x27;s total is shown.');
     expect(html).toContain('These are the plays up to when you opened this page.');
     // "Show newer plays" lands on the play-by-play, not the top of the page.
-    expect(html).toContain('<a href="/self#game-plays">Show newer plays</a>');
+    // It stands beside the play-by-play's title, drawn as every way on is.
+    expect(html).toContain(
+      '<h2 id="game-plays">Play by play</h2><a class="ui-more" href="/self#game-plays">Show newer plays</a>',
+    );
     expect(html).toContain('<h2 id="game-plays">');
     for (const name of bearsNames) expect(html).not.toContain(name);
   });
@@ -222,8 +226,11 @@ describe('a game page', () => {
     // No day yet: the board says "Date to be announced", once.
     expect(titleLine(null, 'UTC', 'scheduled')).toBeNull();
     expect(boardWhen(null, 'UTC', 'scheduled')).toEqual({ day: 'Date to be announced' });
+    // A game still to come says its day once, on the board between the teams, and has no
+    // line over the board (step 2.147 part 3: it said the day twice, 60 apart).
+    expect(titleLine(when, 'UTC', 'scheduled')).toBeNull();
+    expect(boardWhen(when, 'UTC', 'scheduled')).toEqual({ day: 'Fri, Nov 20', time: '6:00 PM' });
     // Every other game keeps its line.
-    expect(titleLine(when, 'UTC', 'scheduled')).toBe(startText(when, 'UTC', 'scheduled'));
     expect(titleLine(when, 'UTC', 'final')).toMatch(/^Played /);
     expect(titleLine(when, 'UTC', 'postponed')).toMatch(/^It was set for /);
     // Drawn: a live game's page has its title and then the board, nothing between.
@@ -319,8 +326,50 @@ describe('a game page', () => {
   it('notes a forfeit under the result', async () => {
     const world = trackerWorld();
     const { view } = await viewOf(world, games.decided);
-    expect(draw({ ...view, status: 'forfeit' })).toContain('This game was decided by forfeit.');
+    // The note names who forfeited (step 2.147 part 3): the team with the loser's score.
+    const { score, teams } = view.snapshot;
+    expect(score.home).not.toBe(score.away);
+    const loser = score.home < score.away ? teams.home.name : teams.away.name;
+    const html = draw({ ...view, status: 'forfeit' });
+    expect(html).toContain(`<p class="ui-scoreboard-note">${loser} forfeited this game.</p>`);
+    expect(forfeitNote({ name: 'Otters', score: 0 }, { name: 'Badgers', score: 20 })).toBe(
+      'Otters forfeited this game.',
+    );
+    expect(forfeitNote({ name: 'Otters', score: 20 }, { name: 'Badgers', score: 0 })).toBe(
+      'Badgers forfeited this game.',
+    );
+    // With the scores level it cannot be told: the sentence only says it was a forfeit.
+    expect(forfeitNote({ name: 'Otters', score: 0 }, { name: 'Badgers', score: 0 })).toBe(
+      'This game was decided by forfeit.',
+    );
     expect(draw({ ...view, status: 'final' })).not.toContain('forfeit');
+  });
+
+  it('ends the page of a game still to come, or put off, with its two teams and the way to the schedule', async () => {
+    const world = trackerWorld();
+    const { view } = await viewOf(world, games.lionsTigers);
+    const card = (slug: string, name: string) => ({
+      slug,
+      name,
+      color: null,
+      href: `/x/teams/${slug}`,
+      seedText: '2',
+      recordText: '1-1',
+      divisionName: 'West',
+    });
+    const teams = [card('lions', 'Lions'), card('tigers', 'Tigers')];
+    for (const status of ['scheduled', 'postponed']) {
+      const html = draw({ ...view, status, scheduleAddress: '/x/schedule', teams });
+      expect(html).toContain('<h2>The two teams</h2>');
+      expect(html).toContain('<a class="ui-more" href="/x/schedule">See the full schedule</a>');
+      // Each team is one link to its own page, under the section's title: level three.
+      expect(html.match(/<h3 class="ui-team-card-name"><a href="\/x\/teams\//g)).toHaveLength(2);
+      expect(html.indexOf('/x/teams/lions')).toBeLessThan(html.indexOf('/x/teams/tigers'));
+      expect(html).toContain('Record</span> 1-1');
+    }
+    // A game with a result has its box scores to end with, and no such section.
+    expect(draw({ ...view, status: 'final', teams })).not.toContain('The two teams');
+    expect(draw({ ...view, status: 'scheduled' })).not.toContain('The two teams');
   });
 
   it('draws a finished game with its result and how it was recorded', async () => {
@@ -437,7 +486,8 @@ describe('a game page', () => {
       },
     });
     expect(html).toContain('<a href="/north-valley/schedule">Schedule</a>');
-    expect(html).toContain('<p class="ui-eyebrow">Game 8</p>');
+    // The game's number is a kicker, with its short rule, as on every other page's head.
+    expect(html).toContain('<p class="ui-kicker">Game 8</p>');
     expect(html).toContain('aria-label="Scoreboard" data-state="other"');
     expect(html).toContain('<span class="ui-scoreboard-day">Sat, Nov 21</span>');
     expect(html).toContain('<span class="ui-scoreboard-time">4:00 PM</span>');

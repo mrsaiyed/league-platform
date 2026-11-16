@@ -15,6 +15,7 @@ export const enScheduleAdmin = {
   'schedule.admin.addRoundNote':
     'The round goes after the others. Its games default to this date. Nobody else sees it until you publish.',
   'schedule.admin.addRoundSubmit': 'Add round',
+  'schedule.admin.askToShow': "Ask the league's owner or an admin to show it.",
   'schedule.admin.away': 'Away team',
   'schedule.admin.blocker.change-no-longer-fits':
     'A change in the draft no longer fits the schedule.',
@@ -133,6 +134,12 @@ export const enScheduleAdmin = {
   'schedule.admin.publishSummary':
     'Publishing will add {added}, move {moved}, remove {removed}, and change how {recorded} are recorded. It reaches {teams} teams and {people} people.',
   'schedule.admin.published': 'The schedule is published. Visitors can see it now.',
+  'schedule.admin.publishedBothHidden':
+    'The schedule is published, but visitors cannot see this league until it is published, and {season} is hidden from them too.',
+  'schedule.admin.publishedLeagueHidden':
+    'The schedule is published, but visitors cannot see this league until it is published.',
+  'schedule.admin.publishedSeasonHidden':
+    'The schedule is published, but visitors cannot see {season} yet.',
   'schedule.admin.putBack': 'Put it back',
   'schedule.admin.recording': 'How it is recorded',
   'schedule.admin.recording.box-score': 'Box score',
@@ -193,6 +200,7 @@ export const enScheduleAdmin = {
     'Saved to the draft: the round was removed. It is not public until you publish.',
   'schedule.admin.seasonName': 'Season: {name}',
   'schedule.admin.seasonNotPublic': '{name} (not public yet)',
+  'schedule.admin.showInSeasonSettings': 'Show it in Season settings.',
   'schedule.admin.swapChoose': 'Choose a game',
   'schedule.admin.swapNote': 'The two games trade rounds, dates, times and courts. The teams stay.',
   'schedule.admin.swapOption': '{game}, {date}',

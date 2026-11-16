@@ -8,6 +8,7 @@
 import {
   lookupSetting,
   membersStartPage,
+  minimumGamesToRank,
   placeRounds,
   publicRosterLine,
   type GameSnapshotStore,
@@ -271,6 +272,14 @@ export function worldStartPage(s: ReadWorld | undefined): StartPage {
     .filter((r) => r.key === membersStartPage.key && r.place.level === 'league')
     .map((r) => ({ level: r.place.level, document: r.document }));
   return lookupSetting(membersStartPage, rows).value;
+}
+
+/** The league's minimum games for leaders (P7 §6), as League settings saves it. */
+export function worldMinimumGames(s: ReadWorld | undefined): number {
+  const rows = (s?.settings ?? [])
+    .filter((r) => r.key === minimumGamesToRank.key && r.place.level === 'league')
+    .map((r) => ({ level: r.place.level, document: r.document }));
+  return lookupSetting(minimumGamesToRank, rows).value;
 }
 
 /** The teams of the season the account has a roster place on now, through its person. */

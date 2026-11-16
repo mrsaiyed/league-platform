@@ -51,7 +51,17 @@ export async function loadTeamCards(
   const records = await readTeamRecords(store, { seasonId: season.id });
   if (!records.ok) return undefined;
   const divisions = new Map((await store.divisions(season.id)).map((d) => [d.id, d.name]));
-  return records.value.map((record) => ({
+  return records.value.map((record) => cardOf(record, divisions, league, season, isCurrent));
+}
+
+function cardOf(
+  record: TeamStanding,
+  divisions: ReadonlyMap<string, string>,
+  league: LeagueAddressee,
+  season: { readonly slug: string },
+  isCurrent: boolean,
+): TeamCard {
+  return {
     slug: record.team.slug,
     name: record.team.name,
     color: record.team.color,
@@ -63,7 +73,28 @@ export async function loadTeamCards(
     recordText: recordText(record),
     divisionName:
       record.team.divisionId === null ? null : (divisions.get(record.team.divisionId) ?? null),
-  }));
+  };
+}
+
+/**
+ * The cards of the teams of one game, in the order asked for (a game's page ends with
+ * them while the game is still to come). A team the season's records do not hold is left
+ * out; a season the public may not see gives none.
+ */
+export async function loadTeamCardsOf(
+  store: StandingsReadStore,
+  league: LeagueAddressee,
+  season: { readonly id: string; readonly slug: string },
+  isCurrent: boolean,
+  teamIds: readonly string[],
+): Promise<readonly TeamCard[]> {
+  const records = await readTeamRecords(store, { seasonId: season.id });
+  if (!records.ok) return [];
+  const divisions = new Map((await store.divisions(season.id)).map((d) => [d.id, d.name]));
+  return teamIds.flatMap((id) => {
+    const record = records.value.find((r) => r.team.id === id);
+    return record === undefined ? [] : [cardOf(record, divisions, league, season, isCurrent)];
+  });
 }
 
 export type RosterRowView = {
@@ -98,10 +129,15 @@ function nameText(line: PublicRosterLine): string {
   return line.leftOn === null ? name : t('team.nameLeft', { name, date: dayText(line.leftOn) });
 }
 
-export function rosterRow(line: PublicRosterLine): RosterRowView {
+/**
+ * One line of the roster. Its key is its place in this page's roster, `roster-N`: the roster
+ * place's database id stays the same across loads and carries when the place was made, so it
+ * does not go into the page (as with the statistics rows).
+ */
+export function rosterRow(line: PublicRosterLine, index: number): RosterRowView {
   const known = roles.find((r) => r === line.role);
   return {
-    key: line.entryId,
+    key: `roster-${index}`,
     number: line.jerseyNumber ?? '',
     name: nameText(line),
     role: known === undefined ? t('team.role.player') : t(`team.role.${known}`),
@@ -212,6 +248,13 @@ export async function loadTeamStats(
         }),
       ),
     },
+    // The numbers behind the written ones: a column is sorted by these, never by its words.
+    sortValues: Object.fromEntries(
+      table.value.statKeys.flatMap((key) => {
+        const entry = player.stats[key];
+        return entry === undefined ? [] : [[key, entry.total] as const];
+      }),
+    ),
   }));
   const totalsColumns: StatsColumn[] = [
     { key: 'team', label: t('stats.col.team') },
@@ -222,7 +265,8 @@ export async function loadTeamStats(
       ? []
       : [
           {
-            id: team.teamId,
+            // One row, the team's own: an opaque key, as the player rows have.
+            id: 'team-totals',
             cells: {
               team: team.name,
               ...Object.fromEntries(
@@ -311,6 +355,6 @@ export type RosterView = {
 };
 
 export function buildRoster(roster: PublicRoster): RosterView {
-  const rows = roster.lines.map(rosterRow);
+  const rows = roster.lines.map((line, index) => rosterRow(line, index));
   return { current: rows.filter((r) => !r.former), former: rows.filter((r) => r.former) };
 }

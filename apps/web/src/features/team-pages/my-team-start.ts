@@ -1,12 +1,8 @@
 // The team a league whose start page is "my team" sends someone to (U-5), from the ports:
 // the setting, the current season's teams, the account's grants and roster places, and
-// the team the device remembers. Undefined keeps them on the league home.
-//
-// On the database a member's roster places are not read until step 2.93 part 3 (record
-// 069): until then a signed-in member there is shown the league home itself, as a
-// visitor is, never the error page. Part 3 puts their team page there.
+// the team the device remembers. Undefined keeps them on the league home. On the
+// database too since step 2.93 part 3 (record 070).
 import type { AccessHolder } from '@srleagues/core';
-import { NotOnTheDatabaseYet } from '../../server/not-on-the-database-yet.ts';
 import type { WebPorts } from '../../server/ports.ts';
 import { chooseSeason } from '../stats-pages/index.ts';
 import { chooseMyTeam, teamIdsFromGrants } from './start-page.ts';
@@ -40,13 +36,7 @@ export async function myTeamStart(
     });
   }
   const holder = await input.holder();
-  let rosterTeamIds: readonly string[];
-  try {
-    rosterTeamIds = await ports.publicTeams.teamIdsOfAccount(leagueId, season.id, accountId);
-  } catch (error) {
-    if (error instanceof NotOnTheDatabaseYet) return undefined;
-    throw error;
-  }
+  const rosterTeamIds = await ports.publicTeams.teamIdsOfAccount(leagueId, season.id, accountId);
   return chooseMyTeam({
     teams,
     grantTeamIds: teamIdsFromGrants(holder),

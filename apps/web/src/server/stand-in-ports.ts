@@ -57,8 +57,10 @@ import {
   standInPeople,
   standInSeedCast,
 } from './stand-in-cast.ts';
+import type { PicturedDesignKey } from './stand-in-designs.ts';
 import { standInFixtureImport } from './stand-in-fixture-import.ts';
 import { standInGames } from './stand-in-games.ts';
+import { standInLeagueSitesIn } from './stand-in-league-sites.ts';
 import { standInMyLeagues } from './stand-in-my-leagues.ts';
 import { standInPublicSchedule } from './stand-in-public-schedule.ts';
 import { standInPublicStats } from './stand-in-public-stats.ts';
@@ -189,6 +191,11 @@ export type StandInOptions = {
   readonly emailFrom: string;
   /** Where a sign-in email that could not be sent is reported: its kind only (T-86). */
   readonly warn?: (message: string, fields: { readonly kind: string }) => void;
+  /**
+   * LOCAL_DESIGN (local work and tests only): the first made-up league drawn under this
+   * design, so every page can be pictured in every color set (scripts/shots.mjs).
+   */
+  readonly localDesign?: PicturedDesignKey | undefined;
   /**
    * LOCAL_NOW: the moment the one made-up world's clock starts at (step 2.179), so a test
    * runs as if at that hour; the world is seeded then and its clock runs on from there.
@@ -408,6 +415,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     // (review 2, M1): a request for another name, or one passed on by another server.
     answers: answersOnlyHere(options.publicBaseUrl),
     fixtureImport: standInFixtureImport(world),
+    leagueSites: standInLeagueSitesIn(options.localDesign),
     publicStats: standInPublicStats(world, namePolicy),
     adminTeams: standInAdminTeams(world),
     adminSettings,

@@ -7,9 +7,9 @@
 // is (identify, below), what they hold in a league (accessOf) and the leagues they
 // belong to (leaguesOfAccount, step 2.127); and, in part 2, the public schedule
 // (database-public-schedule.ts) and the standings with the seasons a visitor may pick
-// (database-public-stats.ts), whose statistics reads, the ones that show people, still
-// refuse until part 3, and the members' start page the league home reads first
-// (database-public-teams.ts), whose rosters refuse likewise. Every other area
+// (database-public-stats.ts) and the members' start page the league home reads first
+// (database-public-teams.ts); in part 3 (record 070) the statistics, a team's roster, a
+// member's teams and each league's name (database-league-sites.ts). Every other area
 // still runs on the stand-in only: here each one refuses with NotOnTheDatabaseYet
 // the first time it is used, so its page shows the error page rather than made-up
 // data that is not in the database. Each moves in a part of its own.
@@ -30,6 +30,7 @@ import type { SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
+import { databaseLeagueSites, type LeagueSitesQueries } from './database-league-sites.ts';
 import { databasePublicSchedule, type PublicScheduleQueries } from './database-public-schedule.ts';
 import { databasePublicStats, type PublicStatsQueries } from './database-public-stats.ts';
 import { databasePublicTeams, type PublicTeamsQueries } from './database-public-teams.ts';
@@ -58,7 +59,8 @@ export type DatabaseQueries = Pick<
 > &
   PublicScheduleQueries &
   PublicStatsQueries &
-  PublicTeamsQueries;
+  PublicTeamsQueries &
+  LeagueSitesQueries;
 
 export type DatabasePortsOptions = {
   readonly database: DatabaseQueries;
@@ -202,6 +204,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // account and no league, through my_leagues(), which answers for that account only.
     leaguesOfAccount: (accountId) =>
       database.withTransaction(db, { accountId }, (scope) => database.listMyLeagues(scope)),
+    leagueSites: databaseLeagueSites(database, db),
     publicStats: databasePublicStats(database, db),
     games: notMovedYet('games area'),
     fixtureImport: notMovedYet('fixture import'),

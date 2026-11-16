@@ -14,6 +14,7 @@ import {
   Group,
   LeaderCard,
   MessagePage,
+  NoValue,
   PageHead,
   RoundPicker,
   Section,
@@ -24,6 +25,7 @@ import {
   appliesAtOnce,
   displayCss,
   initialOf,
+  stripAcross,
 } from '../index.ts';
 
 const arabicName = 'نسور الصحراء';
@@ -115,6 +117,49 @@ describe('message page', () => {
   });
 });
 
+describe('a cell with nothing to show', () => {
+  it('is a dash kept from screen readers, and a word kept for them', () => {
+    expect(render(createElement(NoValue, { word: 'Nothing recorded' }))).toBe(
+      '<span class="ui-no-value" aria-hidden="true">–</span><span class="ui-visually-hidden">Nothing recorded</span>',
+    );
+    // With no word it is the dash alone.
+    expect(render(createElement(NoValue, {}))).toBe(
+      '<span class="ui-no-value" aria-hidden="true">–</span>',
+    );
+    expect(displayCss).toMatch(/\.ui-no-value \{\s*color: var\(--color-muted\);/);
+  });
+
+  it('is the one piece every table draws its empty cells with', () => {
+    const dash = '<span class="ui-no-value" aria-hidden="true">–</span>';
+    const one = render(createElement(NoValue, { word: 'Nothing recorded' }));
+    const stats = render(
+      createElement(SortableStatsTable, {
+        caption: 'Teams',
+        columns: [
+          { key: 'name', label: 'Team' },
+          { key: 'pts', label: 'PTS', numeric: true },
+        ],
+        rows: [{ id: 'a', cells: { name: 'Bears', pts: null } }],
+        labels: { sortBy: 'Sort by', noValue: 'Nothing recorded' },
+      }),
+    );
+    expect(stats).toContain(`<td class="ui-num">${one}</td>`);
+    const box = render(
+      createElement(BoxScoreTable, {
+        teamName: 'Bears',
+        columns: [{ key: 'pts', label: 'PTS' }],
+        players: [{ id: 'p', name: 'Ada', cells: {} }],
+        totals: {},
+        labels: { jersey: 'Number', player: 'Player', total: 'Total', noValue: 'Nothing recorded' },
+      }),
+    );
+    expect(box.match(new RegExp(`<td class="ui-num">${one}</td>`, 'g'))).toHaveLength(2);
+    // And nothing in a table writes a dash of its own.
+    expect(stats.split(dash)).toHaveLength(2);
+    expect(box.split(dash)).toHaveLength(3);
+  });
+});
+
 describe('strip of numbers', () => {
   it('is a named list of numbers, each with its label', () => {
     const html = render(
@@ -129,6 +174,61 @@ describe('strip of numbers', () => {
     expect(html).toContain('aria-label="The season in numbers"');
     expect(html).toContain('<dt>Teams</dt><dd>5</dd>');
     expect(html.match(/<dt>/g)).toHaveLength(2);
+  });
+
+  const stripOf = (count: number) =>
+    render(
+      createElement(StatStrip, {
+        label: 'Team totals',
+        items: Array.from({ length: count }, (_, n) => ({
+          key: `s${n}`,
+          label: `Stat ${n}`,
+          value: String(n),
+        })),
+      }),
+    );
+
+  it('stands up to four numbers in one line, with nothing said about wrapping', () => {
+    for (const count of [1, 2, 3, 4]) {
+      expect(stripOf(count)).toContain('<dl class="ui-stat-strip">');
+    }
+  });
+
+  it('wraps more than four onto even lines: so many across on a phone, so many from a tablet up', () => {
+    // As few lines as it takes, and the lines as even as they can be.
+    expect([5, 6, 7, 8, 9, 10, 12, 13].map((count) => stripAcross(count, 4))).toEqual([
+      3, 3, 4, 4, 3, 4, 4, 4,
+    ]);
+    expect([5, 6, 7, 8, 9, 10, 12, 13].map((count) => stripAcross(count, 6))).toEqual([
+      5, 6, 4, 4, 5, 5, 6, 5,
+    ]);
+    expect(stripAcross(0, 4)).toBe(1);
+    expect(stripOf(5)).toContain(
+      '<dl class="ui-stat-strip" data-wrap="true" style="--ui-stat-across:3;--ui-stat-across-wide:5">',
+    );
+    const seven = stripOf(7);
+    expect(seven).toContain(
+      '<dl class="ui-stat-strip" data-wrap="true" style="--ui-stat-across:4;--ui-stat-across-wide:4">',
+    );
+    // Still one named list of numbers: every one is there, and none is a table.
+    expect(seven.match(/<dt>/g)).toHaveLength(7);
+    expect(seven).not.toContain('<table');
+    const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).toMatch(
+      /\.ui-stat-strip\[data-wrap='true'\] \{\s*grid-auto-flow: row;\s*grid-template-columns: repeat\(var\(--ui-stat-across\), minmax\(0, 1fr\)\);\s*overflow: hidden;/,
+    );
+    expect(css).toMatch(
+      /@media \(min-width: 48rem\) \{\s*\.ui-stat-strip\[data-wrap='true'\] \{\s*grid-template-columns: repeat\(var\(--ui-stat-across-wide\), minmax\(0, 1fr\)\);/,
+    );
+    // On the narrowest phones it is two across, as the short strip is.
+    expect(css).toMatch(
+      /@media \(max-width: 22\.49rem\) \{\s*\.ui-stat-strip\[data-wrap='true'\] \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+    );
+    // The hairlines between its cells, whichever cell ends a line: each cell's own, after
+    // it and under it, and none of the short strip's lines before a cell.
+    expect(css).toMatch(
+      /\.ui-stat-strip\[data-wrap='true'\] > \.ui-stat \{\s*margin-block-end: -1px;\s*margin-inline-end: -1px;\s*border-block-start: 0;\s*border-inline-start: 0;\s*border-block-end: 1px solid var\(--color-line\);\s*border-inline-end: 1px solid var\(--color-line\);/,
+    );
   });
 });
 
@@ -504,6 +604,50 @@ describe('tables', () => {
     );
     expect(hidden).toContain('<tfoot><tr><th scope="row" class="ui-team-cell">Total</th>');
   });
+  it('give the two box scores of one game the same column widths, and never a blank cell', () => {
+    const table = (players: Parameters<typeof BoxScoreTable>[0]['players']) =>
+      render(
+        createElement(BoxScoreTable, {
+          teamName: 'Owls',
+          columns: [
+            { key: 'pts', label: 'PTS' },
+            { key: 'pf', label: 'PF' },
+          ],
+          players,
+          totals: { pts: 10, pf: '' },
+          labels: {
+            jersey: 'No.',
+            player: 'Player',
+            total: 'Total',
+            team: 'Team',
+            noValue: 'Nothing recorded',
+          },
+          nameRoom: 12,
+        }),
+      );
+    // The page tells both tables the letters of the longest name of either.
+    const shown = table([{ id: 'p', jersey: '7', name: 'Max', cells: { pts: 4 } }]);
+    expect(shown).toContain('<table class="ui-table ui-box-score" style="--name-room:12">');
+    expect(displayCss).toMatch(
+      /\.ui-box-score \.ui-team-cell > \[dir\] \{\s*min-inline-size: min\(calc\(var\(--name-room, 0\) \* 1ch\), calc\(45cqi - var\(--step-6\)\)\);/,
+    );
+    expect(displayCss).toMatch(
+      /\.ui-box-score tr > \.ui-num:first-child \{\s*inline-size: var\(--step-7\);/,
+    );
+    // A statistic with nothing recorded, in a player's row and in the totals: a dash, and a
+    // word for screen readers.
+    const dash =
+      '<td class="ui-num"><span class="ui-no-value" aria-hidden="true">–</span><span class="ui-visually-hidden">Nothing recorded</span></td>';
+    expect(shown.split(dash)).toHaveLength(3);
+    // A table that lists no players has "Team" over "Total", not an empty heading cell, and
+    // gives that column the width the other table's first two have together.
+    const hidden = table(null);
+    expect(hidden).toContain('data-players="hidden"');
+    expect(hidden).toContain('<thead><tr><th scope="col" class="ui-team-cell">Team</th>');
+    expect(displayCss).toMatch(
+      /\.ui-box-score\[data-players='hidden'\] \.ui-team-cell \{\s*inline-size: calc\(\s*var\(--step-7\) \+ 2 \* var\(--step-3\) \+/,
+    );
+  });
   it("give the team column one width in every division's table, so the numbers line up down the page", () => {
     expect(displayCss).toMatch(/\.ui-standings \.ui-team-cell \{\s*min-inline-size: 7\.5rem;/);
     // With emblems the column is wider by what a shield is wider than a chip (24 and 12),
@@ -529,21 +673,27 @@ describe('tables', () => {
     expect(html.match(/class="ui-team-cell"/g)).toHaveLength(2);
   });
   it('fade the far edge lightly: a column wholly in view under it keeps its digits', () => {
-    // Narrow, and reaching the panel's color only at the very edge: never a solid band.
+    // Narrow, and reaching the panel's color only at the very edge: never a solid band. A
+    // step narrower since step 2.147 part 3 (16, was 24): under the wider one a number cut
+    // by the box's edge lost a whole digit and read as another number (155 as 15).
     expect(displayCss).toMatch(
-      /\.ui-table-frame::before \{[^}]*inline-size: var\(--step-5\);[^}]*linear-gradient\(to right, transparent, var\(--color-panel\)\);/,
+      /\.ui-table-frame::before \{[^}]*inline-size: var\(--step-4\);[^}]*linear-gradient\(to right, transparent, var\(--color-panel\)\);/,
     );
     expect(displayCss).not.toMatch(/transparent, var\(--color-panel\) \d+%\)/);
   });
-  it('never put the scroll arrow on a column heading: a table with no name in view gets a band for it', () => {
+  it('never put the scroll arrow on a column heading: over a table with no name in view it stands above the box', () => {
+    // Step 2.147 part 3: such a table had a band of its own for the arrow, which read as an
+    // empty strip with an arrow alone in it. The arrow now stands over the box's far
+    // corner, in the gap under the section's title, and the headings have the box's top.
     expect(displayCss).toMatch(
-      /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \{\s*--ui-table-arrow: var\(--step-1\);/,
+      /\.ui-table-frame:has\(caption\.ui-visually-hidden\)::after \{\s*inset-block-start: calc\(-1 \* \(var\(--step-4\) \+ var\(--step-1\)\)\);/,
     );
-    expect(displayCss).toMatch(
-      /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \.ui-table-wrap \{\s*padding-block-start: var\(--step-4\);/,
+    expect(displayCss).not.toMatch(
+      /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \.ui-table-wrap \{\s*padding-block-start/,
     );
+    // And the clear patch the fade keeps behind an arrow inside the box is out of the way.
     expect(displayCss).toMatch(
-      /\.ui-table-frame:has\(caption\.ui-visually-hidden\)::after \{\s*inset-block-start: var\(--step-1\);/,
+      /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \{\s*--ui-table-arrow: calc\(-1 \* var\(--step-8\)\);/,
     );
   });
   it('keep the ring of a heading button whole, and what the keyboard reaches clear of the name column', () => {

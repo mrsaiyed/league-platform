@@ -21,7 +21,13 @@
 // Standings and player totals are not here: core works them out from these results when
 // the world is made (stand-in-world.ts).
 import { defaultSeasonRules, SeasonRules } from '@srleagues/contracts';
-import { membersStartPage, whoMayScore, type Audience, type TeamRecord } from '@srleagues/core';
+import {
+  membersStartPage,
+  minimumGamesToRank,
+  whoMayScore,
+  type Audience,
+  type TeamRecord,
+} from '@srleagues/core';
 import { addDays, dayIn, momentIn, timeIn } from './stand-in-world-clock.ts';
 import {
   emptyLeagueWorld,
@@ -320,7 +326,9 @@ type GameSpec = {
 };
 
 type SeasonSpec = {
-  readonly season: Omit<WorldSeason, 'rules' | 'statKeys'> & { readonly rules: unknown };
+  readonly season: Omit<WorldSeason, 'rules' | 'statKeys' | 'version'> & {
+    readonly rules: unknown;
+  };
   readonly teams: readonly TeamSpec[];
   readonly rosters: Readonly<Record<string, readonly PlayerSpec[]>>;
   readonly divisions: readonly { readonly id: string; readonly name: string }[];
@@ -1011,6 +1019,7 @@ type LeagueFacts = {
   readonly league: CastLeague;
   readonly audience: Audience;
   readonly timeZone: string;
+  /** The fewest games a player needs to be among the leaders (a league setting, P7 §6). */
   readonly minimumGames: number;
   readonly programId: string;
   /** The league's own venues, each with its courts. */
@@ -1130,6 +1139,19 @@ function leagueOf(
   now: Date,
 ): LeagueWorld {
   const s = emptyLeagueWorld(facts.league, facts);
+  // The league's minimum games for leaders, as League settings saves it, where it is not
+  // the starting value (P7 §6).
+  if (facts.minimumGames !== minimumGamesToRank.default) {
+    s.settings = [
+      {
+        place: { level: 'league' },
+        key: minimumGamesToRank.key,
+        document: { version: minimumGamesToRank.version, value: facts.minimumGames },
+        version: 1,
+        savedAt: now.toISOString(),
+      },
+    ];
+  }
   const today = dayIn(now, facts.timeZone);
   s.currentSeasonId = current;
   s.venues = facts.venues.map((v) => ({
@@ -1172,7 +1194,7 @@ function leagueOf(
   let entries = 0;
   for (const spec of seasons) {
     const { rules, ...rest } = spec.season;
-    s.seasons.push({ ...rest, rules, statKeys: [...statKeys] });
+    s.seasons.push({ ...rest, rules, statKeys: [...statKeys], version: 1 });
     spec.divisions.forEach((d, sort) =>
       s.divisions.push({ id: d.id, seasonId: spec.season.id, name: d.name, sort, binned: false }),
     );
@@ -1367,6 +1389,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   );
   // Members start on their team's page here, as the league's admin chose (U-5).
   youth.settings = [
+    ...youth.settings,
     {
       place: { level: 'league' },
       key: membersStartPage.key,
@@ -1394,6 +1417,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   draft.playsBefore = [standInGameId(2)];
   // It scores assigned games only, and its admin is given the live ones (P7 §5.1).
   draft.settings = [
+    ...draft.settings,
     {
       place: { level: 'league' },
       key: whoMayScore.key,
@@ -1429,7 +1453,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   history.currentSeasonId = null;
 
   const others = cast.otherLeagues.map((league) =>
-    emptyLeagueWorld(league, { audience: 'youth', timeZone: 'UTC', minimumGames: 0 }),
+    emptyLeagueWorld(league, { audience: 'youth', timeZone: 'UTC' }),
   );
   return [adult, youth, draft, history, ...others];
 }

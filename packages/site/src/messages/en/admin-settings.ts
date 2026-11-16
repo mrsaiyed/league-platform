@@ -1,5 +1,5 @@
 // English interface text (T-187), one part of `en`, which ../en.ts joins:
-// The admin's league settings and the settings' own words.
+// The admin's league and season settings, and the settings' own words.
 // Keys in alphabetical order: a new key goes in its place, never at the end (step 2.188).
 // A comment above a key is about that key or, from before the split, about the keys
 // that followed it in the one file there was.
@@ -8,6 +8,7 @@ export const enAdminSettings = {
   // A heading for each group of settings, by the first part of their keys.
   'adminSettings.area.members': 'Start page for members',
   'adminSettings.area.privacy': 'Privacy',
+  'adminSettings.area.statistics': 'Statistics',
   'adminSettings.area.teams': 'Team statistics',
   'adminSettings.clear': 'Go back to the default',
   // Beside a setting whose value asks to be confirmed (its `setting.<key>.confirm`).
@@ -59,6 +60,45 @@ export const enAdminSettings = {
   'adminSettings.usingDefault': 'Now: the default.',
   'adminSettings.usingOwn': 'Now: set for this league.',
   'adminSettings.yes': 'Yes',
+  'seasonSettings.done.hidden': '{season} is hidden from visitors again.',
+  'seasonSettings.done.shown': 'Visitors can see {season} now.',
+  'seasonSettings.done.shownLeagueHidden':
+    '{season} is shown. Visitors will see it once the league is published.',
+  'seasonSettings.hide': 'Hide it again',
+  'seasonSettings.hideAsk':
+    'Hide {season} from visitors? Its teams, schedule, results and standings disappear from the public site, and its address shows "Page not found". Nothing is deleted, and you can show it again.',
+  'seasonSettings.hideAskCurrent':
+    "It is the league's current season, so the league's home page and its season picker will show another season visitors can see instead, or no season if there is none.",
+  'seasonSettings.hideAskLive':
+    'A game of {season} is being scored right now: its scorekeeper can keep saving it, but people following it will stop getting updates.',
+  'seasonSettings.hideNo': 'No, keep it shown',
+  'seasonSettings.hideYes': 'Yes, hide it',
+  // Admin → Season settings (step 2.182, A-18): its first panel, who can see a season.
+  // Step 2.47 builds the season's name, dates and rules around it.
+  'seasonSettings.intro': 'Settle how a season runs, and when visitors can see it.',
+  'seasonSettings.noSeason': 'This league has no season yet.',
+  'seasonSettings.refused.not-hidden':
+    'That season is not hidden any more, so nothing was changed. The page shows it as it is now.',
+  'seasonSettings.refused.not-shown':
+    'That season is over or already hidden, so nothing was changed. The page shows it as it is now.',
+  'seasonSettings.seasonName': 'Season: {name}',
+  'seasonSettings.seasonNotFound': 'That season was not found, so this page shows {name}.',
+  'seasonSettings.show': 'Show this season to visitors',
+  'seasonSettings.showAsk':
+    'Show {season} to visitors? Visitors will see its teams, schedule and results.',
+  'seasonSettings.showAskLeagueHidden':
+    'Show {season} to visitors? Once the league is published, they will see its teams, schedule and results.',
+  'seasonSettings.showNo': 'No, keep it hidden',
+  'seasonSettings.showYes': 'Yes, show it',
+  'seasonSettings.visibility.hidden': 'Only the people who run the league can see {season}.',
+  'seasonSettings.visibility.leagueHidden':
+    'Visitors cannot see this league until it is published, so they will see this season only after that.',
+  'seasonSettings.visibility.over':
+    '{season} is over. A season that is over stays shown, so its results stay on the site.',
+  'seasonSettings.visibility.shown': 'Everyone can see {season}.',
+  'seasonSettings.visibility.shownLeagueHidden':
+    '{season} is shown, but visitors cannot see this league until it is published.',
+  'seasonSettings.visibility.title': 'Who can see this season',
   'setting.games.scorekeeperReopenMinutes.label':
     'Minutes after a game ends during which the scorekeeper who ended it may reopen it from the tracker, with a reason, if they tapped End game too soon. 0 means never. After that, only an admin can reopen it.',
   'setting.games.whoMayScore.label':
@@ -87,6 +127,8 @@ export const enAdminSettings = {
     'Full names for adults, like "Jordan Ellis". Children are shown by first name and last initial, like "Jordan E.", unless their full names are confirmed below.',
   'setting.privacy.publicNames.option.hidden':
     'Hidden for everyone, adults and children: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
+  'setting.statistics.minimumGamesToRank.label':
+    'Games a player must have played to be ranked among the leaders. 0 ranks everyone. A player with fewer still shows in the full table.',
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
   'setting.teams.startingStatsLevel.label':

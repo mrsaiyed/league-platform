@@ -367,10 +367,13 @@ const cases = [
       'Leaders',
       'Dana Whitfield',
       'Owls',
-      'Only team totals are shown for Bears, Owls.',
+      // The note names the team whose totals are on the page. The Bears' players are staff
+      // only too, but nothing is recorded for them, so no totals of theirs are shown and
+      // the note no longer says they are (step 2.147 part 3).
+      'Only team totals are shown for Owls.',
       'ui-stats',
     ],
-    ['This page is not built yet.', 'Jordan', 'Castellanos', 'Imani', 'Brooks'],
+    ['This page is not built yet.', 'shown for Bears', 'Jordan', 'Castellanos', 'Imani', 'Brooks'],
   ],
   ['coach', '/north-valley/stats', 200, ['Dana Whitfield'], ['Jordan', 'Castellanos', 'Brooks']],
   ['visitor', '/north-valley/stats?by=total', 200, ['Season totals']],
@@ -435,6 +438,83 @@ const cases = [
   ],
   ['scheduler', '/north-valley/admin/settings', 403, [noAccess]],
   ['coach', '/north-valley/admin/settings', 403, [noAccess]],
+  // Season settings' first panel (step 2.182, A-18): who can see a season, shown or
+  // hidden by the owner or an admin after one question; never a scheduler's.
+  [
+    'owner',
+    '/north-valley/admin/season',
+    200,
+    ['Who can see this season', 'Everyone can see Fall 2026.', 'Hide it again'],
+    ['Nothing here yet.', 'Show this season to visitors'],
+  ],
+  [
+    'owner',
+    '/north-valley/admin/season?season=winter-2027',
+    200,
+    ['Only the people who run the league can see Winter 2027.', 'Show this season to visitors'],
+    ['Everyone can see', 'Yes, show it'],
+  ],
+  // A season the league does not list: the current one, said plainly, never "no season".
+  [
+    'owner',
+    '/north-valley/admin/season?season=no-such-season',
+    200,
+    ['That season was not found, so this page shows Fall 2026.', 'Everyone can see Fall 2026.'],
+    ['This league has no season yet.'],
+  ],
+  // An address alone never makes the panel say something happened that did not.
+  [
+    'owner',
+    '/north-valley/admin/season?season=winter-2027&done=shown',
+    200,
+    ['Only the people who run the league can see Winter 2027.'],
+    ['Visitors can see Winter 2027 now.'],
+  ],
+  [
+    'owner',
+    '/north-valley/admin/season?season=winter-2027&ask=show',
+    200,
+    ['Visitors will see its teams, schedule and results.', 'Yes, show it', 'No, keep it hidden'],
+  ],
+  // Hiding the current season, with a game being scored (Hawks v Bears), says both.
+  [
+    'owner',
+    '/north-valley/admin/season?ask=hide',
+    200,
+    [
+      'Hide Fall 2026 from visitors?',
+      'will show another season visitors can see instead',
+      'A game of Fall 2026 is being scored right now',
+      'Yes, hide it',
+    ],
+  ],
+  // In a league not published, a shown season is never said to be seen by visitors.
+  [
+    'owner',
+    '/quiet-pines/admin/season?done=shown',
+    200,
+    [
+      'is shown. Visitors will see it once the league is published.',
+      'is shown, but visitors cannot see this league until it is published.',
+    ],
+    ['Everyone can see', 'Visitors can see', 'Visitors will see its'],
+  ],
+  [
+    'owner',
+    '/quiet-pines/admin/season?ask=hide',
+    200,
+    ['Yes, hide it'],
+    ['Everyone can see', 'Visitors can see', 'Visitors will see its'],
+  ],
+  [
+    'owner',
+    '/old-meadow/admin/season',
+    200,
+    ['A season that is over stays shown'],
+    ['Hide it again', 'Show this season to visitors'],
+  ],
+  ['scheduler', '/north-valley/admin/season', 403, [noAccess], ['Who can see this season']],
+  ['scorekeeper', '/north-valley/admin/season', 403, [noAccess], ['Who can see this season']],
   // The tracker (step 2.33): a signed-in account allowed to score that game, and nobody
   // else, another league's admin included (U-6). Hawks v Bears is live; Lions v Tigers is
   // the scorekeeper's; game 3 is assigned to nobody (any scorekeeper may score it).

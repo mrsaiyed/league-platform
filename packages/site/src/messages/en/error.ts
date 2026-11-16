@@ -136,6 +136,7 @@ export const enError = {
   'error.leagues.set_setting.invalid-value':
     'That value is not allowed for this setting. Check what it accepts and try again.',
   'error.leagues.set_setting.unknown-setting': 'That setting does not exist.',
+  'error.leagues.update_season.season-not-found': 'That season is not there.',
   'error.not-allowed': 'You are not allowed to do that.',
   'error.not-confirmed': 'Tick the box to confirm first. Nothing was changed.',
   'error.people.create_person.sensitive-fields-not-allowed':

@@ -17,7 +17,6 @@ import { describe, expect, it } from 'vitest';
 import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
 import { adultTeams, standInPublicStats, youthTeams } from './stand-in-public-stats.ts';
-import { standInPublicTeams } from './stand-in-public-teams.ts';
 import { testWorld } from './stand-in-world.test-helper.ts';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -51,11 +50,11 @@ function made() {
   const world = testWorld(() => access);
   const settings = standInAdminSettings(world);
   const stats = standInPublicStats(world, namePolicyOf(settings.deps));
-  const teams = standInPublicTeams(world);
   const rockets = youthTeams.find((t) => t.slug === 'rockets')?.id ?? '';
   const rosterNames = async () => {
-    const policy = (await stats.settingsOf(youth)).namePolicy;
-    const roster = await teams.rosterOf(youth, rockets, { viewer: publicViewer(youth), policy });
+    const roster = await stats.statisticsOf(youth, ({ rosterOf }) =>
+      rosterOf(rockets, publicViewer(youth)),
+    );
     return roster.lines;
   };
   const set = (
@@ -70,7 +69,7 @@ function made() {
       { level: 'league', key, value, version: null, ...extra },
       settings.deps,
     );
-  return { stats, rosterNames, set, teams };
+  return { stats, rosterNames, set };
 }
 
 const texts = (lines: readonly { readonly name: { shown: boolean } }[]) =>
@@ -108,11 +107,12 @@ describe("the league's privacy settings on its public pages (T-81)", () => {
   });
 
   it("follows an adult league's choice of less for its adults, and full names again (R-29)", async () => {
-    const { stats, set, teams } = made();
+    const { stats, set } = made();
     const falcons = adultTeams.find((t) => t.slug === 'falcons')?.id ?? '';
     const adultRoster = async () => {
-      const policy = (await stats.settingsOf(adult)).namePolicy;
-      const roster = await teams.rosterOf(adult, falcons, { viewer: publicViewer(adult), policy });
+      const roster = await stats.statisticsOf(adult, ({ rosterOf }) =>
+        rosterOf(falcons, publicViewer(adult)),
+      );
       return texts(roster.lines);
     };
     const names = (value: string, version: number | null) =>

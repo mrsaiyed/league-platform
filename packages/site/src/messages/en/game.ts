@@ -15,6 +15,7 @@ export const enGame = {
   'game.corrected': 'Corrected on {date}',
   'game.finalScoreOnly': 'Only the final score was recorded for this game.',
   'game.forfeit': 'This game was decided by forfeit.',
+  'game.forfeitBy': '{team} forfeited this game.',
   'game.jerseyOnly': '#{jersey}',
   'game.latestPlay': 'Latest play: {play}',
   'game.live': 'The game, live',
@@ -71,6 +72,8 @@ export const enGame = {
   'game.spokenScore': '{away} {awayScore}, {home} {homeScore}.',
   'game.startsAt': 'Starts {when}',
   'game.teamFouls': 'Team fouls this period: {away} {awayFouls}, {home} {homeFouls}',
+  // Under the board of a game still to come (or put off): the two teams, each with its record.
+  'game.teams': 'The two teams',
   // A game's page (step 2.45, P7 §5.3). Words with {braces} are filled on the device too.
   'game.title': '{away} at {home}',
   'game.wasSetFor': 'It was set for {when}',

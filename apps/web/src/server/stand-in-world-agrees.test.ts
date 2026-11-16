@@ -192,7 +192,7 @@ beforeAll(async () => {
   });
   const empty = emptyLeagueWorld(
     { id: league.leagueId, slug: 'lakeside', name: 'Lakeside Hoops League' },
-    { audience: 'adult', timeZone: zone, minimumGames: 0 },
+    { audience: 'adult', timeZone: zone },
   );
   world = madeUpWorld({
     leagues: [
@@ -213,6 +213,8 @@ beforeAll(async () => {
             rules: (await read((scope) => gamesStore(scope).findSeason(seasonId)))?.rules,
             // A season made by createSeason keeps no statistics of its own yet (0003).
             statKeys: [],
+            // Made active and current on the database above: its second version.
+            version: 2,
           },
         ],
         divisions: divisionIds.map((id, sort) => ({

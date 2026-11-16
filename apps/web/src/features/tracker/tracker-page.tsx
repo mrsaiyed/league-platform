@@ -36,7 +36,7 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { gameWhenText } from '../../server/game-when.ts';
 import { isGameIdFormat } from '../../server/league-api.ts';
-import { leagueSites, siteOfLeague } from '../../server/league-site.ts';
+import { leagueSites, siteOf } from '../../server/league-site.ts';
 import { loadLeaguePage, signedInEmail } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { signInFirstUrl } from '../../server/sign-in-first.ts';
@@ -134,14 +134,14 @@ export async function TrackerPage({
  * the page's body, with no header, menu or footer (the league's layout draws none at the
  * tracker's address). The scoring screen is never inside this.
  */
-function LeagueLook({
+async function LeagueLook({
   league,
   children,
 }: {
   readonly league: { readonly id: string; readonly slug: string };
   readonly children: ReactNode;
 }) {
-  const site = siteOfLeague(league, leagueSites());
+  const site = await siteOf(league, await leagueSites());
   return (
     <div className="league-site ui-root">
       <DesignStyle design={site.design} />

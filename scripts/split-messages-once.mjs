@@ -78,8 +78,8 @@ const files = {
   ],
   'admin-import': ["The admin's fixture import", ['admin.import']],
   'admin-settings': [
-    "The admin's league settings and the settings' own words",
-    ['adminSettings', 'setting'],
+    "The admin's league and season settings, and the settings' own words",
+    ['adminSettings', 'seasonSettings', 'setting'],
   ],
   'admin-teams': ["The admin's teams and rosters", ['adminTeams']],
   error: ['The refusals and errors of every area but scheduling', ['error']],

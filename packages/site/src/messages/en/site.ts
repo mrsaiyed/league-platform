@@ -18,6 +18,7 @@ export const enSite = {
   'display.jerseyShort': '#',
   // The shared display pieces (step 2.41), handed to packages/ui as labels.
   'display.live': 'Live',
+  'display.noValue': 'Nothing recorded',
   'display.note': 'Note',
   'display.notes': 'Notes',
   'display.player': 'Player',
@@ -160,6 +161,9 @@ export const enSite = {
   'standings.order.points-scored': 'Placed above the teams level with it by points scored.',
   'standings.order.still-tied':
     'Level with another team: nothing in the rules separates them yet, so they are shown in a fixed order.',
+  // What follows the tables on the standings page: the latest decided games, as scoreboards.
+  'standings.results': 'Latest results',
+  'standings.results.kicker': 'How they got here',
   'standings.streak.lost': 'L{length}',
   'standings.streak.tied': 'T{length}',
   'standings.streak.won': 'W{length}',
@@ -186,9 +190,16 @@ export const enSite = {
   'stats.leaderOf': '{stat} leader',
   'stats.leaders': 'Leaders',
   'stats.leadersNone': 'No leaders yet.',
+  // Under "All players": the table lists everyone, the leaders above it only those with the
+  // league's minimum games, so a player the table puts first may lead no card. The second
+  // is said to screen readers after the games played of each such player.
+  'stats.listedNotRanked_one': 'Every player is listed. Fewer than {count} game: not ranked yet.',
+  'stats.listedNotRanked_other':
+    'Every player is listed. Fewer than {count} games: not ranked yet.',
   'stats.minimumGames_one': 'A player needs at least {count} game to be ranked.',
   'stats.minimumGames_other': 'A player needs at least {count} games to be ranked.',
   'stats.noSeason': 'There is no season to show yet.',
+  'stats.notRankedYet': 'not ranked yet',
   'stats.showBy': 'Show',
   'stats.teams': 'Teams',
   'stats.teamsJoin': ', ',
@@ -206,6 +217,7 @@ export const enSite = {
   'team.mineNote': 'This device will open the league on this team.',
   'team.nameLeft': '{name} (left {date})',
   'team.nameNotShown': 'Name not shown',
+  'team.noNumber': 'No number',
   'team.noResults': 'This team has not played a game yet.',
   'team.noSchedule': 'No games are coming up for this team.',
   'team.noSeed': 'Not seeded yet',

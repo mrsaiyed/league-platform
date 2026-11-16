@@ -9,7 +9,7 @@
 //   admin.ts: admin
 //   admin-games.ts: admin.games, admin.boxScore, admin.myGames
 //   admin-import.ts: admin.import
-//   admin-settings.ts: adminSettings, setting
+//   admin-settings.ts: adminSettings, seasonSettings, setting
 //   admin-teams.ts: adminTeams
 //   error.ts: error
 //   error-scheduling.ts: error.scheduling

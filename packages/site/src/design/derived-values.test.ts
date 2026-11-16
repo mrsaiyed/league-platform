@@ -23,6 +23,7 @@ import {
   startingDesignKeys,
   textOn,
   textSurfaces,
+  tintShares,
   type DesignDocument,
 } from '../../index.ts';
 
@@ -317,8 +318,18 @@ describe('colors under the pointer (hover)', () => {
       const hovered = [colors.background, colors.panel].map((surface) =>
         hoveredSurface(surface, colors.primary),
       );
-      expect(textSurfaces(colors)).toEqual([colors.background, colors.panel, ...hovered]);
-      for (const surface of hovered) {
+      // And under a light frame's weaker tint (the ground of its soft pill, its hovered
+      // row): between two surfaces a color reads on, it can read a little worse.
+      const tinted = [colors.background, colors.panel].map((surface) =>
+        mixColors(surface, colors.primary, tintShares.light),
+      );
+      expect(textSurfaces(colors)).toEqual([
+        colors.background,
+        colors.panel,
+        ...hovered,
+        ...tinted,
+      ]);
+      for (const surface of [...hovered, ...tinted]) {
         for (const text of [
           colors.text,
           derived.muted,
@@ -341,6 +352,41 @@ describe('colors under the pointer (hover)', () => {
       const share = /var\(--color-primary\) (\d+)%/.exec(tint)?.[1];
       expect(Number(share) / 100, key).toBeLessThanOrEqual(hoverTintShare);
     }
+  });
+
+  it('writes every tint of a frame from the one pair of numbers the texts are fitted to', () => {
+    // The texts are fitted to the stronger of the two, so neither frame lays on more.
+    expect(hoverTintShare).toBe(Math.max(tintShares.dark, tintShares.light));
+    expect(tintShares.light).toBeLessThanOrEqual(tintShares.dark);
+    const seen = new Set<string>();
+    for (const key of startingDesignKeys) {
+      const design = startingDesign(key);
+      const vars = designToCssVariables(design);
+      const percent = `${Math.round(tintShares[design.base] * 100)}%`;
+      seen.add(`${design.base} ${percent}`);
+      // The tint under the pointer, and the solid ground of a soft pill on a card: the
+      // frame's own share, written from the constant and nowhere else.
+      expect(vars['--color-tint'], key).toBe(
+        `color-mix(in srgb, var(--color-primary) ${percent}, transparent)`,
+      );
+      expect(vars['--color-tint-panel'], key).toBe(
+        `color-mix(in srgb, var(--color-primary) ${percent}, var(--color-panel))`,
+      );
+      // And no variable of the frame lays the main color over a panel at any other share.
+      for (const [name, value] of Object.entries(vars)) {
+        const over = /var\(--color-primary\) (\d+%), var\(--color-panel\)/.exec(value)?.[1];
+        if (over !== undefined) expect(over, `${key} ${name}`).toBe(percent);
+      }
+      // In a dark design that ground is, to the digit, a surface the texts are fitted to:
+      // the panel with the pointer over it.
+      if (design.base === 'dark') {
+        const colors = colorsOf(design);
+        expect(textSurfaces(colors)).toContain(
+          mixColors(colors.panel, colors.primary, tintShares.dark),
+        );
+      }
+    }
+    expect([...seen].sort()).toEqual(['dark 9%', 'light 7%']);
   });
 
   it('moves a hovered tab of the light header away from its words, so they read at least as well', () => {
@@ -400,7 +446,7 @@ describe('fitting a color to the surfaces it is read on', () => {
     expect(warnings.length).toBeGreaterThan(0);
     for (const warning of warnings) {
       expect(warning.ratio).toBeLessThan(4.5);
-      expect(warning.pair).toMatch(/ on (hovered )?(background|panel)$/);
+      expect(warning.pair).toMatch(/ on (hovered |tinted )?(background|panel)$/);
     }
     // A design whose worked-out colors all read has nothing to report.
     for (const key of startingDesignKeys) {
@@ -423,7 +469,7 @@ describe('fitting a color to the surfaces it is read on', () => {
     expect(contrastWarnings(design).map((w) => w.pair)).not.toContain('text on panel');
     const pairs = derivedColorWarnings(design).map((w) => w.pair);
     expect(pairs).toContain('text on hovered panel');
-    // Every worked-out color is checked on all four surfaces it is fitted to.
+    // Every worked-out color is checked on all the surfaces it is fitted to.
     const apart = {
       ...base,
       colors: { ...base.colors, background: '#ffffff', panel: '#0f2c40' },
@@ -432,7 +478,28 @@ describe('fitting a color to the surfaces it is read on', () => {
       derivedColorWarnings(apart).map((w) => w.pair.slice(w.pair.indexOf(' on ') + 4)),
     );
     expect([...where].some((surface) => surface.startsWith('hovered '))).toBe(true);
-    expect([...where].some((surface) => !surface.startsWith('hovered '))).toBe(true);
+    expect([...where].some((surface) => surface.startsWith('tinted '))).toBe(true);
+    expect([...where].some((surface) => !/^(hovered|tinted) /.test(surface))).toBe(true);
+  });
+
+  it('fits the texts to a light frame’s weaker tint too: a lime league on an off-white page', () => {
+    // Found by the sweep in frame-look.test.ts: the accent as text read on the page and on
+    // the page under the strongest tint, and fell just short (4.49) under the weaker one,
+    // where a light design draws "1 game postponed".
+    const colors = {
+      background: '#f7f8fa',
+      panel: '#ffffff',
+      text: '#14202b',
+      primary: '#b3ff66',
+      accent: '#e8590c',
+      highlight: '#b4236b',
+    };
+    const under = mixColors(colors.background, colors.primary, tintShares.light);
+    expect(textSurfaces(colors)).toContain(under);
+    const derived = derivedColors(colors, 'light');
+    for (const text of [derived.accentText, derived.muted, derived.primaryText, derived.danger]) {
+      expect(contrastRatio(text, under), text).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });
 

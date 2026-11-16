@@ -1,5 +1,7 @@
+import { defaultSeasonRules } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import { defaultNamePolicy, publicViewer, type Viewer } from '../../people/index.ts';
+import type { StandingsReadStore } from '../read-ports.ts';
 import {
   divisionId,
   leagueId,
@@ -169,5 +171,35 @@ describe('statistics for each kind of viewer (S-22, T-87)', () => {
       ? asCoach.value.players.find((p) => p.personId === mixedPlayer)
       : undefined;
     expect(full?.stats['points']?.total).toBe(50);
+  });
+});
+
+describe('the statistics a season keeps (P7 §1, record 070)', () => {
+  const keysWith = async (named: readonly string[], rules: unknown) => {
+    const store: StandingsReadStore = {
+      ...memoryStandingsRead(),
+      findSeason: async (id) => (id === seasonId ? { id, name: 'Fall', rules } : undefined),
+      seasonStatKeys: async (id) => (id === seasonId ? named : undefined),
+    };
+    const table = await readStatisticsTable(store, { seasonId, viewing: visitor });
+    return table.ok ? table.value.statKeys : undefined;
+  };
+
+  it('keeps the statistics the season names, in its order', async () => {
+    expect(await keysWith(['fouls', 'points'], defaultSeasonRules())).toEqual(['fouls', 'points']);
+  });
+
+  it("keeps its rules' set when it names none: the box score grid's columns", async () => {
+    expect(await keysWith([], defaultSeasonRules())).toEqual(['points', 'fg3', 'fg1', 'fouls']);
+    expect(await keysWith([], { ...defaultSeasonRules(), statistics: 'points-fouls' })).toEqual([
+      'points',
+      'fouls',
+    ]);
+  });
+
+  it('reads rules it cannot read as the games module does: the starting set the grid asked for', async () => {
+    for (const unreadable of [{ version: 1 }, { version: 99 }, 'not rules']) {
+      expect(await keysWith([], unreadable)).toEqual(['points', 'fg3', 'fg1', 'fouls']);
+    }
   });
 });

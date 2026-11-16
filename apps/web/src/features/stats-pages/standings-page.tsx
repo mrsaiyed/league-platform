@@ -1,7 +1,8 @@
-import { leagueUrl } from '@srleagues/core';
+import { leagueUrl, type LeagueAddressee } from '@srleagues/core';
 import { EmptyPanel, PageHead, StandingsTable } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -49,14 +50,27 @@ export function StandingsTables({
   );
 }
 
-/** `/{league}/standings`: one table per division, shown to everyone as the league's page (S-22: standings are never restricted). */
+/** What the foot of the standings page is told: whose league, and which season's tables. */
+export type StandingsFoot = {
+  readonly addressee: LeagueAddressee & { readonly id: string };
+  readonly season: { readonly id: string; readonly slug: string; readonly isCurrent: boolean };
+};
+
+/**
+ * `/{league}/standings`: one table per division, shown to everyone as the league's page
+ * (S-22: standings are never restricted). `after` draws what follows the tables once there
+ * are tables to follow: the route puts the season's latest results there, which are the
+ * schedule pages' to draw.
+ */
 export async function StandingsPage({
   league,
   search,
+  after,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
   readonly search: SearchParams;
+  readonly after?: (foot: StandingsFoot) => ReactNode;
 }) {
   const view = await loadLeaguePage(league, 'site');
   const addressee = view.context.league;
@@ -68,18 +82,27 @@ export async function StandingsPage({
   const result =
     season === undefined ? undefined : await publicStats.standingsOf(addressee.id, season.id);
   if (result !== undefined && !result.ok) return notFound();
+  const tables = result === undefined || !result.ok ? [] : buildStandingsViews(result.value);
   return (
     <main>
       <PageHead title={t('standings.heading')} kicker={season?.name} sub={t('standings.lead')} />
       {season === undefined || result === undefined || !result.ok ? (
         <EmptyPanel text={t('standings.noSeason')} />
       ) : (
-        <StandingsTables
-          tables={buildStandingsViews(result.value)}
-          scheduleHref={leagueUrl(addressee, 'schedule', {
-            season: asked === undefined || asked === '' ? undefined : asked,
-          })}
-        />
+        <>
+          <StandingsTables
+            tables={tables}
+            scheduleHref={leagueUrl(addressee, 'schedule', {
+              season: asked === undefined || asked === '' ? undefined : asked,
+            })}
+          />
+          {after === undefined || tables.length === 0
+            ? null
+            : after({
+                addressee,
+                season: { id: season.id, slug: season.slug, isCurrent: season.isCurrent },
+              })}
+        </>
       )}
     </main>
   );
