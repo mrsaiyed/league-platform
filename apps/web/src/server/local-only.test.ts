@@ -51,7 +51,7 @@ const tools = {
     email: 'owner@example.test',
     password: 'made-up',
   })),
-  newestCodeFor: vi.fn(async () => undefined),
+  watchForCode: vi.fn(() => ({ code: async () => undefined, stop: () => {} })),
 } satisfies LocalTools;
 
 /** What was asked of the app's ports, in order: each property read and each call. */
@@ -270,6 +270,19 @@ describe.each(['local', 'test'])('in %s', (appEnv) => {
     }
     expect(tools.keptEmails).toHaveBeenCalledOnce();
     expect(tools.madeUpPeople).toHaveBeenCalledOnce();
+  });
+
+  it('"be this made-up person" says so plainly when no new code came (review, L9)', async () => {
+    state.request = requestFor(host, '/signin/made-up-people?problem=no-code');
+    const Page = await catchAllPage();
+    const drawn = (await Page({
+      params: Promise.resolve({ league: 'signin', missing: ['made-up-people'] }),
+      searchParams: Promise.resolve({ problem: 'no-code' }),
+    })) as ReactElement<{ readonly tools: LocalTools; readonly noNewCode: boolean }>;
+    const screen = drawn.type as (props: typeof drawn.props) => Promise<ReactNode>;
+    expect(renderToStaticMarkup(await screen(drawn.props))).toContain('No new code came in time');
+    const plain = (await pageAt('made-up-people')) as typeof drawn;
+    expect(renderToStaticMarkup(await screen(plain.props))).not.toContain('No new code');
   });
 
   it('a made-up database without the tools, or any ports without them, answers "not found"', async () => {

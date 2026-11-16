@@ -49,6 +49,24 @@ export type MadeUpSignIn =
   | { readonly kind: 'password'; readonly email: string; readonly password: string }
   | { readonly kind: 'code'; readonly email: string };
 
+/**
+ * Waiting for the next email to one address ("be this made-up person" on the made-up
+ * database), from the moment the watch is made: made before the code is asked for, so the
+ * code it gives is the one that ask sent, never an earlier email's.
+ */
+export type CodeWatch = {
+  /**
+   * The code in the first email to the address captured since the watch was made, waiting
+   * a few seconds at most for it; undefined when none came (in memory, never a file).
+   */
+  readonly code: () => Promise<string | undefined>;
+  /** Stops waiting: the ask failed, so no email will come. */
+  readonly stop: () => void;
+};
+
+/** The problem "be this made-up person" is sent back with when no new code came. */
+export const noNewCode = 'no-code';
+
 export type LocalTools = {
   /** The newest kept emails, newest first (kept-emails.ts). */
   readonly keptEmails: () => Promise<readonly KeptEmail[]>;
@@ -56,8 +74,8 @@ export type LocalTools = {
   readonly madeUpPeople: () => Promise<readonly MadeUpChoice[]>;
   /** How the made-up person of this key signs in; undefined for any other key. */
   readonly madeUpSignInOf: (key: string) => MadeUpSignIn | undefined;
-  /** The code of the newest email captured for `email` (in memory, never a file). */
-  readonly newestCodeFor: (email: string) => Promise<string | undefined>;
+  /** Starts waiting for the next email to `email` and the code in it (CodeWatch). */
+  readonly watchForCode: (email: string) => CodeWatch;
 };
 
 /** The app's own settings the gate reads: APP_ENV and PUBLIC_BASE_URL. */

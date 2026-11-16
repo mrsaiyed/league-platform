@@ -448,7 +448,7 @@ describe('databasePorts with the local tools (step 2.96)', () => {
     keptEmails: async () => [],
     madeUpPeople: async () => [],
     madeUpSignInOf: () => undefined,
-    newestCodeFor: async () => undefined,
+    watchForCode: () => ({ code: async () => undefined, stop: () => {} }),
   };
   const portsWith = (localTools: { tools: LocalTools; publicBaseUrl: string } | null) =>
     databasePorts({

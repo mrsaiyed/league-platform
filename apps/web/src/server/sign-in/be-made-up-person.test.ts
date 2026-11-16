@@ -163,6 +163,102 @@ describe('on the made-up database', () => {
   });
 });
 
+// Review of step 2.96, L9: the code tried is the one this press asked for. An email that
+// arrives late must never make an earlier code be sent, which would fail and use up an
+// attempt; when none comes, the list says so in a plain sentence.
+describe('the code of this ask only', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('gives no earlier email’s code: only one captured after the watch was made', async () => {
+    const signIn = standInSignIn(options());
+    signIn.startKeeping();
+    const owner = seedLeagues[0]?.owner.email ?? '';
+    // An earlier ask: its code is in the capture, as after an earlier press.
+    const before = signIn.watchForCode(owner);
+    expect(
+      (await signIn.signIn.startSignUp({ email: owner, networkAddress: '127.0.0.1' })).ok,
+    ).toBe(true);
+    const earlier = await before.code();
+    expect(earlier).toMatch(/^\d{6}$/);
+    // Now nothing new comes: the watch gives nothing, never the earlier code.
+    vi.useFakeTimers();
+    const watch = signIn.watchForCode(owner);
+    const waited = watch.code();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(await waited).toBeUndefined();
+    vi.useRealTimers();
+    // And the next ask's code is the one given: the one the sign-in service now holds.
+    const next = signIn.watchForCode(owner);
+    await signIn.signIn.startSignUp({ email: owner, networkAddress: '127.0.0.1' });
+    const fresh = await next.code();
+    const proved = await signIn.signIn.verifyCode({
+      email: owner,
+      code: fresh ?? '',
+      networkAddress: '127.0.0.1',
+    });
+    expect(proved.ok).toBe(true);
+  });
+
+  it('sends the browser back to the list with a plain sentence when no new code came', async () => {
+    const signIn = standInSignIn(options());
+    signIn.startKeeping();
+    const real = madeUpDatabaseTools(seedLeagues, standInMember, signIn);
+    // The code email comes, but only after the wait is over: it is never tried.
+    let late: string | undefined;
+    const tools = {
+      ...real,
+      watchForCode: (email: string) => {
+        const watching = real.watchForCode(email);
+        return {
+          code: async () => {
+            late = await watching.code();
+            return undefined;
+          },
+          stop: watching.stop,
+        };
+      },
+    };
+    const owner = seedLeagues[0]?.owner.email ?? '';
+    const deps = flowDepsOf({ signIn: signIn.signIn, mail: signIn.signInMail });
+    const { visit, cookies } = browser();
+    expect(
+      await beMadeUpPerson({ person: owner, next: '/lakeside/admin' }, visit, deps, tools),
+    ).toEqual({ to: `${platformUrl('madeUpPeople')}?problem=no-code` });
+    expect(cookies.has(cookieNames.session)).toBe(false);
+    // The code the ask did send still works on the code screen: no attempt was used on it.
+    expect(late).toMatch(/^\d{6}$/);
+    expect(await enterCode({ code: late }, visit, deps)).toEqual({
+      to: platformUrl('choosePassword'),
+    });
+  });
+
+  it('stops watching when the ask itself is refused', async () => {
+    const signIn = standInSignIn(options());
+    const real = madeUpDatabaseTools(seedLeagues, standInMember, signIn);
+    const stopped = vi.fn();
+    const code = vi.fn(async () => undefined);
+    const tools = { ...real, watchForCode: () => ({ code, stop: stopped }) };
+    const deps = flowDepsOf({
+      signIn: {
+        ...signIn.signIn,
+        startSignUp: async () => ({
+          ok: false,
+          error: { code: 'too-many-attempts', retryAfterSeconds: 60 },
+        }),
+      },
+      mail: signIn.signInMail,
+    });
+    const { visit } = browser();
+    const owner = seedLeagues[0]?.owner.email ?? '';
+    const answer = await beMadeUpPerson({ person: owner }, visit, deps, tools);
+    expect(answer?.to).toMatch(/problem=tooManyAttempts/);
+    expect(stopped).toHaveBeenCalledOnce();
+    expect(code).not.toHaveBeenCalled();
+  });
+});
+
 describe('no code in a log line (T4 §10)', () => {
   afterEach(() => {
     vi.restoreAllMocks();

@@ -28,6 +28,7 @@ import {
   type AccessTx,
   type Clock,
   type CommandDeps,
+  type EmailSender,
   type Grant,
   type Role,
   type Scope,
@@ -45,6 +46,7 @@ import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
 import { keepingSender, readKeptEmails, type KeptEmail } from './kept-emails.ts';
 import { liveListenAuthorize } from './live-listen.ts';
+import type { CodeWatch } from './local-tools.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
 import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
 import type { WebPorts } from './ports.ts';
@@ -81,6 +83,9 @@ import type { TrackerPorts } from './tracker-ports.ts';
 
 export { standInDraftProgramId, standInLeagues, standInPeople } from './stand-in-cast.ts';
 type MadeUpPerson = { readonly accountId: string; readonly token: string };
+
+/** How long "be this made-up person" waits for the code it asked for to be captured. */
+const codeWaitMs = 5000;
 
 const id = castId;
 
@@ -270,10 +275,10 @@ export type StandInSignIn = Pick<StandInPorts, 'signIn' | 'signInMail' | 'signUp
   /** The newest kept emails in the folder, newest first (the kept emails' page). */
   readonly keptEmails: () => Promise<readonly KeptEmail[]>;
   /**
-   * The code in the newest email captured in memory for `email`, once the email asked for
-   * just now has reached the capture ("be this made-up person" on the made-up database).
+   * Waits for the next email captured in memory for `email` and the code in it, from now on
+   * ("be this made-up person" on the made-up database, and the made-up people's sign-ups).
    */
-  readonly newestCodeFor: (email: string) => Promise<string | undefined>;
+  readonly watchForCode: (email: string) => CodeWatch;
   /** From now on emails to made-up addresses are written to the folder (after startup). */
   readonly startKeeping: () => void;
 };
@@ -297,9 +302,19 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
   }
   const now = () => new Date();
   const outbox = captureEmail({ now });
+  // Who waits for the next email to an address (watchForCode): told as each one is captured.
+  const waiting = new Set<{ readonly address: string; readonly arrived: (text: string) => void }>();
+  const telling: EmailSender = {
+    send: async (message) => {
+      const sent = await outbox.send(message);
+      const address = message.to.trim().toLowerCase();
+      for (const waiter of waiting) if (waiter.address === address) waiter.arrived(message.text);
+      return sent;
+    },
+  };
   // A copy of each email to a made-up address in the working folder, once started (step 2.96).
   const folder = options.keptEmailsFolder ?? null;
-  const keeping = keepingSender(outbox, folder, {
+  const keeping = keepingSender(telling, folder, {
     now,
     onNotKept: () => options.warn?.('email not kept', { kind: 'kept-email' }),
   });
@@ -321,17 +336,38 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
     returnOrigins: [options.publicBaseUrl],
     now,
   });
-  const newestCodeFor = async (email: string) => {
-    // The code email is handed over without waiting: let it reach the capture.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+  // The code email is handed over without waiting (sign-in-mail.ts), so it may reach the
+  // capture a moment after the ask returns: only an email captured after the watch was
+  // made is taken, so an earlier email's code is never given (review of step 2.96, L9).
+  const watchForCode = (email: string): CodeWatch => {
     const address = email.trim().toLowerCase();
-    const sent = outbox.messages().findLast((m) => m.to.toLowerCase() === address);
-    return /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
+    let settle: (text: string | undefined) => void = () => {};
+    const next = new Promise<string | undefined>((resolve) => {
+      settle = resolve;
+    });
+    const waiter = { address, arrived: (text: string) => settle(text) };
+    waiting.add(waiter);
+    const stop = () => {
+      waiting.delete(waiter);
+      settle(undefined);
+    };
+    return {
+      stop,
+      code: async () => {
+        const timer = setTimeout(stop, codeWaitMs);
+        const text = await next;
+        clearTimeout(timer);
+        waiting.delete(waiter);
+        return /\b(\d{6})\b/.exec(text ?? '')?.[1];
+      },
+    };
   };
   const signUpMadeUp = async (email: string, password: string) => {
     const here = '127.0.0.1';
+    const watch = watchForCode(email);
     const asked = await signIn.startSignUp({ email, networkAddress: here });
-    const code = await newestCodeFor(email);
+    if (!asked.ok) watch.stop();
+    const code = await watch.code();
     if (!asked.ok || code === undefined) throw new Error('A made-up person got no code.');
     const proved = await signIn.verifyCode({ email, code, networkAddress: here });
     if (!proved.ok) throw new Error('A made-up person could not be proved.');
@@ -349,7 +385,7 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
     signUpMadeUp,
     signUpMadeUpMember: () => signUpMadeUp(standInMember.email, standInMember.password),
     keptEmails: async () => (folder === null ? [] : readKeptEmails(folder, options.publicBaseUrl)),
-    newestCodeFor,
+    watchForCode,
     startKeeping: keeping.startKeeping,
   };
 }
@@ -477,7 +513,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     // them (core's myLeagues over the same rows).
     localTools: {
       keptEmails: made.keptEmails,
-      newestCodeFor: made.newestCodeFor,
+      watchForCode: made.watchForCode,
       madeUpPeople: async () =>
         Promise.all(
           madeUpSignInChoices().map(async (choice) => ({

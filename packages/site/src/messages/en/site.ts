@@ -135,6 +135,8 @@ export const enSite = {
   'standIn.madeUpPeople.be': 'Be {name}',
   'standIn.madeUpPeople.intro':
     'Sign this browser in as one of the made-up people. They exist only in the made-up data on this computer. Where a person has no password, they are sent a code and then choose one.',
+  'standIn.madeUpPeople.noCode':
+    'No new code came in time, so no code was tried. Press the button again, or read the newest code on the kept emails’ page and type it in.',
   'standIn.madeUpPeople.none': 'In no league yet',
   'standIn.madeUpPeople.open': 'Open {league} as {name}',
   'standIn.madeUpPeople.title': 'Be a made-up person',

@@ -29,7 +29,7 @@ export type MadeUpMember = { readonly email: string; readonly password: string }
 export function madeUpDatabaseTools(
   seed: readonly SeedLeagueFacts[],
   member: MadeUpMember,
-  signIn: Pick<StandInSignIn, 'keptEmails' | 'newestCodeFor'>,
+  signIn: Pick<StandInSignIn, 'keptEmails' | 'watchForCode'>,
 ): LocalTools {
   const byEmail = new Map<string, MadeUpChoice>();
   const add = (email: string, name: string, place: MadeUpChoice['places'][number]) => {
@@ -65,7 +65,7 @@ export function madeUpDatabaseTools(
   ];
   return {
     keptEmails: signIn.keptEmails,
-    newestCodeFor: signIn.newestCodeFor,
+    watchForCode: signIn.watchForCode,
     madeUpPeople: async () => people,
     madeUpSignInOf: (key) => {
       if (key === memberKey)

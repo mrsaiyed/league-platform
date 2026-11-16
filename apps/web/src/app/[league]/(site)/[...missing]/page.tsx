@@ -22,11 +22,13 @@ export const dynamic = 'force-dynamic';
  */
 export default async function Page({
   params,
+  searchParams,
 }: {
   readonly params: Promise<{ readonly league: string; readonly missing: readonly string[] }>;
+  readonly searchParams?: Promise<Readonly<Record<string, string | string[] | undefined>>>;
 }) {
   const { league, missing } = await params;
-  const local = await localToolScreen(league, missing);
+  const local = await localToolScreen(league, missing, (await searchParams) ?? {});
   if (local !== null) return local;
   await loadLeaguePage(league, 'site');
   return notFound();

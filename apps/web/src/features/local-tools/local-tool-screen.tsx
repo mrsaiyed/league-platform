@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { localTools } from '../../server/local-only.ts';
+import { noNewCode } from '../../server/local-tools.ts';
 import { KeptEmailsPage } from './kept-emails-page.tsx';
 import { localToolPageOf } from './local-tool-page.ts';
 import { MadeUpPeoplePage } from './made-up-people-page.tsx';
@@ -13,6 +14,7 @@ import { MadeUpPeoplePage } from './made-up-people-page.tsx';
 export async function localToolScreen(
   league: string,
   missing: readonly string[],
+  search: Readonly<Record<string, string | string[] | undefined>>,
 ): Promise<ReactNode | null> {
   const page = localToolPageOf(league, missing);
   if (page === null) return null;
@@ -21,6 +23,6 @@ export async function localToolScreen(
   return page === 'keptEmails' ? (
     <KeptEmailsPage tools={tools} />
   ) : (
-    <MadeUpPeoplePage tools={tools} />
+    <MadeUpPeoplePage tools={tools} noNewCode={search['problem'] === noNewCode} />
   );
 }

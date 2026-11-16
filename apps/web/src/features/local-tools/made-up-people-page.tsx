@@ -12,12 +12,20 @@ import { beMadeUpPersonAction } from '../../server/sign-in/local-actions.ts';
  * (be-made-up-person.ts). Linked from no page a visitor sees; run-it-locally.md says where
  * it is.
  */
-export async function MadeUpPeoplePage({ tools }: { readonly tools: LocalTools }) {
+export async function MadeUpPeoplePage({
+  tools,
+  noNewCode,
+}: {
+  readonly tools: LocalTools;
+  /** Sent back because the code asked for did not come in time (be-made-up-person.ts). */
+  readonly noNewCode: boolean;
+}) {
   const people = await tools.madeUpPeople();
   return (
     <StandalonePage>
       <main className="ui-message made-up-people">
         <h1>{t('standIn.madeUpPeople.title')}</h1>
+        {noNewCode ? <p role="alert">{t('standIn.madeUpPeople.noCode')}</p> : null}
         <p>{t('standIn.madeUpPeople.intro')}</p>
         <ul>
           {people.map((person) => (

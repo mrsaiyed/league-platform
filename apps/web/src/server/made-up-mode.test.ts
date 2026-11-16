@@ -10,7 +10,7 @@ const tools: LocalTools = {
   keptEmails: async () => [],
   madeUpPeople: async () => [],
   madeUpSignInOf: () => undefined,
-  newestCodeFor: async () => undefined,
+  watchForCode: () => ({ code: async () => undefined, stop: () => {} }),
 };
 
 describe('runsOnMadeUpData', () => {
