@@ -135,18 +135,41 @@ export function freePort() {
   });
 }
 
-export async function waitFor(url, server) {
+/**
+ * Waits until the server is ready for the test: `url` answers 200 and its whole page has
+ * arrived, and then so does each of `firstPages`, the pages the test opens first ({ address,
+ * cookie }, the address after the origin), each drawn once before the browser starts, so
+ * the test's first taps never meet a page the server has not yet drawn (step 2.175: a first
+ * page drawn cold on a busy computer took over the test's 30 seconds). A redirect is not
+ * ready. All of it within the same 90 seconds as before.
+ */
+export async function waitFor(url, server, firstPages = []) {
   const until = Date.now() + 90_000;
-  while (Date.now() < until) {
-    if (server.child.exitCode !== null) throw new Error(`the server stopped:\n${server.output()}`);
-    try {
-      await fetch(url);
-      return;
-    } catch {
+  const origin = new URL(url).origin;
+  const wanted = [{ address: new URL(url).pathname + new URL(url).search }, ...firstPages];
+  let last = 'no answer';
+  for (const { address, cookie } of wanted) {
+    for (;;) {
+      if (server.child.exitCode !== null)
+        throw new Error(`the server stopped:\n${server.output()}`);
+      if (Date.now() >= until)
+        throw new Error(
+          `the server was not ready within 90 seconds: ${address} answered ${last}:\n${server.output()}`,
+        );
+      try {
+        const response = await fetch(origin + address, {
+          redirect: 'manual',
+          headers: cookie ? { cookie } : {},
+        });
+        await response.text();
+        last = String(response.status);
+        if (response.status === 200) break;
+      } catch (error) {
+        last = String(error?.cause?.code ?? error?.message ?? error);
+      }
       await new Promise((r) => setTimeout(r, 250));
     }
   }
-  throw new Error(`the server did not answer within 90 seconds:\n${server.output()}`);
 }
 
 /** Builds the web app for tests; false if the build failed or took over 10 minutes. */

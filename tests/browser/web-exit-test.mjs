@@ -44,6 +44,7 @@ import {
   accessibilityProblems,
   sayOnFailure,
   titleInHeadProblem,
+  waitFor,
   whatWentWrong,
 } from './web-browser-kit.mjs';
 
@@ -83,19 +84,6 @@ function freePort() {
       probe.close(() => resolve(port));
     });
   });
-}
-async function waitFor(url, server) {
-  const until = Date.now() + 90_000;
-  while (Date.now() < until) {
-    if (server.child.exitCode !== null) throw new Error(`the server stopped:\n${server.output()}`);
-    try {
-      await fetch(url);
-      return;
-    } catch {
-      await new Promise((r) => setTimeout(r, 250));
-    }
-  }
-  throw new Error(`the server did not answer within 90 seconds:\n${server.output()}`);
 }
 
 const failures = [];
@@ -362,7 +350,9 @@ if (built) {
     PUBLIC_BASE_URL: origin,
   });
   await step('starting the server and the browser', async () => {
-    await waitFor(`${origin}/`, server);
+    // Ready for its first page: the first league's home, drawn once before the browser
+    // starts (the kit's waitFor, step 2.175).
+    await waitFor(`${origin}/`, server, [{ address: '/north-valley' }]);
     browser = await launch();
   });
 }
@@ -1290,7 +1280,7 @@ if (browser) {
           LOCAL_DESIGN: design,
         });
         try {
-          await waitFor(`${base}/`, other);
+          await waitFor(`${base}/`, other, [{ address: '/north-valley' }]);
           await checkHomeBoards(page, `${base}/north-valley`, `/north-valley in ${design}`);
         } finally {
           other.child.kill();

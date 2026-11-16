@@ -81,7 +81,14 @@ if (built) {
     LOCAL_NOW: worldNow,
   });
   await step('starting the server and the browser', async () => {
-    await waitFor(`${origin}/`, server);
+    // The pages its first taps reach, as the made-up scheduler: the admin's home, Games
+    // and the box score, each drawn once before the browser starts.
+    const scheduler = 'srl_session=local-scheduler-token';
+    await waitFor(`${origin}/`, server, [
+      { address: '/north-valley/admin', cookie: scheduler },
+      { address: '/north-valley/admin/games', cookie: scheduler },
+      { address: `/north-valley/admin/games/${finalScoreGame}`, cookie: scheduler },
+    ]);
     browser = await launch();
   });
 }
