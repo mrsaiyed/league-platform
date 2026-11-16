@@ -2,24 +2,21 @@
 // step 2.187, record 073): the name its owner gave it, and the design of its latest
 // published release, checked again before it is drawn; the neutral design for a league
 // with none, and for one whose stored design does not pass, which is reported.
+import { createLeague } from '@srleagues/core';
 import * as database from '@srleagues/database';
 import { designToCssText, startingDesign } from '@srleagues/site';
-import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databaseLeagueSites, designNotDrawn } from './database-league-sites.ts';
 import { siteOf, type LeagueSiteLookup } from './league-site.ts';
 
 let made: database.MadeUpDatabase;
 let db: database.DatabaseHandle;
-let pglite: PGlite;
 let sites: LeagueSiteLookup;
 let reports: { message: string; fields: object }[];
 let clock: number;
 
 beforeAll(async () => {
   made = await database.madeUpDatabase();
-  if (made.source.kind !== 'pglite') throw new Error('the made-up database is not PGlite');
-  pglite = made.source.pglite;
   db = database.createDatabase(made.source);
   reports = [];
   clock = Date.UTC(2026, 10, 16, 12);
@@ -39,31 +36,26 @@ const seedLeague = (slug: string) => {
   return { id: league.leagueId, slug: league.slug, ownerAccountId: league.ownerAccountId };
 };
 
-/**
- * Writes rows past the app's login, as a migration or a hand-made fix could: the
- * made-up database's session was opened by the superuser, which the test takes back for
- * this one write and then gives up again.
- */
-async function pastTheApp(work: () => Promise<unknown>) {
-  await pglite.exec('set session authorization postgres');
-  try {
-    await work();
-  } finally {
-    await pglite.exec(`set session authorization ${database.madeUpLoginRole}`);
-  }
-}
-
 let nextNumber = 10;
-/** Stores a release of the league holding `design`, whatever it is: its number. */
+/**
+ * Stores a release of the league holding `design`, whatever it is, through the database's
+ * own write and not the command, as a document of an older shape or one written past the
+ * command would be there: its number.
+ */
 async function storeRelease(league: { id: string; ownerAccountId: string }, design: unknown) {
   const number = nextNumber++;
-  await pastTheApp(() =>
-    pglite.query(
-      `insert into site_releases (league_id, number, starting_design, design, published_by_account_id)
-       values ($1, $2, 'crest', $3::jsonb, $4)`,
-      [league.id, number, JSON.stringify(design), league.ownerAccountId],
-    ),
+  const stored = await database.withTransaction(
+    db,
+    { leagueId: league.id, accountId: league.ownerAccountId },
+    (scope) =>
+      database.insertSiteRelease(scope, {
+        number,
+        startingDesign: 'crest',
+        design: JSON.parse(JSON.stringify(design)) as database.NewSiteReleaseRow['design'],
+        publishedByAccountId: league.ownerAccountId,
+      }),
   );
+  if (stored === 'number-taken') throw new Error(`release ${number} is taken`);
   return number;
 }
 
@@ -83,22 +75,30 @@ describe('databaseLeagueSites', () => {
   });
 
   it('draws a league with no release in the neutral design', async () => {
+    // Made by the product's own command with no design, as our staff: a seed owner's
+    // account stands in for one, told it is staff for this one store.
     const id = '01900000-0000-7000-8000-00000000f001';
-    await pastTheApp(() =>
-      // A league and its default program are made together (0003).
-      pglite.transaction(async (tx) => {
-        await tx.query(
-          `insert into leagues (id, slug, name, time_zone, audience, listed, owner_account_id)
-           values ($1, 'no-design-yet', 'No Design Yet League', 'America/Chicago', 'adult', true, $2)`,
-          [id, made.leagues[0]?.ownerAccountId],
-        );
-        await tx.query(
-          `insert into programs (league_id, slug, name, sport_key, is_default)
-           values ($1, 'main', 'Main', 'basketball', true)`,
-          [id],
-        );
-      }),
+    const staff = seedLeague('lakeside').ownerAccountId;
+    const transaction = database.commandTransaction(db, (scope) => ({
+      jobs: database.jobsStore(scope),
+      leagues: database.leaguesStore(scope, { platformStaff: [staff] }),
+      divisions: database.divisionsStore(scope),
+      access: database.accessStore(scope),
+      activity: database.activityLogStore(scope),
+    }));
+    const created = await createLeague(
+      { leagueId: id, accountId: staff, requestId: 'no-design-yet' },
+      {
+        slug: 'no-design-yet',
+        name: 'No Design Yet League',
+        timeZone: 'America/Chicago',
+        audience: 'adult',
+        ownerAccountId: staff,
+        sportKey: 'basketball',
+      },
+      { transaction, events: [], log: () => {}, now: () => 0 },
     );
+    expect(created.ok).toBe(true);
     const site = await siteOf({ id, slug: 'no-design-yet' }, sites);
     expect(site).toEqual({ name: 'No Design Yet League', design: startingDesign('clean-court') });
     expect(reports).toEqual([]);
