@@ -54,6 +54,25 @@ describe('the play log (checklist I4)', () => {
     expect(log.rows.map((row) => row.score)).toEqual(['2–3', null, '2–0', null, null]);
     expect(log.rows.every((row) => /^Q1 \d+:\d\d$/.test(row.when))).toBe(true);
     expect(log.unsent).toBe(0);
+    expect(log.count).toBe(5);
+  });
+
+  it('gives only the newest rows when asked, with the count, the unsent and the score of the whole game', () => {
+    const game = played(
+      [basket('h5'), { type: 'foul', side: 'away', playerId: 'a3' }, basket('a7', 3), basket('h9')],
+      tippedOff(),
+    );
+    // The first basket's tap is still waiting: it is not among the two newest rows.
+    const firstBasket = game.plays[2]?.id ?? '';
+    const log = playLog(game, testRosters, [waitingTap(firstBasket)], t, 2);
+    expect(log.rows.map((row) => row.text)).toEqual(['#9 Pia Hawkins +2', '#7 Uma Bearsley +3']);
+    // The running score counts the baskets before the rows shown.
+    expect(log.rows.map((row) => row.score)).toEqual(['4–3', '2–3']);
+    expect(log.count).toBe(6);
+    expect(log.unsent).toBe(1);
+    // Asked for more than there are: all of them.
+    expect(playLog(game, testRosters, [], t, 50).rows).toHaveLength(6);
+    expect(playLog(game, testRosters, [], t, 0).rows).toEqual([]);
   });
 
   it('marks the plays the league does not have yet, by their taps’ ids, whatever their case', () => {
@@ -66,6 +85,7 @@ describe('the play log (checklist I4)', () => {
   it('has a row for a game with no plays: none', () => {
     expect(playLog(basketball.newGame(basketball.QUARTERS, 0), testRosters, [], t)).toEqual({
       rows: [],
+      count: 0,
       unsent: 0,
     });
   });
@@ -120,8 +140,9 @@ describe('what Undo and Redo name (checklist I1, I3)', () => {
       '+2 #5 Ned',
       'Foul #5 Ned',
       '−Foul #5 Ned',
-      'Turnover #5 Ned',
-      '−Turnover #5 Ned',
+      // The one long word comes after the player: a cut line keeps the number.
+      '#5 Ned turnover',
+      '#5 Ned −turnover',
       'Team turnover',
       '−Team turnover',
       'Timeout Bears',

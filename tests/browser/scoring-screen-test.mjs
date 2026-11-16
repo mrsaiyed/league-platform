@@ -254,29 +254,69 @@ async function tapWhereItIs(page, locator, what) {
 
 /**
  * At rest the pad's words fit their place (the second look's L3): nothing of them is cut
- * and there is nothing to scroll to, with `sentences` of the hint's four showing (two
- * before the first play, under what to do next; all four once the game is in play).
+ * and there is nothing to scroll to, with as many of the hint's four sentences showing
+ * as the screen's rule says. `when` is `offered` while the Start clock button or the way
+ * to the next period stands over the hint, `running` while the clock runs.
+ *
+ * Since step 2.37 the pad at rest also holds the latest play's line once the game is
+ * under way (`latest`: false before the first play), and where the pad is a narrow column
+ * that line takes the place of part of the hint: one sentence while `offered`, three
+ * while `running`. Where the pad is wide (a tablet upright) or the log has a panel of its
+ * own under the pad and the line is not drawn (a tablet lying down), the hint is as step
+ * 2.36 left it: two and four. A sentence the hint leaves off is left off whole: it is
+ * counted as showing only where it is inside the hint's own place.
  */
-async function restFits(page, label, sentences) {
+async function restFits(page, label, when, { latest = true } = {}) {
   await twoFrames(page);
+  const { width, height } = page.viewportSize();
+  const logHasItsPanel = width >= 880 && height >= 760;
+  const narrow = width < 700 || height <= 520 || (width >= 880 && !logHasItsPanel);
+  const lineExpected = latest && !logHasItsPanel;
+  const sentences = latest && narrow ? (when === 'offered' ? 1 : 3) : when === 'offered' ? 2 : 4;
   const rest = await page.evaluate(() => {
     const el = document.querySelector('[data-pad] [data-rest]');
     if (el === null) return null;
-    const shown = [...el.querySelectorAll('[data-hint] p')].filter(
-      (p) => p.getClientRects().length > 0,
-    );
+    const hint = el.querySelector('[data-hint]');
+    const place = hint.getBoundingClientRect();
+    const shown = [...hint.querySelectorAll('p')].filter((p) => {
+      const r = p.getBoundingClientRect();
+      // Drawn, and inside the hint's own place: not wrapped out to its side.
+      return p.getClientRects().length > 0 && r.left < place.right - 0.5;
+    });
     const edge = el.getBoundingClientRect();
+    const line = el.querySelector('[data-latest] [data-log-open]');
+    const lineAt = line?.getBoundingClientRect();
     return {
       place: el.clientHeight,
       over: el.scrollHeight - el.clientHeight,
       sentences: shown.length,
-      cut: shown.filter((p) => p.getBoundingClientRect().bottom > edge.bottom + 0.5).length,
+      cut: shown.filter((p) => {
+        const r = p.getBoundingClientRect();
+        return r.bottom > edge.bottom + 0.5 || r.bottom > place.bottom + 0.5;
+      }).length,
+      // The latest play's line: drawn whole inside the pad's rest, 44 or more high.
+      line:
+        lineAt === undefined || lineAt.height === 0
+          ? null
+          : {
+              high: lineAt.height,
+              whole: lineAt.top >= edge.top - 0.5 && lineAt.bottom <= edge.bottom + 0.5,
+              playCut: [...line.querySelectorAll('[data-latest-play]')].some(
+                (play) => play.scrollWidth > play.clientWidth + 0.5,
+              ),
+            },
     };
   });
   note(
-    `${label}: at rest the pad’s words fit their place, nothing cut and nothing to scroll`,
-    rest !== null && rest.over <= 0 && rest.cut === 0 && rest.sentences === sentences,
-    JSON.stringify(rest),
+    `${label}: at rest the pad’s words fit their place, nothing cut and nothing to scroll${lineExpected ? ', under the latest play’s line' : ''}`,
+    rest !== null &&
+      rest.over <= 0 &&
+      rest.cut === 0 &&
+      rest.sentences === sentences &&
+      (lineExpected
+        ? rest.line !== null && rest.line.whole && rest.line.high >= 44
+        : rest.line === null),
+    JSON.stringify({ ...rest, expected: { sentences, lineExpected } }),
   );
 }
 
@@ -657,7 +697,11 @@ if (browser) {
           /Start clock · tip-off/.test(await c.pad.locator('[data-start-clock]').innerText()) &&
             /Start it at the tip\./.test(await c.pad.locator('[data-start-bar]').innerText()),
         );
-        await restFits(page, `${size.width} x ${size.height}, before the first play`, 2);
+        // Before the game is under way the pad has no latest play's line: the hint is
+        // its first two sentences under what to do next.
+        await restFits(page, `${size.width} x ${size.height}, before the first play`, 'offered', {
+          latest: false,
+        });
       }
       await page.setViewportSize({ width: phone.width, height: phone.height });
       await twoFrames(page);
@@ -1676,17 +1720,28 @@ if (browser) {
         // The hint says only what this size offers (second look, L2): dragging a bench
         // player where a bench is on the screen to drag from, the bench's button where
         // it is folded away.
-        const hint = await c.pad.locator('[data-hint]').innerText();
+        // The sentence about substitutions is the hint's second. Since step 2.37 a phone
+        // shows only the first while the Start clock button stands over the hint (the
+        // latest play's line has the room), so the sentence is read where it is in the
+        // page: which of its two wordings this size draws, whether its line shows now
+        // or only once the clock runs.
+        const hint = await c.pad.locator('[data-hint] p:nth-of-type(2)').evaluate((sentence) =>
+          [...sentence.querySelectorAll('span')]
+            .filter((wording) => getComputedStyle(wording).display !== 'none')
+            .map((wording) => wording.textContent)
+            .join(' | '),
+        );
         note(
           `${label}: the hint offers ${fold ? 'the bench’s button, and no drag' : 'the drag from the bench'}`,
           fold ? !/drag/i.test(hint) && /“Bench”/.test(hint) : /drag a bench player/.test(hint),
           hint,
         );
         // And it fits (L3). The game is in play and its clock is stopped, so the pad
-        // begins with the Start clock button of step 2.36, whose own line says the rest:
-        // the hint is then its first two sentences. All four, with the clock running, are
-        // measured at each size by that step (scoring-clock-steps.mjs).
-        await restFits(page, `${label}, in play`, 2);
+        // begins with the Start clock button of step 2.36, whose own line says the rest,
+        // and holds the latest play's line of step 2.37: the hint is then its first two
+        // sentences, or its first where the pad is a narrow column (`restFits`). With the
+        // clock running it is measured at each size by that step (scoring-clock-steps.mjs).
+        await restFits(page, `${label}, in play`, 'offered');
         // Where only its three dots show, More is still named for a screen reader.
         note(
           `${label}: the More button is named "More" for a screen reader, word shown or not`,

@@ -197,7 +197,7 @@ export async function clockSteps(kit) {
         bar,
       );
       await measureTargets(page, '390 x 664, the clock stopped');
-      await restFits(page, '390 x 664, the Start clock button offered', 2);
+      await restFits(page, '390 x 664, the Start clock button offered', 'offered');
       await accessible(page, 'the clock stopped, the Start clock button offered');
 
       // It lies where no option of a picked player lies (the area 4 review of 2.35).
@@ -337,7 +337,7 @@ export async function clockSteps(kit) {
         `${first} to ${later} in 2.3 seconds`,
       );
       await measureTargets(page, '390 x 664, the clock running');
-      await restFits(page, '390 x 664, the clock running', 4);
+      await restFits(page, '390 x 664, the clock running', 'running');
       // The clock's form opened while the clock runs shows the clock as it reads now,
       // ticking, until a time is typed: it used to stand at the moment the form opened.
       await c.clock.click();
@@ -533,7 +533,7 @@ export async function clockSteps(kit) {
       await said(c, /^This period is over\. Pick the next period first\.$/);
       note('tapped, the greyed Start says what to do, in a sentence', true);
       await measureTargets(page, '390 x 664, the period over');
-      await restFits(page, '390 x 664, the period over', 2);
+      await restFits(page, '390 x 664, the period over', 'offered');
       await accessible(page, 'the period over');
       await tapWhereItIs(page, c.pickPeriodButton, 'Pick the next period');
       await c.clockSheet.waitFor();
@@ -1906,7 +1906,7 @@ export async function clockSteps(kit) {
             box.width >= 200,
           JSON.stringify(box),
         );
-        await restFits(page, label, 2);
+        await restFits(page, label, 'offered');
         // Start and Pause, the clock and the timeouts are named for a screen reader.
         note(
           `${label}: Start, the clock and the timeouts are each named for a screen reader`,
@@ -2168,7 +2168,7 @@ export async function clockSteps(kit) {
 
       await c.startClock();
       await atEverySize('the clock running', async (size, label) => {
-        await restFits(page, label, 4);
+        await restFits(page, label, 'running');
       });
       await c.pauseClock();
 
@@ -2313,7 +2313,7 @@ export async function clockSteps(kit) {
           `${label}: the way to the next period is whole in the pad`,
           await wholeInPad(c.pickPeriodButton),
         );
-        await restFits(page, label, 2);
+        await restFits(page, label, 'offered');
       });
       await c.setClock('500');
       await c.saved();

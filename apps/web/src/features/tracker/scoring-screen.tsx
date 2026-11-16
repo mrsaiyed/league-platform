@@ -25,6 +25,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
@@ -56,6 +57,15 @@ import {
 } from './game-clock.ts';
 import type { OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, LineupPicks } from './opened-game-storage.ts';
+import { playLog, redoTarget, redoneText, undoTarget, undoneText } from './play-log.ts';
+import {
+  LatestPlays,
+  MoreLog,
+  PlayLogPanel,
+  PlayLogSheet,
+  UndoRedo,
+  type PlaysHandlers,
+} from './plays-parts.tsx';
 import {
   dropOn,
   padAtRest,
@@ -121,6 +131,41 @@ export type ScoringScreenProps = {
 /** How long the latest sentence stays (checklist I5). */
 const saidForMs = 3200;
 
+/**
+ * How many of the newest plays are worded while the whole log is shut: what the log's
+ * own panel shows on a tablet lying down, with the way to the rest under them.
+ */
+const panelRows = 30;
+/** How many of them the pad lists at rest where it has the room (a tablet upright). */
+const latestRows = 4;
+/**
+ * Where the play log has its own panel under the pad: a tablet lying down with its
+ * height to spare. The same words as the stylesheet's own (court.css), which draws the
+ * panel there; the screen reads them so that a phone, which has no such panel, does not
+ * word and draw thirty lines nobody sees with every tap (finding M6).
+ */
+const logPanelWhere = '(min-width: 880px) and (min-height: 760px)';
+
+/** Whether the screen is one where `query` holds now; drawn again when that changes. */
+function useScreenIs(query: string): boolean {
+  const subscribe = useCallback(
+    (changed: () => void) => {
+      const media = window.matchMedia(query);
+      media.addEventListener('change', changed);
+      return () => media.removeEventListener('change', changed);
+    },
+    [query],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
+}
+
+/** What the keyboard can stop on in a dialog: its buttons and links, and a list that scrolls. */
+const dialogStops = 'button:not(:disabled), a[href], [tabindex="0"]';
+
 /** The tile of a player, in the teams' panels (not the pad's buttons). */
 const tileElement = (root: HTMLElement | null, playerId: string): HTMLElement | null =>
   root?.querySelector<HTMLElement>(`[data-teams] [data-player="${CSS.escape(playerId)}"]`) ?? null;
@@ -153,6 +198,12 @@ const restingPlaces = {
   minus: '[data-pad] [data-act="untimeout"]',
   /** The answers to "Record it anyway?", after the question is asked. */
   answers: '[data-pad] [data-timeout-answers]',
+  /**
+   * Undo and Redo, after each tap taken, for as long as − (step 2.37): each tap takes
+   * one play back or brings one back, so a double tap, fast or slow, must act on one.
+   */
+  undo: '[data-undo]',
+  redo: '[data-redo]',
 } as const;
 type RestingPlace = keyof typeof restingPlaces;
 const restingNames = Object.keys(restingPlaces) as RestingPlace[];
@@ -329,6 +380,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const [padMode, setPadMode] = useState<PadMode>(padAtRest);
   const [said, setSaid] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  /** The whole play log, open over the screen (step 2.37). */
+  const [logOpen, setLogOpen] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
   // The marks of the tiles (tile-marks.ts): kept by player, so a tile drawn anew (a
   // substitution moves two players between floor and bench) is given its player's mark.
@@ -379,7 +432,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
       const resting = !all[name].ready();
       for (const place of screen.querySelectorAll(restingPlaces[name])) {
         place.toggleAttribute('data-resting', resting);
-        // And a screen reader is told, on each button of it.
+        // And a screen reader is told, on each button of it. Not on Undo and Redo: the
+        // screen itself says when each has nothing to act on (`aria-disabled`), and a
+        // key, which is how a screen reader presses, is always taken.
+        if (name === 'undo' || name === 'redo') continue;
         const buttons = place.matches('button') ? [place] : place.querySelectorAll('button');
         for (const button of buttons) drawRest(button, resting);
       }
@@ -390,6 +446,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
     toggle: createTapRest(restTimers, drawRests),
     minus: createTapRest(restTimers, drawRests, takeBackRestMs),
     answers: createTapRest(restTimers, drawRests),
+    undo: createTapRest(restTimers, drawRests, takeBackRestMs),
+    redo: createTapRest(restTimers, drawRests, takeBackRestMs),
   };
   const resting = rests.current;
   // After every drawing: a control drawn anew while it rests is marked as well.
@@ -897,20 +955,86 @@ export function ScoringScreen(props: ScoringScreenProps) {
     ];
   }
 
-  // --- More, and the clock's form: each opened as a dialog; Escape closes it, and the
-  // keyboard stays inside it. The keyboard returns to the button that opened it. ---
+  // --- Undo, Redo and the play log (step 2.37; checklist I1 to I5). ---
+  // What Undo and Redo will act on, named on the buttons; and the newest plays, worded
+  // only as far as the screen shows them while the whole log is shut, so a tap in a long
+  // game does not wait for every line of it (finding M6).
+  const undoPlay = useMemo(() => undoTarget(state, rosters, t), [state, rosters, t]);
+  const redoPlay = useMemo(() => redoTarget(state, rosters, t), [state, rosters, t]);
+  const { waiting } = status;
+  const logHasPanel = useScreenIs(logPanelWhere);
+  const rowsShown = logOpen ? undefined : logHasPanel ? panelRows : latestRows;
+  const log = useMemo(
+    () => playLog(state, rosters, waiting, t, rowsShown),
+    [state, rosters, waiting, t, rowsShown],
+  );
+  /** What had the keyboard when the log was opened: it goes back there. */
+  const logOpener = useRef<Element | null>(null);
+  /**
+   * Undo or Redo tapped. Greyed, it still says why (I6). Each rests from a tap taken, as
+   * − on the timeouts does: one double tap takes one play back, never two. The sentence
+   * says what happened, with what the scorekeeper would not see by itself (I2).
+   */
+  const turn = (kind: 'undo' | 'redo', event: MouseEvent<HTMLButtonElement>) => {
+    const before = controller.status().game ?? state;
+    if (before.status === 'final') return say(t('tracker.refusal.gameFinal'));
+    const none = kind === 'undo' ? before.plays.length === 0 : before.redo.length === 0;
+    if (none) {
+      return say(
+        t(kind === 'undo' ? 'tracker.refusal.nothingToUndo' : 'tracker.refusal.nothingToRedo'),
+      );
+    }
+    if (!tapTaken(resting[kind], tapOf(event))) return;
+    resting[kind].begin(event.timeStamp);
+    // A foul brought back may bring the bonus horn: made ready in this tap (F4).
+    if (kind === 'redo') bonusHorn.ready();
+    void tap({ type: kind })
+      .then((result) => {
+        if (!result.ok) return;
+        say(
+          kind === 'redo'
+            ? redoneText(before, rosters, t)
+            : undoneText(before, result.game ?? before, rosters, t),
+        );
+      })
+      .finally(taken(event.currentTarget));
+  };
+  const plays: PlaysHandlers = {
+    undo: (event) => turn('undo', event),
+    redo: (event) => turn('redo', event),
+    playLog(open) {
+      if (open) logOpener.current = document.activeElement;
+      setMoreOpen(false);
+      setLogOpen(open);
+    },
+  };
+
+  // --- More, the clock's form and the play log: each opened as a dialog; Escape closes
+  // it, and the keyboard stays inside it. The keyboard returns to the button that opened
+  // it: the play log has three (the pad's line, its own panel, More), so it goes back to
+  // whichever had the keyboard, or to More when that one is gone with More's sheet. ---
   const dialog = clockOpen
     ? { sheet: '[data-clock-sheet] [role="dialog"]', opener: '[data-clock]' }
-    : moreOpen
-      ? { sheet: '[data-more] [role="dialog"]', opener: '.court-more-button' }
-      : null;
+    : logOpen
+      ? { sheet: '[data-play-log] [role="dialog"]', opener: '.court-more-button' }
+      : moreOpen
+        ? { sheet: '[data-more] [role="dialog"]', opener: '.court-more-button' }
+        : null;
   const [dialogSheet, dialogOpener] = [dialog?.sheet ?? null, dialog?.opener ?? null];
   useEffect(() => {
     if (dialogSheet === null || dialogOpener === null) return;
     const screen = root.current;
     const sheet = screen?.querySelector<HTMLElement>(dialogSheet);
     sheet?.querySelector<HTMLElement>('button:not(:disabled), a[href]')?.focus();
-    return () => screen?.querySelector<HTMLElement>(dialogOpener)?.focus();
+    const isLog = dialogSheet.startsWith('[data-play-log]');
+    return () => {
+      const opener = isLog ? logOpener.current : null;
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+      // A finger opened it (nothing had the keyboard): nothing is given it now.
+      else if (!isLog || opener instanceof HTMLElement) {
+        screen?.querySelector<HTMLElement>(dialogOpener)?.focus();
+      }
+    };
   }, [dialogSheet, dialogOpener]);
 
   // --- The keyboard: Escape closes the clock's form or More, then the open options,
@@ -922,9 +1046,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Tab' && dialogSheet !== null) {
         const sheet = root.current?.querySelector<HTMLElement>(dialogSheet);
-        const stops = [
-          ...(sheet?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]') ?? []),
-        ];
+        const stops = [...(sheet?.querySelectorAll<HTMLElement>(dialogStops) ?? [])];
         const [first, last] = [stops[0], stops.at(-1)];
         if (first === undefined || last === undefined) return;
         const at = document.activeElement;
@@ -955,6 +1077,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
         setClockOpen(false);
         return;
       }
+      if (logOpen) {
+        setLogOpen(false);
+        return;
+      }
       if (moreOpen) {
         setMoreOpen(false);
         return;
@@ -980,7 +1106,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [moreOpen, clockOpen, dialogSheet, padMode, startBarShown, hideStartFor]);
+  }, [moreOpen, logOpen, clockOpen, dialogSheet, padMode, startBarShown, hideStartFor]);
 
   // --- Dragging a bench player onto a floor player (checklist E2, E3). ---
   // One press is followed at a time (tile-drag.ts): a second finger on another tile is
@@ -1094,7 +1220,11 @@ export function ScoringScreen(props: ScoringScreenProps) {
     /** A tap anywhere else closes a player's options (checklist D4). */
     onClick(event: MouseEvent<HTMLElement>) {
       if (wanted.current.kind !== 'player' || !(event.target instanceof Element)) return;
-      if (event.target.closest('button, a, [data-pad], [data-more], [data-account]') !== null)
+      if (
+        event.target.closest(
+          'button, a, [data-pad], [data-more], [data-play-log], [data-account]',
+        ) !== null
+      )
         return;
       showPad(padAtRest);
     },
@@ -1173,9 +1303,40 @@ export function ScoringScreen(props: ScoringScreenProps) {
       links={props.links}
       on={{ ...on, tile: tileTap }}
       drag={dragHandlers}
-      {...(props.slots === undefined ? {} : { slots: props.slots })}
+      slots={{
+        ...props.slots,
+        // After Start or Pause and the timeouts: Undo and Redo.
+        controls: (
+          <>
+            <UndoRedo t={t} undo={undoPlay} redo={redoPlay} on={plays} />
+            {props.slots?.controls}
+          </>
+        ),
+        // The latest play, once the game is under way: before that the pad says what to
+        // do before tip-off, and Undo itself names what it would take back (a lineup).
+        padRest:
+          state.status === 'live' && log.rows.length > 0 ? (
+            <LatestPlays
+              t={t}
+              log={{ ...log, rows: log.rows.slice(0, latestRows) }}
+              open={logOpen}
+              on={plays}
+            />
+          ) : null,
+        // The log's own panel, only where the stylesheet draws it.
+        playLog: logHasPanel ? (
+          <PlayLogPanel t={t} log={{ ...log, rows: log.rows.slice(0, panelRows) }} on={plays} />
+        ) : null,
+        more: (
+          <>
+            <MoreLog t={t} log={log} on={plays} />
+            {props.slots?.more}
+          </>
+        ),
+      }}
       account={props.account ?? null}
     >
+      {logOpen ? <PlayLogSheet t={t} log={log} on={plays} /> : null}
       {draggedTile === undefined ? null : (
         <div
           className="court-ghost"

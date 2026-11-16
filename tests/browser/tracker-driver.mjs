@@ -420,6 +420,46 @@ export function court(page) {
       await recorded(() => sheet.locator(`[data-period-pick="${period}"]`).click());
       await root.locator(`[data-clock] [data-period="${period}"]`).waitFor();
     },
+    // --- Undo, Redo and the play log (step 2.37). ---
+    /** Undo and Redo, in the row under the scoreboard, and the play Undo names. */
+    undoButton: root.locator('[data-undo]'),
+    redoButton: root.locator('[data-redo]'),
+    undoNames: async () =>
+      (
+        (await root.locator('[data-undo] [data-undo-play] .court-turn-full').textContent()) ?? ''
+      ).trim(),
+    /**
+     * Takes the latest play back with Undo, and waits until the game on the screen holds
+     * one play fewer. Undo rests for a moment after each tap taken and takes no tap then
+     * (it is marked `data-resting`): it is tapped once it is ready, as a person would.
+     */
+    undo: () => recorded(() => root.locator('[data-undo]:not([data-resting])').click()),
+    /** Brings the play back with Redo, and waits until the screen holds it again. */
+    redo: () => recorded(() => root.locator('[data-redo]:not([data-resting])').click()),
+    /** The latest play's line in the pad at rest: the button that opens the log. */
+    latest: pad.locator('[data-latest] [data-log-open]'),
+    /** The whole play log, open over the screen, and its rows, newest first. */
+    logSheet: root.locator('[data-play-log] [role="dialog"]'),
+    logRows: root.locator('[data-play-log] [role="dialog"] [data-play]'),
+    /** The log's own panel under the pad (a tablet lying down). */
+    logPanel: root.locator('[data-log-panel]'),
+    /** Opens the whole play log by the way this size has to it: the pad's line, or More. */
+    async openLog() {
+      const sheet = root.locator('[data-play-log] [role="dialog"]');
+      if (await sheet.isVisible()) return;
+      if (await pad.locator('[data-latest] [data-log-open]').isVisible()) {
+        await pad.locator('[data-latest] [data-log-open]').click();
+      } else {
+        await root.locator('.court-more-button').click();
+        await root.locator('[data-more] [data-more-log]').click();
+      }
+      await sheet.waitFor();
+    },
+    async closeLog() {
+      await root.locator('[data-play-log] .court-close').click();
+      await root.locator('[data-play-log]').waitFor({ state: 'detached' });
+    },
+
     /** Opens the timeouts and calls one for a team; answers "Record it anyway" if asked. */
     async timeout(side, seconds = 60, { anyway = true } = {}) {
       if (!(await pad.locator('[data-timeout-list]').isVisible())) {

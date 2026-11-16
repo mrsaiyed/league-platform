@@ -161,6 +161,8 @@ export const enTracker = {
   'tracker.log.title': 'Play log',
   'tracker.log.unsent_one': '{count} not sent yet',
   'tracker.log.unsent_other': '{count} not sent yet',
+  // Under the newest plays, where a panel shows only those: the way to every play.
+  'tracker.log.whole': 'See all {count} plays',
   'tracker.mark.off': 'Off',
   // On a tile for a moment, for the two players of a substitution.
   'tracker.mark.on': 'On',
@@ -233,6 +235,8 @@ export const enTracker = {
   // The same plays said shortest, for the Undo button under the scoreboard, where a
   // phone has room for a few words: what it was first, then who ("+2 #4 Jordan"), so
   // where the line is cut it is the name that is cut, never what happened or the number.
+  // A turnover is the one long word among them: it is said after the player ("#4 Jordan
+  // turnover"), since "Turnover #4…" lost the number in a phone's narrowest row.
   'tracker.play.short.clock-mode.running': 'Running clock',
   'tracker.play.short.clock-mode.stop': 'Stop clock',
   'tracker.play.short.foul': 'Foul {who}',
@@ -243,10 +247,10 @@ export const enTracker = {
   'tracker.play.short.team-turnover': 'Team turnover',
   'tracker.play.short.team-unturnover': '−Team turnover',
   'tracker.play.short.timeout': 'Timeout {team}',
-  'tracker.play.short.turnover': 'Turnover {who}',
+  'tracker.play.short.turnover': '{who} turnover',
   'tracker.play.short.unfoul': '−Foul {who}',
   'tracker.play.short.untimeout': '−Timeout {team}',
-  'tracker.play.short.unturnover': '−Turnover {who}',
+  'tracker.play.short.unturnover': '{who} −turnover',
   'tracker.play.sub': 'Sub: {in} in for {out}',
   'tracker.play.team-turnover': 'Team turnover: {team}',
   'tracker.play.team-unturnover': 'Team turnover taken back: {team}',

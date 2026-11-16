@@ -11,10 +11,11 @@
 // team's box of the scoreboard, and the pad at rest begins with the large Start clock
 // button.
 //
-// The places left for the steps that follow (their content is handed in as `slots`):
-// Undo and Redo beside the clock's controls (2.37), the play log (2.37), the pad at rest
-// (on a phone 2.37's latest plays), the Players panel's buttons (2.118) and the
-// once-a-game buttons behind More (2.37, 2.118, 2.119).
+// Step 2.37 filled three of the places this frame left (plays-parts.tsx, handed in as
+// `slots` by scoring-screen.tsx): Undo and Redo after the clock's controls, the latest
+// play's line in the pad at rest, and the play log's own panel; the whole log opens over
+// the screen as More does. The places still left for the steps that follow: the Players
+// panel's buttons (2.118) and the once-a-game buttons behind More (2.118, 2.119).
 import type { Translate } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
 import {

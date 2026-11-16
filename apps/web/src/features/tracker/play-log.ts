@@ -28,9 +28,11 @@ export type PlayRow = {
 };
 
 export type PlayLog = {
-  /** Every play that stands, newest first (checklist I4). */
+  /** The plays that stand, newest first (checklist I4): all of them, or the newest asked for. */
   readonly rows: readonly PlayRow[];
-  /** How many of them the league does not have yet. */
+  /** How many plays stand in all, whatever `rows` holds. */
+  readonly count: number;
+  /** How many of them all the league does not have yet. */
   readonly unsent: number;
 };
 
@@ -42,18 +44,29 @@ const unsentIds = (waiting: readonly KeptTap[]): ReadonlySet<string> =>
  * The play log. A play is "not sent yet" while its own tap is waiting. A play brought
  * back by Redo keeps the id of the tap that first made it, so it reads as sent once that
  * one was, while the Redo itself may still be waiting: the banner counts that tap.
+ *
+ * `newest` asks for only that many rows, the newest: what the screen shows while the
+ * whole log is not open, so a tap in a game of five hundred plays does not wait for five
+ * hundred lines to be worded (finding M6). The count, the unsent and each row's running
+ * score are of the whole game either way.
  */
 export function playLog(
   game: basketball.GameState,
   rosters: DeviceRosters,
   waiting: readonly KeptTap[],
   t: Translate,
+  newest: number = Number.POSITIVE_INFINITY,
 ): PlayLog {
   const waitingIds = unsentIds(waiting);
+  const from = Math.max(0, game.plays.length - newest);
   const score = { home: 0, away: 0 };
   const rows: PlayRow[] = [];
-  for (const play of game.plays) {
+  let unsent = 0;
+  game.plays.forEach((play, place) => {
     if (play.type === 'score') score[play.side] += play.points;
+    const notSent = waitingIds.has(play.id.toLowerCase());
+    if (notSent) unsent += 1;
+    if (place < from) return;
     rows.push({
       id: play.id,
       text: playText(play, rosters, game.rules.periods, t),
@@ -65,11 +78,11 @@ export function playLog(
         play.type === 'score'
           ? t('tracker.log.score', { home: score.home, away: score.away })
           : null,
-      unsent: waitingIds.has(play.id.toLowerCase()),
+      unsent: notSent,
     });
-  }
+  });
   rows.reverse();
-  return { rows, unsent: rows.filter((row) => row.unsent).length };
+  return { rows, count: game.plays.length, unsent };
 }
 
 /** What Undo or Redo will act on, as its button says it. */
