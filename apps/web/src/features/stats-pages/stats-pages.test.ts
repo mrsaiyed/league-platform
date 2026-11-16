@@ -342,9 +342,16 @@ describe('statistics page', () => {
     expect(named('Ravi Patel')?.cells['games']).toBe(1);
     expect(named('Ravi Patel')?.quiet).toEqual({ games: 'not ranked yet' });
     expect(named('Dana Whitfield')?.quiet).toBeUndefined();
-    // Nobody marked is among the leaders, and nobody among the leaders is marked.
-    const leaders = new Set(data.leaders.flatMap((board) => board.rows.map((row) => row.id)));
-    expect(marked.filter((row) => leaders.has(row.id))).toEqual([]);
+    // Nobody marked is among the leaders, and nobody among the leaders is marked. By name: a
+    // row's key is only its place on the page (T-81, record 070), so the leaders' lists and
+    // the players' table share no key.
+    const leaders = new Set(
+      data.leaders.flatMap((board) =>
+        board.rows.map((row) => String(row.cells['player']).replace(/^\d+\. /u, '')),
+      ),
+    );
+    expect(leaders.size).toBeGreaterThan(0);
+    expect(marked.filter((row) => leaders.has(String(row.cells['player'])))).toEqual([]);
     const text = html(data);
     expect(text).toContain(
       '<p class="ui-section-note">Every player is listed. Fewer than 3 games: not ranked yet.</p>',
