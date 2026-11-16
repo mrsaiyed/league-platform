@@ -660,6 +660,19 @@
 .court-fouls-short {
   display: none;
 }
+/* Where the line is wider than its box all the same (a device whose letters are wider
+   than most), the screen marks it `data-tight` and it is set a size smaller, so that
+   neither the count nor the badge is cut. */
+.court-score-fouls[data-tight] {
+  gap: 3px;
+}
+.court-score-fouls[data-tight] .court-fouls-count {
+  font-size: 11px;
+}
+.court-score-fouls[data-tight] .court-bonus {
+  padding-inline: 3px;
+  font-size: 9px;
+}
 /* The badge is no higher than the line it sits in, so the box is the same height with it
    and without it. */
 .court-bonus {
@@ -2259,7 +2272,7 @@
      other, so the whole of it is on the screen with nothing scrolling. */
   .court-sheet.court-clock-sheet {
     inline-size: min(100%, 620px);
-    gap: 6px;
+    gap: 8px;
     padding-block: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-bottom));
   }
   .court-clock-parts {

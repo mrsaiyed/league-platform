@@ -13,9 +13,12 @@
 //
 // The files go to .local/shots/court/<state>-<width>x<height>.png, which git ignores; open
 // them with the Read tool, beside the Al-Hadi tracker's own at the same sizes. Each state
-// is one entry of `states` below: steps 2.36 and 2.37 add theirs (the clock stopped, the
-// timeouts open, offline, read-only, final) by adding entries, with the taps in
-// tests/browser/tracker-driver.mjs.
+// is one entry of `states` below. Step 2.36 added the clock's (19 to 36: stopped with its
+// reason, running, the form, timeouts and the question, the bonus and the double bonus on
+// each team, halftime, the period picker, overtime); step 2.37 adds its own (offline,
+// read-only, final) by adding entries, with the taps in tests/browser/tracker-driver.mjs.
+// From state 02 on the game is a stop-clock game, so a foul and a timeout are seen to
+// stop a running clock; the made-up league's own format is a running clock.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

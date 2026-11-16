@@ -431,6 +431,24 @@ export function ScoringScreen(props: ScoringScreenProps) {
     );
   }, [homeBonus, awayBonus, homeName, awayName, bonusHorn, say, t]);
 
+  // A team's fouls and its badge are never cut. On a device whose letters are wider than
+  // most (some Android and Linux faces), "10F" and "Double bonus" can be wider than a
+  // phone's box: the line is then marked, and the stylesheet sets it a size smaller.
+  // Looked at when the fouls or a badge change and when the screen is turned, never in
+  // the turn of a tap on a player.
+  const foulsShown = `${view.teams.home.teamFouls}/${homeBonus}/${view.teams.away.teamFouls}/${awayBonus}`;
+  useLayoutEffect(() => {
+    const fit = () => {
+      for (const line of root.current?.querySelectorAll<HTMLElement>('.court-score-fouls') ?? []) {
+        line.removeAttribute('data-tight');
+        if (line.scrollWidth > line.clientWidth) line.setAttribute('data-tight', '');
+      }
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [foulsShown]);
+
   /** When the pad last came to rest on the screen: the Start clock button waits a moment. */
   const restSince = useRef(0);
   const padKind = pad.kind;
