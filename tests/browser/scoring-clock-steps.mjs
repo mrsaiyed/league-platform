@@ -604,11 +604,22 @@ export async function clockSteps(kit) {
       await c.saved();
       // The second half: the home team has the one foul the step before gave it there,
       // the visitors none. (A period's fouls are its own: going back to it finds them.)
+      // Going back to the first half finds its bonus again. Nobody reached anything, so
+      // the horn stays silent: the badge shows, and what is said is the sentence about
+      // the period (the lead's answer on the area 4 review; the code review, L-2).
       await c.pickPeriod(1);
+      await said(c, /^Start of H1\. Clock set to 20:00\.$/);
+      const backInFirst = {
+        badges: (await c.bonus('home').count()) + (await c.bonus('away').count()),
+        notes: (await notes(page)).length,
+      };
+      note(
+        'going back to a period that is already in the bonus: the badge shows, the horn is silent, and the period’s own sentence is said',
+        backInFirst.badges >= 1 && backInFirst.notes === 0,
+        JSON.stringify(backInFirst),
+      );
       await c.pickPeriod(2);
       await page.waitForTimeout(3400);
-      // Going back to the first half found its bonus again, which the horn said: the
-      // notes are counted from here.
       await page.evaluate(() => (window.hornNotes.length = 0));
       note(
         'each team’s fouls are in its box of the scoreboard, there from the first: "0 fouls"',

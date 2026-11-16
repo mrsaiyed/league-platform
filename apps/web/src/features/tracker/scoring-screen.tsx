@@ -492,14 +492,18 @@ export function ScoringScreen(props: ScoringScreenProps) {
       }
     : null;
 
-  // The bonus horn (F4): when a team's bonus rises, one note (two for the double bonus)
-  // and the sentence, since a muted tablet is the normal case. A game opened already in
-  // the bonus is silent. The horn's failure is its own affair (bonus-horn.ts).
+  // The bonus horn (F4): when a foul puts a team in the bonus, one note (two for the
+  // double bonus) and the sentence, since a muted tablet is the normal case. It sounds
+  // for a foul recorded on any device: what is compared is the game as it is shown. A
+  // game opened already in the bonus is silent, and so is going back to a period that
+  // is already in the bonus: the badge shows, and the sentence about the period is what
+  // is said (`bonusRises`, bonus-horn.ts). The horn's failure is its own affair.
   const bonusShown = useRef<BonusShown | null>(null);
   const [homeBonus, awayBonus] = [view.teams.home.bonus, view.teams.away.bonus];
   const [homeName, awayName] = [view.teams.home.name, view.teams.away.name];
+  const bonusPeriod = view.period;
   useEffect(() => {
-    const now = { home: homeBonus, away: awayBonus };
+    const now = { home: homeBonus, away: awayBonus, period: bonusPeriod };
     const rises = bonusRises(bonusShown.current, now);
     bonusShown.current = now;
     if (rises.length === 0) return;
@@ -513,7 +517,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
         )
         .join(' '),
     );
-  }, [homeBonus, awayBonus, homeName, awayName, bonusHorn, say, t]);
+  }, [homeBonus, awayBonus, bonusPeriod, homeName, awayName, bonusHorn, say, t]);
 
   // A team's fouls and its badge are never cut. On a device whose letters are wider than
   // most (some Android and Linux faces), "10F" and "Double bonus" can be wider than a
@@ -639,7 +643,11 @@ export function ScoringScreen(props: ScoringScreenProps) {
       // A foul on a player already at the limit is recorded, and said once for each.
       const alreadyOut = action === 'foul' && tile.fouledOut && !toldOut.current.has(tile.id);
       if (alreadyOut) toldOut.current.add(tile.id);
-      const bonusBefore = { home: view.teams.home.bonus, away: view.teams.away.bonus };
+      const bonusBefore = {
+        home: view.teams.home.bonus,
+        away: view.teams.away.bonus,
+        period: view.period,
+      };
       // The options close with the tap (D7). The mark is painted first; the tap is then
       // handed to the controller, which stores it before the tile counts it (T-114).
       const keyboard = byKeyboard(event);
@@ -656,11 +664,13 @@ export function ScoringScreen(props: ScoringScreenProps) {
           if (action !== 'foul' || result.game === null) return;
           // A foul that put the other team in the bonus is said as that, with the horn
           // (the effect above): nothing here is said over it.
-          const teams = basketball.derive(result.game).teams;
-          if (
-            bonusRises(bonusBefore, { home: teams.home.bonus, away: teams.away.bonus }).length > 0
-          )
-            return;
+          const after = basketball.derive(result.game);
+          const bonusAfter = {
+            home: after.teams.home.bonus,
+            away: after.teams.away.bonus,
+            period: after.period,
+          };
+          if (bonusRises(bonusBefore, bonusAfter).length > 0) return;
           if (alreadyOut) say(t('tracker.say.outRecorded', { player: name }));
           // On a running clock under a stop clock the foul stopped it: said, since it
           // changes what comes next (D8). The Start clock button then says why.

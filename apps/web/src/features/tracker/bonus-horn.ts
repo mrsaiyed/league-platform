@@ -122,19 +122,32 @@ export function browserHornAudio(): HornAudio | null {
   return Audio === undefined ? null : new Audio();
 }
 
-/** Each team's bonus as the screen last showed it. */
-export type BonusShown = Readonly<Record<'home' | 'away', 0 | 1 | 2>>;
+/** Each team's bonus as the screen last showed it, and the period that was being played. */
+export type BonusShown = Readonly<Record<'home' | 'away', 0 | 1 | 2>> & {
+  readonly period: number;
+};
 
 /**
  * The teams whose bonus rose from what was shown to what is shown now, home first: each
- * is sounded and said once. Nothing rises on the first showing (`before` null): opening
- * a game already in the bonus is silent (F4).
+ * is sounded and said once.
+ *
+ * The horn sounds when a team REACHES the bonus or the double bonus by a foul, recorded
+ * on this device or on any other (the game as it is shown is what is compared, whoever
+ * changed it). It does NOT sound:
+ * - on the first showing (`before` null): opening a game already in the bonus is silent
+ *   (F4);
+ * - when the period changed: going back to a period that is already in the bonus is
+ *   nearly always the correction of a slip, nobody reached anything, and the horn would
+ *   say otherwise to the whole gym. The badge shows, and what the screen says is the
+ *   sentence about the period (the lead's product answer on the area 4 review of step
+ *   2.36; the code review, L-2). A foul given after that, in the same period, sounds as
+ *   always.
  */
 export function bonusRises(
   before: BonusShown | null,
   now: BonusShown,
 ): { readonly side: 'home' | 'away'; readonly level: 1 | 2 }[] {
-  if (before === null) return [];
+  if (before === null || before.period !== now.period) return [];
   const rises: { side: 'home' | 'away'; level: 1 | 2 }[] = [];
   for (const side of ['home', 'away'] as const) {
     const level = now[side];
