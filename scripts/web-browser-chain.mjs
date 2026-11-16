@@ -87,6 +87,12 @@ export function browserChain(names, read, only = [], folder = 'tests/browser') {
     throw new Error(`The browser tests in ${folder} cannot run:\n  ${problems.join('\n  ')}`);
   }
   const wanted = only.map((name) => (name.endsWith('.mjs') ? name : `${name}.mjs`));
+  const unknown = wanted.filter((name) => !names.filter(isBrowserTest).includes(name));
+  if (unknown.length > 0) {
+    throw new Error(
+      `No browser test is named ${unknown.join(', ')} in ${folder}: nothing was run.`,
+    );
+  }
   const tests = names
     .filter(isBrowserTest)
     .filter((name) => wanted.length === 0 || wanted.includes(name))

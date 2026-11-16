@@ -214,3 +214,25 @@ test('a test that kills itself stops the chain; where signals exist it is named 
     );
   }
 });
+
+test('an unknown test name or an unknown flag stops the runner with a sentence, nothing run', () => {
+  const tests = { 'a-pass-test.mjs': `console.log('ran');\n${ends}` };
+  const name = runOn(tests, 'a-pass-test', 'no-such-test');
+  assert.equal(name.status, 1);
+  assert.match(
+    name.stderr,
+    /No browser test is named no-such-test\.mjs in \.local\/.*: nothing was run\./,
+  );
+  assert.doesNotMatch(name.stdout, /ran/);
+  const flag = runOn(tests, '--no-bulid');
+  assert.equal(flag.status, 1);
+  assert.match(
+    flag.stderr,
+    /does not know --no-bulid \(it knows --list and test names\): nothing was run\./,
+  );
+  assert.doesNotMatch(flag.stdout, /ran/);
+  assert.throws(
+    () => browserChain(['a-pass-test.mjs'], () => ends, ['b-test']),
+    /No browser test is named b-test\.mjs in tests\/browser/,
+  );
+});

@@ -25,12 +25,20 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const relative = process.env.WEB_BROWSER_TESTS_FOLDER ?? 'tests/browser';
 const folder = path.join(root, relative);
 const asked = process.argv.slice(2);
+const flags = ['--list'];
+const unknownFlags = asked.filter((a) => a.startsWith('-') && !flags.includes(a));
+if (unknownFlags.length > 0) {
+  console.error(
+    `The browser tests' runner does not know ${unknownFlags.join(', ')} (it knows ${flags.join(', ')} and test names): nothing was run.`,
+  );
+  process.exit(1);
+}
 let chain;
 try {
   chain = browserChain(
     fs.readdirSync(folder),
     (name) => fs.readFileSync(path.join(folder, name), 'utf8'),
-    asked.filter((a) => !a.startsWith('--')),
+    asked.filter((a) => !a.startsWith('-')),
     relative,
   );
 } catch (error) {
@@ -43,7 +51,7 @@ if (asked.includes('--list')) {
   process.exit(0);
 }
 if (chain.length === 0) {
-  console.error(`No browser test is named ${asked.join(' ')} in tests/browser.`);
+  console.error(`There is no browser test in ${relative}: nothing was run.`);
   process.exit(1);
 }
 for (const test of chain) {
