@@ -7,3 +7,4 @@ export * from './src/tracker-protocol.ts';
 export * from './src/reopen-game.ts';
 export * from './src/live-channels.ts';
 export * from './src/not-started.ts';
+export * from './src/site-design.ts';

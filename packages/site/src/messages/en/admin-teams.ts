@@ -114,4 +114,5 @@ export const enAdminTeams = {
   'adminTeams.stats.staff': "Only the team's staff and the league's admins",
   'adminTeams.stats.submit': 'Save who sees the numbers',
   'adminTeams.stats.title': "Who sees this team's numbers",
+  'adminTeams.team.sub': 'This team’s details, who sees its numbers, and its roster.',
 } as const;

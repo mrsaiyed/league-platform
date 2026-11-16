@@ -252,15 +252,14 @@ body {
   font-size: var(--text-14);
   font-weight: 600;
 }
-/* A field a refusal is about (aria-invalid): edged in the danger color, at a control's
-   outline strength (DESIGN.md section 4, line 17), so the wrong box is seen among the rest.
-   With the keyboard on it, it keeps the focus ring (WCAG 2.4.7): the outline is only drawn
-   when it is not focused, and the border stays. */
+/* A field a refusal is about (aria-invalid): edged in the danger color at full strength,
+   2 wide (its own edge and a second line just inside it), so the wrong box is the
+   strongest of the row in a dark design and in a light one. The second line is drawn
+   inside the field, never as an outline: with the keyboard on it the focus ring is whole
+   (WCAG 2.4.7) and the danger edge stays under it. */
 .ui-root [aria-invalid='true'] {
-  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
-}
-.ui-root [aria-invalid='true']:not(:focus-visible) {
-  outline: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
+  border-color: var(--color-danger);
+  box-shadow: inset 0 0 0 1px var(--color-danger);
 }
 
 @media (prefers-reduced-motion: reduce) {

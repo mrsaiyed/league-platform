@@ -1,5 +1,7 @@
 # League platform
 
+**An AI session given this address and told to start:** read [CLAUDE.md](CLAUDE.md), then [docs/build/START-HERE.md](docs/build/START-HERE.md).
+
 An end-to-end league-management platform with customizable public websites, private administration, and reusable operational modules. Basketball is the first implemented sport. The immediate use case is Al-Hadi varsity keeping its own game records within TCSAAL; the broader product serves organizers through shared, configurable software. Intramurals remain a later opportunity.
 
 **Status: detailed specifications, a working live stat tracker, a local rehearsal and a private hosted SQL scoring pilot.** Stat tracking is the first working module of the wider platform; accounts, roles, public publication, payments and email remain future work. The older intramural demo remains a separate fictional presentation.

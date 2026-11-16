@@ -1,4 +1,5 @@
 // createLeague on a stand-in store; the database's own rules are tested in packages/database.
+import { startingDesignWith } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import { leagueId, memoryLeagues, ownerId, staffId } from '../memory-leagues.test-helper.ts';
 import { createLeague } from './create-league.ts';
@@ -176,5 +177,57 @@ describe('createLeague with its first season', () => {
     ).rejects.toThrow(/season with that short name/);
     expect(db.state.league).toBeUndefined();
     expect(db.state.activity).toEqual([]);
+  });
+
+  it('gives the league its first site release from the starting design given (step 2.187)', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    const design = { startingDesign: 'midnight-gold', colors: { primary: '#123456' } } as const;
+    expect(await createLeague(as(staffId), { ...input, design }, deps)).toMatchObject({
+      ok: true,
+    });
+    const made = startingDesignWith('midnight-gold', { primary: '#123456' });
+    expect(db.state.siteReleases).toMatchObject([
+      { number: 1, startingDesign: 'midnight-gold', design: made, publishedByAccountId: staffId },
+    ]);
+    expect(db.state.site).toMatchObject({ startingDesign: 'midnight-gold', designDraft: made });
+    // One entry, as before, naming the design: no other entry for it.
+    expect(db.state.activity).toMatchObject([
+      {
+        action: 'leagues.create',
+        details: { forOwnerAccountId: ownerId, startingDesign: 'midnight-gold' },
+      },
+    ]);
+  });
+
+  it('gives no release when no design is given', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    await createLeague(as(staffId), input, deps);
+    expect(db.state.siteReleases).toEqual([]);
+    expect(db.state.site).toBeUndefined();
+  });
+
+  it('refuses a starting design that is not one, or a color that is not #rrggbb, making nothing', async () => {
+    for (const design of [
+      { startingDesign: 'no-such-design' },
+      { startingDesign: 'crest', colors: { primary: 'red; } body { display:none' } },
+      { startingDesign: 'crest', colors: { accent: '</style><script>' } },
+      { startingDesign: 'crest', colors: { highlight: 'url(http://example.test)' } },
+      { startingDesign: 'crest', colors: { background: '#000000' } },
+    ]) {
+      const { db, deps, as } = memoryLeagues(none);
+      expect(await createLeague(as(staffId), { ...input, design }, deps)).toMatchObject({
+        error: { code: 'invalid-input' },
+      });
+      expect(db.state.league).toBeUndefined();
+      expect(db.state.siteReleases).toEqual([]);
+    }
+  });
+
+  it('makes nothing at all when the first release cannot be written', async () => {
+    const { db, deps, as } = memoryLeagues({ ...none, takenReleaseNumbers: [1] });
+    await expect(
+      createLeague(as(staffId), { ...input, design: { startingDesign: 'crest' } }, deps),
+    ).rejects.toThrow(/already had a site release/);
+    expect(db.state.league).toBeUndefined();
   });
 });

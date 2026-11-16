@@ -165,8 +165,11 @@ function Controls({
   // A refusal names the game ("Tigers at Lions: …").
   const refusal = t('admin.games.refusedAbout', { game: gameText(game), problem: '{problem}' });
   const early = earlyWhen(game.startsAt, now, times);
+  // A game whose start has passed with no result: entering its score is the thing to do.
+  const overdue =
+    game.status === 'scheduled' && game.startsAt !== null && Date.parse(game.startsAt) <= now;
   return (
-    <div className="admin-game-controls ui-stack">
+    <div className="admin-game-controls">
       {game.hasPlays ? (
         // Ended in the tracker (S-46): no score boxes and no forfeit.
         <>
@@ -188,6 +191,7 @@ function Controls({
           version={game.version}
           token={crypto.randomUUID()}
           open={reopened}
+          main={overdue}
           permalink={permalink}
           texts={finalScoreTexts(game, early)}
         />
@@ -208,7 +212,7 @@ function Controls({
       ) : null}
       <ReopenLine view={game.reopen} href={gameHref} times={times} />
       {game.canForfeit ? (
-        <details>
+        <details className="admin-game-other">
           <summary>{t('admin.games.otherActions')}</summary>
           <ActionForm
             action={recordForfeitAction}
@@ -240,6 +244,7 @@ function Controls({
                 hidden={hiddenOf(league, game)}
                 button={t('admin.games.cancel')}
                 refusal={refusal}
+                kind="danger"
               />
             </>
           ) : null}
@@ -276,10 +281,12 @@ function GameList({
   return (
     <ul className="admin-game-list ui-list">
       {rows.map((game) => (
-        <li key={game.id} id={gameAnchor(game.id)} className="ui-stack">
-          <div className="ui-stack">
-            {saved !== undefined && game === saved.row ? <SavedLine text={saved.text} /> : null}
+        <li key={game.id} id={gameAnchor(game.id)} className="admin-game">
+          {saved !== undefined && game === saved.row ? <SavedLine text={saved.text} /> : null}
+          {/* One panel a game: its card, then who scores it and what may be done to it. */}
+          <div className="admin-game-panel">
             <GameCard
+              marks="emblem"
               home={{ name: game.homeName, score: game.homeScore }}
               away={{ name: game.awayName, score: game.awayScore }}
               status={game.status}
@@ -294,7 +301,7 @@ function GameList({
                 : {})}
               labels={labels}
             />
-            <p>
+            <p className="admin-game-who">
               {game.scorekeepers.length === 0
                 ? t('admin.games.noScorekeeper')
                 : t('admin.games.scorekeeper', { names: game.scorekeepers.join(', ') })}
@@ -417,7 +424,9 @@ export async function GamesPage({
         </a>
       </PageHead>
       {saved === undefined || aboutRow !== undefined ? null : <SavedLine text={saved} />}
-      {games.some((g) => !g.scorable) ? <p>{t('admin.games.notScorable')}</p> : null}
+      {games.some((g) => !g.scorable) ? (
+        <p className="ui-notice">{t('admin.games.notScorable')}</p>
+      ) : null}
       {!ok ? (
         <p className="ui-notice" data-kind="error" role="alert">
           {t('admin.games.listProblem')}

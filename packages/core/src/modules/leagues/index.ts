@@ -38,6 +38,11 @@ export {
 } from './commands/set-league-name.ts';
 export { setLeagueStatus, type SetLeagueStatusError } from './commands/set-league-status.ts';
 export {
+  publishSiteDesign,
+  type PublishedSiteDesign,
+  type PublishSiteDesignError,
+} from './commands/publish-site-design.ts';
+export {
   setSetting,
   setSettingFor,
   type SetSettingError,
@@ -136,6 +141,7 @@ export type {
   NewDivision,
   NewLeague,
   NewSeason,
+  NewSiteRelease,
   SeasonChange,
   SeasonRecord,
   SettingPlace,

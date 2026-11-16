@@ -7,7 +7,9 @@
 // transaction for that league (create the league with its first season, status,
 // divisions, teams, people), acting as the people the data names: our own staff
 // creates the league and its current season in one step (T-260), and its owner does
-// the rest. Two things are written directly, not by a command: accounts
+// the rest, its site's design first: each league's first release is its own starting
+// design (seed-data.ts), published by the owner through the site's own command (step
+// 2.187), so the seed's leagues are drawn in different designs. Two things are written directly, not by a command: accounts
 // (they come from signing in, which has no command here) and role grants (through the
 // access store, as the owner; the invite and accept commands need email tokens).
 //
@@ -16,12 +18,14 @@
 // the data: a whole one is left alone ("Already there"); anything else stops with a
 // plain message, never a false "Already there". Start again from a fresh database.
 import type { PGlite } from '@electric-sql/pglite';
+import { startingDesign } from '@srleagues/contracts';
 import {
   createDivision,
   createLeague,
   createPerson,
   createTeam,
   leagueScope,
+  publishSiteDesign,
   setLeagueStatus,
   type AccessTx,
   type CommandContext,
@@ -91,6 +95,7 @@ async function holdsEverything(
   const teams = league.divisions.reduce((sum, d) => sum + d.teams.length, 0);
   return (
     (await count('seasons')) === 1 &&
+    (await count('site_releases')) === 1 &&
     (await count('divisions')) === league.divisions.length &&
     (await count('teams')) === teams &&
     (await count('people')) === league.people.length &&
@@ -147,6 +152,14 @@ async function loadLeague(
   );
   const seasonId = created.firstSeasonId;
   if (seasonId === null) throw new Error(`Seeding failed at season: ${league.slug} has none.`);
+  must(
+    'site design',
+    await publishSiteDesign(
+      as(ownerId),
+      { startingDesign: league.design, design: startingDesign(league.design), sinceRelease: 0 },
+      deps.leagues,
+    ),
+  );
   must(
     'league status',
     await setLeagueStatus(as(ownerId), { status: 'live', version: created.version }, deps.leagues),

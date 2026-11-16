@@ -117,6 +117,18 @@ export async function leagueViewOfAddress(): Promise<LeagueView | null> {
 }
 
 /**
+ * For "not found" inside the admin (`[league]/admin/not-found.tsx`, step 2.103): the league
+ * of the address the proxy wrote down, when its admin is open to this person, else null. It
+ * is the same worked-out request the admin's layout used, so the screen agrees with the
+ * frame around it. Never used to decide access: the page has already refused.
+ */
+export async function staffViewOfAddress(): Promise<LeagueView | null> {
+  const { resolved } = await resolvedRequest();
+  const outcome = leaguePageOutcome(resolved, { page: 'admin', area: null });
+  return outcome.kind === 'show' ? outcome.view : null;
+}
+
+/**
  * For the account button (U-8) and the refusal page: the address the signed-in person is
  * signed in with, as the sign-in service holds it; null for a visitor. Drawn for this
  * request only: the pages it appears on are drawn per request (record 066).

@@ -1,9 +1,11 @@
 import { getFixtureImport, leagueUrl, type FixtureImportView } from '@srleagues/core';
+import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import type { ImportNames } from '../../server/fixture-import-ports.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
+import { StaffTrail } from '../staff/index.ts';
 import {
   applyImportAction,
   discardImportAction,
@@ -103,8 +105,8 @@ function GameTable({
     <section aria-labelledby="import-games">
       <h2 id="import-games">{t('admin.import.gamesTitle')}</h2>
       {/* A wide table scrolls by itself at phone width, never the whole page (A-2). */}
-      <div style={{ overflowX: 'auto' }}>
-        <table>
+      <div className="staff-table-box">
+        <table className="staff-table">
           <thead>
             <tr>
               <th scope="col">{t('admin.import.col.row')}</th>
@@ -166,25 +168,31 @@ function ImportReport({
   readonly reloadHref: string;
 }) {
   return (
-    <section aria-labelledby="import-report" className="admin-import-report">
-      <h2 id="import-report">
+    <section aria-labelledby="import-report" className="staff-panel admin-import-report">
+      <h2 id="import-report" dir="auto">
         {view.fileName === null
           ? t('admin.import.noFileName')
           : t('admin.import.fileName', { name: view.fileName })}
       </h2>
       <p>{t(`admin.import.status.${view.status}`)}</p>
       {view.status === 'reading' ? (
-        <>
-          <p>
-            <a href={reloadHref}>{t('admin.import.reload')}</a>
-          </p>
+        <div className="staff-buttons">
+          <a className="ui-button" href={reloadHref}>
+            {t('admin.import.reload')}
+          </a>
           <form action={discardImportAction}>
             <ImportFields league={league} view={view} />
-            <button type="submit">{t('admin.import.discard')}</button>
+            <button type="submit" className="ui-button" data-kind="danger">
+              {t('admin.import.discard')}
+            </button>
           </form>
-        </>
+        </div>
       ) : null}
-      {view.fileProblem === null ? null : <p role="alert">{view.fileProblem}</p>}
+      {view.fileProblem === null ? null : (
+        <p className="ui-notice" data-kind="error" role="alert">
+          {view.fileProblem}
+        </p>
+      )}
       {view.status === 'reading' || view.fileProblem !== null ? null : (
         <>
           <p>
@@ -198,9 +206,13 @@ function ImportReport({
         </>
       )}
       {view.status === 'ready' ? (
-        <form action={applyImportAction}>
+        <form action={applyImportAction} className="staff-form">
           <ImportFields league={league} view={view} />
-          <button type="submit">{t.plural('admin.import.apply', view.gameCount)}</button>
+          <p className="staff-buttons">
+            <button type="submit" className="ui-button" data-kind="main">
+              {t.plural('admin.import.apply', view.gameCount)}
+            </button>
+          </p>
         </form>
       ) : null}
       {view.status === 'applied' ? (
@@ -211,10 +223,14 @@ function ImportReport({
           {view.scoresRecorded > 0 ? (
             <p>{t.plural('admin.import.scoresRecorded', view.scoresRecorded)}</p>
           ) : null}
-          <p>{t('admin.import.undoHelp')}</p>
-          <form action={undoImportAction}>
+          <p className="staff-quiet">{t('admin.import.undoHelp')}</p>
+          <form action={undoImportAction} className="staff-form">
             <ImportFields league={league} view={view} />
-            <button type="submit">{t('admin.import.undo')}</button>
+            <p className="staff-buttons">
+              <button type="submit" className="ui-button">
+                {t('admin.import.undo')}
+              </button>
+            </p>
           </form>
         </>
       ) : null}
@@ -259,15 +275,22 @@ export async function ImportPage({
 
   return (
     <main className="admin-import">
-      <h1>{t('admin.import.title')}</h1>
-      <p>
-        <a href={leagueUrl(addressee, 'admin-area', { area: 'schedule' })}>
-          {t('admin.import.backToSchedule')}
-        </a>
-      </p>
-      <p>{t('admin.import.intro')}</p>
+      <StaffTrail
+        steps={[
+          {
+            href: leagueUrl(addressee, 'admin-area', { area: 'schedule' }),
+            label: t('admin.area.schedule'),
+          },
+        ]}
+        here={t('admin.import.title')}
+      />
+      <PageHead title={t('admin.import.title')} sub={t('admin.import.intro')} />
       {notice === undefined ? null : (
-        <div role={notice.problem ? 'alert' : 'status'}>
+        <div
+          className="ui-notice"
+          data-kind={notice.problem ? 'error' : 'saved'}
+          role={notice.problem ? 'alert' : 'status'}
+        >
           <p>{t(notice.key, { size: sizeLimitText })}</p>
           {notice.clashes === undefined ? null : (
             <p>{t.plural('admin.import.clashes', notice.clashes)}</p>
@@ -275,17 +298,22 @@ export async function ImportPage({
         </div>
       )}
       {season === undefined ? (
-        <p>{t('admin.import.noSeason')}</p>
+        <EmptyPanel text={t('admin.import.noSeason')} />
       ) : (
         <>
-          <p>{t('admin.import.season', { season: season.name })}</p>
-          <p>
-            {draftCount === 0
-              ? t('admin.import.draftEmpty')
-              : t.plural('admin.import.draft', draftCount)}
+          {/* Two facts, each on its own line. */}
+          <p className="staff-quiet admin-import-facts">
+            <span>{t('admin.import.season', { season: season.name })}</span>{' '}
+            <span>
+              {draftCount === 0
+                ? t('admin.import.draftEmpty')
+                : t.plural('admin.import.draft', draftCount)}
+            </span>
           </p>
           {importId !== undefined && shown === undefined && notice?.problem !== true ? (
-            <p role="alert">{t('admin.import.error.import-not-found')}</p>
+            <p className="ui-notice" data-kind="error" role="alert">
+              {t('admin.import.error.import-not-found')}
+            </p>
           ) : null}
           {shown === undefined || names === undefined ? null : (
             <ImportReport
@@ -295,18 +323,26 @@ export async function ImportPage({
               reloadHref={`${here}?${new URLSearchParams({ import: shown.id })}`}
             />
           )}
-          <section aria-labelledby="import-upload">
+          <section aria-labelledby="import-upload" className="staff-panel">
             <h2 id="import-upload">
               {shown === undefined ? t('admin.import.upload') : t('admin.import.uploadAnother')}
             </h2>
-            <p>{t('admin.import.help')}</p>
-            <form action={uploadFixturesAction}>
+            <p className="staff-quiet">{t('admin.import.help')}</p>
+            <form action={uploadFixturesAction} className="staff-form">
               <input type="hidden" name="league" value={league} />
-              <label>
+              <label className="staff-field">
                 <span>{t('admin.import.fileLabel')}</span>{' '}
                 <input type="file" name="file" accept=".csv,text/csv" required />
-              </label>{' '}
-              <button type="submit">{t('admin.import.upload')}</button>
+              </label>
+              <p className="staff-buttons">
+                <button
+                  type="submit"
+                  className="ui-button"
+                  data-kind={shown === undefined ? 'main' : undefined}
+                >
+                  {t('admin.import.upload')}
+                </button>
+              </p>
             </form>
           </section>
         </>

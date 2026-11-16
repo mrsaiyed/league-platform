@@ -5,6 +5,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import {
   createLeague,
   createSeason,
+  publishSiteDesign,
   renameShortName,
   setCurrentSeason,
   setLeagueStatus,
@@ -12,9 +13,12 @@ import {
   type Job,
   type LeaguesTx,
 } from '@srleagues/core';
+import { startingDesign, startingDesignWith } from '@srleagues/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
+import { withTransaction } from '../db/with-transaction.ts';
+import { findPublishedDesign } from '../queries/index.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import {
   freshSchema,
@@ -383,6 +387,84 @@ describe('seasons on the database', () => {
       await countOf('select count(*)::int as n from seasons where league_id = $1', [
         other.leagueId,
       ]),
+    ).toBe(1);
+  });
+});
+
+describe("a league's site design on the database (step 2.187)", () => {
+  const published = (leagueId: string) =>
+    withTransaction(db, { leagueId }, findPublishedDesign, { snapshot: 'page' });
+  const releases = (leagueId: string) =>
+    countOf('select count(*)::int as n from site_releases where league_id = $1', [leagueId]);
+
+  it('gives a league made with a starting design its first release, in the same step', async () => {
+    const design = { startingDesign: 'crest-light', colors: { primary: '#0a3d62' } } as const;
+    const { result, leagueId } = await create(unique('designed'), { design });
+    expect(result.ok).toBe(true);
+    expect(await published(leagueId)).toEqual({
+      number: 1,
+      startingDesign: 'crest-light',
+      design: startingDesignWith('crest-light', { primary: '#0a3d62' }),
+    });
+    expect(
+      await one(
+        pglite,
+        `select s.version, r.number, r.published_by_account_id::text as by
+         from sites s join site_releases r on r.id = s.published_release_id
+         where s.league_id = $1`,
+        [leagueId],
+      ),
+    ).toEqual({ version: 1, number: 1, by: staffId });
+    // And none for a league made without one: it is drawn in the neutral design.
+    const plain = await create(unique('plain'));
+    expect(await published(plain.leagueId)).toBeUndefined();
+  });
+
+  it('lets the owner publish another, refuses a stale one and a hostile value, storing nothing of them', async () => {
+    const { leagueId, ownerAccountId } = await create(unique('owned'), {
+      design: { startingDesign: 'crest' },
+    });
+    const owner = as(leagueId, ownerAccountId);
+    const gold = startingDesign('midnight-gold');
+    expect(
+      await publishSiteDesign(
+        owner,
+        { startingDesign: 'midnight-gold', design: gold, sinceRelease: 1 },
+        deps,
+      ),
+    ).toEqual({ ok: true, value: { number: 2 } });
+    expect(await published(leagueId)).toMatchObject({ number: 2, design: gold });
+    expect(
+      await publishSiteDesign(
+        owner,
+        { startingDesign: 'crest', design: startingDesign('crest'), sinceRelease: 1 },
+        deps,
+      ),
+    ).toEqual({ ok: false, error: { code: 'changed-since-read' } });
+    for (const primary of [
+      'red; } body { display:none',
+      '</style><script>',
+      'url(http://x.test)',
+    ]) {
+      expect(
+        await publishSiteDesign(
+          owner,
+          {
+            startingDesign: 'crest',
+            design: { ...gold, colors: { ...gold.colors, primary } },
+            sinceRelease: 2,
+          },
+          deps,
+        ),
+      ).toMatchObject({ ok: false, error: { code: 'invalid-input' } });
+    }
+    expect(await releases(leagueId)).toBe(2);
+    expect(
+      await countOf(
+        `select count(*)::int as n from activity_log
+         where league_id = $1 and action = 'leagues.publish_site_design'`,
+        [leagueId],
+      ),
     ).toBe(1);
   });
 });

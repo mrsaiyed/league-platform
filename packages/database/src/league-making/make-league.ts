@@ -12,8 +12,9 @@
 //      app's role may not add an account). The owner's first sign-in with that
 //      email, once the sign-in service has proved the mailbox, links that account
 //      (record 052), so whoever first signs in with it owns the league;
-//   3. runs createLeague, as our staff, with the first season: the league, its
-//      default program and its current season in one transaction (T-260), under the
+//   3. runs createLeague, as our staff, with the first season and the site's first
+//      release (its starting design, step 2.187): the league, its default program,
+//      its current season and its site in one transaction (T-260), under the
 //      app's own login on a hosted database, through the league fence, exactly as the
 //      web app would. Nothing is ever done as the owner.
 // Step 2's accounts cannot share step 3's transaction: they are written by the
@@ -256,6 +257,8 @@ export async function makeLeague(
           ...(plan.season.startsOn === null ? {} : { startsOn: plan.season.startsOn }),
           ...(plan.season.endsOn === null ? {} : { endsOn: plan.season.endsOn }),
         },
+        // Its site's first release, in the same transaction (step 2.187, record 073).
+        design: { startingDesign: plan.design.startingDesign, colors: plan.design.colors },
       },
       deps,
     );
