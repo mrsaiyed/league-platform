@@ -121,6 +121,16 @@ if (browser) {
       ]);
       const game = part(page, 'Earlier games').locator(`li[id="game-${liveGame}"]`);
       await game.waitFor();
+      // And that round is the game's own: started last evening, it falls in the round
+      // before this week's (stand-in-world-seed.ts: this week's is Round 4, so Round 3).
+      const roundName = (
+        (await picker.locator(`option[value="${latest}"]`).textContent()) ?? ''
+      ).trim();
+      note(
+        "the round it is found in is the game's own, Round 3",
+        roundName.startsWith('Round 3, '),
+        roundName,
+      );
       note(
         'under "Earlier games", in its round, the scorekeeper reads until when they may reopen it',
         /^You ended this game in the tracker, so you can reopen it until .+\. Correct this result$/.test(
