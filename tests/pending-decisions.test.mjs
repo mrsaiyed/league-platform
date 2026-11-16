@@ -12,6 +12,8 @@ import * as prettier from 'prettier';
 import {
   foldAll,
   foldRow,
+  fullListTables,
+  keptById,
   parsePending,
   pendingNames,
 } from '../scripts/pending-decisions-rules.mjs';
@@ -92,6 +94,17 @@ test('only "<ID>.md" files are pending rows: the folder README is not', () => {
     'T-276.md',
     'S-64.md',
   ]);
+});
+
+test("every table of DECISIONS.md's full list is kept by ID, T4 once (its rows were there three times)", () => {
+  const tables = fullListTables(fs.readFileSync(decisionsFile, 'utf8'));
+  assert.equal(tables.length, 19, 'P1 to P9 and T1 to T10');
+  for (const { heading, ids } of tables) {
+    assert.ok(ids.length > 0, heading);
+    assert.ok(keptById(ids), `${heading}: one ID a row, each once, in order`);
+  }
+  const t4 = tables.find((t) => t.heading.startsWith('T4 '));
+  assert.equal(t4?.ids.length, 41);
 });
 
 test('every pending file in the folder folds into DECISIONS.md, and the result is formatted', async () => {

@@ -95,8 +95,26 @@ function tableUnder(lines, heading) {
   return undefined;
 }
 
+/**
+ * The full list's tables (one under each "### [P1 — …](…)" heading): [{ heading, ids }],
+ * the IDs in the order the table holds them.
+ */
+export function fullListTables(text) {
+  const lines = text.split('\n');
+  return lines
+    .filter((line) => /^### \[/.test(line))
+    .map((line) => {
+      const heading = headingWords(line);
+      const table = tableUnder(lines, heading);
+      const ids = table
+        ? lines.slice(table.header + 2, table.last + 1).map((row) => cellsOf(row)[0])
+        : [];
+      return { heading, ids };
+    });
+}
+
 /** Whether a table's rows are kept by ID: one ID each, every ID once, in order per letter. */
-function keptById(ids) {
+export function keptById(ids) {
   if (ids.some((id) => !parseId(id)) || new Set(ids).size !== ids.length) return false;
   const lastOf = new Map();
   for (const id of ids) {
