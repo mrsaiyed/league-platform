@@ -10,6 +10,7 @@ const plainFindings = [
   'league-changed',
   'program-changed',
   'season-changed',
+  'site-changed',
   'activity',
 ] as const;
 const isPlainFinding = (word: string): word is (typeof plainFindings)[number] =>

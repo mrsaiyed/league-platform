@@ -3,7 +3,7 @@
 // only ever reach the league the transaction is for (T-28).
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
-import type { SeasonRules } from '@srleagues/contracts';
+import type { DesignDocument, SeasonRules, StartingDesignKey } from '@srleagues/contracts';
 import type { Audience, LeagueStatus, SeasonStatus } from './league-values.ts';
 import type { SettingLevel } from './settings/define-setting.ts';
 
@@ -164,6 +164,23 @@ export type LeaguesStore = {
   ) => Promise<number | undefined>;
   /** Removes the value at a place if it is still at `version`; false if it moved or is not there. */
   readonly clearSetting: (place: SettingPlace, key: string, version: number) => Promise<boolean>;
+  /** The number of the league's latest published site release, or 0 when it has none (T3 §10). */
+  readonly latestSiteReleaseNumber: () => Promise<number>;
+  /**
+   * Writes the league's site release `number` and points its site at it, the site's
+   * draft set to the same design (T3 §10, T5 §5): the release's id, or 'number-taken'
+   * when another publish took that number first (the transaction is then unusable).
+   */
+  readonly publishSiteRelease: (release: NewSiteRelease) => Promise<string | 'number-taken'>;
+};
+
+/** A published version of a league's site: today its design only (T3 §10, record 073). */
+export type NewSiteRelease = {
+  readonly number: number;
+  readonly startingDesign: StartingDesignKey;
+  /** Checked against the written schema (packages/contracts) before it is handed here. */
+  readonly design: DesignDocument;
+  readonly publishedByAccountId: string;
 };
 
 /** A division of a season, in or out of the bin (T3 §4, U-12). */
@@ -238,6 +255,8 @@ export type LeagueRemovalFinding =
   | { readonly kind: 'program-changed' }
   /** A second season, or the first one published, in the bin or changed. */
   | { readonly kind: 'season-changed' }
+  /** Its site: a second release, one by someone else, or the draft changed (0020). */
+  | { readonly kind: 'site-changed' }
   /** An activity-log entry by anyone but the maker, or of anything else. */
   | { readonly kind: 'activity' }
   /** Rows of the league in another table (a game, a person, a role, ...), by table. */
