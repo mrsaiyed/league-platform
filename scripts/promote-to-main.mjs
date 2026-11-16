@@ -25,7 +25,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { decideMove, pinnedCommit, publishWorkflow, reachesLiveSite } from './promote-rules.mjs';
+import {
+  commitCheck,
+  decideMove,
+  pinnedCommit,
+  publishWorkflow,
+  reachesLiveSite,
+} from './promote-rules.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dryRun = process.argv.includes('--dry-run');
@@ -80,20 +86,14 @@ if (!git('merge-base', '--is-ancestor', main, tip).ok) {
   stop('main has commits the build branch lacks. Catch the build branch up with main first.');
 }
 
-// 3. GitHub's checks, for the newest few commits on the build branch.
+// 3. GitHub's checks, for the newest few commits on the build branch: every workflow run of
+// the commit passed, each run being all its jobs together (promote-rules.mjs, commitCheck).
 const response = await fetch(
   `https://api.github.com/repos/${owner}/${repo}/actions/runs?branch=${encodeURIComponent(branch)}&per_page=40`,
   { headers: { Accept: 'application/vnd.github+json' } },
 ).catch(() => null);
 if (!response || !response.ok) stop('could not ask GitHub whether its checks passed.');
 const runs = (await response.json()).workflow_runs ?? [];
-const passed = (sha) => {
-  const mine = runs.filter((run) => run.head_sha === sha);
-  return (
-    mine.length > 0 &&
-    mine.every((run) => run.status === 'completed' && run.conclusion === 'success')
-  );
-};
 // The newest commit may still be being checked, and GitHub checks only the last commit of
 // each push, so look well back along the branch.
 const candidates = git('rev-list', '--first-parent', '-n', '60', tip)
@@ -103,12 +103,12 @@ let chosen = '';
 let failed = '';
 for (const sha of candidates) {
   if (sha === main || git('merge-base', '--is-ancestor', sha, main).ok) break;
-  if (passed(sha)) {
+  const state = commitCheck(runs, sha);
+  if (state === 'passed') {
     chosen = sha;
     break;
   }
-  const finished = runs.filter((run) => run.head_sha === sha && run.status === 'completed');
-  if (!failed && finished.some((run) => run.conclusion !== 'success')) failed = sha;
+  if (!failed && state === 'failed') failed = sha;
 }
 if (!chosen) {
   stop(

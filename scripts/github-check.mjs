@@ -17,7 +17,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   describe,
-  failedStepWords,
+  failedJobLine,
+  failedJobs,
   failureNoteLines,
   newestChecks,
 } from './github-check-rules.mjs';
@@ -96,16 +97,14 @@ const names = wanted
     ].filter(Boolean);
 for (const name of names) console.log(describe(name, checks.get(name), local.get(name) ?? ''));
 
-// For one branch that failed: which step, and what the failing tests said.
+// For one branch that failed: which job and step, and what the failing tests said. The gate
+// runs as several jobs side by side (step 2.191); each one that failed is named.
 const check = wanted ? checks.get(wanted) : null;
 if (check && check.state === 'failed') {
   for (const run of check.failedRuns) {
-    const jobs = (await ask(`${api}/actions/runs/${run}/jobs`)).jobs ?? [];
-    for (const job of jobs.filter((one) => one.conclusion !== 'success')) {
-      const steps = (job.steps ?? [])
-        .filter((step) => step.conclusion !== 'success' && step.conclusion !== 'skipped')
-        .map(failedStepWords);
-      console.log(`  Failed step: ${steps.join(', ') || job.name}`);
+    const jobs = (await ask(`${api}/actions/runs/${run}/jobs?per_page=100`)).jobs ?? [];
+    for (const job of failedJobs(jobs)) {
+      console.log(failedJobLine(job));
       // GitHub lists a job's annotations newest first; the notes read in the order written.
       const notes = await ask(`${api}/check-runs/${job.id}/annotations`);
       const lines = failureNoteLines(Array.isArray(notes) ? [...notes].reverse() : notes);

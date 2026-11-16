@@ -141,7 +141,10 @@ test('groups: every real test is in exactly one group, for any number of groups'
     assert.equal(groups[0][0], 'web-exit-test.mjs');
     for (const group of groups) {
       const places = group.map((name) => whole.indexOf(name));
-      assert.deepEqual(places, [...places].sort((a, b) => a - b));
+      assert.deepEqual(
+        places,
+        [...places].sort((a, b) => a - b),
+      );
     }
   }
   // And with groups, the exit test still runs without --no-build, so all its checks run once.
@@ -165,13 +168,10 @@ test('groups: each group builds once, in its first test, and keeps a test its ow
     ['web-exit-test.mjs', 'b-test.mjs', 'd-test.mjs'],
     ['a-test.mjs', 'c-test.mjs'],
   ]);
-  assert.deepEqual(
-    browserChain(names, readMadeUp, [], 'tests/browser', { k: 2, n: 2 }),
-    [
-      { file: 'tests/browser/a-test.mjs', args: [] },
-      { file: 'tests/browser/c-test.mjs', args: ['--no-build', '--dev'] },
-    ],
-  );
+  assert.deepEqual(browserChain(names, readMadeUp, [], 'tests/browser', { k: 2, n: 2 }), [
+    { file: 'tests/browser/a-test.mjs', args: [] },
+    { file: 'tests/browser/c-test.mjs', args: ['--no-build', '--dev'] },
+  ]);
   // A new test file lands in a group by its name alone: "bb" comes after "b", so the tests
   // after it move along one place, and still every test is in one group exactly.
   const grown = [...names, 'bb-test.mjs'];

@@ -14,6 +14,26 @@ const reach =
   /deploy-pages|upload-pages-artifact|pages:\s*write|gh-pages|SUPABASE_URL|SUPABASE_ANON_KEY/;
 export const reachesLiveSite = (file, text) => file === publishWorkflow || reach.test(text);
 
+// Where GitHub's checks of one commit stand, from GitHub's list of workflow runs:
+//   passed:    it has runs, and every one finished and succeeded
+//   failed:    not passed, and at least one finished without succeeding
+//   running:   neither, and at least one has not finished
+//   unchecked: GitHub has no run of it
+// Each run is one workflow's whole check, all its jobs together: GitHub finishes a run only
+// when every job in it has finished, and calls it a success only when none failed, was
+// cancelled or timed out (ci.yml runs several jobs side by side since step 2.191).
+export function commitCheck(runs, sha) {
+  const mine = runs.filter((run) => run.head_sha === sha);
+  if (mine.length === 0) return 'unchecked';
+  if (mine.every((run) => run.status === 'completed' && run.conclusion === 'success')) {
+    return 'passed';
+  }
+  if (mine.some((run) => run.status === 'completed' && run.conclusion !== 'success')) {
+    return 'failed';
+  }
+  return 'running';
+}
+
 // The one commit the publish workflow builds the live site from. Empty when it does not
 // check out exactly once, at one full commit id.
 export function pinnedCommit(workflow) {

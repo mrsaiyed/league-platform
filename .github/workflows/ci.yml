@@ -4,8 +4,20 @@ permissions:
   contents: read
 env:
   NEXT_TELEMETRY_DISABLED: '1'
+# Since step 2.191 the gate runs as several jobs side by side, not one after another: the
+# whole result is GitHub's one result for this workflow's run, which is "success" only when
+# every job below has succeeded (scripts/github-check.mjs, scripts/wait-for-github.mjs and
+# scripts/promote-to-main.mjs read that one result). No job needs another and no job is
+# skipped by a condition, so each job's failure fails the whole run. Every job starts the
+# same way the single job did: the same checkout, Node 24 with npm's cache, `npm ci`.
+# Together the jobs run every part of `npm run verify` and every browser check the single
+# job ran; tests/ci-workflow.test.mjs checks that against package.json, and that the web
+# browser tests' groups are 1 to n, so no test is left out.
 jobs:
+  # verify's checks that are not tests: the structure check, the typecheck, the formatting,
+  # the demo build. The output also goes to a file, so the next step can say what failed.
   checks:
+    name: checks, typecheck, formatting, demo build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,16 +26,68 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      # The output also goes to a file, so the next step can say what failed.
-      - name: npm run verify
+      - name: npm run check, typecheck, format:check, build:demo
         shell: bash
         run: |
           set -o pipefail
-          npm run verify 2>&1 | tee "$RUNNER_TEMP/verify-output.txt"
+          (npm run check && npm run typecheck && npm run format:check && npm run build:demo) 2>&1 | tee "$RUNNER_TEMP/verify-output.txt"
       - name: Say what failed in verify
         if: failure()
         shell: bash
         run: node scripts/verify-failure-notes.mjs "$RUNNER_TEMP/verify-output.txt"
+  # verify's unit tests, in verify's order: node's (with its pretest) and then vitest's.
+  unit-tests:
+    name: unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: npm test, npm run test:units
+        shell: bash
+        run: |
+          set -o pipefail
+          (npm test && npm run test:units) 2>&1 | tee "$RUNNER_TEMP/verify-output.txt"
+      - name: Say what failed in verify
+        if: failure()
+        shell: bash
+        run: node scripts/verify-failure-notes.mjs "$RUNNER_TEMP/verify-output.txt"
+  # verify's web shell check: it builds the web app and asks the built server, no browser.
+  web-shell:
+    name: web shell check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: npm run test:web
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:web 2>&1 | tee "$RUNNER_TEMP/verify-output.txt"
+      - name: Say what failed in verify
+        if: failure()
+        shell: bash
+        run: node scripts/verify-failure-notes.mjs "$RUNNER_TEMP/verify-output.txt"
+  # The tracker's own browser checks and the demo's, in the single job's order. The demo
+  # check opens the demo verify built, so this job builds it first.
+  tracker-browser:
+    name: tracker and demo browser checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:demo
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - run: npm run test:varsity:browser
@@ -40,15 +104,36 @@ jobs:
         shell: bash
         run: node scripts/browser-failure-notes.mjs "$RUNNER_TEMP/stats-browser-output.txt"
       - run: npm run test:pages:browser
+  # The web app's browser tests, in groups side by side. Which tests a group runs is the
+  # runner's rule (scripts/web-browser-chain.mjs), never a list here: a new test file finds
+  # its group by itself. The number of groups is the number of entries below
+  # (strategy.job-total); they must be 1 to n. fail-fast is off, so one group's failure
+  # does not stop the others and hide what they found.
+  web-browser:
+    name: web browser tests ${{ matrix.group }} of ${{ strategy.job-total }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
       # As for verify: the output also goes to a file, so the next step can say what failed.
-      # npm runs the chain in bash with its trace on, so bash prints "+ node tests/browser/…"
-      # before each test starts, and the notes can name the test that stopped (step 2.178).
+      # npm runs the chain in bash with its trace on, and the runner prints
+      # "+ node tests/browser/…" before each test starts, so the notes can name the test
+      # that stopped (step 2.178).
       - name: npm run test:web:browser
         id: web-browser
         shell: bash
         run: |
           set -o pipefail
-          env SHELLOPTS=xtrace npm_config_script_shell=bash npm run test:web:browser 2>&1 | tee "$RUNNER_TEMP/web-browser-output.txt"
+          env SHELLOPTS=xtrace npm_config_script_shell=bash npm run test:web:browser -- --group=${{ matrix.group }}/${{ strategy.job-total }} 2>&1 | tee "$RUNNER_TEMP/web-browser-output.txt"
       - name: Say what failed in the browser tests
         if: failure() && steps.web-browser.outcome == 'failure'
         shell: bash

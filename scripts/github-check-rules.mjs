@@ -4,6 +4,12 @@
 
 // `runs` is GitHub's list, newest first. For each branch: the newest commit GitHub has
 // started checking, and for that commit the newest run of each workflow.
+//
+// A run is one workflow's whole check, however many jobs it has side by side (ci.yml has
+// several since step 2.191). GitHub keeps a run "in_progress" or "queued" until every job
+// in it has finished, and gives a finished run the conclusion "success" only when no job
+// failed, was cancelled or timed out. So one run is one overall result: no part of it can
+// read as passed while another job is still running or has failed.
 //   passed:  every one of those runs finished and succeeded
 //   failed:  every one finished, and at least one did not succeed
 //   running: at least one has not finished
@@ -35,7 +41,7 @@ export function newestChecks(runs) {
   return checks;
 }
 
-// The lines to show under "Failed step" from GitHub's annotations of a failed job: each
+// The lines to show under a failed job's line from GitHub's annotations of that job: each
 // failure note's title, then every line of its message (the gate's own notes, written by
 // scripts/verify-failure-notes.mjs and scripts/browser-failure-notes.mjs, carry several),
 // at most `most` lines in all.
@@ -54,6 +60,25 @@ export function failureNoteLines(notes, most = 60) {
   }
   if (lines.length <= most) return lines;
   return [...lines.slice(0, most - 1), `  (${lines.length - most + 1} more lines on GitHub)`];
+}
+
+// The jobs of a failed run to say something about, from GitHub's list of the run's jobs:
+// every job that finished without succeeding (failed, cancelled, timed out). A job that
+// succeeded, or was skipped, or has not finished, is not one.
+export function failedJobs(jobs) {
+  return (Array.isArray(jobs) ? jobs : []).filter(
+    (job) =>
+      job.status === 'completed' &&
+      !['success', 'skipped', 'neutral'].includes(job.conclusion ?? ''),
+  );
+}
+
+// The line naming a failed job and its failed steps, as GitHub's list of jobs gives them.
+export function failedJobLine(job) {
+  const steps = (job.steps ?? [])
+    .filter((step) => step.conclusion !== 'success' && step.conclusion !== 'skipped')
+    .map(failedStepWords);
+  return `  Failed in the job "${job.name}": ${steps.join(', ') || job.conclusion || 'no step named'}`;
 }
 
 // A failed step as GitHub's list of a job's steps gives it: its name, and when it ran in
