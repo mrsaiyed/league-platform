@@ -34,6 +34,7 @@ import {
   launch,
   startNext,
   waitFor,
+  worldAtNoon,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -73,6 +74,11 @@ if (built) {
   server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
+    // At noon of the league's day (step 2.175): the game under way started half an hour
+    // before the world was made, so between the league's midnight and 00:35 it started
+    // last evening, and once ended it is under "Earlier games" (S-59), not on the first
+    // lists this test reads it on. `--now=<UTC time>` starts it elsewhere.
+    LOCAL_NOW: worldAtNoon(),
   });
   await step('starting the server and the browser', async () => {
     await waitFor(`${origin}/`, server);

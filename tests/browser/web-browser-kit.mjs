@@ -83,6 +83,47 @@ export function whatWentWrong(error) {
   return waiting ? `${lines[0]} (${waiting})` : lines[0];
 }
 
+/** The made-up league's own zone (stand-in-world-seed.ts). */
+const leagueZone = 'America/Chicago';
+
+/** The wall clock at `moment` in the league's zone, as if it were UTC: milliseconds. */
+function wallClock(moment) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: leagueZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+    })
+      .formatToParts(moment)
+      .map((p) => [p.type, Number(p.value)]),
+  );
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+}
+
+/**
+ * When the made-up world's clock starts (LOCAL_NOW, step 2.179), for a test whose games
+ * must not depend on the hour it is run at: noon in the league's zone on the league's
+ * today, so a test never meets the league's midnight or a clock change. The day's final
+ * game was played three hours before the world is made and the games list starts at the
+ * league's midnight: at noon it is always this morning's, on the list, and already played;
+ * the game under way started this morning too. `--now=<UTC time>` on the test's command
+ * line starts it there instead. One helper for every such test (step 2.175).
+ */
+export function worldAtNoon(argv = process.argv) {
+  const asked = argv.find((a) => a.startsWith('--now='))?.slice('--now='.length);
+  if (asked !== undefined) return asked;
+  const today = new Date(wallClock(new Date())).toISOString().slice(0, 10);
+  const wanted = Date.parse(`${today}T12:00:00Z`);
+  // Noon there: moved by the zone's offset, twice so a day of a clock change settles too.
+  let guess = wanted;
+  for (let i = 0; i < 2; i += 1) guess += wanted - wallClock(new Date(guess));
+  return new Date(guess).toISOString();
+}
+
 export function freePort() {
   return new Promise((resolve, reject) => {
     const probe = net.createServer();
