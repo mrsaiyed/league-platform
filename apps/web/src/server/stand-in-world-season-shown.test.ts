@@ -74,14 +74,40 @@ describe('a season shown and hidden on the made-up world', () => {
     const world = testWorld(accessOf);
     const before = await getSeason(as(owner), { seasonId: winter }, world.deps);
     const version = before.ok ? before.value.version : 0;
+    const fall = (await world.read(first))?.currentSeasonId ?? '';
+    const fallBefore = await getSeason(as(owner), { seasonId: fall }, world.deps);
+    expect(fallBefore).toMatchObject({ ok: true, value: { isCurrent: true } });
     await updateSeason(as(owner), { seasonId: winter, version, current: true }, world.deps);
     expect((await world.read(first))?.currentSeasonId).toBe(winter);
+    // The season that lost the mark was changed, so its version moved on (0002).
+    const fallAfter = await getSeason(as(owner), { seasonId: fall }, world.deps);
+    expect(fallAfter).toMatchObject({
+      ok: true,
+      value: {
+        isCurrent: false,
+        version: (fallBefore.ok ? fallBefore.value.version : 0) + 1,
+      },
+    });
     await updateSeason(
       as(owner),
       { seasonId: winter, version: version + 1, current: false },
       world.deps,
     );
     expect((await world.read(first))?.currentSeasonId).toBeNull();
+  });
+
+  it('refuses by name a current season in a second program, which the world cannot hold', async () => {
+    const world = testWorld(accessOf, undefined, (leagues) => {
+      const league = leagues.find((l) => l.leagueId === first);
+      if (league === undefined) return;
+      league.seasons = league.seasons.map((x) =>
+        x.id === winter ? { ...x, programId: castId(0xc9) } : x,
+      );
+    });
+    await expect(
+      updateSeason(as(owner), { seasonId: winter, version: 1, current: true }, world.deps),
+    ).rejects.toThrow(/Not on the stand-in yet/);
+    expect((await world.read(first))?.currentSeasonId).not.toBe(winter);
   });
 
   it('refuses a scheduler and a scorekeeper, and changes nothing', async () => {

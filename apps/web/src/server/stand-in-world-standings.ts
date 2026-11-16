@@ -260,11 +260,14 @@ const samePlace = (a: SettingPlace, b: SettingPlace) => JSON.stringify(a) === JS
  * Season settings use them: who the league is, its seasons' programs, its stored settings,
  * and a season read and changed (getSeason, updateSeason: step 2.182 shows and hides a
  * season through them) as the database's seasons table does it: the version is checked
- * and raised, and making a season current takes the mark from the other one. Creating
- * leagues, seasons and divisions, changing a league's name, address or state and saving a
- * season's rules have no screen on the stand-in yet: those parts fail by name
- * (createLeague, setLeagueName, renameShortName, setLeagueStatus, createSeason,
- * setSeasonRules, setSeasonRosterSettings, setCurrentSeason, and every division command).
+ * and raised, and making a season current takes the mark from its program's other current
+ * season, raising that one's version too. So the setCurrentSeason command, which changes
+ * a season through updateSeason, works here. Creating leagues, seasons and divisions,
+ * changing a league's name, address or state and saving a season's rules have no screen
+ * on the stand-in yet: those parts fail by name (createLeague, setLeagueName,
+ * renameShortName, setLeagueStatus, createSeason, setSeasonRules, setSeasonRosterSettings,
+ * the store's own setCurrentSeason, which only createLeague calls, and every division
+ * command).
  */
 export function worldLeaguesStores(
   s: LeagueWorld,
@@ -318,9 +321,23 @@ export function worldLeaguesStores(
       const found = s.seasons[at];
       if (found === undefined || found.version !== version) return undefined;
       const { isCurrent, rules: _rules, ...fields } = change;
-      s.seasons = replacedAt(s.seasons, at, { ...found, ...fields, version: version + 1 });
-      if (isCurrent === true) s.currentSeasonId = seasonId;
+      if (isCurrent === true) {
+        // As the database: the mark leaves the other current season of the same program,
+        // whose row is changed and so gets a new version too (0002). The world keeps one
+        // current season for the league, which holds while its seasons share one program,
+        // as every made-up league's do: a second program's current season is refused.
+        const other = s.seasons.findIndex((x) => x.id === s.currentSeasonId && x.id !== seasonId);
+        const losing = s.seasons[other];
+        if (losing !== undefined && losing.programId !== found.programId) {
+          return notYet('leagues.updateSeason current seasons of two programs')();
+        }
+        if (losing !== undefined) {
+          s.seasons = replacedAt(s.seasons, other, { ...losing, version: losing.version + 1 });
+        }
+        s.currentSeasonId = seasonId;
+      }
       if (isCurrent === false && s.currentSeasonId === seasonId) s.currentSeasonId = null;
+      s.seasons = replacedAt(s.seasons, at, { ...found, ...fields, version: version + 1 });
       return version + 1;
     },
     setCurrentSeason: notYet('leagues.setCurrentSeason'),
