@@ -11,6 +11,7 @@ import {
   keepingSender,
   keptEmailOf,
   keptEmailsFolderFrom,
+  keptEmailsShown,
   readKeptEmails,
 } from './kept-emails.ts';
 
@@ -97,6 +98,30 @@ describe('keepingSender', () => {
     expect(kept.map((m) => m.to)).toEqual(['new@example.test']);
     expect(kept[0]?.code).toBe('222222');
     expect(notKept).toBe(0);
+  });
+
+  // Review of step 2.96, L4: the folder does not grow without end.
+  it('keeps the newest files it wrote as the page shows them, never removing another’s', async () => {
+    const folder = path.join(scratch(), 'captured-email');
+    const worker = captureEmail({ directory: folder, now: () => new Date('2026-11-16T09:00:00Z') });
+    const { id: workersId } = await worker.send(message('player@example.test', 'From the worker.'));
+    let minute = 0;
+    const keeping = keepingSender(captureEmail(), folder, {
+      now: () => new Date(Date.UTC(2026, 10, 16, 10, minute++)),
+      onNotKept: () => {},
+    });
+    keeping.startKeeping();
+    for (let n = 0; n < keptEmailsShown + 3; n += 1) {
+      await keeping.sender.send(message(`p${n}@example.test`, `Your code is ${100000 + n}.`));
+    }
+    const files = readdirSync(folder);
+    expect(files.filter((file) => file.endsWith('.json'))).toHaveLength(keptEmailsShown + 1);
+    expect(files.filter((file) => file.includes(workersId))).toHaveLength(2);
+    const kept = await readKeptEmails(folder, origin, keptEmailsShown + 10);
+    expect(kept.map((m) => m.to)).not.toContain('p0@example.test');
+    expect(kept.map((m) => m.to)).not.toContain('p2@example.test');
+    expect(kept.map((m) => m.to)).toContain('p3@example.test');
+    expect(kept[0]?.to).toBe(`p${keptEmailsShown + 2}@example.test`);
   });
 
   it('writes nothing without a folder', async () => {

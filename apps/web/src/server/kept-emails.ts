@@ -91,7 +91,8 @@ export type KeepingSender = {
 /**
  * `memory` (the email capture the stand-in reads) with a copy of each email to a made-up
  * address written to `folder`, once startKeeping is called: the made-up people's own
- * sign-ups when the app starts are not kept. With no folder, nothing is written.
+ * sign-ups when the app starts are not kept. Of the files it writes, the newest
+ * `keptEmailsShown` stay. With no folder, nothing is written.
  */
 export function keepingSender(
   memory: EmailSender,
@@ -102,7 +103,14 @@ export function keepingSender(
   const files =
     folder === null || folder === undefined
       ? null
-      : captureEmail({ directory: folder, now: options.now, maxKept: keptEmailsShown });
+      : // Only the newest the page shows stay: past them, the app's own oldest files are
+        // removed; a file it did not write (the worker's, anyone's) is never touched.
+        captureEmail({
+          directory: folder,
+          now: options.now,
+          maxKept: keptEmailsShown,
+          filesKept: keptEmailsShown,
+        });
   return {
     sender: {
       send: async (message: EmailMessage): Promise<SentEmail> => {
