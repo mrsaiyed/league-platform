@@ -23,7 +23,9 @@
 // the server starts.
 import {
   ok,
+  systemClock,
   type AccessTx,
+  type Clock,
   type CommandDeps,
   type Grant,
   type Role,
@@ -192,7 +194,19 @@ export type StandInOptions = {
    * design, so every page can be pictured in every color set (scripts/shots.mjs).
    */
   readonly localDesign?: PicturedDesignKey | undefined;
+  /**
+   * LOCAL_NOW: the moment the one made-up world's clock starts at (step 2.179), so a test
+   * runs as if at that hour; the world is seeded then and its clock runs on from there.
+   * Only the world reads it; sign-in and sessions keep this computer's clock.
+   */
+  readonly worldStartsAt?: string;
 };
+
+/** A clock that reads `startsAt` now and runs on from it as this computer's does. */
+function clockStartingAt(startsAt: string): Clock {
+  const offset = Date.parse(startsAt) - Date.now();
+  return { now: () => Date.now() + offset };
+}
 
 /**
  * A made-up member who signs in with a password on the sign-in stand-in, made when
@@ -313,10 +327,13 @@ export function standInPorts(options: StandInOptions): StandInPorts {
   };
   const accessOf = accessOfVia(deps);
   // The one made-up world: every area below reads and writes the same rows (step 2.152).
+  const clock =
+    options.worldStartsAt === undefined ? systemClock : clockStartingAt(options.worldStartsAt);
   const world = madeUpWorld({
-    leagues: madeUpLeagues(standInSeedCast, now()),
+    leagues: madeUpLeagues(standInSeedCast, new Date(clock.now())),
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
+    clock,
   });
   // The League settings screen's settings: every area reads them from the same world, and
   // the Privacy settings read who plays there and whether anyone is recorded as a child

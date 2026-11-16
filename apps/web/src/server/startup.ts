@@ -62,6 +62,7 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       ...(deps.warn === undefined ? {} : { warn: deps.warn }),
       emailFrom: config.EMAIL_FROM,
       localDesign: config.LOCAL_DESIGN,
+      ...(config.LOCAL_NOW === undefined ? {} : { worldStartsAt: config.LOCAL_NOW }),
     };
     if (config.LOCAL_DATA === 'made-up-database') return onMadeUpDatabase(options, deps);
     const ports = standInPorts(options);

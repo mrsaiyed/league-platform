@@ -28,6 +28,7 @@ export const fields = {
   PLATFORM_DATABASE_URL: { secret: true },
   LOCAL_DATA: { secret: false },
   LOCAL_DESIGN: { secret: false },
+  LOCAL_NOW: { secret: false },
   SESSION_SECRET: { secret: true },
   SUPABASE_URL: { secret: false },
   SUPABASE_SECRET_KEY: { secret: true },
@@ -70,6 +71,11 @@ const schema = z.object({
   // page can be pictured in every color set (scripts/shots.mjs --design, step 2.147): a
   // starting design, or a made-up one kept for pictures. Only local and test read it.
   LOCAL_DESIGN: z.enum(picturedDesignKeys).optional(),
+  // The moment the made-up stand-in's world starts its clock at, a UTC time such as
+  // 2026-11-15T20:01:00Z, so a browser test can be run as if at any hour (step 2.179): its
+  // seed is made at that moment and its clock runs on from it. Only the stand-in's world
+  // reads it, never the made-up database; only local and test.
+  LOCAL_NOW: z.iso.datetime().optional(),
   // Nothing uses these yet (R8): each becomes required, where it is used, with the
   // step that first uses it. Given now, they are still checked.
   SESSION_SECRET: secretText(32).optional(),
@@ -93,6 +99,7 @@ const optional: readonly ConfigName[] = [
   'PLATFORM_DATABASE_URL',
   'LOCAL_DATA',
   'LOCAL_DESIGN',
+  'LOCAL_NOW',
   'SESSION_SECRET',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
@@ -118,6 +125,7 @@ const requiredIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
 const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   LOCAL_DATA: ['local', 'test'],
   LOCAL_DESIGN: ['local', 'test'],
+  LOCAL_NOW: ['local', 'test'],
 };
 
 /** The settings that name a database or a Supabase project of the platform's own. */
@@ -206,6 +214,18 @@ export function loadConfig(
     if (given[name] !== undefined && knownEnv !== undefined && !environments.includes(knownEnv)) {
       invalid.set(name, `${name}: invalid, may be set only when APP_ENV is local or test`);
     }
+  }
+  // LOCAL_NOW moves only the stand-in's made-up world (step 2.179): the made-up database
+  // keeps this computer's clock, so with it the setting would silently do nothing.
+  if (
+    given['LOCAL_NOW'] !== undefined &&
+    given['LOCAL_DATA'] === 'made-up-database' &&
+    !invalid.has('LOCAL_NOW')
+  ) {
+    invalid.set(
+      'LOCAL_NOW',
+      'LOCAL_NOW: invalid, the made-up database keeps this computer’s clock, so it may not be set with LOCAL_DATA=made-up-database',
+    );
   }
   const result = schema.safeParse(given);
   if (result.success && invalid.size === 0) return Object.freeze(result.data);
