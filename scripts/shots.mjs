@@ -258,14 +258,14 @@ const gamesStates = [
     onlyIn: leagues[0],
     first: `/admin/games/${trackedGame(1)}`,
     tap: async (page) => {
-      // A count the phone's own check would stop: the form is sent as a browser that does
-      // not check would send it, so the server's refusal is what is pictured.
+      // A count over the box's limit, typed in one team's grid; then the other team is
+      // picked, so that grid is put away on a phone, and Save is tapped. The form leaves the
+      // telling to the server (step 2.103): the refusal names the box, and its team is shown.
       const points = page.locator('main input[name^="stat.points."]');
       await showSheetTeamOf(page, points.nth(3));
       await points.nth(3).fill('1000');
-      await page.locator('main form:has(#box-score-scores)').evaluate((form) => {
-        form.noValidate = true;
-      });
+      await showSheetTeamOf(page, points.nth(8));
+      await points.nth(8).fill('9');
       await page.locator('main form button[type="submit"]').last().click();
       await page.locator('#box-score-scores [role="alert"]').waitFor();
     },
@@ -321,7 +321,8 @@ const adminPages = [
   // one), each also in the second league's light look: the empty season with its form;
   // "Saved" after adding a round; the moved game's question; a game outside its round with
   // its button; a round's controls opened, one with "Remove this round" and one saying why
-  // it cannot be removed; a round date refused beside its round, and a new round's date
+  // it cannot be removed; a game's own form opened ("Edit this game": Save game, and Remove
+  // game apart from it); a round date refused beside its round, and a new round's date
   // refused beside its field. Each is reached by the owner's own taps (roundSteps).
   ...[
     { name: 'admin-schedule-no-rounds', steps: [] },
@@ -329,6 +330,7 @@ const adminPages = [
     { name: 'admin-schedule-move-question', steps: ['rounds', 'game', 'move'] },
     { name: 'admin-schedule-outside-round', steps: ['rounds', 'game', 'move', 'keep'] },
     { name: 'admin-schedule-round-controls', steps: ['rounds', 'game', 'open'] },
+    { name: 'admin-schedule-edit-game', steps: ['rounds', 'game', 'edit'] },
     { name: 'admin-schedule-round-refused', steps: ['rounds', 'game', 'bad-round-date'] },
     { name: 'admin-schedule-add-round-refused', steps: ['rounds', 'bad-new-date'] },
   ].flatMap(({ name, steps }) =>
@@ -705,6 +707,9 @@ async function roundSteps(page, steps) {
         page.locator('[data-follow-round-date] a', { hasText: 'No, keep' }),
         /season=winter-2027/,
       );
+    } else if (step === 'edit') {
+      // "Edit this game", opened: its fields, then Save game and, apart, Remove game.
+      await game.locator('summary', { hasText: 'Edit this game' }).click();
     } else if (step === 'open') {
       for (const label of ['Week 1', 'Week 2']) {
         await round(label).locator('summary', { hasText: 'Change or remove this round' }).click();
@@ -936,9 +941,13 @@ try {
         });
         await page.mouse.move(0, 0);
         const file = path.join(out, width.name, `${fileName(job.name)}.jpg`);
+        const whole = !job.opens && opened === null;
+        // A whole page is taken from its top: a page a tap has scrolled (to a box that took
+        // the focus) would be drawn with the row that stays on top across its middle.
+        if (whole) await page.evaluate(() => window.scrollTo(0, 0));
         await page.screenshot({
           path: file,
-          fullPage: !job.opens && opened === null,
+          fullPage: whole,
           type: 'jpeg',
           quality: 80,
         });
