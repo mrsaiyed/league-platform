@@ -91,6 +91,16 @@ describe('startWebApp', () => {
       accessToken: signedIn.value.session.accessToken,
     });
     expect(who.ok && service.ok && who.value.accountId !== service.value.accountId).toBe(true);
+    // It carries the local tools (step 2.96), so, as the stand-in, it answers only requests
+    // made on this computer: never another computer's on the same network (review, M1).
+    expect(ports.localTools).not.toBeNull();
+    expect(ports.answers(new Headers({ host: 'localhost:3000' }))).toBe(true);
+    for (const host of ['192.168.1.20:3000', 'my-laptop.lan:3000', 'leagues.example.com']) {
+      expect(ports.answers(new Headers({ host })), host).toBe(false);
+    }
+    expect(
+      ports.answers(new Headers({ host: 'localhost:3000', 'x-forwarded-for': '192.168.1.30' })),
+    ).toBe(false);
     // Its sign-in stand-in would pass the check the real service must pass (step 2.115).
     await expect(requireEmailConfirmation(ports.signIn)).resolves.toBeUndefined();
   }, 120_000);

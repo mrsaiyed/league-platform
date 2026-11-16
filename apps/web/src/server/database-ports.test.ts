@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databasePorts, NotOnTheDatabaseYet } from './database-ports.ts';
 import { resolveLeagueApi } from './league-api.ts';
+import type { LocalTools } from './local-tools.ts';
 import type { WebPorts } from './ports.ts';
 import { scoringOffersRequest } from './scoring-offers-endpoint.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
@@ -479,5 +480,49 @@ describe('databasePorts (record 055)', () => {
       'America/Chicago',
     );
     expect(await ports.publicTeams.startPageOf(lakeside().leagueId)).toBe('leagueHome');
+  });
+});
+
+// Review of step 2.96, M1: ports that carry the local tools (the kept emails' page and "be
+// this made-up person") answer only requests made on this computer, as the stand-in's do,
+// so no other computer on the network reaches them through the proxy. A real database's
+// ports carry none and answer every request.
+describe('databasePorts with the local tools (step 2.96)', () => {
+  const tools: LocalTools = {
+    keptEmails: async () => [],
+    madeUpPeople: async () => [],
+    madeUpSignInOf: () => undefined,
+    watchForCode: () => ({ code: async () => undefined, stop: () => {} }),
+  };
+  const portsWith = (localTools: { tools: LocalTools; publicBaseUrl: string } | null) =>
+    databasePorts({
+      database,
+      db,
+      signIn: {} as SignInService,
+      signInMail: {} as SignInMail,
+      log: () => {},
+      warn: () => {},
+      localTools,
+    });
+  const here = new Headers({ host: '127.0.0.1:3000', 'x-forwarded-for': '127.0.0.1' });
+  const elsewhere = [
+    new Headers({ host: '192.168.1.20:3000' }),
+    new Headers({ host: 'leagues.example.com' }),
+    new Headers({ host: '127.0.0.1:3000', 'x-forwarded-for': '192.168.1.30' }),
+    new Headers({ host: '127.0.0.1:3000', via: '1.1 a-proxy' }),
+  ];
+
+  it('answers only requests made on this computer when it carries them', () => {
+    const carrying = portsWith({ tools, publicBaseUrl: 'http://127.0.0.1:3000' });
+    expect(carrying.localTools).toBe(tools);
+    expect(carrying.answers(here)).toBe(true);
+    for (const request of elsewhere) expect(carrying.answers(request)).toBe(false);
+  });
+
+  it('answers every request when it carries none, as a real database', () => {
+    for (const none of [portsWith(null), ports]) {
+      expect(none.localTools).toBeNull();
+      for (const request of [here, ...elsewhere]) expect(none.answers(request)).toBe(true);
+    }
   });
 });
