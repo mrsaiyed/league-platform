@@ -57,7 +57,19 @@ function RosterTable({
           <tbody>
             {rows.map((row) => (
               <tr key={row.key}>
-                <td className="ui-num">{row.number}</td>
+                <td className="ui-num">
+                  {row.number === '' ? (
+                    // Someone with no number (a coach, say): a dash, never a blank cell.
+                    <>
+                      <span className="ui-no-value" aria-hidden="true">
+                        –
+                      </span>
+                      <span className="ui-visually-hidden">{t('team.noNumber')}</span>
+                    </>
+                  ) : (
+                    row.number
+                  )}
+                </td>
                 <th scope="row" className="ui-team-cell">
                   <span dir="auto">{row.name}</span>
                 </th>

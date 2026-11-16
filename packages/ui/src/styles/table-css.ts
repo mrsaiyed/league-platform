@@ -18,13 +18,11 @@ export const tableCss = String.raw`
   timeline-scope: --ui-table-scroll;
 }
 /* A table whose name is kept for screen readers only (a heading above it says the same) has
-   no line of its own for the arrow, which then sat on a column heading. It gets a short
-   band above its headings, and the arrow sits there. */
+   no line of its own for the arrow, which must not sit on a column heading. Its arrow
+   stands over the box's far corner instead (below), so the fade keeps no clear patch for
+   one inside the box. */
 .ui-table-frame:has(caption.ui-visually-hidden) {
-  --ui-table-arrow: var(--step-1);
-}
-.ui-table-frame:has(caption.ui-visually-hidden) .ui-table-wrap {
-  padding-block-start: var(--step-4);
+  --ui-table-arrow: calc(-1 * var(--step-8));
 }
 .ui-table-wrap {
   /* Words kept only for screen readers are placed out of the flow; this keeps the ones in
@@ -77,7 +75,7 @@ export const tableCss = String.raw`
   .ui-table-frame::before {
     inset-block: 0;
     inset-inline-end: 0;
-    inline-size: var(--step-5);
+    inline-size: var(--step-4);
     border-start-end-radius: inherit;
     border-end-end-radius: inherit;
     background:
@@ -97,9 +95,6 @@ export const tableCss = String.raw`
       ),
       linear-gradient(to left, transparent, var(--color-panel));
   }
-  .ui-table-frame:has(caption.ui-visually-hidden)::after {
-    inset-block-start: var(--step-1);
-  }
   .ui-table-frame::after {
     inset-block-start: var(--step-4);
     inset-inline-end: var(--step-2);
@@ -112,6 +107,23 @@ export const tableCss = String.raw`
   [dir='rtl'] .ui-table-frame::after {
     transform: rotate(45deg);
   }
+  /* Over a table with no name in view the sign is the arrow of a way on, standing above
+     the box's far corner in the gap under the section's title: no strip is kept for it
+     inside the box, and it never sits on a column heading. */
+  .ui-table-frame:has(caption.ui-visually-hidden)::after {
+    inset-block-start: calc(-1 * (var(--step-4) + var(--step-1)));
+    inset-inline-end: 0;
+    inline-size: var(--step-4);
+    block-size: var(--step-4);
+    border: 0;
+    background: var(--color-muted);
+    -webkit-mask: var(--ui-arrow) center / contain no-repeat;
+    mask: var(--ui-arrow) center / contain no-repeat;
+    transform: none;
+  }
+  [dir='rtl'] .ui-table-frame:has(caption.ui-visually-hidden)::after {
+    transform: scaleX(-1);
+  }
   /* The column that stays put has an edge while the table is scrolled under it: a hairline
      and a soft shadow on its far side. A number half under it is then plainly covered, not
      read as a different number. A table that is not scrolled shows no edge. */
@@ -120,16 +132,18 @@ export const tableCss = String.raw`
     position: absolute;
     inset-block: 0;
     inset-inline-start: 100%;
-    inline-size: var(--step-2);
+    inline-size: var(--step-3);
     border-inline-start: 1px solid var(--color-line-strong);
-    background: linear-gradient(to right, var(--scroll-shadow), transparent);
+    /* The panel's own color, thinning: a number scrolled against the column fades into it
+       over a few pixels, and never stands hard against the name. */
+    background: linear-gradient(to right, var(--color-panel), transparent);
     opacity: 0;
     pointer-events: none;
     animation: ui-table-stuck linear both;
     animation-timeline: --ui-table-scroll;
   }
   [dir='rtl'] .ui-team-cell::after {
-    background: linear-gradient(to left, var(--scroll-shadow), transparent);
+    background: linear-gradient(to left, var(--color-panel), transparent);
   }
 }
 /* A browser that cannot follow the scroll gives that column a hairline at all times. */
@@ -459,7 +473,11 @@ export const tableCss = String.raw`
   justify-content: flex-start;
   gap: var(--step-1);
   padding-block: 0;
-  padding-inline: 0;
+  /* Room inside the button for the keyboard's ring, which is drawn inside it (below), taken
+     back outside it: the heading stands where it stood, and the ring never lies on its
+     letters. */
+  padding-inline: var(--step-2);
+  margin-inline: calc(-1 * var(--step-2));
   min-block-size: var(--tap);
   min-inline-size: var(--tap);
   border: 0;

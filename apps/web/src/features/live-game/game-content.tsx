@@ -205,14 +205,16 @@ export function GameContent({ view }: { readonly view: GameView }) {
         <section className="ui-section" aria-labelledby={playsId}>
           <div className="ui-section-head">
             <h2 id={playsId}>{t('game.plays')}</h2>
-          </div>
-          {view.snapshot.status === 'live' ? (
-            <p className="ui-section-note">
-              {t('game.playsAsOpened')}{' '}
-              <NewerPlaysLink href={`${view.selfAddress}#${playsId}`}>
+            {/* The way to newer plays stands beside the title, drawn as every way on is (in
+                the color the eye lands on, with its arrow), not as a link inside a sentence. */}
+            {view.snapshot.status === 'live' ? (
+              <NewerPlaysLink className="ui-more" href={`${view.selfAddress}#${playsId}`}>
                 {t('game.newerPlays')}
               </NewerPlaysLink>
-            </p>
+            ) : null}
+          </div>
+          {view.snapshot.status === 'live' ? (
+            <p className="ui-section-note">{t('game.playsAsOpened')}</p>
           ) : null}
           {view.plays.length === 0 ? (
             <EmptyPanel text={t('game.noPlays')} />

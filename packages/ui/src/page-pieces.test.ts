@@ -573,21 +573,27 @@ describe('tables', () => {
     expect(html.match(/class="ui-team-cell"/g)).toHaveLength(2);
   });
   it('fade the far edge lightly: a column wholly in view under it keeps its digits', () => {
-    // Narrow, and reaching the panel's color only at the very edge: never a solid band.
+    // Narrow, and reaching the panel's color only at the very edge: never a solid band. A
+    // step narrower since step 2.147 part 3 (16, was 24): under the wider one a number cut
+    // by the box's edge lost a whole digit and read as another number (155 as 15).
     expect(displayCss).toMatch(
-      /\.ui-table-frame::before \{[^}]*inline-size: var\(--step-5\);[^}]*linear-gradient\(to right, transparent, var\(--color-panel\)\);/,
+      /\.ui-table-frame::before \{[^}]*inline-size: var\(--step-4\);[^}]*linear-gradient\(to right, transparent, var\(--color-panel\)\);/,
     );
     expect(displayCss).not.toMatch(/transparent, var\(--color-panel\) \d+%\)/);
   });
-  it('never put the scroll arrow on a column heading: a table with no name in view gets a band for it', () => {
+  it('never put the scroll arrow on a column heading: over a table with no name in view it stands above the box', () => {
+    // Step 2.147 part 3: such a table had a band of its own for the arrow, which read as an
+    // empty strip with an arrow alone in it. The arrow now stands over the box's far
+    // corner, in the gap under the section's title, and the headings have the box's top.
     expect(displayCss).toMatch(
-      /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \{\s*--ui-table-arrow: var\(--step-1\);/,
+      /\.ui-table-frame:has\(caption\.ui-visually-hidden\)::after \{\s*inset-block-start: calc\(-1 \* \(var\(--step-4\) \+ var\(--step-1\)\)\);/,
     );
-    expect(displayCss).toMatch(
-      /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \.ui-table-wrap \{\s*padding-block-start: var\(--step-4\);/,
+    expect(displayCss).not.toMatch(
+      /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \.ui-table-wrap \{\s*padding-block-start/,
     );
+    // And the clear patch the fade keeps behind an arrow inside the box is out of the way.
     expect(displayCss).toMatch(
-      /\.ui-table-frame:has\(caption\.ui-visually-hidden\)::after \{\s*inset-block-start: var\(--step-1\);/,
+      /\.ui-table-frame:has\(caption\.ui-visually-hidden\) \{\s*--ui-table-arrow: calc\(-1 \* var\(--step-8\)\);/,
     );
   });
   it('keep the ring of a heading button whole, and what the keyboard reaches clear of the name column', () => {

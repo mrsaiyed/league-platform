@@ -266,6 +266,7 @@ export const en = {
   'team.rosterEmpty': 'No one is on this team yet.',
   'team.rosterFormer': 'Left the team',
   'team.jersey': 'Number',
+  'team.noNumber': 'No number',
   'team.player': 'Player',
   'team.role': 'Role',
   'team.role.player': 'Player',
