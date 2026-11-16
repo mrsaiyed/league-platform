@@ -66,6 +66,9 @@ repository is then already cloned on a temporary Linux machine. What differs fro
   # Links in .local/pw-browsers give the machine's Chromium under the name Playwright looks for.
   export PLAYWRIGHT_BROWSERS_PATH="<the repository folder>/.local/pw-browsers"
   export BROWSER_EXECUTABLE="/opt/pw-browsers/chromium"
+  # As on GitHub's machines: the browser tests and picture scripts pick Edge unless CI is set, and
+  # Next.js does not stop a first start with its upgrade notice.
+  export CI=1
   ```
 
   and by links made once in `.local/pw-browsers` (the numbers are the builds on the day:
@@ -79,13 +82,20 @@ repository is then already cloned on a temporary Linux machine. What differs fro
   branch's own history, without printing it:
   `git config author.name "$(git log -1 --format=%an origin/build/stage-1)"` and the same
   with `author.email` and `%ae`. Lanes share the setting.
-- **Pushing.** The build branch can be pushed. The app's safety check refused a lane
-  branch on 2026-11-16: `STATUS.md`, "Pushing to GitHub", says whether the founder has
-  since allowed it. Until then a lane's new work is on that machine only, the lead runs
-  each lane's whole gate there, and a landing is what puts work on GitHub.
+- **Pushing.** The app's safety check refused the lead's first push of a lane branch on
+  2026-11-16, until the founder said in the chat that lane branches may be pushed; a
+  scheduled check was refused in the same way until they approved it. A founder's own
+  words in the chat are what the app goes by, so if a push or a schedule is refused, say
+  so to the founder in one plain sentence and carry on with what does not need it. Some
+  helpers' own pushes are still refused: the lead pushes every lane each time it takes a
+  turn. Deleting a branch on GitHub is not possible from a cloud session (403).
 - **The machine is taken away when it stands idle.** Only what is on GitHub survives.
   Section 5's two lead sessions and two scheduled checks rest on one shared folder and do
-  not exist in the cloud: `STATUS.md`, "Next step", says how the build is led there.
+  not exist in the cloud: there is one lead, and one scheduled check of the app that
+  wakes it every hour (`STATUS.md`, "Next step", says how the build is led there).
+- **The progress page** cannot be served from the cloud machine to the founder: a small
+  copy of it is published as a private page of the app (`STATUS.md`, the log line of
+  2026-11-16, 22:39 UTC).
 - **Speed.** Four processors: three heavy turns, one whole lane gate at a time
   (`STATUS.md`, "Lanes").
 
