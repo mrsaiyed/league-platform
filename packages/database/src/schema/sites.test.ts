@@ -7,8 +7,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { PGlite, Transaction } from '@electric-sql/pglite';
+import { PGlite, type Transaction } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createDatabase } from '../db/create-database.ts';
+import { withTransaction } from '../db/with-transaction.ts';
+import { loadMigrations, pgliteDriver, runMigrations } from '../migrations/index.ts';
+import { findPublishedDesign } from '../queries/index.ts';
 import {
   asApp,
   freshSchema,
@@ -214,27 +218,27 @@ describe('the fence on both tables (T-61)', () => {
 });
 
 /** A league as the internal tool now leaves it: its log rows, its season, and its first release. */
-async function makerShaped(withSite: boolean) {
-  const league = await newLeague(db);
-  const staff = await newAccount(db);
+async function makerShaped(withSite: boolean, on: PGlite = db) {
+  const league = await newLeague(on);
+  const staff = await newAccount(on);
   const season = await one<{ id: string }>(
-    db,
+    on,
     `insert into seasons (league_id, program_id, slug, name) values ($1, $2, 'fall', 'Fall')
      returning id`,
     [league.leagueId, league.defaultProgramId],
   );
-  await db.query('update seasons set is_current = true where id = $1', [season.id]);
+  await on.query('update seasons set is_current = true where id = $1', [season.id]);
   for (const action of ['leagues.create', 'leagues.create_season']) {
-    await db.query(
+    await on.query(
       `insert into activity_log (league_id, actor_account_id, action, summary)
        values ($1, $2, $3, $4)`,
       [league.leagueId, staff, action, `activity.${action}`],
     );
   }
-  const releaseId = withSite ? await release(db, league.leagueId, 1, staff) : null;
-  if (releaseId !== null) await site(db, league.leagueId, releaseId);
+  const releaseId = withSite ? await release(on, league.leagueId, 1, staff) : null;
+  if (releaseId !== null) await site(on, league.leagueId, releaseId);
   const row = await one<{ slug: string; version: number; created_at: string }>(
-    db,
+    on,
     'select slug, version, created_at::text as created_at from leagues where id = $1',
     [league.leagueId],
   );
@@ -380,5 +384,63 @@ describe('migration 0020 runs twice', () => {
     ]);
     for (const row of comments.rows) expect(row.comment, row.name).toContain('0020');
     expect(comments.rows[0]?.comment).toContain('site-changed');
+  });
+});
+
+describe('a league made before 0020', () => {
+  it('has no site rows after it, is drawn in the neutral design, and can still be removed', async () => {
+    const loaded = await loadMigrations();
+    if (!loaded.ok) throw new Error(loaded.error.message);
+    const at = loaded.value.findIndex((m) => m.name.startsWith('0020_'));
+    expect(at).toBeGreaterThan(0);
+    const older = new PGlite();
+    try {
+      // Up to 0019, a league exactly as the tool then made it; then 0020 over it.
+      const before = await runMigrations(pgliteDriver(older), loaded.value.slice(0, at));
+      if (!before.ok) throw new Error(before.error.message);
+      const league = await makerShaped(false, older);
+      const after = await runMigrations(pgliteDriver(older), loaded.value);
+      if (!after.ok) throw new Error(after.error.message);
+      for (const table of ['sites', 'site_releases']) {
+        expect(
+          await one(older, `select count(*)::int as n from ${table} where league_id = $1`, [
+            league.leagueId,
+          ]),
+        ).toEqual({ n: 0 });
+      }
+      // No release: what the public read finds is nothing, so its pages are drawn in the
+      // neutral design (apps/web/src/server/league-site.ts).
+      const handle = createDatabase({ kind: 'pglite', pglite: older });
+      try {
+        expect(
+          await withTransaction(handle, { leagueId: league.leagueId }, findPublishedDesign),
+        ).toBeUndefined();
+      } finally {
+        await handle.close();
+      }
+      const problems = await one<{ problems: string[] }>(
+        older,
+        'select public.league_removal_problems($1) as problems',
+        [league.leagueId],
+      );
+      expect(problems).toEqual({ problems: [] });
+      const outcome = await older.transaction(async (tx) => {
+        await tx.query(
+          "select set_config('app.league_id', $1, true), set_config('app.account_id', $2, true)",
+          [league.leagueId, league.staff],
+        );
+        return one<{ outcome: string }>(
+          tx,
+          'select outcome from public.remove_draft_league($1, $2, $3, $4, $5::timestamptz, null)',
+          [league.leagueId, league.slug, league.staff, league.version, league.created_at],
+        );
+      });
+      expect(outcome).toEqual({ outcome: 'removed' });
+      expect(
+        await one(older, 'select count(*)::int as n from leagues where id = $1', [league.leagueId]),
+      ).toEqual({ n: 0 });
+    } finally {
+      await older.close();
+    }
   });
 });
