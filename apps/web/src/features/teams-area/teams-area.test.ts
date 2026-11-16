@@ -22,6 +22,7 @@ import {
   shortNameNeeded,
 } from './form-input.ts';
 import { hasName, numbersWornTwice, rosterName } from './roster-name.ts';
+import { putBackOffer } from './put-back-offer.ts';
 import { saidOnLine } from './said-on-line.ts';
 
 const t = createTranslator('en');
@@ -193,6 +194,19 @@ describe('answers in the address', () => {
     // A number that is not a jersey number is never carried; an entry not on the page says nothing.
     expect(doneAtOf({ done: 'putBackNoNumber', entry, number: '<b>' })?.at).toEqual({ entry });
     expect(saidOnLine(doneAtOf({ done: 'putBack', entry: 'x' }), lines, 'Falcons')).toBeUndefined();
+  });
+
+  it('offers "Put back" only where it can work, and says why not in words', () => {
+    const list = (ids: string[], complete = true) => ({ ids: new Set(ids), complete });
+    expect(putBackOffer('p1', new Set(), list(['p1']))).toBe('offer');
+    // On the team again by a later entry.
+    expect(putBackOffer('p1', new Set(['p1']), list(['p1']))).toBe('back');
+    // Taken off the league list, known because the whole list was read.
+    expect(putBackOffer('p1', new Set(), list(['p2']))).toBe('off-the-list');
+    // A list cut short, or not read: never claims they were taken off.
+    expect(putBackOffer('p1', new Set(), list(['p2'], false))).toBe('offer');
+    expect(putBackOffer('p1', new Set(), undefined)).toBe('offer');
+    expect(t('adminTeams.roster.offTheList')).toContain('taken off the league list');
   });
 
   it('promises no way back from the bin that no screen offers (step 2.161)', () => {

@@ -16,6 +16,7 @@ import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
 import { doneAtOf, entryAnchor, leavingAtOf, problemKey } from './answer.ts';
+import { putBackOffer } from './put-back-offer.ts';
 import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
 import {
@@ -42,6 +43,8 @@ import {
 } from './parts.tsx';
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** How many of the league list one page reads. */
+const peopleShown = 200;
 
 const roleText = (role: string): string =>
   (rosterRoles as readonly string[]).includes(role)
@@ -82,8 +85,11 @@ export async function TeamPage({
   // S-44: a clash of numbers is marked on both players, for the admin to put right.
   const wornTwice = numbersWornTwice(open);
   const left = lines.filter((line) => line.leftOn !== null);
-  const people = await listPeople(context, { limit: 200 }, ports.deps);
+  const people = await listPeople(context, { limit: peopleShown }, ports.deps);
   const everyone: readonly PersonRecord[] = people.ok ? people.value : [];
+  const leagueList = people.ok
+    ? { ids: new Set(everyone.map((person) => person.id)), complete: everyone.length < peopleShown }
+    : undefined;
   // A read that fails is shown as such, never as an empty roster or list.
   const readFailed = !roster.ok || !people.ok;
   const onRoster = new Set(open.map((line) => line.personId));
@@ -231,17 +237,26 @@ export async function TeamPage({
                     date: line.leftOn ?? '',
                   })}
                   {saidHere(line.id)}
-                  <form action={putBackAction}>
-                    <LeagueField league={here.slug} />
-                    <input type="hidden" name="team" value={team.id} />
-                    <input type="hidden" name="entry" value={line.id} />
-                    <input type="hidden" name="version" value={line.version} />
-                    <p>
-                      <button type="submit" className="ui-button">
-                        {t('adminTeams.roster.putBack')}
-                      </button>
+                  {/* Offered only where it can work (step 2.161); else said in words. */}
+                  {putBackOffer(line.personId, onRoster, leagueList) === 'back' ? (
+                    <p data-put-back-not-offered="back">{t('adminTeams.roster.backAlready')}</p>
+                  ) : putBackOffer(line.personId, onRoster, leagueList) === 'off-the-list' ? (
+                    <p data-put-back-not-offered="off-the-list">
+                      {t('adminTeams.roster.offTheList')}
                     </p>
-                  </form>
+                  ) : (
+                    <form action={putBackAction}>
+                      <LeagueField league={here.slug} />
+                      <input type="hidden" name="team" value={team.id} />
+                      <input type="hidden" name="entry" value={line.id} />
+                      <input type="hidden" name="version" value={line.version} />
+                      <p>
+                        <button type="submit" className="ui-button">
+                          {t('adminTeams.roster.putBack')}
+                        </button>
+                      </p>
+                    </form>
+                  )}
                 </li>
               ))}
             </ul>

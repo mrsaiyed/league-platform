@@ -435,6 +435,10 @@ export const en = {
   'adminTeams.roster.markLeft': 'Mark as left',
   'adminTeams.roster.leftOnHelp': 'The day they left: today or a day before.',
   'adminTeams.roster.putBack': 'Put back on the roster (marked by mistake)',
+  'adminTeams.roster.backAlready':
+    'They are on this roster again, so there is nothing to put back.',
+  'adminTeams.roster.offTheList':
+    'They were taken off the league list, so they cannot be put back on the roster.',
   'adminTeams.roster.leftTitle': 'Left the team',
   'adminTeams.roster.leftLine': '{name}, left on {date}',
   'adminTeams.roster.readFailed':
