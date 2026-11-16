@@ -752,10 +752,20 @@ export async function clockSteps(kit) {
             (await none.getAttribute('aria-label')) === 'Full timeout for Hawks, none left',
         );
         const taken = c.timeoutsPad.locator('[data-timeouts-taken="home"] li');
+        /** How many the home team has taken in all: the pad writes out the latest two. */
+        const takenInAll = async () =>
+          Number(
+            await c.timeoutsPad
+              .locator('[data-timeouts-of="home"]')
+              .getAttribute('data-taken-count'),
+          );
+        const earlier = c.timeoutsPad.locator('[data-timeouts-earlier="home"]');
         note(
-          'those taken are listed with their period and clock time',
+          'those taken are listed with their period and clock time, and no "Full" where the league has one length',
           (await taken.count()) === 2 &&
-            (await taken.allInnerTexts()).every((line) => /^H2 \d+:\d\d · Full$/.test(line.trim())),
+            (await takenInAll()) === 2 &&
+            (await earlier.count()) === 0 &&
+            (await taken.allInnerTexts()).every((line) => /^H2 \d+:\d\d$/.test(line.trim())),
           JSON.stringify(await taken.allInnerTexts()),
         );
         // Two fast taps on the button of a team with none left: asked, not recorded.
@@ -780,7 +790,7 @@ export async function clockSteps(kit) {
         await c.timeoutsPad.locator('[data-timeouts-of="home"]').waitFor();
         note(
           '"Do not record it" records nothing and goes back to the timeouts',
-          (await c.root.getAttribute('data-plays')) === plays && (await taken.count()) === 2,
+          (await c.root.getAttribute('data-plays')) === plays && (await takenInAll()) === 2,
         );
         await none.click();
         await ask.waitFor();
@@ -796,7 +806,13 @@ export async function clockSteps(kit) {
         await said(c, /^Full timeout: Hawks\.$/);
         await c.timeoutsButton.click();
         await c.timeoutsPad.waitFor();
-        note('"Record it anyway" records it: three taken', (await taken.count()) === 3);
+        note(
+          '"Record it anyway" records it: three taken, the latest two written out and "and 1 earlier"',
+          (await takenInAll()) === 3 &&
+            (await taken.count()) === 2 &&
+            (await earlier.innerText()).trim() === 'and 1 earlier',
+          `${await takenInAll()} taken, ${await taken.count()} written`,
+        );
         // − takes back the latest, and says so; once more gives the team one back.
         const minus = c.timeoutsPad.locator('[data-act="untimeout"][data-side="home"]');
         note(
@@ -809,6 +825,7 @@ export async function clockSteps(kit) {
         note(
           'taking back the latest gives it back: one taken, one left, and the list stays open',
           (await taken.count()) === 1 &&
+            (await takenInAll()) === 1 &&
             /Full 1 left/.test((await none.innerText()).replace(/\s+/g, ' ')) &&
             (await none.getAttribute('data-none')) === null &&
             (await c.timeoutsPad.isVisible()),
@@ -836,10 +853,23 @@ export async function clockSteps(kit) {
       await page.goto(`${origin}${trackerPath()}`);
       const c = await openCourt(page);
       await c.saved();
-      // The home team with none left, so the question can be asked at every size. (Its
-      // heading's chip knows, shown or not.)
-      const homeChip = c.root.locator('[data-timeouts-chip="home"]');
-      while ((await homeChip.getAttribute('data-none')) === null) await c.timeout('home');
+      // Six timeouts taken by each team, as in a game that reaches its second half and an
+      // overtime (the area 4 review, M1): the list is then at its longest at every size.
+      // Neither team has any left, so the question can be asked at every size too.
+      const takenBy = async (side) => {
+        if (!(await c.timeoutsPad.isVisible())) await c.timeoutsButton.click();
+        await c.timeoutsPad.waitFor();
+        return Number(
+          await c.timeoutsPad
+            .locator(`[data-timeouts-of="${side}"]`)
+            .getAttribute('data-taken-count'),
+        );
+      };
+      for (const side of ['home', 'away']) {
+        while ((await takenBy(side)) < 6) await c.timeout(side);
+      }
+      if (await c.timeoutsPad.isVisible()) await c.pad.locator('.court-close').click();
+      await c.pad.locator('[data-rest]').waitFor();
       await page.waitForTimeout(3400);
       /** Measures the state the screen is in at each of the five sizes, then comes back. */
       const atEverySize = async (state, more = async () => {}) => {
@@ -933,7 +963,7 @@ export async function clockSteps(kit) {
       await c.timeoutsPad.waitFor();
       await atEverySize('the timeouts', async (size, label) => {
         const parts = await c.timeoutsPad
-          .locator('button, .court-timeout-head, [data-timeouts-taken] li')
+          .locator('button, .court-timeout-head, [data-timeouts-taken] li, [data-timeouts-earlier]')
           .evaluateAll((els) => {
             const pad = document.querySelector('[data-pad]').getBoundingClientRect();
             return els.every((el) => {
@@ -947,6 +977,56 @@ export async function clockSteps(kit) {
             });
           });
         note(`${label}: every button and every line of them is whole in the pad`, parts);
+        // Six taken by each team (M1): the latest two written out, each on one line that
+        // is whole in its team's frame, then the count; and nothing in the pad scrolls.
+        const lists = await c.timeoutsPad.locator('[data-timeouts-of]').evaluateAll((teams) =>
+          teams.map((team) => {
+            const frame = team.getBoundingClientRect();
+            const lines = [...team.querySelectorAll('[data-timeouts-taken] li')];
+            const minus = team.querySelector('[data-act="untimeout"]').getBoundingClientRect();
+            return {
+              taken: team.getAttribute('data-taken-count'),
+              written: lines.map((line) => line.textContent),
+              earlier: team.querySelector('[data-timeouts-earlier]')?.textContent ?? '',
+              oneLineEach: lines.every((line) => {
+                const high = line.getBoundingClientRect().height;
+                return high <= Number.parseFloat(getComputedStyle(line).fontSize) * 1.5;
+              }),
+              whole: lines.every((line) => {
+                // The words themselves, not the line's box: none runs under − or out of the frame.
+                const range = document.createRange();
+                range.selectNodeContents(line);
+                const r = range.getBoundingClientRect();
+                const underMinus =
+                  r.right > minus.left + 0.5 && r.bottom > minus.top && r.top < minus.bottom;
+                return r.left >= frame.left && r.right <= frame.right + 0.5 && !underMinus;
+              }),
+            };
+          }),
+        );
+        const scrolling = await c.pad.evaluate((pad) =>
+          [pad, ...pad.querySelectorAll('*')]
+            .filter(
+              (el) => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1,
+            )
+            .filter((el) => /auto|scroll|hidden/.test(getComputedStyle(el).overflow))
+            .map((el) => el.className || el.tagName),
+        );
+        note(
+          `${label}: six timeouts a team: the latest two whole on a line each, then "and 4 earlier"; nothing in the pad scrolls or is cut`,
+          lists.length === 2 &&
+            lists.every(
+              (list) =>
+                list.taken === '6' &&
+                list.written.length === 2 &&
+                list.written.every((line) => /^(H\d|OT\d) \d+:\d\d$/.test(line)) &&
+                list.earlier === 'and 4 earlier' &&
+                list.oneLineEach &&
+                list.whole,
+            ) &&
+            scrolling.length === 0,
+          JSON.stringify({ lists, scrolling }),
+        );
       });
       await c.timeoutButton('home').click();
       await c.pad.locator('[data-timeout-ask]').waitFor();

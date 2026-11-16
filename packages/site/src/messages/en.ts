@@ -1112,8 +1112,13 @@ export const en = {
   'tracker.timeouts.call.full': 'Full timeout for {team}, {left}',
   'tracker.timeouts.call.short': '30-second timeout for {team}, {left}',
   'tracker.timeouts.noneTaken': 'None taken.',
+  // One timeout taken. Where the league has one length, the period and the time are all
+  // of it; with two lengths each says which. Then how many came before the latest two.
+  'tracker.timeouts.taken.one': '{period} {clock}',
   'tracker.timeouts.taken.full': '{period} {clock} · Full',
   'tracker.timeouts.taken.short': '{period} {clock} · 30-second',
+  'tracker.timeouts.earlier_one': 'and {count} earlier',
+  'tracker.timeouts.earlier_other': 'and {count} earlier',
   'tracker.timeouts.takeBack': 'Take back the latest {team} timeout',
   'tracker.timeouts.ask.full':
     'No full timeouts left for {team}. Officials charge a technical foul for an extra one. Record it anyway?',

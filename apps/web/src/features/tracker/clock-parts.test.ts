@@ -16,6 +16,7 @@ import {
   TeamFouls,
   TimeoutsChip,
   TimeoutsPad,
+  latestTimeouts,
   teamBoardLabel,
   timeoutRuleText,
   type ClockHandlers,
@@ -300,6 +301,55 @@ describe('timeouts (G3 to G7)', () => {
     );
     // The other team has taken none: nothing to take back.
     expect(teamOf(padOf(game), 'away')).not.toContain('data-act="untimeout"');
+    // Two lengths in this format: each entry says which, and has the width to itself.
+    expect(tag(home, 'class="court-timeout-taken"')).toContain('data-lengths=""');
+  });
+
+  it('writes out the latest two and counts the rest, so the list never scrolls (M1)', () => {
+    // Six for each team in a league with one length of timeout: two a half, one in
+    // overtime, and one more than allowed in each.
+    const six = (side: 'home' | 'away'): basketball.Command[] => [
+      call(side, 60),
+      call(side, 60),
+      call(side, 60),
+    ];
+    const game = played(
+      [
+        ...six('home'),
+        ...six('away'),
+        { type: 'period', period: 2 },
+        ...six('home'),
+        ...six('away'),
+      ],
+      tippedOff(basketball.HALVES),
+    );
+    for (const side of ['home', 'away'] as const) {
+      const team = teamOf(padOf(game), side);
+      expect(padOf(game)).toContain(`data-timeouts-of="${side}" data-taken-count="6"`);
+      // The latest two whole, with no "Full" where every timeout is one: then a count.
+      expect(team.match(/<li>/g)).toHaveLength(2);
+      expect(words(team)).toContain('none left H2 20:00 H2 20:00 and 4 earlier');
+      expect(words(team)).not.toMatch(/· Full/);
+      expect(tag(team, 'class="court-timeout-taken"')).not.toContain('data-lengths');
+    }
+    // Three taken: the latest two and "and 1 earlier"; two taken: both, and no count.
+    const three = teamOf(padOf(played(six('home'), tippedOff(basketball.HALVES))), 'home');
+    expect(words(three)).toContain('H1 20:00 H1 20:00 and 1 earlier');
+    const two = teamOf(padOf(played(six('home').slice(1), tippedOff(basketball.HALVES))), 'home');
+    expect(two.match(/<li>/g)).toHaveLength(2);
+    expect(two).not.toContain('data-timeouts-earlier');
+  });
+
+  it('the latest is first: it is the one − takes back', () => {
+    const taken = [1, 2, 3, 4].map((n) => ({
+      id: `t${n}`,
+      period: 1,
+      clockMs: n * 60_000,
+      seconds: 60 as const,
+    }));
+    expect(latestTimeouts(taken)).toEqual({ written: [taken[3], taken[2]], earlier: 2 });
+    expect(latestTimeouts(taken.slice(0, 1))).toEqual({ written: [taken[0]], earlier: 0 });
+    expect(latestTimeouts([])).toEqual({ written: [], earlier: 0 });
   });
 
   it('says "none left" for a length that is used up, and marks the button', () => {

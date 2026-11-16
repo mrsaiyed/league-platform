@@ -21,7 +21,7 @@ import type { MouseEvent } from 'react';
 import { periodText } from './engine-words.ts';
 import type { ClockEntry, PeriodChoice } from './game-clock.ts';
 import type { TimeoutCall } from './scoring-moves.ts';
-import type { ScoringView, Side, TeamPanel } from './scoring-view.ts';
+import type { ScoringView, Side, TakenTimeout, TeamPanel } from './scoring-view.ts';
 
 /** The clock as the screen draws it. The ticker repaints the time between drawings. */
 export type CourtClock = {
@@ -337,11 +337,28 @@ export function timeoutRuleText(rules: basketball.TimeoutRules, t: Translate): s
 const leftText = (count: number, t: Translate): string =>
   count > 0 ? t.plural('tracker.timeouts.left', count) : t('tracker.timeouts.noneLeft');
 
+/** How many of the timeouts a team took are written out in the pad: the latest ones. */
+export const timeoutsWritten = 2;
+
+/**
+ * The timeouts a team took, as the pad shows them during play (G7; the area 4 review of
+ * step 2.36, M1): the latest first, since it is the one − takes back, then the one before
+ * it, and how many came earlier as a count. Nothing in the pad scrolls and no entry is
+ * cut, however many a team has taken; the whole list is the play log's (step 2.37).
+ */
+export function latestTimeouts(taken: readonly TakenTimeout[]): {
+  readonly written: readonly TakenTimeout[];
+  readonly earlier: number;
+} {
+  const written = taken.slice(-timeoutsWritten).reverse();
+  return { written, earlier: taken.length - written.length };
+}
+
 /**
  * Both teams' timeouts, in the pad (G4 to G7): a button for each length saying how many
- * are left, those taken with their period and clock time, and − to take the latest back.
- * A team with none of a length left is asked about first, in the pad's lowest band, away
- * from the buttons that were just tapped.
+ * are left, the latest taken with their period and clock time, and − to take the latest
+ * back. A team with none of a length left is asked about first, in the pad's lowest band,
+ * away from the buttons that were just tapped.
  */
 export function TimeoutsPad(props: {
   readonly t: Translate;
@@ -448,13 +465,16 @@ function TeamTimeouts(props: {
       </button>
     );
   };
-  // The latest first: it is the one − takes back.
-  const taken = [...timeouts.taken].reverse();
+  const { written, earlier } = latestTimeouts(timeouts.taken);
+  // Where the league has one length of timeout, an entry is its period and time and no
+  // more: "Full" on every line says nothing. With two lengths each entry says which.
+  const lengths = timeouts.offersShort;
   return (
     <section
       className="court-timeout-team"
       data-color={team.color}
       data-timeouts-of={team.side}
+      data-taken-count={timeouts.taken.length}
       aria-label={t('tracker.timeouts.of', { team: team.name })}
     >
       <p className="court-timeout-name">
@@ -465,18 +485,20 @@ function TeamTimeouts(props: {
         {call(60)}
         {timeouts.offersShort ? call(30) : null}
       </div>
-      <div className="court-timeout-taken">
-        {taken.length === 0 ? (
+      <div className="court-timeout-taken" data-lengths={lengths ? '' : undefined}>
+        {written.length === 0 ? (
           <p className="court-quiet">{t('tracker.timeouts.noneTaken')}</p>
         ) : (
           <>
             <ul data-timeouts-taken={team.side}>
-              {taken.map((timeout) => (
+              {written.map((timeout) => (
                 <li key={timeout.id}>
                   {t(
-                    timeout.seconds === 30
-                      ? 'tracker.timeouts.taken.short'
-                      : 'tracker.timeouts.taken.full',
+                    !lengths
+                      ? 'tracker.timeouts.taken.one'
+                      : timeout.seconds === 30
+                        ? 'tracker.timeouts.taken.short'
+                        : 'tracker.timeouts.taken.full',
                     {
                       period: periodText(timeout.period, view.periods, t),
                       clock: basketball.formatClock(timeout.clockMs),
@@ -485,6 +507,11 @@ function TeamTimeouts(props: {
                 </li>
               ))}
             </ul>
+            {earlier === 0 ? null : (
+              <p className="court-timeout-earlier" data-timeouts-earlier={team.side}>
+                {t.plural('tracker.timeouts.earlier', earlier)}
+              </p>
+            )}
             <button
               type="button"
               className="court-opt court-opt-minus"

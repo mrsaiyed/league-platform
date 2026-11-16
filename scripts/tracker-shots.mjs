@@ -13,10 +13,11 @@
 //
 // The files go to .local/shots/court/<state>-<width>x<height>.png, which git ignores; open
 // them with the Read tool, beside the Al-Hadi tracker's own at the same sizes. Each state
-// is one entry of `states` below. Step 2.36 added the clock's (19 to 36: stopped with its
+// is one entry of `states` below. Step 2.36 added the clock's (19 to 37: stopped with its
 // reason, running, the form, timeouts and the question, the bonus and the double bonus on
-// each team, halftime, the period picker, overtime); step 2.37 adds its own (offline,
-// read-only, final) by adding entries, with the taps in tests/browser/tracker-driver.mjs.
+// each team, halftime, the period picker, overtime, six timeouts taken by each team);
+// step 2.37 adds its own (offline, read-only, final) by adding entries, with the taps in
+// tests/browser/tracker-driver.mjs.
 // From state 02 on the game is a stop-clock game, so a foul and a timeout are seen to
 // stop a running clock; the made-up league's own format is a running clock.
 import fs from 'node:fs';
@@ -428,6 +429,29 @@ const states = [
       const c = court(page);
       await c.pickPeriod(3);
       await c.startButton.waitFor();
+    },
+  },
+  {
+    name: '37-timeouts-six-each',
+    about:
+      'six timeouts taken by each team: the latest two written out, then "and 4 earlier"; nothing scrolls',
+    run: async (page) => {
+      const c = court(page);
+      const takenBy = async (side) => {
+        if (!(await c.timeoutsPad.isVisible())) await c.timeoutsButton.click();
+        await c.timeoutsPad.waitFor();
+        return Number(
+          await c.timeoutsPad
+            .locator(`[data-timeouts-of="${side}"]`)
+            .getAttribute('data-taken-count'),
+        );
+      };
+      for (const side of ['home', 'away']) {
+        while ((await takenBy(side)) < 6) await c.timeout(side);
+      }
+      await page.waitForTimeout(3400);
+      if (!(await c.timeoutsPad.isVisible())) await c.timeoutsButton.click();
+      await c.timeoutsPad.waitFor();
     },
   },
 ];
