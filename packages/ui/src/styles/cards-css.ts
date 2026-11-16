@@ -555,25 +555,32 @@ export const cardsCss = String.raw`
   border-block-end: 1px solid var(--color-line);
 }
 .ui-group > summary {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--step-1) var(--step-3);
   min-block-size: var(--step-7);
   padding-block: var(--step-3);
+  /* Room at the start for the mark that says the group opens. Everything else in the
+     heading starts after it, on every line: what wraps (a note beside the round's mark, the
+     count of its games) wraps under the round's name, never under the mark. */
+  padding-inline-start: var(--step-6);
   list-style: none;
   cursor: pointer;
 }
 .ui-group > summary::-webkit-details-marker {
   display: none;
 }
-/* The mark that says a group opens: a small corner that points on when shut, down when open. */
+/* The mark that says a group opens: a small corner that points on when shut, down when
+   open. It stands in the room at the start, level with the heading's first line. */
 .ui-group > summary::before {
   content: '';
-  flex: none;
+  position: absolute;
+  inset-block-start: calc(var(--step-3) + var(--step-2));
+  inset-inline-start: var(--step-2);
   inline-size: var(--step-2);
   block-size: var(--step-2);
-  margin-inline: var(--step-1);
   border-block-end: var(--line-heavy) solid var(--color-muted);
   border-inline-end: var(--line-heavy) solid var(--color-muted);
   transition: transform 0.15s;
@@ -613,11 +620,14 @@ export const cardsCss = String.raw`
   text-transform: uppercase;
   white-space: nowrap;
 }
-/* The group to look at now: the round being played. */
+/* The group to look at now: the round being played. Its mark is in the text color on a soft
+   tint, with a control's edge: plainer than the quiet marks beside the other rounds, and
+   never as loud as the Live pill of a game inside it, which is the one filled mark of the
+   page. */
 .ui-group[data-phase='current'] .ui-group-mark {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  border-color: var(--color-line-strong);
+  background: var(--color-tint);
+  color: var(--color-text);
 }
 /* What the mark does not say, beside it ("1 game postponed"), is drawn like a postponed
    game's own pill, soft, so it is read as news about the games inside in any round and is
@@ -628,12 +638,12 @@ export const cardsCss = String.raw`
   font-size: var(--text-14);
 }
 /* On a phone every round's count stands on a line of its own under the round's name, in
-   line with it: so a round with a note beside its mark is not the only one whose heading
-   breaks. */
+   line with it (the heading's own room at the start sees to that): so a round with a note
+   beside its mark is not the only one whose heading breaks. */
 @media (max-width: 29.99rem) {
   .ui-group-summary {
     flex: 1 1 100%;
-    margin-inline-start: var(--step-5);
+    margin-inline-start: 0;
   }
 }
 .ui-group-body {

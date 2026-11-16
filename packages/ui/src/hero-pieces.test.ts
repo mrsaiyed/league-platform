@@ -1104,8 +1104,22 @@ describe('the second landing’s smaller rules', () => {
     expect(css).toMatch(
       /\.ui-emblem\[data-size='small'\] \{\s*block-size: calc\(var\(--step-5\) \+ var\(--step-1\)\);/,
     );
+    // The count still has its own line, in line with the round's name. Since step 2.147
+    // part 3 it is the heading's own room at the start that puts it there (the mark that
+    // says the group opens stands in that room), so the count needs no margin of its own,
+    // and a note that wraps ("1 game postponed") wraps under the name too.
     expect(css).toMatch(
-      /@media \(max-width: 29\.99rem\) \{\s*\.ui-group-summary \{\s*flex: 1 1 100%;\s*margin-inline-start: var\(--step-5\);/,
+      /@media \(max-width: 29\.99rem\) \{\s*\.ui-group-summary \{\s*flex: 1 1 100%;\s*margin-inline-start: 0;/,
+    );
+    expect(css).toMatch(/\.ui-group > summary \{[^}]*padding-inline-start: var\(--step-6\);/);
+    expect(css).toMatch(
+      /\.ui-group > summary::before \{[^}]*position: absolute;[^}]*inset-inline-start: var\(--step-2\);/,
+    );
+  });
+
+  it('gives every state’s pill a line of its own on a phone, the long and the short alike', () => {
+    expect(css).toMatch(
+      /@media \(max-width: 47\.99rem\) \{\s*\.ui-game-card\[data-layout='board'\] \.ui-game-about \{\s*flex-basis: 100%;/,
     );
   });
 });

@@ -259,6 +259,14 @@ export const gameCss = String.raw`
     flex-basis: 100%;
   }
 }
+/* And on a phone of any width, where boards stand one under the other: every state's pill
+   has a line of its own there, the long ones ("Awaiting result") and the short alike, so
+   it stands in one place down the whole list. */
+@media (max-width: 47.99rem) {
+  .ui-game-card[data-layout='board'] .ui-game-about {
+    flex-basis: 100%;
+  }
+}
 /* The two teams sit side by side with what stands between them, or, when they cannot,
    one over the other. The board works out the width they need side by side: each side
    has room for the longer of the two names (the card counts its letters, a name of
