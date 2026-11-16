@@ -95,18 +95,4 @@ Record 070 says every public page's reads run in one page snapshot: `withTransac
 
 ## What is built and committed
 
-Nothing yet, apart from this note.
-
-## Half built
-
-Nothing.
-
-## Not started
-
-All of half 1 and half 2.
-
-## The next three things to do, in order
-
-1. Write `apps/web/src/server/database-games.ts`. It holds one `CommandDeps<TrackerTx>` for both the games area and the tracker: the stores in the table above, plus `standings`, and `events` set to core's `eventHandlers` adapted as described. It also holds `namesOf`, on the new query. Wire it as `games` in `database-ports.ts`, write the half-1 tests (the typed final score moves the standings; roles; another league's game id), commit, and push with `node scripts/push-lane.mjs --times=2`.
-2. Write `apps/web/src/server/database-tracker.ts`: the same `deps`; `snapshotStoreOf` on `gamesReadStore` in page snapshots; `namesShownOf` in one page snapshot; `displayNameOf` through `listAccessNames`; `clock`; a publisher that publishes nowhere. Set `publishPlays` to resolve at once (nothing listens; `liveFeed` stays `null`). Settle the snapshot design point above with the lead first, or build the one-snapshot read and report it.
-3. Write the walk through the ports, the role and other-league tests, and the hidden-season test. Replace the old refusal expectations in `database-ports.test.ts`. Then push, wait for GitHub (`node scripts/wait-for-github.mjs`) and report.
+Built on 2026-11-16 by a second builder (record 076, T-280): `listGameNames` with its test; `database-games.ts` (half 1) and `database-tracker.ts` (half 2) wired in `database-ports.ts`; `TrackerPorts.gameReadsOf`, the lead's one-snapshot read, used by the game page, the snapshot endpoint and the play publisher; the role tests `database-games.test.ts` and `database-tracker.test.ts` on the shared `database-games.test-helper.ts`. Not verified on real PostgreSQL. No browser journey until step 2.96 lands.
