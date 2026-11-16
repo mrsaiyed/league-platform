@@ -33,7 +33,7 @@ import {
 } from '@srleagues/core';
 import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
-import type { LeagueScope } from '../db/transaction-scope.ts';
+import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import { withTransaction } from '../db/with-transaction.ts';
 import {
@@ -174,12 +174,20 @@ async function loadLeague(
   }
   const programIds = new Map<string, string>();
   for (const program of league.programs ?? []) {
-    const made = await pglite.query<{ id: string }>(
-      `insert into programs (league_id, slug, name, sport_key)
-       values ($1, $2, $3, 'basketball') returning id`,
-      [leagueId, program.slug, program.name],
+    // In the league's own transaction, behind its fence, as the grants below.
+    const made = await withTransaction(db, { leagueId, accountId: ownerId }, (scope) =>
+      transactionOf(scope)
+        .insertInto('programs')
+        .values({
+          league_id: leagueId,
+          slug: program.slug,
+          name: program.name,
+          sport_key: 'basketball',
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow(),
     );
-    programIds.set(program.slug, made.rows[0]!.id);
+    programIds.set(program.slug, made.id);
   }
   for (const member of league.members) {
     const memberId = await accountId(pglite, member.email, member.displayName);
