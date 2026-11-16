@@ -15,6 +15,7 @@ import {
   subTap,
   swapColorsTap,
   tapTile,
+  timeoutTap,
   type PadMode,
 } from './scoring-moves.ts';
 import { played, testRosters, tippedOff } from './scoring-test-game.test-helper.ts';
@@ -241,5 +242,45 @@ describe('swap colors (D3)', () => {
     const swapped = after(game, swapColorsTap(game));
     expect(swapped.colorsSwapped).toBe(true);
     expect(swapColorsTap(swapped)).toEqual({ type: 'colors', swapped: false });
+  });
+});
+
+describe('calling a timeout (step 2.36; G4, G5)', () => {
+  it('records one the team has, and the engine takes it', () => {
+    const game = tippedOff();
+    const tapped = timeoutTap(viewOf(game), { side: 'home', seconds: 60 });
+    expect(tapped).toEqual({
+      kind: 'record',
+      input: { type: 'timeout', side: 'home', seconds: 60 },
+    });
+    if (tapped.kind !== 'record') throw new Error('not recorded');
+    expect(viewOf(after(game, tapped.input)).teams.home.timeouts).toMatchObject({
+      full: 2,
+      short: 2,
+    });
+  });
+
+  it('asks first when the team has none of that length left, whatever it has of the other', () => {
+    // Two 30-second ones a game: both taken, three full ones still left.
+    const game = played(
+      [
+        { type: 'timeout', side: 'away', seconds: 30 },
+        { type: 'timeout', side: 'away', seconds: 30 },
+      ],
+      tippedOff(),
+    );
+    expect(timeoutTap(viewOf(game), { side: 'away', seconds: 30 })).toEqual({ kind: 'ask' });
+    expect(timeoutTap(viewOf(game), { side: 'away', seconds: 60 }).kind).toBe('record');
+    expect(timeoutTap(viewOf(game), { side: 'home', seconds: 30 }).kind).toBe('record');
+    // Asked, and answered yes: the engine records it anyway (officials grant it).
+    const extra = after(game, { type: 'timeout', side: 'away', seconds: 30 });
+    expect(viewOf(extra).teams.away.timeouts.taken).toHaveLength(3);
+    expect(timeoutTap(viewOf(extra), { side: 'away', seconds: 30 })).toEqual({ kind: 'ask' });
+  });
+
+  it('the pad keeps the timeouts open, and the question, through a change of the game', () => {
+    const asking: PadMode = { kind: 'timeouts', asking: { side: 'home', seconds: 60 } };
+    expect(padFor(viewOf(tippedOff()), asking)).toBe(asking);
+    expect(padIsFor(asking, 'h3')).toBe(false);
   });
 });

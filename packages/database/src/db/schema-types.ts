@@ -438,6 +438,31 @@ export interface SettingValuesTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface SiteReleasesTable {
+  id: Generated<string>;
+  league_id: string;
+  number: number;
+  starting_design: string;
+  design: ColumnType<JsonValue, JsonObject, JsonObject>;
+  menu: ColumnType<JsonValue, JsonObject | undefined, JsonObject>;
+  pages: ColumnType<JsonValue, JsonObject | undefined, JsonObject>;
+  published_by_account_id: string;
+  published_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface SitesTable {
+  id: Generated<string>;
+  league_id: string;
+  starting_design: string;
+  design_draft: ColumnType<JsonValue, JsonObject, JsonObject>;
+  menu_draft: ColumnType<JsonValue, JsonObject | undefined, JsonObject>;
+  published_release_id: string | null;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface StagesTable {
   id: Generated<string>;
   league_id: string;
@@ -561,6 +586,8 @@ export interface Database {
   season_player_totals: SeasonPlayerTotalsTable;
   seasons: SeasonsTable;
   setting_values: SettingValuesTable;
+  site_releases: SiteReleasesTable;
+  sites: SitesTable;
   stages: StagesTable;
   standings_adjustments: StandingsAdjustmentsTable;
   standings_rows: StandingsRowsTable;

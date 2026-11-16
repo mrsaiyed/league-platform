@@ -35,6 +35,8 @@ export const enActivity = {
   'activity.leagues.create_division': 'Added a division',
   'activity.leagues.create_season': 'Added a season',
   'activity.leagues.empty_bin': 'Removed old things from the bin for good',
+  'activity.leagues.publish_site_design':
+    "Published a design for the league's site (version {number})",
   'activity.leagues.remove_division': 'Moved a division to the bin',
   'activity.leagues.rename_short_name': "Changed the league's address to {slug}",
   'activity.leagues.reorder_divisions': 'Changed the order of the divisions',

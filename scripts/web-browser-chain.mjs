@@ -41,7 +41,7 @@ export const FIRST = 'web-exit-test.mjs';
  * of them. Any other file there must be a test, named `<name>-test.mjs`, or the chain
  * refuses to run, so a test misnamed is never quietly left out.
  */
-export const HELPERS = ['tracker-driver.mjs', 'web-browser-kit.mjs'];
+export const HELPERS = ['scoring-clock-steps.mjs', 'tracker-driver.mjs', 'web-browser-kit.mjs'];
 
 /** Whether a file in tests/browser is a test of the chain. */
 export const isBrowserTest = (name) => /^[a-z0-9]+(?:-[a-z0-9]+)*-test\.mjs$/.test(name);

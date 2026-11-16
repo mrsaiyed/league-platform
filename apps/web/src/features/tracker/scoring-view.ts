@@ -39,6 +39,30 @@ export type PlayerTile = {
   readonly picked: boolean;
 };
 
+/** One timeout a team took that still stands (checklist G7). */
+export type TakenTimeout = {
+  /** The id of the play. */
+  readonly id: string;
+  readonly period: number;
+  /** The game clock it was called at, in milliseconds. */
+  readonly clockMs: number;
+  readonly seconds: 60 | 30;
+};
+
+/** A team's timeouts (checklist G3 to G7): the engine's own count, by length. */
+export type TeamTimeouts = {
+  /** Full (60-second) timeouts left now; never below zero here. */
+  readonly full: number;
+  /** 30-second timeouts left now; never below zero here. */
+  readonly short: number;
+  /** Both lengths together: what the team's chip says. */
+  readonly left: number;
+  /** The format has 30-second timeouts, or one was taken anyway: the button is offered. */
+  readonly offersShort: boolean;
+  /** Those taken and still standing, oldest first. */
+  readonly taken: readonly TakenTimeout[];
+};
+
 /** One team's panel. */
 export type TeamPanel = {
   readonly side: Side;
@@ -64,6 +88,16 @@ export type TeamPanel = {
   readonly teamTurnovers: number;
   /** The players charged with turnovers, most first, then in jersey order (G1). */
   readonly turnoverList: readonly PlayerTile[];
+  /** Team fouls counted toward the bonus in the period being played (F1, F5). */
+  readonly teamFouls: number;
+  /**
+   * This team's own foul trouble (F2): 1 once its fouls have put the other team in the
+   * bonus, 2 in the double bonus.
+   */
+  readonly foulLevel: 0 | 1 | 2;
+  /** What this team shoots, from the other team's fouls (F3): 1 the bonus, 2 the double. */
+  readonly bonus: 0 | 1 | 2;
+  readonly timeouts: TeamTimeouts;
 };
 
 export type ScoringView = {
@@ -74,8 +108,52 @@ export type ScoringView = {
   readonly plays: number;
   /** True until both teams that have players have their lineup set. */
   readonly pickingLineups: boolean;
+  /** The format's timeouts, for the rule's one line (G7). */
+  readonly timeoutRules: basketball.TimeoutRules;
   readonly teams: Readonly<Record<Side, TeamPanel>>;
 };
+
+/** A team's timeouts that still stand, each with when it was called: read from the plays. */
+function takenTimeouts(game: basketball.GameState, side: Side): TakenTimeout[] {
+  const taken: TakenTimeout[] = [];
+  for (const play of game.plays) {
+    if (play.type === 'timeout' && play.side === side) {
+      taken.push({
+        id: play.id,
+        period: play.period,
+        clockMs: play.clockMs,
+        seconds: play.seconds,
+      });
+    } else if (play.type === 'untimeout' && play.side === side) taken.pop();
+  }
+  return taken;
+}
+
+/**
+ * The timeout a take-back took back (the area 4 review of step 2.36, M2: the screen says
+ * which one came back): `playId` is the take-back's own play. Undefined when that play is
+ * not a take-back, or the team had none standing.
+ */
+export function timeoutTakenBack(
+  game: basketball.GameState,
+  playId: string,
+): TakenTimeout | undefined {
+  const takeBack = game.plays.find((play) => play.id === playId);
+  if (takeBack?.type !== 'untimeout') return undefined;
+  const standing: TakenTimeout[] = [];
+  for (const play of game.plays) {
+    if (play.id === playId) return standing.pop();
+    if (play.type === 'timeout' && play.side === takeBack.side) {
+      standing.push({
+        id: play.id,
+        period: play.period,
+        clockMs: play.clockMs,
+        seconds: play.seconds,
+      });
+    } else if (play.type === 'untimeout' && play.side === takeBack.side) standing.pop();
+  }
+  return undefined;
+}
 
 /** A player the engine has and the device's rosters lack: one object for each, kept. */
 const unlistedPlayers = new Map<string, DevicePlayer>();
@@ -139,6 +217,7 @@ export function scoringView(
   elapsedMs: number = game.clock.elapsedMs,
 ): ScoringView {
   const derived = basketball.derive(game, elapsedMs);
+  const timeoutRules = basketball.timeoutRules(game.rules);
   const panel = (side: Side): TeamPanel => {
     const team = rosters[side];
     const view = derived.teams[side];
@@ -185,6 +264,11 @@ export function scoringView(
     const tiles = shown.map(tile);
     const floor = view.onCourt.flatMap((id) => tiles.find((p) => p.id === id) ?? []);
     const order = new Map(tiles.map((p, index) => [p.id, index]));
+    const taken = takenTimeouts(game, side);
+    // Below zero in the engine once a team has taken more than allowed; the screen says
+    // "none left" and asks before another is recorded.
+    const full = Math.max(0, view.timeoutsLeft.full);
+    const short = Math.max(0, view.timeoutsLeft.short);
     return {
       side,
       name: team.name,
@@ -202,6 +286,16 @@ export function scoringView(
         .sort(
           (a, b) => b.turnovers - a.turnovers || (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
         ),
+      teamFouls: view.periodFouls,
+      foulLevel: view.penalty,
+      bonus: view.bonus,
+      timeouts: {
+        full,
+        short,
+        left: full + short,
+        offersShort: timeoutRules.shortTimeouts > 0 || taken.some((t) => t.seconds === 30),
+        taken,
+      },
     };
   };
   const teams = { home: panel('home'), away: panel('away') };
@@ -211,6 +305,7 @@ export function scoringView(
     periods: game.rules.periods,
     plays: game.plays.length,
     pickingLineups: teams.home.stage === 'picking' || teams.away.stage === 'picking',
+    timeoutRules,
     teams,
   };
 }

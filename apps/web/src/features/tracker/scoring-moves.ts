@@ -18,9 +18,33 @@ export type PadMode =
   | { readonly kind: 'rest' }
   | { readonly kind: 'player'; readonly playerId: string }
   | { readonly kind: 'turnovers'; readonly side: Side }
-  | { readonly kind: 'bench'; readonly side: Side; readonly forId: string | null };
+  | { readonly kind: 'bench'; readonly side: Side; readonly forId: string | null }
+  /**
+   * Both teams' timeouts (step 2.36). `asking` is the timeout a team with none of that
+   * length left is about to be given: it is recorded only after the scorekeeper says so
+   * (checklist G5).
+   */
+  | { readonly kind: 'timeouts'; readonly asking: TimeoutCall | null };
+
+/** A timeout to record: whose, and how long. */
+export type TimeoutCall = { readonly side: Side; readonly seconds: 60 | 30 };
 
 export const padAtRest: PadMode = { kind: 'rest' };
+
+/**
+ * A timeout button tapped (checklist G4, G5): the tap that records it, or, when the team
+ * has none of that length left, the question to ask first. Officials grant an extra one
+ * at the cost of a technical foul, so it is never refused, only asked about.
+ */
+export function timeoutTap(
+  view: ScoringView,
+  call: TimeoutCall,
+): { readonly kind: 'record'; readonly input: TapInput } | { readonly kind: 'ask' } {
+  const left = view.teams[call.side].timeouts[call.seconds === 30 ? 'short' : 'full'];
+  return left > 0
+    ? { kind: 'record', input: { type: 'timeout', side: call.side, seconds: call.seconds } }
+    : { kind: 'ask' };
+}
 
 /**
  * Whether the pad is open on one of these players: an option is taken only while it is.

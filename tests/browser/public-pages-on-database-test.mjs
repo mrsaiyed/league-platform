@@ -16,8 +16,11 @@
 // name and last initial) with the points their box scores gave, a points leaders card and
 // none for fouls (S-48); the teams page lists every team; one team's page shows its record,
 // its roster and its totals; the home page's leaders name the top scorers; the header
-// shows the league's own name, and its look is the neutral starting design (no design is
-// stored on the database yet); and no page holds a withheld name or a private value.
+// shows the league's own name; and no page holds a withheld name or a private value.
+// Step 2.187 (record 073): each league's home page is drawn in its own published design,
+// its starting design's main color in the page's styles, not the neutral one (#1f5fbf),
+// and the two leagues differ. A league with no design published is drawn in the neutral
+// one: that fallback is proved in apps/web/src/server/database-league-sites.test.ts.
 import {
   accessibilityProblems,
   buildNext,
@@ -76,6 +79,8 @@ const people = [
   {
     slug: 'lakeside',
     name: 'Lakeside Hoops League',
+    // Its seed design, crest (packages/database/src/seed/seed-data.ts): its main color.
+    primary: '#96062d',
     players: [
       { shown: 'Morgan Example', points: 10 },
       { shown: 'Quinn S.', points: 14 },
@@ -101,6 +106,8 @@ const people = [
   {
     slug: 'maple-street',
     name: 'Maple Street Rec League',
+    // Its seed design, midnight-gold: its main color.
+    primary: '#c8a84b',
     players: [
       { shown: 'Jordan I.', points: 10 },
       { shown: 'Casey F.', points: 14 },
@@ -236,6 +243,8 @@ if (browser) {
   }
 
   // Part 3 (record 070): the pages that show people, and each league's name and look.
+  /** Each league's main color as its home page drew it (step 2.187). */
+  const drawnIn = new Map();
   for (const league of people) {
     const { slug } = league;
     /** Nothing a visitor may not see: a withheld name or a private value, anywhere. */
@@ -435,16 +444,28 @@ if (browser) {
         primary: getComputedStyle(document.documentElement)
           .getPropertyValue('--color-primary')
           .trim(),
+        styles: [...document.querySelectorAll('style')].map((s) => s.textContent ?? '').join(' '),
       }));
       note(`${slug}: the header shows the league's own name`, look.name === league.name, look.name);
-      // No design is stored on the database yet: every league has the neutral one.
+      // Its own published design (step 2.187), not the neutral one.
       note(
-        `${slug}: the neutral starting design (none stored yet)`,
-        look.primary === '#1f5fbf',
+        `${slug}: drawn in its own design's main color ${league.primary}`,
+        look.primary === league.primary,
         look.primary,
       );
+      note(
+        `${slug}: its design's main color is in the page's styles`,
+        look.styles.includes(`--color-primary: ${league.primary};`),
+      );
+      note(`${slug}: not the neutral design`, look.primary !== '#1f5fbf', look.primary);
+      drawnIn.set(slug, look.primary);
     });
   }
+  note(
+    'the two seed leagues are drawn in different designs',
+    drawnIn.size === people.length && new Set(drawnIn.values()).size === people.length,
+    JSON.stringify([...drawnIn]),
+  );
 }
 
 await browser?.close();

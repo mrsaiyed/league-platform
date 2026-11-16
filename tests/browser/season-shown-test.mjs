@@ -19,6 +19,7 @@ import {
   buildNext,
   freePort,
   launch,
+  openStaffMenu,
   startNext,
   waitFor,
   whatWentWrong,
@@ -86,6 +87,8 @@ if (built) {
     const mainText = (on) => on.locator('main').innerText();
     /** Admin → Schedule, the hidden season, a first round, then Publish. */
     const publishHidden = async (on, label, date) => {
+      // The admin's areas are behind its own menu button on a phone (step 2.103).
+      await openStaffMenu(on);
       await tap(
         on,
         on.locator('nav').getByRole('link', { name: 'Schedule', exact: true }).first(),

@@ -36,7 +36,11 @@ test('the chain is every test file in tests/browser: the exit test first, then a
   assert.deepEqual(files.slice(1), [...files.slice(1)].sort());
   assert.ok(files.length >= 16, 'the sixteen tests of step 2.188 at least');
   // The helpers are not tests.
-  assert.ok(!files.includes('web-browser-kit.mjs') && !files.includes('tracker-driver.mjs'));
+  assert.ok(
+    !files.includes('web-browser-kit.mjs') &&
+      !files.includes('tracker-driver.mjs') &&
+      !files.includes('scoring-clock-steps.mjs'),
+  );
   // The first builds; every other serves its build.
   assert.deepEqual(chain[0].args, []);
   for (const t of chain.slice(1)) assert.equal(t.args[0], '--no-build', t.file);
@@ -58,7 +62,11 @@ test('only files named "<name>-test.mjs" are tests', () => {
 test('a file that is neither a test nor a listed helper, or a test that does not run, stops the chain', () => {
   // The real folder: only tests and the listed helpers, every test a real run.
   assert.deepEqual(folderProblems(fs.readdirSync(folder), read), []);
-  assert.deepEqual(HELPERS, ['tracker-driver.mjs', 'web-browser-kit.mjs']);
+  assert.deepEqual(HELPERS, [
+    'scoring-clock-steps.mjs',
+    'tracker-driver.mjs',
+    'web-browser-kit.mjs',
+  ]);
   const files = {
     'web-exit-test.mjs': ends,
     'rounds.test.mjs': ends,

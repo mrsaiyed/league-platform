@@ -11,6 +11,7 @@ import {
   SiteHeader,
   type LeagueRouteProps,
 } from '../../features/shell/index.ts';
+import { isStaffAddress } from '../../features/staff/index.ts';
 import { isTrackerAddress } from '../../features/tracker/index.ts';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
@@ -37,7 +38,8 @@ export default async function LeagueLayout({
   children,
   params,
 }: LeagueRouteProps & { readonly children: ReactNode }) {
-  const view = await leagueView((await params).league, 'site');
+  const routeLeague = (await params).league;
+  const view = await leagueView(routeLeague, 'site');
   if (view === null) return children;
   const site = await siteOf(view.context.league, await leagueSites());
   const path = (await headers()).get(pathHeader) ?? '';
@@ -47,6 +49,13 @@ export default async function LeagueLayout({
   // none of the league's design, which must never reach the scoring screen (record 064).
   // Its page draws the league's look itself where it only refuses (tracker-page.tsx).
   if (isTrackerAddress(league, path)) return children;
+  // The admin has a frame of its own too (step 2.103; DESIGN.md section 4, line 20): for
+  // someone the admin is open to, its layout draws the admin's own header and menu, and
+  // the public site's header, tabs and footer are not shown at all. Anyone else at an
+  // admin address is refused by the page, inside the league's frame as before.
+  if (isStaffAddress(league, path) && (await leagueView(routeLeague, 'admin')) !== null) {
+    return children;
+  }
   const current = currentMenuPage(league, path);
   const season =
     current === null ? null : headerSeason(league, path, await seasonsOfLeague(league.id));

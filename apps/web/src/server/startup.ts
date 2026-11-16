@@ -127,5 +127,6 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
     signInMail: signIn.signInMail,
     log: options.log,
     warn: (message, fields) => deps.warn?.(message, fields),
+    reportDesign: (message, fields) => deps.warn?.(message, fields),
   });
 }
