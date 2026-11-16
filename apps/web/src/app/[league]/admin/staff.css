@@ -987,15 +987,52 @@ html:has(.staff) {
 
 /* ---------- The admin's home ---------- */
 
-/* The areas this person can use, as cards: one across on a phone, two or three on a
-   laptop. Each is one link: its icon, its name, one line of what it is for. */
+/* The areas this person can use, as cards: one across on a phone, two across from a
+   tablet up, so four areas are a block of two by two and never three and one. Each is one
+   link: its icon, its name, one line of what it is for. Only an area with a screen is a
+   card; what the home shows beside them (numbers, what to do next) is step 2.129's. */
 .staff-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17.5rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--step-3);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+@media (min-width: 40rem) {
+  .staff-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--step-4);
+  }
+}
+.staff-home > section + section {
+  margin-block-start: var(--step-6);
+}
+/* The areas with no screen yet: named quietly in one row under a small label, each a
+   mark and a name. They are not cards and not links, and carry no chevron: nothing here
+   looks like somewhere to go. */
+.staff-coming ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--step-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.staff-coming li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--step-2);
+  min-block-size: calc(var(--step-6) + var(--step-1));
+  padding-inline: var(--step-3);
+  border: 1px dashed color-mix(in srgb, var(--color-text) 22%, transparent);
+  border-radius: var(--radius-pill);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.staff-coming .staff-icon {
+  inline-size: var(--step-4);
+  block-size: var(--step-4);
 }
 .staff-tiles > li {
   display: grid;
@@ -1041,12 +1078,4 @@ html:has(.staff) {
   color: var(--color-muted);
   font-size: var(--text-14);
   line-height: 1.35;
-}
-/* An area with no screen yet is quieter: its icon grey, its mark beside it. */
-.staff-tile[data-ready='no'] .staff-tile-icon {
-  background: color-mix(in srgb, var(--color-text) 6%, transparent);
-  color: var(--color-muted);
-}
-.staff-tile[data-ready='no'] .staff-tile-name {
-  color: var(--color-muted);
 }

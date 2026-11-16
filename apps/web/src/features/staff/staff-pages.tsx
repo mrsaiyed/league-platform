@@ -1,18 +1,17 @@
 // The admin's own plain pages (step 2.103): its home, an area that has no screen yet, and
 // "not found" inside the admin. What the home asks a person to do is step 2.129's; here it
-// is what exists today, drawn finished: a title that greets, one line, the way to the
-// site, and the areas this person can use as cards (the menu's own links, so a phone's
-// first screen is somewhere to go, not a list above an empty page).
+// is what exists today, drawn finished: a title that greets, one line, one main action,
+// the areas with a screen as cards (the menu's own links, so a phone's first screen is
+// somewhere to go, not a list above an empty page), and the areas still to come named
+// quietly beneath, not as cards that lead to an empty page.
 import { leagueUrl, type AdminArea as Area, type LeagueAddressee } from '@srleagues/core';
 import { EmptyPanel, MessagePage, PageHead } from '@srleagues/ui';
 import type { LeagueView } from '../../server/league-gate.ts';
 import { leagueSites, siteOfLeague } from '../../server/league-site.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
-import { leagueHomeStayUrl } from '../team-pages/index.ts';
 import { isReadyArea } from './staff-area.ts';
 import { StaffIcon } from './staff-icon.tsx';
-import { StaffPill } from './pieces.tsx';
 
 /** One line on what an area is for, for the areas that have a screen today. */
 const purposes: Partial<Readonly<Record<Area, TextKey>>> = {
@@ -22,12 +21,31 @@ const purposes: Partial<Readonly<Record<Area, TextKey>>> = {
   settings: 'admin.home.purpose.settings',
 };
 
+/**
+ * The home's one main action, at its top right: something this person does here, not the
+ * way to the public site (the menu has that). The home reads nothing but which areas are
+ * this person's, so it is the first of their jobs in this order: entering results for
+ * whoever has Games (the Games list opens on the games that need one), else the schedule,
+ * else the teams, else the settings. Whether a game is waiting right now is for step
+ * 2.129, which gives the home its own reads.
+ */
+const mainActions: readonly (readonly [Area, TextKey])[] = [
+  ['games', 'admin.home.action.games'],
+  ['schedule', 'admin.home.action.schedule'],
+  ['teams', 'admin.home.action.teams'],
+  ['settings', 'admin.home.action.settings'],
+];
+
 /** The admin's home, for a page that has already checked the admin is open to this person. */
 export function StaffHome({ view }: { readonly view: LeagueView }) {
   const league = view.context.league;
   const site = siteOfLeague(league, leagueSites());
-  // The areas with a screen first, in the menu's own order; the ones not ready after them.
-  const areas = [...view.areas.filter(isReadyArea), ...view.areas.filter((a) => !isReadyArea(a))];
+  // The areas with a screen are the cards. The ones with no screen yet are not somewhere
+  // to go: they are named quietly together under "Coming", and are no links here (the
+  // menu still lists each one, marked "Not ready").
+  const ready = view.areas.filter(isReadyArea);
+  const coming = view.areas.filter((area) => !isReadyArea(area));
+  const action = mainActions.find(([area]) => view.areas.includes(area));
   return (
     <main className="staff-home">
       <PageHead
@@ -35,40 +53,60 @@ export function StaffHome({ view }: { readonly view: LeagueView }) {
         title={t('admin.home.title')}
         sub={t('admin.home.sub', { league: site.name })}
       >
-        <a className="ui-button" data-kind="main" href={leagueHomeStayUrl(league)}>
-          {t('admin.viewSite')}
-        </a>
+        {action === undefined ? null : (
+          <a
+            className="ui-button"
+            data-kind="main"
+            href={leagueUrl(league, 'admin-area', { area: action[0] })}
+          >
+            {t(action[1])}
+          </a>
+        )}
       </PageHead>
-      <section aria-labelledby="staff-home-areas">
-        <h2 id="staff-home-areas" className="staff-label">
-          {t('admin.home.areas')}
-        </h2>
-        <ul className="staff-tiles">
-          {areas.map((area) => {
-            const purpose = purposes[area];
-            return (
+      {ready.length === 0 ? null : (
+        <section aria-labelledby="staff-home-areas">
+          <h2 id="staff-home-areas" className="staff-label">
+            {t('admin.home.areas')}
+          </h2>
+          <ul className="staff-tiles">
+            {ready.map((area) => {
+              const purpose = purposes[area];
+              return (
+                <li key={area}>
+                  <a className="staff-tile" href={leagueUrl(league, 'admin-area', { area })}>
+                    <span className="staff-tile-icon">
+                      <StaffIcon name={area} />
+                    </span>
+                    <span className="staff-tile-words">
+                      <span className="staff-tile-name">{t(`admin.area.${area}`)}</span>
+                      {purpose === undefined ? null : (
+                        <span className="staff-tile-line">{t(purpose)}</span>
+                      )}
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      {/* What else the home shows (numbers, a checklist of what to do next) is step
+          2.129's, and stands here, between the cards and what is coming. */}
+      {coming.length === 0 ? null : (
+        <section aria-labelledby="staff-home-coming" className="staff-coming">
+          <h2 id="staff-home-coming" className="staff-label">
+            {t('admin.home.coming')}
+          </h2>
+          <ul>
+            {coming.map((area) => (
               <li key={area}>
-                <a
-                  className="staff-tile"
-                  href={leagueUrl(league, 'admin-area', { area })}
-                  data-ready={isReadyArea(area) ? 'yes' : 'no'}
-                >
-                  <span className="staff-tile-icon">
-                    <StaffIcon name={area} />
-                  </span>
-                  <span className="staff-tile-words">
-                    <span className="staff-tile-name">{t(`admin.area.${area}`)}</span>
-                    {purpose === undefined ? null : (
-                      <span className="staff-tile-line">{t(purpose)}</span>
-                    )}
-                  </span>
-                  {isReadyArea(area) ? null : <StaffPill>{t('admin.notReady.mark')}</StaffPill>}
-                </a>
+                <StaffIcon name={area} />
+                <span>{t(`admin.area.${area}`)}</span>
               </li>
-            );
-          })}
-        </ul>
-      </section>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }

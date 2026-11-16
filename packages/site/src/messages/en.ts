@@ -395,6 +395,13 @@ export const en = {
   'admin.home.title': 'Welcome back.',
   'admin.home.sub': 'Everything you run for {league} is here.',
   'admin.home.areas': 'Where to go',
+  // The home's one main action: the first of this person's jobs (step 2.103).
+  'admin.home.action.games': 'Enter results',
+  'admin.home.action.schedule': 'Open the schedule',
+  'admin.home.action.teams': 'Open teams',
+  'admin.home.action.settings': 'Open league settings',
+  // The areas with no screen yet, named together under the cards.
+  'admin.home.coming': 'Coming',
   'admin.home.purpose.teams': 'Teams, rosters and jersey numbers.',
   'admin.home.purpose.schedule': 'Rounds, games, places and times.',
   'admin.home.purpose.games': 'Results, box scores and who scores each game.',
