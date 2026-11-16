@@ -1108,6 +1108,9 @@ export const en = {
   'tracker.fouls.thisPeriod_one': '{count} team foul this period',
   'tracker.fouls.thisPeriod_other': '{count} team fouls this period',
   'tracker.bonus.1': 'Bonus',
+  // In a box too narrow for both words (a phone whose letters are wide) the badge shows
+  // the first word only, at the same size: the word that tells the two badges apart
+  // comes first.
   'tracker.bonus.2': 'Double bonus',
   'tracker.court.teamBoard': '{team}: {score}, {fouls}',
   'tracker.court.teamBoardBonus': '{team}: {score}, {fouls}, shooting the {bonus}',

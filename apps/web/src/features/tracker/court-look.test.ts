@@ -173,6 +173,14 @@ describe('the courtside look: the bonus at a glance (the area 4 review of step 2
     expect(double).toContain('background: var(--court-red)');
     expect(double).toContain('font-size: var(--court-badge-2)');
   });
+
+  it('for want of room the badge’s words wrap out of sight: they are not set smaller', () => {
+    const words = /^\.court-bonus-words\s*\{[^}]*\}/m.exec(rules)?.[0] ?? '';
+    expect(words).toContain('white-space: normal');
+    expect(words).toContain('overflow: hidden');
+    expect(words).not.toContain('font-size');
+    expect(words).not.toContain('text-overflow');
+  });
 });
 
 describe('the courtside look: its own values, and nothing else', () => {

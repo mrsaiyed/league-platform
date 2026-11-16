@@ -97,7 +97,9 @@ export function teamBoardLabel(team: TeamPanel, t: Translate): string {
  * given; it grows and turns red at the bonus, and again at the double bonus. The badge
  * sits with the team that SHOOTS the bonus, and says which in words. Where the box is
  * narrow (a phone, either way up) and holds a badge too, the count is written as the tiles
- * write a player's fouls ("10F"), so "Double bonus" is never cut.
+ * write a player's fouls ("10F"), so "Double bonus" is never cut. On a device whose
+ * letters are too wide even for that, neither is set smaller: the badge says "Double"
+ * (the first of its words; a screen reader is still given both, in the box's own name).
  */
 export function TeamFouls({ t, team }: { readonly t: Translate; readonly team: TeamPanel }) {
   return (
@@ -116,7 +118,10 @@ export function TeamFouls({ t, team }: { readonly t: Translate; readonly team: T
       </span>
       {team.bonus === 0 ? null : (
         <span className="court-bonus" data-bonus={team.side} data-level={team.bonus}>
-          {t(`tracker.bonus.${team.bonus}`)}
+          {/* Where a device's letters are too wide for "Double bonus" beside the count,
+              the badge keeps its size and its words wrap: the first line is what shows
+              ("Double"), filled and beside the count as before. */}
+          <span className="court-bonus-words">{t(`tracker.bonus.${team.bonus}`)}</span>
         </span>
       )}
     </span>

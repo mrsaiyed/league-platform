@@ -734,6 +734,86 @@ export async function clockSteps(kit) {
       });
     const notes = (page) => page.evaluate(() => window.hornNotes);
     const level = (locator) => locator.getAttribute('data-level');
+    /**
+     * Each team's box as a glance takes it in: the sizes of its count, its badge and its
+     * score; the words its badge shows (where a device's letters are too wide for
+     * "Double bonus" beside the count it says "Double", at the same size) and what the
+     * line would need to show both; whether the count and the badge are whole in the
+     * box; and whether the screen had to set them a step smaller (`tight`: only for a
+     * face wider than any measured here).
+     */
+    const glance = (page) =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('[data-score]')].map((box) => {
+          const px = (part) =>
+            part === null ? null : Number.parseFloat(getComputedStyle(part).fontSize);
+          const edge = box.getBoundingClientRect();
+          const inBox = (part) => {
+            const r = part.getBoundingClientRect();
+            return (
+              r.width > 0 &&
+              r.left >= edge.left - 0.5 &&
+              r.right <= edge.right + 0.5 &&
+              r.top >= edge.top - 0.5 &&
+              r.bottom <= edge.bottom + 0.5
+            );
+          };
+          const line = box.querySelector('.court-score-fouls');
+          const count = box.querySelector('[data-team-fouls]');
+          const badge = box.querySelector('[data-bonus]');
+          const seen = { level: null, px: null, shows: null, needsForAll: null };
+          if (badge !== null) {
+            const words = badge.querySelector('.court-bonus-words');
+            const place = words.getBoundingClientRect();
+            const node = words.firstChild;
+            const onItsLine = [];
+            let at = 0;
+            for (const word of node.textContent.split(' ')) {
+              const range = document.createRange();
+              range.setStart(node, at);
+              range.setEnd(node, at + word.length);
+              const r = range.getBoundingClientRect();
+              const middle = (r.top + r.bottom) / 2;
+              if (middle > place.top && middle < place.bottom) onItsLine.push(word);
+              at += word.length + 1;
+            }
+            // How wide all its words are on one line, measured on a copy beside them.
+            const copy = words.cloneNode(true);
+            copy.style.cssText =
+              'position: absolute; visibility: hidden; white-space: nowrap; inline-size: max-content;';
+            badge.append(copy);
+            const all = copy.getBoundingClientRect().width;
+            copy.remove();
+            seen.level = badge.getAttribute('data-level');
+            seen.px = px(badge);
+            seen.shows = onItsLine.join(' ');
+            seen.needsForAll =
+              count.getBoundingClientRect().width +
+              Number.parseFloat(getComputedStyle(line).columnGap) +
+              (badge.getBoundingClientRect().width - place.width) +
+              all;
+          }
+          return {
+            side: box.getAttribute('data-score'),
+            level: count.getAttribute('data-level'),
+            count: px(count),
+            badge: seen.px,
+            badgeLevel: seen.level,
+            shows: seen.shows,
+            needsForAll: seen.needsForAll,
+            has: line.clientWidth,
+            score: px(box.querySelector('.court-score-value')),
+            whole: inBox(count) && (badge === null || inBox(badge)),
+            tight: line.hasAttribute('data-tight'),
+            heard: box.getAttribute('aria-label'),
+          };
+        }),
+      );
+    /** The steps the fix round gave the count and the badge, at a size (court.css). */
+    const steps = (size) =>
+      size.width >= 700 && size.height >= 521
+        ? { count: [14, 20, 26], badge: [15, 19] }
+        : { count: [11, 13, 15], badge: [11, 12] };
     const { context, page, errors } = await scorekeeperAt(phoneLying);
     try {
       await hears(context);
@@ -791,6 +871,41 @@ export async function clockSteps(kit) {
           JSON.stringify(await notes(page)) === '[523]',
         JSON.stringify(await notes(page)),
       );
+      // The bonus at a glance (the area 4 review, M3), at every size, in this device's
+      // own letters and in wider ones: the count that reached the bonus and the badge
+      // it gave are at the step the fix round set, whole in their boxes, and the screen
+      // has not set them a step smaller for want of room.
+      for (const { size, letters, family } of await fits(page)) {
+        await drawIn(page, family);
+        await page.setViewportSize({ width: size.width, height: size.height });
+        await twoFrames(page);
+        const [home, away] = await glance(page);
+        const least = steps(size);
+        console.log(
+          `  ${size.width} x ${size.height}${letters}: at the bonus the count is ${home?.count} px (${away?.count} px at rest), the badge ${away?.badge} px and says “${away?.shows}”`,
+        );
+        note(
+          `${size.width} x ${size.height}${letters}: at the bonus the count and the badge are at their steps, whole, and not set smaller`,
+          home !== undefined &&
+            away !== undefined &&
+            home.level === '1' &&
+            home.count >= least.count[1] &&
+            away.level === '0' &&
+            away.count >= least.count[0] &&
+            away.badgeLevel === '1' &&
+            away.badge >= least.badge[0] &&
+            away.shows === 'Bonus' &&
+            home.whole &&
+            away.whole &&
+            !home.tight &&
+            !away.tight &&
+            home.score > home.count,
+          JSON.stringify({ home, away }),
+        );
+      }
+      await drawIn(page, '');
+      await page.setViewportSize({ width: phoneLying.width, height: phoneLying.height });
+      await twoFrames(page);
       await foul(c, 'home', 2);
       await foul(c, 'home', 3);
       await page.waitForTimeout(3400);
@@ -845,6 +960,11 @@ export async function clockSteps(kit) {
             return { fits: line.scrollWidth <= line.clientWidth + 1, shown };
           }),
         );
+        // The badge's words are in the page whole ("Double bonus"), and the box's own
+        // name gives a screen reader both. What the badge SHOWS is both words, or, on a
+        // device whose letters are too wide for both beside the count, the first: "Double",
+        // at the same size, and only where the line truly has no room for both.
+        const drawn = await glance(page);
         note(
           `${size.width} x ${size.height}${letters}: both teams in the double bonus: each box holds its fouls and "Double bonus" whole`,
           boxes.length === 2 &&
@@ -855,28 +975,25 @@ export async function clockSteps(kit) {
                 box.shown.every((part) => part.whole) &&
                 /^10( fouls|F)$/.test(box.shown[0].says) &&
                 box.shown[1].says === 'Double bonus',
+            ) &&
+            drawn.length === 2 &&
+            drawn.every(
+              (box) =>
+                box.whole &&
+                /, shooting the Double bonus$/.test(box.heard) &&
+                (box.shows === 'Double bonus' ||
+                  (box.shows === 'Double' && box.needsForAll > box.has - 0.5)),
             ),
-          JSON.stringify(boxes),
+          JSON.stringify({ boxes, drawn }),
         );
         // The bonus at a glance (the area 4 review, M3): at the double bonus the count is
-        // 15 px or more and the badge 12 or more on a phone, 26 and 19 on a tablet,
-        // unless this device's letters are wider than the box (then a step smaller, and
-        // still whole); and the count is never larger than the score beside it.
-        const drawn = await page.evaluate(() =>
-          [...document.querySelectorAll('[data-score]')].map((box) => {
-            const px = (part) => Number.parseFloat(getComputedStyle(part).fontSize);
-            return {
-              count: px(box.querySelector('[data-team-fouls]')),
-              badge: px(box.querySelector('[data-bonus]')),
-              score: px(box.querySelector('.court-score-value')),
-              tight: box.querySelector('.court-score-fouls').hasAttribute('data-tight'),
-            };
-          }),
-        );
-        const tablet = size.width >= 700 && size.height >= 521;
-        const least = tablet ? { count: 26, badge: 19 } : { count: 15, badge: 12 };
+        // 15 px or more and the badge 12 or more on a phone, 26 and 19 on a tablet, in
+        // this device's own letters and in wider ones: the screen never sets them a step
+        // smaller for want of room (it shortens the badge's words, above). And the count
+        // is never larger than the score beside it.
+        const least = steps(size);
         console.log(
-          `  ${size.width} x ${size.height}${letters}: at the double bonus the count is ${drawn[0]?.count} px, the badge ${drawn[0]?.badge} px, the score ${drawn[0]?.score} px${drawn.some((box) => box.tight) ? ' (letters wider than the box: a step smaller)' : ''}`,
+          `  ${size.width} x ${size.height}${letters}: at the double bonus the count is ${drawn[0]?.count} px, the badge ${drawn[0]?.badge} px and says “${drawn[0]?.shows}”, the score ${drawn[0]?.score} px${drawn.some((box) => box.tight) ? ' (letters wider than the box: a step smaller)' : ''}`,
         );
         note(
           `${size.width} x ${size.height}${letters}: at the double bonus the count and the badge are at their largest, and the score is larger still`,
@@ -884,7 +1001,11 @@ export async function clockSteps(kit) {
             drawn.every(
               (box) =>
                 box.score > box.count &&
-                (box.tight || (box.count >= least.count && box.badge >= least.badge)),
+                !box.tight &&
+                box.level === '2' &&
+                box.count >= least.count[2] &&
+                box.badgeLevel === '2' &&
+                box.badge >= least.badge[1],
             ),
           JSON.stringify(drawn),
         );
@@ -921,9 +1042,11 @@ export async function clockSteps(kit) {
             return {
               says: name.textContent,
               width: Math.round(name.clientWidth),
+              // Cut at its end, or by a line of it that does not show. (Half a line of
+              // doubt: some faces' letters are a pixel higher than the line they sit on.)
               cut:
                 name.scrollWidth > name.clientWidth + 0.5 ||
-                name.scrollHeight > name.clientHeight + 0.5,
+                name.scrollHeight > name.clientHeight + Number.parseFloat(style.lineHeight) / 2,
               ends: style.webkitLineClamp === '2' ? 'ellipsis' : style.textOverflow,
             };
           }),

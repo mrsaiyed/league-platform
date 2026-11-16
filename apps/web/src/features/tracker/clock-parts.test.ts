@@ -209,6 +209,12 @@ describe('team fouls and the bonus, in each team’s box (F1 to F3)', () => {
     expect(tag(box(ten, 'home').html, 'data-team-fouls="home"')).toContain('data-level="2"');
     expect(words(box(ten, 'away').html)).toBe('0 fouls Double bonus');
     expect(tag(box(ten, 'away').html, 'data-bonus="away"')).toContain('data-level="2"');
+    // Both words are drawn, in the place where they wrap for want of room (a narrow box
+    // in wide letters shows the first); the box's own name says both to a screen reader.
+    expect(box(ten, 'away').html).toContain('<span class="court-bonus-words">Double bonus</span>');
+    expect(box(ten, 'away').label).toBe(
+      'Bears: 0, 0 team fouls this period, shooting the Double bonus',
+    );
   });
 
   it('shows both at once when both teams are over the limit', () => {

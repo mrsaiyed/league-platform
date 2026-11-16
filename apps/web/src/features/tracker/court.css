@@ -708,6 +708,20 @@
   color: var(--court-text);
   font-size: var(--court-badge-2);
 }
+/* The badge is not set smaller for want of room, and its words are never cut. They wrap,
+   in a place one line high: on a device whose letters are too wide for "Double bonus"
+   beside the count, the badge says "Double", still filled, still a size larger than
+   "Bonus", still beside the count. It is never narrower than its longest word, and it
+   takes the room it needs before it wraps. (The step smaller, `data-tight`, is left for
+   a face in which even "10F" and "Double" do not fit.) */
+.court-bonus-words {
+  display: block;
+  block-size: 1.2em;
+  margin-block: -0.1em;
+  overflow: hidden;
+  line-height: 1.2;
+  white-space: normal;
+}
 /* The clock is the button that sets it and picks the period (T5, T6): a fine edge and a
    caret say it can be tapped. It turns red at 0:00 (T3), and says "Period over" beside
    it in words. */
@@ -2445,10 +2459,11 @@
      out of the two teams' names. So it says it shorter ("12 to send"), a line for each
      thing it says, in a column of 96 at most: a name of fifteen letters is then whole
      on a device whose letters are a sixth wider than most (it was cut at 132), and three
-     lines of it are as high as the scoreboard, so the row does not grow. */
+     lines of it are as high as the scoreboard, so the row does not grow. Its own edges
+     are 3, so "12 not saved" is one line in those wider letters too (it needs 87 of 90). */
   .court-banner {
     max-inline-size: 96px;
-    padding-inline: 4px;
+    padding-inline: 3px;
     font-size: var(--court-size-small);
     line-height: 1.2;
   }
