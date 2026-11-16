@@ -383,8 +383,10 @@ const cases = [
     '/signin?next=%2Fnorth-valley%2Fadmin',
   ],
   ['visitor', '/north-valley/admin/teams', 403, [noAccess], ['Admin areas']],
-  ['stranger', '/north-valley/admin', 403, [noAccess]],
-  ['coach', '/north-valley/admin/teams', 403, [noAccess]],
+  // Someone the admin is not open to at all is refused on the plain screen of SR Leagues'
+  // own: nothing of the admin's frame, and no way "back to the admin" (U-9).
+  ['stranger', '/north-valley/admin', 403, [noAccess], ['Admin areas', 'Back to the admin']],
+  ['coach', '/north-valley/admin/teams', 403, [noAccess], ['Admin areas', 'Back to the admin']],
   [
     'scheduler',
     '/north-valley/admin',
@@ -399,7 +401,18 @@ const cases = [
     [adminLink('north-valley', 'schedule'), 'Build the schedule here, round by round.'],
     [adminPlaceholder],
   ],
-  ['scheduler', '/north-valley/admin/teams', 403, [noAccess]],
+  // A scheduler at an area that is not theirs is refused inside the admin's own frame,
+  // which is open to them: their own areas in its menu, and the way back to its home
+  // (step 2.103). Another league's admin, which is not open to them, shows them no frame.
+  // (A refusal's screen is in the page's data, so an area's address is looked for bare.)
+  [
+    'scheduler',
+    '/north-valley/admin/teams',
+    403,
+    [noAccess, 'Admin areas', '/north-valley/admin/schedule', 'Back to the admin'],
+    ['/north-valley/admin/people'],
+  ],
+  ['scheduler', '/harbor-city/admin/teams', 403, [noAccess], ['Admin areas', 'Back to the admin']],
   // An area with no screen yet is the placeholder, in the words the checks around this
   // one look for to prove a real screen has replaced it (scripts/admin-placeholder.mjs).
   ['owner', '/north-valley/admin/people', 200, [adminPlaceholder, 'Back to the admin']],

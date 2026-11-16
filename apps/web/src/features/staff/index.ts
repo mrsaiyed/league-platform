@@ -11,4 +11,4 @@ export {
   type NoticeKind,
   type PillKind,
 } from './pieces.tsx';
-export { AdminArea, StaffHome, StaffNotFound } from './staff-pages.tsx';
+export { AdminArea, StaffHome, StaffNotFound, StaffRefused } from './staff-pages.tsx';

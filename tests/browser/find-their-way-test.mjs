@@ -506,12 +506,58 @@ if (browser) {
       await openMenu(page);
       await link(page, 'Sign in or create an account').click();
       await signIn(page, people.scheduler);
+      // The refusal's screen brings the admin's stylesheet with it (step 2.103), and
+      // Next.js sends that screen inside every page: a public page must not load it.
+      const staffRules = () =>
+        page.evaluate(() =>
+          [...document.styleSheets].some((sheet) => {
+            try {
+              return [...sheet.cssRules].some((rule) => rule.cssText.includes('.staff-bar'));
+            } catch {
+              return false;
+            }
+          }),
+        );
+      note('a public page loads none of the admin’s styles', !(await staffRules()));
       // The one address typed after the first: a refusal is only met at an address (U-6).
       await page.goto(`${origin}/north-valley/admin/people`);
       await page.getByRole('heading', { level: 1, name: 'You do not have access' }).waitFor();
       note(
         'the refusal says which account is signed in',
         (await page.getByText('You are signed in as scheduler@example.test.').count()) === 1,
+      );
+      // Step 2.103: the scheduler has part of this admin, so the refusal is drawn inside
+      // the admin's own frame (its row on top, its menu with their areas), in the
+      // league's workspace, and leads back to the admin's home.
+      const bar = page.locator('.staff-bar');
+      const barLook = await bar.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return { position: style.position, ground: style.backgroundColor };
+      });
+      note(
+        'a refusal inside an admin that is open to the person keeps the admin’s frame',
+        (await bar.isVisible()) &&
+          (await staffRules()) &&
+          barLook.position === 'sticky' &&
+          barLook.ground !== 'rgba(0, 0, 0, 0)',
+        JSON.stringify(barLook),
+      );
+      await openStaffMenu(page);
+      const areas = page.locator('.staff-menu-panel').getByRole('navigation', {
+        name: 'Admin areas',
+      });
+      note(
+        'the frame of the refusal lists the person’s own areas, and not the one refused',
+        (await areas.locator('a[href="/north-valley/admin/schedule"]').count()) === 1 &&
+          (await areas.locator('a[href="/north-valley/admin/people"]').count()) === 0,
+      );
+      await page.locator('.staff-bar .staff-menu > summary').click();
+      note(
+        'the refusal’s one clear way on is back to the admin',
+        (await page
+          .locator('main')
+          .getByRole('link', { name: 'Back to the admin' })
+          .getAttribute('href')) === '/north-valley/admin',
       );
       await accessible(page, 'no access, signed in');
       await noSidewaysScroll(page, 'no access, signed in');

@@ -1,22 +1,27 @@
-import { leagueUrl } from '@srleagues/core';
 import { MessagePage } from '@srleagues/ui';
 import { cookies } from 'next/headers';
 import { StandalonePage } from '../features/shell/index.ts';
-import { isStaffAddress } from '../features/staff/index.ts';
+import { isStaffAddress, StaffFrame, StaffRefused } from '../features/staff/index.ts';
+import type { LeagueView } from '../server/league-gate.ts';
 import { requestPath, signedInEmail, staffViewOfAddress } from '../server/load-league-page.ts';
 import { t } from '../server/messages.ts';
 import { signInFirstUrl } from '../server/sign-in-first.ts';
+// The admin's frame is drawn here for a refusal inside an admin that is open to the person
+// (below), so this screen brings the frame's stylesheet with it. Next.js attaches it to
+// this screen alone: it is loaded only when the refusal is drawn, never by a public page.
+import './[league]/admin/staff.css';
 
 /**
- * The admin's home, when the address refused is an area of an admin that is open to this
- * person (a scheduler at Teams): the refusal then leads back to it (step 2.103). Null for
- * anyone the admin is not open to, so nothing is said of a league to someone outside it.
+ * The admin as it is open to this person, when the address refused is an area of an admin
+ * that is open to them (a scheduler at Teams): the refusal is then drawn inside that
+ * admin's frame and leads back to its home (step 2.103). Null for anyone the admin is not
+ * open to, so nothing is said or shown of a league to someone outside it.
  */
-async function staffHomeOfRefusal(path: string): Promise<string | null> {
+async function staffOfRefusal(path: string): Promise<LeagueView | null> {
   try {
     const staff = await staffViewOfAddress();
     if (staff === null || !isStaffAddress(staff.context.league, path)) return null;
-    return leagueUrl(staff.context.league, 'admin');
+    return staff;
   } catch {
     return null;
   }
@@ -32,7 +37,11 @@ async function staffHomeOfRefusal(path: string): Promise<string | null> {
  * cannot be read the screen is a visitor's. The rest of its words are step 2.157's.
  *
  * Inside an admin that is open to the person (an area that is not theirs), the one clear
- * way on is "Back to the admin", and switching accounts is a second, quieter link.
+ * way on is "Back to the admin", and switching accounts is a second, quieter link. That
+ * one refusal is drawn inside the admin's own frame, in the league's workspace, as "Page
+ * not found" inside the admin is (docs/build/DESIGN.md section 4, lines 19 and 20): the
+ * person is already inside that admin, so the frame tells them nothing they may not know.
+ * Everyone else sees the plain screen of SR Leagues' own, as before.
  */
 export default async function Forbidden() {
   // Next.js draws this screen into every page it sends, before it is known whether the
@@ -53,23 +62,16 @@ export default async function Forbidden() {
       </StandalonePage>
     );
   }
-  const staffHome = await staffHomeOfRefusal(path);
-  if (staffHome !== null) {
+  const staff = await staffOfRefusal(path);
+  if (staff !== null) {
     return (
-      <StandalonePage>
-        <MessagePage
-          title={t('access.noAccess.title')}
-          action={{ href: staffHome, label: t('admin.backToAdmin') }}
-        >
-          <p>{t('access.noAccess.body')}</p>
-          <p>{t('access.noAccess.signedInAs', { email })}</p>
-          <p>
-            <a className="ui-button" data-kind="quiet" href={signInFirstUrl(path)}>
-              {t('access.noAccess.switch')}
-            </a>
-          </p>
-        </MessagePage>
-      </StandalonePage>
+      <StaffFrame view={staff}>
+        <StaffRefused
+          league={staff.context.league}
+          email={email}
+          switchHref={signInFirstUrl(path)}
+        />
+      </StaffFrame>
     );
   }
   return (
