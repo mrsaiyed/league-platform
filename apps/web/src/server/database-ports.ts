@@ -12,7 +12,8 @@
 // member's teams and each league's name (database-league-sites.ts); in part 4 League
 // settings and Season settings (database-admin-settings.ts) and Admin → Schedule, the
 // grid with its drafts, rounds and publishing and its list of seasons
-// (database-schedule-admin.ts). Every other area
+// (database-schedule-admin.ts); in part 6 (record 076) Admin → Games and "My games to
+// score" (database-games.ts). Every other area
 // still runs on the stand-in only: here each one refuses with NotOnTheDatabaseYet
 // the first time it is used, so its page shows the error page rather than made-up
 // data that is not in the database. Each moves in a part of its own.
@@ -34,6 +35,7 @@ import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
 import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
+import { databaseGames, databaseGamesDeps, type GamesQueries } from './database-games.ts';
 import {
   databaseLeagueSites,
   type DesignReport,
@@ -67,6 +69,7 @@ export type DatabaseQueries = Pick<
   | 'jobsStore'
 > &
   AdminSettingsQueries &
+  GamesQueries &
   PublicScheduleQueries &
   PublicStatsQueries &
   PublicTeamsQueries &
@@ -198,6 +201,11 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
   };
 
   const accessOf = accessOfVia(deps);
+  // The games commands' one transaction, the tracker's too (database-games.ts).
+  const gamesDeps = databaseGamesDeps(database, db, {
+    log: options.log,
+    clock: { now: () => now().getTime() },
+  });
 
   return {
     findLeague: (shortName) =>
@@ -227,7 +235,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
       now: () => now().getTime(),
     }),
     publicStats: databasePublicStats(database, db),
-    games: notMovedYet('games area'),
+    games: databaseGames(database, db, gamesDeps),
     fixtureImport: notMovedYet('fixture import'),
     publicSchedule: databasePublicSchedule(database, db, now),
     // Its seasonsOf lists only what mayListSeason allows the holder, read again for the

@@ -2,7 +2,7 @@
 // by short name and id, the sign-in service's users turned into our accounts, and
 // what they hold, read through packages/database as the app's login role. The
 // sign-in service is a fake here: only who each token belongs to matters.
-import { fail, ok, publicViewer } from '@srleagues/core';
+import { fail, listGamesNeedingResult, ok, publicViewer } from '@srleagues/core';
 import * as database from '@srleagues/database';
 import type { SessionIdentity, SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
@@ -359,7 +359,7 @@ describe('databasePorts (record 055)', () => {
   }, 120_000);
 
   it('refuses each area not yet on the database when it is reached, not before', async () => {
-    const areas = [ports.games, ports.fixtureImport, ports.adminTeams, ports.tracker];
+    const areas = [ports.fixtureImport, ports.adminTeams, ports.tracker];
     for (const area of areas) {
       expect(await Promise.resolve(area)).toBe(area);
       expect(() => Reflect.get(area, 'deps')).toThrow(NotOnTheDatabaseYet);
@@ -368,6 +368,18 @@ describe('databasePorts (record 055)', () => {
       NotOnTheDatabaseYet,
     );
     expect(ports.liveFeed).toBeNull();
+  });
+
+  it('runs the games area on the database: its commands and the names beside its games (part 6)', async () => {
+    const leagueId = lakeside().leagueId;
+    const owner = { leagueId, accountId: lakeside().ownerAccountId, requestId: randomUUID() };
+    // The games commands' transaction is the league's own: the owner's list answers.
+    const listed = await listGamesNeedingResult(owner, {}, ports.games.deps);
+    expect(listed).toMatchObject({ ok: true, value: { seesEveryGame: true } });
+    const names = await ports.games.namesOf(leagueId);
+    expect(Object.values(names.teams)).toContain('Lakeside Herons');
+    expect(Object.values(names.seasons)).toContain('Winter Season');
+    // The rest is database-games.test.ts.
   });
 
   it("reads the statistics' settings, a member's teams and the league's name (part 3)", async () => {
