@@ -178,7 +178,8 @@ const shown = (p: WorldPerson, sensitive: boolean): PersonRecord => {
   return sensitive ? { ...plain, sensitive: kept } : plain;
 };
 
-export function worldPeopleStore(s: LeagueWorld): PeopleStore {
+/** The people store over one league's world; `now` is the world's one clock (stand-in-world.ts). */
+export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
   return {
     find: async (id, sensitive) => {
       const p = s.people.find((x) => x.id === id);
@@ -254,6 +255,8 @@ export function worldPeopleStore(s: LeagueWorld): PeopleStore {
           s.teams.some((t) => t.id === r.teamId && !t.binned),
       ),
     leagueAudience: async () => s.audience,
+    // The day a birth date is read against (R-28), as the teams store's today.
+    leagueToday: async () => dayIn(now(), s.timeZone),
     leagueSettingRows: async (key) =>
       s.settings
         .filter((r) => r.key === key && r.place.level === 'league')

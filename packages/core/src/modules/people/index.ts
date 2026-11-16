@@ -14,6 +14,7 @@ export {
   type PrivateFieldScanOptions,
   type PrivatePersonFields,
 } from './rules/private-field-scan.ts';
+export { adultAge, isMinorOn, type MinorFacts } from './rules/minor-by-age.ts';
 export {
   showName,
   type PersonForDisplay,

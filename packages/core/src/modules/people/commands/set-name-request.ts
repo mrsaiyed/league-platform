@@ -27,6 +27,7 @@ import {
 } from '../../../command/index.ts';
 import type { PeopleTx } from '../ports.ts';
 import { readNamePolicy } from '../queries/read-name-policy.ts';
+import { isMinorOn } from '../rules/minor-by-age.ts';
 import {
   mayRecordNameRequest,
   nameRequests,
@@ -85,11 +86,19 @@ export const setNameRequest = defineCommand({
     if (person.version !== input.version) return fail({ code: 'changed-since-read' });
     if (person.visibility === input.showAs) return ok({ version: person.version });
     if (input.showAs === 'initials') {
-      const [audience, policy] = await Promise.all([
+      const [audience, policy, today] = await Promise.all([
         tx.people.leagueAudience(),
         readNamePolicy({ settingRows: (key) => tx.people.leagueSettingRows(key) }),
+        tx.people.leagueToday(),
       ]);
-      const isMinor = person.sensitive?.isMinor ?? null;
+      // R-28: the birth date decides where there is one, whatever the tick says.
+      const isMinor = isMinorOn(
+        {
+          birthDate: person.sensitive?.birthDate ?? null,
+          isMinor: person.sensitive?.isMinor ?? null,
+        },
+        today,
+      );
       if (!mayRecordNameRequest('initials', { isMinor }, audience, policy)) {
         return fail({ code: 'initials-not-offered' });
       }

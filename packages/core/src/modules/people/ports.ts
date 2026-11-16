@@ -90,6 +90,11 @@ export type PeopleStore = {
    * counts as youth: the careful reading.
    */
   readonly leagueAudience: () => Promise<Audience>;
+  /**
+   * Today in the league's own time zone (yyyy-mm-dd), by the database's clock: the day a
+   * birth date is read against to say whether the person is a child (R-28, isMinorOn).
+   */
+  readonly leagueToday: () => Promise<string>;
   /** The league's own stored values of one setting (the name policy's, R-25). */
   readonly leagueSettingRows: (key: string) => Promise<readonly StoredSettingRow[]>;
 };
