@@ -9,7 +9,6 @@
 import type { DesignDocument, StartingDesignKey } from '@srleagues/site';
 import { startingDesign } from '@srleagues/site';
 import { webPorts } from './container.ts';
-import { standInLeagueSites } from './stand-in-league-sites.ts';
 
 export type LeagueSite = {
   /** The league's own name, shown first in the header (U-8). It can be in any script (T-188). */
@@ -35,14 +34,7 @@ export async function leagueSites(): Promise<LeagueSiteLookup> {
   return (await webPorts()).leagueSites;
 }
 
-export function siteOfLeague(
-  league: { readonly id: string; readonly slug: string },
-  source: LeagueSiteSource = standInLeagueSites,
-): LeagueSite {
-  return siteFrom(league, source(league.id));
-}
-
-/** A league's name and design, read from `lookup`. */
+/** A league's name and design, read from `lookup` (the ports' own, or a stand-in's source). */
 export async function siteOf(
   league: { readonly id: string; readonly slug: string },
   lookup: LeagueSiteLookup,

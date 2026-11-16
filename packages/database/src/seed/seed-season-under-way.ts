@@ -162,8 +162,11 @@ async function putPeopleOnTeams(
 }
 
 /**
- * A player's line on the box score sheet, from their place in the league's list: points
- * 10, 14, 18 and on (4 more each), one 3-pointer, 2, 3, 4 free throws, 1, 2, 3 fouls.
+ * A player's line on the box score sheet, from their place p in the league's list (0
+ * first): points 10, 14, 18 and on (10 + 4p), one 3-pointer, 1, 3, 5 free throws (1 + 2p)
+ * and 1, 2, 3 fouls. A line that could be played: the points are 3 for the 3-pointer, the
+ * free throws, and 2 each for 3, 4, 5 two-pointers (3 + p), which the seed season does not
+ * keep as a statistic of its own.
  */
 function boxScoreLine(player: Rostered): BoxScoreLineInput {
   return {
@@ -174,7 +177,7 @@ function boxScoreLine(player: Rostered): BoxScoreLineInput {
     stats: {
       points: 10 + 4 * player.place,
       fg3: 1,
-      fg1: 2 + player.place,
+      fg1: 1 + 2 * player.place,
       fouls: 1 + player.place,
     },
   };

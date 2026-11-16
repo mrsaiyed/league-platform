@@ -304,15 +304,46 @@ if (browser) {
       const team = await open(`/${slug}/teams/${league.team.slug}`);
       note(`${slug}: ${league.team.name}'s page is served`, team.status === 200);
       note(`${slug}: ${league.team.name}'s page names the team`, has(team.text, league.team.name));
+      // The page's tables, cell by cell: a number is checked in its own row and column,
+      // never anywhere in the page's text, where a "4" or a "10" nearly always is.
+      const tables = await page.evaluate(() =>
+        [...document.querySelectorAll('main table')].map((table) => ({
+          headers: [...table.querySelectorAll('thead th')].map((th) =>
+            th.textContent.replace(/\s+/g, ' ').trim(),
+          ),
+          rows: [...table.querySelectorAll('tbody tr')].map((tr) =>
+            [...tr.children].map((cell) => cell.textContent.replace(/\s+/g, ' ').trim()),
+          ),
+        })),
+      );
+      const rowOf = (name) =>
+        tables.flatMap((table) => {
+          const points = table.headers.findIndex((h) => /\bPoints\b/.test(h));
+          return (
+            table.rows
+              // A team's cell may start with its shield's letter: the name ends the cell.
+              .filter((cells) => cells.some((cell) => cell.endsWith(name)))
+              .map((cells) => ({ cells, points: points < 0 ? undefined : cells[points] }))
+          );
+        });
+      const inRoster = rowOf(league.team.player).find((row) => row.points === undefined);
       note(
         `${slug}: ${league.team.name}'s roster shows ${league.team.player} with number ${league.team.number}`,
-        has(team.text, league.team.player) && team.text.includes(league.team.number),
-        team.text.slice(0, 600),
+        inRoster?.cells[0] === league.team.number,
+        JSON.stringify(inRoster?.cells ?? tables),
       );
       note(`${slug}: ${league.team.name}'s record is 1-0`, /\b1-0\b/.test(team.text));
+      const inStats = rowOf(league.team.player).find((row) => row.points !== undefined);
+      note(
+        `${slug}: ${league.team.name}'s player statistics give ${league.team.player} ${league.team.points} points`,
+        inStats?.points === String(league.team.points),
+        JSON.stringify(inStats?.cells ?? tables),
+      );
+      const totals = rowOf(league.team.name).find((row) => row.points !== undefined);
       note(
         `${slug}: ${league.team.name}'s totals show its ${league.team.points} points`,
-        team.text.includes(String(league.team.points)),
+        totals?.points === String(league.team.points),
+        JSON.stringify(totals?.cells ?? tables),
       );
       await nothingPrivate(`${league.team.name}'s page`);
       await accessible(`/${slug}/teams/${league.team.slug} on the database`);

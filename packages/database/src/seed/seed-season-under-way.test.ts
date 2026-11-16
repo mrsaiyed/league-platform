@@ -107,6 +107,13 @@ describe('putSeedSeasonsUnderWay', () => {
         ),
       );
       for (const player of table.value.players) expect(player.gamesPlayed).toBe(1);
+      // Each line could have been played: its points are 3 for each 3-pointer, 1 for each
+      // free throw, and 2 for each of a whole number of two-pointers (not kept here).
+      for (const player of table.value.players) {
+        const total = (key: string) => player.stats[key]?.total ?? 0;
+        const twos = (total('points') - 3 * total('fg3') - total('fg1')) / 2;
+        expect(Number.isInteger(twos) && twos >= 0, `${player.name.text}: ${twos} twos`).toBe(true);
+      }
     });
   }
 

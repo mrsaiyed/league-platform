@@ -15,7 +15,7 @@ import {
   textSurfaces,
 } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
-import { siteOfLeague } from './league-site.ts';
+import { siteOf } from './league-site.ts';
 import {
   madeUpDesign,
   madeUpDesignKeys,
@@ -46,19 +46,19 @@ describe('the designs a made-up league can be pictured under', () => {
     }
   });
 
-  it('draws the first made-up league under the first starting design, or the one named', () => {
-    expect(siteOfLeague(standInLeagues.live, standInLeagueSites).design).toEqual(
+  it('draws the first made-up league under the first starting design, or the one named', async () => {
+    expect((await siteOf(standInLeagues.live, standInLeagueSites)).design).toEqual(
       picturedDesign('crest'),
     );
     for (const key of picturedDesignKeys) {
       const source = standInLeagueSitesIn(key);
-      expect(siteOfLeague(standInLeagues.live, source).design, key).toEqual(picturedDesign(key));
+      expect((await siteOf(standInLeagues.live, source)).design, key).toEqual(picturedDesign(key));
       // Only the first league: the other keeps its own look, and its name.
-      expect(siteOfLeague(standInLeagues.other, source)).toEqual(
-        siteOfLeague(standInLeagues.other, standInLeagueSites),
+      expect(await siteOf(standInLeagues.other, source)).toEqual(
+        await siteOf(standInLeagues.other, standInLeagueSites),
       );
     }
-    expect(siteOfLeague(standInLeagues.other, standInLeagueSites).design).toEqual(
+    expect((await siteOf(standInLeagues.other, standInLeagueSites)).design).toEqual(
       picturedDesign('clean-court'),
     );
   });

@@ -82,7 +82,7 @@ describe('myTeamStart on the made-up database', () => {
           scope: { type: 'team', id: herons.id },
           grantedByAccountId: member,
           revokedAt: null,
-        } as never,
+        },
       ],
     };
     expect(
