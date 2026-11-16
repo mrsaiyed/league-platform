@@ -1291,6 +1291,9 @@ function leagueOf(
   return s;
 }
 
+/** The made-up adult league's own time zone: the day its games list and the tests count from. */
+export const adultTimeZone = 'America/Chicago';
+
 /**
  * Every made-up league's rows, with days counted from `now` in each league's own time
  * zone, so the current round is always this week's.
@@ -1301,7 +1304,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
     {
       league: cast.adultLeague,
       audience: 'adult',
-      timeZone: 'America/Chicago',
+      timeZone: adultTimeZone,
       minimumGames: 3,
       programId: adultProgram,
       venues: adultVenues,
