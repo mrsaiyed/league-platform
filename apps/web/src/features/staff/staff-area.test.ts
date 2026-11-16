@@ -9,7 +9,14 @@ describe('where in the admin an address is', () => {
     expect(isStaffAddress(league, '/north-valley/admin/')).toBe(true);
     expect(isStaffAddress(league, '/north-valley/admin?x=1')).toBe(true);
     expect(isStaffAddress(league, '/north-valley/admin/teams/abc')).toBe(true);
-    expect(isStaffAddress(league, '/North-Valley/Admin/Games')).toBe(true);
+  });
+
+  it('reads an address as it is written: the routes tell capitals from small letters', () => {
+    // `/…/Admin/teams` is no page of the admin, so it is not framed as one.
+    expect(isStaffAddress(league, '/north-valley/Admin/teams')).toBe(false);
+    expect(isStaffAddress(league, '/North-Valley/admin')).toBe(false);
+    expect(staffPlaceAt(league, '/north-valley/Admin', ['teams'])).toBeNull();
+    expect(staffPlaceAt(league, '/north-valley/admin/Teams', ['teams'])).toBeNull();
   });
 
   it('is not fooled by a public page, the tracker or a longer word', () => {

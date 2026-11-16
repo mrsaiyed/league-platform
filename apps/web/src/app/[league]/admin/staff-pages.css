@@ -58,7 +58,22 @@
   margin: 0;
   padding-inline-start: var(--step-4);
 }
-/* A round: its name, its day and how many games it holds; then its games as rows. */
+/* A round: its name, its day and how many games it holds; then its games as rows. On a
+   phone the day and the count always take the line under the name, so every round's head
+   is one shape (a short name had them beside it and a long one beneath). From a tablet up
+   there is room for them at the far end of the name's line. */
+.admin-round > .staff-panel-head > .admin-round-facts {
+  flex: 1 1 100%;
+}
+@media (min-width: 40rem) {
+  .admin-round > .staff-panel-head {
+    flex-wrap: nowrap;
+    align-items: baseline;
+  }
+  .admin-round > .staff-panel-head > .admin-round-facts {
+    flex: none;
+  }
+}
 .admin-round-facts {
   display: flex;
   flex-wrap: wrap;
@@ -345,6 +360,20 @@
   padding-inline: var(--space);
   color: var(--color-muted);
   font-size: var(--text-14);
+}
+/* How a game's result is recorded ("Box score", "Final score only") is a small label
+   before its button, as a label over a group is: in plain grey words at the button's own
+   size it read as a second link that did nothing. */
+.staff .admin-my-game > p[data-recording] {
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+}
+.staff .admin-my-game > p[data-recording] > .ui-button {
+  margin-inline-start: auto;
+  letter-spacing: normal;
+  text-transform: none;
 }
 .staff .admin-my-games-foot {
   margin: 0;
@@ -692,6 +721,12 @@
 .admin-team-part[data-kind='danger'] {
   border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
 }
+/* Its one button stands at the start, under the tick it needs: there is no Save here for
+   it to stand apart from, and pushed to the far end of its form it hung in the middle of
+   a laptop's panel. */
+.admin-team-part[data-kind='danger'] .staff-buttons > [data-kind='danger'] {
+  margin-inline-start: 0;
+}
 .admin-team .ui-page-head-row > .ui-emblem {
   block-size: var(--step-7);
 }
@@ -747,6 +782,11 @@
 }
 .staff .admin-roster-fields select {
   inline-size: calc(3 * var(--step-7));
+}
+/* A jersey number's box is wide enough for what it says while it is empty ("No number"),
+   in a wide typeface too: it was cut to "No numbe". */
+.staff .admin-roster-fields .staff-field[data-size='figure'] input {
+  inline-size: calc(2 * var(--step-7) + var(--step-6));
 }
 .staff .admin-roster-form .staff-field input[type='date'] {
   inline-size: calc(3 * var(--step-7) + var(--step-4));

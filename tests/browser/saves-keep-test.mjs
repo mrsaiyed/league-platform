@@ -407,9 +407,15 @@ if (browser) {
           grid.scrollLeft = 0;
           return { moved, rows: rows.length, hidden: hidden.length };
         });
+        // The grid must really have moved: a grid that never scrolled proves nothing here.
+        note(
+          'the box score: at 390 wide the grid is wider than its box and scrolls in it',
+          names.moved === true,
+          JSON.stringify(names),
+        );
         note(
           'the box score: every row still shows its player with the last column in view',
-          names.rows === 6 && names.hidden === 0,
+          names.moved === true && names.rows === 6 && names.hidden === 0,
           JSON.stringify(names),
         );
         const tick = await grids.nth(0).locator('input[type=checkbox]').first().boundingBox();
@@ -460,6 +466,78 @@ if (browser) {
       }
     },
   );
+
+  // Step 2.103: the admin's own menu on a phone is a plain disclosure, so it opens with
+  // scripts switched off, and leads on.
+  await step('with scripts off, the admin’s own menu opens on a phone and leads on', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token', {
+      javaScriptEnabled: false,
+    });
+    try {
+      await page.goto(`${origin}/north-valley/admin`);
+      const menu = page.locator('.staff-bar .staff-menu');
+      const areas = menu.getByRole('navigation', { name: 'Admin areas' });
+      const games = areas.locator('a[href="/north-valley/admin/games"]');
+      note(
+        'with scripts off, the admin’s menu is shut behind its button to begin with',
+        (await menu.locator('> summary').isVisible()) && !(await games.isVisible()),
+      );
+      await menu.locator('> summary').click();
+      note(
+        'with scripts off, the menu button opens the admin’s own areas, the site and signing out',
+        (await menu.getAttribute('open')) !== null &&
+          (await games.isVisible()) &&
+          (await menu.getByRole('link', { name: 'View the site' }).isVisible()) &&
+          (await menu.getByRole('button', { name: 'Sign out' }).isVisible()),
+      );
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
+        games.click(),
+      ]);
+      note(
+        'with scripts off, an area tapped in the menu opens',
+        (await page.getByRole('heading', { level: 1, name: 'Games' }).count()) === 1,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  // Step 2.103: tabbing past the menu's last entry moved the focus on to the page under
+  // the open panel, out of sight. The menu shuts when the focus leaves it, and on Escape.
+  await step('the admin’s open menu shuts when the keyboard’s focus leaves it', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token');
+    try {
+      await page.goto(`${origin}/north-valley/admin`);
+      const menu = page.locator('.staff-bar .staff-menu');
+      await openStaffMenu(page);
+      await menu.getByRole('button', { name: 'Sign out' }).focus();
+      await page.keyboard.press('Tab');
+      await page.waitForFunction(() => !document.querySelector('.staff-bar .staff-menu')?.open);
+      const focused = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!(el instanceof HTMLElement) || el === document.body) return null;
+        const box = el.getBoundingClientRect();
+        const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return { inMenu: el.closest('.staff-menu') !== null, seen: el === top || el.contains(top) };
+      });
+      note(
+        'tabbing past "Sign out" shuts the menu, and the focus is on something in sight',
+        focused !== null && !focused.inMenu && focused.seen,
+        JSON.stringify(focused),
+      );
+      await openStaffMenu(page);
+      await menu.getByRole('link', { name: 'View the site' }).focus();
+      await page.keyboard.press('Escape');
+      note(
+        'Escape shuts the menu and gives the focus back to its button',
+        (await menu.getAttribute('open')) === null &&
+          (await page.evaluate(() => document.activeElement?.tagName === 'SUMMARY')),
+      );
+    } finally {
+      await context.close();
+    }
+  });
 
   await step('with scripts off, the box score keeps a refused sheet', async () => {
     const { context, page } = await signedInAs('local-scheduler-token', {

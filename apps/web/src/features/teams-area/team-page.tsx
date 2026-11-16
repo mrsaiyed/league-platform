@@ -15,7 +15,7 @@ import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { StaffTrail } from '../staff/index.ts';
+import { StaffField, StaffNotice, StaffTrail } from '../staff/index.ts';
 import { leagueDayText } from '../../server/game-when.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { doneAtOf, entryAnchor, leavingAtOf, problemKey } from './answer.ts';
@@ -109,9 +109,9 @@ export async function TeamPage({
   const onLine = saidOnLine(doneAtOf(query), lines, team.name);
   const saidHere = (entryId: string) =>
     onLine?.entry !== entryId ? null : (
-      <p className="ui-notice" data-kind="saved" role="status" data-said-on={entryId}>
+      <StaffNotice kind="saved" data={{ 'data-said-on': entryId }}>
         {onLine.text}
-      </p>
+      </StaffNotice>
     );
 
   return (
@@ -176,9 +176,7 @@ export async function TeamPage({
 
       <Section title={t('adminTeams.roster.title')}>
         {!roster.ok ? (
-          <p className="ui-notice" data-kind="error" role="alert">
-            {t('adminTeams.roster.readFailed')}
-          </p>
+          <StaffNotice kind="refused">{t('adminTeams.roster.readFailed')}</StaffNotice>
         ) : open.length === 0 ? (
           <p className="staff-quiet">{t('adminTeams.roster.none')}</p>
         ) : (
@@ -205,8 +203,7 @@ export async function TeamPage({
                   <input type="hidden" name="entry" value={line.id} />
                   <input type="hidden" name="version" value={line.version} />
                   <p className="admin-roster-fields">
-                    <label className="staff-field" data-size="figure">
-                      {t('adminTeams.roster.number')}
+                    <StaffField label={t('adminTeams.roster.number')} size="figure">
                       <input
                         name="jerseyNumber"
                         type="text"
@@ -217,7 +214,7 @@ export async function TeamPage({
                         placeholder={t('adminTeams.roster.noNumber')}
                         autoComplete="off"
                       />
-                    </label>{' '}
+                    </StaffField>{' '}
                     <RoleSelect value={line.role} />{' '}
                     <button type="submit" className="ui-button">
                       {t('adminTeams.roster.saveEntry')}
@@ -296,9 +293,7 @@ export async function TeamPage({
 
       <Section title={t('adminTeams.add.title')} id={addPlayerAnchor}>
         {readFailed ? (
-          <p className="ui-notice" data-kind="error" role="alert">
-            {t('adminTeams.add.readFailed')}
-          </p>
+          <StaffNotice kind="refused">{t('adminTeams.add.readFailed')}</StaffNotice>
         ) : available.length === 0 ? (
           <p className="staff-quiet">{t('adminTeams.add.noOne')}</p>
         ) : (
@@ -306,8 +301,7 @@ export async function TeamPage({
             <LeagueField league={here.slug} />
             <input type="hidden" name="team" value={team.id} />
             <p>
-              <label className="staff-field">
-                {t('adminTeams.add.person')}
+              <StaffField label={t('adminTeams.add.person')}>
                 <select name="personId" required defaultValue="">
                   <option value="" disabled>
                     {t('adminTeams.add.choose')}
@@ -318,7 +312,7 @@ export async function TeamPage({
                     </option>
                   ))}
                 </select>
-              </label>
+              </StaffField>
             </p>
             <NumberAndRole />
             <p className="staff-buttons">
@@ -358,9 +352,7 @@ export async function TeamPage({
       <Section title={t('adminTeams.people.title')}>
         <p className="staff-quiet">{t('adminTeams.people.body')}</p>
         {people.ok ? null : (
-          <p className="ui-notice" data-kind="error" role="alert">
-            {t('adminTeams.people.readFailed')}
-          </p>
+          <StaffNotice kind="refused">{t('adminTeams.people.readFailed')}</StaffNotice>
         )}
         <ul className="staff-rows admin-people">
           {everyone.map((person) => (
@@ -425,8 +417,7 @@ function LeavingDate({
   return (
     <>
       <p>
-        <label className="staff-field">
-          {t('adminTeams.roster.leftOn')}
+        <StaffField label={t('adminTeams.roster.leftOn')}>
           <input
             name="leftOn"
             type="date"
@@ -435,7 +426,7 @@ function LeavingDate({
             aria-describedby={problem === undefined ? helpId : `${errorId} ${helpId}`}
             aria-invalid={problem === undefined ? undefined : true}
           />
-        </label>
+        </StaffField>
       </p>
       {problem === undefined ? null : (
         <p id={errorId} className="ui-field-error" role="alert" data-left-on-problem={entryId}>
@@ -467,8 +458,7 @@ function ConfirmBox() {
 
 function RoleSelect({ value }: { readonly value: string }) {
   return (
-    <label className="staff-field">
-      {t('adminTeams.roster.role')}
+    <StaffField label={t('adminTeams.roster.role')}>
       <select name="role" defaultValue={value}>
         {rosterRoles.map((role) => (
           <option key={role} value={role}>
@@ -476,15 +466,14 @@ function RoleSelect({ value }: { readonly value: string }) {
           </option>
         ))}
       </select>
-    </label>
+    </StaffField>
   );
 }
 
 function NumberAndRole() {
   return (
     <p className="admin-roster-fields">
-      <label className="staff-field" data-size="figure">
-        {t('adminTeams.add.number')}
+      <StaffField label={t('adminTeams.add.number')} size="figure">
         <input
           name="jerseyNumber"
           type="text"
@@ -493,7 +482,7 @@ function NumberAndRole() {
           maxLength={2}
           autoComplete="off"
         />
-      </label>{' '}
+      </StaffField>{' '}
       <RoleSelect value="player" />
     </p>
   );

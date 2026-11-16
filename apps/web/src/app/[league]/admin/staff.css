@@ -16,8 +16,9 @@ html:has(.staff) {
   --gutter: var(--step-4);
   /* The row that stays on top on a phone: 56 high. */
   --staff-bar: calc(var(--tap) + var(--step-3));
-  /* The side menu on a laptop: 240 wide. */
-  --staff-side: calc(5 * var(--step-7));
+  /* The side menu on a laptop: 256 wide, so "Registration" and its mark share a row in a
+     wide typeface too. */
+  --staff-side: calc(4 * var(--step-8));
   /* The icons a notice, a row and a button are marked with: drawn once here, as masks. */
   --staff-tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='m8 12.4 2.8 2.8L16.2 9.5'/%3E%3C/svg%3E");
   --staff-stop: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.5 21.5 20h-19z'/%3E%3Cpath d='M12 10v4.5M12 17.2v.2'/%3E%3C/svg%3E");
@@ -252,20 +253,25 @@ html:has(.staff) {
 .staff-nav a[aria-current='page'] .staff-icon {
   color: inherit;
 }
-/* An area with no screen yet: a quiet mark at the end of its row. */
+/* An item's name takes the room there is and breaks between its words when it must, so
+   nothing beside it is ever pushed past the item's edge, in any typeface. */
+.staff-nav a > span:not(.staff-nav-mark) {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+/* An area with no screen yet: two quiet words at the end of its row, every one ending on
+   the same line down the menu. Words only: six outlined pills one under another were the
+   loudest thing in a menu that should be the calmest. */
 .staff-nav-mark {
-  margin-inline-start: auto;
-  padding-inline: var(--step-2);
-  border: 1px solid var(--staff-menu-line);
-  border-radius: var(--radius-pill);
+  flex: none;
   color: var(--staff-menu-muted);
   font-size: var(--text-12);
-  font-weight: 600;
+  font-weight: 400;
   white-space: nowrap;
 }
 /* On the current item everything is in the one color that reads on its fill. */
 .staff-nav a[aria-current='page'] .staff-nav-mark {
-  border-color: color-mix(in srgb, currentColor 55%, transparent);
   color: inherit;
 }
 /* Apart at the foot: the way to the public site, who is signed in, and signing out. */
@@ -321,12 +327,6 @@ html:has(.staff) {
   display: none;
 }
 .staff .staff-status-says {
-  position: absolute;
-  inset-block-start: 100%;
-  inset-inline-end: 0;
-  z-index: 25;
-  inline-size: max-content;
-  max-inline-size: min(18rem, 80vw);
   margin: 0;
   padding-block: var(--step-3);
   padding-inline: var(--step-4);
@@ -335,7 +335,39 @@ html:has(.staff) {
   background: var(--color-panel);
   color: var(--color-text);
   font-size: var(--text-14);
-  box-shadow: var(--overlay-shadow);
+}
+/* On a phone the opened sentence is a strip of its own under the row that stays on top,
+   in the page's flow: it moves the page down and covers none of it (as a box hung from
+   the pill it lay over the page's label and the top of its title). The strip is the
+   frame's second copy of the sentence, for the eye; the one inside the pill's own
+   disclosure is kept for a screen reader, which meets it right where it was opened. */
+.staff .staff-bar .staff-status-says {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.staff .staff-status-band {
+  display: none;
+  margin: 0;
+  padding-block: var(--step-3);
+  padding-inline: var(--gutter);
+  border-block-end: 1px solid var(--color-line);
+  background: var(--staff-wait-soft);
+  color: var(--color-text);
+  font-size: var(--text-14);
+}
+.staff .staff-status-band[data-status='suspended'] {
+  background: var(--staff-danger-soft);
+}
+@media (max-width: 63.99rem) {
+  .staff:has(.staff-bar .staff-status[open]) > .staff-status-band {
+    display: block;
+  }
 }
 
 /* On a laptop the menu is at the side and stays there while the page scrolls. */
@@ -372,14 +404,33 @@ html:has(.staff) {
     padding-block: var(--step-5) var(--step-4);
     padding-inline: var(--step-4);
   }
-  /* On a short screen the areas scroll between the league's name and the foot, so "View
-     the site" and "Sign out" never leave the screen. */
+  /* On a short screen (a laptop 768 high, with ten areas) the areas scroll between the
+     league's name and the foot, so "View the site" and "Sign out" never leave the screen.
+     While areas are out of sight below, the last one in view fades into the menu, so an
+     item is never cut in half as if the menu ended there: a strip that fades to the
+     menu's own color stays at the foot of the list. The strip has its own room after the
+     last area, so with the list at its end (or a list that fits) it covers nothing. */
   .staff-side .staff-nav {
     flex: 0 1 auto;
     min-block-size: 0;
     margin-inline: calc(-1 * var(--step-2));
     padding-inline: var(--step-2);
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--staff-menu-line) transparent;
+  }
+  .staff-side .staff-nav::after {
+    content: '';
+    position: sticky;
+    inset-block-end: 0;
+    display: block;
+    block-size: var(--step-6);
+    background: linear-gradient(to bottom, transparent, var(--staff-menu) 75%);
+    pointer-events: none;
+  }
+  .staff .staff-side .staff-status-says {
+    position: static;
+    margin-block-start: var(--step-2);
   }
   /* At the side the rows are a pointer's: 40 high, so every area of a full menu is on a
      laptop's screen at once and the current one is never out of sight. */
@@ -411,12 +462,6 @@ html:has(.staff) {
   .staff-side .staff-status > summary {
     min-block-size: var(--step-6);
   }
-  .staff .staff-side .staff-status-says {
-    position: static;
-    inline-size: auto;
-    max-inline-size: none;
-    margin-block-start: var(--step-2);
-  }
   .staff-side .staff-foot {
     flex: none;
     margin-block-start: auto;
@@ -443,8 +488,51 @@ html:has(.staff) {
 .staff-body > .ui-message {
   margin-block: var(--step-6);
 }
+/* The foot of a staff page: the product's small one (Terms, Privacy and "Powered by
+   SR Leagues", which every page a league shows carries: U-8), never the league's public
+   footer with its name and menu. Its look is written here whole, so the frame needs
+   nothing of the public pages' stylesheet: it is also drawn around a refusal, which that
+   stylesheet does not reach (app/forbidden.tsx). */
+.staff .site-footer {
+  border-block-start: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
 .staff .site-footer .site-column {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-2) var(--step-5);
+  inline-size: 100%;
+  max-inline-size: calc(70rem + 2 * var(--gutter));
+  margin-inline: auto;
   padding-block: var(--step-4);
+  padding-inline: var(--gutter);
+}
+.staff .site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--step-5);
+}
+.staff .site-footer nav a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap);
+  color: var(--color-muted);
+  text-decoration: none;
+}
+.staff .site-footer nav a:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+.staff .site-footer .powered-by {
+  font-size: var(--text-12);
+  letter-spacing: 0.04em;
+}
+.staff .site-footer-made-up {
+  flex: 1 1 100%;
+  font-size: var(--text-12);
 }
 
 /* ---------- The shared staff pieces ---------- */

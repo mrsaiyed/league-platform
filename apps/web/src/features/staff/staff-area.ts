@@ -3,8 +3,10 @@
 // frame is drawn), and which area's page it is, so the menu can mark it.
 import { leagueUrl, type AdminArea, type LeagueAddressee } from '@srleagues/core';
 
-const plain = (address: string): string =>
-  (address.split(/[?#]/)[0] ?? '').replace(/\/+$/, '').toLowerCase();
+// An address is compared as it is written: the app's routes tell capitals from small
+// letters, so `/…/Admin/teams` is no page of the admin, and must not be taken for one
+// (taken for one, it lost the league's frame and got no admin frame: a bare page).
+const plain = (address: string): string => (address.split(/[?#]/)[0] ?? '').replace(/\/+$/, '');
 
 /** The admin's home, or one of its areas. */
 export type StaffPlace = 'home' | AdminArea;

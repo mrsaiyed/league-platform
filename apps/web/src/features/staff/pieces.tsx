@@ -44,10 +44,13 @@ export type NoticeKind = 'saved' | 'refused' | 'removed';
 export function StaffNotice({
   kind,
   id,
+  data,
   children,
 }: {
   readonly kind: NoticeKind;
   readonly id?: string;
+  /** What the notice is found by: the `data-…` attributes of the thing it is about. */
+  readonly data?: Readonly<Record<`data-${string}`, string>> | undefined;
   readonly children: ReactNode;
 }) {
   return (
@@ -56,6 +59,7 @@ export function StaffNotice({
       className="ui-notice"
       data-kind={kind === 'refused' ? 'error' : kind}
       role={kind === 'refused' ? 'alert' : 'status'}
+      {...data}
     >
       {children}
     </div>

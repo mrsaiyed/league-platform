@@ -8,8 +8,9 @@
 // - On a laptop, the menu is at the side: the league's mark and name, the areas with their
 //   icons and the current one filled, and, apart at the foot, "View the site", who is
 //   signed in, their account and "Sign out".
-// - The public site's header, tabs and footer are not drawn at all here (the league's
-//   layout leaves them off an address of the admin).
+// - The public site's header and tabs are not drawn at all here (the league's layout
+//   leaves them off an address of the admin). The foot is the product's small one: Terms,
+//   Privacy and "Powered by SR Leagues" (U-8), never the league's public footer.
 // - A league that is not public says so as a small pill in the header, which opens the
 //   whole sentence; never a band across every page.
 //
@@ -26,6 +27,7 @@ import { leagueSites, siteOfLeague } from '../../server/league-site.ts';
 import { requestPath, signedInEmail } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
 import { accountMenuOf, displayStylesheet, SiteFooter } from '../shell/index.ts';
+import { CloseWhenLeft } from './close-when-left.tsx';
 import { staffPlaceAt } from './staff-area.ts';
 import { StaffFoot, StaffNav } from './staff-nav.tsx';
 
@@ -81,6 +83,7 @@ export async function StaffFrame({
   const place = staffPlaceAt(league, path, view.areas);
   const account = accountMenuOf(view, await signedInEmail(), path);
   const home = leagueUrl(league, 'admin');
+  const notPublic = statuses[league.status];
   const menu = (
     <>
       <StaffNav league={league} areas={view.areas} current={place} />
@@ -112,8 +115,16 @@ export async function StaffFrame({
             <span className="ui-visually-hidden">{t('nav.menu')}</span>
           </summary>
           <div className="staff-menu-panel">{menu}</div>
+          <CloseWhenLeft />
         </details>
       </header>
+      {/* On a phone the pill's sentence, opened, is a strip in the page's flow under the
+          row, so it covers none of the page; a second copy for the eye (staff.css). */}
+      {notPublic === null ? null : (
+        <p className="staff-status-band" data-status={league.status} aria-hidden="true">
+          {t(notPublic.says)}
+        </p>
+      )}
       {/* The side's dark ground runs the height of the page; what it holds stays on the
           screen while the page scrolls. */}
       <aside className="staff-side">
