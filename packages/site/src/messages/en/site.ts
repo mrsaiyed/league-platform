@@ -139,6 +139,7 @@ export const enSite = {
     'No new code came in time, so no code was tried. Press the button again, or read the newest code on the kept emails’ page and type it in.',
   'standIn.madeUpPeople.none': 'In no league yet',
   'standIn.madeUpPeople.open': 'Open {league} as {name}',
+  'standIn.madeUpPeople.place': '{league}: {roles}',
   'standIn.madeUpPeople.title': 'Be a made-up person',
   'standIn.otherHost.body':
     'This copy of SR Leagues holds only made-up leagues. It answers only requests made on the computer it runs on, to that computer’s own address, and not requests passed on by another server.',

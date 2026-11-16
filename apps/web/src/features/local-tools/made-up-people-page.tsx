@@ -38,7 +38,10 @@ export async function MadeUpPeoplePage({
                 <ul>
                   {person.places.map((place) => (
                     <li key={place.slug} dir="auto">
-                      {place.name}: {membershipsInWords(place.memberships)}
+                      {t('standIn.madeUpPeople.place', {
+                        league: place.name,
+                        roles: membershipsInWords(place.memberships),
+                      })}
                     </li>
                   ))}
                 </ul>

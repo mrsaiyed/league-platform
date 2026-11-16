@@ -272,6 +272,29 @@ describe.each(['local', 'test'])('in %s', (appEnv) => {
     expect(tools.madeUpPeople).toHaveBeenCalledOnce();
   });
 
+  // Review of step 2.96, L8: the words between a league and a person's roles are a message.
+  it('"be this made-up person" writes each league and its roles by the message files', async () => {
+    tools.madeUpPeople.mockResolvedValueOnce([
+      {
+        key: 'owner',
+        name: 'Olive Owner',
+        email: 'owner@example.test',
+        places: [{ slug: 'north-valley', name: 'North Valley League', memberships: ['owner'] }],
+      },
+    ] as never);
+    state.request = requestFor(host, '/signin/made-up-people');
+    const drawn = (await pageAt('made-up-people')) as ReactElement<{ readonly tools: LocalTools }>;
+    const screen = drawn.type as (props: typeof drawn.props) => Promise<ReactNode>;
+    const markup = renderToStaticMarkup(await screen(drawn.props));
+    const { t } = await import('./messages.ts');
+    const { membershipsInWords } = await import('../features/shell/index.ts');
+    const words = t('standIn.madeUpPeople.place', {
+      league: 'North Valley League',
+      roles: membershipsInWords(['owner']),
+    });
+    expect(markup).toContain(`<li dir="auto">${words}</li>`);
+  });
+
   it('"be this made-up person" says so plainly when no new code came (review, L9)', async () => {
     state.request = requestFor(host, '/signin/made-up-people?problem=no-code');
     const Page = await catchAllPage();
