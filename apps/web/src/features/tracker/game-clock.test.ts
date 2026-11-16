@@ -6,10 +6,10 @@ import { describe, expect, it } from 'vitest';
 import {
   clockEntry,
   clockEntryKey,
+  minutesBack,
   minutesNow,
   periodChoices,
   periodEnd,
-  putsBackMs,
   readClock,
   startOffered,
   stopKey,
@@ -205,10 +205,71 @@ describe('the clock’s keys (T5)', () => {
     const paused = at(at(tippedOff(), 10_000, { type: 'start' }), 100_000, { type: 'pause' });
     const reading = readClock(paused, 101_000);
     expect(reading.text).toBe('6:30');
-    expect(putsBackMs(reading, 7 * 60_000)).toBe(30_000);
-    expect(putsBackMs(reading, 6 * 60_000)).toBe(0);
+    expect(minutesBack(paused, reading, 7 * 60_000).ms).toBe(30_000);
+    expect(minutesBack(paused, reading, 6 * 60_000).ms).toBe(0);
     // Before the clock has run there are no minutes to take off.
-    expect(putsBackMs(readClock(tippedOff(), 0), 9 * 60_000)).toBe(0);
+    expect(minutesBack(tippedOff(), readClock(tippedOff(), 0), 8 * 60_000).ms).toBe(0);
+  });
+
+  /** What the engine really took off the minutes when the clock was set. */
+  const tookOff = (game: basketball.GameState, now: number, ms: number): number =>
+    readClock(game, now).elapsedMs -
+    readClock(at(game, now, { type: 'set-clock', ms }), now).elapsedMs;
+
+  it('never says more than the engine takes: only time of the period being played (M-b)', () => {
+    // A full first quarter, then the second: 8:00 on its clock, nothing run in it yet.
+    const first = at(tippedOff(), 10_000, { type: 'start' });
+    expect(readClock(first, 600_000)).toMatchObject({ text: '0:00', elapsedMs: 480_000 });
+    const second = at(first, 610_000, { type: 'period', period: 2 });
+    const fresh = readClock(second, 611_000);
+    expect(fresh.text).toBe('8:00');
+    // Typing 8:00 again changes nothing, and nothing of the first quarter is ever touched.
+    expect(minutesBack(second, fresh, 8 * 60_000)).toEqual({ ms: 0, wholePeriod: false });
+    // A minute and a half into the second quarter, 6:30 on the clock.
+    const paused = at(at(second, 620_000, { type: 'start' }), 710_000, { type: 'pause' });
+    const reading = readClock(paused, 711_000);
+    expect(reading.text).toBe('6:30');
+    // 7:00 puts half a minute back: that comes off, and it is the engine's own figure.
+    expect(minutesBack(paused, reading, 7 * 60_000)).toEqual({ ms: 30_000, wholePeriod: false });
+    expect(tookOff(paused, 711_000, 7 * 60_000)).toBe(30_000);
+    // 8:00 puts a minute and a half back: all this quarter has run, and no more than it.
+    expect(minutesBack(paused, reading, 8 * 60_000)).toEqual({ ms: 90_000, wholePeriod: true });
+    expect(tookOff(paused, 711_000, 8 * 60_000)).toBe(90_000);
+  });
+
+  it('a clock set lower by mistake, then put right: says the whole period comes off (M4)', () => {
+    // 16:55 on a 20-minute half: each starter has played 3:05.
+    const paused = at(at(tippedOff(basketball.HALVES), 10_000, { type: 'start' }), 195_000, {
+      type: 'pause',
+    });
+    expect(readClock(paused, 196_000).text).toBe('16:55');
+    // Set to 12:00 by mistake: lower, so nothing comes off, and the form says nothing.
+    expect(minutesBack(paused, readClock(paused, 196_000), 12 * 60_000).ms).toBe(0);
+    const wrong = at(paused, 200_000, { type: 'set-clock', ms: 12 * 60_000 });
+    // Put right: 4:55 goes back on the clock, but what comes off the minutes is the 3:05
+    // the half has run, which is all of it. The form says both, and the engine does it.
+    const reading = readClock(wrong, 201_000);
+    expect(minutesBack(wrong, reading, 1_015_000)).toEqual({ ms: 185_000, wholePeriod: true });
+    expect(tookOff(wrong, 201_000, 1_015_000)).toBe(185_000);
+    const right = at(wrong, 210_000, { type: 'set-clock', ms: 1_015_000 });
+    expect(basketball.derive(paused).players['h3']?.ms).toBe(185_000);
+    expect(basketball.derive(right).players['h3']?.ms).toBe(0);
+  });
+
+  it('refuses a time longer than the period being played, in words (L5)', () => {
+    const half = basketball.periodMs(basketball.HALVES, 1);
+    expect(clockEntry('2500', half)).toEqual({ text: '25:00', ms: null, problem: 'period' });
+    expect(clockEntry('2001', half).problem).toBe('period');
+    // The period's own length is taken, and so is anything under it.
+    expect(clockEntry('2000', half)).toEqual({ text: '20:00', ms: 1_200_000, problem: null });
+    expect(clockEntry('1959', half).problem).toBeNull();
+    // Overtime is shorter: 5:00 in this format.
+    const overtime = basketball.periodMs(basketball.HALVES, 3);
+    expect(clockEntry('500', overtime).problem).toBeNull();
+    expect(clockEntry('501', overtime).problem).toBe('period');
+    // What the clock cannot hold at all is still said as that.
+    expect(clockEntry('6001', half).problem).toBe('range');
+    expect(clockEntry('75', half).problem).toBe('seconds');
   });
 });
 

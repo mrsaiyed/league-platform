@@ -277,6 +277,17 @@ export async function clockSteps(kit) {
         /Seconds go up to 59\./.test(await c.clockSheet.locator('[data-clock-note]').innerText()) &&
           (await c.clockSheet.locator('[data-set-clock]').isDisabled()),
       );
+      // Longer than the half is long (the area 4 review, L5): refused in words, not set.
+      await c.clockSheet.locator('[data-key="clear"]').click();
+      await c.typeClock('2500');
+      note(
+        'a time longer than the period is refused in words before Set is offered',
+        (await c.clockSheet.locator('[data-clock-note]').innerText()).trim() ===
+          'H1 is 20:00 long: type 20:00 or less.' &&
+          (await c.clockSheet.locator('[data-set-clock]').isDisabled()) &&
+          (await c.clockSheet.locator('[data-set-clock]').innerText()).trim() === 'Set clock',
+        await c.clockSheet.locator('[data-clock-note]').innerText(),
+      );
       await tapWhereItIs(page, c.clockSheet.locator('.court-close'), 'the × of the clock’s form');
       await c.root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
       note('× closes the form with nothing changed', (await c.clockText()) === before);
@@ -286,21 +297,32 @@ export async function clockSteps(kit) {
       await page.keyboard.type('1800');
       await page.keyboard.press('Backspace');
       await page.keyboard.type('0');
-      const warning = await c.clockSheet.locator('[data-clock-note]').innerText();
+      // What the form says comes off the minutes is the engine's own figure (the code
+      // review, M-b): never more than this half has run, and, when it is all of that,
+      // said so. The sentence after the tap then says the same figure.
+      const warning = (await c.clockSheet.locator('[data-clock-note]').innerText()).trim();
+      const warned =
+        /^This takes (\d+:\d\d) off (?:the minutes of the players on the court|the players’ minutes: all they have played this period)\.$/.exec(
+          warning,
+        );
       note(
-        'time put back on the clock is said before it is set: it comes off the players’ minutes',
-        /^This puts \d+:\d\d back on, and takes it off the minutes of the players on the court\.$/.test(
-          warning.trim(),
-        ),
+        'time put back on the clock is said before it is set: what comes off the players’ minutes',
+        warned !== null,
         warning,
       );
       await tapWhereItIs(page, c.clockSheet.locator('[data-set-clock]'), 'Set clock');
       await c.root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
-      await said(c, /^Clock set to 18:00\. \d+:\d\d went back on/);
+      await said(c, /^Clock set to 18:00\. \d+:\d\d came off the minutes/);
+      const after = /^Clock set to 18:00\. (\d+:\d\d) came off/.exec(
+        (await c.said.innerText()).trim(),
+      );
       note(
-        'the clock is set, stopped, and the screen says what came off the minutes',
+        'the clock is set, stopped, and the screen says what came off the minutes: the figure the form said',
         (await c.clockText()) === '18:00' &&
-          (await c.toggle.getAttribute('data-state')) === 'start',
+          (await c.toggle.getAttribute('data-state')) === 'start' &&
+          after !== null &&
+          after[1] === warned?.[1],
+        `${warned?.[1]} said before, ${after?.[1]} after`,
       );
       // Set wrongly: put right by setting it again (finding M2).
       await c.setClock('1200');

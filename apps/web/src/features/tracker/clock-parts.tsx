@@ -41,8 +41,14 @@ export type CourtClock = {
 export type ClockSheet = {
   /** What is typed on its keys so far, and what that means. */
   readonly entry: ClockEntry;
-  /** "0:30" when the time typed puts that much back on the clock; null when it does not. */
-  readonly putsBack: string | null;
+  /**
+   * What setting the time typed takes off the players' minutes ("0:30"), and whether
+   * that is all this period has run; null when it takes nothing off. The engine's own
+   * figure (game-clock.ts), so the form never says more than is then done.
+   */
+  readonly minutesBack: { readonly back: string; readonly wholePeriod: boolean } | null;
+  /** "20:00": how long the period being played is, said when a longer time is typed. */
+  readonly periodLength: string;
   readonly periods: readonly PeriodChoice[];
 };
 
@@ -554,9 +560,19 @@ export function ClockSheetView(props: {
       ? t('tracker.clockSheet.seconds')
       : entry.problem === 'range'
         ? t('tracker.clockSheet.range')
-        : sheet.putsBack !== null
-          ? t('tracker.clockSheet.putsBack', { back: sheet.putsBack })
-          : t(clock.running ? 'tracker.clockSheet.stops' : 'tracker.clockSheet.keysHelp');
+        : entry.problem === 'period'
+          ? t('tracker.clockSheet.tooLong', {
+              period: period(view, t),
+              length: sheet.periodLength,
+            })
+          : sheet.minutesBack !== null
+            ? t(
+                sheet.minutesBack.wholePeriod
+                  ? 'tracker.clockSheet.putsBackAll'
+                  : 'tracker.clockSheet.putsBack',
+                { back: sheet.minutesBack.back },
+              )
+            : t(clock.running ? 'tracker.clockSheet.stops' : 'tracker.clockSheet.keysHelp');
   return (
     <div className="court-sheet-wrap" data-clock-sheet="">
       <div className="court-scrim" onClick={() => on.clockSheet(false)} />

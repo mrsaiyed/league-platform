@@ -415,9 +415,14 @@ describe('timeouts (G3 to G7)', () => {
 });
 
 describe('the form that sets the clock and picks the period (T5, T6)', () => {
-  const sheetOf = (digits: string, putsBack: string | null = null, period = 1): ClockSheet => ({
-    entry: clockEntry(digits),
-    putsBack,
+  const sheetOf = (
+    digits: string,
+    minutesBack: ClockSheet['minutesBack'] = null,
+    period = 1,
+  ): ClockSheet => ({
+    entry: clockEntry(digits, basketball.periodMs(basketball.QUARTERS, period)),
+    minutesBack,
+    periodLength: basketball.formatClock(basketball.periodMs(basketball.QUARTERS, period)),
     periods: periodChoices(basketball.QUARTERS, period),
   });
   const form = (sheet: ClockSheet, clock: CourtClock = stopped, game = tippedOff()) =>
@@ -441,9 +446,13 @@ describe('the form that sets the clock and picks the period (T5, T6)', () => {
     expect(words(html)).toContain('Set clock to 6:30');
   });
 
-  it('says so before time goes back on the clock, and that setting a running clock stops it', () => {
-    expect(words(form(sheetOf('800', '0:30')))).toContain(
-      'This puts 0:30 back on, and takes it off the minutes of the players on the court.',
+  it('says what comes off the minutes before time goes back on the clock, and that setting a running clock stops it', () => {
+    expect(words(form(sheetOf('800', { back: '0:30', wholePeriod: false })))).toContain(
+      'This takes 0:30 off the minutes of the players on the court.',
+    );
+    // All the period has run comes off: the form says so (the area 4 review, M4).
+    expect(words(form(sheetOf('800', { back: '3:05', wholePeriod: true })))).toContain(
+      'This takes 3:05 off the players’ minutes: all they have played this period.',
     );
     expect(words(form(sheetOf(''), running))).toContain('Setting the clock stops it.');
   });
@@ -454,6 +463,13 @@ describe('the form that sets the clock and picks the period (T5, T6)', () => {
     expect(tag(seconds, 'data-clock-entry')).toContain('data-problem=""');
     expect(tag(seconds, 'data-set-clock')).toMatch(/\sdisabled=""/);
     expect(words(form(sheetOf('6001')))).toContain('The clock goes up to 60:00.');
+    // Longer than the period being played: refused in words, and Set is not offered.
+    const long = form(sheetOf('900'));
+    expect(words(long)).toContain('Q1 is 8:00 long: type 8:00 or less.');
+    expect(tag(long, 'data-clock-entry')).toContain('data-problem=""');
+    expect(tag(long, 'data-set-clock')).toMatch(/\sdisabled=""/);
+    expect(words(long)).toContain('Set clock');
+    expect(words(long)).not.toContain('Set clock to');
   });
 
   it('offers every period and three overtimes, the one being played marked and the next one too', () => {

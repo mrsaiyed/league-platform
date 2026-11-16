@@ -121,16 +121,21 @@ export type ClockEntry = {
   readonly ms: number | null;
   /**
    * `empty`: nothing typed yet; `seconds`: the seconds are over 59; `range`: more than
-   * the clock holds (60:00).
+   * the clock holds (60:00); `period`: more than the period being played is long.
    */
-  readonly problem: 'empty' | 'seconds' | 'range' | null;
+  readonly problem: 'empty' | 'seconds' | 'range' | 'period' | null;
 };
 
 /**
  * The time typed on the clock's keys (checklist T5). The digits fill from the right, as
  * on a scoreboard's own controller or a kitchen timer: 6, 3, 0 is 6:30; 8, 0, 0 is 8:00.
+ *
+ * `periodMs` is the length of the period being played: a time longer than that (25:00 in
+ * a 20-minute half) is a slip of the finger, and is refused in words before Set is
+ * offered (the area 4 review of step 2.36, L5). Left out, only the engine's own limit
+ * holds.
  */
-export function clockEntry(digits: string): ClockEntry {
+export function clockEntry(digits: string, periodMs: number = maxClockMs): ClockEntry {
   const typed = digits.replace(/\D/g, '').slice(0, clockEntryDigits);
   const padded = typed.padStart(3, '0');
   const minutes = Number(padded.slice(0, -2));
@@ -140,6 +145,7 @@ export function clockEntry(digits: string): ClockEntry {
   if (seconds > 59) return { text, ms: null, problem: 'seconds' };
   const ms = (minutes * 60 + seconds) * 1000;
   if (ms > maxClockMs) return { text, ms: null, problem: 'range' };
+  if (ms > periodMs) return { text, ms: null, problem: 'period' };
   return { text, ms, problem: null };
 }
 
@@ -153,13 +159,41 @@ export function clockEntryKey(digits: string, key: string): string {
   return typed.length < clockEntryDigits ? typed + key : digits;
 }
 
+/** What setting the clock will take off the players' minutes. */
+export type MinutesBack = {
+  /** How much comes off, in milliseconds of game clock; 0 when nothing does. */
+  readonly ms: number;
+  /**
+   * It is all the time the clock has run in this period: the period is wound back to its
+   * start, and everything played in it so far comes off the minutes.
+   */
+  readonly wholePeriod: boolean;
+};
+
 /**
- * How much time setting the clock to `ms` puts back on it, in milliseconds; 0 when it
- * takes time off or the clock has not run. Time put back is also taken off the minutes of
- * whoever was on the court (the engine's `setClock`), so the form says so first.
+ * What setting the clock to `ms` takes off the minutes of the players, so the form can
+ * say so before it is done: the engine's own figure (`setClock` of the engine, which is
+ * used as it is). Time put back on the clock is time it should not have run, so it comes
+ * off the minutes, but only time of the period BEING PLAYED: never more than the clock
+ * has run since this period began. In the second period, with 8:00 on the clock after a
+ * full first one, setting 10:00 takes nothing off anybody (the code review of step 2.36,
+ * M-b: the form used to say 2:00). Setting the clock lower takes nothing off either.
+ *
+ * And when what comes off is ALL this period has run, the form says that too: a clock
+ * set lower by mistake and then put right winds the period back to its start (the area 4
+ * review, M4: 16:55, set to 12:00, set back to 16:55, and all ten on the court read 0:00).
  */
-export const putsBackMs = (reading: ClockReading, ms: number): number =>
-  reading.elapsedMs > 0 && ms > reading.remainingMs ? ms - reading.remainingMs : 0;
+export function minutesBack(
+  game: basketball.GameState,
+  reading: ClockReading,
+  ms: number,
+): MinutesBack {
+  if (ms <= reading.remainingMs) return { ms: 0, wholePeriod: false };
+  const periodStart = Math.min(reading.elapsedMs, basketball.derive(game).periodStartElapsedMs);
+  const ranThisPeriod = reading.elapsedMs - periodStart;
+  const back = Math.min(ms - reading.remainingMs, ranThisPeriod);
+  return { ms: back, wholePeriod: back > 0 && back === ranThisPeriod };
+}
 
 /** A period the picker offers. */
 export type PeriodChoice = {

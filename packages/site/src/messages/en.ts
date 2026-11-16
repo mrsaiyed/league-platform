@@ -1055,8 +1055,9 @@ export const en = {
   'tracker.say.foulStopped': 'Foul on {player}. Clock stopped.',
   'tracker.say.periodStart': 'Start of {period}. Clock set to {clock}.',
   'tracker.say.clockSet': 'Clock set to {clock}.',
+  // {back} is what came off the minutes, which can be less than went back on the clock.
   'tracker.say.clockSetBack':
-    'Clock set to {clock}. {back} went back on, and came off the minutes of the players on the court.',
+    'Clock set to {clock}. {back} came off the minutes of the players on the court.',
   // The bonus horn's sentence: a muted tablet is the normal case in a gym.
   'tracker.say.bonus.1': 'Bonus: {team}.',
   'tracker.say.bonus.2': 'Double bonus: {team}.',
@@ -1092,8 +1093,14 @@ export const en = {
   'tracker.clockSheet.stops': 'Setting the clock stops it.',
   'tracker.clockSheet.seconds': 'Seconds go up to 59.',
   'tracker.clockSheet.range': 'The clock goes up to 60:00.',
-  'tracker.clockSheet.putsBack':
-    'This puts {back} back on, and takes it off the minutes of the players on the court.',
+  // A time longer than the period being played: "H1 is 20:00 long: type 20:00 or less."
+  'tracker.clockSheet.tooLong': '{period} is {length} long: type {length} or less.',
+  // What a time that puts time back on the clock takes off the minutes: the engine's own
+  // figure, which is never more than the period being played has run. The second says
+  // that it is all of it (a clock set lower by mistake and then put right).
+  'tracker.clockSheet.putsBack': 'This takes {back} off the minutes of the players on the court.',
+  'tracker.clockSheet.putsBackAll':
+    'This takes {back} off the players’ minutes: all they have played this period.',
   'tracker.clockSheet.clear': 'Clear',
   'tracker.clockSheet.clearLabel': 'Clear the time typed',
   'tracker.clockSheet.backLabel': 'Delete the last digit',

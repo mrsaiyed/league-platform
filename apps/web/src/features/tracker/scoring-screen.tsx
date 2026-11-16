@@ -42,10 +42,10 @@ import { findPlayer, periodText, playerLabel, refusalText } from './engine-words
 import {
   clockEntry,
   clockEntryKey,
+  minutesBack,
   minutesNow,
   periodChoices,
   periodEnd,
-  putsBackMs,
   readClock,
   startOffered,
   stopKey,
@@ -475,12 +475,19 @@ export function ScoringScreen(props: ScoringScreenProps) {
     if (toggleDrawn.current !== null && toggleDrawn.current !== toggleWord) resting.toggle.begin();
     toggleDrawn.current = toggleWord;
   }, [toggleWord, resting]);
-  const entry = clockEntry(digits);
-  const back = entry.ms === null ? 0 : putsBackMs(reading, entry.ms);
+  // The clock's form: a time longer than the period being played is not taken, and what
+  // a time takes off the players' minutes is the engine's own figure (game-clock.ts).
+  const periodLengthMs = basketball.periodMs(state.rules, view.period);
+  const entry = clockEntry(digits, periodLengthMs);
+  const back = entry.ms === null ? null : minutesBack(state, reading, entry.ms);
   const clockSheet: ClockSheet | null = clockOpen
     ? {
         entry,
-        putsBack: back > 0 ? basketball.formatClock(back) : null,
+        minutesBack:
+          back !== null && back.ms > 0
+            ? { back: basketball.formatClock(back.ms), wholePeriod: back.wholePeriod }
+            : null,
+        periodLength: basketball.formatClock(periodLengthMs),
         periods: periodChoices(state.rules, view.period),
       }
     : null;
@@ -763,7 +770,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       );
     },
     setClock() {
-      const typed = clockEntry(digits);
+      const typed = clockEntry(digits, periodLengthMs);
       if (typed.ms === null) return;
       const before = readClock(state, status.now());
       setDigits('');
