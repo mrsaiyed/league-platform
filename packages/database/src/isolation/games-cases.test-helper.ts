@@ -53,6 +53,7 @@ import {
   listDecidedGameLines,
   listDecidedGames,
   listGameLines,
+  listGameNames,
   listGameRoster,
   listEarlierRound,
   listEarlierRounds,
@@ -305,6 +306,13 @@ registerIsolationCase({
   subject: deleteGameAssignment,
   name: "take the target's member off its upcoming game",
   run: (scope, target) => deleteGameAssignment(scope, target.upcomingGameId, target.memberId),
+});
+
+registerIsolationCase({
+  subject: listGameNames,
+  name: "list the scope's teams, seasons and game assignments, the target's assigned game among them",
+  // The target's member is assigned to its upcoming game (two-leagues.test-helper.ts).
+  run: (scope) => listGameNames(scope),
 });
 
 registerIsolationCase({
