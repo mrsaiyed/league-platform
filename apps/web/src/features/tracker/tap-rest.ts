@@ -19,6 +19,13 @@ import type { TapInput } from './tracker-controller.ts';
 /** How long a control rests: longer than a double tap, shorter than a second thought. */
 export const restMs = 350;
 
+/**
+ * How long − on the timeouts rests after a take-back (the area lead's second look, with
+ * touch): a slow double tap lands 310 to 340 ms apart, lift to lift, and took two back
+ * under `restMs`. Taking a timeout back is rare and never urgent, so − waits longer.
+ */
+export const takeBackRestMs = 600;
+
 /** The clock and the timer a rest runs on: the page's own, or a test's. */
 export type RestTimers = {
   /** The steady clock a tap's own time is read on, in milliseconds. */
@@ -28,7 +35,7 @@ export type RestTimers = {
 };
 
 export type TapRest = {
-  /** The control comes to rest at `at` (now, when left out): no tap is taken for `restMs`. */
+  /** The control comes to rest at `at` (now, when left out): no tap is taken for its rest. */
   begin(at?: number): void;
   /** Whether a pointer's tap made at `at` is taken. */
   takes(at: number): boolean;
@@ -38,14 +45,21 @@ export type TapRest = {
   stop(): void;
 };
 
-/** A rest for one control (or one group that rests together); `drawn` redraws it. */
-export function createTapRest(timers: RestTimers, drawn: () => void = () => undefined): TapRest {
+/**
+ * A rest for one control (or one group that rests together); `drawn` redraws it. It
+ * lasts `ms`: `restMs` unless the control says otherwise.
+ */
+export function createTapRest(
+  timers: RestTimers,
+  drawn: () => void = () => undefined,
+  ms: number = restMs,
+): TapRest {
   let until = Number.NEGATIVE_INFINITY;
   let resting = false;
   let cancel: (() => void) | null = null;
   return {
     begin(at = timers.now()) {
-      until = at + restMs;
+      until = at + ms;
       resting = true;
       cancel?.();
       cancel = timers.after(Math.max(0, until - timers.now()), () => {
@@ -126,8 +140,9 @@ export const startBarTap = (rest: TapRest, tap: Tap): TapInput | null =>
 
 /**
  * − tapped on a team's timeouts (G7; M2): the tap that takes the latest one back, or null
- * while − rests. It rests from each tap taken, so two timeouts come back only by two
- * deliberate taps: a fast double tap takes one.
+ * while − rests. It rests from each tap taken (`takeBackRestMs`, given to its rest by the
+ * screen), so two timeouts come back only by two deliberate taps: a double tap, fast or
+ * slow, takes one.
  */
 export function takeBackTimeoutTap(
   side: 'home' | 'away',

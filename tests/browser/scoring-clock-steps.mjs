@@ -1207,7 +1207,8 @@ export async function clockSteps(kit) {
             sayAt.y + sayAt.height <= fullNow.y,
           JSON.stringify({ minusAt, minusNow, fullBefore: at, fullNow, sayAt }),
         );
-        await page.waitForTimeout(500);
+        // − rests 600 ms after a take-back (takeBackRestMs): looked at once it is over.
+        await page.waitForTimeout(700);
         await c.saved();
         note(
           'two fast taps on − take one timeout back, not two: − rests, is drawn resting, and the screen says which came back',
@@ -1306,6 +1307,35 @@ export async function clockSteps(kit) {
             (await c.timeoutsPad.locator('[data-timeout-ask]').count()) === 0,
           `${before} taken before, ${await takenInAll()} after`,
         );
+        // A slow double tap (the area lead's second look, with touch: two came back at
+        // 310 to 340 ms apart): − rests 600 ms after a take-back, so at 350 and at 450 ms
+        // apart exactly one comes back too.
+        if (size === phoneInBrowser) {
+          for (const apart of [350, 450]) {
+            await page.waitForTimeout(700);
+            while ((await takenInAll()) < 2) {
+              await c.timeout('home');
+              await c.timeoutsButton.click();
+              await c.timeoutsPad.waitFor();
+            }
+            const was = await takenInAll();
+            const box = await minus.boundingBox();
+            const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+            await page.mouse.click(x, y);
+            await page.waitForTimeout(apart);
+            await page.mouse.click(x, y);
+            const restingWhenTapped = (await minus.getAttribute('data-resting')) !== null;
+            await page.waitForTimeout(700);
+            await c.saved();
+            note(
+              `${at}: two taps on − ${apart} ms apart take exactly one timeout back, and − was drawn resting for the second`,
+              (await takenInAll()) === was - 1 &&
+                restingWhenTapped &&
+                (await c.timeoutsPad.locator('[data-timeout-ask]').count()) === 0,
+              `${was} taken before, ${await takenInAll()} after; resting at the second: ${restingWhenTapped}`,
+            );
+          }
+        }
         note(`${at}: nothing broke on the page`, errors.length === 0, errors.join('; '));
       } finally {
         await letGo(page, context);

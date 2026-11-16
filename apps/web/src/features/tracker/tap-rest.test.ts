@@ -7,6 +7,7 @@ import {
   drawRest,
   restMs,
   startBarTap,
+  takeBackRestMs,
   takeBackTimeoutTap,
   tapTaken,
   type RestTimers,
@@ -232,22 +233,60 @@ describe('Start and Pause under the scoreboard (the code review, M-a)', () => {
 });
 
 describe('− on a team’s timeouts (the area 4 review, M2)', () => {
+  /** −'s own rest, as the screen makes it: longer than the other controls'. */
+  const minusRest = (drawn?: () => void) => createTapRest(timers, drawn, takeBackRestMs);
+
+  it('rests 600 ms after a take-back, its own length, not the Start clock’s third of a second', () => {
+    expect(takeBackRestMs).toBe(600);
+    expect(takeBackRestMs).toBeGreaterThan(restMs);
+  });
+
   it('a fast double tap takes one timeout back, never two', () => {
-    const rest = createTapRest(timers);
+    const rest = minusRest();
     expect(takeBackTimeoutTap('home', rest, finger())).toEqual({ type: 'untimeout', side: 'home' });
     // The second touch of a double tap, 90 ms on: not taken, and − shows it is resting.
     vi.advanceTimersByTime(90);
     expect(takeBackTimeoutTap('home', rest, finger())).toBeNull();
     expect(rest.ready()).toBe(false);
     // A tap that is not taken does not start the rest again.
-    vi.advanceTimersByTime(270);
+    vi.advanceTimersByTime(520);
     expect(rest.ready()).toBe(true);
   });
 
+  it('a slow double tap, 310 to 550 ms apart, takes one back too; at 550 ms − is drawn resting and aria-disabled, at 650 ready', () => {
+    const attributes = new Map<string, string>();
+    const button = {
+      hasAttribute: (name: string) => attributes.has(name),
+      setAttribute: (name: string, value: string) => void attributes.set(name, value),
+      removeAttribute: (name: string) => void attributes.delete(name),
+    };
+    const drawn: boolean[] = [];
+    const rest = minusRest(() => {
+      drawn.push(rest.ready());
+      drawRest(button, !rest.ready());
+    });
+    const first = Date.now();
+    expect(takeBackTimeoutTap('home', rest, finger(first))).not.toBeNull();
+    // The second touch of a slow double tap, as the area lead's touches made it.
+    for (const apart of [310, 340, 450, 550]) {
+      expect(tapTaken(rest, finger(first + apart))).toBe(false);
+    }
+    vi.advanceTimersByTime(550);
+    expect(takeBackTimeoutTap('home', rest, finger())).toBeNull();
+    expect(rest.ready()).toBe(false);
+    expect(drawn).toEqual([false]);
+    expect(attributes.get('aria-disabled')).toBe('true');
+    vi.advanceTimersByTime(100);
+    // 650 ms on: drawn ready, said ready, and a tap is taken.
+    expect(drawn).toEqual([false, true]);
+    expect(attributes.has('aria-disabled')).toBe(false);
+    expect(takeBackTimeoutTap('home', rest, finger())).toEqual({ type: 'untimeout', side: 'home' });
+  });
+
   it('two deliberate taps take two back', () => {
-    const rest = createTapRest(timers);
+    const rest = minusRest();
     expect(takeBackTimeoutTap('away', rest, finger())).not.toBeNull();
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(650);
     expect(takeBackTimeoutTap('away', rest, finger())).toEqual({ type: 'untimeout', side: 'away' });
     // And it rests again from the second.
     vi.advanceTimersByTime(100);
@@ -255,7 +294,7 @@ describe('− on a team’s timeouts (the area 4 review, M2)', () => {
   });
 
   it('rests for the other team’s − too: the two are side by side', () => {
-    const rest = createTapRest(timers);
+    const rest = minusRest();
     expect(takeBackTimeoutTap('home', rest, finger())).not.toBeNull();
     vi.advanceTimersByTime(90);
     expect(takeBackTimeoutTap('away', rest, finger())).toBeNull();

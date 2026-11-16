@@ -84,6 +84,7 @@ import {
   createTapRest,
   drawRest,
   startBarTap,
+  takeBackRestMs,
   takeBackTimeoutTap,
   tapTaken,
   type RestTimers,
@@ -148,7 +149,7 @@ const restingPlaces = {
   start: '[data-pad] [data-start-bar]',
   /** Start or Pause under the scoreboard, after a tap on it and after its word changes. */
   toggle: '[data-clock-toggle]',
-  /** − on a team's timeouts, after a take-back (the area 4 review, M2). */
+  /** − on a team's timeouts, after a take-back, for longer (the area 4 review, M2). */
   minus: '[data-pad] [data-act="untimeout"]',
   /** The answers to "Record it anyway?", after the question is asked. */
   answers: '[data-pad] [data-timeout-answers]',
@@ -386,7 +387,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
   rests.current ??= {
     start: createTapRest(restTimers, drawRests),
     toggle: createTapRest(restTimers, drawRests),
-    minus: createTapRest(restTimers, drawRests),
+    minus: createTapRest(restTimers, drawRests, takeBackRestMs),
     answers: createTapRest(restTimers, drawRests),
   };
   const resting = rests.current;
