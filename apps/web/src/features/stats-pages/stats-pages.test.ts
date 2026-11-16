@@ -283,11 +283,42 @@ describe('statistics page', () => {
 
   it("follows the league's minimum games for leaders but keeps the player in the full table", async () => {
     const data = await statsFor(adult);
-    const leaders = data.leaders.flatMap((b) => b.rows.map((r) => r.id));
+    // Each leader's name, without the place ("2. Dana Whitfield").
+    const leaders = data.leaders.flatMap((b) =>
+      b.rows.map((r) => String(r.cells['player']).replace(/^\d+\. /u, '')),
+    );
     const theo = data.playerRows.find((r) => r.cells['player'] === 'Theo Lindqvist');
     expect(theo).toBeDefined();
-    expect(leaders).not.toContain(theo?.id);
+    expect(leaders.length).toBeGreaterThan(0);
+    expect(leaders).not.toContain('Theo Lindqvist');
     expect(html(data)).toContain('at least 3 games');
+  });
+
+  it("holds no person's id in its data or its HTML, in either league (T-81, record 070)", async () => {
+    for (const leagueId of [adult, youth]) {
+      const [season] = await seasonsOf(leagueId);
+      const totals = await stats.readStoreOf(leagueId).playerTotals(season?.id ?? '');
+      const ids = totals.map((row) => row.personId.toLowerCase());
+      expect(ids.length).toBeGreaterThan(0);
+      for (const by of ['average', 'total'] as const) {
+        const data = await statsFor(leagueId, by);
+        expect(data.playerRows.length).toBeGreaterThan(0);
+        const sent = `${JSON.stringify(data)}\n${html(data)}`.toLowerCase();
+        expect(ids.filter((id) => sent.includes(id))).toEqual([]);
+        // The rows' keys are their places on this page.
+        expect(data.playerRows.map((row) => row.id)).toEqual(
+          data.playerRows.map((_, place) => `player-${place}`),
+        );
+      }
+    }
+  });
+
+  it('keeps the points card while fouls has none (S-48)', async () => {
+    const data = await statsFor(adult);
+    expect(data.playerColumns.map((c) => c.key)).toContain('fouls');
+    expect(data.leaders.map((board) => board.key)).not.toContain('fouls');
+    expect(data.leaders.map((board) => board.key)).not.toContain('turnovers');
+    expect(data.leaders.map((board) => board.key)).toContain('points');
   });
 
   it('shows children by first name and last initial in a youth league', async () => {

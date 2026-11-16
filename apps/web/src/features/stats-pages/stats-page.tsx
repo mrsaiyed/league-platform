@@ -182,10 +182,9 @@ export async function StatsPage({
   const data =
     season === undefined
       ? undefined
-      : await loadStatsPage(
-          publicStats.readStoreOf(addressee.id),
-          await publicStats.settingsOf(addressee.id),
-          { leagueId: addressee.id, seasonId: season.id, by },
+      : // The statistics and the league's name settings, as one snapshot (T-81).
+        await publicStats.statisticsOf(addressee.id, ({ store, settings }) =>
+          loadStatsPage(store, settings, { leagueId: addressee.id, seasonId: season.id, by }),
         );
   if (data !== undefined && 'code' in data) return notFound();
   const labels = displayLabels(t);

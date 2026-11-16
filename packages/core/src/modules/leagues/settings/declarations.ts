@@ -10,6 +10,8 @@
 //   - the statistics level a new team starts with (S-22; S-23, the founder: everyone
 //     can see its players' statistics), and whether teams may choose their own (S-24:
 //     yes, the league can switch it off);
+//   - the least games a player needs to be ranked among the leaders (P7 §6; 3 to start,
+//     decided for you at step 2.93 part 3);
 //   - how names show on public pages (R-24, R-29: full names, first name and last
 //     initial, or hidden, followed for every player; every league starts on full
 //     names), whether the admin has confirmed the parents' agreement to children's
@@ -152,12 +154,28 @@ export const playersMayAskForInitials = defineSetting({
   label: 'setting.privacy.playersMayAskForInitials.label',
 });
 
+/**
+ * The least number of games a player needs to be ranked among the leaders (P7 §6: a rule
+ * the league sets). The lead answered the starting value for the founder at step 2.93
+ * part 3: 3 games, and the league can change it; 0 ranks everyone. At most 1000, as core's
+ * leaders read allows (readStatLeaders). A player below it stays in the full table.
+ */
+export const minimumGamesToRank = defineSetting({
+  key: 'statistics.minimumGamesToRank',
+  type: z.number().int().min(0).max(1000),
+  default: 3,
+  levels: ['league'],
+  permission: 'league.settings',
+  label: 'setting.statistics.minimumGamesToRank.label',
+});
+
 export const declaredSettings = settingRegistry([
   membersStartPage,
   whoMayScore,
   scorekeeperReopenMinutes,
   startingStatsLevel,
   teamsMayChooseStatsLevel,
+  minimumGamesToRank,
   publicNames,
   childrenInFullConfirmed,
   playersMayAskForInitials,

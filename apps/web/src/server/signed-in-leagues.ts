@@ -10,7 +10,7 @@
 // nothing else calls the port).
 import { myLeagues, type MyLeague } from '@srleagues/core';
 import type { AccountProblem, RequestFacts } from './context.ts';
-import { leagueSites, type LeagueSiteSource } from './league-site.ts';
+import { leagueSites, type LeagueSiteLookup } from './league-site.ts';
 import type { WebPorts } from './ports.ts';
 import { thisRequestFacts } from './this-request.ts';
 import { webPorts } from './container.ts';
@@ -54,17 +54,23 @@ export async function signedInPerson(): Promise<SignedInPerson> {
 export async function leaguesOfPerson(
   person: SignedInPerson,
   ports: Pick<WebPorts, 'leaguesOfAccount'>,
-  sites: LeagueSiteSource,
+  sites: LeagueSiteLookup,
 ): Promise<readonly MyLeague[]> {
   if (person.kind !== 'signed-in') return [];
   const { accountId } = person;
   const found = await myLeagues(accountId, () => ports.leaguesOfAccount(accountId));
-  return found
-    .map((league) => ({ ...league, name: sites(league.leagueId)?.name ?? league.name }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'en') || a.leagueId.localeCompare(b.leagueId));
+  const named = await Promise.all(
+    found.map(async (league) => ({
+      ...league,
+      name: (await sites(league.leagueId))?.name ?? league.name,
+    })),
+  );
+  return named.sort(
+    (a, b) => a.name.localeCompare(b.name, 'en') || a.leagueId.localeCompare(b.leagueId),
+  );
 }
 
 /** The leagues of the person signed in on this request (the front and account pages). */
 export async function leaguesOfThisRequest(): Promise<readonly MyLeague[]> {
-  return leaguesOfPerson(await signedInPerson(), await webPorts(), leagueSites());
+  return leaguesOfPerson(await signedInPerson(), await webPorts(), await leagueSites());
 }

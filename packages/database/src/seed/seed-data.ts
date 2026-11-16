@@ -2,7 +2,7 @@
 // invented; email addresses end in .test, which can never be a real mailbox. Nothing here
 // is a person. A league is data: the loader (seed-leagues.ts) reads this list and
 // treats every entry the same way, so adding a third league means adding an entry.
-import type { Role } from '@srleagues/core';
+import type { Audience, Role } from '@srleagues/core';
 
 export type SeedMember = {
   readonly email: string;
@@ -19,18 +19,33 @@ export type SeedTeam = {
 
 export type SeedDivision = { readonly name: string; readonly teams: readonly SeedTeam[] };
 
+/**
+ * A person added to the league's list by hand. The private fields are made up too: they
+ * are there so the public pages' scans (T-81) have private values to look for.
+ */
+export type SeedPerson = {
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly contactEmail?: string;
+  readonly birthDate?: string;
+  /** Left out: the league does not know (R-15). */
+  readonly isMinor?: boolean;
+};
+
 export type SeedLeague = {
   readonly slug: string;
   readonly name: string;
   readonly timeZone: string;
+  /** Who plays: decides who counts as a child when their age is not known (R-15). */
+  readonly audience: Audience;
   /** A starting design key of packages/site; the web app checks it is a real one. */
   readonly design: string;
   readonly owner: { readonly email: string; readonly displayName: string };
   readonly members: readonly SeedMember[];
   readonly season: { readonly slug: string; readonly name: string };
   readonly divisions: readonly SeedDivision[];
-  /** Names of people added to the league's list by hand. */
-  readonly people: readonly { readonly firstName: string; readonly lastName: string }[];
+  /** People added to the league's list by hand. */
+  readonly people: readonly SeedPerson[];
 };
 
 /** The account that creates the leagues, as our own staff does (A-3). */
@@ -41,6 +56,7 @@ export const seedLeagues: readonly SeedLeague[] = [
     slug: 'lakeside',
     name: 'Lakeside Hoops League',
     timeZone: 'America/Chicago',
+    audience: 'adult',
     design: 'crest',
     owner: { email: 'owner@lakeside.example.test', displayName: 'Ola Lakeside' },
     members: [
@@ -68,15 +84,26 @@ export const seedLeagues: readonly SeedLeague[] = [
       },
     ],
     people: [
-      { firstName: 'Pat', lastName: 'Example' },
-      { firstName: 'Quinn', lastName: 'Sample' },
-      { firstName: 'Robin', lastName: 'Placeholder' },
+      {
+        // Not "Pat": the name scans look for a withheld first name anywhere in a page, and
+        // "pat" is in every drawn shield's <path>.
+        firstName: 'Morgan',
+        lastName: 'Example',
+        contactEmail: 'morgan@lakeside.example.test',
+        birthDate: '1990-04-12',
+        isMinor: false,
+      },
+      // A child in an adult league: shown by first name and last initial (R-14).
+      { firstName: 'Quinn', lastName: 'Sample', birthDate: '2012-09-03', isMinor: true },
+      { firstName: 'Robin', lastName: 'Placeholder', contactEmail: 'robin@lakeside.example.test' },
     ],
   },
   {
     slug: 'maple-street',
     name: 'Maple Street Rec League',
     timeZone: 'America/New_York',
+    // A youth league: a player whose age is not known is shown as a child (R-15).
+    audience: 'youth',
     design: 'clean-court',
     owner: { email: 'owner@maple.example.test', displayName: 'Mara Maple' },
     members: [
@@ -96,7 +123,13 @@ export const seedLeagues: readonly SeedLeague[] = [
       },
     ],
     people: [
-      { firstName: 'Jordan', lastName: 'Imaginary' },
+      {
+        firstName: 'Jordan',
+        lastName: 'Imaginary',
+        contactEmail: 'jordan.parent@maple.example.test',
+        birthDate: '2013-06-02',
+        isMinor: true,
+      },
       { firstName: 'Casey', lastName: 'Fictional' },
     ],
   },

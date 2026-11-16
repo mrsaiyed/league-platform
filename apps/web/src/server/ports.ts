@@ -8,6 +8,7 @@ import type { SignInMail } from './sign-in/sign-in-mail.ts';
 import type { ContextDeps, IdentifyError } from './context.ts';
 import type { FixtureImportPorts } from './fixture-import-ports.ts';
 import type { GamesAreaPorts } from './games-area-ports.ts';
+import type { LeagueSiteLookup } from './league-site.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 import type { ScheduleAdminPorts } from './schedule-admin.ts';
@@ -43,6 +44,8 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * myLeagues may turn them into a list, in its one caller (signed-in-leagues.ts).
    */
   readonly leaguesOfAccount: (accountId: string) => Promise<readonly AccountLeagueRow[]>;
+  /** Each league's name and design, as its pages show them (league-site.ts). */
+  readonly leagueSites: LeagueSiteLookup;
   /** What the public standings and statistics pages read (step 2.43). */
   readonly publicStats: PublicStatsPorts;
   /** What the admin's games area runs on (step 2.55). */

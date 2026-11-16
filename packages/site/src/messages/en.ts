@@ -540,6 +540,7 @@ export const en = {
   'adminSettings.area.members': 'Start page for members',
   'adminSettings.area.games': 'Scoring',
   'adminSettings.area.teams': 'Team statistics',
+  'adminSettings.area.statistics': 'Statistics',
   'adminSettings.area.privacy': 'Privacy',
   // What the Privacy part says around its settings (step 2.162, R-29, record 065): one
   // opening sentence by who plays, what is in force now, and where the parents'
@@ -1533,6 +1534,8 @@ export const en = {
   'setting.teams.startingStatsLevel.option.staff': "Only the team's staff and the league's admins",
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
+  'setting.statistics.minimumGamesToRank.label':
+    'Games a player must have played to be ranked among the leaders. 0 ranks everyone. A player with fewer still shows in the full table.',
   'setting.privacy.publicNames.label':
     "Names on public pages: how players are shown on the team pages, game pages and statistics. If a person's own request for less is recorded (initials, or their name taken off), it always wins over this setting.",
   // Each choice says what it does to adults and to children (R-29, record 065).

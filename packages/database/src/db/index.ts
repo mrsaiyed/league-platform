@@ -8,4 +8,9 @@ export { commandTransaction } from './command-transaction.ts';
 export { createDatabase, type DatabaseSource } from './create-database.ts';
 export type { DatabaseHandle } from './database-handle.ts';
 export type { AppScope, LeagueScope } from './transaction-scope.ts';
-export { withTransaction, type AccountContext, type LeagueContext } from './with-transaction.ts';
+export {
+  withTransaction,
+  type AccountContext,
+  type LeagueContext,
+  type TransactionOptions,
+} from './with-transaction.ts';
