@@ -9,9 +9,11 @@
 // creates the league and its current season in one step (T-260), and its owner does
 // the rest, its site's design first: each league's first release is its own starting
 // design (seed-data.ts), published by the owner through the site's own command (step
-// 2.187), so the seed's leagues are drawn in different designs. Two things are written directly, not by a command: accounts
-// (they come from signing in, which has no command here) and role grants (through the
-// access store, as the owner; the invite and accept commands need email tokens).
+// 2.187), so the seed's leagues are drawn in different designs. Three things are written
+// directly, not by a command: accounts (they come from signing in, which has no command
+// here), role grants (through the access store, as the owner; the invite and accept
+// commands need email tokens) and a league's programs besides its default one (no command
+// makes one yet, U-12), inside the league's own transaction.
 //
 // Loading is NOT one transaction, since each command has its own, so a load that stops
 // part-way leaves a partly loaded league. A rerun checks each existing league against
@@ -36,7 +38,7 @@ import {
 } from '@srleagues/core';
 import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
-import type { LeagueScope } from '../db/transaction-scope.ts';
+import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import { withTransaction } from '../db/with-transaction.ts';
 import {
@@ -94,6 +96,7 @@ async function holdsEverything(
     ).rows[0]!.n;
   const teams = league.divisions.reduce((sum, d) => sum + d.teams.length, 0);
   return (
+    (await count('programs')) === 1 + (league.programs ?? []).length &&
     (await count('seasons')) === 1 &&
     (await count('site_releases')) === 1 &&
     (await count('divisions')) === league.divisions.length &&
@@ -183,13 +186,34 @@ async function loadLeague(
   for (const person of league.people) {
     must('person', await createPerson(as(ownerId), person, deps.people));
   }
+  const programIds = new Map<string, string>();
+  for (const program of league.programs ?? []) {
+    // In the league's own transaction, behind its fence, as the grants below.
+    const made = await withTransaction(db, { leagueId, accountId: ownerId }, (scope) =>
+      transactionOf(scope)
+        .insertInto('programs')
+        .values({
+          league_id: leagueId,
+          slug: program.slug,
+          name: program.name,
+          sport_key: 'basketball',
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow(),
+    );
+    programIds.set(program.slug, made.id);
+  }
   for (const member of league.members) {
     const memberId = await accountId(pglite, member.email, member.displayName);
+    const programId = member.program === undefined ? undefined : programIds.get(member.program);
+    if (member.program !== undefined && programId === undefined) {
+      throw new Error(`Seeding failed at role: ${league.slug} has no program ${member.program}.`);
+    }
     await withTransaction(db, { leagueId, accountId: ownerId }, (scope) =>
       accessStore(scope).createGrant({
         accountId: memberId,
         role: member.role,
-        scope: leagueScope,
+        scope: programId === undefined ? leagueScope : { type: 'program', id: programId },
         grantedByAccountId: ownerId,
       }),
     );
