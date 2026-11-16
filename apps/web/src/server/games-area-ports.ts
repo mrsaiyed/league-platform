@@ -10,6 +10,8 @@ export type GameNames = {
   readonly teams: Readonly<Record<string, string>>;
   /** Scorekeepers assigned to each game, by game id. */
   readonly scorekeepers: Readonly<Record<string, readonly string[]>>;
+  /** Seasons by id: an earlier round of another season is named with its season (step 2.156). */
+  readonly seasons: Readonly<Record<string, string>>;
 };
 
 export type GamesAreaPorts = {

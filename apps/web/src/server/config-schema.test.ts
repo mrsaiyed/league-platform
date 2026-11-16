@@ -18,6 +18,7 @@ const valid: Record<ConfigName, string> = {
   PLATFORM_DATABASE_URL: 'postgres://app:hunter2-made-up@localhost:5432/x',
   LOCAL_DATA: 'stand-in',
   LOCAL_DESIGN: 'crest-light',
+  LOCAL_NOW: '2026-11-15T20:01:00Z',
   SESSION_SECRET: longValue('SESSION_SECRET'),
   SUPABASE_URL: 'http://localhost:54321',
   SUPABASE_SECRET_KEY: longValue('SUPABASE_SECRET_KEY'),
@@ -28,10 +29,10 @@ const valid: Record<ConfigName, string> = {
 };
 const names = Object.keys(fields) as ConfigName[];
 /**
- * Every setting, for staging and production: LOCAL_DATA and LOCAL_DESIGN are for local
- * work and tests only.
+ * Every setting, for staging and production: LOCAL_DATA, LOCAL_DESIGN and LOCAL_NOW are
+ * for local work and tests only.
  */
-const hosted = { ...valid, LOCAL_DATA: undefined, LOCAL_DESIGN: undefined };
+const hosted = { ...valid, LOCAL_DATA: undefined, LOCAL_DESIGN: undefined, LOCAL_NOW: undefined };
 /** Required in every environment. */
 const required: readonly ConfigName[] = ['APP_ENV', 'PUBLIC_BASE_URL', 'EMAIL_FROM'];
 /** Where something uses it (R8): only those environments require it. */
@@ -118,6 +119,7 @@ describe('loadConfig', () => {
       TRUSTED_PROXY: undefined,
       LOCAL_DATA: undefined,
       LOCAL_DESIGN: undefined,
+      LOCAL_NOW: undefined,
       EMAIL_FROM: undefined,
     });
     expect(error.missing).toEqual(['EMAIL_FROM']);
@@ -294,6 +296,32 @@ describe('loadConfig', () => {
         'LOCAL_DESIGN: invalid, may be set only when APP_ENV is local or test',
       ]);
     }
+  });
+
+  it('takes LOCAL_NOW in local work and tests only, and only a UTC time (step 2.179)', () => {
+    expect(loadConfig(localOnly).LOCAL_NOW).toBeUndefined();
+    const at = '2026-11-15T06:10:00Z';
+    expect(loadConfig({ ...localOnly, LOCAL_NOW: at }).LOCAL_NOW).toBe(at);
+    expect(loadConfig({ ...localOnly, APP_ENV: 'test', LOCAL_NOW: at }).LOCAL_NOW).toBe(at);
+    expect(failure({ ...localOnly, LOCAL_NOW: 'tomorrow' }).invalid.join()).toContain('LOCAL_NOW');
+    for (const appEnv of ['staging', 'production']) {
+      expect(failure({ ...production, APP_ENV: appEnv, LOCAL_NOW: at }).invalid).toEqual([
+        'LOCAL_NOW: invalid, may be set only when APP_ENV is local or test',
+      ]);
+    }
+  });
+
+  it('refuses LOCAL_NOW with the made-up database, which keeps this computer’s clock', () => {
+    const at = '2026-11-15T06:10:00Z';
+    for (const appEnv of ['local', 'test']) {
+      expect(
+        failure({ ...localOnly, APP_ENV: appEnv, LOCAL_DATA: 'made-up-database', LOCAL_NOW: at })
+          .invalid,
+      ).toEqual([
+        'LOCAL_NOW: invalid, the made-up database keeps this computer’s clock, so it may not be set with LOCAL_DATA=made-up-database',
+      ]);
+    }
+    expect(loadConfig({ ...localOnly, LOCAL_DATA: 'stand-in', LOCAL_NOW: at }).LOCAL_NOW).toBe(at);
   });
 
   it('ignores variables it does not know', () => {

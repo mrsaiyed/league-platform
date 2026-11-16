@@ -296,32 +296,37 @@ export function GameCard({
           </span>
           {state}
         </header>
-        <div
-          className="ui-game-board"
-          data-scored={scored ? 'true' : undefined}
-          data-room={!scored && figures !== undefined ? 'scored' : undefined}
-          style={
-            {
-              '--letters': letters,
-              ...(figures === undefined ? {} : { '--figures': figures }),
-            } as CSSProperties
-          }
-        >
-          <Side team={away} isWinner={winner === 'away'} scored={scored} labels={labels} />
-          <div className="ui-game-middle">
-            {scored ? (
-              <p className="ui-game-score">
-                <span data-winner={winner === 'away' ? 'true' : undefined}>{away.score}</span>
-                <span className="ui-game-score-colon" aria-hidden="true">
-                  :
-                </span>{' '}
-                <span data-winner={winner === 'home' ? 'true' : undefined}>{home.score}</span>
-              </p>
-            ) : (
-              <p className="ui-game-versus">{labels.versus}</p>
-            )}
+        {/* The card's middle part. It, and the top line, are the measures the card's pieces
+            size themselves by (the stylesheet): the card itself is left free to share the
+            heights of its three parts with the cards beside it. */}
+        <div className="ui-game-body">
+          <div
+            className="ui-game-board"
+            data-scored={scored ? 'true' : undefined}
+            data-room={!scored && figures !== undefined ? 'scored' : undefined}
+            style={
+              {
+                '--letters': letters,
+                ...(figures === undefined ? {} : { '--figures': figures }),
+              } as CSSProperties
+            }
+          >
+            <Side team={away} isWinner={winner === 'away'} scored={scored} labels={labels} />
+            <div className="ui-game-middle">
+              {scored ? (
+                <p className="ui-game-score">
+                  <span data-winner={winner === 'away' ? 'true' : undefined}>{away.score}</span>
+                  <span className="ui-game-score-colon" aria-hidden="true">
+                    :
+                  </span>{' '}
+                  <span data-winner={winner === 'home' ? 'true' : undefined}>{home.score}</span>
+                </p>
+              ) : (
+                <p className="ui-game-versus">{labels.versus}</p>
+              )}
+            </div>
+            <Side team={home} isWinner={winner === 'home'} scored={scored} labels={labels} />
           </div>
-          <Side team={home} isWinner={winner === 'home'} scored={scored} labels={labels} />
         </div>
         {placeText ? (
           <footer className="ui-game-foot">

@@ -12,7 +12,7 @@ import {
   type Scope,
 } from '../access/index.ts';
 import { lookupSetting, whoMayScore, type whoMayScoreChoices } from '../leagues/index.ts';
-import type { GamesTx } from './ports.ts';
+import type { GamesTx, ScoringReach } from './ports.ts';
 
 export type ScoringRule = (typeof whoMayScoreChoices)[number];
 
@@ -49,4 +49,42 @@ export function mayScoreUnder(
 ): boolean {
   if (!allows(holder, 'games.score', scope)) return false;
   return scoresWithoutAssignment(holder, scope) || rule === 'anyScorekeeper' || assigned;
+}
+
+/** The programs these scopes reach: 'all' for a league scope (club and team scopes reach none). */
+const programsOf = (scopes: readonly Scope[]): ScoringReach['every'] =>
+  scopes.some((scope) => scope.type === 'league')
+    ? 'all'
+    : [...new Set(scopes.flatMap((scope) => (scope.type === 'program' ? [scope.id] : [])))];
+
+/**
+ * The games `holder` may score under `rule`, as the store filters them (ScoringReach), by
+ * the same rule as mayScoreUnder: every game where a role other than scorekeeper scores
+ * (or any scorekeeper may), and the assigned games wherever they hold `games.score`.
+ */
+export function scoringReachOf(holder: AccessHolder, rule: ScoringRule): ScoringReach {
+  if (holder.isOwner) return { every: 'all', assigned: 'all' };
+  const scoring = holder.grants.filter(
+    (grant) =>
+      grant.accountId === holder.accountId &&
+      grant.revokedAt === null &&
+      roleHasPermission(grant.role, 'games.score'),
+  );
+  const every = scoring.filter(
+    (grant) => grant.role !== 'scorekeeper' || rule === 'anyScorekeeper',
+  );
+  return {
+    every: programsOf(every.map((grant) => grant.scope)),
+    assigned: programsOf(scoring.map((grant) => grant.scope)),
+  };
+}
+
+/** Whether a game of `programId`, assigned to the person or not, is in `reach`. */
+export function inScoringReach(
+  reach: ScoringReach,
+  entry: { readonly programId: string; readonly assigned: boolean },
+): boolean {
+  const reaches = (programs: ScoringReach['every']) =>
+    programs === 'all' || programs.includes(entry.programId);
+  return reaches(reach.every) || (entry.assigned && reaches(reach.assigned));
 }

@@ -50,6 +50,23 @@ const bases = {
     // On a white panel a team's color needs more than half to have the strength it has on
     // a dark one.
     '--emblem-strength': '55%',
+    // The first of a row of leaders' cards. In a dark design it is a small band of the
+    // main color (the shared pieces' own default, so nothing is said there). In a light
+    // one a filled card of the main color would be a second band over the page's closing
+    // band: it is the panel with a little of the main color at one corner (no more than
+    // every text is fitted to) and an edge of the main color, and a shield on it is drawn
+    // as on any panel.
+    '--spot-ground': 'var(--color-panel)',
+    '--spot-glow': 'color-mix(in srgb, var(--color-primary) 7%, var(--color-panel))',
+    '--spot-edge': 'color-mix(in srgb, var(--color-primary) 45%, transparent)',
+    '--spot-words': 'var(--color-text)',
+    '--spot-muted': 'var(--color-muted)',
+    '--spot-pop': 'var(--color-pop)',
+    '--spot-shield-share': '55%',
+    '--spot-shield-under': 'transparent',
+    '--spot-line-share': '74%',
+    '--spot-letter': 'var(--color-text)',
+    '--spot-letter-edge': 'transparent',
     '--label-tracking': '0.08em',
     '--hero-align': 'start',
     '--overlay-shadow': '0 16px 32px rgba(0, 0, 0, 0.18)',

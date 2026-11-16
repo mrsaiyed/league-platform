@@ -75,7 +75,7 @@ body {
   text-underline-offset: 0.18em;
 }
 .ui-root :where(a:hover) {
-  text-decoration-thickness: 2px;
+  text-decoration-thickness: var(--line-heavy);
 }
 .ui-root :focus-visible {
   outline: 3px solid var(--color-primary-text);

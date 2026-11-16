@@ -125,3 +125,46 @@ describe('startWebApp', () => {
     expect(d.checkLoginRole).toHaveBeenCalledOnce();
   });
 });
+
+describe('LOCAL_NOW (step 2.179)', () => {
+  // Years from this computer's clock, so the two can never be mistaken for each other.
+  const worldStartsAt = '2020-06-01T15:00:00Z';
+  const start = () =>
+    startWebApp(loadConfig({ ...env, APP_ENV: 'test', LOCAL_NOW: worldStartsAt }), deps([]).given);
+
+  it("starts the made-up world's clock there: the world's today is the setting's day", async () => {
+    const ports = await start();
+    const league = await ports.findLeague('north-valley');
+    if (league === undefined) throw new Error('no made-up league');
+    const clock = await ports.publicSchedule.clockOf(league.leagueId);
+    expect(clock.today).toBe('2020-06-01');
+    // Running on from the setting, not from this computer's clock.
+    const gone = Date.parse(clock.now) - Date.parse(worldStartsAt);
+    expect(gone).toBeGreaterThanOrEqual(0);
+    expect(gone).toBeLessThan(5 * 60_000);
+  });
+
+  it("keeps this computer's clock for sign-in, sessions and their renewal", async () => {
+    const ports = await start();
+    const before = Date.now();
+    const signedIn = await ports.signIn.signIn({
+      email: 'member@example.test',
+      password: 'made-up member password',
+      device: {
+        deviceId: 'made-up-device-0000000002',
+        label: 'made-up',
+        networkAddress: '127.0.0.1',
+      },
+    });
+    if (!signedIn.ok)
+      throw new Error(`the made-up member could not sign in: ${signedIn.error.code}`);
+    const session = signedIn.value.session;
+    // Its access lasts from this computer's now, not from 2020.
+    expect(session.accessExpiresAt.getTime()).toBeGreaterThan(before);
+    expect((await ports.identify(session.accessToken)).ok).toBe(true);
+    const renewed = await ports.renewSession(session.refreshToken);
+    if (!renewed.ok) throw new Error(`the session could not be renewed: ${renewed.error.code}`);
+    expect(renewed.value.accessExpiresAt.getTime()).toBeGreaterThan(before);
+    expect((await ports.identify(renewed.value.accessToken)).ok).toBe(true);
+  });
+});

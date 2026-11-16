@@ -16,6 +16,9 @@ const reads = new Set([
   'people.list_people',
   'games.list_postponed_games',
   'games.list_my_games',
+  // The games list's "Needs a result" and "Earlier games" (step 2.156): reads.
+  'games.list_games_needing_result',
+  'games.list_earlier_games',
   'leagues.get_season',
   'leagues.preview_season_rules',
   'scheduling.list_venues',

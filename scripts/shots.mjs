@@ -113,6 +113,49 @@ const gamePages = {
 const gamesStates = [
   { name: 'admin-games-boxes-open', at: '/admin/games', onlyIn: leagues[0], tap: openBoxes(1) },
   {
+    // Step 2.156: the game played three days ago with no score, first under "Needs a
+    // result", made final: "Saved" names it at the top, and it has left that list.
+    name: 'admin-games-needs-saved',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const id = listedGame(13, 20);
+      const game = page.locator(`li[id="game-${id}"]`);
+      if ((await game.count()) === 0) {
+        // Made final at the other width already: reopened first, as a correction is.
+        await page.goto(page.url().replace(/\/admin\/games.*$/, `/admin/games/${id}`));
+        await page.locator('[data-reopen-form] input[name="reason"]').fill('Pictures');
+        await Promise.all([
+          page.waitForURL((url) => url.pathname.endsWith('/admin/games')),
+          page.locator('[data-reopen-form] button[type="submit"]').click(),
+        ]);
+      }
+      const boxes = game.locator('[data-score-boxes]');
+      if ((await boxes.getAttribute('open')) === null) await boxes.locator('> summary').click();
+      await game.locator('input[name="awayScore"]').fill('45');
+      await game.locator('input[name="homeScore"]').fill('50');
+      await game.locator('[data-score-boxes] button[type="submit"]').click();
+      await game.getByRole('button', { name: 'Yes, make it final' }).click();
+      await page.getByRole('status').filter({ hasText: 'Saved' }).waitFor();
+    },
+  },
+  {
+    // Step 2.156: "Earlier games" with its latest round chosen, a round at a time.
+    name: 'admin-games-earlier',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      const picker = page.locator('#earlier select[name="round"]');
+      const latest = await picker.locator('option').nth(1).getAttribute('value');
+      await Promise.all([
+        page.waitForURL((url) => url.searchParams.get('round') === latest),
+        picker.selectOption(latest ?? ''),
+      ]);
+      await page.locator('#earlier li[id^="game-"]').first().waitFor();
+    },
+  },
+  {
     name: 'admin-games-question',
     at: '/admin/games',
     onlyIn: leagues[0],
@@ -707,7 +750,8 @@ try {
         context: staff,
         base: '',
       })),
-      ...(design === '' ? accountMenuPages : []).map((page) => ({
+      // Under a named design too: the account button sits in the header every design draws.
+      ...accountMenuPages.map((page) => ({
         ...page,
         name: `${leagues[0]}-${page.name}`,
         context: staff,
@@ -857,7 +901,11 @@ try {
             };
             put(document.querySelector('.site-header .site-name > span'), league);
             for (const table of document.querySelectorAll('table.ui-table')) {
-              put(table.querySelector('tbody .ui-team-cell > [dir]'), name);
+              // Only the name's own words are replaced. In the standings they have an
+              // element of their own, with a note's mark after it in the same flow, and
+              // the picture must show where the mark lands.
+              const cell = table.querySelector('tbody .ui-team-cell > [dir]');
+              put(cell?.querySelector('.ui-team-name') ?? cell, name);
             }
             put(document.querySelector('.ui-scoreboard-name > [dir]'), name);
             // The first game card gets the long name, and the next card one long word. A

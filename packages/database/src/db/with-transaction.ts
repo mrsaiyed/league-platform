@@ -6,7 +6,9 @@
 // no longer. A pooled connection is handed to the next request afterwards, so a
 // session-wide setting would carry one league into another league's request; the
 // test beside this file proves the next transaction on the same connection starts
-// with no league and its login role.
+// with no league and its login role. The one session-wide setting is the id function's
+// memory of its last id (srleagues.uuid_v7_last, migration 0019, record 068): it holds
+// no league, person or permission, and nothing but that function reads it.
 //
 // How the restricted role is reached: the app logs in as app_user, or as a role that
 // is a member of it; on PGlite, tests run as the superuser. Either way `set local
