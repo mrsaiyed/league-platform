@@ -75,6 +75,16 @@ export type Rules = {
   mercyLead?: number | null;
   /** Personal fouls that mark a player out (`Line.fouledOut`). */
   playerFoulLimit?: number | null;
+  /**
+   * How minutes are counted when the clock is set (S-71, record 077). Absent, as in
+   * every game of the Al-Hadi tracker and every game saved before it: on the clock's
+   * running time, where time put back on the clock winds the period back and time
+   * taken off counts for nobody. 'game-clock': on the game clock, so in each period the
+   * time played is the time the period started with less what the clock shows; a clock
+   * set wrongly and set right changes nothing. Only the new product sets it, and
+   * `checkRules` never keeps it, so the tracker cannot turn it on.
+   */
+  minutesFollow?: 'game-clock';
 };
 export type TimeoutRules = Required<
   Pick<
@@ -254,6 +264,12 @@ export type Stamp = {
    * the play's clock time later does not change it.
    */
   lastMinutes?: true;
+  /**
+   * Under minutes on the game clock only: the clock's true running time when the play
+   * was recorded (`Clock.ranMs`), which is never rewritten. `clockMs` and `elapsedMs`
+   * are reckoned from it again whenever the clock is set (`reckon`).
+   */
+  ranMs?: number;
 };
 export type LoggedPlay = Play & Stamp;
 
@@ -262,9 +278,23 @@ export type Clock = {
   running: boolean;
   /** While running, the moment `remainingMs` and `elapsedMs` were last brought up to date. */
   anchorAt: number;
-  /** Cumulative time the clock has run across every period: what minutes are measured in. */
+  /**
+   * What minutes are measured in. By default the cumulative time the clock has run
+   * across every period. Under minutes on the game clock, the game time played: each
+   * period's start less what its clock shows, added up.
+   */
   elapsedMs: number;
+  /** Under minutes on the game clock only: all the time the clock has truly run, never wound back. */
+  ranMs?: number;
 };
+
+/**
+ * Under minutes on the game clock only: the clock set to `ms` at `ranMs` of the clock's
+ * running time, in `segment`, the stretch from one period play to the next (0 before
+ * the first). Kept as a fact and never rewritten; a second set at the same moment
+ * replaces it, and a set to what the clock shows anyway removes it.
+ */
+export type ClockSet = { segment: number; ranMs: number; ms: number };
 
 export type GameState = {
   version: 1;
@@ -278,6 +308,8 @@ export type GameState = {
   recent: string[];
   /** Time of the last applied command; later commands never run the clock backwards. */
   lastAt: number;
+  /** Under minutes on the game clock only: every set of the clock still standing, in order. */
+  clockSets?: ClockSet[];
 };
 
 export type Line = {
@@ -360,16 +392,18 @@ export function periodOptions(rules: Rules, current = 1) {
 }
 
 export function newGame(rules: Rules = DEFAULT_RULES, now = 0): GameState {
+  const clock = { remainingMs: periodMs(rules, 1), running: false, anchorAt: now, elapsedMs: 0 };
   return {
     version: 1,
     status: 'scheduled',
     rules: { ...rules },
-    clock: { remainingMs: periodMs(rules, 1), running: false, anchorAt: now, elapsedMs: 0 },
+    clock: onGameClock(rules) ? { ...clock, ranMs: 0 } : clock,
     plays: [],
     redo: [],
     colorsSwapped: false,
     recent: [],
     lastAt: now,
+    ...(onGameClock(rules) ? { clockSets: [] } : {}),
   };
 }
 
@@ -379,12 +413,201 @@ export function clockAt(state: GameState, now: number): Clock {
   if (!c.running) return { ...c };
   const ran = Math.min(c.remainingMs, Math.max(0, now - c.anchorAt));
   const remainingMs = c.remainingMs - ran;
-  return {
+  const next = {
     remainingMs,
     running: remainingMs > 0,
     anchorAt: Math.max(c.anchorAt, now),
     elapsedMs: c.elapsedMs + ran,
   };
+  if (!onGameClock(state.rules)) return next;
+  // On the game clock, time run above the period's start (a clock set too high) is not
+  // played: the game time is the start less what the clock shows (S-71).
+  const { lengthMs } = segmentNow(state, state.clockSets ?? []);
+  return {
+    ...next,
+    elapsedMs: c.elapsedMs + Math.min(lengthMs, c.remainingMs) - Math.min(lengthMs, remainingMs),
+    ranMs: ranOfClock(c) + ran,
+  };
+}
+
+// ------------------------------------------------- minutes on the game clock (S-71)
+//
+// Under `minutesFollow: 'game-clock'` the engine keeps facts and reckons from them,
+// never overwriting: the clock's true running time (`Clock.ranMs`), the running time of
+// each play (`Stamp.ranMs`) and each set of the clock (`GameState.clockSets`). For each
+// segment (the stretch from one period play to the next), L is the reading it started
+// with: the period's length, or a set made at its first moment. The reading at running
+// time r is the last set at or before r, run down since. The corrected reading is that,
+// or any LATER set's time if higher (time put back says the clock should never have run
+// so far), and never above L. A moment's game time is the segment's base (the game time
+// at its start) plus L less the corrected reading; derive counts minutes in it as ever.
+
+/** Whether the rules count minutes on the game clock. */
+const onGameClock = (rules: Rules): boolean => rules.minutesFollow === 'game-clock';
+/** The true running time of the clock, for a state made before it was kept (all zero then). */
+const ranOfClock = (clock: Clock): number => clock.ranMs ?? clock.elapsedMs;
+const ranOfPlay = (play: LoggedPlay): number => play.ranMs ?? play.elapsedMs;
+
+type Segment = {
+  /** 0 before the first period play, then one more for each. */
+  index: number;
+  period: number;
+  /** The running time the segment began at. */
+  startRan: number;
+  /** L: the reading it started with. */
+  lengthMs: number;
+  /** Its sets, in order of running time. */
+  sets: ClockSet[];
+};
+
+function segmentOf(
+  rules: Rules,
+  all: readonly ClockSet[],
+  index: number,
+  period: number,
+  startRan: number,
+): Segment {
+  const sets = all.filter((e) => e.segment === index).sort((x, y) => x.ranMs - y.ranMs);
+  const first = sets.find((e) => e.ranMs === startRan);
+  return { index, period, startRan, lengthMs: first?.ms ?? periodMs(rules, period), sets };
+}
+
+/** The segment the game is in now, with the sets given. */
+function segmentNow(state: GameState, sets: readonly ClockSet[]): Segment {
+  let index = 0;
+  let period = 1;
+  let startRan = 0;
+  for (const play of state.plays)
+    if (play.type === 'period') {
+      index += 1;
+      period = play.period;
+      startRan = ranOfPlay(play);
+    }
+  return segmentOf(state.rules, sets, index, period, startRan);
+}
+
+/** What the clock reads at running time `r` of the segment, from its sets alone. */
+function readingAt(segment: Segment, r: number): number {
+  let ms = segment.lengthMs;
+  let from = segment.startRan;
+  for (const e of segment.sets)
+    if (e.ranMs <= r) {
+      ms = e.ms;
+      from = e.ranMs;
+    }
+  return Math.max(0, ms - (r - from));
+}
+
+/** The reading at `r`, corrected by every later set and never above the segment's start. */
+function correctedAt(segment: Segment, r: number): number {
+  let reading = readingAt(segment, r);
+  for (const e of segment.sets) if (e.ranMs > r) reading = Math.max(reading, e.ms);
+  return Math.min(segment.lengthMs, reading);
+}
+
+/**
+ * Stamp every play again from the facts, in `plays` and in `redo` (as it will be
+ * redone), and bring the clock's game time up to date. Nothing else moves.
+ */
+function reckon(s: GameState) {
+  const sets = s.clockSets ?? [];
+  const timeline = [...s.plays, ...[...s.redo].reverse()];
+  let segment = segmentOf(s.rules, sets, 0, 1, 0);
+  let base = 0;
+  let now = { segment, base };
+  const stamped = timeline.map((play, i) => {
+    if (i === s.plays.length) now = { segment, base };
+    const r = ranOfPlay(play);
+    if (play.type === 'period') {
+      base += segment.lengthMs - correctedAt(segment, r);
+      segment = segmentOf(s.rules, sets, segment.index + 1, play.period, r);
+      return restamped(play, segment.lengthMs, base);
+    }
+    const reading = correctedAt(segment, r);
+    return restamped(play, reading, base + segment.lengthMs - reading);
+  });
+  if (s.plays.length === timeline.length) now = { segment, base };
+  s.plays = stamped.slice(0, s.plays.length);
+  s.redo = stamped.slice(s.plays.length).reverse();
+  const shown = Math.min(now.segment.lengthMs, s.clock.remainingMs);
+  s.clock = { ...s.clock, elapsedMs: now.base + now.segment.lengthMs - shown };
+}
+
+const restamped = (play: LoggedPlay, clockMs: number, elapsedMs: number): LoggedPlay =>
+  play.clockMs === clockMs && play.elapsedMs === elapsedMs ? play : { ...play, clockMs, elapsedMs };
+
+/** The clock's reading shown in whole seconds, as `formatClock` rounds it. */
+const shownSeconds = (ms: number) => Math.ceil(ms / 1000);
+
+/**
+ * Set the clock on the game clock (S-71). A second set at the same moment replaces
+ * the first; a set to what the clock would show anyway, in whole seconds, removes it
+ * and the clock reads exactly what it did. Then every play is reckoned again.
+ */
+function setGameClock(s: GameState, ms: number) {
+  const ran = ranOfClock(s.clock);
+  const current = segmentNow(s, s.clockSets ?? []);
+  const sets = (s.clockSets ?? []).filter((e) => !(e.segment === current.index && e.ranMs === ran));
+  const anyway = readingAt(segmentNow(s, sets), ran);
+  const same = shownSeconds(ms) === shownSeconds(anyway);
+  if (!same) sets.push({ segment: current.index, ranMs: ran, ms });
+  s.clockSets = sets;
+  s.clock = { ...s.clock, running: false, ranMs: ran, remainingMs: same ? anyway : ms };
+  reckon(s);
+}
+
+/**
+ * Undo of a period play on the game clock: that period's sets go, and the clock time
+ * run in it counts for nobody, so the period before reads at this moment what it read
+ * when the period was picked (`prevClockMs`).
+ */
+function undoGamePeriod(s: GameState, prevClockMs: number) {
+  const ran = ranOfClock(s.clock);
+  const before = segmentNow(s, []);
+  const sets = (s.clockSets ?? []).filter(
+    (e) => e.segment < before.index + 1 && !(e.segment === before.index && e.ranMs === ran),
+  );
+  if (readingAt(segmentNow(s, sets), ran) !== prevClockMs)
+    sets.push({ segment: before.index, ranMs: ran, ms: prevClockMs });
+  s.clockSets = sets;
+  s.clock = { ...s.clock, ranMs: ran };
+}
+
+export type ClockSetEffect =
+  /** Minutes do not change, and the clock has run in this period already. */
+  | { kind: 'none' }
+  /** The clock has not run in this period: the set says where it starts. */
+  | { kind: 'start' }
+  /** `ms` comes off the minutes of the players on the court; `wholePeriod` when that is all this period has run. */
+  | { kind: 'back'; ms: number; wholePeriod: boolean }
+  /** `ms` is added to the minutes of the players on the court (played with the clock stopped). */
+  | { kind: 'added'; ms: number };
+
+/**
+ * What setting the clock to `ms` at `now` would do to the players' minutes, under the
+ * game's own rule: the set is made on a copy and the game time compared, so the form
+ * that sets the clock never says other than what is then done. A set the engine would
+ * refuse does nothing.
+ */
+export function clockSetEffect(state: GameState, ms: number, now: number): ClockSetEffect {
+  const at = Math.max(now, state.lastAt);
+  const s: GameState = { ...state, clock: clockAt(state, at), lastAt: at };
+  const before = s.clock.elapsedMs;
+  const periodStart = Math.min(before, derive(s).periodStartElapsedMs);
+  const notRun = onGameClock(s.rules)
+    ? ranOfClock(s.clock) === segmentNow(s, []).startRan
+    : before === periodStart;
+  try {
+    if (s.status === 'final') return { kind: 'none' };
+    setClock(s, ms);
+  } catch {
+    return { kind: 'none' };
+  }
+  const change = s.clock.elapsedMs - before;
+  if (change < 0)
+    return { kind: 'back', ms: -change, wholePeriod: s.clock.elapsedMs === periodStart };
+  if (change > 0) return { kind: 'added', ms: change };
+  return notRun ? { kind: 'start' } : { kind: 'none' };
 }
 
 const bonusLevel = (fouls: number, rules: Rules): 0 | 1 | 2 =>
@@ -641,24 +864,39 @@ export function apply(state: GameState, command: Command, { id, now }: Context):
       const play = s.plays.pop();
       if (!play) fail('Nothing to undo.');
       s.redo.push(play);
-      if (play.type === 'period')
+      if (play.type === 'period') {
         s.clock = { ...s.clock, running: false, remainingMs: play.prevClockMs ?? 0 };
+        if (onGameClock(s.rules)) undoGamePeriod(s, play.prevClockMs ?? 0);
+      }
+      if (onGameClock(s.rules)) reckon(s);
       break;
     }
     case 'redo': {
-      const play = s.redo.pop();
-      if (!play) fail('Nothing to redo.');
+      const undone = s.redo.pop();
+      if (!undone) fail('Nothing to redo.');
+      // On the game clock a period play redone starts its period at the present moment.
+      const play =
+        onGameClock(s.rules) && undone.type === 'period'
+          ? { ...undone, ranMs: ranOfClock(s.clock), prevClockMs: s.clock.remainingMs }
+          : undone;
       s.plays.push(play);
       if (play.type === 'period')
         s.clock = { ...s.clock, running: false, remainingMs: periodMs(s.rules, play.period) };
+      if (onGameClock(s.rules)) reckon(s);
       break;
     }
-    case 'rules':
+    case 'rules': {
       if (s.plays.length || s.redo.length || s.clock.elapsedMs > 0)
         fail('The format is fixed once the game is under way. Mark it not started to change it.');
-      s.rules = checkRules(command.rules);
+      // How minutes are counted is the product's, never the format's (S-71): kept as it was.
+      const gameClock = onGameClock(s.rules);
+      s.rules = gameClock
+        ? { ...checkRules(command.rules), minutesFollow: 'game-clock' }
+        : checkRules(command.rules);
       s.clock = { ...s.clock, running: false, remainingMs: periodMs(s.rules, 1) };
+      if (gameClock) s.clockSets = [];
       break;
+    }
     case 'colors':
       s.colorsSwapped = command.swapped === true;
       break;
@@ -694,6 +932,7 @@ function record(s: GameState, input: Play, id: string, at: number) {
     period: d.period,
     clockMs: s.clock.remainingMs,
     elapsedMs: s.clock.elapsedMs,
+    ...(onGameClock(s.rules) ? { ranMs: ranOfClock(s.clock) } : {}),
   };
   if (play.type === 'period') {
     const prevClockMs = s.clock.remainingMs;
@@ -719,6 +958,8 @@ function record(s: GameState, input: Play, id: string, at: number) {
     s.plays.push({ ...play, ...stamp, lastMinutes: true });
   } else s.plays.push({ ...play, ...stamp });
   s.redo = [];
+  // On the game clock a play reads as the game clock does now (never above its start).
+  if (onGameClock(s.rules)) reckon(s);
   // Setting lineups or the clock mode before tip-off does not make the game live for
   // viewers; anything else does.
   if (s.status === 'scheduled' && play.type !== 'lineup' && play.type !== 'clock-mode')
@@ -878,10 +1119,14 @@ function checkRules(rules: Rules): Rules {
  * past the start of the period) and plays stamped after that moment move onto
  * it. What was recorded still counts; only when it happened moves. Setting the
  * clock forward is the scorer catching up and leaves minutes alone.
+ *
+ * That is the Al-Hadi tracker's rule, and every game's whose rules leave out
+ * `minutesFollow`. Under minutes on the game clock, `setGameClock` decides instead.
  */
 function setClock(s: GameState, ms: number) {
   if (!Number.isInteger(ms) || ms < 0 || ms > MAX_CLOCK_MS)
     fail('Set the clock between 0:00 and 60:00.');
+  if (onGameClock(s.rules)) return setGameClock(s, ms);
   const clock = { ...s.clock, running: false };
   if (ms > clock.remainingMs) {
     const d = derive(s);
