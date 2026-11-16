@@ -2,13 +2,16 @@
 // by short name and id, the sign-in service's users turned into our accounts, and
 // what they hold, read through packages/database as the app's login role. The
 // sign-in service is a fake here: only who each token belongs to matters.
-import { fail, ok, publicViewer } from '@srleagues/core';
+import { fail, leagueApiUrl, mayOpenTracker, ok, publicViewer } from '@srleagues/core';
 import * as database from '@srleagues/database';
 import type { SessionIdentity, SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databasePorts, NotOnTheDatabaseYet } from './database-ports.ts';
+import { resolveLeagueApi } from './league-api.ts';
+import type { LocalTools } from './local-tools.ts';
 import type { WebPorts } from './ports.ts';
+import { scoringOffersRequest } from './scoring-offers-endpoint.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
 
 let made: database.MadeUpDatabase;
@@ -370,6 +373,55 @@ describe('databasePorts (record 055)', () => {
     expect(ports.liveFeed).toBeNull();
   });
 
+  it('answers a public page\'s "Score this game" read with no games, never an error (step 2.153)', async () => {
+    // The games area has not moved yet: a scorekeeper's read reaches it and is given no
+    // games; someone who scores nowhere in the league is answered before it is reached.
+    const parts = ['scoring'];
+    const holdsToScore = async (token: string) =>
+      mayOpenTracker(
+        await ports.accessOf({
+          leagueId: lakeside().leagueId,
+          accountId: await accountOf(token),
+          requestId: randomUUID(),
+        }),
+      );
+    const askAs = async (token: string) => {
+      const resolved = await resolveLeagueApi(
+        {
+          host: 'localhost:3000',
+          path: leagueApiUrl({ id: lakeside().leagueId }, parts),
+          session: await ports.identify(token),
+        },
+        parts,
+        { ...ports, siteOrigin: 'http://localhost:3000' },
+        'visitor',
+      );
+      // Asked as that person, never as a visitor.
+      if (!resolved.ok || resolved.context.account === null) throw new Error('not signed in');
+      const read = { accessOf: ports.accessOf, games: () => ports.games.deps };
+      return scoringOffersRequest({ ...resolved, ports: read }, `${randomUUID()},${randomUUID()}`);
+    };
+    // A seed member signed in once already keeps their sign-in: another would be refused.
+    // (Plain ASCII only: the Kelvin sign above folds into k, and is another mailbox.)
+    const member = (email: string) =>
+      [...sessions].find(
+        ([, who]) => /^[\x20-\x7e]+$/.test(who.email) && who.email.toLowerCase() === email,
+      )?.[0] ?? signedIn(email);
+    const none = {
+      status: 200,
+      body: { games: [] },
+      headers: { 'Cache-Control': 'private, no-store' },
+    };
+    const keeper = member('scorer@lakeside.example.test');
+    expect(await holdsToScore(keeper)).toBe(true);
+    expect(await askAs(keeper)).toEqual(none);
+    const admin = member('admin@lakeside.example.test');
+    expect(await holdsToScore(admin)).toBe(true);
+    expect(await askAs(admin)).toEqual(none);
+    // A person with no role here, as a coach or a fan is.
+    expect(await askAs(signedIn(`fan-${randomUUID()}@example.test`))).toEqual(none);
+  });
+
   it("reads the statistics' settings, a member's teams and the league's name (part 3)", async () => {
     expect((await ports.publicStats.settingsOf(lakeside().leagueId)).audience).toBe('adult');
     // A league that saved no minimum games for its leaders has the starting 3 (P7 §6).
@@ -428,5 +480,49 @@ describe('databasePorts (record 055)', () => {
       'America/Chicago',
     );
     expect(await ports.publicTeams.startPageOf(lakeside().leagueId)).toBe('leagueHome');
+  });
+});
+
+// Review of step 2.96, M1: ports that carry the local tools (the kept emails' page and "be
+// this made-up person") answer only requests made on this computer, as the stand-in's do,
+// so no other computer on the network reaches them through the proxy. A real database's
+// ports carry none and answer every request.
+describe('databasePorts with the local tools (step 2.96)', () => {
+  const tools: LocalTools = {
+    keptEmails: async () => [],
+    madeUpPeople: async () => [],
+    madeUpSignInOf: () => undefined,
+    watchForCode: () => ({ code: async () => undefined, stop: () => {} }),
+  };
+  const portsWith = (localTools: { tools: LocalTools; publicBaseUrl: string } | null) =>
+    databasePorts({
+      database,
+      db,
+      signIn: {} as SignInService,
+      signInMail: {} as SignInMail,
+      log: () => {},
+      warn: () => {},
+      localTools,
+    });
+  const here = new Headers({ host: '127.0.0.1:3000', 'x-forwarded-for': '127.0.0.1' });
+  const elsewhere = [
+    new Headers({ host: '192.168.1.20:3000' }),
+    new Headers({ host: 'leagues.example.com' }),
+    new Headers({ host: '127.0.0.1:3000', 'x-forwarded-for': '192.168.1.30' }),
+    new Headers({ host: '127.0.0.1:3000', via: '1.1 a-proxy' }),
+  ];
+
+  it('answers only requests made on this computer when it carries them', () => {
+    const carrying = portsWith({ tools, publicBaseUrl: 'http://127.0.0.1:3000' });
+    expect(carrying.localTools).toBe(tools);
+    expect(carrying.answers(here)).toBe(true);
+    for (const request of elsewhere) expect(carrying.answers(request)).toBe(false);
+  });
+
+  it('answers every request when it carries none, as a real database', () => {
+    for (const none of [portsWith(null), ports]) {
+      expect(none.localTools).toBeNull();
+      for (const request of [here, ...elsewhere]) expect(none.answers(request)).toBe(true);
+    }
   });
 });

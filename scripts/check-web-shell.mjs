@@ -72,6 +72,7 @@ const tokens = {
 // The made-up leagues' ids (stand-in-ports.ts), which name the cookie of a device's "my team".
 const northValley = '01900000-0000-7000-8000-000000000001';
 const harborCity = '01900000-0000-7000-8000-000000000002';
+const quietPines = '01900000-0000-7000-8000-000000000003';
 // Two of the made-up games of the first league (stand-in-games.ts).
 const liveGame = '01900000-0000-7000-8000-006a00000002';
 const unassignedGame = '01900000-0000-7000-8000-006a00000003';
@@ -79,6 +80,8 @@ const unassignedGame = '01900000-0000-7000-8000-006a00000003';
 /** A made-up game of North Valley (apps/web/src/server/stand-in-games.ts): 1 scheduled,
  * 2 live (Hawks v Bears), 5 final (Bears v Lions), 6 in a season still being set up. */
 const game = (n) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0')}`;
+/** The draft league's game nobody scored, two days ago, assigned to the scorekeeper. */
+const draftUnscored = '01900000-0000-7000-8000-0000b20003e8';
 
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
 // browser's script fills with the not-found or forbidden screen (record 020), so
@@ -192,6 +195,38 @@ const cases = [
       ],
     ),
   ),
+  // Step 2.96: the two local-only pages answer on made-up data (here APP_ENV=test) and
+  // show no password; nothing is served under the kept emails' page, not its files; and
+  // no page a visitor sees links to either. In staging and production they answer as an
+  // unknown /signin/<name>, by the same route (apps/web/src/server/local-only.test.ts):
+  // neither mode can serve a page today, as the check at the end of this file shows.
+  [
+    'visitor',
+    '/signin/kept-emails',
+    200,
+    ['Emails kept on this computer', 'None of them left it'],
+    ['made-up owner password'],
+  ],
+  [
+    'visitor',
+    '/signin/made-up-people',
+    200,
+    ['Be a made-up person', 'Olive Owner', 'owner@example.test', 'Open North Valley League as'],
+    ['made-up owner password', 'made-up member password', 'local-owner-token'],
+  ],
+  ...['/signin/kept-emails/anything.json', '/signin/kept-emails/anything.html'].map((address) => [
+    'visitor',
+    address,
+    404,
+    [notFound],
+  ]),
+  ...['/', '/signin', '/signup', '/north-valley'].map((address) => [
+    'visitor',
+    address,
+    200,
+    [],
+    ['/signin/kept-emails', '/signin/made-up-people'],
+  ]),
   // The account button (U-8): a signed-in person's own, never in a visitor's page.
   [
     'owner',
@@ -779,6 +814,48 @@ const cases = [
     ['You are not assigned to score this game.'],
     ['Lions at Hawks', noAccess],
   ],
+  // Step 2.153: "Score this game" on the public pages is read after the page, for the person
+  // signed in only. The page a scorekeeper is served holds no trace of it, as a visitor's;
+  // the read gives a scorekeeper the games they may score (in the draft league, which scores
+  // assigned games only, only theirs) and gives a visitor, a coach and another league's
+  // admin nothing, privately.
+  [
+    'scorekeeper',
+    '/north-valley/schedule',
+    200,
+    ['Hawks'],
+    ['Score this game', 'Enter the score', '/north-valley/score/'],
+  ],
+  [
+    'scorekeeper',
+    `/api/v1/leagues/${northValley}/scoring?games=${liveGame},${game(5)}`,
+    200,
+    [`"href":"/north-valley/score/${liveGame}"`, '"score":"Score this game"'],
+    [game(5)],
+  ],
+  ...['visitor', 'coach', 'otherAdmin'].map((who) => [
+    who,
+    `/api/v1/leagues/${northValley}/scoring?games=${liveGame},${unassignedGame}`,
+    200,
+    ['{"games":[]}'],
+    [liveGame, unassignedGame, 'Score this game'],
+  ]),
+  [
+    'scorekeeper',
+    `/api/v1/leagues/${quietPines}/scoring?games=${liveGame},${unassignedGame},${game(4)},${draftUnscored}`,
+    200,
+    [`"gameId":"${draftUnscored}"`, '"kind":"enter"'],
+    // Game 4 is theirs too, but two days ahead: not offered before its day (S-70).
+    [liveGame, unassignedGame, game(4)],
+  ],
+  // A game of tomorrow is not offered today, to its scorekeeper either (S-70).
+  [
+    'scorekeeper',
+    `/api/v1/leagues/${northValley}/scoring?games=${unassignedGame}`,
+    200,
+    ['{"games":[]}'],
+    [unassignedGame],
+  ],
   [
     'clubAdmin',
     '/quiet-pines/admin/teams',
@@ -787,6 +864,25 @@ const cases = [
     [adminLink('quiet-pines', 'people')],
   ],
   ['otherAdmin', '/still-waters/admin', 200, [adminLink('still-waters', 'settings')]],
+  // Step 2.192: the empty league to start from. Its Teams and Schedule open on its one
+  // current season, which holds nothing yet, and each says what to do first.
+  [
+    'owner',
+    '/still-waters/admin/teams',
+    200,
+    ['Teams of First Season', 'No teams yet.', 'Add a team'],
+  ],
+  [
+    'owner',
+    '/still-waters/admin/schedule',
+    200,
+    [
+      adminLink('still-waters', 'schedule'),
+      'Season: First Season',
+      'This season has no rounds yet.',
+      'Add the first one here, then add its games.',
+    ],
+  ],
   ['scheduler', '/still-waters', 404, [notFound]],
   ['registrar', '/closed-gate', 404, [notFound]],
   ['visitor', '/closed-gate', 404, [notFound]],
@@ -925,6 +1021,7 @@ try {
     );
   }
   failures.push(...(await sameAsNoLeague(origin)));
+  failures.push(...(await scoringSameAsNoLeague(origin)));
   failures.push(...(await checkStylesheets(origin)));
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
@@ -934,38 +1031,46 @@ try {
   server.child.kill();
 }
 
-// Staging with a database that answers nobody: the app must refuse to start.
-const staging = start(['start', '--port', String(await freePort())], {
-  APP_ENV: 'staging',
-  PUBLIC_BASE_URL: 'https://staging.example.test',
-  // Required in staging (config-schema.ts), so the settings check passes and the
-  // database is reached. All made up: the address answers nobody on this computer. A
-  // host name, as staging refuses an IP address as the host (record 055).
-  TRUSTED_PROXY: 'one',
-  PLATFORM_DATABASE_URL: 'postgres://made-up:made-up-password@localhost:1/nowhere',
-  SUPABASE_URL: 'http://localhost:54321',
-  SUPABASE_SECRET_KEY: 'made-up-supabase-secret-key',
-});
-const code = await new Promise((resolve) => {
-  const timer = setTimeout(() => {
-    staging.child.kill();
-    resolve('still running');
-  }, 60_000);
-  staging.child.on('exit', (exitCode) => {
-    clearTimeout(timer);
-    resolve(exitCode);
+// Staging, and since step 2.96 production too, with a database that answers nobody: the app
+// must refuse to start, so in neither mode does any page answer, the local-only pages of
+// step 2.96 among them (that they answer there as an unknown address is
+// apps/web/src/server/local-only.test.ts).
+for (const appEnv of ['staging', 'production']) {
+  const deployed = start(['start', '--port', String(await freePort())], {
+    APP_ENV: appEnv,
+    PUBLIC_BASE_URL: `https://${appEnv}.example.test`,
+    // Required in staging and production (config-schema.ts), so the settings check passes
+    // and the database is reached. All made up: the address answers nobody on this
+    // computer. A host name, as staging refuses an IP address as the host (record 055).
+    TRUSTED_PROXY: 'one',
+    PLATFORM_DATABASE_URL: 'postgres://made-up:made-up-password@localhost:1/nowhere',
+    SUPABASE_URL: 'http://localhost:54321',
+    SUPABASE_SECRET_KEY: 'made-up-supabase-secret-key',
+    ...(appEnv === 'production' ? { RESEND_API_KEY: 'made-up-resend-key' } : {}),
   });
-});
-if (code === 0 || code === 'still running') {
-  failures.push(`staging with an unreachable database did not refuse to start (${code})`);
-} else if (!staging.output().includes('the database could not be reached')) {
-  failures.push(
-    `staging refused to start without saying why:\n${staging.output()}${whichFileNodeRefused(staging.output())}`,
-  );
-} else if (staging.output().includes('made-up-password')) {
-  failures.push('the refusal printed the database address');
-} else if (staging.output().includes('made-up-supabase-secret-key')) {
-  failures.push('the refusal printed SUPABASE_SECRET_KEY');
+  const code = await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      deployed.child.kill();
+      resolve('still running');
+    }, 60_000);
+    deployed.child.on('exit', (exitCode) => {
+      clearTimeout(timer);
+      resolve(exitCode);
+    });
+  });
+  if (code === 0 || code === 'still running') {
+    failures.push(`${appEnv} with an unreachable database did not refuse to start (${code})`);
+  } else if (!deployed.output().includes('the database could not be reached')) {
+    failures.push(
+      `${appEnv} refused to start without saying why:\n${deployed.output()}${whichFileNodeRefused(deployed.output())}`,
+    );
+  } else if (deployed.output().includes('made-up-password')) {
+    failures.push(`the ${appEnv} refusal printed the database address`);
+  } else if (deployed.output().includes('made-up-supabase-secret-key')) {
+    failures.push(`the ${appEnv} refusal printed SUPABASE_SECRET_KEY`);
+  } else if (deployed.output().includes('made-up-resend-key')) {
+    failures.push(`the ${appEnv} refusal printed RESEND_API_KEY`);
+  }
 }
 
 if (failures.length > 0) {
@@ -973,7 +1078,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Web shell check passed: ${cases.length + spoofs.length + 6} checks against the built server.`,
+  `Web shell check passed: ${cases.length + spoofs.length + 7} checks against the built server.`,
 );
 
 // When Node refused a TypeScript file it was to run itself, the server prints only
@@ -1113,6 +1218,87 @@ async function sameAsNoLeague(origin) {
   }
   if (a.rows !== b.rows) {
     found.push(`a draft's page data differs from no league's ${firstDifference(a.rows, b.rows)}`);
+  }
+  return found;
+}
+
+/**
+ * Step 2.153's read of a page's buttons (GET /api/v1/leagues/{leagueId}/scoring) answers a
+ * league its visitor may not see, a draft or a suspended one, exactly as a league that does
+ * not exist or is in the bin (U-9): for a visitor, a signed-in stranger, another league's
+ * admin and another league's scorekeeper, the answers for the leagues each may not see are
+ * compared with no league's, status, body and every header but the date and the length.
+ * The draft league's owner gets the ordinary answer.
+ */
+async function scoringSameAsNoLeague(origin) {
+  const leagueOf = (n) => `01900000-0000-7000-8000-${n.toString(16).padStart(12, '0')}`;
+  const leagues = {
+    'no league': leagueOf(0xfffff),
+    'in the bin': leagueOf(6),
+    draft: leagueOf(3),
+    suspended: leagueOf(5),
+    'another draft': leagueOf(7),
+  };
+  // Who may not see which: another league's admin holds the other draft; another league's
+  // scorekeeper holds north-valley, the draft and the archived league (stand-in-ports.ts).
+  const hiddenFrom = {
+    visitor: ['draft', 'suspended'],
+    stranger: ['draft', 'suspended'],
+    otherAdmin: ['draft', 'suspended'],
+    scorekeeper: ['another draft', 'suspended'],
+  };
+  const ask = async (who, leagueId) => {
+    const response = await fetch(
+      `${origin}/api/v1/leagues/${leagueId}/scoring?games=${liveGame},${unassignedGame}`,
+      {
+        headers: who === 'visitor' ? {} : { cookie: `srl_session=${tokens[who]}` },
+        redirect: 'manual',
+      },
+    );
+    const headers = [...response.headers]
+      .filter(([header]) => !['date', 'content-length'].includes(header))
+      .map(([header, value]) => `${header}: ${value}`)
+      .join('\n');
+    return { status: response.status, headers, body: await response.text() };
+  };
+  const found = [];
+  for (const [who, hidden] of Object.entries(hiddenFrom)) {
+    const answers = [];
+    for (const what of ['no league', 'in the bin', ...hidden]) {
+      answers.push([what, await ask(who, leagues[what])]);
+    }
+    const [, first] = answers[0];
+    if (first.status !== 404) found.push(`${who}'s scoring read of no league is ${first.status}`);
+    for (const [what, answer] of answers.slice(1)) {
+      if (JSON.stringify(answer) !== JSON.stringify(first)) {
+        found.push(
+          `${who}'s scoring read of a league ${what} differs from no league's:\n${JSON.stringify(answer)}\n---\n${JSON.stringify(first)}`,
+        );
+      }
+    }
+  }
+  // And exactly as the other public read, the snapshot, answers a visitor of a hidden league.
+  const snapshot = await fetch(
+    `${origin}/api/v1/leagues/${leagues.draft}/games/${liveGame}/snapshot`,
+    { redirect: 'manual' },
+  );
+  const snapshotAnswer = {
+    status: snapshot.status,
+    headers: [...snapshot.headers]
+      .filter(([header]) => !['date', 'content-length'].includes(header))
+      .map(([header, value]) => `${header}: ${value}`)
+      .join('\n'),
+    body: await snapshot.text(),
+  };
+  const scoringAnswer = await ask('visitor', leagues.draft);
+  if (JSON.stringify(scoringAnswer) !== JSON.stringify(snapshotAnswer)) {
+    found.push(
+      `a visitor's scoring read of a draft differs from its snapshot:\n${JSON.stringify(scoringAnswer)}\n---\n${JSON.stringify(snapshotAnswer)}`,
+    );
+  }
+  const owner = await ask('owner', leagues.draft);
+  if (owner.status !== 200 || !/private, no-store/.test(owner.headers)) {
+    found.push(`the draft league's owner's scoring read is ${owner.status}: ${owner.headers}`);
   }
   return found;
 }

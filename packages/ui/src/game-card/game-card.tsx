@@ -68,6 +68,13 @@ export type GameCardProps = {
    * with its own two names and its own score.
    */
   readonly room?: BoardRoom | undefined;
+  /**
+   * A second thing to do with the game, for one person only, already drawn by the page:
+   * "Score this game" for someone who may score it. It stands at the card's foot, over the
+   * card's link and after it, so the card and the button are each tapped and reached by
+   * keyboard on their own, and no link is ever inside another.
+   */
+  readonly action?: ReactNode;
 };
 
 /** What a board's sum of the width its teams need side by side is made from. */
@@ -258,6 +265,7 @@ export function GameCard({
   featured = false,
   marks = 'chip',
   room,
+  action,
 }: GameCardProps) {
   const winner = winnerOf(status, home, away);
   let state: ReactNode = null;
@@ -284,10 +292,21 @@ export function GameCard({
       )}
     </a>
   ) : null;
+  // After the card's link, so the keyboard reaches the card first and the button is drawn
+  // over the link that covers the card.
+  const second =
+    action === undefined || action === null ? null : <div className="ui-game-action">{action}</div>;
   if (layout === 'board') {
     const scored = hasScore({ status, home, away });
     // The sum is made from the list's room where the list gave one, else from this game.
     const letters = room?.letters ?? Math.max(nameMeasure(home.name), nameMeasure(away.name));
+    const foot = placeText ? (
+      <footer className="ui-game-foot">
+        <span className="ui-game-place" dir="auto">
+          {placeText}
+        </span>
+      </footer>
+    ) : null;
     const figures =
       room === undefined
         ? scored
@@ -340,14 +359,22 @@ export function GameCard({
             <Side team={home} isWinner={winner === 'home'} scored={scored} labels={labels} />
           </div>
         </div>
-        {placeText ? (
-          <footer className="ui-game-foot">
-            <span className="ui-game-place" dir="auto">
-              {placeText}
-            </span>
-          </footer>
-        ) : null}
-        {link}
+        {second === null ? (
+          <>
+            {foot}
+            {link}
+          </>
+        ) : (
+          <>
+            {link}
+            {/* The board's third part holds the place and the button together, so a list
+                that shares its cards' parts across a row still has three of them. */}
+            <div className="ui-game-end">
+              {foot}
+              {second}
+            </div>
+          </>
+        )}
       </article>
     );
   }
@@ -370,6 +397,7 @@ export function GameCard({
         <Team team={home} isWinner={winner === 'home'} labels={labels} marks={marks} />
       </ul>
       {link}
+      {second}
     </article>
   );
 }

@@ -30,7 +30,11 @@ type LinkedGame = {
   readonly awaiting?: boolean | undefined;
 };
 
-const fill = (text: string, values: Readonly<Record<string, string | number>>): string =>
+/**
+ * Puts each {name} of a message's text in, in one pass: a value put in is never read again,
+ * as braces or as a replacement pattern ($&).
+ */
+export const fill = (text: string, values: Readonly<Record<string, string | number>>): string =>
   text.replace(/\{(\w+)\}/g, (whole, name: string) =>
     Object.hasOwn(values, name) ? String(values[name]) : whole,
   );
