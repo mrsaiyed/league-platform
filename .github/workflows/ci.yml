@@ -35,9 +35,11 @@ jobs:
         if: failure()
         shell: bash
         run: node scripts/verify-failure-notes.mjs "$RUNNER_TEMP/verify-output.txt"
-  # verify's unit tests, in verify's order: node's (with its pretest) and then vitest's.
-  unit-tests:
-    name: unit tests
+  # verify's unit tests, two jobs: node's own runner (with npm's pretest) and vitest. Neither
+  # reads what the other writes (vitest's files are listed in vitest.config.ts; the pretest
+  # writes only into apps/varsity-hosted, which vitest does not read).
+  node-tests:
+    name: unit tests (node)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,11 +48,30 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - name: npm test, npm run test:units
+      - name: npm test
         shell: bash
         run: |
           set -o pipefail
-          (npm test && npm run test:units) 2>&1 | tee "$RUNNER_TEMP/verify-output.txt"
+          npm test 2>&1 | tee "$RUNNER_TEMP/verify-output.txt"
+      - name: Say what failed in verify
+        if: failure()
+        shell: bash
+        run: node scripts/verify-failure-notes.mjs "$RUNNER_TEMP/verify-output.txt"
+  vitest-tests:
+    name: unit tests (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: npm run test:units
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:units 2>&1 | tee "$RUNNER_TEMP/verify-output.txt"
       - name: Say what failed in verify
         if: failure()
         shell: bash

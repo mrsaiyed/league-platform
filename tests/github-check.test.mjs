@@ -142,7 +142,8 @@ test("a failed job's annotations are shown line by line under the failed step", 
 const job = (name, status, conclusion, steps = []) => ({ name, status, conclusion, steps });
 const passedJobs = [
   job('checks, typecheck, formatting, demo build', 'completed', 'success'),
-  job('unit tests', 'completed', 'success'),
+  job('unit tests (node)', 'completed', 'success'),
+  job('unit tests (vitest)', 'completed', 'success'),
   job('web shell check', 'completed', 'success'),
   job('tracker and demo browser checks', 'completed', 'success'),
   job('web browser tests 1 of 3', 'completed', 'success'),
