@@ -14,9 +14,13 @@ import { dayIn } from './stand-in-world-clock.ts';
 import { worldGamesStore } from './stand-in-world-games.ts';
 import { standInSchedule } from './stand-in-schedule.ts';
 import type { LeagueWorld } from './stand-in-world-state.ts';
+import { standInGameId } from './stand-in-world-seed.ts';
 import { testWorld } from './stand-in-world.test-helper.ts';
 
 const minute = 60_000;
+
+/** The first league's game played three days ago with no score (step 2.156). */
+const threeDaysAgo = '01900000-0000-7000-8000-0000b20032dc';
 
 /** A stretch of time the world is made at, every `step` minutes from `from` up to `to`. */
 type Window = { readonly name: string; readonly from: string; readonly to: string; step: number };
@@ -63,7 +67,7 @@ const momentsOf = (w: Window): Date[] => {
 };
 
 /** What is wrong with one season's schedule as the grid reads it, in words; empty when nothing. */
-function faultsOf(view: ScheduleDraftView, today: string): string[] {
+function faultsOf(view: ScheduleDraftView, today: string, current: boolean): string[] {
   const faults: string[] = [];
   const { rounds, games } = view.result;
   for (const clash of view.clashes) faults.push(`clash ${JSON.stringify(clash)}`);
@@ -73,8 +77,14 @@ function faultsOf(view: ScheduleDraftView, today: string): string[] {
   // the next round's, a week on for the last).
   const grid = buildGrid(view, [], []);
   for (const clash of grid.clashes) faults.push(`the grid lists a clash: ${clash.text}`);
+  // A game with no round is the grid's own "other games" (a make-up game, step 2.156's
+  // unscored game in the draft league): not a flag. One naming a round the season has not
+  // is.
+  const roundIds = new Set(rounds.map((r) => r.id));
   for (const game of grid.looseGames) {
-    faults.push(`game ${game.id} on ${game.date} is in no round of the season`);
+    if (game.roundId !== null && !roundIds.has(game.roundId)) {
+      faults.push(`game ${game.id} on ${game.date} names a round the season has not`);
+    }
   }
   for (const game of grid.allGames) {
     if (game.clashed) faults.push(`game ${game.id} is marked as in a clash`);
@@ -87,11 +97,14 @@ function faultsOf(view: ScheduleDraftView, today: string): string[] {
       faults.push(`finished game ${game.id} is dated after today`);
     }
   }
-  if (rounds.filter((r) => r.date === today).length !== 1) {
+  if (current && rounds.filter((r) => r.date === today).length !== 1) {
     faults.push(`not exactly one round is dated today (${today})`);
   }
   return faults;
 }
+
+/** The made-up leagues with a schedule: each is read at every moment. */
+const scheduled = ['north-valley', 'harbor-city', 'quiet-pines', 'old-meadow'];
 
 describe('the made-up schedule, at every hour: no clash and no flag in any league', () => {
   it.each(windows.map((w) => [w.name, w] as const))('%s', async (_name, window) => {
@@ -99,6 +112,7 @@ describe('the made-up schedule, at every hour: no clash and no flag in any leagu
     expect(moments.length).toBeGreaterThan(60);
     const faults: string[] = [];
     let read = 0;
+    let unread: string[] = [];
     for (const now of moments) {
       const at = now.toISOString();
       let leagues: readonly LeagueWorld[] = [];
@@ -108,26 +122,33 @@ describe('the made-up schedule, at every hour: no clash and no flag in any leagu
         (made) => (leagues = made),
       );
       const { deps } = standInSchedule(world);
+      const leaguesRead = new Set<string>();
       for (const league of leagues) {
-        const seasonId = league.currentSeasonId;
-        if (seasonId === null || !league.rounds.some((r) => r.seasonId === seasonId)) continue;
-        const where = `${at} ${league.slug}`;
-        const context = {
-          leagueId: league.leagueId,
-          accountId: standInPeople.owner.accountId,
-          requestId: 'every-hour',
-        };
-        const got = await getScheduleDraft(context, { seasonId }, deps);
-        if (!got.ok) throw new Error(`${where}: ${got.error.code}`);
-        read += 1;
-        faults.push(
-          ...faultsOf(got.value, dayIn(now, league.timeZone)).map((f) => `${where} ${f}`),
+        // Every season with rounds: the current one, an earlier one, a finished league's.
+        const seasons = league.seasons.filter((s) =>
+          league.rounds.some((r) => r.seasonId === s.id),
         );
+        for (const { id: seasonId } of seasons) {
+          const where = `${at} ${league.slug} ${seasonId}`;
+          const context = {
+            leagueId: league.leagueId,
+            accountId: standInPeople.owner.accountId,
+            requestId: 'every-hour',
+          };
+          const got = await getScheduleDraft(context, { seasonId }, deps);
+          if (!got.ok) throw new Error(`${where}: ${got.error.code}`);
+          read += 1;
+          leaguesRead.add(league.slug);
+          const today = dayIn(now, league.timeZone);
+          const current = seasonId === league.currentSeasonId;
+          faults.push(...faultsOf(got.value, today, current).map((f) => `${where} ${f}`));
+        }
+        const where = `${at} ${league.slug}`;
         const listed = await worldGamesStore(league, () => now).listWindow(
           standInPeople.scorekeeper.accountId,
           7,
         );
-        for (const game of league.games.filter((g) => g.seasonId === seasonId)) {
+        for (const game of league.games) {
           const started = game.startsAt !== null && game.startsAt <= at;
           if (['final', 'forfeit', 'live'].includes(game.status) && !started) {
             faults.push(`${where} ${game.status} game ${game.id} has not started`);
@@ -136,10 +157,29 @@ describe('the made-up schedule, at every hour: no clash and no flag in any leagu
             faults.push(`${where} the game under way ${game.id} is not on the scorekeeper's list`);
           }
         }
+        // "Needs a result" (step 2.156), by the world's clock: the game three days ago is
+        // its oldest, first, and the game under way is on it, at every hour.
+        if (league.slug === 'north-valley') {
+          const needs = await worldGamesStore(league, () => now).listNeedingResult(
+            standInPeople.owner.accountId,
+            { every: 'all', assigned: 'all' },
+            101,
+          );
+          const ids = needs.games.map((g) => g.game.id);
+          if (ids[0] !== threeDaysAgo)
+            faults.push(`${where} "Needs a result" opens with ${ids[0]}`);
+          if (!ids.includes(standInGameId(2)))
+            faults.push(`${where} the game under way needs no result`);
+        }
       }
+      unread = [
+        ...unread,
+        ...scheduled.filter((slug) => !leaguesRead.has(slug)).map((s) => `${at} ${s}`),
+      ];
     }
-    // The three made-up leagues with a schedule, at every moment.
-    expect(read).toBe(moments.length * 3);
+    // Every made-up league with a schedule, at every moment.
+    expect(unread).toEqual([]);
+    expect(read).toBeGreaterThanOrEqual(moments.length * scheduled.length);
     expect(faults).toEqual([]);
   });
 });

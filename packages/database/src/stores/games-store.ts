@@ -13,7 +13,10 @@ import {
   listDecidedGames,
   listGameLines,
   listGameRoster,
+  listEarlierRound,
+  listEarlierRounds,
   listGamesInWindow,
+  listGamesNeedingResult,
   listPostponedGames,
   listSettingValues,
   lockLiveGame,
@@ -49,5 +52,11 @@ export function gamesStore(scope: LeagueScope): GamesStore {
     assign: (gameId, accountId) => insertGameAssignment(scope, gameId, accountId),
     unassign: (gameId, accountId) => deleteGameAssignment(scope, gameId, accountId),
     listWindow: (accountId, days) => listGamesInWindow(scope, accountId, days),
+    listNeedingResult: (accountId, reach, limit) =>
+      listGamesNeedingResult(scope, accountId, reach, limit),
+    listEarlierRounds: (accountId, reach, limit) =>
+      listEarlierRounds(scope, accountId, reach, limit),
+    listEarlierRound: (accountId, reach, round, limit) =>
+      listEarlierRound(scope, accountId, reach, round, limit),
   };
 }

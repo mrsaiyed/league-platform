@@ -51,7 +51,7 @@ export function mayChangeResult(holder: AccessHolder | undefined, programId: str
 
 export function buildGameRows(
   games: readonly MyGame[],
-  names: GameNames,
+  names: Pick<GameNames, 'teams' | 'scorekeepers'>,
   holder: AccessHolder | undefined,
   reopens: ReadonlyMap<string, ReopenView> = new Map(),
 ): readonly GameRowView[] {

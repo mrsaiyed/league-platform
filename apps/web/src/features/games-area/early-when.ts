@@ -6,13 +6,16 @@
 import { gameWhenText, type LeagueTimes } from '../../server/game-when.ts';
 import type { LeagueClock } from '../../server/public-schedule.ts';
 
-/** The game's time in words while it is still to come by `clock`; undefined once it has come. */
+/** The ports' clock's moment (LeagueClock.now) in milliseconds: what the games page compares with. */
+export const nowOf = (clock: Pick<LeagueClock, 'now'>): number => Date.parse(clock.now);
+
+/** The game's time in words while it is still to come at `now` (nowOf); undefined once it has come. */
 export function earlyWhen(
   startsAt: string | null,
-  clock: Pick<LeagueClock, 'now'>,
+  now: number,
   times: LeagueTimes,
 ): string | undefined {
-  return startsAt !== null && Date.parse(startsAt) > Date.parse(clock.now)
+  return startsAt !== null && Date.parse(startsAt) > now
     ? gameWhenText(startsAt, times)
     : undefined;
 }

@@ -70,7 +70,7 @@ export async function StandingsPage({
   if (result !== undefined && !result.ok) return notFound();
   return (
     <main>
-      <PageHead title={t('standings.title')} eyebrow={season?.name} />
+      <PageHead title={t('standings.heading')} kicker={season?.name} sub={t('standings.lead')} />
       {season === undefined || result === undefined || !result.ok ? (
         <EmptyPanel text={t('standings.noSeason')} />
       ) : (

@@ -11,9 +11,32 @@ export function addDays(day: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Answers already worked out, by what was asked: each of these is the same answer every time
+ * for the same zone and moment, and working one out reads the zone's rules, which is slow
+ * when a world of hundreds of games is read or made again and again (step 2.179's kept test).
+ * Emptied when it grows large, so a long-running server never holds more than a few.
+ */
+function remembered<T>(work: (key: string) => T): (key: string) => T {
+  const known = new Map<string, T>();
+  return (key) => {
+    const found = known.get(key);
+    if (found !== undefined) return found;
+    if (known.size >= 20_000) known.clear();
+    const made = work(key);
+    known.set(key, made);
+    return made;
+  };
+}
+
+const dayAt = remembered((key) => {
+  const cut = key.indexOf('|');
+  return leagueDayIn(key.slice(0, cut), Number(key.slice(cut + 1)));
+});
+
 /** The day it is at `moment` in the league's zone, yyyy-mm-dd: core's own rule. */
 export function dayIn(moment: Date, timeZone: string): string {
-  return leagueDayIn(timeZone, moment.getTime());
+  return dayAt(`${timeZone}|${moment.getTime()}`);
 }
 
 /** One reader of the wall clock for each zone: making one is the slow part. */
@@ -34,11 +57,11 @@ const wallClockOf = (timeZone: string): Intl.DateTimeFormat => {
   return made;
 };
 
-/** The wall clock at `moment` in the zone, as if it were UTC: milliseconds. */
-function wallClockIn(moment: Date, timeZone: string): number {
+const wallClockAt = remembered((key) => {
+  const cut = key.indexOf('|');
   const parts = Object.fromEntries(
-    wallClockOf(timeZone)
-      .formatToParts(moment)
+    wallClockOf(key.slice(0, cut))
+      .formatToParts(new Date(Number(key.slice(cut + 1))))
       .map((p) => [p.type, Number(p.value)]),
   ) as Record<string, number>;
   return Date.UTC(
@@ -48,6 +71,11 @@ function wallClockIn(moment: Date, timeZone: string): number {
     parts['hour'] ?? 0,
     parts['minute'] ?? 0,
   );
+});
+
+/** The wall clock at `moment` in the zone, as if it were UTC: milliseconds. */
+function wallClockIn(moment: Date, timeZone: string): number {
+  return wallClockAt(`${timeZone}|${moment.getTime()}`);
 }
 
 /** The time it is at `moment` in the zone, HH:MM. */
@@ -55,8 +83,17 @@ export function timeIn(moment: Date, timeZone: string): string {
   return new Date(wallClockIn(moment, timeZone)).toISOString().slice(11, 16);
 }
 
+const momentAt = remembered((key) => {
+  const [timeZone = 'UTC', day = '', time = ''] = key.split('|');
+  return momentWorkedOut(day, time, timeZone);
+});
+
 /** The moment it is `time` (HH:MM) on `day` in the zone, as an ISO time. */
 export function momentIn(day: string, time: string, timeZone: string): string {
+  return momentAt(`${timeZone}|${day}|${time}`);
+}
+
+function momentWorkedOut(day: string, time: string, timeZone: string): string {
   const [y, m, d] = day.split('-').map(Number);
   const [hour, minute] = time.split(':').map(Number);
   const wanted = Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1, hour ?? 0, minute ?? 0);

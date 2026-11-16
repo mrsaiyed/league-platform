@@ -10,8 +10,16 @@
 // A table is never changed in place: each write gives it a new array (stand-in-world-rows.ts).
 import { refusedAddEventType } from '@srleagues/contracts';
 import {
+  earlierRoundsOf,
   hasPlaysPastMarker,
+  inEarlierRound,
+  inScoringReach,
+  isEarlierGame,
+  needsResult,
+  oldestFirst,
   rulesOfGame,
+  type GameInWindow,
+  type GameWithRound,
   type GameLine,
   type GamePlayer,
   type GameRecord,
@@ -74,6 +82,21 @@ const onDay = (entry: WorldRosterEntry, day: string) =>
 export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
   const assigned = (gameId: string, accountId: string) =>
     s.assignments.some((a) => a.gameId === gameId && a.accountId === accountId);
+  /** A game as the admin's lists read it; a game with no time (only a live one) is today's. */
+  const entryOf = (g: WorldGame, accountId: string, today: string): GameInWindow => ({
+    game: gameRecordOf(g),
+    programId: s.seasons.find((x) => x.id === g.seasonId)?.programId ?? '',
+    day: g.startsAt === null ? today : dayIn(new Date(g.startsAt), s.timeZone),
+    assigned: assigned(g.id, accountId),
+  });
+  const withRound = (g: WorldGame, accountId: string, today: string): GameWithRound => {
+    const round = s.rounds.find((r) => r.id === g.roundId);
+    return {
+      ...entryOf(g, accountId, today),
+      round:
+        round === undefined ? null : { id: round.id, number: round.number, label: round.label },
+    };
+  };
   const decidedOf = (seasonId: string) =>
     s.games
       .filter((g) => g.seasonId === seasonId && !g.binned && decided(g.status))
@@ -206,7 +229,8 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       );
       return true;
     },
-    // From the start of the league's today, for `days` days, in its own calendar.
+    // From the start of the league's today, for `days` days, in its own calendar, and
+    // every live game whenever it started (step 2.156), as list-games-in-window.ts.
     listWindow: async (accountId, days) => {
       const today = dayIn(now(), s.timeZone);
       const from = momentIn(today, '00:00', s.timeZone);
@@ -215,18 +239,57 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
         today,
         games: s.games
           .filter(
-            (g) => !g.binned && g.startsAt !== null && g.startsAt >= from && g.startsAt < until,
+            (g) =>
+              !g.binned &&
+              (g.status === 'live' ||
+                (g.startsAt !== null && g.startsAt >= from && g.startsAt < until)),
           )
-          .sort(
-            (a, b) =>
-              (a.startsAt ?? '').localeCompare(b.startsAt ?? '') || a.id.localeCompare(b.id),
-          )
-          .map((g) => ({
-            game: gameRecordOf(g),
-            programId: s.seasons.find((x) => x.id === g.seasonId)?.programId ?? '',
-            day: dayIn(new Date(g.startsAt ?? ''), s.timeZone),
-            assigned: assigned(g.id, accountId),
-          })),
+          .sort(oldestFirst)
+          .map((g) => entryOf(g, accountId, today)),
+      };
+    },
+    // As list-games-needing-result.ts: core's own rule, by the server's clock.
+    // The games in the person's reach first, then the cut.
+    listNeedingResult: async (accountId, reach, limit) => {
+      const today = dayIn(now(), s.timeZone);
+      return {
+        today,
+        games: s.games
+          .filter((g) => !g.binned && needsResult(g, now().getTime()))
+          .sort(oldestFirst)
+          .map((g) => entryOf(g, accountId, today))
+          .filter((entry) => inScoringReach(reach, entry))
+          .slice(0, limit),
+      };
+    },
+    // As list-earlier-rounds.ts and list-earlier-round.ts, by core's own counting.
+    // The games in the person's reach first, then the counting and the cut.
+    listEarlierRounds: async (accountId, reach, limit) => {
+      const today = dayIn(now(), s.timeZone);
+      return earlierRoundsOf(
+        s.games
+          .map((g) => withRound(g, accountId, today))
+          .filter((entry) => inScoringReach(reach, entry)),
+        today,
+        limit,
+      );
+    },
+    listEarlierRound: async (accountId, reach, round, limit) => {
+      const today = dayIn(now(), s.timeZone);
+      return {
+        today,
+        games: s.games
+          .filter((g) => {
+            const entry = withRound(g, accountId, today);
+            return (
+              isEarlierGame(entry, today) &&
+              inEarlierRound(entry, round) &&
+              inScoringReach(reach, entry)
+            );
+          })
+          .sort(oldestFirst)
+          .slice(0, limit)
+          .map((g) => entryOf(g, accountId, today)),
       };
     },
   };

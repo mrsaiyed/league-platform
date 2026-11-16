@@ -38,6 +38,14 @@ export const textVariables = {
 export const tapVariables = { '--tap': '2.75rem' } as const;
 
 /**
+ * The heavier of the product's two lines. A plain edge is 1 pixel; a line that says
+ * something (the ornament's line over a board or a table, a team's color over its card,
+ * the line under the page a visitor is on, a drawn arrow or cross) is this one. Written
+ * once here, so no stylesheet carries the number itself.
+ */
+export const lineVariables = { '--line-heavy': '2px' } as const;
+
+/**
  * What a design's spacing choice sets: the padding of a card and the gap between cards
  * (`--space`), the gap inside a card (`--space-tight`) and the gap between the sections of a
  * page (`--space-section`).

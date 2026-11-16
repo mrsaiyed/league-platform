@@ -7,7 +7,7 @@ import { standInLeagues } from '../../server/stand-in-cast.ts';
 import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts';
 import { standInGameId } from '../../server/stand-in-world-seed.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
-import { earlyWhen } from './early-when.ts';
+import { earlyWhen, nowOf } from './early-when.ts';
 
 const leagueId = standInLeagues.live.id;
 
@@ -27,7 +27,7 @@ describe('the question before a final score', () => {
     const { clock, startsAt } = await gameOneAt('2020-06-01T15:00:00Z');
     expect(Date.parse(startsAt ?? '')).toBeLessThan(Date.now());
     const times = { locale: 'en-US', timeZone: clock.timeZone };
-    expect(earlyWhen(startsAt, clock, times)).toMatch(/6:00\s?PM/);
+    expect(earlyWhen(startsAt, nowOf(clock), times)).toMatch(/6:00\s?PM/);
   });
 
   it("does not ask once the game's time has come by the ports' clock: a world far ahead", async () => {
@@ -36,6 +36,6 @@ describe('the question before a final score', () => {
     const { clock, startsAt } = await gameOneAt('2040-06-02T02:00:00Z');
     expect(Date.parse(startsAt ?? '')).toBeGreaterThan(Date.now());
     const times = { locale: 'en-US', timeZone: clock.timeZone };
-    expect(earlyWhen(startsAt, clock, times)).toBeUndefined();
+    expect(earlyWhen(startsAt, nowOf(clock), times)).toBeUndefined();
   });
 });
