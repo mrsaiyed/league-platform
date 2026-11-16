@@ -326,6 +326,24 @@ const adminPages = [
   ),
   { name: 'admin-import', at: '/admin/schedule/import' },
   { name: 'admin-season', at: '/admin/season' },
+  // Step 2.182, Season settings' first panel: the first league's season not public yet; the
+  // question before showing it and before hiding the current one; the answer after showing;
+  // and the schedule's "published" sentence for the hidden season (the page draws it from
+  // the address's `done=published` and the season as it stands, as after publishing, so
+  // taking it publishes nothing that the other pictures would then show).
+  { name: 'admin-season-hidden', at: '/admin/season?season=winter-2027', league: 'north-valley' },
+  {
+    name: 'admin-season-show-ask',
+    at: '/admin/season?season=winter-2027&ask=show#who-can-see',
+    league: 'north-valley',
+  },
+  { name: 'admin-season-hide-ask', at: '/admin/season?ask=hide#who-can-see' },
+  { name: 'admin-season-shown-done', at: '/admin/season?done=shown#who-can-see' },
+  {
+    name: 'admin-schedule-published-hidden',
+    at: '/admin/schedule?season=winter-2027&done=published',
+    league: 'north-valley',
+  },
   { name: 'admin-settings', at: '/admin/settings' },
   { name: 'admin-people', at: '/admin/people' },
   { name: 'admin-standings', at: '/admin/standings' },
