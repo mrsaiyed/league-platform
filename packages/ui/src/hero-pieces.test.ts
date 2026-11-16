@@ -1093,6 +1093,13 @@ describe('the second landing’s smaller rules', () => {
     expect(css).not.toMatch(/\[data-across='pair'\] > li:last-child:nth-child\(odd\)/);
   });
 
+  it('never stretches a board that is a list by itself across the page: about 560 wide', () => {
+    // 8 × 64 + 48 = 560, from a tablet up, in a list at the page's width or in a column.
+    expect(css).toMatch(
+      /@media \(min-width: 48rem\) \{\s*\.ui-card-grid\[data-layout='board'\]:is\(\[data-across='two'\], \[data-across='pair'\]\) > li:only-child \{\s*max-inline-size: calc\(8 \* var\(--step-8\) \+ var\(--step-7\)\);/,
+    );
+  });
+
   it('gives a table’s shield a little more than a line, and a round’s count its own line on a phone', () => {
     expect(css).toMatch(
       /\.ui-emblem\[data-size='small'\] \{\s*block-size: calc\(var\(--step-5\) \+ var\(--step-1\)\);/,

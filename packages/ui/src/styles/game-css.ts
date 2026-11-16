@@ -567,6 +567,14 @@ export const gameCss = String.raw`
     grid-column: 1 / -1;
   }
 }
+/* A board that is a list by itself is never stretched across the page: from a tablet up it
+   is held to about 560 wide, at the start of its row (three rounds of one game each were
+   three boards 1120 wide, mostly empty). */
+@media (min-width: 48rem) {
+  .ui-card-grid[data-layout='board']:is([data-across='two'], [data-across='pair']) > li:only-child {
+    max-inline-size: calc(8 * var(--step-8) + var(--step-7));
+  }
+}
 /* The cards of one row share the heights of their three parts (the top line, the middle,
    the place): a row that holds a card whose pill took a second line gives every card of
    that row the same top line, so shields, names and scores stand on one line across the
