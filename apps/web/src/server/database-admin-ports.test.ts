@@ -28,6 +28,7 @@ import {
   moveDraftGame,
   ok,
   previewSchedulePublish,
+  publicViewer,
   publishSchedule,
   removeDraftGame,
   removeDraftRound,
@@ -379,6 +380,26 @@ describe("the seasons each person is told of (mayListSeason, the schedule admin'
     expect(theirs.map((s) => s.name)).toEqual(['Spring Season']);
     expect(theirs.map((s) => s.id)).not.toContain(winterId);
   });
+
+  it('opens nothing hidden to a holder read in another league, however it is handed in', async () => {
+    // This league's owner, as read here (owner, every grant), handed in with the other
+    // league's id: the port reads what the account holds there again, which is nothing.
+    const ownerHere = await ports.accessOf(contextOf('owner'));
+    expect(ownerHere?.isOwner).toBe(true);
+    expect(await ports.scheduleAdmin.seasonsOf(otherLeagueId, ownerHere)).toEqual([]);
+    // Nor does an admin's or a scheduler's holder from here open the other league's.
+    for (const actor of ['admin', 'scheduler'] as const) {
+      const here = await ports.accessOf(contextOf(actor));
+      expect(await ports.scheduleAdmin.seasonsOf(otherLeagueId, here), actor).toEqual([]);
+    }
+    // And the other league's own admin, handed in here, is told of nothing hidden here.
+    const theirs = await ports.accessOf({
+      ...contextOf('otherLeagueAdmin'),
+      leagueId: otherLeagueId,
+    });
+    expect(theirs?.grants.length ?? 0).toBeGreaterThan(0);
+    expect(await ports.scheduleAdmin.seasonsOf(leagueId, theirs)).toEqual([]);
+  });
 });
 
 // Admin → Schedule (half 2): every command the grid sends, through scheduleAdmin.deps, on
@@ -712,7 +733,8 @@ describe('Admin → Schedule on the database ports, role by role', () => {
         ...(shown?.rounds.flatMap((r) => r.games) ?? []),
         ...(shown?.unplacedGames ?? []),
       ];
-      expect(games.length).toBeGreaterThanOrEqual(2);
+      // The very games this publication made, not only an older revision's.
+      expect(games.map((g) => g.id)).toEqual(expect.arrayContaining([s.g1, s.g2]));
       expect(shown?.rounds.map((r) => r.label)).toContain('Week 1');
     } finally {
       must(
@@ -724,6 +746,103 @@ describe('Admin → Schedule on the database ports, role by role', () => {
         ),
       );
     }
+  });
+
+  it('takes a hidden season off every public read, and puts it back when shown again', async () => {
+    // What a signed-out visitor's pages read, with the season's id and a game's already in
+    // hand (an old link): the schedule, a game's facts, the standings, and the statistics
+    // and team pages' reads (the season, its teams, the players' totals, a team's roster).
+    const gameId = (await draftNow()).published.games[0]?.id ?? '';
+    const teamId = teams[0] ?? '';
+    expect(gameId).not.toBe('');
+    const visitorReads = async () => ({
+      schedule: await ports.publicSchedule.scheduleOf(leagueId, winterId, '2026-12-01'),
+      game: await ports.publicSchedule.gameFactsOf(leagueId, winterId, gameId),
+      standings: await ports.publicStats.standingsOf(leagueId, winterId),
+      picker: (await ports.publicStats.seasonsOf(leagueId)).map((s) => s.id),
+      stats: await ports.publicStats.statisticsOf(leagueId, async ({ store, rosterOf }) => ({
+        season: await store.findSeason(winterId),
+        teams: (await store.teams(winterId)).map((t) => t.id),
+        totals: await store.playerTotals(winterId),
+        roster: await rosterOf(teamId, publicViewer(leagueId)),
+      })),
+    });
+    const setStatus = async (status: 'active' | 'draft') =>
+      must(
+        status,
+        await updateSeason(
+          contextOf('owner'),
+          { seasonId: winterId, version: (await seasonNow(winterId)).version, status },
+          ports.adminSettings.deps,
+        ),
+      );
+    const expectShown = (reads: Awaited<ReturnType<typeof visitorReads>>) => {
+      expect(reads.schedule).toBeDefined();
+      expect(reads.game).toBeDefined();
+      expect(reads.standings.ok).toBe(true);
+      expect(reads.picker).toContain(winterId);
+      expect(reads.stats.season?.id).toBe(winterId);
+      expect(reads.stats.teams).toContain(teamId);
+    };
+    try {
+      await setStatus('active');
+      expectShown(await visitorReads());
+      // "Hide it again": every read answers as for a season that does not exist.
+      await setStatus('draft');
+      const hidden = await visitorReads();
+      expect(hidden.schedule).toBeUndefined();
+      expect(hidden.game).toBeUndefined();
+      expect(hidden.standings).toEqual({ ok: false, error: { code: 'season-not-found' } });
+      expect(hidden.picker).not.toContain(winterId);
+      expect(hidden.stats.season).toBeUndefined();
+      expect(hidden.stats.teams).toEqual([]);
+      expect(hidden.stats.totals).toEqual([]);
+      expect(hidden.stats.roster).toEqual({ lines: [] });
+      // Shown again: each answers again.
+      await setStatus('active');
+      expectShown(await visitorReads());
+    } finally {
+      if ((await seasonNow(winterId)).status !== 'draft') await setStatus('draft');
+    }
+  });
+
+  it('keeps each program-limited scheduler to its own program’s seasons', async () => {
+    // The scheduler of the default program, on the camp program's season: refused, and
+    // nothing is started there.
+    const campView = async () =>
+      must(
+        'camp schedule',
+        await getScheduleDraft(
+          contextOf('owner'),
+          { seasonId: campSeasonId },
+          ports.scheduleAdmin.deps,
+        ),
+      );
+    const before = await campView();
+    const firstEdit = {
+      seasonId: campSeasonId,
+      basedOnRevision: before.latestRevision,
+      version: before.draft?.version ?? null,
+      draftId: before.draft?.id ?? null,
+    };
+    const round = { roundId: randomUUID(), label: 'Camp week 1', date: '2027-07-05' };
+    const refused = await addDraftRound(
+      contextOf('programScheduler'),
+      { ...firstEdit, ...round },
+      ports.scheduleAdmin.deps,
+    );
+    expect(refused).toEqual({ ok: false, error: { code: 'not-allowed' } });
+    expect((await campView()).draft).toEqual(before.draft);
+    // The camp's own scheduler, on it: done.
+    const done = await addDraftRound(
+      contextOf('otherProgramScheduler'),
+      { ...firstEdit, ...round },
+      ports.scheduleAdmin.deps,
+    );
+    expect(done).toMatchObject({ ok: true });
+    const after = await campView();
+    expect(after.draft?.changeCount).toBe((before.draft?.changeCount ?? 0) + 1);
+    expect(after.result.rounds.map((r) => r.label)).toContain('Camp week 1');
   });
 
   it("finds no draft of another league's season, even for that league's owner", async () => {
