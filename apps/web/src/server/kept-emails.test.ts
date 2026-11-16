@@ -14,6 +14,7 @@ import {
   keptEmailsShown,
   readKeptEmails,
 } from './kept-emails.ts';
+import { t } from './messages.ts';
 
 const origin = 'http://127.0.0.1:3000';
 const scratch = () => mkdtempSync(path.join(os.tmpdir(), 'kept-emails-'));
@@ -51,6 +52,25 @@ describe('isMadeUpAddress', () => {
     ]) {
       expect(isMadeUpAddress(address), address).toBe(false);
     }
+  });
+});
+
+// Review of step 2.96, L7: the page names every kind of address it keeps, and no other.
+describe('the kept emails page’s words', () => {
+  it('name exactly the made-up addresses isMadeUpAddress keeps', () => {
+    const intro = t('standIn.keptEmails.intro');
+    const endings = [...intro.matchAll(/(?<![\w.])\.(test|example|invalid|localhost)\b/g)].map(
+      (m) => `.${m[1]}`,
+    );
+    const names = [...intro.matchAll(/\bexample\.(com|net|org)\b/g)].map((m) => m[0]);
+    expect(endings).toEqual(['.test', '.example', '.invalid', '.localhost']);
+    expect(names).toEqual(['example.com', 'example.net', 'example.org']);
+    for (const ending of endings) expect(isMadeUpAddress(`a@b${ending}`), ending).toBe(true);
+    for (const name of names) {
+      expect(isMadeUpAddress(`a@${name}`), name).toBe(true);
+      expect(isMadeUpAddress(`a@mail.${name}`), name).toBe(true);
+    }
+    expect(intro).toContain('a name under them');
   });
 });
 

@@ -127,7 +127,7 @@ export const enSite = {
   'standIn.keptEmails.code': 'Its code',
   'standIn.keptEmails.empty': 'No email has been kept yet.',
   'standIn.keptEmails.intro':
-    'The emails the made-up data sent on this computer, newest first. None of them left it. Only emails to made-up addresses (ending in .test, or at example.com) are kept here.',
+    'The emails the made-up data sent on this computer, newest first. None of them left it. Only emails to made-up addresses are kept here: those ending in .test, .example, .invalid or .localhost, or at example.com, example.net or example.org or a name under them.',
   'standIn.keptEmails.keptAt': 'Kept {when}',
   'standIn.keptEmails.title': 'Emails kept on this computer',
   'standIn.keptEmails.to': 'To {address}',
