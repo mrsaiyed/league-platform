@@ -1,9 +1,8 @@
 // What the admin's Teams screens need from outside (step 2.51): the commands' own
 // transaction (the real teams and people commands run on it) and the few reads that
 // no command offers yet: the season being worked on, its divisions and its teams.
-// container.ts chooses the adapter; today only the local stand-in
-// (stand-in-admin-teams.ts) fills it, because the database's list of a season's teams
-// is not wired to the web app yet.
+// container.ts chooses the adapter: the local stand-in (stand-in-admin-teams.ts) or the
+// database (database-admin-teams.ts, step 2.93 part 5).
 import type { CommandDeps, PeopleTx, TeamRecord, TeamsTx } from '@srleagues/core';
 
 /** The transaction the Teams screens' commands run in: the teams and people stores. */

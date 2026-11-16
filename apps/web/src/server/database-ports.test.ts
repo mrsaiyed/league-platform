@@ -361,7 +361,8 @@ describe('databasePorts (record 055)', () => {
   }, 120_000);
 
   it('refuses each area not yet on the database when it is reached, not before', async () => {
-    const areas = [ports.games, ports.fixtureImport, ports.adminTeams, ports.tracker];
+    // Admin → Teams moved in part 5 (database-admin-teams.test.ts).
+    const areas = [ports.games, ports.fixtureImport, ports.tracker];
     for (const area of areas) {
       expect(await Promise.resolve(area)).toBe(area);
       expect(() => Reflect.get(area, 'deps')).toThrow(NotOnTheDatabaseYet);

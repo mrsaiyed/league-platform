@@ -12,7 +12,8 @@
 // member's teams and each league's name (database-league-sites.ts); in part 4 League
 // settings and Season settings (database-admin-settings.ts) and Admin → Schedule, the
 // grid with its drafts, rounds and publishing and its list of seasons
-// (database-schedule-admin.ts). Every other area
+// (database-schedule-admin.ts); in part 5 Admin → Teams, its teams, rosters and the league
+// list of people (database-admin-teams.ts). Every other area
 // still runs on the stand-in only: here each one refuses with NotOnTheDatabaseYet
 // the first time it is used, so its page shows the error page rather than made-up
 // data that is not in the database. Each moves in a part of its own.
@@ -34,6 +35,7 @@ import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
 import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
+import { databaseAdminTeams, type AdminTeamsQueries } from './database-admin-teams.ts';
 import {
   databaseLeagueSites,
   type DesignReport,
@@ -67,6 +69,7 @@ export type DatabaseQueries = Pick<
   | 'jobsStore'
 > &
   AdminSettingsQueries &
+  AdminTeamsQueries &
   PublicScheduleQueries &
   PublicStatsQueries &
   PublicTeamsQueries &
@@ -234,7 +237,8 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // league it lists (part 4).
     scheduleAdmin: databaseScheduleAdmin(database, db, options.log, accessOf),
     publicTeams: databasePublicTeams(database, db),
-    adminTeams: notMovedYet('Admin → Teams'),
+    // Its commands run with core's event handlers, never an empty list (part 5).
+    adminTeams: databaseAdminTeams(database, db, options.log),
     adminSettings: databaseAdminSettings(database, db, options.log),
     tracker: notMovedYet('tracker'),
     publishPlays: async () => {

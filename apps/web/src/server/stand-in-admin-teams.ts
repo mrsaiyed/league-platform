@@ -6,7 +6,8 @@
 // import and the tracker. Every rule (who may change what, a number worn twice, a person
 // still on a roster) is the product's own: only the storage is made up.
 //
-// Gone when the database-backed list of a season's teams is wired to the web app.
+// The database's are database-admin-teams.ts (step 2.93 part 5); this one stays for the
+// made-up world.
 import type { AdminTeamsPorts } from './admin-teams.ts';
 import type { World } from './stand-in-world.ts';
 
