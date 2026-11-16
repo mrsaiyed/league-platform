@@ -375,6 +375,7 @@ All dated November 12, 2026.
 | T-272                 | T-41: ids sort by creation time (0002: in order on one connection)           | Agreed (delegated): on one connection each id sorts after every id it made before (a memory of the session); none across connections (rec. 068) | Step 2.151: PGlite ticks in whole ms, so ids of one ms sorted either way; tests failed by chance   |
 | T-273                 | New                                                                          | On the database, the public schedule and standings move first; statistics refuse until part 3; local seasons under way (rec. 069)               | Step 2.93 part 2: one port serves both the standings and the statistics, and the seed had no games |
 | T-275                 | New                                                                          | Page titles and other page metadata are never streamed: every page has its title in the head of its first bytes (rec. 071)                      | Step 2.175: a page could arrive with its content before its title; browser checks met it untitled  |
+| T-276                 | New                                                                          | Agreed (delegated): browser tests are their own files; decision rows wait in a file each until landing; messages by area (rec. 072)             | Step 2.188: 74 of 193 catch-up merges of lanes collided, nearly all in a few shared lists          |
 
 ## The full list
 
@@ -956,6 +957,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-199 | An AI assistant never marks a product or business decision agreed; the technical decisions are delegated to the technical lead                                     | Changed (delegated) |         |
 | T-200 | Help articles are written with the feature, as part of "done" (T-184), not afterwards                                                                              | Agreed (delegated)  |         |
 | T-201 | AI assistants work only on made-up data and never touch production                                                                                                 | Agreed (delegated)  |         |
+| T-276 | Shared lists are kept so lanes do not collide: browser tests are their own files, decision rows wait in a file each until landing, messages by area (record 072)   | Agreed (delegated)  |         |
 
 ### [T10 — Build order](technical/T10-build-order.md)
 
