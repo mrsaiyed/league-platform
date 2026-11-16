@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode }
 import './court.css';
 import type { CourtBanner } from './court-view.tsx';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
+import { createFetchGameDoors } from './fetch-game-doors.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
 import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.ts';
@@ -141,6 +142,8 @@ export function TrackerOpening({
         }),
         transport: createFetchCommandTransport({ leagueId, gameId }),
         server: createFetchTrackerServer({ leagueId, gameId }),
+        // Reopen and Mark not started are requests of their own, not taps (step 2.37).
+        doors: createFetchGameDoors({ leagueId, gameId }),
         newDeviceId: () => globalThis.crypto.randomUUID(),
         onStoreFailed: () => setStoreFailed(true),
       });
