@@ -26,10 +26,16 @@ import * as database from '@srleagues/database';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { HomeLeaders } from '../features/schedule-pages/home-leaders.tsx';
 import { homeLeadersOf } from '../features/stats-pages/build-home-leaders.ts';
 import { loadStatsPage } from '../features/stats-pages/build-stats.ts';
 import { StatsTables } from '../features/stats-pages/stats-page.tsx';
-import { loadTeamCards, loadTeamHead, loadTeamStats } from '../features/team-pages/build-team.ts';
+import {
+  buildRoster,
+  loadTeamCards,
+  loadTeamHead,
+  loadTeamStats,
+} from '../features/team-pages/build-team.ts';
 import { databasePublicStats } from './database-public-stats.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 
@@ -122,10 +128,18 @@ async function pagesOf(slug: string) {
     fromPorts: [table.value, leaders, ...teamPages.map((p) => p.roster)] as unknown[],
     pageData: [
       statsPage,
+      leaders,
       cards,
-      ...teamPages.map(({ head, teamStats }) => ({ head, teamStats })),
-      // The statistics page as it is sent.
+      ...teamPages.map(({ head, teamStats, roster }) => ({
+        head,
+        teamStats,
+        roster: buildRoster(roster),
+      })),
+      // The statistics page and the home page's leaders as they are sent.
       renderToStaticMarkup(createElement(StatsTables, { data: statsPage })),
+      renderToStaticMarkup(
+        createElement(HomeLeaders, { leaders, placing: 'across', statsHref: '/stats' }),
+      ),
     ] as unknown[],
     /** Each player as the statistics page shows them, by points (10, 14, 18 in seed order). */
     byPoints: new Map(
@@ -137,6 +151,31 @@ async function pagesOf(slug: string) {
     leaderNames: leaders.map((l) => l.name),
   };
 }
+
+/**
+ * Every person of the league as its owner's list holds them (people not in the bin), read
+ * once through the people module's own store and kept, so a person moved to the bin later
+ * is still looked for. No public page may hold any of their ids (T-81, record 070).
+ */
+const peopleKept = new Map<string, readonly { id: string; firstName: string }[]>();
+async function peopleOf(slug: string) {
+  const known = peopleKept.get(slug);
+  if (known !== undefined) return known;
+  const { leagueId, ownerAccountId } = leagueOf(slug);
+  const people = await peopleDeps.transaction(
+    { leagueId, accountId: ownerAccountId, requestId: 'scan' },
+    (tx) => tx.people.list({ limit: 1000, offset: 0, sensitive: false }),
+  );
+  const kept = people.map((p) => ({ id: p.id, firstName: p.firstName }));
+  peopleKept.set(slug, kept);
+  return kept;
+}
+
+/** The person ids found in a page's data or its HTML, in any capitals. */
+const personIdsIn = (data: unknown, ids: readonly string[]) => {
+  const text = (typeof data === 'string' ? data : JSON.stringify(data)).toLowerCase();
+  return ids.filter((id) => text.includes(id.toLowerCase()));
+};
 
 /** Saves a league setting as its owner, through the settings command (League settings). */
 const versions = new Map<string, number>();
@@ -242,6 +281,11 @@ async function scan(
     );
     expect(findings.filter((f) => !tableWords.includes(f))).toEqual([]);
   }
+  // No person's database id in any page's data or HTML: a saved copy would name a player
+  // hidden later on their nameless line, and the id carries when the record was made.
+  const ids = (await peopleOf(slug)).map((p) => p.id);
+  expect(ids.length).toBe(seed.people.length);
+  for (const response of pages.pageData) expect(personIdsIn(response, ids)).toEqual([]);
   return privateValues;
 }
 
@@ -259,6 +303,12 @@ describe('the T-81 scan through the database-backed ports', () => {
           [],
         );
       }
+      // And it finds a person's id, as a row key or anywhere in a page's text.
+      const [someone] = await peopleOf(slug);
+      if (someone === undefined) throw new Error(`${slug} has no people`);
+      expect(personIdsIn({ rows: [{ id: someone.id.toUpperCase() }] }, [someone.id])).toEqual([
+        someone.id,
+      ]);
       await save(slug, 'privacy.childrenInFullConfirmed', true, true);
       await scan(slug, 'fullConfirmed', {});
       await save(slug, 'privacy.publicNames', 'firstNameLastInitial');
@@ -282,14 +332,11 @@ describe('the T-81 scan through the database-backed ports', () => {
     const { leagueId, ownerAccountId, seed } = leagueOf('maple-street');
     const first = seed.people[0];
     if (first === undefined) throw new Error('no person');
-    // The person's id, as the statistics page holds it (its row id).
-    const [season] = await stats.seasonsOf(leagueId);
-    const page = await stats.statisticsOf(leagueId, ({ store, settings }) =>
-      loadStatsPage(store, settings, { leagueId, seasonId: season?.id ?? '', by: 'total' }),
-    );
-    if ('code' in page) throw new Error(page.code);
-    const personId = page.playerRows.find((row) => Number(row.cells['points']) === 10)?.id;
-    if (personId === undefined) throw new Error('no player with 10 points');
+    // The person's id, from the owner's own list of people (no public page holds it).
+    const personId = (await peopleOf('maple-street')).find(
+      (p) => p.firstName === first.firstName,
+    )?.id;
+    if (personId === undefined) throw new Error(`no ${first.firstName}`);
     const asked = await setNameRequest(
       { leagueId, accountId: ownerAccountId, requestId: 'scan' },
       { personId, version: 1, showAs: 'removed', reason: 'guardianAsked' },

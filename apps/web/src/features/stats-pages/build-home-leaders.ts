@@ -124,11 +124,12 @@ async function readHomeLeaders(
       // A leader with nothing to their name yet is no leader.
       .filter((leader) => leader.value > 0)
       .slice(0, homeLeaderLimit)
-      .map((leader) => {
+      .map((leader, index) => {
         const theirs = leader.teamIds.flatMap((id) => teams.get(id) ?? []);
         const only = theirs.length === 1 ? theirs[0] : undefined;
         return {
-          id: leader.personId,
+          // A place on this page only: a person's id does not go into the page.
+          id: `leader-${index}`,
           // The leader's rank, as the statistics page gives it: players who are level
           // share a place (01, 01, 03), they are not numbered by where they happen to stand.
           label: t('home.leaders.label', { place: String(leader.rank).padStart(2, '0'), stat }),
