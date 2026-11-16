@@ -1297,7 +1297,10 @@ if (browser) {
         await page.keyboard.press('Tab');
         const buttons = page.locator('main table .ui-sort-button');
         const table = buttons.first().locator('xpath=ancestor::table');
-        const own = table.locator('.ui-sort-button');
+        // Only the headings that are drawn: on a phone the players' table folds its team
+        // column into the name's (step 2.147 part 3), and that column's button is not there
+        // to be reached. The button after the column that stays put is then "GP".
+        const own = table.locator('.ui-sort-button:visible');
         await own.last().focus();
         for (let i = (await own.count()) - 1; i > 1; i -= 1) await page.keyboard.press('Shift+Tab');
         const reached = await table.evaluate((el) => {
