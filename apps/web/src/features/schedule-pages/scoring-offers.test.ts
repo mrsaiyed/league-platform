@@ -115,6 +115,54 @@ describe('the page’s one reader of its scoring buttons', () => {
     expect(told).toBe(0);
   });
 
+  it('keeps what it read for one view only: once every list has gone, it asks again', async () => {
+    // Signed in, then signed out: the second view's read answers no games.
+    let signedIn = true;
+    const { read, asks } = reader((asked) => (signedIn ? scoreS(asked) : { games: [] }));
+    const queue = laterQueue();
+    const shared = sharedScoringOffers(read, queue.later);
+    let first: PageOffers | undefined;
+    const stops = [
+      shared.ask(address, ['s1'], (known) => (first = known)),
+      shared.ask(address, ['s2'], () => {}),
+    ];
+    await queue.settle();
+    expect(ids(first)).toEqual(['s1', 's2']);
+    // One list goes: the view is still there, and a list that comes is given what it knows.
+    stops[0]?.();
+    let still: PageOffers | undefined;
+    const stopStill = shared.ask(address, ['s1'], (known) => (still = known));
+    expect(ids(still)).toEqual(['s1', 's2']);
+    expect(asks).toHaveLength(1);
+    // Every list goes (another page, or Back after signing out), and the page comes again.
+    stops[1]?.();
+    stopStill();
+    signedIn = false;
+    let again: PageOffers | undefined;
+    shared.ask(address, ['s1', 's2'], (known) => (again = known));
+    expect(again).toBeUndefined();
+    await queue.settle();
+    expect(asks).toEqual([
+      ['s1', 's2'],
+      ['s1', 's2'],
+    ]);
+    expect(again).toBeUndefined();
+  });
+
+  it('hands nothing to a view from a read made for the view before it', async () => {
+    const { read } = reader();
+    const queue = laterQueue();
+    const shared = sharedScoringOffers(read, queue.later);
+    let before = 0;
+    const stop = shared.ask(address, ['s1'], () => (before += 1));
+    stop();
+    let after: PageOffers | undefined;
+    shared.ask(address, ['x9'], (known) => (after = known));
+    await queue.settle();
+    expect(before).toBe(0);
+    expect(after).toBeUndefined();
+  });
+
   it('takes only an answer it understands, leading only to this site', () => {
     const offer = { gameId: 'g', kind: 'score' };
     expect(scoringOfferReply.safeParse({ games: [{ ...offer, href: '/a/score/g' }] }).success).toBe(

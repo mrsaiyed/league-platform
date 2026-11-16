@@ -43,6 +43,7 @@ const step = async (name, run) => {
 
 const phone = { width: 390, height: 844 };
 const scorekeeper = { email: 'scorekeeper@example.test', password: 'made-up scorekeeper password' };
+const coach = { email: 'coach@example.test', password: 'made-up coach password' };
 // The made-up people known by their session cookie alone (stand-in-cast.ts).
 const tokens = {
   scorekeeper: 'local-scorekeeper-token',
@@ -160,6 +161,23 @@ async function readOfPage(page, expected = true) {
     note(`the page reads its buttons after it arrives: ${pathOf(page)}`, answer !== null);
   await page.waitForTimeout(400);
   return answer;
+}
+/**
+ * Signs `who` in from the account menu of the league page the phone is on, back on that
+ * page, and waits for its read of the buttons.
+ */
+async function signInFromMenu(page, who) {
+  const back = pathOf(page);
+  await openMenu(page);
+  await link(page, 'Sign in or create an account').click();
+  await page.getByLabel('Email').fill(who.email);
+  await page.getByLabel('Password').fill(who.password);
+  const read = readOfPage(page);
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === back),
+    page.getByRole('button', { name: 'Sign in', exact: true }).click(),
+  ]);
+  return read;
 }
 /** Goes to `path` by an address (only where a journey starts) and waits for its read. */
 async function open(page, path, expected = true) {
@@ -337,6 +355,66 @@ if (browser) {
         await accessible(page, "a game's page with the button");
         await noSidewaysScroll(page, "a game's page with the button");
         await tallEnough(page, "a game's page");
+      } finally {
+        await context.close();
+      }
+    },
+  );
+
+  await step(
+    'after signing out, no button is left behind, and the next person sees none',
+    async () => {
+      const { context, page } = await fresh();
+      const offersNow = () => page.locator('main [data-offer]').count();
+      try {
+        // The scorekeeper signs in on a shared phone and sees the buttons.
+        await page.goto(`${origin}/north-valley`);
+        await signInFromMenu(page, scorekeeper);
+        await offersDrawn(page);
+        note('the scorekeeper sees "Score this game" before signing out', (await offersNow()) > 0);
+
+        // Signs out with the account menu.
+        await openMenu(page);
+        await Promise.all([
+          page.waitForURL((url) => url.pathname === '/signin'),
+          page.locator('.site-header .site-account-sign-out').click(),
+        ]);
+
+        // Back to the league home they were on: asked again, as nobody, and no button.
+        const backRead = readOfPage(page, false);
+        await page.goBack();
+        await page.waitForURL((url) => url.pathname === '/north-valley');
+        const back = await backRead;
+        const backBody = back === null ? null : await back.json().catch(() => null);
+        note(
+          'after Back, the page asked again and was told of no games (or did not need to ask)',
+          back === null || (Array.isArray(backBody?.games) && backBody.games.length === 0),
+          JSON.stringify(backBody),
+        );
+        note('after signing out and going Back, no card has a button', (await offersNow()) === 0);
+
+        // The league's home by its link, in the same document.
+        const homeRead = readOfPage(page, false);
+        await page.locator('.site-header a.site-name').click();
+        await page.waitForURL((url) => url.pathname === '/north-valley');
+        await homeRead;
+        note(
+          "after signing out, the league's home by its link has no button",
+          (await offersNow()) === 0,
+        );
+
+        // The next person, a coach, signs in on the same phone: no button anywhere.
+        await signInFromMenu(page, coach);
+        note('a coach signed in after the scorekeeper sees no button', (await offersNow()) === 0);
+        const scheduleRead = readOfPage(page);
+        await openMenu(page);
+        await link(page.locator('.site-header'), 'Schedule').first().click();
+        await page.waitForURL((url) => url.pathname === '/north-valley/schedule');
+        await scheduleRead;
+        note(
+          "the coach's schedule after the scorekeeper's has no button",
+          (await offersNow()) === 0,
+        );
       } finally {
         await context.close();
       }

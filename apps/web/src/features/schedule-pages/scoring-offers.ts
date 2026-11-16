@@ -4,8 +4,11 @@
 // buttons are never part of the page, which is the same for everyone who opens it (T5 §4):
 // not their words, not where they lead. Every list of games on a page asks through the one
 // shared reader, so a page makes one request (one per hundred games), a game asked by two
-// lists is read once, and a game a list asks about later is read then. A read that fails
-// leaves the page as it came, with no buttons; nothing on it waits for this.
+// lists is read once, and a game a list asks about later is read then. What it read lasts
+// one view of the page only: once the page's last list has gone, it is dropped, so a page
+// shown again (after Back, after signing out, by its link) asks again for whoever is signed
+// in then. A read that fails leaves the page as it came, with no buttons; nothing on it
+// waits for this.
 import { z } from 'zod';
 
 /** Where a button leads: an address on this site, never another's. */
@@ -84,6 +87,8 @@ export function sharedScoringOffers(
     place.waiting.clear();
     let learned = false;
     for (let at = 0; at < ids.length; at += offersAskedAtOnce) {
+      // Every list of this view has gone: nobody is left to read for.
+      if (places.get(address) !== place) return;
       const reply = await read(address, ids.slice(at, at + offersAskedAtOnce)).catch(() => null);
       if (reply === null) continue;
       for (const offer of reply.games) place.offers.set(offer.gameId, offer);
@@ -120,7 +125,13 @@ export function sharedScoringOffers(
         mine.planned = true;
         later(() => void readWaiting(address, mine));
       }
-      return () => void mine.listeners.delete(listener);
+      return () => {
+        mine.listeners.delete(listener);
+        // The last list of this view has gone (another page, or the same page shown again,
+        // after Back or a sign-out): what was read goes with it, so the next view asks
+        // afresh, as whoever is signed in then, and is never handed offers read for another.
+        if (mine.listeners.size === 0 && places.get(address) === mine) places.delete(address);
+      };
     },
   };
 }
