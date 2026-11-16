@@ -190,6 +190,11 @@ export const enError = {
   'error.teams.put_back_on_roster.person-not-found':
     'This person has been taken off the league list, so they cannot be put back on the roster.',
   'error.teams.put_back_on_roster.roster-entry-not-found': 'That roster entry is not there.',
+  // A-17: the team's own page says these with its name and how many (adminTeams.remove.has…).
+  'error.teams.remove_team.team-has-games-to-play':
+    'This team still has games to play. Remove them from the schedule, or record them as forfeited or cancelled, first.',
+  'error.teams.remove_team.team-has-results':
+    'This team has results that are part of other teams’ records, so it stays. If the team has left, record its games to come as forfeited; it keeps the games it played.',
   'error.teams.remove_team.team-not-found': 'That team is not there.',
   'error.teams.reorder_roster.roster-entry-not-found':
     'Someone on that list is not on this roster.',

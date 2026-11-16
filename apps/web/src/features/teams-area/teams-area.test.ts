@@ -10,8 +10,10 @@ import {
   leavingAtOf,
   problemKey,
   refused,
+  removeRefusalOf,
   done,
 } from './answer.ts';
+import { gamesLine, refusalWords } from './remove-team-words.ts';
 import {
   changeEntryInput,
   changeTeamInput,
@@ -256,6 +258,54 @@ describe('answers in the address', () => {
     );
   });
 
+  it('says what a team has of games before it is removed (A-17)', () => {
+    expect(gamesLine('Badgers', { played: 4, toPlay: 3 })).toBe(
+      'Badgers have played 4 games and have 3 still to play.',
+    );
+    expect(gamesLine('Badgers', { played: 1, toPlay: 0 })).toBe(
+      'Badgers have played 1 game and have none still to play.',
+    );
+    expect(gamesLine('Wrens', { played: 0, toPlay: 3 })).toBe(
+      'Wrens have played no games and have 3 still to play.',
+    );
+    expect(gamesLine('Wrens', { played: 0, toPlay: 0 })).toBe(
+      'Wrens have played no games and have none to play.',
+    );
+    expect(gamesLine('Wrens', undefined)).toContain('could not be read just now');
+  });
+
+  it('says a refused removal in the panel, with the count and the way on (A-17)', () => {
+    const address = answerQuery(refused('teams.remove_team', 'team-has-games-to-play'));
+    expect(address).toBe('?problem=teams.remove_team.team-has-games-to-play#remove-team');
+    expect(removeRefusalOf({ problem: 'teams.remove_team.team-has-results' })).toBe(
+      'team-has-results',
+    );
+    expect(removeRefusalOf({ problem: 'teams.mark_left.already-left' })).toBeUndefined();
+    expect(removeRefusalOf({})).toBeUndefined();
+
+    expect(refusalWords('Wrens', 'team-has-games-to-play', { played: 0, toPlay: 3 })).toEqual({
+      text: 'Wrens still have 3 games to play. Remove them from the schedule, or record them as forfeited or cancelled, first.',
+      wayOn: 'schedule',
+    });
+    expect(refusalWords('Badgers', 'team-has-results', { played: 4, toPlay: 3 })).toEqual({
+      text: 'Badgers have results in 4 games. Those results are part of other teams’ records, so the team stays. If the team has left, record its games to come as forfeited; it keeps the games it played.',
+      wayOn: 'games',
+    });
+    expect(refusalWords('Badgers', 'team-has-results', { played: 1, toPlay: 0 })).toMatchObject({
+      text: expect.stringMatching(/^Badgers have a result in 1 game\. That result is/),
+      wayOn: null,
+    });
+    // Counts that have since gone, and other refusals, in their general words.
+    expect(refusalWords('Wrens', 'team-has-games-to-play', { played: 0, toPlay: 0 })).toEqual({
+      text: t('error.teams.remove_team.team-has-games-to-play'),
+      wayOn: null,
+    });
+    expect(refusalWords('Wrens', 'not-confirmed', undefined)).toEqual({
+      text: 'Tick the box to confirm first. Nothing was changed.',
+      wayOn: null,
+    });
+  });
+
   it('carries a refusal and picks the command’s own words, then the code’s, then a general one', () => {
     expect(answerQuery(refused('people.remove_person', 'person-on-a-roster'))).toBe(
       '?problem=people.remove_person.person-on-a-roster',
@@ -292,6 +342,9 @@ describe('answers in the address', () => {
       ['teams.put_back_on_roster', 'already-on-team'],
       ['teams.put_back_on_roster', 'jersey-taken'],
       ['teams.put_back_on_roster', 'roster-entry-not-found'],
+      ['teams.remove_team', 'team-has-games-to-play'],
+      ['teams.remove_team', 'team-has-results'],
+      ['teams.remove_team', 'not-confirmed'],
     ];
     for (const [command, code] of codes) {
       const key = problemKey({ problem: `${command}.${code}` });

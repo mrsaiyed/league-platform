@@ -64,8 +64,27 @@ export const enAdminTeams = {
   // A person's name as the Teams screens show it; a language may put the parts the other way.
   'adminTeams.personName': '{firstName} {lastName}',
   // Until step 2.77 gives the bin a screen, nothing here promises a way back (step 2.161).
+  // A-17: only a team that has played no games and has none to play goes to the bin.
   'adminTeams.remove.body':
-    'The team is moved to the bin. Its games and numbers are kept. It is kept for 30 days; the screen to bring it back is not ready yet.',
+    'A team with no games, played or to play, can be moved to the bin. It is kept for 30 days; the screen to bring it back is not ready yet.',
+  // "{played}" is adminTeams.remove.gamesCount: "Badgers have played 4 games and have 3 still to play."
+  'adminTeams.remove.games': '{name} have played {played} and have {toPlay} still to play.',
+  'adminTeams.remove.gamesCount_one': '{count} game',
+  'adminTeams.remove.gamesCount_other': '{count} games',
+  'adminTeams.remove.gamesNone': '{name} have played no games and have none to play.',
+  'adminTeams.remove.gamesNoneToPlay': '{name} have played {played} and have none still to play.',
+  'adminTeams.remove.gamesNotPlayed':
+    '{name} have played no games and have {toPlay} still to play.',
+  'adminTeams.remove.gamesUnknown':
+    'How many games the team has could not be read just now. Reload the page to try again.',
+  'adminTeams.remove.hasGamesToPlay_one':
+    '{name} still have {count} game to play. Remove it from the schedule, or record it as forfeited or cancelled, first.',
+  'adminTeams.remove.hasGamesToPlay_other':
+    '{name} still have {count} games to play. Remove them from the schedule, or record them as forfeited or cancelled, first.',
+  'adminTeams.remove.hasResults_one':
+    '{name} have a result in {count} game. That result is part of other teams’ records, so the team stays. If the team has left, record its games to come as forfeited; it keeps the games it played.',
+  'adminTeams.remove.hasResults_other':
+    '{name} have results in {count} games. Those results are part of other teams’ records, so the team stays. If the team has left, record its games to come as forfeited; it keeps the games it played.',
   'adminTeams.remove.rosterNone': 'Nobody is on its roster now.',
   'adminTeams.remove.rosterUnknown':
     'The roster could not be read just now, so how many people are on it is not shown.',
@@ -75,6 +94,8 @@ export const enAdminTeams = {
     '{count} people are on its roster now. Once the team is removed, they can be taken off the league list.',
   'adminTeams.remove.submit': 'Move the team to the bin',
   'adminTeams.remove.title': 'Remove this team',
+  'adminTeams.remove.toGames': 'Go to Games',
+  'adminTeams.remove.toSchedule': 'Go to Schedule',
   'adminTeams.roster.backAlready':
     'They are on this roster again, so there is nothing to put back.',
   'adminTeams.roster.leftLine': '{name}, left on {date}',

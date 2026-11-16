@@ -3,6 +3,7 @@
 // as having left (R-17: they stay in the team's history), and put back when that was a
 // mistake (step 2.161). Every change is a plain form.
 import {
+  countTeamGames,
   leagueUrl,
   listPeople,
   listRoster,
@@ -18,7 +19,15 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { StaffField, StaffNotice, StaffTrail } from '../staff/index.ts';
 import { leagueDayText } from '../../server/game-when.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
-import { doneAtOf, entryAnchor, leavingAtOf, problemKey } from './answer.ts';
+import {
+  doneAtOf,
+  entryAnchor,
+  leavingAtOf,
+  problemKey,
+  removeRefusalOf,
+  removeTeamAnchor,
+} from './answer.ts';
+import { gamesLine, refusalWords } from './remove-team-words.ts';
 import { putBackOffer } from './put-back-offer.ts';
 import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
@@ -107,6 +116,14 @@ export async function TeamPage({
   const leavingProblem = besideEntry === undefined ? undefined : problemKey(query);
   // What went well on one line is said on that line, naming the player (step 2.161).
   const onLine = saidOnLine(doneAtOf(query), lines, team.name);
+  // What the team has of games, and why "Remove this team" was refused, said in its panel (A-17).
+  const counted = await countTeamGames(context, { teamId: team.id }, ports.deps);
+  const games = counted.ok ? counted.value : undefined;
+  const removeCode = removeRefusalOf(query);
+  const removeRefused =
+    removeCode === undefined
+      ? undefined
+      : { code: removeCode, ...refusalWords(team.name, removeCode, games) };
   const saidHere = (entryId: string) =>
     onLine?.entry !== entryId ? null : (
       <StaffNotice kind="saved" data={{ 'data-said-on': entryId }}>
@@ -124,7 +141,12 @@ export async function TeamPage({
           {t('adminTeams.add.title')}
         </a>
       </PageHead>
-      <Notice query={query} saidBeside={leavingProblem !== undefined || onLine !== undefined} />
+      <Notice
+        query={query}
+        saidBeside={
+          leavingProblem !== undefined || onLine !== undefined || removeRefused !== undefined
+        }
+      />
 
       <Section title={t('adminTeams.edit.title')}>
         <form action={saveTeamAction} className="staff-form">
@@ -374,9 +396,16 @@ export async function TeamPage({
         </ul>
       </Section>
 
-      <Section title={t('adminTeams.remove.title')} kind="danger">
+      <Section title={t('adminTeams.remove.title')} kind="danger" id={removeTeamAnchor}>
         <p className="staff-quiet">{t('adminTeams.remove.body')}</p>
-        {/* How many people the bin would take with the team, said before it is confirmed. */}
+        {/* What the team has of games (A-17), and how many people the bin would take with
+            it, said before anything is confirmed. */}
+        <p
+          className="staff-quiet"
+          data-remove-games={games === undefined ? 'unknown' : `${games.played}/${games.toPlay}`}
+        >
+          {gamesLine(team.name, games)}
+        </p>
         <p className="staff-quiet" data-remove-roster-count={open.length}>
           {!roster.ok
             ? t('adminTeams.remove.rosterUnknown')
@@ -384,6 +413,25 @@ export async function TeamPage({
               ? t('adminTeams.remove.rosterNone')
               : t.plural('adminTeams.remove.roster', open.length)}
         </p>
+        {removeRefused === undefined ? null : (
+          <StaffNotice kind="refused" data={{ 'data-remove-refused': removeRefused.code }}>
+            <p>{removeRefused.text}</p>
+            {removeRefused.wayOn === null ? null : (
+              <p>
+                <a
+                  className="ui-button"
+                  href={leagueUrl(here, 'admin-area', { area: removeRefused.wayOn })}
+                >
+                  {t(
+                    removeRefused.wayOn === 'schedule'
+                      ? 'adminTeams.remove.toSchedule'
+                      : 'adminTeams.remove.toGames',
+                  )}
+                </a>
+              </p>
+            )}
+          </StaffNotice>
+        )}
         <form action={removeTeamAction} className="staff-form">
           <LeagueField league={here.slug} />
           <input type="hidden" name="team" value={team.id} />
