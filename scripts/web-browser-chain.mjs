@@ -20,7 +20,9 @@
 //   order of its own must say so here, in words, and in FIRST below or beside it.
 // - Extra arguments: a test that needs some in the chain (none does today) says so in a
 //   line of its own, `// In the browser chain: <arguments>`, in its own file.
-// - The chain stops at the first test that fails, with that test's own exit code.
+// - The chain stops at the first test that fails, with that test's own exit code; a test
+//   stopped by a signal is named and ends the chain with 128 and the signal's number.
+import os from 'node:os';
 
 /** The test that runs first and builds the app; the rest are given --no-build. */
 export const FIRST = 'web-exit-test.mjs';
@@ -40,17 +42,35 @@ export function extraArguments(source) {
  * `only`, when given, keeps just those tests (by file name, with or without ".mjs"), in the
  * chain's order; the first kept builds.
  */
-export function browserChain(names, read, only = []) {
+export function browserChain(names, read, only = [], folder = 'tests/browser') {
   const wanted = only.map((name) => (name.endsWith('.mjs') ? name : `${name}.mjs`));
   const tests = names
     .filter(isBrowserTest)
     .filter((name) => wanted.length === 0 || wanted.includes(name))
     .sort((a, b) => (a === FIRST ? -1 : b === FIRST ? 1 : a < b ? -1 : a > b ? 1 : 0));
   return tests.map((name, i) => ({
-    file: `tests/browser/${name}`,
+    file: `${folder}/${name}`,
     args: [...(i === 0 ? [] : ['--no-build']), ...extraArguments(read(name))],
   }));
 }
 
 /** The line the runner prints before it starts a test, as bash's trace printed it. */
 export const startLine = ({ file, args }) => `+ ${['node', file, ...args].join(' ')}`;
+
+/**
+ * What the runner says when a test did not end by itself: stopped by a signal (`run.signal`)
+ * or never started (`run.error`), as spawnSync reports them. { line, code }, or undefined
+ * for a test that ended with an exit code of its own. The line is one the notes on GitHub
+ * pick out (scripts/browser-failure-rules.mjs: "Killed", or "Error:"): bash used to print
+ * "Killed" for a test the machine stopped, as when it runs out of memory, so SIGKILL keeps
+ * that word. The code is the one bash gave: 128 and the signal's number.
+ */
+export function stoppedLine({ file }, run) {
+  if (run.error) {
+    return { line: `Error: ${file} could not be run: ${run.error.message}`, code: 1 };
+  }
+  if (!run.signal) return undefined;
+  const code = 128 + (os.constants.signals[run.signal] ?? 0);
+  const said = `${file} was stopped by ${run.signal} (exit code ${code})`;
+  return { line: run.signal === 'SIGKILL' ? `Killed: ${said}` : `Error: ${said}`, code };
+}

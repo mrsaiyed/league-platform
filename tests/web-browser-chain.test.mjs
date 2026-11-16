@@ -3,6 +3,7 @@
 // --no-build, a test's own extra arguments kept; and the runner prints the line the notes
 // on GitHub read (scripts/browser-failure-rules.mjs).
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -12,6 +13,7 @@ import {
   extraArguments,
   isBrowserTest,
   startLine,
+  stoppedLine,
 } from '../scripts/web-browser-chain.mjs';
 import { browserFailureNotes } from '../scripts/browser-failure-rules.mjs';
 
@@ -96,4 +98,90 @@ test('the line printed before a test is the one the notes on GitHub name the tes
     notes[0],
   );
   assert.ok(notes.some((n) => n.includes('the made-up league home shows its name')));
+});
+
+test('a test stopped by a signal is named, in a line the notes pick out, with 128 and its number', () => {
+  const file = { file: 'tests/browser/made-up-test.mjs', args: [] };
+  assert.equal(stoppedLine(file, { status: 3, signal: null }), undefined);
+  assert.deepEqual(stoppedLine(file, { status: null, signal: 'SIGKILL' }), {
+    line: 'Killed: tests/browser/made-up-test.mjs was stopped by SIGKILL (exit code 137)',
+    code: 137,
+  });
+  assert.deepEqual(stoppedLine(file, { status: null, signal: 'SIGTERM' }), {
+    line: 'Error: tests/browser/made-up-test.mjs was stopped by SIGTERM (exit code 143)',
+    code: 143,
+  });
+  assert.deepEqual(
+    stoppedLine(file, { status: null, signal: null, error: new Error('spawn ENOMEM') }),
+    {
+      line: 'Error: tests/browser/made-up-test.mjs could not be run: spawn ENOMEM',
+      code: 1,
+    },
+  );
+  // As GitHub's notes read it: the test named, and the line that says what stopped it.
+  const notes = browserFailureNotes(
+    [
+      startLine(file),
+      'Made-up browser check: starting',
+      stoppedLine(file, { status: null, signal: 'SIGKILL' }).line,
+    ].join('\n'),
+  );
+  assert.ok(notes[0].includes('browser tests stopped in tests/browser/made-up-test.mjs'), notes[0]);
+  assert.ok(
+    notes.some((n) =>
+      n.startsWith('::error title=printed::Killed: tests/browser/made-up-test.mjs'),
+    ),
+  );
+});
+
+/** Runs the runner on a folder of made-up tests: { status, stderr, stdout }. */
+function runOn(tests, ...args) {
+  fs.mkdirSync(path.join(root, '.local'), { recursive: true });
+  const dir = fs.mkdtempSync(path.join(root, '.local', 'browser-chain-test-'));
+  try {
+    for (const [name, source] of Object.entries(tests))
+      fs.writeFileSync(path.join(dir, name), source);
+    const run = spawnSync(process.execPath, ['scripts/run-web-browser-tests.mjs', ...args], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        WEB_BROWSER_TESTS_FOLDER: path.relative(root, dir).split(path.sep).join('/'),
+      },
+    });
+    return { status: run.status, stdout: run.stdout, stderr: run.stderr, dir: path.basename(dir) };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('the runner stops at the first test that fails, with its own exit code', () => {
+  const run = runOn({
+    'a-pass-test.mjs': "console.log('A made-up check passed.');\n",
+    'b-fail-test.mjs': "console.log('Made-up check failed:');\nprocess.exit(3);\n",
+    'c-never-test.mjs': "console.log('never run');\n",
+  });
+  assert.equal(run.status, 3);
+  assert.ok(run.stderr.includes(`+ node .local/${run.dir}/b-fail-test.mjs --no-build`), run.stderr);
+  assert.doesNotMatch(run.stdout + run.stderr, /never run/);
+});
+
+test('a test that kills itself stops the chain; where signals exist it is named "Killed", 137', () => {
+  const run = runOn({
+    'a-kill-test.mjs': "console.log('stopping myself');\nprocess.kill(process.pid, 'SIGKILL');\n",
+    'b-never-test.mjs': "console.log('never run');\n",
+  });
+  assert.doesNotMatch(run.stdout + run.stderr, /never run/);
+  if (process.platform === 'win32') {
+    // Windows has no signals: a process that kills itself just ends, with exit code 1.
+    assert.equal(run.status, 1);
+  } else {
+    assert.equal(run.status, 137);
+    assert.ok(
+      run.stderr.includes(
+        `Killed: .local/${run.dir}/a-kill-test.mjs was stopped by SIGKILL (exit code 137)`,
+      ),
+      run.stderr,
+    );
+  }
 });
