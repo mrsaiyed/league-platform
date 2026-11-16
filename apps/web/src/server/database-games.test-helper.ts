@@ -67,13 +67,28 @@ const addDays = (day: string, days: number) => {
 
 export type GamesWorld = Awaited<ReturnType<typeof gamesWorld>>;
 
+/** How many games of each kind to make, and who plays in Lakeside. */
+export type GamesWorldOptions = {
+  readonly byHand: number;
+  readonly live: number;
+  /**
+   * Lakeside told it is a youth league (R-15), with the Herons' first player recorded as a
+   * child and the other four of unknown age; the Otters stay adults. Left out: an adult
+   * league, every player an adult.
+   */
+  readonly youth?: true;
+};
+
 /**
  * The world. `byHand` games are recorded by final score, `live` ones in the tracker; each
  * is Herons (home) against Otters (away), started some days ago at 20:00, so each needs a
  * result.
  */
-export async function gamesWorld(counts: { readonly byHand: number; readonly live: number }) {
-  const made = await database.madeUpDatabase({ underWay: true });
+export async function gamesWorld(counts: GamesWorldOptions) {
+  const made = await database.madeUpDatabase({
+    underWay: true,
+    ...(counts.youth === true ? { audiences: { lakeside: 'youth' as const } } : {}),
+  });
   const db = database.createDatabase(made.source);
   /** The ports' clock: the server's now, moved on by hand. */
   const clock = { at: Date.now() };
@@ -157,15 +172,20 @@ export async function gamesWorld(counts: { readonly byHand: number; readonly liv
     log: () => {},
     now: () => performance.now(),
   };
-  /** Five new players a team, numbered from `first`. */
-  const squad = async (team: string, first: number, family: string) => {
+  /** Five new players a team, numbered from `first`, each an adult unless `ageOf` says. */
+  const squad = async (
+    team: string,
+    first: number,
+    family: string,
+    ageOf: (n: number) => { readonly isMinor?: boolean } = () => ({ isMinor: false }),
+  ) => {
     const ids: string[] = [];
     for (let n = 0; n < 5; n++) {
       const { personId } = must(
         'a person',
         await createPerson(
           asOwner,
-          { firstName: `Player${first + n}`, lastName: family, isMinor: false },
+          { firstName: `Player${first + n}`, lastName: family, ...ageOf(n) },
           rosterDeps,
         ),
       );
@@ -182,7 +202,12 @@ export async function gamesWorld(counts: { readonly byHand: number; readonly liv
     return ids;
   };
   const players = {
-    herons: await squad(herons, 30, 'Heronfamily'),
+    herons: await squad(
+      herons,
+      30,
+      'Heronfamily',
+      counts.youth === true ? (n) => (n === 0 ? { isMinor: true } : {}) : undefined,
+    ),
     otters: await squad(otters, 40, 'Otterfamily'),
   };
 

@@ -381,6 +381,10 @@ describe('databasePorts (record 055)', () => {
       game: await store.findGame(randomUUID()),
     }));
     expect(read).toEqual({ audience: 'adult', game: undefined });
+    // Each league's own audience, read from its row: the other seed league is a youth one.
+    const youth = seedLeague('maple-street').leagueId;
+    expect(await ports.tracker.namesShownOf(youth)).toMatchObject({ audience: 'youth' });
+    expect(await ports.tracker.gameReadsOf(youth, async (r) => r.audience)).toBe('youth');
     // A person's name is read only with those settings, in the same snapshot.
     await expect(ports.tracker.snapshotStoreOf(leagueId).people([randomUUID()])).rejects.toThrow(
       GameNamesOnlyWithSettings,
