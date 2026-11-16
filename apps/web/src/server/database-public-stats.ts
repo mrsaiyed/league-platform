@@ -2,13 +2,16 @@
 // records 069 and 070): the seasons a visitor may pick, the standings and the
 // statistics, through packages/database's own standings read store, as the stand-in reads
 // its one world (stand-in-public-stats.ts). Each read is one transaction set to the
-// league it is for, never one from the request (T-28). An id that is not a UUID is no
+// league it is for, never one from the request (T-28), opened as a page's read: one
+// snapshot (REPEATABLE READ) that writes nothing (READ ONLY), so every statement in it
+// sees the league as it was at the first (record 070). An id that is not a UUID is no
 // row, asked of no database.
 //
 // Names (T-81): who sees players' names is the league's own settings (step 2.126) and
 // who plays there its own audience, read from the league's rows. A page that shows a
-// name reads it through statisticsOf, where the statistics, the people and those settings
-// are read in one transaction, so a name is shown by the setting saved when it was read.
+// name reads it through statisticsOf, where the statistics, the people and those
+// settings are read in that one snapshot, so a name is shown by the settings as
+// they all stood at one moment, never a mix of two saves.
 // The read store alone (readStoreOf) does not read people: it refuses, so no page can put
 // a name beside a setting read at another moment. The rules of who is shown and how stay
 // in core (statisticsSource, showName); these ports only fetch.
@@ -49,7 +52,7 @@ export function databasePublicStats(
   db: DatabaseHandle,
 ): PublicStatsPorts {
   const inLeague = <T>(leagueId: string, work: (scope: LeagueScope) => Promise<T>): Promise<T> =>
-    database.withTransaction(db, { leagueId }, work);
+    database.withTransaction(db, { leagueId }, work, { snapshot: 'page' });
   // The league's own audience and name settings, in the scope's transaction.
   const settingsIn = async (scope: LeagueScope): Promise<PublicStatsSettings> => ({
     audience: await database.findLeagueAudience(scope),
@@ -72,8 +75,8 @@ export function databasePublicStats(
         (work) => inLeague(leagueId, (scope) => work(database.standingsReadStore(scope))),
         false,
       ),
-    // The standings' five reads in one transaction: one snapshot of the season, never a
-    // table half from before a result and half from after it.
+    // The standings' five reads in one snapshot of the season (above), never a table
+    // half from before a result and half from after it.
     standingsOf: (leagueId, seasonId) =>
       isId(seasonId)
         ? inLeague(leagueId, (scope) =>
@@ -83,7 +86,7 @@ export function databasePublicStats(
             ),
           )
         : Promise.resolve(fail({ code: 'season-not-found' })),
-    // A page's statistics with the league's settings, all in one transaction (T-81).
+    // A page's statistics with the league's settings, all in one snapshot (T-81).
     statisticsOf: (leagueId, work) =>
       inLeague(leagueId, async (scope) =>
         work({

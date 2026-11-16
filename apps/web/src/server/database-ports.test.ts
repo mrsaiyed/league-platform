@@ -2,7 +2,7 @@
 // by short name and id, the sign-in service's users turned into our accounts, and
 // what they hold, read through packages/database as the app's login role. The
 // sign-in service is a fake here: only who each token belongs to matters.
-import { fail, ok } from '@srleagues/core';
+import { fail, ok, publicViewer } from '@srleagues/core';
 import * as database from '@srleagues/database';
 import type { SessionIdentity, SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
@@ -383,6 +383,44 @@ describe('databasePorts (record 055)', () => {
       await ports.publicTeams.teamIdsOfAccount(lakeside().leagueId, randomUUID(), randomUUID()),
     ).toEqual([]);
     expect((await ports.leagueSites(lakeside().leagueId))?.name).toBe('Lakeside Hoops League');
+  });
+
+  it("reads every public page's data as one snapshot that writes nothing (record 070)", async () => {
+    const asked: (database.TransactionOptions | undefined)[] = [];
+    const withTransaction = ((
+      handle: database.DatabaseHandle,
+      context: database.LeagueContext,
+      work: (scope: database.LeagueScope) => Promise<unknown>,
+      options?: database.TransactionOptions,
+    ) => {
+      asked.push(options);
+      return database.withTransaction(handle, context, work, options);
+    }) as typeof database.withTransaction;
+    const counted = databasePorts({
+      database: { ...database, withTransaction },
+      db,
+      signIn: {} as SignInService,
+      signInMail: {} as SignInMail,
+      log: () => {},
+      warn: () => {},
+      now: () => clock,
+    });
+    const leagueId = lakeside().leagueId;
+    const seasonId = randomUUID();
+    await counted.leagueSites(leagueId);
+    await counted.publicStats.seasonsOf(leagueId);
+    await counted.publicStats.settingsOf(leagueId);
+    await counted.publicStats.readStoreOf(leagueId).teams(seasonId);
+    await counted.publicStats.standingsOf(leagueId, seasonId);
+    await counted.publicStats.statisticsOf(leagueId, async ({ store }) => store.teams(seasonId));
+    await counted.publicSchedule.clockOf(leagueId);
+    await counted.publicSchedule.scheduleOf(leagueId, seasonId, '2026-11-14');
+    await counted.publicSchedule.gameFactsOf(leagueId, seasonId, randomUUID());
+    await counted.publicTeams.startPageOf(leagueId);
+    await counted.publicTeams.rosterOf(leagueId, randomUUID(), publicViewer(leagueId));
+    await counted.publicTeams.teamIdsOfAccount(leagueId, seasonId, randomUUID());
+    expect(asked.length).toBeGreaterThanOrEqual(12);
+    expect(asked.every((options) => options?.snapshot === 'page')).toBe(true);
   });
 
   it('reads the public schedule and standings from the database (part 2)', async () => {

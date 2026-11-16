@@ -18,8 +18,12 @@ export function databaseLeagueSites(
 ): LeagueSiteLookup {
   return async (leagueId) => {
     if (!isId(leagueId)) return undefined;
-    const name = await database.withTransaction(db, { leagueId: leagueId.toLowerCase() }, (scope) =>
-      database.findLeagueName(scope),
+    // A page's read: one snapshot that writes nothing (record 070).
+    const name = await database.withTransaction(
+      db,
+      { leagueId: leagueId.toLowerCase() },
+      (scope) => database.findLeagueName(scope),
+      { snapshot: 'page' },
     );
     return name === undefined ? undefined : { name };
   };

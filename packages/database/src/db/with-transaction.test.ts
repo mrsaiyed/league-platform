@@ -156,6 +156,60 @@ describe('withTransaction', () => {
     await expect(nested).rejects.toThrow('inside another withTransaction');
   });
 
+  // Record 070: a public page's reads are one moment and write nothing. The local database
+  // has one session, so that a second session's save is not seen half-way through is for
+  // the supervised session on PostgreSQL; here the transaction's own settings are read.
+  const readMode = sql<{ isolation: string; read_only: string }>`select
+    current_setting('transaction_isolation') as isolation,
+    current_setting('transaction_read_only') as read_only`;
+
+  it("opens a page's reads as one snapshot that cannot write, fenced as any other", async () => {
+    const seen = await withTransaction(
+      db,
+      { leagueId: a.leagueId, accountId: account },
+      async (scope) => ({
+        mode: (await readMode.execute(transactionOf(scope))).rows[0],
+        settings: (await readSettings.execute(transactionOf(scope))).rows[0],
+        programs: await allPrograms(scope),
+      }),
+      { snapshot: 'page' },
+    );
+    expect(seen.mode).toEqual({ isolation: 'repeatable read', read_only: 'on' });
+    expect(seen.settings).toEqual({
+      league: a.leagueId,
+      account,
+      fenced_league: a.leagueId,
+      role: 'app_user',
+    });
+    expect(seen.programs.length).toBeGreaterThan(0);
+    expect(seen.programs.every((row) => row.league_id === a.leagueId)).toBe(true);
+  });
+
+  it("refuses a write inside a page's snapshot, even into its own league", async () => {
+    const write = withTransaction(
+      db,
+      { leagueId: a.leagueId },
+      (scope) =>
+        transactionOf(scope)
+          .insertInto('programs')
+          .values({ league_id: a.leagueId, slug: 'read-only', name: 'No', sport_key: 'volleyball' })
+          .execute(),
+      { snapshot: 'page' },
+    );
+    // 25006: read_only_sql_transaction.
+    await expect(write).rejects.toMatchObject({ code: '25006' });
+    const { rows } = await pglite.query("select id from programs where slug = 'read-only'");
+    expect(rows).toEqual([]);
+  });
+
+  it('keeps the default for everything else, and leaves no mode behind', async () => {
+    await withTransaction(db, { leagueId: a.leagueId }, async () => 1, { snapshot: 'page' });
+    const mode = await withTransaction(db, { leagueId: a.leagueId }, (scope) =>
+      readMode.execute(transactionOf(scope)),
+    );
+    expect(mode.rows[0]).toEqual({ isolation: 'read committed', read_only: 'off' });
+  });
+
   it('refuses a query on the bare handle inside the work', async () => {
     const bare = withTransaction(db, { leagueId: a.leagueId }, () =>
       kyselyOf(db).selectFrom('programs').select('league_id').execute(),

@@ -367,7 +367,7 @@ All dated November 12, 2026.
 | T-271                 | Each form answered with the answer in the address                            | Agreed (delegated): refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)           | Step 2.155: a refusal emptied a box score; "Saved" off screen; a reload said it again (H6, M2, M8) |
 | T-272                 | T-41: ids sort by creation time (0002: in order on one connection)           | Agreed (delegated): on one connection each id sorts after every id it made before (a memory of the session); none across connections (rec. 068) | Step 2.151: PGlite ticks in whole ms, so ids of one ms sorted either way; tests failed by chance   |
 | T-273                 | New                                                                          | On the database, the public schedule and standings move first; statistics refuse until part 3; local seasons under way (rec. 069)               | Step 2.93 part 2: one port serves both the standings and the statistics, and the seed had no games |
-| T-274                 | New                                                                          | Names read with the league's own settings in one transaction; no design stored yet; a season naming no statistics keeps its rules' (rec. 070)   | Step 2.93 part 3: the statistics and team pages show children's names; nothing wrote `stat_keys`   |
+| T-274                 | New                                                                          | Names read with the league's own settings in one snapshot; no design stored yet; a season naming no statistics keeps its rules' (rec. 070)      | Step 2.93 part 3: the statistics and team pages show children's names; nothing wrote `stat_keys`   |
 
 ## The full list
 
@@ -657,7 +657,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-232 | The shell works a request out once, then each page answers shown, not found, forwarded or no access (403); pages check, layouts never refuse; Next.js 16 (record 020)               | Agreed (delegated) | yes     |
 | T-271 | A form's answer never rides in the address: refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)                       | Agreed (delegated) |         |
 | T-273 | On the database the public schedule and the standings move first; the statistics refuse until part 3; local seasons are under way (record 069)                                      | Agreed (delegated) |         |
-| T-274 | On the database a name is read with the league's own settings and audience in one transaction; no design is stored yet; a season naming no statistics keeps its rules' (record 070) | Agreed (delegated) |         |
+| T-274 | On the database a name is read with the league's own settings and audience in one snapshot; no design is stored yet; a season that names no statistics keeps its rules (record 070) | Agreed (delegated) |         |
 
 ### [T3 — Data model](technical/T3-data-model.md)
 
