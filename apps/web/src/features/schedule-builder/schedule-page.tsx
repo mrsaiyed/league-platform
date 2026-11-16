@@ -497,6 +497,14 @@ function RoundSection({
               : t('schedule.admin.roundDate', { date: dayText(round.date) })}
           </span>{' '}
           <StaffPill>{t.plural('schedule.admin.roundGames', round.games.length)}</StaffPill>
+          {/* Games with no date yet hold the round though the grid cannot place them (step
+              2.181): counted beside the others, so the round never looks emptier than it is. */}
+          {round.undated === 0 ? null : (
+            <>
+              {' '}
+              <StaffPill>{t.plural('schedule.admin.roundUndated', round.undated)}</StaffPill>
+            </>
+          )}
         </p>
       </div>
       {saved}
@@ -534,8 +542,10 @@ function RoundSection({
                 </button>
               </p>
             </form>
-            {/* Removing is apart from the two saves, and looks like neither. */}
-            {round.games.length === 0 ? (
+            {/* Removing is apart from the two saves, and looks like neither. It is offered
+                only when the tap will succeed: no game is in the round, placed or with no
+                date yet; a game in the bin does not count (S-60, step 2.181). */}
+            {round.games.length === 0 && round.undated === 0 ? (
               <form
                 action={removeRoundAction}
                 data-remove-round={round.id}
@@ -553,13 +563,15 @@ function RoundSection({
               </form>
             ) : (
               <p className="ui-field-help admin-round-remove" data-remove-round-blocked={round.id}>
-                {t.plural('schedule.admin.removeRoundBlocked', round.games.length)}
+                {round.games.length > 0
+                  ? t.plural('schedule.admin.removeRoundBlocked', round.games.length)
+                  : t.plural('schedule.admin.removeRoundUndated', round.undated)}
               </p>
             )}
           </div>
         </details>
       ) : null}
-      {round.games.length === 0 ? (
+      {round.games.length === 0 && round.undated === 0 ? (
         <p className="staff-quiet">{t('schedule.admin.noGamesInRound')}</p>
       ) : null}
       <GameList

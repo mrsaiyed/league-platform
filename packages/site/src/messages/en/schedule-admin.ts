@@ -30,7 +30,7 @@ export const enScheduleAdmin = {
   'schedule.admin.blocker.revision-out-of-date':
     'A newer schedule was published after this draft was started.',
   'schedule.admin.blocker.round-in-use':
-    'The draft removes a round that a game in the bin or with no date is still in.',
+    'The draft removes a round that a game with no date yet is still in.',
   'schedule.admin.blocker.unknown-court': 'A game in the draft names a court that is gone.',
   'schedule.admin.blocker.unknown-team':
     'A game in the draft names a team that is not in the season.',
@@ -86,7 +86,7 @@ export const enScheduleAdmin = {
     'A new round in the draft could not be added to the season. Discard the draft and add it again.',
   'schedule.admin.error.round-cannot-be-updated': 'A round in the draft is gone from the season.',
   'schedule.admin.error.round-in-use':
-    'A game that is in the bin, has no date yet or was removed in this draft is still in this round, so it cannot be removed.',
+    'A game with no date yet is still in this round, so it cannot be removed.',
   'schedule.admin.error.season-not-found': 'That season is not there.',
   'schedule.admin.error.unknown-court': 'That court is not at the chosen venue.',
   'schedule.admin.error.unknown-team': 'One of those teams is not in this season.',
@@ -175,6 +175,10 @@ export const enScheduleAdmin = {
   'schedule.admin.removeRoundBlocked_other':
     'This round has {count} games, so it cannot be removed. Move or remove its games first.',
   'schedule.admin.removeRoundNote': 'It has no games, so it can be removed from the draft.',
+  'schedule.admin.removeRoundUndated_one':
+    'This round has {count} game with no date yet, so it cannot be removed.',
+  'schedule.admin.removeRoundUndated_other':
+    'This round has {count} games with no date yet, so it cannot be removed.',
   'schedule.admin.removedDraftOnly':
     'It was only in the draft, so nothing public has changed. Put it back and it is exactly as it was.',
   'schedule.admin.removedPublished':
@@ -189,6 +193,8 @@ export const enScheduleAdmin = {
   'schedule.admin.roundGames_one': '{count} game',
   'schedule.admin.roundGames_other': '{count} games',
   'schedule.admin.roundNoDate': 'No date set',
+  'schedule.admin.roundUndated_one': '{count} game with no date yet',
+  'schedule.admin.roundUndated_other': '{count} games with no date yet',
   'schedule.admin.save': 'Save game',
   'schedule.admin.saved': 'Saved to the draft. It is not public until you publish.',
   'schedule.admin.savedGame': 'Saved to the draft: {game}.',
