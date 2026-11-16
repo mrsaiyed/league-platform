@@ -23,6 +23,8 @@ export type MemoryTeams = {
   uniqueJerseys: boolean;
   /** The league's today in its own time zone (yyyy-mm-dd). */
   today: string;
+  /** Roster entries added at a scorer's table, waiting for an admin's review (S-6, 0015). */
+  waitingForReview: string[];
   grants: Grant[];
   /** The league's stored setting rows by key, as setting_values keeps them. */
   settings: Record<string, StoredSetting[]>;
@@ -118,6 +120,7 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
     roster: [],
     uniqueJerseys: false,
     today: '2026-11-15',
+    waitingForReview: [],
     grants: [],
     settings: {},
     activity: [],
@@ -209,7 +212,12 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
           if (
             s.uniqueJerseys &&
             e.jerseyNumber !== null &&
-            mine.some((r) => r.leftOn === null && r.jerseyNumber === e.jerseyNumber)
+            mine.some(
+              (r) =>
+                r.leftOn === null &&
+                !s.waitingForReview.includes(r.id) &&
+                r.jerseyNumber === e.jerseyNumber,
+            )
           ) {
             return 'jersey-taken';
           }
@@ -237,12 +245,16 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
           if (next.leftOn === null && others.some((r) => r.personId === found.personId)) {
             return 'already-on-team';
           }
+          // One waiting for review is not held to it, nor holds a number (0015, needs_review).
           if (
             s.uniqueJerseys &&
+            !s.waitingForReview.includes(id) &&
             next.leftOn === null &&
             next.jerseyNumber !== null &&
             (change.jerseyNumber !== undefined || change.leftOn !== undefined) &&
-            others.some((r) => r.jerseyNumber === next.jerseyNumber)
+            others.some(
+              (r) => !s.waitingForReview.includes(r.id) && r.jerseyNumber === next.jerseyNumber,
+            )
           ) {
             return 'jersey-taken';
           }

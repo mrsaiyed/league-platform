@@ -136,7 +136,14 @@ export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
       if (found === undefined || (version !== undefined && found.version !== version)) {
         return undefined;
       }
-      if (change.jerseyNumber !== undefined && jerseyWorn(found.teamId, change.jerseyNumber, id)) {
+      // An entry waiting for review is not held to unique numbers until it is confirmed:
+      // the database's trigger skips it (0015, `or new.needs_review`).
+      const checked = !found.needsReview;
+      if (
+        checked &&
+        change.jerseyNumber !== undefined &&
+        jerseyWorn(found.teamId, change.jerseyNumber, id)
+      ) {
         return 'jersey-taken';
       }
       // Put back on the roster (leaving date cleared): as the database's roster_entries_once
@@ -151,7 +158,7 @@ export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
         );
         if (open) return 'already-on-team';
         const jersey = change.jerseyNumber === undefined ? found.jerseyNumber : change.jerseyNumber;
-        if (jerseyWorn(found.teamId, jersey, id)) return 'jersey-taken';
+        if (checked && jerseyWorn(found.teamId, jersey, id)) return 'jersey-taken';
       }
       s.roster = replacedAt(s.roster, at, { ...found, ...change, version: found.version + 1 });
       return found.version + 1;

@@ -133,6 +133,20 @@ describe('putBackOnRoster', () => {
     expect((await putBack(loose.deps, loose.as, 1)).ok).toBe(true);
   });
 
+  it('puts back one waiting for review with their number: the number rule waits for the review (0015)', async () => {
+    const { db, deps, as } = memoryTeams({
+      ...base(),
+      uniqueJerseys: true,
+      waitingForReview: [entryUuid(1)],
+      roster: [
+        entry(1, { jerseyNumber: '7', leftOn: '2026-11-01' }),
+        entry(2, { jerseyNumber: '7' }),
+      ],
+    });
+    expect(await putBack(deps, as, 1)).toEqual({ ok: true, value: { version: 2 } });
+    expect(db.state.roster[0]).toMatchObject({ jerseyNumber: '7', leftOn: null });
+  });
+
   it('puts back a player who is on another team of the season too: a season does not limit it', async () => {
     const { deps, as } = memoryTeams({
       ...base(),

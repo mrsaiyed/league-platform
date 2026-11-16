@@ -232,6 +232,46 @@ describe('the admin Teams screens over the stand-in', () => {
     expect((await leave(1, '2030-03-01')).ok).toBe(true);
   });
 
+  it('puts back one waiting for review with their number, as the database does (0015)', async () => {
+    // Pat Gorski (left, #8) was added at a scorer's table and waits for review; since then
+    // Marcus Oyelaran wears 8, in a season that asks for a different number for each.
+    const world = testWorld(
+      () => access,
+      undefined,
+      (leagues) => {
+        withUniqueJerseys(leagues);
+        for (const league of leagues) {
+          const id = (first: string) =>
+            league.people.find((p) => p.firstName === first && p.lastName !== '')?.id;
+          league.roster = league.roster.map((r) =>
+            r.personId === id('Pat')
+              ? { ...r, needsReview: true }
+              : r.personId === id('Marcus')
+                ? { ...r, jerseyNumber: '8' }
+                : r,
+          );
+        }
+      },
+    );
+    const m = { ...made(), ports: standInAdminTeams(world) };
+    const read = await world.read(leagueId);
+    const pat = read?.people.find((p) => p.firstName === 'Pat' && p.lastName === 'Gorski');
+    const entry = read?.roster.find((r) => r.personId === pat?.id);
+    if (entry === undefined) throw new Error('no Pat Gorski');
+    expect(
+      await putBackOnRoster(
+        m.owner,
+        { teamId: entry.teamId, rosterEntryId: entry.id, version: entry.version },
+        m.ports.deps,
+      ),
+    ).toMatchObject({ ok: true });
+    const after = value(await listRoster(m.owner, { teamId: entry.teamId }, m.ports.deps));
+    expect(after.find((line) => line.id === entry.id)).toMatchObject({
+      leftOn: null,
+      jerseyNumber: '8',
+    });
+  });
+
   it('lets a player of a team in the bin be taken off the league list (A-16)', async () => {
     const m = made();
     const { teamId, people } = await teamOfTen(m);

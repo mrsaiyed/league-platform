@@ -427,6 +427,47 @@ describe('rosters', () => {
     ).toEqual({ ok: false, error: { code: 'roster-entry-not-found' } });
   });
 
+  it('puts back one waiting for review with their number, as the trigger skips them (0015)', async () => {
+    const l = await league(true);
+    const [walkUp, wearer] = [
+      await newPerson(pglite, l.leagueId),
+      await newPerson(pglite, l.leagueId),
+    ];
+    // As a player added at a scorer's table is: named by the game, waiting for review; then
+    // marked as left by mistake, and their number taken by someone else since.
+    const gameId = await newGame(pglite, {
+      leagueId: l.leagueId,
+      seasonId: l.seasonId,
+      stageId: await newStage(pglite, l.leagueId, l.seasonId),
+      homeTeamId: l.teamId,
+      awayTeamId: await newTeam(pglite, l.leagueId, l.seasonId),
+    });
+    const first = {
+      rosterEntryId: (
+        await one<{ id: string }>(
+          pglite,
+          `insert into roster_entries
+             (league_id, team_id, person_id, jersey_number, left_on, added_at_game_id, needs_review)
+           values ($1, $2, $3, '9', '2026-11-10', $4, true) returning id`,
+          [l.leagueId, l.teamId, walkUp, gameId],
+        )
+      ).id,
+    };
+    value(await addToRoster(l.as, { teamId: l.teamId, personId: wearer, jerseyNumber: '9' }, deps));
+    const { version } = await entryRow(first.rosterEntryId);
+    value(
+      await putBackOnRoster(
+        l.as,
+        { teamId: l.teamId, rosterEntryId: first.rosterEntryId, version },
+        deps,
+      ),
+    );
+    expect(await entryRow(first.rosterEntryId)).toMatchObject({
+      left_on: null,
+      jersey_number: '9',
+    });
+  });
+
   it('does not hold a person by a place on a team in the bin (A-16)', async () => {
     const l = await league();
     const [first, second, elsewhere] = [
