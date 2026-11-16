@@ -4,7 +4,8 @@
 // games by hand across two rounds; a game booked on top of another is flagged at once and
 // fixed by moving it to the other court; nothing is on the public schedule until it is
 // published; the grid works by keyboard; every field has a name. `--dev` runs `next dev`
-// instead of building.
+// instead of building. `--now=2026-11-15T20:01:00Z` starts the made-up world's clock at
+// that moment (LOCAL_NOW, step 2.179), to run the test as if at any hour.
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -66,6 +67,7 @@ async function waitFor(url, server) {
 }
 
 const dev = process.argv.includes('--dev');
+const worldNow = process.argv.find((a) => a.startsWith('--now='))?.slice('--now='.length);
 const failures = [];
 const note = (ok, label) => {
   if (!ok) failures.push(label);
@@ -83,6 +85,7 @@ if (built) {
   const server = start(dev ? ['dev', '--port', String(port)] : ['start', '--port', String(port)], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
+    ...(worldNow === undefined ? {} : { LOCAL_NOW: worldNow }),
   });
   let browser;
   try {
