@@ -21,7 +21,8 @@
 //   | T-276 | New | Agreed (delegated): what it now says | Why |
 //
 // The line under the ID says what the file is: `New` (an ID the list does not hold yet) or
-// `Change` (a decision already in the list whose words or status change). Each `## <heading>`
+// `Change` (a decision already in the list whose words or status change). The file's name,
+// its `# <ID>` and the first cell of every row in it are the same ID. Each `## <heading>`
 // names a heading of DECISIONS.md (its words, without a link: "T9 — Quality and
 // maintainability" for "### [T9 — Quality and maintainability](technical/…)"), and the rows
 // under it go into the first table under that heading, with as many cells as the table has
@@ -80,13 +81,17 @@ export function compareIds(a, b) {
 
 /**
  * A pending file: { id, kind: 'New' | 'Change', rows: [{ heading, cells }] }. Throws, naming
- * the file, when it does not say `New` or `Change` under its ID, or when it holds a row
- * outside a `## heading` or no row at all.
+ * the file, when its name, its `# <ID>` and its rows' IDs are not all the same ID, when it
+ * does not say `New` or `Change` under its ID, or when it holds a row outside a
+ * `## heading` or no row at all.
  */
 export function parsePending(name, text) {
   const id = name.replace(/\.md$/, '');
   const lines = text.split(/\r?\n/);
   const title = lines.find((line) => line.trim() !== '') ?? '';
+  if (title.trim() !== `# ${id}`) {
+    throw new Error(`${name}: its first line must be "# ${id}", the ID in its name.`);
+  }
   const kind = lines.slice(lines.indexOf(title) + 1).find((line) => line.trim() !== '');
   if (kind?.trim() !== 'New' && kind?.trim() !== 'Change') {
     throw new Error(
@@ -99,7 +104,11 @@ export function parsePending(name, text) {
     if (/^## /.test(line)) heading = headingWords(line);
     else if (isRow(line)) {
       if (heading === undefined) throw new Error(`${name}: a row before any "## heading".`);
-      rows.push({ heading, cells: cellsOf(line) });
+      const cells = cellsOf(line);
+      if (cells[0] !== id) {
+        throw new Error(`${name}: a row under "${heading}" is for ${cells[0]}, not ${id}.`);
+      }
+      rows.push({ heading, cells });
     }
   }
   if (rows.length === 0) throw new Error(`${name}: no row to fold in.`);

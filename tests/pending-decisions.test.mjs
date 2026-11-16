@@ -168,6 +168,25 @@ test('a wrong heading, a wrong number of cells, no kind or a row outside a headi
   );
 });
 
+test("a pending file's name, its first line and every row in it name the same ID", () => {
+  assert.throws(
+    () => parsePending('T-1.md', '# T-2\n\nNew\n\n## T9 — Quality\n\n| T-2 | x | y |\n'),
+    /T-1\.md: its first line must be "# T-1", the ID in its name/,
+  );
+  assert.throws(
+    () =>
+      parsePending(
+        'T-1.md',
+        '# T-1\n\nNew\n\n## T9 — Quality\n\n| T-1 | x | y |\n\n## Change log\n\n| T-3 | a | b | c |\n',
+      ),
+    /T-1\.md: a row under "Change log" is for T-3, not T-1/,
+  );
+  assert.deepEqual(
+    parsePending('T-1.md', '# T-1\n\nChange\n\n## T9 — Quality\n\n| T-1 | x | y |\n'),
+    { id: 'T-1', kind: 'Change', rows: [{ heading: 'T9 — Quality', cells: ['T-1', 'x', 'y'] }] },
+  );
+});
+
 test('only "<ID>.md" files are pending rows: the folder README is not', () => {
   assert.deepEqual(pendingNames(['README.md', 'T-276.md', 'S-64.md', 'notes.txt']), [
     'T-276.md',
