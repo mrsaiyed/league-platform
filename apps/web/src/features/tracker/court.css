@@ -55,6 +55,18 @@
   --court-size-number: 26px;
   --court-size-text: 14px;
   --court-size-small: 12px;
+  /* A team's fouls this period, in its box of the scoreboard: at rest, once they have put
+     the other team in the bonus, and at the double bonus. Then the badge of the team that
+     shoots: at the bonus, and at the double. Steps a glance tells apart, each as large as
+     the box of that size allows (set again for each size, further down); and one step
+     down where a device's letters are wider than the box (`data-tight`). */
+  --court-fouls-0: 11px;
+  --court-fouls-1: 13px;
+  --court-fouls-2: 15px;
+  --court-fouls-tight: 11px;
+  --court-badge-1: 11px;
+  --court-badge-2: 12px;
+  --court-badge-tight: 9px;
   --court-gap: 8px;
   --court-radius: 10px;
   --court-tile-height: 64px;
@@ -625,11 +637,15 @@
   line-height: 1;
 }
 /* A team's fouls this period, and its bonus, in its box (step 2.36; checklist F1 to F3):
-   a team's heading has no room for them on a phone. The line is always there, so nothing
-   moves when the first foul is given. The count grows and turns red once it has put the
-   other team in the bonus, and again at the double bonus. The badge sits with the team
-   that SHOOTS the bonus and says which in words: hollow for the bonus, filled for the
-   double, so the two differ in more than a shade. */
+   a team's heading has no room for them on a phone. The line is always there, and as
+   high from the first as it will ever be, so nothing moves when the first foul is given
+   or when the bonus comes. The count grows and turns red once it has put the other team
+   in the bonus, and grows again at the double bonus: in steps a glance tells apart (the
+   area 4 review, M3: they were a pixel apart on a phone), never by the color alone. The
+   badge sits with the team that SHOOTS the bonus and says which in words: hollow for the
+   bonus, larger and filled for the double, so the two differ in size, in shape and in
+   word, and in more than a shade. In the letters the words are written in, not capitals:
+   they read sooner, and "Double bonus" is then narrow enough to be set larger. */
 .court-score-fouls {
   display: flex;
   align-items: center;
@@ -637,7 +653,7 @@
   gap: 6px;
   max-inline-size: 100%;
   min-block-size: 18px;
-  font-size: 11px;
+  font-size: var(--court-fouls-0);
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
@@ -647,12 +663,12 @@
 }
 .court-fouls-count[data-level='1'] {
   color: var(--court-team-red);
-  font-size: 12px;
+  font-size: var(--court-fouls-1);
   font-weight: 800;
 }
 .court-fouls-count[data-level='2'] {
   color: var(--court-team-red);
-  font-size: 14px;
+  font-size: var(--court-fouls-2);
   font-weight: 800;
 }
 /* The count as the tiles write it ("10F"): only where the box is narrow and holds a
@@ -666,12 +682,12 @@
 .court-score-fouls[data-tight] {
   gap: 3px;
 }
-.court-score-fouls[data-tight] .court-fouls-count {
-  font-size: 11px;
+.court-score-fouls[data-tight] .court-fouls-count:not([data-level='0']) {
+  font-size: var(--court-fouls-tight);
 }
 .court-score-fouls[data-tight] .court-bonus {
   padding-inline: 3px;
-  font-size: 9px;
+  font-size: var(--court-badge-tight);
 }
 /* The badge is no higher than the line it sits in, so the box is the same height with it
    and without it. */
@@ -681,15 +697,16 @@
   border: 1px solid var(--court-team-red);
   border-radius: 8px;
   color: var(--court-team-red);
-  font-size: 11px;
+  font-size: var(--court-badge-1);
   font-weight: 800;
   line-height: 1;
-  text-transform: uppercase;
+  text-align: center;
 }
 .court-bonus[data-level='2'] {
   border-color: var(--court-red);
   background: var(--court-red);
   color: var(--court-text);
+  font-size: var(--court-badge-2);
 }
 /* The clock is the button that sets it and picks the period (T5, T6): a fine edge and a
    caret say it can be tapped. It turns red at 0:00 (T3), and says "Period over" beside
@@ -2005,7 +2022,7 @@
     --court-size-score: 36px;
   }
   .court-board {
-    gap: 6px;
+    gap: 4px;
   }
   .court-score {
     padding-inline: 2px;
@@ -2018,7 +2035,13 @@
   .court-controls {
     min-block-size: 48px;
   }
+  /* One line, 15 or 16 high and about 120 wide, is all the box has here, and the score is
+     not moved for it. So the steps are taken in what fits: the count goes 11, 13, 15 and
+     turns red; the badge is a hollow pill at the bonus and, at the double, a filled bar
+     as wide as the rest of the line, a size larger. "10F" and "Double bonus" are both
+     whole in the box at their largest, with room for a device whose letters are wider. */
   .court-score-fouls {
+    align-self: stretch;
     gap: 4px;
     min-block-size: 16px;
     overflow: hidden;
@@ -2029,12 +2052,13 @@
   .court-score-fouls[data-badge] .court-fouls-short {
     display: inline;
   }
-  .court-fouls-count[data-level='2'] {
-    font-size: 13px;
-  }
   .court-bonus {
+    padding-block: 0;
     padding-inline: 4px;
-    text-transform: none;
+  }
+  .court-bonus[data-level='2'] {
+    flex: 1 1 auto;
+    padding-inline: 3px;
   }
 }
 
@@ -2187,6 +2211,12 @@
     --court-size-clock: 32px;
     --court-size-score: 30px;
     --court-size-number: 22px;
+    /* The box is one row here, 36 high inside: the count over the badge, 11, 13, 16 and
+       12, 13, which is all that height holds (16 + 2 + 17 at the double bonus). */
+    --court-fouls-2: 16px;
+    --court-badge-1: 12px;
+    --court-badge-2: 13px;
+    --court-badge-tight: 10px;
     --court-tile-height: 56px;
     --court-chip-height: 44px;
     --court-points-height: 56px;
@@ -2239,6 +2269,12 @@
     flex-direction: column;
     gap: 2px;
     order: 1;
+  }
+  /* At the double bonus the badge is a filled bar as wide as its place, as on an upright
+     phone: seen from the corner of the eye, where a pill of small letters is not. */
+  .court-bonus[data-level='2'] {
+    align-self: stretch;
+    margin-inline: 6px;
   }
   .court-score-value {
     order: 2;
@@ -2395,6 +2431,13 @@
     --court-who-height: 48px;
     --court-subs-label: 0px;
     --court-pad-edge: 22px;
+    --court-fouls-0: 14px;
+    --court-fouls-1: 20px;
+    --court-fouls-2: 26px;
+    --court-fouls-tight: 18px;
+    --court-badge-1: 15px;
+    --court-badge-2: 19px;
+    --court-badge-tight: 14px;
     padding-block: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-bottom));
     padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
   }
@@ -2465,19 +2508,16 @@
     padding-inline: 18px;
     font-size: 17px;
   }
+  /* A tablet's box has the room, and uses it: the count goes 14, 20, 26 and the badge 15,
+     19, on one line that is 28 high from the first foul, so nothing moves at the bonus. */
   .court-score-fouls {
     gap: 10px;
-    min-block-size: 24px;
-    font-size: 14px;
-  }
-  .court-fouls-count[data-level='1'] {
-    font-size: 16px;
-  }
-  .court-fouls-count[data-level='2'] {
-    font-size: 19px;
+    min-block-size: 28px;
   }
   .court-bonus {
-    padding-inline: 8px;
+    padding-block: 3px;
+    padding-inline: 9px;
+    border-radius: 14px;
   }
   .court-timeouts-chip {
     display: inline-flex;

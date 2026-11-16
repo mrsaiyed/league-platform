@@ -121,6 +121,60 @@ describe('the courtside look: contrast', () => {
   });
 });
 
+describe('the courtside look: the bonus at a glance (the area 4 review of step 2.36, M3)', () => {
+  /** The sizes one arrangement sets, on top of the ones before it. */
+  const sizes = (from: string, over: Record<string, number> = {}): Record<string, number> => {
+    const start = rules.indexOf(from);
+    if (start === -1) throw new Error(`court.css has no "${from}"`);
+    const end = rules.indexOf('}', start);
+    const set = { ...over };
+    for (const m of rules
+      .slice(start, end)
+      .matchAll(/--court-((?:fouls|badge)-[a-z0-9]+):\s*(\d+)px/g)) {
+      set[m[1] ?? ''] = Number(m[2]);
+    }
+    return set;
+  };
+  const phone = sizes('.court {');
+  const arrangements: [string, Record<string, number>][] = [
+    ['an upright phone', phone],
+    ['a phone lying down', sizes('@media (orientation: landscape) and (max-height: 520px)', phone)],
+    ['a tablet', sizes('@media (min-width: 700px) and (min-height: 521px)', phone)],
+  ];
+
+  it.each(arrangements)('on %s the count grows in steps a glance tells apart', (_what, size) => {
+    const [rest, bonus, double] = [size['fouls-0'], size['fouls-1'], size['fouls-2']];
+    // Two pixels or more a step, and each step at least a seventh larger: never the one
+    // pixel a step the first build had on a phone.
+    expect((bonus ?? 0) - (rest ?? 0)).toBeGreaterThanOrEqual(2);
+    expect((double ?? 0) - (bonus ?? 0)).toBeGreaterThanOrEqual(2);
+    expect((bonus ?? 0) / (rest ?? 1)).toBeGreaterThanOrEqual(1.14);
+    expect((double ?? 0) / (bonus ?? 1)).toBeGreaterThanOrEqual(1.14);
+  });
+
+  it.each(arrangements)('on %s the badge is larger at the double bonus', (_what, size) => {
+    expect(size['badge-2']).toBeGreaterThan(size['badge-1'] ?? 0);
+    // Where letters are wider than the box, one step down, never up.
+    expect(size['badge-tight']).toBeLessThan(size['badge-1'] ?? 0);
+    expect(size['fouls-tight']).toBeLessThanOrEqual(size['fouls-1'] ?? 0);
+  });
+
+  it('a tablet uses the room it has', () => {
+    const tablet = arrangements[2]?.[1] ?? {};
+    expect(tablet['fouls-2']).toBeGreaterThanOrEqual(24);
+    expect(tablet['badge-2']).toBeGreaterThanOrEqual(18);
+  });
+
+  it('never by color alone: the badge says it in words, hollow then filled', () => {
+    const badge = /^\.court-bonus\s*\{[^}]*\}/m.exec(rules)?.[0] ?? '';
+    const double = /^\.court-bonus\[data-level='2'\]\s*\{[^}]*\}/m.exec(rules)?.[0] ?? '';
+    expect(badge).toContain('border: 1px solid var(--court-team-red)');
+    expect(badge).not.toContain('background');
+    expect(double).toContain('background: var(--court-red)');
+    expect(double).toContain('font-size: var(--court-badge-2)');
+  });
+});
+
 describe('the courtside look: its own values, and nothing else', () => {
   it('reads only its own variables, never a league’s design values', () => {
     const read = [...rules.matchAll(/var\((--[a-z0-9-]+)/g)].map((m) => m[1] ?? '');

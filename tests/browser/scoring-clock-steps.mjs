@@ -781,6 +781,36 @@ export async function clockSteps(kit) {
             ),
           JSON.stringify(boxes),
         );
+        // The bonus at a glance (the area 4 review, M3): at the double bonus the count is
+        // 15 px or more and the badge 12 or more on a phone, 26 and 19 on a tablet,
+        // unless this device's letters are wider than the box (then a step smaller, and
+        // still whole); and the count is never larger than the score beside it.
+        const drawn = await page.evaluate(() =>
+          [...document.querySelectorAll('[data-score]')].map((box) => {
+            const px = (part) => Number.parseFloat(getComputedStyle(part).fontSize);
+            return {
+              count: px(box.querySelector('[data-team-fouls]')),
+              badge: px(box.querySelector('[data-bonus]')),
+              score: px(box.querySelector('.court-score-value')),
+              tight: box.querySelector('.court-score-fouls').hasAttribute('data-tight'),
+            };
+          }),
+        );
+        const tablet = size.width >= 700 && size.height >= 521;
+        const least = tablet ? { count: 26, badge: 19 } : { count: 15, badge: 12 };
+        console.log(
+          `  ${size.width} x ${size.height}: at the double bonus the count is ${drawn[0]?.count} px, the badge ${drawn[0]?.badge} px, the score ${drawn[0]?.score} px${drawn.some((box) => box.tight) ? ' (letters wider than the box: a step smaller)' : ''}`,
+        );
+        note(
+          `${size.width} x ${size.height}: at the double bonus the count and the badge are at their largest, and the score is larger still`,
+          drawn.length === 2 &&
+            drawn.every(
+              (box) =>
+                box.score > box.count &&
+                (box.tight || (box.count >= least.count && box.badge >= least.badge)),
+            ),
+          JSON.stringify(drawn),
+        );
       }
       await page.setViewportSize({ width: phoneLying.width, height: phoneLying.height });
       await accessible(page, 'both teams in the double bonus');
