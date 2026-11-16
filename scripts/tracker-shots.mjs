@@ -26,6 +26,7 @@ import {
   playStretch,
   scorekeeper,
   sizes,
+  stopClockGame,
   trackerPath,
 } from '../tests/browser/tracker-driver.mjs';
 import {
@@ -60,8 +61,17 @@ const states = [
   {
     name: '02-lineups',
     about: 'before tip-off: nobody picked yet',
-    run: async (page) => {
-      await court(page).open();
+    run: async (page, origin) => {
+      const c = court(page);
+      await c.open();
+      // The made-up league plays a running clock, under which a foul or a timeout does
+      // not stop the clock. So that the pictures of step 2.36 show a clock stopped for a
+      // foul and for a timeout, the game is let go of, switched to a stop clock from
+      // another tablet (the engine's own switch), and opened again.
+      await c.leave();
+      await stopClockGame(origin);
+      await page.goto(`${origin}${trackerPath()}`);
+      await c.open();
     },
   },
   {
@@ -226,6 +236,190 @@ const states = [
       await c.pad.locator('[data-rest]').waitFor();
       await c.root.locator('[data-account] > summary').click();
       await c.root.locator('[data-account] .site-account-panel').waitFor();
+    },
+  },
+  // --- Step 2.36: the clock, periods, team fouls and timeouts. The game is a stop-clock
+  // game here (a foul or a timeout stops a running clock), set before tip-off. ---
+  {
+    name: '19-clock-stopped',
+    about: 'the clock stopped by hand: the Start clock button in the pad, with why',
+    run: async (page) => {
+      const c = court(page);
+      await c.root.locator('[data-account] > summary').click();
+      await c.startClock();
+      await page.waitForTimeout(2600);
+      await c.pauseClock();
+      await c.startButton.waitFor();
+    },
+  },
+  {
+    name: '20-clock-running',
+    about: 'the clock running: Pause, in a word and a shape of its own; the pad at rest',
+    run: async (page) => {
+      // Started with the large button in the pad, where the thumb is.
+      await court(page).startButton.click();
+      await court(page).root.locator('[data-clock-toggle][data-state="pause"]').waitFor();
+    },
+  },
+  {
+    name: '21-stopped-for-a-foul',
+    about: 'a foul on the running clock stopped it: said, and the Start clock button says why',
+    run: async (page) => {
+      const c = court(page);
+      await c.play('away', 3, 'foul');
+      await c.startButton.waitFor();
+    },
+  },
+  {
+    name: '22-options-clock-stopped',
+    about: 'a player’s options while the clock is stopped: a free throw is scored as always',
+    run: async (page) => {
+      const c = court(page);
+      await page.waitForTimeout(3400);
+      await c.tile('home', 3).click();
+      await c.pad.locator('[data-options]').waitFor();
+    },
+  },
+  {
+    name: '23-set-clock',
+    about:
+      'the clock tapped: the period picker and the form with large keys, 20:00 typed, which puts time back on',
+    run: async (page) => {
+      const c = court(page);
+      await c.pad.locator('.court-close').click();
+      await c.typeClock('2000');
+    },
+  },
+  {
+    name: '24-clock-set',
+    about: 'the clock set: said, with what came off the players’ minutes when time went back on',
+    run: async (page) => {
+      const c = court(page);
+      await c.setClock('');
+      await c.said.filter({ hasText: /./ }).waitFor();
+    },
+  },
+  {
+    name: '25-timeouts',
+    about: 'both teams’ timeouts in the pad: how many are left by length, and the rule',
+    run: async (page) => {
+      const c = court(page);
+      await c.startClock();
+      await c.timeoutsButton.click();
+      await c.timeoutsPad.waitFor();
+    },
+  },
+  {
+    name: '26-timeout-taken',
+    about: 'a timeout taken on the running clock: said, and the clock stopped for it',
+    run: async (page) => {
+      const c = court(page);
+      await c.timeout('home');
+      await c.startButton.waitFor();
+    },
+  },
+  {
+    name: '27-timeout-question',
+    about: 'a team with none left: asked first, before one more is recorded',
+    run: async (page) => {
+      const c = court(page);
+      await c.timeout('home');
+      await page.waitForTimeout(3400);
+      await c.timeout('home', 60, { anyway: false });
+    },
+  },
+  {
+    name: '28-timeouts-used',
+    about: 'timeouts used up: "none left", those taken with period and time, − for the latest',
+    run: async (page) => {
+      const c = court(page);
+      await page.waitForTimeout(450);
+      await c.recorded(() => c.pad.locator('[data-answer="yes"]').click());
+      await page.waitForTimeout(3400);
+      await c.timeout('away');
+      await page.waitForTimeout(3400);
+      await c.timeoutsButton.click();
+      await c.timeoutsPad.waitFor();
+    },
+  },
+  {
+    name: '29-bonus',
+    about: 'the visitors’ seventh team foul: the home team’s Bonus badge, the horn’s sentence',
+    run: async (page) => {
+      const c = court(page);
+      await c.pad.locator('.court-close').click();
+      // The visitors have three team fouls this half; four more is the bonus.
+      for (const jersey of [5, 7, 11, 5]) await c.play('away', jersey, 'foul');
+      await c.bonus('home').waitFor();
+    },
+  },
+  {
+    name: '30-double-bonus',
+    about: 'the double bonus for one team and the bonus for the other, each in its box',
+    run: async (page) => {
+      const c = court(page);
+      for (const jersey of [7, 11, 5]) await c.play('away', jersey, 'foul');
+      // The home team has six; its seventh puts the visitors in the bonus.
+      await c.play('home', 3, 'foul');
+      await c.bonus('away').waitFor();
+    },
+  },
+  {
+    name: '31-both-double-bonus',
+    about: 'both teams in the double bonus: the fullest the scoreboard’s boxes get',
+    run: async (page) => {
+      const c = court(page);
+      for (const jersey of [5, 9, 11]) await c.play('home', jersey, 'foul');
+      await c.root.locator('[data-bonus="away"][data-level="2"]').waitFor();
+      await page.waitForTimeout(3400);
+    },
+  },
+  {
+    name: '32-halftime',
+    about:
+      'the clock ran out: "Halftime.", Start greyed as "Period over", the way to the next period',
+    run: async (page) => {
+      const c = court(page);
+      await c.setClock('2');
+      await c.startClock().catch(() => undefined);
+      await c.pickPeriodButton.waitFor();
+    },
+  },
+  {
+    name: '33-period-picker',
+    about: 'the period picker at 0:00: every period and three overtimes, the next one in gold',
+    run: async (page) => {
+      const c = court(page);
+      await c.pickPeriodButton.click();
+      await c.clockSheet.waitFor();
+    },
+  },
+  {
+    name: '34-second-half',
+    about: 'the second half picked: the clock at its length, team fouls start again',
+    run: async (page) => {
+      const c = court(page);
+      await c.pickPeriod(2);
+      await c.startButton.waitFor();
+    },
+  },
+  {
+    name: '35-end-of-period',
+    about: 'the last period’s clock ran out: "End of H2."',
+    run: async (page) => {
+      const c = court(page);
+      await c.setClock('2');
+      await c.startClock().catch(() => undefined);
+      await c.pickPeriodButton.waitFor();
+    },
+  },
+  {
+    name: '36-overtime',
+    about: 'overtime picked: OT1, its own length, and the fouls carried on from the last period',
+    run: async (page) => {
+      const c = court(page);
+      await c.pickPeriod(3);
+      await c.startButton.waitFor();
     },
   },
 ];

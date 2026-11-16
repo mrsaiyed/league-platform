@@ -4,6 +4,12 @@
 // action to the controller that exists (tracker-controller.ts). It keeps no copy of the
 // game: what is drawn is the controller's game, through scoring-view.ts.
 //
+// Step 2.36 added the clock: Start, Pause, setting it, periods, the large Start clock
+// button, team fouls with the bonus horn, and timeouts. The clock is read from the
+// server's time (game-clock.ts) and written into its place by a ticker that draws
+// nothing else again. Start, Pause and setting the clock are taps like any other, and
+// are not plays: Undo (step 2.37) takes back the last play, never a clock correction.
+//
 // A tap answers at once (finding M6; DESIGN.md section 7, line 9). What is painted before
 // the controller has the tap: a tapped player's ring, and for an option the tile's mark
 // ("+2"), drawn hollow, as taken and not as a recorded play. When the controller answers,
@@ -23,8 +29,30 @@ import {
   type PointerEvent,
   type ReactNode,
 } from 'react';
+import {
+  bonusRises,
+  browserHornAudio,
+  createBonusHorn,
+  type BonusHorn,
+  type BonusShown,
+} from './bonus-horn.ts';
+import type { ClockSheet, CourtClock } from './clock-parts.tsx';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
-import { playerLabel, refusalText } from './engine-words.ts';
+import { findPlayer, periodText, playerLabel, refusalText } from './engine-words.ts';
+import {
+  clockEntry,
+  clockEntryKey,
+  minutesNow,
+  periodChoices,
+  periodEnd,
+  putsBackMs,
+  readClock,
+  startOffered,
+  stopKey,
+  stopReason,
+  type ClockReading,
+  type StopReason,
+} from './game-clock.ts';
 import type { OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, LineupPicks } from './opened-game-storage.ts';
 import {
@@ -38,13 +66,15 @@ import {
   subTap,
   swapColorsTap,
   tapTile,
+  timeoutTap,
   type PadAction,
   type PadMode,
+  type TimeoutCall,
 } from './scoring-moves.ts';
-import { findTile, scoringView, type PlayerTile } from './scoring-view.ts';
+import { findTile, scoringView, type PlayerTile, type ScoringView } from './scoring-view.ts';
 import { createTileDrag, type TileDrag } from './tile-drag.ts';
 import { createTileMarks, type MarkKind, type TileMark, type TileMarks } from './tile-marks.ts';
-import type { TapInput, TrackerControllerStatus } from './tracker-controller.ts';
+import type { TapInput, TapResult, TrackerControllerStatus } from './tracker-controller.ts';
 
 export type ScoringScreenProps = {
   readonly game: OpenedTrackerGame;
@@ -130,39 +160,104 @@ function afterPaint(work: () => void): void {
   window.setTimeout(once, 150);
 }
 
-/** Server time, read once a second while the clock runs: the minutes on the tiles. */
-function useElapsed(state: basketball.GameState, now: () => number): number {
-  const read = useCallback(() => basketball.clockAt(state, now()).elapsedMs, [state, now]);
-  const [elapsed, setElapsed] = useState(read);
-  useEffect(() => {
-    setElapsed(read());
-    if (!state.clock.running) return;
-    const timer = window.setInterval(() => setElapsed(read()), 1000);
-    return () => window.clearInterval(timer);
-  }, [read, state.clock.running]);
-  return elapsed;
+/**
+ * Rings a button the moment it is tapped, before the tap is stored (finding M6): Start
+ * and Pause change their word only once the device has kept the tap (T-114), and the
+ * ring says meanwhile that the tap was taken. Gives back what takes the ring off again.
+ */
+function taken(button: Element): () => void {
+  button.setAttribute('data-taken', '');
+  return () => button.removeAttribute('data-taken');
 }
 
-/** The game clock as it reads now, four times a second while it runs, from the server's time. */
-function ClockTime({
-  state,
-  now,
-}: {
-  readonly state: basketball.GameState;
-  readonly now: () => number;
-}) {
-  const read = useCallback(
-    () => basketball.formatClock(basketball.clockAt(state, now()).remainingMs),
-    [state, now],
+/** How long the large Start clock button takes no tap once the pad has come to rest. */
+const restGuardMs = 350;
+/** How often the running clock is read (checklist T3: four times a second). */
+const tickMs = 250;
+
+/** Writes `text` into a place React drew, keeping React's own text node where there is one. */
+function writeText(place: Element | null, text: string): void {
+  if (place === null || place.textContent === text) return;
+  const only = place.childNodes.length === 1 ? place.firstChild : null;
+  if (only !== null && only.nodeType === Node.TEXT_NODE) only.nodeValue = text;
+  else place.textContent = text;
+}
+
+/**
+ * The game clock on the screen (checklist T3, T4; finding M1). It is read from the
+ * SERVER's time (`now`), never the device's, four times a second while it runs, and
+ * written straight into its place and into the minutes' places (`data-clock-time`,
+ * `data-minutes-of`): nothing of the screen is drawn again for a tick, so a running
+ * clock never makes a tile's tap wait. The screen is drawn again only when the clock
+ * runs out, and `onRanOut` is then called once.
+ */
+function useGameClock(
+  game: basketball.GameState,
+  now: () => number,
+  root: { readonly current: HTMLElement | null },
+  view: ScoringView,
+  t: Translate,
+  onRanOut: () => void,
+): ClockReading {
+  const [, setRanOut] = useState<basketball.GameState | null>(null);
+  // What the game holds of each player's minutes, as of its latest tap.
+  const minutes = useMemo(() => {
+    const held = new Map<string, { readonly ms: number; readonly onCourt: boolean }>();
+    for (const side of basketball.SIDES) {
+      for (const tile of [...view.teams[side].floor, ...view.teams[side].bench]) {
+        held.set(tile.id, { ms: tile.ms, onCourt: tile.onCourt });
+      }
+    }
+    return held;
+  }, [view]);
+  const painted = useRef<{ game: basketball.GameState; text: string } | null>(null);
+  const paint = useCallback(
+    (all: boolean): ClockReading => {
+      const reading = readClock(game, now());
+      const last = painted.current;
+      // Between seconds nothing reads differently: nothing is looked for, nothing written.
+      if (!all && last !== null && last.game === game && last.text === reading.text) {
+        return reading;
+      }
+      painted.current = { game, text: reading.text };
+      const screen = root.current;
+      if (screen === null) return reading;
+      writeText(screen.querySelector('[data-clock-time]'), reading.text);
+      for (const place of screen.querySelectorAll<HTMLElement>('[data-minutes-of]')) {
+        const held = minutes.get(place.dataset.minutesOf ?? '');
+        if (held === undefined) continue;
+        const text = minutesNow(game, reading, held.ms, held.onCourt);
+        writeText(
+          place,
+          place.hasAttribute('data-minutes-played')
+            ? t('tracker.pad.who.minutes', { minutes: text })
+            : text,
+        );
+      }
+      return reading;
+    },
+    [game, now, root, minutes, t],
   );
-  const [text, setText] = useState(read);
+  // After every drawing: what was just drawn from the game's latest tap reads as of now.
+  useLayoutEffect(() => {
+    paint(true);
+  });
+  const ranOut = useRef(onRanOut);
+  useLayoutEffect(() => {
+    ranOut.current = onRanOut;
+  });
   useEffect(() => {
-    setText(read());
-    if (!state.clock.running) return;
-    const timer = window.setInterval(() => setText(read()), 250);
+    // A clock already at 0:00 when the game is shown ran out unseen: nothing is announced.
+    if (!game.clock.running || !readClock(game, now()).running) return;
+    const timer = window.setInterval(() => {
+      if (paint(false).running) return;
+      window.clearInterval(timer);
+      setRanOut(game);
+      ranOut.current();
+    }, tickMs);
     return () => window.clearInterval(timer);
-  }, [read, state.clock.running]);
-  return text;
+  }, [game, now, paint]);
+  return readClock(game, now());
 }
 
 export function ScoringScreen(props: ScoringScreenProps) {
@@ -188,13 +283,20 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const markTile = (playerId: string, text: string, kind: MarkKind): TileMark =>
     tileMarks.show(playerId, text, kind);
 
-  const elapsed = useElapsed(state, status.now);
-  const view = useMemo(
-    () => scoringView(state, rosters, picks, elapsed),
-    [state, rosters, picks, elapsed],
-  );
+  // The view holds each player's minutes as of the game's latest tap; the clock's ticker
+  // writes them on from there, so the view is not worked out again as the clock runs.
+  const view = useMemo(() => scoringView(state, rosters, picks), [state, rosters, picks]);
   // The options of a player the game no longer shows are not left open.
   const pad = padFor(view, padMode);
+  // --- The clock (step 2.36). ---
+  /** The form that sets the clock and picks the period: open or not, and what is typed. */
+  const [clockOpen, setClockOpen] = useState(false);
+  const [digits, setDigits] = useState('');
+  /** The stop of the clock for which × hid the large Start clock button (T10). */
+  const [startHiddenFor, setStartHiddenFor] = useState<string | null>(null);
+  const horn = useRef<BonusHorn | null>(null);
+  horn.current ??= createBonusHorn(browserHornAudio);
+  const bonusHorn = horn.current;
   /**
    * What the pad is to show, as the taps so far leave it. It is known at once, a frame
    * before it is drawn (a tap is answered on its tile first), so a second tap made in
@@ -219,14 +321,19 @@ export function ScoringScreen(props: ScoringScreenProps) {
     [],
   );
 
-  /** Sends a tap to the controller; a refusal is said in a sentence (checklist I6). */
-  const send = useCallback(
-    async (input: TapInput, saidWhenTaken?: string): Promise<boolean> => {
+  /**
+   * Hands a tap to the controller and gives its answer; a refusal is said in a sentence
+   * (checklist I6). A tap that was taken comes back with the game as it stands with it.
+   */
+  const tap = useCallback(
+    async (
+      input: TapInput,
+    ): Promise<
+      | (Extract<TapResult, { ok: true }> & { readonly game: basketball.GameState | null })
+      | { readonly ok: false }
+    > => {
       const result = await controller.tap(input);
-      if (result.ok) {
-        if (saidWhenTaken !== undefined) say(saidWhenTaken);
-        return true;
-      }
+      if (result.ok) return { ...result, game: controller.status().game };
       // The device stopped scoring as the tap was made: this screen is about to be
       // taken away, so the page that replaces it is told, and says so there.
       if (result.reason === 'not-scoring') onNotRecorded?.();
@@ -235,10 +342,110 @@ export function ScoringScreen(props: ScoringScreenProps) {
           ? refusalText(result.message, t)
           : t(result.reason === 'storage' ? 'tracker.say.storage' : 'tracker.say.notScoring'),
       );
-      return false;
+      return { ok: false };
     },
     [controller, say, t, onNotRecorded],
   );
+  /** Sends a tap; says `saidWhenTaken` once it is taken. */
+  const send = useCallback(
+    async (input: TapInput, saidWhenTaken?: string): Promise<boolean> => {
+      const result = await tap(input);
+      if (result.ok && saidWhenTaken !== undefined) say(saidWhenTaken);
+      return result.ok;
+    },
+    [tap, say],
+  );
+
+  // The clock as it reads now, from the server's time. When it runs out the screen says
+  // "Halftime." or "End of Q1." (T4). No horn sounds then: the horn is the bonus horn.
+  const reading = useGameClock(state, status.now, root, view, t, () => {
+    const period = periodText(view.period, view.periods, t);
+    say(
+      periodEnd(view.period, view.periods) === 'halftime'
+        ? t('tracker.say.halftime')
+        : t('tracker.say.periodEnd', { period }),
+    );
+  });
+  const lineupsSet = basketball.SIDES.every((side) => view.teams[side].stage === 'set');
+  const startShown = startOffered(state, reading, {
+    lineupsSet,
+    period: view.period,
+    hiddenFor: startHiddenFor,
+  });
+  const whyStopped = (reason: StopReason): string => {
+    switch (reason.kind) {
+      case 'tip-off':
+        return t('tracker.start.reason.tipOff');
+      case 'foul':
+        return t('tracker.start.reason.foul', {
+          player: playerLabel(findPlayer(rosters, reason.playerId), t),
+        });
+      case 'timeout':
+        return t('tracker.start.reason.timeout', { team: view.teams[reason.side].name });
+      case 'period-start':
+        return t('tracker.start.reason.periodStart', {
+          period: periodText(reason.period, view.periods, t),
+        });
+      case 'stopped':
+        return t('tracker.start.reason.stopped');
+    }
+  };
+  const clock: CourtClock = {
+    text: reading.text,
+    running: reading.running,
+    over: reading.over,
+    start: startShown
+      ? { tipOff: state.status === 'scheduled', why: whyStopped(stopReason(state)) }
+      : null,
+  };
+  const entry = clockEntry(digits);
+  const back = entry.ms === null ? 0 : putsBackMs(reading, entry.ms);
+  const clockSheet: ClockSheet | null = clockOpen
+    ? {
+        entry,
+        putsBack: back > 0 ? basketball.formatClock(back) : null,
+        periods: periodChoices(state.rules, view.period),
+      }
+    : null;
+
+  // The bonus horn (F4): when a team's bonus rises, one note (two for the double bonus)
+  // and the sentence, since a muted tablet is the normal case. A game opened already in
+  // the bonus is silent. The horn's failure is its own affair (bonus-horn.ts).
+  const bonusShown = useRef<BonusShown | null>(null);
+  const [homeBonus, awayBonus] = [view.teams.home.bonus, view.teams.away.bonus];
+  const [homeName, awayName] = [view.teams.home.name, view.teams.away.name];
+  useEffect(() => {
+    const now = { home: homeBonus, away: awayBonus };
+    const rises = bonusRises(bonusShown.current, now);
+    bonusShown.current = now;
+    if (rises.length === 0) return;
+    bonusHorn.sound(rises.some((rise) => rise.level === 2) ? 2 : 1);
+    say(
+      rises
+        .map((rise) =>
+          t(`tracker.say.bonus.${rise.level}`, {
+            team: rise.side === 'home' ? homeName : awayName,
+          }),
+        )
+        .join(' '),
+    );
+  }, [homeBonus, awayBonus, homeName, awayName, bonusHorn, say, t]);
+
+  /** When the pad last came to rest on the screen: the Start clock button waits a moment. */
+  const restSince = useRef(0);
+  const padKind = pad.kind;
+  useLayoutEffect(() => {
+    if (padKind === 'rest') restSince.current = performance.now();
+  }, [padKind]);
+  /**
+   * True for a tap on the pad's Start clock button made as the pad came to rest: the
+   * second of two fast taps, meant for what was there a moment before. It lies where no
+   * option lies, and this is the second guard.
+   */
+  const tooSoonAfterRest = (event: MouseEvent): boolean =>
+    event.detail !== 0 &&
+    event.currentTarget.closest('[data-pad]') !== null &&
+    event.timeStamp - restSince.current < restGuardMs;
 
   const keepPicks = useCallback(
     (next: LineupPicks) => {
@@ -260,7 +467,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const toldOut = useRef(new Set<string>());
 
   /** Where the keyboard goes next: back to a tile, or into the pad that just opened. */
-  const focusNext = useRef<{ readonly tile: string } | 'pad' | null>(null);
+  const focusNext = useRef<
+    { readonly tile: string } | { readonly selector: string } | 'pad' | null
+  >(null);
   useEffect(() => {
     const next = focusNext.current;
     if (next === null) return;
@@ -268,6 +477,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
     if (next === 'pad') {
       // The first point button, never a substitution: a second Enter must not swap players.
       root.current?.querySelector<HTMLElement>('[data-pad] [data-act="p1"]')?.focus();
+    } else if ('selector' in next) {
+      root.current?.querySelector<HTMLElement>(next.selector)?.focus();
     } else {
       tileElement(root.current, next.tile)?.focus();
     }
@@ -320,22 +531,40 @@ export function ScoringScreen(props: ScoringScreenProps) {
             );
       const kind = input.type === 'score' ? 'points' : action === 'foul' ? 'foul' : 'plain';
       const mark = markTile(tile.id, text, kind);
+      // A foul may bring the bonus horn: a phone lets sound start only from a tap, so
+      // the horn is made ready in this one (F4).
+      if (action === 'foul') bonusHorn.ready();
       // A foul on a player already at the limit is recorded, and said once for each.
       const alreadyOut = action === 'foul' && tile.fouledOut && !toldOut.current.has(tile.id);
       if (alreadyOut) toldOut.current.add(tile.id);
-      const saidWhenTaken =
-        action === 'turnover'
-          ? t('tracker.say.turnover', { player: name })
-          : alreadyOut
-            ? t('tracker.say.outRecorded', { player: name })
-            : undefined;
+      const bonusBefore = { home: view.teams.home.bonus, away: view.teams.away.bonus };
       // The options close with the tap (D7). The mark is painted first; the tap is then
       // handed to the controller, which stores it before the tile counts it (T-114).
       const keyboard = byKeyboard(event);
       afterPaint(() => {
         setPadMode(wanted.current);
         if (keyboard) focusNext.current = { tile: tile.id };
-        void send(input, saidWhenTaken).then((taken) => answerMarks([mark], taken));
+        void tap(input).then((result) => {
+          answerMarks([mark], result.ok);
+          if (!result.ok) return;
+          if (action === 'turnover') {
+            say(t('tracker.say.turnover', { player: name }));
+            return;
+          }
+          if (action !== 'foul' || result.game === null) return;
+          // A foul that put the other team in the bonus is said as that, with the horn
+          // (the effect above): nothing here is said over it.
+          const teams = basketball.derive(result.game).teams;
+          if (
+            bonusRises(bonusBefore, { home: teams.home.bonus, away: teams.away.bonus }).length > 0
+          )
+            return;
+          if (alreadyOut) say(t('tracker.say.outRecorded', { player: name }));
+          // On a running clock under a stop clock the foul stopped it: said, since it
+          // changes what comes next (D8). The Start clock button then says why.
+          else if (result.game.plays.find((p) => p.id === result.commandId)?.stoppedClock === true)
+            say(t('tracker.say.foulStopped', { player: name }));
+        });
       });
     },
     substitute(coming, going, event) {
@@ -399,8 +628,113 @@ export function ScoringScreen(props: ScoringScreenProps) {
       setMoreOpen(false);
       void send(swapColorsTap(state));
     },
+    // --- The clock, periods and timeouts (step 2.36). ---
+    startClock(event) {
+      if (tooSoonAfterRest(event)) return;
+      // The first tap of a game is often this one: the horn is made ready for later.
+      bonusHorn.ready();
+      void send({ type: 'start' }).finally(taken(event.currentTarget));
+    },
+    pauseClock(event) {
+      void send({ type: 'pause' }).finally(taken(event.currentTarget));
+    },
+    periodOver() {
+      say(t('tracker.refusal.periodOver'));
+    },
+    hideStart(event) {
+      if (tooSoonAfterRest(event)) return;
+      setStartHiddenFor(stopKey(state, view.period));
+      // Start is still one tap away, under the scoreboard: the keyboard goes there.
+      focusNext.current = { selector: '[data-clock-toggle]' };
+    },
+    clockSheet(open) {
+      setDigits('');
+      setClockOpen(open);
+    },
+    clockKey(key) {
+      setDigits((typed) =>
+        key === 'clear' ? '' : key === 'back' ? typed.slice(0, -1) : clockEntryKey(typed, key),
+      );
+    },
+    setClock() {
+      const typed = clockEntry(digits);
+      if (typed.ms === null) return;
+      const before = readClock(state, status.now());
+      setDigits('');
+      setClockOpen(false);
+      void tap({ type: 'set-clock', ms: typed.ms }).then((result) => {
+        if (!result.ok || result.game === null) return;
+        // What the engine really took off the minutes: time put back on, within the period.
+        const tookOff = before.elapsedMs - result.game.clock.elapsedMs;
+        say(
+          tookOff > 0
+            ? t('tracker.say.clockSetBack', {
+                clock: typed.text,
+                back: basketball.formatClock(tookOff),
+              })
+            : t('tracker.say.clockSet', { clock: typed.text }),
+        );
+      });
+    },
+    pickPeriod(period) {
+      setDigits('');
+      setClockOpen(false);
+      void send(
+        { type: 'period', period },
+        t('tracker.say.periodStart', {
+          period: periodText(period, view.periods, t),
+          clock: basketball.formatClock(basketball.periodMs(state.rules, period)),
+        }),
+      );
+    },
+    timeouts() {
+      const open = wanted.current.kind === 'timeouts';
+      setSaid(null);
+      showPad(open ? padAtRest : { kind: 'timeouts', asking: null });
+    },
+    callTimeout(call, event) {
+      const now = wanted.current;
+      if (now.kind !== 'timeouts' || now.asking !== null) return;
+      // A team with none of that length left is asked about first (G5).
+      if (timeoutTap(view, call).kind === 'ask') {
+        askedAt.current = event.timeStamp;
+        showPad({ kind: 'timeouts', asking: call });
+        if (byKeyboard(event)) focusNext.current = { selector: '[data-pad] [data-answer="no"]' };
+        return;
+      }
+      recordTimeout(call);
+    },
+    answerTimeout(record, event) {
+      const now = wanted.current;
+      if (now.kind !== 'timeouts' || now.asking === null) return;
+      // The second of two fast taps on a timeout button is not an answer.
+      if (event.detail !== 0 && event.timeStamp - askedAt.current < restGuardMs) return;
+      if (record) recordTimeout(now.asking);
+      else showPad({ kind: 'timeouts', asking: null });
+    },
+    takeBackTimeout(side) {
+      void send(
+        { type: 'untimeout', side },
+        t('tracker.say.untimeout', { team: view.teams[side].name }),
+      );
+    },
     leave: props.leave,
   };
+
+  /** When "Record it anyway?" was asked: its answers wait a moment, as Start clock does. */
+  const askedAt = useRef(0);
+  /** Records a timeout; the list closes and the screen says it, and that the clock stopped (G6). */
+  function recordTimeout(call: TimeoutCall) {
+    showPad(padAtRest);
+    const team = view.teams[call.side].name;
+    void tap({ type: 'timeout', side: call.side, seconds: call.seconds }).then((result) => {
+      if (!result.ok) return;
+      const stopped =
+        result.game?.plays.find((p) => p.id === result.commandId)?.stoppedClock === true;
+      const length = call.seconds === 30 ? 'short' : 'full';
+      say(t(`tracker.say.timeout.${length}${stopped ? 'Stopped' : ''}`, { team }));
+    });
+  }
 
   function markSub(coming: PlayerTile, going: PlayerTile) {
     return [
@@ -409,22 +743,34 @@ export function ScoringScreen(props: ScoringScreenProps) {
     ];
   }
 
-  // --- More: opened as a dialog; Escape closes it, and the keyboard stays inside it. ---
-  const moreButton = useRef<HTMLElement | null>(null);
+  // --- More, and the clock's form: each opened as a dialog; Escape closes it, and the
+  // keyboard stays inside it. The keyboard returns to the button that opened it. ---
+  const dialog = clockOpen
+    ? { sheet: '[data-clock-sheet] [role="dialog"]', opener: '[data-clock]' }
+    : moreOpen
+      ? { sheet: '[data-more] [role="dialog"]', opener: '.court-more-button' }
+      : null;
+  const [dialogSheet, dialogOpener] = [dialog?.sheet ?? null, dialog?.opener ?? null];
   useEffect(() => {
-    if (!moreOpen) return;
-    const sheet = root.current?.querySelector<HTMLElement>('[data-more] [role="dialog"]');
-    moreButton.current = root.current?.querySelector<HTMLElement>('.court-more-button') ?? null;
-    sheet?.querySelector<HTMLElement>('button, a[href]')?.focus();
-    return () => moreButton.current?.focus();
-  }, [moreOpen]);
+    if (dialogSheet === null || dialogOpener === null) return;
+    const screen = root.current;
+    const sheet = screen?.querySelector<HTMLElement>(dialogSheet);
+    sheet?.querySelector<HTMLElement>('button:not(:disabled), a[href]')?.focus();
+    return () => screen?.querySelector<HTMLElement>(dialogOpener)?.focus();
+  }, [dialogSheet, dialogOpener]);
 
-  // --- The keyboard: Escape closes More, then the open options (checklist S4). ---
+  // --- The keyboard: Escape closes the clock's form or More, then the open options,
+  // then hides the Start clock button (checklist S4, T10). The clock's form takes the
+  // number keys and Backspace wherever the keyboard is in it. ---
+  const startBarShown = startShown && pad.kind === 'rest';
+  const hideStartFor = stopKey(state, view.period);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Tab' && moreOpen) {
-        const sheet = root.current?.querySelector<HTMLElement>('[data-more] [role="dialog"]');
-        const stops = [...(sheet?.querySelectorAll<HTMLElement>('button, a[href]') ?? [])];
+      if (event.key === 'Tab' && dialogSheet !== null) {
+        const sheet = root.current?.querySelector<HTMLElement>(dialogSheet);
+        const stops = [
+          ...(sheet?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]') ?? []),
+        ];
         const [first, last] = [stops[0], stops.at(-1)];
         if (first === undefined || last === undefined) return;
         const at = document.activeElement;
@@ -437,13 +783,41 @@ export function ScoringScreen(props: ScoringScreenProps) {
         }
         return;
       }
+      if (clockOpen && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        const key = /^\d$/.test(event.key)
+          ? event.key
+          : event.key === 'Backspace' || event.key === 'Delete'
+            ? 'back'
+            : null;
+        if (key !== null) {
+          event.preventDefault();
+          setDigits((typed) => (key === 'back' ? typed.slice(0, -1) : clockEntryKey(typed, key)));
+          return;
+        }
+      }
       if (event.key !== 'Escape') return;
+      if (clockOpen) {
+        setDigits('');
+        setClockOpen(false);
+        return;
+      }
       if (moreOpen) {
         setMoreOpen(false);
         return;
       }
       const now = wanted.current;
-      if (now.kind === 'rest') return;
+      if (now.kind === 'rest') {
+        if (!startBarShown) return;
+        setStartHiddenFor(hideStartFor);
+        focusNext.current = { selector: '[data-clock-toggle]' };
+        return;
+      }
+      // "Record it anyway?" closed with Escape is "no": the timeouts stay open.
+      if (now.kind === 'timeouts' && now.asking !== null) {
+        wanted.current = { kind: 'timeouts', asking: null };
+        setPadMode(wanted.current);
+        return;
+      }
       const open = now.kind === 'player' ? now.playerId : null;
       wanted.current = padAtRest;
       setPadMode(padAtRest);
@@ -452,7 +826,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [moreOpen, padMode]);
+  }, [moreOpen, clockOpen, dialogSheet, padMode, startBarShown, hideStartFor]);
 
   // --- Dragging a bench player onto a floor player (checklist E2, E3). ---
   // One press is followed at a time (tile-drag.ts): a second finger on another tile is
@@ -635,7 +1009,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
       view={view}
       title={props.title}
       when={props.when}
-      clock={<ClockTime state={state} now={status.now} />}
+      clock={clock}
+      clockSheet={clockSheet}
       banner={props.banner}
       notices={props.notices}
       pad={pad}

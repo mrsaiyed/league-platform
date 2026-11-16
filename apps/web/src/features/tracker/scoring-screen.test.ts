@@ -159,6 +159,18 @@ const noHandlers: CourtHandlers = {
   more: () => undefined,
   swapColors: () => undefined,
   leave: () => () => undefined,
+  startClock: () => undefined,
+  pauseClock: () => undefined,
+  periodOver: () => undefined,
+  hideStart: () => undefined,
+  clockSheet: () => undefined,
+  clockKey: () => undefined,
+  setClock: () => undefined,
+  pickPeriod: () => undefined,
+  timeouts: () => undefined,
+  callTimeout: () => undefined,
+  answerTimeout: () => undefined,
+  takeBackTimeout: () => undefined,
 };
 
 /** The screen as it is drawn for `view`. */
@@ -179,7 +191,7 @@ function drawn(
       view,
       title: 'Bears at Hawks',
       when: options.when === undefined ? 'Sat, 14 Nov, 7:00 PM' : options.when,
-      clock: '8:00',
+      clock: { text: '8:00', running: false, over: false, start: null },
       banner: { text: 'All saved', state: 'saved' },
       pad: options.pad ?? padAtRest,
       said: options.said ?? null,
@@ -218,6 +230,12 @@ const foulsDrawn = (html: string, id: string) =>
   Number(/data-fouls="(\d+)"/.exec(tileDrawn(html, id))?.[1]);
 /** The pad as drawn. */
 const padDrawn = (html: string): string => html.slice(html.indexOf('id="court-pad"'));
+/** The words of a piece of the screen, as they read, whatever they are wrapped in. */
+const wordsDrawn = (html: string): string =>
+  html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&#x27;/g, '’')
+    .replace(/&amp;/g, '&');
 
 describe('starting lineups (checklist C1 to C4)', () => {
   it('picks five by tapping, sets the lineup on the fifth, and draws the picks', async () => {
@@ -312,7 +330,7 @@ describe('a player’s options (checklist D1 to D11)', () => {
     const html = drawn(device.view(), { pad: { kind: 'player', playerId: h2 } });
     expect(foulsDrawn(html, h2)).toBe(1);
     expect(tagWith(padDrawn(html), 'data-act="unfoul"')).not.toContain('disabled');
-    expect(padDrawn(html)).toContain('On court · 1 foul · 0 pts · 0:00 played');
+    expect(wordsDrawn(padDrawn(html))).toContain('On court · 1 foul · 0 pts · 0:00 played');
   });
 
   it('marks a player at the league’s foul limit, and still scores them (D10)', async () => {
@@ -613,8 +631,13 @@ describe('the frame (checklist A3, A4, A6, I7, T1; DESIGN.md section 7, line 11)
       expect(top).toContain(piece);
     }
     expect(tagWith(top, 'data-saved-banner=""')).toContain('role="status"');
+    // The clock's row, which step 2.36 filled: Start and the way to the timeouts; what
+    // step 2.37 adds (Undo, Redo) goes after them.
+    const controls = html.slice(html.indexOf('data-slot="clock-controls"'));
+    expect(controls.slice(0, controls.indexOf('</section>'))).toMatch(
+      /^data-slot="clock-controls" aria-label="Clock and undo"><button[^>]*data-clock-toggle=""[^>]*>.*<button[^>]*data-timeouts-open=""[^>]*>Timeouts<span[^>]*><\/span><\/button>$/s,
+    );
     // The places left: empty until the steps that own them.
-    expect(html).toContain('data-slot="clock-controls" aria-label="Clock and undo"></section>');
     expect(html).toContain('data-slot="play-log" aria-label="Plays"></section>');
     expect(html).toContain('data-slot="pad-rest"></div>');
     // The hint, in four sentences (I7).

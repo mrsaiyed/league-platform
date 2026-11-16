@@ -624,13 +624,82 @@
   font-weight: 800;
   line-height: 1;
 }
+/* A team's fouls this period, and its bonus, in its box (step 2.36; checklist F1 to F3):
+   a team's heading has no room for them on a phone. The line is always there, so nothing
+   moves when the first foul is given. The count grows and turns red once it has put the
+   other team in the bonus, and again at the double bonus. The badge sits with the team
+   that SHOOTS the bonus and says which in words: hollow for the bonus, filled for the
+   double, so the two differ in more than a shade. */
+.court-score-fouls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-inline-size: 100%;
+  min-block-size: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+.court-fouls-count {
+  color: var(--court-team-muted);
+}
+.court-fouls-count[data-level='1'] {
+  color: var(--court-team-red);
+  font-size: 12px;
+  font-weight: 800;
+}
+.court-fouls-count[data-level='2'] {
+  color: var(--court-team-red);
+  font-size: 14px;
+  font-weight: 800;
+}
+/* The count as the tiles write it ("10F"): only where the box is narrow and holds a
+   badge as well (an upright phone, further down). */
+.court-fouls-short {
+  display: none;
+}
+.court-bonus {
+  padding-block: 2px;
+  padding-inline: 5px;
+  border: 1px solid var(--court-team-red);
+  border-radius: 8px;
+  color: var(--court-team-red);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.court-bonus[data-level='2'] {
+  border-color: var(--court-red);
+  background: var(--court-red);
+  color: var(--court-text);
+}
+/* The clock is the button that sets it and picks the period (T5, T6): a fine edge and a
+   caret say it can be tapped. It turns red at 0:00 (T3), and says "Period over" beside
+   it in words. */
 .court-clock {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-inline-size: 116px;
+  min-block-size: 44px;
+  padding-block: 2px;
+  padding-inline: 4px;
+  border: 1px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: transparent;
   color: var(--court-gold);
+}
+.court-clock[data-zero] {
+  color: var(--court-red-text);
+}
+.court-clock:disabled {
+  border-color: transparent;
+}
+.court-clock:disabled .court-caret {
+  display: none;
 }
 .court-clock-time {
   font-size: var(--court-size-clock);
@@ -638,6 +707,8 @@
   line-height: 1;
 }
 .court-clock-period {
+  display: flex;
+  align-items: center;
   font-size: var(--court-size-text);
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -685,6 +756,86 @@
   gap: var(--court-gap);
   min-block-size: 52px;
   min-inline-size: 0;
+}
+/* Start and Pause (step 2.36; checklist T2): green with a triangle, red with two bars.
+   The word and the shape change, never only the color. At 0:00 it is greyed and says
+   "Period over"; tapped, the screen says what to do. */
+.court-go {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-inline-size: 0;
+  max-inline-size: 260px;
+  min-block-size: 44px;
+  padding-block: 0;
+  padding-inline: 10px;
+  border: 2px solid var(--court-green-line);
+  border-radius: var(--court-radius);
+  background: var(--court-green);
+  color: var(--court-text);
+  font-size: 17px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.court-go[data-state='pause'] {
+  border-color: var(--court-red-line);
+  background: var(--court-red);
+}
+.court-go[data-state='over'],
+.court-go:disabled {
+  border-color: var(--court-line);
+  background: var(--court-tile);
+  color: var(--court-muted);
+}
+.court-go[data-state='over'] .court-mark-start,
+.court-go:disabled .court-mark-start {
+  display: none;
+}
+/* Tapped, and not yet kept by the device: ringed at once, as a tapped tile is. */
+.court-go[data-taken],
+.court-start-button[data-taken] {
+  outline: 3px solid var(--court-gold);
+  outline-offset: 1px;
+}
+/* A triangle and two bars, drawn with edges: no icon font, no picture. */
+.court-mark-start {
+  flex: none;
+  inline-size: 0;
+  block-size: 0;
+  border-block: 8px solid transparent;
+  border-inline-start: 13px solid currentColor;
+}
+.court-mark-pause {
+  flex: none;
+  inline-size: 14px;
+  block-size: 16px;
+  border-inline: 5px solid currentColor;
+}
+/* The one way to both teams' timeouts, in blue, which means timeouts and nothing else. */
+.court-timeouts-button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  padding-block: 0;
+  padding-inline: 12px;
+  border: 2px solid var(--court-blue-line);
+  border-radius: var(--court-radius);
+  background: var(--court-blue);
+  color: var(--court-text);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.court-timeouts-button[aria-expanded='true'] {
+  border-color: var(--court-gold);
+}
+.court-timeouts-button:disabled {
+  opacity: 0.45;
 }
 /* On a phone the play log has no panel of its own: its latest plays go in the pad at
    rest, and the whole list opens over the screen (step 2.37). */
@@ -1036,6 +1187,66 @@
 .court-say:empty {
   display: none;
 }
+/* The large Start clock button (step 2.36; checklist T7 to T10): the pad's first line
+   while nobody is picked, by the thumbs on an upright phone and between the two teams
+   elsewhere. Its row is as high as the line that names a picked player and the gap under
+   it, so it never lies where +1, +2, +3, Foul or a substitute lie: the pad returns to
+   rest with each of those taps, and a second fast tap must not start the clock. × is
+   where the pad's own × is. Under it, why the clock is stopped. At 0:00 the same place
+   holds the way to the next period, in gold: the one button that takes the next step. */
+.court-start {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.court-start-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--court-gap);
+  block-size: calc(var(--court-who-height) + var(--court-gap));
+}
+.court-start-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-inline-size: 0;
+  padding-block: 0;
+  padding-inline: 10px;
+  border: 2px solid var(--court-green-line);
+  border-radius: var(--court-radius);
+  background: var(--court-green);
+  color: var(--court-text);
+  font-size: 18px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.court-start-button[data-kind='next'] {
+  border-color: var(--court-gold);
+  background: var(--court-gold);
+  color: var(--court-gold-ink);
+}
+.court-start-when {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+.court-start .court-close {
+  align-self: center;
+}
+.court-start-why {
+  padding-inline: 4px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+/* While the Start clock button is offered the hint is its first two sentences, as before
+   the first play: the button's own line has said the rest. */
+.court-pad[data-start] .court-hint p:nth-of-type(n + 3) {
+  display: none;
+}
 .court-rest {
   display: flex;
   flex-direction: column;
@@ -1295,6 +1506,257 @@
   min-block-size: 48px;
 }
 
+/* Both teams' timeouts, in the pad (step 2.36; checklist G3 to G7): each team in its own
+   frame, light or dark as on the court; a blue button for each length saying how many
+   are left (red words when none are); those taken with their period and clock time, the
+   latest first, and − to take it back. */
+.court-timeouts .court-who {
+  padding-inline-start: 6px;
+}
+.court-timeout-head {
+  flex: 1;
+  min-inline-size: 0;
+  color: var(--court-muted);
+  font-size: 13px;
+  line-height: 1.2;
+}
+.court-timeout-title {
+  color: var(--court-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+.court-timeout-teams {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--court-gap);
+  min-block-size: 0;
+}
+.court-timeout-team {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: 4px;
+  border: 2px solid var(--court-team-edge);
+  border-radius: var(--court-radius);
+}
+.court-timeout-name {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-inline-size: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.court-timeout-calls {
+  flex: none;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--court-gap);
+  block-size: var(--court-acts-height);
+}
+.court-opt-timeout {
+  border-color: var(--court-blue-line);
+  background: var(--court-blue);
+}
+.court-opt-timeout[data-none] {
+  border-color: var(--court-red-line);
+  background: transparent;
+}
+.court-opt-timeout[data-none] .court-opt-small {
+  color: var(--court-red-text);
+}
+.court-opt-word {
+  font-size: 15px;
+  font-weight: 700;
+}
+.court-timeout-taken {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-block-size: 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.court-timeout-taken ul {
+  flex: 1;
+  min-inline-size: 0;
+  max-block-size: 100%;
+  overflow-y: auto;
+}
+/* Each is read whole: in a narrow column a line wraps, and nothing of it is cut. */
+.court-timeout-taken li {
+  overflow-wrap: anywhere;
+}
+.court-timeout-taken li:first-child {
+  font-weight: 700;
+}
+.court-timeout-taken .court-quiet {
+  padding-inline: 2px;
+}
+/* "Record it anyway?": the question, and its two answers in the pad's lowest band, away
+   from the timeout buttons that were just tapped. */
+.court-timeout-ask {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--court-gap);
+  min-block-size: 0;
+  padding-inline: 6px;
+  font-size: 15px;
+  line-height: 1.3;
+}
+.court-timeout-answers {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--court-gap);
+  block-size: var(--court-acts-height);
+}
+.court-timeout-answers .court-opt {
+  font-size: 15px;
+}
+/* A team's timeouts left, beside its name: only where the heading has room (a tablet). */
+.court-timeouts-chip {
+  display: none;
+  border-color: var(--court-blue-line);
+  color: var(--court-blue-text);
+}
+.court-timeouts-chip[data-none] {
+  border-color: var(--court-red-line);
+  color: var(--court-red-text);
+}
+.court-timeouts-chip:disabled {
+  opacity: 0.45;
+}
+
+/* The form that sets the clock and picks the period (step 2.36; checklist T5, T6): large
+   keys in place of the browser's own box. Opened over the screen like More; nothing in
+   it scrolls at the five sizes. */
+.court-sheet.court-clock-sheet {
+  gap: 10px;
+}
+.court-clock-parts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'period'
+    'time'
+    'keys'
+    'set';
+  gap: 10px;
+}
+.court-clock-part {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-inline-size: 0;
+}
+.court-clock-part[data-part='period'] {
+  grid-area: period;
+}
+.court-clock-part[data-part='time'] {
+  grid-area: time;
+}
+.court-period-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: var(--court-gap);
+}
+.court-opt-period {
+  min-block-size: 48px;
+}
+/* The period being played: marked and named, and not a button to tap. */
+.court-opt-period[aria-pressed='true'] {
+  border-color: var(--court-muted);
+  background: transparent;
+  opacity: 1;
+}
+/* The period after it, edged in gold: what is picked next. Once the clock has run out it
+   is the next step, and filled. */
+.court-opt-period[data-next] {
+  border-color: var(--court-gold);
+  color: var(--court-gold);
+}
+.court-opt-period[data-next='due'] {
+  background: var(--court-gold);
+  color: var(--court-gold-ink);
+}
+.court-sheet .court-clock-help {
+  font-size: 13px;
+  line-height: 1.25;
+}
+.court-clock-entry {
+  display: block;
+  padding-block: 2px;
+  border: 2px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: var(--court-page);
+  color: var(--court-muted);
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+}
+.court-clock-entry[data-typed] {
+  border-color: var(--court-gold);
+  color: var(--court-gold);
+}
+.court-clock-entry[data-problem] {
+  border-color: var(--court-red-line);
+  color: var(--court-red-text);
+}
+.court-clock-note {
+  min-block-size: 34px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.court-keys {
+  grid-area: keys;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 52px;
+  gap: var(--court-gap);
+}
+.court-key {
+  font-size: 26px;
+  font-weight: 800;
+}
+.court-key[data-key='clear'] {
+  font-size: 15px;
+}
+/* "Delete the last digit": an arrow pointing back, drawn. */
+.court-mark-back {
+  position: relative;
+  inline-size: 0;
+  block-size: 0;
+  margin-inline-end: 10px;
+  border-block: 8px solid transparent;
+  border-inline-end: 12px solid currentColor;
+}
+.court-mark-back::after {
+  content: '';
+  position: absolute;
+  inset-block-start: -2px;
+  inset-inline-start: 12px;
+  inline-size: 10px;
+  block-size: 4px;
+  background: currentColor;
+}
+.court-sheet .court-clock-set {
+  grid-area: set;
+  inline-size: 100%;
+  min-block-size: 52px;
+}
+
 /* More: the buttons used once a game, behind one button (checklist S6). */
 .court-sheet-wrap {
   position: fixed;
@@ -1385,6 +1847,21 @@
   .court-sheet {
     animation: court-sheet 160ms ease-out both;
   }
+  /* The Start clock button's triangle breathes while the clock waits to be started, as
+     the standard's button pulses: only its own faintness changes, which costs a slow
+     tablet nothing. */
+  .court-start-button[data-start-clock] .court-mark-start {
+    animation: court-start-wait 1800ms ease-in-out infinite;
+  }
+}
+@keyframes court-start-wait {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 @keyframes court-mark-a {
   0%,
@@ -1413,6 +1890,45 @@
   }
 }
 
+/* ---- An upright phone, tall or short: each team's box of the scoreboard is narrow, a
+   third of the width less the clock. So the clock gives the boxes a little of its width,
+   and a box that holds a badge writes the team's fouls as the tiles write a player's
+   ("10F"), and the badge in small letters: "10F" and "Double bonus" are both whole in
+   the box, with room to spare for a device whose letters are wider (step 2.36). -------- */
+@media (max-width: 699px) and (orientation: portrait) {
+  .court {
+    --court-size-clock: 40px;
+    --court-size-score: 38px;
+  }
+  .court-board {
+    gap: 6px;
+  }
+  .court-score {
+    padding-inline: 2px;
+  }
+  .court-clock {
+    min-inline-size: 0;
+    padding-inline: 3px;
+  }
+  .court-score-fouls {
+    gap: 4px;
+    overflow: hidden;
+  }
+  .court-score-fouls[data-badge] .court-fouls-words {
+    display: none;
+  }
+  .court-score-fouls[data-badge] .court-fouls-short {
+    display: inline;
+  }
+  .court-fouls-count[data-level='2'] {
+    font-size: 13px;
+  }
+  .court-bonus {
+    padding-inline: 4px;
+    text-transform: none;
+  }
+}
+
 /* ---- A short upright phone: the same phone with a browser's bars showing, or opened
    from the home screen with the phone's own bars above and below: anything lower than
    the 844 the taller arrangement is drawn for, which does not fit in less.
@@ -1421,8 +1937,9 @@
    its 8 from the next. Below 760 high the benches fold away as well (the next block). -- */
 @media (max-width: 699px) and (max-height: 843px) and (orientation: portrait) {
   .court {
-    --court-size-clock: 34px;
-    --court-size-score: 30px;
+    --court-size-clock: 32px;
+    --court-size-score: 28px;
+    --court-size-number: 24px;
     --court-tile-height: 56px;
     --court-chip-height: 44px;
     --court-points-height: 56px;
@@ -1432,11 +1949,17 @@
   .court-play {
     gap: 4px;
   }
+  .court-teams {
+    gap: 4px;
+  }
+  /* The first row is the title over the saved line, with the account button and More
+     at its end: the scoreboard then has the whole width, and each team's box has room
+     for its fouls and its bonus (step 2.36). */
   .court-top {
     grid-template-areas:
-      'title title'
-      'board more'
-      'banner banner'
+      'title more'
+      'banner more'
+      'board board'
       'notices notices';
     row-gap: 2px;
   }
@@ -1446,6 +1969,13 @@
     justify-content: flex-start;
     gap: 8px;
     min-block-size: 0;
+  }
+  .court-banner {
+    justify-self: start;
+    text-align: start;
+  }
+  .court-score-fouls {
+    min-block-size: 15px;
   }
   .court-title-teams {
     flex: none;
@@ -1472,20 +2002,24 @@
     white-space: nowrap;
   }
   .court-score {
-    padding-block: 2px 4px;
+    padding-block: 2px;
   }
+  /* The clock is a button now, and Start is right under it: it is as high as what it
+     says, in the middle of its place, so the two are 8 apart. */
   .court-clock {
-    min-inline-size: 96px;
+    align-self: center;
+    padding-block: 1px;
   }
   .court-clock-period {
     font-size: var(--court-size-small);
+    line-height: 1.1;
   }
   .court-banner {
     min-block-size: 18px;
     font-size: var(--court-size-small);
   }
   .court-controls {
-    min-block-size: 48px;
+    min-block-size: 44px;
   }
   .court-team-head {
     min-block-size: 44px;
@@ -1529,6 +2063,7 @@
     --court-points-height: 56px;
     --court-acts-height: 48px;
     --court-subs-height: 44px;
+    --court-who-height: 40px;
     padding-block-start: max(4px, env(safe-area-inset-top));
   }
   .court-play {
@@ -1565,16 +2100,46 @@
   .court-score[data-side='away'] {
     flex-direction: row-reverse;
   }
+  /* In one row: the name, the team's fouls over its bonus, the score. */
+  .court-score-name {
+    flex: 0 1 auto;
+    min-inline-size: 0;
+  }
+  .court-score-fouls {
+    flex: 1 0 auto;
+    flex-direction: column;
+    gap: 2px;
+    order: 1;
+  }
+  .court-score-value {
+    order: 2;
+  }
   .court-clock {
     flex-direction: row;
     align-items: baseline;
     gap: 6px;
     min-inline-size: 0;
+    padding-inline: 8px;
   }
   .court-banner {
-    max-inline-size: 180px;
+    max-inline-size: 132px;
     font-size: var(--court-size-small);
     line-height: 1.2;
+  }
+  .court-who-where {
+    display: none;
+  }
+  .court-who-facts[data-out] .court-who-where {
+    display: inline;
+  }
+  .court-timeout-name {
+    font-size: 11px;
+  }
+  .court-start-button {
+    font-size: 16px;
+  }
+  .court-start-when {
+    font-size: 13px;
   }
   /* The dots alone, the word still the button's name (as on a short upright phone). */
   .court-more-button {
@@ -1588,8 +2153,10 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+  /* The clock above is a button now: Start begins 8 under it. */
   .court-controls {
     min-block-size: 48px;
+    padding-block-start: 2px;
   }
   .court-teams {
     display: contents;
@@ -1644,6 +2211,40 @@
   .court-who-number {
     block-size: 40px;
     font-size: 20px;
+  }
+  /* The clock's form, lying down: the period and the time on one side, the keys on the
+     other, so the whole of it is on the screen with nothing scrolling. */
+  .court-sheet.court-clock-sheet {
+    inline-size: min(100%, 620px);
+    gap: 6px;
+    padding-block: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-bottom));
+  }
+  .court-clock-parts {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'period keys'
+      'time keys'
+      'set keys';
+    column-gap: 16px;
+    row-gap: 6px;
+  }
+  .court-clock-help {
+    display: none;
+  }
+  .court-opt-period {
+    min-block-size: 44px;
+  }
+  .court-clock-entry {
+    font-size: 30px;
+  }
+  .court-keys {
+    grid-auto-rows: 48px;
+    align-content: start;
+  }
+  .court-sheet .court-clock-set {
+    align-self: end;
+    min-block-size: 48px;
   }
 }
 
@@ -1716,6 +2317,58 @@
   }
   .court-controls {
     min-block-size: 60px;
+  }
+  .court-go {
+    font-size: 20px;
+  }
+  .court-timeouts-button {
+    padding-inline: 18px;
+    font-size: 17px;
+  }
+  .court-score-fouls {
+    gap: 10px;
+    min-block-size: 24px;
+    font-size: 14px;
+  }
+  .court-fouls-count[data-level='1'] {
+    font-size: 16px;
+  }
+  .court-fouls-count[data-level='2'] {
+    font-size: 19px;
+  }
+  .court-bonus {
+    padding-inline: 8px;
+  }
+  .court-timeouts-chip {
+    display: inline-flex;
+  }
+  .court-start-button {
+    font-size: 21px;
+  }
+  .court-start-when {
+    font-size: 17px;
+  }
+  .court-start-why {
+    font-size: 15px;
+  }
+  .court-timeout-team {
+    padding: 8px;
+    gap: 6px;
+  }
+  .court-timeout-name {
+    font-size: 14px;
+  }
+  .court-opt-word {
+    font-size: 17px;
+  }
+  .court-timeout-taken {
+    font-size: 15px;
+  }
+  .court-timeout-ask {
+    font-size: 17px;
+  }
+  .court-keys {
+    grid-auto-rows: 60px;
   }
   .court-log {
     display: block;

@@ -41,6 +41,8 @@ function contrast(text: string, ground: string): number {
 /** What is read at arm's length, between plays: each on the ground it sits on. */
 const glance: readonly (readonly [what: string, text: string, ground: string])[] = [
   ['the clock', 'gold', 'page'],
+  ['the clock at 0:00 (step 2.36)', 'red-text', 'page'],
+  ['the time typed in the clock’s form (step 2.36)', 'gold', 'page'],
   ['the score and a number of the team drawn light', 'light-ink', 'light'],
   ['a bench number of the team drawn light', 'light-ink', 'light-bench'],
   ['the score and a number of the team drawn dark', 'text', 'tile'],
@@ -73,6 +75,13 @@ const rest: readonly (readonly [what: string, text: string, ground: string])[] =
   ['−Foul and a take-back, on a panel', 'red-text', 'panel'],
   ['a timeout button (step 2.36)', 'text', 'blue'],
   ['timeouts on a panel (step 2.36)', 'blue-text', 'panel'],
+  ['Start and the Start clock button (step 2.36)', 'text', 'green'],
+  ['Pause (step 2.36)', 'text', 'red'],
+  ['Start greyed at 0:00, "Period over" (step 2.36)', 'muted', 'tile'],
+  ['a dark team’s fouls at the bonus, in its box (step 2.36)', 'red-text', 'tile'],
+  ['a light team’s fouls at the bonus, in its box (step 2.36)', 'light-red', 'light'],
+  ['the double bonus badge (step 2.36)', 'text', 'red'],
+  ['"none left" on a timeout button (step 2.36)', 'red-text', 'panel'],
   ['a name on a light tile', 'light-muted', 'light'],
   ['a name on a light bench tile', 'light-muted', 'light-bench'],
   ['fouls on a light tile', 'light-red', 'light'],

@@ -65,6 +65,33 @@ export const morePlayers = {
  * list of `[jersey, name]`; a name may be empty (S-34).
  */
 export async function addPlayers(origin, players = morePlayers, game = liveGame) {
+  const commands = ['home', 'away'].flatMap((side) =>
+    (players[side] ?? []).map(([jersey, name]) => ({
+      type: 'add-player',
+      side,
+      playerId: randomUUID(),
+      jersey,
+      name,
+    })),
+  );
+  await fromAnotherTablet(origin, commands, game);
+}
+
+/**
+ * Makes the game a stop-clock game, where a foul or a timeout stops a running clock
+ * (step 2.36): the made-up league's own format is a running clock, under which neither
+ * does. It is the engine's own switch (`clock-mode`, T-128), sent before tip-off from
+ * another tablet, as the players are; the scorekeeper's switch on the screen is step 2.69.
+ */
+export async function stopClockGame(origin, game = liveGame) {
+  await fromAnotherTablet(origin, [{ type: 'clock-mode', mode: 'stop' }], game);
+}
+
+/**
+ * Sends taps to a game as a scorekeeper's device would (record 058), from a tablet that
+ * is not the browser's, then lets go of the game so the browser can take it.
+ */
+async function fromAnotherTablet(origin, inputs, game = liveGame) {
   const post = async (at, body) => {
     const answer = await fetch(`${origin}/api/v1/leagues/${leagueId}/games/${game}${at}`, {
       method: 'POST',
@@ -80,17 +107,11 @@ export async function addPlayers(origin, players = morePlayers, game = liveGame)
     return JSON.parse(text);
   };
   const { sessionId } = await post('/session', { type: 'open', deviceId: 'setup-tablet' });
-  const commands = ['home', 'away'].flatMap((side) =>
-    (players[side] ?? []).map(([jersey, name]) => ({
-      commandId: randomUUID(),
-      at: Date.now(),
-      input: { type: 'add-player', side, playerId: randomUUID(), jersey, name },
-    })),
-  );
+  const commands = inputs.map((input) => ({ commandId: randomUUID(), at: Date.now(), input }));
   if (commands.length > 0) {
     const reply = await post('/commands', { protocolVersion: 2, sessionId, commands });
     const refused = reply.results.filter((r) => r.status !== 'accepted');
-    if (refused.length > 0) throw new Error(`players refused: ${JSON.stringify(refused)}`);
+    if (refused.length > 0) throw new Error(`taps refused: ${JSON.stringify(refused)}`);
   }
   await post('/session', { type: 'release', sessionId });
 }
@@ -241,6 +262,76 @@ export function court(page) {
     /** Waits until every tap made is on the server: the banner says "All saved". */
     async saved() {
       await root.locator('[data-saved-banner][data-state="saved"]').waitFor();
+    },
+
+    // --- The clock, periods, team fouls and timeouts (step 2.36). ---
+    /** The clock in the scoreboard: the button that sets it and picks the period. */
+    clock: root.locator('[data-clock]'),
+    /** The time the clock shows, "7:58". */
+    clockText: async () => (await root.locator('[data-clock-time]').textContent()) ?? '',
+    /** Start or Pause, under the scoreboard: `data-state` is start, pause or over. */
+    toggle: root.locator('[data-clock-toggle]'),
+    /** The large Start clock button in the pad at rest, its × and its line of words. */
+    startButton: pad.locator('[data-start-clock]'),
+    hideStart: pad.locator('[data-hide-start]'),
+    stopReason: pad.locator('[data-stop-reason]'),
+    /** At 0:00, in the pad at rest: the way to the next period. */
+    pickPeriodButton: pad.locator('[data-pick-period]'),
+    /** The form that sets the clock and picks the period. */
+    clockSheet: root.locator('[data-clock-sheet] [role="dialog"]'),
+    /** A team's fouls this period and its bonus badge, in its box of the scoreboard. */
+    teamFouls: (side) => root.locator(`[data-team-fouls="${side}"]`),
+    bonus: (side) => root.locator(`[data-bonus="${side}"]`),
+    /** The one way to both teams' timeouts, and what the pad then holds. */
+    timeoutsButton: root.locator('[data-timeouts-open]'),
+    timeoutsPad: pad.locator('[data-timeout-list]'),
+    timeoutButton: (side, seconds = 60) =>
+      pad.locator(`[data-act="timeout"][data-side="${side}"][data-seconds="${seconds}"]`),
+    /** Starts the clock with the button under the scoreboard, and waits until it runs. */
+    async startClock() {
+      await root.locator('[data-clock-toggle][data-state="start"]').click();
+      await root.locator('[data-clock-toggle][data-state="pause"]').waitFor();
+    },
+    async pauseClock() {
+      await root.locator('[data-clock-toggle][data-state="pause"]').click();
+      await root.locator('[data-clock-toggle][data-state="start"]').waitFor();
+    },
+    /** Opens the clock's form and types a time on its keys: '630' is 6:30. Does not set it. */
+    async typeClock(digits) {
+      const sheet = root.locator('[data-clock-sheet] [role="dialog"]');
+      if (!(await sheet.isVisible())) await root.locator('[data-clock]').click();
+      await sheet.waitFor();
+      for (const digit of digits) await sheet.locator(`[data-key="${digit}"]`).click();
+    },
+    /** Sets the clock through its form: '630' is 6:30. The clock is stopped by it. */
+    async setClock(digits) {
+      await this.typeClock(digits);
+      await root.locator('[data-clock-sheet] [data-set-clock]').click();
+      await root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
+    },
+    /** Picks a period in the clock's form: 2 is the second, the first past regulation is overtime. */
+    async pickPeriod(period) {
+      const sheet = root.locator('[data-clock-sheet] [role="dialog"]');
+      if (!(await sheet.isVisible())) await root.locator('[data-clock]').click();
+      await recorded(() => sheet.locator(`[data-period-pick="${period}"]`).click());
+      await root.locator(`[data-clock] [data-period="${period}"]`).waitFor();
+    },
+    /** Opens the timeouts and calls one for a team; answers "Record it anyway" if asked. */
+    async timeout(side, seconds = 60, { anyway = true } = {}) {
+      if (!(await pad.locator('[data-timeout-list]').isVisible())) {
+        await root.locator('[data-timeouts-open]').click();
+      }
+      const button = pad.locator(
+        `[data-act="timeout"][data-side="${side}"][data-seconds="${seconds}"]`,
+      );
+      const asked = (await button.getAttribute('data-none')) !== null;
+      if (!asked) return recorded(() => button.click());
+      await button.click();
+      await pad.locator('[data-timeout-ask]').waitFor();
+      if (!anyway) return undefined;
+      // Its answers take no tap for a moment after the question is asked.
+      await page.waitForTimeout(450);
+      return recorded(() => pad.locator('[data-answer="yes"]').click());
     },
   };
 }
