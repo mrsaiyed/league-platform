@@ -9,7 +9,7 @@ import {
   setSeasonRules,
   updateSeason as updateSeasonCommand,
 } from '@srleagues/core';
-import { countPrograms, findSeason, updateSeason } from '../queries/index.ts';
+import { countPrograms, findSeason, listLeagueSeasons, updateSeason } from '../queries/index.ts';
 import { harnessTx, registerCommandCase } from './command-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 
@@ -17,6 +17,13 @@ registerIsolationCase({
   subject: findSeason,
   name: "find the target's season",
   run: (scope, target) => findSeason(scope, target.seasonId),
+});
+
+registerIsolationCase({
+  subject: listLeagueSeasons,
+  name: "list every season staff may be told of, the target's not public yet among them",
+  // The target's seeded season is still being set up: listed only to its own league.
+  run: (scope) => listLeagueSeasons(scope),
 });
 
 registerIsolationCase({

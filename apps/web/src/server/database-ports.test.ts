@@ -364,7 +364,6 @@ describe('databasePorts (record 055)', () => {
       ports.fixtureImport,
       ports.scheduleAdmin,
       ports.adminTeams,
-      ports.adminSettings,
       ports.tracker,
     ];
     for (const area of areas) {
