@@ -258,3 +258,49 @@ test('a cancelled or timed-out job is named; a skipped one is not; a commit unch
   );
   assert.equal(commitCheck([run(1, 'x', b, 'completed', 'success')], a), 'unchecked');
 });
+
+// The rule that lets main move (scripts/promote-to-main.mjs) passes a commit only when every
+// one of its runs finished and succeeded. Each case below fails a looser rule: `some` run
+// succeeded, only the newest run counts, or a skipped run counts as success.
+test('promote passes a commit only when every run of it finished and succeeded', () => {
+  const ok = (id, name = 'Verify') => run(id, 'x', a, 'completed', 'success', name);
+  const ended = (id, conclusion) => run(id, 'x', a, 'completed', conclusion);
+  // The same commit checked twice (a re-run, or a lane and its twin): one failure is enough,
+  // whichever run is newer and whichever order GitHub lists them in.
+  assert.equal(commitCheck([ok(2), ended(1, 'failure')], a), 'failed');
+  assert.equal(commitCheck([ended(1, 'failure'), ok(2)], a), 'failed');
+  assert.equal(commitCheck([ended(2, 'failure'), ok(1)], a), 'failed');
+  assert.equal(commitCheck([ok(1), ended(2, 'failure')], a), 'failed');
+  assert.equal(commitCheck([ok(3), ok(2), ended(1, 'failure')], a), 'failed');
+  // Every finished conclusion that is not success is a failure, alone or beside a success,
+  // and so is a finished run that says no conclusion at all.
+  for (const conclusion of [
+    'failure',
+    'skipped',
+    'cancelled',
+    'timed_out',
+    'neutral',
+    'action_required',
+    'stale',
+    'startup_failure',
+    null,
+    undefined,
+  ]) {
+    assert.equal(commitCheck([ended(1, conclusion)], a), 'failed', String(conclusion));
+    assert.equal(commitCheck([ok(2), ended(1, conclusion)], a), 'failed', String(conclusion));
+    assert.equal(commitCheck([ended(2, conclusion), ok(1)], a), 'failed', String(conclusion));
+  }
+  const { conclusion: _, ...noConclusion } = ended(1, 'success');
+  assert.equal(commitCheck([ok(2), noConclusion], a), 'failed');
+  // A run still going beside a finished success is not passed yet.
+  for (const status of ['queued', 'in_progress', 'waiting', 'requested', 'pending']) {
+    const going = run(2, 'x', a, status, null);
+    assert.equal(commitCheck([going, ok(1)], a), 'running', status);
+    assert.equal(commitCheck([ok(1), going], a), 'running', status);
+    assert.equal(commitCheck([ok(3), going], a), 'running', status);
+  }
+  // Two finished successes, of the same workflow or of two, pass; other commits do not count.
+  assert.equal(commitCheck([ok(2), ok(1)], a), 'passed');
+  assert.equal(commitCheck([ok(2), ok(1, 'Other')], a), 'passed');
+  assert.equal(commitCheck([ok(2), run(1, 'x', b, 'completed', 'failure')], a), 'passed');
+});

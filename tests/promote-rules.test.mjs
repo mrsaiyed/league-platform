@@ -1,6 +1,9 @@
 // The rules that guard GitHub's `main` (scripts/promote-rules.mjs), and the promise the
 // publish workflow makes: the live tracker is built from one fixed commit, and an ordinary
 // push to main does not publish anything.
+// The third rule, commitCheck (main moves only when every run of the commit passed), is
+// tested in tests/github-check.test.mjs, beside the scripts that read the same runs: see
+// "promote passes a commit only when every run of it finished and succeeded".
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
