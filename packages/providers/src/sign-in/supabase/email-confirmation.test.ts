@@ -139,6 +139,25 @@ describe('the question alone, before the adapter is built (step 2.115)', () => {
     }
   });
 
+  it('answers unknown on a redirect, and never takes the answer from where it points', async () => {
+    const elsewhere = 'https://elsewhere.example.test/settings';
+    const sentElsewhere: Record<string, string>[] = [];
+    // As the real fetch does unless told `manual`: it follows, with the same headers.
+    const following: FetchLike = async (_url, init) => {
+      if (init.redirect === 'manual') {
+        return new Response(null, { status: 307, headers: { location: elsewhere } });
+      }
+      sentElsewhere.push(init.headers);
+      return settings({ mailer_autoconfirm: false });
+    };
+    const question = createSupabaseEmailConfirmation({ projectUrl, secretKey, fetch: following });
+    expect(await question.emailConfirmation()).toEqual({
+      unknown: 'unexpected-answer',
+      status: 307,
+    });
+    expect(sentElsewhere).toEqual([]);
+  });
+
   it('answers unknown when there is no connection, or the answer is cut off', async () => {
     const question = createSupabaseEmailConfirmation({
       projectUrl,

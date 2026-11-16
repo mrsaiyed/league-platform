@@ -7,7 +7,12 @@
 // is thrown as unexpected, never guessed at. Nothing thrown carries an address,
 // a password, a code or a token (T-86).
 
-/** The part of `fetch` the adapter uses, so tests can pass a fake Supabase. */
+/**
+ * The part of `fetch` the adapter uses, so tests can pass a fake Supabase. Every call
+ * is sent with `redirect: 'manual'`: the real `fetch` would otherwise follow a redirect
+ * with the same headers, carrying the secret key (`apikey`) to wherever it points and
+ * reading that place's answer as Supabase's. A redirect is a failed call instead.
+ */
 export type FetchLike = (
   url: string,
   init: {
@@ -15,6 +20,7 @@ export type FetchLike = (
     readonly headers: Record<string, string>;
     readonly body?: string;
     readonly signal?: AbortSignal;
+    readonly redirect?: 'manual';
   },
 ) => Promise<Response>;
 
@@ -232,7 +238,13 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
     const exchange = (async () => {
       let response: Response;
       try {
-        response = await options.fetch(url, { ...init, signal: controller.signal });
+        // Never followed: the key would go with it (FetchLike). The 3xx, or the status 0
+        // a browser's fetch gives for one, is then thrown below like any answer it cannot use.
+        response = await options.fetch(url, {
+          ...init,
+          redirect: 'manual',
+          signal: controller.signal,
+        });
       } catch {
         throw timedOut
           ? new SupabaseAuthTimedOut(what)
@@ -258,8 +270,8 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
 
   /**
    * One call. `bearer` is the person's access token, or the secret key for the admin
-   * calls. A 4xx comes back as a refusal; a 5xx, a failed connection or no answer in
-   * time is thrown.
+   * calls. A 4xx comes back as a refusal; a redirect (never followed), a 5xx, a failed
+   * connection or no answer in time is thrown.
    */
   async function call(
     what: string,
