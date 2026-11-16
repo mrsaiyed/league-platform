@@ -4,6 +4,7 @@ import { createTranslator } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
 import {
   answerQuery,
+  doneAtOf,
   doneKey,
   doneNames,
   leavingAtOf,
@@ -21,6 +22,7 @@ import {
   shortNameNeeded,
 } from './form-input.ts';
 import { hasName, numbersWornTwice, rosterName } from './roster-name.ts';
+import { saidOnLine } from './said-on-line.ts';
 
 const t = createTranslator('en');
 
@@ -156,6 +158,41 @@ describe('answers in the address', () => {
     expect(answerQuery(refused('teams.mark_left', 'x', { entry: 'nope', leftOn: '' }))).toBe(
       '?problem=teams.mark_left.x',
     );
+  });
+
+  it('says a player put back without their number on their own line, naming both (R-32)', () => {
+    const entry = '01900000-0000-7000-8000-0000000e0001';
+    const answer = done('putBackNoNumber', { entry, number: '11' });
+    const query = answerQuery(answer);
+    expect(query).toBe(`?done=putBackNoNumber&entry=${entry}&number=11#entry-${entry}`);
+    const found = doneAtOf({ done: 'putBackNoNumber', entry, number: '11' });
+    expect(found).toEqual({ done: 'putBackNoNumber', at: { entry, number: '11' } });
+    const line = (id: string, first: string, last: string, jerseyNumber: string | null) => ({
+      id,
+      teamId: 't',
+      personId: `p-${id}`,
+      jerseyNumber,
+      role: 'player',
+      joinedOn: null,
+      leftOn: null,
+      sort: 0,
+      version: 1,
+      firstName: first,
+      lastName: last,
+      publicName: null,
+    });
+    const lines = [line(entry, 'Marcus', 'Oyelaran', null), line('e2', 'Dana', 'Whitfield', '11')];
+    expect(saidOnLine(found, lines, 'Falcons')).toEqual({
+      entry,
+      text: 'Marcus Oyelaran is back on the roster with no number: 11 is now worn by Dana Whitfield. Give them a number.',
+    });
+    // Nobody wears it now: still true words, and no wearer named.
+    expect(saidOnLine(found, [lines[0] ?? line(entry, '', '', null)], 'Falcons')?.text).toBe(
+      'Marcus Oyelaran is back on the roster with no number: someone else on the team now wears 11. Give them a number.',
+    );
+    // A number that is not a jersey number is never carried; an entry not on the page says nothing.
+    expect(doneAtOf({ done: 'putBackNoNumber', entry, number: '<b>' })?.at).toEqual({ entry });
+    expect(saidOnLine(doneAtOf({ done: 'putBack', entry: 'x' }), lines, 'Falcons')).toBeUndefined();
   });
 
   it('promises no way back from the bin that no screen offers (step 2.161)', () => {

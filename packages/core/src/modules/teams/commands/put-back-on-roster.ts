@@ -4,10 +4,11 @@
 // leaving date). Allowed to exactly those who may mark a player as left, and refused in
 // the same places: while the league is archived or suspended, on a team in the bin. It
 // is refused for an entry of another team than the page's, for one that has no leaving
-// date, for a person no longer in the league's list, and where the database would refuse
-// the entry open again: the person is on the team again by a later entry, or their number
-// is now worn where the season asks for unique numbers. A season does not limit a person
-// to one team (adding to a roster checks only this team), so neither does this.
+// date, for a person no longer in the league's list, and for a person on the team again
+// by a later entry. Where the season asks for unique numbers and someone now wears theirs,
+// they are put back with no number (R-32), and the result names the number they lost so
+// the screen can say who wears it. A season does not limit a person to one team (adding
+// to a roster checks only this team), so neither does this.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -20,8 +21,15 @@ export type PutBackOnRosterError = {
     | 'not-left'
     | 'person-not-found'
     | 'already-on-team'
+    /** Only if the database refuses even the entry with no number: kept as its own word. */
     | 'jersey-taken'
     | 'changed-since-read';
+};
+
+export type PutBackOnRosterValue = {
+  readonly version: number;
+  /** The number they wore, when someone else now wears it and they came back without it. */
+  readonly numberDropped: string | null;
 };
 
 export const putBackOnRoster = defineCommand({
@@ -38,7 +46,7 @@ export const putBackOnRoster = defineCommand({
     context,
     input,
     tx,
-  }): Promise<Result<{ version: number }, PutBackOnRosterError>> => {
+  }): Promise<Result<PutBackOnRosterValue, PutBackOnRosterError>> => {
     const entry = await tx.teams.findRosterEntry(input.rosterEntryId);
     if (entry === undefined || entry.teamId !== input.teamId) {
       return fail({ code: 'roster-entry-not-found' });
@@ -50,20 +58,29 @@ export const putBackOnRoster = defineCommand({
     // A roster never holds someone who is not in the league's list (add-to-roster.ts).
     const person = await tx.teams.findPerson(entry.personId);
     if (person === undefined || person.binned) return fail({ code: 'person-not-found' });
-    // Said before the database's own refusal, which leaves the transaction unusable.
     const roster = await tx.teams.listRoster(team.id);
     if (roster.some((line) => line.personId === entry.personId && line.leftOn === null)) {
       return fail({ code: 'already-on-team' });
     }
-    const updated = await tx.teams.updateRosterEntry(entry.id, { leftOn: null }, input.version);
+    let numberDropped: string | null = null;
+    let updated = await tx.teams.updateRosterEntry(entry.id, { leftOn: null }, input.version);
+    if (updated === 'jersey-taken' && entry.jerseyNumber !== null) {
+      // Their number is worn now, where it must be unique: back with no number (R-32).
+      numberDropped = entry.jerseyNumber;
+      updated = await tx.teams.updateRosterEntry(
+        entry.id,
+        { leftOn: null, jerseyNumber: null },
+        input.version,
+      );
+    }
     if (updated === 'already-on-team') return fail({ code: 'already-on-team' });
     if (updated === 'jersey-taken') return fail({ code: 'jersey-taken' });
     if (updated === undefined) return fail({ code: 'changed-since-read' });
     await recordActivity(tx, context, {
       action: 'teams.put_back_on_roster',
       target: { type: 'team', id: team.id },
-      details: { personId: entry.personId },
+      details: { personId: entry.personId, numberDropped },
     });
-    return ok({ version: updated });
+    return ok({ version: updated, numberDropped });
   },
 });

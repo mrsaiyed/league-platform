@@ -15,7 +15,8 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
-import { entryAnchor, leavingAtOf, problemKey } from './answer.ts';
+import { doneAtOf, entryAnchor, leavingAtOf, problemKey } from './answer.ts';
+import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
 import {
   addNewPersonAction,
@@ -92,6 +93,14 @@ export async function TeamPage({
   const leaving = leavingAtOf(query);
   const besideEntry = open.some((line) => line.id === leaving?.entry) ? leaving : undefined;
   const leavingProblem = besideEntry === undefined ? undefined : problemKey(query);
+  // What went well on one line is said on that line, naming the player (step 2.161).
+  const onLine = saidOnLine(doneAtOf(query), lines, team.name);
+  const saidHere = (entryId: string) =>
+    onLine?.entry !== entryId ? null : (
+      <p className="ui-notice" role="status" data-said-on={entryId}>
+        {onLine.text}
+      </p>
+    );
 
   return (
     <main>
@@ -102,7 +111,7 @@ export async function TeamPage({
         <Swatch team={team} />
         {team.name}
       </h1>
-      <Notice query={query} saidBeside={leavingProblem !== undefined} />
+      <Notice query={query} saidBeside={leavingProblem !== undefined || onLine !== undefined} />
 
       <Section title={t('adminTeams.edit.title')}>
         <form action={saveTeamAction}>
@@ -156,6 +165,7 @@ export async function TeamPage({
             {open.map((line, place) => (
               <li key={line.id} id={entryAnchor(line.id)}>
                 <strong>{nameOf(line)}</strong>
+                {saidHere(line.id)}
                 {line.needsReview === true ? <> {t('adminTeams.roster.toReview')}</> : null}
                 {line.jerseyNumber !== null && wornTwice.has(line.jerseyNumber) ? (
                   <> {t('adminTeams.roster.numberTwice', { number: line.jerseyNumber })}</>
@@ -215,11 +225,12 @@ export async function TeamPage({
             <h3>{t('adminTeams.roster.leftTitle')}</h3>
             <ul>
               {left.map((line) => (
-                <li key={line.id} data-left-entry={line.id}>
+                <li key={line.id} id={entryAnchor(line.id)} data-left-entry={line.id}>
                   {t('adminTeams.roster.leftLine', {
                     name: nameOf(line),
                     date: line.leftOn ?? '',
                   })}
+                  {saidHere(line.id)}
                   <form action={putBackAction}>
                     <LeagueField league={here.slug} />
                     <input type="hidden" name="team" value={team.id} />

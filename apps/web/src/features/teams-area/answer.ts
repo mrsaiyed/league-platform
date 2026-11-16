@@ -17,9 +17,16 @@ export const doneNames = [
   'moved',
   'left',
   'putBack',
+  'putBackNoNumber',
   'personRemoved',
 ] as const;
 export type DoneName = (typeof doneNames)[number];
+
+/**
+ * The roster line a change was about, so the page says what went well on that line,
+ * naming the player (step 2.161); and the number a player put back lost (R-32).
+ */
+export type DoneAt = { readonly entry: string; readonly number?: string };
 
 /**
  * A refused leaving date, said beside the roster line it was typed in, with what was
@@ -29,7 +36,7 @@ export type DoneName = (typeof doneNames)[number];
 export type LeavingAt = { readonly entry: string; readonly leftOn: string };
 
 export type Answer =
-  | { readonly kind: 'done'; readonly done: DoneName }
+  | { readonly kind: 'done'; readonly done: DoneName; readonly at?: DoneAt }
   | {
       readonly kind: 'refused';
       readonly command: string;
@@ -44,12 +51,14 @@ export function refused(command: string, code: string, at?: LeavingAt): Answer {
     : { kind: 'refused', command, code, at };
 }
 
-export function done(name: DoneName): Answer {
-  return { kind: 'done', done: name };
+export function done(name: DoneName, at?: DoneAt): Answer {
+  return at === undefined ? { kind: 'done', done: name } : { kind: 'done', done: name, at };
 }
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const dateShape = /^\d{4}-\d{2}-\d{2}$/;
+/** A jersey number as the roster takes it (core's roster-fields.ts): 0 to 99, or 00. */
+const numberShape = /^(0|00|[1-9][0-9]?)$/;
 
 /** The anchor of a roster line, where a refusal of its leaving date is said. */
 export const entryAnchor = (entryId: string): string => `entry-${entryId}`;
@@ -59,7 +68,14 @@ export const entryAnchor = (entryId: string): string => `entry-${entryId}`;
  * refused leaving date adds its line and what was typed, and the line's anchor.
  */
 export function answerQuery(answer: Answer): string {
-  if (answer.kind === 'done') return `?done=${answer.done}`;
+  if (answer.kind === 'done') {
+    const at = answer.at;
+    if (at === undefined || !uuidShape.test(at.entry)) return `?done=${answer.done}`;
+    const entry = at.entry.toLowerCase();
+    const number =
+      at.number !== undefined && numberShape.test(at.number) ? `&number=${at.number}` : '';
+    return `?done=${answer.done}&entry=${entry}${number}#${entryAnchor(entry)}`;
+  }
   const problem = `?problem=${encodeURIComponent(`${answer.command}.${answer.code}`)}`;
   const at = answer.at;
   if (at === undefined || !uuidShape.test(at.entry)) return problem;
@@ -80,6 +96,24 @@ export function leavingAtOf(query: Query): LeavingAt | undefined {
   }
   const leftOn = only(query['leftOn']) ?? '';
   return { entry: entry.toLowerCase(), leftOn: dateShape.test(leftOn) ? leftOn : '' };
+}
+
+/** What went well on one roster line, from the address, if it names one we know. */
+export function doneAtOf(
+  query: Query,
+): { readonly done: DoneName; readonly at: DoneAt } | undefined {
+  const word = only(query['done']);
+  const found = doneNames.find((name) => name === word);
+  const entry = only(query['entry']);
+  if (found === undefined || entry === undefined || !uuidShape.test(entry)) return undefined;
+  const number = only(query['number']);
+  return {
+    done: found,
+    at: {
+      entry: entry.toLowerCase(),
+      ...(number !== undefined && numberShape.test(number) ? { number } : {}),
+    },
+  };
 }
 
 /** The text of what went well, from the address; undefined when nothing did or the word is not ours. */

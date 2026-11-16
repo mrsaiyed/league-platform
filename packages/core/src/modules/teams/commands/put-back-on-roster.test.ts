@@ -47,7 +47,10 @@ describe('putBackOnRoster', () => {
       deps,
     );
     expect(left.ok).toBe(true);
-    expect(await putBack(deps, as, 1, 2)).toEqual({ ok: true, value: { version: 3 } });
+    expect(await putBack(deps, as, 1, 2)).toEqual({
+      ok: true,
+      value: { version: 3, numberDropped: null },
+    });
     // One entry, the same one, as it was: number, role, joining date and place kept.
     expect(db.state.roster).toEqual([
       entry(1, { jerseyNumber: '5', joinedOn: '2026-10-01', role: 'captain', version: 3 }),
@@ -62,7 +65,7 @@ describe('putBackOnRoster', () => {
       actorAccountId: ownerId,
       targetType: 'team',
       targetId: teamUuid(1),
-      details: { personId: personUuid(1) },
+      details: { personId: personUuid(1), numberDropped: null },
     });
   });
 
@@ -119,18 +122,29 @@ describe('putBackOnRoster', () => {
     expect(await putBack(deps, as, 2)).toEqual({ ok: false, error: { code: 'person-not-found' } });
   });
 
-  it('refuses a number worn since, where the season asks for unique numbers', async () => {
+  it('puts back with no number one whose number is worn since, where numbers are unique (R-32)', async () => {
     const roster = [
       entry(1, { jerseyNumber: '7', leftOn: '2026-11-01' }),
       entry(2, { jerseyNumber: '7' }),
     ];
     const strict = memoryTeams({ ...base(), uniqueJerseys: true, roster });
     expect(await putBack(strict.deps, strict.as, 1)).toEqual({
-      ok: false,
-      error: { code: 'jersey-taken' },
+      ok: true,
+      value: { version: 2, numberDropped: '7' },
     });
+    expect(strict.db.state.roster[0]).toMatchObject({ leftOn: null, jerseyNumber: null });
+    expect(strict.db.state.roster[1]).toMatchObject({ jerseyNumber: '7' });
+    expect(strict.db.state.activity[0]?.details).toEqual({
+      personId: personUuid(1),
+      numberDropped: '7',
+    });
+    // Where two may wear the same number, they keep theirs.
     const loose = memoryTeams({ ...base(), uniqueJerseys: false, roster });
-    expect((await putBack(loose.deps, loose.as, 1)).ok).toBe(true);
+    expect(await putBack(loose.deps, loose.as, 1)).toEqual({
+      ok: true,
+      value: { version: 2, numberDropped: null },
+    });
+    expect(loose.db.state.roster[0]).toMatchObject({ jerseyNumber: '7' });
   });
 
   it('puts back one waiting for review with their number: the number rule waits for the review (0015)', async () => {
@@ -143,7 +157,10 @@ describe('putBackOnRoster', () => {
         entry(2, { jerseyNumber: '7' }),
       ],
     });
-    expect(await putBack(deps, as, 1)).toEqual({ ok: true, value: { version: 2 } });
+    expect(await putBack(deps, as, 1)).toEqual({
+      ok: true,
+      value: { version: 2, numberDropped: null },
+    });
     expect(db.state.roster[0]).toMatchObject({ jerseyNumber: '7', leftOn: null });
   });
 

@@ -205,9 +205,15 @@ describe('the admin Teams screens over the stand-in', () => {
         m.ports.deps,
       ),
     );
+    // Back with no number (R-32), as the database puts them back.
     expect(
       await putBackOnRoster(m.owner, { teamId, rosterEntryId: entry, version: 4 }, m.ports.deps),
-    ).toEqual({ ok: false, error: { code: 'jersey-taken' } });
+    ).toEqual({ ok: true, value: { version: 5, numberDropped: '3' } });
+    const after = value(await listRoster(m.owner, { teamId }, m.ports.deps));
+    expect(after.find((line) => line.id === entry)).toMatchObject({
+      leftOn: null,
+      jerseyNumber: null,
+    });
   });
 
   it("takes the league's today from the world's own clock, not the computer's", async () => {

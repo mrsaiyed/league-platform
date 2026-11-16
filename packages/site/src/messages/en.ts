@@ -478,6 +478,16 @@ export const en = {
   'adminTeams.done.left': 'The player was marked as having left.',
   'adminTeams.done.putBack':
     'The player was put back on the roster. Their games and numbers are as they were.',
+  'adminTeams.done.putBackNoNumber':
+    'The player is back on the roster with no number, because someone else now wears theirs. Give them a number.',
+  // Said on the player's own line, naming them (step 2.161; R-32 for the number).
+  'adminTeams.said.left': '{name} was marked as having left {team}.',
+  'adminTeams.said.putBack':
+    '{name} is back on the roster. Their games and numbers are as they were.',
+  'adminTeams.said.putBackNoNumber':
+    '{name} is back on the roster with no number: {number} is now worn by {wearer}. Give them a number.',
+  'adminTeams.said.putBackNoNumberNoWearer':
+    '{name} is back on the roster with no number: someone else on the team now wears {number}. Give them a number.',
   'adminTeams.done.personRemoved':
     'Removed from the league list. The person is kept for 30 days; the screen to bring them back is not ready yet.',
   // Why a teams or people change was refused (T-187): `error.`, the command's name, the code.
@@ -980,7 +990,7 @@ export const en = {
   'error.teams.put_back_on_roster.already-on-team':
     'This person is on the team again already, so they were not put back a second time.',
   'error.teams.put_back_on_roster.jersey-taken':
-    'Another player on this team now wears their number, and this season asks for a different number for each player. Give the other player a different number first, then put them back.',
+    'This player could not be put back, even with no number: the roster refused it. Nothing was changed; reload the page and try again.',
   // Why assigning a scorekeeper was refused (T-187).
   'error.games.assign_scorekeeper.game-not-found': 'That game is not there.',
   'error.games.assign_scorekeeper.game-closed':

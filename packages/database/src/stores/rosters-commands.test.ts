@@ -351,7 +351,7 @@ describe('rosters', () => {
       ok: false,
       error: { code: 'roster-entry-not-found' },
     });
-    expect(await put(2)).toEqual({ ok: true, value: { version: 3 } });
+    expect(await put(2)).toEqual({ ok: true, value: { version: 3, numberDropped: null } });
     expect(await entryRow(rosterEntryId)).toMatchObject({ left_on: null, jersey_number: '5' });
     const listed = value(await listRoster(l.as, { teamId: l.teamId }, deps));
     expect(listed.map((line) => [line.id, line.leftOn])).toEqual([[rosterEntryId, null]]);
@@ -373,7 +373,7 @@ describe('rosters', () => {
     expect(logged.n).toBe(1);
   });
 
-  it('refuses putting back a number worn since, a person on the team again, and a binned team', async () => {
+  it('puts back without a number worn since; refuses a person on the team again, and a binned team', async () => {
     const l = await league(true);
     const [left, wearer, again] = [
       await newPerson(pglite, l.leagueId),
@@ -397,8 +397,12 @@ describe('rosters', () => {
         { teamId: l.teamId, rosterEntryId: first.rosterEntryId, version: 2 },
         deps,
       ),
-    ).toEqual({ ok: false, error: { code: 'jersey-taken' } });
-    expect((await entryRow(first.rosterEntryId)).left_on).toBe('2026-11-10');
+    ).toEqual({ ok: true, value: { version: 3, numberDropped: '7' } });
+    // Back with no number (R-32): the database's refusal of 7 cost nothing else.
+    expect(await entryRow(first.rosterEntryId)).toMatchObject({
+      left_on: null,
+      jersey_number: null,
+    });
 
     const old = value(await addToRoster(l.as, { teamId: l.teamId, personId: again }, deps));
     value(

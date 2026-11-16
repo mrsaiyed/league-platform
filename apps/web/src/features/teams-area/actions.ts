@@ -136,8 +136,16 @@ export async function markLeftAction(form: FormData): Promise<never> {
 /** Puts a player marked as left by mistake back on the roster (step 2.161). */
 export async function putBackAction(form: FormData): Promise<never> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
-    const result = await putBackOnRoster(context, putBackInput(fields), ports.deps);
-    return settle(putBackOnRoster, result, 'putBack', fields['team']);
+    const input = putBackInput(fields);
+    const result = await putBackOnRoster(context, input, ports.deps);
+    if (!result.ok) return settle(putBackOnRoster, result, 'putBack', fields['team']);
+    // Said on the player's own line; back with no number when theirs is worn (R-32).
+    const dropped = result.value.numberDropped;
+    const answer =
+      dropped === null
+        ? done('putBack', { entry: input.rosterEntryId })
+        : done('putBackNoNumber', { entry: input.rosterEntryId, number: dropped });
+    return { answer, teamId: fields['team'] };
   });
 }
 
