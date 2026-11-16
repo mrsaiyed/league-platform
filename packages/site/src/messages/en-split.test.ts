@@ -15,7 +15,10 @@ const before: Record<string, string> = JSON.parse(
 describe('the split of the English messages (step 2.188)', () => {
   it('has every key of the old file, and no other', () => {
     expect(Object.keys(en).sort()).toEqual(Object.keys(before).sort());
-    expect(Object.keys(en)).toHaveLength(1495);
+    // As many as the file split held (1,495 at the step; more once the split is redone at
+    // its catch-up from the build branch's en.ts, scripts/split-messages-once.mjs).
+    expect(Object.keys(en)).toHaveLength(Object.keys(before).length);
+    expect(Object.keys(before).length).toBeGreaterThanOrEqual(1495);
   });
   it('has the same text for every key', () => {
     for (const [key, text] of Object.entries(before)) {
