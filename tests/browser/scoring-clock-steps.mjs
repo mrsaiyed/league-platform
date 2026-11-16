@@ -1224,7 +1224,7 @@ export async function clockSteps(kit) {
         // The longest the banner says: all three of its lines at once (queue-banner.ts),
         // in its long form and in the short one that a phone short of room shows.
         await written({
-          '[data-saved-banner] .court-banner-long': `This device could not save to its storage · ${bannerNow} · 12 actions not saved`,
+          '[data-saved-banner] .court-banner-long': `This device could not save to its storage · ${bannerNow} · 12 plays not saved`,
           '[data-saved-banner] .court-banner-short': [
             'Storage failed',
             bannerShort,
@@ -1269,7 +1269,8 @@ export async function clockSteps(kit) {
           `…and with the longest the banner says, neither name is cut${again}`,
           longestBanner.length === 2 &&
             longestBanner.every((name) => !name.cut) &&
-            /^Storage failed · \d+ to send · 12 not saved$/.test(longestShows),
+            // With the network off the banner says so too (step 2.37): four things at once.
+            /^Storage failed · No connection · \d+ to send · 12 not saved$/.test(longestShows),
           JSON.stringify({ longestBanner, longestShows }),
         );
         note(
@@ -1299,8 +1300,8 @@ export async function clockSteps(kit) {
       await twoFrames(page);
       const atLength = (await c.banner.innerText()).trim();
       note(
-        '390 x 844: the banner says it at length (“68 actions waiting to send”)',
-        /^\d+ actions waiting to send$/.test(atLength),
+        '390 x 844: the banner says it at length (“No connection: plays are kept on this device · 68 plays waiting to send”)',
+        /^No connection: plays are kept on this device · \d+ plays waiting to send$/.test(atLength),
         atLength,
       );
       await page.setViewportSize({ width: phoneLying.width, height: phoneLying.height });

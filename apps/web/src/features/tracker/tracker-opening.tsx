@@ -17,6 +17,7 @@ import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
 import {
+  isOffline,
   savedBanner,
   savedBannerShortLines,
   savedBannerText,
@@ -81,6 +82,19 @@ export function TrackerOpening({
   const t = useMemo(() => createTranslator(locale, { [locale]: catalog }), [locale, catalog]);
   const [phase, setPhase] = useState<Phase>({ kind: 'preparing' });
   const [storeFailed, setStoreFailed] = useState(false);
+  // What the browser says of the network: the saved banner says "No connection" while it
+  // says there is none (queue-banner.ts), also when no play is waiting to find it out.
+  const [browserOnline, setBrowserOnline] = useState(true);
+  useEffect(() => {
+    const read = () => setBrowserOnline(window.navigator.onLine);
+    read();
+    window.addEventListener('online', read);
+    window.addEventListener('offline', read);
+    return () => {
+      window.removeEventListener('online', read);
+      window.removeEventListener('offline', read);
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
   // What `busy` will be once drawn: read here, so a double tap before the next drawing
   // cannot run the same step twice.
@@ -278,7 +292,8 @@ export function TrackerOpening({
     phase.status.game !== null &&
     screenOf(phase.status, phase.confirmed).kind === 'scoring'
   ) {
-    const banner = savedBanner(phase.status.queue);
+    // With no connection the banner says so, and never "All saved" (step 2.37).
+    const banner = savedBanner(phase.status.queue, isOffline(phase.status.queue, browserOnline));
     const notices = trackerNotices(phase.status);
     const anythingToTell = notices.length > 0 || signIn !== null || storeFailedNotice !== null;
     return (
@@ -370,7 +385,10 @@ export function TrackerOpening({
 function bannerState(banner: SavedBanner): CourtBanner['state'] {
   const first = banner[0].key;
   if (first === 'tracker.queue.allSaved') return 'saved';
-  return first === 'tracker.queue.waiting' ? 'waiting' : 'trouble';
+  // No connection is not a fault: the plays are kept, and wait as the others do.
+  return first === 'tracker.queue.waiting' || first === 'tracker.queue.offline'
+    ? 'waiting'
+    : 'trouble';
 }
 
 /** What the tracker tells about holding the game and taps that did not go in. */

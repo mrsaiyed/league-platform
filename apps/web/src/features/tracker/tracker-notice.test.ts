@@ -59,8 +59,8 @@ describe('tracker notices (T6 §5, T-113)', () => {
       }),
     ).toEqual([
       'Sam Scorekeeper is scoring this game on another device.',
-      '1 action on this device was not saved. Enter it again if it is needed.',
-      '2 actions were not applied. The game now shows what was saved.',
+      '1 play on this device was not saved. Enter it again if it is needed.',
+      '2 plays were not applied. The game now shows what was saved.',
     ]);
   });
 

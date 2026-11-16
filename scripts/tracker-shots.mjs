@@ -553,7 +553,7 @@ const states = [
       await page.evaluate(() => {
         const long = document.querySelector('[data-saved-banner] .court-banner-long');
         const short = document.querySelector('[data-saved-banner] .court-banner-short');
-        long.textContent = `This device could not save to its storage · ${long.textContent} · 12 actions not saved`;
+        long.textContent = `This device could not save to its storage · ${long.textContent} · 12 plays not saved`;
         const span = (name, says) => {
           const part = document.createElement('span');
           part.className = name;

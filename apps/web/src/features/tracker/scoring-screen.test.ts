@@ -646,13 +646,13 @@ describe('the frame (checklist A3, A4, A6, I7, T1; DESIGN.md section 7, line 11)
     expect(top).toContain('data-state="saved">All saved</p>');
     const waiting = drawn(device.view(), {
       banner: {
-        text: '12 actions waiting to send · 3 actions not saved',
+        text: '12 plays waiting to send · 3 plays not saved',
         short: ['12 to send', '3 not saved'],
         state: 'trouble',
       },
     });
     expect(waiting).toContain(
-      '<span class="court-banner-long">12 actions waiting to send · 3 actions not saved</span>' +
+      '<span class="court-banner-long">12 plays waiting to send · 3 plays not saved</span>' +
         '<span class="court-banner-short"><span class="court-banner-line">12 to send</span>' +
         '<span class="court-banner-dot"> · </span><span class="court-banner-line">3 not saved</span></span></p>',
     );

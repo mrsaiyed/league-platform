@@ -7,8 +7,20 @@ export const enTrackerStates = {
   // Marking a game not started (step 2.121, S-40): the Al-Hadi tracker's question
   // (checklist J5), the reason asked for once a basket, foul or turnover stands, and
   // each refusal of POST …/not-started by its code (NotStartedReply). Step 2.37 draws them.
+  // What the question says before the tap (step 2.37): to someone who may clear plays,
+  // how many and what score; to a scorekeeper, that the plays are undone first.
+  'tracker.notStarted.askClears_one':
+    '{count} play and the score, {home} {homeScore}, {away} {awayScore}, will be cleared.',
+  'tracker.notStarted.askClears_other':
+    '{count} plays and the score, {home} {homeScore}, {away} {awayScore}, will be cleared.',
+  'tracker.notStarted.askUndoFirst_one':
+    '{count} basket, foul or turnover is recorded. Undo it first, then mark the game not started.',
+  'tracker.notStarted.askUndoFirst_other':
+    '{count} baskets, fouls or turnovers are recorded. Undo them first, then mark the game not started.',
   'tracker.notStarted.button': 'Mark not started',
   'tracker.notStarted.done': 'The game is scheduled again. Nothing recorded in it counts.',
+  'tracker.notStarted.help':
+    'For a game started by mistake, or only to try the tracker. You are asked first.',
   'tracker.notStarted.no': 'Keep scoring',
   'tracker.notStarted.question': 'Mark this game as not started?',
   'tracker.notStarted.questionDetail':
@@ -129,10 +141,37 @@ export const enTrackerStates = {
   'tracker.reopen.done': 'The game is live again. Carry on scoring.',
   'tracker.reopen.noConnection':
     'No connection. The game reopens as soon as the connection is back.',
+  // Why a door (Reopen, Mark not started) did not open when the league did not say
+  // (step 2.37): the controller's own reasons.
+  'tracker.reopen.problem.not-offered': 'That is not offered on this device now.',
+  'tracker.reopen.problem.plays-waiting':
+    'Plays are still waiting to send. Try again once the top line says All saved.',
+  'tracker.reopen.problem.rejected': 'The league turned that away. A league admin can help.',
+  'tracker.reopen.problem.signed-out': 'You are signed out. Sign in again, then try once more.',
+  'tracker.reopen.problem.unanswered': 'No connection. Try again when it is back.',
   'tracker.reopen.question':
     'Reopen this game? It goes back to live with every play as it was, and it stops counting in the standings until you end it again.',
   'tracker.reopen.reasonLabel':
     'Why it is being reopened (kept in the game’s corrections, never shown publicly)',
   'tracker.reopen.reasonReady': 'End game tapped by mistake',
+  // Each refusal of POST …/reopen by its code (ReopenReply), in the tracker's words.
+  'tracker.reopen.refused.changed-since-read':
+    'This game changed since this screen last read it. Look again, then reopen it if it still needs it.',
+  'tracker.reopen.refused.game-not-decided':
+    'This game is not over, so there is nothing to reopen.',
+  'tracker.reopen.refused.game-not-found': 'This game could not be found.',
+  'tracker.reopen.refused.not-allowed':
+    'You cannot score this game, so you cannot reopen it. A league admin can reopen it.',
+  'tracker.reopen.refused.not-ended-by-tracker':
+    'This game was not ended from the tracker, so it cannot be reopened here. A league admin can reopen it.',
+  'tracker.reopen.refused.not-ended-by-you':
+    'Only the scorekeeper who ended this game can reopen it here. A league admin can reopen it.',
+  'tracker.reopen.refused.not-ended-by-youNamed':
+    '{name} ended this game, so only they can reopen it here. A league admin can reopen it.',
+  'tracker.reopen.refused.reason-needed': 'Say in a few words why the game is being reopened.',
+  'tracker.reopen.refused.reopen-time-over':
+    'It is too long since this game ended to reopen it here. A league admin can reopen it.',
+  'tracker.reopen.refused.scorekeepers-may-not-reopen':
+    'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
   'tracker.reopen.until': 'You can reopen this game until {time}.',
 } as const;
