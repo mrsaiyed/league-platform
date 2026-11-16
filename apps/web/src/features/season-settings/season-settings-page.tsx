@@ -20,6 +20,7 @@ import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/inde
 import { changeVisibilityAction } from './actions.ts';
 import { doneOf, problemKey } from './answer.ts';
 import { mayShowSeason } from './may-show-season.ts';
+import { panelWords } from './panel-words.ts';
 import { seasonSettingsAddress, visibilityAnchor } from './season-settings-address.ts';
 import { visibilityOf, wishOf, type VisibilityWish } from './season-visibility.ts';
 
@@ -109,6 +110,7 @@ function VisibilityPanel({
 }) {
   const name = season.name;
   const visibility = visibilityOf(season.status);
+  const words = panelWords({ visibility, leagueShown: !leagueHidden, seasonName: name });
   const wish = mayChange ? wishOf(season.status) : undefined;
   const asked = firstValue(search['ask']);
   const said = doneOf(search);
@@ -123,24 +125,19 @@ function VisibilityPanel({
       )}
       {problem === undefined && said !== undefined ? (
         <p className="ui-notice" role="status" data-notice="done">
-          {t(said === 'shown' ? 'seasonSettings.done.shown' : 'seasonSettings.done.hidden', {
-            season: name,
-          })}
+          {said === 'shown' ? words.shown : t('seasonSettings.done.hidden', { season: name })}
         </p>
       ) : null}
-      <p data-season-visibility={visibility}>
-        {t(
-          visibility === 'hidden'
-            ? 'seasonSettings.visibility.hidden'
-            : visibility === 'shown'
-              ? 'seasonSettings.visibility.shown'
-              : 'seasonSettings.visibility.over',
-          { season: name },
-        )}
-      </p>
-      {leagueHidden ? <p>{t('seasonSettings.visibility.leagueHidden')}</p> : null}
+      <p data-season-visibility={visibility}>{words.state}</p>
+      {words.leagueNote === undefined ? null : <p>{words.leagueNote}</p>}
       {wish === undefined ? null : asked === wish ? (
-        <Question wish={wish} season={season} league={league} back={address()} />
+        <Question
+          wish={wish}
+          ask={wish === 'show' ? words.showAsk : t('seasonSettings.hideAsk', { season: name })}
+          season={season}
+          league={league}
+          back={address()}
+        />
       ) : (
         <form method="get" action={`${base}#${visibilityAnchor}`}>
           <input type="hidden" name="season" value={season.slug} />
@@ -161,11 +158,14 @@ function VisibilityPanel({
 /** The one question before the season is shown or hidden: yes runs it, no goes back. */
 function Question({
   wish,
+  ask,
   season,
   league,
   back,
 }: {
   readonly wish: VisibilityWish;
+  /** The question's words (panel-words.ts). */
+  readonly ask: string;
   readonly season: SeasonView;
   readonly league: string;
   /** The page without the question. */
@@ -174,9 +174,7 @@ function Question({
   const show = wish === 'show';
   return (
     <div data-visibility-ask={wish}>
-      <p>
-        {t(show ? 'seasonSettings.showAsk' : 'seasonSettings.hideAsk', { season: season.name })}
-      </p>
+      <p>{ask}</p>
       <form action={changeVisibilityAction}>
         <input type="hidden" name="league" value={league} />
         <input type="hidden" name="seasonId" value={season.id} />

@@ -451,11 +451,23 @@ const cases = [
     200,
     ['Visitors will see its teams, schedule and results.', 'Yes, show it', 'No, keep it hidden'],
   ],
+  // In a league not published, a shown season is never said to be seen by visitors.
   [
     'owner',
-    '/quiet-pines/admin/season',
+    '/quiet-pines/admin/season?done=shown',
     200,
-    ['Visitors cannot see this league until it is published'],
+    [
+      'is shown. Visitors will see it once the league is published.',
+      'is shown, but visitors cannot see this league until it is published.',
+    ],
+    ['Everyone can see', 'Visitors can see', 'Visitors will see its'],
+  ],
+  [
+    'owner',
+    '/quiet-pines/admin/season?ask=hide',
+    200,
+    ['Yes, hide it'],
+    ['Everyone can see', 'Visitors can see', 'Visitors will see its'],
   ],
   [
     'owner',

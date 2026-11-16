@@ -544,6 +544,8 @@ export const en = {
   'seasonSettings.visibility.title': 'Who can see this season',
   'seasonSettings.visibility.hidden': 'Only the people who run the league can see {season}.',
   'seasonSettings.visibility.shown': 'Everyone can see {season}.',
+  'seasonSettings.visibility.shownLeagueHidden':
+    '{season} is shown, but visitors cannot see this league until it is published.',
   'seasonSettings.visibility.over':
     '{season} is over. A season that is over stays shown, so its results stay on the site.',
   'seasonSettings.visibility.leagueHidden':
@@ -552,6 +554,8 @@ export const en = {
   'seasonSettings.hide': 'Hide it again',
   'seasonSettings.showAsk':
     'Show {season} to visitors? Visitors will see its teams, schedule and results.',
+  'seasonSettings.showAskLeagueHidden':
+    'Show {season} to visitors? Once the league is published, they will see its teams, schedule and results.',
   'seasonSettings.showYes': 'Yes, show it',
   'seasonSettings.showNo': 'No, keep it hidden',
   'seasonSettings.hideAsk':
@@ -559,6 +563,8 @@ export const en = {
   'seasonSettings.hideYes': 'Yes, hide it',
   'seasonSettings.hideNo': 'No, keep it shown',
   'seasonSettings.done.shown': 'Visitors can see {season} now.',
+  'seasonSettings.done.shownLeagueHidden':
+    '{season} is shown. Visitors will see it once the league is published.',
   'seasonSettings.done.hidden': '{season} is hidden from visitors again.',
   'error.leagues.update_season.season-not-found': 'That season is not there.',
   'seasonSettings.refused.not-hidden':
