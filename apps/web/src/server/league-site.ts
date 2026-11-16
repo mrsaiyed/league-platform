@@ -1,13 +1,15 @@
 // What a league's pages look like and are called (T-90, P5 §2): its design document and
-// its display name. They come from a LeagueSiteSource, a small port. Until the design
-// editor exists and saves a design with the league, there is nothing in the database to
-// read a design from (the seed leagues of packages/database carry theirs as data), so
-// the made-up stand-in below is the only source; the database-backed one arrives with the editor. A league the source does
-// not know gets the neutral starting design and its short name.
+// its display name. They come from a source by league id, one of the web app's ports
+// (`leagueSites`): on the made-up stand-in its made-up leagues' names and designs; on the
+// database the league's own name, as its owner saved it (step 2.93 part 3, record 070).
+// Until the design editor exists and saves a design with the league (T3's `sites` and
+// `site_releases`, not yet in the database), a league on the database has no design of
+// its own and gets the neutral starting design; so does a league the source does not
+// know, which also takes its short name.
 import type { DesignDocument, StartingDesignKey } from '@srleagues/site';
 import { startingDesign } from '@srleagues/site';
-import { getConfig } from './config.ts';
-import { standInLeagueSites, standInLeagueSitesIn } from './stand-in-league-sites.ts';
+import { webPorts } from './container.ts';
+import { standInLeagueSites } from './stand-in-league-sites.ts';
 
 export type LeagueSite = {
   /** The league's own name, shown first in the header (U-8). It can be in any script (T-188). */
@@ -15,29 +17,40 @@ export type LeagueSite = {
   readonly design: DesignDocument;
 };
 
+/** What a source knows of a league: its name, and its design when one is saved. */
+export type FoundSite = { readonly name: string; readonly design?: DesignDocument | undefined };
+
 /** Where a league's name and design are read from, by league id. */
-export type LeagueSiteSource = (
+export type LeagueSiteSource = (leagueId: string) => FoundSite | undefined;
+
+/** The same, where the answer may have to be read first (the database). */
+export type LeagueSiteLookup = (
   leagueId: string,
-) => { readonly name: string; readonly design: DesignDocument } | undefined;
+) => FoundSite | undefined | Promise<FoundSite | undefined>;
 
 const fallbackDesign: StartingDesignKey = 'clean-court';
 
-/**
- * The source a running server draws its leagues' pages from: the stand-in's, with the
- * first made-up league under the design the LOCAL_DESIGN setting names when it is set.
- * That setting is refused outside local work and tests (config-schema.ts), as the
- * stand-in itself is, so no real league's look can be changed this way.
- */
-export function leagueSites(): LeagueSiteSource {
-  const pictured = getConfig().LOCAL_DESIGN;
-  return pictured === undefined ? standInLeagueSites : standInLeagueSitesIn(pictured);
+/** The source a running server draws its leagues' pages from: its ports' own. */
+export async function leagueSites(): Promise<LeagueSiteLookup> {
+  return (await webPorts()).leagueSites;
 }
 
 export function siteOfLeague(
   league: { readonly id: string; readonly slug: string },
   source: LeagueSiteSource = standInLeagueSites,
 ): LeagueSite {
-  const found = source(league.id);
+  return siteFrom(league, source(league.id));
+}
+
+/** A league's name and design, read from `lookup`. */
+export async function siteOf(
+  league: { readonly id: string; readonly slug: string },
+  lookup: LeagueSiteLookup,
+): Promise<LeagueSite> {
+  return siteFrom(league, await lookup(league.id));
+}
+
+function siteFrom(league: { readonly slug: string }, found: FoundSite | undefined): LeagueSite {
   return {
     name: found?.name ?? league.slug,
     design: found?.design ?? startingDesign(fallbackDesign),

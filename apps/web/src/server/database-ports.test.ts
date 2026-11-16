@@ -375,13 +375,14 @@ describe('databasePorts (record 055)', () => {
       NotOnTheDatabaseYet,
     );
     expect(ports.liveFeed).toBeNull();
-    // The statistics and the rosters (part 3) refuse within the ports that have moved.
-    await expect(ports.publicStats.settingsOf(lakeside().leagueId)).rejects.toThrow(
-      NotOnTheDatabaseYet,
-    );
-    await expect(
-      ports.publicTeams.teamIdsOfAccount(lakeside().leagueId, randomUUID(), randomUUID()),
-    ).rejects.toThrow(NotOnTheDatabaseYet);
+  });
+
+  it("reads the statistics' settings, a member's teams and the league's name (part 3)", async () => {
+    expect((await ports.publicStats.settingsOf(lakeside().leagueId)).audience).toBe('adult');
+    expect(
+      await ports.publicTeams.teamIdsOfAccount(lakeside().leagueId, randomUUID(), randomUUID()),
+    ).toEqual([]);
+    expect((await ports.leagueSites(lakeside().leagueId))?.name).toBe('Lakeside Hoops League');
   });
 
   it('reads the public schedule and standings from the database (part 2)', async () => {

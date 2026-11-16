@@ -13,7 +13,7 @@ import {
 } from '../../features/shell/index.ts';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
-import { leagueSites, siteOfLeague } from '../../server/league-site.ts';
+import { leagueSites, siteOf } from '../../server/league-site.ts';
 import { leagueView, signedInEmail } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { pathHeader } from '../../server/request-facts-header.ts';
@@ -38,7 +38,7 @@ export default async function LeagueLayout({
 }: LeagueRouteProps & { readonly children: ReactNode }) {
   const view = await leagueView((await params).league, 'site');
   if (view === null) return children;
-  const site = siteOfLeague(view.context.league, leagueSites());
+  const site = await siteOf(view.context.league, await leagueSites());
   const path = (await headers()).get(pathHeader) ?? '';
   const league = view.context.league;
   const current = currentMenuPage(league, path);
