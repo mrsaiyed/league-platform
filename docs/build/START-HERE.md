@@ -49,14 +49,14 @@ Two computers building on the same branch would overwrite each other.
 
 ## 3. What did not come with the repository
 
-| What                                                         | What to do                                                                                                                                                                                                                                                                                                                                                    |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The open lanes' folders                                      | Made again from their branches (section 4). Every open lane's work was committed and pushed before the move.                                                                                                                                                                                                                                                  |
-| `.env.staging`, the test copy's keys                         | Not needed to build. Needed only for the supervised step "put the test copy online" (T-270), by the chat lead in a session the founder started. The founder carries the file over by hand, or fills a new one from the Supabase dashboard using `.env.example` for the names. Never in chat, never committed, never opened by an unattended run or a builder. |
-| `.local/` working files                                      | Made fresh here (section 5). None of them is needed from the first computer.                                                                                                                                                                                                                                                                                  |
-| Pictures of the first demo and pictures made for the founder | `DESIGN.md` is the rule and is complete without them. They were kept out of git because the first demo shows a real school. If a design lead needs them, the founder can copy `.local/reference/` and `.local/for-the-founder/` across by hand.                                                                                                               |
-| The earlier conversations and the app's memory               | What matters from them is in `CLAUDE.md`, the files under `docs/build/`, and sections 6 and 7 here. Save to your own memory what you will need again.                                                                                                                                                                                                         |
-| The two scheduled checks                                     | Their prompts are in `docs/build/schedules/` (section 5).                                                                                                                                                                                                                                                                                                     |
+| What                                                         | What to do                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The open lanes' folders                                      | Made again from their branches (section 4). Every open lane's work was committed and pushed before the move.                                                                                                                                                                                                                                                   |
+| `.env.staging`, the test copy's keys                         | Not needed to build. Needed only for the supervised step "put the test copy online" (T-270), by the chat lead in a session the founder started. The founder carries the file over by hand, or fills a new one from the Supabase dashboard using `.env.example` for the names. Never in chat, never committed, never opened by an unattended run or a builder.  |
+| `.local/` working files                                      | Made fresh here (section 5). None of them is needed from the first computer.                                                                                                                                                                                                                                                                                   |
+| Pictures of the first demo and pictures made for the founder | `DESIGN.md` is the rule and is complete without them. They were kept out of git because the first demo shows a real school. The first demo's pictures, which `DESIGN.md` sends design leads to, are made again on any computer with `node docs/build/handover/first-demo-shoot.mjs <the repository folder>`. The pictures made for the founder are not needed. |
+| The earlier conversations and the app's memory               | What matters from them is in `CLAUDE.md`, the files under `docs/build/`, and sections 6 and 7 here. Save to your own memory what you will need again.                                                                                                                                                                                                          |
+| The two scheduled checks                                     | Their prompts are in `docs/build/schedules/` (section 5).                                                                                                                                                                                                                                                                                                      |
 
 ## 4. Pick the build up
 
@@ -67,7 +67,10 @@ Two computers building on the same branch would overwrite each other.
    `git worktree add .local/lanes/<name> lane/<name>` (git makes the local branch from
    GitHub's), and set the lane up as the runbook's section 3 says.
 3. Nobody from the first computer exists here. Every lane gets a **fresh** helper, briefed
-   from the lane's line and its commits.
+   from the lane's line and its commits. Each open lane's branch carries a note of its own,
+   `docs/build/handover/lane-<step>.md`: read it before you brief that lane's helper. The
+   builders' common brief is `docs/build/BUILDER-BRIEF.md`, and the founder's design direction
+   in their own words is `docs/build/handover/founder-design-direction.md`.
 4. From there the runbook is the method, from its section 1.
 
 ## 5. How the build is led: the parts that live in the Claude app
@@ -127,6 +130,14 @@ model call. So:
   Fresh helpers are for the independent reviews, which run at the same time on one commit.
 - **A landing queue**, and shared lists that no longer collide (step 2.188; runbook,
   section 3).
+- **GitHub gives this repository twenty machines at once.** When its check runs as many
+  jobs side by side (step 2.191: eleven of them, the whole result in under five minutes),
+  pushing a lane and its twin at the same moment asks for more than twenty and doubles the
+  wait. Push the twin when the first run is done, or only for the last pass before a
+  landing.
+- **If the app refuses a builder's push,** the lead pushes that lane itself, and nobody
+  looks for a way round the refusal. It happened once, in a lane whose brief still said
+  that builders never push.
 - When the founder asks why something is slow, measure before you answer. The app keeps a
   record per helper under its projects folder (`<session>/subagents/agent-*.jsonl`): the
   times of the entries and of each command and its result are enough.
