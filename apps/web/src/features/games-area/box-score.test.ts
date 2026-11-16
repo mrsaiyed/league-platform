@@ -125,15 +125,16 @@ describe('the box score grid', () => {
   });
 
   // Step 2.103: the grid's form switches the browser's own checking off (a phone shows
-  // one team's grid at a time, and a browser blocks a save on a box it cannot show), so
-  // the server must refuse everything the boxes' `min`, `max` and `step` would have.
+  // one team's grid at a time, and a browser blocks a save on a box it cannot show), and
+  // its boxes are text boxes with no `min`, `max` or `step` on them, so the server alone
+  // must refuse a number below 0, above its limit or not whole.
   it('refuses, by name, whatever a box’s min, max or step would have stopped', async () => {
     const { games, sheetOf } = setup();
     const target = (await games()).find((g) => g.id === lionsTigers);
     const sheet = { ...(await sheetOf(target?.id ?? '')), minutes: true };
     const someone = sheet.players[0]?.personId ?? '';
     const boxes = [
-      // The limits the form writes on each kind of box: min 0, step 1, and this max.
+      // The limits the server holds each kind of box to: 0 or more, whole, and this max.
       { name: boxScoreField.stat(someone, 'points'), max: 999 },
       { name: boxScoreField.minutes(someone), max: 1440 },
       { name: 'awayScore', max: 999 },
