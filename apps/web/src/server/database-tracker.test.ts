@@ -11,6 +11,7 @@
 import {
   applyTrackerCommands,
   getSeason,
+  listScoringOffers,
   markNotStarted,
   openScoringSession,
   publicNames,
@@ -568,5 +569,19 @@ describe("the tracker: who may reopen, and another league's admin", () => {
     ).toEqual(notFound);
     expect(await w.everything(w.leagueId, [gameId])).toEqual(before);
     expect(await w.everything(w.otherLeagueId, [w.otherGameId])).toEqual(theirs);
+  });
+});
+
+describe('"Score this game" on the database ports (step 2.153)', () => {
+  it("offers a game under way to its scorekeeper, never another league's game", async () => {
+    const gameId = await underWay();
+    const asked = { gameIds: [gameId, w.otherGameId] };
+    expect(await listScoringOffers(w.contextOf('scorekeeper'), asked, w.ports.games.deps)).toEqual({
+      ok: true,
+      value: { games: [{ gameId, recording: 'live' }] },
+    });
+    expect(await listScoringOffers(w.contextOf('coach'), asked, w.ports.games.deps)).toEqual(
+      refused,
+    );
   });
 });

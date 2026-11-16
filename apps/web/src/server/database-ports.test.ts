@@ -425,8 +425,9 @@ describe('databasePorts (record 055)', () => {
   });
 
   it('answers a public page\'s "Score this game" read with no games, never an error (step 2.153)', async () => {
-    // The games area has not moved yet: a scorekeeper's read reaches it and is given no
-    // games; someone who scores nowhere in the league is answered before it is reached.
+    // The games area runs on the database (part 6): a scorekeeper's read reaches it and is
+    // given no games for ids the league does not have; someone who scores nowhere in the
+    // league is answered before it is reached.
     const parts = ['scoring'];
     const holdsToScore = async (token: string) =>
       mayOpenTracker(
