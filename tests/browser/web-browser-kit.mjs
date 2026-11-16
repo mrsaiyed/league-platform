@@ -1,7 +1,8 @@
 // What a browser test of the web app needs, shared: starting the built app on its made-up
 // stand-in (APP_ENV=test) with made-up settings, a free port, waiting for it to answer, the
-// browser to use, and the hand-written accessibility checks (T-186). Nothing leaves this
-// computer. The same steps as tests/browser/web-exit-test.mjs, kept here for the newer tests.
+// browser to use, and the hand-written accessibility checks (T-186), the exit test's among
+// them. Nothing leaves this computer. Its first steps are the same as those
+// tests/browser/web-exit-test.mjs starts with, kept here for the newer tests.
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -117,13 +118,35 @@ export async function buildNext() {
 }
 
 /**
- * Accessibility checks on the screen the page shows (T-186). axe is not a dependency,
- * so these are the checks that can be made from the page itself: language, title, one
- * main landmark and one level-one heading, names on every link, button and field,
- * descriptions on images, no repeated ids, and text contrast of at least 4.5 to 1
- * (3 to 1 for large text).
+ * What is wrong with the title in a page's raw HTML, as it arrived, before any script
+ * runs: '' when the head holds a title with words in it (step 2.175). A title that comes
+ * later, at the end of the body, is not one a person meets when the page is drawn.
+ */
+export function titleInHeadProblem(html) {
+  const head = /<head\b[^>]*>([\s\S]*?)<\/head>/i.exec(html);
+  if (!head) return 'the page has no head';
+  const title = /<title\b[^>]*>([^<]*)<\/title>/i.exec(head[1]);
+  if (title && title[1].trim()) return '';
+  if (title) return 'the title in the head is empty';
+  return /<title\b/i.test(html.slice(head.index + head[0].length))
+    ? 'the title comes after the head, not in it'
+    : 'the page has no title';
+}
+
+/**
+ * Accessibility checks on the screen the page shows (T-186), used by every browser test
+ * (the exit test too: one copy). axe is not a dependency, so these are the checks that
+ * can be made from the page itself: language, title, one main landmark and one level-one
+ * heading, names on every link, button and field, descriptions on images, no repeated
+ * ids, and text contrast of at least 4.5 to 1 (3 to 1 for large text).
+ *
+ * They read the document once it has all arrived (its load event). A tap that a page's
+ * scripts have not yet taken over (on a busy machine they can still be starting) is the
+ * browser's own: it posts the form and loads a new document, whose refusal or heading
+ * shows while the rest of it, its styles among it, is still arriving (step 2.175).
  */
 export async function accessibilityProblems(page) {
+  await page.waitForLoadState('load');
   return page.evaluate(() => {
     const problems = [];
     if (!document.documentElement.lang) problems.push('the page has no language');

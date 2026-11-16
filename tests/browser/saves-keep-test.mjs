@@ -18,13 +18,16 @@
 //   without scrolling; a reload does not say it again, and nothing of it is in the address.
 // - A real double tap on a save button (the grid's, and "Yes, make it final") saves once
 //   and is never answered "someone changed".
-// - Accessibility checks (T-186) and no sideways scrolling, on each refusal.
+// - Accessibility checks (T-186) and no sideways scrolling, on each refusal; and, with
+//   scripts off, the box score drawn again after the refusal has its title in its head, in
+//   the raw HTML of the answer to the post (step 2.175).
 import {
   accessibilityProblems,
   buildNext,
   freePort,
   launch,
   startNext,
+  titleInHeadProblem,
   waitFor,
   whatWentWrong,
 } from './web-browser-kit.mjs';
@@ -315,10 +318,20 @@ if (browser) {
     try {
       await openBoxScore(page, laterGame, 'Box score: Bears at Tigers');
       const typed = await typeTiedSheet(page, 'Bears', 'Tigers');
-      await Promise.all([
+      const [answer] = await Promise.all([
+        page.waitForResponse(
+          (r) => r.request().method() === 'POST' && r.request().isNavigationRequest(),
+        ),
         page.waitForEvent('load'),
         page.getByRole('button', { name: 'Save box score and make it final' }).click(),
       ]);
+      // The page drawn again in the answer to the post has its title in its head (step 2.175).
+      const titleProblem = titleInHeadProblem(await answer.text());
+      note(
+        'the box score with scripts off, refused: the title is in the head of the page drawn again',
+        titleProblem === '',
+        titleProblem,
+      );
       await checkTiedSheetRefused(page, 'the box score with scripts off', typed, 'Bears', 'Tigers');
       await page.getByLabel('Score for Bears').fill('');
       await page.getByLabel('Score for Tigers').fill('');
