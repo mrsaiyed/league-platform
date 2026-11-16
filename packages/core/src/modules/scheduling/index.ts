@@ -23,7 +23,11 @@ export {
   type RoundPhase,
   type RoundToPlace,
 } from './public-schedule.ts';
-export { summarizePublish, type PublishSummary } from './rules/summarize-publish.ts';
+export {
+  publishChangeCount,
+  summarizePublish,
+  type PublishSummary,
+} from './rules/summarize-publish.ts';
 export { generatePairings, maxTimesEachPair } from './rules/generate-pairings.ts';
 export { fairnessReport } from './rules/fairness-report.ts';
 export { placeSchedule, strictRules } from './rules/place-schedule.ts';

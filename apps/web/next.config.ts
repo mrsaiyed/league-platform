@@ -44,6 +44,15 @@ const config: NextConfig = {
     // above our limit, so our notice always shows, and still small.
     serverActions: { bodySizeLimit: '2mb' },
   },
+  // Every page's title is in its head, in its first bytes, for every browser (step 2.175).
+  // By default Next.js puts the title in the head only for the few bots it lists; for a
+  // browser, a title not ready when the page starts to be sent comes later, at the end of
+  // the body, so a person (or their screen reader) can meet the page drawn with no title.
+  // A list that names every browser turns that off ("To fully disable streaming metadata",
+  // node_modules/next/dist/docs, htmlLimitedBots). Our title is a word from the message
+  // files, so no page waits on it. (A request that names no browser at all still gets the
+  // title late: Next.js's own rule; every browser names itself.)
+  htmlLimitedBots: /.*/,
   poweredByHeader: false,
   headers: async () => [
     { source: '/:path*', headers: everyAnswer },

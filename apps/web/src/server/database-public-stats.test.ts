@@ -1,13 +1,20 @@
-// The public standings' ports on the made-up database (step 2.93 part 2): the seasons a
-// visitor may pick and the standings, read as the app's login role from the seed leagues
-// with their seasons under way; the statistics' reads, which show people, still refuse
-// (part 3), and the home page's leaders are left out rather than taking it down.
-import { readStandings, readTeamRecords } from '@srleagues/core';
+// The public standings' and statistics' ports on the made-up database (step 2.93 parts 2
+// and 3): the seasons a visitor may pick, the standings and the statistics, read as the
+// app's login role from the seed leagues with their seasons under way; names only with
+// the league's own settings, in one transaction with them (T-81, record 070).
+import {
+  defaultNamePolicy,
+  minimumGamesToRank,
+  publicViewer,
+  setSetting,
+  readStandings,
+  readStatisticsTable,
+  readTeamRecords,
+} from '@srleagues/core';
 import * as database from '@srleagues/database';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { homeLeadersOf } from '../features/stats-pages/build-home-leaders.ts';
-import { databasePublicStats } from './database-public-stats.ts';
-import { NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
+import { databasePublicStats, NamesOnlyWithSettings } from './database-public-stats.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 
 let made: database.MadeUpDatabase;
@@ -132,21 +139,123 @@ describe('databasePublicStats', () => {
     expect(await ports.standingsOf(league('maple-street'), season.id)).toEqual(elsewhere);
   });
 
-  it('refuses the statistics reads and the name settings until they move (part 3)', async () => {
+  it("reads each league's own audience, name settings and minimum games (step 2.126, R-15, P7 §6)", async () => {
+    // The seed saves 1 game for the leaders, through League settings' own command.
+    expect(await ports.settingsOf(league('lakeside'))).toEqual({
+      audience: 'adult',
+      namePolicy: defaultNamePolicy,
+      minimumGames: 1,
+    });
+    expect((await ports.settingsOf(league('maple-street'))).audience).toBe('youth');
+  });
+
+  it("reads the league's minimum games for leaders as its owner saves it, and ranks by it (P7 §6)", async () => {
+    const owner = made.leagues.find((l) => l.slug === 'maple-street')?.ownerAccountId ?? '';
+    const deps = {
+      transaction: database.commandTransaction(db, (scope) => ({
+        jobs: database.jobsStore(scope),
+        access: database.accessStore(scope),
+        activity: database.activityLogStore(scope),
+        leagues: database.leaguesStore(scope),
+        divisions: database.divisionsStore(scope),
+      })),
+      events: [],
+      log: () => {},
+      now: () => performance.now(),
+    };
+    const at = { leagueId: league('maple-street'), accountId: owner, requestId: 'minimum' };
+    const leadersNow = async () =>
+      homeLeadersOf(ports, {
+        leagueId: league('maple-street'),
+        seasonId: (await seasonOf('maple-street')).id,
+      });
+    expect(await leadersNow()).not.toEqual([]);
+    // Every seed player has played one game: at 2, no one is ranked.
+    const read = await deps.transaction(at, (tx) =>
+      tx.leagues.settingRows(minimumGamesToRank.key, {}),
+    );
+    const saved = await setSetting(
+      at,
+      {
+        level: 'league',
+        key: minimumGamesToRank.key,
+        value: 2,
+        version: read.find((row) => row.level === 'league')?.version ?? null,
+      },
+      deps,
+    );
+    expect(saved.ok).toBe(true);
+    expect((await ports.settingsOf(league('maple-street'))).minimumGames).toBe(2);
+    expect(await leadersNow()).toEqual([]);
+    // The other league keeps its own.
+    expect((await ports.settingsOf(league('lakeside'))).minimumGames).toBe(1);
+    // Back as the seed left it, for the tests after this one.
+    if (!saved.ok) throw new Error(saved.error.code);
+    const back = await setSetting(
+      at,
+      { level: 'league', key: minimumGamesToRank.key, value: 1, version: saved.value.version },
+      deps,
+    );
+    expect(back.ok).toBe(true);
+    expect(await leadersNow()).not.toEqual([]);
+  });
+
+  it('reads the statistics and the settings as one snapshot: one transaction, set to the league', async () => {
+    const { id } = await seasonOf('lakeside');
+    const { scopes, counted } = countingScopes();
+    const names = await counted.statisticsOf(league('lakeside'), async ({ store, settings }) => {
+      const table = await readStatisticsTable(store, {
+        seasonId: id,
+        viewing: {
+          leagueId: league('lakeside'),
+          viewer: publicViewer(league('lakeside')),
+          audience: settings.audience,
+          policy: settings.namePolicy,
+        },
+      });
+      if (!table.ok) throw new Error(table.error.code);
+      return table.value.players.map((p) => [p.name.text, p.stats['points']?.total]);
+    });
+    // The seed's people, by the league's starting setting: the child Quinn with care.
+    expect(Object.fromEntries(names)).toEqual({
+      'Morgan Example': 10,
+      'Quinn S.': 14,
+      'Robin Placeholder': 18,
+    });
+    expect(scopes.length).toBeGreaterThan(1);
+    expect(new Set(scopes).size).toBe(1);
+    expect(scopes[0]?.leagueId).toBe(league('lakeside'));
+  });
+
+  it('reads no person through the read store alone: names only with the settings (T-81)', async () => {
     const store = ports.readStoreOf(league('lakeside'));
     const { id } = await seasonOf('lakeside');
-    await expect(ports.settingsOf(league('lakeside'))).rejects.toThrow(NotOnTheDatabaseYet);
-    for (const read of [
-      () => store.seasonStatKeys(id),
-      () => store.playerTotals(id),
-      () => store.playerTeams(id),
-      () => store.decidedGamesOf(id, []),
-      () => store.teamStatTotals(id),
-      () => store.people([]),
-    ]) {
-      await expect(read()).rejects.toThrow(NotOnTheDatabaseYet);
-    }
-    // The home page leaves its leaders out, and still shows everything else.
-    expect(await homeLeadersOf(ports, { leagueId: league('lakeside'), seasonId: id })).toEqual([]);
+    expect((await store.playerTotals(id)).length).toBe(3);
+    expect(await store.seasonStatKeys(id)).toEqual([]);
+    await expect(store.people([])).rejects.toThrow(NamesOnlyWithSettings);
+    await expect(
+      readStatisticsTable(store, {
+        seasonId: id,
+        viewing: {
+          leagueId: league('lakeside'),
+          viewer: publicViewer(league('lakeside')),
+          audience: 'adult',
+          policy: defaultNamePolicy,
+        },
+      }),
+    ).rejects.toThrow(NamesOnlyWithSettings);
+    // Ids that are not UUIDs are asked of no database.
+    expect(await store.playerTotals('winter-seed')).toEqual([]);
+    expect(await store.seasonStatKeys('winter-seed')).toBeUndefined();
+  });
+
+  it("shows the home page's leaders from the database, by points per game", async () => {
+    const { id } = await seasonOf('lakeside');
+    const leaders = await homeLeadersOf(ports, { leagueId: league('lakeside'), seasonId: id });
+    expect(leaders.map((l) => [l.name, l.value])).toEqual([
+      ['Robin Placeholder', '18.0'],
+      ['Quinn S.', '14.0'],
+      ['Morgan Example', '10.0'],
+    ]);
   });
 });

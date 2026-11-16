@@ -108,7 +108,16 @@ if (built) {
     PUBLIC_BASE_URL: origin,
   });
   await step('starting the server and the browser', async () => {
-    await waitFor(`${origin}/`, server);
+    // The pages its first taps reach, as the made-up scorekeeper: the admin's home, the
+    // tracker of the game it is reached from and the tracker of the game being played,
+    // each drawn once before the browser starts, so no tap or speed check here meets a
+    // page drawn cold (the kit's waitFor, step 2.175). Drawing a tracker takes no session.
+    const keeper = `${scorekeeper.name}=${scorekeeper.value}`;
+    await waitFor(`${origin}/`, server, [
+      { address: `/${league}/admin`, cookie: keeper },
+      { address: trackerPath(otherGame), cookie: keeper },
+      { address: trackerPath(), cookie: keeper },
+    ]);
     // Twelve players a side, as on a real game night.
     await addPlayers(origin);
     browser = await launch();

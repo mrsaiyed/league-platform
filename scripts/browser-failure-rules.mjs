@@ -5,7 +5,8 @@
 // it can be tested by itself (tests/browser-failure-notes.test.mjs).
 //
 // The output is read as ci.yml makes it: bash runs the chain with its trace on, so it
-// prints "+ node tests/browser/<file>.mjs" before it starts each test; every test prints
+// prints "+ node tests/browser/<file>.mjs" before it starts each test (or, for the
+// tracker's own check, "+ node scripts/check-live-stats-browser.mjs"); every test prints
 // "<its name> … failed:" (or "…: 2 problem(s)") and one indented line per failing check;
 // and a test that fails
 // prints the last lines of any Next.js build or server that did not finish well
@@ -36,10 +37,12 @@ export function browserFailureNotes(output, machine = []) {
   const lines = plainLines(output);
   const notes = [];
 
-  // The last test bash started is the one that stopped the chain.
+  // The last test bash started is the one that stopped the chain: a web browser test, or
+  // a browser check of its own in scripts/ (the tracker's, step 2.175).
   let started = -1;
   lines.forEach((line, i) => {
-    if (/^\++ node tests\/browser\/\S+/.test(line)) started = i;
+    if (/^\++ node (tests\/browser\/\S+|scripts\/check-[\w-]+-browser\.mjs)/.test(line))
+      started = i;
   });
   const own = started >= 0 ? lines.slice(started + 1) : lines;
   const file = started >= 0 ? lines[started].split(' ')[2] : '';

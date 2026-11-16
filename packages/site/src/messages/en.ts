@@ -408,8 +408,16 @@ export const en = {
   'adminTeams.stats.everyone': 'Everyone',
   'adminTeams.stats.staff': "Only the team's staff and the league's admins",
   'adminTeams.remove.title': 'Remove this team',
+  // Until step 2.77 gives the bin a screen, nothing here promises a way back (step 2.161).
   'adminTeams.remove.body':
-    'The team is moved to the bin. Its games and numbers are kept and it can be brought back.',
+    'The team is moved to the bin. Its games and numbers are kept. It is kept for 30 days; the screen to bring it back is not ready yet.',
+  'adminTeams.remove.roster_one':
+    '{count} person is on its roster now. Once the team is removed, they can be taken off the league list.',
+  'adminTeams.remove.roster_other':
+    '{count} people are on its roster now. Once the team is removed, they can be taken off the league list.',
+  'adminTeams.remove.rosterNone': 'Nobody is on its roster now.',
+  'adminTeams.remove.rosterUnknown':
+    'The roster could not be read just now, so how many people are on it is not shown.',
   'adminTeams.remove.submit': 'Move the team to the bin',
   'adminTeams.roster.title': 'Roster',
   'adminTeams.roster.none': 'Nobody is on this roster yet.',
@@ -425,6 +433,12 @@ export const en = {
   'adminTeams.roster.saveEntry': 'Save number and role',
   'adminTeams.roster.leftOn': 'Left on',
   'adminTeams.roster.markLeft': 'Mark as left',
+  'adminTeams.roster.leftOnHelp': 'The day they left: today or a day before.',
+  'adminTeams.roster.putBack': 'Put back on the roster (marked by mistake)',
+  'adminTeams.roster.backAlready':
+    'They are on this roster again, so there is nothing to put back.',
+  'adminTeams.roster.offTheList':
+    'They were taken off the league list, so they cannot be put back on the roster.',
   'adminTeams.roster.leftTitle': 'Left the team',
   'adminTeams.roster.leftLine': '{name}, left on {date}',
   'adminTeams.roster.readFailed':
@@ -454,18 +468,32 @@ export const en = {
   'adminTeams.newPerson.submit': 'Add the person and put them on the roster',
   'adminTeams.people.title': 'The league list',
   'adminTeams.people.body':
-    'Taking someone off the list is refused while they are on a roster: mark them as having left first.',
+    'Taking someone off the list is refused while they are on a roster: mark them as having left first. A place on a team that was moved to the bin does not count.',
   'adminTeams.people.remove': 'Remove from the league list',
   'adminTeams.confirm': 'Yes, I am sure',
   'adminTeams.done.created': 'The team was added.',
   'adminTeams.done.updated': 'The team was saved.',
   'adminTeams.done.statsSaved': 'Who sees the numbers was saved.',
-  'adminTeams.done.removed': 'The team was moved to the bin.',
+  'adminTeams.done.removed':
+    'Removed. The team is kept for 30 days; the screen to bring it back is not ready yet.',
   'adminTeams.done.added': 'The player was added to the roster.',
   'adminTeams.done.entrySaved': 'The number and role were saved.',
   'adminTeams.done.moved': 'The roster order was saved.',
   'adminTeams.done.left': 'The player was marked as having left.',
-  'adminTeams.done.personRemoved': 'The person was taken off the league list.',
+  'adminTeams.done.putBack':
+    'The player was put back on the roster. Their games and numbers are as they were.',
+  'adminTeams.done.putBackNoNumber':
+    'The player is back on the roster with no number, because someone else now wears theirs. Give them a number.',
+  // Said on the player's own line, naming them (step 2.161; R-32 for the number).
+  'adminTeams.said.left': '{name} was marked as having left {team}.',
+  'adminTeams.said.putBack':
+    '{name} is back on the roster. Their games and numbers are as they were.',
+  'adminTeams.said.putBackNoNumber':
+    '{name} is back on the roster with no number: {number} is now worn by {wearer}. Give them a number.',
+  'adminTeams.said.putBackNoNumberNoWearer':
+    '{name} is back on the roster with no number: someone else on the team now wears {number}. Give them a number.',
+  'adminTeams.done.personRemoved':
+    'Removed from the league list. The person is kept for 30 days; the screen to bring them back is not ready yet.',
   // Why a teams or people change was refused (T-187): `error.`, the command's name, the code.
   'error.invalid-input': 'Something you entered is not valid. Check the fields and try again.',
   'error.not-allowed': 'You are not allowed to do that.',
@@ -512,6 +540,7 @@ export const en = {
   'adminSettings.area.members': 'Start page for members',
   'adminSettings.area.games': 'Scoring',
   'adminSettings.area.teams': 'Team statistics',
+  'adminSettings.area.statistics': 'Statistics',
   'adminSettings.area.privacy': 'Privacy',
   // What the Privacy part says around its settings (step 2.162, R-29, record 065): one
   // opening sentence by who plays, what is in force now, and where the parents'
@@ -1263,6 +1292,17 @@ export const en = {
     'This person has left the team, so their entry can no longer be changed.',
   'error.teams.mark_left.already-left': 'This person is already marked as having left.',
   'error.teams.mark_left.left-before-joined': 'The leaving date is before the day they joined.',
+  'error.teams.mark_left.left-after-today':
+    'The leaving date is after today. Choose today or a day before: nobody was marked as left.',
+  'error.teams.put_back_on_roster.roster-entry-not-found': 'That roster entry is not there.',
+  'error.teams.put_back_on_roster.not-left':
+    'This person is already on the roster, so there was nothing to put back.',
+  'error.teams.put_back_on_roster.person-not-found':
+    'This person has been taken off the league list, so they cannot be put back on the roster.',
+  'error.teams.put_back_on_roster.already-on-team':
+    'This person is on the team again already, so they were not put back a second time.',
+  'error.teams.put_back_on_roster.jersey-taken':
+    'This player could not be put back, even with no number: the roster refused it. Nothing was changed; reload the page and try again.',
   // Why assigning a scorekeeper was refused (T-187).
   'error.games.assign_scorekeeper.game-not-found': 'That game is not there.',
   'error.games.assign_scorekeeper.game-closed':
@@ -1571,6 +1611,7 @@ export const en = {
   'activity.teams.change_roster_entry': "Changed a player's number or role",
   'activity.teams.reorder_roster': 'Changed the order of a roster',
   'activity.teams.mark_left': 'Marked a person as having left a team',
+  'activity.teams.put_back_on_roster': 'Put a person marked as left by mistake back on a roster',
   'activity.scheduling.add_draft_game': 'Added a game to the schedule draft',
   'activity.scheduling.move_draft_game': 'Moved a game in the schedule draft',
   'activity.scheduling.swap_draft_games': 'Swapped two games in the schedule draft',
@@ -1616,6 +1657,8 @@ export const en = {
   'setting.teams.startingStatsLevel.option.staff': "Only the team's staff and the league's admins",
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
+  'setting.statistics.minimumGamesToRank.label':
+    'Games a player must have played to be ranked among the leaders. 0 ranks everyone. A player with fewer still shows in the full table.',
   'setting.privacy.publicNames.label':
     "Names on public pages: how players are shown on the team pages, game pages and statistics. If a person's own request for less is recorded (initials, or their name taken off), it always wins over this setting.",
   // Each choice says what it does to adults and to children (R-29, record 065).
@@ -1858,6 +1901,8 @@ export const en = {
   'schedule.admin.noDraft': 'There is no draft yet. You are looking at the published schedule.',
   'schedule.admin.draftChanges_one': 'Draft in progress: {count} change not yet published.',
   'schedule.admin.draftChanges_other': 'Draft in progress: {count} changes not yet published.',
+  'schedule.admin.draftChangesNone':
+    'Draft in progress: as it stands it changes nothing in the published schedule.',
   'schedule.admin.draftOutOfDate':
     'A new version of the schedule was published after this draft was started. Discard the draft and start again from the published schedule.',
   'schedule.admin.rejected_one':
@@ -1898,6 +1943,17 @@ export const en = {
     'Saved to the draft: the round was removed. It is not public until you publish.',
   'schedule.admin.savedGame': 'Saved to the draft: {game}.',
   'schedule.admin.savedGameRemoved': 'Saved to the draft: a game was removed here.',
+  // Removing a game from the draft, and putting it back in one tap (step 2.161).
+  'schedule.admin.savedGameRemovedNamed': 'Removed: {game}, {round}.',
+  'schedule.admin.savedGameRemovedNoRound': 'Removed: {game}, from the games with no round.',
+  'schedule.admin.error.nothing-to-put-back':
+    'That game is no longer waiting to be put back: the draft was published or discarded since, so nothing was added.',
+  'schedule.admin.removedDraftOnly':
+    'It was only in the draft, so nothing public has changed. Put it back and it is exactly as it was.',
+  'schedule.admin.removedPublished':
+    'Nothing public changes until you publish. Put it back now and it is exactly as it was. Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
+  'schedule.admin.putBack': 'Put it back',
+  'schedule.admin.savedGamePutBack': 'Put back in the draft: {game}, as it was.',
   'schedule.admin.savedGameRound': 'Saved to the draft: {game} is now in {round}.',
   'schedule.admin.followRoundDate': 'Move it to {date} too?',
   'schedule.admin.followRoundDateYes': 'Yes, move it to {date}',
