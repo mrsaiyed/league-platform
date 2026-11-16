@@ -14,6 +14,7 @@ import {
   type StandingsReadStore,
   type StandingsStore,
 } from '@srleagues/core';
+import { minorAt } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld, SavedPlayerTotals } from './stand-in-world-state.ts';
@@ -79,8 +80,12 @@ const statsDocument = (totals: Frozen<SavedPlayerTotals>) => ({
  * The public standings and statistics reads of one league, each over its world as it
  * stands once the transactions before it have ended (standings-read-store.ts).
  */
-export function worldStandingsRead(read: () => Promise<ReadWorld | undefined>): StandingsReadStore {
-  const over = async () => standingsReadOver(await read());
+export function worldStandingsRead(
+  read: () => Promise<ReadWorld | undefined>,
+  /** The world's one clock: the day a birth date is read against (R-28). */
+  now: () => Date,
+): StandingsReadStore {
+  const over = async () => standingsReadOver(await read(), now());
   return {
     findSeason: async (seasonId) => (await over()).findSeason(seasonId),
     seasonStatKeys: async (seasonId) => (await over()).seasonStatKeys(seasonId),
@@ -98,7 +103,7 @@ export function worldStandingsRead(read: () => Promise<ReadWorld | undefined>): 
 }
 
 /** The same reads over one fixed state of a league's world; undefined is a league with none. */
-function standingsReadOver(s: ReadWorld | undefined): StandingsReadStore {
+function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsReadStore {
   const at = () => s;
   const decidedGames = (seasonId: string) =>
     (at()?.games ?? [])
@@ -239,7 +244,8 @@ function standingsReadOver(s: ReadWorld | undefined): StandingsReadStore {
           id: p.id,
           firstName: p.firstName,
           lastName: p.lastName,
-          isMinor: p.sensitive.isMinor,
+          // R-28: the birth date decides where there is one (list-people-for-display.ts).
+          isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment),
           visibility: p.visibility,
         })),
   };
@@ -282,7 +288,9 @@ export function worldLeaguesStores(
     // child, read from its own rows, so the Privacy settings say what the public pages do
     // (record 065; has-recorded-child.ts reads the people table the same way).
     leagueAudience: async () => s.audience,
-    hasRecordedChild: async () => s.people.some((p) => !p.binned && p.sensitive.isMinor === true),
+    // R-28: a child by birth date counts, whatever the tick says.
+    hasRecordedChild: async () =>
+      s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
     // The permission check asks who the league is and whether it may be changed.
     currentLeague: async () => {
       const status = await access.leagueStatus();

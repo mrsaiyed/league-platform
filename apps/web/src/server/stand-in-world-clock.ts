@@ -2,7 +2,7 @@
 // and back from a day and time there to a moment. What the database works out with
 // `at time zone`, for the stand-in's one world (stand-in-world.ts). Local work only.
 // "Today" is always the league's own day, by core's own rule (dayIn of the leagues module).
-import { dayIn as leagueDayIn } from '@srleagues/core';
+import { isMinorOn, dayIn as leagueDayIn, type MinorFacts } from '@srleagues/core';
 
 /** yyyy-mm-dd, `days` days on from `day` (or back, when negative). */
 export function addDays(day: string, days: number): string {
@@ -37,6 +37,19 @@ const dayAt = remembered((key) => {
 /** The day it is at `moment` in the league's zone, yyyy-mm-dd: core's own rule. */
 export function dayIn(moment: Date, timeZone: string): string {
   return dayAt(`${timeZone}|${moment.getTime()}`);
+}
+
+/**
+ * Whether a person of the world counts as a child at `moment`, by core's one rule (R-28,
+ * isMinorOn): their birth date on the league's own day where they have one, else the tick.
+ * Every read of the world that says whether someone is a child goes through this.
+ */
+export function minorAt(
+  person: { readonly sensitive: MinorFacts },
+  timeZone: string,
+  moment: Date,
+): boolean | null {
+  return isMinorOn(person.sensitive, dayIn(moment, timeZone));
 }
 
 /** One reader of the wall clock for each zone: making one is the slow part. */

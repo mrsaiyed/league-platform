@@ -251,15 +251,17 @@ beforeAll(async () => {
       name: 'world',
       deps: madeUp.deps,
       as,
-      standings: (work) => work(worldStandingsRead(() => madeUp.read(league.leagueId))),
-      games: (work) => work(worldGameSnapshot(() => madeUp.read(league.leagueId))),
+      standings: (work) => work(worldStandingsRead(() => madeUp.read(league.leagueId), madeUp.now)),
+      games: (work) => work(worldGameSnapshot(() => madeUp.read(league.leagueId), madeUp.now)),
       schedule: async (id, today) =>
         worldPublicSchedule(await madeUp.read(league.leagueId), id, today),
       roster: async (teamId) =>
-        worldPublicRoster(await madeUp.read(league.leagueId), teamId, {
-          viewer: publicViewer(league.leagueId),
-          policy: adultPolicy,
-        }),
+        worldPublicRoster(
+          await madeUp.read(league.leagueId),
+          teamId,
+          { viewer: publicViewer(league.leagueId), policy: adultPolicy },
+          madeUp.now(),
+        ),
       names: new Map(),
     },
   ];

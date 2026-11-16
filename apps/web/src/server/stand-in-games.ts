@@ -35,7 +35,7 @@ export function standInGames(world: World, options: StandInGamesOptions): StandI
     deps,
     tracker: {
       deps,
-      snapshotStoreOf: (leagueId) => worldGameSnapshot(() => world.read(leagueId)),
+      snapshotStoreOf: (leagueId) => worldGameSnapshot(() => world.read(leagueId), world.now),
       namesShownOf: options.namesShownOf,
       displayNameOf: async (leagueId, accountId) =>
         (await world.read(leagueId)) === undefined ? '' : (options.people[accountId] ?? ''),
