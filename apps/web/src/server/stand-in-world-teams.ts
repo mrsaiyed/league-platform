@@ -25,7 +25,8 @@ const entryOf = ({
   ...entry
 }: LeagueWorld['roster'][number]): RosterEntryRecord => entry;
 
-export function worldTeamsStore(s: LeagueWorld): TeamsStore {
+/** The teams store over one league's world; `now` is the world's one clock (stand-in-world.ts). */
+export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
   const clash = (t: { seasonId: string; slug: string; name: string }, except?: string) => {
     const others = s.teams.filter((o) => o.id !== except && !o.binned && o.seasonId === t.seasonId);
     if (others.some((o) => o.slug === t.slug)) return 'slug-taken' as const;
@@ -155,8 +156,8 @@ export function worldTeamsStore(s: LeagueWorld): TeamsStore {
       s.roster = replacedAt(s.roster, at, { ...found, ...change, version: found.version + 1 });
       return found.version + 1;
     },
-    // The league's today in its own zone by the server's clock (the world's database clock).
-    leagueToday: async () => dayIn(new Date(), s.timeZone),
+    // The league's today in its own zone, by the world's own clock (as the games store's).
+    leagueToday: async () => dayIn(now(), s.timeZone),
     seasonProgramId: async (id) => s.seasons.find((x) => x.id === id)?.programId,
     findDivision: async (id) => {
       const d = s.divisions.find((x) => x.id === id);

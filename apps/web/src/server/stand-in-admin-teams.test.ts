@@ -210,6 +210,28 @@ describe('the admin Teams screens over the stand-in', () => {
     ).toEqual({ ok: false, error: { code: 'jersey-taken' } });
   });
 
+  it("takes the league's today from the world's own clock, not the computer's", async () => {
+    // The world's clock says March 2030, years after this computer's.
+    const world = testWorld(
+      () => access,
+      () => new Date('2030-03-01T18:00:00Z'),
+    );
+    const m = { ...made(), ports: standInAdminTeams(world) };
+    const { entries } = await teamOfTen(m);
+    const leave = (n: number, leftOn: string) =>
+      markLeft(
+        m.owner,
+        markLeftInput({ entry: entries[n] ?? '', version: '1', leftOn }),
+        m.ports.deps,
+      );
+    expect(await leave(0, '2030-03-05')).toEqual({
+      ok: false,
+      error: { code: 'left-after-today' },
+    });
+    expect((await leave(0, '2029-12-01')).ok).toBe(true);
+    expect((await leave(1, '2030-03-01')).ok).toBe(true);
+  });
+
   it('lets a player of a team in the bin be taken off the league list (A-16)', async () => {
     const m = made();
     const { teamId, people } = await teamOfTen(m);
