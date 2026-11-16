@@ -2,7 +2,16 @@
 // how an answer travels in the address, and how the words for it are chosen (step 2.51).
 import { createTranslator } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
-import { answerQuery, doneKey, doneNames, problemKey, refused, done } from './answer.ts';
+import {
+  answerQuery,
+  doneAtOf,
+  doneKey,
+  doneNames,
+  leavingAtOf,
+  problemKey,
+  refused,
+  done,
+} from './answer.ts';
 import {
   changeEntryInput,
   changeTeamInput,
@@ -13,6 +22,8 @@ import {
   shortNameNeeded,
 } from './form-input.ts';
 import { hasName, numbersWornTwice, rosterName } from './roster-name.ts';
+import { putBackOffer } from './put-back-offer.ts';
+import { saidOnLine } from './said-on-line.ts';
 
 const t = createTranslator('en');
 
@@ -127,6 +138,124 @@ describe('answers in the address', () => {
     for (const name of doneNames) expect(doneKey({ done: name })).toBeDefined();
   });
 
+  it('carries a refused leaving date to its line, with the date typed and nothing else (step 2.161)', () => {
+    const entry = '01900000-0000-7000-8000-0000000e0001';
+    const query = answerQuery(
+      refused('teams.mark_left', 'left-after-today', { entry, leftOn: '2027-11-15' }),
+    );
+    expect(query).toBe(
+      `?problem=teams.mark_left.left-after-today&entry=${entry}&leftOn=2027-11-15#entry-${entry}`,
+    );
+    expect(
+      leavingAtOf({ problem: 'teams.mark_left.left-after-today', entry, leftOn: '2027-11-15' }),
+    ).toEqual({ entry, leftOn: '2027-11-15' });
+    // Not a date: the field is drawn empty. Not an entry, or no refusal: nothing is said beside.
+    expect(answerQuery(refused('teams.mark_left', 'x', { entry, leftOn: '<b>' }))).toContain(
+      'leftOn=#',
+    );
+    expect(leavingAtOf({ problem: 'p', entry, leftOn: 'soon' })).toEqual({ entry, leftOn: '' });
+    expect(leavingAtOf({ problem: 'p', entry: 'nope', leftOn: '2027-11-15' })).toBeUndefined();
+    expect(leavingAtOf({ entry, leftOn: '2027-11-15' })).toBeUndefined();
+    expect(answerQuery(refused('teams.mark_left', 'x', { entry: 'nope', leftOn: '' }))).toBe(
+      '?problem=teams.mark_left.x',
+    );
+  });
+
+  it('says a player put back without their number on their own line, naming both (R-32)', () => {
+    const entry = '01900000-0000-7000-8000-0000000e0001';
+    const answer = done('putBackNoNumber', { entry, number: '11' });
+    const query = answerQuery(answer);
+    expect(query).toBe(`?done=putBackNoNumber&entry=${entry}&number=11#entry-${entry}`);
+    const found = doneAtOf({ done: 'putBackNoNumber', entry, number: '11' });
+    expect(found).toEqual({ done: 'putBackNoNumber', at: { entry, number: '11' } });
+    const line = (id: string, first: string, last: string, jerseyNumber: string | null) => ({
+      id,
+      teamId: 't',
+      personId: `p-${id}`,
+      jerseyNumber,
+      role: 'player',
+      joinedOn: null,
+      leftOn: null,
+      sort: 0,
+      version: 1,
+      firstName: first,
+      lastName: last,
+      publicName: null,
+    });
+    const lines = [line(entry, 'Marcus', 'Oyelaran', null), line('e2', 'Dana', 'Whitfield', '11')];
+    expect(saidOnLine(found, lines, 'Falcons')).toEqual({
+      entry,
+      text: 'Marcus Oyelaran is back on the roster with no number: 11 is now worn by Dana Whitfield. Give them a number.',
+    });
+    // Nobody wears it now: still true words, and no wearer named.
+    expect(saidOnLine(found, [lines[0] ?? line(entry, '', '', null)], 'Falcons')?.text).toBe(
+      'Marcus Oyelaran is back on the roster with no number: someone else on the team now wears 11. Give them a number.',
+    );
+    // A number that is not a jersey number is never carried; an entry not on the page says nothing.
+    expect(doneAtOf({ done: 'putBackNoNumber', entry, number: '<b>' })?.at).toEqual({ entry });
+    expect(saidOnLine(doneAtOf({ done: 'putBack', entry: 'x' }), lines, 'Falcons')).toBeUndefined();
+    // An address carrying the mark on a line that has a number says nothing about having none.
+    const numbered = [
+      line(entry, 'Marcus', 'Oyelaran', '7'),
+      line('e2', 'Dana', 'Whitfield', '11'),
+    ];
+    expect(saidOnLine(found, numbered, 'Falcons')).toBeUndefined();
+  });
+
+  it('names who left and which team, on their "left" line', () => {
+    const entry = '01900000-0000-7000-8000-0000000e0002';
+    const left = {
+      id: entry,
+      teamId: 't',
+      personId: 'p',
+      jerseyNumber: '11',
+      role: 'player',
+      joinedOn: null,
+      leftOn: '2026-11-13',
+      sort: 0,
+      version: 2,
+      firstName: 'Marcus',
+      lastName: 'Oyelaran',
+      publicName: null,
+    };
+    expect(answerQuery(done('left', { entry }))).toBe(`?done=left&entry=${entry}#entry-${entry}`);
+    expect(saidOnLine(doneAtOf({ done: 'left', entry }), [left], 'Falcons')).toEqual({
+      entry,
+      text: 'Marcus Oyelaran was marked as having left Falcons.',
+    });
+    // Not said if the line no longer shows them as left.
+    expect(
+      saidOnLine(doneAtOf({ done: 'left', entry }), [{ ...left, leftOn: null }], 'Falcons'),
+    ).toBeUndefined();
+  });
+
+  it('offers "Put back" only where it can work, and says why not in words', () => {
+    const list = (ids: string[], complete = true) => ({ ids: new Set(ids), complete });
+    expect(putBackOffer('p1', new Set(), list(['p1']))).toBe('offer');
+    // On the team again by a later entry.
+    expect(putBackOffer('p1', new Set(['p1']), list(['p1']))).toBe('back');
+    // Taken off the league list, known because the whole list was read.
+    expect(putBackOffer('p1', new Set(), list(['p2']))).toBe('off-the-list');
+    // A list cut short, or not read: never claims they were taken off.
+    expect(putBackOffer('p1', new Set(), list(['p2'], false))).toBe('offer');
+    expect(putBackOffer('p1', new Set(), undefined)).toBe('offer');
+    expect(t('adminTeams.roster.offTheList')).toContain('taken off the league list');
+  });
+
+  it('promises no way back from the bin that no screen offers (step 2.161)', () => {
+    for (const key of [
+      'adminTeams.remove.body',
+      'adminTeams.done.removed',
+      'adminTeams.done.personRemoved',
+    ] as const) {
+      expect(t(key)).toContain('kept for 30 days; the screen to bring');
+      expect(t(key)).not.toMatch(/can be brought back|restore/i);
+    }
+    expect(t.plural('adminTeams.remove.roster', 2)).toBe(
+      '2 people are on its roster now. Once the team is removed, they can be taken off the league list.',
+    );
+  });
+
   it('carries a refusal and picks the command’s own words, then the code’s, then a general one', () => {
     expect(answerQuery(refused('people.remove_person', 'person-on-a-roster'))).toBe(
       '?problem=people.remove_person.person-on-a-roster',
@@ -157,6 +286,12 @@ describe('answers in the address', () => {
       ['teams.reorder_roster', 'invalid-input'],
       ['teams.create_team', 'short-name-needed'],
       ['teams.update_team', 'short-name-needed'],
+      ['teams.mark_left', 'left-after-today'],
+      ['teams.put_back_on_roster', 'not-left'],
+      ['teams.put_back_on_roster', 'person-not-found'],
+      ['teams.put_back_on_roster', 'already-on-team'],
+      ['teams.put_back_on_roster', 'jersey-taken'],
+      ['teams.put_back_on_roster', 'roster-entry-not-found'],
     ];
     for (const [command, code] of codes) {
       const key = problemKey({ problem: `${command}.${code}` });

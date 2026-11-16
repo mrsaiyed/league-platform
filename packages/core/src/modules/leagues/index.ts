@@ -54,6 +54,7 @@ export {
   startingStatsLevel,
   statsLevelChoices,
   teamsMayChooseStatsLevel,
+  minimumGamesToRank,
   publicNames,
   publicNamesChoices,
   childrenInFullConfirmed,

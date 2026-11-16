@@ -1,7 +1,9 @@
 // Marks someone as having left a team on a date (R-17, T-52). The entry stays in the
 // team's history with every game they played; only its leaving date is set, and the
 // number they wore is free for others where numbers must be unique. They may join
-// again later (a new entry). The date cannot be before the day they joined.
+// again later (a new entry). The date cannot be before the day they joined, nor after
+// the league's today in its own time zone (step 2.161). One marked by mistake is put
+// back with put-back-on-roster.ts.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -14,6 +16,8 @@ export type MarkLeftError = {
     | 'roster-entry-not-found'
     | 'already-left'
     | 'left-before-joined'
+    /** The leaving date is after the league's today. */
+    | 'left-after-today'
     | 'changed-since-read';
 };
 
@@ -37,6 +41,7 @@ export const markLeft = defineCommand({
     if (entry.joinedOn !== null && input.leftOn < entry.joinedOn) {
       return fail({ code: 'left-before-joined' });
     }
+    if (input.leftOn > (await tx.teams.leagueToday())) return fail({ code: 'left-after-today' });
     const updated = await tx.teams.updateRosterEntry(
       entry.id,
       { leftOn: input.leftOn },

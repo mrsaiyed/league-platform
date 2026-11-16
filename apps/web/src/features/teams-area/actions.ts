@@ -8,6 +8,7 @@ import {
   changeRosterEntry,
   createTeam,
   markLeft,
+  putBackOnRoster,
   removePerson,
   removeTeam,
   setTeamStatsVisibility,
@@ -21,6 +22,7 @@ import {
   changeTeamInput,
   markLeftInput,
   newTeamInput,
+  putBackInput,
   shortNameNeeded,
   teamStatsInput,
 } from './form-input.ts';
@@ -122,8 +124,31 @@ export async function changeEntryAction(form: FormData): Promise<never> {
 
 export async function markLeftAction(form: FormData): Promise<never> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
-    const result = await markLeft(context, markLeftInput(fields), ports.deps);
-    return settle(markLeft, result, 'left', fields['team']);
+    const input = markLeftInput(fields);
+    const result = await markLeft(context, input, ports.deps);
+    // Said on the player's "left" line, naming them and the team.
+    if (result.ok) {
+      return { answer: done('left', { entry: input.rosterEntryId }), teamId: fields['team'] };
+    }
+    // Said beside the line's leaving date, with the date typed kept in it.
+    const at = { entry: input.rosterEntryId, leftOn: input.leftOn };
+    return { answer: refused(markLeft.commandName, result.error.code, at), teamId: fields['team'] };
+  });
+}
+
+/** Puts a player marked as left by mistake back on the roster (step 2.161). */
+export async function putBackAction(form: FormData): Promise<never> {
+  return runTeamsAction(form, async ({ context, ports, fields }) => {
+    const input = putBackInput(fields);
+    const result = await putBackOnRoster(context, input, ports.deps);
+    if (!result.ok) return settle(putBackOnRoster, result, 'putBack', fields['team']);
+    // Said on the player's own line; back with no number when theirs is worn (R-32).
+    const dropped = result.value.numberDropped;
+    const answer =
+      dropped === null
+        ? done('putBack', { entry: input.rosterEntryId })
+        : done('putBackNoNumber', { entry: input.rosterEntryId, number: dropped });
+    return { answer, teamId: fields['team'] };
   });
 }
 

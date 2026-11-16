@@ -21,7 +21,13 @@
 // Standings and player totals are not here: core works them out from these results when
 // the world is made (stand-in-world.ts).
 import { defaultSeasonRules, SeasonRules } from '@srleagues/contracts';
-import { membersStartPage, whoMayScore, type Audience, type TeamRecord } from '@srleagues/core';
+import {
+  membersStartPage,
+  minimumGamesToRank,
+  whoMayScore,
+  type Audience,
+  type TeamRecord,
+} from '@srleagues/core';
 import { addDays, dayIn, momentIn, timeIn } from './stand-in-world-clock.ts';
 import {
   emptyLeagueWorld,
@@ -303,7 +309,9 @@ type GameSpec = {
   /**
    * Minutes from the moment the world is made, in place of `day` and `time`: a game played
    * earlier today, or under way now, is in the past whatever the time of day (it may then
-   * fall on yesterday, a little after midnight).
+   * fall on yesterday, a little after midnight, and is then in the round before). It is
+   * moved earlier, five minutes at a time, off any time another made-up game holds on its
+   * court or for one of its teams, and off the whole and half hours (startsFromNow).
    */
   readonly fromNow?: number;
   readonly home: string;
@@ -335,6 +343,10 @@ const win = SeasonRules.parse(defaultSeasonRules());
 const byPoints = SeasonRules.parse({
   ...defaultSeasonRules(),
   standings: { ...win.standings, rankBy: 'points', columns: [...win.standings.columns, 'points'] },
+  // The youth league asks for a different number for each player in a team (T-44), so the
+  // made-up world shows that rule too: a player put back whose number is worn comes back
+  // with none (step 2.161, R-32). Its rosters wear each number once.
+  rosters: { ...win.rosters, uniqueJerseys: true },
 });
 
 const gym = venue(1);
@@ -836,14 +848,19 @@ const draftLeagueSeason = (programId: string): SeasonSpec => {
     teams: adultTeams.filter((t) => own.includes(t.id)).map((t) => ({ ...t, division: null })),
     rosters: adultRosters,
     divisions: [],
-    rounds: [{ id: big(0xb5, 1), days: 0, label: null }],
+    // Last week's round holds a game played last night, when the world is made a little
+    // after midnight (step 2.179); this week's is the tracked games' round.
+    rounds: [
+      { id: big(0xb5, 2), days: -7, label: null },
+      { id: big(0xb5, 1), days: 0, label: null },
+    ],
     games: [
       // At the draft league's own gym, on its own courts.
       ...fall.games
         .filter((g) => g.id.includes('-8000-006a'))
         .map((g) => ({
           ...g,
-          round: 0,
+          round: 1,
           venue: pines,
           court: g.court === court(1) ? court(21) : court(22),
         })),
@@ -1000,6 +1017,7 @@ type LeagueFacts = {
   readonly league: CastLeague;
   readonly audience: Audience;
   readonly timeZone: string;
+  /** The fewest games a player needs to be among the leaders (a league setting, P7 §6). */
   readonly minimumGames: number;
   readonly programId: string;
   /** The league's own venues, each with its courts. */
@@ -1052,6 +1070,65 @@ const draftVenues: readonly VenueSpec[] = [
   },
 ];
 
+const fiveMinutes = 300_000;
+
+/**
+ * When each of a season's games set from now starts (step 2.179). It starts on a whole five
+ * minutes, `fromNow` minutes from now, then moves earlier, five minutes at a time, while it
+ * would clash, by core's clash rule (the same day and time in the league's zone), with a
+ * game already placed on its court or with one of its teams, and while it is on a whole or
+ * half hour, where the season's own games are, and the games a test or a person adds by
+ * hand. Moving earlier keeps a finished game finished and the game under way started; the
+ * latest are placed first, so the others move round them. Any of them may fall on last
+ * night in a world made just after midnight: a game under way is listed whenever it
+ * started (step 2.156, list-games-in-window.ts), and the round whose days hold it takes it.
+ * The games placed at a day and a time, those of step 2.156 two and three days back
+ * included, are held first, so these move round them too.
+ */
+function startsFromNow(
+  spec: SeasonSpec,
+  today: string,
+  now: Date,
+  timeZone: string,
+): ReadonlyMap<string, Date> {
+  type Held = { date: string; time: string; court: string | null; teams: readonly string[] };
+  const held: Held[] = spec.games.flatMap((g) => {
+    if (g.fromNow !== undefined || g.time === null) return [];
+    const days = g.day ?? (g.round === null ? undefined : spec.rounds[g.round]?.days);
+    if (days === undefined) return [];
+    return [{ date: addDays(today, days), time: g.time, court: g.court, teams: [g.home, g.away] }];
+  });
+  const starts = new Map<string, Date>();
+  const later = spec.games
+    .filter((g) => g.fromNow !== undefined)
+    .sort((a, b) => (b.fromNow ?? 0) - (a.fromNow ?? 0));
+  for (const g of later) {
+    let at = Math.floor((now.getTime() + (g.fromNow ?? 0) * 60_000) / fiveMinutes) * fiveMinutes;
+    const slot = (t: number) => ({
+      date: dayIn(new Date(t), timeZone),
+      time: timeIn(new Date(t), timeZone),
+    });
+    const taken = (t: number) => {
+      const { date, time } = slot(t);
+      return (
+        Number(time.slice(3)) % 30 === 0 ||
+        held.some(
+          (h) =>
+            h.date === date &&
+            h.time === time &&
+            ((g.court !== null && h.court === g.court) ||
+              h.teams.includes(g.home) ||
+              h.teams.includes(g.away)),
+        )
+      );
+    };
+    while (taken(at)) at -= fiveMinutes;
+    starts.set(g.id, new Date(at));
+    held.push({ ...slot(at), court: g.court, teams: [g.home, g.away] });
+  }
+  return starts;
+}
+
 function leagueOf(
   facts: LeagueFacts,
   seasons: readonly SeasonSpec[],
@@ -1060,6 +1137,19 @@ function leagueOf(
   now: Date,
 ): LeagueWorld {
   const s = emptyLeagueWorld(facts.league, facts);
+  // The league's minimum games for leaders, as League settings saves it, where it is not
+  // the starting value (P7 §6).
+  if (facts.minimumGames !== minimumGamesToRank.default) {
+    s.settings = [
+      {
+        place: { level: 'league' },
+        key: minimumGamesToRank.key,
+        document: { version: minimumGamesToRank.version, value: facts.minimumGames },
+        version: 1,
+        savedAt: now.toISOString(),
+      },
+    ];
+  }
   const today = dayIn(now, facts.timeZone);
   s.currentSeasonId = current;
   s.venues = facts.venues.map((v) => ({
@@ -1148,21 +1238,24 @@ function leagueOf(
         date: addDays(today, r.days),
       });
     }
+    const fromNowAt = startsFromNow(spec, today, now, facts.timeZone);
     for (const g of spec.games) {
-      const round = g.round === null ? undefined : spec.rounds[g.round];
+      const fromNow = fromNowAt.get(g.id);
+      const own = g.round === null ? undefined : spec.rounds[g.round];
+      // A game set from now that fell on an earlier day than its round's (last night, a
+      // little after midnight) is in the round whose days hold it, so no game is ever
+      // outside its round's days.
+      const fromDay = fromNow === undefined ? undefined : dayIn(fromNow, facts.timeZone);
+      const round =
+        own === undefined || fromDay === undefined || addDays(today, own.days) <= fromDay
+          ? own
+          : (spec.rounds.filter((r) => addDays(today, r.days) <= fromDay).at(-1) ?? own);
       const day =
         g.day !== undefined
           ? addDays(today, g.day)
           : round === undefined
             ? null
             : addDays(today, round.days);
-      // A game set from now starts on a whole five minutes, `fromNow` minutes from now, so
-      // it may fall on last night in a world made just after midnight: a game under way
-      // is listed whenever it started (step 2.156, list-games-in-window.ts).
-      const fromNow =
-        g.fromNow === undefined
-          ? undefined
-          : new Date(Math.floor((now.getTime() + g.fromNow * 60_000) / 300_000) * 300_000);
       const startsAt =
         fromNow !== undefined
           ? fromNow.toISOString()
@@ -1218,6 +1311,9 @@ function leagueOf(
   return s;
 }
 
+/** The made-up adult league's own time zone: the day its games list and the tests count from. */
+export const adultTimeZone = 'America/Chicago';
+
 /**
  * Every made-up league's rows, with days counted from `now` in each league's own time
  * zone, so the current round is always this week's.
@@ -1228,7 +1324,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
     {
       league: cast.adultLeague,
       audience: 'adult',
-      timeZone: 'America/Chicago',
+      timeZone: adultTimeZone,
       minimumGames: 3,
       programId: adultProgram,
       venues: adultVenues,
@@ -1291,6 +1387,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   );
   // Members start on their team's page here, as the league's admin chose (U-5).
   youth.settings = [
+    ...youth.settings,
     {
       place: { level: 'league' },
       key: membersStartPage.key,
@@ -1318,6 +1415,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   draft.playsBefore = [standInGameId(2)];
   // It scores assigned games only, and its admin is given the live ones (P7 §5.1).
   draft.settings = [
+    ...draft.settings,
     {
       place: { level: 'league' },
       key: whoMayScore.key,
@@ -1353,7 +1451,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   history.currentSeasonId = null;
 
   const others = cast.otherLeagues.map((league) =>
-    emptyLeagueWorld(league, { audience: 'youth', timeZone: 'UTC', minimumGames: 0 }),
+    emptyLeagueWorld(league, { audience: 'youth', timeZone: 'UTC' }),
   );
   return [adult, youth, draft, history, ...others];
 }

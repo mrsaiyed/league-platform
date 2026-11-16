@@ -1,4 +1,5 @@
-// Run by .github/workflows/ci.yml when `npm run test:web:browser` fails: prints, as GitHub
+// Run by .github/workflows/ci.yml when `npm run test:web:browser` or the tracker's own
+// `npm run test:stats:browser` fails (step 2.175): prints, as GitHub
 // annotations, which browser test stopped, what failed and what the machine was, from the
 // output the step kept (scripts/browser-failure-rules.mjs decides what is shown).
 //

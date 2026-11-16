@@ -3,9 +3,12 @@
 // not show, so each case first opens the scope's own season to the public (inside the
 // run's rolled-back transaction), as a published season would be.
 import { defaultNamePolicy, publicViewer, type PublicDisplay } from '@srleagues/core';
+import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
+  findLeagueName,
   findLeagueTimeZone,
+  findLeagueToday,
   findPublicGameFacts,
   findPublicSeason,
   findPublicTeam,
@@ -14,6 +17,7 @@ import {
   listPublicSchedule,
   listPublicSeasons,
   listPublicTeams,
+  listTeamsOfAccount,
 } from '../queries/index.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
@@ -87,6 +91,12 @@ registerIsolationCase({
 });
 
 registerIsolationCase({
+  subject: findLeagueToday,
+  name: "read the league's today (the target's own, in its scope)",
+  run: (scope) => findLeagueToday(scope),
+});
+
+registerIsolationCase({
   subject: listPublicTeams,
   name: "list the target season's teams after opening it",
   run: async (scope, target) => {
@@ -107,6 +117,58 @@ registerIsolationCase({
       .where('id', '=', target.teamId)
       .executeTakeFirst();
     return findPublicTeam(scope, target.seasonId, row?.slug ?? 'nobody', displayFor(scope));
+  },
+});
+
+registerIsolationCase({
+  subject: findLeagueName,
+  name: "read the league's own name, its row moved after the target's (the target's, in its scope)",
+  run: async (scope) => {
+    // The scope's own league row is written again (inside the run's rolled-back
+    // transaction), so the database keeps it after the other league's: a read that lost
+    // its `where id = scope.leagueId` would meet the target's row first and name it. Where
+    // the fence refuses the write, nothing is moved and the read goes on.
+    const trx = transactionOf(scope);
+    await sql`savepoint move_league_row`.execute(trx);
+    try {
+      await trx
+        .updateTable('leagues')
+        .set({ name: sql<string>`name` })
+        .where('id', '=', scope.leagueId)
+        .execute();
+      await sql`release savepoint move_league_row`.execute(trx);
+    } catch {
+      await sql`rollback to savepoint move_league_row`.execute(trx);
+    }
+    return findLeagueName(scope);
+  },
+});
+
+registerIsolationCase({
+  subject: listTeamsOfAccount,
+  name: "list the target team as the scope's account's own, after linking the target's player to it in any league",
+  run: async (scope, target) => {
+    // One account with roster places in two leagues: the target's player is linked to the
+    // scope's account's own profile WITH NO league filter, so in the code-only run (no
+    // fence) only the query's own league filters keep the target's team out, and in the
+    // target's own league (the control) it comes back. The link is undone before the run
+    // ends (a savepoint), so the run itself changes nothing of the target's league.
+    const trx = transactionOf(scope);
+    const own = await trx
+      .selectFrom('profile_access')
+      .select('profile_id')
+      .where('account_id', '=', scope.accountId ?? '')
+      .where('relation', '=', 'self')
+      .executeTakeFirst();
+    await sql`savepoint link_target_player`.execute(trx);
+    await trx
+      .updateTable('people')
+      .set({ profile_id: own?.profile_id ?? null })
+      .where('id', '=', target.personId)
+      .execute();
+    const teams = await listTeamsOfAccount(scope, target.seasonId);
+    await sql`rollback to savepoint link_target_player`.execute(trx);
+    return teams;
   },
 });
 

@@ -18,15 +18,19 @@
 //   without scrolling; a reload does not say it again, and nothing of it is in the address.
 // - A real double tap on a save button (the grid's, and "Yes, make it final") saves once
 //   and is never answered "someone changed".
-// - Accessibility checks (T-186) and no sideways scrolling, on each refusal.
+// - Accessibility checks (T-186) and no sideways scrolling, on each refusal; and, with
+//   scripts off, the box score drawn again after the refusal has its title in its head, in
+//   the raw HTML of the answer to the post (step 2.175).
 import {
   accessibilityProblems,
   buildNext,
   freePort,
   launch,
   startNext,
+  titleInHeadProblem,
   waitFor,
   whatWentWrong,
+  worldAtNoon,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -52,6 +56,12 @@ const finalGame = '01900000-0000-7000-8000-006a00000005'; // Lions at Bears, fin
 const phone = { width: 390, height: 844 };
 const someoneChanged = /Someone changed/;
 
+// The made-up world's clock starts at noon of the league's day (LOCAL_NOW, step 2.179),
+// so this test never depends on the hour, the day or a clock change it is run at: the
+// day's final game is always this morning's, on the list, and already played (the kit's
+// worldAtNoon; `--now=<UTC time>` starts it elsewhere).
+const worldNow = worldAtNoon();
+
 let built = true;
 if (!process.argv.includes('--no-build')) {
   await step('building the web app', async () => {
@@ -68,9 +78,17 @@ if (built) {
   server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
+    LOCAL_NOW: worldNow,
   });
   await step('starting the server and the browser', async () => {
-    await waitFor(`${origin}/`, server);
+    // The pages its first taps reach, as the made-up scheduler: the admin's home, Games
+    // and the box score, each drawn once before the browser starts.
+    const scheduler = 'srl_session=local-scheduler-token';
+    await waitFor(`${origin}/`, server, [
+      { address: '/north-valley/admin', cookie: scheduler },
+      { address: '/north-valley/admin/games', cookie: scheduler },
+      { address: `/north-valley/admin/games/${finalScoreGame}`, cookie: scheduler },
+    ]);
     browser = await launch();
   });
 }
@@ -315,10 +333,20 @@ if (browser) {
     try {
       await openBoxScore(page, laterGame, 'Box score: Bears at Tigers');
       const typed = await typeTiedSheet(page, 'Bears', 'Tigers');
-      await Promise.all([
+      const [answer] = await Promise.all([
+        page.waitForResponse(
+          (r) => r.request().method() === 'POST' && r.request().isNavigationRequest(),
+        ),
         page.waitForEvent('load'),
         page.getByRole('button', { name: 'Save box score and make it final' }).click(),
       ]);
+      // The page drawn again in the answer to the post has its title in its head (step 2.175).
+      const titleProblem = titleInHeadProblem(await answer.text());
+      note(
+        'the box score with scripts off, refused: the title is in the head of the page drawn again',
+        titleProblem === '',
+        titleProblem,
+      );
       await checkTiedSheetRefused(page, 'the box score with scripts off', typed, 'Bears', 'Tigers');
       await page.getByLabel('Score for Bears').fill('');
       await page.getByLabel('Score for Tigers').fill('');
@@ -405,6 +433,14 @@ if (browser) {
         page.waitForEvent('load'),
         gameOn(page, finalGame).getByRole('button', { name: 'Save final score' }).click(),
       ]);
+      // Played this morning by the world's clock, which is the page's clock too (step
+      // 2.179): the ordinary question, never "This game is set for …".
+      const asked = (await gameOn(page, finalGame).locator('[data-question]').textContent()) ?? '';
+      note(
+        "the played game's question is the ordinary one, by the world's clock",
+        /Lions 40, Bears 38\. Make this final\?/.test(asked) && !/set for/.test(asked),
+        asked,
+      );
       await Promise.all([
         page.waitForEvent('load'),
         gameOn(page, finalGame).getByRole('button', { name: 'Yes, make it final' }).click(),

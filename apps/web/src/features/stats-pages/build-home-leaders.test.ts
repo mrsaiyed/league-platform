@@ -1,6 +1,6 @@
 // The home page's leaders (step 2.147 part 2), on the made-up stand-in: who is named, how
 // their name is written, and who is never named.
-import type { StandingsReadStore } from '@srleagues/core';
+import { publicViewer, readStatLeaders, type StandingsReadStore } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
@@ -11,6 +11,9 @@ import { loadStatsPage } from './build-stats.ts';
 const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
 const stats = standInPublicStats(testWorld(), startingNamePolicy);
+
+/** A leader board row's name without its place: "2. Dana W." is "Dana W.". */
+const nameIn = (cell: unknown) => String(cell).replace(/^\d+\. /u, '');
 
 async function leadersOf(leagueId: string) {
   const season = (await stats.seasonsOf(leagueId))[0];
@@ -31,8 +34,12 @@ describe('the home page’s leaders', () => {
     const board = page.leaders[0];
     expect(board?.key).toBe('points');
     // The same people in the same order, and the same numbers, as the statistics page.
+    expect(leaders.map((leader) => leader.name)).toEqual(
+      board?.rows.slice(0, leaders.length).map((row) => nameIn(row.cells['player'])),
+    );
+    // Each one's key is its place on this page, never a person's id (T-81).
     expect(leaders.map((leader) => leader.id)).toEqual(
-      board?.rows.slice(0, leaders.length).map((row) => row.id),
+      ['leader-0', 'leader-1', 'leader-2'].slice(0, leaders.length),
     );
     expect(leaders.map((leader) => leader.value)).toEqual(
       board?.rows.slice(0, leaders.length).map((row) => row.cells['value']),
@@ -50,8 +57,12 @@ describe('the home page’s leaders', () => {
   it('write a name only as the statistics page does: by the league’s own name setting', async () => {
     for (const league of [adult, youth]) {
       const { leaders, page } = await leadersOf(league);
-      const names = new Map(page.playerRows.map((row) => [row.id, row.cells['player']]));
-      for (const leader of leaders) expect(leader.name).toBe(names.get(leader.id));
+      const board = page.leaders[0]?.rows ?? [];
+      const shown = new Set(page.playerRows.map((row) => row.cells['player']));
+      for (const [place, leader] of leaders.entries()) {
+        expect(leader.name).toBe(nameIn(board[place]?.cells['player']));
+        expect(shown).toContain(leader.name);
+      }
     }
     // The youth league shows a first name and an initial, never a family name.
     const { leaders } = await leadersOf(youth);
@@ -144,8 +155,21 @@ describe('the home page’s leaders', () => {
     const store = stats.readStoreOf(youth);
     const settings = await stats.settingsOf(youth);
     const input = { leagueId: youth, seasonId: season.id };
-    const [first, second] = await loadHomeLeaders(store, settings, input);
+    // The first two leaders as core ranks them for the home page: by points, per game.
+    const ranked = await readStatLeaders(
+      store,
+      { ...input, measure: 'points', by: 'average', minimumGames: settings.minimumGames },
+      {
+        leagueId: youth,
+        viewer: publicViewer(youth),
+        audience: settings.audience,
+        policy: settings.namePolicy,
+      },
+    );
+    if (!ranked.ok) throw new Error(ranked.error.code);
+    const [first, second] = ranked.value.leaders;
     if (first === undefined || second === undefined) throw new Error('fewer than two leaders');
+    const firstName = first.name.text ?? '';
     const changed: StandingsReadStore = {
       ...store,
       people: async (ids) =>
@@ -153,9 +177,9 @@ describe('the home page’s leaders', () => {
           ...person,
           isMinor: true,
           visibility:
-            person.id === first.id
+            person.id === first.personId
               ? 'removed'
-              : person.id === second.id
+              : person.id === second.personId
                 ? 'initials'
                 : person.visibility,
         })),
@@ -163,12 +187,16 @@ describe('the home page’s leaders', () => {
     const after = await loadHomeLeaders(changed, settings, input);
     const page = await loadStatsPage(changed, settings, { ...input, by: 'average' });
     if ('code' in page) throw new Error(page.code);
-    const names = new Map(page.playerRows.map((row) => [row.id, row.cells['player']]));
-    for (const leader of after) expect(leader.name).toBe(names.get(leader.id));
-    // The one taken off has no name at all; the other is two initials.
-    expect(after.find((leader) => leader.id === first.id)?.name).toBe('A player (name not shown)');
-    expect(after.find((leader) => leader.id === second.id)?.name).toMatch(/^\S\. \S\.$/u);
-    expect(JSON.stringify(after)).not.toContain(first.name);
+    const board = page.leaders[0]?.rows ?? [];
+    for (const [place, leader] of after.entries()) {
+      expect(leader.name).toBe(nameIn(board[place]?.cells['player']));
+    }
+    // A name changes nothing of the order: the one taken off has no name at all; the other
+    // is two initials.
+    expect(after[0]?.name).toBe('A player (name not shown)');
+    expect(after[1]?.name).toMatch(/^\S\. \S\.$/u);
+    expect(firstName).not.toBe('');
+    expect(JSON.stringify(after)).not.toContain(firstName);
   });
 
   it('are left out when the statistics cannot be read, and never take the page down', async () => {
@@ -184,12 +212,11 @@ describe('the home page’s leaders', () => {
       },
     };
     await expect(loadHomeLeaders(broken, settings, input)).resolves.toEqual([]);
-    // The same when it is the league's settings that cannot be read.
+    // The same when it is the league's settings, read with them, that cannot be read.
     await expect(
       homeLeadersOf(
         {
-          readStoreOf: () => store,
-          settingsOf: async () => {
+          statisticsOf: async () => {
             throw new Error('database unreachable');
           },
         },

@@ -11,6 +11,7 @@
 // It takes nothing and opens no address, so it cannot reach a real database. It is
 // gone when closed: nothing is written to disk.
 import { PGlite } from '@electric-sql/pglite';
+import type { Audience } from '@srleagues/core';
 import type { DatabaseSource } from '../db/create-database.ts';
 import { applyMigrations } from '../migrations/apply-migrations.ts';
 import { pgliteDriver } from '../migrations/pglite-driver.ts';
@@ -39,6 +40,11 @@ export type MadeUpOptions = {
   /** Seed leagues, by short name, to put in the bin once loaded: for tests of the bin. */
   readonly inBin?: readonly string[];
   /**
+   * Seed leagues, by short name, told another audience once loaded (who plays: adult,
+   * youth or mixed, R-15): for the name scans of a league of mixed ages (T-81).
+   */
+  readonly audiences?: Readonly<Record<string, Audience>>;
+  /**
    * Each seed league's season opened, with a published schedule and a result
    * (seed-season-under-way.ts): what the web app runs on locally, so its public pages
    * have something to show. Off by default: the seeded season is still being set up.
@@ -54,6 +60,15 @@ export async function madeUpDatabase(options: MadeUpOptions = {}): Promise<MadeU
     if (!run.ok) throw new Error(`The made-up database could not be built: ${run.error.code}.`);
     await seedLeaguesInto(pglite);
     if (options.underWay === true) await putSeedSeasonsUnderWay(pglite);
+    for (const [slug, audience] of Object.entries(options.audiences ?? {})) {
+      const told = await pglite.query('update leagues set audience = $2 where slug = $1', [
+        slug,
+        audience,
+      ]);
+      if (told.affectedRows !== 1) {
+        throw new Error('The made-up database has no seed league of one of those short names.');
+      }
+    }
     const inBin = options.inBin ?? [];
     if (inBin.length > 0) {
       const binned = await pglite.query(

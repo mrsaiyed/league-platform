@@ -1,7 +1,8 @@
 // Moves a person's league record to the bin (A-5): the row stays, with `deleted_at`
 // set, and can be restored for 30 days. It is refused while the person is on a team's
 // roster: the admin takes them off first (they then stay in the team's history,
-// R-17), so a roster never holds someone who is not in the league's list.
+// R-17), so a roster never holds someone who is not in the league's list. A place on a
+// team in the bin does not count (A-16): its players can still be taken off the list.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';

@@ -1,11 +1,14 @@
 'use client';
 // The tracker's page on the device (P7 §5.1; T6 §4, §5; T-115, T-116): opens the game
 // (open-tracker-game.ts), shows who holds it, asks for the format to be confirmed, and
-// then holds the place where the scoring screens of steps 2.35 to 2.37 will draw. Plain
-// forms and messages only. The words come from the page, from the message files (T-187).
+// then draws the scoring screen (scoring-screen.tsx, step 2.35). The whole page is in the
+// tracker's own frame and look (docs/build/DESIGN.md section 7; record 064): no public
+// header, menu or footer, the title says the two teams, the day and the time, and there
+// is one way out. The words come from the page, from the message files (T-187).
 import { createTranslator, type Catalog } from '@srleagues/site';
-import { PageHead } from '@srleagues/ui';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import './court.css';
+import type { CourtBanner } from './court-view.tsx';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
@@ -13,7 +16,8 @@ import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.
 import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
-import { savedBanner, savedBannerText } from './queue-banner.ts';
+import { savedBanner, savedBannerText, type SavedBanner } from './queue-banner.ts';
+import { ScoringScreen } from './scoring-screen.tsx';
 import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controller.ts';
 import { trackerNoticeText, trackerNotices } from './tracker-notice.ts';
 import { holdSignOut } from './tracker-sign-out.ts';
@@ -24,10 +28,20 @@ export type TrackerOpeningProps = {
   readonly accountId: string;
   readonly gameId: string;
   readonly rosters: DeviceRosters;
+  /** The game's day and time in the league's time zone, in words; null when it has none. */
+  readonly when: string | null;
+  /** The league's public page of this game, opened beside the tracker (checklist A4). */
+  readonly watchHref: string;
   /** Where "back to your games" goes, leaving the game. */
   readonly backHref: string;
   /** The account page, where a shared device is signed out (and its kept games cleared). */
   readonly accountHref: string;
+  /**
+   * The account button of step 2.127 (the shell's AccountButton), drawn by the server: in
+   * the frame's first row, so a shared tablet can be signed out (DESIGN.md section 7,
+   * line 11). Its "Sign out" leaves the game first (holdSignOut, below). Null: none.
+   */
+  readonly account?: ReactNode;
   /** The sign-in screen, coming back to this game: offered once the device is signed out. */
   readonly signInHref: string;
   readonly locale: string;
@@ -50,8 +64,11 @@ export function TrackerOpening({
   accountId,
   gameId,
   rosters,
+  when,
+  watchHref,
   backHref,
   accountHref,
+  account = null,
   signInHref,
   locale,
   catalog,
@@ -172,7 +189,7 @@ export function TrackerOpening({
       window.location.assign(to);
     }
   };
-  // The account button's "Sign out" (in the league's header, above this page) leaves the
+  // The account button's "Sign out" (in this frame's first row: `account`) leaves the
   // game this way too (tracker-sign-out.ts): it asks when plays are waiting, then the
   // session is released before the device is signed out (T6 §5).
   useEffect(
@@ -202,6 +219,19 @@ export function TrackerOpening({
     phase.kind === 'preparing' ||
     (phase.kind === 'open' && screenOf(phase.status, phase.confirmed).kind === 'opening');
   const slow = useSlowAfter(stillOpening, slowOpeningMs);
+  // A tap made in the very moment this device stopped scoring (taken over, signed out,
+  // no longer allowed) reaches no list of plays not saved, and the scoring screen that
+  // would have said so is gone: this page says it, until the game is scored here again.
+  const scoringNow =
+    phase.kind === 'open' &&
+    phase.status.game !== null &&
+    screenOf(phase.status, phase.confirmed).kind === 'scoring';
+  const [lastTapLost, setLastTapLost] = useState(false);
+  const wasScoring = useRef(false);
+  useEffect(() => {
+    if (scoringNow && !wasScoring.current) setLastTapLost(false);
+    wasScoring.current = scoringNow;
+  }, [scoringNow]);
   const openingText = (
     <p role="status" data-opening="">
       {t('tracker.opening')}
@@ -220,7 +250,7 @@ export function TrackerOpening({
     phase.kind === 'open' && (phase.status.signedOut || readOnlySignedOut) ? (
       <p>
         <a
-          className="ui-button"
+          className="court-button"
           {...(readOnlySignedOut ? { 'data-kind': 'main' } : {})}
           href={signInHref}
           onClick={leaveBy(signInHref)}
@@ -229,50 +259,128 @@ export function TrackerOpening({
         </a>
       </p>
     ) : null;
+  const storeFailedNotice = storeFailed ? (
+    <p className="court-notice" data-kind="error" role="alert">
+      {t('tracker.storeFailed')}
+    </p>
+  ) : null;
 
   const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
+
+  // The scoring screen, once this device holds the game and its format is confirmed.
+  if (
+    phase.kind === 'open' &&
+    phase.status.game !== null &&
+    screenOf(phase.status, phase.confirmed).kind === 'scoring'
+  ) {
+    const banner = savedBanner(phase.status.queue);
+    const notices = trackerNotices(phase.status);
+    const anythingToTell = notices.length > 0 || signIn !== null || storeFailedNotice !== null;
+    return (
+      <ScoringScreen
+        game={phase.game}
+        status={phase.status}
+        state={phase.status.game}
+        rosters={rosters}
+        t={t}
+        title={matchup}
+        when={when}
+        banner={{ text: savedBannerText(banner, t), state: bannerState(banner) }}
+        notices={
+          anythingToTell ? (
+            <>
+              <Notices status={phase.status} t={t} />
+              {signIn}
+              {storeFailedNotice}
+            </>
+          ) : null
+        }
+        links={{ back: backHref, account: accountHref, watch: watchHref }}
+        account={account}
+        leave={leaveBy}
+        onNotRecorded={() => setLastTapLost(true)}
+      />
+    );
+  }
+
   return (
-    <main className="ui-stack" data-tracker="">
-      <PageHead title={t('tracker.title')} sub={matchup} />
-      <section className="ui-panel ui-stack" aria-label={matchup}>
-        {phase.kind === 'preparing' ? openingText : null}
-        {phase.kind === 'no-storage' ? (
-          <p className="ui-notice" data-kind="error" role="alert">
-            {t('tracker.noStorage')}
+    <main className="court court-opening" data-tracker="">
+      <div className="court-card">
+        <header className="court-card-head" data-with-account={account === null ? undefined : ''}>
+          {account === null ? null : <div className="court-account">{account}</div>}
+          <p className="court-label">{t('tracker.title')}</p>
+          <h1 className="court-title">
+            <span className="court-title-teams">{matchup}</span>
+            {when === null ? null : <span className="court-title-when">{when}</span>}
+          </h1>
+        </header>
+        <section className="court-card-body" aria-label={matchup}>
+          {lastTapLost ? (
+            <p className="court-notice" data-kind="error" role="alert" data-last-tap-lost="">
+              {t('tracker.lastTapNotRecorded')}
+            </p>
+          ) : null}
+          {phase.kind === 'preparing' ? openingText : null}
+          {phase.kind === 'no-storage' ? (
+            <p className="court-notice" data-kind="error" role="alert">
+              {t('tracker.noStorage')}
+            </p>
+          ) : null}
+          {phase.kind === 'open' ? (
+            <OpenGame
+              phase={phase}
+              t={t}
+              locale={locale}
+              busy={busy}
+              openingText={openingText}
+              signIn={signIn}
+              onTakeOver={act((game) => game.controller.takeOver())}
+              onOpenAgain={act((game) => game.controller.openAgain())}
+              onConfirm={(format) => act((game) => game.confirmFormat(format))()}
+            />
+          ) : null}
+          {storeFailedNotice}
+        </section>
+        <footer className="court-card-foot">
+          <a className="court-button" href={backHref} onClick={leaveBy(backHref)}>
+            {t('tracker.back')}
+          </a>
+          <p className="court-quiet" data-shared-device="">
+            {t('tracker.sharedDevice.text')}{' '}
+            <a href={accountHref} onClick={leaveBy(accountHref)}>
+              {t('tracker.sharedDevice.link')}
+            </a>
           </p>
-        ) : null}
-        {phase.kind === 'open' ? (
-          <OpenGame
-            phase={phase}
-            t={t}
-            locale={locale}
-            rosters={rosters}
-            busy={busy}
-            openingText={openingText}
-            signIn={signIn}
-            onTakeOver={act((game) => game.controller.takeOver())}
-            onOpenAgain={act((game) => game.controller.openAgain())}
-            onConfirm={(format) => act((game) => game.confirmFormat(format))()}
-          />
-        ) : null}
-        {storeFailed ? (
-          <p className="ui-notice" data-kind="error" role="alert">
-            {t('tracker.storeFailed')}
-          </p>
-        ) : null}
-      </section>
-      <p>
-        <a className="ui-button" href={backHref} onClick={leaveBy(backHref)}>
-          {t('tracker.back')}
-        </a>
-      </p>
-      <p data-shared-device="">
-        {t('tracker.sharedDevice.text')}{' '}
-        <a href={accountHref} onClick={leaveBy(accountHref)}>
-          {t('tracker.sharedDevice.link')}
-        </a>
-      </p>
+        </footer>
+      </div>
     </main>
+  );
+}
+
+/** How the saved banner is drawn: calm when all is saved, amber while plays wait. */
+function bannerState(banner: SavedBanner): CourtBanner['state'] {
+  const first = banner[0].key;
+  if (first === 'tracker.queue.allSaved') return 'saved';
+  return first === 'tracker.queue.waiting' ? 'waiting' : 'trouble';
+}
+
+/** What the tracker tells about holding the game and taps that did not go in. */
+function Notices({
+  status,
+  t,
+}: {
+  readonly status: TrackerControllerStatus;
+  readonly t: ReturnType<typeof createTranslator>;
+}) {
+  const notices = trackerNotices(status);
+  return notices.length === 0 ? null : (
+    <div role="alert" className="court-stack" data-tracker-notices="">
+      {notices.map((notice) => (
+        <p key={notice.key} className="court-notice">
+          {trackerNoticeText(notice, t)}
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -307,7 +415,6 @@ function OpenGame({
   phase,
   t,
   locale,
-  rosters,
   busy,
   openingText,
   signIn,
@@ -318,7 +425,6 @@ function OpenGame({
   readonly phase: Extract<Phase, { kind: 'open' }>;
   readonly t: ReturnType<typeof createTranslator>;
   readonly locale: string;
-  readonly rosters: DeviceRosters;
   readonly busy: boolean;
   /** "Opening the game…", and after a while a word about the connection. */
   readonly openingText: ReactNode;
@@ -330,7 +436,6 @@ function OpenGame({
 }) {
   const { status, confirmed } = phase;
   const screen = screenOf(status, confirmed);
-  const notices = trackerNotices(status);
   // Taking over asks first (T6 §5, P7 §5.2): the other device stops scoring, and plays
   // it has not sent yet are lost.
   const [askingTakeOver, setAskingTakeOver] = useState(false);
@@ -339,32 +444,30 @@ function OpenGame({
     if (screen.kind !== 'held-by-other') setAskingTakeOver(false);
   }, [screen.kind]);
   const banner = savedBanner(status.queue);
-  // "All saved" is said once there is something to have saved: on the scoring screen,
-  // or whenever taps are waiting, refused or cannot be stored.
-  const showBanner = screen.kind === 'scoring' || banner[0].key !== 'tracker.queue.allSaved';
+  // Before the scoring screen, "All saved" would say nothing: the banner is shown only
+  // when taps are waiting, refused or cannot be stored.
+  const showBanner = banner[0].key !== 'tracker.queue.allSaved';
   return (
     <>
       {showBanner ? (
-        <p role="status" aria-live="polite" data-saved-banner="">
+        <p
+          className="court-banner"
+          role="status"
+          aria-live="polite"
+          data-saved-banner=""
+          data-state={bannerState(banner)}
+        >
           {savedBannerText(banner, t)}
         </p>
       ) : null}
-      {notices.length === 0 ? null : (
-        <div role="alert" className="ui-stack" data-tracker-notices="">
-          {notices.map((notice) => (
-            <p key={notice.key} className="ui-notice">
-              {trackerNoticeText(notice, t)}
-            </p>
-          ))}
-        </div>
-      )}
+      <Notices status={status} t={t} />
       {signIn}
       {screen.kind === 'opening' ? openingText : null}
       {screen.kind === 'held-by-other' && !askingTakeOver ? (
         <p>
           <button
             type="button"
-            className="ui-button"
+            className="court-button"
             data-kind="main"
             onClick={() => setAskingTakeOver(true)}
             disabled={busy}
@@ -374,12 +477,12 @@ function OpenGame({
         </p>
       ) : null}
       {screen.kind === 'held-by-other' && askingTakeOver ? (
-        <section aria-labelledby="tracker-take-over" data-take-over="">
+        <section className="court-stack" aria-labelledby="tracker-take-over" data-take-over="">
           <p id="tracker-take-over">{t('tracker.takeOverQuestion', { name: screen.name })}</p>
-          <p>
+          <p className="court-row">
             <button
               type="button"
-              className="ui-button"
+              className="court-button"
               data-kind="main"
               onClick={() => {
                 setAskingTakeOver(false);
@@ -388,10 +491,10 @@ function OpenGame({
               disabled={busy}
             >
               {t('tracker.takeOverYes')}
-            </button>{' '}
+            </button>
             <button
               type="button"
-              className="ui-button"
+              className="court-button"
               onClick={() => setAskingTakeOver(false)}
               disabled={busy}
             >
@@ -402,45 +505,31 @@ function OpenGame({
       ) : null}
       {screen.kind === 'read-only' && mayOpenAgain(screen.reason) ? (
         <p>
-          <button type="button" className="ui-button" onClick={onOpenAgain} disabled={busy}>
+          <button type="button" className="court-button" onClick={onOpenAgain} disabled={busy}>
             {/* Taken over: opening again shows who has the game, and offers it back. */}
             {t(screen.reason === 'taken-over' ? 'tracker.seeWhoIsScoring' : 'tracker.openAgain')}
           </button>
         </p>
       ) : null}
       {screen.kind === 'confirm-format' ? (
-        <section aria-labelledby="tracker-format-title" data-format="">
+        <section className="court-stack" aria-labelledby="tracker-format-title" data-format="">
           <h2 id="tracker-format-title">{t('tracker.format.title')}</h2>
           <p>{t('tracker.format.intro')}</p>
-          <ul>
+          <ul className="court-format">
             {formatLines(screen.format, t, locale).map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
-          <p>{t('tracker.format.wrong')}</p>
+          <p className="court-quiet">{t('tracker.format.wrong')}</p>
           <button
             type="button"
-            className="ui-button"
+            className="court-button"
             data-kind="main"
             onClick={() => onConfirm(screen.format)}
             disabled={busy}
           >
             {t('tracker.format.confirm')}
           </button>
-        </section>
-      ) : null}
-      {screen.kind === 'scoring' ? (
-        // Where the scoring screens of steps 2.35 to 2.37 will draw.
-        <section data-scoring="">
-          <p>{t('tracker.ready')}</p>
-          <p>
-            {t('tracker.savedOnDevice', {
-              home: rosters.home.name,
-              homeCount: rosters.home.players.length,
-              away: rosters.away.name,
-              awayCount: rosters.away.players.length,
-            })}
-          </p>
         </section>
       ) : null}
     </>

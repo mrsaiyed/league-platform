@@ -194,7 +194,8 @@ function pageData(
     const only = leader.teamIds.length === 1 ? (leader.teamIds[0] ?? '') : '';
     const name = teamName.get(only);
     return {
-      id: leader.personId,
+      // The key of the board's first row (below): a place, never the person's id.
+      id: 'leader-0',
       name: playerName(leader.name),
       value: shown(leader.value, board.by),
       games: leader.gamesPlayed,
@@ -209,8 +210,9 @@ function pageData(
     first: firstOf(board),
     columns: leaderColumns,
     rows: board.leaders.map(
-      (leader: StatLeader): StatRow => ({
-        id: leader.personId,
+      (leader: StatLeader, index): StatRow => ({
+        // A place in this board, for this page only: never the person's id.
+        id: `leader-${index}`,
         cells: {
           player: t('stats.leaderName', { rank: leader.rank, name: playerName(leader.name) }),
           team: teamsOf(leader.teamIds),
@@ -238,8 +240,9 @@ function pageData(
     },
     ...statColumns,
   ];
-  const playerRows: StatRow[] = table.players.map((player) => ({
-    id: player.personId,
+  // A place in this table, for this page only: a person's id does not go into the page.
+  const playerRows: StatRow[] = table.players.map((player, index) => ({
+    id: `player-${index}`,
     cells: {
       player: playerName(player.name),
       team: teamsOf(player.teamIds),

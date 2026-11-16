@@ -12,6 +12,9 @@ export async function addGameAction(form: FormData): Promise<never> {
 export async function removeGameAction(form: FormData): Promise<never> {
   return performScheduleAction('remove-game', form);
 }
+export async function putBackGameAction(form: FormData): Promise<never> {
+  return performScheduleAction('put-back-game', form);
+}
 export async function swapGamesAction(form: FormData): Promise<never> {
   return performScheduleAction('swap-games', form);
 }

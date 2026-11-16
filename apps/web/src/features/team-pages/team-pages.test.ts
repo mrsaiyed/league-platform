@@ -182,10 +182,9 @@ describe('a team page', () => {
     // Beat the Herons and the Badgers, lost to the Owls: its three results.
     expect(head?.recordText).toBe('2-1');
     const roster = buildRoster(
-      await teams.rosterOf(adult, head?.teamId ?? '', {
-        viewer: publicViewer(adult),
-        policy: (await stats.settingsOf(adult)).namePolicy,
-      }),
+      await stats.statisticsOf(adult, ({ rosterOf }) =>
+        rosterOf(head?.teamId ?? '', publicViewer(adult)),
+      ),
     );
     expect(roster.current.map((r) => r.name)).toContain('Dana Whitfield');
     // A person who asked to be taken off the public pages is a nameless entry (R-17).
@@ -198,9 +197,15 @@ describe('a team page', () => {
   it('shows a youth team by number only where the league hides names (R-24)', async () => {
     const s = await season(youth);
     const head = await loadTeamHead(stats.readStoreOf(youth), youth, s.id, 'rockets');
+    // The youth league's own setting says hidden: the roster reads it itself.
     const policy = { ...(await stats.settingsOf(youth)).namePolicy, names: 'hidden' as const };
+    const hiding = standInPublicStats(world, async (leagueId) =>
+      leagueId === youth ? policy : startingNamePolicy(leagueId),
+    );
     const roster = buildRoster(
-      await teams.rosterOf(youth, head?.teamId ?? '', { viewer: publicViewer(youth), policy }),
+      await hiding.statisticsOf(youth, ({ rosterOf }) =>
+        rosterOf(head?.teamId ?? '', publicViewer(youth)),
+      ),
     );
     // The players by number; since step 2.162 hidden is followed for adults too (R-29), so
     // their coach, a grown-up with no number, is a nameless entry.
@@ -239,6 +244,8 @@ describe('a team page', () => {
       // No name and no number cannot be added at the table; were it there, it is nameless.
       ['', 'Name not shown'],
     ]);
+    // Each row's key is its place in the page's roster, never the roster place's id.
+    expect(roster.current.map((r) => r.key)).toEqual(['roster-0', 'roster-1', 'roster-2']);
   });
 
   it('draws a dash with its word, the shared piece, for someone on the roster with no number', () => {
@@ -282,6 +289,8 @@ describe('a team page', () => {
     expect(hidden?.totalsColumns[0]?.label).toBe('Team');
     expect(hidden?.totalsRows[0]?.cells['team']).toBe('Owls');
     expect(hidden?.totalsRows[0]?.chips?.['team']).toBe(owls?.team.color);
+    // An opaque key, not the team's database id.
+    expect(hidden?.totalsRows[0]?.id).toBe('team-totals');
     expect(owls?.team.color).toMatch(/^#[0-9a-f]{6}$/i);
     expect(JSON.stringify(hidden)).not.toContain('Castellanos');
     const falcons = await loadTeamHead(store, adult, s.id, 'falcons');

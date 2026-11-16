@@ -10,7 +10,11 @@ import type { DraftRecord, NewPublishedGame, SchedulingTx } from './ports.ts';
 import { roundsStillInUse } from './round-use.ts';
 import { applyDraft, type ApplyDraftResult } from './rules/apply-draft.ts';
 import type { Clash, ScheduleGame, ScheduleState } from './rules/schedule-types.ts';
-import { summarizePublish, type PublishSummary } from './rules/summarize-publish.ts';
+import {
+  publishChangeCount,
+  summarizePublish,
+  type PublishSummary,
+} from './rules/summarize-publish.ts';
 
 export type PublishBlocker =
   | {
@@ -71,16 +75,7 @@ export async function planPublication(
   if (draft.basedOnRevision !== latestRevision) blockers.push({ code: 'revision-out-of-date' });
   applied.rejected.forEach(() => blockers.push({ code: 'change-no-longer-fits' }));
 
-  const nothing =
-    summary.gamesAdded.length +
-      summary.gamesRemoved.length +
-      summary.gamesMoved.length +
-      summary.gamesRecordingChanged.length +
-      summary.roundsRenamed.length +
-      summary.roundsDateChanged.length +
-      summary.roundsAdded.length +
-      summary.roundsRemoved.length ===
-    0;
+  const nothing = publishChangeCount(summary) === 0;
   if (nothing) blockers.push({ code: 'nothing-to-publish' });
   const inUse = await roundsStillInUse(tx, seasonId, summary.roundsRemoved, applied.state);
   for (const roundId of summary.roundsRemoved) {

@@ -76,10 +76,25 @@ export function createTranslator(
     return fill(key, text, params);
   };
 
+  // The language's plural rule, made once and only when first asked for: making one for
+  // every count is slow enough to be felt where a screen words many counts at each tap
+  // (the scoring screen, finding M6 of the 2.107 audit). Null where the language has none.
+  let rules: Intl.PluralRules | null | undefined;
+  const pluralRules = (): Intl.PluralRules | null => {
+    if (rules === undefined) {
+      try {
+        rules = new Intl.PluralRules(tag);
+      } catch {
+        rules = null;
+      }
+    }
+    return rules;
+  };
+
   const plural = (key: string, count: number, params?: MessageParams): string => {
     let category = 'other';
     try {
-      category = new Intl.PluralRules(tag).select(count);
+      category = pluralRules()?.select(count) ?? 'other';
     } catch {
       // keep "other"
     }

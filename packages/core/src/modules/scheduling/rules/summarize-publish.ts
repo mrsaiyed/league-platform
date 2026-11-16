@@ -87,3 +87,22 @@ export function summarizePublish(published: ScheduleState, draft: ScheduleState)
     teamsAffected: [...teams].sort(),
   };
 }
+
+/**
+ * How many things publishing would change: games added, removed, moved or re-recorded,
+ * and rounds renamed, re-dated, added or removed. Zero is "nothing to publish". The
+ * schedule grid's "changes not yet published" and the publish box both count by this,
+ * so they cannot disagree (step 2.161): a game removed and put back as it was is none.
+ */
+export function publishChangeCount(summary: PublishSummary): number {
+  return (
+    summary.gamesAdded.length +
+    summary.gamesRemoved.length +
+    summary.gamesMoved.length +
+    summary.gamesRecordingChanged.length +
+    summary.roundsRenamed.length +
+    summary.roundsDateChanged.length +
+    summary.roundsAdded.length +
+    summary.roundsRemoved.length
+  );
+}

@@ -6,6 +6,7 @@ import {
   createTeam,
   listRoster as listRosterCommand,
   markLeft,
+  putBackOnRoster,
   removeTeam,
   reorderRoster,
   setTeamStatsVisibility,
@@ -170,7 +171,17 @@ registerCommandCase(reorderRoster, harnessTx, {
 
 registerCommandCase(markLeft, harnessTx, {
   name: "mark the target's roster entry as left",
-  input: (target) => ({ rosterEntryId: target.rosterEntryId, version: 1, leftOn: '2026-12-01' }),
+  // The day the target joined: not after the league's today, whenever the harness runs.
+  input: (target) => ({ rosterEntryId: target.rosterEntryId, version: 1, leftOn: '2026-11-01' }),
+});
+
+registerCommandCase(putBackOnRoster, harnessTx, {
+  name: "put the target's former player back on the target's team (marked as left by mistake)",
+  input: (target) => ({
+    teamId: target.teamId,
+    rosterEntryId: target.formerRosterEntryId,
+    version: 1,
+  }),
 });
 
 registerCommandCase(listRosterCommand, harnessTx, {

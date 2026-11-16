@@ -4,7 +4,8 @@
 // games by hand across two rounds; a game booked on top of another is flagged at once and
 // fixed by moving it to the other court; nothing is on the public schedule until it is
 // published; the grid works by keyboard; every field has a name. `--dev` runs `next dev`
-// instead of building.
+// instead of building. `--now=2026-11-15T20:01:00Z` starts the made-up world's clock at
+// that moment (LOCAL_NOW, step 2.179), to run the test as if at any hour.
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -66,6 +67,7 @@ async function waitFor(url, server) {
 }
 
 const dev = process.argv.includes('--dev');
+const worldNow = process.argv.find((a) => a.startsWith('--now='))?.slice('--now='.length);
 const failures = [];
 const note = (ok, label) => {
   if (!ok) failures.push(label);
@@ -83,6 +85,7 @@ if (built) {
   const server = start(dev ? ['dev', '--port', String(port)] : ['start', '--port', String(port)], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
+    ...(worldNow === undefined ? {} : { LOCAL_NOW: worldNow }),
   });
   let browser;
   try {
@@ -110,6 +113,14 @@ if (built) {
     note(narrow, 'the page scrolls sideways on a phone');
 
     const round = (n) => page.locator('section[data-round]').nth(n - 1);
+    /**
+     * Clicks a form's button and waits for the page it leads to. Not `waitForURL`: it
+     * answers at once when the address showing already says `done=saved` (the save
+     * before), so the next count would read the page the click is leaving.
+     */
+    async function submitTo(done, button) {
+      await Promise.all([page.waitForNavigation({ url: done }), button.click()]);
+    }
     /** Adds a game in a round with the form the grid offers. */
     async function addGame(n, home, away, time, court) {
       const add = round(n).locator('details[data-add-game]');
@@ -118,10 +129,7 @@ if (built) {
       await add.locator('select[name=awayTeamId]').selectOption({ label: away });
       await add.locator('input[name=time]').fill(time);
       await add.locator('select[name=place]').selectOption({ label: `Central Gym: ${court}` });
-      await Promise.all([
-        page.waitForURL(/done=saved/),
-        add.locator('button[type=submit]').click(),
-      ]);
+      await submitTo(/done=saved/, add.locator('button[type=submit]'));
     }
     const teams = await page.$$eval(
       'section[data-round] details[data-add-game] select[name=homeTeamId] option',
@@ -163,20 +171,17 @@ if (built) {
     const flagged = page.locator('li[data-clash=yes]').last();
     await flagged.locator('summary').first().click();
     await flagged.locator('select[name=place]').selectOption({ label: 'Central Gym: Court 2' });
-    await Promise.all([
-      page.waitForURL(/done=saved/),
-      flagged.locator('form').first().locator('button[type=submit]').first().click(),
-    ]);
+    await submitTo(
+      /done=saved/,
+      flagged.locator('form').first().locator('button[type=submit]').first(),
+    );
     note((await page.locator('[data-clashes] li').count()) === 0, 'the clash is gone once fixed');
     note((await page.locator('li[data-clash=yes]').count()) === 0, 'a game is still marked');
 
     // Rename a round and see it.
     await round(1).locator('summary').first().click();
     await round(1).locator('input[name=label]').fill('Week 5, Rivalry Week');
-    await Promise.all([
-      page.waitForURL(/done=saved/),
-      round(1).locator('form').first().locator('button[type=submit]').click(),
-    ]);
+    await submitTo(/done=saved/, round(1).locator('form').first().locator('button[type=submit]'));
     note(
       (await page.locator('h2', { hasText: 'Rivalry Week' }).count()) === 1,
       'the round was not renamed',
@@ -202,10 +207,7 @@ if (built) {
 
     // Publish it: the page then says so.
     await page.goto(address);
-    await Promise.all([
-      page.waitForURL(/done=published/),
-      page.locator('button', { hasText: 'Publish this schedule' }).click(),
-    ]);
+    await submitTo(/done=published/, page.locator('button', { hasText: 'Publish this schedule' }));
     note((await page.locator('[data-notice=done]').count()) === 1, 'no word that it was published');
   } catch (error) {
     failures.push(whatWentWrong(error));

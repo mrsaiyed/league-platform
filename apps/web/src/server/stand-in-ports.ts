@@ -23,7 +23,9 @@
 // the server starts.
 import {
   ok,
+  systemClock,
   type AccessTx,
+  type Clock,
   type CommandDeps,
   type Grant,
   type Role,
@@ -51,7 +53,9 @@ import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
 import { createPlayPublisher } from './publish-plays.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
+import type { PicturedDesignKey } from './stand-in-designs.ts';
 import { standInFixtureImport } from './stand-in-fixture-import.ts';
+import { standInLeagueSitesIn } from './stand-in-league-sites.ts';
 import { standInGames } from './stand-in-games.ts';
 import { standInPublicSchedule } from './stand-in-public-schedule.ts';
 import { standInPublicStats } from './stand-in-public-stats.ts';
@@ -185,7 +189,24 @@ export type StandInOptions = {
   readonly emailFrom: string;
   /** Where a sign-in email that could not be sent is reported: its kind only (T-86). */
   readonly warn?: (message: string, fields: { readonly kind: string }) => void;
+  /**
+   * LOCAL_DESIGN (local work and tests only): the first made-up league drawn under this
+   * design, so every page can be pictured in every color set (scripts/shots.mjs).
+   */
+  readonly localDesign?: PicturedDesignKey | undefined;
+  /**
+   * LOCAL_NOW: the moment the one made-up world's clock starts at (step 2.179), so a test
+   * runs as if at that hour; the world is seeded then and its clock runs on from there.
+   * Only the world reads it; sign-in and sessions keep this computer's clock.
+   */
+  readonly worldStartsAt?: string;
 };
+
+/** A clock that reads `startsAt` now and runs on from it as this computer's does. */
+function clockStartingAt(startsAt: string): Clock {
+  const offset = Date.parse(startsAt) - Date.now();
+  return { now: () => Date.now() + offset };
+}
 
 /**
  * A made-up member who signs in with a password on the sign-in stand-in, made when
@@ -306,10 +327,13 @@ export function standInPorts(options: StandInOptions): StandInPorts {
   };
   const accessOf = accessOfVia(deps);
   // The one made-up world: every area below reads and writes the same rows (step 2.152).
+  const clock =
+    options.worldStartsAt === undefined ? systemClock : clockStartingAt(options.worldStartsAt);
   const world = madeUpWorld({
-    leagues: madeUpLeagues(standInSeedCast, now()),
+    leagues: madeUpLeagues(standInSeedCast, new Date(clock.now())),
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
+    clock,
   });
   // The League settings screen's settings: every area reads them from the same world, and
   // the Privacy settings read who plays there and whether anyone is recorded as a child
@@ -389,6 +413,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     // (review 2, M1): a request for another name, or one passed on by another server.
     answers: answersOnlyHere(options.publicBaseUrl),
     fixtureImport: standInFixtureImport(world),
+    leagueSites: standInLeagueSitesIn(options.localDesign),
     publicStats: standInPublicStats(world, namePolicy),
     adminTeams: standInAdminTeams(world),
     adminSettings,
