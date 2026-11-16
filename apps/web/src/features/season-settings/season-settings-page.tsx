@@ -185,7 +185,7 @@ function VisibilityPanel({
           back={address()}
         />
       ) : (
-        <form method="get" action={`${base}#${visibilityAnchor}`} className="staff-buttons">
+        <form method="get" action={`${base}#${visibilityAnchor}`}>
           <input type="hidden" name="season" value={season.slug} />
           <input type="hidden" name="ask" value={wish} />
           <button
@@ -229,7 +229,8 @@ function Question({
     >
       <p id="who-can-see-ask">{ask}</p>
       <div className="staff-buttons">
-        <form action={changeVisibilityAction}>
+        {/* A row of its own, so its button lines up with "No" beside it. */}
+        <form action={changeVisibilityAction} className="staff-buttons">
           <input type="hidden" name="league" value={league} />
           <input type="hidden" name="seasonId" value={season.id} />
           <input type="hidden" name="version" value={season.version} />
