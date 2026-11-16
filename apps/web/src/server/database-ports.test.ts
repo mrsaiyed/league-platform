@@ -417,7 +417,9 @@ describe('databasePorts (record 055)', () => {
     await counted.publicSchedule.scheduleOf(leagueId, seasonId, '2026-11-14');
     await counted.publicSchedule.gameFactsOf(leagueId, seasonId, randomUUID());
     await counted.publicTeams.startPageOf(leagueId);
-    await counted.publicTeams.rosterOf(leagueId, randomUUID(), publicViewer(leagueId));
+    await counted.publicStats.statisticsOf(leagueId, ({ rosterOf }) =>
+      rosterOf(randomUUID(), publicViewer(leagueId)),
+    );
     await counted.publicTeams.teamIdsOfAccount(leagueId, seasonId, randomUUID());
     expect(asked.length).toBeGreaterThanOrEqual(12);
     expect(asked.every((options) => options?.snapshot === 'page')).toBe(true);

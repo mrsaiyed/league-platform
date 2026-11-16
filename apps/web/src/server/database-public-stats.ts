@@ -9,8 +9,8 @@
 //
 // Names (T-81): who sees players' names is the league's own settings (step 2.126) and
 // who plays there its own audience, read from the league's rows. A page that shows a
-// name reads it through statisticsOf, where the statistics, the people and those
-// settings are read in that one snapshot, so a name is shown by the settings as
+// name reads it through statisticsOf, where the statistics, the people, a team's
+// roster and those settings are read in that one snapshot, so a name is shown by the settings as
 // they all stood at one moment, never a mix of two saves.
 // The read store alone (readStoreOf) does not read people: it refuses, so no page can put
 // a name beside a setting read at another moment. The rules of who is shown and how stay
@@ -29,6 +29,7 @@ export type PublicStatsQueries = Pick<
   | 'standingsReadStore'
   | 'findLeagueAudience'
   | 'listSettingValues'
+  | 'listPublicRoster'
 >;
 
 /**
@@ -86,14 +87,22 @@ export function databasePublicStats(
             ),
           )
         : Promise.resolve(fail({ code: 'season-not-found' })),
-    // A page's statistics with the league's settings, all in one snapshot (T-81).
+    // A page's statistics and a team's roster with the league's settings, all in one
+    // snapshot (T-81). The roster's names come from core's one publicRosterLine, under the
+    // same name settings (listPublicRoster reads the audience from the league's row, in the
+    // same snapshot as findLeagueAudience).
     statisticsOf: (leagueId, work) =>
-      inLeague(leagueId, async (scope) =>
-        work({
+      inLeague(leagueId, async (scope) => {
+        const settings = await settingsIn(scope);
+        return work({
           store: readStore((read) => read(database.standingsReadStore(scope)), true),
-          settings: await settingsIn(scope),
-        }),
-      ),
+          settings,
+          rosterOf: async (teamId, viewer) =>
+            isId(teamId)
+              ? database.listPublicRoster(scope, teamId, { viewer, policy: settings.namePolicy })
+              : { lines: [] },
+        });
+      }),
   };
 }
 

@@ -141,26 +141,27 @@ export async function TeamPage({
   const asked = firstValue(search['season']);
   const season = chooseSeason(seasons, asked);
   if (season === undefined) return notFound();
-  // The team's record and its statistics with the league's name settings, as one snapshot
-  // (T-81); the roster reads the same settings with its own people.
-  const read = await publicStats.statisticsOf(addressee.id, async ({ store, settings }) => {
-    const head = await loadTeamHead(store, addressee.id, season.id, teamSlug);
-    if (head === undefined) return undefined;
-    const stats = await loadTeamStats(store, settings, {
-      leagueId: addressee.id,
-      seasonId: season.id,
-      teamId: head.teamId,
-    });
-    return { head, stats };
-  });
+  // The team's record, its statistics and its roster with the league's name settings, as
+  // one snapshot (T-81, record 070): one child is never shown two ways on one page.
+  const read = await publicStats.statisticsOf(
+    addressee.id,
+    async ({ store, settings, rosterOf }) => {
+      const head = await loadTeamHead(store, addressee.id, season.id, teamSlug);
+      if (head === undefined) return undefined;
+      const stats = await loadTeamStats(store, settings, {
+        leagueId: addressee.id,
+        seasonId: season.id,
+        teamId: head.teamId,
+      });
+      const roster = await rosterOf(head.teamId, publicViewer(addressee.id));
+      return { head, stats, roster: buildRoster(roster) };
+    },
+  );
   if (read === undefined) return notFound();
-  const { head, stats } = read;
+  const { head, stats, roster } = read;
   const clock = await publicSchedule.clockOf(addressee.id);
   const schedule = await publicSchedule.scheduleOf(addressee.id, season.id, clock.today);
   const games = buildTeamGames(schedule, head.team.slug, clock, addressee);
-  const roster = buildRoster(
-    await publicTeams.rosterOf(addressee.id, head.teamId, publicViewer(addressee.id)),
-  );
   const offersMyTeam = (await publicTeams.startPageOf(addressee.id)) === 'myTeam';
   const remembered = (await cookies()).get(myTeamCookieName(addressee.id))?.value;
   const isMine = remembered === head.team.slug;

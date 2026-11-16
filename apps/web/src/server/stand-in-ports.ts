@@ -419,7 +419,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     adminSettings,
     publicSchedule: standInPublicSchedule(world),
     scheduleAdmin: standInSchedule(world),
-    publicTeams: standInPublicTeams(world, namePolicy),
+    publicTeams: standInPublicTeams(world),
     signUpMadeUpMember,
     signUpMadeUpStaff: async () => {
       for (const person of Object.values(standInStaffSignIns)) {

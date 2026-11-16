@@ -5,10 +5,12 @@
 import type {
   Audience,
   NamePolicy,
+  PublicRoster,
   ReadStandingsError,
   Result,
   Standings,
   StandingsReadStore,
+  Viewer,
 } from '@srleagues/core';
 
 /** A season the public may pick: its address name (`?season=`) and whether it is the current one. */
@@ -27,10 +29,16 @@ export type PublicStatsSettings = {
   readonly minimumGames: number;
 };
 
-/** A page's statistics reads and the league's name settings, taken together. */
+/** A page's statistics reads, a team's roster and the league's name settings, taken together. */
 export type StatisticsRead = {
   readonly store: StandingsReadStore;
   readonly settings: PublicStatsSettings;
+  /**
+   * One team's roster: those on it now, then those who left (R-17); names by the one name
+   * function (T-81) under `settings`, read in the same snapshot as the statistics, so one
+   * child is never shown two ways on one page (record 070). Asked inside `work` only.
+   */
+  readonly rosterOf: (teamId: string, viewer: Viewer) => Promise<PublicRoster>;
 };
 
 export type PublicStatsPorts = {
@@ -44,9 +52,10 @@ export type PublicStatsPorts = {
    */
   readonly readStoreOf: (leagueId: string) => StandingsReadStore;
   /**
-   * `work` over one snapshot of the league (T-81, record 070): the statistics reads and the
-   * league's own name settings and audience, read in the same transaction on the database,
-   * so a name is always shown by the setting that was saved when it was read.
+   * `work` over one snapshot of the league (T-81, record 070): the statistics reads, a
+   * team's roster and the league's own name settings and audience, read in the same
+   * snapshot on the database, so a name is always shown by the settings as they stood at
+   * one moment.
    */
   readonly statisticsOf: <T>(
     leagueId: string,

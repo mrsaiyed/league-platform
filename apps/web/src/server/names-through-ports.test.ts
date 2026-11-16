@@ -124,7 +124,9 @@ function world() {
   const youthNames = async () => {
     const viewer = publicViewer(youth);
     const rockets = youthTeams.find((t) => t.slug === 'rockets')?.id ?? '';
-    const roster = await w.ports.publicTeams.rosterOf(youth, rockets, viewer);
+    const roster = await w.ports.publicStats.statisticsOf(youth, ({ rosterOf }) =>
+      rosterOf(rockets, viewer),
+    );
     // As the pages read them: the statistics with the league's settings, one snapshot.
     const table = await w.ports.publicStats.statisticsOf(youth, ({ store, settings }) =>
       readStatisticsTable(store, {

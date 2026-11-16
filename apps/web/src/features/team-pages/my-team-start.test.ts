@@ -20,7 +20,7 @@ describe('myTeamStart on the stand-in', () => {
   const world = testWorld(undefined, () => new Date('2026-11-13T15:00:00Z'));
   const ports = {
     publicStats: standInPublicStats(world, startingNamePolicy),
-    publicTeams: standInPublicTeams(world, startingNamePolicy),
+    publicTeams: standInPublicTeams(world),
   };
 
   it("sends a member to their own team's page", async () => {

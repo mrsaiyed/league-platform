@@ -31,14 +31,11 @@ import { loadStatsPage } from '../features/stats-pages/build-stats.ts';
 import { StatsTables } from '../features/stats-pages/stats-page.tsx';
 import { loadTeamCards, loadTeamHead, loadTeamStats } from '../features/team-pages/build-team.ts';
 import { databasePublicStats } from './database-public-stats.ts';
-import { databasePublicTeams } from './database-public-teams.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
-import type { PublicTeamsPorts } from './public-teams.ts';
 
 let made: database.MadeUpDatabase;
 let db: database.DatabaseHandle;
 let stats: PublicStatsPorts;
-let teams: PublicTeamsPorts;
 let settingsDeps: CommandDeps<LeaguesTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
 
@@ -46,7 +43,6 @@ beforeAll(async () => {
   made = await database.madeUpDatabase({ underWay: true });
   db = database.createDatabase(made.source);
   stats = databasePublicStats(database, db);
-  teams = databasePublicTeams(database, db);
   const base = (scope: database.LeagueScope) => ({
     jobs: database.jobsStore(scope),
     access: database.accessStore(scope),
@@ -112,14 +108,15 @@ async function pagesOf(slug: string) {
   const cards = await loadTeamCards(stats.readStoreOf(leagueId), { slug }, season, true);
   const teamPages = [];
   for (const card of cards ?? []) {
-    const page = await stats.statisticsOf(leagueId, async ({ store, settings }) => {
+    // As the team page reads it: its head, statistics and roster in one snapshot.
+    const page = await stats.statisticsOf(leagueId, async ({ store, settings, rosterOf }) => {
       const head = await loadTeamHead(store, leagueId, season.id, card.slug);
       if (head === undefined) throw new Error(`no ${card.slug}`);
       const teamStats = await loadTeamStats(store, settings, { ...input, teamId: head.teamId });
-      return { head, teamStats };
+      const roster = await rosterOf(head.teamId, publicViewer(leagueId));
+      return { head, teamStats, roster };
     });
-    const roster = await teams.rosterOf(leagueId, page.head.teamId, publicViewer(leagueId));
-    teamPages.push({ ...page, roster });
+    teamPages.push(page);
   }
   return {
     fromPorts: [table.value, leaders, ...teamPages.map((p) => p.roster)] as unknown[],

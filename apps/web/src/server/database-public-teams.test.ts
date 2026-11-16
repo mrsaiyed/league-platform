@@ -1,16 +1,19 @@
 // The members' start page on the made-up database (step 2.93 part 2, record 069): the
 // league's own setting as League settings saves it, the league home until one is chosen,
-// and one league's choice never another's. And (part 3, record 070) a team's roster,
-// its names by the league's own audience and settings.
+// and one league's choice never another's. And (part 3, record 070) a team's roster, read
+// with the statistics in one snapshot, its names by the league's own audience and settings.
 import { publicViewer, setSetting, type CommandDeps, type LeaguesTx } from '@srleagues/core';
 import * as database from '@srleagues/database';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { databasePublicStats } from './database-public-stats.ts';
 import { databasePublicTeams } from './database-public-teams.ts';
+import type { PublicStatsPorts } from './public-stats.ts';
 import type { PublicTeamsPorts } from './public-teams.ts';
 
 let made: database.MadeUpDatabase;
 let db: database.DatabaseHandle;
 let ports: PublicTeamsPorts;
+let stats: PublicStatsPorts;
 
 const league = (slug: string) => {
   const found = made.leagues.find((l) => l.slug === slug);
@@ -22,6 +25,7 @@ beforeAll(async () => {
   made = await database.madeUpDatabase();
   db = database.createDatabase(made.source);
   ports = databasePublicTeams(database, db);
+  stats = databasePublicStats(database, db);
 }, 120_000);
 
 afterAll(async () => {
@@ -57,9 +61,11 @@ describe('databasePublicTeams', () => {
 
   it('asks no database for an id that is not a UUID (part 3)', async () => {
     const { leagueId } = league('lakeside');
-    expect(await ports.rosterOf(leagueId, 'not-an-id', publicViewer(leagueId))).toEqual({
-      lines: [],
-    });
+    expect(
+      await stats.statisticsOf(leagueId, ({ rosterOf }) =>
+        rosterOf('not-an-id', publicViewer(leagueId)),
+      ),
+    ).toEqual({ lines: [] });
     expect(
       await ports.teamIdsOfAccount(leagueId, 'not-an-id', league('lakeside').ownerAccountId),
     ).toEqual([]);
@@ -69,11 +75,11 @@ describe('databasePublicTeams', () => {
 describe('databasePublicTeams with the seasons under way', () => {
   let under: database.MadeUpDatabase;
   let underDb: database.DatabaseHandle;
-  let underPorts: PublicTeamsPorts;
+  let underStats: PublicStatsPorts;
   beforeAll(async () => {
     under = await database.madeUpDatabase({ underWay: true });
     underDb = database.createDatabase(under.source);
-    underPorts = databasePublicTeams(database, underDb);
+    underStats = databasePublicStats(database, underDb);
   }, 120_000);
   afterAll(async () => {
     await underDb.close();
@@ -90,7 +96,9 @@ describe('databasePublicTeams with the seasons under way', () => {
     });
     const names: (string | null)[] = [];
     for (const team of teams) {
-      const roster = await underPorts.rosterOf(leagueId, team.id, publicViewer(leagueId));
+      const roster = await underStats.statisticsOf(leagueId, ({ rosterOf }) =>
+        rosterOf(team.id, publicViewer(leagueId)),
+      );
       names.push(...roster.lines.map((l) => (l.name.shown ? l.name.text : null)));
     }
     return names.sort();
