@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   designDocumentSchema,
+  firstStartingDesign,
   isStartingDesignKey,
   neutralStartingDesign,
   parseDesignDocument,
@@ -31,6 +32,9 @@ describe('the design document', () => {
       expect(isStartingDesignKey(key)).toBe(true);
     }
     expect(startingDesignKeys).toContain(neutralStartingDesign);
+    // A new league opens with the first starting design (C-16), never the neutral one.
+    expect(firstStartingDesign).toBe(startingDesignKeys[0]);
+    expect(firstStartingDesign).not.toBe(neutralStartingDesign);
     expect(isStartingDesignKey('toString')).toBe(false);
     expect(isStartingDesignKey('no-such-design')).toBe(false);
   });

@@ -131,10 +131,10 @@ describe('npm run league:make with no terminal', () => {
     expect(ran.stdout).not.toContain('This will make');
   });
 
-  it('shows the starting design and colors in the plan, the neutral one by default (step 2.187)', async () => {
+  it('shows the starting design and colors in the plan, the first one by default (step 2.187, C-16)', async () => {
     const plain = await runScript(every(), '');
     expect(plain.stdout).toContain(
-      'Design          clean-court (the neutral one; choose another with --design)',
+      'Design          crest (the first starting design; choose another with --design)',
     );
     const chosen = await runScript(
       [...every(), '--design', 'midnight-gold', '--main-color', '#0A3D62'],

@@ -264,16 +264,25 @@ describe('makeLeague', () => {
     ]);
   });
 
-  it('gives a league made without a design the neutral one', async () => {
+  it('gives a league made without a design the first starting design, crest, never the neutral one (C-16)', async () => {
     const outcome = await makeLeague(target, planFor());
     if (!outcome.ok) throw new Error(JSON.stringify(outcome));
+    const { leagueId } = outcome.made;
     expect(
       await one(
         pglite,
         'select number, starting_design, design from site_releases where league_id = $1',
-        [outcome.made.leagueId],
+        [leagueId],
       ),
-    ).toEqual({ number: 1, starting_design: 'clean-court', design: startingDesign('clean-court') });
+    ).toEqual({ number: 1, starting_design: 'crest', design: startingDesign('crest') });
+    // What its public pages are drawn from, read as the web app reads it: crest's main color.
+    const published = await withTransaction(target.db, { leagueId }, findPublishedDesign, {
+      snapshot: 'page',
+    });
+    const drawn = parseDesignDocument(published?.design);
+    if (!drawn.ok) throw new Error(drawn.problems.join('; '));
+    expect(drawn.design.colors.primary).toBe('#96062d');
+    expect(drawn.design.colors.primary).not.toBe(startingDesign('clean-court').colors.primary);
   });
 
   it('makes nothing, not even an account, when the short name is held', async () => {

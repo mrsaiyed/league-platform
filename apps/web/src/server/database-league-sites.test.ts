@@ -2,7 +2,7 @@
 // step 2.187, record 073): the name its owner gave it, and the design of its latest
 // published release, checked again before it is drawn; the neutral design for a league
 // with none, and for one whose stored design does not pass, which is reported.
-import { createLeague } from '@srleagues/core';
+import { createLeague, planNewLeague, type NewLeaguePlan } from '@srleagues/core';
 import * as database from '@srleagues/database';
 import { designToCssText, startingDesign } from '@srleagues/site';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -74,10 +74,17 @@ describe('databaseLeagueSites', () => {
     expect(reports).toEqual([]);
   });
 
-  it('draws a league with no release in the neutral design', async () => {
-    // Made by the product's own command with no design, as our staff: a seed owner's
-    // account stands in for one, told it is staff for this one store.
-    const id = '01900000-0000-7000-8000-00000000f001';
+  /**
+   * Makes a league by the product's own command as our staff: a seed owner's account
+   * stands in for one, told it is staff for this one store. With `design`, as the
+   * league-making tool passes its plan's.
+   */
+  async function makeLeagueAsStaff(
+    id: string,
+    slug: string,
+    name: string,
+    design?: NewLeaguePlan['design'],
+  ) {
     const staff = seedLeague('lakeside').ownerAccountId;
     const transaction = database.commandTransaction(db, (scope) => ({
       jobs: database.jobsStore(scope),
@@ -86,21 +93,54 @@ describe('databaseLeagueSites', () => {
       access: database.accessStore(scope),
       activity: database.activityLogStore(scope),
     }));
-    const created = await createLeague(
-      { leagueId: id, accountId: staff, requestId: 'no-design-yet' },
+    return createLeague(
+      { leagueId: id, accountId: staff, requestId: slug },
       {
-        slug: 'no-design-yet',
-        name: 'No Design Yet League',
+        slug,
+        name,
         timeZone: 'America/Chicago',
         audience: 'adult',
         ownerAccountId: staff,
         sportKey: 'basketball',
+        ...(design === undefined
+          ? {}
+          : { design: { startingDesign: design.startingDesign, colors: design.colors } }),
       },
       { transaction, events: [], log: () => {}, now: () => 0 },
     );
-    expect(created.ok).toBe(true);
+  }
+
+  it('draws a league with no release in the neutral design', async () => {
+    // Made by the command with no design, as a test or the seed may: no release.
+    const id = '01900000-0000-7000-8000-00000000f001';
+    expect((await makeLeagueAsStaff(id, 'no-design-yet', 'No Design Yet League')).ok).toBe(true);
     const site = await siteOf({ id, slug: 'no-design-yet' }, sites);
     expect(site).toEqual({ name: 'No Design Yet League', design: startingDesign('clean-court') });
+    expect(reports).toEqual([]);
+  });
+
+  it('draws a league the tool made with no design named in the first starting design, crest (C-16)', async () => {
+    // The league-making tool's own plan, no design named: what it passes the command.
+    const planned = planNewLeague({
+      name: 'Tool Made League',
+      shortName: 'tool-made',
+      sport: 'basketball',
+      whoPlays: 'adults',
+      city: 'Springfield',
+      timeZone: 'America/Chicago',
+      contactEmail: 'hello@example.test',
+      ownerEmail: 'owner@example.test',
+      seasonName: 'Fall 2026',
+      staffEmail: 'staff@example.test',
+    });
+    if (!planned.ok) throw new Error(JSON.stringify(planned.problems));
+    const id = '01900000-0000-7000-8000-00000000f002';
+    const made = await makeLeagueAsStaff(id, 'tool-made', 'Tool Made League', planned.plan.design);
+    expect(made.ok).toBe(true);
+    const site = await siteOf({ id, slug: 'tool-made' }, sites);
+    expect(site.design).toEqual(startingDesign('crest'));
+    expect(designToCssText(site.design)).toContain('--color-primary: #96062d;');
+    expect(site.design.colors.primary).not.toBe(startingDesign('clean-court').colors.primary);
     expect(reports).toEqual([]);
   });
 

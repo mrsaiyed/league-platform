@@ -25,8 +25,8 @@ export const usage = [
   '  --season-starts <date>   when it starts, YYYY-MM-DD (optional)',
   '  --season-ends <date>     when it ends, YYYY-MM-DD (optional)',
   '  --design <name>          the starting design its site opens in: crest, crest-light,',
-  '                           midnight-gold or clean-court (default: clean-court, the',
-  '                           neutral one)',
+  '                           midnight-gold or clean-court (default: crest, the first',
+  '                           starting design)',
   '  --main-color <#rrggbb>   colors in place of the design’s own (each optional):',
   '  --accent-color <#rrggbb>   the main color, the accent and the highlight',
   '  --highlight-color <#rrggbb>',
@@ -145,7 +145,7 @@ const designWords = (design) => {
   const colors = chosen.length === 0 ? '' : `, with its ${chosen.join(', ')}`;
   return design.chosen
     ? `${design.startingDesign}${colors}`
-    : `${design.startingDesign}${colors} (the neutral one; choose another with --design)`;
+    : `${design.startingDesign}${colors} (the first starting design; choose another with --design)`;
 };
 
 const seasonDates = (season) => {

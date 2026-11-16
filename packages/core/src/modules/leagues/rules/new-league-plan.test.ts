@@ -44,12 +44,12 @@ describe('planNewLeague', () => {
         ownerEmail: 'Owner@Example.test',
         staffEmail: 'Staff@Example.test',
         season: { name: 'Fall 2026', slug: 'fall-2026', startsOn: null, endsOn: null },
-        design: { startingDesign: 'clean-court', chosen: false, colors: {} },
+        design: { startingDesign: 'crest', chosen: false, colors: {} },
       },
     });
   });
 
-  it('takes a starting design by its key and the colors chosen, or the neutral one (step 2.187)', () => {
+  it('takes a starting design by its key and the colors chosen, or the first one, never the neutral one (step 2.187, C-16)', () => {
     const of = (change: NewLeagueAnswers) => {
       const result = planNewLeague({ ...answers, ...change });
       return result.ok ? result.plan.design : result.problems;
@@ -62,9 +62,14 @@ describe('planNewLeague', () => {
       colors: { primary: '#0a3d62', accent: '#b77d8c' },
     });
     expect(of({ mainColor: '#123456' })).toEqual({
-      startingDesign: 'clean-court',
+      startingDesign: 'crest',
       chosen: false,
       colors: { primary: '#123456' },
+    });
+    expect(of({ design: 'clean-court' })).toEqual({
+      startingDesign: 'clean-court',
+      chosen: true,
+      colors: {},
     });
     expect(of({ design: 'no-such-design' })).toEqual([{ field: 'design', problem: 'invalid' }]);
     expect(of({ design: 'toString' })).toEqual([{ field: 'design', problem: 'invalid' }]);

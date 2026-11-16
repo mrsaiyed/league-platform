@@ -1,7 +1,9 @@
 // The starting designs, stored as data (T5 §1, P5 §2, C-2, C-16). Neutral names: no league
-// is named in code. They live beside the design's written shape in packages/contracts
-// (site-design.ts), so a league made by our tools starts from the very same documents
-// (record 073, T-277); this package re-exports them unchanged.
+// is named in code. The first is the one a new league made by our tools opens with
+// (`firstStartingDesign` in packages/contracts). They live beside the
+// design's written shape in packages/contracts (site-design.ts), so a league made by our
+// tools starts from the very same documents (record 073, T-277); this package re-exports
+// them unchanged.
 export {
   isStartingDesignKey,
   neutralStartingDesign,

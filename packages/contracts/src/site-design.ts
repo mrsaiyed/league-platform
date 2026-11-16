@@ -59,7 +59,8 @@ export function parseDesignDocument(
 }
 
 // The starting designs, stored as data (T5 §1, P5 §2, C-2, C-16). Neutral names: no league
-// is named in code. The first is the one C-16 builds from the first demo.
+// is named in code. The first is the one C-16 builds from the first demo, and the one a
+// league made by our tools opens with (firstStartingDesign).
 const definitions = {
   // The first starting design (C-16): a wine-black page, panels one step lighter, cream
   // text, a deep maroon for identity, a soft rose for small labels and gold where the eye
@@ -146,7 +147,13 @@ export const startingDesignKeys = Object.keys(definitions) as [
   ...StartingDesignKey[],
 ];
 
-/** The design a league with no design of its own is drawn in, and a new league's by default. */
+/**
+ * The first starting design (C-16): the one a league made by our tools opens with when no
+ * other is named (step 2.187, record 073). An admin changes it later (P5 §2).
+ */
+export const firstStartingDesign: StartingDesignKey = 'crest';
+
+/** The design a league with no design of its own is drawn in: never a new league's default. */
 export const neutralStartingDesign: StartingDesignKey = 'clean-court';
 
 export function isStartingDesignKey(value: unknown): value is StartingDesignKey {

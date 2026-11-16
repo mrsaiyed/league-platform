@@ -4,12 +4,13 @@
 // first season's name and rough dates (step 4: "Rough dates: optional"), and the email
 // of the member of our staff who makes it, and the starting design its site opens in,
 // with any main, accent and highlight colors chosen in place of the design's own (step
-// 2.187, P5 §2; left out, the neutral design). Pure: it reads nothing and makes nothing.
+// 2.187, P5 §2; left out, the first starting design, C-16). Pure: it reads nothing and
+// makes nothing.
 // The commands check everything again when they run.
 import {
   designColorPattern,
+  firstStartingDesign,
   isStartingDesignKey,
-  neutralStartingDesign,
   type StartingColors,
   type StartingDesignKey,
 } from '@srleagues/contracts';
@@ -54,7 +55,7 @@ export type NewLeagueAnswers = {
   readonly seasonEndsOn?: string | undefined;
   /** The member of our staff who makes it (P3 §8). */
   readonly staffEmail?: string | undefined;
-  /** One of the starting designs, by its key; left out, the neutral one. */
+  /** One of the starting designs, by its key; left out, the first one (C-16). */
   readonly design?: string | undefined;
   /** Colors written #rrggbb, in place of the starting design's own; each optional. */
   readonly mainColor?: string | undefined;
@@ -116,7 +117,7 @@ export type NewLeaguePlan = {
   /** The site's first release: a starting design and the colors chosen in place of its own. */
   readonly design: {
     readonly startingDesign: StartingDesignKey;
-    /** True when the answers named it; false when it is the neutral one by default. */
+    /** True when the answers named it; false when it is the first one by default. */
     readonly chosen: boolean;
     readonly colors: StartingColors;
   };
@@ -315,7 +316,7 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
       staffEmail,
       season: { ...season, startsOn: startsOn ?? null, endsOn: endsOn ?? null },
       design: {
-        startingDesign: startingDesign ?? neutralStartingDesign,
+        startingDesign: startingDesign ?? firstStartingDesign,
         chosen: startingDesign !== undefined,
         colors: {
           ...(primary === undefined ? {} : { primary }),
