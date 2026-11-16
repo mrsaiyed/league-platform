@@ -145,6 +145,7 @@ export {
   adminAreas,
   checkedSiteOrigin,
   forwardedLeagueUrl,
+  gameAnchor,
   isLeagueIdFormat,
   isLeagueSiteName,
   leagueApiBase,

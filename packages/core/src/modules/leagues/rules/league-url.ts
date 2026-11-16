@@ -261,6 +261,14 @@ export function leagueApiUrl(league: { readonly id: string }, path: readonly str
 }
 
 /**
+ * The id a game's place carries on a page that lists games (the admin's games list, the
+ * schedule grid), so an address can lead straight to it: `${leagueUrl(…)}#${gameAnchor(id)}`.
+ * The one maker of that anchor, for the pages that carry it and the addresses that lead
+ * to it (step 2.153's "Enter the score" among them).
+ */
+export const gameAnchor = (gameId: string): string => `game-${gameId}`;
+
+/**
  * The same request under a league's current short name, for forwarding an address
  * that used a former one or other capitals (U-7). `below` is what followed the short
  * name, exactly as it arrived: empty, or starting with `/` or `?`. Only

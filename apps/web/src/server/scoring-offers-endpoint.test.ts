@@ -4,7 +4,7 @@
 // a league this person may not see is "not found", exactly as one that is not there (U-9).
 import { leagueApiUrl, scoringOffersLimit } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
-import { offersAskedAtOnce } from '../features/schedule-pages/scoring-offers.ts';
+import { offersAskedAtOnce } from '../features/schedule-pages/index.ts';
 import { resolveLeagueApi } from './league-api.ts';
 import { notMovedYet } from './not-on-the-database-yet.ts';
 import type { WebPorts } from './ports.ts';

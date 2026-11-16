@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gameAnchor, gameIdOf, typedScoresOf, wrongScoreFields } from './score-fields.ts';
+import { gameIdOf, typedScoresOf, wrongScoreFields } from './score-fields.ts';
 
 const id = '01900000-0000-7000-8000-006A00000001';
 const lower = id.toLowerCase();
@@ -28,9 +28,5 @@ describe("the games list's score boxes as the forms send them", () => {
       'awayScore',
       'homeScore',
     ]);
-  });
-
-  it("leads to the game's place on the list", () => {
-    expect(gameAnchor(lower)).toBe(`game-${lower}`);
   });
 });

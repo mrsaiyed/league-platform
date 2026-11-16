@@ -14,6 +14,7 @@
 // no games and no words; nothing is said about a game the person may not score, nor whether
 // it exists. Always private, never kept by a cache.
 import {
+  gameAnchor,
   leagueUrl,
   listScoringOffers,
   mayOpenLeague,
@@ -24,7 +25,6 @@ import {
   type ScoringOffer,
 } from '@srleagues/core';
 import type { CommandDeps, LeagueAddressee, TrackerTx } from '@srleagues/core';
-import { gameAnchor } from '../features/games-area/index.ts';
 import type { ScoringOfferReply } from '../features/schedule-pages/index.ts';
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { isGameIdFormat, refusalAnswer, type ApiAnswer, type ApiRefusal } from './league-api.ts';
