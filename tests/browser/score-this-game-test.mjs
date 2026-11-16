@@ -261,7 +261,10 @@ if (browser) {
         );
         note(
           'a screen reader hears which game the button is for',
-          (await button.textContent())?.trim() === 'Score this game Bears against Hawks',
+          (await page
+            .getByRole('link', { name: 'Score this game: Bears against Hawks', exact: true })
+            .count()) === 1 &&
+            (await button.locator('[aria-hidden]').textContent()) === 'Score this game',
           String(await button.textContent()),
         );
 

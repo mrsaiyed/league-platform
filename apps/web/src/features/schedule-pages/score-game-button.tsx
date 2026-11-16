@@ -44,14 +44,19 @@ export function OfferButton({
   readonly words: OfferWords;
   readonly which?: { readonly away: string; readonly home: string } | undefined;
 }) {
+  const label = offer.kind === 'score' ? words.score : words.enter;
   return (
     <a className="ui-button" data-kind="main" data-offer={offer.kind} href={offer.href}>
-      {offer.kind === 'score' ? words.score : words.enter}
-      {which === undefined ? null : (
-        <span className="ui-visually-hidden" dir="auto">
-          {' '}
-          {offerWhich(words, which.away, which.home)}
-        </span>
+      {which === undefined ? (
+        label
+      ) : (
+        <>
+          {/* Seen: the words. Heard: the words and the game, as one sentence. */}
+          <span aria-hidden="true">{label}</span>
+          <span className="ui-visually-hidden" dir="auto">
+            {offerWhich(words, offer.kind, which.away, which.home)}
+          </span>
+        </>
       )}
     </a>
   );

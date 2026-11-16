@@ -137,7 +137,7 @@ async function scoringOffers(
     words: {
       score: t('schedule.offer.score'),
       enter: t('schedule.offer.enter'),
-      which: t('schedule.offer.which', { away: '{away}', home: '{home}' }),
+      which: t('schedule.offer.which', { action: '{action}', away: '{away}', home: '{home}' }),
     },
   });
 }

@@ -65,7 +65,7 @@ describe('the scoring read of a public page', () => {
       words: {
         score: 'Score this game',
         enter: 'Enter the score',
-        which: '{away} against {home}',
+        which: '{action}: {away} against {home}',
       },
     });
   });

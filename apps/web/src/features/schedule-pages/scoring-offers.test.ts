@@ -15,7 +15,7 @@ import {
 const words = {
   score: 'Score this game',
   enter: 'Enter the score',
-  which: '{away} against {home}',
+  which: '{action}: {away} against {home}',
 };
 const address = '/api/v1/leagues/made-up/scoring';
 
@@ -178,7 +178,21 @@ describe('the page’s one reader of its scoring buttons', () => {
     ).toBe(false);
   });
 
-  it('names the game for a screen reader', () => {
-    expect(offerWhich(words, 'Hawks', 'Bears')).toBe('Hawks against Bears');
+  it("names the game for a screen reader, after the button's words", () => {
+    expect(offerWhich(words, 'score', 'Bears', 'Hawks')).toBe(
+      'Score this game: Bears against Hawks',
+    );
+    expect(offerWhich(words, 'enter', 'Bears', 'Hawks')).toBe(
+      'Enter the score: Bears against Hawks',
+    );
+  });
+
+  it('says a team as it is named, braces and dollar signs too', () => {
+    expect(offerWhich(words, 'score', '$& Stars', '{home} Club')).toBe(
+      'Score this game: $& Stars against {home} Club',
+    );
+    expect(offerWhich(words, 'enter', "$' and $$", '{away}{action}')).toBe(
+      "Enter the score: $' and $$ against {away}{action}",
+    );
   });
 });

@@ -10,6 +10,7 @@
 // in then. A read that fails leaves the page as it came, with no buttons; nothing on it
 // waits for this.
 import { z } from 'zod';
+import { fill } from './game-link-text.ts';
 
 /** Where a button leads: an address on this site, never another's. */
 const ownAddress = z.string().refine((href) => href.startsWith('/') && !href.startsWith('//'));
@@ -152,7 +153,16 @@ export const browserReadOffers: ReadOffers = async (address, gameIds) => {
 /** The page's own: every list of games on a page asks through this one. */
 export const pageScoringOffers = sharedScoringOffers(browserReadOffers);
 
-/** The words a screen reader hears after the button's, naming the game: "Hawks against Bears". */
-export function offerWhich(words: OfferWords, away: string, home: string): string {
-  return words.which.replace('{away}', away).replace('{home}', home);
+/**
+ * What a screen reader hears for a button where several are near, naming the game: "Score
+ * this game: Bears against Hawks". The message's braces are filled in one pass, so a team
+ * named with braces or $ patterns is said as it is named.
+ */
+export function offerWhich(
+  words: OfferWords,
+  kind: ScoringOffer['kind'],
+  away: string,
+  home: string,
+): string {
+  return fill(words.which, { action: kind === 'score' ? words.score : words.enter, away, home });
 }
