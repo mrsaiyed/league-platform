@@ -41,6 +41,7 @@ export { findTeam } from './find-team.ts';
 export { findRosterEntry } from './find-roster-entry.ts';
 export { insertRosterEntry, type NewRosterEntryRow } from './insert-roster-entry.ts';
 export { listRoster, type RosterLineSummary } from './list-roster.ts';
+export { listStaffSeasonTeams } from './list-staff-season-teams.ts';
 export { updateRosterEntry, type RosterEntryChangeRow } from './update-roster-entry.ts';
 export { insertTeam, type NewTeamRow } from './insert-team.ts';
 export { setTeamBinned } from './set-team-binned.ts';
