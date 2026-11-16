@@ -96,6 +96,17 @@ describe('contrast in the three color sets the pieces are proved in', () => {
         reads(colors.highlight, surface, "the winner's score");
       }
       reads(derived.onHighlight, colors.highlight, 'the Live pill');
+      // A soft pill on a card (Postponed, Forfeit): the accent as text on the panel with
+      // the tint in it, one solid ground, at the share the design's frame gives it.
+      const tinted = /var\(--color-primary\) (\d+)%, var\(--color-panel\)/.exec(
+        designToCssVariables(design)['--color-tint-panel'] ?? '',
+      );
+      expect(tinted, `${key}: a soft pill's ground`).not.toBeNull();
+      reads(
+        derived.accentText,
+        mixColors(colors.panel, colors.primary, Number(tinted?.[1] ?? 0) / 100),
+        'a soft pill',
+      );
       reads(derived.onPrimary, colors.primary, 'the main button');
       for (const surface of Object.values(bandSurfaces(colors, design.base))) {
         reads(derived.onBand, surface, "the hero's title");

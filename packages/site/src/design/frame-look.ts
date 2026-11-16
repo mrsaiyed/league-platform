@@ -76,6 +76,11 @@ const bases = {
     // A card of a dark design has a little of the main color at one corner, never more
     // than the texts are fitted to (hoverTintShare): where the page gets its warmth.
     '--card-wash': 'color-mix(in srgb, var(--color-primary) 9%, var(--color-panel))',
+    // The ground of a soft pill on a card (Postponed, Forfeit): the panel with the tint
+    // in it, as one solid color. Laid over a card as a see-through tint it stacked on the
+    // card's own wash, and under a bright main color the pill's words fell short of 4.5
+    // to 1 there (measured, step 2.147 part 3). This is a surface the texts are fitted to.
+    '--color-tint-panel': 'color-mix(in srgb, var(--color-primary) 9%, var(--color-panel))',
     // How much of a team's color fills its shield: on a dark panel a third shows as a
     // deep tone of it.
     '--emblem-strength': '30%',
@@ -93,6 +98,7 @@ const bases = {
     // A card of a light design is its panel's color and nothing else: cards and tables
     // are one tint, and a main color laid over white would turn it dusty.
     '--card-wash': 'var(--color-panel)',
+    '--color-tint-panel': 'color-mix(in srgb, var(--color-primary) 7%, var(--color-panel))',
     // On a white panel a team's color needs more than half to have the strength it has on
     // a dark one.
     '--emblem-strength': '55%',

@@ -183,6 +183,14 @@ export const gameCss = String.raw`
   background: var(--color-tint);
   color: var(--color-accent-text);
 }
+/* On a card and on the big board the tint is the panel's own color with the tint in it,
+   one solid ground: a see-through tint there lay over the card's own wash, twice the
+   main color the pill's words are fitted to. */
+.ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit'])
+  .ui-game-state,
+.ui-scoreboard:not([data-pill='quiet']) .ui-game-state {
+  background: var(--color-tint-panel);
+}
 
 /* A game as a scoreboard: an emblem and a name on each side, the score or "VS" large
    between them, a quiet line above (which game, when, its state) and below (where). The
