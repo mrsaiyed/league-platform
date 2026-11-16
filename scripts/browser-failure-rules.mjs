@@ -4,9 +4,10 @@
 // scripts/browser-failure-notes.mjs, which reads the file, asks the machine and prints, so
 // it can be tested by itself (tests/browser-failure-notes.test.mjs).
 //
-// The output is read as ci.yml makes it: bash runs the chain with its trace on, so it
-// prints "+ node tests/browser/<file>.mjs" before it starts each test (or, for the
-// tracker's own check, "+ node scripts/check-live-stats-browser.mjs"); every test prints
+// The output is read as ci.yml makes it: the chain's runner (scripts/run-web-browser-tests.mjs,
+// step 2.188) prints "+ node tests/browser/<file>.mjs" before it starts each test, as bash's
+// trace did when the chain was one line of package.json (and for the tracker's own check
+// bash's trace prints "+ node scripts/check-live-stats-browser.mjs"); every test prints
 // "<its name> … failed:" (or "…: 2 problem(s)") and one indented line per failing check;
 // and a test that fails
 // prints the last lines of any Next.js build or server that did not finish well

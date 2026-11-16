@@ -1,5 +1,6 @@
 import {
   getScheduleDraft,
+  isLeagueHidden,
   leagueUrl,
   listVenues,
   previewSchedulePublish,
@@ -14,6 +15,11 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
+import {
+  mayShowSeason,
+  seasonSettingsAddress,
+  visibilityAnchor,
+} from '../season-settings/index.ts';
 import { StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import {
@@ -50,6 +56,7 @@ import {
 import type { SavedDetail } from './run-schedule-action.ts';
 import { importLinkOf } from './import-link.ts';
 import { addRoundProblemOf, noticeOf, whyNotSaved } from './notice.ts';
+import { publishedNotice } from './published-notice.ts';
 import { ScheduleHeading } from './schedule-heading.tsx';
 import { seasonControls } from './season-controls.ts';
 
@@ -133,8 +140,31 @@ export async function ScheduleBuilderPage({
       {top}
     </ScheduleHeading>
   );
+  // "Published" says what is true for this season and this league (step 2.182, A-18).
+  const published =
+    firstValue(search['done']) === 'published'
+      ? publishedNotice({
+          seasonShown: season.isPublic,
+          leagueShown: !isLeagueHidden(addressee.status),
+          seasonName: season.name,
+          mayShow: mayShowSeason(holder, season, addressee.status),
+        })
+      : undefined;
   const plainNotice =
-    notice === undefined ? null : (
+    published !== undefined ? (
+      <div className="ui-notice" role="status" data-notice="done" data-published="">
+        <p>{published.text}</p>
+        {published.next === undefined ? null : published.next.kind === 'link' ? (
+          <p>
+            <a href={`${seasonSettingsAddress(addressee, season.slug)}#${visibilityAnchor}`}>
+              {published.next.text}
+            </a>
+          </p>
+        ) : (
+          <p>{published.next.text}</p>
+        )}
+      </div>
+    ) : notice === undefined ? null : (
       <p
         className="ui-notice"
         role="status"

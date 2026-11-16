@@ -356,6 +356,40 @@ const adminPages = [
   ),
   { name: 'admin-import', at: '/admin/schedule/import' },
   { name: 'admin-season', at: '/admin/season' },
+  // Step 2.182, Season settings' first panel: the first league's season not public yet; the
+  // question before showing it and before hiding the current one; the answer after the
+  // owner really shows it (winterSteps taps Show and Yes); and the schedule's "published"
+  // sentence for the hidden season (the page draws it from the address's `done=published`
+  // and the season as it stands, as after publishing, so taking it publishes nothing that
+  // the other pictures would then show). Each picture of the season hidden first hides it
+  // again by the owner's own taps if an earlier picture showed it.
+  {
+    name: 'admin-season-hidden',
+    at: '/admin/season?season=winter-2027',
+    league: 'north-valley',
+    steps: (page) => winterSteps(page, 'hidden', '/admin/season?season=winter-2027'),
+  },
+  {
+    name: 'admin-season-show-ask',
+    at: '/admin/season?season=winter-2027',
+    league: 'north-valley',
+    steps: (page) =>
+      winterSteps(page, 'hidden', '/admin/season?season=winter-2027&ask=show#who-can-see'),
+  },
+  { name: 'admin-season-hide-ask', at: '/admin/season?ask=hide#who-can-see' },
+  {
+    name: 'admin-season-shown-done',
+    at: '/admin/season?season=winter-2027',
+    league: 'north-valley',
+    steps: (page) => winterSteps(page, 'shown'),
+  },
+  {
+    name: 'admin-schedule-published-hidden',
+    at: '/admin/schedule?season=winter-2027',
+    league: 'north-valley',
+    steps: (page) =>
+      winterSteps(page, 'hidden', '/admin/schedule?season=winter-2027&done=published'),
+  },
   { name: 'admin-settings', at: '/admin/settings' },
   { name: 'admin-people', at: '/admin/people' },
   { name: 'admin-standings', at: '/admin/standings' },
@@ -940,6 +974,32 @@ async function undoSteps(page, what) {
     .locator('section', { has: page.getByRole('heading', { name: 'Remove this team' }) })
     .locator('input[name=confirm]')
     .check();
+}
+
+/**
+ * Step 2.182's pictures: the first league's Winter 2027 brought to `want` ('shown' or
+ * 'hidden') by the owner's own taps in Season settings (Show or Hide it again, then Yes),
+ * when it is not so already; then, if `then` is given, that address of the league is
+ * opened. Scripts are off. Showing ends on the panel's "done" answer, which is the picture.
+ */
+async function winterSteps(page, want, then) {
+  const tapTo = async (locator, url) => {
+    await Promise.all([page.waitForEvent('load'), locator.click()]);
+    if (!url.test(page.url())) throw new Error(`a step landed on ${page.url()}, not ${url}`);
+  };
+  const origin = new URL(page.url()).origin;
+  await page.goto(`${origin}/north-valley/admin/season?season=winter-2027`);
+  const panel = page.locator('#who-can-see');
+  const [button, yes, answer] =
+    want === 'shown'
+      ? ['Show this season to visitors', 'Yes, show it', /done=shown/]
+      : ['Hide it again', 'Yes, hide it', /done=hidden/];
+  const start = panel.getByRole('button', { name: button });
+  if ((await start.count()) > 0) {
+    await tapTo(start, /ask=/);
+    await tapTo(panel.getByRole('button', { name: yes }), answer);
+  }
+  if (then !== undefined) await page.goto(`${origin}/north-valley${then}`);
 }
 
 async function roundSteps(page, steps) {

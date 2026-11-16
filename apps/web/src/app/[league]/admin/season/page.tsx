@@ -1,7 +1,12 @@
+import { SeasonSettingsPage } from '../../../../features/season-settings/index.ts';
 import type { LeagueRouteProps } from '../../../../features/shell/index.ts';
-import { AdminArea } from '../../../../features/staff/index.ts';
 
-export default async function Page({ params }: LeagueRouteProps) {
+export default async function Page({
+  params,
+  searchParams,
+}: LeagueRouteProps & {
+  readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
+}) {
   const { league } = await params;
-  return <AdminArea league={league} area="season" />;
+  return <SeasonSettingsPage league={league} search={await searchParams} />;
 }

@@ -1,26 +1,32 @@
 // The cases the two-league harness runs (T-65): every query in ../queries and every
 // command in core's registry. Importing this file registers them.
+//
+// A new area's cases go in a file of their own, `<area>-cases.test-helper.ts`, imported
+// below in its alphabetical place; a new case of an area that has a file goes in that
+// file. The imports here are kept in alphabetical order, never added at the end, so two
+// steps rarely touch the same lines (step 2.188, record 072). The order changes nothing
+// that is checked: every case runs on its own and is rolled back.
 import {
   acceptInvitation,
   cancelInvitation,
-  createLeague,
   clearSetting,
   clearSettingFor,
+  createLeague,
   createSeason,
   defineSetting,
   invite,
-  setSetting,
-  setSettingFor,
-  settingRegistry,
   listAccess,
   listActivity,
   myAccess,
+  renameShortName,
   resendInvitation,
   revokeGrant,
-  renameShortName,
   setCurrentSeason as setCurrentSeasonCommand,
   setLeagueName,
   setLeagueStatus,
+  setSetting,
+  setSettingFor,
+  settingRegistry,
 } from '@srleagues/core';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -29,36 +35,37 @@ import {
   findCurrentLeague,
   findInvitation,
   findInvitationByTokenHash,
+  findProgramBySlug,
+  findProgramId,
   findRoleGrant,
+  findSeasonProgramId,
   hasPendingInvitation,
   insertActivity,
   insertInvitation,
+  insertJob,
+  insertLeague,
   insertRoleGrant,
+  insertSeason,
+  listAccessNames,
   listActiveGrantsOf,
   listActivityEntries,
   listOpenInvitations,
+  listPrograms,
   listRoleGrants,
-  listAccessNames,
+  listSettingValues,
   markInvitationAccepted,
   markInvitationCancelled,
+  renameLeagueSlug,
   renewInvitationLink,
   replaceInvitationLink,
   revokeRoleGrant,
-  findProgramBySlug,
-  findProgramId,
-  findSeasonProgramId,
-  insertJob,
-  insertLeague,
-  insertSeason,
-  listPrograms,
-  listSettingValues,
-  renameLeagueSlug,
   setCurrentSeason,
   settleJob,
   updateLeagueName,
   updateLeagueStatus,
   writeSettingValue,
 } from '../queries/index.ts';
+import './bin-cases.test-helper.ts';
 import {
   harnessTx,
   inFreshLeague,
@@ -67,18 +74,17 @@ import {
 } from './command-cases.test-helper.ts';
 import './divisions-venues-cases.test-helper.ts';
 import './games-cases.test-helper.ts';
-import './not-started-cases.test-helper.ts';
 import './imports-cases.test-helper.ts';
+import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import './league-removal-cases.test-helper.ts';
-import './bin-cases.test-helper.ts';
+import './not-started-cases.test-helper.ts';
 import './people-cases.test-helper.ts';
-import './public-schedule-cases.test-helper.ts';
 import './public-reads-cases.test-helper.ts';
+import './public-schedule-cases.test-helper.ts';
 import './schedule-draft-cases.test-helper.ts';
 import './seasons-cases.test-helper.ts';
 import './standings-cases.test-helper.ts';
 import './teams-cases.test-helper.ts';
-import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 
 registerIsolationCase({
   subject: listPrograms,
