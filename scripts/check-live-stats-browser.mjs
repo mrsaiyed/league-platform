@@ -100,10 +100,15 @@ function sayWhatFailed(error) {
 
 let browser;
 try {
-  for (let i = 0; ; i++) {
+  // Waits for the server's own ready line, which it prints once its database is set up and
+  // it is listening. 120 seconds is only a ceiling, for a loaded computer: its local
+  // database took 46 seconds to start here while other lanes built (step 2.175). It
+  // returns as soon as the line comes, and every check after it is unchanged.
+  const serverReadyBy = Date.now() + 120_000;
+  for (;;) {
     if (server.exitCode !== null) throw new Error(output);
     if (output.includes(`Live stats: ${base}`)) break;
-    if (i === 150) throw new Error(`Server timeout: ${output}`);
+    if (Date.now() > serverReadyBy) throw new Error(`Server timeout: ${output}`);
     await new Promise((r) => setTimeout(r, 200));
   }
   // Changes need a same-origin browser request.
@@ -588,10 +593,12 @@ try {
   online.stdout.on('data', (s) => (onlineOutput += s));
   online.stderr.on('data', (s) => (onlineOutput += s));
   try {
-    for (let i = 0; ; i++) {
+    // The same ceiling for the second server, for the same loaded computer.
+    const onlineReadyBy = Date.now() + 120_000;
+    for (;;) {
       if (online.exitCode !== null) throw new Error(onlineOutput);
       if (onlineOutput.includes('Live stats:')) break;
-      if (i === 150) throw new Error(`Online server timeout: ${onlineOutput}`);
+      if (Date.now() > onlineReadyBy) throw new Error(`Online server timeout: ${onlineOutput}`);
       await new Promise((r) => setTimeout(r, 200));
     }
     const g = (await (await fetch(`${onlineBase}/api/schedule`)).json()).games[0];
