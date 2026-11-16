@@ -1,6 +1,7 @@
 // The teams module (T2 §3). Other modules and packages use only what is here.
 export { addToRoster, type AddToRosterError } from './commands/add-to-roster.ts';
 export { changeRosterEntry, type ChangeRosterEntryError } from './commands/change-roster-entry.ts';
+export { countTeamGames, type CountTeamGamesError } from './commands/count-team-games.ts';
 export { listRoster, type ListRosterError } from './commands/list-roster.ts';
 export { markLeft, type MarkLeftError } from './commands/mark-left.ts';
 export {
@@ -31,6 +32,7 @@ export {
   type RosterLineSource,
 } from './public-team.ts';
 export { statsVisibilityChoices, type TeamStatsVisibility } from './team-fields.ts';
+export type { TeamGames } from './team-games.ts';
 export { rosterRoles } from './roster-fields.ts';
 export type {
   NewRosterEntry,
@@ -40,6 +42,7 @@ export type {
   RosterLine,
   RosterTaken,
   TeamChange,
+  TeamGamesRecord,
   TeamRecord,
   TeamsStore,
   TeamsTx,

@@ -38,6 +38,7 @@ export { hasLiveCourts } from './has-live-courts.ts';
 export { hasLiveSubdivisions } from './has-live-subdivisions.ts';
 export { hasLiveTeams } from './has-live-teams.ts';
 export { findTeam } from './find-team.ts';
+export { findTeamGames } from './find-team-games.ts';
 export { findRosterEntry } from './find-roster-entry.ts';
 export { insertRosterEntry, type NewRosterEntryRow } from './insert-roster-entry.ts';
 export { listRoster, type RosterLineSummary } from './list-roster.ts';

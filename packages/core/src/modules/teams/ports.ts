@@ -41,6 +41,19 @@ export type TeamChange = {
   statsVisibility?: string;
 };
 
+/**
+ * What a team has of games, for whether it may go to the bin (A-17): its games not in the
+ * bin with a final or forfeited result, the ids of those still to play (scheduled,
+ * postponed or live), and its season's schedule draft as stored, whose games to come
+ * count too (team-games.ts reads it).
+ */
+export type TeamGamesRecord = {
+  readonly played: number;
+  readonly toPlayIds: readonly string[];
+  /** The season's schedule draft's changes as stored, or null when the season has none. */
+  readonly draftChanges: unknown;
+};
+
 /** Which of a team's unique fields a save hit. */
 export type TeamTaken = 'slug-taken' | 'name-taken';
 
@@ -112,6 +125,8 @@ export type TeamsStore = {
   ) => Promise<number | TeamTaken | undefined>;
   /** Moves a team to the bin or brings it back: false if it is not in this league. */
   readonly setBinned: (teamId: string, binned: boolean) => Promise<boolean | TeamTaken>;
+  /** The team's games and its season's schedule draft (A-17); none for a team not in this league. */
+  readonly games: (teamId: string, seasonId: string) => Promise<TeamGamesRecord>;
   /** The person (not merged into another) and whether they are in the bin, or undefined. */
   readonly findPerson: (
     personId: string,
