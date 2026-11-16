@@ -6,7 +6,22 @@ import type { Clash, ScheduleDraftView, ScheduleGame, VenueWithCourts } from '@s
 import { leagueDayText } from '../../server/game-when.ts';
 import { locale, t } from '../../server/messages.ts';
 
-export type GridTeam = { readonly id: string; readonly name: string };
+/** A team as the grid names it; one in the bin (`removed`) is only named, never offered. */
+export type GridTeam = { readonly id: string; readonly name: string; readonly removed?: boolean };
+
+/**
+ * A team's name in the grid: "Badgers (removed)" for one in the bin (A-17), and words, never
+ * an id, for one the season's list does not hold.
+ */
+export function gridTeamName(teams: readonly GridTeam[], id: string): string {
+  const team = teams.find((x) => x.id === id);
+  if (team === undefined) return t('schedule.admin.unknownTeam');
+  return team.removed === true ? t('schedule.admin.removedTeam', { name: team.name }) : team.name;
+}
+
+/** The teams a new game can be given: those not in the bin. */
+export const pickableTeams = (teams: readonly GridTeam[]): readonly GridTeam[] =>
+  teams.filter((team) => team.removed !== true);
 
 export type GridGame = {
   readonly id: string;
@@ -113,7 +128,7 @@ export function buildGrid(
   teams: readonly GridTeam[],
   venues: readonly VenueWithCourts[],
 ): Grid {
-  const teamName = (id: string) => teams.find((x) => x.id === id)?.name ?? id;
+  const teamName = (id: string) => gridTeamName(teams, id);
   const labelOf = (venueId: string | null, court: string | null): string | null => {
     if (venueId === null) return null;
     const venue = venues.find((v) => v.id === venueId);

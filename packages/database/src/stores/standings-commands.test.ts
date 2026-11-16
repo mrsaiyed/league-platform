@@ -312,4 +312,22 @@ describe('standings follow every result (step 2.24)', () => {
     expect(rows.map((r) => r.team_id)).not.toContain(extra);
     expect(rows).toHaveLength(4);
   });
+
+  it('a team put in the bin with a result stays counted, so its opponent keeps the win (A-17)', async () => {
+    const s = await season();
+    const deps = depsWith();
+    // Game 0: team 0 beats team 1. Then team 1 goes to the bin directly, as before A-17.
+    await recordFinalScore(
+      s.ctx,
+      { gameId: s.game(0), version: 1, homeScore: 60, awayScore: 50 },
+      deps,
+    );
+    const before = await calculated(s);
+    await pglite.query('update teams set deleted_at = now() where id = $1', [s.teams[1]]);
+    await rebuildStandings(s.ctx, { seasonId: s.seasonId }, deps);
+    const after = await calculated(s);
+    expect(after.rows).toEqual(before.rows);
+    const winner = after.rows.find((r) => r.team_id === s.teams[0]);
+    expect(winner).toMatchObject({ games_played: 1, wins: 1, losses: 0 });
+  });
 });

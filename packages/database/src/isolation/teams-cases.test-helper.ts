@@ -22,6 +22,7 @@ import {
   insertRosterEntry,
   insertTeam,
   listRoster,
+  listScheduleTeams,
   setTeamBinned,
   updateRosterEntry,
   updateTeam,
@@ -70,6 +71,12 @@ registerIsolationCase({
   subject: findTeamGames,
   name: "count the target team's games",
   run: (scope, target) => findTeamGames(scope, target.teamId),
+});
+
+registerIsolationCase({
+  subject: listScheduleTeams,
+  name: "name the target's season's teams for the schedule grid, those in the bin too",
+  run: (scope, target) => listScheduleTeams(scope, target.seasonId),
 });
 
 registerIsolationCase({

@@ -26,9 +26,22 @@ export function worldStandingsStore(s: LeagueWorld): StandingsStore {
   return {
     // The world runs one transaction at a time (stand-in-world.ts): nothing to hold.
     lockSeason: async () => undefined,
+    // As queries/list-table-teams.ts: a team in the bin with a result in a game not in the
+    // bin is still counted, so its opponents keep those wins and losses (A-5, A-17).
     listTeams: async (seasonId) =>
       s.teams
-        .filter((t) => t.seasonId === seasonId && !t.binned)
+        .filter(
+          (t) =>
+            t.seasonId === seasonId &&
+            (!t.binned ||
+              s.games.some(
+                (g) =>
+                  g.seasonId === seasonId &&
+                  !g.binned &&
+                  decided(g.status) &&
+                  (g.homeTeamId === t.id || g.awayTeamId === t.id),
+              )),
+        )
         .sort(byId)
         .map((t) => ({ teamId: t.id, divisionId: t.divisionId })),
     listAdjustments: async (seasonId) =>

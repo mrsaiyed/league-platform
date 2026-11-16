@@ -40,6 +40,7 @@ import {
   clockText,
   dayText,
   daysAfter,
+  pickableTeams,
   type Grid,
   type GridGame,
   type GridRound,
@@ -105,11 +106,13 @@ export async function ScheduleBuilderPage({
     );
   }
   const deps = ports.scheduleAdmin.deps;
-  const [drafted, listed, teams] = await Promise.all([
+  const [drafted, listed, seasonTeams] = await Promise.all([
     getScheduleDraft(context, { seasonId: season.id }, deps),
     listVenues(context, {}, deps),
     ports.scheduleAdmin.teamsOf(addressee.id, season.id),
   ]);
+  // A team in the bin is named in its games ("Badgers (removed)"), never offered for one.
+  const teams = pickableTeams(seasonTeams);
   // What the page lets you do, at the top right of its head: bring games in from a
   // spreadsheet and, while a draft is waiting, go to "Review and publish" (the box itself
   // is at the foot of the grid; its place is step 2.53's).
@@ -193,7 +196,7 @@ export async function ScheduleBuilderPage({
   }
   const draft = drafted.value;
   const venues = listed.ok ? listed.value : [];
-  const grid = buildGrid(draft, teams, venues);
+  const grid = buildGrid(draft, seasonTeams, venues);
   const saved = savedDetailOf(search);
   const refusedAt = refusedAtOf(search);
   // A refusal of a round's form is said beside that form, if it is on the page.

@@ -179,6 +179,8 @@ export const enScheduleAdmin = {
     'It was only in the draft, so nothing public has changed. Put it back and it is exactly as it was.',
   'schedule.admin.removedPublished':
     'Nothing public changes until you publish. Put it back now and it is exactly as it was. Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
+  // A team in the bin, named in a game it played or was to play (A-17, step 2.180).
+  'schedule.admin.removedTeam': '{name} (removed)',
   'schedule.admin.renameRound': 'Round name',
   'schedule.admin.renameRoundSubmit': 'Rename round',
   'schedule.admin.reviewPublish': 'Review and publish',
@@ -214,6 +216,8 @@ export const enScheduleAdmin = {
   'schedule.admin.time': 'Time',
   // Admin → Schedule: the grid of rounds and games (step 2.52).
   'schedule.admin.title': 'Schedule',
+  // A game's team the season's list does not hold: words, never its id (step 2.180).
+  'schedule.admin.unknownTeam': 'Team not in this season',
   'schedule.admin.venueCourt': '{venue}: {court}',
   'schedule.admin.venueOnly': '{venue} (any court)',
 } as const;
