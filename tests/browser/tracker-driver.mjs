@@ -25,6 +25,68 @@ export const sizes = [
   { name: 'phone-in-browser', width: 390, height: 664 },
 ];
 
+// The scoring screen draws with the plain sans face the device already has (DESIGN.md
+// section 7, line 7), so its letters are as wide as that device's: GitHub's Ubuntu
+// machines draw DejaVu Sans, about a sixth wider than Windows' Segoe UI, and a phone whose
+// letters are that wide is a real phone. So the fit is measured, and the pictures can be
+// taken, in a wider face as well. Verdana is on Windows and macOS and is a little wider
+// than DejaVu Sans; a machine with neither falls back to its own sans.
+export const widerFace = 'Verdana, "DejaVu Sans", "Bitstream Vera Sans"';
+/**
+ * One line of the screen, and how wide GitHub's Ubuntu machines drew it (the failed run
+ * of commit 19dcaddf: "needs 263"). Segoe UI draws it 226 wide and Verdana 270.
+ */
+export const widthOnGitHub = {
+  says: 'On court · 3 fouls · 104 pts · 0:07 played',
+  px: 13,
+  width: 263,
+};
+
+/**
+ * Draws the scoring screen in another face from now on ('' puts its own back). The screen
+ * looks again at what fits when it is turned or resized, so it is told it was: a device
+ * has one face from the start, and this one changes under a screen already drawn.
+ */
+export async function drawIn(page, family) {
+  await page.evaluate((face) => {
+    document.querySelector('style[data-drawn-in]')?.remove();
+    if (face !== '') {
+      const style = document.createElement('style');
+      style.setAttribute('data-drawn-in', '');
+      style.textContent = `.court, .court * { font-family: ${face}, sans-serif !important; }`;
+      document.head.append(style);
+    }
+    window.dispatchEvent(new Event('resize'));
+  }, family);
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  );
+}
+
+/**
+ * How wide `widthOnGitHub`'s line is on the scoring screen that is open now: in the face
+ * the screen has, and in the wider one.
+ */
+export async function lettersHere(page) {
+  const own = await page.evaluate((line) => {
+    const probe = document.createElement('span');
+    probe.setAttribute('data-letters-probe', '');
+    probe.style.cssText = `position: absolute; visibility: hidden; white-space: nowrap; font-size: ${line.px}px; font-weight: 400; letter-spacing: normal;`;
+    probe.textContent = line.says;
+    document.querySelector('[data-scoring]').append(probe);
+    return probe.getBoundingClientRect().width;
+  }, widthOnGitHub);
+  await drawIn(page, widerFace);
+  const wider = await page.evaluate(() => {
+    const probe = document.querySelector('[data-letters-probe]');
+    const width = probe.getBoundingClientRect().width;
+    probe.remove();
+    return width;
+  });
+  await drawIn(page, '');
+  return { own, wider };
+}
+
 /** Three more a side on top of `morePlayers`: fifteen a side, a bench of ten. */
 export const evenMorePlayers = {
   home: [
@@ -65,6 +127,41 @@ export const morePlayers = {
  * list of `[jersey, name]`; a name may be empty (S-34).
  */
 export async function addPlayers(origin, players = morePlayers, game = liveGame) {
+  const commands = ['home', 'away'].flatMap((side) =>
+    (players[side] ?? []).map(([jersey, name]) => ({
+      type: 'add-player',
+      side,
+      playerId: randomUUID(),
+      jersey,
+      name,
+    })),
+  );
+  await fromAnotherTablet(origin, commands, game);
+}
+
+/**
+ * Makes the game a stop-clock game, where a foul or a timeout stops a running clock
+ * (step 2.36): the made-up league's own format is a running clock, under which neither
+ * does. It is the engine's own switch (`clock-mode`, T-128), sent before tip-off from
+ * another tablet, as the players are; the scorekeeper's switch on the screen is step 2.69.
+ */
+export async function stopClockGame(origin, game = liveGame) {
+  // Refused when the game already stops its clock on fouls: that is the game wanted.
+  await fromAnotherTablet(origin, [{ type: 'clock-mode', mode: 'stop' }], game, {
+    refusalsAreFine: true,
+  });
+}
+
+/**
+ * Sends taps to a game as a scorekeeper's device would (record 058), from a tablet that
+ * is not the browser's, then lets go of the game so the browser can take it.
+ */
+async function fromAnotherTablet(
+  origin,
+  inputs,
+  game = liveGame,
+  { refusalsAreFine = false } = {},
+) {
   const post = async (at, body) => {
     const answer = await fetch(`${origin}/api/v1/leagues/${leagueId}/games/${game}${at}`, {
       method: 'POST',
@@ -80,19 +177,19 @@ export async function addPlayers(origin, players = morePlayers, game = liveGame)
     return JSON.parse(text);
   };
   const { sessionId } = await post('/session', { type: 'open', deviceId: 'setup-tablet' });
-  const commands = ['home', 'away'].flatMap((side) =>
-    (players[side] ?? []).map(([jersey, name]) => ({
-      commandId: randomUUID(),
-      at: Date.now(),
-      input: { type: 'add-player', side, playerId: randomUUID(), jersey, name },
-    })),
-  );
-  if (commands.length > 0) {
-    const reply = await post('/commands', { protocolVersion: 2, sessionId, commands });
-    const refused = reply.results.filter((r) => r.status !== 'accepted');
-    if (refused.length > 0) throw new Error(`players refused: ${JSON.stringify(refused)}`);
+  const commands = inputs.map((input) => ({ commandId: randomUUID(), at: Date.now(), input }));
+  try {
+    if (commands.length > 0) {
+      const reply = await post('/commands', { protocolVersion: 2, sessionId, commands });
+      const refused = reply.results.filter((r) => r.status !== 'accepted');
+      if (refused.length > 0 && !refusalsAreFine) {
+        throw new Error(`taps refused: ${JSON.stringify(refused)}`);
+      }
+    }
+  } finally {
+    // The game is let go of whatever happened, so the browser finds it free.
+    await post('/session', { type: 'release', sessionId });
   }
-  await post('/session', { type: 'release', sessionId });
 }
 
 /** The scoring screen on `page`: its parts, and the taps a scorekeeper makes. */
@@ -241,6 +338,88 @@ export function court(page) {
     /** Waits until every tap made is on the server: the banner says "All saved". */
     async saved() {
       await root.locator('[data-saved-banner][data-state="saved"]').waitFor();
+    },
+
+    // --- The clock, periods, team fouls and timeouts (step 2.36). ---
+    /** The clock in the scoreboard: the button that sets it and picks the period. */
+    clock: root.locator('[data-clock]'),
+    /** The time the clock shows, "7:58". */
+    clockText: async () => (await root.locator('[data-clock-time]').textContent()) ?? '',
+    /** Start or Pause, under the scoreboard: `data-state` is start, pause or over. */
+    toggle: root.locator('[data-clock-toggle]'),
+    /** The large Start clock button in the pad at rest, its × and its line of words. */
+    startButton: pad.locator('[data-start-clock]'),
+    hideStart: pad.locator('[data-hide-start]'),
+    stopReason: pad.locator('[data-stop-reason]'),
+    /** At 0:00, in the pad at rest: the way to the next period. */
+    pickPeriodButton: pad.locator('[data-pick-period]'),
+    /** The form that sets the clock and picks the period. */
+    clockSheet: root.locator('[data-clock-sheet] [role="dialog"]'),
+    /** A team's fouls this period and its bonus badge, in its box of the scoreboard. */
+    teamFouls: (side) => root.locator(`[data-team-fouls="${side}"]`),
+    bonus: (side) => root.locator(`[data-bonus="${side}"]`),
+    /** The one way to both teams' timeouts, and what the pad then holds. */
+    timeoutsButton: root.locator('[data-timeouts-open]'),
+    timeoutsPad: pad.locator('[data-timeout-list]'),
+    timeoutButton: (side, seconds = 60) =>
+      pad.locator(`[data-act="timeout"][data-side="${side}"][data-seconds="${seconds}"]`),
+    /**
+     * Starts the clock with the button under the scoreboard, and waits until it runs. The
+     * button rests for a third of a second after its word changes and takes no tap then
+     * (it is marked `data-resting`): it is tapped once it is ready, as a person would.
+     */
+    async startClock() {
+      await root.locator('[data-clock-toggle][data-state="start"]:not([data-resting])').click();
+      await root.locator('[data-clock-toggle][data-state="pause"]').waitFor();
+    },
+    async pauseClock() {
+      await root.locator('[data-clock-toggle][data-state="pause"]:not([data-resting])').click();
+      await root.locator('[data-clock-toggle][data-state="start"]').waitFor();
+    },
+    /** Opens the clock's form and types a time on its keys: '630' is 6:30. Does not set it. */
+    async typeClock(digits) {
+      const sheet = root.locator('[data-clock-sheet] [role="dialog"]');
+      if (!(await sheet.isVisible())) await root.locator('[data-clock]').click();
+      await sheet.waitFor();
+      for (const digit of digits) await sheet.locator(`[data-key="${digit}"]`).click();
+    },
+    /** Sets the clock through its form: '630' is 6:30. The clock is stopped by it. */
+    async setClock(digits) {
+      await this.typeClock(digits);
+      const typed = (
+        await root.locator('[data-clock-sheet] [data-clock-entry]').innerText()
+      ).trim();
+      await root.locator('[data-clock-sheet] [data-set-clock]').click();
+      await root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
+      // The form closes with the tap; the clock shows the time once the device has kept it.
+      await page.waitForFunction(
+        (time) => document.querySelector('[data-clock-time]')?.textContent === time,
+        typed,
+      );
+    },
+    /** Picks a period in the clock's form: 2 is the second, the first past regulation is overtime. */
+    async pickPeriod(period) {
+      const sheet = root.locator('[data-clock-sheet] [role="dialog"]');
+      if (!(await sheet.isVisible())) await root.locator('[data-clock]').click();
+      await recorded(() => sheet.locator(`[data-period-pick="${period}"]`).click());
+      await root.locator(`[data-clock] [data-period="${period}"]`).waitFor();
+    },
+    /** Opens the timeouts and calls one for a team; answers "Record it anyway" if asked. */
+    async timeout(side, seconds = 60, { anyway = true } = {}) {
+      if (!(await pad.locator('[data-timeout-list]').isVisible())) {
+        await root.locator('[data-timeouts-open]').click();
+      }
+      const button = pad.locator(
+        `[data-act="timeout"][data-side="${side}"][data-seconds="${seconds}"]`,
+      );
+      const asked = (await button.getAttribute('data-none')) !== null;
+      if (!asked) return recorded(() => button.click());
+      await button.click();
+      await pad.locator('[data-timeout-ask]').waitFor();
+      if (!anyway) return undefined;
+      // Its answers take no tap for a moment after the question is asked.
+      await page.waitForTimeout(450);
+      return recorded(() => pad.locator('[data-answer="yes"]').click());
     },
   };
 }

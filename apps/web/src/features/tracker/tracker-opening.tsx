@@ -16,7 +16,12 @@ import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.
 import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
-import { savedBanner, savedBannerText, type SavedBanner } from './queue-banner.ts';
+import {
+  savedBanner,
+  savedBannerShortLines,
+  savedBannerText,
+  type SavedBanner,
+} from './queue-banner.ts';
 import { ScoringScreen } from './scoring-screen.tsx';
 import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controller.ts';
 import { trackerNoticeText, trackerNotices } from './tracker-notice.ts';
@@ -285,7 +290,11 @@ export function TrackerOpening({
         t={t}
         title={matchup}
         when={when}
-        banner={{ text: savedBannerText(banner, t), state: bannerState(banner) }}
+        banner={{
+          text: savedBannerText(banner, t),
+          short: savedBannerShortLines(banner, t),
+          state: bannerState(banner),
+        }}
         notices={
           anythingToTell ? (
             <>

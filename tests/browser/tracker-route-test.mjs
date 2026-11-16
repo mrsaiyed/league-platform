@@ -22,7 +22,11 @@
 //   seconds and opens by itself once it answers; signed out while open, it offers to sign
 //   in and come back.
 // - Signing out on the account page clears the games the device kept (T-115).
+// - The scoring screen a game opens on has its clock (step 2.36): at each of the five
+//   sizes the clock, Start and the way to the timeouts are on the screen, named for a
+//   screen reader and 44 x 44 or more, with nothing scrolling.
 // Accessibility checks on each screen (T-186), and no sideways scrolling at phone width (A-2).
+import { sizes } from './tracker-driver.mjs';
 import {
   accessibilityProblems,
   buildNext,
@@ -246,6 +250,57 @@ if (browser) {
         (await keptOnDevice(page, liveGame))?.confirmedFormat !== null,
       );
       await accessible(page, 'the scoring screen');
+
+      // The game opens with its clock (step 2.36): at each of the five sizes the clock,
+      // Start and the way to the timeouts are on the screen, named for a screen reader,
+      // 44 x 44 or more, and nothing scrolls.
+      for (const size of sizes) {
+        await page.setViewportSize({ width: size.width, height: size.height });
+        const controls = {
+          'the clock, which sets the time and the period': page.getByRole('button', {
+            name: /^20:00\s*H1\s*Set the clock or change the period$/,
+          }),
+          'Start, named "Start the clock"': page.getByRole('button', {
+            name: 'Start the clock',
+            exact: true,
+          }),
+          // Named with how many each team has left: two full a half in this league.
+          'the way to both teams’ timeouts': page.getByRole('button', {
+            name: 'Timeouts: Hawks 2 left, Bears 2 left',
+            exact: true,
+          }),
+        };
+        const found = {};
+        for (const [what, control] of Object.entries(controls)) {
+          const box = (await control.count()) === 1 ? await control.boundingBox() : null;
+          found[what] =
+            box !== null &&
+            box.width >= 43.99 &&
+            box.height >= 43.99 &&
+            box.x >= 0 &&
+            box.y >= 0 &&
+            box.x + box.width <= size.width &&
+            box.y + box.height <= size.height;
+        }
+        const scrolls = await page.evaluate(
+          () =>
+            document.scrollingElement.scrollHeight > window.innerHeight ||
+            document.documentElement.scrollWidth > window.innerWidth,
+        );
+        note(
+          `${size.width} x ${size.height}: the scoring screen opens with the clock, Start and the timeouts, each named, 44 x 44 or more, nothing scrolling`,
+          Object.values(found).every(Boolean) && !scrolls,
+          JSON.stringify({ found, scrolls }),
+        );
+      }
+      await page.setViewportSize({ width: 375, height: 812 });
+      // Before tip-off Start is offered under the scoreboard, and the large button waits
+      // for both lineups: nothing in the pad can start the clock by a stray tap.
+      note(
+        'before the lineups are set the pad offers no Start clock button',
+        (await page.locator('[data-pad] [data-start-clock]').count()) === 0 &&
+          (await page.locator('[data-clock-toggle][data-state="start"]').count()) === 1,
+      );
 
       // The same device opens straight to scoring: the format was confirmed here.
       await page.reload();
