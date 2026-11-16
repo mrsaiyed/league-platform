@@ -320,7 +320,9 @@ type GameSpec = {
 };
 
 type SeasonSpec = {
-  readonly season: Omit<WorldSeason, 'rules' | 'statKeys'> & { readonly rules: unknown };
+  readonly season: Omit<WorldSeason, 'rules' | 'statKeys' | 'version'> & {
+    readonly rules: unknown;
+  };
   readonly teams: readonly TeamSpec[];
   readonly rosters: Readonly<Record<string, readonly PlayerSpec[]>>;
   readonly divisions: readonly { readonly id: string; readonly name: string }[];
@@ -1172,7 +1174,7 @@ function leagueOf(
   let entries = 0;
   for (const spec of seasons) {
     const { rules, ...rest } = spec.season;
-    s.seasons.push({ ...rest, rules, statKeys: [...statKeys] });
+    s.seasons.push({ ...rest, rules, statKeys: [...statKeys], version: 1 });
     spec.divisions.forEach((d, sort) =>
       s.divisions.push({ id: d.id, seasonId: spec.season.id, name: d.name, sort, binned: false }),
     );

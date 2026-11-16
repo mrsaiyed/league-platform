@@ -256,12 +256,15 @@ const notYet = (name: string) => async (): Promise<never> => {
 const samePlace = (a: SettingPlace, b: SettingPlace) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * The leagues module's stores over one league's world, as far as League settings uses
- * them: who the league is, its seasons' programs, and its stored settings. Creating
- * leagues, seasons and divisions and changing a league's name, address or state have no
- * screen on the stand-in yet: those parts fail by name (createLeague, setLeagueName,
- * renameShortName, setLeagueStatus, createSeason, updateSeason, setSeasonRules,
- * setSeasonRosterSettings, setCurrentSeason, getSeason, and every division command).
+ * The leagues module's stores over one league's world, as far as League settings and
+ * Season settings use them: who the league is, its seasons' programs, its stored settings,
+ * and a season read and changed (getSeason, updateSeason: step 2.182 shows and hides a
+ * season through them) as the database's seasons table does it: the version is checked
+ * and raised, and making a season current takes the mark from the other one. Creating
+ * leagues, seasons and divisions, changing a league's name, address or state and saving a
+ * season's rules have no screen on the stand-in yet: those parts fail by name
+ * (createLeague, setLeagueName, renameShortName, setLeagueStatus, createSeason,
+ * setSeasonRules, setSeasonRosterSettings, setCurrentSeason, and every division command).
  */
 export function worldLeaguesStores(
   s: LeagueWorld,
@@ -289,9 +292,37 @@ export function worldLeaguesStores(
     renameShortName: notYet('leagues.renameShortName'),
     setStatus: notYet('leagues.setStatus'),
     createSeason: notYet('leagues.createSeason'),
-    findSeason: notYet('leagues.findSeason'),
-    programCount: notYet('leagues.programCount'),
-    updateSeason: notYet('leagues.updateSeason'),
+    findSeason: async (seasonId) => {
+      const found = s.seasons.find((x) => x.id === seasonId);
+      return found === undefined
+        ? undefined
+        : {
+            id: found.id,
+            programId: found.programId,
+            slug: found.slug,
+            name: found.name,
+            startsOn: found.startsOn,
+            endsOn: found.endsOn,
+            status: found.status,
+            isCurrent: s.currentSeasonId === found.id,
+            rules: found.rules,
+            version: found.version,
+          };
+    },
+    // The world's leagues have one program each, named on their seasons.
+    programCount: async () => new Set(s.seasons.map((x) => x.programId)).size,
+    updateSeason: async (seasonId, change, version) => {
+      // Saving rules is step 2.47's, with its preview: not on the stand-in yet.
+      if (change.rules !== undefined) return notYet('leagues.updateSeason rules')();
+      const at = s.seasons.findIndex((x) => x.id === seasonId);
+      const found = s.seasons[at];
+      if (found === undefined || found.version !== version) return undefined;
+      const { isCurrent, rules: _rules, ...fields } = change;
+      s.seasons = replacedAt(s.seasons, at, { ...found, ...fields, version: version + 1 });
+      if (isCurrent === true) s.currentSeasonId = seasonId;
+      if (isCurrent === false && s.currentSeasonId === seasonId) s.currentSeasonId = null;
+      return version + 1;
+    },
     setCurrentSeason: notYet('leagues.setCurrentSeason'),
     isPlatformStaff: async () => false,
     settingRows: async (key, places) =>

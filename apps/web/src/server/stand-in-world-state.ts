@@ -47,6 +47,8 @@ export type WorldSeason = {
   readonly rules: unknown;
   /** The statistics the season keeps, in order. */
   readonly statKeys: readonly string[];
+  /** Raised by every change, as the seasons table's own column is (T-46, A-8). */
+  readonly version: number;
 };
 
 export type WorldDivision = {
