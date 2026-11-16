@@ -180,7 +180,6 @@ export const gameCss = String.raw`
 .ui-scoreboard:not([data-pill='quiet']) .ui-game-state,
 .ui-group .ui-group-mark[data-kind='note'] {
   border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
-  background: var(--color-tint);
   color: var(--color-accent-text);
 }
 /* On a card and on the big board the tint is the panel's own color with the tint in it,
@@ -190,6 +189,11 @@ export const gameCss = String.raw`
   .ui-game-state,
 .ui-scoreboard:not([data-pill='quiet']) .ui-game-state {
   background: var(--color-tint-panel);
+}
+/* Beside a round's name the mark stands on the page itself, with nothing washed under it:
+   there the tint is laid over the page, see-through. */
+.ui-group .ui-group-mark[data-kind='note'] {
+  background: var(--color-tint);
 }
 
 /* A game as a scoreboard: an emblem and a name on each side, the score or "VS" large

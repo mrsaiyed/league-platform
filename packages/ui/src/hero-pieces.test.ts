@@ -786,9 +786,37 @@ describe('a game as a scoreboard', () => {
     // tint every text is fitted to, the accent for its words, and an edge at a line's
     // strength (DESIGN.md line 17: 12 to 25 percent). The same look on the big board and
     // on a round's "1 game postponed".
+    const softCard =
+      ".ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit']) .ui-game-state";
+    const softBoard = ".ui-scoreboard:not([data-pill='quiet']) .ui-game-state";
+    const roundMark = ".ui-group .ui-group-mark[data-kind='note']";
     expect(flat).toContain(
-      ".ui-game-card:is([data-status='postponed'], [data-status='cancelled'], [data-status='forfeit']) .ui-game-state, .ui-scoreboard:not([data-pill='quiet']) .ui-game-state, .ui-group .ui-group-mark[data-kind='note'] { border-color: color-mix(in srgb, var(--color-accent) 25%, transparent); background: var(--color-tint); color: var(--color-accent-text); }",
+      `${softCard}, ${softBoard}, ${roundMark} { border-color: color-mix(in srgb, var(--color-accent) 25%, transparent); color: var(--color-accent-text); }`,
     );
+    // Its ground on a card and on the big board is one solid color, the panel with the
+    // tint in it: a see-through tint there lay over the card's own wash, and under a
+    // bright main color the pill's words fell short (measured, step 2.147 part 3). Only
+    // beside a round's name, on the page itself, is the tint see-through.
+    expect(flat).toContain(`${softCard}, ${softBoard} { background: var(--color-tint-panel); }`);
+    expect(flat).toContain(`${roundMark} { background: var(--color-tint); }`);
+    // And that is the ground each one ends up with: the last background any rule gives it.
+    const groundOf = (selector: string): string | undefined => {
+      let ground: string | undefined;
+      for (const rule of flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selectors = (rule[1] ?? '').split(/,(?![^(]*\))/).map((part) => part.trim());
+        if (!selectors.includes(selector)) continue;
+        ground = /(?:^|[;\s])background: ([^;]+);/.exec(rule[2] ?? '')?.[1] ?? ground;
+      }
+      return ground;
+    };
+    expect(groundOf(softCard)).toBe('var(--color-tint-panel)');
+    expect(groundOf(softBoard)).toBe('var(--color-tint-panel)');
+    expect(groundOf(roundMark)).toBe('var(--color-tint)');
+    // No rule lays the see-through tint under a state's pill on a card or a board.
+    for (const rule of flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\.ui-game-state/.test(rule[1] ?? '')) continue;
+      expect(rule[2], rule[1]).not.toMatch(/background: var\(--color-tint\);/);
+    }
     // No pill anywhere has a full-strength edge or the page's text color for its words.
     for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!/\.ui-game-state|ui-group-mark\[data-kind='note'\]/.test(rule[1] ?? '')) continue;
