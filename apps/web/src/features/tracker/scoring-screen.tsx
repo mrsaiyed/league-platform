@@ -82,6 +82,7 @@ import {
 import {
   clockToggleTap,
   createTapRest,
+  drawRest,
   startBarTap,
   takeBackTimeoutTap,
   tapTaken,
@@ -376,6 +377,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
       const resting = !all[name].ready();
       for (const place of screen.querySelectorAll(restingPlaces[name])) {
         place.toggleAttribute('data-resting', resting);
+        // And a screen reader is told, on each button of it.
+        const buttons = place.matches('button') ? [place] : place.querySelectorAll('button');
+        for (const button of buttons) drawRest(button, resting);
       }
     }
   }, []);

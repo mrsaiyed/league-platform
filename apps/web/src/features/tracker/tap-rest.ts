@@ -65,6 +65,31 @@ export function createTapRest(timers: RestTimers, drawn: () => void = () => unde
   };
 }
 
+/** The few things of a drawn button that its rest changes (an element, or a test's stand-in). */
+export type RestDrawn = {
+  hasAttribute(name: string): boolean;
+  setAttribute(name: string, value: string): void;
+  removeAttribute(name: string): void;
+};
+
+/**
+ * Tells a screen reader that a button rests, as the hollow look tells the eye (the code
+ * review's confirming look): `aria-disabled="true"` while it rests, the attribute the
+ * screen already gives Start greyed as "Period over". An `aria-disabled` the screen gave
+ * for a reason of its own is left alone: only the one the rest put on is taken off
+ * (it is marked `data-rest-disabled`).
+ */
+export function drawRest(button: RestDrawn, resting: boolean): void {
+  if (resting) {
+    if (button.hasAttribute('aria-disabled')) return;
+    button.setAttribute('aria-disabled', 'true');
+    button.setAttribute('data-rest-disabled', '');
+  } else if (button.hasAttribute('data-rest-disabled')) {
+    button.removeAttribute('aria-disabled');
+    button.removeAttribute('data-rest-disabled');
+  }
+}
+
 /** A tap as the guards read it: when it was made, and whether a key made it. */
 export type Tap = { readonly at: number; readonly keyboard: boolean };
 

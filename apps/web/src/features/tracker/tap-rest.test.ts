@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clockToggleTap,
   createTapRest,
+  drawRest,
   restMs,
   startBarTap,
   takeBackTimeoutTap,
@@ -53,6 +54,39 @@ describe('a control that rests', () => {
     expect(rest.ready()).toBe(true);
     expect(tapTaken(rest, finger())).toBe(true);
     expect(restMs).toBe(350);
+  });
+
+  it('tells a screen reader it rests, aria-disabled for exactly as long', () => {
+    const attributes = new Map<string, string>();
+    const button = {
+      hasAttribute: (name: string) => attributes.has(name),
+      setAttribute: (name: string, value: string) => void attributes.set(name, value),
+      removeAttribute: (name: string) => void attributes.delete(name),
+    };
+    const rest = createTapRest(timers, () => drawRest(button, !rest.ready()));
+    rest.begin();
+    vi.advanceTimersByTime(340);
+    expect(attributes.get('aria-disabled')).toBe('true');
+    vi.advanceTimersByTime(20);
+    // 360 ms on: ready, and nothing more is said of it.
+    expect(attributes.has('aria-disabled')).toBe(false);
+    expect([...attributes.keys()]).toEqual([]);
+  });
+
+  it('leaves alone an aria-disabled the screen gave for a reason of its own', () => {
+    // Start greyed as "Period over" rests when its word changes, and stays disabled after.
+    const attributes = new Map<string, string>([['aria-disabled', 'true']]);
+    const button = {
+      hasAttribute: (name: string) => attributes.has(name),
+      setAttribute: (name: string, value: string) => void attributes.set(name, value),
+      removeAttribute: (name: string) => void attributes.delete(name),
+    };
+    const rest = createTapRest(timers, () => drawRest(button, !rest.ready()));
+    rest.begin();
+    vi.advanceTimersByTime(340);
+    expect(attributes.get('aria-disabled')).toBe('true');
+    vi.advanceTimersByTime(20);
+    expect(attributes.get('aria-disabled')).toBe('true');
   });
 
   it('reads a tap by when the finger made it, not by when the page got round to it', () => {
