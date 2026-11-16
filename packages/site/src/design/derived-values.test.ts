@@ -23,6 +23,7 @@ import {
   startingDesignKeys,
   textOn,
   textSurfaces,
+  tintShares,
   type DesignDocument,
 } from '../../index.ts';
 
@@ -341,6 +342,41 @@ describe('colors under the pointer (hover)', () => {
       const share = /var\(--color-primary\) (\d+)%/.exec(tint)?.[1];
       expect(Number(share) / 100, key).toBeLessThanOrEqual(hoverTintShare);
     }
+  });
+
+  it('writes every tint of a frame from the one pair of numbers the texts are fitted to', () => {
+    // The texts are fitted to the stronger of the two, so neither frame lays on more.
+    expect(hoverTintShare).toBe(Math.max(tintShares.dark, tintShares.light));
+    expect(tintShares.light).toBeLessThanOrEqual(tintShares.dark);
+    const seen = new Set<string>();
+    for (const key of startingDesignKeys) {
+      const design = startingDesign(key);
+      const vars = designToCssVariables(design);
+      const percent = `${Math.round(tintShares[design.base] * 100)}%`;
+      seen.add(`${design.base} ${percent}`);
+      // The tint under the pointer, and the solid ground of a soft pill on a card: the
+      // frame's own share, written from the constant and nowhere else.
+      expect(vars['--color-tint'], key).toBe(
+        `color-mix(in srgb, var(--color-primary) ${percent}, transparent)`,
+      );
+      expect(vars['--color-tint-panel'], key).toBe(
+        `color-mix(in srgb, var(--color-primary) ${percent}, var(--color-panel))`,
+      );
+      // And no variable of the frame lays the main color over a panel at any other share.
+      for (const [name, value] of Object.entries(vars)) {
+        const over = /var\(--color-primary\) (\d+%), var\(--color-panel\)/.exec(value)?.[1];
+        if (over !== undefined) expect(over, `${key} ${name}`).toBe(percent);
+      }
+      // In a dark design that ground is, to the digit, a surface the texts are fitted to:
+      // the panel with the pointer over it.
+      if (design.base === 'dark') {
+        const colors = colorsOf(design);
+        expect(textSurfaces(colors)).toContain(
+          mixColors(colors.panel, colors.primary, tintShares.dark),
+        );
+      }
+    }
+    expect([...seen].sort()).toEqual(['dark 9%', 'light 7%']);
   });
 
   it('moves a hovered tab of the light header away from its words, so they read at least as well', () => {

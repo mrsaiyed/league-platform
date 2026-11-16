@@ -131,10 +131,19 @@ type ChosenColors = {
 };
 
 /**
- * How much of the main color is laid over a surface under the pointer (a row of a table, a
- * button): the stronger of the two frames' tints (frame-look.ts).
+ * How much of the main color a frame lays over a surface as its tint (frame-look.ts): the
+ * tint under the pointer, a dark card's wash, and the solid ground of a soft pill on a
+ * card. A dark design takes a little more of it than a light one, where the main color
+ * over white soon turns dusty. The one place these two numbers are written.
  */
-export const hoverTintShare = 0.09;
+export const tintShares = { dark: 0.09, light: 0.07 } as const;
+
+/**
+ * How much of the main color is laid over a surface under the pointer (a row of a table, a
+ * button) when the texts are fitted to it: the stronger of the two frames' tints, so no
+ * frame ever lays on more than the texts were fitted to.
+ */
+export const hoverTintShare = Math.max(tintShares.dark, tintShares.light);
 
 /** How far the main color moves under the pointer where words are written on it. */
 const primaryHoverShare = 0.18;
