@@ -178,10 +178,25 @@ export function CourtView(props: CourtViewProps) {
       onClick={props.drag?.onClick}
     >
       <header className="court-top">
-        <h1 className="court-title">
-          <span className="court-title-teams">{props.title}</span>
-          {props.when === null ? null : <span className="court-title-when">{props.when}</span>}
-        </h1>
+        {/* The title and the saved line are one place on an upright phone, where the
+            first row is 44 high and never grows (step 2.37): the saved line is always
+            whole, and the title gives way to it when it has much to say. Elsewhere each
+            has its own place in the header (the stylesheet says which). */}
+        <div className="court-top-start">
+          <h1 className="court-title">
+            <span className="court-title-teams">{props.title}</span>
+            {props.when === null ? null : <span className="court-title-when">{props.when}</span>}
+          </h1>
+          <p
+            className="court-banner"
+            role="status"
+            aria-live="polite"
+            data-saved-banner=""
+            data-state={props.banner.state}
+          >
+            <SavedWords t={t} banner={props.banner} />
+          </p>
+        </div>
         <div className="court-top-end">
           {props.account === undefined || props.account === null ? null : (
             <div className="court-account">{props.account}</div>
@@ -209,15 +224,6 @@ export function CourtView(props: CourtViewProps) {
           />
           <Score t={t} team={view.teams.away} />
         </div>
-        <p
-          className="court-banner"
-          role="status"
-          aria-live="polite"
-          data-saved-banner=""
-          data-state={props.banner.state}
-        >
-          <SavedWords t={t} banner={props.banner} />
-        </p>
         {props.notices === undefined || props.notices === null ? null : (
           <div className="court-notices">{props.notices}</div>
         )}
@@ -267,20 +273,31 @@ export function CourtView(props: CourtViewProps) {
 /**
  * What the saved banner says. Where its short form says the same ("All saved") there is
  * one form; otherwise both are drawn and the stylesheet shows one: the long one, or, on a
- * phone whose scoreboard has no room for it, the short one (a line for each thing it
+ * phone whose first row has no room for it, the short one (a line for each thing it
  * says where the banner is a narrow column, joined as the long one is where it is a row).
+ *
+ * In the short form the mark between two things (" · ") is held with the thing before
+ * it, and a line may break only after it: so a line never begins with the dot, and no
+ * thing is broken in two (step 2.37).
  */
 function SavedWords({ t, banner }: { readonly t: Translate; readonly banner: CourtBanner }) {
   const separator = t('tracker.queue.separator');
   if (banner.short.join(separator) === banner.text) return banner.text;
+  const mark = separator.trimEnd();
+  const space = separator.slice(mark.length);
   return (
     <>
       <span className="court-banner-long">{banner.text}</span>
       <span className="court-banner-short">
         {banner.short.map((line, index) => (
           <Fragment key={line}>
-            {index === 0 ? null : <span className="court-banner-dot">{separator}</span>}
-            <span className="court-banner-line">{line}</span>
+            {index === 0 ? null : space}
+            <span className="court-banner-line">
+              {line}
+              {index === banner.short.length - 1 ? null : (
+                <span className="court-banner-dot">{mark}</span>
+              )}
+            </span>
           </Fragment>
         ))}
       </span>

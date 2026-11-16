@@ -390,6 +390,11 @@
   align-items: center;
   min-inline-size: 0;
 }
+/* The title and the saved line are held together for an upright phone, where they share
+   one place (further down). Everywhere else each is laid in the header by itself. */
+.court-top-start {
+  display: contents;
+}
 .court-title {
   grid-area: title;
   display: flex;
@@ -780,10 +785,15 @@
   background: var(--court-red);
   color: var(--court-text);
 }
-/* The same said shorter ("12 to send"): only on a phone whose scoreboard has no room for
-   the long one (lying down, and upright in its browser: further down). */
+/* The same said shorter ("12 to send"): on a phone, upright or lying down, whose first row
+   has no room for the long one (further down). */
 .court-banner-short {
   display: none;
+}
+/* In the short form a thing it says is never broken in two, and the dot between two
+   things is held with the thing before it: it ends a line, never begins one. */
+.court-banner-line {
+  white-space: nowrap;
 }
 .court-notices {
   grid-area: notices;
@@ -2136,11 +2146,75 @@
     --court-size-clock: 40px;
     --court-size-score: 36px;
   }
+  /* The first row is the title over the saved line, with the account button and More at
+     its end: the scoreboard then has the whole width under it, and nothing above the two
+     teams grows while a game is scored (step 2.37; the area lead's rule for step 2.36).
+     The saved line said "All saved" under the scoreboard on a tall phone until then, in a
+     row of its own; with no connection and plays waiting it took two lines there and
+     pushed the lower bench under the pad.
+
+     The place is as high as it will ever be, and holds the saved line whole whatever it
+     says. The title is over it while both fit; when the saved line has much to say (the
+     storage, the connection, plays waiting and plays not saved, all at once) the title
+     gives way whole, never by a cut line: the teams' names are on the scoreboard, and a
+     screen reader is still given the title. No script measures anything: the two are
+     laid from the bottom, the saved line first, and what does not fit over it wraps out
+     of the place, to its side, where nothing shows. The empty first piece is as wide as
+     the place, so "to its side" is always out of it. */
+  .court-top {
+    grid-template-areas:
+      'start more'
+      'board board'
+      'notices notices';
+  }
+  .court-top-start {
+    grid-area: start;
+    display: flex;
+    flex-flow: column-reverse wrap;
+    align-content: flex-start;
+    align-items: flex-start;
+    justify-content: center;
+    block-size: 60px;
+    min-inline-size: 0;
+    overflow: hidden;
+  }
+  .court-top-start::before {
+    content: '';
+    order: -1;
+    inline-size: 100%;
+    block-size: 0;
+  }
+  .court-title {
+    flex: none;
+    order: 1;
+    inline-size: 100%;
+    min-block-size: 0;
+    margin-block-end: 2px;
+  }
+  .court-banner {
+    flex: none;
+    max-inline-size: 100%;
+    max-block-size: 100%;
+    overflow: hidden;
+    line-height: 1.2;
+    text-align: start;
+  }
+  .court-banner-long {
+    display: none;
+  }
+  .court-banner-short {
+    display: inline;
+  }
   .court-board {
     gap: 4px;
   }
   .court-score {
     padding-inline: 2px;
+  }
+  /* A name of two lines is 11 higher than a name of one, and the place has that to spare
+     at both heights: capitals need no more than their own height between two lines. */
+  .court-score-name {
+    line-height: 1;
   }
   .court-clock {
     min-inline-size: 0;
@@ -2200,27 +2274,19 @@
   .court-teams {
     gap: 4px;
   }
-  /* The first row is the title over the saved line, with the account button and More
-     at its end: the scoreboard then has the whole width, and each team's box has room
-     for its fouls and its bonus (step 2.36). */
+  /* The first row is 44 high here, the height of its buttons: the title is one thin line
+     over the saved line (step 2.36). */
   .court-top {
-    grid-template-areas:
-      'title more'
-      'banner more'
-      'board board'
-      'notices notices';
     row-gap: 2px;
+  }
+  .court-top-start {
+    block-size: 44px;
   }
   .court-title {
     flex-direction: row;
     align-items: baseline;
     justify-content: flex-start;
     gap: 8px;
-    min-block-size: 0;
-  }
-  .court-banner {
-    justify-self: start;
-    text-align: start;
   }
   .court-score-fouls {
     min-block-size: 15px;
@@ -2249,8 +2315,16 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+  /* Every row counts on this screen, and a team's name of two lines must cost no more
+     than the two teams' panels have to spare (the area lead's second look at step 2.36,
+     N1: it pushed the visitors' five under the pad by 4). The score's figures are set
+     on a line a little lower than they are high, which touches no figure: a figure is
+     about seven tenths as high as its size. */
   .court-score {
-    padding-block: 2px;
+    padding-block: 1px;
+  }
+  .court-score-value {
+    line-height: 0.9;
   }
   /* The clock is a button now, and Start is right under it: it is as high as what it
      says, in the middle of its place, so the two are 8 apart. */
@@ -2262,20 +2336,11 @@
     font-size: var(--court-size-small);
     line-height: 1.1;
   }
-  /* The saved line says it shorter here ("12 to send"), so it stays one line beside the
-     title: a second line of it pushes the scoreboard down, and on a phone in its browser
-     the players under it then reach the pad. Only when it says three things at once in
-     wide letters does it take a second line, and that still fits. */
+  /* The saved line says it shorter here ("12 to send"), in the small size: one line under
+     the title for anything a game usually brings (no connection and plays waiting). */
   .court-banner {
     min-block-size: 18px;
     font-size: var(--court-size-small);
-    line-height: 1.2;
-  }
-  .court-banner-long {
-    display: none;
-  }
-  .court-banner-short {
-    display: inline;
   }
   /* Start and the timeouts are 8 above the chips of the team under them. */
   .court-controls {
@@ -2369,11 +2434,18 @@
       'home controls away'
       'home pad away';
   }
+  /* The first row is 48 high and never grows (step 2.37): the 4 that stood under it as a
+     gap, before a row of notices that is nearly always empty, are the row's own now, so
+     the saved line has room for the most it ever says (four things, a line each). */
   .court-top {
     grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
       'board banner more'
       'notices notices notices';
+    row-gap: 0;
+  }
+  .court-notices {
+    margin-block-start: 4px;
   }
   /* The title is kept for screen readers; the teams' names are on the scoreboard. */
   .court-play .court-title {
@@ -2399,7 +2471,7 @@
     align-content: center;
     column-gap: var(--court-gap);
     row-gap: 2px;
-    min-block-size: 44px;
+    min-block-size: 48px;
     padding-block: 2px;
     padding-inline: var(--court-gap);
   }
@@ -2457,13 +2529,18 @@
   }
   /* The saved line sits beside the scoreboard here, and every pixel of its width comes
      out of the two teams' names. So it says it shorter ("12 to send"), a line for each
-     thing it says, in a column of 96 at most: a name of fifteen letters is then whole
-     on a device whose letters are a sixth wider than most (it was cut at 132), and three
-     lines of it are as high as the scoreboard, so the row does not grow. Its own edges
-     are 3, so "12 not saved" is one line in those wider letters too (it needs 87 of 90). */
+     thing it says, in a column of 104 at most: a name of fifteen letters is then whole
+     on a device whose letters are a sixth wider than most (it was cut at 132), and "No
+     connection" is one line in those letters too (it needs 97 of the 98 inside its
+     edges of 3). The column is never higher than the row: three lines stand at their
+     ease, and the four it says at the very most close up, each still in its own size.
+     A line too wide for the column in some face ends in "…"; it never takes a second
+     line, so the row does not grow whatever a device's letters are. */
   .court-banner {
-    max-inline-size: 96px;
+    max-inline-size: 104px;
+    max-block-size: 48px;
     padding-inline: 3px;
+    overflow: hidden;
     font-size: var(--court-size-small);
     line-height: 1.2;
   }
@@ -2471,9 +2548,18 @@
   .court-banner-dot {
     display: none;
   }
-  .court-banner-short,
+  .court-banner-short {
+    display: flex;
+    flex-direction: column;
+    max-block-size: 48px;
+  }
+  /* Cut only at its end: the tail of a "g" may reach under its own line. */
   .court-banner-line {
-    display: block;
+    flex: 0 1 1.2em;
+    min-block-size: 1em;
+    overflow-x: clip;
+    line-height: 1;
+    text-overflow: ellipsis;
   }
   .court-who-where {
     display: none;

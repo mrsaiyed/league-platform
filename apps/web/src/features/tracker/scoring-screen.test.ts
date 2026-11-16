@@ -642,7 +642,8 @@ describe('the frame (checklist A3, A4, A6, I7, T1; DESIGN.md section 7, line 11)
     expect(tagWith(top, 'data-saved-banner=""')).toContain('role="status"');
     // "All saved" is said one way. What is longer is drawn at length and shorter too, a
     // line for each thing it says: the stylesheet shows the short one on a phone whose
-    // scoreboard has no room for the long one.
+    // first row has no room for the long one. The dot between two things is held with
+    // the thing before it, so a line never begins with it (step 2.37).
     expect(top).toContain('data-state="saved">All saved</p>');
     const waiting = drawn(device.view(), {
       banner: {
@@ -653,8 +654,14 @@ describe('the frame (checklist A3, A4, A6, I7, T1; DESIGN.md section 7, line 11)
     });
     expect(waiting).toContain(
       '<span class="court-banner-long">12 plays waiting to send · 3 plays not saved</span>' +
-        '<span class="court-banner-short"><span class="court-banner-line">12 to send</span>' +
-        '<span class="court-banner-dot"> · </span><span class="court-banner-line">3 not saved</span></span></p>',
+        '<span class="court-banner-short"><span class="court-banner-line">12 to send' +
+        '<span class="court-banner-dot"> ·</span></span> ' +
+        '<span class="court-banner-line">3 not saved</span></span></p>',
+    );
+    // The title and the saved line are held together, the title first: on an upright
+    // phone they share the first row, and the title gives way when the line is long.
+    expect(top).toMatch(
+      /<div class="court-top-start"><h1 class="court-title">.*<\/h1><p class="court-banner"[^>]*>All saved<\/p><\/div>/s,
     );
     // The clock's row, which step 2.36 filled: Start and the way to the timeouts; what
     // step 2.37 adds (Undo, Redo) goes after them.

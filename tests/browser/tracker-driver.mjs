@@ -87,6 +87,22 @@ export async function lettersHere(page) {
   return { own, wider };
 }
 
+/**
+ * The saved banner's short form as the screen itself draws it (court-view.tsx,
+ * `SavedWords`), for a test or a picture that writes the banner's longest words into the
+ * page: each thing it says is one piece, the dot between two is held with the thing
+ * before it, and a space stands between two pieces. Given the lines, it gives the markup
+ * of what goes inside `.court-banner-short`.
+ */
+export const bannerShortHtml = (lines) =>
+  lines
+    .map((line, index) => {
+      const words = line.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+      const dot = index === lines.length - 1 ? '' : '<span class="court-banner-dot"> ·</span>';
+      return `<span class="court-banner-line">${words}${dot}</span>`;
+    })
+    .join(' ');
+
 /** Three more a side on top of `morePlayers`: fifteen a side, a bench of ten. */
 export const evenMorePlayers = {
   home: [

@@ -28,7 +28,14 @@
 //   bonus) is measured in this device's own letters and again in wider ones: the screen
 //   draws with the face a device already has, and GitHub's Ubuntu machines, like some
 //   phones, draw letters a sixth wider than Windows does (`facesOf`, in the test).
-import { court, drawIn, sizes, stopClockGame, trackerPath } from './tracker-driver.mjs';
+import {
+  bannerShortHtml,
+  court,
+  drawIn,
+  sizes,
+  stopClockGame,
+  trackerPath,
+} from './tracker-driver.mjs';
 
 const [phone, phoneLying, tabletUpright, , phoneInBrowser] = sizes;
 
@@ -1163,18 +1170,8 @@ export async function clockSteps(kit) {
                 el.textContent = text;
                 continue;
               }
-              const span = (name, says) => {
-                const part = document.createElement('span');
-                part.className = name;
-                part.textContent = says;
-                return part;
-              };
-              el.replaceChildren(
-                ...text.flatMap((line, index) => [
-                  ...(index === 0 ? [] : [span('court-banner-dot', ' · ')]),
-                  span('court-banner-line', line),
-                ]),
-              );
+              // The banner's short form, drawn as the screen draws it.
+              el.innerHTML = text.html;
             }
           }
         }, into);
@@ -1183,9 +1180,22 @@ export async function clockSteps(kit) {
         page.evaluate(() => {
           const pad = document.querySelector('[data-pad]').getBoundingClientRect();
           const rest = document.querySelector('[data-pad] [data-rest]');
+          // On an upright phone the two teams are in one block, which would scroll by
+          // itself if what is above it grew: a five cut at its lower edge is still inside
+          // its own panel and over the pad, so it is looked for here (the area lead's
+          // second look at step 2.36, N1: the block could be dragged 4 px).
+          const teams = document.querySelector('[data-teams]');
+          const block = teams.getBoundingClientRect();
+          const held = getComputedStyle(teams).display !== 'contents';
           return {
             page: document.scrollingElement.scrollHeight - window.innerHeight,
             sideways: document.documentElement.scrollWidth - window.innerWidth,
+            teams: held ? teams.scrollHeight - teams.clientHeight : 0,
+            tilesCutByTheirBlock: held
+              ? [...document.querySelectorAll('[data-floor] .court-tile')].filter(
+                  (el) => el.getBoundingClientRect().bottom > block.bottom + 0.5,
+                ).length
+              : 0,
             panels: [...document.querySelectorAll('.court-team')].map(
               (panel) => panel.scrollHeight - panel.clientHeight,
             ),
@@ -1217,23 +1227,64 @@ export async function clockSteps(kit) {
         const bannerNow = (await c.banner.locator('.court-banner-long').textContent()) ?? '';
         const bannerShort = (await c.banner.locator('.court-banner-short').textContent()) ?? '';
         // What the banner shows a scorekeeper here, and what it gives a screen reader.
+        // Lying down each thing it says is a line of its own, with no dot between.
         const bannerShows = {
-          words: (await c.banner.innerText()).trim(),
+          words: (await c.banner.innerText()).trim().replace(/\s*\n\s*/g, ' · '),
           heard: (await c.banner.ariaSnapshot()).trim(),
         };
-        // The longest the banner says: all three of its lines at once (queue-banner.ts),
-        // in its long form and in the short one that a phone short of room shows.
+        // How high the rows above the two teams are, and where the lowest floor tile ends.
+        const above = () =>
+          page.evaluate(() => {
+            const high = (selector) =>
+              document.querySelector(selector)?.getBoundingClientRect().height ?? null;
+            return {
+              // The first row: the title over the saved line upright, the whole of the
+              // scoreboard's row lying down.
+              firstRow: high(
+                getComputedStyle(document.querySelector('.court-top-start')).display === 'contents'
+                  ? '.court-top'
+                  : '.court-top-start',
+              ),
+              scoreboard: high('.court-board'),
+              lowestTile: Math.max(
+                ...[...document.querySelectorAll('[data-floor] .court-tile')].map(
+                  (el) => el.getBoundingClientRect().bottom,
+                ),
+              ),
+            };
+          });
+        const aboveAsItIs = await above();
+        // The longest the banner says: all four of its lines at once (queue-banner.ts: the
+        // storage, the connection, plays waiting and plays not saved), in its long form
+        // and in the short one that a phone shows.
         await written({
           '[data-saved-banner] .court-banner-long': `This device could not save to its storage · ${bannerNow} · 12 plays not saved`,
-          '[data-saved-banner] .court-banner-short': [
-            'Storage failed',
-            bannerShort,
-            '12 not saved',
-          ],
+          '[data-saved-banner] .court-banner-short': {
+            html: bannerShortHtml(['Storage failed', ...bannerShort.split(' · '), '12 not saved']),
+          },
         });
         await twoFrames(page);
         const longestBanner = await names();
         const longestShows = (await c.banner.innerText()).trim().replace(/\s*\n\s*/g, ' · ');
+        const aboveAtLongest = await above();
+        // Every thing the banner says is whole where it is drawn: no line of it is cut
+        // at its end, and none is under the edge of its place. (A run of words is
+        // measured a little higher than the line it stands on, by the room a face keeps
+        // over and under its letters: 2 px of that is not a cut.)
+        const bannerWhole = await c.banner.evaluate((banner) => {
+          const edge = banner.getBoundingClientRect();
+          return [...banner.querySelectorAll('.court-banner-short .court-banner-line')].map(
+            (line) => {
+              const r = line.getBoundingClientRect();
+              return {
+                says: line.textContent,
+                cut: line.scrollWidth > line.clientWidth + 0.5,
+                outside:
+                  r.top < edge.top - 2 || r.bottom > edge.bottom + 2 || r.right > edge.right + 0.5,
+              };
+            },
+          );
+        });
         // A name of fifteen letters, and a truly long one (made-up names, written in).
         await written({
           '[data-score="home"] .court-score-name': 'Riverside Bears',
@@ -1257,21 +1308,37 @@ export async function clockSteps(kit) {
             asTheyAre.every((name) => !name.cut),
           JSON.stringify({ fullest, bannerNow, asTheyAre }),
         );
+        // With the network off the banner says so as well (step 2.37), and never only how
+        // many plays wait: two things, said shorter on a phone.
         note(
-          `${at}: the banner says it shorter (“68 to send”), in one form for the eye and for a screen reader`,
-          /^\d+ to send$/.test(bannerShows.words) &&
+          `${at}: the banner says it shorter (“No connection · 68 to send”), in one form for the eye and for a screen reader`,
+          /^No connection · \d+ to send$/.test(bannerShows.words) &&
             bannerShows.words === bannerShort &&
-            bannerShows.heard.includes(bannerShort) &&
-            !bannerShows.heard.includes('waiting to send'),
+            bannerShort.split(' · ').every((thing) => bannerShows.heard.includes(thing)) &&
+            !bannerShows.heard.includes('waiting to send') &&
+            !bannerShows.heard.includes('plays are kept'),
           JSON.stringify({ bannerShows, bannerShort }),
         );
         note(
           `…and with the longest the banner says, neither name is cut${again}`,
           longestBanner.length === 2 &&
             longestBanner.every((name) => !name.cut) &&
-            // With the network off the banner says so too (step 2.37): four things at once.
+            // Four things at once.
             /^Storage failed · No connection · \d+ to send · 12 not saved$/.test(longestShows),
           JSON.stringify({ longestBanner, longestShows }),
+        );
+        // The rule the area lead left step 2.37 (the landing of step 2.36): nothing above
+        // the two teams grows with what the banner says. Its four things are all whole,
+        // and the first row, the scoreboard and the players under them stay where they were.
+        note(
+          `…the longest the banner says is whole, every thing it says, and nothing above the two teams grew for it: not the first row, not the scoreboard, and no player moved (${at})`,
+          bannerWhole.length === 4 &&
+            bannerWhole.every((line) => !line.cut && !line.outside) &&
+            aboveAtLongest.firstRow !== null &&
+            aboveAtLongest.firstRow <= aboveAsItIs.firstRow + 0.5 &&
+            aboveAtLongest.scoreboard <= aboveAsItIs.scoreboard + 0.5 &&
+            aboveAtLongest.lowestTile <= aboveAsItIs.lowestTile + 0.5,
+          JSON.stringify({ bannerWhole, aboveAsItIs, aboveAtLongest }),
         );
         note(
           `…a name of fifteen letters is whole; only a truly long one is cut, ending in "…", with room for fifteen${again}`,
@@ -1286,6 +1353,8 @@ export async function clockSteps(kit) {
           `…and with all of that at once, nothing is pushed under the pad or off the screen, nothing scrolls and the hint is whole (${at})`,
           atItsFullest.page <= 0 &&
             atItsFullest.sideways <= 0 &&
+            atItsFullest.teams <= 0 &&
+            atItsFullest.tilesCutByTheirBlock === 0 &&
             atItsFullest.panels.every((over) => over <= 0) &&
             atItsFullest.tilesUnderThePad === 0 &&
             atItsFullest.hintCutBy !== null &&
@@ -1294,16 +1363,56 @@ export async function clockSteps(kit) {
         );
       }
       await drawIn(page, '');
-      // Where there is room (a phone upright at its full height, a tablet) the banner
-      // says it at length.
-      await page.setViewportSize({ width: phone.width, height: phone.height });
+      // Where there is room (a tablet) the banner says it at length.
+      await page.setViewportSize({ width: tabletUpright.width, height: tabletUpright.height });
       await twoFrames(page);
       const atLength = (await c.banner.innerText()).trim();
       note(
-        '390 x 844: the banner says it at length (“No connection: plays are kept on this device · 68 plays waiting to send”)',
+        '820 x 1180: the banner says it at length (“No connection: plays are kept on this device · 68 plays waiting to send”)',
         /^No connection: plays are kept on this device · \d+ plays waiting to send$/.test(atLength),
         atLength,
       );
+      // A phone upright at its full height says it shorter too (step 2.37): at length,
+      // with no connection, it took two lines under the scoreboard and pushed the lower
+      // bench under the pad. It is one line in the first row, in both faces, and the
+      // lower bench is whole.
+      for (const { letters, family } of await fits(page, [phone])) {
+        await drawIn(page, family);
+        await page.setViewportSize({ width: phone.width, height: phone.height });
+        await twoFrames(page);
+        const tall = await page.evaluate(() => {
+          const banner = document.querySelector('[data-saved-banner]');
+          const teams = document.querySelector('[data-teams]');
+          const pad = document.querySelector('[data-pad]').getBoundingClientRect();
+          return {
+            says: banner.innerText.trim(),
+            lines: Math.round(
+              banner.getBoundingClientRect().height /
+                Number.parseFloat(getComputedStyle(banner).lineHeight),
+            ),
+            teams: teams.scrollHeight - teams.clientHeight,
+            // The bench players its line shows: those it does not hold are counted on
+            // its end tile ("4 more") and are not drawn.
+            benchUnderThePad: [
+              ...document.querySelectorAll(
+                '[data-bench] [data-player]:not([data-folded]), [data-bench] .court-more-tile',
+              ),
+            ].filter((el) => {
+              const r = el.getBoundingClientRect();
+              return r.height > 0 && r.bottom > pad.top + 0.5;
+            }).length,
+          };
+        });
+        note(
+          `390 x 844${letters}: with no connection the banner says it shorter, in one line of the first row, and the lower bench is whole over the pad`,
+          /^No connection · \d+ to send$/.test(tall.says) &&
+            tall.lines === 1 &&
+            tall.teams <= 0 &&
+            tall.benchUnderThePad === 0,
+          JSON.stringify(tall),
+        );
+      }
+      await drawIn(page, '');
       await page.setViewportSize({ width: phoneLying.width, height: phoneLying.height });
       await context.setOffline(false);
       await page.evaluate(() => window.dispatchEvent(new Event('online')));

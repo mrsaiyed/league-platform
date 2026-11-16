@@ -33,6 +33,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   addPlayers,
+  bannerShortHtml,
   court,
   evenMorePlayers,
   playStretch,
@@ -511,8 +512,8 @@ const states = [
   {
     name: '40-scoreboard-fullest',
     about:
-      'the scoreboard at its fullest: both teams in the double bonus, three-figure scores, the longest the banner says and long names (written in)',
-    sizes: ['phone-lying', 'phone-in-browser'],
+      'the scoreboard at its fullest: both teams in the double bonus, three-figure scores, the longest the banner says (four things) and long names, one of two lines (written in): nothing above the two teams grows',
+    sizes: ['phone-lying', 'phone-in-browser', 'phone-upright'],
     run: async (page) => {
       const c = court(page);
       await c.pad.locator('[data-rest]').waitFor();
@@ -547,29 +548,22 @@ const states = [
       await c.root.locator('[data-bonus="home"][data-level="2"]').waitFor();
       await c.root.locator('[data-bonus="away"][data-level="2"]').waitFor();
       await c.root.locator('[data-saved-banner][data-state="waiting"]').waitFor();
-      // Written into the page for the picture only: the banner's three lines at once
-      // (queue-banner.ts), in its long form and in the short one these two phones show,
-      // and long made-up names.
-      await page.evaluate(() => {
-        const long = document.querySelector('[data-saved-banner] .court-banner-long');
-        const short = document.querySelector('[data-saved-banner] .court-banner-short');
-        long.textContent = `This device could not save to its storage · ${long.textContent} · 12 plays not saved`;
-        const span = (name, says) => {
-          const part = document.createElement('span');
-          part.className = name;
-          part.textContent = says;
-          return part;
-        };
-        short.replaceChildren(
-          ...['Storage failed', short.textContent, '12 not saved'].flatMap((line, index) => [
-            ...(index === 0 ? [] : [span('court-banner-dot', ' · ')]),
-            span('court-banner-line', line),
-          ]),
-        );
-        const [home, away] = document.querySelectorAll('[data-score] .court-score-name');
-        home.textContent = 'Riverside Bears';
-        away.textContent = 'Northside Academy Hawks of the Valley';
-      });
+      // Written into the page for the picture only: the banner's four lines at once
+      // (queue-banner.ts: the storage, the connection, plays waiting, plays not saved),
+      // in its long form and in the short one a phone shows, drawn as the screen draws
+      // it, and long made-up names: one of fifteen letters, one of two lines.
+      const waiting = (await c.banner.locator('.court-banner-short').textContent()) ?? '';
+      await page.evaluate(
+        (short) => {
+          const long = document.querySelector('[data-saved-banner] .court-banner-long');
+          long.textContent = `This device could not save to its storage · ${long.textContent} · 12 plays not saved`;
+          document.querySelector('[data-saved-banner] .court-banner-short').innerHTML = short;
+          const [home, away] = document.querySelectorAll('[data-score] .court-score-name');
+          home.textContent = 'Riverside Bears';
+          away.textContent = 'Northside Academy Hawks of the Valley';
+        },
+        bannerShortHtml(['Storage failed', ...waiting.split(' · '), '12 not saved']),
+      );
     },
   },
 ];

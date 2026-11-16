@@ -1938,14 +1938,21 @@ if (browser) {
             while (document.querySelector('[data-pad] [data-act="p1"]') !== null) await drawn();
           }
         }, id);
+        // With the network off the banner says that first (step 2.37), then how many wait.
         await page.waitForFunction(
-          () => /^500 /.test(document.querySelector('[data-saved-banner]').textContent),
+          () =>
+            /(^|\W)500 plays waiting to send/.test(
+              document.querySelector('[data-saved-banner]').textContent,
+            ),
           null,
           { timeout: 120_000 },
         );
+        const bannerSays = (await c.banner.innerText()).trim();
         note(
-          'the banner tells the truth: 500 waiting to send',
-          (await c.banner.getAttribute('data-state')) === 'waiting',
+          'the banner tells the truth: no connection, and 500 waiting to send',
+          (await c.banner.getAttribute('data-state')) === 'waiting' &&
+            /^No connection · 500 to send$/.test(bannerSays),
+          bannerSays,
         );
         // The clock is started (step 2.36) and runs through the hundred plays measured
         // below: a running clock must never make a tile's tap late. Start is a tap like
